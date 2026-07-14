@@ -6,8 +6,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.compose.NavHost
@@ -51,6 +59,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         playerViewModel.connect()
@@ -102,7 +112,11 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
 
     Scaffold(
         bottomBar = {
-            if (uiState.currentSong != null) {
+            AnimatedVisibility(
+                visible = uiState.currentSong != null,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            ) {
                 MiniPlayerBar(
                     uiState = uiState,
                     onPlayPause = { playerViewModel.togglePlayPause() },
@@ -121,7 +135,24 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onSongClick = { songs, index -> playerViewModel.playQueue(songs, index) }
                 )
             }
-            composable("now_playing") {
+            composable(
+                route = "now_playing",
+                enterTransition = {
+                    slideInVertically(
+                        initialOffsetY = { fullHeight -> fullHeight },
+                        animationSpec = tween(350)
+                    ) + fadeIn(tween(350))
+                },
+                exitTransition = {
+                    fadeOut(tween(200))
+                },
+                popExitTransition = {
+                    slideOutVertically(
+                        targetOffsetY = { fullHeight -> fullHeight },
+                        animationSpec = tween(300)
+                    ) + fadeOut(tween(300))
+                }
+            ) {
                 NowPlayingScreen(
                     uiState = uiState,
                     onPlayPause = { playerViewModel.togglePlayPause() },
