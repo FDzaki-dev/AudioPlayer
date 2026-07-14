@@ -109,6 +109,8 @@ class MainActivity : ComponentActivity() {
 private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val navController = rememberNavController()
     val uiState by playerViewModel.uiState.collectAsState()
+    val favoriteIds by playerViewModel.favoriteIds.collectAsState()
+    val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsState()
 
     Scaffold(
         bottomBar = {
@@ -132,6 +134,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
         ) {
             composable("library") {
                 LibraryScreen(
+                    favoriteIds = favoriteIds,
+                    onToggleFavorite = { playerViewModel.toggleFavorite(it) },
                     onSongClick = { songs, index -> playerViewModel.playQueue(songs, index) }
                 )
             }
@@ -155,12 +159,18 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
             ) {
                 NowPlayingScreen(
                     uiState = uiState,
+                    isFavorite = uiState.currentSong?.let { favoriteIds.contains(it.id) } ?: false,
+                    sleepTimerRemainingMs = sleepTimerRemaining,
                     onPlayPause = { playerViewModel.togglePlayPause() },
                     onNext = { playerViewModel.next() },
                     onPrevious = { playerViewModel.previous() },
                     onSeek = { playerViewModel.seekTo(it) },
                     onShuffle = { playerViewModel.toggleShuffle() },
                     onRepeat = { playerViewModel.cycleRepeatMode() },
+                    onToggleFavorite = { uiState.currentSong?.let { playerViewModel.toggleFavorite(it.id) } },
+                    onSetSleepTimer = { playerViewModel.setSleepTimer(it) },
+                    onCancelSleepTimer = { playerViewModel.cancelSleepTimer() },
+                    onSetSpeed = { playerViewModel.setPlaybackSpeed(it) },
                     onBack = { navController.popBackStack() }
                 )
             }

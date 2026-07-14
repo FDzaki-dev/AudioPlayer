@@ -6,11 +6,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
+import com.rudi.audioplayer.data.FavoritesStore
 import com.rudi.audioplayer.data.Song
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +27,7 @@ data class PlaybackUiState(
     val duration: Long = 0L,
     val shuffleEnabled: Boolean = false,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
+    val playbackSpeed: Float = 1f,
     val queue: List<Song> = emptyList()
 )
 
@@ -32,8 +36,17 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private var controller: MediaController? = null
     private var currentQueue: List<Song> = emptyList()
 
+    private val favoritesStore = FavoritesStore(appContext)
+
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
+
+    private val _favoriteIds = MutableStateFlow(loadFavoriteIds())
+    val favoriteIds: StateFlow<Set<Long>> = _favoriteIds.asStateFlow()
+
+    private val _sleepTimerRemaining = MutableStateFlow<Long?>(null)
+    val sleepTimerRemaining: StateFlow<Long?> = _sleepTimerRemaining.asStateFlow()
+    private var sleepTimerJob: Job? = null
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -55,6 +68,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
         override fun onRepeatModeChanged(repeatMode: Int) {
             _uiState.value = _uiState.value.copy(repeatMode = repeatMode)
+        }
+
+        override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+            _uiState.value = _uiState.value.copy(playbackSpeed = playbackParameters.speed)
         }
     }
 
@@ -129,7 +146,41 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         }
     }
 
+    fun setPlaybackSpeed(speed: Float) {
+        controller?.setPlaybackSpeed(speed)
+    }
+
+    fun toggleFavorite(songId: Long) {
+        favoritesStore.toggleFavorite(songId)
+        _favoriteIds.value = loadFavoriteIds()
+    }
+
+    private fun loadFavoriteIds(): Set<Long> =
+        favoritesStore.getFavorites().mapNotNull { it.toLongOrNull() }.toSet()
+
+    fun setSleepTimer(minutes: Int) {
+        sleepTimerJob?.cancel()
+        var remaining = minutes * 60_000L
+        _sleepTimerRemaining.value = remaining
+        sleepTimerJob = viewModelScope.launch {
+            while (remaining > 0) {
+                delay(1000)
+                remaining -= 1000
+                _sleepTimerRemaining.value = remaining.coerceAtLeast(0)
+            }
+            controller?.pause()
+            _sleepTimerRemaining.value = null
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimerRemaining.value = null
+    }
+
     override fun onCleared() {
+        sleepTimerJob?.cancel()
         controller?.release()
         super.onCleared()
     }

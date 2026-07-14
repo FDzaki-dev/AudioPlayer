@@ -11,6 +11,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -19,6 +21,8 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,16 +40,24 @@ import com.rudi.audioplayer.playback.PlaybackUiState
 @Composable
 fun NowPlayingScreen(
     uiState: PlaybackUiState,
+    isFavorite: Boolean,
+    sleepTimerRemainingMs: Long?,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onSeek: (Long) -> Unit,
     onShuffle: () -> Unit,
     onRepeat: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onSetSleepTimer: (Int) -> Unit,
+    onCancelSleepTimer: () -> Unit,
+    onSetSpeed: (Float) -> Unit,
     onBack: () -> Unit
 ) {
     val song = uiState.currentSong
     val haptic = LocalHapticFeedback.current
+    var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var showSpeedDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -58,13 +70,35 @@ fun NowPlayingScreen(
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
                 Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Tutup")
             }
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = onToggleFavorite) {
+                Icon(
+                    if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = if (isFavorite) "Hapus dari favorit" else "Tambah ke favorit",
+                    tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                )
+            }
+            IconButton(onClick = { showSleepTimerDialog = true }) {
+                Icon(
+                    Icons.Default.Timer,
+                    contentDescription = "Sleep timer",
+                    tint = if (sleepTimerRemainingMs != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                )
+            }
+            IconButton(onClick = { showSpeedDialog = true }) {
+                Icon(
+                    Icons.Default.Speed,
+                    contentDescription = "Kecepatan putar",
+                    tint = MaterialTheme.colorScheme.secondary
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         VinylAlbumArt(albumId = song?.albumId, isPlaying = uiState.isPlaying)
 
@@ -151,6 +185,30 @@ fun NowPlayingScreen(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "${uiState.playbackSpeed}x",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary
+        )
+    }
+
+    if (showSleepTimerDialog) {
+        SleepTimerDialog(
+            currentRemainingMs = sleepTimerRemainingMs,
+            onDismiss = { showSleepTimerDialog = false },
+            onSelect = onSetSleepTimer,
+            onCancelTimer = onCancelSleepTimer
+        )
+    }
+
+    if (showSpeedDialog) {
+        SpeedDialog(
+            currentSpeed = uiState.playbackSpeed,
+            onDismiss = { showSpeedDialog = false },
+            onSelect = onSetSpeed
+        )
     }
 }
 
@@ -181,7 +239,7 @@ private fun VinylAlbumArt(albumId: Long?, isPlaying: Boolean) {
             model = albumId?.let { albumArtUri(it) },
             contentDescription = null,
             modifier = Modifier
-                .size(280.dp)
+                .size(260.dp)
                 .graphicsLayer { rotationZ = rotation.value }
                 .clip(CircleShape)
                 .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
@@ -193,4 +251,78 @@ private fun VinylAlbumArt(albumId: Long?, isPlaying: Boolean) {
                 .background(MaterialTheme.colorScheme.background)
         )
     }
+}
+
+@Composable
+private fun SleepTimerDialog(
+    currentRemainingMs: Long?,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit,
+    onCancelTimer: () -> Unit
+) {
+    val options = listOf(10, 15, 30, 45, 60)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Sleep Timer") },
+        text = {
+            Column {
+                if (currentRemainingMs != null) {
+                    Text(
+                        "Aktif — berhenti dalam ${formatDuration(currentRemainingMs)}",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                options.forEach { minutes ->
+                    TextButton(
+                        onClick = { onSelect(minutes); onDismiss() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("$minutes menit")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (currentRemainingMs != null) {
+                TextButton(onClick = { onCancelTimer(); onDismiss() }) { Text("Matikan Timer") }
+            } else {
+                TextButton(onClick = onDismiss) { Text("Tutup") }
+            }
+        },
+        dismissButton = {
+            if (currentRemainingMs != null) {
+                TextButton(onClick = onDismiss) { Text("Tutup") }
+            }
+        }
+    )
+}
+
+@Composable
+private fun SpeedDialog(currentSpeed: Float, onDismiss: () -> Unit, onSelect: (Float) -> Unit) {
+    val options = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Kecepatan Putar") },
+        text = {
+            Column {
+                options.forEach { speed ->
+                    val isSelected = speed == currentSpeed
+                    TextButton(
+                        onClick = { onSelect(speed); onDismiss() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (isSelected) "${speed}x  ✓" else "${speed}x",
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Tutup") }
+        }
+    )
 }
