@@ -2,6 +2,7 @@ package com.rudi.audioplayer.ui
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -50,20 +51,7 @@ fun LibraryScreen(onSongClick: (List<Song>, Int) -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
         LibraryHeader(onRescan = { refreshKey++ })
 
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-            indicator = { tabPositions ->
-                TabRowDefaults.Indicator(
-                    Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        ) {
-            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Lagu") })
-            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Folder") })
-        }
+        LibrarySegmentedTabs(selectedTab = selectedTab, onSelect = { selectedTab = it })
 
         when {
             loading -> ShimmerList()
@@ -93,6 +81,38 @@ private fun LibraryHeader(onRescan: () -> Unit) {
         }
         IconButton(onClick = onRescan) {
             Icon(Icons.Default.Refresh, contentDescription = "Pindai ulang")
+        }
+    }
+}
+
+@Composable
+private fun LibrarySegmentedTabs(selectedTab: Int, onSelect: (Int) -> Unit) {
+    val labels = listOf("Lagu", "Folder")
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(4.dp)
+    ) {
+        labels.forEachIndexed { index, label ->
+            val selected = selectedTab == index
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .clickable { onSelect(index) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     }
 }
