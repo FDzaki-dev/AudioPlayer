@@ -12,6 +12,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import com.rudi.audioplayer.data.FavoritesStore
+import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.Song
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -37,6 +38,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private var currentQueue: List<Song> = emptyList()
 
     private val favoritesStore = FavoritesStore(appContext)
+    private val playbackStateStore = PlaybackStateStore(appContext)
+    private var positionTick = 0
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
@@ -51,6 +54,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
+            if (!isPlaying) persistPlaybackState()
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -60,6 +64,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 currentSong = song,
                 duration = controller?.duration?.coerceAtLeast(0) ?: 0L
             )
+            persistPlaybackState()
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
@@ -94,14 +99,44 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                         duration = c.duration.coerceAtLeast(0)
                     )
                 }
+                positionTick++
+                if (positionTick % 10 == 0) persistPlaybackState()
                 delay(500)
             }
         }
     }
 
-    fun playQueue(songs: List<Song>, startIndex: Int) {
+    private fun persistPlaybackState() {
+        val c = controller ?: return
+        val index = c.currentMediaItemIndex
+        if (currentQueue.isEmpty() || index !in currentQueue.indices) return
+        playbackStateStore.save(
+            songIds = currentQueue.map { it.id },
+            index = index,
+            positionMs = c.currentPosition.coerceAtLeast(0)
+        )
+    }
+
+    /** Looks up the last-played song for display, without starting playback. */
+    fun peekSavedSong(allSongs: List<Song>): Song? {
+        val saved = playbackStateStore.load() ?: return null
+        val songMap = allSongs.associateBy { it.id }
+        return saved.songIds.getOrNull(saved.index)?.let { songMap[it] }
+    }
+
+    /** Rebuilds the last queue from the freshly scanned library and resumes at the saved position. */
+    fun resumeFromSaved(allSongs: List<Song>, autoPlay: Boolean = true) {
+        val saved = playbackStateStore.load() ?: return
+        val songMap = allSongs.associateBy { it.id }
+        val resolvedSongs = saved.songIds.mapNotNull { songMap[it] }
+        if (resolvedSongs.isEmpty()) return
+        val newIndex = saved.index.coerceIn(0, resolvedSongs.size - 1)
+        playQueue(resolvedSongs, newIndex, saved.positionMs, autoPlay)
+    }
+
+    fun playQueue(songs: List<Song>, startIndex: Int, startPositionMs: Long = 0L, autoPlay: Boolean = true) {
         currentQueue = songs
-        _uiState.value = _uiState.value.copy(queue = songs)
+        _uiState.value = _uiState.value.copy(queue = songs, currentSong = songs.getOrNull(startIndex))
 
         val items = songs.map { song ->
             MediaItem.Builder()
@@ -118,9 +153,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         }
 
         controller?.apply {
-            setMediaItems(items, startIndex, 0L)
+            setMediaItems(items, startIndex, startPositionMs)
             prepare()
-            play()
+            if (autoPlay) play()
         }
     }
 

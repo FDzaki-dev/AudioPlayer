@@ -9,6 +9,7 @@ data class Song(
     val album: String,
     val albumId: Long,
     val duration: Long,
+    val dateAdded: Long,
     val uri: Uri,
     val folderName: String,
     val folderPath: String

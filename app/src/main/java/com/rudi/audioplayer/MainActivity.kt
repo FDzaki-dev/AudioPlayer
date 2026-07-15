@@ -10,9 +10,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +21,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,8 +46,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.rudi.audioplayer.playback.PlayerViewModel
+import com.rudi.audioplayer.ui.HomeScreen
 import com.rudi.audioplayer.ui.LibraryScreen
 import com.rudi.audioplayer.ui.MiniPlayerBar
 import com.rudi.audioplayer.ui.NowPlayingScreen
@@ -112,26 +120,65 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val favoriteIds by playerViewModel.favoriteIds.collectAsState()
     val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsState()
 
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
+
     Scaffold(
         bottomBar = {
-            AnimatedVisibility(
-                visible = uiState.currentSong != null,
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-            ) {
-                MiniPlayerBar(
-                    uiState = uiState,
-                    onPlayPause = { playerViewModel.togglePlayPause() },
-                    onExpand = { navController.navigate("now_playing") }
-                )
+            Column {
+                AnimatedVisibility(
+                    visible = uiState.currentSong != null,
+                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                ) {
+                    MiniPlayerBar(
+                        uiState = uiState,
+                        onPlayPause = { playerViewModel.togglePlayPause() },
+                        onExpand = { navController.navigate("now_playing") }
+                    )
+                }
+                if (currentRoute == "home" || currentRoute == "library") {
+                    NavigationBar {
+                        NavigationBarItem(
+                            selected = currentRoute == "home",
+                            onClick = {
+                                navController.navigate("home") {
+                                    popUpTo("home") { inclusive = true }
+                                    launchSingleTop = true
+                                }
+                            },
+                            icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                            label = { Text("Beranda") }
+                        )
+                        NavigationBarItem(
+                            selected = currentRoute == "library",
+                            onClick = {
+                                navController.navigate("library") {
+                                    popUpTo("home")
+                                    launchSingleTop = true
+                                }
+                            },
+                            icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
+                            label = { Text("Perpustakaan") }
+                        )
+                    }
+                }
             }
         }
     ) { padding ->
         NavHost(
             navController = navController,
-            startDestination = "library",
+            startDestination = "home",
             modifier = Modifier.padding(padding)
         ) {
+            composable("home") {
+                HomeScreen(
+                    favoriteIds = favoriteIds,
+                    onSongClick = { songs, index -> playerViewModel.playQueue(songs, index) },
+                    resumePreview = { songs -> playerViewModel.peekSavedSong(songs) },
+                    onResumeClick = { songs -> playerViewModel.resumeFromSaved(songs) }
+                )
+            }
             composable("library") {
                 LibraryScreen(
                     favoriteIds = favoriteIds,
