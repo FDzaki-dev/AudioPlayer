@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 
 data class PlaybackUiState(
     val currentSong: Song? = null,
+    val currentIndex: Int = -1,
     val isPlaying: Boolean = false,
     val position: Long = 0L,
     val duration: Long = 0L,
@@ -62,6 +63,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             val song = currentQueue.getOrNull(index)
             _uiState.value = _uiState.value.copy(
                 currentSong = song,
+                currentIndex = index,
                 duration = controller?.duration?.coerceAtLeast(0) ?: 0L
             )
             persistPlaybackState()
@@ -136,21 +138,13 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     fun playQueue(songs: List<Song>, startIndex: Int, startPositionMs: Long = 0L, autoPlay: Boolean = true) {
         currentQueue = songs
-        _uiState.value = _uiState.value.copy(queue = songs, currentSong = songs.getOrNull(startIndex))
+        _uiState.value = _uiState.value.copy(
+            queue = songs,
+            currentSong = songs.getOrNull(startIndex),
+            currentIndex = startIndex
+        )
 
-        val items = songs.map { song ->
-            MediaItem.Builder()
-                .setMediaId(song.id.toString())
-                .setUri(song.uri)
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle(song.title)
-                        .setArtist(song.artist)
-                        .setAlbumTitle(song.album)
-                        .build()
-                )
-                .build()
-        }
+        val items = songs.map { song -> mediaItemFor(song) }
 
         controller?.apply {
             setMediaItems(items, startIndex, startPositionMs)
@@ -158,6 +152,75 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             if (autoPlay) play()
         }
     }
+
+    /** Jumps straight to a specific position in the current queue and plays it. */
+    fun playFromQueueIndex(index: Int) {
+        val c = controller ?: return
+        if (index !in currentQueue.indices) return
+        c.seekTo(index, 0)
+        c.play()
+    }
+
+    /** Moves an item within the queue (used for drag/up-down reordering in the Queue sheet). */
+    fun moveQueueItem(from: Int, to: Int) {
+        val c = controller ?: return
+        if (from == to || from !in currentQueue.indices || to !in currentQueue.indices) return
+        c.moveMediaItem(from, to)
+        currentQueue = currentQueue.toMutableList().apply { add(to, removeAt(from)) }
+        _uiState.value = _uiState.value.copy(
+            queue = currentQueue,
+            currentIndex = c.currentMediaItemIndex
+        )
+        persistPlaybackState()
+    }
+
+    /** Removes a song from the queue. Keeps at least one item so playback never goes fully empty. */
+    fun removeFromQueue(index: Int) {
+        val c = controller ?: return
+        if (index !in currentQueue.indices || currentQueue.size <= 1) return
+        c.removeMediaItem(index)
+        currentQueue = currentQueue.toMutableList().apply { removeAt(index) }
+        val newIndex = c.currentMediaItemIndex
+        _uiState.value = _uiState.value.copy(
+            queue = currentQueue,
+            currentIndex = newIndex,
+            currentSong = currentQueue.getOrNull(newIndex)
+        )
+        persistPlaybackState()
+    }
+
+    /** Inserts a song to play right after the current track, without disturbing the rest of the queue. */
+    fun playNext(song: Song) {
+        val c = controller ?: return
+        val insertAt = (c.currentMediaItemIndex + 1).coerceAtMost(currentQueue.size)
+        val item = mediaItemFor(song)
+        c.addMediaItem(insertAt, item)
+        currentQueue = currentQueue.toMutableList().apply { add(insertAt, song) }
+        _uiState.value = _uiState.value.copy(queue = currentQueue, currentIndex = c.currentMediaItemIndex)
+        persistPlaybackState()
+    }
+
+    /** Appends a song to the end of the queue. */
+    fun addToQueue(song: Song) {
+        val c = controller ?: return
+        c.addMediaItem(mediaItemFor(song))
+        currentQueue = currentQueue + song
+        _uiState.value = _uiState.value.copy(queue = currentQueue, currentIndex = c.currentMediaItemIndex)
+        persistPlaybackState()
+    }
+
+    private fun mediaItemFor(song: Song): MediaItem =
+        MediaItem.Builder()
+            .setMediaId(song.id.toString())
+            .setUri(song.uri)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(song.title)
+                    .setArtist(song.artist)
+                    .setAlbumTitle(song.album)
+                    .build()
+            )
+            .build()
 
     fun togglePlayPause() {
         controller?.let { if (it.isPlaying) it.pause() else it.play() }

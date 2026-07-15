@@ -183,7 +183,21 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                 LibraryScreen(
                     favoriteIds = favoriteIds,
                     onToggleFavorite = { playerViewModel.toggleFavorite(it) },
-                    onSongClick = { songs, index -> playerViewModel.playQueue(songs, index) }
+                    onSongClick = { songs, index -> playerViewModel.playQueue(songs, index) },
+                    onPlayNext = { song ->
+                        if (uiState.currentSong == null) {
+                            playerViewModel.playQueue(listOf(song), 0)
+                        } else {
+                            playerViewModel.playNext(song)
+                        }
+                    },
+                    onAddToQueue = { song ->
+                        if (uiState.currentSong == null) {
+                            playerViewModel.playQueue(listOf(song), 0)
+                        } else {
+                            playerViewModel.addToQueue(song)
+                        }
+                    }
                 )
             }
             composable(
@@ -218,6 +232,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onSetSleepTimer = { playerViewModel.setSleepTimer(it) },
                     onCancelSleepTimer = { playerViewModel.cancelSleepTimer() },
                     onSetSpeed = { playerViewModel.setPlaybackSpeed(it) },
+                    onPlayQueueIndex = { playerViewModel.playFromQueueIndex(it) },
+                    onMoveQueueItem = { from, to -> playerViewModel.moveQueueItem(from, to) },
+                    onRemoveFromQueue = { playerViewModel.removeFromQueue(it) },
                     onBack = { navController.popBackStack() }
                 )
             }

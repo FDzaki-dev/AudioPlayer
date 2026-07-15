@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -52,12 +53,16 @@ fun NowPlayingScreen(
     onSetSleepTimer: (Int) -> Unit,
     onCancelSleepTimer: () -> Unit,
     onSetSpeed: (Float) -> Unit,
+    onPlayQueueIndex: (Int) -> Unit,
+    onMoveQueueItem: (Int, Int) -> Unit,
+    onRemoveFromQueue: (Int) -> Unit,
     onBack: () -> Unit
 ) {
     val song = uiState.currentSong
     val haptic = LocalHapticFeedback.current
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
+    var showQueueSheet by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -93,6 +98,13 @@ fun NowPlayingScreen(
                 Icon(
                     Icons.Default.Speed,
                     contentDescription = "Kecepatan putar",
+                    tint = MaterialTheme.colorScheme.secondary
+                )
+            }
+            IconButton(onClick = { showQueueSheet = true }) {
+                Icon(
+                    Icons.Default.QueueMusic,
+                    contentDescription = "Antrean putar",
                     tint = MaterialTheme.colorScheme.secondary
                 )
             }
@@ -208,6 +220,17 @@ fun NowPlayingScreen(
             currentSpeed = uiState.playbackSpeed,
             onDismiss = { showSpeedDialog = false },
             onSelect = onSetSpeed
+        )
+    }
+
+    if (showQueueSheet) {
+        QueueSheet(
+            queue = uiState.queue,
+            currentIndex = uiState.currentIndex,
+            onDismiss = { showQueueSheet = false },
+            onPlayIndex = { index -> onPlayQueueIndex(index) },
+            onMove = { from, to -> onMoveQueueItem(from, to) },
+            onRemove = { index -> onRemoveFromQueue(index) }
         )
     }
 }

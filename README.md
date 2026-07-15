@@ -9,13 +9,19 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - Now Playing: album art, seek bar, shuffle, repeat (off/all/one), play/pause/next/prev
 - Mini player persisten di bagian bawah layar
 - Dark mode default
+- Pencarian (search) judul/artis di Perpustakaan
+- Sleep timer (10/15/30/45/60 menit)
+- Kecepatan putar (0.5x–2x)
+- Resume otomatis dari posisi terakhir setelah app ditutup
+- Favorit lagu
+- **Antrean putar (Queue)**: lihat antrean, naik/turunkan urutan, hapus dari antrean, lompat langsung ke lagu manapun, plus aksi "Putar Berikutnya" / "Tambah ke Antrean" via tekan-lama pada lagu di Perpustakaan
 
 ## Build
 Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai artifact bernama `AudioPlayer-release`.
 
 ## Rencana v2 (belum dibuat)
 - Equalizer
-- Sleep timer
-- Pencarian (search)
 - Widget home screen
 - Lyrics
+- Playlist manual (custom, lintas folder)
+- Recently played / most played

@@ -6,9 +6,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -20,6 +22,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -43,7 +47,9 @@ import kotlinx.coroutines.withContext
 fun LibraryScreen(
     favoriteIds: Set<Long>,
     onToggleFavorite: (Long) -> Unit,
-    onSongClick: (List<Song>, Int) -> Unit
+    onSongClick: (List<Song>, Int) -> Unit,
+    onPlayNext: (Song) -> Unit,
+    onAddToQueue: (Song) -> Unit
 ) {
     val context = LocalContext.current
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
@@ -68,6 +74,15 @@ fun LibraryScreen(
                     it.artist.contains(searchQuery, ignoreCase = true)
             }
         }
+    }
+
+    val playNext: (Song) -> Unit = {
+        onPlayNext(it)
+        Toast.makeText(context, "Diputar setelah lagu ini", Toast.LENGTH_SHORT).show()
+    }
+    val addToQueue: (Song) -> Unit = {
+        onAddToQueue(it)
+        Toast.makeText(context, "Ditambahkan ke antrean", Toast.LENGTH_SHORT).show()
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -106,34 +121,40 @@ fun LibraryScreen(
                         subtitle = "Ketuk ikon hati pada lagu untuk menambahkannya ke sini."
                     )
                 } else {
-                    SongListView(favoriteSongs, favoriteIds, onToggleFavorite, onSongClick)
+                    SongListView(favoriteSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue)
                 }
             }
             filteredSongs.isEmpty() -> EmptyState(
                 title = "Tidak ditemukan",
                 subtitle = "Coba kata kunci lain."
             )
-            selectedTab == 0 -> SongListView(filteredSongs, favoriteIds, onToggleFavorite, onSongClick)
+            selectedTab == 0 -> SongListView(filteredSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue)
             selectedTab == 1 -> GroupedListView(
                 songs = filteredSongs,
                 groupOf = { it.album.ifBlank { "Album Tidak Diketahui" } },
                 favoriteIds = favoriteIds,
                 onFavoriteToggle = onToggleFavorite,
-                onSongClick = onSongClick
+                onSongClick = onSongClick,
+                onPlayNext = playNext,
+                onAddToQueue = addToQueue
             )
             selectedTab == 2 -> GroupedListView(
                 songs = filteredSongs,
                 groupOf = { it.artist },
                 favoriteIds = favoriteIds,
                 onFavoriteToggle = onToggleFavorite,
-                onSongClick = onSongClick
+                onSongClick = onSongClick,
+                onPlayNext = playNext,
+                onAddToQueue = addToQueue
             )
             else -> GroupedListView(
                 songs = filteredSongs,
                 groupOf = { it.folderName },
                 favoriteIds = favoriteIds,
                 onFavoriteToggle = onToggleFavorite,
-                onSongClick = onSongClick
+                onSongClick = onSongClick,
+                onPlayNext = playNext,
+                onAddToQueue = addToQueue
             )
         }
     }
@@ -224,7 +245,9 @@ private fun SongListView(
     songs: List<Song>,
     favoriteIds: Set<Long>,
     onFavoriteToggle: (Long) -> Unit,
-    onSongClick: (List<Song>, Int) -> Unit
+    onSongClick: (List<Song>, Int) -> Unit,
+    onPlayNext: (Song) -> Unit,
+    onAddToQueue: (Song) -> Unit
 ) {
     LazyColumn {
         itemsIndexed(songs) { index, song ->
@@ -232,7 +255,9 @@ private fun SongListView(
                 song = song,
                 isFavorite = favoriteIds.contains(song.id),
                 onFavoriteToggle = { onFavoriteToggle(song.id) },
-                onClick = { onSongClick(songs, index) }
+                onClick = { onSongClick(songs, index) },
+                onPlayNext = { onPlayNext(song) },
+                onAddToQueue = { onAddToQueue(song) }
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
         }
@@ -245,7 +270,9 @@ private fun GroupedListView(
     groupOf: (Song) -> String,
     favoriteIds: Set<Long>,
     onFavoriteToggle: (Long) -> Unit,
-    onSongClick: (List<Song>, Int) -> Unit
+    onSongClick: (List<Song>, Int) -> Unit,
+    onPlayNext: (Song) -> Unit,
+    onAddToQueue: (Song) -> Unit
 ) {
     var selectedGroup by remember(songs) { mutableStateOf<String?>(null) }
     val grouped = remember(songs) { songs.groupBy(groupOf) }
@@ -272,7 +299,9 @@ private fun GroupedListView(
                         song = song,
                         isFavorite = favoriteIds.contains(song.id),
                         onFavoriteToggle = { onFavoriteToggle(song.id) },
-                        onClick = { onSongClick(groupSongs, index) }
+                        onClick = { onSongClick(groupSongs, index) },
+                        onPlayNext = { onPlayNext(song) },
+                        onAddToQueue = { onAddToQueue(song) }
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
@@ -281,53 +310,73 @@ private fun GroupedListView(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SongRow(
     song: Song,
     isFavorite: Boolean,
     onFavoriteToggle: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddToQueue: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        AsyncImage(
-            model = albumArtUri(song.albumId),
-            contentDescription = null,
+    var showMenu by remember { mutableStateOf(false) }
+
+    Box {
+        Row(
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(12.dp))
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                song.title,
-                maxLines = 1,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.basicMarquee()
+                .fillMaxWidth()
+                .combinedClickable(onClick = onClick, onLongClick = { showMenu = true })
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = albumArtUri(song.albumId),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
             )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    song.title,
+                    maxLines = 1,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.basicMarquee()
+                )
+                Text(
+                    song.artist,
+                    maxLines = 1,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                song.artist,
-                maxLines = 1,
+                formatDuration(song.duration),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.secondary
             )
+            IconButton(onClick = onFavoriteToggle) {
+                Icon(
+                    if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = if (isFavorite) "Hapus dari favorit" else "Tambah ke favorit",
+                    tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                )
+            }
         }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            formatDuration(song.duration),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.secondary
-        )
-        IconButton(onClick = onFavoriteToggle) {
-            Icon(
-                if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = if (isFavorite) "Hapus dari favorit" else "Tambah ke favorit",
-                tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+
+        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+            DropdownMenuItem(
+                text = { Text("Putar Berikutnya") },
+                leadingIcon = { Icon(Icons.Default.PlaylistPlay, contentDescription = null) },
+                onClick = { showMenu = false; onPlayNext() }
+            )
+            DropdownMenuItem(
+                text = { Text("Tambah ke Antrean") },
+                leadingIcon = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
+                onClick = { showMenu = false; onAddToQueue() }
             )
         }
     }
