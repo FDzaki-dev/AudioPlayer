@@ -12,6 +12,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import com.rudi.audioplayer.data.FavoritesStore
+import com.rudi.audioplayer.data.LyricsStore
 import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.PlayStatsStore
 import com.rudi.audioplayer.data.Playlist
@@ -45,6 +46,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val playbackStateStore = PlaybackStateStore(appContext)
     private val playStatsStore = PlayStatsStore(appContext)
     private val playlistStore = PlaylistStore(appContext)
+    private val lyricsStore = LyricsStore(appContext)
     private var positionTick = 0
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
@@ -282,6 +284,12 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         playlistStore.moveSong(playlistId, from, to)
         _playlists.value = playlistStore.getPlaylists()
     }
+
+    fun getLyrics(songId: Long): String? = lyricsStore.getLyrics(songId)
+
+    fun saveLyrics(songId: Long, text: String) = lyricsStore.setLyrics(songId, text)
+
+    fun deleteLyrics(songId: Long) = lyricsStore.deleteLyrics(songId)
 
     fun togglePlayPause() {
         controller?.let { if (it.isPlaying) it.pause() else it.play() }

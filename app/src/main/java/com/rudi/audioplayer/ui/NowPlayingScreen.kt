@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -56,6 +57,9 @@ fun NowPlayingScreen(
     onPlayQueueIndex: (Int) -> Unit,
     onMoveQueueItem: (Int, Int) -> Unit,
     onRemoveFromQueue: (Int) -> Unit,
+    onGetLyrics: (Long) -> String?,
+    onSaveLyrics: (Long, String) -> Unit,
+    onDeleteLyrics: (Long) -> Unit,
     onBack: () -> Unit
 ) {
     val song = uiState.currentSong
@@ -63,6 +67,7 @@ fun NowPlayingScreen(
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
     var showQueueSheet by remember { mutableStateOf(false) }
+    var showLyricsSheet by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -105,6 +110,13 @@ fun NowPlayingScreen(
                 Icon(
                     Icons.Default.QueueMusic,
                     contentDescription = "Antrean putar",
+                    tint = MaterialTheme.colorScheme.secondary
+                )
+            }
+            IconButton(onClick = { showLyricsSheet = true }) {
+                Icon(
+                    Icons.Default.Article,
+                    contentDescription = "Lirik",
                     tint = MaterialTheme.colorScheme.secondary
                 )
             }
@@ -231,6 +243,23 @@ fun NowPlayingScreen(
             onPlayIndex = { index -> onPlayQueueIndex(index) },
             onMove = { from, to -> onMoveQueueItem(from, to) },
             onRemove = { index -> onRemoveFromQueue(index) }
+        )
+    }
+
+    if (showLyricsSheet && song != null) {
+        var lyricsText by remember(song.id) { mutableStateOf(onGetLyrics(song.id)) }
+        LyricsSheet(
+            rawLyrics = lyricsText,
+            positionMs = uiState.position,
+            onDismiss = { showLyricsSheet = false },
+            onSave = { text ->
+                onSaveLyrics(song.id, text)
+                lyricsText = text
+            },
+            onDelete = {
+                onDeleteLyrics(song.id)
+                lyricsText = null
+            }
         )
     }
 }

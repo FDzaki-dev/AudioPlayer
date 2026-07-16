@@ -247,6 +247,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onPlayQueueIndex = { playerViewModel.playFromQueueIndex(it) },
                     onMoveQueueItem = { from, to -> playerViewModel.moveQueueItem(from, to) },
                     onRemoveFromQueue = { playerViewModel.removeFromQueue(it) },
+                    onGetLyrics = { id -> playerViewModel.getLyrics(id) },
+                    onSaveLyrics = { id, text -> playerViewModel.saveLyrics(id, text) },
+                    onDeleteLyrics = { id -> playerViewModel.deleteLyrics(id) },
                     onBack = { navController.popBackStack() }
                 )
             }

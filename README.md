@@ -17,6 +17,7 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Antrean putar (Queue)**: lihat antrean, naik/turunkan urutan, hapus dari antrean, lompat langsung ke lagu manapun, plus aksi "Putar Berikutnya" / "Tambah ke Antrean" via tekan-lama pada lagu di Perpustakaan
 - **Beranda pintar**: bagian "Baru Diputar" dan "Paling Sering Diputar" otomatis terisi dari riwayat dengar, tanpa perlu aksi manual dari user
 - **Playlist manual**: buat playlist sendiri lintas folder/album/artis, isi lewat "Tambah ke Playlist" (tekan-lama lagu), atur urutan, hapus lagu, ganti nama, atau hapus playlist — tersedia di tab Playlist pada Perpustakaan
+- **Lirik**: tambahkan lirik sendiri per lagu (tempel teks biasa, atau format LRC `[mm:ss.xx]` untuk lirik yang otomatis mengikuti posisi putar dan auto-scroll)
 
 ## Build
 Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai artifact bernama `AudioPlayer-release`.
@@ -24,4 +25,4 @@ Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diu
 ## Rencana v2 (belum dibuat)
 - Equalizer
 - Widget home screen
-- Lyrics
+- Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)
