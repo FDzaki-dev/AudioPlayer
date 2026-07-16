@@ -28,7 +28,10 @@ fun HomeScreen(
     favoriteIds: Set<Long>,
     onSongClick: (List<Song>, Int) -> Unit,
     resumePreview: (List<Song>) -> Song?,
-    onResumeClick: (List<Song>) -> Unit
+    onResumeClick: (List<Song>) -> Unit,
+    recentSongsProvider: (List<Song>) -> List<Song>,
+    mostPlayedProvider: (List<Song>) -> List<Song>,
+    statsVersion: Int
 ) {
     val context = LocalContext.current
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
@@ -42,6 +45,8 @@ fun HomeScreen(
     val continueSong = remember(songs) { if (songs.isEmpty()) null else resumePreview(songs) }
     val favoriteSongs = remember(songs, favoriteIds) { songs.filter { favoriteIds.contains(it.id) } }
     val recentlyAdded = remember(songs) { songs.sortedByDescending { it.dateAdded }.take(15) }
+    val recentlyPlayed = remember(songs, statsVersion) { recentSongsProvider(songs) }
+    val mostPlayed = remember(songs, statsVersion) { mostPlayedProvider(songs) }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item { HomeGreeting() }
@@ -69,6 +74,26 @@ fun HomeScreen(
                     title = "Favorit",
                     songs = favoriteSongs,
                     onSongClick = { song -> onSongClick(favoriteSongs, favoriteSongs.indexOf(song)) }
+                )
+            }
+        }
+
+        if (recentlyPlayed.isNotEmpty()) {
+            item {
+                HomeSectionRow(
+                    title = "Baru Diputar",
+                    songs = recentlyPlayed,
+                    onSongClick = { song -> onSongClick(recentlyPlayed, recentlyPlayed.indexOf(song)) }
+                )
+            }
+        }
+
+        if (mostPlayed.isNotEmpty()) {
+            item {
+                HomeSectionRow(
+                    title = "Paling Sering Diputar",
+                    songs = mostPlayed,
+                    onSongClick = { song -> onSongClick(mostPlayed, mostPlayed.indexOf(song)) }
                 )
             }
         }

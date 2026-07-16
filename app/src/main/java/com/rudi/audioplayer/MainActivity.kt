@@ -119,6 +119,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val uiState by playerViewModel.uiState.collectAsState()
     val favoriteIds by playerViewModel.favoriteIds.collectAsState()
     val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsState()
+    val statsVersion by playerViewModel.statsVersion.collectAsState()
+    val playlists by playerViewModel.playlists.collectAsState()
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
@@ -176,7 +178,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     favoriteIds = favoriteIds,
                     onSongClick = { songs, index -> playerViewModel.playQueue(songs, index) },
                     resumePreview = { songs -> playerViewModel.peekSavedSong(songs) },
-                    onResumeClick = { songs -> playerViewModel.resumeFromSaved(songs) }
+                    onResumeClick = { songs -> playerViewModel.resumeFromSaved(songs) },
+                    recentSongsProvider = { songs -> playerViewModel.getRecentSongs(songs) },
+                    mostPlayedProvider = { songs -> playerViewModel.getMostPlayedSongs(songs) },
+                    statsVersion = statsVersion
                 )
             }
             composable("library") {
@@ -197,7 +202,14 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                         } else {
                             playerViewModel.addToQueue(song)
                         }
-                    }
+                    },
+                    playlists = playlists,
+                    onCreatePlaylist = { name -> playerViewModel.createPlaylist(name) },
+                    onDeletePlaylist = { id -> playerViewModel.deletePlaylist(id) },
+                    onRenamePlaylist = { id, name -> playerViewModel.renamePlaylist(id, name) },
+                    onAddSongToPlaylist = { id, songId -> playerViewModel.addSongToPlaylist(id, songId) },
+                    onRemoveSongFromPlaylist = { id, songId -> playerViewModel.removeSongFromPlaylist(id, songId) },
+                    onMoveSongInPlaylist = { id, from, to -> playerViewModel.moveSongInPlaylist(id, from, to) }
                 )
             }
             composable(

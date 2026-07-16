@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -40,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.rudi.audioplayer.data.MusicRepository
+import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -50,7 +52,14 @@ fun LibraryScreen(
     onToggleFavorite: (Long) -> Unit,
     onSongClick: (List<Song>, Int) -> Unit,
     onPlayNext: (Song) -> Unit,
-    onAddToQueue: (Song) -> Unit
+    onAddToQueue: (Song) -> Unit,
+    playlists: List<Playlist>,
+    onCreatePlaylist: (String) -> Playlist,
+    onDeletePlaylist: (String) -> Unit,
+    onRenamePlaylist: (String, String) -> Unit,
+    onAddSongToPlaylist: (String, Long) -> Boolean,
+    onRemoveSongFromPlaylist: (String, Long) -> Unit,
+    onMoveSongInPlaylist: (String, Int, Int) -> Unit
 ) {
     val context = LocalContext.current
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
@@ -59,6 +68,7 @@ fun LibraryScreen(
     var refreshKey by remember { mutableStateOf(0) }
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var songForPlaylistDialog by remember { mutableStateOf<Song?>(null) }
 
     LaunchedEffect(refreshKey) {
         loading = true
@@ -85,6 +95,7 @@ fun LibraryScreen(
         onAddToQueue(it)
         Toast.makeText(context, "Ditambahkan ke antrean", Toast.LENGTH_SHORT).show()
     }
+    val addToPlaylist: (Song) -> Unit = { songForPlaylistDialog = it }
 
     Column(modifier = Modifier.fillMaxSize()) {
         LibraryHeader(
@@ -122,14 +133,23 @@ fun LibraryScreen(
                         subtitle = "Ketuk ikon hati pada lagu untuk menambahkannya ke sini."
                     )
                 } else {
-                    SongListView(favoriteSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue)
+                    SongListView(favoriteSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue, addToPlaylist)
                 }
             }
+            selectedTab == 5 -> PlaylistTabView(
+                playlists = playlists,
+                onSongClick = onSongClick,
+                onCreatePlaylist = { name -> onCreatePlaylist(name) },
+                onDeletePlaylist = onDeletePlaylist,
+                onRenamePlaylist = onRenamePlaylist,
+                onRemoveSongFromPlaylist = onRemoveSongFromPlaylist,
+                onMoveSongInPlaylist = onMoveSongInPlaylist
+            )
             filteredSongs.isEmpty() -> EmptyState(
                 title = "Tidak ditemukan",
                 subtitle = "Coba kata kunci lain."
             )
-            selectedTab == 0 -> SongListView(filteredSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue)
+            selectedTab == 0 -> SongListView(filteredSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue, addToPlaylist)
             selectedTab == 1 -> GroupedListView(
                 songs = filteredSongs,
                 groupOf = { it.album.ifBlank { "Album Tidak Diketahui" } },
@@ -137,7 +157,8 @@ fun LibraryScreen(
                 onFavoriteToggle = onToggleFavorite,
                 onSongClick = onSongClick,
                 onPlayNext = playNext,
-                onAddToQueue = addToQueue
+                onAddToQueue = addToQueue,
+                onAddToPlaylist = addToPlaylist
             )
             selectedTab == 2 -> GroupedListView(
                 songs = filteredSongs,
@@ -146,7 +167,8 @@ fun LibraryScreen(
                 onFavoriteToggle = onToggleFavorite,
                 onSongClick = onSongClick,
                 onPlayNext = playNext,
-                onAddToQueue = addToQueue
+                onAddToQueue = addToQueue,
+                onAddToPlaylist = addToPlaylist
             )
             else -> GroupedListView(
                 songs = filteredSongs,
@@ -155,9 +177,34 @@ fun LibraryScreen(
                 onFavoriteToggle = onToggleFavorite,
                 onSongClick = onSongClick,
                 onPlayNext = playNext,
-                onAddToQueue = addToQueue
+                onAddToQueue = addToQueue,
+                onAddToPlaylist = addToPlaylist
             )
         }
+    }
+
+    val pendingSong = songForPlaylistDialog
+    if (pendingSong != null) {
+        AddToPlaylistDialog(
+            song = pendingSong,
+            playlists = playlists,
+            onAddToExisting = { playlist ->
+                val added = onAddSongToPlaylist(playlist.id, pendingSong.id)
+                Toast.makeText(
+                    context,
+                    if (added) "Ditambahkan ke \"${playlist.name}\"" else "Sudah ada di \"${playlist.name}\"",
+                    Toast.LENGTH_SHORT
+                ).show()
+                songForPlaylistDialog = null
+            },
+            onCreateAndAdd = { name ->
+                val playlist = onCreatePlaylist(name)
+                onAddSongToPlaylist(playlist.id, pendingSong.id)
+                Toast.makeText(context, "Dibuat & ditambahkan ke \"${playlist.name}\"", Toast.LENGTH_SHORT).show()
+                songForPlaylistDialog = null
+            },
+            onDismiss = { songForPlaylistDialog = null }
+        )
     }
 }
 
@@ -216,7 +263,7 @@ private fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, o
 
 @Composable
 private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
-    val labels = listOf("Lagu", "Album", "Artis", "Folder", "Favorit")
+    val labels = listOf("Lagu", "Album", "Artis", "Folder", "Favorit", "Playlist")
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
@@ -248,7 +295,8 @@ private fun SongListView(
     onFavoriteToggle: (Long) -> Unit,
     onSongClick: (List<Song>, Int) -> Unit,
     onPlayNext: (Song) -> Unit,
-    onAddToQueue: (Song) -> Unit
+    onAddToQueue: (Song) -> Unit,
+    onAddToPlaylist: (Song) -> Unit
 ) {
     LazyColumn {
         itemsIndexed(songs) { index, song ->
@@ -258,7 +306,8 @@ private fun SongListView(
                 onFavoriteToggle = { onFavoriteToggle(song.id) },
                 onClick = { onSongClick(songs, index) },
                 onPlayNext = { onPlayNext(song) },
-                onAddToQueue = { onAddToQueue(song) }
+                onAddToQueue = { onAddToQueue(song) },
+                onAddToPlaylist = { onAddToPlaylist(song) }
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
         }
@@ -273,7 +322,8 @@ private fun GroupedListView(
     onFavoriteToggle: (Long) -> Unit,
     onSongClick: (List<Song>, Int) -> Unit,
     onPlayNext: (Song) -> Unit,
-    onAddToQueue: (Song) -> Unit
+    onAddToQueue: (Song) -> Unit,
+    onAddToPlaylist: (Song) -> Unit
 ) {
     var selectedGroup by remember(songs) { mutableStateOf<String?>(null) }
     val grouped = remember(songs) { songs.groupBy(groupOf) }
@@ -302,7 +352,8 @@ private fun GroupedListView(
                         onFavoriteToggle = { onFavoriteToggle(song.id) },
                         onClick = { onSongClick(groupSongs, index) },
                         onPlayNext = { onPlayNext(song) },
-                        onAddToQueue = { onAddToQueue(song) }
+                        onAddToQueue = { onAddToQueue(song) },
+                        onAddToPlaylist = { onAddToPlaylist(song) }
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
@@ -319,7 +370,8 @@ private fun SongRow(
     onFavoriteToggle: () -> Unit,
     onClick: () -> Unit,
     onPlayNext: () -> Unit,
-    onAddToQueue: () -> Unit
+    onAddToQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -379,12 +431,17 @@ private fun SongRow(
                 leadingIcon = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
                 onClick = { showMenu = false; onAddToQueue() }
             )
+            DropdownMenuItem(
+                text = { Text("Tambah ke Playlist") },
+                leadingIcon = { Icon(Icons.Default.QueueMusic, contentDescription = null) },
+                onClick = { showMenu = false; onAddToPlaylist() }
+            )
         }
     }
 }
 
 @Composable
-private fun EmptyState(
+fun EmptyState(
     title: String,
     subtitle: String,
     actionLabel: String? = null,

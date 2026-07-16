@@ -13,6 +13,9 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import com.rudi.audioplayer.data.FavoritesStore
 import com.rudi.audioplayer.data.PlaybackStateStore
+import com.rudi.audioplayer.data.PlayStatsStore
+import com.rudi.audioplayer.data.Playlist
+import com.rudi.audioplayer.data.PlaylistStore
 import com.rudi.audioplayer.data.Song
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -40,10 +43,18 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     private val favoritesStore = FavoritesStore(appContext)
     private val playbackStateStore = PlaybackStateStore(appContext)
+    private val playStatsStore = PlayStatsStore(appContext)
+    private val playlistStore = PlaylistStore(appContext)
     private var positionTick = 0
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
+
+    private val _statsVersion = MutableStateFlow(0)
+    val statsVersion: StateFlow<Int> = _statsVersion.asStateFlow()
+
+    private val _playlists = MutableStateFlow(playlistStore.getPlaylists())
+    val playlists: StateFlow<List<Playlist>> = _playlists.asStateFlow()
 
     private val _favoriteIds = MutableStateFlow(loadFavoriteIds())
     val favoriteIds: StateFlow<Set<Long>> = _favoriteIds.asStateFlow()
@@ -66,6 +77,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 currentIndex = index,
                 duration = controller?.duration?.coerceAtLeast(0) ?: 0L
             )
+            song?.let {
+                playStatsStore.recordPlay(it.id)
+                _statsVersion.value += 1
+            }
             persistPlaybackState()
         }
 
@@ -221,6 +236,52 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                     .build()
             )
             .build()
+
+    /** Resolves recently-played song IDs against the freshly scanned library, most recent first. */
+    fun getRecentSongs(allSongs: List<Song>, limit: Int = 15): List<Song> {
+        val songMap = allSongs.associateBy { it.id }
+        return playStatsStore.getRecentIds(limit).mapNotNull { songMap[it] }
+    }
+
+    /** Resolves most-played song IDs against the freshly scanned library, highest count first. */
+    fun getMostPlayedSongs(allSongs: List<Song>, limit: Int = 15): List<Song> {
+        val songMap = allSongs.associateBy { it.id }
+        return playStatsStore.getMostPlayedIds(limit).mapNotNull { songMap[it] }
+    }
+
+    fun createPlaylist(name: String): Playlist {
+        val playlist = playlistStore.createPlaylist(name.trim().ifBlank { "Playlist Baru" })
+        _playlists.value = playlistStore.getPlaylists()
+        return playlist
+    }
+
+    fun deletePlaylist(id: String) {
+        playlistStore.deletePlaylist(id)
+        _playlists.value = playlistStore.getPlaylists()
+    }
+
+    fun renamePlaylist(id: String, newName: String) {
+        if (newName.isBlank()) return
+        playlistStore.renamePlaylist(id, newName.trim())
+        _playlists.value = playlistStore.getPlaylists()
+    }
+
+    /** Returns true if the song was newly added (false if it was already in that playlist). */
+    fun addSongToPlaylist(playlistId: String, songId: Long): Boolean {
+        val added = playlistStore.addSong(playlistId, songId)
+        _playlists.value = playlistStore.getPlaylists()
+        return added
+    }
+
+    fun removeSongFromPlaylist(playlistId: String, songId: Long) {
+        playlistStore.removeSong(playlistId, songId)
+        _playlists.value = playlistStore.getPlaylists()
+    }
+
+    fun moveSongInPlaylist(playlistId: String, from: Int, to: Int) {
+        playlistStore.moveSong(playlistId, from, to)
+        _playlists.value = playlistStore.getPlaylists()
+    }
 
     fun togglePlayPause() {
         controller?.let { if (it.isPlaying) it.pause() else it.play() }
