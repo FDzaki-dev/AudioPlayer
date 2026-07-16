@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -25,6 +26,9 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.VolumeDown
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
@@ -54,6 +59,7 @@ fun NowPlayingScreen(
     onSetSleepTimer: (Int) -> Unit,
     onCancelSleepTimer: () -> Unit,
     onSetSpeed: (Float) -> Unit,
+    onSetVolume: (Float) -> Unit,
     onPlayQueueIndex: (Int) -> Unit,
     onMoveQueueItem: (Int, Int) -> Unit,
     onRemoveFromQueue: (Int) -> Unit,
@@ -124,7 +130,12 @@ fun NowPlayingScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        VinylAlbumArt(albumId = song?.albumId, isPlaying = uiState.isPlaying)
+        VinylAlbumArt(
+            albumId = song?.albumId,
+            isPlaying = uiState.isPlaying,
+            onSwipeNext = onNext,
+            onSwipePrevious = onPrevious
+        )
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -216,6 +227,31 @@ fun NowPlayingScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.secondary
         )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val volumeIcon = when {
+                uiState.volume <= 0f -> Icons.Default.VolumeOff
+                uiState.volume < 0.5f -> Icons.Default.VolumeDown
+                else -> Icons.Default.VolumeUp
+            }
+            Icon(volumeIcon, contentDescription = "Volume", tint = MaterialTheme.colorScheme.secondary)
+            Spacer(modifier = Modifier.width(8.dp))
+            Slider(
+                value = uiState.volume,
+                onValueChange = onSetVolume,
+                valueRange = 0f..1f,
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.secondary,
+                    activeTrackColor = MaterialTheme.colorScheme.secondary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            )
+        }
     }
 
     if (showSleepTimerDialog) {
@@ -270,8 +306,15 @@ fun NowPlayingScreen(
  * exactly like a real turntable.
  */
 @Composable
-private fun VinylAlbumArt(albumId: Long?, isPlaying: Boolean) {
+private fun VinylAlbumArt(
+    albumId: Long?,
+    isPlaying: Boolean,
+    onSwipeNext: () -> Unit,
+    onSwipePrevious: () -> Unit
+) {
     val rotation = remember { Animatable(0f) }
+    val haptic = LocalHapticFeedback.current
+    var totalDrag by remember { mutableStateOf(0f) }
 
     LaunchedEffect(isPlaying) {
         if (isPlaying) {
@@ -286,7 +329,27 @@ private fun VinylAlbumArt(albumId: Long?, isPlaying: Boolean) {
         }
     }
 
-    Box(contentAlignment = Alignment.Center) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.pointerInput(Unit) {
+            detectHorizontalDragGestures(
+                onDragStart = { totalDrag = 0f },
+                onDragEnd = {
+                    if (totalDrag < -120f) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onSwipeNext()
+                    } else if (totalDrag > 120f) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onSwipePrevious()
+                    }
+                },
+                onHorizontalDrag = { change, dragAmount ->
+                    totalDrag += dragAmount
+                    change.consume()
+                }
+            )
+        }
+    ) {
         AsyncImage(
             model = albumId?.let { albumArtUri(it) },
             contentDescription = null,

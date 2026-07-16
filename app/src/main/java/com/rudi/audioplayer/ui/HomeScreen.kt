@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,7 +32,8 @@ fun HomeScreen(
     onResumeClick: (List<Song>) -> Unit,
     recentSongsProvider: (List<Song>) -> List<Song>,
     mostPlayedProvider: (List<Song>) -> List<Song>,
-    statsVersion: Int
+    statsVersion: Int,
+    onShuffleAll: (List<Song>) -> Unit
 ) {
     val context = LocalContext.current
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
@@ -49,7 +51,12 @@ fun HomeScreen(
     val mostPlayed = remember(songs, statsVersion) { mostPlayedProvider(songs) }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        item { HomeGreeting() }
+        item {
+            HomeGreeting(
+                showShuffleAll = songs.isNotEmpty(),
+                onShuffleAll = { onShuffleAll(songs) }
+            )
+        }
 
         if (continueSong != null) {
             item {
@@ -125,7 +132,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeGreeting() {
+private fun HomeGreeting(showShuffleAll: Boolean, onShuffleAll: () -> Unit) {
     val greeting = remember {
         when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
             in 4..10 -> "Selamat Pagi"
@@ -134,14 +141,26 @@ private fun HomeGreeting() {
             else -> "Selamat Malam"
         }
     }
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp)
+            .padding(start = 20.dp, end = 8.dp, top = 20.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("BERANDA", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(greeting, style = MaterialTheme.typography.titleLarge)
+        Column(modifier = Modifier.weight(1f)) {
+            Text("BERANDA", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(greeting, style = MaterialTheme.typography.titleLarge)
+        }
+        if (showShuffleAll) {
+            IconButton(onClick = onShuffleAll) {
+                Icon(
+                    Icons.Default.Shuffle,
+                    contentDescription = "Acak semua musik",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
     }
 }
 

@@ -181,7 +181,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onResumeClick = { songs -> playerViewModel.resumeFromSaved(songs) },
                     recentSongsProvider = { songs -> playerViewModel.getRecentSongs(songs) },
                     mostPlayedProvider = { songs -> playerViewModel.getMostPlayedSongs(songs) },
-                    statsVersion = statsVersion
+                    statsVersion = statsVersion,
+                    onShuffleAll = { songs -> playerViewModel.shuffleAll(songs) }
                 )
             }
             composable("library") {
@@ -244,6 +245,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onSetSleepTimer = { playerViewModel.setSleepTimer(it) },
                     onCancelSleepTimer = { playerViewModel.cancelSleepTimer() },
                     onSetSpeed = { playerViewModel.setPlaybackSpeed(it) },
+                    onSetVolume = { playerViewModel.setVolume(it) },
                     onPlayQueueIndex = { playerViewModel.playFromQueueIndex(it) },
                     onMoveQueueItem = { from, to -> playerViewModel.moveQueueItem(from, to) },
                     onRemoveFromQueue = { playerViewModel.removeFromQueue(it) },

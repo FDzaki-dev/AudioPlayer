@@ -34,6 +34,7 @@ data class PlaybackUiState(
     val shuffleEnabled: Boolean = false,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
     val playbackSpeed: Float = 1f,
+    val volume: Float = 1f,
     val queue: List<Song> = emptyList()
 )
 
@@ -96,6 +97,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
         override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
             _uiState.value = _uiState.value.copy(playbackSpeed = playbackParameters.speed)
+        }
+
+        override fun onVolumeChanged(volume: Float) {
+            _uiState.value = _uiState.value.copy(volume = volume)
         }
     }
 
@@ -226,8 +231,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         persistPlaybackState()
     }
 
-    private fun mediaItemFor(song: Song): MediaItem =
-        MediaItem.Builder()
+    private fun mediaItemFor(song: Song): MediaItem {
+        val artworkUri = android.net.Uri.parse("content://media/external/audio/albumart/${song.albumId}")
+        return MediaItem.Builder()
             .setMediaId(song.id.toString())
             .setUri(song.uri)
             .setMediaMetadata(
@@ -235,9 +241,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                     .setTitle(song.title)
                     .setArtist(song.artist)
                     .setAlbumTitle(song.album)
+                    .setArtworkUri(artworkUri)
                     .build()
             )
             .build()
+    }
 
     /** Resolves recently-played song IDs against the freshly scanned library, most recent first. */
     fun getRecentSongs(allSongs: List<Song>, limit: Int = 15): List<Song> {
@@ -315,6 +323,18 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     fun setPlaybackSpeed(speed: Float) {
         controller?.setPlaybackSpeed(speed)
+    }
+
+    fun setVolume(volume: Float) {
+        controller?.setVolume(volume.coerceIn(0f, 1f))
+    }
+
+    /** Shuffles the whole library and starts playing immediately — one tap from Home. */
+    fun shuffleAll(allSongs: List<Song>) {
+        if (allSongs.isEmpty()) return
+        val shuffled = allSongs.shuffled()
+        playQueue(shuffled, 0)
+        controller?.shuffleModeEnabled = true
     }
 
     fun toggleFavorite(songId: Long) {
