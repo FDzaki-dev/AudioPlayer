@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.Song
 import kotlinx.coroutines.Dispatchers
@@ -40,7 +41,8 @@ fun HomeScreen(
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        songs = withContext(Dispatchers.IO) { MusicRepository(context).getAllSongs() }
+        val raw = withContext(Dispatchers.IO) { MusicRepository(context).getAllSongs() }
+        songs = LibraryFilterStore(context).apply(raw)
         loading = false
     }
 

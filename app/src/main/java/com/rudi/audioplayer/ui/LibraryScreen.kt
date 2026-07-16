@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.Song
@@ -62,18 +65,42 @@ fun LibraryScreen(
     onMoveSongInPlaylist: (String, Int, Int) -> Unit
 ) {
     val context = LocalContext.current
-    var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    val filterStore = remember { LibraryFilterStore(context) }
+    var rawSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableStateOf(0) }
     var refreshKey by remember { mutableStateOf(0) }
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var songForPlaylistDialog by remember { mutableStateOf<Song?>(null) }
+    var showFolderManager by remember { mutableStateOf(false) }
+    var filterVersion by remember { mutableStateOf(0) }
 
     LaunchedEffect(refreshKey) {
         loading = true
-        songs = withContext(Dispatchers.IO) { MusicRepository(context).getAllSongs() }
+        rawSongs = withContext(Dispatchers.IO) { MusicRepository(context).getAllSongs() }
         loading = false
+    }
+
+    val songs = remember(rawSongs, filterVersion) { filterStore.apply(rawSongs) }
+
+    val folderSummaries = remember(rawSongs, filterVersion) {
+        val excluded = filterStore.getExcludedFolders()
+        rawSongs.groupBy { it.folderPath }
+            .map { (path, group) ->
+                FolderSummary(
+                    path = path,
+                    name = group.first().folderName,
+                    songCount = group.size,
+                    excluded = excluded.contains(path)
+                )
+            }
+            .sortedBy { it.name.lowercase() }
+    }
+
+    val hiddenSongsList = remember(rawSongs, filterVersion) {
+        val hiddenIds = filterStore.getHiddenSongIds()
+        rawSongs.filter { hiddenIds.contains(it.id) }
     }
 
     val filteredSongs = remember(songs, searchQuery) {
@@ -96,6 +123,11 @@ fun LibraryScreen(
         Toast.makeText(context, "Ditambahkan ke antrean", Toast.LENGTH_SHORT).show()
     }
     val addToPlaylist: (Song) -> Unit = { songForPlaylistDialog = it }
+    val hideSong: (Song) -> Unit = {
+        filterStore.setSongHidden(it.id, true)
+        filterVersion++
+        Toast.makeText(context, "\"${it.title}\" disembunyikan dari perpustakaan", Toast.LENGTH_SHORT).show()
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         LibraryHeader(
@@ -104,7 +136,8 @@ fun LibraryScreen(
                 searchActive = !searchActive
                 if (!searchActive) searchQuery = ""
             },
-            onRescan = { refreshKey++ }
+            onRescan = { refreshKey++ },
+            onOpenFolderManager = { showFolderManager = true }
         )
 
         if (searchActive) {
@@ -133,7 +166,7 @@ fun LibraryScreen(
                         subtitle = "Ketuk ikon hati pada lagu untuk menambahkannya ke sini."
                     )
                 } else {
-                    SongListView(favoriteSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue, addToPlaylist)
+                    SongListView(favoriteSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue, addToPlaylist, hideSong)
                 }
             }
             selectedTab == 5 -> PlaylistTabView(
@@ -149,7 +182,7 @@ fun LibraryScreen(
                 title = "Tidak ditemukan",
                 subtitle = "Coba kata kunci lain."
             )
-            selectedTab == 0 -> SongListView(filteredSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue, addToPlaylist)
+            selectedTab == 0 -> SongListView(filteredSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue, addToPlaylist, hideSong)
             selectedTab == 1 -> GroupedListView(
                 songs = filteredSongs,
                 groupOf = { it.album.ifBlank { "Album Tidak Diketahui" } },
@@ -158,7 +191,8 @@ fun LibraryScreen(
                 onSongClick = onSongClick,
                 onPlayNext = playNext,
                 onAddToQueue = addToQueue,
-                onAddToPlaylist = addToPlaylist
+                onAddToPlaylist = addToPlaylist,
+                onHideSong = hideSong
             )
             selectedTab == 2 -> GroupedListView(
                 songs = filteredSongs,
@@ -168,7 +202,8 @@ fun LibraryScreen(
                 onSongClick = onSongClick,
                 onPlayNext = playNext,
                 onAddToQueue = addToQueue,
-                onAddToPlaylist = addToPlaylist
+                onAddToPlaylist = addToPlaylist,
+                onHideSong = hideSong
             )
             else -> GroupedListView(
                 songs = filteredSongs,
@@ -178,7 +213,8 @@ fun LibraryScreen(
                 onSongClick = onSongClick,
                 onPlayNext = playNext,
                 onAddToQueue = addToQueue,
-                onAddToPlaylist = addToPlaylist
+                onAddToPlaylist = addToPlaylist,
+                onHideSong = hideSong
             )
         }
     }
@@ -206,10 +242,31 @@ fun LibraryScreen(
             onDismiss = { songForPlaylistDialog = null }
         )
     }
+
+    if (showFolderManager) {
+        FolderManagerSheet(
+            folders = folderSummaries,
+            hiddenSongs = hiddenSongsList,
+            onDismiss = { showFolderManager = false },
+            onToggleFolder = { path, excluded ->
+                filterStore.setFolderExcluded(path, excluded)
+                filterVersion++
+            },
+            onUnhideSong = { songId ->
+                filterStore.setSongHidden(songId, false)
+                filterVersion++
+            }
+        )
+    }
 }
 
 @Composable
-private fun LibraryHeader(searchActive: Boolean, onToggleSearch: () -> Unit, onRescan: () -> Unit) {
+private fun LibraryHeader(
+    searchActive: Boolean,
+    onToggleSearch: () -> Unit,
+    onRescan: () -> Unit,
+    onOpenFolderManager: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -230,6 +287,9 @@ private fun LibraryHeader(searchActive: Boolean, onToggleSearch: () -> Unit, onR
                 if (searchActive) Icons.Default.Close else Icons.Default.Search,
                 contentDescription = "Cari"
             )
+        }
+        IconButton(onClick = onOpenFolderManager) {
+            Icon(Icons.Default.Tune, contentDescription = "Kelola folder")
         }
         IconButton(onClick = onRescan) {
             Icon(Icons.Default.Refresh, contentDescription = "Pindai ulang")
@@ -296,7 +356,8 @@ private fun SongListView(
     onSongClick: (List<Song>, Int) -> Unit,
     onPlayNext: (Song) -> Unit,
     onAddToQueue: (Song) -> Unit,
-    onAddToPlaylist: (Song) -> Unit
+    onAddToPlaylist: (Song) -> Unit,
+    onHideSong: (Song) -> Unit
 ) {
     LazyColumn {
         itemsIndexed(songs) { index, song ->
@@ -307,7 +368,8 @@ private fun SongListView(
                 onClick = { onSongClick(songs, index) },
                 onPlayNext = { onPlayNext(song) },
                 onAddToQueue = { onAddToQueue(song) },
-                onAddToPlaylist = { onAddToPlaylist(song) }
+                onAddToPlaylist = { onAddToPlaylist(song) },
+                onHideSong = { onHideSong(song) }
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
         }
@@ -323,7 +385,8 @@ private fun GroupedListView(
     onSongClick: (List<Song>, Int) -> Unit,
     onPlayNext: (Song) -> Unit,
     onAddToQueue: (Song) -> Unit,
-    onAddToPlaylist: (Song) -> Unit
+    onAddToPlaylist: (Song) -> Unit,
+    onHideSong: (Song) -> Unit
 ) {
     var selectedGroup by remember(songs) { mutableStateOf<String?>(null) }
     val grouped = remember(songs) { songs.groupBy(groupOf) }
@@ -353,7 +416,8 @@ private fun GroupedListView(
                         onClick = { onSongClick(groupSongs, index) },
                         onPlayNext = { onPlayNext(song) },
                         onAddToQueue = { onAddToQueue(song) },
-                        onAddToPlaylist = { onAddToPlaylist(song) }
+                        onAddToPlaylist = { onAddToPlaylist(song) },
+                        onHideSong = { onHideSong(song) }
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
@@ -371,7 +435,8 @@ private fun SongRow(
     onClick: () -> Unit,
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
-    onAddToPlaylist: () -> Unit
+    onAddToPlaylist: () -> Unit,
+    onHideSong: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -435,6 +500,11 @@ private fun SongRow(
                 text = { Text("Tambah ke Playlist") },
                 leadingIcon = { Icon(Icons.Default.QueueMusic, contentDescription = null) },
                 onClick = { showMenu = false; onAddToPlaylist() }
+            )
+            DropdownMenuItem(
+                text = { Text("Sembunyikan") },
+                leadingIcon = { Icon(Icons.Default.VisibilityOff, contentDescription = null) },
+                onClick = { showMenu = false; onHideSong() }
             )
         }
     }
