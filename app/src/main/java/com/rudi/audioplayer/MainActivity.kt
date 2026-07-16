@@ -1,8 +1,11 @@
 package com.rudi.audioplayer
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -19,18 +22,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,6 +48,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.ViewModel
@@ -76,6 +86,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             AudioPlayerTheme {
                 var hasPermission by remember { mutableStateOf(false) }
+                var permissionRequested by remember { mutableStateOf(false) }
 
                 val neededPermissions = remember {
                     buildList {
@@ -97,18 +108,56 @@ class MainActivity : ComponentActivity() {
                     hasPermission = result[neededPermissions[0]] == true
                 }
 
-                LaunchedEffect(Unit) {
-                    launcher.launch(neededPermissions)
-                }
-
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    if (hasPermission) {
-                        AppNavHost(playerViewModel)
-                    } else {
-                        PermissionRationale { launcher.launch(neededPermissions) }
+                    when {
+                        hasPermission -> AppNavHost(playerViewModel)
+                        !permissionRequested -> WelcomeScreen(
+                            onContinue = {
+                                permissionRequested = true
+                                launcher.launch(neededPermissions)
+                            }
+                        )
+                        else -> PermissionRationale(
+                            onRequest = { launcher.launch(neededPermissions) }
+                        )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun WelcomeScreen(onContinue: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            Icons.Default.MusicNote,
+            contentDescription = null,
+            modifier = Modifier.size(72.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            "Selamat Datang di Audio Player",
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            "Untuk menampilkan koleksi musik kamu, aplikasi ini butuh izin membaca file audio di perangkat. Semua pemrosesan terjadi langsung di HP kamu, tidak ada data yang dikirim ke internet.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.secondary,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+        Button(onClick = onContinue, modifier = Modifier.fillMaxWidth()) {
+            Text("Lanjutkan")
         }
     }
 }
@@ -264,15 +313,45 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
 
 @Composable
 private fun PermissionRationale(onRequest: () -> Unit) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Izin akses musik dibutuhkan untuk menampilkan library kamu.")
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onRequest) { Text("Berikan Izin") }
+        Icon(
+            Icons.Default.MusicNote,
+            contentDescription = null,
+            modifier = Modifier.size(56.dp),
+            tint = MaterialTheme.colorScheme.secondary
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(
+            "Izin akses musik dibutuhkan",
+            style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "Aplikasi tidak bisa menampilkan lagu tanpa izin ini. Kalau tombol di bawah tidak memunculkan dialog izin, aktifkan izinnya lewat Pengaturan Aplikasi.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.secondary,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = onRequest, modifier = Modifier.fillMaxWidth()) {
+            Text("Coba Lagi")
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        TextButton(onClick = {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+            }
+            context.startActivity(intent)
+        }) {
+            Text("Buka Pengaturan Aplikasi")
+        }
     }
 }

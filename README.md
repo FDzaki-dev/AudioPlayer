@@ -18,11 +18,19 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Beranda pintar**: bagian "Baru Diputar" dan "Paling Sering Diputar" otomatis terisi dari riwayat dengar, tanpa perlu aksi manual dari user
 - **Playlist manual**: buat playlist sendiri lintas folder/album/artis, isi lewat "Tambah ke Playlist" (tekan-lama lagu), atur urutan, hapus lagu, ganti nama, atau hapus playlist — tersedia di tab Playlist pada Perpustakaan
 - **Lirik**: tambahkan lirik sendiri per lagu (tempel teks biasa, atau format LRC `[mm:ss.xx]` untuk lirik yang otomatis mengikuti posisi putar dan auto-scroll)
+- **Tema dinamis**: warna aksen di Now Playing & mini player otomatis diambil dari sampul album lagu yang sedang diputar
+- **Kontrol volume** langsung dari Now Playing
+- **Kelola folder**: pilih folder mana saja yang mau disertakan/dikecualikan dari pemindaian musik
+- **Filter Perpustakaan tersimpan**: tab yang terakhir dipilih (Lagu/Album/Artis/Folder/dst.) diingat di antar sesi
+- **Onboarding**: layar selamat datang menjelaskan kenapa izin dibutuhkan sebelum dialog izin muncul, dengan fallback "Buka Pengaturan Aplikasi" kalau izin ditolak permanen
+
+## Belum selesai / dalam pengerjaan
+- `EqualizerController.kt` sudah ada (baca/tulis band frekuensi, preset, persist ke SharedPreferences) tapi **belum disambungkan** ke ViewModel maupun UI manapun
 
 ## Build
 Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai artifact bernama `AudioPlayer-release`.
 
 ## Rencana v2 (belum dibuat)
-- Equalizer
+- Equalizer (selesaikan wiring UI-nya)
 - Widget home screen
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)
