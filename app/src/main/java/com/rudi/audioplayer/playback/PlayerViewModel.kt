@@ -2,6 +2,7 @@ package com.rudi.audioplayer.playback
 
 import android.content.ComponentName
 import android.content.Context
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -18,12 +19,14 @@ import com.rudi.audioplayer.data.PlayStatsStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.PlaylistStore
 import com.rudi.audioplayer.data.Song
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class PlaybackUiState(
     val currentSong: Song? = null,
@@ -66,6 +69,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     val sleepTimerRemaining: StateFlow<Long?> = _sleepTimerRemaining.asStateFlow()
     private var sleepTimerJob: Job? = null
 
+    private val _accentColor = MutableStateFlow<Color?>(null)
+    val accentColor: StateFlow<Color?> = _accentColor.asStateFlow()
+
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
@@ -84,6 +90,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 playStatsStore.recordPlay(it.id)
                 _statsVersion.value += 1
             }
+            updateAccentColor(song)
             persistPlaybackState()
         }
 
@@ -139,6 +146,15 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             index = index,
             positionMs = c.currentPosition.coerceAtLeast(0)
         )
+    }
+
+    private fun updateAccentColor(song: Song?) {
+        viewModelScope.launch {
+            val color = withContext(Dispatchers.IO) {
+                AccentColorExtractor.extract(appContext, song?.albumId)
+            }
+            _accentColor.value = color
+        }
     }
 
     /** Looks up the last-played song for display, without starting playback. */

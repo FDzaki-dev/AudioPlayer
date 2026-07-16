@@ -1,6 +1,8 @@
 package com.rudi.audioplayer.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,9 +12,11 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
@@ -22,11 +26,17 @@ import com.rudi.audioplayer.playback.PlaybackUiState
 @Composable
 fun MiniPlayerBar(
     uiState: PlaybackUiState,
+    accentColor: Color?,
     onPlayPause: () -> Unit,
     onExpand: () -> Unit
 ) {
     val song = uiState.currentSong ?: return
     val haptic = LocalHapticFeedback.current
+    val animatedAccent by animateColorAsState(
+        targetValue = accentColor ?: MaterialTheme.colorScheme.primary,
+        animationSpec = tween(700),
+        label = "miniAccentColor"
+    )
 
     Surface(
         modifier = Modifier
@@ -71,6 +81,10 @@ fun MiniPlayerBar(
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onPlayPause()
                 },
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = animatedAccent,
+                    contentColor = MaterialTheme.colorScheme.background
+                ),
                 modifier = Modifier.size(40.dp)
             ) {
                 AnimatedContent(targetState = uiState.isPlaying, label = "miniPlayPause") { playing ->

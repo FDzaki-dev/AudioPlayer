@@ -121,6 +121,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsState()
     val statsVersion by playerViewModel.statsVersion.collectAsState()
     val playlists by playerViewModel.playlists.collectAsState()
+    val accentColor by playerViewModel.accentColor.collectAsState()
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
@@ -135,6 +136,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                 ) {
                     MiniPlayerBar(
                         uiState = uiState,
+                        accentColor = accentColor,
                         onPlayPause = { playerViewModel.togglePlayPause() },
                         onExpand = { navController.navigate("now_playing") }
                     )
@@ -235,6 +237,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     uiState = uiState,
                     isFavorite = uiState.currentSong?.let { favoriteIds.contains(it.id) } ?: false,
                     sleepTimerRemainingMs = sleepTimerRemaining,
+                    accentColor = accentColor,
                     onPlayPause = { playerViewModel.togglePlayPause() },
                     onNext = { playerViewModel.next() },
                     onPrevious = { playerViewModel.previous() },

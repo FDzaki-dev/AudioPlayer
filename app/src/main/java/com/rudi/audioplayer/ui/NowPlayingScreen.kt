@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.infiniteRepeatable
@@ -35,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -49,6 +51,7 @@ fun NowPlayingScreen(
     uiState: PlaybackUiState,
     isFavorite: Boolean,
     sleepTimerRemainingMs: Long?,
+    accentColor: Color?,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
@@ -75,12 +78,23 @@ fun NowPlayingScreen(
     var showQueueSheet by remember { mutableStateOf(false) }
     var showLyricsSheet by remember { mutableStateOf(false) }
 
+    val fallback = MaterialTheme.colorScheme.primary
+    val animatedAccent by animateColorAsState(
+        targetValue = accentColor ?: fallback,
+        animationSpec = tween(700),
+        label = "accentColor"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.background)
+                    listOf(
+                        animatedAccent.copy(alpha = 0.28f),
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.background
+                    )
                 )
             )
             .padding(24.dp),
@@ -102,7 +116,7 @@ fun NowPlayingScreen(
                 Icon(
                     Icons.Default.Timer,
                     contentDescription = "Sleep timer",
-                    tint = if (sleepTimerRemainingMs != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    tint = if (sleepTimerRemainingMs != null) animatedAccent else MaterialTheme.colorScheme.secondary
                 )
             }
             IconButton(onClick = { showSpeedDialog = true }) {
@@ -133,6 +147,7 @@ fun NowPlayingScreen(
         VinylAlbumArt(
             albumId = song?.albumId,
             isPlaying = uiState.isPlaying,
+            accentColor = animatedAccent,
             onSwipeNext = onNext,
             onSwipePrevious = onPrevious
         )
@@ -142,7 +157,7 @@ fun NowPlayingScreen(
         Text(
             "SEDANG DIPUTAR",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.secondary
+            color = animatedAccent
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -162,8 +177,8 @@ fun NowPlayingScreen(
             onValueChangeFinished = { onSeek(sliderPosition.toLong()) },
             valueRange = 0f..(uiState.duration.coerceAtLeast(1L).toFloat()),
             colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
+                thumbColor = animatedAccent,
+                activeTrackColor = animatedAccent,
                 inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         )
@@ -187,7 +202,7 @@ fun NowPlayingScreen(
                 Icon(
                     Icons.Default.Shuffle,
                     contentDescription = "Acak",
-                    tint = if (uiState.shuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    tint = if (uiState.shuffleEnabled) animatedAccent else MaterialTheme.colorScheme.secondary
                 )
             }
             IconButton(onClick = onPrevious) {
@@ -198,6 +213,10 @@ fun NowPlayingScreen(
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onPlayPause()
                 },
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = animatedAccent,
+                    contentColor = MaterialTheme.colorScheme.background
+                ),
                 modifier = Modifier.size(68.dp)
             ) {
                 AnimatedContent(targetState = uiState.isPlaying, label = "playPause") { playing ->
@@ -216,7 +235,7 @@ fun NowPlayingScreen(
                 Icon(
                     icon,
                     contentDescription = "Ulangi",
-                    tint = if (uiState.repeatMode != Player.REPEAT_MODE_OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    tint = if (uiState.repeatMode != Player.REPEAT_MODE_OFF) animatedAccent else MaterialTheme.colorScheme.secondary
                 )
             }
         }
@@ -309,6 +328,7 @@ fun NowPlayingScreen(
 private fun VinylAlbumArt(
     albumId: Long?,
     isPlaying: Boolean,
+    accentColor: Color,
     onSwipeNext: () -> Unit,
     onSwipePrevious: () -> Unit
 ) {
@@ -357,7 +377,7 @@ private fun VinylAlbumArt(
                 .size(260.dp)
                 .graphicsLayer { rotationZ = rotation.value }
                 .clip(CircleShape)
-                .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                .border(3.dp, accentColor, CircleShape)
         )
         Box(
             modifier = Modifier
