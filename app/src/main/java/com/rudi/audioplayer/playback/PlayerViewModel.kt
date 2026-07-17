@@ -14,6 +14,7 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import com.rudi.audioplayer.data.FavoritesStore
 import com.rudi.audioplayer.data.LyricsStore
+import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.PlayStatsStore
 import com.rudi.audioplayer.data.Playlist
@@ -72,6 +73,14 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val _accentColor = MutableStateFlow<Color?>(null)
     val accentColor: StateFlow<Color?> = _accentColor.asStateFlow()
 
+    private val _librarySongs = MutableStateFlow<List<Song>>(emptyList())
+    val librarySongs: StateFlow<List<Song>> = _librarySongs.asStateFlow()
+
+    private val _libraryLoading = MutableStateFlow(true)
+    val libraryLoading: StateFlow<Boolean> = _libraryLoading.asStateFlow()
+
+    private var libraryLoadedOnce = false
+
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
@@ -119,6 +128,23 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             controller?.addListener(playerListener)
             startPositionLoop()
         }, MoreExecutors.directExecutor())
+        ensureLibraryLoaded()
+    }
+
+    /** Scans MediaStore once and caches the result so Home/Library/Playlist don't each scan independently. */
+    fun ensureLibraryLoaded() {
+        if (libraryLoadedOnce) return
+        refreshLibrary()
+    }
+
+    /** Forces a fresh MediaStore scan (used by the Library screen's "Pindai Ulang" button). */
+    fun refreshLibrary() {
+        libraryLoadedOnce = true
+        viewModelScope.launch {
+            _libraryLoading.value = true
+            _librarySongs.value = withContext(Dispatchers.IO) { MusicRepository(appContext).getAllSongs() }
+            _libraryLoading.value = false
+        }
     }
 
     private fun startPositionLoop() {

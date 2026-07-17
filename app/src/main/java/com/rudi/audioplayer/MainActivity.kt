@@ -171,6 +171,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val statsVersion by playerViewModel.statsVersion.collectAsState()
     val playlists by playerViewModel.playlists.collectAsState()
     val accentColor by playerViewModel.accentColor.collectAsState()
+    val librarySongs by playerViewModel.librarySongs.collectAsState()
+    val libraryLoading by playerViewModel.libraryLoading.collectAsState()
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
@@ -226,6 +228,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
         ) {
             composable("home") {
                 HomeScreen(
+                    rawSongs = librarySongs,
+                    loading = libraryLoading,
                     favoriteIds = favoriteIds,
                     onSongClick = { songs, index -> playerViewModel.playQueue(songs, index) },
                     resumePreview = { songs -> playerViewModel.peekSavedSong(songs) },
@@ -238,6 +242,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
             }
             composable("library") {
                 LibraryScreen(
+                    rawSongs = librarySongs,
+                    loading = libraryLoading,
+                    onRescan = { playerViewModel.refreshLibrary() },
                     favoriteIds = favoriteIds,
                     onToggleFavorite = { playerViewModel.toggleFavorite(it) },
                     onSongClick = { songs, index -> playerViewModel.playQueue(songs, index) },

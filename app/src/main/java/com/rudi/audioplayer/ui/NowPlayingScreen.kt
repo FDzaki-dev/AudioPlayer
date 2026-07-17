@@ -34,12 +34,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
@@ -85,21 +88,37 @@ fun NowPlayingScreen(
         label = "accentColor"
     )
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        animatedAccent.copy(alpha = 0.28f),
-                        MaterialTheme.colorScheme.surface,
-                        MaterialTheme.colorScheme.background
+    Box(modifier = Modifier.fillMaxSize()) {
+        AsyncImage(
+            model = song?.albumId?.let { albumArtUri(it) },
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(60.dp)
+                .alpha(0.5f)
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            animatedAccent.copy(alpha = 0.35f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.75f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.97f)
+                        )
                     )
                 )
-            )
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
                 Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Tutup")
@@ -270,6 +289,7 @@ fun NowPlayingScreen(
                     inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             )
+        }
         }
     }
 

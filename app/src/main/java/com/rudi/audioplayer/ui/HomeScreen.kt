@@ -21,14 +21,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.rudi.audioplayer.data.LibraryFilterStore
-import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.Song
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 @Composable
 fun HomeScreen(
+    rawSongs: List<Song>,
+    loading: Boolean,
     favoriteIds: Set<Long>,
     onSongClick: (List<Song>, Int) -> Unit,
     resumePreview: (List<Song>) -> Song?,
@@ -39,14 +38,7 @@ fun HomeScreen(
     onShuffleAll: (List<Song>) -> Unit
 ) {
     val context = LocalContext.current
-    var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-        val raw = withContext(Dispatchers.IO) { MusicRepository(context).getAllSongs() }
-        songs = LibraryFilterStore(context).apply(raw)
-        loading = false
-    }
+    val songs = remember(rawSongs) { LibraryFilterStore(context).apply(rawSongs) }
 
     val continueSong = remember(songs) { if (songs.isEmpty()) null else resumePreview(songs) }
     val favoriteSongs = remember(songs, favoriteIds) { songs.filter { favoriteIds.contains(it.id) } }

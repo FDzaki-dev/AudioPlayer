@@ -23,6 +23,9 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Kelola folder**: pilih folder mana saja yang mau disertakan/dikecualikan dari pemindaian musik
 - **Filter Perpustakaan tersimpan**: tab yang terakhir dipilih (Lagu/Album/Artis/Folder/dst.) diingat di antar sesi
 - **Onboarding**: layar selamat datang menjelaskan kenapa izin dibutuhkan sebelum dialog izin muncul, dengan fallback "Buka Pengaturan Aplikasi" kalau izin ditolak permanen
+- **Optimalisasi**: pemindaian MediaStore kini terpusat satu kali di ViewModel (bukan diulang di setiap Beranda/Perpustakaan/Playlist), mengurangi kerja I/O berulang dan flicker loading tiap pindah tab
+- **Navigasi gesture back**: gesture back sistem sekarang navigasi bertahap sesuai stack (Now Playing → Perpustakaan/Beranda), bukan langsung keluar aplikasi
+- **Now Playing lebih atmosferik**: backdrop blur dari album art (seperti Spotify/Apple Music) di belakang piringan hitam yang berputar, dipadu warna aksen dinamis per lagu
 
 ## Belum selesai / dalam pengerjaan
 - `EqualizerController.kt` sudah ada (baca/tulis band frekuensi, preset, persist ke SharedPreferences) tapi **belum disambungkan** ke ViewModel maupun UI manapun

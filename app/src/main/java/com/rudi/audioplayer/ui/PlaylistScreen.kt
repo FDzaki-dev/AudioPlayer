@@ -16,18 +16,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.Song
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /** Playlist tab content: list of playlists, or the detail view of a selected one. */
 @Composable
 fun PlaylistTabView(
+    allSongs: List<Song>,
     playlists: List<Playlist>,
     onSongClick: (List<Song>, Int) -> Unit,
     onCreatePlaylist: (String) -> Unit,
@@ -36,12 +33,6 @@ fun PlaylistTabView(
     onRemoveSongFromPlaylist: (String, Long) -> Unit,
     onMoveSongInPlaylist: (String, Int, Int) -> Unit
 ) {
-    val context = LocalContext.current
-    var allSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
-    LaunchedEffect(Unit) {
-        allSongs = withContext(Dispatchers.IO) { MusicRepository(context).getAllSongs() }
-    }
-
     var selectedPlaylistId by remember { mutableStateOf<String?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }

@@ -43,14 +43,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.rudi.audioplayer.data.LibraryFilterStore
-import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.Song
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Composable
 fun LibraryScreen(
+    rawSongs: List<Song>,
+    loading: Boolean,
+    onRescan: () -> Unit,
     favoriteIds: Set<Long>,
     onToggleFavorite: (Long) -> Unit,
     onSongClick: (List<Song>, Int) -> Unit,
@@ -66,21 +66,12 @@ fun LibraryScreen(
 ) {
     val context = LocalContext.current
     val filterStore = remember { LibraryFilterStore(context) }
-    var rawSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableStateOf(0) }
-    var refreshKey by remember { mutableStateOf(0) }
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var songForPlaylistDialog by remember { mutableStateOf<Song?>(null) }
     var showFolderManager by remember { mutableStateOf(false) }
     var filterVersion by remember { mutableStateOf(0) }
-
-    LaunchedEffect(refreshKey) {
-        loading = true
-        rawSongs = withContext(Dispatchers.IO) { MusicRepository(context).getAllSongs() }
-        loading = false
-    }
 
     val songs = remember(rawSongs, filterVersion) { filterStore.apply(rawSongs) }
 
@@ -136,7 +127,7 @@ fun LibraryScreen(
                 searchActive = !searchActive
                 if (!searchActive) searchQuery = ""
             },
-            onRescan = { refreshKey++ },
+            onRescan = onRescan,
             onOpenFolderManager = { showFolderManager = true }
         )
 
@@ -156,7 +147,7 @@ fun LibraryScreen(
                 title = "Belum ada musik",
                 subtitle = "Tambahkan file audio ke penyimpanan perangkat, lalu pindai ulang.",
                 actionLabel = "Pindai Ulang",
-                onAction = { refreshKey++ }
+                onAction = onRescan
             )
             selectedTab == 4 -> {
                 val favoriteSongs = filteredSongs.filter { favoriteIds.contains(it.id) }
@@ -170,6 +161,7 @@ fun LibraryScreen(
                 }
             }
             selectedTab == 5 -> PlaylistTabView(
+                allSongs = rawSongs,
                 playlists = playlists,
                 onSongClick = onSongClick,
                 onCreatePlaylist = { name -> onCreatePlaylist(name) },
