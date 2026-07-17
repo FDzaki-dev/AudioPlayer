@@ -26,6 +26,12 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Optimalisasi**: pemindaian MediaStore kini terpusat satu kali di ViewModel (bukan diulang di setiap Beranda/Perpustakaan/Playlist), mengurangi kerja I/O berulang dan flicker loading tiap pindah tab
 - **Navigasi gesture back**: gesture back sistem sekarang navigasi bertahap sesuai stack (Now Playing → Perpustakaan/Beranda), bukan langsung keluar aplikasi
 - **Now Playing lebih atmosferik**: backdrop blur dari album art (seperti Spotify/Apple Music) di belakang piringan hitam yang berputar, dipadu warna aksen dinamis per lagu
+- **Micro-interaction**: tombol play/pause, shuffle, repeat, favorit, dan navigasi lagu kini punya animasi "bounce" halus tiap ditekan — bukan cuma ganti ikon instan
+- **Status bar & navigation bar** dipaksa kontras terang, konsisten dengan tema gelap aplikasi, tidak ikut mode terang/gelap sistem
+- **Shimmer skeleton loading** kini konsisten di Beranda (bentuknya persis kartu asli), bukan cuma spinner generik
+- **Haptic diperluas**: reorder antrean, hapus dari antrean, dan berhasil tambah ke playlist masing-masing punya pola getar berbeda
+- **Search dikelompokkan**: hasil pencarian dipisah per Artis / Album / Lagu (bukan satu list rata), plus riwayat pencarian terbaru saat kolom pencarian masih kosong
+- **Transisi Now Playing**: piringan hitam "tumbuh" masuk dengan animasi scale-spring saat layar dibuka, alih-alih muncul instan penuh
 
 ## Belum selesai / dalam pengerjaan
 - `EqualizerController.kt` sudah ada (baca/tulis band frekuensi, preset, persist ke SharedPreferences) tapi **belum disambungkan** ke ViewModel maupun UI manapun

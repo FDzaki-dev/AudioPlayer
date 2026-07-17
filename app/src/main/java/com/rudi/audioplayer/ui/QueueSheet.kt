@@ -16,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,6 +39,7 @@ fun QueueSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val listState = rememberLazyListState()
+    val haptic = LocalHapticFeedback.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -73,9 +76,18 @@ fun QueueSheet(
                         canMoveDown = index < queue.lastIndex,
                         canRemove = queue.size > 1,
                         onClick = { onPlayIndex(index) },
-                        onMoveUp = { onMove(index, index - 1) },
-                        onMoveDown = { onMove(index, index + 1) },
-                        onRemove = { onRemove(index) }
+                        onMoveUp = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onMove(index, index - 1)
+                        },
+                        onMoveDown = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onMove(index, index + 1)
+                        },
+                        onRemove = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onRemove(index)
+                        }
                     )
                 }
             }

@@ -3,8 +3,10 @@ package com.rudi.audioplayer.ui
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,9 +15,11 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -50,7 +54,13 @@ fun MiniPlayerBar(
         shape = RoundedCornerShape(20.dp)
     ) {
         Row(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(animatedAccent.copy(alpha = 0.16f), Color.Transparent)
+                    )
+                )
+                .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
@@ -76,16 +86,20 @@ fun MiniPlayerBar(
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
+            val playPauseInteraction = remember { MutableInteractionSource() }
             FilledIconButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onPlayPause()
                 },
+                interactionSource = playPauseInteraction,
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = animatedAccent,
                     contentColor = MaterialTheme.colorScheme.background
                 ),
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier
+                    .size(40.dp)
+                    .bouncyPress(playPauseInteraction, pressedScale = 0.82f)
             ) {
                 AnimatedContent(targetState = uiState.isPlaying, label = "miniPlayPause") { playing ->
                     Icon(
