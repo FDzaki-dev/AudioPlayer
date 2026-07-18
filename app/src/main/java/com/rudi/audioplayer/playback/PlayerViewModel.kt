@@ -118,6 +118,36 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         override fun onVolumeChanged(volume: Float) {
             _uiState.value = _uiState.value.copy(volume = volume)
         }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_ENDED) {
+                continuePlaybackIfQueueEnded()
+            }
+        }
+    }
+
+    /**
+     * When the queue plays through to the end with repeat off, keep the music going with
+     * more songs from the library instead of falling silent — the "radio continues" feel
+     * of Spotify/YouTube Music, built from purely local data (no streaming catalog needed).
+     */
+    private fun continuePlaybackIfQueueEnded() {
+        val c = controller ?: return
+        if (c.repeatMode != Player.REPEAT_MODE_OFF) return
+        val library = _librarySongs.value
+        if (library.isEmpty()) return
+
+        val queuedIds = currentQueue.map { it.id }.toSet()
+        val candidates = library.filter { it.id !in queuedIds }
+        val pool = if (candidates.isEmpty()) library else candidates
+        val toAdd = pool.shuffled().take(20)
+        if (toAdd.isEmpty()) return
+
+        c.addMediaItems(toAdd.map { mediaItemFor(it) })
+        currentQueue = currentQueue + toAdd
+        _uiState.value = _uiState.value.copy(queue = currentQueue)
+        c.seekToNextMediaItem()
+        c.play()
     }
 
     fun connect() {
@@ -290,6 +320,26 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     }
 
     /** Resolves recently-played song IDs against the freshly scanned library, most recent first. */
+    /**
+     * The closest honest local equivalent to a streaming service's algorithmic "Artist Mix":
+     * finds the artist the user actually listens to most (from real play counts, not a guess)
+     * and returns their other songs. Returns null until there's enough listening history.
+     */
+    fun getTopArtistMix(allSongs: List<Song>): Pair<String, List<Song>>? {
+        val mostPlayedIds = playStatsStore.getMostPlayedIds(50)
+        if (mostPlayedIds.isEmpty()) return null
+        val songMap = allSongs.associateBy { it.id }
+        val topArtist = mostPlayedIds.mapNotNull { songMap[it]?.artist }
+            .filter { it.isNotBlank() }
+            .groupingBy { it }
+            .eachCount()
+            .maxByOrNull { it.value }
+            ?.key ?: return null
+        val artistSongs = allSongs.filter { it.artist == topArtist }
+        if (artistSongs.size < 3) return null
+        return topArtist to artistSongs
+    }
+
     fun getRecentSongs(allSongs: List<Song>, limit: Int = 15): List<Song> {
         val songMap = allSongs.associateBy { it.id }
         return playStatsStore.getRecentIds(limit).mapNotNull { songMap[it] }

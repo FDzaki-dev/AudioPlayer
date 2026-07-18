@@ -4,12 +4,15 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -48,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import com.rudi.audioplayer.playback.PlaybackUiState
+import kotlinx.coroutines.launch
 
 @Composable
 fun NowPlayingScreen(
@@ -116,7 +120,7 @@ fun NowPlayingScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -124,7 +128,15 @@ fun NowPlayingScreen(
                 Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Tutup")
             }
             Spacer(modifier = Modifier.weight(1f))
-            IconButton(onClick = onToggleFavorite) {
+            val favoriteInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onToggleFavorite()
+                },
+                interactionSource = favoriteInteraction,
+                modifier = Modifier.bouncyPress(favoriteInteraction, pressedScale = 0.75f)
+            ) {
                 Icon(
                     if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (isFavorite) "Hapus dari favorit" else "Tambah ke favorit",
@@ -163,13 +175,33 @@ fun NowPlayingScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        VinylAlbumArt(
-            albumId = song?.albumId,
-            isPlaying = uiState.isPlaying,
-            accentColor = animatedAccent,
-            onSwipeNext = onNext,
-            onSwipePrevious = onPrevious
-        )
+        val entranceScale = remember { Animatable(0.55f) }
+        val entranceAlpha = remember { Animatable(0f) }
+        LaunchedEffect(Unit) {
+            launch {
+                entranceScale.animateTo(
+                    1f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+                )
+            }
+            launch { entranceAlpha.animateTo(1f, animationSpec = tween(280)) }
+        }
+
+        Box(
+            modifier = Modifier.graphicsLayer {
+                scaleX = entranceScale.value
+                scaleY = entranceScale.value
+                alpha = entranceAlpha.value
+            }
+        ) {
+            VinylAlbumArt(
+                albumId = song?.albumId,
+                isPlaying = uiState.isPlaying,
+                accentColor = animatedAccent,
+                onSwipeNext = onNext,
+                onSwipePrevious = onPrevious
+            )
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -217,26 +249,40 @@ fun NowPlayingScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onShuffle) {
+            val shuffleInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = onShuffle,
+                interactionSource = shuffleInteraction,
+                modifier = Modifier.bouncyPress(shuffleInteraction)
+            ) {
                 Icon(
                     Icons.Default.Shuffle,
                     contentDescription = "Acak",
                     tint = if (uiState.shuffleEnabled) animatedAccent else MaterialTheme.colorScheme.secondary
                 )
             }
-            IconButton(onClick = onPrevious) {
+            val prevInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = onPrevious,
+                interactionSource = prevInteraction,
+                modifier = Modifier.bouncyPress(prevInteraction)
+            ) {
                 Icon(Icons.Default.SkipPrevious, contentDescription = "Sebelumnya", modifier = Modifier.size(36.dp))
             }
+            val playPauseInteraction = remember { MutableInteractionSource() }
             FilledIconButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onPlayPause()
                 },
+                interactionSource = playPauseInteraction,
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = animatedAccent,
                     contentColor = MaterialTheme.colorScheme.background
                 ),
-                modifier = Modifier.size(68.dp)
+                modifier = Modifier
+                    .size(68.dp)
+                    .bouncyPress(playPauseInteraction, pressedScale = 0.85f)
             ) {
                 AnimatedContent(targetState = uiState.isPlaying, label = "playPause") { playing ->
                     Icon(
@@ -246,10 +292,20 @@ fun NowPlayingScreen(
                     )
                 }
             }
-            IconButton(onClick = onNext) {
+            val nextInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = onNext,
+                interactionSource = nextInteraction,
+                modifier = Modifier.bouncyPress(nextInteraction)
+            ) {
                 Icon(Icons.Default.SkipNext, contentDescription = "Berikutnya", modifier = Modifier.size(36.dp))
             }
-            IconButton(onClick = onRepeat) {
+            val repeatInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = onRepeat,
+                interactionSource = repeatInteraction,
+                modifier = Modifier.bouncyPress(repeatInteraction)
+            ) {
                 val icon = if (uiState.repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
                 Icon(
                     icon,

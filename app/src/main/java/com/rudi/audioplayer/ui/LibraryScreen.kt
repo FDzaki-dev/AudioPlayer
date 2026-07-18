@@ -19,10 +19,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.QueueMusic
@@ -39,11 +42,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.Playlist
+import com.rudi.audioplayer.data.SearchHistoryStore
 import com.rudi.audioplayer.data.Song
 
 @Composable
@@ -65,7 +71,10 @@ fun LibraryScreen(
     onMoveSongInPlaylist: (String, Int, Int) -> Unit
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val filterStore = remember { LibraryFilterStore(context) }
+    val searchHistoryStore = remember { SearchHistoryStore(context) }
+    var searchHistory by remember { mutableStateOf(searchHistoryStore.getHistory()) }
     var selectedTab by remember { mutableStateOf(0) }
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -139,8 +148,39 @@ fun LibraryScreen(
             )
         }
 
-        LibraryFilterChips(selectedTab = selectedTab, onSelect = { selectedTab = it })
+        if (!searchActive) {
+            LibraryFilterChips(selectedTab = selectedTab, onSelect = { selectedTab = it })
+        }
 
+        if (searchActive) {
+            if (searchQuery.isBlank()) {
+                SearchHistoryView(
+                    history = searchHistory,
+                    onSelect = { q -> searchQuery = q },
+                    onClear = {
+                        searchHistoryStore.clear()
+                        searchHistory = emptyList()
+                    }
+                )
+            } else {
+                SearchResultsView(
+                    query = searchQuery,
+                    songs = songs,
+                    favoriteIds = favoriteIds,
+                    onToggleFavorite = onToggleFavorite,
+                    onSongClick = { list, index ->
+                        searchHistoryStore.record(searchQuery)
+                        searchHistory = searchHistoryStore.getHistory()
+                        onSongClick(list, index)
+                    },
+                    onGroupSelect = { name -> searchQuery = name },
+                    onPlayNext = playNext,
+                    onAddToQueue = addToQueue,
+                    onAddToPlaylist = addToPlaylist,
+                    onHideSong = hideSong
+                )
+            }
+        } else {
         when {
             loading -> ShimmerList()
             songs.isEmpty() -> EmptyState(
@@ -209,6 +249,7 @@ fun LibraryScreen(
                 onHideSong = hideSong
             )
         }
+        }
     }
 
     val pendingSong = songForPlaylistDialog
@@ -218,6 +259,7 @@ fun LibraryScreen(
             playlists = playlists,
             onAddToExisting = { playlist ->
                 val added = onAddSongToPlaylist(playlist.id, pendingSong.id)
+                if (added) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 Toast.makeText(
                     context,
                     if (added) "Ditambahkan ke \"${playlist.name}\"" else "Sudah ada di \"${playlist.name}\"",
@@ -228,6 +270,7 @@ fun LibraryScreen(
             onCreateAndAdd = { name ->
                 val playlist = onCreatePlaylist(name)
                 onAddSongToPlaylist(playlist.id, pendingSong.id)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 Toast.makeText(context, "Dibuat & ditambahkan ke \"${playlist.name}\"", Toast.LENGTH_SHORT).show()
                 songForPlaylistDialog = null
             },
@@ -341,6 +384,142 @@ private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
 }
 
 @Composable
+private fun SearchHistoryView(
+    history: List<String>,
+    onSelect: (String) -> Unit,
+    onClear: () -> Unit
+) {
+    if (history.isEmpty()) {
+        EmptyState(
+            title = "Cari lagu, album, atau artis",
+            subtitle = "Riwayat pencarian kamu akan muncul di sini."
+        )
+        return
+    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Pencarian Terbaru",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onClear) { Text("Hapus") }
+        }
+        LazyColumn {
+            items(history) { query ->
+                ListItem(
+                    headlineContent = { Text(query) },
+                    leadingContent = { Icon(Icons.Default.History, contentDescription = null) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier
+                        .clickable { onSelect(query) }
+                        .padding(horizontal = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchSectionLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.secondary,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+    )
+}
+
+/** Search results grouped by type — Artis / Album / Lagu — like big-name music apps, instead of one flat list. */
+@Composable
+private fun SearchResultsView(
+    query: String,
+    songs: List<Song>,
+    favoriteIds: Set<Long>,
+    onToggleFavorite: (Long) -> Unit,
+    onSongClick: (List<Song>, Int) -> Unit,
+    onGroupSelect: (String) -> Unit,
+    onPlayNext: (Song) -> Unit,
+    onAddToQueue: (Song) -> Unit,
+    onAddToPlaylist: (Song) -> Unit,
+    onHideSong: (Song) -> Unit
+) {
+    val matchedSongs = remember(songs, query) {
+        songs.filter {
+            it.title.contains(query, ignoreCase = true) || it.artist.contains(query, ignoreCase = true)
+        }
+    }
+    val matchedArtists = remember(songs, query) {
+        songs.map { it.artist }.distinct()
+            .filter { it.isNotBlank() && it.contains(query, ignoreCase = true) }
+            .sorted()
+            .take(6)
+    }
+    val matchedAlbums = remember(songs, query) {
+        songs.map { it.album }.distinct()
+            .filter { it.isNotBlank() && it.contains(query, ignoreCase = true) }
+            .sorted()
+            .take(6)
+    }
+
+    if (matchedSongs.isEmpty() && matchedArtists.isEmpty() && matchedAlbums.isEmpty()) {
+        EmptyState(title = "Tidak ditemukan", subtitle = "Coba kata kunci lain.")
+        return
+    }
+
+    LazyColumn {
+        if (matchedArtists.isNotEmpty()) {
+            item { SearchSectionLabel("Artis") }
+            items(matchedArtists) { artist ->
+                ListItem(
+                    headlineContent = { Text(artist) },
+                    leadingContent = { Icon(Icons.Default.Person, contentDescription = null) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier
+                        .clickable { onGroupSelect(artist) }
+                        .padding(horizontal = 4.dp)
+                )
+            }
+        }
+        if (matchedAlbums.isNotEmpty()) {
+            item { SearchSectionLabel("Album") }
+            items(matchedAlbums) { album ->
+                ListItem(
+                    headlineContent = { Text(album) },
+                    leadingContent = { Icon(Icons.Default.Album, contentDescription = null) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier
+                        .clickable { onGroupSelect(album) }
+                        .padding(horizontal = 4.dp)
+                )
+            }
+        }
+        if (matchedSongs.isNotEmpty()) {
+            item { SearchSectionLabel("Lagu") }
+            itemsIndexed(matchedSongs) { index, song ->
+                SongRow(
+                    song = song,
+                    isFavorite = favoriteIds.contains(song.id),
+                    onFavoriteToggle = { onToggleFavorite(song.id) },
+                    onClick = { onSongClick(matchedSongs, index) },
+                    onPlayNext = { onPlayNext(song) },
+                    onAddToQueue = { onAddToQueue(song) },
+                    onAddToPlaylist = { onAddToPlaylist(song) },
+                    onHideSong = { onHideSong(song) }
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
 private fun SongListView(
     songs: List<Song>,
     favoriteIds: Set<Long>,
@@ -390,7 +569,9 @@ private fun GroupedListView(
                     headlineContent = { Text(group, style = MaterialTheme.typography.titleMedium) },
                     supportingContent = { Text("${grouped[group]?.size ?: 0} lagu") },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    modifier = Modifier.clickable { selectedGroup = group }
+                    modifier = Modifier
+                        .clickable { selectedGroup = group }
+                        .padding(horizontal = 4.dp)
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             }
@@ -437,14 +618,7 @@ private fun SongRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .combinedClickable(onClick = onClick, onLongClick = { showMenu = true })
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AsyncImage(
-                model = albumArtUri(song.albumId),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(48.dp)
+                .padding(horizontal = 20.dp, vertical = 8.dp),
                     .clip(RoundedCornerShape(12.dp))
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -539,7 +713,7 @@ fun EmptyState(
 }
 
 @Composable
-private fun ShimmerBrush(): Brush {
+fun ShimmerBrush(): Brush {
     val transition = rememberInfiniteTransition(label = "shimmer")
     val translateAnim by transition.animateFloat(
         initialValue = 0f,
@@ -565,7 +739,7 @@ private fun ShimmerRow() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(

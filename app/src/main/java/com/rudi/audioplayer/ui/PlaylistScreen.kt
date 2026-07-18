@@ -100,7 +100,7 @@ fun PlaylistTabView(
                 Text(
                     selectedPlaylist.name,
                     style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
                 )
 
                 if (playlistSongs.isEmpty()) {
@@ -170,7 +170,7 @@ private fun PlaylistSongRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {

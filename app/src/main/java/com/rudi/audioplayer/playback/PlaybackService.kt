@@ -2,6 +2,8 @@ package com.rudi.audioplayer.playback
 
 import android.app.PendingIntent
 import android.content.Intent
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -14,7 +16,20 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
-        val player = ExoPlayer.Builder(this).build()
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+
+        val player = ExoPlayer.Builder(this)
+            // true = ExoPlayer requests/abandons audio focus automatically, ducking or
+            // pausing when a call, notification sound, or another app needs the output.
+            .setAudioAttributes(audioAttributes, true)
+            // Auto-pauses when headphones are unplugged or a Bluetooth device disconnects,
+            // instead of blasting through the speaker unannounced — table stakes in every
+            // major music app.
+            .setHandleAudioBecomingNoisy(true)
+            .build()
 
         val sessionActivityIntent = PendingIntent.getActivity(
             this,
