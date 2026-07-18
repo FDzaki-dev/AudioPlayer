@@ -1,7 +1,9 @@
 package com.rudi.audioplayer.playback
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.exoplayer.ExoPlayer
@@ -21,6 +23,12 @@ class PlaybackService : MediaSessionService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
+        // Generated explicitly (rather than left to lazy ExoPlayer default) so the Equalizer can
+        // attach to a known, stable session ID from PlayerViewModel — see PlaybackAudioSession.
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val audioSessionId = audioManager.generateAudioSessionId()
+        PlaybackAudioSession.sessionId = audioSessionId
+
         val player = ExoPlayer.Builder(this)
             // true = ExoPlayer requests/abandons audio focus automatically, ducking or
             // pausing when a call, notification sound, or another app needs the output.
@@ -29,6 +37,7 @@ class PlaybackService : MediaSessionService() {
             // instead of blasting through the speaker unannounced — table stakes in every
             // major music app.
             .setHandleAudioBecomingNoisy(true)
+            .setAudioSessionId(audioSessionId)
             .build()
 
         val sessionActivityIntent = PendingIntent.getActivity(

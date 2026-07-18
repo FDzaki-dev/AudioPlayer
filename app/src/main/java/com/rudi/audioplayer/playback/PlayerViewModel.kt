@@ -393,11 +393,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     fun deleteLyrics(songId: Long) = lyricsStore.deleteLyrics(songId)
 
-    /** Attaches the equalizer to the current playback session. Call when the Equalizer sheet opens —
-     * the audio session ID is only valid once playback has actually started. Safe to call repeatedly. */
+    /** Attaches the equalizer to the current playback session. Call when the Equalizer sheet opens.
+     * Safe to call repeatedly. */
     fun ensureEqualizerAttached() {
-        val sessionId = controller?.audioSessionId ?: 0
-        equalizerController.attach(sessionId)
+        equalizerController.attach(PlaybackAudioSession.sessionId)
     }
 
     fun setEqualizerEnabled(enabled: Boolean) = equalizerController.setEnabled(enabled)
