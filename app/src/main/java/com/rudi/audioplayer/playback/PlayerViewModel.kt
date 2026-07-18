@@ -52,6 +52,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val playStatsStore = PlayStatsStore(appContext)
     private val playlistStore = PlaylistStore(appContext)
     private val lyricsStore = LyricsStore(appContext)
+    private val equalizerController = EqualizerController(appContext)
+    val equalizerState: StateFlow<EqualizerUiState> = equalizerController.state
     private var positionTick = 0
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
@@ -391,6 +393,19 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     fun deleteLyrics(songId: Long) = lyricsStore.deleteLyrics(songId)
 
+    /** Attaches the equalizer to the current playback session. Call when the Equalizer sheet opens —
+     * the audio session ID is only valid once playback has actually started. Safe to call repeatedly. */
+    fun ensureEqualizerAttached() {
+        val sessionId = controller?.audioSessionId ?: 0
+        equalizerController.attach(sessionId)
+    }
+
+    fun setEqualizerEnabled(enabled: Boolean) = equalizerController.setEnabled(enabled)
+
+    fun setEqualizerBand(band: Int, level: Short) = equalizerController.setBandLevel(band, level)
+
+    fun useEqualizerPreset(presetIndex: Int) = equalizerController.usePreset(presetIndex)
+
     fun togglePlayPause() {
         controller?.let { if (it.isPlaying) it.pause() else it.play() }
     }
@@ -460,6 +475,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     override fun onCleared() {
         sleepTimerJob?.cancel()
+        equalizerController.release()
         controller?.release()
         super.onCleared()
     }

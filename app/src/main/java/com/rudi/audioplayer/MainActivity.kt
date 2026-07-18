@@ -175,6 +175,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val statsVersion by playerViewModel.statsVersion.collectAsState()
     val playlists by playerViewModel.playlists.collectAsState()
     val accentColor by playerViewModel.accentColor.collectAsState()
+    val equalizerState by playerViewModel.equalizerState.collectAsState()
     val librarySongs by playerViewModel.librarySongs.collectAsState()
     val libraryLoading by playerViewModel.libraryLoading.collectAsState()
 
@@ -316,6 +317,11 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onGetLyrics = { id -> playerViewModel.getLyrics(id) },
                     onSaveLyrics = { id, text -> playerViewModel.saveLyrics(id, text) },
                     onDeleteLyrics = { id -> playerViewModel.deleteLyrics(id) },
+                    equalizerState = equalizerState,
+                    onOpenEqualizer = { playerViewModel.ensureEqualizerAttached() },
+                    onToggleEqualizerEnabled = { playerViewModel.setEqualizerEnabled(it) },
+                    onEqualizerBandChange = { band, level -> playerViewModel.setEqualizerBand(band, level) },
+                    onEqualizerPresetSelect = { index -> playerViewModel.useEqualizerPreset(index) },
                     onBack = { navController.popBackStack() }
                 )
             }
