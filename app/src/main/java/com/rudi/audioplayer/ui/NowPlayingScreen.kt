@@ -70,6 +70,8 @@ fun NowPlayingScreen(
     onCancelSleepTimer: () -> Unit,
     onSetSpeed: (Float) -> Unit,
     onSetVolume: (Float) -> Unit,
+    crossfadeEnabled: Boolean,
+    onSetCrossfadeEnabled: (Boolean) -> Unit,
     onPlayQueueIndex: (Int) -> Unit,
     onMoveQueueItem: (Int, Int) -> Unit,
     onRemoveFromQueue: (Int) -> Unit,
@@ -361,8 +363,10 @@ fun NowPlayingScreen(
     if (showSpeedDialog) {
         SpeedDialog(
             currentSpeed = uiState.playbackSpeed,
+            crossfadeEnabled = crossfadeEnabled,
             onDismiss = { showSpeedDialog = false },
-            onSelect = onSetSpeed
+            onSelect = onSetSpeed,
+            onToggleCrossfade = onSetCrossfadeEnabled
         )
     }
 
@@ -511,17 +515,28 @@ private fun SleepTimerDialog(
 }
 
 @Composable
-private fun SpeedDialog(currentSpeed: Float, onDismiss: () -> Unit, onSelect: (Float) -> Unit) {
+private fun SpeedDialog(
+    currentSpeed: Float,
+    crossfadeEnabled: Boolean,
+    onDismiss: () -> Unit,
+    onSelect: (Float) -> Unit,
+    onToggleCrossfade: (Boolean) -> Unit
+) {
     val options = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Kecepatan Putar") },
+        title = { Text("Pengaturan Putar") },
         text = {
             Column {
+                Text(
+                    "Kecepatan",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
                 options.forEach { speed ->
                     val isSelected = speed == currentSpeed
                     TextButton(
-                        onClick = { onSelect(speed); onDismiss() },
+                        onClick = { onSelect(speed) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
@@ -529,6 +544,27 @@ private fun SpeedDialog(currentSpeed: Float, onDismiss: () -> Unit, onSelect: (F
                             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                     }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onToggleCrossfade(!crossfadeEnabled) },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Fade Transisi", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Volume melandai halus di pergantian lagu",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                    Switch(checked = crossfadeEnabled, onCheckedChange = onToggleCrossfade)
                 }
             }
         },

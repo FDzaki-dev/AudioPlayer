@@ -619,13 +619,6 @@ private fun SongRow(
                 .fillMaxWidth()
                 .combinedClickable(onClick = onClick, onLongClick = { showMenu = true })
                 .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AsyncImage(
-                model = albumArtUri(song.albumId),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(48.dp)
                     .clip(RoundedCornerShape(12.dp))
             )
             Spacer(modifier = Modifier.width(12.dp))

@@ -177,6 +177,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val accentColor by playerViewModel.accentColor.collectAsState()
     val librarySongs by playerViewModel.librarySongs.collectAsState()
     val libraryLoading by playerViewModel.libraryLoading.collectAsState()
+    val crossfadeEnabled by playerViewModel.crossfadeEnabled.collectAsState()
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
@@ -310,6 +311,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onCancelSleepTimer = { playerViewModel.cancelSleepTimer() },
                     onSetSpeed = { playerViewModel.setPlaybackSpeed(it) },
                     onSetVolume = { playerViewModel.setVolume(it) },
+                    crossfadeEnabled = crossfadeEnabled,
+                    onSetCrossfadeEnabled = { playerViewModel.setCrossfadeEnabled(it) },
                     onPlayQueueIndex = { playerViewModel.playFromQueueIndex(it) },
                     onMoveQueueItem = { from, to -> playerViewModel.moveQueueItem(from, to) },
                     onRemoveFromQueue = { playerViewModel.removeFromQueue(it) },
