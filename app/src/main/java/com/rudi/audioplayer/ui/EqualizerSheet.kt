@@ -9,9 +9,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
 import java.util.Locale
 import kotlin.math.roundToInt
+
+private val boldPresetOptions = listOf(
+    EqualizerController.BoldPreset.FLAT to "Flat",
+    EqualizerController.BoldPreset.BASS_BOOST to "Bass+",
+    EqualizerController.BoldPreset.TREBLE_BOOST to "Treble+",
+    EqualizerController.BoldPreset.VOCAL_BOOST to "Vokal+"
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,7 +28,8 @@ fun EqualizerSheet(
     onDismiss: () -> Unit,
     onToggleEnabled: (Boolean) -> Unit,
     onBandChange: (band: Int, level: Short) -> Unit,
-    onPresetSelect: (Int) -> Unit
+    onPresetSelect: (Int) -> Unit,
+    onBoldPresetSelect: (EqualizerController.BoldPreset) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -63,8 +72,32 @@ fun EqualizerSheet(
                     modifier = Modifier.padding(vertical = 24.dp)
                 )
             } else {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Preset Kuat",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(boldPresetOptions.size) { index ->
+                        val (preset, label) = boldPresetOptions[index]
+                        FilterChip(
+                            selected = state.boldPreset == preset.name,
+                            onClick = { onBoldPresetSelect(preset) },
+                            label = { Text(label) }
+                        )
+                    }
+                }
+
                 if (state.presets.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "Preset Bawaan Perangkat",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(state.presets.size) { index ->
                             FilterChip(

@@ -405,6 +405,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     fun useEqualizerPreset(presetIndex: Int) = equalizerController.usePreset(presetIndex)
 
+    fun useBoldEqualizerPreset(preset: EqualizerController.BoldPreset) = equalizerController.useBoldPreset(preset)
+
     fun togglePlayPause() {
         controller?.let { if (it.isPlaying) it.pause() else it.play() }
     }

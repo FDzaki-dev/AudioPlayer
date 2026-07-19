@@ -35,7 +35,7 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Audio focus & "becoming noisy"**: auto-pause saat headset/Bluetooth dicabut, auto-duck saat ada notifikasi/telepon masuk
 - **Radio otomatis & Mix Artis**: saat antrean habis (repeat off), pemutaran otomatis lanjut dengan lagu lain dari library; Beranda punya bagian "Mix: [Artis]" berdasarkan artis yang paling sering didengar
 - **App icon adaptif**: ikon aplikasi diganti dari placeholder default Android Studio menjadi identitas "Ink & Brass" sendiri (piringan hitam brass di atas ink hitam), pakai format Adaptive Icon (`mipmap-anydpi-v26`) untuk Android 8+, dengan fallback PNG untuk versi lebih lama
-- **Equalizer**: `EqualizerController.kt` kini tersambung penuh — sheet baru di Now Playing dengan toggle aktif/nonaktif, preset bawaan perangkat (chip pilihan), dan slider per band frekuensi. Tersimpan otomatis dan diterapkan ulang tiap sesi
+- **Equalizer**: `EqualizerController.kt` kini tersambung penuh — sheet baru di Now Playing dengan toggle aktif/nonaktif, **preset kuat buatan sendiri** (Flat/Bass+/Treble+/Vokal+, sengaja dibuat dramatis karena preset bawaan Android biasanya sangat halus di banyak perangkat), preset bawaan perangkat, dan slider per band frekuensi. Geser slider atau pilih preset otomatis mengaktifkan efeknya. Tersimpan otomatis dan diterapkan ulang tiap sesi
 
 ## Belum selesai / dalam pengerjaan
 - Crossfade / gapless playback antar lagu belum ada

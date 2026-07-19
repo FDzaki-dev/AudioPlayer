@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
+import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
 import com.rudi.audioplayer.playback.PlaybackUiState
 import kotlinx.coroutines.launch
@@ -83,6 +84,7 @@ fun NowPlayingScreen(
     onToggleEqualizerEnabled: (Boolean) -> Unit,
     onEqualizerBandChange: (Int, Short) -> Unit,
     onEqualizerPresetSelect: (Int) -> Unit,
+    onEqualizerBoldPresetSelect: (EqualizerController.BoldPreset) -> Unit,
     onBack: () -> Unit
 ) {
     val song = uiState.currentSong
@@ -418,7 +420,8 @@ fun NowPlayingScreen(
             onDismiss = { showEqualizerSheet = false },
             onToggleEnabled = onToggleEqualizerEnabled,
             onBandChange = onEqualizerBandChange,
-            onPresetSelect = onEqualizerPresetSelect
+            onPresetSelect = onEqualizerPresetSelect,
+            onBoldPresetSelect = onEqualizerBoldPresetSelect
         )
     }
 }

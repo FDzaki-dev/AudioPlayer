@@ -322,6 +322,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onToggleEqualizerEnabled = { playerViewModel.setEqualizerEnabled(it) },
                     onEqualizerBandChange = { band, level -> playerViewModel.setEqualizerBand(band, level) },
                     onEqualizerPresetSelect = { index -> playerViewModel.useEqualizerPreset(index) },
+                    onEqualizerBoldPresetSelect = { preset -> playerViewModel.useBoldEqualizerPreset(preset) },
                     onBack = { navController.popBackStack() }
                 )
             }
