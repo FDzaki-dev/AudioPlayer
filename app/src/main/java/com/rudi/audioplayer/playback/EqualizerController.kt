@@ -19,7 +19,8 @@ data class EqualizerUiState(
     val maxLevel: Short = 1500,
     val bands: List<EqualizerBand> = emptyList(),
     val presets: List<String> = emptyList(),
-    val selectedPreset: Int = -1
+    val selectedPreset: Int = -1,
+    val boldPreset: String = ""
 )
 
 /**
@@ -73,7 +74,8 @@ class EqualizerController(private val context: Context) {
                 maxLevel = range[1],
                 bands = bands,
                 presets = presetNames,
-                selectedPreset = prefs.getInt(KEY_PRESET, -1)
+                selectedPreset = prefs.getInt(KEY_PRESET, -1),
+                boldPreset = prefs.getString(KEY_BOLD_PRESET, "") ?: ""
             )
         } catch (e: Exception) {
             equalizer = null
@@ -88,22 +90,32 @@ class EqualizerController(private val context: Context) {
     }
 
     fun setBandLevel(band: Int, level: Short) {
-        equalizer?.setBandLevel(band.toShort(), level)
+        val eq = equalizer ?: return
+        eq.setBandLevel(band.toShort(), level)
+        // Adjusting a band is a clear signal the user wants to hear the effect —
+        // don't make them separately remember to flip the enabled switch too.
+        eq.setEnabled(true)
         prefs.edit()
             .putInt(KEY_BAND_PREFIX + band, level.toInt())
             .putInt(KEY_PRESET, -1)
+            .putString(KEY_BOLD_PRESET, "")
+            .putBoolean(KEY_ENABLED, true)
             .apply()
         val updatedBands = _state.value.bands.map {
             if (it.index == band) it.copy(levelMillibel = level) else it
         }
-        _state.value = _state.value.copy(bands = updatedBands, selectedPreset = -1)
+        _state.value = _state.value.copy(bands = updatedBands, selectedPreset = -1, enabled = true, boldPreset = "")
     }
 
     fun usePreset(presetIndex: Int) {
         val eq = equalizer ?: return
         eq.usePreset(presetIndex.toShort())
+        eq.setEnabled(true)
 
-        val editor = prefs.edit().putInt(KEY_PRESET, presetIndex)
+        val editor = prefs.edit()
+            .putInt(KEY_PRESET, presetIndex)
+            .putString(KEY_BOLD_PRESET, "")
+            .putBoolean(KEY_ENABLED, true)
         val updatedBands = _state.value.bands.map { band ->
             val newLevel = eq.getBandLevel(band.index.toShort())
             editor.putInt(KEY_BAND_PREFIX + band.index, newLevel.toInt())
@@ -111,8 +123,50 @@ class EqualizerController(private val context: Context) {
         }
         editor.apply()
 
-        _state.value = _state.value.copy(bands = updatedBands, selectedPreset = presetIndex)
+        _state.value = _state.value.copy(bands = updatedBands, selectedPreset = presetIndex, enabled = true, boldPreset = "")
     }
+
+    /**
+     * Applies a hand-shaped, deliberately noticeable curve across whatever bands this device
+     * actually has, instead of relying on the platform's often-subtle built-in presets. Intensity
+     * is scaled to 85% of the device's real reported range so it stays clear of the hard clip edge.
+     */
+    fun useBoldPreset(preset: BoldPreset) {
+        val eq = equalizer ?: return
+        val bands = _state.value.bands
+        if (bands.isEmpty()) return
+
+        val maxRange = _state.value.maxLevel.toFloat()
+        val editor = prefs.edit()
+            .putInt(KEY_PRESET, -1)
+            .putString(KEY_BOLD_PRESET, preset.name)
+            .putBoolean(KEY_ENABLED, true)
+
+        val updatedBands = bands.mapIndexed { i, band ->
+            val fraction = if (bands.size == 1) 0f else i / (bands.size - 1).toFloat() // 0 = lowest band, 1 = highest
+            val intensity = when (preset) {
+                BoldPreset.FLAT -> 0f
+                BoldPreset.BASS_BOOST -> ((1f - fraction).coerceIn(0f, 1f)).let { it * it }
+                BoldPreset.TREBLE_BOOST -> fraction.let { it * it }
+                BoldPreset.VOCAL_BOOST -> (1f - (2f * (fraction - 0.5f)) * (2f * (fraction - 0.5f))).coerceIn(0f, 1f)
+            }
+            val level = (intensity * maxRange * 0.85f).toInt().toShort()
+            eq.setBandLevel(i.toShort(), level)
+            editor.putInt(KEY_BAND_PREFIX + i, level.toInt())
+            band.copy(levelMillibel = level)
+        }
+        eq.setEnabled(true)
+        editor.apply()
+
+        _state.value = _state.value.copy(
+            bands = updatedBands,
+            selectedPreset = -1,
+            enabled = true,
+            boldPreset = preset.name
+        )
+    }
+
+    enum class BoldPreset { FLAT, BASS_BOOST, TREBLE_BOOST, VOCAL_BOOST }
 
     fun release() {
         equalizer?.release()
@@ -123,6 +177,7 @@ class EqualizerController(private val context: Context) {
         private const val PREFS_NAME = "equalizer"
         private const val KEY_ENABLED = "eq_enabled"
         private const val KEY_PRESET = "eq_preset"
+        private const val KEY_BOLD_PRESET = "eq_bold_preset"
         private const val KEY_BAND_PREFIX = "eq_band_"
     }
 }

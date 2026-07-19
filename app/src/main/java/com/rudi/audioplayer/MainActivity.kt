@@ -175,9 +175,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val statsVersion by playerViewModel.statsVersion.collectAsState()
     val playlists by playerViewModel.playlists.collectAsState()
     val accentColor by playerViewModel.accentColor.collectAsState()
+    val equalizerState by playerViewModel.equalizerState.collectAsState()
+    val crossfadeEnabled by playerViewModel.crossfadeEnabled.collectAsState()
     val librarySongs by playerViewModel.librarySongs.collectAsState()
     val libraryLoading by playerViewModel.libraryLoading.collectAsState()
-    val crossfadeEnabled by playerViewModel.crossfadeEnabled.collectAsState()
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
@@ -310,15 +311,21 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onSetSleepTimer = { playerViewModel.setSleepTimer(it) },
                     onCancelSleepTimer = { playerViewModel.cancelSleepTimer() },
                     onSetSpeed = { playerViewModel.setPlaybackSpeed(it) },
-                    onSetVolume = { playerViewModel.setVolume(it) },
                     crossfadeEnabled = crossfadeEnabled,
                     onSetCrossfadeEnabled = { playerViewModel.setCrossfadeEnabled(it) },
+                    onSetVolume = { playerViewModel.setVolume(it) },
                     onPlayQueueIndex = { playerViewModel.playFromQueueIndex(it) },
                     onMoveQueueItem = { from, to -> playerViewModel.moveQueueItem(from, to) },
                     onRemoveFromQueue = { playerViewModel.removeFromQueue(it) },
                     onGetLyrics = { id -> playerViewModel.getLyrics(id) },
                     onSaveLyrics = { id, text -> playerViewModel.saveLyrics(id, text) },
                     onDeleteLyrics = { id -> playerViewModel.deleteLyrics(id) },
+                    equalizerState = equalizerState,
+                    onOpenEqualizer = { playerViewModel.ensureEqualizerAttached() },
+                    onToggleEqualizerEnabled = { playerViewModel.setEqualizerEnabled(it) },
+                    onEqualizerBandChange = { band, level -> playerViewModel.setEqualizerBand(band, level) },
+                    onEqualizerPresetSelect = { index -> playerViewModel.useEqualizerPreset(index) },
+                    onEqualizerBoldPresetSelect = { preset -> playerViewModel.useBoldEqualizerPreset(preset) },
                     onBack = { navController.popBackStack() }
                 )
             }

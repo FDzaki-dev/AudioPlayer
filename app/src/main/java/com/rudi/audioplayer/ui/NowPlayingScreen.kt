@@ -11,12 +11,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -50,6 +52,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
+import com.rudi.audioplayer.playback.EqualizerController
+import com.rudi.audioplayer.playback.EqualizerUiState
 import com.rudi.audioplayer.playback.PlaybackUiState
 import kotlinx.coroutines.launch
 
@@ -69,15 +73,21 @@ fun NowPlayingScreen(
     onSetSleepTimer: (Int) -> Unit,
     onCancelSleepTimer: () -> Unit,
     onSetSpeed: (Float) -> Unit,
-    onSetVolume: (Float) -> Unit,
     crossfadeEnabled: Boolean,
     onSetCrossfadeEnabled: (Boolean) -> Unit,
+    onSetVolume: (Float) -> Unit,
     onPlayQueueIndex: (Int) -> Unit,
     onMoveQueueItem: (Int, Int) -> Unit,
     onRemoveFromQueue: (Int) -> Unit,
     onGetLyrics: (Long) -> String?,
     onSaveLyrics: (Long, String) -> Unit,
     onDeleteLyrics: (Long) -> Unit,
+    equalizerState: EqualizerUiState,
+    onOpenEqualizer: () -> Unit,
+    onToggleEqualizerEnabled: (Boolean) -> Unit,
+    onEqualizerBandChange: (Int, Short) -> Unit,
+    onEqualizerPresetSelect: (Int) -> Unit,
+    onEqualizerBoldPresetSelect: (EqualizerController.BoldPreset) -> Unit,
     onBack: () -> Unit
 ) {
     val song = uiState.currentSong
@@ -86,6 +96,7 @@ fun NowPlayingScreen(
     var showSpeedDialog by remember { mutableStateOf(false) }
     var showQueueSheet by remember { mutableStateOf(false) }
     var showLyricsSheet by remember { mutableStateOf(false) }
+    var showEqualizerSheet by remember { mutableStateOf(false) }
 
     val fallback = MaterialTheme.colorScheme.primary
     val animatedAccent by animateColorAsState(
@@ -170,6 +181,16 @@ fun NowPlayingScreen(
                 Icon(
                     Icons.Default.Article,
                     contentDescription = "Lirik",
+                    tint = MaterialTheme.colorScheme.secondary
+                )
+            }
+            IconButton(onClick = {
+                onOpenEqualizer()
+                showEqualizerSheet = true
+            }) {
+                Icon(
+                    Icons.Default.Equalizer,
+                    contentDescription = "Equalizer",
                     tint = MaterialTheme.colorScheme.secondary
                 )
             }
@@ -395,6 +416,17 @@ fun NowPlayingScreen(
                 onDeleteLyrics(song.id)
                 lyricsText = null
             }
+        )
+    }
+
+    if (showEqualizerSheet) {
+        EqualizerSheet(
+            state = equalizerState,
+            onDismiss = { showEqualizerSheet = false },
+            onToggleEnabled = onToggleEqualizerEnabled,
+            onBandChange = onEqualizerBandChange,
+            onPresetSelect = onEqualizerPresetSelect,
+            onBoldPresetSelect = onEqualizerBoldPresetSelect
         )
     }
 }
