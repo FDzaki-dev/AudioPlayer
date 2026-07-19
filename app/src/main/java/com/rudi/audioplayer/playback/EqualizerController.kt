@@ -88,22 +88,30 @@ class EqualizerController(private val context: Context) {
     }
 
     fun setBandLevel(band: Int, level: Short) {
-        equalizer?.setBandLevel(band.toShort(), level)
+        val eq = equalizer ?: return
+        eq.setBandLevel(band.toShort(), level)
+        // Adjusting a band is a clear signal the user wants to hear the effect —
+        // don't make them separately remember to flip the enabled switch too.
+        eq.setEnabled(true)
         prefs.edit()
             .putInt(KEY_BAND_PREFIX + band, level.toInt())
             .putInt(KEY_PRESET, -1)
+            .putBoolean(KEY_ENABLED, true)
             .apply()
         val updatedBands = _state.value.bands.map {
             if (it.index == band) it.copy(levelMillibel = level) else it
         }
-        _state.value = _state.value.copy(bands = updatedBands, selectedPreset = -1)
+        _state.value = _state.value.copy(bands = updatedBands, selectedPreset = -1, enabled = true)
     }
 
     fun usePreset(presetIndex: Int) {
         val eq = equalizer ?: return
         eq.usePreset(presetIndex.toShort())
+        eq.setEnabled(true)
 
-        val editor = prefs.edit().putInt(KEY_PRESET, presetIndex)
+        val editor = prefs.edit()
+            .putInt(KEY_PRESET, presetIndex)
+            .putBoolean(KEY_ENABLED, true)
         val updatedBands = _state.value.bands.map { band ->
             val newLevel = eq.getBandLevel(band.index.toShort())
             editor.putInt(KEY_BAND_PREFIX + band.index, newLevel.toInt())
@@ -111,7 +119,7 @@ class EqualizerController(private val context: Context) {
         }
         editor.apply()
 
-        _state.value = _state.value.copy(bands = updatedBands, selectedPreset = presetIndex)
+        _state.value = _state.value.copy(bands = updatedBands, selectedPreset = presetIndex, enabled = true)
     }
 
     fun release() {

@@ -45,6 +45,14 @@ fun EqualizerSheet(
                 )
             }
 
+            if (state.supported) {
+                Text(
+                    if (state.enabled) "Aktif — geser slider untuk menyesuaikan" else "Nonaktif — nyalakan atau geser slider untuk mendengar efek",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (state.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                )
+            }
+
             Spacer(modifier = Modifier.height(4.dp))
 
             if (!state.supported) {
