@@ -12,6 +12,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
+import com.rudi.audioplayer.data.CrossfadeStore
 import com.rudi.audioplayer.data.FavoritesStore
 import com.rudi.audioplayer.data.LyricsStore
 import com.rudi.audioplayer.data.MusicRepository
@@ -54,6 +55,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val lyricsStore = LyricsStore(appContext)
     private val equalizerController = EqualizerController(appContext)
     val equalizerState: StateFlow<EqualizerUiState> = equalizerController.state
+
+    private val crossfadeStore = CrossfadeStore(appContext)
+    private var userTargetVolume = 1f
+    private var fadeJob: Job? = null
+    private var fadedOutForIndex = -1
     private var positionTick = 0
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
@@ -61,6 +67,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     private val _statsVersion = MutableStateFlow(0)
     val statsVersion: StateFlow<Int> = _statsVersion.asStateFlow()
+
+    private val _crossfadeEnabled = MutableStateFlow(crossfadeStore.isEnabled())
+    val crossfadeEnabled: StateFlow<Boolean> = _crossfadeEnabled.asStateFlow()
 
     private val _playlists = MutableStateFlow(playlistStore.getPlaylists())
     val playlists: StateFlow<List<Playlist>> = _playlists.asStateFlow()
@@ -103,6 +112,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             }
             updateAccentColor(song)
             persistPlaybackState()
+
+            if (_crossfadeEnabled.value) {
+                startFadeIn()
+            }
+            fadedOutForIndex = -1
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
@@ -183,10 +197,19 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         viewModelScope.launch {
             while (true) {
                 controller?.let { c ->
-                    _uiState.value = _uiState.value.copy(
-                        position = c.currentPosition.coerceAtLeast(0),
-                        duration = c.duration.coerceAtLeast(0)
-                    )
+                    val position = c.currentPosition.coerceAtLeast(0)
+                    val duration = c.duration.coerceAtLeast(0)
+                    _uiState.value = _uiState.value.copy(position = position, duration = duration)
+
+                    if (_crossfadeEnabled.value && c.isPlaying && duration > 0) {
+                        val remaining = duration - position
+                        val currentIndex = c.currentMediaItemIndex
+                        val hasNext = currentIndex < currentQueue.size - 1 || c.repeatMode != Player.REPEAT_MODE_OFF
+                        if (remaining in 1..FADE_DURATION_MS && hasNext && fadedOutForIndex != currentIndex) {
+                            fadedOutForIndex = currentIndex
+                            startFadeOut()
+                        }
+                    }
                 }
                 positionTick++
                 if (positionTick % 10 == 0) persistPlaybackState()
@@ -407,6 +430,42 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     fun useBoldEqualizerPreset(preset: EqualizerController.BoldPreset) = equalizerController.useBoldPreset(preset)
 
+    /** Ramps volume down toward the end of a track, just before the next one begins. */
+    private fun startFadeOut() {
+        fadeJob?.cancel()
+        fadeJob = viewModelScope.launch {
+            animateVolume(from = userTargetVolume, to = userTargetVolume * FADE_FLOOR)
+        }
+    }
+
+    /** Ramps volume back up at the start of a new track, softening the transition. */
+    private fun startFadeIn() {
+        fadeJob?.cancel()
+        controller?.setVolume(userTargetVolume * FADE_FLOOR)
+        fadeJob = viewModelScope.launch {
+            animateVolume(from = userTargetVolume * FADE_FLOOR, to = userTargetVolume)
+        }
+    }
+
+    private suspend fun animateVolume(from: Float, to: Float) {
+        val steps = 24
+        val stepDelay = FADE_DURATION_MS / steps
+        for (i in 0..steps) {
+            val fraction = i / steps.toFloat()
+            controller?.setVolume((from + (to - from) * fraction).coerceIn(0f, 1f))
+            delay(stepDelay)
+        }
+    }
+
+    fun setCrossfadeEnabled(enabled: Boolean) {
+        crossfadeStore.setEnabled(enabled)
+        _crossfadeEnabled.value = enabled
+        if (!enabled) {
+            fadeJob?.cancel()
+            controller?.setVolume(userTargetVolume)
+        }
+    }
+
     fun togglePlayPause() {
         controller?.let { if (it.isPlaying) it.pause() else it.play() }
     }
@@ -434,7 +493,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     }
 
     fun setVolume(volume: Float) {
-        controller?.setVolume(volume.coerceIn(0f, 1f))
+        userTargetVolume = volume.coerceIn(0f, 1f)
+        fadeJob?.cancel()
+        controller?.setVolume(userTargetVolume)
     }
 
     /** Shuffles the whole library and starts playing immediately — one tap from Home. */
@@ -476,8 +537,14 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     override fun onCleared() {
         sleepTimerJob?.cancel()
+        fadeJob?.cancel()
         equalizerController.release()
         controller?.release()
         super.onCleared()
+    }
+
+    companion object {
+        private const val FADE_DURATION_MS = 3000L
+        private const val FADE_FLOOR = 0.15f
     }
 }

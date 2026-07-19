@@ -176,6 +176,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val playlists by playerViewModel.playlists.collectAsState()
     val accentColor by playerViewModel.accentColor.collectAsState()
     val equalizerState by playerViewModel.equalizerState.collectAsState()
+    val crossfadeEnabled by playerViewModel.crossfadeEnabled.collectAsState()
     val librarySongs by playerViewModel.librarySongs.collectAsState()
     val libraryLoading by playerViewModel.libraryLoading.collectAsState()
 
@@ -310,6 +311,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onSetSleepTimer = { playerViewModel.setSleepTimer(it) },
                     onCancelSleepTimer = { playerViewModel.cancelSleepTimer() },
                     onSetSpeed = { playerViewModel.setPlaybackSpeed(it) },
+                    crossfadeEnabled = crossfadeEnabled,
+                    onSetCrossfadeEnabled = { playerViewModel.setCrossfadeEnabled(it) },
                     onSetVolume = { playerViewModel.setVolume(it) },
                     onPlayQueueIndex = { playerViewModel.playFromQueueIndex(it) },
                     onMoveQueueItem = { from, to -> playerViewModel.moveQueueItem(from, to) },
