@@ -14,7 +14,18 @@ import java.io.File
  */
 class MusicRepository(private val context: Context) {
 
-    fun getAllSongs(): List<Song> {
+    fun getAllSongs(): List<Song> = querySongs(selection = BASE_SELECTION, selectionArgs = null)
+
+    /** Targeted lookup for just a few IDs — used to restore a saved queue without a full library scan. */
+    fun getSongsByIds(ids: List<Long>): List<Song> {
+        if (ids.isEmpty()) return emptyList()
+        val placeholders = ids.joinToString(",") { "?" }
+        val selection = "$BASE_SELECTION AND ${MediaStore.Audio.Media._ID} IN ($placeholders)"
+        val selectionArgs = ids.map { it.toString() }.toTypedArray()
+        return querySongs(selection, selectionArgs)
+    }
+
+    private fun querySongs(selection: String, selectionArgs: Array<String>?): List<Song> {
         val songs = mutableListOf<Song>()
         val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
 
@@ -35,10 +46,9 @@ class MusicRepository(private val context: Context) {
             folderColumn
         )
 
-        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} > 0"
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
 
-        context.contentResolver.query(collection, projection, selection, null, sortOrder)?.use { cursor ->
+        context.contentResolver.query(collection, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
             val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
             val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
             val artistCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
@@ -83,5 +93,9 @@ class MusicRepository(private val context: Context) {
             }
         }
         return songs
+    }
+
+    companion object {
+        private val BASE_SELECTION = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} > 0"
     }
 }

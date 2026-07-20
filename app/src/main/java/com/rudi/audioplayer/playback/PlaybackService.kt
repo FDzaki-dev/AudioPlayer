@@ -2,19 +2,30 @@ package com.rudi.audioplayer.playback
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.net.Uri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.rudi.audioplayer.MainActivity
+import com.rudi.audioplayer.data.MusicRepository
+import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.widget.WidgetUpdater
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
+    private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun onCreate() {
         super.onCreate()
@@ -82,14 +93,71 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            WidgetUpdater.ACTION_TOGGLE_PLAY -> mediaSession?.player?.let {
-                if (it.isPlaying) it.pause() else it.play()
+        val action = intent?.action
+        val isWidgetAction = action == WidgetUpdater.ACTION_TOGGLE_PLAY ||
+            action == WidgetUpdater.ACTION_NEXT ||
+            action == WidgetUpdater.ACTION_PREVIOUS
+
+        if (isWidgetAction) {
+            val player = mediaSession?.player
+            if (player != null && player.mediaItemCount == 0) {
+                // Cold start: the widget was tapped before this session ever loaded a queue
+                // (fresh install, or the service was killed). Restore the last saved queue
+                // first, then apply the tapped action — otherwise "play" from the widget would
+                // silently do nothing since there'd be nothing queued to play.
+                serviceScope.launch {
+                    restoreLastQueue()
+                    applyWidgetAction(action)
+                }
+            } else {
+                applyWidgetAction(action)
             }
-            WidgetUpdater.ACTION_NEXT -> mediaSession?.player?.seekToNextMediaItem()
-            WidgetUpdater.ACTION_PREVIOUS -> mediaSession?.player?.seekToPreviousMediaItem()
         }
+
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun applyWidgetAction(action: String?) {
+        val player = mediaSession?.player ?: return
+        when (action) {
+            WidgetUpdater.ACTION_TOGGLE_PLAY -> if (player.isPlaying) player.pause() else player.play()
+            WidgetUpdater.ACTION_NEXT -> player.seekToNextMediaItem()
+            WidgetUpdater.ACTION_PREVIOUS -> player.seekToPreviousMediaItem()
+        }
+    }
+
+    private suspend fun restoreLastQueue() {
+        val saved = PlaybackStateStore(this).load() ?: return
+        val foundSongs = withContext(Dispatchers.IO) {
+            MusicRepository(this@PlaybackService).getSongsByIds(saved.songIds)
+        }
+        if (foundSongs.isEmpty()) return
+
+        val songMap = foundSongs.associateBy { it.id }
+        val orderedSongs = saved.songIds.mapNotNull { songMap[it] }
+        if (orderedSongs.isEmpty()) return
+
+        val items = orderedSongs.map { song ->
+            val artworkUri = Uri.parse("content://media/external/audio/albumart/${song.albumId}")
+            MediaItem.Builder()
+                .setMediaId(song.id.toString())
+                .setUri(song.uri)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(song.title)
+                        .setArtist(song.artist)
+                        .setAlbumTitle(song.album)
+                        .setArtworkUri(artworkUri)
+                        .build()
+                )
+                .build()
+        }
+
+        val index = saved.index.coerceIn(0, items.size - 1)
+        mediaSession?.player?.apply {
+            setMediaItems(items, index, saved.positionMs)
+            prepare()
+        }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -100,6 +168,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        serviceScope.cancel()
         mediaSession?.run {
             player.release()
             release()

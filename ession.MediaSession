@@ -1,0 +1,42 @@
+[1mdiff --cc app/src/main/java/com/rudi/audioplayer/playback/PlaybackService.kt[m
+[1mindex 5acce5c,0ae4bdc..0000000[m
+[1m--- a/app/src/main/java/com/rudi/audioplayer/playback/PlaybackService.kt[m
+[1m+++ b/app/src/main/java/com/rudi/audioplayer/playback/PlaybackService.kt[m
+[36m@@@ -4,7 -4,6 +4,10 @@@[m [mimport android.app.PendingInten[m
+  import android.content.Intent[m
+  import androidx.media3.common.AudioAttributes[m
+  import androidx.media3.common.C[m
+[32m++<<<<<<< HEAD[m
+[32m +import androidx.media3.common.MediaItem[m
+[32m++=======[m
+[32m++>>>>>>> 3b24e6f9a43f5d835c3c874c4d560c325123133e[m
+  import androidx.media3.common.Player[m
+  import androidx.media3.exoplayer.ExoPlayer[m
+  import androidx.media3.session.MediaSession[m
+[36m@@@ -39,20 -37,11 +42,26 @@@[m [mclass PlaybackService : MediaSessionSer[m
+          // this ExoPlayer-specific property — so we mirror it into a same-process singleton every[m
+          // time the player reports an event, and the Equalizer reads it from there. onEvents is[m
+          // part of the stable, common Player.Listener API, so this stays robust across versions.[m
+[32m++<<<<<<< HEAD[m
+[32m +        // The same listener also keeps the home-screen widget in sync with the current track.[m
+[32m++=======[m
+[32m++>>>>>>> 3b24e6f9a43f5d835c3c874c4d560c325123133e[m
+          player.addListener(object : Player.Listener {[m
+              override fun onEvents(player: Player, events: Player.Events) {[m
+                  val id = (player as? ExoPlayer)?.audioSessionId ?: return[m
+                  if (id != 0) PlaybackAudioSession.sessionId = id[m
+              }[m
+[32m++<<<<<<< HEAD[m
+[32m +[m
+[32m +            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {[m
+[32m +                pushWidgetUpdate(player)[m
+[32m +            }[m
+[32m +[m
+[32m +            override fun onIsPlayingChanged(isPlaying: Boolean) {[m
+[32m +                pushWidgetUpdate(player)[m
+[32m +            }[m
+[32m++=======[m
+[32m++>>>>>>> 3b24e6f9a43f5d835c3c874c4d560c325123133e[m
+          })[m
+  [m
+          val sessionActivityIntent = PendingIntent.getActivity([m

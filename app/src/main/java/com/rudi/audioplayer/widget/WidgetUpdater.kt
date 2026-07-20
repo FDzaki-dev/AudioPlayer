@@ -61,7 +61,7 @@ object WidgetUpdater {
 
         val albumArt = artworkUriRaw?.let { loadAlbumArtBitmap(context, Uri.parse(it)) }
         if (albumArt != null) {
-            views.setImageViewBitmap(R.id.widget_album_art, albumArt)
+            views.setImageViewBitmap(R.id.widget_album_art, roundBitmapCorners(albumArt, radiusPx = 24f))
         } else {
             views.setImageViewResource(R.id.widget_album_art, R.mipmap.ic_launcher)
         }
@@ -101,5 +101,22 @@ object WidgetUpdater {
         } catch (e: Exception) {
             null
         }
+    }
+
+    /** Center-crops to a square and rounds the corners, so widget art matches the app's rounded look. */
+    private fun roundBitmapCorners(source: Bitmap, radiusPx: Float): Bitmap {
+        val size = minOf(source.width, source.height)
+        val x = (source.width - size) / 2
+        val y = (source.height - size) / 2
+        val squared = Bitmap.createBitmap(source, x, y, size, size)
+
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(output)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        val rect = android.graphics.RectF(0f, 0f, size.toFloat(), size.toFloat())
+        canvas.drawRoundRect(rect, radiusPx, radiusPx, paint)
+        paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+        canvas.drawBitmap(squared, 0f, 0f, paint)
+        return output
     }
 }
