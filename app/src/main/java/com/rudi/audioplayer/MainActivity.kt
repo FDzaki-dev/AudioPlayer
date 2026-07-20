@@ -2,6 +2,7 @@ package com.rudi.audioplayer
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -19,18 +20,27 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FolderOff
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -49,9 +59,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -89,8 +102,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AudioPlayerTheme {
-                var hasPermission by remember { mutableStateOf(false) }
-                var permissionRequested by remember { mutableStateOf(false) }
+                val context = LocalContext.current
 
                 val neededPermissions = remember {
                     buildList {
@@ -105,6 +117,18 @@ class MainActivity : ComponentActivity() {
                         }
                     }.toTypedArray()
                 }
+
+                fun isAudioPermissionGranted(): Boolean =
+                    ContextCompat.checkSelfPermission(context, neededPermissions[0]) ==
+                        PackageManager.PERMISSION_GRANTED
+
+                // Reflects Android's actual current grant state instead of always assuming
+                // "not granted" — otherwise every fresh process start (very common: the app
+                // gets backgrounded, killed for memory, reopened later) would show the
+                // welcome/permission screens again even though the permission was already
+                // given previously.
+                var hasPermission by remember { mutableStateOf(isAudioPermissionGranted()) }
+                var permissionRequested by remember { mutableStateOf(false) }
 
                 val launcher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions()
@@ -136,33 +160,86 @@ private fun WelcomeScreen(onContinue: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.background)
+                )
+            )
             .padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            Icons.Default.MusicNote,
-            contentDescription = null,
-            modifier = Modifier.size(72.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.height(24.dp))
+        Box(
+            modifier = Modifier
+                .size(96.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.MusicNote,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
+
         Text(
-            "Selamat Datang di Audio Player",
-            style = MaterialTheme.typography.headlineSmall,
+            "SELAMAT DATANG",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.secondary
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            "Audio Player",
+            style = MaterialTheme.typography.titleLarge,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            "Untuk menampilkan koleksi musik kamu, aplikasi ini butuh izin membaca file audio di perangkat. Semua pemrosesan terjadi langsung di HP kamu, tidak ada data yang dikirim ke internet.",
+            "Untuk menampilkan koleksi musik kamu, aplikasi ini butuh izin membaca file audio di perangkat.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.secondary,
             textAlign = TextAlign.Center
         )
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        WelcomeHighlight(Icons.Default.WifiOff, "Semua diproses di HP — tidak ada data yang dikirim ke internet")
+        Spacer(modifier = Modifier.height(12.dp))
+        WelcomeHighlight(Icons.Default.FolderOff, "Kamu yang atur folder mana yang tampil")
+        Spacer(modifier = Modifier.height(12.dp))
+        WelcomeHighlight(Icons.Default.GraphicEq, "Equalizer, crossfade, sampai widget — lengkap")
+
         Spacer(modifier = Modifier.height(32.dp))
+
         Button(onClick = onContinue, modifier = Modifier.fillMaxWidth()) {
             Text("Lanjutkan")
         }
+    }
+}
+
+@Composable
+private fun WelcomeHighlight(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary
+        )
     }
 }
 
@@ -177,6 +254,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val accentColor by playerViewModel.accentColor.collectAsState()
     val equalizerState by playerViewModel.equalizerState.collectAsState()
     val crossfadeEnabled by playerViewModel.crossfadeEnabled.collectAsState()
+    val customFolders by playerViewModel.customFolders.collectAsState()
     val librarySongs by playerViewModel.librarySongs.collectAsState()
     val libraryLoading by playerViewModel.libraryLoading.collectAsState()
 
@@ -275,7 +353,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onRenamePlaylist = { id, name -> playerViewModel.renamePlaylist(id, name) },
                     onAddSongToPlaylist = { id, songId -> playerViewModel.addSongToPlaylist(id, songId) },
                     onRemoveSongFromPlaylist = { id, songId -> playerViewModel.removeSongFromPlaylist(id, songId) },
-                    onMoveSongInPlaylist = { id, from, to -> playerViewModel.moveSongInPlaylist(id, from, to) }
+                    onMoveSongInPlaylist = { id, from, to -> playerViewModel.moveSongInPlaylist(id, from, to) },
+                    customFolders = customFolders,
+                    onAddCustomFolder = { uri -> playerViewModel.addCustomFolder(uri) },
+                    onRemoveCustomFolder = { uri -> playerViewModel.removeCustomFolder(uri) }
                 )
             }
             composable(

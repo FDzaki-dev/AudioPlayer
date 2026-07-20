@@ -3,12 +3,18 @@ package com.rudi.audioplayer.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.rudi.audioplayer.data.CustomFolderInfo
 import com.rudi.audioplayer.data.Song
 
 data class FolderSummary(
@@ -20,17 +26,21 @@ data class FolderSummary(
 
 /**
  * Bottom sheet to scope which folders get scanned (e.g. turn off WhatsApp's
- * audio folder) and to bring back individually hidden songs. Purely a display
- * filter — never touches files on disk.
+ * audio folder), bring back individually hidden songs, and add extra folders
+ * via the system's folder picker for audio MediaStore hasn't indexed yet.
+ * Purely a display filter for the auto-scanned side — never touches files on disk.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FolderManagerSheet(
     folders: List<FolderSummary>,
     hiddenSongs: List<Song>,
+    customFolders: List<CustomFolderInfo>,
     onDismiss: () -> Unit,
     onToggleFolder: (String, Boolean) -> Unit,
-    onUnhideSong: (Long) -> Unit
+    onUnhideSong: (Long) -> Unit,
+    onAddCustomFolder: () -> Unit,
+    onRemoveCustomFolder: (String) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -85,6 +95,55 @@ fun FolderManagerSheet(
                         )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Folder Tambahan", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Pilih folder lewat sistem untuk memindai lagu yang belum terdeteksi otomatis.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = onAddCustomFolder,
+                        modifier = Modifier
+                            .padding(horizontal = 20.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.CreateNewFolder, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Pilih Folder")
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                items(customFolders, key = { it.uri }) { folder ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            folder.displayName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = { onRemoveCustomFolder(folder.uri) }) {
+                            Icon(Icons.Default.Close, contentDescription = "Hapus folder tambahan")
+                        }
+                    }
                 }
 
                 if (hiddenSongs.isNotEmpty()) {

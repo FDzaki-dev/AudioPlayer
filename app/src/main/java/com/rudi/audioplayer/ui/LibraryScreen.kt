@@ -1,12 +1,15 @@
 package com.rudi.audioplayer.ui
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -47,6 +50,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.rudi.audioplayer.data.CustomFolderInfo
 import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.SearchHistoryStore
@@ -68,7 +72,10 @@ fun LibraryScreen(
     onRenamePlaylist: (String, String) -> Unit,
     onAddSongToPlaylist: (String, Long) -> Boolean,
     onRemoveSongFromPlaylist: (String, Long) -> Unit,
-    onMoveSongInPlaylist: (String, Int, Int) -> Unit
+    onMoveSongInPlaylist: (String, Int, Int) -> Unit,
+    customFolders: List<CustomFolderInfo>,
+    onAddCustomFolder: (Uri) -> Unit,
+    onRemoveCustomFolder: (String) -> Unit
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -279,9 +286,14 @@ fun LibraryScreen(
     }
 
     if (showFolderManager) {
+        val addFolderLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocumentTree()
+        ) { uri -> if (uri != null) onAddCustomFolder(uri) }
+
         FolderManagerSheet(
             folders = folderSummaries,
             hiddenSongs = hiddenSongsList,
+            customFolders = customFolders,
             onDismiss = { showFolderManager = false },
             onToggleFolder = { path, excluded ->
                 filterStore.setFolderExcluded(path, excluded)
@@ -290,7 +302,9 @@ fun LibraryScreen(
             onUnhideSong = { songId ->
                 filterStore.setSongHidden(songId, false)
                 filterVersion++
-            }
+            },
+            onAddCustomFolder = { addFolderLauncher.launch(null) },
+            onRemoveCustomFolder = onRemoveCustomFolder
         )
     }
 }

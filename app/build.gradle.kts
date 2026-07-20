@@ -18,7 +18,7 @@ android {
     signingConfigs {
         create("release") {
             val keystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
-            if (keystorePath != null && file(keystorePath).exists()) {
+            if (keystorePath != null && file(keystorePath).let { it.exists() && it.length() > 0 }) {
                 storeFile = file(keystorePath)
                 storePassword = System.getenv("SIGNING_STORE_PASSWORD")
                 keyAlias = System.getenv("SIGNING_KEY_ALIAS")
@@ -31,11 +31,13 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Uses the stable release keystore when CI actually decoded one (consistent
-            // signature across builds, no more uninstall-before-install). Falls back to the
-            // debug keystore whenever that file isn't present — e.g. local builds.
+            // Uses the stable release keystore when CI actually decoded a non-empty one
+            // (consistent signature across builds, no more uninstall-before-install). Falls
+            // back to the debug keystore whenever that file is missing or empty — e.g. local
+            // builds, or a CI run where the secret wasn't set.
             val keystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
-            signingConfig = if (keystorePath != null && file(keystorePath).exists()) {
+            val hasStableKeystore = keystorePath != null && file(keystorePath).let { it.exists() && it.length() > 0 }
+            signingConfig = if (hasStableKeystore) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
@@ -69,6 +71,7 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.activity:activity-compose:1.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.1")

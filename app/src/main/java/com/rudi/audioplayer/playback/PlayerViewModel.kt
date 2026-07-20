@@ -2,7 +2,10 @@ package com.rudi.audioplayer.playback
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.ui.graphics.Color
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -13,6 +16,9 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import com.rudi.audioplayer.data.CrossfadeStore
+import com.rudi.audioplayer.data.CustomFolderInfo
+import com.rudi.audioplayer.data.CustomFolderScanner
+import com.rudi.audioplayer.data.CustomFolderStore
 import com.rudi.audioplayer.data.FavoritesStore
 import com.rudi.audioplayer.data.LyricsStore
 import com.rudi.audioplayer.data.MusicRepository
@@ -57,6 +63,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     val equalizerState: StateFlow<EqualizerUiState> = equalizerController.state
 
     private val crossfadeStore = CrossfadeStore(appContext)
+    private val customFolderStore = CustomFolderStore(appContext)
+    private val customFolderScanner = CustomFolderScanner(appContext)
+
+    private val _customFolders = MutableStateFlow(loadCustomFolderInfos())
+    val customFolders: StateFlow<List<CustomFolderInfo>> = _customFolders.asStateFlow()
     private var userTargetVolume = 1f
     private var fadeJob: Job? = null
     private var fadedOutForIndex = -1
@@ -188,10 +199,64 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         libraryLoadedOnce = true
         viewModelScope.launch {
             _libraryLoading.value = true
-            _librarySongs.value = withContext(Dispatchers.IO) { MusicRepository(appContext).getAllSongs() }
+            _librarySongs.value = withContext(Dispatchers.IO) {
+                val mediaStoreSongs = MusicRepository(appContext).getAllSongs()
+                val existingIds = mediaStoreSongs.map { it.id }.toHashSet()
+                val customSongs = customFolderStore.getFolderUris().flatMap { uriString ->
+                    try {
+                        val uri = Uri.parse(uriString)
+                        customFolderScanner.scan(uri, folderLabelFor(uri))
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
+                }
+                // A file can legitimately live in both worlds if MediaStore catches up later —
+                // prefer the MediaStore copy (real album art, stable ID) when that happens.
+                val dedupedCustomSongs = customSongs.filterNot { existingIds.contains(it.id) }
+                mediaStoreSongs + dedupedCustomSongs
+            }
             _libraryLoading.value = false
         }
     }
+
+    /** Grants persistent access to a folder the user picked via the system folder picker,
+     * remembers it, and rescans so its audio shows up immediately. */
+    fun addCustomFolder(treeUri: Uri) {
+        try {
+            appContext.contentResolver.takePersistableUriPermission(
+                treeUri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (e: SecurityException) {
+            return
+        }
+        customFolderStore.addFolder(treeUri.toString())
+        _customFolders.value = loadCustomFolderInfos()
+        refreshLibrary()
+    }
+
+    fun removeCustomFolder(uriString: String) {
+        try {
+            appContext.contentResolver.releasePersistableUriPermission(
+                Uri.parse(uriString),
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (e: Exception) {
+            // Permission may already be gone (e.g. folder moved/deleted) — still forget it locally.
+        }
+        customFolderStore.removeFolder(uriString)
+        _customFolders.value = loadCustomFolderInfos()
+        refreshLibrary()
+    }
+
+    private fun loadCustomFolderInfos(): List<CustomFolderInfo> =
+        customFolderStore.getFolderUris().map { uriString ->
+            val uri = Uri.parse(uriString)
+            CustomFolderInfo(uri = uriString, displayName = folderLabelFor(uri))
+        }
+
+    private fun folderLabelFor(treeUri: Uri): String =
+        DocumentFile.fromTreeUri(appContext, treeUri)?.name ?: "Folder Tambahan"
 
     private fun startPositionLoop() {
         viewModelScope.launch {
