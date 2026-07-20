@@ -23,7 +23,23 @@ jobs:
         with:
           gradle-version: 8.7
 
+      - name: Decode signing keystore
+        run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > ${{ github.workspace }}/app/release.keystore
+
+      - name: Report signing status
+        run: |
+          if [ -s "${{ github.workspace }}/app/release.keystore" ]; then
+            echo "✅ Stable release keystore decoded ($(wc -c < "${{ github.workspace }}/app/release.keystore") bytes) — build will use it."
+          else
+            echo "⚠️ No keystore decoded (SIGNING_KEYSTORE_BASE64 secret missing/empty) — falling back to debug signing."
+          fi
+
       - name: Build Release APK
+        env:
+          SIGNING_KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: gradle assembleRelease --no-daemon
 
       - name: Upload APK artifact
