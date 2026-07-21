@@ -1,12 +1,15 @@
 package com.rudi.audioplayer.ui
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -23,6 +26,7 @@ import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
@@ -47,6 +51,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.rudi.audioplayer.data.CustomFolderInfo
 import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.SearchHistoryStore
@@ -68,7 +73,10 @@ fun LibraryScreen(
     onRenamePlaylist: (String, String) -> Unit,
     onAddSongToPlaylist: (String, Long) -> Boolean,
     onRemoveSongFromPlaylist: (String, Long) -> Unit,
-    onMoveSongInPlaylist: (String, Int, Int) -> Unit
+    onMoveSongInPlaylist: (String, Int, Int) -> Unit,
+    customFolders: List<CustomFolderInfo>,
+    onAddCustomFolder: (Uri) -> Unit,
+    onRemoveCustomFolder: (String) -> Unit
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -80,6 +88,7 @@ fun LibraryScreen(
     var searchQuery by remember { mutableStateOf("") }
     var songForPlaylistDialog by remember { mutableStateOf<Song?>(null) }
     var showFolderManager by remember { mutableStateOf(false) }
+    var showSignatureMatcher by remember { mutableStateOf(false) }
     var filterVersion by remember { mutableStateOf(0) }
 
     val songs = remember(rawSongs, filterVersion) { filterStore.apply(rawSongs) }
@@ -137,7 +146,8 @@ fun LibraryScreen(
                 if (!searchActive) searchQuery = ""
             },
             onRescan = onRescan,
-            onOpenFolderManager = { showFolderManager = true }
+            onOpenFolderManager = { showFolderManager = true },
+            onOpenSignatureMatcher = { showSignatureMatcher = true }
         )
 
         if (searchActive) {
@@ -279,9 +289,14 @@ fun LibraryScreen(
     }
 
     if (showFolderManager) {
+        val addFolderLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocumentTree()
+        ) { uri -> if (uri != null) onAddCustomFolder(uri) }
+
         FolderManagerSheet(
             folders = folderSummaries,
             hiddenSongs = hiddenSongsList,
+            customFolders = customFolders,
             onDismiss = { showFolderManager = false },
             onToggleFolder = { path, excluded ->
                 filterStore.setFolderExcluded(path, excluded)
@@ -290,8 +305,14 @@ fun LibraryScreen(
             onUnhideSong = { songId ->
                 filterStore.setSongHidden(songId, false)
                 filterVersion++
-            }
+            },
+            onAddCustomFolder = { addFolderLauncher.launch(null) },
+            onRemoveCustomFolder = onRemoveCustomFolder
         )
+    }
+
+    if (showSignatureMatcher) {
+        SignatureMatcherSheet(onDismiss = { showSignatureMatcher = false })
     }
 }
 
@@ -300,7 +321,8 @@ private fun LibraryHeader(
     searchActive: Boolean,
     onToggleSearch: () -> Unit,
     onRescan: () -> Unit,
-    onOpenFolderManager: () -> Unit
+    onOpenFolderManager: () -> Unit,
+    onOpenSignatureMatcher: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -325,6 +347,9 @@ private fun LibraryHeader(
         }
         IconButton(onClick = onOpenFolderManager) {
             Icon(Icons.Default.Tune, contentDescription = "Kelola folder")
+        }
+        IconButton(onClick = onOpenSignatureMatcher) {
+            Icon(Icons.Default.Fingerprint, contentDescription = "Cek Signature APK")
         }
         IconButton(onClick = onRescan) {
             Icon(Icons.Default.Refresh, contentDescription = "Pindai ulang")

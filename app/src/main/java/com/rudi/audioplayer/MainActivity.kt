@@ -254,6 +254,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val accentColor by playerViewModel.accentColor.collectAsState()
     val equalizerState by playerViewModel.equalizerState.collectAsState()
     val crossfadeEnabled by playerViewModel.crossfadeEnabled.collectAsState()
+    val customFolders by playerViewModel.customFolders.collectAsState()
     val librarySongs by playerViewModel.librarySongs.collectAsState()
     val libraryLoading by playerViewModel.libraryLoading.collectAsState()
 
@@ -352,7 +353,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onRenamePlaylist = { id, name -> playerViewModel.renamePlaylist(id, name) },
                     onAddSongToPlaylist = { id, songId -> playerViewModel.addSongToPlaylist(id, songId) },
                     onRemoveSongFromPlaylist = { id, songId -> playerViewModel.removeSongFromPlaylist(id, songId) },
-                    onMoveSongInPlaylist = { id, from, to -> playerViewModel.moveSongInPlaylist(id, from, to) }
+                    onMoveSongInPlaylist = { id, from, to -> playerViewModel.moveSongInPlaylist(id, from, to) },
+                    customFolders = customFolders,
+                    onAddCustomFolder = { uri -> playerViewModel.addCustomFolder(uri) },
+                    onRemoveCustomFolder = { uri -> playerViewModel.removeCustomFolder(uri) }
                 )
             }
             composable(

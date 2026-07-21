@@ -1,8 +1,14 @@
 package com.rudi.audioplayer.playback
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.net.Uri
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -12,6 +18,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.rudi.audioplayer.MainActivity
+import com.rudi.audioplayer.R
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.widget.WidgetUpdater
@@ -19,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -102,12 +110,20 @@ class PlaybackService : MediaSessionService() {
             val player = mediaSession?.player
             if (player != null && player.mediaItemCount == 0) {
                 // Cold start: the widget was tapped before this session ever loaded a queue
-                // (fresh install, or the service was killed). Restore the last saved queue
-                // first, then apply the tapped action — otherwise "play" from the widget would
-                // silently do nothing since there'd be nothing queued to play.
+                // (fresh install, or the service was killed). Promote to a foreground service
+                // IMMEDIATELY, before any suspending work — some OEM skins (XOS/MIUI-style
+                // aggressive background killers) will kill a freshly-spawned process within
+                // moments if it isn't already flagged as foreground, and the MediaStore query
+                // + queue restore below can easily take longer than that window.
+                startForegroundColdStartNotification()
                 serviceScope.launch {
                     restoreLastQueue()
                     applyWidgetAction(action)
+                    // Give Media3's own notification a moment to take over as the real
+                    // foreground notification once playback actually starts, then clear
+                    // our temporary placeholder so it doesn't linger in the shade.
+                    delay(1000)
+                    NotificationManagerCompat.from(this@PlaybackService).cancel(COLD_START_NOTIFICATION_ID)
                 }
             } else {
                 applyWidgetAction(action)
@@ -115,6 +131,37 @@ class PlaybackService : MediaSessionService() {
         }
 
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    /** Bare-minimum "waking up" notification so the OS treats this process as a legitimate
+     * foreground service from the very first instant of a widget-triggered cold start. */
+    private fun startForegroundColdStartNotification() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = getSystemService(NotificationManager::class.java)
+            if (manager.getNotificationChannel(COLD_START_CHANNEL_ID) == null) {
+                manager.createNotificationChannel(
+                    NotificationChannel(
+                        COLD_START_CHANNEL_ID,
+                        "Memulai Pemutaran",
+                        NotificationManager.IMPORTANCE_LOW
+                    )
+                )
+            }
+        }
+
+        val notification = NotificationCompat.Builder(this, COLD_START_CHANNEL_ID)
+            .setContentTitle("AudioPlayer")
+            .setContentText("Memuat lagu…")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        } else {
+            startForeground(COLD_START_NOTIFICATION_ID, notification)
+        }
     }
 
     private fun applyWidgetAction(action: String?) {
@@ -175,5 +222,10 @@ class PlaybackService : MediaSessionService() {
             mediaSession = null
         }
         super.onDestroy()
+    }
+
+    companion object {
+        private const val COLD_START_CHANNEL_ID = "playback_cold_start"
+        private const val COLD_START_NOTIFICATION_ID = 7001
     }
 }

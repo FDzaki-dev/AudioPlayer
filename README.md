@@ -20,7 +20,9 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Lirik**: tambahkan lirik sendiri per lagu (tempel teks biasa, atau format LRC `[mm:ss.xx]` untuk lirik yang otomatis mengikuti posisi putar dan auto-scroll)
 - **Tema dinamis**: warna aksen di Now Playing & mini player otomatis diambil dari sampul album lagu yang sedang diputar
 - **Kontrol volume** langsung dari Now Playing
-- **Kelola folder**: pilih folder mana saja yang mau disertakan/dikecualikan dari pemindaian musik
+- **Kelola folder**: pilih folder mana saja yang mau disertakan/dikecualikan dari pemindaian musik otomatis, **plus tambahkan folder tambahan lewat izin sistem** (Storage Access Framework) untuk memindai audio yang belum terdeteksi MediaStore — bekerja penuh offline/lokal, tidak ada koneksi internet yang terlibat
+- **Widget lebih tahan banting**: diperbaiki supaya tetap merespons play/pause/next meski aplikasi sudah disingkirkan total dari recent apps — service langsung "lapor" ke sistem sebagai proses aktif begitu widget ditekan, sebelum sempat dibunuh oleh pengelola baterai agresif (relevan khususnya di skin seperti XOS/MIUI). Widget juga ikut update judul/artis/status main tiap kali lagu berganti
+- **Pencocok Signature APK**: alat diagnostik di Perpustakaan (ikon sidik jari) — pilih dua file APK (versi lama & baru), langsung ketahuan apakah keduanya ditandatangani dengan key yang sama tanpa perlu install dulu. Kalau beda, laporan lengkap (nama package, versi, SHA-256 tiap file) bisa disalin ke papan klip lewat dialog khusus — bukan cuma tombol OK polos kayak dialog instalasi Android
 - **Filter Perpustakaan tersimpan**: tab yang terakhir dipilih (Lagu/Album/Artis/Folder/dst.) diingat di antar sesi
 - **Onboarding**: layar selamat datang menjelaskan kenapa izin dibutuhkan sebelum dialog izin muncul, dengan fallback "Buka Pengaturan Aplikasi" kalau izin ditolak permanen
 - **Optimalisasi**: pemindaian MediaStore kini terpusat satu kali di ViewModel (bukan diulang di setiap Beranda/Perpustakaan/Playlist), mengurangi kerja I/O berulang dan flicker loading tiap pindah tab
