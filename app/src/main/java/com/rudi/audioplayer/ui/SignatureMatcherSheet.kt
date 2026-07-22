@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
@@ -169,7 +171,11 @@ private fun SignatureLogDialog(report: String, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text("Laporan Lengkap") },
         text = {
-            Column(modifier = Modifier.heightIn(max = 360.dp)) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 Text(
                     report,
                     style = MaterialTheme.typography.bodySmall,

@@ -26,6 +26,8 @@ import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.PlayStatsStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.PlaylistStore
+import com.rudi.audioplayer.data.ThemeStore
+import com.rudi.audioplayer.ui.theme.AppTheme
 import com.rudi.audioplayer.data.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -64,6 +66,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     private val crossfadeStore = CrossfadeStore(appContext)
     private val customFolderStore = CustomFolderStore(appContext)
+    private val themeStore = ThemeStore(appContext)
+    private val _appTheme = MutableStateFlow(themeStore.getTheme())
+    val appTheme: StateFlow<AppTheme> = _appTheme.asStateFlow()
     private val customFolderScanner = CustomFolderScanner(appContext)
 
     private val _customFolders = MutableStateFlow(loadCustomFolderInfos())
@@ -247,6 +252,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         customFolderStore.removeFolder(uriString)
         _customFolders.value = loadCustomFolderInfos()
         refreshLibrary()
+    }
+
+    fun setAppTheme(theme: AppTheme) {
+        themeStore.setTheme(theme)
+        _appTheme.value = theme
     }
 
     private fun loadCustomFolderInfos(): List<CustomFolderInfo> =
