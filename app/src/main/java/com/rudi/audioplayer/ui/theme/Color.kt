@@ -11,23 +11,23 @@ val Brass = Color(0xFFE8B75D)             // primary accent — warm gold
 val Parchment = Color(0xFFF5F1E8)         // primary text — warm off-white
 val Mist = Color(0xFF9C97A8)              // secondary text — cool lavender-grey
 
-// "Midnight Bloom" — a dark, vivid nightlife palette: deep plum background
-// with an electric magenta accent. Louder and more playful than Ink & Brass,
-// built for someone who wants their player to feel like a night out, not a
-// listening room.
-val Plum = Color(0xFF180E1F)              // background
-val PlumSurface = Color(0xFF241530)       // cards, sheets, mini player
-val PlumSurfaceVariant = Color(0xFF362145) // dividers, unfilled tracks, skeletons
-val Magenta = Color(0xFFE64AC9)           // primary accent — electric magenta
-val Bloom = Color(0xFFF7EEFA)             // primary text — cool warm white
-val Lavender = Color(0xFFB7A1C4)          // secondary text — dusty lavender
+// "Midnight Bloom" — a deep, jewel-toned nightlife palette: near-black aubergine
+// background with a muted rose-orchid accent. Rich and atmospheric rather than
+// neon-bright — the kind of dark theme a boutique cocktail bar's app would use,
+// not a gaming app.
+val Plum = Color(0xFF160C1D)              // background
+val PlumSurface = Color(0xFF221530)       // cards, sheets, mini player
+val PlumSurfaceVariant = Color(0xFF33213F) // dividers, unfilled tracks, skeletons
+val Magenta = Color(0xFFC15A94)           // primary accent — muted rose-orchid, not neon
+val Bloom = Color(0xFFF2ECF3)             // primary text — soft warm white
+val Lavender = Color(0xFFA995B0)          // secondary text — dusty mauve
 
-// "Paper & Ink" — a warm light theme: cream paper background, dark ink
-// text, burnt-terracotta accent. An editorial, printed-page feel, not a
+// "Paper & Ink" — a warm light theme: ivory paper background, deep espresso
+// text, muted burnt-sienna accent. An editorial, printed-page feel, not a
 // system light-mode inversion of the dark palettes.
-val Paper = Color(0xFFF6F1E7)             // background
-val PaperSurface = Color(0xFFFFFDF8)      // cards, sheets, mini player
-val PaperSurfaceVariant = Color(0xFFE8DFCE) // dividers, unfilled tracks, skeletons
-val Terracotta = Color(0xFFC1552C)        // primary accent — burnt terracotta
-val InkText = Color(0xFF2B241C)           // primary text — near-black ink brown
-val WarmGrey = Color(0xFF7A7166)          // secondary text — warm grey-brown
+val Paper = Color(0xFFF3ECDD)             // background
+val PaperSurface = Color(0xFFFFFDF7)      // cards, sheets, mini player
+val PaperSurfaceVariant = Color(0xFFE6DCC7) // dividers, unfilled tracks, skeletons
+val Terracotta = Color(0xFFA6512E)        // primary accent — muted burnt sienna
+val InkText = Color(0xFF241E17)           // primary text — deep espresso brown
+val WarmGrey = Color(0xFF6E6559)          // secondary text — warm grey-brown

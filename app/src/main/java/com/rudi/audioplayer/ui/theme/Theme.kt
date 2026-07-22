@@ -13,8 +13,8 @@ import androidx.compose.ui.unit.dp
  * corner-radius language — not just a recolor of the same layout. */
 enum class AppTheme(val storageKey: String, val displayName: String, val description: String) {
     INK_BRASS("ink_brass", "Ink & Brass", "Gelap, boutique hi-fi — emas hangat di atas hitam pekat"),
-    MIDNIGHT_BLOOM("midnight_bloom", "Midnight Bloom", "Gelap, magenta elektrik — nuansa malam yang hidup"),
-    PAPER_INK("paper_ink", "Paper & Ink", "Terang, gaya editorial — krem hangat dan terracotta");
+    MIDNIGHT_BLOOM("midnight_bloom", "Midnight Bloom", "Gelap, jewel-tone — rose-orchid lembut di atas aubergine pekat"),
+    PAPER_INK("paper_ink", "Paper & Ink", "Terang, gaya editorial — krem hangat dan sienna terbakar");
 
     companion object {
         fun fromStorageKey(key: String?): AppTheme = entries.find { it.storageKey == key } ?: INK_BRASS
@@ -72,9 +72,9 @@ private val InkBrassShapes = Shapes(
     large = RoundedCornerShape(22.dp)
 )
 private val MidnightBloomShapes = Shapes(
-    small = RoundedCornerShape(16.dp),
-    medium = RoundedCornerShape(26.dp),
-    large = RoundedCornerShape(32.dp)
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(18.dp),
+    large = RoundedCornerShape(24.dp)
 )
 private val PaperInkShapes = Shapes(
     small = RoundedCornerShape(4.dp),

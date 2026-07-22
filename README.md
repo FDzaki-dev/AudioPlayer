@@ -25,14 +25,16 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Pencocok Signature APK**: alat diagnostik di Perpustakaan (ikon sidik jari) — pilih dua file APK (versi lama & baru), langsung ketahuan apakah keduanya ditandatangani dengan key yang sama tanpa perlu install dulu. Kalau beda, laporan lengkap (nama package, versi, SHA-256 tiap file) bisa disalin ke papan klip lewat dialog khusus — bukan cuma tombol OK polos kayak dialog instalasi Android
 - **3 tema penuh** (bukan cuma ganti warna): tiap tema punya palet warna, jenis huruf, dan bahasa bentuk sudut sendiri-sendiri.
   - **Ink & Brass** (gelap) — boutique hi-fi, emas hangat di atas hitam pekat, judul bertipe serif tegas
-  - **Midnight Bloom** (gelap) — magenta elektrik di atas ungu tua, tipografi tebal ala poster klub, sudut hampir bulat penuh
-  - **Paper & Ink** (terang) — krem hangat + terracotta, serif tipis gaya editorial cetak, sudut nyaris kotak
+  - **Midnight Bloom** (gelap) — jewel-tone, rose-orchid lembut di atas aubergine pekat, tipografi bold dengan tracking rapat, sudut sedang
+  - **Paper & Ink** (terang) — krem hangat + sienna terbakar, serif tipis gaya editorial cetak, sudut nyaris kotak
   
   Dipilih lewat tab **Pengaturan** baru di navigasi bawah, tersimpan otomatis, diterapkan ulang tiap sesi
 - **Halaman Pengaturan**: tab baru di navigasi bawah — berisi pemilih tema dan info versi aplikasi (nomor versi + build)
 
 ## Standar Penomoran Versi
-Mulai versi 3.5, nomor versi aplikasi (`versionName` di `build.gradle.kts`), nama file zip yang dikirim, dan pesan commit **selalu konsisten satu sama lain** — misalnya zip `AudioPlayer-v3_5-tema.zip` dengan commit "v3.5: ..." berarti `versionName = "3.5"` di dalamnya. Nomor versi terlihat langsung di tab Pengaturan.
+Nomor versi aplikasi (`versionName` di `build.gradle.kts`), nama file zip yang dikirim, dan pesan commit **selalu konsisten satu sama lain** — misalnya zip `AudioPlayer-v3_6-tema-versioning.zip` dengan commit "v3.6: ..." berarti `versionName = "3.6"` di dalamnya. Nomor versi terlihat langsung di tab Pengaturan.
+
+File APK hasil build dan artifact GitHub Actions juga ikut membawa nomor versi di namanya (`AudioPlayer-v3.6-release.apk`, artifact `AudioPlayer-v3.6-release`) — bukan lagi nama generik statis `app-release.apk`/`AudioPlayer-release` yang sama persis di setiap versi.
 - **Filter Perpustakaan tersimpan**: tab yang terakhir dipilih (Lagu/Album/Artis/Folder/dst.) diingat di antar sesi
 - **Onboarding**: layar selamat datang menjelaskan kenapa izin dibutuhkan sebelum dialog izin muncul, dengan fallback "Buka Pengaturan Aplikasi" kalau izin ditolak permanen
 - **Optimalisasi**: pemindaian MediaStore kini terpusat satu kali di ViewModel (bukan diulang di setiap Beranda/Perpustakaan/Playlist), mengurangi kerja I/O berulang dan flicker loading tiap pindah tab
@@ -56,10 +58,9 @@ Mulai versi 3.5, nomor versi aplikasi (`versionName` di `build.gradle.kts`), nam
 - Shared-element transition sungguhan (mini player → Now Playing sebagai satu elemen visual) belum ada — versi sekarang pakai animasi scale-in sebagai pendekatan yang lebih aman (lihat catatan di riwayat commit)
 
 ## Build
-Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai artifact bernama `AudioPlayer-release`. Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
+Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai artifact bernama `AudioPlayer-v<versi>-release` (nama filenya sendiri juga membawa nomor versi). Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
 
 ## Rencana v2 (belum dibuat)
 - Gapless playback murni (penyambungan buffer audio tanpa jeda)
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
-- Widget home screen
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)

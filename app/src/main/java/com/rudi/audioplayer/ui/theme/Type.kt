@@ -38,21 +38,20 @@ val InkBrassTypography = Typography(
     )
 )
 
-// "Midnight Bloom": bold, wide-tracked poster-style titles in heavy sans —
-// closer to a club flyer than an album sleeve. Everything else stays plain
-// so the shouty titles keep their impact.
+// "Midnight Bloom": bold sans with tight, confident tracking — closer to a
+// boutique hotel's signage than a club flyer. Weight carries the identity,
+// not exaggerated letter-spacing.
 val MidnightBloomTypography = Typography(
     titleLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Black,
+        fontWeight = FontWeight.Bold,
         fontSize = 25.sp,
-        letterSpacing = 0.5.sp
+        letterSpacing = (-0.2).sp
     ),
     titleMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.ExtraBold,
-        fontSize = 16.sp,
-        letterSpacing = 0.3.sp
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 16.sp
     ),
     bodyMedium = TextStyle(
         fontFamily = FontFamily.Default,
@@ -66,9 +65,9 @@ val MidnightBloomTypography = Typography(
     ),
     labelSmall = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 11.sp,
-        letterSpacing = 2.sp
+        letterSpacing = 1.4.sp
     )
 )
 
