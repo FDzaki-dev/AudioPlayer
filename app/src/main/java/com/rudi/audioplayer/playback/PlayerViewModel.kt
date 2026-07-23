@@ -100,6 +100,16 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val _accentColor = MutableStateFlow<Color?>(null)
     val accentColor: StateFlow<Color?> = _accentColor.asStateFlow()
 
+    // A small, one-shot delight when a real listening milestone is crossed — never a nag to
+    // open the app more, just an occasional "nice, look how much you've listened" moment that
+    // only ever fires as a side effect of listening the user was already doing.
+    private val _celebrationMessage = MutableStateFlow<String?>(null)
+    val celebrationMessage: StateFlow<String?> = _celebrationMessage.asStateFlow()
+
+    fun consumeCelebrationMessage() {
+        _celebrationMessage.value = null
+    }
+
     private val _librarySongs = MutableStateFlow<List<Song>>(emptyList())
     val librarySongs: StateFlow<List<Song>> = _librarySongs.asStateFlow()
 
@@ -125,6 +135,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             song?.let {
                 playStatsStore.recordPlay(it.id)
                 _statsVersion.value += 1
+                checkListeningMilestone()
             }
             updateAccentColor(song)
             persistPlaybackState()
@@ -206,7 +217,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             _libraryLoading.value = true
             _librarySongs.value = withContext(Dispatchers.IO) {
                 val mediaStoreSongs = MusicRepository(appContext).getAllSongs()
-                val existingIds = mediaStoreSongs.map { it.id }.toHashSet()
+                val mediaStoreSignatures = mediaStoreSongs.map { dedupeSignature(it) }.toHashSet()
                 val customSongs = customFolderStore.getFolderUris().flatMap { uriString ->
                     try {
                         val uri = Uri.parse(uriString)
@@ -215,14 +226,30 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                         emptyList()
                     }
                 }
-                // A file can legitimately live in both worlds if MediaStore catches up later —
-                // prefer the MediaStore copy (real album art, stable ID) when that happens.
-                val dedupedCustomSongs = customSongs.filterNot { existingIds.contains(it.id) }
+                // A file can legitimately live in both worlds if MediaStore catches up later
+                // (e.g. a folder granted through the SAF picker also happens to be inside a
+                // path MediaStore already indexes) — prefer the MediaStore copy (real album
+                // art, stable ID) when that happens. Custom-scanned songs always get negative
+                // IDs specifically so they never collide with MediaStore's always-non-negative
+                // ones, which means comparing by ID here could never detect a real duplicate —
+                // matching on (title, artist, duration) instead is what actually catches it.
+                val dedupedCustomSongs = customSongs.filterNot { dedupeSignature(it) in mediaStoreSignatures }
                 mediaStoreSongs + dedupedCustomSongs
             }
             _libraryLoading.value = false
         }
     }
+
+    /** A cross-source identity key: title+artist+duration survives a song being seen once via
+     * MediaStore and once via a raw SAF folder scan, even though those paths assign unrelated
+     * IDs. Duration is bucketed to the nearest second since MediaStore and
+     * MediaMetadataRetriever can report durations a handful of milliseconds apart for the
+     * exact same file. */
+    private fun dedupeSignature(song: Song): Triple<String, String, Long> = Triple(
+        song.title.trim().lowercase(),
+        song.artist.trim().lowercase(),
+        song.duration / 1000
+    )
 
     /** Grants persistent access to a folder the user picked via the system folder picker,
      * remembers it, and rescans so its audio shows up immediately. */
@@ -302,6 +329,23 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             index = index,
             positionMs = c.currentPosition.coerceAtLeast(0)
         )
+    }
+
+    /** Fires a one-time celebration the exact play that crosses a milestone total —
+     * checking equality (not >=) means it can only ever trigger once per threshold,
+     * even though this runs on every single track transition. */
+    private fun checkListeningMilestone() {
+        val total = playStatsStore.totalPlayCount()
+        val message = when (total) {
+            10 -> "10 lagu sudah kamu putar 🎧"
+            50 -> "50 lagu! Selera musik kamu mulai kebaca nih 🎶"
+            100 -> "100 lagu diputar — telinga kamu sudah kerja keras hari ini 🔥"
+            250 -> "250 lagu total. Ini udah kebiasaan, bukan cuma iseng 😌"
+            500 -> "500 lagu sepanjang masa. Serius, respect. 🏆"
+            1000 -> "1000 lagu! Kamu ini pendengar sejati 👑"
+            else -> null
+        }
+        if (message != null) _celebrationMessage.value = message
     }
 
     private fun updateAccentColor(song: Song?) {

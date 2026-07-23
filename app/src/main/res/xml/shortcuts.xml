@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="shuffle_all"
+        android:enabled="true"
+        android:icon="@drawable/ic_widget_next"
+        android:shortcutShortLabel="@string/shortcut_shuffle_short"
+        android:shortcutLongLabel="@string/shortcut_shuffle_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.rudi.audioplayer"
+            android:targetClass="com.rudi.audioplayer.MainActivity"
+            android:data="audioplayer://shuffle_all" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="continue_listening"
+        android:enabled="true"
+        android:icon="@drawable/ic_widget_play"
+        android:shortcutShortLabel="@string/shortcut_continue_short"
+        android:shortcutLongLabel="@string/shortcut_continue_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.rudi.audioplayer"
+            android:targetClass="com.rudi.audioplayer.MainActivity"
+            android:data="audioplayer://continue_listening" />
+    </shortcut>
+</shortcuts>

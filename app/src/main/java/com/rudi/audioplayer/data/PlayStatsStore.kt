@@ -47,6 +47,13 @@ class PlayStatsStore(context: Context) {
             .take(limit)
             .map { it.first }
 
+    /** Sum of every song's play count — the app's all-time "songs played" tally,
+     * used to celebrate small listening milestones. */
+    fun totalPlayCount(): Int =
+        prefs.all.entries
+            .filter { it.key.startsWith(COUNT_PREFIX) }
+            .sumOf { (it.value as? Int) ?: 0 }
+
     companion object {
         private const val PREFS_NAME = "play_stats"
         private const val COUNT_PREFIX = "count_"

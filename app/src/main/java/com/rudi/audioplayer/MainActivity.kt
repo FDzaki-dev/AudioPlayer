@@ -48,6 +48,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -92,6 +95,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Backed by Compose state so a shortcut tap (handled in onNewIntent, a plain Activity
+    // callback outside the composition) can still signal the composable tree to react.
+    private var pendingShortcutAction by mutableStateOf<String?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // MainActivity is launchMode="singleTop", so tapping a shortcut while the app is
+        // already running redelivers here instead of recreating the Activity — without this
+        // override the shortcut would silently do nothing unless the app was cold-started.
+        setIntent(intent)
+        pendingShortcutAction = intent.data?.toString()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         enableEdgeToEdge(
@@ -100,12 +116,29 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
 
+        pendingShortcutAction = intent?.data?.toString()
         playerViewModel.connect()
 
         setContent {
             val appTheme by playerViewModel.appTheme.collectAsState()
             AudioPlayerTheme(theme = appTheme) {
                 val context = LocalContext.current
+
+                // Both shortcuts mirror an action already reachable from the Home screen
+                // (the shuffle icon next to the greeting, and the "Lanjutkan" card) — same
+                // effect, just launchable straight from the launcher icon without opening
+                // the app first. Neither navigates anywhere; playback simply starts and the
+                // mini player appears, exactly like tapping those same buttons would.
+                val librarySongsForShortcut by playerViewModel.librarySongs.collectAsState()
+                LaunchedEffect(pendingShortcutAction, librarySongsForShortcut.isEmpty()) {
+                    val action = pendingShortcutAction ?: return@LaunchedEffect
+                    if (librarySongsForShortcut.isEmpty()) return@LaunchedEffect
+                    when (action) {
+                        "audioplayer://shuffle_all" -> playerViewModel.shuffleAll(librarySongsForShortcut)
+                        "audioplayer://continue_listening" -> playerViewModel.resumeFromSaved(librarySongsForShortcut)
+                    }
+                    pendingShortcutAction = null
+                }
 
                 val neededPermissions = remember {
                     buildList {
@@ -260,11 +293,34 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val customFolders by playerViewModel.customFolders.collectAsState()
     val librarySongs by playerViewModel.librarySongs.collectAsState()
     val libraryLoading by playerViewModel.libraryLoading.collectAsState()
+    val celebrationMessage by playerViewModel.celebrationMessage.collectAsState()
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(celebrationMessage) {
+        val message = celebrationMessage ?: return@LaunchedEffect
+        try {
+            snackbarHostState.showSnackbar(message)
+        } finally {
+            playerViewModel.consumeCelebrationMessage()
+        }
+    }
+
     Scaffold(
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    action = null
+                ) {
+                    Text(data.visuals.message, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        },
         bottomBar = {
             Column {
                 AnimatedVisibility(

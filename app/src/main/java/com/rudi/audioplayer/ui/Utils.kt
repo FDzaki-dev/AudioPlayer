@@ -1,6 +1,9 @@
 package com.rudi.audioplayer.ui
 
+import android.app.Activity
 import android.content.ContentUris
+import android.content.Context
+import android.content.ContextWrapper
 import android.net.Uri
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -15,6 +18,20 @@ import java.util.Locale
 
 fun albumArtUri(albumId: Long): Uri =
     ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId)
+
+/**
+ * Compose's LocalContext is often a themed ContextWrapper, not the Activity itself.
+ * Needed to reach the current window (e.g. to set a per-app screen brightness override
+ * for the brightness swipe gesture) without requiring any extra permission.
+ */
+fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
+}
 
 fun formatDuration(ms: Long): String {
     val totalSeconds = ms / 1000

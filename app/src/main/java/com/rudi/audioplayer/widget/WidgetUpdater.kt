@@ -85,10 +85,21 @@ object WidgetUpdater {
 
     private fun servicePendingIntent(context: Context, action: String, requestCode: Int): PendingIntent {
         val intent = Intent(context, PlaybackService::class.java).setAction(action)
-        return PendingIntent.getService(
-            context, requestCode, intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+        val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        // Widget taps happen with no guarantee the app process is alive — e.g. right after
+        // the user swipes AudioPlayer away from recent apps and the system reclaims the
+        // process. PendingIntent.getService() sends the intent as a plain Context.startService(),
+        // which Android 8+ (API 26) actively REFUSES to start from that background state
+        // (IllegalStateException), so the service — and everything in it, including the
+        // cold-start restore logic in PlaybackService — never even runs. getForegroundService()
+        // instead calls startForegroundService(), which IS allowed from the background, on the
+        // condition the service promotes itself with startForeground() within 5 seconds —
+        // PlaybackService's cold-start path already does exactly that as its very first step.
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(context, requestCode, intent, flags)
+        } else {
+            PendingIntent.getService(context, requestCode, intent, flags)
+        }
     }
 
     private fun loadAlbumArtBitmap(context: Context, uri: Uri): Bitmap? {

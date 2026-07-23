@@ -3,6 +3,23 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// A hardcoded versionCode has to be remembered and manually bumped on every single
+// release, and forgetting even once means the next APK isn't recognized as "newer" —
+// which can silently break the update path on some devices/launchers even when the
+// signing certificate is correct. Counting git commits gives a versionCode that's
+// guaranteed to increase with every push, with no manual step to forget.
+fun gitCommitCount(): Int = try {
+    val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
+        .redirectErrorStream(true)
+        .start()
+    process.waitFor()
+    process.inputStream.bufferedReader().readText().trim().toIntOrNull() ?: 1
+} catch (e: Exception) {
+    1 // local build outside a git checkout, or git unavailable — never fail the build over this
+}
+
+val appVersionCode = gitCommitCount()
+
 android {
     namespace = "com.rudi.audioplayer"
     compileSdk = 34
@@ -11,8 +28,8 @@ android {
         applicationId = "com.rudi.audioplayer"
         minSdk = 23
         targetSdk = 34
-        versionCode = 37
-        versionName = "3.7"
+        versionCode = appVersionCode
+        versionName = "1.0.$appVersionCode"
     }
 
     signingConfigs {

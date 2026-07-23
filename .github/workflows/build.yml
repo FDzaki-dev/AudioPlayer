@@ -11,6 +11,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history, not a shallow clone — the version scheme below counts total
+          # commits, and a shallow checkout would silently under-count that.
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -34,6 +38,15 @@ jobs:
             echo "⚠️ No keystore decoded (SIGNING_KEYSTORE_BASE64 secret missing/empty) — falling back to debug signing."
           fi
 
+      - name: Determine version name
+        id: version
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "name=1.0.$COUNT" >> "$GITHUB_OUTPUT"
+          echo "tag=v1.0.$COUNT-$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: 1.0.$COUNT ($SHORT_SHA)"
+
       - name: Build Release APK
         env:
           SIGNING_KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
@@ -42,8 +55,15 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: gradle assembleRelease --no-daemon
 
+      - name: Rename APK to match version
+        run: |
+          mkdir -p renamed
+          cp app/build/outputs/apk/release/app-release.apk "renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AudioPlayer-release
-          path: app/build/outputs/apk/release/app-release.apk
+          # upload-artifact zips this folder using `name:` as the zip's own file name too,
+          # so both the APK inside and the zip GitHub hands back carry the same version tag.
+          name: AudioPlayer-${{ steps.version.outputs.tag }}
+          path: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk
