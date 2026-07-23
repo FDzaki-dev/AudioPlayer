@@ -21,7 +21,20 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Tema dinamis**: warna aksen di Now Playing & mini player otomatis diambil dari sampul album lagu yang sedang diputar
 - **Kontrol volume** langsung dari Now Playing
 - **Kelola folder**: pilih folder mana saja yang mau disertakan/dikecualikan dari pemindaian musik otomatis, **plus tambahkan folder tambahan lewat izin sistem** (Storage Access Framework) untuk memindai audio yang belum terdeteksi MediaStore — bekerja penuh offline/lokal, tidak ada koneksi internet yang terlibat
-- **Widget lebih tahan banting**: diperbaiki supaya tetap merespons play/pause/next meski aplikasi sudah disingkirkan total dari recent apps — service langsung "lapor" ke sistem sebagai proses aktif begitu widget ditekan, sebelum sempat dibunuh oleh pengelola baterai agresif (relevan khususnya di skin seperti XOS/MIUI)
+- **Widget lebih tahan banting**: diperbaiki supaya tetap merespons play/pause/next meski aplikasi sudah disingkirkan total dari recent apps — service langsung "lapor" ke sistem sebagai proses aktif begitu widget ditekan, sebelum sempat dibunuh oleh pengelola baterai agresif (relevan khususnya di skin seperti XOS/MIUI). Widget juga ikut update judul/artis/status main tiap kali lagu berganti
+- **Pencocok Signature APK**: alat diagnostik di Perpustakaan (ikon sidik jari) — pilih dua file APK (versi lama & baru), langsung ketahuan apakah keduanya ditandatangani dengan key yang sama tanpa perlu install dulu. Kalau beda, laporan lengkap (nama package, versi, SHA-256 tiap file) bisa disalin ke papan klip lewat dialog khusus — bukan cuma tombol OK polos kayak dialog instalasi Android
+- **3 tema penuh** (bukan cuma ganti warna): tiap tema punya palet warna, jenis huruf, dan bahasa bentuk sudut sendiri-sendiri.
+  - **Ink & Brass** (gelap) — boutique hi-fi, emas hangat di atas hitam pekat, judul bertipe serif tegas
+  - **Midnight Bloom** (gelap) — jewel-tone, rose-orchid lembut di atas aubergine pekat, tipografi bold dengan tracking rapat, sudut sedang
+  - **Paper & Ink** (terang) — krem hangat + sienna terbakar, serif tipis gaya editorial cetak, sudut nyaris kotak
+  
+  Dipilih lewat tab **Pengaturan** baru di navigasi bawah, tersimpan otomatis, diterapkan ulang tiap sesi
+- **Halaman Pengaturan**: tab baru di navigasi bawah — berisi pemilih tema dan info versi aplikasi (nomor versi + build)
+
+## Standar Penomoran Versi
+Nomor versi aplikasi (`versionName` di `build.gradle.kts`), nama file zip yang dikirim, dan pesan commit **selalu konsisten satu sama lain** — misalnya zip `AudioPlayer-v3_6-tema-versioning.zip` dengan commit "v3.6: ..." berarti `versionName = "3.6"` di dalamnya. Nomor versi terlihat langsung di tab Pengaturan.
+
+File APK hasil build dan artifact GitHub Actions juga ikut membawa nomor versi di namanya (`AudioPlayer-v3.6-release.apk`, artifact `AudioPlayer-v3.6-release`) — bukan lagi nama generik statis `app-release.apk`/`AudioPlayer-release` yang sama persis di setiap versi.
 - **Filter Perpustakaan tersimpan**: tab yang terakhir dipilih (Lagu/Album/Artis/Folder/dst.) diingat di antar sesi
 - **Onboarding**: layar selamat datang menjelaskan kenapa izin dibutuhkan sebelum dialog izin muncul, dengan fallback "Buka Pengaturan Aplikasi" kalau izin ditolak permanen
 - **Optimalisasi**: pemindaian MediaStore kini terpusat satu kali di ViewModel (bukan diulang di setiap Beranda/Perpustakaan/Playlist), mengurangi kerja I/O berulang dan flicker loading tiap pindah tab
@@ -39,16 +52,16 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Equalizer**: `EqualizerController.kt` kini tersambung penuh — sheet baru di Now Playing dengan toggle aktif/nonaktif, **preset kuat buatan sendiri** (Flat/Bass+/Treble+/Vokal+, sengaja dibuat dramatis karena preset bawaan Android biasanya sangat halus di banyak perangkat), preset bawaan perangkat, dan slider per band frekuensi. Geser slider atau pilih preset otomatis mengaktifkan efeknya. Tersimpan otomatis dan diterapkan ulang tiap sesi
 - **Fade Transisi (crossfade sederhana)**: volume melandai halus ±3 detik di pergantian lagu, bisa diatur nyala/mati lewat dialog "Pengaturan Putar" (ikon kecepatan). Aktif secara default
 - **APK release ditandatangani konsisten**: CI kini bisa memakai keystore release asli (lewat secret GitHub) untuk build release, bukan debug key — install APK baru tidak perlu uninstall dulu. Otomatis jatuh ke debug key kalau secret belum diisi, jadi tidak pernah gagal build
+- **Gesture swipe kecerahan & volume** (v3.8): di layar Now Playing, geser vertikal di sisi kiri piringan hitam untuk atur kecerahan layar, geser di sisi kanan untuk atur volume putar — lengkap dengan indikator persentase mengambang selagi digeser. Area geser horizontal di piringan hitam (untuk lagu berikutnya/sebelumnya) tetap seperti semula, tidak terganggu. Kecerahan diatur lewat override per-window (tidak butuh izin tambahan) dan otomatis kembali ke pengaturan sistem begitu layar Now Playing ditutup
 
 ## Belum selesai / dalam pengerjaan
 - Gapless playback murni (tanpa jeda encoder/decoder) belum ada — yang ada sekarang crossfade berbasis fade volume, bukan penyambungan buffer audio
 - Shared-element transition sungguhan (mini player → Now Playing sebagai satu elemen visual) belum ada — versi sekarang pakai animasi scale-in sebagai pendekatan yang lebih aman (lihat catatan di riwayat commit)
 
 ## Build
-Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai artifact bernama `AudioPlayer-release`. Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
+Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai artifact bernama `AudioPlayer-v<versi>-release` (nama filenya sendiri juga membawa nomor versi). Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
 
 ## Rencana v2 (belum dibuat)
 - Gapless playback murni (penyambungan buffer audio tanpa jeda)
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
-- Widget home screen
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)

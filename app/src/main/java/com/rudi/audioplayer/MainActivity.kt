@@ -38,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.WifiOff
@@ -75,6 +76,7 @@ import androidx.navigation.compose.rememberNavController
 import com.rudi.audioplayer.playback.PlayerViewModel
 import com.rudi.audioplayer.ui.HomeScreen
 import com.rudi.audioplayer.ui.LibraryScreen
+import com.rudi.audioplayer.ui.SettingsScreen
 import com.rudi.audioplayer.ui.MiniPlayerBar
 import com.rudi.audioplayer.ui.NowPlayingScreen
 import com.rudi.audioplayer.ui.theme.AudioPlayerTheme
@@ -101,7 +103,8 @@ class MainActivity : ComponentActivity() {
         playerViewModel.connect()
 
         setContent {
-            AudioPlayerTheme {
+            val appTheme by playerViewModel.appTheme.collectAsState()
+            AudioPlayerTheme(theme = appTheme) {
                 val context = LocalContext.current
 
                 val neededPermissions = remember {
@@ -276,7 +279,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                         onExpand = { navController.navigate("now_playing") }
                     )
                 }
-                if (currentRoute == "home" || currentRoute == "library") {
+                if (currentRoute == "home" || currentRoute == "library" || currentRoute == "settings") {
                     NavigationBar {
                         NavigationBarItem(
                             selected = currentRoute == "home",
@@ -299,6 +302,17 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                             },
                             icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
                             label = { Text("Perpustakaan") }
+                        )
+                        NavigationBarItem(
+                            selected = currentRoute == "settings",
+                            onClick = {
+                                navController.navigate("settings") {
+                                    popUpTo("home")
+                                    launchSingleTop = true
+                                }
+                            },
+                            icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                            label = { Text("Pengaturan") }
                         )
                     }
                 }
@@ -357,6 +371,13 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     customFolders = customFolders,
                     onAddCustomFolder = { uri -> playerViewModel.addCustomFolder(uri) },
                     onRemoveCustomFolder = { uri -> playerViewModel.removeCustomFolder(uri) }
+                )
+            }
+            composable("settings") {
+                val appTheme by playerViewModel.appTheme.collectAsState()
+                SettingsScreen(
+                    currentTheme = appTheme,
+                    onSelectTheme = { theme -> playerViewModel.setAppTheme(theme) }
                 )
             }
             composable(

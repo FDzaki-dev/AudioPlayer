@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -8,16 +9,23 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.BrightnessHigh
+import androidx.compose.material.icons.filled.BrightnessLow
+import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -45,16 +53,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import android.view.WindowManager
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
 import com.rudi.audioplayer.playback.PlaybackUiState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -97,6 +109,40 @@ fun NowPlayingScreen(
     var showQueueSheet by remember { mutableStateOf(false) }
     var showLyricsSheet by remember { mutableStateOf(false) }
     var showEqualizerSheet by remember { mutableStateOf(false) }
+
+    // --- Swipe gesture: brightness (left of album art) & audio volume (right of album art) ---
+    val gestureScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+    var brightnessLevel by remember {
+        mutableStateOf(
+            activity?.window?.attributes?.screenBrightness
+                ?.takeIf { it in 0f..1f } ?: 0.5f
+        )
+    }
+    var showBrightnessIndicator by remember { mutableStateOf(false) }
+    var showVolumeIndicator by remember { mutableStateOf(false) }
+    val latestVolume = rememberUpdatedState(uiState.volume)
+
+    fun applyBrightness(target: Float) {
+        val clamped = target.coerceIn(0.02f, 1f)
+        brightnessLevel = clamped
+        val window = activity?.window ?: return
+        val params = window.attributes
+        params.screenBrightness = clamped
+        window.attributes = params
+    }
+
+    // The brightness override only applies to this screen — restore the system/app
+    // default the moment Now Playing is closed, instead of leaving it dimmed everywhere.
+    DisposableEffect(Unit) {
+        onDispose {
+            val window = activity?.window ?: return@onDispose
+            val params = window.attributes
+            params.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            window.attributes = params
+        }
+    }
 
     val fallback = MaterialTheme.colorScheme.primary
     val animatedAccent by animateColorAsState(
@@ -210,19 +256,73 @@ fun NowPlayingScreen(
             launch { entranceAlpha.animateTo(1f, animationSpec = tween(280)) }
         }
 
-        Box(
-            modifier = Modifier.graphicsLayer {
-                scaleX = entranceScale.value
-                scaleY = entranceScale.value
-                alpha = entranceAlpha.value
-            }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            VinylAlbumArt(
-                albumId = song?.albumId,
-                isPlaying = uiState.isPlaying,
-                accentColor = animatedAccent,
-                onSwipeNext = onNext,
-                onSwipePrevious = onPrevious
+            // Left zone: swipe up/down to raise/lower screen brightness.
+            Spacer(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onDragStart = { showBrightnessIndicator = true },
+                            onDragEnd = {
+                                gestureScope.launch {
+                                    delay(600)
+                                    showBrightnessIndicator = false
+                                }
+                            },
+                            onDragCancel = { showBrightnessIndicator = false },
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                applyBrightness(brightnessLevel - dragAmount / size.height)
+                            }
+                        )
+                    }
+            )
+
+            Box(
+                modifier = Modifier.graphicsLayer {
+                    scaleX = entranceScale.value
+                    scaleY = entranceScale.value
+                    alpha = entranceAlpha.value
+                }
+            ) {
+                VinylAlbumArt(
+                    albumId = song?.albumId,
+                    isPlaying = uiState.isPlaying,
+                    accentColor = animatedAccent,
+                    onSwipeNext = onNext,
+                    onSwipePrevious = onPrevious
+                )
+            }
+
+            // Right zone: swipe up/down to raise/lower playback volume.
+            Spacer(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onDragStart = { showVolumeIndicator = true },
+                            onDragEnd = {
+                                gestureScope.launch {
+                                    delay(600)
+                                    showVolumeIndicator = false
+                                }
+                            },
+                            onDragCancel = { showVolumeIndicator = false },
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                val next = (latestVolume.value - dragAmount / size.height).coerceIn(0f, 1f)
+                                onSetVolume(next)
+                            }
+                        )
+                    }
             )
         }
 
@@ -370,6 +470,44 @@ fun NowPlayingScreen(
             )
         }
         }
+
+        AnimatedVisibility(
+            visible = showBrightnessIndicator,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 20.dp),
+            enter = fadeIn(tween(150)),
+            exit = fadeOut(tween(300))
+        ) {
+            GestureIndicatorBadge(
+                icon = when {
+                    brightnessLevel < 0.33f -> Icons.Default.BrightnessLow
+                    brightnessLevel < 0.66f -> Icons.Default.BrightnessMedium
+                    else -> Icons.Default.BrightnessHigh
+                },
+                value = brightnessLevel,
+                accentColor = animatedAccent
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showVolumeIndicator,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 20.dp),
+            enter = fadeIn(tween(150)),
+            exit = fadeOut(tween(300))
+        ) {
+            GestureIndicatorBadge(
+                icon = when {
+                    uiState.volume <= 0f -> Icons.Default.VolumeOff
+                    uiState.volume < 0.5f -> Icons.Default.VolumeDown
+                    else -> Icons.Default.VolumeUp
+                },
+                value = uiState.volume,
+                accentColor = animatedAccent
+            )
+        }
     }
 
     if (showSleepTimerDialog) {
@@ -428,6 +566,33 @@ fun NowPlayingScreen(
             onPresetSelect = onEqualizerPresetSelect,
             onBoldPresetSelect = onEqualizerBoldPresetSelect
         )
+    }
+}
+
+/**
+ * Small floating pill shown while dragging the brightness/volume swipe zones,
+ * mirroring the transient overlay pattern used by most media/video apps.
+ */
+@Composable
+private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: Color) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        tonalElevation = 6.dp,
+        shadowElevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(icon, contentDescription = null, tint = accentColor)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                "${(value * 100).toInt()}%",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }
 

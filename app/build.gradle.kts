@@ -11,8 +11,8 @@ android {
         applicationId = "com.rudi.audioplayer"
         minSdk = 23
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 38
+        versionName = "3.8"
     }
 
     signingConfigs {
@@ -59,6 +59,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
