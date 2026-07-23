@@ -11,8 +11,8 @@ android {
         applicationId = "com.rudi.audioplayer"
         minSdk = 23
         targetSdk = 34
-        versionCode = 36
-        versionName = "3.6"
+        versionCode = 37
+        versionName = "3.7"
     }
 
     signingConfigs {
@@ -66,17 +66,6 @@ android {
     }
     packaging {
         resources.excludes.add("/META-INF/{AL2.0,LGPL2.1}")
-    }
-}
-
-// Names the actual output file "AudioPlayer-v<versionName>.apk" instead of Gradle's generic
-// default "app-release.apk" — so the APK itself carries proof of its version, not just the
-// zip it was delivered in (which is easy to lose track of once it's out of Downloads).
-androidComponents {
-    onVariants { variant ->
-        variant.outputs.forEach { output ->
-            output.outputFileName.set("AudioPlayer-v${android.defaultConfig.versionName}-${variant.name}.apk")
-        }
     }
 }
 
