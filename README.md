@@ -45,7 +45,7 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Radio otomatis & Mix Artis**: saat antrean habis (repeat off), pemutaran otomatis lanjut dengan lagu lain dari library; Beranda punya bagian "Mix: [Artis]" berdasarkan artis yang paling sering didengar
 - **App icon adaptif**: ikon aplikasi diganti dari placeholder default Android Studio menjadi identitas "Ink & Brass" sendiri (piringan hitam brass di atas ink hitam), pakai format Adaptive Icon (`mipmap-anydpi-v26`) untuk Android 8+, dengan fallback PNG untuk versi lebih lama
 - **Equalizer**: `EqualizerController.kt` tersambung penuh — sheet di Now Playing dengan toggle aktif/nonaktif, **preset kuat buatan sendiri** (Flat/Bass+/Treble+/Vokal+, sengaja dibuat dramatis karena preset bawaan Android biasanya sangat halus di banyak perangkat), preset bawaan perangkat, dan slider per band frekuensi. Geser slider atau pilih preset otomatis mengaktifkan efeknya. Tersimpan otomatis dan diterapkan ulang tiap sesi
-- **Fade Transisi (crossfade sederhana)**: volume melandai halus ±3 detik di pergantian lagu, bisa diatur nyala/mati lewat dialog "Pengaturan Putar" (ikon kecepatan). Aktif secara default
+- **Gapless (Murni) vs Fade Halus**: dialog "Pengaturan Putar" sekarang menampilkan dua pilihan eksplisit, bukan cuma satu toggle fade — "Gapless (Murni)" membiarkan transisi alami tanpa campur tangan (default), "Fade Halus" menerapkan fade volume ±3 detik di tiap pergantian lagu
 - **APK release ditandatangani konsisten**: CI memakai keystore release asli (lewat secret GitHub) untuk build release, bukan debug key — install APK baru tidak perlu uninstall dulu. Otomatis jatuh ke debug key kalau secret belum diisi, jadi tidak pernah gagal build
 - **Gesture swipe kecerahan & volume**: di layar Now Playing, geser vertikal di **separuh kiri** untuk atur kecerahan layar, **separuh kanan** untuk atur volume — masing-masing zona selebar 50% layar penuh (bukan cuma strip tipis di ujung), lengkap indikator persentase mengambang selagi digeser. Volume yang diatur adalah **volume sistem Android sungguhan** (sama seperti tombol fisik HP), bukan sekadar penguat internal app. Area geser horizontal di piringan hitam (lagu berikutnya/sebelumnya) tetap berfungsi normal di atasnya. Kecerahan diatur lewat override per-window (tidak butuh izin tambahan) dan otomatis kembali ke pengaturan sistem begitu layar Now Playing ditutup
 
@@ -57,13 +57,18 @@ Nomor versi aplikasi (`versionName` di `build.gradle.kts`), nama file zip yang d
 File APK hasil build dan artifact GitHub Actions juga ikut membawa nomor versi + short commit hash di namanya (`AudioPlayer-v3.8-a3f8e21.apk`) — bukan lagi nama generik statis `app-release.apk`/`AudioPlayer-release` yang sama persis di setiap versi. Penamaan ini murni dikerjakan di level workflow CI (`.github/workflows/build.yml`), bukan dobel dengan Gradle, biar tidak saling tabrak.
 
 ## Belum selesai / dalam pengerjaan
-- Gapless playback murni (tanpa jeda encoder/decoder) belum ada — yang ada sekarang crossfade berbasis fade volume, bukan penyambungan buffer audio
 - Shared-element transition sungguhan (mini player → Now Playing sebagai satu elemen visual) belum ada — versi sekarang pakai animasi scale-in sebagai pendekatan yang lebih aman (lihat catatan di riwayat commit)
+
+## Catatan jujur soal Gapless Playback
+Mesin pemutarannya **sudah gapless secara arsitektur** sejak awal — satu ExoPlayer yang hidup terus sepanjang sesi, memutar satu playlist asli (`setMediaItems`/`addMediaItem`), bukan mengganti lagu satu per satu dengan restart/re-prepare. Ini menghilangkan penyebab paling umum dari "jeda" antar lagu (loading ulang, klik/pop transisi). Toggle "Gapless (Murni)" vs "Fade Halus" di dialog Pengaturan Putar cuma menentukan apakah transisi itu **dibiarkan alami** (gapless) atau **sengaja diberi efek fade turun-naik volume**.
+
+Untuk file **FLAC/WAV** (lossless), ini menjamin sambungan sempurna tanpa jeda — dijamin oleh cara format itu bekerja, bukan sekadar klaim.
+
+Untuk **MP3/AAC** (lossy), gapless yang benar-benar sample-accurate juga bergantung pada metadata encoder di file itu sendiri (LAME tag / iTunSMPB) dan seberapa tepat decoder ExoPlayer memangkas padding-nya — ini terjadi di level library, bukan sesuatu yang bisa "ditambahkan" lewat kode aplikasi ini, dan saya belum bisa memverifikasinya dengan telinga di device fisik. Kalau setelah dicoba masih kerasa ada jeda halus khusus di file MP3/AAC tertentu, itu petunjuk berharga — kabari, biar bisa ditelusuri lebih spesifik ke file/formatnya.
 
 ## Build
 Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai artifact bernama `AudioPlayer-v<versi>-<sha>` (nama filenya sendiri juga membawa nomor versi + commit hash). Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
 
 ## Rencana v2 (belum dibuat)
-- Gapless playback murni (penyambungan buffer audio tanpa jeda)
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)

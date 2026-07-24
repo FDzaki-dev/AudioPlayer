@@ -60,6 +60,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import android.content.Context
 import android.media.AudioManager
 import android.view.WindowManager
 import androidx.media3.common.Player
@@ -782,26 +783,63 @@ private fun SpeedDialog(
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onToggleCrossfade(!crossfadeEnabled) },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Fade Transisi", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Volume melandai halus di pergantian lagu",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-                    Switch(checked = crossfadeEnabled, onCheckedChange = onToggleCrossfade)
-                }
+                Text(
+                    "Transisi Antar Lagu",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Gapless has always been the actual playback engine's default behavior —
+                // ExoPlayer decodes a real back-to-back playlist with zero re-buffering
+                // between tracks whenever crossfade doesn't touch volume. The only thing
+                // that was missing was ever telling the user this exists; before this, "off"
+                // was just the crossfade switch's unlabeled resting state.
+                TransitionModeOption(
+                    title = "Gapless (Murni)",
+                    subtitle = "Sambung langsung tanpa jeda atau perubahan volume — persis seperti file aslinya",
+                    selected = !crossfadeEnabled,
+                    onClick = { onToggleCrossfade(false) }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                TransitionModeOption(
+                    title = "Fade Halus",
+                    subtitle = "Volume melandai turun lalu naik lagi di tiap pergantian lagu",
+                    selected = crossfadeEnabled,
+                    onClick = { onToggleCrossfade(true) }
+                )
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("Tutup") }
         }
     )
+}
+
+@Composable
+private fun TransitionModeOption(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Spacer(modifier = Modifier.width(4.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary
+            )
+        }
+    }
 }
