@@ -29,7 +29,10 @@ android {
         minSdk = 23
         targetSdk = 34
         versionCode = appVersionCode
-        versionName = "1.0.$appVersionCode"
+        // versionCode auto-increments with git history (see gitCommitCount() above) so it can
+        // never be forgotten. versionName stays a deliberate, human-readable string set per
+        // release — kept in sync with the zip filename and commit message for that update.
+        versionName = "3.8"
     }
 
     signingConfigs {
@@ -85,6 +88,10 @@ android {
         resources.excludes.add("/META-INF/{AL2.0,LGPL2.1}")
     }
 }
+
+// NOTE: output APK renaming is handled in .github/workflows/build.yml (the "Rename APK to
+// match version" step), not here — doing it in both places would make the workflow's `cp`
+// step fail looking for a file this block already renamed out from under it.
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")

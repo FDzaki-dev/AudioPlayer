@@ -60,6 +60,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import android.media.AudioManager
 import android.view.WindowManager
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
@@ -68,6 +69,7 @@ import com.rudi.audioplayer.playback.EqualizerUiState
 import com.rudi.audioplayer.playback.PlaybackUiState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @Composable
 fun NowPlayingScreen(
@@ -122,7 +124,24 @@ fun NowPlayingScreen(
     }
     var showBrightnessIndicator by remember { mutableStateOf(false) }
     var showVolumeIndicator by remember { mutableStateOf(false) }
-    val latestVolume = rememberUpdatedState(uiState.volume)
+
+    // The volume swipe controls the phone's actual system media volume (the same one the
+    // hardware buttons and notification-shade slider control) via AudioManager — not
+    // controller.setVolume(), which only scales this app's own output and never touches the
+    // real system level. The separate slider further down (onSetVolume/uiState.volume) is a
+    // distinct, deliberate in-app attenuation control and is left as-is.
+    val audioManager = remember(context) {
+        context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    }
+    val maxSystemVolume = remember(audioManager) {
+        (audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15).coerceAtLeast(1)
+    }
+    var systemVolumeFraction by remember {
+        mutableStateOf(
+            ((audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0).toFloat() / maxSystemVolume)
+                .coerceIn(0f, 1f)
+        )
+    }
 
     fun applyBrightness(target: Float) {
         val clamped = target.coerceIn(0.02f, 1f)
@@ -131,6 +150,13 @@ fun NowPlayingScreen(
         val params = window.attributes
         params.screenBrightness = clamped
         window.attributes = params
+    }
+
+    fun applySystemVolume(target: Float) {
+        val clamped = target.coerceIn(0f, 1f)
+        systemVolumeFraction = clamped
+        val level = (clamped * maxSystemVolume).roundToInt()
+        audioManager?.setStreamVolume(AudioManager.STREAM_MUSIC, level, 0)
     }
 
     // The brightness override only applies to this screen — restore the system/app
@@ -256,16 +282,18 @@ fun NowPlayingScreen(
             launch { entranceAlpha.animateTo(1f, animationSpec = tween(280)) }
         }
 
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(300.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .height(300.dp)
         ) {
-            // Left zone: swipe up/down to raise/lower screen brightness.
-            Spacer(
+            // Left half of the whole row: swipe up/down to raise/lower screen brightness.
+            // Sized to a true 50% of the available width — independent of however big the
+            // vinyl art itself is — so the touch target is generous, not a thin edge sliver.
+            Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .align(Alignment.CenterStart)
+                    .fillMaxWidth(0.5f)
                     .fillMaxHeight()
                     .pointerInput(Unit) {
                         detectVerticalDragGestures(
@@ -285,26 +313,12 @@ fun NowPlayingScreen(
                     }
             )
 
+            // Right half of the whole row: swipe up/down to raise/lower the phone's actual
+            // system media volume (not just this app's internal gain).
             Box(
-                modifier = Modifier.graphicsLayer {
-                    scaleX = entranceScale.value
-                    scaleY = entranceScale.value
-                    alpha = entranceAlpha.value
-                }
-            ) {
-                VinylAlbumArt(
-                    albumId = song?.albumId,
-                    isPlaying = uiState.isPlaying,
-                    accentColor = animatedAccent,
-                    onSwipeNext = onNext,
-                    onSwipePrevious = onPrevious
-                )
-            }
-
-            // Right zone: swipe up/down to raise/lower playback volume.
-            Spacer(
                 modifier = Modifier
-                    .weight(1f)
+                    .align(Alignment.CenterEnd)
+                    .fillMaxWidth(0.5f)
                     .fillMaxHeight()
                     .pointerInput(Unit) {
                         detectVerticalDragGestures(
@@ -318,12 +332,33 @@ fun NowPlayingScreen(
                             onDragCancel = { showVolumeIndicator = false },
                             onVerticalDrag = { change, dragAmount ->
                                 change.consume()
-                                val next = (latestVolume.value - dragAmount / size.height).coerceIn(0f, 1f)
-                                onSetVolume(next)
+                                applySystemVolume(systemVolumeFraction - dragAmount / size.height)
                             }
                         )
                     }
             )
+
+            // Vinyl sits centered on top of both zones. It gets first claim on touches within
+            // its own bounds (its own pointerInput for horizontal swipe-next/prev), the same
+            // way it already did before this change — only the leftover vertical drag outside
+            // its bounds reaches the brightness/volume zones underneath.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .graphicsLayer {
+                        scaleX = entranceScale.value
+                        scaleY = entranceScale.value
+                        alpha = entranceAlpha.value
+                    }
+            ) {
+                VinylAlbumArt(
+                    albumId = song?.albumId,
+                    isPlaying = uiState.isPlaying,
+                    accentColor = animatedAccent,
+                    onSwipeNext = onNext,
+                    onSwipePrevious = onPrevious
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -500,11 +535,11 @@ fun NowPlayingScreen(
         ) {
             GestureIndicatorBadge(
                 icon = when {
-                    uiState.volume <= 0f -> Icons.Default.VolumeOff
-                    uiState.volume < 0.5f -> Icons.Default.VolumeDown
+                    systemVolumeFraction <= 0f -> Icons.Default.VolumeOff
+                    systemVolumeFraction < 0.5f -> Icons.Default.VolumeDown
                     else -> Icons.Default.VolumeUp
                 },
-                value = uiState.volume,
+                value = systemVolumeFraction,
                 accentColor = animatedAccent
             )
         }
