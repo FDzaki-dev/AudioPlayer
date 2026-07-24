@@ -10,16 +10,35 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 
 /** The app's selectable themes. Each is a full identity — palette, type, and
- * corner-radius language — not just a recolor of the same layout. */
+ * corner-radius language — not just a recolor of the same layout. All five
+ * are deliberately low-contrast: no near-black/near-white extremes anywhere,
+ * so long listening sessions stay easy on the eyes regardless of which one
+ * is picked. */
 enum class AppTheme(val storageKey: String, val displayName: String, val description: String) {
-    INK_BRASS("ink_brass", "Ink & Brass", "Gelap, boutique hi-fi — emas hangat di atas hitam pekat"),
-    MIDNIGHT_BLOOM("midnight_bloom", "Midnight Bloom", "Gelap, jewel-tone — rose-orchid lembut di atas aubergine pekat"),
-    PAPER_INK("paper_ink", "Paper & Ink", "Terang, gaya editorial — krem hangat dan sienna terbakar");
+    DEFAULT("default", "Default", "Netral dan tenang — abu slate lembut dengan aksen biru dusty"),
+    INK_BRASS("ink_brass", "Ink & Brass", "Boutique hi-fi — emas hangat yang lembut di atas charcoal hangat"),
+    MIDNIGHT_BLOOM("midnight_bloom", "Midnight Bloom", "Jewel-tone tenang — rose-mauve dusty di atas aubergine lembut"),
+    PAPER_INK("paper_ink", "Paper & Ink", "Terang, gaya editorial — krim hangat dan clay lembut"),
+    BOTANICAL("botanical", "Botanical", "Tenang dan alami — hijau sage lembut di atas hutan gelap");
 
     companion object {
-        fun fromStorageKey(key: String?): AppTheme = entries.find { it.storageKey == key } ?: INK_BRASS
+        fun fromStorageKey(key: String?): AppTheme = entries.find { it.storageKey == key } ?: DEFAULT
     }
 }
+
+private val DefaultColors = darkColorScheme(
+    primary = SteelBlue,
+    onPrimary = Slate,
+    secondary = SlateMist,
+    onSecondary = Slate,
+    background = Slate,
+    onBackground = SlateText,
+    surface = SlateSurface,
+    onSurface = SlateText,
+    surfaceVariant = SlateSurfaceVariant,
+    onSurfaceVariant = SlateMist,
+    outline = SlateSurfaceVariant
+)
 
 private val InkBrassColors = darkColorScheme(
     primary = Brass,
@@ -63,9 +82,30 @@ private val PaperInkColors = lightColorScheme(
     outline = PaperSurfaceVariant
 )
 
-// Corner language differs per theme too: Ink & Brass keeps the softly rounded
-// default; Midnight Bloom goes almost pill-shaped for a louder, clubbier
-// feel; Paper & Ink goes crisp and barely-rounded for a printed-page feel.
+private val BotanicalColors = darkColorScheme(
+    primary = Sage,
+    onPrimary = Forest,
+    secondary = Olive,
+    onSecondary = Forest,
+    background = Forest,
+    onBackground = ForestText,
+    surface = ForestSurface,
+    onSurface = ForestText,
+    surfaceVariant = ForestSurfaceVariant,
+    onSurfaceVariant = Olive,
+    outline = ForestSurfaceVariant
+)
+
+// Corner language differs per theme too: Default stays close to standard
+// Material rounding (the neutral choice); Ink & Brass keeps its softly
+// rounded signature; Midnight Bloom goes almost pill-shaped for a louder,
+// clubbier feel; Paper & Ink stays crisp and barely-rounded for a printed
+// feel; Botanical goes generously soft and organic.
+private val DefaultShapes = Shapes(
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp)
+)
 private val InkBrassShapes = Shapes(
     small = RoundedCornerShape(10.dp),
     medium = RoundedCornerShape(16.dp),
@@ -81,27 +121,38 @@ private val PaperInkShapes = Shapes(
     medium = RoundedCornerShape(8.dp),
     large = RoundedCornerShape(12.dp)
 )
+private val BotanicalShapes = Shapes(
+    small = RoundedCornerShape(14.dp),
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(28.dp)
+)
 
 fun colorsFor(theme: AppTheme) = when (theme) {
+    AppTheme.DEFAULT -> DefaultColors
     AppTheme.INK_BRASS -> InkBrassColors
     AppTheme.MIDNIGHT_BLOOM -> MidnightBloomColors
     AppTheme.PAPER_INK -> PaperInkColors
+    AppTheme.BOTANICAL -> BotanicalColors
 }
 
 fun typographyFor(theme: AppTheme): Typography = when (theme) {
+    AppTheme.DEFAULT -> DefaultTypography
     AppTheme.INK_BRASS -> InkBrassTypography
     AppTheme.MIDNIGHT_BLOOM -> MidnightBloomTypography
     AppTheme.PAPER_INK -> PaperInkTypography
+    AppTheme.BOTANICAL -> BotanicalTypography
 }
 
 fun shapesFor(theme: AppTheme) = when (theme) {
+    AppTheme.DEFAULT -> DefaultShapes
     AppTheme.INK_BRASS -> InkBrassShapes
     AppTheme.MIDNIGHT_BLOOM -> MidnightBloomShapes
     AppTheme.PAPER_INK -> PaperInkShapes
+    AppTheme.BOTANICAL -> BotanicalShapes
 }
 
 @Composable
-fun AudioPlayerTheme(theme: AppTheme = AppTheme.INK_BRASS, content: @Composable () -> Unit) {
+fun AudioPlayerTheme(theme: AppTheme = AppTheme.DEFAULT, content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = colorsFor(theme),
         typography = typographyFor(theme),
