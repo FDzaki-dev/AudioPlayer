@@ -58,6 +58,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import android.content.Context
@@ -117,6 +118,12 @@ fun NowPlayingScreen(
     val gestureScope = rememberCoroutineScope()
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
+    // Full 0-100% swing over a fixed 140dp of drag, regardless of how tall the gesture zone
+    // itself renders — the old version divided by the zone's full 300dp height, so a normal
+    // thumb swipe barely moved the value at all and felt like it needed a long, deep drag to
+    // respond. This roughly doubles sensitivity for the same physical swipe distance.
+    val density = LocalDensity.current
+    val gestureRangePx = remember(density) { with(density) { 140.dp.toPx() } }
     var brightnessLevel by remember {
         mutableStateOf(
             activity?.window?.attributes?.screenBrightness
@@ -308,7 +315,7 @@ fun NowPlayingScreen(
                             onDragCancel = { showBrightnessIndicator = false },
                             onVerticalDrag = { change, dragAmount ->
                                 change.consume()
-                                applyBrightness(brightnessLevel - dragAmount / size.height)
+                                applyBrightness(brightnessLevel - dragAmount / gestureRangePx)
                             }
                         )
                     }
@@ -333,7 +340,7 @@ fun NowPlayingScreen(
                             onDragCancel = { showVolumeIndicator = false },
                             onVerticalDrag = { change, dragAmount ->
                                 change.consume()
-                                applySystemVolume(systemVolumeFraction - dragAmount / size.height)
+                                applySystemVolume(systemVolumeFraction - dragAmount / gestureRangePx)
                             }
                         )
                     }

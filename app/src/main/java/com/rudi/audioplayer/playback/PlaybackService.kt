@@ -119,10 +119,18 @@ class PlaybackService : MediaSessionService() {
                 serviceScope.launch {
                     restoreLastQueue()
                     applyWidgetAction(action)
-                    // Give Media3's own notification a moment to take over as the real
-                    // foreground notification once playback actually starts, then clear
-                    // our temporary placeholder so it doesn't linger in the shade.
-                    delay(1000)
+                    // Only give up our placeholder once playback is CONFIRMED actually
+                    // running — not after a blind fixed delay. The old fixed 1s timer could
+                    // fire before the MediaStore query + queue restore above even finished
+                    // (easily >1s on a slower device or large library), cancelling the only
+                    // visible notification before Media3's own real one had anything to show
+                    // yet — leaving no pause control anywhere until the app was reopened.
+                    val player = mediaSession?.player
+                    var waited = 0L
+                    while (player?.isPlaying != true && waited < MAX_HANDOFF_WAIT_MS) {
+                        delay(150)
+                        waited += 150
+                    }
                     NotificationManagerCompat.from(this@PlaybackService).cancel(COLD_START_NOTIFICATION_ID)
                 }
             } else {
@@ -227,5 +235,10 @@ class PlaybackService : MediaSessionService() {
     companion object {
         private const val COLD_START_CHANNEL_ID = "playback_cold_start"
         private const val COLD_START_NOTIFICATION_ID = 7001
+        // Safety net only — normal handoff to Media3's own notification happens much sooner,
+        // as soon as isPlaying flips true. This just prevents the placeholder from lingering
+        // forever in the rare case playback never actually starts (e.g. every saved song was
+        // deleted from disk since it was last played).
+        private const val MAX_HANDOFF_WAIT_MS = 8000L
     }
 }
