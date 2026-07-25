@@ -5,7 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.os.RecoverableSecurityException
+import android.app.RecoverableSecurityException
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
