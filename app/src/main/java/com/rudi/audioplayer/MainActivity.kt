@@ -8,7 +8,7 @@ import android.os.Build
 import android.app.RecoverableSecurityException
 import android.os.Bundle
 import android.provider.Settings
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.compose.setContent
@@ -80,13 +80,14 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.rudi.audioplayer.playback.PlayerViewModel
 import com.rudi.audioplayer.ui.HomeScreen
+import com.rudi.audioplayer.ui.LockScreen
 import com.rudi.audioplayer.ui.LibraryScreen
 import com.rudi.audioplayer.ui.SettingsScreen
 import com.rudi.audioplayer.ui.MiniPlayerBar
 import com.rudi.audioplayer.ui.NowPlayingScreen
 import com.rudi.audioplayer.ui.theme.AudioPlayerTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val playerViewModel: PlayerViewModel by viewModels {
         object : ViewModelProvider.Factory {
@@ -101,6 +102,16 @@ class MainActivity : ComponentActivity() {
     // callback outside the composition) can still signal the composable tree to react.
     private var pendingShortcutAction by mutableStateOf<String?>(null)
 
+    // Re-locks whenever the app is genuinely backgrounded (not on config changes, since
+    // onStop only fires when actually leaving, not on rotation) — mutableState so Compose
+    // reacts immediately without needing a process restart.
+    private var isUnlocked by mutableStateOf(false)
+
+    override fun onStop() {
+        super.onStop()
+        isUnlocked = false
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // MainActivity is launchMode="singleTop", so tapping a shortcut while the app is
@@ -108,6 +119,29 @@ class MainActivity : ComponentActivity() {
         // override the shortcut would silently do nothing unless the app was cold-started.
         setIntent(intent)
         pendingShortcutAction = intent.data?.toString()
+    }
+
+    private fun showBiometricPrompt(onSuccess: () -> Unit) {
+        val executor = androidx.core.content.ContextCompat.getMainExecutor(this)
+        val prompt = androidx.biometric.BiometricPrompt(
+            this, executor,
+            object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) {
+                    onSuccess()
+                }
+            }
+        )
+        val info = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Buka AudioPlayer")
+            .setNegativeButtonText("Pakai PIN")
+            .build()
+        prompt.authenticate(info)
+    }
+
+    private fun isBiometricAvailable(): Boolean {
+        val manager = androidx.biometric.BiometricManager.from(this)
+        return manager.canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+            androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -174,9 +208,25 @@ class MainActivity : ComponentActivity() {
                     hasPermission = result[neededPermissions[0]] == true
                 }
 
+                val lockEnabled by playerViewModel.lockEnabled.collectAsState()
+                val biometricEnabled by playerViewModel.biometricEnabled.collectAsState()
+                val needsUnlock = lockEnabled && !isUnlocked
+
+                LaunchedEffect(needsUnlock, biometricEnabled) {
+                    if (needsUnlock && biometricEnabled && isBiometricAvailable()) {
+                        showBiometricPrompt { isUnlocked = true }
+                    }
+                }
+
                 Surface(modifier = Modifier.fillMaxSize()) {
                     when {
-                        hasPermission -> AppNavHost(playerViewModel)
+                        needsUnlock -> LockScreen(
+                            biometricEnabled = biometricEnabled && isBiometricAvailable(),
+                            onVerifyPin = { pin -> playerViewModel.verifyPin(pin) },
+                            onUnlocked = { isUnlocked = true },
+                            onRequestBiometric = { showBiometricPrompt { isUnlocked = true } }
+                        )
+                        hasPermission -> AppNavHost(playerViewModel, isBiometricAvailable())
                         !permissionRequested -> WelcomeScreen(
                             onContinue = {
                                 permissionRequested = true
@@ -282,7 +332,7 @@ private fun WelcomeHighlight(icon: androidx.compose.ui.graphics.vector.ImageVect
 }
 
 @Composable
-private fun AppNavHost(playerViewModel: PlayerViewModel) {
+private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boolean) {
     val navController = rememberNavController()
     val uiState by playerViewModel.uiState.collectAsState()
     val favoriteIds by playerViewModel.favoriteIds.collectAsState()
@@ -296,6 +346,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val librarySongs by playerViewModel.librarySongs.collectAsState()
     val libraryLoading by playerViewModel.libraryLoading.collectAsState()
     val celebrationMessage by playerViewModel.celebrationMessage.collectAsState()
+    val currentRating by playerViewModel.currentRating.collectAsState()
+    val lockEnabled by playerViewModel.lockEnabled.collectAsState()
+    val biometricEnabled by playerViewModel.biometricEnabled.collectAsState()
 
     val deleteContext = LocalContext.current
     val deleteRequestLauncher = rememberLauncherForActivityResult(
@@ -441,6 +494,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     recentSongsProvider = { songs -> playerViewModel.getRecentSongs(songs) },
                     mostPlayedProvider = { songs -> playerViewModel.getMostPlayedSongs(songs) },
                     topArtistMixProvider = { songs -> playerViewModel.getTopArtistMix(songs) },
+                    flashbackProvider = { songs -> playerViewModel.getFlashback(songs) },
                     statsVersion = statsVersion,
                     onShuffleAll = { songs -> playerViewModel.shuffleAll(songs) }
                 )
@@ -484,7 +538,13 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                 val appTheme by playerViewModel.appTheme.collectAsState()
                 SettingsScreen(
                     currentTheme = appTheme,
-                    onSelectTheme = { theme -> playerViewModel.setAppTheme(theme) }
+                    onSelectTheme = { theme -> playerViewModel.setAppTheme(theme) },
+                    lockEnabled = lockEnabled,
+                    biometricEnabled = biometricEnabled,
+                    biometricAvailable = biometricAvailable,
+                    onSetPin = { pin -> playerViewModel.setPin(pin) },
+                    onDisableLock = { playerViewModel.disableLock() },
+                    onToggleBiometric = { enabled -> playerViewModel.setBiometricEnabled(enabled) }
                 )
             }
             composable(
@@ -508,6 +568,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                 NowPlayingScreen(
                     uiState = uiState,
                     isFavorite = uiState.currentSong?.let { favoriteIds.contains(it.id) } ?: false,
+                    currentRating = currentRating,
+                    onSetRating = { stars -> playerViewModel.setCurrentSongRating(stars) },
                     sleepTimerRemainingMs = sleepTimerRemaining,
                     accentColor = accentColor,
                     onPlayPause = { playerViewModel.togglePlayPause() },

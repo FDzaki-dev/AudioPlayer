@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeOff
@@ -77,6 +79,8 @@ import kotlin.math.roundToInt
 fun NowPlayingScreen(
     uiState: PlaybackUiState,
     isFavorite: Boolean,
+    currentRating: Int,
+    onSetRating: (Int) -> Unit,
     sleepTimerRemainingMs: Long?,
     accentColor: Color?,
     onPlayPause: () -> Unit,
@@ -384,6 +388,8 @@ fun NowPlayingScreen(
             modifier = Modifier.basicMarquee()
         )
         Text(song?.artist ?: "-", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+        Spacer(modifier = Modifier.height(6.dp))
+        StarRatingRow(rating = currentRating, onRate = onSetRating, accentColor = animatedAccent)
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -616,6 +622,25 @@ fun NowPlayingScreen(
  * Small floating pill shown while dragging the brightness/volume swipe zones,
  * mirroring the transient overlay pattern used by most media/video apps.
  */
+@Composable
+private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit, accentColor: Color) {
+    Row(horizontalArrangement = Arrangement.Center) {
+        for (star in 1..5) {
+            IconButton(
+                onClick = { onRate(if (rating == star) 0 else star) },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    if (star <= rating) Icons.Default.Star else Icons.Default.StarBorder,
+                    contentDescription = "Beri rating $star bintang",
+                    tint = if (star <= rating) accentColor else MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: Color) {
     Surface(

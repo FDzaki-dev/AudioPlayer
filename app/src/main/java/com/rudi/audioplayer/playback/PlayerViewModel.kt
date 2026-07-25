@@ -23,7 +23,10 @@ import com.rudi.audioplayer.data.FavoritesStore
 import com.rudi.audioplayer.data.LyricsStore
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
+import com.rudi.audioplayer.data.AppLockStore
+import com.rudi.audioplayer.data.ListeningHistoryStore
 import com.rudi.audioplayer.data.PlayStatsStore
+import com.rudi.audioplayer.data.RatingStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.PlaylistStore
 import com.rudi.audioplayer.data.ThemeStore
@@ -59,6 +62,33 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val favoritesStore = FavoritesStore(appContext)
     private val playbackStateStore = PlaybackStateStore(appContext)
     private val playStatsStore = PlayStatsStore(appContext)
+    private val ratingStore = RatingStore(appContext)
+    private val appLockStore = AppLockStore(appContext)
+    private val listeningHistoryStore = ListeningHistoryStore(appContext)
+
+    private val _lockEnabled = MutableStateFlow(appLockStore.isLockEnabled())
+    val lockEnabled: StateFlow<Boolean> = _lockEnabled.asStateFlow()
+
+    private val _biometricEnabled = MutableStateFlow(appLockStore.isBiometricEnabled())
+    val biometricEnabled: StateFlow<Boolean> = _biometricEnabled.asStateFlow()
+
+    fun setPin(pin: String) {
+        appLockStore.setPin(pin)
+        _lockEnabled.value = true
+    }
+
+    fun disableLock() {
+        appLockStore.disableLock()
+        _lockEnabled.value = false
+        _biometricEnabled.value = false
+    }
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        appLockStore.setBiometricEnabled(enabled)
+        _biometricEnabled.value = enabled
+    }
+
+    fun verifyPin(pin: String): Boolean = appLockStore.verifyPin(pin)
     private val playlistStore = PlaylistStore(appContext)
     private val lyricsStore = LyricsStore(appContext)
     private val equalizerController = EqualizerController(appContext)
@@ -100,6 +130,15 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val _accentColor = MutableStateFlow<Color?>(null)
     val accentColor: StateFlow<Color?> = _accentColor.asStateFlow()
 
+    private val _currentRating = MutableStateFlow(0)
+    val currentRating: StateFlow<Int> = _currentRating.asStateFlow()
+
+    fun setCurrentSongRating(stars: Int) {
+        val songId = _uiState.value.currentSong?.id ?: return
+        ratingStore.setRating(songId, stars)
+        _currentRating.value = ratingStore.getRating(songId)
+    }
+
     // A small, one-shot delight when a real listening milestone is crossed — never a nag to
     // open the app more, just an occasional "nice, look how much you've listened" moment that
     // only ever fires as a side effect of listening the user was already doing.
@@ -134,10 +173,12 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             )
             song?.let {
                 playStatsStore.recordPlay(it.id)
+                listeningHistoryStore.recordPlay(it.id)
                 _statsVersion.value += 1
                 checkListeningMilestone()
             }
             updateAccentColor(song)
+            _currentRating.value = song?.let { ratingStore.getRating(it.id) } ?: 0
             persistPlaybackState()
 
             if (_crossfadeEnabled.value) {
@@ -469,6 +510,25 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
      * finds the artist the user actually listens to most (from real play counts, not a guess)
      * and returns their other songs. Returns null until there's enough listening history.
      */
+    /** "Kilas Balik" — looks back at exactly 1 year, 6 months, then 1 month ago (in that
+     * priority) for the same calendar date, returning the first match with actual listening
+     * history plus a human label. Null until there's at least a month of history behind it. */
+    fun getFlashback(allSongs: List<Song>): Pair<String, List<Song>>? {
+        val today = java.time.LocalDate.now()
+        val candidates = listOf(
+            "Setahun lalu hari ini" to today.minusYears(1),
+            "6 bulan lalu hari ini" to today.minusMonths(6),
+            "Sebulan lalu hari ini" to today.minusMonths(1)
+        )
+        val songMap = allSongs.associateBy { it.id }
+        for ((label, date) in candidates) {
+            val ids = listeningHistoryStore.getSongIdsForDate(date)
+            val songs = ids.mapNotNull { songMap[it] }
+            if (songs.isNotEmpty()) return label to songs
+        }
+        return null
+    }
+
     fun getTopArtistMix(allSongs: List<Song>): Pair<String, List<Song>>? {
         val mostPlayedIds = playStatsStore.getMostPlayedIds(50)
         if (mostPlayedIds.isEmpty()) return null

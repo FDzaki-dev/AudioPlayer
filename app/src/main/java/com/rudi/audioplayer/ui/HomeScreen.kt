@@ -37,6 +37,7 @@ fun HomeScreen(
     recentSongsProvider: (List<Song>) -> List<Song>,
     mostPlayedProvider: (List<Song>) -> List<Song>,
     topArtistMixProvider: (List<Song>) -> Pair<String, List<Song>>?,
+    flashbackProvider: (List<Song>) -> Pair<String, List<Song>>?,
     statsVersion: Int,
     onShuffleAll: (List<Song>) -> Unit
 ) {
@@ -49,6 +50,7 @@ fun HomeScreen(
     val recentlyPlayed = remember(songs, statsVersion) { recentSongsProvider(songs) }
     val mostPlayed = remember(songs, statsVersion) { mostPlayedProvider(songs) }
     val artistMix = remember(songs, statsVersion) { topArtistMixProvider(songs) }
+    val flashback = remember(songs, statsVersion) { flashbackProvider(songs) }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
@@ -70,6 +72,17 @@ fun HomeScreen(
         if (loading) {
             item { HomeShimmerSection() }
             item { HomeShimmerSection() }
+        }
+
+        if (flashback != null) {
+            val (label, flashbackSongs) = flashback
+            item {
+                HomeSectionRow(
+                    title = "Kilas Balik: $label",
+                    songs = flashbackSongs,
+                    onSongClick = { song -> onSongClick(flashbackSongs, flashbackSongs.indexOf(song)) }
+                )
+            }
         }
 
         if (artistMix != null) {
