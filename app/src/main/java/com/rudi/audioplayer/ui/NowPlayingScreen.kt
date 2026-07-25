@@ -11,6 +11,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -394,17 +395,28 @@ fun NowPlayingScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         var sliderPosition by remember(uiState.position) { mutableStateOf(uiState.position.toFloat()) }
-        Slider(
-            value = sliderPosition,
-            onValueChange = { sliderPosition = it },
-            onValueChangeFinished = { onSeek(sliderPosition.toLong()) },
-            valueRange = 0f..(uiState.duration.coerceAtLeast(1L).toFloat()),
-            colors = SliderDefaults.colors(
-                thumbColor = animatedAccent,
-                activeTrackColor = animatedAccent,
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+        val progressFraction = (sliderPosition / uiState.duration.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
+
+        Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+            WaveformSeekBar(
+                seed = song?.id ?: 0L,
+                progress = progressFraction,
+                playedColor = animatedAccent,
+                unplayedColor = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth().height(32.dp)
             )
-        )
+            Slider(
+                value = sliderPosition,
+                onValueChange = { sliderPosition = it },
+                onValueChangeFinished = { onSeek(sliderPosition.toLong()) },
+                valueRange = 0f..(uiState.duration.coerceAtLeast(1L).toFloat()),
+                colors = SliderDefaults.colors(
+                    thumbColor = animatedAccent,
+                    activeTrackColor = Color.Transparent,
+                    inactiveTrackColor = Color.Transparent
+                )
+            )
+        }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
                 formatDuration(uiState.position),
@@ -622,6 +634,45 @@ fun NowPlayingScreen(
  * Small floating pill shown while dragging the brightness/volume swipe zones,
  * mirroring the transient overlay pattern used by most media/video apps.
  */
+/** A deterministic (not real-audio-analyzed — see project README) pseudo-waveform, seeded by
+ * song ID so the same song always renders the same bar pattern rather than reshuffling on
+ * every recomposition. Purely decorative visual layer; an invisible Slider drawn on top of
+ * this handles all actual seek interaction, so seeking behavior is completely unchanged. */
+@Composable
+private fun WaveformSeekBar(
+    seed: Long,
+    progress: Float,
+    playedColor: Color,
+    unplayedColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val barHeights = remember(seed) {
+        val random = kotlin.random.Random(seed)
+        List(BAR_COUNT) { 0.25f + random.nextFloat() * 0.75f }
+    }
+
+    Canvas(modifier = modifier) {
+        val barWidth = size.width / BAR_COUNT
+        val gap = barWidth * 0.35f
+        val playedBars = (progress * BAR_COUNT).toInt()
+
+        barHeights.forEachIndexed { index, heightFraction ->
+            val barHeightPx = size.height * heightFraction
+            drawRoundRect(
+                color = if (index < playedBars) playedColor else unplayedColor,
+                topLeft = androidx.compose.ui.geometry.Offset(
+                    x = index * barWidth + gap / 2,
+                    y = (size.height - barHeightPx) / 2
+                ),
+                size = androidx.compose.ui.geometry.Size(barWidth - gap, barHeightPx),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
+            )
+        }
+    }
+}
+
+private const val BAR_COUNT = 48
+
 @Composable
 private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit, accentColor: Color) {
     Row(horizontalArrangement = Arrangement.Center) {

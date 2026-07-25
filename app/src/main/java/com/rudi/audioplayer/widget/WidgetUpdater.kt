@@ -25,6 +25,7 @@ object WidgetUpdater {
     private const val KEY_ARTIST = "artist"
     private const val KEY_ARTWORK_URI = "artwork_uri"
     private const val KEY_IS_PLAYING = "is_playing"
+    private const val COMPACT_WIDTH_THRESHOLD_DP = 180
 
     const val ACTION_TOGGLE_PLAY = "com.rudi.audioplayer.widget.TOGGLE_PLAY"
     const val ACTION_NEXT = "com.rudi.audioplayer.widget.NEXT"
@@ -50,35 +51,46 @@ object WidgetUpdater {
         val artist = prefs.getString(KEY_ARTIST, null)
         val artworkUriRaw = prefs.getString(KEY_ARTWORK_URI, null)
         val isPlaying = prefs.getBoolean(KEY_IS_PLAYING, false)
-
-        val views = RemoteViews(context.packageName, R.layout.widget_player)
-        views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
-        views.setTextViewText(R.id.widget_artist, artist ?: "Buka AudioPlayer")
-        views.setImageViewResource(
-            R.id.widget_play_pause,
-            if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
-        )
-
         val albumArt = artworkUriRaw?.let { loadAlbumArtBitmap(context, Uri.parse(it)) }
-        if (albumArt != null) {
-            views.setImageViewBitmap(R.id.widget_album_art, roundBitmapCorners(albumArt, radiusPx = 24f))
-        } else {
-            views.setImageViewResource(R.id.widget_album_art, R.mipmap.ic_launcher)
-        }
-
-        views.setOnClickPendingIntent(R.id.widget_play_pause, servicePendingIntent(context, ACTION_TOGGLE_PLAY, 1))
-        views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
-        views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))
-
-        val openAppIntent = Intent(context, MainActivity::class.java)
-        val openAppPending = PendingIntent.getActivity(
-            context, 0, openAppIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        views.setOnClickPendingIntent(R.id.widget_album_art, openAppPending)
-        views.setOnClickPendingIntent(R.id.widget_title, openAppPending)
 
         for (id in ids) {
+            // Widgets can be resized independently by the user, so each one gets its own
+            // layout choice — a widget shrunk down to just an icon shouldn't try to cram in
+            // a title, artist, and three buttons that no longer fit.
+            val options = manager.getAppWidgetOptions(id)
+            val minWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
+            val isCompact = minWidthDp < COMPACT_WIDTH_THRESHOLD_DP
+
+            val views = RemoteViews(context.packageName, if (isCompact) R.layout.widget_player_compact else R.layout.widget_player)
+
+            if (!isCompact) {
+                views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
+                views.setTextViewText(R.id.widget_artist, artist ?: "Buka AudioPlayer")
+                views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
+                views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))
+            }
+
+            views.setImageViewResource(
+                R.id.widget_play_pause,
+                if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
+            )
+
+            if (albumArt != null) {
+                views.setImageViewBitmap(R.id.widget_album_art, roundBitmapCorners(albumArt, radiusPx = 24f))
+            } else {
+                views.setImageViewResource(R.id.widget_album_art, R.mipmap.ic_launcher)
+            }
+
+            views.setOnClickPendingIntent(R.id.widget_play_pause, servicePendingIntent(context, ACTION_TOGGLE_PLAY, 1))
+
+            val openAppIntent = Intent(context, MainActivity::class.java)
+            val openAppPending = PendingIntent.getActivity(
+                context, 0, openAppIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            views.setOnClickPendingIntent(R.id.widget_album_art, openAppPending)
+            if (!isCompact) views.setOnClickPendingIntent(R.id.widget_title, openAppPending)
+
             manager.updateAppWidget(id, views)
         }
     }

@@ -27,6 +27,7 @@ import com.rudi.audioplayer.data.AppLockStore
 import com.rudi.audioplayer.data.ListeningHistoryStore
 import com.rudi.audioplayer.data.PlayStatsStore
 import com.rudi.audioplayer.data.RatingStore
+import com.rudi.audioplayer.data.ShakeSettingsStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.PlaylistStore
 import com.rudi.audioplayer.data.ThemeStore
@@ -65,6 +66,15 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val ratingStore = RatingStore(appContext)
     private val appLockStore = AppLockStore(appContext)
     private val listeningHistoryStore = ListeningHistoryStore(appContext)
+    private val shakeSettingsStore = ShakeSettingsStore(appContext)
+
+    private val _shakeToSkipEnabled = MutableStateFlow(shakeSettingsStore.isEnabled())
+    val shakeToSkipEnabled: StateFlow<Boolean> = _shakeToSkipEnabled.asStateFlow()
+
+    fun setShakeToSkipEnabled(enabled: Boolean) {
+        shakeSettingsStore.setEnabled(enabled)
+        _shakeToSkipEnabled.value = enabled
+    }
 
     private val _lockEnabled = MutableStateFlow(appLockStore.isLockEnabled())
     val lockEnabled: StateFlow<Boolean> = _lockEnabled.asStateFlow()

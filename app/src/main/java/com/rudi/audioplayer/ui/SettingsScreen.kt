@@ -35,7 +35,9 @@ fun SettingsScreen(
     biometricAvailable: Boolean,
     onSetPin: (String) -> Unit,
     onDisableLock: () -> Unit,
-    onToggleBiometric: (Boolean) -> Unit
+    onToggleBiometric: (Boolean) -> Unit,
+    shakeToSkipEnabled: Boolean,
+    onToggleShakeToSkip: (Boolean) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
@@ -96,6 +98,32 @@ fun SettingsScreen(
                 onDisableLock = onDisableLock,
                 onToggleBiometric = onToggleBiometric
             )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                "Lainnya",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Goyang untuk Lagu Berikutnya", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Aktif hanya saat sedang memutar musik",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                Switch(checked = shakeToSkipEnabled, onCheckedChange = onToggleShakeToSkip)
+            }
         }
 
         item {

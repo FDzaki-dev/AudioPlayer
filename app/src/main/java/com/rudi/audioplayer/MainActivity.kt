@@ -349,6 +349,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val currentRating by playerViewModel.currentRating.collectAsState()
     val lockEnabled by playerViewModel.lockEnabled.collectAsState()
     val biometricEnabled by playerViewModel.biometricEnabled.collectAsState()
+    val shakeToSkipEnabled by playerViewModel.shakeToSkipEnabled.collectAsState()
 
     val deleteContext = LocalContext.current
     val deleteRequestLauncher = rememberLauncherForActivityResult(
@@ -544,7 +545,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     biometricAvailable = biometricAvailable,
                     onSetPin = { pin -> playerViewModel.setPin(pin) },
                     onDisableLock = { playerViewModel.disableLock() },
-                    onToggleBiometric = { enabled -> playerViewModel.setBiometricEnabled(enabled) }
+                    onToggleBiometric = { enabled -> playerViewModel.setBiometricEnabled(enabled) },
+                    shakeToSkipEnabled = shakeToSkipEnabled,
+                    onToggleShakeToSkip = { enabled -> playerViewModel.setShakeToSkipEnabled(enabled) }
                 )
             }
             composable(

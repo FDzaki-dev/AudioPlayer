@@ -21,6 +21,7 @@ import com.rudi.audioplayer.MainActivity
 import com.rudi.audioplayer.R
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
+import com.rudi.audioplayer.data.ShakeSettingsStore
 import com.rudi.audioplayer.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,7 @@ class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
+    private var shakeDetector: ShakeDetector? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -71,8 +73,15 @@ class PlaybackService : MediaSessionService() {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 pushWidgetUpdate(player)
+                if (isPlaying && ShakeSettingsStore(this@PlaybackService).isEnabled()) {
+                    shakeDetector?.start()
+                } else {
+                    shakeDetector?.stop()
+                }
             }
         })
+
+        shakeDetector = ShakeDetector(this) { mediaSession?.player?.seekToNextMediaItem() }
 
         val sessionActivityIntent = PendingIntent.getActivity(
             this,
@@ -223,6 +232,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        shakeDetector?.stop()
         serviceScope.cancel()
         mediaSession?.run {
             player.release()
