@@ -5,10 +5,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.RecoverableSecurityException
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.compose.setContent
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -295,6 +297,54 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
     val libraryLoading by playerViewModel.libraryLoading.collectAsState()
     val celebrationMessage by playerViewModel.celebrationMessage.collectAsState()
 
+    val deleteContext = LocalContext.current
+    val deleteRequestLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        // On success the system has already deleted the files; just refresh our own scan
+        // so they disappear from the library too. On cancel, nothing was deleted — no-op.
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            playerViewModel.refreshLibrary()
+        }
+    }
+
+    fun deleteSongsFromDevice(songs: List<com.rudi.audioplayer.data.Song>) {
+        if (songs.isEmpty()) return
+        val resolver = deleteContext.contentResolver
+        val uris = songs.map { it.uri }
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
+                // Android 11+: the only correct path — the system shows its own confirmation
+                // and handles the actual deletion; we never touch the files directly.
+                val pendingIntent = android.provider.MediaStore.createDeleteRequest(resolver, uris)
+                deleteRequestLauncher.launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
+            }
+            Build.VERSION.SDK_INT == Build.VERSION_CODES.Q -> {
+                // Android 10: delete() throws a RecoverableSecurityException carrying the
+                // exact system confirmation prompt to launch for files this app doesn't own.
+                try {
+                    uris.forEach { resolver.delete(it, null, null) }
+                    playerViewModel.refreshLibrary()
+                } catch (e: RecoverableSecurityException) {
+                    deleteRequestLauncher.launch(IntentSenderRequest.Builder(e.userAction.actionIntent.intentSender).build())
+                }
+            }
+            else -> {
+                // Pre-Android 10: no scoped-storage confirmation flow exists yet; a direct
+                // delete (content resolver + backing file) is the standard approach.
+                uris.forEach { uri ->
+                    try {
+                        resolver.delete(uri, null, null)
+                    } catch (e: Exception) {
+                        // Leave library state consistent even if one file couldn't be removed
+                        // (e.g. already gone) — refreshLibrary() below re-syncs regardless.
+                    }
+                }
+                playerViewModel.refreshLibrary()
+            }
+        }
+    }
+
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
@@ -426,7 +476,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel) {
                     onMoveSongInPlaylist = { id, from, to -> playerViewModel.moveSongInPlaylist(id, from, to) },
                     customFolders = customFolders,
                     onAddCustomFolder = { uri -> playerViewModel.addCustomFolder(uri) },
-                    onRemoveCustomFolder = { uri -> playerViewModel.removeCustomFolder(uri) }
+                    onRemoveCustomFolder = { uri -> playerViewModel.removeCustomFolder(uri) },
+                    onDeleteSongs = { songs -> deleteSongsFromDevice(songs) }
                 )
             }
             composable("settings") {

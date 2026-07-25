@@ -16,14 +16,20 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Fingerprint
@@ -76,7 +82,8 @@ fun LibraryScreen(
     onMoveSongInPlaylist: (String, Int, Int) -> Unit,
     customFolders: List<CustomFolderInfo>,
     onAddCustomFolder: (Uri) -> Unit,
-    onRemoveCustomFolder: (String) -> Unit
+    onRemoveCustomFolder: (String) -> Unit,
+    onDeleteSongs: (List<Song>) -> Unit
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -90,6 +97,20 @@ fun LibraryScreen(
     var showFolderManager by remember { mutableStateOf(false) }
     var showSignatureMatcher by remember { mutableStateOf(false) }
     var filterVersion by remember { mutableStateOf(0) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    var songForBulkPlaylistDialog by remember { mutableStateOf(false) }
+    var songsPendingDelete by remember { mutableStateOf<List<Song>>(emptyList()) }
+
+    fun exitSelectionMode() {
+        selectionMode = false
+        selectedIds = emptySet()
+    }
+
+    fun toggleSelect(id: Long) {
+        selectedIds = if (selectedIds.contains(id)) selectedIds - id else selectedIds + id
+        if (selectedIds.isEmpty()) selectionMode = false
+    }
 
     val songs = remember(rawSongs, filterVersion) { filterStore.apply(rawSongs) }
 
@@ -132,23 +153,52 @@ fun LibraryScreen(
         Toast.makeText(context, "Ditambahkan ke antrean", Toast.LENGTH_SHORT).show()
     }
     val addToPlaylist: (Song) -> Unit = { songForPlaylistDialog = it }
+    var undoHideIds by remember { mutableStateOf<List<Long>>(emptyList()) }
+    var undoBarKey by remember { mutableStateOf(0) }
     val hideSong: (Song) -> Unit = {
         filterStore.setSongHidden(it.id, true)
         filterVersion++
-        Toast.makeText(context, "\"${it.title}\" disembunyikan dari perpustakaan", Toast.LENGTH_SHORT).show()
+        undoHideIds = listOf(it.id)
+        undoBarKey++
     }
+    val bulkHide: () -> Unit = {
+        selectedIds.forEach { id -> filterStore.setSongHidden(id, true) }
+        filterVersion++
+        undoHideIds = selectedIds.toList()
+        undoBarKey++
+        exitSelectionMode()
+    }
+    val undoHide: () -> Unit = {
+        undoHideIds.forEach { id -> filterStore.setSongHidden(id, false) }
+        undoHideIds = emptyList()
+    }
+    val bulkAddToPlaylist: () -> Unit = { songForBulkPlaylistDialog = true }
+    val bulkDelete: () -> Unit = {
+        songsPendingDelete = rawSongs.filter { selectedIds.contains(it.id) }
+    }
+    val deleteSong: (Song) -> Unit = { songsPendingDelete = listOf(it) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        LibraryHeader(
-            searchActive = searchActive,
-            onToggleSearch = {
-                searchActive = !searchActive
-                if (!searchActive) searchQuery = ""
-            },
-            onRescan = onRescan,
-            onOpenFolderManager = { showFolderManager = true },
-            onOpenSignatureMatcher = { showSignatureMatcher = true }
-        )
+        if (selectionMode) {
+            SelectionActionBar(
+                count = selectedIds.size,
+                onClose = { exitSelectionMode() },
+                onAddToPlaylist = bulkAddToPlaylist,
+                onHide = bulkHide,
+                onDelete = bulkDelete
+            )
+        } else {
+            LibraryHeader(
+                searchActive = searchActive,
+                onToggleSearch = {
+                    searchActive = !searchActive
+                    if (!searchActive) searchQuery = ""
+                },
+                onRescan = onRescan,
+                onOpenFolderManager = { showFolderManager = true },
+                onOpenSignatureMatcher = { showSignatureMatcher = true }
+            )
+        }
 
         if (searchActive) {
             LibrarySearchField(
@@ -224,17 +274,24 @@ fun LibraryScreen(
                 title = "Tidak ditemukan",
                 subtitle = "Coba kata kunci lain."
             )
-            selectedTab == 0 -> SongListView(filteredSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue, addToPlaylist, hideSong)
-            selectedTab == 1 -> GroupedListView(
+            selectedTab == 0 -> SongListView(
                 songs = filteredSongs,
-                groupOf = { it.album.ifBlank { "Album Tidak Diketahui" } },
                 favoriteIds = favoriteIds,
                 onFavoriteToggle = onToggleFavorite,
                 onSongClick = onSongClick,
                 onPlayNext = playNext,
                 onAddToQueue = addToQueue,
                 onAddToPlaylist = addToPlaylist,
-                onHideSong = hideSong
+                onHideSong = hideSong,
+                onDeleteSong = deleteSong,
+                selectionMode = selectionMode,
+                selectedIds = selectedIds,
+                onToggleSelect = { id -> toggleSelect(id) },
+                onEnterSelectionMode = { id -> selectionMode = true; selectedIds = setOf(id) }
+            )
+            selectedTab == 1 -> AlbumGridView(
+                songs = filteredSongs,
+                onSongClick = onSongClick
             )
             selectedTab == 2 -> GroupedListView(
                 songs = filteredSongs,
@@ -288,6 +345,88 @@ fun LibraryScreen(
         )
     }
 
+    if (songForBulkPlaylistDialog && selectedIds.isNotEmpty()) {
+        val firstSong = rawSongs.firstOrNull { selectedIds.contains(it.id) }
+        if (firstSong != null) {
+            AddToPlaylistDialog(
+                song = firstSong,
+                playlists = playlists,
+                onAddToExisting = { playlist ->
+                    selectedIds.forEach { id -> onAddSongToPlaylist(playlist.id, id) }
+                    Toast.makeText(context, "Ditambahkan ke \"${playlist.name}\"", Toast.LENGTH_SHORT).show()
+                    songForBulkPlaylistDialog = false
+                    exitSelectionMode()
+                },
+                onCreateAndAdd = { name ->
+                    val playlist = onCreatePlaylist(name)
+                    selectedIds.forEach { id -> onAddSongToPlaylist(playlist.id, id) }
+                    Toast.makeText(context, "Dibuat & ditambahkan ke \"${playlist.name}\"", Toast.LENGTH_SHORT).show()
+                    songForBulkPlaylistDialog = false
+                    exitSelectionMode()
+                },
+                onDismiss = { songForBulkPlaylistDialog = false }
+            )
+        }
+    }
+
+    if (songsPendingDelete.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { songsPendingDelete = emptyList() },
+            title = { Text("Hapus dari Perangkat?") },
+            text = {
+                Text(
+                    if (songsPendingDelete.size == 1)
+                        "\"${songsPendingDelete.first().title}\" akan dihapus permanen dari penyimpanan HP. Tindakan ini tidak bisa dibatalkan."
+                    else
+                        "${songsPendingDelete.size} lagu akan dihapus permanen dari penyimpanan HP. Tindakan ini tidak bisa dibatalkan."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteSongs(songsPendingDelete)
+                    songsPendingDelete = emptyList()
+                    exitSelectionMode()
+                }) {
+                    Text("Hapus", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { songsPendingDelete = emptyList() }) { Text("Batal") }
+            }
+        )
+    }
+
+    if (undoHideIds.isNotEmpty()) {
+        LaunchedEffect(undoBarKey) {
+            kotlinx.coroutines.delay(4000)
+            undoHideIds = emptyList()
+        }
+        Box(modifier = Modifier.fillMaxSize()) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                shadowElevation = 6.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (undoHideIds.size == 1) "1 lagu disembunyikan" else "${undoHideIds.size} lagu disembunyikan",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = undoHide) { Text("Batalkan") }
+                }
+            }
+        }
+    }
+
     if (showFolderManager) {
         val addFolderLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.OpenDocumentTree()
@@ -313,6 +452,101 @@ fun LibraryScreen(
 
     if (showSignatureMatcher) {
         SignatureMatcherSheet(onDismiss = { showSignatureMatcher = false })
+    }
+}
+
+@Composable
+private fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> Unit) {
+    var selectedAlbum by remember(songs) { mutableStateOf<String?>(null) }
+    val grouped = remember(songs) { songs.groupBy { it.album.ifBlank { "Album Tidak Diketahui" } } }
+
+    if (selectedAlbum == null) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            items(grouped.keys.toList().sortedBy { it.lowercase() }, key = { it }) { album ->
+                val albumSongs = grouped[album].orEmpty()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectedAlbum = album }
+                ) {
+                    AsyncImage(
+                        model = albumArtUri(albumSongs.first().albumId),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(album, maxLines = 1, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "${albumSongs.size} lagu",
+                        maxLines = 1,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+        }
+    } else {
+        val albumSongs = grouped[selectedAlbum].orEmpty()
+        Column {
+            TextButton(onClick = { selectedAlbum = null }) { Text("< Kembali ke Album") }
+            LazyColumn {
+                itemsIndexed(albumSongs, key = { _, song -> song.id }) { index, song ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSongClick(albumSongs, index) }
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(song.title, maxLines = 1, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text(formatDuration(song.duration), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SelectionActionBar(
+    count: Int,
+    onClose: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onHide: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onClose) {
+            Icon(Icons.Default.Close, contentDescription = "Batal")
+        }
+        Text(
+            "$count dipilih",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onAddToPlaylist) {
+            Icon(Icons.Default.QueueMusic, contentDescription = "Tambah ke Playlist")
+        }
+        IconButton(onClick = onHide) {
+            Icon(Icons.Default.VisibilityOff, contentDescription = "Sembunyikan")
+        }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Default.DeleteForever, contentDescription = "Hapus dari Perangkat", tint = MaterialTheme.colorScheme.error)
+        }
     }
 }
 
@@ -553,10 +787,15 @@ private fun SongListView(
     onPlayNext: (Song) -> Unit,
     onAddToQueue: (Song) -> Unit,
     onAddToPlaylist: (Song) -> Unit,
-    onHideSong: (Song) -> Unit
+    onHideSong: (Song) -> Unit,
+    onDeleteSong: (Song) -> Unit = {},
+    selectionMode: Boolean = false,
+    selectedIds: Set<Long> = emptySet(),
+    onToggleSelect: (Long) -> Unit = {},
+    onEnterSelectionMode: (Long) -> Unit = {}
 ) {
     LazyColumn {
-        itemsIndexed(songs) { index, song ->
+        itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
             SongRow(
                 song = song,
                 isFavorite = favoriteIds.contains(song.id),
@@ -565,7 +804,12 @@ private fun SongListView(
                 onPlayNext = { onPlayNext(song) },
                 onAddToQueue = { onAddToQueue(song) },
                 onAddToPlaylist = { onAddToPlaylist(song) },
-                onHideSong = { onHideSong(song) }
+                onHideSong = { onHideSong(song) },
+                onDeleteSong = { onDeleteSong(song) },
+                selectionMode = selectionMode,
+                isSelected = selectedIds.contains(song.id),
+                onToggleSelect = { onToggleSelect(song.id) },
+                onEnterSelectionMode = { onEnterSelectionMode(song.id) }
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
         }
@@ -634,7 +878,12 @@ private fun SongRow(
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
     onAddToPlaylist: () -> Unit,
-    onHideSong: () -> Unit
+    onHideSong: () -> Unit,
+    onDeleteSong: () -> Unit = {},
+    selectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelect: () -> Unit = {},
+    onEnterSelectionMode: () -> Unit = {}
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -642,10 +891,17 @@ private fun SongRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .combinedClickable(onClick = onClick, onLongClick = { showMenu = true })
+                .combinedClickable(
+                    onClick = { if (selectionMode) onToggleSelect() else onClick() },
+                    onLongClick = { if (selectionMode) onToggleSelect() else onEnterSelectionMode() }
+                )
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (selectionMode) {
+                Checkbox(checked = isSelected, onCheckedChange = { onToggleSelect() })
+                Spacer(modifier = Modifier.width(4.dp))
+            }
             AsyncImage(
                 model = albumArtUri(song.albumId),
                 contentDescription = null,
@@ -669,17 +925,19 @@ private fun SongRow(
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                formatDuration(song.duration),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
-            IconButton(onClick = onFavoriteToggle) {
-                Icon(
-                    if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = if (isFavorite) "Hapus dari favorit" else "Tambah ke favorit",
-                    tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+            if (!selectionMode) {
+                Text(
+                    formatDuration(song.duration),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
                 )
+                IconButton(onClick = onFavoriteToggle) {
+                    Icon(
+                        if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (isFavorite) "Hapus dari favorit" else "Tambah ke favorit",
+                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    )
+                }
             }
         }
 
@@ -703,6 +961,23 @@ private fun SongRow(
                 text = { Text("Sembunyikan") },
                 leadingIcon = { Icon(Icons.Default.VisibilityOff, contentDescription = null) },
                 onClick = { showMenu = false; onHideSong() }
+            )
+            DropdownMenuItem(
+                text = { Text("Pilih") },
+                leadingIcon = { Icon(Icons.Default.CheckCircleOutline, contentDescription = null) },
+                onClick = { showMenu = false; onEnterSelectionMode() }
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            DropdownMenuItem(
+                text = { Text("Hapus dari Perangkat", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.DeleteForever,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                },
+                onClick = { showMenu = false; onDeleteSong() }
             )
         }
     }
