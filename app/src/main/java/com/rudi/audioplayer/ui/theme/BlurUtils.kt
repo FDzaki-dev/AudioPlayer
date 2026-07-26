@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun Modifier.frostedGlass(
     tint: Color = MaterialTheme.colorScheme.surface,
-    alpha: Float = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.96f else 0.92f,
+    alpha: Float = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.98f else 0.94f,
     blurRadius: Dp = 24.dp
 ): Modifier {
     // blurRadius is kept in the API for source compatibility with existing call sites.
@@ -32,7 +32,7 @@ fun Modifier.frostedGlass(
     // content. The surface tint is intentionally opaque enough to preserve contrast.
     val shape = RoundedCornerShape(24.dp)
     val edge = MaterialTheme.colorScheme.onSurface.copy(
-        alpha = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.10f else 0.16f
+        alpha = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.12f else 0.20f
     )
     return this
         .background(tint.copy(alpha = alpha), shape)
