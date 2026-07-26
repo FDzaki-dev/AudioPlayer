@@ -33,6 +33,7 @@ import com.rudi.audioplayer.data.PlaylistStore
 import com.rudi.audioplayer.data.ThemeStore
 import com.rudi.audioplayer.ui.theme.AppTheme
 import com.rudi.audioplayer.data.Song
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -166,6 +167,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     val libraryLoading: StateFlow<Boolean> = _libraryLoading.asStateFlow()
 
     private var libraryLoadedOnce = false
+    private var libraryRefreshJob: Job? = null
+    private var libraryRefreshGeneration = 0L
+    private val musicRepository = MusicRepository(appContext)
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -264,30 +268,49 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     /** Forces a fresh MediaStore scan (used by the Library screen's "Pindai Ulang" button). */
     fun refreshLibrary() {
         libraryLoadedOnce = true
-        viewModelScope.launch {
+        libraryRefreshJob?.cancel()
+        val generation = ++libraryRefreshGeneration
+        libraryRefreshJob = viewModelScope.launch {
             _libraryLoading.value = true
-            _librarySongs.value = withContext(Dispatchers.IO) {
-                val mediaStoreSongs = MusicRepository(appContext).getAllSongs()
-                val mediaStoreSignatures = mediaStoreSongs.map { dedupeSignature(it) }.toHashSet()
-                val customSongs = customFolderStore.getFolderUris().flatMap { uriString ->
-                    try {
-                        val uri = Uri.parse(uriString)
-                        customFolderScanner.scan(uri, folderLabelFor(uri))
-                    } catch (e: Exception) {
-                        emptyList()
+            try {
+                val songs = withContext(Dispatchers.IO) {
+                    val mediaStoreSongs = musicRepository.getAllSongs()
+                    val mediaStoreSignatures = mediaStoreSongs.asSequence()
+                        .map(::dedupeSignature)
+                        .toHashSet()
+                    val customSongs = customFolderStore.getFolderUris().asSequence().flatMap { uriString ->
+                        try {
+                            val uri = Uri.parse(uriString)
+                            customFolderScanner.scan(uri, folderLabelFor(uri)).asSequence()
+                        } catch (_: Exception) {
+                            emptySequence()
+                        }
+                    }.toList()
+
+                    // Prefer the MediaStore copy when a SAF folder is also indexed by MediaStore.
+                    val dedupedCustomSongs = customSongs.filterNot {
+                        dedupeSignature(it) in mediaStoreSignatures
                     }
+                    mediaStoreSongs + dedupedCustomSongs
                 }
-                // A file can legitimately live in both worlds if MediaStore catches up later
-                // (e.g. a folder granted through the SAF picker also happens to be inside a
-                // path MediaStore already indexes) — prefer the MediaStore copy (real album
-                // art, stable ID) when that happens. Custom-scanned songs always get negative
-                // IDs specifically so they never collide with MediaStore's always-non-negative
-                // ones, which means comparing by ID here could never detect a real duplicate —
-                // matching on (title, artist, duration) instead is what actually catches it.
-                val dedupedCustomSongs = customSongs.filterNot { dedupeSignature(it) in mediaStoreSignatures }
-                mediaStoreSongs + dedupedCustomSongs
+                // A newer refresh may have started while this scan was running. Never let an
+                // older, slower scan overwrite the newer result.
+                if (generation == libraryRefreshGeneration) {
+                    _librarySongs.value = songs
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // A transient MediaStore/SAF failure must not permanently mark the library as
+                // loaded. The next ensureLibraryLoaded() call can retry safely.
+                if (generation == libraryRefreshGeneration) {
+                    libraryLoadedOnce = false
+                }
+            } finally {
+                if (generation == libraryRefreshGeneration) {
+                    _libraryLoading.value = false
+                }
             }
-            _libraryLoading.value = false
         }
     }
 
@@ -727,6 +750,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     override fun onCleared() {
         sleepTimerJob?.cancel()
         fadeJob?.cancel()
+        libraryRefreshJob?.cancel()
         equalizerController.release()
         controller?.release()
         super.onCleared()

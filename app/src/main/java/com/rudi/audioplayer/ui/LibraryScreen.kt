@@ -133,15 +133,11 @@ fun LibraryScreen(
         rawSongs.filter { hiddenIds.contains(it.id) }
     }
 
-    val filteredSongs = remember(songs, searchQuery) {
-        if (searchQuery.isBlank()) {
-            songs
-        } else {
-            songs.filter {
-                it.title.contains(searchQuery, ignoreCase = true) ||
-                    it.artist.contains(searchQuery, ignoreCase = true)
-            }
-        }
+    // Normalize searchable fields once per visible-library change. This avoids repeating
+    // case-insensitive string normalization for every song on every search keystroke.
+    val searchIndex = remember(songs) { LibrarySearchIndex(songs) }
+    val filteredSongs = remember(searchIndex, searchQuery) {
+        searchIndex.search(searchQuery)
     }
 
     val playNext: (Song) -> Unit = {
