@@ -20,8 +20,8 @@ val AppleLightSurfaceVariant = Color(0xFFE5E5EA)
 val AppleLightText = Color(0xFF000000)
 val AppleLightSecondaryText = Color(0xFF636366)
 
-// Signature accent — a refined red-pink close to Apple Music's own brand
-// accent. Used for chrome (buttons, active states); the Now Playing screen
-// itself still prefers a per-song accent extracted from the album art, the
-// same way Apple Music's now-playing view tints itself from the artwork.
-val AppleAccent = Color(0xFFFA233B)
+// Signature accent — a refined deep blue accent for a calmer, premium interface.
+// Used for chrome (buttons, active states); the Now Playing screen itself still
+// prefers a per-song accent extracted from the album art, the same way a modern
+// music player can tint itself from the artwork.
+val AppleAccent = Color(0xFF4F7CFF)
