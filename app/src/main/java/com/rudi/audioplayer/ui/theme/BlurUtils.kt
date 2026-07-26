@@ -1,28 +1,40 @@
 package com.rudi.audioplayer.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Frosted-glass background: a real blur of whatever sits behind this surface on Android 12+
- * (API 31, where Modifier.blur first has an actual RenderEffect to render with), layered over
- * a translucent tint of the surface color so it still reads as "glass" rather than "flat" on
- * older Android versions. minSdk here is 23, so this fallback matters — Modifier.blur() itself
- * is always safe to call at any API level, it simply has no visible effect below 31.
+ * Readable glass surface for Compose.
+ *
+ * Important: Modifier.blur() blurs the composable's own content, not the pixels behind it.
+ * Applying it to a container therefore also blurs its text and icons, which is the opposite
+ * of what a usable frosted-glass surface should do. This implementation intentionally uses a
+ * high-opacity tinted surface plus a subtle edge so content stays crisp and readable.
+ *
+ * The visual result is still glass-like when placed over artwork/ambient color, while avoiding
+ * the common "beautiful but unreadable" failure mode caused by blurring the foreground.
  */
 @Composable
 fun Modifier.frostedGlass(
     tint: Color = MaterialTheme.colorScheme.surface,
-    alpha: Float = 0.72f,
+    alpha: Float = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.96f else 0.92f,
     blurRadius: Dp = 24.dp
 ): Modifier {
-    val blurred = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) this.blur(blurRadius) else this
-    return blurred.background(tint.copy(alpha = alpha))
+    // blurRadius is kept in the API for source compatibility with existing call sites.
+    // Real backdrop blur is not performed here because Modifier.blur() would blur foreground
+    // content. The surface tint is intentionally opaque enough to preserve contrast.
+    val shape = RoundedCornerShape(24.dp)
+    val edge = MaterialTheme.colorScheme.onSurface.copy(
+        alpha = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.10f else 0.16f
+    )
+    return this
+        .background(tint.copy(alpha = alpha), shape)
+        .border(1.dp, edge, shape)
 }
