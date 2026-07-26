@@ -715,12 +715,6 @@ private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: 
     }
 }
 
-/**
- * The app's signature element: album art rendered as a spinning vinyl disc.
- * Rotation runs continuously while playing and freezes in place on pause,
- * exactly like a real turntable.
- */
-@Composable
 /** Apple Music-style hero art: a large rounded-square image with a soft ambient glow
  * (tinted by the same accent color already extracted from this song's artwork) instead of
  * the old spinning vinyl. Horizontal swipe-to-skip gesture logic is unchanged from before. */
