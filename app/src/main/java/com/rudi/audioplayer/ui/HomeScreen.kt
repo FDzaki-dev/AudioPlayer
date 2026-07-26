@@ -192,7 +192,7 @@ private fun HomeShimmerSection() {
                     Box(
                         modifier = Modifier
                             .size(120.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(20.dp))
                             .background(brush)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -270,7 +270,7 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
                 contentDescription = null,
                 modifier = Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(20.dp))
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -336,7 +336,7 @@ private fun HomeSongCard(song: Song, onClick: () -> Unit) {
             contentDescription = null,
             modifier = Modifier
                 .size(120.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(20.dp))
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(

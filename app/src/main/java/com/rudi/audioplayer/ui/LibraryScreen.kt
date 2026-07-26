@@ -407,7 +407,7 @@ fun LibraryScreen(
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
                     .fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 6.dp,
                 shadowElevation = 6.dp
@@ -480,7 +480,7 @@ private fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> U
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(24.dp))
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(album, maxLines = 1, style = MaterialTheme.typography.titleMedium)
@@ -607,7 +607,7 @@ private fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, o
                 Icon(Icons.Default.Close, contentDescription = "Tutup pencarian")
             }
         },
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
             unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
@@ -907,7 +907,7 @@ private fun SongRow(
                 contentDescription = null,
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(20.dp))
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -1052,7 +1052,7 @@ private fun ShimmerRow() {
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(20.dp))
                 .background(brush)
         )
         Spacer(modifier = Modifier.width(12.dp))

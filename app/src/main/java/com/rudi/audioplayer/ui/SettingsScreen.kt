@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.BuildConfig
 import com.rudi.audioplayer.ui.theme.AppTheme
 import com.rudi.audioplayer.ui.theme.colorsFor
-import com.rudi.audioplayer.ui.theme.typographyFor
+import com.rudi.audioplayer.ui.theme.resolveIsDark
 
 @Composable
 fun SettingsScreen(
@@ -155,8 +155,7 @@ fun SettingsScreen(
 
 @Composable
 private fun ThemeOptionCard(theme: AppTheme, selected: Boolean, onClick: () -> Unit) {
-    val previewColors = colorsFor(theme)
-    val previewTypography = typographyFor(theme)
+    val previewColors = colorsFor(resolveIsDark(theme))
 
     Surface(
         modifier = Modifier
@@ -204,7 +203,7 @@ private fun ThemeOptionCard(theme: AppTheme, selected: Boolean, onClick: () -> U
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     theme.displayName,
-                    style = previewTypography.titleMedium,
+                    style = MaterialTheme.typography.titleMedium,
                     color = previewColors.onSurface
                 )
                 Spacer(modifier = Modifier.height(2.dp))

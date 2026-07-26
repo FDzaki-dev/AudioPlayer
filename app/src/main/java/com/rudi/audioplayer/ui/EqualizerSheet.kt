@@ -9,6 +9,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
 import java.util.Locale
@@ -33,10 +35,11 @@ fun EqualizerSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp)
         ) {

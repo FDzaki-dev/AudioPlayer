@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -26,6 +27,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.rudi.audioplayer.playback.PlaybackUiState
+import com.rudi.audioplayer.ui.theme.frostedGlass
 
 @Composable
 fun MiniPlayerBar(
@@ -42,16 +44,14 @@ fun MiniPlayerBar(
         label = "miniAccentColor"
     )
 
-    Surface(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(onClick = onExpand),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp,
-        shadowElevation = 10.dp,
-        shape = RoundedCornerShape(20.dp)
+            .shadow(elevation = 12.dp, shape = RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(24.dp))
+            .frostedGlass()
+            .clickable(onClick = onExpand)
     ) {
         Row(
             modifier = Modifier
@@ -68,7 +68,7 @@ fun MiniPlayerBar(
                 contentDescription = null,
                 modifier = Modifier
                     .size(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(RoundedCornerShape(14.dp))
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {

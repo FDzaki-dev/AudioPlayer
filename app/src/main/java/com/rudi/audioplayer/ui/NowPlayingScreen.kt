@@ -53,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -364,9 +365,8 @@ fun NowPlayingScreen(
                         alpha = entranceAlpha.value
                     }
             ) {
-                VinylAlbumArt(
+                AlbumArtHero(
                     albumId = song?.albumId,
-                    isPlaying = uiState.isPlaying,
                     accentColor = animatedAccent,
                     onSwipeNext = onNext,
                     onSwipePrevious = onPrevious
@@ -721,29 +721,18 @@ private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: 
  * exactly like a real turntable.
  */
 @Composable
-private fun VinylAlbumArt(
+/** Apple Music-style hero art: a large rounded-square image with a soft ambient glow
+ * (tinted by the same accent color already extracted from this song's artwork) instead of
+ * the old spinning vinyl. Horizontal swipe-to-skip gesture logic is unchanged from before. */
+@Composable
+private fun AlbumArtHero(
     albumId: Long?,
-    isPlaying: Boolean,
     accentColor: Color,
     onSwipeNext: () -> Unit,
     onSwipePrevious: () -> Unit
 ) {
-    val rotation = remember { Animatable(0f) }
     val haptic = LocalHapticFeedback.current
     var totalDrag by remember { mutableStateOf(0f) }
-
-    LaunchedEffect(isPlaying) {
-        if (isPlaying) {
-            rotation.animateTo(
-                targetValue = rotation.value + 360f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 18000, easing = LinearEasing)
-                )
-            )
-        } else {
-            rotation.stop()
-        }
-    }
 
     Box(
         contentAlignment = Alignment.Center,
@@ -766,20 +755,23 @@ private fun VinylAlbumArt(
             )
         }
     ) {
+        Box(
+            modifier = Modifier
+                .size(300.dp)
+                .blur(90.dp)
+                .background(accentColor.copy(alpha = 0.38f), CircleShape)
+        )
         AsyncImage(
             model = albumId?.let { albumArtUri(it) },
             contentDescription = null,
             modifier = Modifier
-                .size(260.dp)
-                .graphicsLayer { rotationZ = rotation.value }
-                .clip(CircleShape)
-                .border(3.dp, accentColor, CircleShape)
-        )
-        Box(
-            modifier = Modifier
-                .size(14.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.background)
+                .size(280.dp)
+                .shadow(
+                    elevation = 28.dp,
+                    shape = RoundedCornerShape(28.dp),
+                    spotColor = accentColor.copy(alpha = 0.45f)
+                )
+                .clip(RoundedCornerShape(28.dp))
         )
     }
 }

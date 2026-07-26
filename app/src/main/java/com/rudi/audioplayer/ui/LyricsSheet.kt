@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.data.LyricsParser
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,10 +31,11 @@ fun LyricsSheet(
     var editing by remember { mutableStateOf(rawLyrics.isNullOrBlank()) }
     var draft by remember { mutableStateOf(rawLyrics.orEmpty()) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 .padding(horizontal = 20.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

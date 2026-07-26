@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.data.CustomFolderInfo
 import com.rudi.audioplayer.data.Song
 
@@ -46,9 +48,10 @@ fun FolderManagerSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = Color.Transparent
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().frostedGlass().padding(bottom = 24.dp)) {
             Text(
                 "Kelola Perpustakaan",
                 style = MaterialTheme.typography.titleLarge,
