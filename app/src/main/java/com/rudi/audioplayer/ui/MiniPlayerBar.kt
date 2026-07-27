@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
@@ -43,6 +44,9 @@ fun MiniPlayerBar(
         animationSpec = tween(700),
         label = "miniAccentColor"
     )
+    // Album-art accents can be very bright or very dark. Choose the control icon
+    // color from luminance so the primary action remains readable in every case.
+    val accentContentColor = if (animatedAccent.luminance() > 0.55f) Color.Black else Color.White
 
     Box(
         modifier = Modifier
@@ -95,7 +99,7 @@ fun MiniPlayerBar(
                 interactionSource = playPauseInteraction,
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = animatedAccent,
-                    contentColor = MaterialTheme.colorScheme.background
+                    contentColor = accentContentColor
                 ),
                 modifier = Modifier
                     .size(40.dp)
