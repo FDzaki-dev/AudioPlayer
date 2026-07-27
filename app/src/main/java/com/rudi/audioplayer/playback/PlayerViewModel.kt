@@ -372,10 +372,17 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private fun startPositionLoop() {
         viewModelScope.launch {
             while (true) {
-                controller?.let { c ->
+                val c = controller
+                if (c != null) {
                     val position = c.currentPosition.coerceAtLeast(0)
                     val duration = c.duration.coerceAtLeast(0)
-                    _uiState.value = _uiState.value.copy(position = position, duration = duration)
+                    val currentState = _uiState.value
+
+                    // Avoid emitting a new immutable UI state while paused and nothing changed.
+                    // This prevents needless recompositions across the whole player UI.
+                    if (currentState.position != position || currentState.duration != duration) {
+                        _uiState.value = currentState.copy(position = position, duration = duration)
+                    }
 
                     if (_crossfadeEnabled.value && c.isPlaying && duration > 0) {
                         val remaining = duration - position
@@ -386,9 +393,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                             startFadeOut()
                         }
                     }
+
+                    positionTick++
+                    if (positionTick % 10 == 0) persistPlaybackState()
                 }
-                positionTick++
-                if (positionTick % 10 == 0) persistPlaybackState()
                 delay(500)
             }
         }
