@@ -395,7 +395,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                     }
 
                     positionTick++
-                    if (positionTick % 10 == 0) persistPlaybackState()
+                    if (c.isPlaying && positionTick % 10 == 0) persistPlaybackState()
                 }
                 delay(500)
             }
@@ -406,11 +406,19 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val c = controller ?: return
         val index = c.currentMediaItemIndex
         if (currentQueue.isEmpty() || index !in currentQueue.indices) return
-        playbackStateStore.save(
-            songIds = currentQueue.map { it.id },
-            index = index,
-            positionMs = c.currentPosition.coerceAtLeast(0)
-        )
+
+        // Playback state persistence is infrequent disk I/O. Keep it off the main
+        // thread so periodic saves cannot cause UI jank while the user scrolls or
+        // interacts with the player.
+        val songIds = currentQueue.map { it.id }
+        val positionMs = c.currentPosition.coerceAtLeast(0)
+        viewModelScope.launch(Dispatchers.IO) {
+            playbackStateStore.save(
+                songIds = songIds,
+                index = index,
+                positionMs = positionMs
+            )
+        }
     }
 
     /** Fires a one-time celebration the exact play that crosses a milestone total —
