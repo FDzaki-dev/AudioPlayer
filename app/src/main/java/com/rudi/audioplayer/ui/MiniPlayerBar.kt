@@ -86,7 +86,7 @@ fun MiniPlayerBar(
                     song.artist,
                     maxLines = 1,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
