@@ -34,7 +34,10 @@ object AccentColorExtractor {
         }
     }
 
-    /** Keeps whatever color comes out of the album art vivid and legible on a dark background. */
+    /** 
+     * Keeps whatever color comes out of the album art vivid and highly legible on dark UI.
+     * Adjusted to ensure consistent contrast ratio and prevent dull or invisible tones.
+     */
     private fun normalize(color: Color): Color {
         val hsv = FloatArray(3)
         android.graphics.Color.RGBToHSV(
@@ -43,8 +46,12 @@ object AccentColorExtractor {
             (color.blue * 255).toInt(),
             hsv
         )
-        hsv[1] = hsv[1].coerceAtLeast(0.5f)
-        hsv[2] = hsv[2].coerceIn(0.6f, 0.95f)
+        // Saturasi dijaga agar warna tetap pekat dan kontras
+        hsv[1] = hsv[1].coerceIn(0.55f, 0.85f)
+        
+        // Kecerahan (Value) dikunci di rentang ideal agar tidak terlalu gelap/terang di atas background
+        hsv[2] = hsv[2].coerceIn(0.70f, 0.90f)
+        
         return Color(android.graphics.Color.HSVToColor(hsv))
     }
 }

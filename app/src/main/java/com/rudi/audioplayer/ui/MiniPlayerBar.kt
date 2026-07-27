@@ -44,6 +44,7 @@ fun MiniPlayerBar(
         animationSpec = tween(700),
         label = "miniAccentColor"
     )
+    
     // Album-art accents can be very bright or very dark. Choose the control icon
     // color from luminance so the primary action remains readable in every case.
     val accentContentColor = if (animatedAccent.luminance() > 0.55f) Color.Black else Color.White
@@ -61,36 +62,44 @@ fun MiniPlayerBar(
             modifier = Modifier
                 .background(
                     Brush.horizontalGradient(
-                        listOf(animatedAccent.copy(alpha = 0.16f), Color.Transparent)
+                        listOf(animatedAccent.copy(alpha = 0.18f), Color.Transparent)
                     )
                 )
-                .padding(10.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
                 model = albumArtUri(song.albumId),
                 contentDescription = null,
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(46.dp)
                     .clip(RoundedCornerShape(14.dp))
             )
+            
             Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 6.dp)
+            ) {
                 Text(
-                    song.title,
+                    text = song.title,
                     maxLines = 1,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.basicMarquee()
+                    modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
                 )
                 Text(
-                    song.artist,
+                    text = song.artist,
                     maxLines = 1,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            
             val playPauseInteraction = remember { MutableInteractionSource() }
+            
+            // Touch target ditingkatkan ke 48.dp sesuai pedoman kenyamanan Material Design
             FilledIconButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -102,13 +111,14 @@ fun MiniPlayerBar(
                     contentColor = accentContentColor
                 ),
                 modifier = Modifier
-                    .size(40.dp)
-                    .bouncyPress(playPauseInteraction, pressedScale = 0.82f)
+                    .size(48.dp)
+                    .bouncyPress(playPauseInteraction, pressedScale = 0.85f)
             ) {
                 AnimatedContent(targetState = uiState.isPlaying, label = "miniPlayPause") { playing ->
                     Icon(
-                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playing) "Jeda" else "Putar"
+                        imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (playing) "Jeda" else "Putar",
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
