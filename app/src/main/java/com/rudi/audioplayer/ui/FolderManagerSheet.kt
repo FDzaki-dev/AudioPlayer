@@ -38,7 +38,6 @@ fun FolderManagerSheet(
     folders: List<FolderSummary>,
     hiddenSongs: List<Song>,
     customFolders: List<CustomFolderInfo>,
-    isScanning: Boolean = false, // Status indikator loading pemindaian
     onDismiss: () -> Unit,
     onToggleFolder: (String, Boolean) -> Unit,
     onUnhideSong: (Long) -> Unit,
@@ -52,26 +51,7 @@ fun FolderManagerSheet(
         sheetState = sheetState,
         containerColor = Color.Transparent
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .frostedGlass()
-                .padding(bottom = 24.dp)
-        ) {
-            // Indikator Loading Garis Halus di bagian paling atas Sheet saat scanning
-            if (isScanning) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(2.dp),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            } else {
-                Spacer(modifier = Modifier.height(2.dp))
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
+        Column(modifier = Modifier.fillMaxWidth().frostedGlass().padding(bottom = 24.dp)) {
             Text(
                 "Kelola Perpustakaan",
                 style = MaterialTheme.typography.titleLarge,
@@ -86,15 +66,13 @@ fun FolderManagerSheet(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (folders.isEmpty() && customFolders.isEmpty()) {
+            if (folders.isEmpty()) {
                 Text(
                     "Belum ada folder terdeteksi.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp)
+                    modifier = Modifier.fillMaxWidth().padding(24.dp)
                 )
             }
 
@@ -140,24 +118,13 @@ fun FolderManagerSheet(
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedButton(
                         onClick = onAddCustomFolder,
-                        enabled = !isScanning, // Mencegah spaming klik saat memindai
                         modifier = Modifier
                             .padding(horizontal = 20.dp)
                             .fillMaxWidth()
                     ) {
-                        if (isScanning) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Memindai folder...")
-                        } else {
-                            Icon(Icons.Default.CreateNewFolder, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Pilih Folder")
-                        }
+                        Icon(Icons.Default.CreateNewFolder, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Pilih Folder")
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                 }
@@ -169,18 +136,14 @@ fun FolderManagerSheet(
                             .padding(horizontal = 20.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                folder.displayName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        IconButton(
-                            onClick = { onRemoveCustomFolder(folder.uri) },
-                            enabled = !isScanning
-                        ) {
+                        Text(
+                            folder.displayName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = { onRemoveCustomFolder(folder.uri) }) {
                             Icon(Icons.Default.Close, contentDescription = "Hapus folder tambahan")
                         }
                     }

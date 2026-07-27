@@ -350,6 +350,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val lockEnabled by playerViewModel.lockEnabled.collectAsState()
     val biometricEnabled by playerViewModel.biometricEnabled.collectAsState()
     val shakeToSkipEnabled by playerViewModel.shakeToSkipEnabled.collectAsState()
+    val radioAutoContinueEnabled by playerViewModel.radioAutoContinueEnabled.collectAsState()
 
     val deleteContext = LocalContext.current
     val deleteRequestLauncher = rememberLauncherForActivityResult(
@@ -547,7 +548,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     onDisableLock = { playerViewModel.disableLock() },
                     onToggleBiometric = { enabled -> playerViewModel.setBiometricEnabled(enabled) },
                     shakeToSkipEnabled = shakeToSkipEnabled,
-                    onToggleShakeToSkip = { enabled -> playerViewModel.setShakeToSkipEnabled(enabled) }
+                    onToggleShakeToSkip = { enabled -> playerViewModel.setShakeToSkipEnabled(enabled) },
+                    radioAutoContinueEnabled = radioAutoContinueEnabled,
+                    onToggleRadioAutoContinue = { enabled -> playerViewModel.setRadioAutoContinueEnabled(enabled) }
                 )
             }
             composable(

@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -37,8 +38,12 @@ fun SettingsScreen(
     onDisableLock: () -> Unit,
     onToggleBiometric: (Boolean) -> Unit,
     shakeToSkipEnabled: Boolean,
-    onToggleShakeToSkip: (Boolean) -> Unit
+    onToggleShakeToSkip: (Boolean) -> Unit,
+    radioAutoContinueEnabled: Boolean,
+    onToggleRadioAutoContinue: (Boolean) -> Unit
 ) {
+    var showSignatureMatcher by remember { mutableStateOf(false) }
+
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
             Text(
@@ -124,6 +129,55 @@ fun SettingsScreen(
                 }
                 Switch(checked = shakeToSkipEnabled, onCheckedChange = onToggleShakeToSkip)
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Lanjutkan Otomatis (Radio)", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Saat antrean habis, putar lagu lain dari library alih-alih berhenti",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                Switch(checked = radioAutoContinueEnabled, onCheckedChange = onToggleRadioAutoContinue)
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                "Alat Developer",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Bukan untuk penggunaan sehari-hari — dipakai untuk mengecek APK sebelum instal update manual.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showSignatureMatcher = true }
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Fingerprint,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("Cek Signature APK", style = MaterialTheme.typography.bodyMedium)
+            }
         }
 
         item {
@@ -150,6 +204,10 @@ fun SettingsScreen(
             )
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    if (showSignatureMatcher) {
+        SignatureMatcherSheet(onDismiss = { showSignatureMatcher = false })
     }
 }
 

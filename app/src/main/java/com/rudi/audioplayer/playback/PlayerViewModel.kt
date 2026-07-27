@@ -27,6 +27,7 @@ import com.rudi.audioplayer.data.AppLockStore
 import com.rudi.audioplayer.data.ListeningHistoryStore
 import com.rudi.audioplayer.data.PlayStatsStore
 import com.rudi.audioplayer.data.RatingStore
+import com.rudi.audioplayer.data.RadioSettingsStore
 import com.rudi.audioplayer.data.ShakeSettingsStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.PlaylistStore
@@ -68,6 +69,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val appLockStore = AppLockStore(appContext)
     private val listeningHistoryStore = ListeningHistoryStore(appContext)
     private val shakeSettingsStore = ShakeSettingsStore(appContext)
+    private val radioSettingsStore = RadioSettingsStore(appContext)
 
     private val _shakeToSkipEnabled = MutableStateFlow(shakeSettingsStore.isEnabled())
     val shakeToSkipEnabled: StateFlow<Boolean> = _shakeToSkipEnabled.asStateFlow()
@@ -75,6 +77,14 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     fun setShakeToSkipEnabled(enabled: Boolean) {
         shakeSettingsStore.setEnabled(enabled)
         _shakeToSkipEnabled.value = enabled
+    }
+
+    private val _radioAutoContinueEnabled = MutableStateFlow(radioSettingsStore.isEnabled())
+    val radioAutoContinueEnabled: StateFlow<Boolean> = _radioAutoContinueEnabled.asStateFlow()
+
+    fun setRadioAutoContinueEnabled(enabled: Boolean) {
+        radioSettingsStore.setEnabled(enabled)
+        _radioAutoContinueEnabled.value = enabled
     }
 
     private val _lockEnabled = MutableStateFlow(appLockStore.isLockEnabled())
@@ -230,6 +240,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
      * of Spotify/YouTube Music, built from purely local data (no streaming catalog needed).
      */
     private fun continuePlaybackIfQueueEnded() {
+        if (!_radioAutoContinueEnabled.value) return
         val c = controller ?: return
         if (c.repeatMode != Player.REPEAT_MODE_OFF) return
         val library = _librarySongs.value

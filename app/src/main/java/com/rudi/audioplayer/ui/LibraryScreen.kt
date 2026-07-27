@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
@@ -95,7 +94,6 @@ fun LibraryScreen(
     var searchQuery by remember { mutableStateOf("") }
     var songForPlaylistDialog by remember { mutableStateOf<Song?>(null) }
     var showFolderManager by remember { mutableStateOf(false) }
-    var showSignatureMatcher by remember { mutableStateOf(false) }
     var filterVersion by remember { mutableStateOf(0) }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
@@ -191,8 +189,7 @@ fun LibraryScreen(
                     if (!searchActive) searchQuery = ""
                 },
                 onRescan = onRescan,
-                onOpenFolderManager = { showFolderManager = true },
-                onOpenSignatureMatcher = { showSignatureMatcher = true }
+                onOpenFolderManager = { showFolderManager = true }
             )
         }
 
@@ -446,9 +443,6 @@ fun LibraryScreen(
         )
     }
 
-    if (showSignatureMatcher) {
-        SignatureMatcherSheet(onDismiss = { showSignatureMatcher = false })
-    }
 }
 
 @Composable
@@ -551,8 +545,7 @@ private fun LibraryHeader(
     searchActive: Boolean,
     onToggleSearch: () -> Unit,
     onRescan: () -> Unit,
-    onOpenFolderManager: () -> Unit,
-    onOpenSignatureMatcher: () -> Unit
+    onOpenFolderManager: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -577,9 +570,6 @@ private fun LibraryHeader(
         }
         IconButton(onClick = onOpenFolderManager) {
             Icon(Icons.Default.Tune, contentDescription = "Kelola folder")
-        }
-        IconButton(onClick = onOpenSignatureMatcher) {
-            Icon(Icons.Default.Fingerprint, contentDescription = "Cek Signature APK")
         }
         IconButton(onClick = onRescan) {
             Icon(Icons.Default.Refresh, contentDescription = "Pindai ulang")
