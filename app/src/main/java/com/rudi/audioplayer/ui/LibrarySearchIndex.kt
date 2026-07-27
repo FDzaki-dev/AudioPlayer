@@ -1,33 +1,35 @@
 package com.rudi.audioplayer.ui
 
 import com.rudi.audioplayer.data.Song
+import java.util.Locale
 
 /**
  * Small in-memory search index for the currently visible library.
  *
- * The expensive lowercase normalization is performed once when the visible song list changes,
+ * Searchable text is normalized once when the visible song list changes,
  * rather than once for every song on every keystroke.
  */
 class LibrarySearchIndex(songs: List<Song>) {
     private data class Entry(
         val song: Song,
-        val title: String,
-        val artist: String
+        val searchableText: String
     )
 
+    private val allSongs = songs
     private val entries = songs.map { song ->
+        val title = song.title.lowercase(Locale.ROOT)
+        val artist = song.artist.lowercase(Locale.ROOT)
         Entry(
             song = song,
-            title = song.title.lowercase(),
-            artist = song.artist.lowercase()
+            searchableText = "$title\u0000$artist"
         )
     }
 
     fun search(query: String): List<Song> {
-        val normalized = query.trim().lowercase()
-        if (normalized.isEmpty()) return entries.map { it.song }
+        val normalized = query.trim().lowercase(Locale.ROOT)
+        if (normalized.isEmpty()) return allSongs
         return entries.asSequence()
-            .filter { it.title.contains(normalized) || it.artist.contains(normalized) }
+            .filter { it.searchableText.contains(normalized) }
             .map { it.song }
             .toList()
     }
