@@ -221,7 +221,7 @@ fun LibraryScreen(
             } else {
                 SearchResultsView(
                     query = searchQuery,
-                    songs = songs,
+                    songs = filteredSongs,
                     favoriteIds = favoriteIds,
                     onToggleFavorite = onToggleFavorite,
                     onSongClick = { list, index ->
