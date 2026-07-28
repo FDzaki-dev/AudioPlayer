@@ -712,12 +712,13 @@ private fun SearchHistoryView(
             TextButton(onClick = onClear) { Text("Hapus") }
         }
         LazyColumn {
-            items(history) { query ->
+            items(history, key = { it }) { query ->
                 ListItem(
                     headlineContent = { Text(query) },
                     leadingContent = { Icon(Icons.Default.History, contentDescription = null) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier
+                        .animateItemPlacement()
                         .clickable { onSelect(query) }
                         .padding(horizontal = 4.dp)
                 )
@@ -776,12 +777,13 @@ private fun SearchResultsView(
     LazyColumn {
         if (matchedArtists.isNotEmpty()) {
             item { SearchSectionLabel("Artis") }
-            items(matchedArtists) { artist ->
+            items(matchedArtists, key = { it }) { artist ->
                 ListItem(
                     headlineContent = { Text(artist) },
                     leadingContent = { Icon(Icons.Default.Person, contentDescription = null) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier
+                        .animateItemPlacement()
                         .clickable { onGroupSelect(artist) }
                         .padding(horizontal = 4.dp)
                 )
@@ -789,12 +791,13 @@ private fun SearchResultsView(
         }
         if (matchedAlbums.isNotEmpty()) {
             item { SearchSectionLabel("Album") }
-            items(matchedAlbums) { album ->
+            items(matchedAlbums, key = { it }) { album ->
                 ListItem(
                     headlineContent = { Text(album) },
                     leadingContent = { Icon(Icons.Default.Album, contentDescription = null) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier
+                        .animateItemPlacement()
                         .clickable { onGroupSelect(album) }
                         .padding(horizontal = 4.dp)
                 )
@@ -802,7 +805,7 @@ private fun SearchResultsView(
         }
         if (matchedSongs.isNotEmpty()) {
             item { SearchSectionLabel("Lagu") }
-            itemsIndexed(matchedSongs) { index, song ->
+            itemsIndexed(matchedSongs, key = { _, song -> song.id }) { index, song ->
                 SongRow(
                     song = song,
                     isFavorite = favoriteIds.contains(song.id),
@@ -874,12 +877,13 @@ private fun GroupedListView(
 
     if (selectedGroup == null) {
         LazyColumn {
-            items(grouped.keys.toList().sorted()) { group ->
+            items(grouped.keys.toList().sorted(), key = { it }) { group ->
                 ListItem(
                     headlineContent = { Text(group, style = MaterialTheme.typography.titleMedium) },
                     supportingContent = { Text("${grouped[group]?.size ?: 0} lagu") },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier
+                        .animateItemPlacement()
                         .clickable { selectedGroup = group }
                         .padding(horizontal = 4.dp)
                 )
@@ -891,7 +895,7 @@ private fun GroupedListView(
         Column {
             TextButton(onClick = { selectedGroup = null }) { Text("< Kembali") }
             LazyColumn {
-                itemsIndexed(groupSongs) { index, song ->
+                itemsIndexed(groupSongs, key = { _, song -> song.id }) { index, song ->
                     SongRow(
                         song = song,
                         isFavorite = favoriteIds.contains(song.id),

@@ -119,7 +119,7 @@ fun LyricsSheet(
                             .fillMaxWidth()
                             .heightIn(max = 420.dp)
                     ) {
-                        itemsIndexed(lines) { index, line ->
+                        itemsIndexed(lines, key = { index, _ -> index }) { index, line ->
                             val isActive = synced && index == activeIndex
                             Text(
                                 line.text.ifBlank { "\u266A" },

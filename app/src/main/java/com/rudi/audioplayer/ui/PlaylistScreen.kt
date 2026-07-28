@@ -50,7 +50,7 @@ fun PlaylistTabView(
                 )
             } else {
                 LazyColumn {
-                    itemsIndexed(playlists) { _, playlist ->
+                    itemsIndexed(playlists, key = { _, playlist -> playlist.id }) { _, playlist ->
                         ListItem(
                             headlineContent = { Text(playlist.name) },
                             supportingContent = { Text("${playlist.songIds.size} lagu") },
@@ -271,7 +271,7 @@ fun AddToPlaylistDialog(
                     )
                 } else {
                     LazyColumn(modifier = Modifier.heightIn(max = 260.dp)) {
-                        itemsIndexed(playlists) { _, playlist ->
+                        itemsIndexed(playlists, key = { _, playlist -> playlist.id }) { _, playlist ->
                             ListItem(
                                 headlineContent = { Text(playlist.name) },
                                 supportingContent = { Text("${playlist.songIds.size} lagu") },

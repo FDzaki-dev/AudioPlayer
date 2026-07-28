@@ -79,7 +79,7 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        items(AppTheme.entries.toList()) { theme ->
+        items(AppTheme.entries.toList(), key = { it.name }) { theme ->
             ThemeOptionCard(
                 theme = theme,
                 selected = theme == currentTheme,

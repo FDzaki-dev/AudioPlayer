@@ -83,7 +83,7 @@ fun EqualizerSheet(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(boldPresetOptions.size) { index ->
+                    items(boldPresetOptions.size, key = { index -> boldPresetOptions[index].first.name }) { index ->
                         val (preset, label) = boldPresetOptions[index]
                         FilterChip(
                             selected = state.boldPreset == preset.name,
@@ -102,7 +102,7 @@ fun EqualizerSheet(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(state.presets.size) { index ->
+                        items(state.presets.size, key = { index -> state.presets[index] }) { index ->
                             FilterChip(
                                 selected = state.selectedPreset == index,
                                 onClick = { onPresetSelect(index) },
