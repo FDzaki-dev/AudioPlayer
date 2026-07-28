@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
@@ -70,13 +71,16 @@ import android.media.AudioManager
 import android.view.WindowManager
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
+import com.rudi.audioplayer.data.OnboardingHintStore
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
 import com.rudi.audioplayer.playback.PlaybackUiState
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingScreen(
     uiState: PlaybackUiState,
@@ -119,10 +123,13 @@ fun NowPlayingScreen(
     var showQueueSheet by remember { mutableStateOf(false) }
     var showLyricsSheet by remember { mutableStateOf(false) }
     var showEqualizerSheet by remember { mutableStateOf(false) }
+    var showAdvancedSheet by remember { mutableStateOf(false) }
 
     // --- Swipe gesture: brightness (left of album art) & audio volume (right of album art) ---
     val gestureScope = rememberCoroutineScope()
     val context = LocalContext.current
+    val hintStore = remember(context) { OnboardingHintStore(context) }
+    var showNowPlayingHint by remember { mutableStateOf(!hintStore.hasSeenNowPlayingHint()) }
     val activity = remember(context) { context.findActivity() }
     // Full 0-100% swing over a fixed 140dp of drag, regardless of how tall the gesture zone
     // itself renders — the old version divided by the zone's full 300dp height, so a normal
@@ -242,20 +249,6 @@ fun NowPlayingScreen(
                     tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                 )
             }
-            IconButton(onClick = { showSleepTimerDialog = true }) {
-                Icon(
-                    Icons.Default.Timer,
-                    contentDescription = "Sleep timer",
-                    tint = if (sleepTimerRemainingMs != null) animatedAccent else MaterialTheme.colorScheme.secondary
-                )
-            }
-            IconButton(onClick = { showSpeedDialog = true }) {
-                Icon(
-                    Icons.Default.Speed,
-                    contentDescription = "Kecepatan putar",
-                    tint = MaterialTheme.colorScheme.secondary
-                )
-            }
             IconButton(onClick = { showQueueSheet = true }) {
                 Icon(
                     Icons.Default.QueueMusic,
@@ -270,16 +263,24 @@ fun NowPlayingScreen(
                     tint = MaterialTheme.colorScheme.secondary
                 )
             }
-            IconButton(onClick = {
-                onOpenEqualizer()
-                showEqualizerSheet = true
-            }) {
+            IconButton(onClick = { showAdvancedSheet = true }) {
                 Icon(
-                    Icons.Default.Equalizer,
-                    contentDescription = "Equalizer",
+                    Icons.Default.MoreVert,
+                    contentDescription = "Kontrol lanjutan",
                     tint = MaterialTheme.colorScheme.secondary
                 )
             }
+        }
+
+        if (showNowPlayingHint) {
+            Spacer(modifier = Modifier.height(8.dp))
+            FeatureHintBanner(
+                text = "Geser di kiri/kanan piringan buat atur kecerahan & volume HP. Ketuk ⋮ buat Sleep Timer, Kecepatan, dan Equalizer.",
+                onDismiss = {
+                    showNowPlayingHint = false
+                    hintStore.markNowPlayingHintSeen()
+                }
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -498,43 +499,6 @@ fun NowPlayingScreen(
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            "${uiState.playbackSpeed}x",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.secondary
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            "Peredam Dalam Aplikasi (bukan volume HP)",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.secondary
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val volumeIcon = when {
-                uiState.volume <= 0f -> Icons.Default.VolumeOff
-                uiState.volume < 0.5f -> Icons.Default.VolumeDown
-                else -> Icons.Default.VolumeUp
-            }
-            Icon(volumeIcon, contentDescription = "Peredam dalam aplikasi", tint = MaterialTheme.colorScheme.secondary)
-            Spacer(modifier = Modifier.width(8.dp))
-            Slider(
-                value = uiState.volume,
-                onValueChange = onSetVolume,
-                valueRange = 0f..1f,
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.secondary,
-                    activeTrackColor = MaterialTheme.colorScheme.secondary,
-                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            )
-        }
         }
 
         AnimatedVisibility(
@@ -633,6 +597,133 @@ fun NowPlayingScreen(
             onPresetSelect = onEqualizerPresetSelect,
             onBoldPresetSelect = onEqualizerBoldPresetSelect
         )
+    }
+
+    if (showAdvancedSheet) {
+        AdvancedControlsSheet(
+            sleepTimerRemainingMs = sleepTimerRemainingMs,
+            playbackSpeed = uiState.playbackSpeed,
+            volume = uiState.volume,
+            onSetVolume = onSetVolume,
+            onDismiss = { showAdvancedSheet = false },
+            onOpenSleepTimer = {
+                showAdvancedSheet = false
+                showSleepTimerDialog = true
+            },
+            onOpenSpeed = {
+                showAdvancedSheet = false
+                showSpeedDialog = true
+            },
+            onOpenEqualizer = {
+                showAdvancedSheet = false
+                onOpenEqualizer()
+                showEqualizerSheet = true
+            }
+        )
+    }
+}
+
+/** Houses the controls a casual listener rarely touches day-to-day — sleep timer, playback
+ * speed, equalizer, and the in-app volume attenuation — behind one "Lanjutan" entry point
+ * instead of six equal-weight icons crowding the main Now Playing top bar. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AdvancedControlsSheet(
+    sleepTimerRemainingMs: Long?,
+    playbackSpeed: Float,
+    volume: Float,
+    onSetVolume: (Float) -> Unit,
+    onDismiss: () -> Unit,
+    onOpenSleepTimer: () -> Unit,
+    onOpenSpeed: () -> Unit,
+    onOpenEqualizer: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.Transparent
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().frostedGlass()) {
+            Text(
+                "Kontrol Lanjutan",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+            )
+
+            AdvancedControlRow(
+                icon = Icons.Default.Timer,
+                label = "Sleep Timer",
+                value = if (sleepTimerRemainingMs != null) "Aktif" else "Nonaktif",
+                onClick = onOpenSleepTimer
+            )
+            AdvancedControlRow(
+                icon = Icons.Default.Speed,
+                label = "Kecepatan Putar",
+                value = "${playbackSpeed}x",
+                onClick = onOpenSpeed
+            )
+            AdvancedControlRow(
+                icon = Icons.Default.Equalizer,
+                label = "Equalizer",
+                value = null,
+                onClick = onOpenEqualizer
+            )
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+            )
+
+            Text(
+                "Peredam Dalam Aplikasi (bukan volume HP)",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val volumeIcon = when {
+                    volume <= 0f -> Icons.Default.VolumeOff
+                    volume < 0.5f -> Icons.Default.VolumeDown
+                    else -> Icons.Default.VolumeUp
+                }
+                Icon(volumeIcon, contentDescription = "Peredam dalam aplikasi", tint = MaterialTheme.colorScheme.secondary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Slider(
+                    value = volume,
+                    onValueChange = onSetVolume,
+                    valueRange = 0f..1f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.secondary,
+                        activeTrackColor = MaterialTheme.colorScheme.secondary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                )
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun AdvancedControlRow(icon: ImageVector, label: String, value: String?, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        if (value != null) {
+            Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        }
     }
 }
 

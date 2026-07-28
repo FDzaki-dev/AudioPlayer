@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.History
@@ -58,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.rudi.audioplayer.data.CustomFolderInfo
 import com.rudi.audioplayer.data.LibraryFilterStore
+import com.rudi.audioplayer.data.OnboardingHintStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.SearchHistoryStore
 import com.rudi.audioplayer.data.Song
@@ -87,6 +89,8 @@ fun LibraryScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val filterStore = remember { LibraryFilterStore(context) }
+    val hintStore = remember(context) { OnboardingHintStore(context) }
+    var showLibraryHint by remember { mutableStateOf(!hintStore.hasSeenLibraryHint()) }
     val searchHistoryStore = remember { SearchHistoryStore(context) }
     var searchHistory by remember { mutableStateOf(searchHistoryStore.getHistory()) }
     var selectedTab by remember { mutableStateOf(0) }
@@ -203,6 +207,17 @@ fun LibraryScreen(
 
         if (!searchActive) {
             LibraryFilterChips(selectedTab = selectedTab, onSelect = { selectedTab = it })
+        }
+
+        if (!searchActive && showLibraryHint) {
+            FeatureHintBanner(
+                text = "Folder, Favorit, dan Playlist sekarang ada di tab \"Lainnya\" biar tampilan depan nggak penuh.",
+                onDismiss = {
+                    showLibraryHint = false
+                    hintStore.markLibraryHintSeen()
+                },
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+            )
         }
 
         if (searchActive) {
@@ -603,13 +618,18 @@ private fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, o
 
 @Composable
 private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
-    val labels = listOf("Lagu", "Album", "Artis", "Folder", "Favorit", "Playlist")
+    val primaryLabels = listOf("Lagu", "Album", "Artis")
+    val moreLabels = listOf("Folder", "Favorit", "Playlist") // indices 3, 4, 5
+    var showMoreMenu by remember { mutableStateOf(false) }
+    val moreSelected = selectedTab in 3..5
+    val moreChipLabel = if (moreSelected) moreLabels[selectedTab - 3] else "Lainnya"
+
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        itemsIndexed(labels) { index, label ->
+        itemsIndexed(primaryLabels) { index, label ->
             val selected = selectedTab == index
             Box(
                 modifier = Modifier
@@ -623,6 +643,41 @@ private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                 )
+            }
+        }
+        item {
+            Box {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (moreSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
+                        .clickable { showMoreMenu = true }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        moreChipLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (moreSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                    )
+                    Icon(
+                        Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (moreSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                    moreLabels.forEachIndexed { offset, label ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                onSelect(3 + offset)
+                                showMoreMenu = false
+                            }
+                        )
+                    }
+                }
             }
         }
     }
