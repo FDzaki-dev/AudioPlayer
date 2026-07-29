@@ -49,7 +49,12 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Shrinks + obfuscates the release APK. Media3, Coil, and AndroidX all ship
+            // their own consumer proguard rules, and this project has no reflection-based
+            // JSON/serialization (playlists etc. are hand-rolled org.json), so there's
+            // nothing here that R8 needs extra keep rules for.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Uses the stable release keystore when CI actually decoded a non-empty one
             // (consistent signature across builds, no more uninstall-before-install). Falls

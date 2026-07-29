@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Legacy Auto Backup rules (used on API 23-30; superseded by data_extraction_rules.xml
+    on API 31+, but both must be declared to cover the full minSdk range).
+    app_lock holds the salted PIN hash and lockout state — it must never leave the device
+    via cloud backup, or a restore on another device could carry over (or worse, let
+    someone inspect) another user's lock secrets.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="app_lock.xml" />
+</full-backup-content>

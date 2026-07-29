@@ -224,7 +224,8 @@ class MainActivity : FragmentActivity() {
                             biometricEnabled = biometricEnabled && isBiometricAvailable(),
                             onVerifyPin = { pin -> playerViewModel.verifyPin(pin) },
                             onUnlocked = { isUnlocked = true },
-                            onRequestBiometric = { showBiometricPrompt { isUnlocked = true } }
+                            onRequestBiometric = { showBiometricPrompt { isUnlocked = true } },
+                            initialLockedOutUntil = remember(needsUnlock) { playerViewModel.currentPinLockout() }
                         )
                         hasPermission -> AppNavHost(playerViewModel, isBiometricAvailable())
                         !permissionRequested -> WelcomeScreen(

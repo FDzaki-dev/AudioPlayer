@@ -54,13 +54,22 @@ data class PlaybackUiState(
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
     val playbackSpeed: Float = 1f,
     val volume: Float = 1f,
-    val queue: List<Song> = emptyList()
+    val queue: List<Song> = emptyList(),
+    // Mirrors `queue` 1:1. A slot's id follows its song when the queue is reordered, instead
+    // of being tied to position — so the Queue sheet can key list items on something that
+    // stays stable across a move, which is what actually lets item-move animate smoothly
+    // instead of every row appearing to be swapped out for a new one.
+    val queueSlotIds: List<Long> = emptyList()
 )
 
 class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     private var controller: MediaController? = null
     private var currentQueue: List<Song> = emptyList()
+    private var currentQueueSlotIds: List<Long> = emptyList()
+    private var nextQueueSlotId: Long = 0L
+
+    private fun newSlotIds(count: Int): List<Long> = List(count) { nextQueueSlotId++ }
 
     private val favoritesStore = FavoritesStore(appContext)
     private val playbackStateStore = PlaybackStateStore(appContext)
@@ -109,7 +118,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         _biometricEnabled.value = enabled
     }
 
-    fun verifyPin(pin: String): Boolean = appLockStore.verifyPin(pin)
+    fun verifyPin(pin: String): AppLockStore.PinResult = appLockStore.verifyPin(pin)
+
+    /** Lets the lock screen restore an in-progress lockout countdown after a process restart. */
+    fun currentPinLockout(): Long? = appLockStore.lockedOutUntil()
     private val playlistStore = PlaylistStore(appContext)
     private val lyricsStore = LyricsStore(appContext)
     private val equalizerController = EqualizerController(appContext)
@@ -254,7 +266,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
         c.addMediaItems(toAdd.map { mediaItemFor(it) })
         currentQueue = currentQueue + toAdd
-        _uiState.value = _uiState.value.copy(queue = currentQueue)
+        currentQueueSlotIds = currentQueueSlotIds + newSlotIds(toAdd.size)
+        _uiState.value = _uiState.value.copy(queue = currentQueue, queueSlotIds = currentQueueSlotIds)
         c.seekToNextMediaItem()
         c.play()
     }
@@ -477,8 +490,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     fun playQueue(songs: List<Song>, startIndex: Int, startPositionMs: Long = 0L, autoPlay: Boolean = true) {
         currentQueue = songs
+        currentQueueSlotIds = newSlotIds(songs.size)
         _uiState.value = _uiState.value.copy(
             queue = songs,
+            queueSlotIds = currentQueueSlotIds,
             currentSong = songs.getOrNull(startIndex),
             currentIndex = startIndex
         )
@@ -506,8 +521,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         if (from == to || from !in currentQueue.indices || to !in currentQueue.indices) return
         c.moveMediaItem(from, to)
         currentQueue = currentQueue.toMutableList().apply { add(to, removeAt(from)) }
+        currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { add(to, removeAt(from)) }
         _uiState.value = _uiState.value.copy(
             queue = currentQueue,
+            queueSlotIds = currentQueueSlotIds,
             currentIndex = c.currentMediaItemIndex
         )
         persistPlaybackState()
@@ -519,9 +536,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         if (index !in currentQueue.indices || currentQueue.size <= 1) return
         c.removeMediaItem(index)
         currentQueue = currentQueue.toMutableList().apply { removeAt(index) }
+        currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { removeAt(index) }
         val newIndex = c.currentMediaItemIndex
         _uiState.value = _uiState.value.copy(
             queue = currentQueue,
+            queueSlotIds = currentQueueSlotIds,
             currentIndex = newIndex,
             currentSong = currentQueue.getOrNull(newIndex)
         )
@@ -535,7 +554,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val item = mediaItemFor(song)
         c.addMediaItem(insertAt, item)
         currentQueue = currentQueue.toMutableList().apply { add(insertAt, song) }
-        _uiState.value = _uiState.value.copy(queue = currentQueue, currentIndex = c.currentMediaItemIndex)
+        currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { add(insertAt, nextQueueSlotId++) }
+        _uiState.value = _uiState.value.copy(queue = currentQueue, queueSlotIds = currentQueueSlotIds, currentIndex = c.currentMediaItemIndex)
         persistPlaybackState()
     }
 
@@ -544,7 +564,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val c = controller ?: return
         c.addMediaItem(mediaItemFor(song))
         currentQueue = currentQueue + song
-        _uiState.value = _uiState.value.copy(queue = currentQueue, currentIndex = c.currentMediaItemIndex)
+        currentQueueSlotIds = currentQueueSlotIds + (nextQueueSlotId++)
+        _uiState.value = _uiState.value.copy(queue = currentQueue, queueSlotIds = currentQueueSlotIds, currentIndex = c.currentMediaItemIndex)
         persistPlaybackState()
     }
 

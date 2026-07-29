@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    API 31+ backup/transfer rules. app_lock (the PIN hash + lockout state) is excluded from
+    both cloud backup and device-to-device transfer — a lock secret should stay tied to the
+    one device the user set it on, not silently ride along with everything else.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="app_lock.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="app_lock.xml" />
+    </device-transfer>
+</data-extraction-rules>

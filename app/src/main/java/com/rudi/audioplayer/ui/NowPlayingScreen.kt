@@ -563,6 +563,7 @@ fun NowPlayingScreen(
     if (showQueueSheet) {
         QueueSheet(
             queue = uiState.queue,
+            slotIds = uiState.queueSlotIds,
             currentIndex = uiState.currentIndex,
             onDismiss = { showQueueSheet = false },
             onPlayIndex = { index -> onPlayQueueIndex(index) },

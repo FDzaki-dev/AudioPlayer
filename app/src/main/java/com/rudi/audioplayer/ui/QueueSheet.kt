@@ -32,6 +32,11 @@ import com.rudi.audioplayer.data.Song
 @Composable
 fun QueueSheet(
     queue: List<Song>,
+    // Mirrors `queue` 1:1: slotIds[i] is the stable identity of queue[i]. It travels with
+    // its song when the queue is reordered, unlike an index-based key which would instead
+    // stay attached to the *position* — the difference between a row sliding to its new
+    // spot versus every row below the moved one appearing to jump to a new song.
+    slotIds: List<Long>,
     currentIndex: Int,
     onDismiss: () -> Unit,
     onPlayIndex: (Int) -> Unit,
@@ -70,8 +75,12 @@ fun QueueSheet(
                     .fillMaxWidth()
                     .heightIn(max = 480.dp)
             ) {
-                itemsIndexed(queue, key = { index, song -> "${song.id}_$index" }) { index, song ->
+                itemsIndexed(
+                    queue,
+                    key = { index, _ -> slotIds.getOrElse(index) { index.toLong() } }
+                ) { index, song ->
                     QueueRow(
+                        modifier = Modifier.animateItemPlacement(),
                         song = song,
                         isPlaying = index == currentIndex,
                         canMoveUp = index > 0,
@@ -109,12 +118,13 @@ private fun QueueRow(
     onClick: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val background = if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(background)
             .clickable(onClick = onClick)

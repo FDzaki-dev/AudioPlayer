@@ -14,16 +14,59 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.rudi.audioplayer.data.AppLockStore
+import kotlinx.coroutines.delay
 
 @Composable
 fun LockScreen(
     biometricEnabled: Boolean,
-    onVerifyPin: (String) -> Boolean,
+    onVerifyPin: (String) -> AppLockStore.PinResult,
     onUnlocked: () -> Unit,
-    onRequestBiometric: () -> Unit
+    onRequestBiometric: () -> Unit,
+    // Restores an in-progress lockout countdown after the activity/process is recreated,
+    // so leaving the app and coming back doesn't reset the clock on a brute-force attempt.
+    initialLockedOutUntil: Long? = null
 ) {
     var entered by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
+    var lockedOutUntil by remember { mutableStateOf(initialLockedOutUntil) }
+    var remainingSeconds by remember { mutableStateOf(0) }
+
+    LaunchedEffect(lockedOutUntil) {
+        val until = lockedOutUntil ?: return@LaunchedEffect
+        while (true) {
+            val remainingMs = until - System.currentTimeMillis()
+            if (remainingMs <= 0) {
+                remainingSeconds = 0
+                lockedOutUntil = null
+                break
+            }
+            remainingSeconds = ((remainingMs + 999) / 1000).toInt()
+            delay(1000)
+        }
+    }
+
+    val locked = lockedOutUntil != null
+
+    fun handleDigit(digit: String) {
+        if (locked) return
+        error = false
+        if (entered.length < 6) entered += digit
+        if (entered.length == 6) {
+            when (val result = onVerifyPin(entered)) {
+                is AppLockStore.PinResult.Success -> onUnlocked()
+                is AppLockStore.PinResult.Wrong -> {
+                    error = true
+                    entered = ""
+                }
+                is AppLockStore.PinResult.LockedOut -> {
+                    error = true
+                    entered = ""
+                    lockedOutUntil = result.untilMillis
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -60,8 +103,15 @@ fun LockScreen(
             }
         }
 
-        if (error) {
-            Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+        if (locked) {
+            Text(
+                "Terlalu banyak percobaan salah. Coba lagi dalam ${formatLockoutTime(remainingSeconds)}.",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        } else if (error) {
             Text("PIN salah", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
 
@@ -75,18 +125,7 @@ fun LockScreen(
         rows.forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 row.forEach { digit ->
-                    PinKey(label = digit) {
-                        error = false
-                        if (entered.length < 6) entered += digit
-                        if (entered.length == 6) {
-                            if (onVerifyPin(entered)) {
-                                onUnlocked()
-                            } else {
-                                error = true
-                                entered = ""
-                            }
-                        }
-                    }
+                    PinKey(label = digit, enabled = !locked) { handleDigit(digit) }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -94,7 +133,7 @@ fun LockScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             if (biometricEnabled) {
                 Box(
-                    modifier = Modifier.size(64.dp).clip(CircleShape).clickable { onRequestBiometric() },
+                    modifier = Modifier.size(64.dp).clip(CircleShape).clickable(enabled = !locked) { onRequestBiometric() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Fingerprint, contentDescription = "Buka dengan sidik jari", modifier = Modifier.size(28.dp))
@@ -102,15 +141,9 @@ fun LockScreen(
             } else {
                 Spacer(modifier = Modifier.size(64.dp))
             }
-            PinKey(label = "0") {
-                error = false
-                if (entered.length < 6) entered += "0"
-                if (entered.length == 6) {
-                    if (onVerifyPin(entered)) onUnlocked() else { error = true; entered = "" }
-                }
-            }
+            PinKey(label = "0", enabled = !locked) { handleDigit("0") }
             Box(
-                modifier = Modifier.size(64.dp).clip(CircleShape).clickable {
+                modifier = Modifier.size(64.dp).clip(CircleShape).clickable(enabled = !locked) {
                     error = false
                     if (entered.isNotEmpty()) entered = entered.dropLast(1)
                 },
@@ -122,14 +155,20 @@ fun LockScreen(
     }
 }
 
+private fun formatLockoutTime(totalSeconds: Int): String {
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return if (minutes > 0) "${minutes}m ${seconds}d" else "${seconds}d"
+}
+
 @Composable
-private fun PinKey(label: String, onClick: () -> Unit) {
+private fun PinKey(label: String, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(64.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surface)
-            .clickable(onClick = onClick),
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = if (enabled) 1f else 0.4f))
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(label, style = MaterialTheme.typography.titleLarge)
