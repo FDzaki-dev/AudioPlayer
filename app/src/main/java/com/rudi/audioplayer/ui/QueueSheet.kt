@@ -2,31 +2,45 @@ package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.rudi.audioplayer.data.Song
 
 /**
- * Bottom sheet showing the current playback queue. Lets the user jump to any
- * song, nudge items up/down to reorder, and remove songs they don't want anymore.
+ * Bottom sheet showing the current playback queue. Lets the user jump to any song, drag a
+ * row (via its handle) or nudge it with the up/down buttons to reorder, and remove songs
+ * they don't want anymore. Drag and the arrow buttons both call the same [onMove] — the
+ * handle is just a faster path to the same result, not a replacement for the buttons, so
+ * precise single-step reordering (or a TalkBack user) still has a reliable fallback.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,6 +60,19 @@ fun QueueSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val listState = rememberLazyListState()
     val haptic = LocalHapticFeedback.current
+
+    // A drag gesture runs across many frames inside its own coroutine, started once when the
+    // finger goes down. By the time it's mid-drag, `queue`/`slotIds`/`onMove` may have already
+    // been replaced by newer ones from recomposition (each reorder step recomposes this whole
+    // sheet) — rememberUpdatedState keeps the gesture's callbacks reading the *current* values
+    // instead of the stale ones captured when the drag started.
+    val currentQueue by rememberUpdatedState(queue)
+    val currentSlotIds by rememberUpdatedState(slotIds)
+    val currentOnMove by rememberUpdatedState(onMove)
+
+    var draggingSlotId by remember { mutableStateOf<Long?>(null) }
+    var dragOffsetPx by remember { mutableStateOf(0f) }
+    var rowHeightPx by remember { mutableStateOf(0f) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -79,8 +106,20 @@ fun QueueSheet(
                     queue,
                     key = { index, _ -> slotIds.getOrElse(index) { index.toLong() } }
                 ) { index, song ->
+                    val slotId = slotIds.getOrElse(index) { index.toLong() }
+                    val isDragging = slotId == draggingSlotId
+
                     QueueRow(
-                        modifier = Modifier.animateItemPlacement(),
+                        modifier = Modifier
+                            .animateItemPlacement()
+                            .onGloballyPositioned { coordinates ->
+                                if (rowHeightPx == 0f) rowHeightPx = coordinates.size.height.toFloat()
+                            }
+                            .graphicsLayer {
+                                translationY = if (isDragging) dragOffsetPx else 0f
+                                shadowElevation = if (isDragging) 10f else 0f
+                            }
+                            .zIndex(if (isDragging) 1f else 0f),
                         song = song,
                         isPlaying = index == currentIndex,
                         canMoveUp = index > 0,
@@ -98,7 +137,37 @@ fun QueueSheet(
                         onRemove = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onRemove(index)
-                        }
+                        },
+                        dragHandleModifier = Modifier.pointerInputDragHandle(
+                            slotId = slotId,
+                            onDragStart = {
+                                draggingSlotId = slotId
+                                dragOffsetPx = 0f
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            },
+                            onDragEnd = {
+                                draggingSlotId = null
+                                dragOffsetPx = 0f
+                            },
+                            onDragDelta = { deltaY ->
+                                val h = rowHeightPx
+                                if (h > 0f) {
+                                    dragOffsetPx += deltaY
+                                    val fromIndex = currentSlotIds.indexOf(slotId)
+                                    if (fromIndex >= 0) {
+                                        if (dragOffsetPx > h / 2 && fromIndex < currentQueue.lastIndex) {
+                                            currentOnMove(fromIndex, fromIndex + 1)
+                                            dragOffsetPx -= h
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        } else if (dragOffsetPx < -h / 2 && fromIndex > 0) {
+                                            currentOnMove(fromIndex, fromIndex - 1)
+                                            dragOffsetPx += h
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
+                                    }
+                                }
+                            }
+                        )
                     )
                 }
             }
@@ -107,6 +176,30 @@ fun QueueSheet(
         }
     }
 }
+
+/**
+ * Long-press-then-drag on a dedicated handle only (never the whole row) so it can never hijack
+ * the LazyColumn's own vertical scroll or the row's tap-to-play. `deltaY` is reported raw and
+ * un-thresholded — the caller decides how many pixels constitute "moved one slot".
+ */
+private fun Modifier.pointerInputDragHandle(
+    slotId: Long,
+    onDragStart: () -> Unit,
+    onDragEnd: () -> Unit,
+    onDragDelta: (deltaY: Float) -> Unit
+): Modifier = this.then(
+    Modifier.pointerInput(slotId) {
+        detectDragGesturesAfterLongPress(
+            onDragStart = { onDragStart() },
+            onDragEnd = { onDragEnd() },
+            onDragCancel = { onDragEnd() },
+            onDrag = { change, dragAmount ->
+                change.consume()
+                onDragDelta(dragAmount.y)
+            }
+        )
+    }
+)
 
 @Composable
 private fun QueueRow(
@@ -119,6 +212,7 @@ private fun QueueRow(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onRemove: () -> Unit,
+    dragHandleModifier: Modifier = Modifier,
     modifier: Modifier = Modifier
 ) {
     val background = if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
@@ -128,9 +222,21 @@ private fun QueueRow(
             .fillMaxWidth()
             .background(background)
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Box(
+            modifier = dragHandleModifier
+                .size(40.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.DragHandle,
+                contentDescription = "Tahan lalu geser untuk mengurutkan ulang",
+                tint = MaterialTheme.colorScheme.secondary
+            )
+        }
+
         Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
             if (isPlaying) {
                 Icon(

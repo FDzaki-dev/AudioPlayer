@@ -53,6 +53,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,6 +70,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.runtime.SideEffect
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -86,6 +91,7 @@ import com.rudi.audioplayer.ui.SettingsScreen
 import com.rudi.audioplayer.ui.MiniPlayerBar
 import com.rudi.audioplayer.ui.NowPlayingScreen
 import com.rudi.audioplayer.ui.theme.AudioPlayerTheme
+import com.rudi.audioplayer.ui.theme.resolveIsDark
 
 class MainActivity : FragmentActivity() {
 
@@ -158,6 +164,19 @@ class MainActivity : FragmentActivity() {
         setContent {
             val appTheme by playerViewModel.appTheme.collectAsState()
             AudioPlayerTheme(theme = appTheme) {
+                // enableEdgeToEdge() above only sets the *initial* system bar icon style once,
+                // at process start — it never reacts to the in-app theme picker. Without this,
+                // switching to "Terang" leaves status/nav bar icons stuck light-on-light
+                // (styled for the dark theme they started in) and effectively invisible.
+                val isDarkTheme = resolveIsDark(appTheme)
+                val decorView = LocalView.current
+                SideEffect {
+                    WindowCompat.getInsetsController(window, decorView).apply {
+                        isAppearanceLightStatusBars = !isDarkTheme
+                        isAppearanceLightNavigationBars = !isDarkTheme
+                    }
+                }
+
                 val context = LocalContext.current
 
                 // Both shortcuts mirror an action already reachable from the Home screen
@@ -348,6 +367,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val libraryLoading by playerViewModel.libraryLoading.collectAsState()
     val celebrationMessage by playerViewModel.celebrationMessage.collectAsState()
     val playbackErrorMessage by playerViewModel.playbackErrorMessage.collectAsState()
+    val undoableAction by playerViewModel.undoableAction.collectAsState()
     val currentRating by playerViewModel.currentRating.collectAsState()
     val lockEnabled by playerViewModel.lockEnabled.collectAsState()
     val biometricEnabled by playerViewModel.biometricEnabled.collectAsState()
@@ -425,13 +445,35 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         }
     }
 
+    LaunchedEffect(undoableAction) {
+        val action = undoableAction ?: return@LaunchedEffect
+        try {
+            val result = snackbarHostState.showSnackbar(
+                message = action.message,
+                actionLabel = "Urungkan",
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                action.undo()
+            }
+        } finally {
+            playerViewModel.consumeUndoableAction()
+        }
+    }
+
     Scaffold(
         snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
                 Snackbar(
                     containerColor = MaterialTheme.colorScheme.surface,
                     contentColor = MaterialTheme.colorScheme.onSurface,
-                    action = null
+                    action = data.visuals.actionLabel?.let { label ->
+                        {
+                            TextButton(onClick = { data.performAction() }) {
+                                Text(label, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
                 ) {
                     Text(data.visuals.message, style = MaterialTheme.typography.bodyMedium)
                 }

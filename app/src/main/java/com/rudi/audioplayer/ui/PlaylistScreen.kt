@@ -16,6 +16,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.Playlist
@@ -36,6 +38,7 @@ fun PlaylistTabView(
     var selectedPlaylistId by remember { mutableStateOf<String?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     val selectedPlaylist = playlists.find { it.id == selectedPlaylistId }
 
@@ -110,15 +113,25 @@ fun PlaylistTabView(
                     )
                 } else {
                     LazyColumn {
-                        itemsIndexed(playlistSongs, key = { index, song -> "${song.id}_$index" }) { index, song ->
+                        itemsIndexed(playlistSongs, key = { _, song -> song.id }) { index, song ->
                             PlaylistSongRow(
+                                modifier = Modifier.animateItemPlacement(),
                                 song = song,
                                 canMoveUp = index > 0,
                                 canMoveDown = index < playlistSongs.lastIndex,
                                 onClick = { onSongClick(playlistSongs, index) },
-                                onMoveUp = { onMoveSongInPlaylist(selectedPlaylist.id, index, index - 1) },
-                                onMoveDown = { onMoveSongInPlaylist(selectedPlaylist.id, index, index + 1) },
-                                onRemove = { onRemoveSongFromPlaylist(selectedPlaylist.id, song.id) }
+                                onMoveUp = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onMoveSongInPlaylist(selectedPlaylist.id, index, index - 1)
+                                },
+                                onMoveDown = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onMoveSongInPlaylist(selectedPlaylist.id, index, index + 1)
+                                },
+                                onRemove = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onRemoveSongFromPlaylist(selectedPlaylist.id, song.id)
+                                }
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                         }
@@ -164,10 +177,11 @@ private fun PlaylistSongRow(
     onClick: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 8.dp),

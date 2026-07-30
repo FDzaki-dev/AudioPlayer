@@ -198,6 +198,17 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         _playbackErrorMessage.value = null
     }
 
+    /** Carries both the Snackbar message and the exact action that reverses it — the Snackbar
+     * itself doesn't need to know *what* was removed, only how to undo it. */
+    data class UndoableAction(val message: String, val undo: () -> Unit)
+
+    private val _undoableAction = MutableStateFlow<UndoableAction?>(null)
+    val undoableAction: StateFlow<UndoableAction?> = _undoableAction.asStateFlow()
+
+    fun consumeUndoableAction() {
+        _undoableAction.value = null
+    }
+
     private val _librarySongs = MutableStateFlow<List<Song>>(emptyList())
     val librarySongs: StateFlow<List<Song>> = _librarySongs.asStateFlow()
 
@@ -601,6 +612,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     fun removeFromQueue(index: Int) {
         val c = controller ?: return
         if (index !in currentQueue.indices || currentQueue.size <= 1) return
+        val removedSong = currentQueue[index]
+        val removedSlotId = currentQueueSlotIds.getOrNull(index)
         c.removeMediaItem(index)
         currentQueue = currentQueue.toMutableList().apply { removeAt(index) }
         currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { removeAt(index) }
@@ -610,6 +623,26 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             queueSlotIds = currentQueueSlotIds,
             currentIndex = newIndex,
             currentSong = currentQueue.getOrNull(newIndex)
+        )
+        persistPlaybackState()
+        _undoableAction.value = UndoableAction("\"${removedSong.title}\" dihapus dari antrean") {
+            reinsertIntoQueue(removedSong, index, removedSlotId)
+        }
+    }
+
+    /** The undo half of [removeFromQueue] — puts the song back at (as close as possible to)
+     * the index it was removed from, keeping its original slot id so nothing else in the
+     * queue appears to shuffle around just because one item came back. */
+    private fun reinsertIntoQueue(song: Song, atIndex: Int, slotId: Long?) {
+        val c = controller ?: return
+        val insertAt = atIndex.coerceIn(0, currentQueue.size)
+        c.addMediaItem(insertAt, mediaItemFor(song))
+        currentQueue = currentQueue.toMutableList().apply { add(insertAt, song) }
+        currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { add(insertAt, slotId ?: nextQueueSlotId++) }
+        _uiState.value = _uiState.value.copy(
+            queue = currentQueue,
+            queueSlotIds = currentQueueSlotIds,
+            currentIndex = c.currentMediaItemIndex
         )
         persistPlaybackState()
     }
@@ -728,8 +761,20 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     }
 
     fun removeSongFromPlaylist(playlistId: String, songId: Long) {
+        val originalIndex = playlistStore.getPlaylists().find { it.id == playlistId }?.songIds?.indexOf(songId) ?: -1
         playlistStore.removeSong(playlistId, songId)
         _playlists.value = playlistStore.getPlaylists()
+        if (originalIndex >= 0) {
+            val title = _librarySongs.value.find { it.id == songId }?.title ?: "Lagu"
+            _undoableAction.value = UndoableAction("\"$title\" dihapus dari playlist") {
+                playlistStore.addSong(playlistId, songId)
+                val lastIndex = playlistStore.getPlaylists().find { it.id == playlistId }?.songIds?.lastIndex ?: -1
+                if (lastIndex > 0 && originalIndex < lastIndex) {
+                    playlistStore.moveSong(playlistId, lastIndex, originalIndex)
+                }
+                _playlists.value = playlistStore.getPlaylists()
+            }
+        }
     }
 
     fun moveSongInPlaylist(playlistId: String, from: Int, to: Int) {

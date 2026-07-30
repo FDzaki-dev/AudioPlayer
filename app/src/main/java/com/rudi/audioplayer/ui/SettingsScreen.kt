@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,6 +50,7 @@ fun SettingsScreen(
     var showSignatureMatcher by remember { mutableStateOf(false) }
     var showDiagnosticLog by remember { mutableStateOf(false) }
     var showAdvancedSettings by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
@@ -112,7 +115,13 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.secondary
                     )
                 }
-                Switch(checked = shakeToSkipEnabled, onCheckedChange = onToggleShakeToSkip)
+                Switch(
+                    checked = shakeToSkipEnabled,
+                    onCheckedChange = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onToggleShakeToSkip(it)
+                    }
+                )
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(
@@ -127,7 +136,13 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.secondary
                     )
                 }
-                Switch(checked = radioAutoContinueEnabled, onCheckedChange = onToggleRadioAutoContinue)
+                Switch(
+                    checked = radioAutoContinueEnabled,
+                    onCheckedChange = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onToggleRadioAutoContinue(it)
+                    }
+                )
             }
         }
 
@@ -339,6 +354,7 @@ private fun AppLockSection(
     onToggleBiometric: (Boolean) -> Unit
 ) {
     var showSetPinDialog by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     Column(modifier = Modifier.padding(horizontal = 20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -353,6 +369,7 @@ private fun AppLockSection(
             Switch(
                 checked = lockEnabled,
                 onCheckedChange = { enabled ->
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     if (enabled) showSetPinDialog = true else onDisableLock()
                 }
             )
@@ -367,7 +384,13 @@ private fun AppLockSection(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Buka dengan Sidik Jari", style = MaterialTheme.typography.bodyMedium)
                     }
-                    Switch(checked = biometricEnabled, onCheckedChange = onToggleBiometric)
+                    Switch(
+                        checked = biometricEnabled,
+                        onCheckedChange = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleBiometric(it)
+                        }
+                    )
                 }
             }
         }
