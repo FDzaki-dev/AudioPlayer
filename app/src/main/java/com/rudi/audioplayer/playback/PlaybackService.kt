@@ -22,6 +22,7 @@ import com.rudi.audioplayer.R
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.ShakeSettingsStore
+import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -126,21 +127,30 @@ class PlaybackService : MediaSessionService() {
                 // + queue restore below can easily take longer than that window.
                 startForegroundColdStartNotification()
                 serviceScope.launch {
-                    restoreLastQueue()
-                    applyWidgetAction(action)
-                    // Only give up our placeholder once playback is CONFIRMED actually
-                    // running — not after a blind fixed delay. The old fixed 1s timer could
-                    // fire before the MediaStore query + queue restore above even finished
-                    // (easily >1s on a slower device or large library), cancelling the only
-                    // visible notification before Media3's own real one had anything to show
-                    // yet — leaving no pause control anywhere until the app was reopened.
-                    val player = mediaSession?.player
-                    var waited = 0L
-                    while (player?.isPlaying != true && waited < MAX_HANDOFF_WAIT_MS) {
-                        delay(150)
-                        waited += 150
+                    try {
+                        restoreLastQueue()
+                        applyWidgetAction(action)
+                        // Only give up our placeholder once playback is CONFIRMED actually
+                        // running — not after a blind fixed delay. The old fixed 1s timer could
+                        // fire before the MediaStore query + queue restore above even finished
+                        // (easily >1s on a slower device or large library), cancelling the only
+                        // visible notification before Media3's own real one had anything to show
+                        // yet — leaving no pause control anywhere until the app was reopened.
+                        val player = mediaSession?.player
+                        var waited = 0L
+                        while (player?.isPlaying != true && waited < MAX_HANDOFF_WAIT_MS) {
+                            delay(150)
+                            waited += 150
+                        }
+                    } catch (e: Exception) {
+                        // Whatever failed here (MediaStore permission revoked, a saved queue
+                        // pointing at songs since deleted, etc.) must never leave the placeholder
+                        // stuck — an ongoing "Memuat lagu..." notification with no working
+                        // controls, unable to be swiped away, forever, was exactly this bug.
+                        AppLogger.e("PlaybackService", "Cold-start handoff gagal", e)
+                    } finally {
+                        NotificationManagerCompat.from(this@PlaybackService).cancel(COLD_START_NOTIFICATION_ID)
                     }
-                    NotificationManagerCompat.from(this@PlaybackService).cancel(COLD_START_NOTIFICATION_ID)
                 }
             } else {
                 applyWidgetAction(action)
@@ -151,7 +161,10 @@ class PlaybackService : MediaSessionService() {
     }
 
     /** Bare-minimum "waking up" notification so the OS treats this process as a legitimate
-     * foreground service from the very first instant of a widget-triggered cold start. */
+     * foreground service from the very first instant of a widget-triggered cold start. Still
+     * carries a real Jeda/Lanjutkan action — even in this brief handoff window before Media3's
+     * own full notification takes over, the user has something to tap instead of a dead,
+     * control-less notification. */
     private fun startForegroundColdStartNotification() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(NotificationManager::class.java)
@@ -166,12 +179,26 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
+        val isPlaying = mediaSession?.player?.isPlaying == true
+        val toggleIntent = Intent(this, PlaybackService::class.java).setAction(WidgetUpdater.ACTION_TOGGLE_PLAY)
+        val toggleFlags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        val togglePendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(this, 101, toggleIntent, toggleFlags)
+        } else {
+            PendingIntent.getService(this, 101, toggleIntent, toggleFlags)
+        }
+
         val notification = NotificationCompat.Builder(this, COLD_START_CHANNEL_ID)
             .setContentTitle("AudioPlayer")
             .setContentText("Memuat lagu…")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
+            .addAction(
+                if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play,
+                if (isPlaying) "Jeda" else "Lanjutkan",
+                togglePendingIntent
+            )
             .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -226,7 +253,13 @@ class PlaybackService : MediaSessionService() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = mediaSession?.player
-        if (player == null || !player.playWhenReady || player.mediaItemCount == 0) {
+        // Swiping the app away from Recents must not silently kill a session that still has
+        // something loaded — the whole point of a media notification and the lock-screen
+        // media control is that they keep working after the app itself is gone from Recents.
+        // Only tear down when there's genuinely nothing left to control: no player, or an
+        // empty queue. A *paused* session with real songs in it stays exactly as visible and
+        // controllable from the notification/lock screen as it was right before the swipe.
+        if (player == null || player.mediaItemCount == 0) {
             stopSelf()
         }
     }
