@@ -37,6 +37,7 @@ class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var shakeDetector: ShakeDetector? = null
+    private var coldStartNotificationActive = false
 
     override fun onCreate() {
         super.onCreate()
@@ -78,6 +79,14 @@ class PlaybackService : MediaSessionService() {
                     shakeDetector?.start()
                 } else {
                     shakeDetector?.stop()
+                }
+                // The cold-start placeholder is a plain NotificationCompat notification, not
+                // a MediaStyle one Media3 keeps in sync automatically — without this, its
+                // action button was permanently stuck on whatever label it had at the instant
+                // it was first built (always "Lanjutkan", since nothing was playing yet at
+                // that exact moment), even after playback actually started.
+                if (coldStartNotificationActive) {
+                    updateColdStartNotification(isPlaying)
                 }
             }
         })
@@ -126,6 +135,7 @@ class PlaybackService : MediaSessionService() {
                 // moments if it isn't already flagged as foreground, and the MediaStore query
                 // + queue restore below can easily take longer than that window.
                 startForegroundColdStartNotification()
+                coldStartNotificationActive = true
                 serviceScope.launch {
                     try {
                         restoreLastQueue()
@@ -149,6 +159,7 @@ class PlaybackService : MediaSessionService() {
                         // controls, unable to be swiped away, forever, was exactly this bug.
                         AppLogger.e("PlaybackService", "Cold-start handoff gagal", e)
                     } finally {
+                        coldStartNotificationActive = false
                         NotificationManagerCompat.from(this@PlaybackService).cancel(COLD_START_NOTIFICATION_ID)
                     }
                 }
@@ -158,6 +169,36 @@ class PlaybackService : MediaSessionService() {
         }
 
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun buildColdStartNotification(isPlaying: Boolean): android.app.Notification {
+        val toggleIntent = Intent(this, PlaybackService::class.java).setAction(WidgetUpdater.ACTION_TOGGLE_PLAY)
+        val toggleFlags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        val togglePendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(this, 101, toggleIntent, toggleFlags)
+        } else {
+            PendingIntent.getService(this, 101, toggleIntent, toggleFlags)
+        }
+
+        return NotificationCompat.Builder(this, COLD_START_CHANNEL_ID)
+            .setContentTitle("AudioPlayer")
+            .setContentText("Memuat lagu…")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .addAction(
+                if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play,
+                if (isPlaying) "Jeda" else "Lanjutkan",
+                togglePendingIntent
+            )
+            .build()
+    }
+
+    /** Re-posts the placeholder with an action label matching the player's actual current
+     * state. Only meaningful while [coldStartNotificationActive] — never called after Media3's
+     * own notification has taken over. */
+    private fun updateColdStartNotification(isPlaying: Boolean) {
+        NotificationManagerCompat.from(this).notify(COLD_START_NOTIFICATION_ID, buildColdStartNotification(isPlaying))
     }
 
     /** Bare-minimum "waking up" notification so the OS treats this process as a legitimate
@@ -179,27 +220,7 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
-        val isPlaying = mediaSession?.player?.isPlaying == true
-        val toggleIntent = Intent(this, PlaybackService::class.java).setAction(WidgetUpdater.ACTION_TOGGLE_PLAY)
-        val toggleFlags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        val togglePendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            PendingIntent.getForegroundService(this, 101, toggleIntent, toggleFlags)
-        } else {
-            PendingIntent.getService(this, 101, toggleIntent, toggleFlags)
-        }
-
-        val notification = NotificationCompat.Builder(this, COLD_START_CHANNEL_ID)
-            .setContentTitle("AudioPlayer")
-            .setContentText("Memuat lagu…")
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .addAction(
-                if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play,
-                if (isPlaying) "Jeda" else "Lanjutkan",
-                togglePendingIntent
-            )
-            .build()
+        val notification = buildColdStartNotification(isPlaying = mediaSession?.player?.isPlaying == true)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
