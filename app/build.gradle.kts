@@ -92,6 +92,13 @@ android {
     packaging {
         resources.excludes.add("/META-INF/{AL2.0,LGPL2.1}")
     }
+
+    // The unit tests under src/test are plain JVM tests (no Robolectric, no emulator) — any
+    // Android SDK call they happen to touch (e.g. Uri.parse while building a test fixture)
+    // would otherwise throw "not mocked" instead of just returning a harmless default.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 // NOTE: output APK renaming is handled in .github/workflows/build.yml (the "Rename APK to
@@ -125,4 +132,8 @@ dependencies {
     implementation("androidx.fragment:fragment-ktx:1.7.1")
 
     implementation("com.google.guava:guava:33.2.1-android")
+
+    // Pure-JVM unit tests only (src/test) — no Robolectric/instrumentation, so these run in
+    // seconds with no emulator and are cheap enough to actually get written and kept up to date.
+    testImplementation("junit:junit:4.13.2")
 }

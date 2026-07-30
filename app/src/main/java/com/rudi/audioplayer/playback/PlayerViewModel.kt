@@ -3,17 +3,23 @@ package com.rudi.audioplayer.playback
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.database.ContentObserver
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.MediaStore
 import androidx.compose.ui.graphics.Color
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.rudi.audioplayer.util.AppLogger
 import com.google.common.util.concurrent.MoreExecutors
 import com.rudi.audioplayer.data.CrossfadeStore
 import com.rudi.audioplayer.data.CustomFolderInfo
@@ -182,6 +188,16 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         _celebrationMessage.value = null
     }
 
+    // Same one-shot pattern as celebrationMessage, so a playback failure (deleted/corrupt
+    // file, unreadable SAF folder, etc.) surfaces as a Snackbar instead of the player just
+    // going silent with no explanation.
+    private val _playbackErrorMessage = MutableStateFlow<String?>(null)
+    val playbackErrorMessage: StateFlow<String?> = _playbackErrorMessage.asStateFlow()
+
+    fun consumePlaybackErrorMessage() {
+        _playbackErrorMessage.value = null
+    }
+
     private val _librarySongs = MutableStateFlow<List<Song>>(emptyList())
     val librarySongs: StateFlow<List<Song>> = _librarySongs.asStateFlow()
 
@@ -244,6 +260,23 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 continuePlaybackIfQueueEnded()
             }
         }
+
+        // Without this, a deleted/moved/corrupt file just silently stops the player with
+        // nothing shown to the user. Logs locally (never transmitted) and tries to keep
+        // the music going by skipping to the next queued track when one exists.
+        override fun onPlayerError(error: PlaybackException) {
+            val index = controller?.currentMediaItemIndex ?: -1
+            val song = currentQueue.getOrNull(index)
+            val label = song?.let { "${it.title} — ${it.artist}" } ?: "Lagu ini"
+            AppLogger.e("PlayerViewModel", "Playback error pada index=$index ($label)", error)
+            _playbackErrorMessage.value = "$label tidak bisa diputar (file mungkin dihapus atau rusak)."
+
+            val c = controller
+            if (c != null && c.hasNextMediaItem()) {
+                c.seekToNextMediaItem()
+                c.play()
+            }
+        }
     }
 
     /**
@@ -281,6 +314,38 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             startPositionLoop()
         }, MoreExecutors.directExecutor())
         ensureLibraryLoaded()
+        registerLibraryContentObserver()
+    }
+
+    private var libraryContentObserver: ContentObserver? = null
+    private var libraryAutoRefreshJob: Job? = null
+
+    /**
+     * Watches MediaStore so a file added/removed by another app (a file manager, a sync tool)
+     * while this app is already open in the foreground shows up without the user having to
+     * background-and-resume or hit "Pindai Ulang" manually. MediaStore can fire a burst of
+     * change notifications for one bulk operation, so each one just restarts a short debounce
+     * instead of triggering a rescan per notification.
+     */
+    private fun registerLibraryContentObserver() {
+        if (libraryContentObserver != null) return
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                libraryAutoRefreshJob?.cancel()
+                libraryAutoRefreshJob = viewModelScope.launch {
+                    delay(1500)
+                    refreshLibrary()
+                }
+            }
+        }
+        runCatching {
+            appContext.contentResolver.registerContentObserver(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                true,
+                observer
+            )
+        }.onFailure { AppLogger.e("PlayerViewModel", "Gagal mendaftarkan pengamat library", it) }
+        libraryContentObserver = observer
     }
 
     /** Scans MediaStore once and caches the result so Home/Library/Playlist don't each scan independently. */
@@ -324,9 +389,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 // A transient MediaStore/SAF failure must not permanently mark the library as
-                // loaded. The next ensureLibraryLoaded() call can retry safely.
+                // loaded. The next ensureLibraryLoaded() call can retry safely — but the
+                // failure itself is still worth a local record, since it used to vanish here.
+                AppLogger.e("PlayerViewModel", "Gagal memindai library", e)
                 if (generation == libraryRefreshGeneration) {
                     libraryLoadedOnce = false
                 }
@@ -799,6 +866,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         sleepTimerJob?.cancel()
         fadeJob?.cancel()
         libraryRefreshJob?.cancel()
+        libraryAutoRefreshJob?.cancel()
+        libraryContentObserver?.let { runCatching { appContext.contentResolver.unregisterContentObserver(it) } }
         equalizerController.release()
         controller?.release()
         super.onCleared()

@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
@@ -45,6 +46,7 @@ fun SettingsScreen(
     onToggleRadioAutoContinue: (Boolean) -> Unit
 ) {
     var showSignatureMatcher by remember { mutableStateOf(false) }
+    var showDiagnosticLog by remember { mutableStateOf(false) }
     var showAdvancedSettings by remember { mutableStateOf(false) }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -203,6 +205,22 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Cek Signature APK", style = MaterialTheme.typography.bodyMedium)
                 }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showDiagnosticLog = true }
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.BugReport,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Log Diagnostik", style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
 
@@ -234,6 +252,9 @@ fun SettingsScreen(
 
     if (showSignatureMatcher) {
         SignatureMatcherSheet(onDismiss = { showSignatureMatcher = false })
+    }
+    if (showDiagnosticLog) {
+        DiagnosticLogSheet(onDismiss = { showDiagnosticLog = false })
     }
 }
 

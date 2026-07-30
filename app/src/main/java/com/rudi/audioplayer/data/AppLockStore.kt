@@ -58,7 +58,7 @@ class AppLockStore(context: Context) {
         }
 
         val fails = prefs.getInt(KEY_FAIL_COUNT, 0) + 1
-        val lockoutMs = lockoutDurationMillis(fails)
+        val lockoutMs = PinLockoutPolicy.lockoutDurationMillis(fails)
         val editor = prefs.edit().putInt(KEY_FAIL_COUNT, fails)
         return if (lockoutMs > 0) {
             val until = System.currentTimeMillis() + lockoutMs
@@ -101,16 +101,9 @@ class AppLockStore(context: Context) {
 
     /**
      * The first 4 wrong attempts cost nothing, so an honest typo never locks anyone out.
-     * From the 5th attempt on, the lockout escalates: 30s, 1m, 2m, capped at 4m — enough to
-     * make repeated guessing impractical without permanently locking the owner out.
+     * From the 5th attempt on, the lockout escalates — see [PinLockoutPolicy] for the formula
+     * itself, kept separate so it can be unit-tested without a Context.
      */
-    private fun lockoutDurationMillis(failCount: Int): Long {
-        if (failCount < 5) return 0L
-        val step = (failCount - 4).coerceAtMost(4)
-        val seconds = 30L * (1L shl (step - 1))
-        return seconds.coerceAtMost(240L) * 1000L
-    }
-
     companion object {
         private const val PREFS_NAME = "app_lock"
         private const val KEY_PIN_HASH = "pin_hash"

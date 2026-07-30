@@ -3,6 +3,7 @@ package com.rudi.audioplayer
 import android.app.Application
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import com.rudi.audioplayer.util.AppLogger
 
 /** Every AsyncImage in the app (Library grid/list rows, Home, MiniPlayerBar, Now Playing)
  * uses Coil's default singleton ImageLoader unless it builds its own request — so configuring
@@ -10,6 +11,11 @@ import coil.ImageLoaderFactory
  * instant a bitmap decodes) masks normal decode latency and is one of the cheapest, most
  * broadly-felt wins for making list/grid scrolling feel smooth. */
 class AudioPlayerApplication : Application(), ImageLoaderFactory {
+    override fun onCreate() {
+        super.onCreate()
+        AppLogger.init(this)
+    }
+
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
             .crossfade(200)
