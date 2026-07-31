@@ -36,12 +36,24 @@
 
         <service
             android:name=".playback.PlaybackService"
-            android:exported="false"
+            android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
+        <!-- Lets Bluetooth devices and the Android System UI media-resumption feature relaunch
+             this service and hand it a MEDIA_BUTTON intent even after the app process has been
+             killed — required for MediaSession.Callback.onPlaybackResumption() to ever fire. -->
+        <receiver
+            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name=".widget.PlayerWidgetProvider"

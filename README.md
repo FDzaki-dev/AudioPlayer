@@ -48,16 +48,41 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Gapless (Murni) vs Fade Halus**: dialog "Pengaturan Putar" sekarang menampilkan dua pilihan eksplisit, bukan cuma satu toggle fade — "Gapless (Murni)" membiarkan transisi alami tanpa campur tangan (default), "Fade Halus" menerapkan fade volume ±3 detik di tiap pergantian lagu
 - **APK release ditandatangani konsisten**: CI memakai keystore release asli (lewat secret GitHub) untuk build release, bukan debug key — install APK baru tidak perlu uninstall dulu. Otomatis jatuh ke debug key kalau secret belum diisi, jadi tidak pernah gagal build
 - **Gesture swipe kecerahan & volume**: di layar Now Playing, geser vertikal di **separuh kiri** untuk atur kecerahan layar, **separuh kanan** untuk atur volume — masing-masing zona selebar 50% layar penuh (bukan cuma strip tipis di ujung), lengkap indikator persentase mengambang selagi digeser. Volume yang diatur adalah **volume sistem Android sungguhan** (sama seperti tombol fisik HP), bukan sekadar penguat internal app. Area geser horizontal di piringan hitam (lagu berikutnya/sebelumnya) tetap berfungsi normal di atasnya. Kecerahan diatur lewat override per-window (tidak butuh izin tambahan) dan otomatis kembali ke pengaturan sistem begitu layar Now Playing ditutup
+- **Keamanan kunci PIN**: hash PIN pakai PBKDF2 + salt unik per-instalasi (bukan SHA-256 polos), plus lockout berjenjang setelah 4x percobaan gagal (30 detik → 1 menit → 2 menit → maksimal 4 menit) — layar kunci menampilkan hitung mundur dan mengunci keypad selama masa lockout
+- **Backup dikecualikan untuk data sensitif**: `app_lock` (hash PIN + status lockout) dikecualikan dari cloud backup & device transfer Android; data lain tetap ikut backup seperti biasa
+- **Release build di-shrink & di-obfuscate** (R8 minify + resource shrinking) — APK lebih kecil dan tidak gampang dibongkar kalau bocor
+- **Antrean (Queue) bisa di-drag**: pegangan drag baru di tiap baris antrean untuk mengurutkan ulang lewat tahan-geser, tombol panah atas/bawah tetap ada sebagai cara presisi/fallback
+- **Undo untuk hapus**: hapus lagu dari antrean atau playlist memunculkan Snackbar "Urungkan" yang mengembalikan lagu persis ke posisi semula
+- **Auto-refresh library**: perubahan file musik dari luar app (file manager, sinkronisasi) terdeteksi otomatis lewat pengamat MediaStore selagi app terbuka, tanpa perlu pencet "Pindai Ulang" manual
+- **Log diagnostik lokal**: Settings → Lanjutan → Log Diagnostik — catatan error & crash tersimpan di file privat HP, tidak pernah dikirim ke mana pun (app ini tidak punya izin INTERNET sama sekali)
+- **Playback Resumption**: musik bisa dilanjutkan dari lock screen / kontrol Bluetooth walau proses aplikasi sudah benar-benar mati (lewat mekanisme resmi Android `MediaLibraryService` + `onPlaybackResumption`), dan sesi tidak lagi mati otomatis hanya karena di-swipe dari Recents saat musik sedang dijeda
+- **Penanganan error playback**: file yang dihapus/rusak saat sedang diputar memicu pesan + otomatis lompat ke lagu berikutnya, bukan diam macet tanpa penjelasan
 
 ## Standar Penomoran Versi
-Nomor versi aplikasi (`versionName` di `build.gradle.kts`), nama file zip yang dikirim, dan pesan commit **selalu konsisten satu sama lain** — misalnya zip `AudioPlayer-v3_8-....zip` dengan commit "v3.8: ..." berarti `versionName = "3.8"` di dalamnya. Nomor versi terlihat langsung di tab Pengaturan.
+`versionCode` (nomor internal, tidak terlihat user) naik otomatis mengikuti jumlah commit git — jadi tidak akan pernah lupa di-bump dan APK baru selalu dikenali "lebih baru" oleh Android. `versionName` (nomor yang terlihat user, misal `3.8`) tetap dikontrol manual, dibump sesekali di titik-titik rilis yang dianggap layak, bukan tiap batch.
 
-`versionCode` (nomor internal, tidak terlihat user) naik otomatis mengikuti jumlah commit git — jadi tidak akan pernah lupa di-bump dan APK baru selalu dikenali "lebih baru" oleh Android, walau `versionName` (yang terlihat user) tetap saya kontrol manual per rilis.
+Nama file ZIP hasil tiap batch pengembangan (`AudioPlayer-batchN-release.zip`) melacak nomor batch percakapan, **bukan** `versionName` — keduanya sengaja dipisah: `versionName` untuk rilis yang user-facing, nomor batch untuk melacak paket kerja per sesi supaya ZIP lama dan baru gampang dibedakan.
 
-File APK hasil build dan artifact GitHub Actions juga ikut membawa nomor versi + short commit hash di namanya (`AudioPlayer-v3.8-a3f8e21.apk`) — bukan lagi nama generik statis `app-release.apk`/`AudioPlayer-release` yang sama persis di setiap versi. Penamaan ini murni dikerjakan di level workflow CI (`.github/workflows/build.yml`), bukan dobel dengan Gradle, biar tidak saling tabrak.
+File APK hasil build dan artifact GitHub Actions membawa nomor versi + short commit hash di namanya (`AudioPlayer-v3.8-a3f8e21.apk`) — bukan nama generik statis. Penamaan ini dikerjakan di level workflow CI (`.github/workflows/build.yml`), bukan dobel dengan Gradle, biar tidak saling tabrak.
+
+## Keputusan Arsitektur
+Ringkasan kenapa, bukan cuma apa — supaya sesi kerja berikutnya (chat AI baru sekalipun) tidak perlu menebak ulang alasan di balik hal-hal yang tidak jelas kalau cuma baca kode.
+
+- **`MediaLibraryService`, bukan `MediaSessionService`**: dibutuhkan spesifik untuk Playback Resumption resmi Android (kartu resume di System UI, kontrol lewat Bluetooth walau proses aplikasi sudah mati). `MediaSessionService` saja tidak cukup untuk fitur ini per dokumentasi resmi Media3.
+- **Notifikasi cold-start terpisah** (`startForegroundColdStartNotification`): saat widget home screen ditekan sementara aplikasi benar-benar mati, harus ada notifikasi foreground service **instan** sebelum proses pemulihan antrean (query MediaStore, dst.) selesai — beberapa skin Android (XOS/MIUI dkk) membunuh proses baru dalam hitungan saat kalau belum ditandai foreground. Notifikasi ini sengaja sementara, digantikan notifikasi asli Media3 begitu lagu benar-benar mulai.
+- **`onTaskRemoved` hanya mematikan sesi kalau antrean kosong**: sebelumnya juga mati kalau musik sedang dijeda, yang berarti kontrol lock screen ikut hilang setiap kali app di-swipe saat tidak sedang main lagu. Catatan jujur: ini perbaikan yang tidak cukup sendirian — lihat batasan Playback Resumption di bawah.
+- **Log diagnostik lokal (`AppLogger`), bukan Crashlytics/Sentry**: app ini tidak punya izin INTERNET sama sekali dan itu bagian dari klaim privasinya (diverifikasi eksplisit: semua pemrosesan lokal di HP). Crash reporting pihak ketiga akan butuh izin itu.
+- **`PinLockoutPolicy` dipisah dari `AppLockStore`**: murni supaya rumus lockout-nya bisa di-unit-test tanpa perlu Context/SharedPreferences.
+
+**Batasan yang tidak bisa dihilangkan dari sisi kode:** HP dengan pengelolaan RAM agresif (sebagian skin Xiaomi/Oppo/Vivo, dan sebagian Samsung) tetap bisa membunuh proses aplikasi kapan saja kecuali user manual whitelist app itu di pengaturan baterai — ini keterbatasan Android, bukan sesuatu yang bisa diperbaiki murni lewat kode di app manapun.
+
+Riwayat lebih detail per batch pengembangan ada di `CHANGELOG.md`.
 
 ## Belum selesai / dalam pengerjaan
 - Shared-element transition sungguhan (mini player → Now Playing sebagai satu elemen visual) belum ada — versi sekarang pakai animasi scale-in sebagai pendekatan yang lebih aman (lihat catatan di riwayat commit)
+- Pull-to-refresh gesture di Library belum ada (cuma tombol manual + auto-refresh saat resume/ContentObserver) — proyek ini pakai Compose BOM 2024.05.00, dan API pull-to-refresh Material3 yang simpel baru stabil di versi BOM lebih baru; naikkan BOM berisiko ke komponen lain yang sudah jalan
+- Ekstraksi penuh string hardcode ke `strings.xml` (untuk i18n) belum dikerjakan — ada ratusan string tersebar di ~12 file, refactor mekanis sebesar itu belum aman dikerjakan tanpa akses compiler untuk verifikasi
+- Belum pernah diuji di perangkat fisik sungguhan oleh siapa pun selain lewat deskripsi/screenshot — termasuk hasil build release dengan minify yang baru aktif sejak Batch 7
 
 ## Catatan jujur soal Gapless Playback
 Mesin pemutarannya **sudah gapless secara arsitektur** sejak awal — satu ExoPlayer yang hidup terus sepanjang sesi, memutar satu playlist asli (`setMediaItems`/`addMediaItem`), bukan mengganti lagu satu per satu dengan restart/re-prepare. Ini menghilangkan penyebab paling umum dari "jeda" antar lagu (loading ulang, klik/pop transisi). Toggle "Gapless (Murni)" vs "Fade Halus" di dialog Pengaturan Putar cuma menentukan apakah transisi itu **dibiarkan alami** (gapless) atau **sengaja diberi efek fade turun-naik volume**.

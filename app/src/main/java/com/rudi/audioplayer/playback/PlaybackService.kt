@@ -14,9 +14,13 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibrarySession
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 import com.rudi.audioplayer.MainActivity
 import com.rudi.audioplayer.R
 import com.rudi.audioplayer.data.MusicRepository
@@ -32,9 +36,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class PlaybackService : MediaSessionService() {
+class PlaybackService : MediaLibraryService() {
 
-    private var mediaSession: MediaSession? = null
+    private var mediaSession: MediaLibrarySession? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var shakeDetector: ShakeDetector? = null
     private var coldStartNotificationActive = false
@@ -100,7 +104,7 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        mediaSession = MediaSession.Builder(this, player)
+        mediaSession = MediaLibrarySession.Builder(this, player, PlaybackSessionCallback())
             .setSessionActivity(sessionActivityIntent)
             .build()
     }
@@ -117,7 +121,7 @@ class PlaybackService : MediaSessionService() {
         WidgetUpdater.updateAll(this)
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaSession
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
@@ -238,16 +242,23 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    private suspend fun restoreLastQueue() {
-        val saved = PlaybackStateStore(this).load() ?: return
+    /** What a saved queue resolves to: the actual MediaItems (already matched back against
+     * MediaStore, since only song IDs are persisted), which one to start on, and where in it.
+     * Shared by the widget cold-start path ([restoreLastQueue]) and playback resumption
+     * ([PlaybackSessionCallback.onPlaybackResumption]) so both restore a saved queue exactly
+     * the same way — one no longer needs to be kept in sync with the other by hand. */
+    private data class SavedQueueItems(val items: List<MediaItem>, val startIndex: Int, val startPositionMs: Long)
+
+    private suspend fun loadSavedQueueItems(): SavedQueueItems? {
+        val saved = PlaybackStateStore(this).load() ?: return null
         val foundSongs = withContext(Dispatchers.IO) {
             MusicRepository(this@PlaybackService).getSongsByIds(saved.songIds)
         }
-        if (foundSongs.isEmpty()) return
+        if (foundSongs.isEmpty()) return null
 
         val songMap = foundSongs.associateBy { it.id }
         val orderedSongs = saved.songIds.mapNotNull { songMap[it] }
-        if (orderedSongs.isEmpty()) return
+        if (orderedSongs.isEmpty()) return null
 
         val items = orderedSongs.map { song ->
             val artworkUri = Uri.parse("content://media/external/audio/albumart/${song.albumId}")
@@ -266,9 +277,57 @@ class PlaybackService : MediaSessionService() {
         }
 
         val index = saved.index.coerceIn(0, items.size - 1)
+        return SavedQueueItems(items, index, saved.positionMs)
+    }
+
+    private suspend fun restoreLastQueue() {
+        val saved = loadSavedQueueItems() ?: return
         mediaSession?.player?.apply {
-            setMediaItems(items, index, saved.positionMs)
+            setMediaItems(saved.items, saved.startIndex, saved.startPositionMs)
             prepare()
+        }
+    }
+
+    /** Accepts every controller with the same full default access the app has always had
+     * (no callback was set before this class existed — MediaLibrarySession.Builder requires
+     * one, unlike MediaSession.Builder, so this replicates that same "accept everyone, no
+     * restrictions" behavior explicitly rather than relying on an implicit default). The only
+     * behavior actually being added is [onPlaybackResumption]. */
+    private inner class PlaybackSessionCallback : MediaLibrarySession.Callback {
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): MediaSession.ConnectionResult {
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailablePlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS)
+                .setAvailableSessionCommands(MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS)
+                .build()
+        }
+
+        // Lets Bluetooth devices and the Android System UI media-resumption feature restart
+        // playback with the last saved queue even after this service (and the whole app
+        // process) has been killed — the actual mechanism behind the lock-screen media control
+        // and status-bar indicator being reachable again without reopening the app.
+        @UnstableApi
+        override fun onPlaybackResumption(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            val future = SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
+            serviceScope.launch {
+                val saved = loadSavedQueueItems()
+                if (saved != null) {
+                    future.set(
+                        MediaSession.MediaItemsWithStartPosition(saved.items, saved.startIndex, saved.startPositionMs)
+                    )
+                } else {
+                    // Nothing to resume (fresh install, or the saved songs are all gone) —
+                    // fail the future rather than hand back an empty/fake item, which is what
+                    // used to leave a dead, control-less notification stuck on screen.
+                    future.setException(IllegalStateException("Tidak ada antrean tersimpan untuk dilanjutkan"))
+                }
+            }
+            return future
         }
     }
 
