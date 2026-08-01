@@ -78,6 +78,28 @@ tersedia.
 - Beberes repo: folder duplikat `AudioPlayer-main/AudioPlayer-main/` dan file nyasar
   `ession.MediaSession` dihapus
 
+## Batch 15 — Persiapan lanjut di sesi lain
+- Ditambah komentar level-file di `PlaybackService.kt` yang eksplisit menunjuk ke CHANGELOG
+  Batch 10-14 dan mengingatkan supaya asumsi soal API Media3 dicek ulang ke dokumentasi
+  resmi/source code sebelum diubah — file ini yang paling sering jadi sumber asumsi salah
+  sepanjang riwayat batch di atas
+- README ditambah catatan "mulai dari sini" di paling atas untuk sesi chat baru mana pun
+- Referensi basi "Media3 `MediaSessionService`" di README diperbaiki jadi `MediaLibraryService`
+  (sudah pindah sejak Batch 12, belum sempat disinkronkan)
+- Dipertimbangkan tapi tidak dikerjakan: menambah tahap compile-check terpisah di CI sebelum
+  build release penuh — dicek dulu ke `.github/workflows/build.yml`, ternyata
+  `compileReleaseKotlin` (tempat error Batch 14 ketahuan) sudah gagal duluan sebelum tahap
+  minify/sign yang mahal, jadi tidak ada keuntungan waktu yang jelas untuk saat ini
+
+## Batch 14 — Hotfix build error dari Batch 12
+- `MediaLibrarySession` ternyata nested di dalam `MediaLibraryService`
+  (`MediaLibraryService.MediaLibrarySession`), bukan class top-level di package
+  `androidx.media3.session` seperti yang ditulis di Batch 12 — dicek ulang langsung ke source
+  code resmi androidx/media (konsisten dari versi 1.0.0 sampai rilis terbaru) untuk
+  memastikan sebelum memperbaiki
+- Satu baris import yang salah; semua pemakaian lain di file itu otomatis benar begitu
+  import-nya benar
+
 ## Batch 6 dan sebelumnya
 Lihat daftar fitur di `README.md` — detail per-batch untuk rentang ini tidak tercatat
 terpisah di file ini.

@@ -36,6 +36,24 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * Background playback: owns the [MediaLibrarySession], the ExoPlayer instance, and the
+ * cold-start/resumption notification handling.
+ *
+ * This is the single riskiest file in the project — Android's foreground-service and
+ * media-session lifecycle rules are full of version-specific, OEM-specific, and easy-to-guess-
+ * wrong behavior. Two real build/behavior bugs already happened here from confident-but-wrong
+ * assumptions (see CHANGELOG.md, Batch 10 through 14) — one about `onTaskRemoved` not being
+ * sufficient on its own to keep the session alive, one an import path
+ * (`MediaLibraryService.MediaLibrarySession` is nested, not top-level) that only surfaced as a
+ * CI build failure. Before changing anything about session lifecycle, notifications, or
+ * `onTaskRemoved`/`onPlaybackResumption` here: read CHANGELOG.md's Batch 10-14 entries and the
+ * "Keputusan Arsitektur" section of README.md first, and verify any Media3 API assumption
+ * against https://developer.android.com/media/media3/session/background-playback or the actual
+ * androidx/media source on GitHub rather than trusting memory/training data — this project
+ * pins media3 1.3.1 specifically (see app/build.gradle.kts), and Media3's session API has
+ * changed shape across versions (e.g. `onPlaybackResumption`'s signature).
+ */
 class PlaybackService : MediaLibraryService() {
 
     private var mediaSession: MediaLibrarySession? = null
