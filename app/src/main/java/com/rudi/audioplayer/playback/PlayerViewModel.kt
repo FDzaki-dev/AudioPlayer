@@ -40,6 +40,8 @@ import com.rudi.audioplayer.data.PlaylistStore
 import com.rudi.audioplayer.data.ThemeStore
 import com.rudi.audioplayer.ui.theme.AppTheme
 import com.rudi.audioplayer.data.Song
+import kotlinx.collections.immutable.ImmutableSet
+import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -160,7 +162,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     val playlists: StateFlow<List<Playlist>> = _playlists.asStateFlow()
 
     private val _favoriteIds = MutableStateFlow(loadFavoriteIds())
-    val favoriteIds: StateFlow<Set<Long>> = _favoriteIds.asStateFlow()
+    val favoriteIds: StateFlow<ImmutableSet<Long>> = _favoriteIds.asStateFlow()
 
     private val _sleepTimerRemaining = MutableStateFlow<Long?>(null)
     val sleepTimerRemaining: StateFlow<Long?> = _sleepTimerRemaining.asStateFlow()
@@ -906,8 +908,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         _favoriteIds.value = loadFavoriteIds()
     }
 
-    private fun loadFavoriteIds(): Set<Long> =
-        favoritesStore.getFavorites().mapNotNull { it.toLongOrNull() }.toSet()
+    private fun loadFavoriteIds(): ImmutableSet<Long> =
+        favoritesStore.getFavorites().mapNotNull { it.toLongOrNull() }.toPersistentSet()
 
     fun setSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()

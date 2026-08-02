@@ -60,8 +60,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -162,7 +162,7 @@ class MainActivity : FragmentActivity() {
         playerViewModel.connect()
 
         setContent {
-            val appTheme by playerViewModel.appTheme.collectAsState()
+            val appTheme by playerViewModel.appTheme.collectAsStateWithLifecycle()
             AudioPlayerTheme(theme = appTheme) {
                 // enableEdgeToEdge() above only sets the *initial* system bar icon style once,
                 // at process start — it never reacts to the in-app theme picker. Without this,
@@ -184,7 +184,7 @@ class MainActivity : FragmentActivity() {
                 // effect, just launchable straight from the launcher icon without opening
                 // the app first. Neither navigates anywhere; playback simply starts and the
                 // mini player appears, exactly like tapping those same buttons would.
-                val librarySongsForShortcut by playerViewModel.librarySongs.collectAsState()
+                val librarySongsForShortcut by playerViewModel.librarySongs.collectAsStateWithLifecycle()
                 LaunchedEffect(pendingShortcutAction, librarySongsForShortcut.isEmpty()) {
                     val action = pendingShortcutAction ?: return@LaunchedEffect
                     if (librarySongsForShortcut.isEmpty()) return@LaunchedEffect
@@ -227,8 +227,8 @@ class MainActivity : FragmentActivity() {
                     hasPermission = result[neededPermissions[0]] == true
                 }
 
-                val lockEnabled by playerViewModel.lockEnabled.collectAsState()
-                val biometricEnabled by playerViewModel.biometricEnabled.collectAsState()
+                val lockEnabled by playerViewModel.lockEnabled.collectAsStateWithLifecycle()
+                val biometricEnabled by playerViewModel.biometricEnabled.collectAsStateWithLifecycle()
                 val needsUnlock = lockEnabled && !isUnlocked
 
                 LaunchedEffect(needsUnlock, biometricEnabled) {
@@ -354,26 +354,26 @@ private fun WelcomeHighlight(icon: androidx.compose.ui.graphics.vector.ImageVect
 @Composable
 private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boolean) {
     val navController = rememberNavController()
-    val uiState by playerViewModel.uiState.collectAsState()
-    val favoriteIds by playerViewModel.favoriteIds.collectAsState()
-    val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsState()
-    val statsVersion by playerViewModel.statsVersion.collectAsState()
-    val playlists by playerViewModel.playlists.collectAsState()
-    val accentColor by playerViewModel.accentColor.collectAsState()
-    val equalizerState by playerViewModel.equalizerState.collectAsState()
-    val crossfadeEnabled by playerViewModel.crossfadeEnabled.collectAsState()
-    val customFolders by playerViewModel.customFolders.collectAsState()
-    val librarySongs by playerViewModel.librarySongs.collectAsState()
-    val libraryLoading by playerViewModel.libraryLoading.collectAsState()
-    val celebrationMessage by playerViewModel.celebrationMessage.collectAsState()
-    val playbackErrorMessage by playerViewModel.playbackErrorMessage.collectAsState()
-    val actionErrorMessage by playerViewModel.actionErrorMessage.collectAsState()
-    val undoableAction by playerViewModel.undoableAction.collectAsState()
-    val currentRating by playerViewModel.currentRating.collectAsState()
-    val lockEnabled by playerViewModel.lockEnabled.collectAsState()
-    val biometricEnabled by playerViewModel.biometricEnabled.collectAsState()
-    val shakeToSkipEnabled by playerViewModel.shakeToSkipEnabled.collectAsState()
-    val radioAutoContinueEnabled by playerViewModel.radioAutoContinueEnabled.collectAsState()
+    val uiState by playerViewModel.uiState.collectAsStateWithLifecycle()
+    val favoriteIds by playerViewModel.favoriteIds.collectAsStateWithLifecycle()
+    val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsStateWithLifecycle()
+    val statsVersion by playerViewModel.statsVersion.collectAsStateWithLifecycle()
+    val playlists by playerViewModel.playlists.collectAsStateWithLifecycle()
+    val accentColor by playerViewModel.accentColor.collectAsStateWithLifecycle()
+    val equalizerState by playerViewModel.equalizerState.collectAsStateWithLifecycle()
+    val crossfadeEnabled by playerViewModel.crossfadeEnabled.collectAsStateWithLifecycle()
+    val customFolders by playerViewModel.customFolders.collectAsStateWithLifecycle()
+    val librarySongs by playerViewModel.librarySongs.collectAsStateWithLifecycle()
+    val libraryLoading by playerViewModel.libraryLoading.collectAsStateWithLifecycle()
+    val celebrationMessage by playerViewModel.celebrationMessage.collectAsStateWithLifecycle()
+    val playbackErrorMessage by playerViewModel.playbackErrorMessage.collectAsStateWithLifecycle()
+    val actionErrorMessage by playerViewModel.actionErrorMessage.collectAsStateWithLifecycle()
+    val undoableAction by playerViewModel.undoableAction.collectAsStateWithLifecycle()
+    val currentRating by playerViewModel.currentRating.collectAsStateWithLifecycle()
+    val lockEnabled by playerViewModel.lockEnabled.collectAsStateWithLifecycle()
+    val biometricEnabled by playerViewModel.biometricEnabled.collectAsStateWithLifecycle()
+    val shakeToSkipEnabled by playerViewModel.shakeToSkipEnabled.collectAsStateWithLifecycle()
+    val radioAutoContinueEnabled by playerViewModel.radioAutoContinueEnabled.collectAsStateWithLifecycle()
 
     val deleteContext = LocalContext.current
     val deleteRequestLauncher = rememberLauncherForActivityResult(
@@ -600,7 +600,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 )
             }
             composable("settings") {
-                val appTheme by playerViewModel.appTheme.collectAsState()
+                val appTheme by playerViewModel.appTheme.collectAsStateWithLifecycle()
                 SettingsScreen(
                     currentTheme = appTheme,
                     onSelectTheme = { theme -> playerViewModel.setAppTheme(theme) },

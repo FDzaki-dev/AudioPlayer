@@ -24,13 +24,14 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.Song
+import kotlinx.collections.immutable.ImmutableSet
 import java.util.Calendar
 
 @Composable
 fun HomeScreen(
     rawSongs: List<Song>,
     loading: Boolean,
-    favoriteIds: Set<Long>,
+    favoriteIds: ImmutableSet<Long>,
     onSongClick: (List<Song>, Int) -> Unit,
     resumePreview: (List<Song>) -> Song?,
     onResumeClick: (List<Song>) -> Unit,

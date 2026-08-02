@@ -6,9 +6,13 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
-**Batch 19** — Audit lifecycle (EqualizerController, AccentColorExtractor, ShakeDetector).
-Ketemu 1 race condition nyata di `AccentColorExtractor`/`PlayerViewModel` (sudah diperbaiki),
-2 audit lain hasilnya bersih (tidak ada perubahan kode). `versionName` masih `3.8`.
+**Batch 20** — Audit null-safety (state collection) & performa (recomposition list panjang).
+Null-safety hasilnya bersih. Performa: 2 temuan nyata diperbaiki — `favoriteIds`/`selectedIds`
+di `LibraryScreen` pindah ke `ImmutableSet<Long>` (kotlinx.collections.immutable), dan
+`android.net.Uri` ditandai stable lewat Compose stability config karena bikin `Song` unstable.
+Ditambah: `collectAsState()` → `collectAsStateWithLifecycle()` di seluruh `MainActivity`, dan
+2 pemanggilan `sortedBy`/`sorted` yang belum di-`remember` di `LibraryScreen` dirapikan.
+`versionName` masih `3.8` (batch maintenance, bukan rilis fitur baru).
 
 ## Riwayat insiden kronologis (jangan dihapus)
 Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu konteksnya.

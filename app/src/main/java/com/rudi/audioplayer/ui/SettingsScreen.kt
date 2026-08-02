@@ -430,9 +430,9 @@ private fun SetPinDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
                     label = { Text("Konfirmasi PIN") },
                     singleLine = true
                 )
-                if (error != null) {
+                error?.let {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },

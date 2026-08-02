@@ -78,7 +78,11 @@ android {
         jvmTarget = "17"
         freeCompilerArgs += listOf(
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi"
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            // Batch 20: see app/compose_stability_config.conf for why this exists.
+            "-P",
+            "plugin:androidx.compose.compiler.plugins.kotlin:stabilityConfigurationPath=" +
+                "${project.projectDir}/compose_stability_config.conf"
         )
     }
 
@@ -112,6 +116,15 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.1")
+    // Batch 20: lifecycle-aware state collection (collectAsStateWithLifecycle) so Compose
+    // stops collecting StateFlows while the app is backgrounded, instead of collectAsState()
+    // which keeps collecting regardless of lifecycle state.
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.1")
+    // Batch 20: stable, structurally-comparable collections for favoriteIds/selectedIds so
+    // Compose can skip recomposing the library list when neither actually changed, instead of
+    // treating plain Set<Long> as always-unstable and recomposing every visible row on any
+    // unrelated recomposition (e.g. playback position ticking every second).
+    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.7")
 
     implementation(platform("androidx.compose:compose-bom:2024.05.00"))
     implementation("androidx.compose.ui:ui")

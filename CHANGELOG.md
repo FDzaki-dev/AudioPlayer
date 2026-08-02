@@ -10,6 +10,41 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 20 — Audit null-safety (state collection) & performa (recomposition list panjang)
+- **Null-safety di layer UI (Compose state collection) — diaudit, hasilnya bersih**: semua
+  `StateFlow` nullable (`celebrationMessage`, `playbackErrorMessage`, `actionErrorMessage`,
+  `undoableAction`) sudah dikonsumsi lewat pola aman (`?: return@LaunchedEffect`), dan
+  `accentColor` selalu di-fallback (`accentColor ?: fallback`). Satu-satunya `!!` yang
+  ditemukan (`SettingsScreen.kt`, dialog atur PIN) sudah dijaga `if (error != null)` sebelumnya
+  jadi bukan bug — tetap dirapikan jadi `error?.let { ... }` untuk konsistensi gaya
+- **`favoriteIds`/`selectedIds` di `LibraryScreen` → `ImmutableSet<Long>` (perbaikan performa
+  utama)**: sebelumnya `Set<Long>` biasa, yang selalu dianggap *unstable* oleh Compose
+  compiler. Ini bikin `SongListView`/`GroupedListView`/setiap `SongRow` tidak bisa di-skip
+  recomposition-nya sekalipun isinya sama persis — jadi setiap kali komposabel induk
+  recompose karena alasan lain (mis. posisi playback yang tick tiap detik saat lagu main),
+  seluruh baris lagu yang sedang tampil di layar ikut recompose walau tidak ada satu pun
+  favorit/seleksi yang berubah. Ditambah dependency `kotlinx-collections-immutable:0.3.7`;
+  `PlayerViewModel.favoriteIds` dan `selectedIds` lokal di `LibraryScreen` sekarang
+  `ImmutableSet<Long>`/`PersistentSet<Long>`
+- **`Song.uri: Uri` ditandai stable lewat Compose stability config (perbaikan performa
+  kedua)**: `android.net.Uri` adalah tipe platform yang tidak bisa diverifikasi compiler,
+  jadi seluruh `Song` (walau field lain Long/String sudah stabil) ikut dianggap unstable —
+  memperparah temuan di atas karena `SongRow` menerima `Song` sebagai parameter. File baru
+  `app/compose_stability_config.conf` menandai `android.net.Uri` sebagai stable (aman karena
+  `Uri` efektif immutable, tidak ada setter publik), diwire lewat `stabilityConfigurationPath`
+  di `freeCompilerArgs`
+- **`collectAsState()` → `collectAsStateWithLifecycle()` di seluruh `MainActivity`**: versi
+  lama tetap collect StateFlow walau app di background, buang-buang kerja. Dependency baru:
+  `androidx.lifecycle:lifecycle-runtime-compose:2.8.1`
+- **2 pemanggilan `sortedBy`/`sorted` yang belum di-`remember`** (daftar kunci album di
+  `AlbumGridView`, daftar kunci grup di `GroupedListView`) dirapikan jadi
+  `remember(grouped) { ... }`, konsisten dengan pola `remember` yang sudah dipakai di bagian
+  lain file yang sama
+- 6 file kode produksi berubah (`PlayerViewModel.kt`, `LibraryScreen.kt`, `HomeScreen.kt`,
+  `MainActivity.kt`, `SettingsScreen.kt`, `build.gradle.kts`) + 1 file baru
+  (`compose_stability_config.conf`). Tidak ada perubahan behavior yang terlihat user — murni
+  perbaikan internal Compose recomposition & 1 rapi-rapi gaya kode
+
 ## Batch 19 — Audit lifecycle: EqualizerController, AccentColorExtractor, ShakeDetector
 - **`AccentColorExtractor` — race condition nyata, diperbaiki**: `updateAccentColor()`
   melempar coroutine baru setiap `onMediaItemTransition` tanpa membatalkan yang sebelumnya.

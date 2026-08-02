@@ -63,13 +63,15 @@ import com.rudi.audioplayer.data.OnboardingHintStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.SearchHistoryStore
 import com.rudi.audioplayer.data.Song
+import kotlinx.collections.immutable.ImmutableSet
+import kotlinx.collections.immutable.persistentSetOf
 
 @Composable
 fun LibraryScreen(
     rawSongs: List<Song>,
     loading: Boolean,
     onRescan: () -> Unit,
-    favoriteIds: Set<Long>,
+    favoriteIds: ImmutableSet<Long>,
     onToggleFavorite: (Long) -> Unit,
     onSongClick: (List<Song>, Int) -> Unit,
     onPlayNext: (Song) -> Unit,
@@ -100,13 +102,13 @@ fun LibraryScreen(
     var showFolderManager by remember { mutableStateOf(false) }
     var filterVersion by remember { mutableStateOf(0) }
     var selectionMode by remember { mutableStateOf(false) }
-    var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    var selectedIds by remember { mutableStateOf(persistentSetOf<Long>()) }
     var songForBulkPlaylistDialog by remember { mutableStateOf(false) }
     var songsPendingDelete by remember { mutableStateOf<List<Song>>(emptyList()) }
 
     fun exitSelectionMode() {
         selectionMode = false
-        selectedIds = emptySet()
+        selectedIds = persistentSetOf()
     }
 
     fun toggleSelect(id: Long) {
@@ -295,7 +297,7 @@ fun LibraryScreen(
                 selectionMode = selectionMode,
                 selectedIds = selectedIds,
                 onToggleSelect = { id -> toggleSelect(id) },
-                onEnterSelectionMode = { id -> selectionMode = true; selectedIds = setOf(id) }
+                onEnterSelectionMode = { id -> selectionMode = true; selectedIds = persistentSetOf(id) }
             )
             selectedTab == 1 -> AlbumGridView(
                 songs = filteredSongs,
@@ -464,6 +466,7 @@ fun LibraryScreen(
 private fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> Unit) {
     var selectedAlbum by remember(songs) { mutableStateOf<String?>(null) }
     val grouped = remember(songs) { songs.groupBy { it.album.ifBlank { "Album Tidak Diketahui" } } }
+    val sortedAlbumKeys = remember(grouped) { grouped.keys.sortedBy { it.lowercase() } }
 
     if (selectedAlbum == null) {
         LazyVerticalGrid(
@@ -472,7 +475,7 @@ private fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> U
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(grouped.keys.toList().sortedBy { it.lowercase() }, key = { it }) { album ->
+            items(sortedAlbumKeys, key = { it }) { album ->
                 val albumSongs = grouped[album].orEmpty()
                 Column(
                     modifier = Modifier
@@ -742,7 +745,7 @@ private fun SearchSectionLabel(text: String) {
 private fun SearchResultsView(
     query: String,
     songs: List<Song>,
-    favoriteIds: Set<Long>,
+    favoriteIds: ImmutableSet<Long>,
     onToggleFavorite: (Long) -> Unit,
     onSongClick: (List<Song>, Int) -> Unit,
     onGroupSelect: (String) -> Unit,
@@ -825,7 +828,7 @@ private fun SearchResultsView(
 @Composable
 private fun SongListView(
     songs: List<Song>,
-    favoriteIds: Set<Long>,
+    favoriteIds: ImmutableSet<Long>,
     onFavoriteToggle: (Long) -> Unit,
     onSongClick: (List<Song>, Int) -> Unit,
     onPlayNext: (Song) -> Unit,
@@ -834,7 +837,7 @@ private fun SongListView(
     onHideSong: (Song) -> Unit,
     onDeleteSong: (Song) -> Unit = {},
     selectionMode: Boolean = false,
-    selectedIds: Set<Long> = emptySet(),
+    selectedIds: ImmutableSet<Long> = persistentSetOf(),
     onToggleSelect: (Long) -> Unit = {},
     onEnterSelectionMode: (Long) -> Unit = {}
 ) {
@@ -864,7 +867,7 @@ private fun SongListView(
 private fun GroupedListView(
     songs: List<Song>,
     groupOf: (Song) -> String,
-    favoriteIds: Set<Long>,
+    favoriteIds: ImmutableSet<Long>,
     onFavoriteToggle: (Long) -> Unit,
     onSongClick: (List<Song>, Int) -> Unit,
     onPlayNext: (Song) -> Unit,
@@ -874,10 +877,11 @@ private fun GroupedListView(
 ) {
     var selectedGroup by remember(songs) { mutableStateOf<String?>(null) }
     val grouped = remember(songs) { songs.groupBy(groupOf) }
+    val sortedGroupKeys = remember(grouped) { grouped.keys.sorted() }
 
     if (selectedGroup == null) {
         LazyColumn {
-            items(grouped.keys.toList().sorted(), key = { it }) { group ->
+            items(sortedGroupKeys, key = { it }) { group ->
                 ListItem(
                     headlineContent = { Text(group, style = MaterialTheme.typography.titleMedium) },
                     supportingContent = { Text("${grouped[group]?.size ?: 0} lagu") },
