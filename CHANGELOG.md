@@ -10,6 +10,27 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 16 — Konsistensi observability & feedback kegagalan senyap
+- `AppLogger` ditambahkan ke 7 titik yang sebelumnya gagal 100% diam-diam tanpa jejak sama
+  sekali di Log Diagnostik: `SearchHistoryStore`, `PlaylistStore` (parse gagal → playlist
+  user tampak hilang tanpa penjelasan), `CustomFolderScanner` (dua titik: gagal baca isi
+  folder, gagal baca metadata satu file), `WidgetUpdater` (gagal muat artwork widget),
+  `AccentColorExtractor` (gagal ekstrak warna aksen), `EqualizerController` (gagal attach
+  equalizer — sebelumnya tidak bisa dibedakan dari "device memang tidak dukung equalizer"),
+  dan `PlayerViewModel` (gagal scan satu folder tambahan saat refresh library gabungan)
+- Bug UX ditemukan sekalian saat audit: `addCustomFolder` gagal ambil izin (`SecurityException`)
+  sebelumnya `return` polos tanpa penjelasan apa pun ke user — user pilih folder, tidak
+  terjadi apa-apa, tidak ada cara tahu kenapa. Sekarang dicatat ke Log Diagnostik + muncul
+  Snackbar "Gagal menambahkan folder — izin ditolak sistem."
+- `PlayerViewModel` dapat flow baru `actionErrorMessage` (terpisah dari `playbackErrorMessage`
+  yang sudah ada) khusus untuk kegagalan aksi di luar playback, supaya penamaan flow tetap
+  jujur soal konteksnya masing-masing — bukan menumpuk semua jenis error ke satu nama yang
+  jadi menyesatkan
+- Tidak ada perubahan behavior lain: semua fallback (kosongkan list, lewati file, dsb.) tetap
+  identik seperti sebelumnya — perubahan murni menambah jejak log + satu pesan Snackbar baru
+- `PROJECT_STATE.md` dan `FILE_MANIFEST.txt` ditambahkan di root, sesuai standar proyek yang
+  belum sempat diterapkan ke repo ini sebelumnya
+
 ## Batch 12 — Playback Resumption resmi
 - `PlaybackService` dipindah dari `MediaSessionService` ke `MediaLibraryService` — prasyarat
   resmi Google supaya kartu resume media di System UI bisa muncul

@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.data
 
 import android.content.Context
+import com.rudi.audioplayer.util.AppLogger
 import org.json.JSONArray
 
 /** Keeps the user's most recent successful searches so the search screen isn't a blank box when opened. */
@@ -13,6 +14,9 @@ class SearchHistoryStore(context: Context) {
             val array = JSONArray(raw)
             (0 until array.length()).map { array.getString(it) }
         } catch (e: Exception) {
+            // Riwayat pencarian yang rusak bukan hal fatal (fallback ke kosong sudah aman),
+            // tapi tetap dicatat — tanpa ini kerusakan datanya tidak pernah kelihatan sama sekali.
+            AppLogger.e("SearchHistoryStore", "Gagal parse riwayat pencarian", e)
             emptyList()
         }
     }

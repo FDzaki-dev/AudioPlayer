@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.rudi.audioplayer.util.AppLogger
 
 /**
  * Scans a folder tree the user granted through the system's folder picker (Storage
@@ -26,6 +27,10 @@ class CustomFolderScanner(private val context: Context) {
         val children = try {
             dir.listFiles()
         } catch (e: Exception) {
+            // Folder tambahan mungkin sudah dipindah/dicabut aksesnya sejak izin diberikan —
+            // scan folder lain tetap lanjut (return di sini hanya menghentikan cabang ini),
+            // tapi dicatat supaya "kok folder saya kosong" bisa ditelusuri lewat Log Diagnostik.
+            AppLogger.e("CustomFolderScanner", "Gagal membaca isi folder '$folderLabel'", e)
             return
         }
         for (child in children) {
@@ -73,6 +78,10 @@ class CustomFolderScanner(private val context: Context) {
                 folderPath = "Folder Tambahan/$folderLabel"
             )
         } catch (e: Exception) {
+            // File ini sudah lolos filter ekstensi audio tapi metadatanya tidak terbaca (file
+            // rusak/setengah-tersalin/format tak didukung retriever) — dilewati diam-diam ke
+            // UI (lagu lain di folder yang sama tetap tampil), tapi dicatat agar bisa dilacak.
+            AppLogger.e("CustomFolderScanner", "Gagal baca metadata '${doc.name}'", e)
             null
         } finally {
             retriever.release()

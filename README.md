@@ -2,11 +2,12 @@
 
 Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 
-> **Mulai dari sini kalau ini sesi/percakapan baru:** baca `CHANGELOG.md` (histori tiap
-> batch) dan bagian "Keputusan Arsitektur" di bawah sebelum mengubah apa pun — terutama
-> sebelum menyentuh `PlaybackService.kt`, `AppLockStore.kt`, atau `app/build.gradle.kts`.
-> Konteks percakapan lama tidak ikut ke sesi baru; dua file itu sudah pernah menyebabkan
-> asumsi salah yang baru ketahuan setelah build gagal (lihat Batch 10-14 di CHANGELOG).
+> **Mulai dari sini kalau ini sesi/percakapan baru:** baca `PROJECT_STATE.md` (status +
+> riwayat insiden ringkas), `CHANGELOG.md` (histori tiap batch), dan bagian "Keputusan
+> Arsitektur" di bawah sebelum mengubah apa pun — terutama sebelum menyentuh
+> `PlaybackService.kt`, `AppLockStore.kt`, atau `app/build.gradle.kts`. Konteks percakapan
+> lama tidak ikut ke sesi baru; dua file itu sudah pernah menyebabkan asumsi salah yang baru
+> ketahuan setelah build gagal (lihat Batch 10-14 di CHANGELOG).
 
 ## Fitur v1
 - Scan otomatis semua file audio di perangkat via MediaStore (mendukung codec mainstream: MP3, AAC/M4A, FLAC, WAV, OGG/Vorbis, OPUS, AMR — apa pun yang bisa diindeks sistem)

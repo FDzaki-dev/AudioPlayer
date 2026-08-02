@@ -7,6 +7,7 @@ import android.os.Build
 import android.util.Size
 import androidx.compose.ui.graphics.Color
 import androidx.palette.graphics.Palette
+import com.rudi.audioplayer.util.AppLogger
 
 /**
  * Extracts a dominant color from a song's album art so the Now Playing
@@ -30,6 +31,9 @@ object AccentColorExtractor {
             val swatch = palette.vibrantSwatch ?: palette.dominantSwatch ?: palette.mutedSwatch
             swatch?.let { normalize(Color(it.rgb)) }
         } catch (e: Exception) {
+            // Gagal ekstrak warna hanya berarti Now Playing jatuh balik ke aksen statis (tidak
+            // fatal), tapi dicatat karena sebelumnya kegagalan ini tidak meninggalkan jejak sama sekali.
+            AppLogger.e("AccentColorExtractor", "Gagal ekstrak warna aksen dari album art", e)
             null
         }
     }

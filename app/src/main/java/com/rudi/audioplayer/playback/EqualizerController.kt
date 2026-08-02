@@ -2,6 +2,7 @@ package com.rudi.audioplayer.playback
 
 import android.content.Context
 import android.media.audiofx.Equalizer
+import com.rudi.audioplayer.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -78,6 +79,11 @@ class EqualizerController(private val context: Context) {
                 boldPreset = prefs.getString(KEY_BOLD_PRESET, "") ?: ""
             )
         } catch (e: Exception) {
+            // UI menampilkan ini persis sama dengan "device memang tidak mendukung equalizer" —
+            // tapi keduanya bisa jadi beda kasus (mis. audioSessionId tidak valid, konflik efek
+            // audio lain). Dicatat supaya kalau ada laporan "equalizer saya hilang" di device yang
+            // seharusnya mendukung, penyebab sebenarnya tidak perlu ditebak dari nol.
+            AppLogger.e("EqualizerController", "Gagal attach equalizer ke sesi audio", e)
             equalizer = null
             _state.value = EqualizerUiState(supported = false)
         }

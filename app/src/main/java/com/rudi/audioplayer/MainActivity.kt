@@ -367,6 +367,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val libraryLoading by playerViewModel.libraryLoading.collectAsState()
     val celebrationMessage by playerViewModel.celebrationMessage.collectAsState()
     val playbackErrorMessage by playerViewModel.playbackErrorMessage.collectAsState()
+    val actionErrorMessage by playerViewModel.actionErrorMessage.collectAsState()
     val undoableAction by playerViewModel.undoableAction.collectAsState()
     val currentRating by playerViewModel.currentRating.collectAsState()
     val lockEnabled by playerViewModel.lockEnabled.collectAsState()
@@ -442,6 +443,15 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             snackbarHostState.showSnackbar(message)
         } finally {
             playerViewModel.consumePlaybackErrorMessage()
+        }
+    }
+
+    LaunchedEffect(actionErrorMessage) {
+        val message = actionErrorMessage ?: return@LaunchedEffect
+        try {
+            snackbarHostState.showSnackbar(message)
+        } finally {
+            playerViewModel.consumeActionErrorMessage()
         }
     }
 

@@ -198,6 +198,16 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         _playbackErrorMessage.value = null
     }
 
+    // Same one-shot pattern again, tapi untuk kegagalan aksi di luar playback (mis. gagal
+    // menambahkan folder tambahan) — dipisah dari playbackErrorMessage supaya namanya tetap
+    // jujur soal konteksnya, bukan dipakai ulang untuk hal yang tidak berhubungan.
+    private val _actionErrorMessage = MutableStateFlow<String?>(null)
+    val actionErrorMessage: StateFlow<String?> = _actionErrorMessage.asStateFlow()
+
+    fun consumeActionErrorMessage() {
+        _actionErrorMessage.value = null
+    }
+
     /** Carries both the Snackbar message and the exact action that reverses it — the Snackbar
      * itself doesn't need to know *what* was removed, only how to undo it. */
     data class UndoableAction(val message: String, val undo: () -> Unit)
@@ -382,7 +392,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                         try {
                             val uri = Uri.parse(uriString)
                             customFolderScanner.scan(uri, folderLabelFor(uri)).asSequence()
-                        } catch (_: Exception) {
+                        } catch (e: Exception) {
+                            // Lagu-lagu folder ini hilang diam-diam dari library sampai kejadian
+                            // ini dicatat — folder lain tetap discan normal (satu folder gagal
+                            // tidak menggagalkan seluruh refresh).
+                            AppLogger.e("PlayerViewModel", "Gagal scan folder tambahan '$uriString'", e)
                             emptySequence()
                         }
                     }.toList()
@@ -436,6 +450,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
         } catch (e: SecurityException) {
+            // Sebelumnya gagal 100% diam-diam — user memilih folder, tidak terjadi apa-apa, dan
+            // tidak ada cara untuk tahu kenapa. Sekarang dicatat dan dikabari lewat Snackbar.
+            AppLogger.e("PlayerViewModel", "Gagal ambil izin folder tambahan", e)
+            _actionErrorMessage.value = "Gagal menambahkan folder — izin ditolak sistem."
             return
         }
         customFolderStore.addFolder(treeUri.toString())

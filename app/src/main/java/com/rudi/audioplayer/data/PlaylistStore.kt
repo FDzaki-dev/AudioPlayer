@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.data
 
 import android.content.Context
+import com.rudi.audioplayer.util.AppLogger
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -23,6 +24,9 @@ class PlaylistStore(context: Context) {
                 Playlist(id = obj.getString("id"), name = obj.getString("name"), songIds = ids)
             }
         } catch (e: Exception) {
+            // Fallback ke daftar kosong di sini berarti semua playlist user tampak hilang dari
+            // UI — layak dicatat, bukan cuma diam, supaya kejadian ini bisa ditelusuri kalau ada laporan.
+            AppLogger.e("PlaylistStore", "Gagal parse data playlist tersimpan", e)
             emptyList()
         }
     }

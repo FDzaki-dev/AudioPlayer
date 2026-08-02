@@ -12,6 +12,7 @@ import android.widget.RemoteViews
 import com.rudi.audioplayer.MainActivity
 import com.rudi.audioplayer.R
 import com.rudi.audioplayer.playback.PlaybackService
+import com.rudi.audioplayer.util.AppLogger
 
 /**
  * Pushes the current playback state into any home-screen widgets. The service calls
@@ -122,6 +123,9 @@ object WidgetUpdater {
                 context.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it) }
             }
         } catch (e: Exception) {
+            // Widget jatuh balik ke ikon aplikasi kalau ini gagal (masih terlihat wajar di layar
+            // beranda), tapi dicatat supaya kegagalan muat artwork tidak sepenuhnya tak terlihat.
+            AppLogger.e("WidgetUpdater", "Gagal muat artwork widget", e)
             null
         }
     }
