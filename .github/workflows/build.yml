@@ -44,8 +44,8 @@ jobs:
           COUNT=$(git rev-list --count HEAD)
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "name=1.0.$COUNT" >> "$GITHUB_OUTPUT"
-          echo "tag=v1.0.$COUNT-$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          echo "Resolved version: 1.0.$COUNT ($SHORT_SHA)"
+          echo "tag=v1.0.$COUNT-release" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: 1.0.$COUNT (commit $SHORT_SHA)"
 
       - name: Build Release APK
         env:

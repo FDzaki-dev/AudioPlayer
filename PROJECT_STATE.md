@@ -6,9 +6,10 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
-**Batch 16** — Konsistensi observability & feedback kegagalan senyap (lihat CHANGELOG.md
-untuk detail lengkap). `versionName` masih `3.8` (belum di-bump — batch ini murni perbaikan
-internal, bukan titik rilis).
+**Batch 17** — Sinkron dokumentasi (Kilas Balik & Shake-to-Skip yang sudah lama terimplementasi
+tapi belum tercatat di README) + hilangkan short commit hash dari nama artifact GitHub Actions
+(lihat CHANGELOG.md untuk detail lengkap). `versionName` masih `3.8` (belum di-bump — batch ini
+juga bukan titik rilis).
 
 ## Riwayat insiden kronologis (jangan dihapus)
 Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu konteksnya.
@@ -35,6 +36,10 @@ Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu k
 - **Batch 16** — Audit menemukan `addCustomFolder` gagal ambil izin folder (SecurityException)
   sebelumnya `return` polos tanpa penjelasan apa pun ke user — sudah diperbaiki (lihat
   CHANGELOG.md).
+- **Batch 17** — README sempat tertinggal dari kode selama beberapa batch: fitur Kilas Balik
+  dan Shake-to-Skip sudah lama terimplementasi penuh (termasuk toggle setting) tapi baru
+  tercatat di README di batch ini. **Pelajaran: fitur baru wajib langsung masuk README di
+  batch yang sama saat diimplementasikan, jangan ditunda.**
 
 ## Keputusan arsitektur utama
 Ringkasan penuh + alasan ada di README.md § "Keputusan Arsitektur". Poin paling kritis:

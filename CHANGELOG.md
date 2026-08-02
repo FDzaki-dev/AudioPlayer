@@ -10,6 +10,22 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 17 — Sinkron dokumentasi + penamaan artifact CI
+- README diperbarui: dua fitur yang sudah lama terimplementasi penuh (termasuk toggle di
+  Pengaturan) tapi belum pernah tercatat — **Kilas Balik** (bagian Beranda yang menampilkan
+  lagu yang didengar persis 1 tahun/6 bulan/1 bulan lalu di tanggal yang sama) dan
+  **Shake-to-Skip** (opsi kocok HP untuk skip lagu, nonaktif secara default) — sekarang masuk
+  daftar Fitur v1
+- `PROJECT_STATE.md` dicatat: pelajaran supaya fitur baru langsung masuk README di batch yang
+  sama, tidak menyusul belakangan
+- Nama artifact GitHub Actions (`.github/workflows/build.yml`) diubah dari
+  `AudioPlayer-v<versi>-<short-sha>` jadi `AudioPlayer-v<versi>-release` — short commit hash
+  dihapus dari nama tag supaya polanya stabil dan tidak berubah-ubah tiap commit. `SHORT_SHA`
+  tetap dihitung dan muncul di log run Actions (guna jejak commit saat debug), cuma tidak lagi
+  ikut jadi bagian nama file/artifact
+- README § "Standar Penomoran Versi" dan § "Build" disinkronkan ke pola nama baru
+- Tidak ada perubahan logic build/signing/versionCode — murni penamaan output & dokumentasi
+
 ## Batch 16 — Konsistensi observability & feedback kegagalan senyap
 - `AppLogger` ditambahkan ke 7 titik yang sebelumnya gagal 100% diam-diam tanpa jejak sama
   sekali di Log Diagnostik: `SearchHistoryStore`, `PlaylistStore` (parse gagal → playlist
