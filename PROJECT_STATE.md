@@ -6,10 +6,9 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
-**Batch 17** — Sinkron dokumentasi (Kilas Balik & Shake-to-Skip yang sudah lama terimplementasi
-tapi belum tercatat di README) + hilangkan short commit hash dari nama artifact GitHub Actions
-(lihat CHANGELOG.md untuk detail lengkap). `versionName` masih `3.8` (belum di-bump — batch ini
-juga bukan titik rilis).
+**Batch 18** — Unit test `LyricsParserTest.kt` (16 test, nol perubahan kode produksi). Audit
+accessibility dicoba tapi hasilnya negatif — sudah dicatat di CHANGELOG supaya tidak diulang.
+`versionName` masih `3.8`.
 
 ## Riwayat insiden kronologis (jangan dihapus)
 Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu konteksnya.

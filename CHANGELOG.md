@@ -10,6 +10,25 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 18 — Unit test untuk LyricsParser (logic murni yang belum pernah ditest)
+- Audit accessibility (Icon `contentDescription = null`) dicoba dulu sebagai kandidat batch
+  ini — hasilnya **negatif**: dari 34 kemunculan, yang benar-benar interaktif (di dalam
+  `IconButton`/`.clickable`) cuma 5, dan kelimanya sudah benar apa adanya (Icon/gambar
+  berdampingan dengan `Text` label dalam satu Row yang sama — Compose otomatis menggabung
+  semantics-nya untuk TalkBack, jadi ngasih `contentDescription` di situ justru bikin dibaca
+  dobel). Kontrol utama (play/pause di Mini Player & Now Playing) sudah punya
+  `contentDescription` dinamis ("Putar"/"Jeda") sejak awal. **Tidak ada perubahan kode dari
+  temuan ini** — dicatat di sini supaya sesi berikutnya tidak mengulang audit yang sama.
+- Kandidat pengganti yang dieksekusi: `LyricsParser` (parsing LRC, `com.rudi.audioplayer.data`)
+  murni logic tanpa dependensi Android — persis pola yang sudah dipakai project ini untuk
+  `PinLockoutPolicyTest` dan `LibrarySearchIndexTest` — tapi belum pernah dapat test sendiri.
+  Ditambahkan `LyricsParserTest.kt`, 16 test mencakup: parsing lebar digit milidetik (1/2/3
+  digit), baris tak-tersinkron vs LRC, baris rusak/kurung tak tertutup (jatuh balik ke teks
+  polos), `isSynced()`, dan `currentLineIndex()` termasuk perilaku melompati baris tanpa
+  timestamp yang diselipkan di tengah lirik LRC
+- Murni penambahan test — **nol perubahan kode produksi**, jadi risiko regresi nol
+- `FILE_MANIFEST.txt` diperbarui (102 file, tambah `LyricsParserTest.kt`)
+
 ## Batch 17 — Sinkron dokumentasi + penamaan artifact CI
 - README diperbarui: dua fitur yang sudah lama terimplementasi penuh (termasuk toggle di
   Pengaturan) tapi belum pernah tercatat — **Kilas Balik** (bagian Beranda yang menampilkan
