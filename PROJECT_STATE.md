@@ -6,9 +6,9 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
-**Batch 18** — Unit test `LyricsParserTest.kt` (16 test, nol perubahan kode produksi). Audit
-accessibility dicoba tapi hasilnya negatif — sudah dicatat di CHANGELOG supaya tidak diulang.
-`versionName` masih `3.8`.
+**Batch 19** — Audit lifecycle (EqualizerController, AccentColorExtractor, ShakeDetector).
+Ketemu 1 race condition nyata di `AccentColorExtractor`/`PlayerViewModel` (sudah diperbaiki),
+2 audit lain hasilnya bersih (tidak ada perubahan kode). `versionName` masih `3.8`.
 
 ## Riwayat insiden kronologis (jangan dihapus)
 Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu konteksnya.

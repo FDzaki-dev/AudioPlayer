@@ -10,6 +10,31 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 19 — Audit lifecycle: EqualizerController, AccentColorExtractor, ShakeDetector
+- **`AccentColorExtractor` — race condition nyata, diperbaiki**: `updateAccentColor()`
+  melempar coroutine baru setiap `onMediaItemTransition` tanpa membatalkan yang sebelumnya.
+  Skip cepat beruntun (next ditekan cepat, shake-to-skip berkali-kali) bisa memicu beberapa
+  ekstraksi tumpang tindih — kalau yang untuk lagu lama selesai belakangan, warna aksen lagu
+  yang sudah dilewati bisa menimpa warna lagu yang sedang main. Diperbaiki dengan
+  `accentColorJob?.cancel()` sebelum melempar job baru — pola yang sama persis dengan
+  `fadeJob`/`sleepTimerJob`/`libraryRefreshJob` yang sudah ada di file yang sama. Job baru ini
+  juga dibatalkan di `onCleared()` untuk konsisten dengan job-job lain
+- **`EqualizerController` — diaudit, tidak ada leak**: `attach()` sudah memanggil `release()`
+  duluan sebelum bikin instance baru (self-cleaning), dan `PlayerViewModel.onCleared()` sudah
+  memanggil `equalizerController.release()`. `ensureEqualizerAttached()` juga cuma dipanggil
+  sekali per buka sheet Equalizer (klik eksplisit user), bukan tiap recomposition. Tidak ada
+  perubahan kode dari audit ini — dicatat di sini supaya tidak diaudit ulang sia-sia
+- **`ShakeDetector` start/stop di transisi audio focus — diaudit, tidak ada bug**: start/stop
+  terikat satu sumber kebenaran (`Player.Listener.onIsPlayingChanged`), dan `ExoPlayer` sudah
+  dikonfigurasi `setAudioAttributes(..., handleAudioFocus = true)` — jadi kehilangan fokus
+  audio (telepon masuk, app lain butuh output), auto-pause "becoming noisy" (headset
+  dicabut), dan jeda manual user semuanya lewat jalur yang sama dan otomatis memicu
+  `shakeDetector?.stop()`. Duck sementara (notifikasi singkat) sengaja tidak menghentikan
+  sensor karena musik secara konsep masih "main", cuma volumenya turun — perilaku itu benar,
+  bukan celah. Tidak ada perubahan kode dari audit ini
+- 1 file kode produksi berubah (`PlayerViewModel.kt`), murni perbaikan race condition — tidak
+  ada perubahan behavior lain
+
 ## Batch 18 — Unit test untuk LyricsParser (logic murni yang belum pernah ditest)
 - Audit accessibility (Icon `contentDescription = null`) dicoba dulu sebagai kandidat batch
   ini — hasilnya **negatif**: dari 34 kemunculan, yang benar-benar interaktif (di dalam

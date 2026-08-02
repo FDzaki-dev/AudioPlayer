@@ -168,6 +168,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     private val _accentColor = MutableStateFlow<Color?>(null)
     val accentColor: StateFlow<Color?> = _accentColor.asStateFlow()
+    private var accentColorJob: Job? = null
 
     private val _currentRating = MutableStateFlow(0)
     val currentRating: StateFlow<Int> = _currentRating.asStateFlow()
@@ -559,7 +560,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     }
 
     private fun updateAccentColor(song: Song?) {
-        viewModelScope.launch {
+        // Tanpa ini, skip cepat (next beruntun, shake-to-skip berkali-kali) bisa memicu
+        // beberapa ekstraksi tumpang tindih — kalau yang lebih lama selesai belakangan, warna
+        // aksen lagu yang sudah dilewati bisa menimpa warna lagu yang sedang main sekarang.
+        accentColorJob?.cancel()
+        accentColorJob = viewModelScope.launch {
             val color = withContext(Dispatchers.IO) {
                 AccentColorExtractor.extract(appContext, song?.albumId)
             }
@@ -928,6 +933,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     override fun onCleared() {
         sleepTimerJob?.cancel()
         fadeJob?.cancel()
+        accentColorJob?.cancel()
         libraryRefreshJob?.cancel()
         libraryAutoRefreshJob?.cancel()
         libraryContentObserver?.let { runCatching { appContext.contentResolver.unregisterContentObserver(it) } }
