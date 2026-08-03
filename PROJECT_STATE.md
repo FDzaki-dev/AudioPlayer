@@ -6,6 +6,13 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 21** — Hotfix build gagal dari Batch 20: `app/compose_stability_config.conf` memakai
+komentar `#`, padahal parser `stabilityConfigurationPath` cuma mengenali `//` sebagai komentar
+— baris `#` dibaca sebagai pattern literal (tidak valid) dan bikin `compileReleaseKotlin`
+gagal di CI. Diperbaiki dengan mengganti semua baris komentar ke `//` (dicocokkan dengan
+contoh resmi Google di `android/nowinandroid`). Tidak ada perubahan lain di luar file ini.
+`versionName` masih `3.8`.
+
 **Batch 20** — Audit null-safety (state collection) & performa (recomposition list panjang).
 Null-safety hasilnya bersih. Performa: 2 temuan nyata diperbaiki — `favoriteIds`/`selectedIds`
 di `LibraryScreen` pindah ke `ImmutableSet<Long>` (kotlinx.collections.immutable), dan
@@ -43,6 +50,24 @@ Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu k
   dan Shake-to-Skip sudah lama terimplementasi penuh (termasuk toggle setting) tapi baru
   tercatat di README di batch ini. **Pelajaran: fitur baru wajib langsung masuk README di
   batch yang sama saat diimplementasikan, jangan ditunda.**
+- **Batch 21 — Insiden pertama (build)**: file konfigurasi baru di Batch 20
+  (`compose_stability_config.conf`) pakai komentar bergaya `#`, tapi parser compiler plugin
+  `stabilityConfigurationPath` cuma mengenali `//`. Baris `#` dibaca sebagai pattern class,
+  bukan komentar, dan gagal validasi ("is not a valid pattern") — build CI gagal total.
+  **Pelajaran: file konfigurasi non-standar seperti ini tidak divalidasi compiler saat
+  ditulis (bukan kode Kotlin biasa), jadi format syntax-nya wajib dicek ke referensi
+  resmi/proyek AOSP dulu sebelum dianggap benar, bukan ditebak dari kebiasaan format komentar
+  bahasa lain.**
+- **Batch 21 — Insiden kedua (proses, bukan kode)**: percobaan pertama update via Termux
+  gagal *bukan* karena kode, tapi karena command "Update Harian" lama meng-unzip ke folder
+  induk (`~/projects/`) dengan asumsi ZIP-nya membungkus semua file dalam satu folder
+  `AudioPlayer/`. Konvensi ZIP proyek ini justru sebaliknya (tanpa folder pembungkus, file
+  langsung di root ZIP) — jadi seluruh isi nyasar ke `~/projects/app/...` dkk, bukan
+  `~/projects/AudioPlayer/app/...`. Safety-check jumlah file (fallback tanpa manifest) benar
+  mendeteksi ini sebagai file-drop besar dan rollback otomatis — repo tidak rusak, tapi update
+  tidak masuk. **Pelajaran: command Update Harian/Inisialisasi wajib unzip langsung ke
+  direktori project yang sudah di-`cd`, BUKAN ke folder induknya** — konvensi "ZIP tanpa
+  folder pembungkus" mengharuskan ini, jangan diasumsikan sebaliknya lagi.
 
 ## Keputusan arsitektur utama
 Ringkasan penuh + alasan ada di README.md § "Keputusan Arsitektur". Poin paling kritis:

@@ -10,6 +10,22 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 21 — Hotfix: build CI gagal setelah Batch 20
+- **Root cause**: `app/compose_stability_config.conf` (ditambahkan di Batch 20) pakai gaya
+  komentar `#`, tapi parser `stabilityConfigurationPath` milik Compose compiler plugin hanya
+  mengenali `//` sebagai penanda komentar. Baris `#` diperlakukan sebagai pattern class
+  literal, dan gagal validasi karena mengandung spasi/tanda baca — error persisnya:
+  `Error parsing stability configuration file on line 0` diikuti `... is not a valid pattern`,
+  membuat task `:app:compileReleaseKotlin` gagal dan seluruh build CI berhenti
+- **Fix**: semua baris komentar di `compose_stability_config.conf` diganti dari `#` ke `//`,
+  dicocokkan dengan format resmi yang dipakai Google sendiri di file sejenis pada
+  `android/nowinandroid`. Baris pattern-nya sendiri (`android.net.Uri`) tidak berubah — sudah
+  benar sejak awal
+- Diagnosis berdasarkan log build GitHub Actions (`0_build.txt`) yang gagal — bukan tebakan;
+  fix ini murni format komentar, tidak menyentuh logika/pattern apa pun
+- 1 file berubah (`app/compose_stability_config.conf`), tidak ada file baru/dihapus. Tidak ada
+  perubahan behavior — perbaikan syntax konfigurasi build murni
+
 ## Batch 20 — Audit null-safety (state collection) & performa (recomposition list panjang)
 - **Null-safety di layer UI (Compose state collection) — diaudit, hasilnya bersih**: semua
   `StateFlow` nullable (`celebrationMessage`, `playbackErrorMessage`, `actionErrorMessage`,
