@@ -10,6 +10,28 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 24 — Fix definitif crash "terus berhenti" (fix Batch 23 belum cukup)
+- **Kondisi**: setelah Batch 23 (bump `lifecycle-runtime-compose` 2.8.1→2.8.2), crash log baru
+  dari crash logger (Batch 22) menunjukkan `IllegalStateException: CompositionLocal
+  LocalLifecycleOwner not present` **masih terjadi, stack trace identik** dengan sebelumnya
+- **Root cause sebenarnya**: sejak lifecycle 2.8.0, `LocalLifecycleOwner` dipecah jadi dua
+  CompositionLocal terpisah — `androidx.compose.ui.platform.LocalLifecycleOwner` (lama, dari
+  Compose UI, yang SUDAH diisi benar oleh `setContent()`) dan `androidx.lifecycle.compose
+  .LocalLifecycleOwner` (baru, dipakai internal `collectAsStateWithLifecycle()`). Keduanya
+  TIDAK otomatis saling terhubung di Compose UI 1.6.x (compose-bom project ini,
+  `2024.05.00`), berapa pun versi `lifecycle-runtime-compose`-nya — klaim release notes bahwa
+  2.8.2 "bekerja dengan versi Compose apa pun" tidak terbukti berlaku di kasus ini
+- **Fix**: `MainActivity.kt`, seluruh isi `setContent {}` dibungkus
+  `CompositionLocalProvider(androidx.lifecycle.compose.LocalLifecycleOwner provides
+  androidx.compose.ui.platform.LocalLifecycleOwner.current) { ... }` — dipasang sekali di titik
+  terluar, otomatis berlaku ke seluruh pohon composable di bawahnya termasuk `AppNavHost` dan
+  semua layar lain, tidak perlu menyentuh satu pun dari 20+ titik `collectAsStateWithLifecycle`
+  individual
+- Bump lifecycle ke 2.8.2 dari Batch 23 tetap dipertahankan (tidak ada ruginya), tapi fix ini
+  sudah tidak bergantung padanya sama sekali
+- 1 file berubah (`MainActivity.kt`), tidak ada file baru/dihapus, tidak ada perubahan behavior
+  yang terlihat user
+
 ## Batch 23 — Root cause crash "terus berhenti" ditemukan & diperbaiki
 - **Crash**: `java.lang.IllegalStateException: CompositionLocal LocalLifecycleOwner not present`
   — dilempar `collectAsStateWithLifecycle()` di baris pertama `setContent {}` MainActivity,

@@ -6,6 +6,22 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 24** — Fix Batch 23 (bump lifecycle 2.8.1→2.8.2) **ternyata tidak cukup** — crash
+`LocalLifecycleOwner not present` masih terjadi persis sama (dikonfirmasi lewat crash log baru
+via fitur Batch 22). Root cause sebenarnya: ada **DUA** `LocalLifecycleOwner` yang berbeda
+sebagai objek — satu di `androidx.compose.ui.platform` (versi lama, dari Compose UI 1.6.x yang
+project ini pakai) yang SUDAH terisi benar oleh `setContent()`, dan satu lagi di
+`androidx.lifecycle.compose` (versi baru, dipakai internal oleh `collectAsStateWithLifecycle()`)
+yang TIDAK otomatis kebridge dari yang lama di Compose UI 1.6.x — apapun versi
+`lifecycle-runtime-compose`-nya. Fix definitif: bungkus seluruh konten `setContent {}` di
+MainActivity dengan `CompositionLocalProvider` yang secara eksplisit menyediakan
+`androidx.lifecycle.compose.LocalLifecycleOwner` dari nilai
+`androidx.compose.ui.platform.LocalLifecycleOwner.current` — sekali di titik terluar, otomatis
+berlaku ke seluruh pohon composable di bawahnya (termasuk 20+ titik `collectAsStateWithLifecycle`
+lain). Bump lifecycle 2.8.2 dari Batch 23 tetap dipertahankan (tidak merugikan), tapi fix
+sebenarnya tidak lagi bergantung padanya. **Pelajaran ada di bagian Riwayat Insiden di
+bawah.** `versionName` masih `3.8`.
+
 **Batch 23** — Root cause crash yang bikin app "terus berhenti" sejak Batch 20 akhirnya
 ditemukan lewat crash log dari fitur Batch 22: `java.lang.IllegalStateException:
 CompositionLocal LocalLifecycleOwner not present`, dilempar dari `collectAsStateWithLifecycle()`
@@ -119,6 +135,23 @@ Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu k
   juga alasan kenapa fitur crash logger publik (Batch 22) penting: tanpa itu, root cause ini
   praktis mustahil ditemukan cuma dari baca kode statis — sudah dicoba dan nihil sebelum
   crash log-nya ada.**
+- **Batch 24 — Fix Batch 23 ternyata belum cukup, crash sama persis masih terjadi**: crash log
+  baru (via crash logger Batch 22) menunjukkan stack trace **identik** dengan Batch 23, padahal
+  `lifecycle-runtime-compose` sudah di 2.8.2. Root cause sebenarnya lebih dalam dari sekadar
+  versi: sejak lifecycle 2.8.0, `collectAsStateWithLifecycle()` membaca `LocalLifecycleOwner`
+  dari **objek CompositionLocal yang berbeda** (`androidx.lifecycle.compose.LocalLifecycleOwner`)
+  dibanding yang otomatis diisi `setContent()` di Compose UI 1.6.x
+  (`androidx.compose.ui.platform.LocalLifecycleOwner`) — dua CompositionLocal terpisah, bukan
+  satu yang beda versi. Bump versi lifecycle TIDAK membuat keduanya otomatis kebridge di Compose
+  UI 1.6.x, meskipun release notes resminya bilang begitu (nampaknya cuma berlaku penuh mulai
+  Compose UI 1.7+). Fix definitif: `CompositionLocalProvider` eksplisit di titik terluar
+  `setContent {}` MainActivity yang menyediakan `androidx.lifecycle.compose.LocalLifecycleOwner`
+  dari nilai `androidx.compose.ui.platform.LocalLifecycleOwner.current` — sekali pasang di atas,
+  berlaku ke seluruh pohon composable di bawahnya. **Pelajaran: kalau sudah ikuti fix resmi dari
+  release notes tapi crash log MASIH identik persis, jangan ulangi pendekatan yang sama dengan
+  variasi kecil (mis. coba versi lain) — curigai bahwa root cause-nya beda level dari yang
+  didiagnosis, cari penjelasan yang lebih dalam (di sini: dua CompositionLocal berbeda, bukan
+  cuma soal versi) sebelum coba lagi.**
 
 ## Keputusan arsitektur utama
 Ringkasan penuh + alasan ada di README.md § "Keputusan Arsitektur". Poin paling kritis:

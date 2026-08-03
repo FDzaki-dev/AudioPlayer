@@ -59,6 +59,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -162,6 +163,17 @@ class MainActivity : FragmentActivity() {
         playerViewModel.connect()
 
         setContent {
+            // Batch 24: bridge the two separate LocalLifecycleOwner CompositionLocals.
+            // androidx.compose.ui.platform.LocalLifecycleOwner (Compose UI 1.6.x, what this
+            // project's compose-bom resolves to) IS correctly populated by setContent() here.
+            // androidx.lifecycle.compose.LocalLifecycleOwner (a separate, newer CompositionLocal
+            // used internally by collectAsStateWithLifecycle()) is NOT automatically bridged from
+            // the old one on Compose UI 1.6.x — bumping lifecycle to 2.8.2 alone (Batch 23) did
+            // not fix this crash in practice, despite upstream release notes claiming it should.
+            // Explicitly providing it here removes the dependency on that fix entirely.
+            CompositionLocalProvider(
+                androidx.lifecycle.compose.LocalLifecycleOwner provides androidx.compose.ui.platform.LocalLifecycleOwner.current
+            ) {
             val appTheme by playerViewModel.appTheme.collectAsStateWithLifecycle()
             AudioPlayerTheme(theme = appTheme) {
                 // enableEdgeToEdge() above only sets the *initial* system bar icon style once,
@@ -259,6 +271,7 @@ class MainActivity : FragmentActivity() {
                     }
                 }
             }
+            } // tutup CompositionLocalProvider (Batch 24)
         }
     }
 }
