@@ -6,12 +6,15 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
-**Batch 21** — Hotfix build gagal dari Batch 20: `app/compose_stability_config.conf` memakai
-komentar `#`, padahal parser `stabilityConfigurationPath` cuma mengenali `//` sebagai komentar
-— baris `#` dibaca sebagai pattern literal (tidak valid) dan bikin `compileReleaseKotlin`
-gagal di CI. Diperbaiki dengan mengganti semua baris komentar ke `//` (dicocokkan dengan
-contoh resmi Google di `android/nowinandroid`). Tidak ada perubahan lain di luar file ini.
-`versionName` masih `3.8`.
+**Batch 21** — Hotfix build gagal dari Batch 20, 2 root cause terpisah ditemukan lewat 2 kali
+log CI: (1) `app/compose_stability_config.conf` pakai komentar `#`, parser
+`stabilityConfigurationPath` cuma mengenali `//` — baris `#` dibaca sebagai pattern tidak
+valid; (2) `LibraryScreen.kt` baris 115, operator `selectedIds - id` / `selectedIds + id`
+resolve ke `kotlin.collections.Set` bawaan (bukan versi `kotlinx.collections.immutable`) karena
+tidak ada import operator yang tepat, hasilnya `Set<Long>` bukan `PersistentSet<Long>` yang
+diharapkan — diganti ke method `.remove(id)`/`.add(id)` bawaan `PersistentSet` (lebih aman,
+tidak tergantung import operator). Tidak ada perubahan behavior/fitur. `versionName` masih
+`3.8`.
 
 **Batch 20** — Audit null-safety (state collection) & performa (recomposition list panjang).
 Null-safety hasilnya bersih. Performa: 2 temuan nyata diperbaiki — `favoriteIds`/`selectedIds`
@@ -68,6 +71,18 @@ Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu k
   tidak masuk. **Pelajaran: command Update Harian/Inisialisasi wajib unzip langsung ke
   direktori project yang sudah di-`cd`, BUKAN ke folder induknya** — konvensi "ZIP tanpa
   folder pembungkus" mengharuskan ini, jangan diasumsikan sebaliknya lagi.
+- **Batch 21 — Insiden ketiga (build lagi, kode)**: setelah insiden pertama beres, build maju
+  sampai `compileReleaseKotlin` lalu gagal beda error: `LibraryScreen.kt:115`
+  `selectedIds - id` / `selectedIds + id` inferred `Set<Long>`, padahal `selectedIds`
+  bertipe `PersistentSet<Long>`. Sebabnya: operator `+`/`-` versi
+  `kotlinx.collections.immutable` yang tipe-nya benar HANYA aktif kalau di-import eksplisit
+  (lihat README resmi library-nya) — tanpa itu, Kotlin fallback ke operator `+`/`-` bawaan
+  `kotlin.collections.Set` yang selalu mengembalikan `Set<T>` polos, bukan tipe konkretnya.
+  Diperbaiki pakai method `.add()`/`.remove()` bawaan `PersistentSet` (dideklarasikan return
+  `PersistentSet<E>` langsung), bukan menambah import operator. **Pelajaran: kalau kerja
+  dengan `PersistentList`/`PersistentSet` dari kotlinx.collections.immutable, jangan pakai
+  operator `+`/`-`, langsung `.add()`/`.remove()`/`.addAll()`/`.removeAll()` — bebas dari
+  jebakan resolusi operator ini sama sekali, tidak perlu diingat-ingat importnya.**
 
 ## Keputusan arsitektur utama
 Ringkasan penuh + alasan ada di README.md § "Keputusan Arsitektur". Poin paling kritis:

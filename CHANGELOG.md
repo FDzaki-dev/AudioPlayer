@@ -10,21 +10,29 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
-## Batch 21 — Hotfix: build CI gagal setelah Batch 20
-- **Root cause**: `app/compose_stability_config.conf` (ditambahkan di Batch 20) pakai gaya
+## Batch 21 — Hotfix: build CI gagal setelah Batch 20 (2 root cause terpisah)
+- **Root cause #1**: `app/compose_stability_config.conf` (ditambahkan di Batch 20) pakai gaya
   komentar `#`, tapi parser `stabilityConfigurationPath` milik Compose compiler plugin hanya
   mengenali `//` sebagai penanda komentar. Baris `#` diperlakukan sebagai pattern class
   literal, dan gagal validasi karena mengandung spasi/tanda baca — error persisnya:
   `Error parsing stability configuration file on line 0` diikuti `... is not a valid pattern`,
   membuat task `:app:compileReleaseKotlin` gagal dan seluruh build CI berhenti
-- **Fix**: semua baris komentar di `compose_stability_config.conf` diganti dari `#` ke `//`,
+- **Fix #1**: semua baris komentar di `compose_stability_config.conf` diganti dari `#` ke `//`,
   dicocokkan dengan format resmi yang dipakai Google sendiri di file sejenis pada
   `android/nowinandroid`. Baris pattern-nya sendiri (`android.net.Uri`) tidak berubah — sudah
   benar sejak awal
-- Diagnosis berdasarkan log build GitHub Actions (`0_build.txt`) yang gagal — bukan tebakan;
-  fix ini murni format komentar, tidak menyentuh logika/pattern apa pun
-- 1 file berubah (`app/compose_stability_config.conf`), tidak ada file baru/dihapus. Tidak ada
-  perubahan behavior — perbaikan syntax konfigurasi build murni
+- **Root cause #2** (muncul di run CI berikutnya, setelah fix #1 lolos): `LibraryScreen.kt:115`,
+  `selectedIds - id` / `selectedIds + id` — operator `+`/`-` versi `kotlinx.collections.immutable`
+  yang bertipe benar (`PersistentSet<E>`) hanya aktif kalau diimport eksplisit; tanpa itu Kotlin
+  fallback ke operator `+`/`-` bawaan stdlib yang selalu mengembalikan `Set<T>` polos —
+  `Type mismatch: inferred type is Set<Long> but PersistentSet<Long> was expected`
+- **Fix #2**: `selectedIds - id` / `selectedIds + id` diganti `selectedIds.remove(id)` /
+  `selectedIds.add(id)` — method bawaan `PersistentSet` yang sudah dideklarasikan return
+  `PersistentSet<E>` langsung, tidak tergantung import operator tambahan. Sudah diaudit,
+  tidak ada titik lain di project yang pakai pola operator serupa pada Persistent/ImmutableSet
+- Diagnosis kedua-duanya berdasarkan log build GitHub Actions asli, bukan tebakan
+- 2 file berubah total (`app/compose_stability_config.conf`, `LibraryScreen.kt`), tidak ada
+  file baru/dihapus. Tidak ada perubahan behavior — murni perbaikan syntax/tipe kompilasi
 
 ## Batch 20 — Audit null-safety (state collection) & performa (recomposition list panjang)
 - **Null-safety di layer UI (Compose state collection) — diaudit, hasilnya bersih**: semua

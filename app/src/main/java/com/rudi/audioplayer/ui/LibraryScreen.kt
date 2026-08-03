@@ -112,7 +112,7 @@ fun LibraryScreen(
     }
 
     fun toggleSelect(id: Long) {
-        selectedIds = if (selectedIds.contains(id)) selectedIds - id else selectedIds + id
+        selectedIds = if (selectedIds.contains(id)) selectedIds.remove(id) else selectedIds.add(id)
         if (selectedIds.isEmpty()) selectionMode = false
     }
 
