@@ -1,6 +1,10 @@
 package com.rudi.audioplayer.util
 
+import android.content.ContentValues
 import android.content.Context
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import java.io.File
 import java.text.SimpleDateFormat
@@ -15,6 +19,14 @@ import java.util.Locale
  * permission and nothing it collects should ever need one — a remote crash reporter would
  * require adding that permission and would undercut the "everything stays on this device"
  * guarantee the app otherwise makes.
+ *
+ * Batch 22: a crash that happens before the app can ever reach Settings (e.g. on launch)
+ * makes the private log above unreachable without root/ADB. On a fatal uncaught exception,
+ * this also writes a standalone .txt into the public Documents/AudioPlayer/logs folder via
+ * MediaStore (API 29+ only — no storage permission needed, scoped-storage apps can always
+ * contribute new files to public collections) so it can be grabbed with any ordinary file
+ * manager. Non-fatal errors (`AppLogger.e`) still only go to the private log — this is
+ * specifically for the "app won't even open" case.
  */
 object AppLogger {
     private const val LOG_FILE_NAME = "diagnostic_log.txt"
@@ -24,13 +36,16 @@ object AppLogger {
     private const val MAX_LOG_BYTES = 200_000L
 
     private var logFile: File? = null
+    private var appContext: Context? = null
     private var previousHandler: Thread.UncaughtExceptionHandler? = null
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+    private val fileStampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
 
     /** Call once from Application.onCreate(). Safe to call more than once (no-ops after the first). */
     @Synchronized
     fun init(context: Context) {
         if (logFile != null) return
+        appContext = context.applicationContext
         logFile = File(context.applicationContext.filesDir, LOG_FILE_NAME)
 
         previousHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -38,6 +53,7 @@ object AppLogger {
             runCatching {
                 appendEntry("FATAL", "Uncaught di thread '${thread.name}': ${Log.getStackTraceString(throwable)}")
             }
+            runCatching { writePublicCrashLog(thread, throwable) }
             // Always defer to whatever handler existed before (or terminate normally if there
             // was none) — this logger only ever observes a crash, never changes how it's handled.
             previousHandler?.uncaughtException(thread, throwable) ?: Runtime.getRuntime().exit(2)
@@ -77,5 +93,27 @@ object AppLogger {
             val kept = lines.takeLast(lines.size / 2)
             file.writeText(kept.joinToString("\n", postfix = "\n"))
         }
+    }
+
+    /** Writes a standalone crash report to the public Documents/AudioPlayer/logs folder so it's
+     * reachable with a normal file manager even if the app can no longer be opened at all. Silently
+     * does nothing below API 29 (pre-scoped-storage) rather than risk needing a storage permission
+     * mid-crash. */
+    private fun writePublicCrashLog(thread: Thread, throwable: Throwable) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        val context = appContext ?: return
+        val fileName = "crash_${fileStampFormat.format(Date())}.txt"
+        val content = "Waktu: ${dateFormat.format(Date())}\n" +
+            "Thread: ${thread.name}\n\n" +
+            Log.getStackTraceString(throwable)
+
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+            put(MediaStore.MediaColumns.MIME_TYPE, "text/plain")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOCUMENTS}/AudioPlayer/logs")
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Files.getContentUri("external"), values) ?: return
+        resolver.openOutputStream(uri)?.use { it.write(content.toByteArray()) }
     }
 }

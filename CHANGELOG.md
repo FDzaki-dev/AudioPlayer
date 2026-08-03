@@ -10,6 +10,25 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 22 — Fitur: crash logger ke folder publik (Documents/AudioPlayer/logs)
+- **Latar belakang**: saat app crash sebelum sempat dibuka sama sekali, log diagnostik privat
+  yang sudah ada (`Settings → Lanjutan → Log Diagnostik`) jadi tidak terjangkau — tidak ada
+  cara ambil isinya tanpa root/ADB
+- **Implementasi**: `AppLogger` — begitu `Thread.UncaughtExceptionHandler` menangkap crash
+  fatal, selain tetap menulis ke log privat seperti biasa, sekarang juga menulis file terpisah
+  `crash_<yyyyMMdd_HHmmss>.txt` ke `Documents/AudioPlayer/logs/` lewat MediaStore
+  (`RELATIVE_PATH` + `MediaStore.Files`) — file baru per crash (bukan satu file ditimpa terus),
+  isinya waktu + nama thread + stack trace lengkap
+- **Kenapa MediaStore, bukan `WRITE_EXTERNAL_STORAGE` + path langsung**: menulis ke koleksi
+  publik lewat MediaStore tidak butuh permission apa pun di app dengan scoped storage (API
+  29+) — jadi tidak perlu nambah permission baru di manifest. Di bawah API 29 (belum ada
+  scoped storage), fungsi ini langsung `return` tanpa melakukan apa-apa — daripada menambah
+  kerumitan minta izin storage tepat saat crash, error non-fatal tetap tercatat di log privat
+  seperti biasa
+- Tidak menyentuh log diagnostik privat yang sudah ada — murni tambahan, bukan pengganti
+- 1 file berubah (`app/src/main/java/com/rudi/audioplayer/util/AppLogger.kt`), README
+  diperbarui untuk menyebutkan lokasi file publik ini
+
 ## Batch 21 — Hotfix: build CI gagal setelah Batch 20 (2 root cause terpisah)
 - **Root cause #1**: `app/compose_stability_config.conf` (ditambahkan di Batch 20) pakai gaya
   komentar `#`, tapi parser `stabilityConfigurationPath` milik Compose compiler plugin hanya

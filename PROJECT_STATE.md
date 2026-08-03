@@ -6,6 +6,13 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 22** — Fitur baru: crash logger ke folder publik. Saat crash fatal, `AppLogger`
+sekarang juga menulis salinan stack trace ke `Documents/AudioPlayer/logs/crash_<waktu>.txt`
+lewat MediaStore (API 29+, tanpa izin storage tambahan) — supaya bisa diambil pakai File
+Manager biasa tanpa ADB/root, khusus untuk kasus app tidak bisa dibuka sama sekali. Log
+diagnostik privat yang lama (`Settings → Lanjutan`) tidak diubah, tetap jalan seperti biasa.
+`versionName` masih `3.8`.
+
 **Batch 21** — Hotfix build gagal dari Batch 20, 2 root cause terpisah ditemukan lewat 2 kali
 log CI: (1) `app/compose_stability_config.conf` pakai komentar `#`, parser
 `stabilityConfigurationPath` cuma mengenali `//` — baris `#` dibaca sebagai pattern tidak
