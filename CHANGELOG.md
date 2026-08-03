@@ -10,6 +10,24 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 23 — Root cause crash "terus berhenti" ditemukan & diperbaiki
+- **Crash**: `java.lang.IllegalStateException: CompositionLocal LocalLifecycleOwner not present`
+  — dilempar `collectAsStateWithLifecycle()` di baris pertama `setContent {}` MainActivity,
+  jadi app crash di SETIAP kali dibuka sejak Batch 20, sebelum satu frame UI pun sempat
+  tergambar. Ditemukan lewat file `Documents/AudioPlayer/logs/crash_*.txt` dari fitur crash
+  logger Batch 22 — sebelumnya sudah diaudit manual per file (MainActivity, PlayerViewModel,
+  LibraryScreen, manifest, theme, proguard) dan nihil, karena memang bukan bug di kode kita
+- **Root cause asli**: bug upstream resmi di `androidx.lifecycle:lifecycle-runtime-compose:2.8.1`
+  saat dipasangkan dengan Compose UI 1.6.x (versi yang di-resolve `compose-bom:2024.05.00`).
+  Dikonfirmasi di release notes resmi Lifecycle: "Fixed CompositionLocal LocalLifecycleOwner
+  not present errors when using Lifecycle 2.8.X with Compose 1.6.X or earlier — you can now
+  use Lifecycle 2.8.2 with any version of Compose without any workarounds required"
+- **Fix**: bump `androidx.lifecycle:lifecycle-runtime-ktx`, `lifecycle-viewmodel-compose`, dan
+  `lifecycle-runtime-compose` — ketiganya dari `2.8.1` ke `2.8.2` di `app/build.gradle.kts`.
+  Tidak ada perubahan lain; tidak perlu menyentuh satupun dari 20+ titik pemanggilan
+  `collectAsStateWithLifecycle()` di `MainActivity.kt`
+- 1 file berubah (`app/build.gradle.kts`, 3 baris versi), tidak ada file baru/dihapus
+
 ## Batch 22 — Fitur: crash logger ke folder publik (Documents/AudioPlayer/logs)
 - **Latar belakang**: saat app crash sebelum sempat dibuka sama sekali, log diagnostik privat
   yang sudah ada (`Settings → Lanjutan → Log Diagnostik`) jadi tidak terjangkau — tidak ada

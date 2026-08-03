@@ -114,12 +114,17 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.activity:activity-compose:1.9.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.1")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
     // Batch 20: lifecycle-aware state collection (collectAsStateWithLifecycle) so Compose
     // stops collecting StateFlows while the app is backgrounded, instead of collectAsState()
     // which keeps collecting regardless of lifecycle state.
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.1")
+    // Batch 23: 2.8.1 has a confirmed upstream bug (fixed in 2.8.2, aosp/3105647 b/336842920)
+    // where collectAsStateWithLifecycle() throws "CompositionLocal LocalLifecycleOwner not
+    // present" when paired with Compose UI 1.6.x (which is what compose-bom 2024.05.00 below
+    // resolves to) — crashed on every single launch since Batch 20 first called it. All 3
+    // lifecycle-* artifacts above bumped together to 2.8.2 to stay consistent.
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
     // Batch 20: stable, structurally-comparable collections for favoriteIds/selectedIds so
     // Compose can skip recomposing the library list when neither actually changed, instead of
     // treating plain Set<Long> as always-unstable and recomposing every visible row on any

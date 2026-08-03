@@ -6,6 +6,18 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 23** — Root cause crash yang bikin app "terus berhenti" sejak Batch 20 akhirnya
+ditemukan lewat crash log dari fitur Batch 22: `java.lang.IllegalStateException:
+CompositionLocal LocalLifecycleOwner not present`, dilempar dari `collectAsStateWithLifecycle()`
+di baris paling awal `setContent {}` MainActivity, setiap kali app dibuka. Ini **bug resmi
+upstream Google** di `lifecycle-runtime-compose:2.8.1` saat dipasangkan dengan Compose UI
+1.6.x (yang dipakai `compose-bom:2024.05.00` di project ini) — bukan bug di kode kita. Sudah
+resmi diperbaiki Google di versi **2.8.2**. Fix: bump ketiga dependency `androidx.lifecycle:*`
+dari `2.8.1` ke `2.8.2` di `app/build.gradle.kts`. **Pelajaran: crash "LocalLifecycleOwner not
+present" setelah menambah `collectAsStateWithLifecycle()` = cek versi `lifecycle-runtime-compose`
+dulu vs versi Compose BOM, jangan langsung curiga ke kode sendiri — ini kombinasi versi yang
+memang pernah rusak resmi di rilis Google.** `versionName` masih `3.8`.
+
 **Batch 22** — Fitur baru: crash logger ke folder publik. Saat crash fatal, `AppLogger`
 sekarang juga menulis salinan stack trace ke `Documents/AudioPlayer/logs/crash_<waktu>.txt`
 lewat MediaStore (API 29+, tanpa izin storage tambahan) — supaya bisa diambil pakai File
@@ -90,6 +102,23 @@ Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu k
   dengan `PersistentList`/`PersistentSet` dari kotlinx.collections.immutable, jangan pakai
   operator `+`/`-`, langsung `.add()`/`.remove()`/`.addAll()`/`.removeAll()` — bebas dari
   jebakan resolusi operator ini sama sekali, tidak perlu diingat-ingat importnya.**
+- **Batch 23 — Crash runtime yang bikin app "terus berhenti" sejak Batch 20 push pertama
+  (butuh 2 batch + fitur crash logger buat nemuin)**: `java.lang.IllegalStateException:
+  CompositionLocal LocalLifecycleOwner not present`, dilempar `collectAsStateWithLifecycle()`
+  di baris pertama `setContent {}` MainActivity — crash di SETIAP kali app dibuka, sebelum UI
+  sempat kelihatan sama sekali. Root cause: bug upstream resmi di
+  `androidx.lifecycle:lifecycle-runtime-compose:2.8.1` saat dipasangkan dengan Compose UI 1.6.x
+  (dipakai lewat `compose-bom:2024.05.00`) — sudah dikonfirmasi & diperbaiki Google sendiri di
+  versi 2.8.2 (release notes Lifecycle: "Fixed CompositionLocal LocalLifecycleOwner not present
+  errors when using Lifecycle 2.8.X with Compose 1.6.X or earlier"). Diperbaiki dengan bump
+  ketiga `androidx.lifecycle:*` dari 2.8.1 ke 2.8.2 di `app/build.gradle.kts`. **Pelajaran:
+  begitu ada dependency Compose baru yang ditambah di batch yang sama dengan versi library
+  lain yang sudah lama tidak diperbarui (di sini: `compose-bom` masih 2024.05.00 sejak lama),
+  CEK dulu compatibility matrix resminya sebelum nambah — jangan asumsikan versi "stabil
+  terbaru" otomatis kompatibel ke belakang dengan BOM lama yang sudah dipakai project. Ini
+  juga alasan kenapa fitur crash logger publik (Batch 22) penting: tanpa itu, root cause ini
+  praktis mustahil ditemukan cuma dari baca kode statis — sudah dicoba dan nihil sebelum
+  crash log-nya ada.**
 
 ## Keputusan arsitektur utama
 Ringkasan penuh + alasan ada di README.md § "Keputusan Arsitektur". Poin paling kritis:
