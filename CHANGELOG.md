@@ -35,6 +35,14 @@ tersedia.
     mati bareng ViewModel-nya saat app di-swipe, jadi bukan itu)
 - 2 file berubah (`MainActivity.kt`, `ShakeDetector.kt`), tidak ada file baru/dihapus, tidak
   ada perubahan behavior yang terlihat user selain 2 fix di atas
+- **Susulan (sama batch)**: `.github/workflows/build.yml` ternyata masih pakai
+  `actions/upload-artifact` (CI artifact, expire + otomatis dibungkus `.zip` oleh GitHub saat
+  diunduh) — bukan **GitHub Release** seperti yang seharusnya sesuai aturan rilis proyek ini.
+  Ini kelewat sejak workflow pertama kali dibuat, ketahuan dari laporan user. Diganti ke
+  `softprops/action-gh-release@v2`, nempel APK signed langsung sebagai release asset
+  (permanen, publik-diunduh tanpa login, tidak dibungkus `.zip`), plus `permissions:
+  contents: write` di job biar `GITHUB_TOKEN` bisa bikin tag+release. README.md § Build dan
+  § Standar Penomoran Versi disesuaikan sebutannya (artifact → Release)
 
 ## Batch 24 — Fix definitif crash "terus berhenti" (fix Batch 23 belum cukup)
 - **Kondisi**: setelah Batch 23 (bump `lifecycle-runtime-compose` 2.8.1→2.8.2), crash log baru

@@ -14,7 +14,9 @@ kemungkinan besar (dari baca kode, **belum terverifikasi runtime**): `ShakeDetec
 finish), dan sebelumnya fire dari 1 spike g-force tunggal — nyaris tidak beda dari HP
 kebanting di kantong. Fix: syaratkan 3 pulse dalam 900ms sebelum fire. **Kalau Shake-to-Skip
 user OFF, diagnosis ini belum tentu penyebabnya — perlu ditelusuri ulang** (lihat
-CHANGELOG.md Batch 25 untuk kandidat yang sudah disingkirkan). `versionName` masih `3.8`.
+CHANGELOG.md Batch 25 untuk kandidat yang sudah disingkirkan). Susulan sama batch: CI
+workflow ternyata masih pakai GitHub Actions artifact (bukan Release) — sudah dibenerin ke
+`softprops/action-gh-release`. `versionName` masih `3.8`.
 
 **Batch 24** — Fix Batch 23 (bump lifecycle 2.8.1→2.8.2) **ternyata tidak cukup** — crash
 `LocalLifecycleOwner not present` masih terjadi persis sama (dikonfirmasi lewat crash log baru

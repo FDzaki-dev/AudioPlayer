@@ -8,6 +8,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Wajib: GITHUB_TOKEN bawaan cuma read-only ke contents secara default — action
+    # pembuat Release di bawah butuh izin tulis buat bikin tag + release + upload asset.
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,10 +64,13 @@ jobs:
           mkdir -p renamed
           cp app/build/outputs/apk/release/app-release.apk "renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk"
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+      - name: Create GitHub Release with signed APK
+        # softprops/action-gh-release menempel file APK langsung sebagai release asset —
+        # BUKAN CI artifact. Release asset di-serve GitHub apa adanya (tidak dibungkus .zip
+        # otomatis seperti actions/upload-artifact), dan permanen/publik-diunduh tanpa login,
+        # sesuai aturan: APK signed harus jadi asset rilis GitHub, dilarang dibungkus .zip.
+        uses: softprops/action-gh-release@v2
         with:
-          # upload-artifact zips this folder using `name:` as the zip's own file name too,
-          # so both the APK inside and the zip GitHub hands back carry the same version tag.
-          name: AudioPlayer-${{ steps.version.outputs.tag }}
-          path: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          files: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk

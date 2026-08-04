@@ -72,7 +72,7 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 
 Nama file ZIP hasil tiap batch pengembangan (`AudioPlayer-batchN-release.zip`) melacak nomor batch percakapan, **bukan** `versionName` — keduanya sengaja dipisah: `versionName` untuk rilis yang user-facing, nomor batch untuk melacak paket kerja per sesi supaya ZIP lama dan baru gampang dibedakan.
 
-File APK hasil build dan artifact GitHub Actions membawa nomor versi di namanya, diakhiri `-release` (`AudioPlayer-v1.0.247-release.apk`) — bukan nama generik statis, dan sengaja **tanpa** short commit hash di belakang supaya nama artifact tetap stabil/gampang dikenali. Penamaan ini dikerjakan di level workflow CI (`.github/workflows/build.yml`), bukan dobel dengan Gradle, biar tidak saling tabrak.
+File APK hasil build dan asset GitHub Release membawa nomor versi di namanya, diakhiri `-release` (`AudioPlayer-v1.0.247-release.apk`) — bukan nama generik statis, dan sengaja **tanpa** short commit hash di belakang supaya nama file tetap stabil/gampang dikenali. Penamaan ini dikerjakan di level workflow CI (`.github/workflows/build.yml`), bukan dobel dengan Gradle, biar tidak saling tabrak.
 
 ## Keputusan Arsitektur
 Ringkasan kenapa, bukan cuma apa — supaya sesi kerja berikutnya (chat AI baru sekalipun) tidak perlu menebak ulang alasan di balik hal-hal yang tidak jelas kalau cuma baca kode.
@@ -103,7 +103,7 @@ Untuk file **FLAC/WAV** (lossless), ini menjamin sambungan sempurna tanpa jeda �
 Untuk **MP3/AAC** (lossy), gapless yang benar-benar sample-accurate juga bergantung pada metadata encoder di file itu sendiri (LAME tag / iTunSMPB) dan seberapa tepat decoder ExoPlayer memangkas padding-nya — ini terjadi di level library, bukan sesuatu yang bisa "ditambahkan" lewat kode aplikasi ini, dan saya belum bisa memverifikasinya dengan telinga di device fisik. Kalau setelah dicoba masih kerasa ada jeda halus khusus di file MP3/AAC tertentu, itu petunjuk berharga — kabari, biar bisa ditelusuri lebih spesifik ke file/formatnya.
 
 ## Build
-Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai artifact bernama `AudioPlayer-v<versi>-release` (nama filenya sendiri juga membawa nomor versi, tanpa commit hash di belakang). Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
+Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai **GitHub Release** bertag `v<versi>-release` (bukan CI artifact — release asset di-serve GitHub apa adanya, tanpa dibungkus `.zip`, dan bisa diunduh publik tanpa login). Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
 
 ## Rencana v2 (belum dibuat)
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
