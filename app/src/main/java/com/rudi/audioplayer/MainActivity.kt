@@ -513,7 +513,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         uiState = uiState,
                         accentColor = accentColor,
                         onPlayPause = { playerViewModel.togglePlayPause() },
-                        onExpand = { navController.navigate("now_playing") }
+                        onExpand = {
+                            navController.navigate("now_playing") { launchSingleTop = true }
+                        }
                     )
                 }
                 if (currentRoute == "home" || currentRoute == "library" || currentRoute == "settings") {

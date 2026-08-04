@@ -6,6 +6,16 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 25** — 2 bug user-reported diperbaiki. (1) MiniPlayerBar `onExpand` navigate ke
+`now_playing` tanpa `launchSingleTop` → numpuk di backstack kalau di-tap cepat, fix: tambah
+`launchSingleTop = true`. (2) Lagu skip sendiri saat app di-swipe dari Recents → root cause
+kemungkinan besar (dari baca kode, **belum terverifikasi runtime**): `ShakeDetector` di
+`PlaybackService` tetap hidup independen dari `PlayerViewModel` (yang mati saat Activity
+finish), dan sebelumnya fire dari 1 spike g-force tunggal — nyaris tidak beda dari HP
+kebanting di kantong. Fix: syaratkan 3 pulse dalam 900ms sebelum fire. **Kalau Shake-to-Skip
+user OFF, diagnosis ini belum tentu penyebabnya — perlu ditelusuri ulang** (lihat
+CHANGELOG.md Batch 25 untuk kandidat yang sudah disingkirkan). `versionName` masih `3.8`.
+
 **Batch 24** — Fix Batch 23 (bump lifecycle 2.8.1→2.8.2) **ternyata tidak cukup** — crash
 `LocalLifecycleOwner not present` masih terjadi persis sama (dikonfirmasi lewat crash log baru
 via fitur Batch 22). Root cause sebenarnya: ada **DUA** `LocalLifecycleOwner` yang berbeda
@@ -51,13 +61,6 @@ diharapkan — diganti ke method `.remove(id)`/`.add(id)` bawaan `PersistentSet`
 tidak tergantung import operator). Tidak ada perubahan behavior/fitur. `versionName` masih
 `3.8`.
 
-**Batch 20** — Audit null-safety (state collection) & performa (recomposition list panjang).
-Null-safety hasilnya bersih. Performa: 2 temuan nyata diperbaiki — `favoriteIds`/`selectedIds`
-di `LibraryScreen` pindah ke `ImmutableSet<Long>` (kotlinx.collections.immutable), dan
-`android.net.Uri` ditandai stable lewat Compose stability config karena bikin `Song` unstable.
-Ditambah: `collectAsState()` → `collectAsStateWithLifecycle()` di seluruh `MainActivity`, dan
-2 pemanggilan `sortedBy`/`sorted` yang belum di-`remember` di `LibraryScreen` dirapikan.
-`versionName` masih `3.8` (batch maintenance, bukan rilis fitur baru).
 
 ## Riwayat insiden kronologis (jangan dihapus)
 Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu konteksnya.

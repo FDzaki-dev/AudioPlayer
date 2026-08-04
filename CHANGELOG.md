@@ -10,6 +10,32 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 25 — 2 bug user-reported: navigasi numpuk & skip sendiri di background
+- **Bug 1 — MiniPlayerBar numpuk kalau di-tap cepat berkali-kali**: `onExpand` MiniPlayerBar
+  di `MainActivity.kt` manggil `navController.navigate("now_playing")` tanpa
+  `launchSingleTop`, beda dari 3 item `NavigationBar` lain yang sudah benar. Tiap tap nambah
+  instance baru di backstack, jadi butuh back berkali-kali buat keluar
+  - **Fix**: tambah `{ launchSingleTop = true }` di navigate call itu — konsisten dengan pola
+    yang sudah dipakai di 3 tempat lain di file yang sama
+- **Bug 2 — Lagu skip sendiri tanpa tap, utamanya saat app di-swipe dari Recents**:
+  - Ditelusuri lewat baca kode (bukan verifikasi runtime — tidak ada runner): satu-satunya
+    pemicu `seekToNextMediaItem()` yang hidup independen dari `PlayerViewModel` (yang
+    `onCleared()`-nya jalan begitu Activity di-finish saat app di-swipe dari Recents) adalah
+    `ShakeDetector` di `PlaybackService` — start/stop-nya cuma terikat ke `isPlaying`, jadi
+    tetap aktif selama musik main di background lewat foreground service
+  - `ShakeDetector` lama fire dari **satu** spike g-force tunggal di atas threshold — nyaris
+    tidak bisa dibedakan dari HP kebanting-banting di kantong/tas saat jalan, khususnya
+    persis di skenario "di luar app" yang dilaporkan
+  - **Fix**: `ShakeDetector.kt` sekarang mensyaratkan 3 pulse terpisah dalam window 900ms
+    (gerakan kocok asli) sebelum fire, bukan 1 spike tunggal — pola klasik deteksi shake yang
+    jauh lebih tahan dari goyangan biasa
+  - **Belum terverifikasi 100%** — kalau Shake-to-Skip di pengaturan user OFF, root cause di
+    atas bukan penyebabnya dan bug butuh ditelusuri ulang (kandidat lain yang sudah dicek dan
+    disingkirkan: `onPlayerError`-based auto-skip di `PlayerViewModel` — listener itu justru
+    mati bareng ViewModel-nya saat app di-swipe, jadi bukan itu)
+- 2 file berubah (`MainActivity.kt`, `ShakeDetector.kt`), tidak ada file baru/dihapus, tidak
+  ada perubahan behavior yang terlihat user selain 2 fix di atas
+
 ## Batch 24 — Fix definitif crash "terus berhenti" (fix Batch 23 belum cukup)
 - **Kondisi**: setelah Batch 23 (bump `lifecycle-runtime-compose` 2.8.1→2.8.2), crash log baru
   dari crash logger (Batch 22) menunjukkan `IllegalStateException: CompositionLocal
