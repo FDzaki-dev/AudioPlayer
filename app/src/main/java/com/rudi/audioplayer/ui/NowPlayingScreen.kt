@@ -773,10 +773,14 @@ private const val BAR_COUNT = 48
 
 @Composable
 private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit, accentColor: Color) {
+    val haptic = LocalHapticFeedback.current
     Row(horizontalArrangement = Arrangement.Center) {
         for (star in 1..5) {
             IconButton(
-                onClick = { onRate(if (rating == star) 0 else star) },
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onRate(if (rating == star) 0 else star)
+                },
                 modifier = Modifier.size(32.dp)
             ) {
                 Icon(

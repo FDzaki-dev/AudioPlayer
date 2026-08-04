@@ -16,7 +16,9 @@ kebanting di kantong. Fix: syaratkan 3 pulse dalam 900ms sebelum fire. **Kalau S
 user OFF, diagnosis ini belum tentu penyebabnya — perlu ditelusuri ulang** (lihat
 CHANGELOG.md Batch 25 untuk kandidat yang sudah disingkirkan). Susulan sama batch: CI
 workflow ternyata masih pakai GitHub Actions artifact (bukan Release) — sudah dibenerin ke
-`softprops/action-gh-release`. `versionName` masih `3.8`.
+`softprops/action-gh-release`. Susulan lagi: audit konsistensi haptic feedback menemukan 3
+gap (toggle favorit beda perlakuan Library vs Now Playing, long-press pilih di Library nol
+haptic, rating bintang nol haptic) — dibenarkan semua. `versionName` masih `3.8`.
 
 **Batch 24** — Fix Batch 23 (bump lifecycle 2.8.1→2.8.2) **ternyata tidak cukup** — crash
 `LocalLifecycleOwner not present` masih terjadi persis sama (dikonfirmasi lewat crash log baru

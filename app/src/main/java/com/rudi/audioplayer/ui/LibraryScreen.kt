@@ -935,6 +935,7 @@ private fun SongRow(
     onEnterSelectionMode: () -> Unit = {}
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     Box {
         Row(
@@ -942,7 +943,17 @@ private fun SongRow(
                 .fillMaxWidth()
                 .combinedClickable(
                     onClick = { if (selectionMode) onToggleSelect() else onClick() },
-                    onLongClick = { if (selectionMode) onToggleSelect() else onEnterSelectionMode() }
+                    onLongClick = {
+                        if (selectionMode) {
+                            onToggleSelect()
+                        } else {
+                            // Matches the long-press-to-multi-select haptic convention most
+                            // large Android apps (Gmail, Photos) use — this screen was
+                            // silently skipping it before.
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onEnterSelectionMode()
+                        }
+                    }
                 )
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -980,7 +991,13 @@ private fun SongRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary
                 )
-                IconButton(onClick = onFavoriteToggle) {
+                IconButton(onClick = {
+                    // Was the only place this toggle fired with zero haptic — Now Playing's
+                    // identical favorite button already had it (see below). Same action,
+                    // same feedback, regardless of which screen it's tapped from.
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onFavoriteToggle()
+                }) {
                     Icon(
                         if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = if (isFavorite) "Hapus dari favorit" else "Tambah ke favorit",
