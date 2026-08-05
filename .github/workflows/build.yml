@@ -37,7 +37,11 @@ jobs:
         # artinya kalau ada test yang gagal, itu tidak pernah menghentikan build. Dijalankan
         # di sini, sebelum decode keystore, supaya gagal cepat tanpa buang waktu ke langkah
         # signing kalau logikanya sendiri sudah salah.
-        run: gradle testDebugUnitTest --no-daemon
+        # `set -o pipefail` wajib — tanpa itu, exit code pipeline ini ikut `tee` (selalu 0),
+        # bukan `gradle`, jadi step ini akan selalu "sukses" walau test-nya gagal.
+        run: |
+          set -o pipefail
+          gradle testDebugUnitTest --no-daemon 2>&1 | tee test-output.log
 
       - name: Decode signing keystore
         run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > ${{ github.workspace }}/app/release.keystore
@@ -65,7 +69,9 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: gradle assembleRelease --no-daemon
+        run: |
+          set -o pipefail
+          gradle assembleRelease --no-daemon 2>&1 | tee build-output.log
 
       - name: Rename APK to match version
         run: |
@@ -82,3 +88,22 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
           files: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk
+
+      - name: Upload failure log artifact
+        # Kalau step manapun di atas gagal (test atau build) — dijalankan terakhir supaya
+        # nangkep kegagalan dari step manapun, bukan cuma satu step tertentu. Isinya:
+        # output mentah kedua step (test-output.log/build-output.log, kalau step itu sempat
+        # jalan) + laporan HTML/XML JUnit kalau ada. Nama pakai run number (selalu tersedia,
+        # beda dari steps.version yang ke-skip kalau test gagal duluan) supaya gampang
+        # dicari tanpa harus download seluruh raw log lewat UI Actions.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log_fail_${{ github.run_number }}
+          path: |
+            test-output.log
+            build-output.log
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
+          if-no-files-found: ignore
+          retention-days: 14

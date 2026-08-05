@@ -154,4 +154,10 @@ dependencies {
     // Pure-JVM unit tests only (src/test) — no Robolectric/instrumentation, so these run in
     // seconds with no emulator and are cheap enough to actually get written and kept up to date.
     testImplementation("junit:junit:4.13.2")
+    // Uri.parse() (and any other android.net.Uri call) returns null under isReturnDefaultValues
+    // = true, not a harmless placeholder — assigning that to Song's non-null `uri: Uri` field
+    // throws a NullPointerException. mockito-core's mock(Uri::class.java) builds a real Uri
+    // instance via bytecode proxying instead of calling into the stubbed platform class, so
+    // test fixtures that need *a* Uri (without caring what it resolves to) can get one safely.
+    testImplementation("org.mockito:mockito-core:5.12.0")
 }

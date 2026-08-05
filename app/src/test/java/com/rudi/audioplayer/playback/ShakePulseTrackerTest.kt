@@ -41,15 +41,16 @@ class ShakePulseTrackerTest {
     }
 
     @Test
-    fun `samples too close to the previous pulse are ignored as one motion`() {
+    fun `samples too close to a real pulse are ignored, delaying when the shake threshold is reached`() {
         val tracker = ShakePulseTracker()
-        assertFalse(tracker.onSample(0L))
-        // 50ms later, inside the 100ms min-gap -> ignored, does not count as pulse 2
-        assertFalse(tracker.onSample(50L))
-        assertFalse(tracker.onSample(300L))
-        // this is really only the 2nd counted pulse, not the 3rd
-        assertFalse(tracker.onSample(600L))
-        assertTrue(tracker.onSample(900L))
+        assertFalse(tracker.onSample(0L)) // real pulse 1
+        assertFalse(tracker.onSample(50L)) // ignored: <100ms gap from pulse 1
+        assertFalse(tracker.onSample(300L)) // real pulse 2
+        assertFalse(tracker.onSample(350L)) // ignored: <100ms gap from pulse 2
+        // Naively counting every sample, this would already be the 5th — well past the
+        // threshold. Correctly ignoring the two too-close samples, it's only the 3rd real
+        // pulse, and this is exactly where the shake should fire.
+        assertTrue(tracker.onSample(600L))
     }
 
     @Test

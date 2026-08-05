@@ -49,6 +49,13 @@ sungguhan baru terjadi begitu CI (Gap 1) jalan pertama kali di push berikutnya.*
 `versionName` tetap `3.9` (batch infrastruktur, bukan titik rilis user-facing). 4 file
 Kotlin utama disentuh + 3 file test baru + 1 file workflow CI.
 
+**Revisi pasca-push** (detail lengkap di `PROJECT_STATE.md` § Riwayat insiden): (1) ZIP
+sempat salah paket (folder terbungkus + exclude flag nyaplok `.gitignore`/`.github/`) —
+diperbaiki. (2) CI test run pertama nemu 9 test gagal dari 53 — 1 bug asli di
+`ShakePulseTracker` (`lastShakeTime` default `0L`, sekarang `Long?`) + 1 bug lama yang baru
+ketahuan di `LibrarySearchIndexTest` (`Uri.parse` null di unit test JVM murni, sekarang pakai
+`mockito-core`). Sekalian ditambah CI artifact `log_fail_<run_number>` saat ada step gagal.
+
 ## Batch 26 — Audit konsistensi feedback interaksi (segmen "feedback")
 Scope: apa yang terjadi/diharapkan saat user berinteraksi dengan app — **beda cakupan** dari
 audit haptic Batch 25 (favorit, long-press-select Library, rating bintang — sudah selesai

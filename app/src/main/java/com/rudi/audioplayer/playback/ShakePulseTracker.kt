@@ -18,10 +18,10 @@ class ShakePulseTracker(
     private val minPulseGapMs: Long = MIN_PULSE_GAP_MS,
     private val debounceMs: Long = DEBOUNCE_MS
 ) {
-    private var lastShakeTime = 0L
-    private var lastPulseTime = 0L
+    private var lastShakeTime: Long? = null
+    private var lastPulseTime: Long? = null
     private var pulseCount = 0
-    private var pulseWindowStart = 0L
+    private var pulseWindowStart: Long? = null
 
     /**
      * Feed one already-above-threshold sample timestamped [now] (millis, same clock as
@@ -30,14 +30,16 @@ class ShakePulseTracker(
      */
     fun onSample(now: Long): Boolean {
         // Cooldown after a confirmed shake already fired — prevents the tail end of the same
-        // physical gesture from immediately starting a new pulse count.
-        if (now - lastShakeTime < debounceMs) return false
+        // physical gesture from immediately starting a new pulse count. Nothing to debounce
+        // against until a shake has actually fired once (lastShakeTime == null).
+        lastShakeTime?.let { if (now - it < debounceMs) return false }
 
         // Ignore samples too close to the last counted pulse — several accelerometer readings
         // in a row from one single motion shouldn't count as separate pulses.
-        if (now - lastPulseTime < minPulseGapMs) return false
+        lastPulseTime?.let { if (now - it < minPulseGapMs) return false }
 
-        if (now - pulseWindowStart > pulseWindowMs) {
+        val windowStart = pulseWindowStart
+        if (windowStart == null || now - windowStart > pulseWindowMs) {
             // Window expired (or this is the first pulse) — start counting fresh.
             pulseWindowStart = now
             pulseCount = 1
@@ -57,6 +59,7 @@ class ShakePulseTracker(
     /** Called when the detector (re)starts listening — clears any in-progress pulse count. */
     fun reset() {
         pulseCount = 0
+        pulseWindowStart = null
     }
 
     companion object {

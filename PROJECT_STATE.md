@@ -113,7 +113,7 @@ tidak tergantung import operator). Tidak ada perubahan behavior/fitur. `versionN
 ## Riwayat insiden kronologis (jangan dihapus)
 Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu konteksnya.
 
-- **Batch 27** — ZIP hasil batch ini sempat dibungkus folder (`AudioPlayer/`), padahal aturan
+- **Batch 27 (revisi 1)** — ZIP hasil batch ini sempat dibungkus folder (`AudioPlayer/`), padahal aturan
   proyek jelas: "file proyek langsung di root ZIP". Karena Termux update command sudah
   `unzip -d ~/projects/AudioPlayer/` (destinasi = folder repo itu sendiri), pembungkusan ini
   bikin nested-duplicate — persis pola gejala yang sudah dicatat sebelumnya di sesi lama
@@ -126,6 +126,29 @@ Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu k
   tidak pernah benar-benar terkirim. **Fix**: `-x '.git/*'` (scoped, bukan wildcard longgar)
   + isi ZIP di-diff eksplisit terhadap `FILE_MANIFEST.txt` sebelum dikirim, bukan cuma
   dicek di folder kerja sebelum di-zip.
+
+- **Batch 27 (revisi 2)** — CI test run pertama (baru bisa jalan berkat fix revisi 1) langsung
+  nemu 9 test gagal dari 53, di 2 file berbeda:
+  - `ShakePulseTrackerTest` (4 gagal) — bug asli di `ShakePulseTracker` sendiri: `lastShakeTime`
+    default `0L` bikin sample dengan timestamp kecil (test pakai `0L`, `300L`, dst., bukan
+    epoch sungguhan) salah kena anggap "masih dalam debounce dari shake di waktu 0". Tidak
+    pernah muncul di device asli (`System.currentTimeMillis()` selalu angka besar), tapi tetap
+    bug nyata. **Fix**: `lastShakeTime`/`lastPulseTime`/`pulseWindowStart` jadi `Long?`
+    (null = belum pernah ada pulsa/shake), bukan default `0L` — benar untuk timestamp
+    berapa pun, bukan cuma epoch besar. 1 dari 4 test yang gagal itu ternyata testnya sendiri
+    salah hitung pulsa (diperbaiki, lihat komentar di file test).
+  - `LibrarySearchIndexTest` (5 gagal) — bug **lama**, sudah ada sejak file ini dibuat,
+    baru ketahuan sekarang karena CI baru pertama kali menjalankan test sama sekali:
+    `Uri.parse(...)` di unit test JVM murni mengembalikan `null` (bukan placeholder aman
+    seperti komentar lama di `build.gradle.kts` klaim), yang crash saat diisi ke field
+    `Song.uri` yang non-null. **Fix**: `mockito-core` (dependency baru) + `mock(Uri::class.java)`
+    menggantikan `Uri.parse(...)` di fixture test — proyek tetap sengaja menghindari
+    Robolectric.
+  - Sekalian ditambah: CI upload artifact `log_fail_<run_number>` kalau ada step gagal
+    (test atau build) — isi output mentah + laporan JUnit — supaya tidak perlu download
+    seluruh raw log lewat UI Actions tiap kali ada kegagalan.
+  - **Batas jaminan tetap sama**: fix ini juga belum pernah dijalankan compiler sungguhan,
+    baru terverifikasi di push berikutnya.
 
 - **Batch 7** — Bug reorder-key Queue: key lama gabungan id+posisi merusak animasi tiap
   reorder karena terikat ke posisi, bukan identitas lagu.

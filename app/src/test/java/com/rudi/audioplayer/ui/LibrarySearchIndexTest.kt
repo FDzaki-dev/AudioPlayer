@@ -5,9 +5,15 @@ import com.rudi.audioplayer.data.Song
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.mockito.Mockito.mock
 
 class LibrarySearchIndexTest {
 
+    // Uri.parse(...) returns null here (plain-JVM test, android.jar stub with
+    // isReturnDefaultValues = true) — NOT a harmless placeholder, it throws a
+    // NullPointerException the moment it's assigned to Song's non-null `uri: Uri` field. A
+    // mock is used instead purely so each song gets *some* distinct, non-throwing Uri
+    // instance — nothing in these tests reads the Uri's actual content.
     private fun song(id: Long, title: String, artist: String) = Song(
         id = id,
         title = title,
@@ -16,7 +22,7 @@ class LibrarySearchIndexTest {
         albumId = 1L,
         duration = 200_000L,
         dateAdded = 0L,
-        uri = Uri.parse("content://media/external/audio/media/$id"),
+        uri = mock(Uri::class.java),
         folderName = "Music",
         folderPath = "/Music"
     )

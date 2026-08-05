@@ -96,7 +96,14 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
-`android.net.Uri` sengaja dihindari sebagai parameter test murni — tidak aman dikonstruksi di unit test JVM tanpa Robolectric, jadi fungsi pure yang aslinya menerima `Song` (yang punya field `uri`) diubah menerima field mentah (`folderPath`, `id`) saja.
+`android.net.Uri` tidak bisa dikonstruksi aman di unit test JVM tanpa Robolectric —
+`Uri.parse(...)` dkk mengembalikan `null` di bawah `isReturnDefaultValues = true`, bukan
+placeholder aman. Dua pola dipakai tergantung situasi: (1) kalau fungsi pure-nya kita yang
+tulis, ubah supaya menerima field mentah (`folderPath`, `id`) saja, bukan `Song` utuh
+(`LibraryFilterStore.shouldKeep`); (2) kalau harus benar-benar ada objek `Song` utuh
+(`LibrarySearchIndexTest`, karena fungsi yang ditest menerima `List<Song>`), pakai
+`org.mockito:mockito-core` → `mock(Uri::class.java)` untuk dapat instance yang tidak throw,
+tanpa peduli isinya.
 
 ## Belum selesai / dalam pengerjaan
 - Shared-element transition sungguhan (mini player → Now Playing sebagai satu elemen visual) belum ada — versi sekarang pakai animasi scale-in sebagai pendekatan yang lebih aman (lihat catatan di riwayat commit)
