@@ -68,11 +68,7 @@ class MusicRepository(private val context: Context) {
                 val dateAdded = cursor.getLong(dateAddedCol)
                 val rawFolder = cursor.getString(folderCol) ?: ""
 
-                val folderName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    rawFolder.trimEnd('/').substringAfterLast('/').ifBlank { "Musik" }
-                } else {
-                    File(rawFolder).parentFile?.name ?: "Musik"
-                }
+                val folderName = deriveFolderName(rawFolder, Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
 
                 val uri = ContentUris.withAppendedId(collection, id)
 
@@ -97,5 +93,18 @@ class MusicRepository(private val context: Context) {
 
     companion object {
         private val BASE_SELECTION = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} > 0"
+
+        /**
+         * Turns MediaStore's raw folder column into the short display name shown in Library
+         * tabs (e.g. "Musik", "WhatsApp Audio"). Pure string logic, extracted so its edge
+         * cases — blank path, trailing slash, root-level file — are unit-testable without a
+         * real Context or file system.
+         */
+        internal fun deriveFolderName(rawFolder: String, useRelativePath: Boolean): String =
+            if (useRelativePath) {
+                rawFolder.trimEnd('/').substringAfterLast('/').ifBlank { "Musik" }
+            } else {
+                File(rawFolder).parentFile?.name ?: "Musik"
+            }
     }
 }

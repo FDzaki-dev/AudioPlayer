@@ -6,6 +6,25 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 27** — Fondasi testing otomatis. Dari self-review internal (skor 8.8/10, prioritas:
+testing → performa → memori/battery → refactor business logic → benchmark → ukuran APK),
+dikerjakan prioritas #1 dulu. 2 gap: (1) CI (`.github/workflows/build.yml`) tidak pernah
+menjalankan 4 test JVM yang sudah ada di repo — ditambah step `gradle testDebugUnitTest`
+sebelum decode keystore. (2) 3 business logic kritis tidak bisa di-unit-test karena menyatu
+dengan Context/Android framework — diekstrak ke pure function/class tanpa ubah perilaku:
+`ShakeDetector` → `ShakePulseTracker` baru (pulse-counting shake-to-skip dari fix Batch 25,
+belum pernah terverifikasi langsung sebelum ini), `MusicRepository.deriveFolderName`
+(parsing folder dari path MediaStore), `LibraryFilterStore.shouldKeep` (filter gabungan
+folder-dikecualikan + lagu-disembunyikan — sengaja terima `folderPath`/`id` polos, bukan
+`Song` utuh, karena `Song.uri` bertipe `android.net.Uri` tidak aman dikonstruksi di pure-JVM
+test tanpa Robolectric). 21 test baru total (8 `ShakePulseTracker` + 9 `MusicRepository`
+folder-name + 4 `LibraryFilterStore`). **Batas jaminan: seperti biasa analisis statis saja
+— tidak ada kotlinc di environment ini, jadi test-test ini belum pernah benar-benar
+dijalankan; verifikasi sungguhan baru terjadi di push pertama setelah ini lewat CI (Gap 1
+di atas).** Prioritas #2-6 dari self-review (performa, memori/battery, refactor business
+logic lanjutan, benchmark, ukuran APK) sengaja belum disentuh — batch berikutnya. Tidak ada
+perubahan behavior/fitur user-facing. `versionName` tetap `3.9`.
+
 **Batch 26** — Audit feedback interaksi (scope: "apa yang terjadi/diharapkan saat user
 berinteraksi dengan app"), cakupannya **beda dari** audit haptic Batch 25 (favorit,
 long-press-select, rating bintang — itu semua sudah kelar duluan). 4 gap ditemukan &

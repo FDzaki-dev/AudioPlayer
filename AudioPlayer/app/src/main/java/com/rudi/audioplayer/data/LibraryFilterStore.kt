@@ -36,12 +36,24 @@ class LibraryFilterStore(context: Context) {
         val excludedFolders = getExcludedFolders()
         val hiddenIds = getHiddenSongIds()
         if (excludedFolders.isEmpty() && hiddenIds.isEmpty()) return songs
-        return songs.filter { it.folderPath !in excludedFolders && it.id !in hiddenIds }
+        return songs.filter { shouldKeep(it.folderPath, it.id, excludedFolders, hiddenIds) }
     }
 
     companion object {
         private const val PREFS_NAME = "library_filter"
         private const val KEY_EXCLUDED_FOLDERS = "excluded_folders"
         private const val KEY_HIDDEN_SONGS = "hidden_songs"
+
+        /**
+         * Pure predicate behind [apply], operating on plain folderPath/id instead of a full
+         * [Song] so it's unit-testable without constructing a Song (which needs a real
+         * android.net.Uri — not safely constructible in a plain-JVM test).
+         */
+        internal fun shouldKeep(
+            folderPath: String,
+            id: Long,
+            excludedFolders: Set<String>,
+            hiddenIds: Set<Long>
+        ): Boolean = folderPath !in excludedFolders && id !in hiddenIds
     }
 }

@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 103 file
+# Total: 107 file
 
 .github/workflows/build.yml
 .gitignore
@@ -43,6 +43,7 @@ app/src/main/java/com/rudi/audioplayer/playback/PlaybackAudioSession.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlaybackService.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlayerViewModel.kt
 app/src/main/java/com/rudi/audioplayer/playback/ShakeDetector.kt
+app/src/main/java/com/rudi/audioplayer/playback/ShakePulseTracker.kt
 app/src/main/java/com/rudi/audioplayer/ui/DiagnosticLogSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/EqualizerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/FeatureHintBanner.kt
@@ -99,8 +100,11 @@ app/src/main/res/xml/backup_rules.xml
 app/src/main/res/xml/data_extraction_rules.xml
 app/src/main/res/xml/shortcuts.xml
 app/src/main/res/xml/widget_player_info.xml
+app/src/test/java/com/rudi/audioplayer/data/LibraryFilterStoreTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LyricsParserTest.kt
+app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryFolderNameTest.kt
 app/src/test/java/com/rudi/audioplayer/data/PinLockoutPolicyTest.kt
+app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
 build.gradle.kts

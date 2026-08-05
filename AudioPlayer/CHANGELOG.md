@@ -10,6 +10,45 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 27 — Fondasi testing otomatis
+Self-review internal proyek (skor 8.8/10) menandai prioritas berikutnya: bukan fitur baru,
+tapi stabilitas/testing/pengurangan technical debt. Batch ini mengerjakan prioritas
+pertama dari daftar itu: testing otomatis, dimulai dari dua gap paling mendesak — CI yang
+tidak pernah menjalankan test yang sudah ada, dan business logic kritis yang belum bisa
+di-unit-test sama sekali karena masih menyatu dengan kelas ber-Context/Android framework.
+
+- **Gap 1 — CI tidak pernah menjalankan unit test**: 4 file test JVM murni sudah ada di
+  repo sejak beberapa batch lalu (`LyricsParserTest`, `PinLockoutPolicyTest`,
+  `LibrarySearchIndexTest`, `UtilsTest`), tapi `.github/workflows/build.yml` langsung
+  `assembleRelease` tanpa pernah menjalankannya — kalau ada test gagal, build tetap lolos
+  dan APK tetap ter-release
+  - **Fix**: step baru `gradle testDebugUnitTest --no-daemon`, ditaruh sebelum decode
+    keystore supaya gagal cepat tanpa buang waktu signing kalau logikanya sendiri salah
+- **Gap 2 — `ShakeDetector` (logika shake-to-skip dari fix Batch 25) belum pernah
+  terverifikasi langsung, cuma dianalisis dari baca kode**: state machine pulse-counting-nya
+  menyatu dengan `SensorEventListener`/`SensorManager`, tidak bisa di-unit-test tanpa
+  Robolectric (proyek ini sengaja pure-JVM test only)
+  - **Fix**: pulse-counting diekstrak murni ke `ShakePulseTracker` baru (menerima timestamp
+    `Long`, kembalikan `Boolean` — nol dependency Android), `ShakeDetector` tinggal
+    delegasikan ke situ. Perilaku eksternal identik, bukan perubahan behavior. 8 test baru
+    memverifikasi persis skenario yang jadi alasan fix Batch 25 (pocket-jostling: spike
+    tunggal berjarak jauh tidak pernah terakumulasi jadi shake)
+- **Gap 3 & 4 — dua business logic lain yang juga tidak bisa di-unit-test karena menyatu
+  dengan Context**: folder-name derivation di `MusicRepository` (parsing path MediaStore,
+  ada beberapa edge case — path kosong, trailing slash, file di root) dan filter
+  gabungan folder-dikecualikan + lagu-disembunyikan di `LibraryFilterStore`
+  - **Fix**: masing-masing diekstrak jadi pure function di companion object
+    (`MusicRepository.deriveFolderName`, `LibraryFilterStore.shouldKeep`) — method instance
+    lama tinggal delegasikan, tidak ada perubahan perilaku. `LibraryFilterStore.shouldKeep`
+    sengaja menerima `folderPath`/`id` polos, bukan `Song` utuh — `Song.uri` bertipe
+    `android.net.Uri` yang tidak bisa dikonstruksi aman di pure-JVM test tanpa Robolectric
+
+**Batas jaminan: seperti biasa, analisis statis kode saja — tidak ada kotlinc di environment
+ini, jadi 8+9+4 test baru (21 total) belum pernah benar-benar dijalankan. Verifikasi
+sungguhan baru terjadi begitu CI (Gap 1) jalan pertama kali di push berikutnya.**
+`versionName` tetap `3.9` (batch infrastruktur, bukan titik rilis user-facing). 4 file
+Kotlin utama disentuh + 3 file test baru + 1 file workflow CI.
+
 ## Batch 26 — Audit konsistensi feedback interaksi (segmen "feedback")
 Scope: apa yang terjadi/diharapkan saat user berinteraksi dengan app — **beda cakupan** dari
 audit haptic Batch 25 (favorit, long-press-select Library, rating bintang — sudah selesai

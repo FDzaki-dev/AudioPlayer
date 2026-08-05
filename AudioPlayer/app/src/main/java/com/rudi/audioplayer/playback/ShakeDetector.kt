@@ -23,10 +23,9 @@ import kotlin.math.sqrt
 class ShakeDetector(context: Context, private val onShake: () -> Unit) {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
     private val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-    private var lastShakeTime = 0L
-    private var lastPulseTime = 0L
-    private var pulseCount = 0
-    private var pulseWindowStart = 0L
+    // Pulse-counting state machine lives in ShakePulseTracker (playback/ShakePulseTracker.kt)
+    // so it can be unit-tested directly — this class only owns sensor wiring.
+    private val pulseTracker = ShakePulseTracker()
 
     private val listener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
@@ -38,28 +37,7 @@ class ShakeDetector(context: Context, private val onShake: () -> Unit) {
             val gForce = sqrt((x * x + y * y + z * z).toDouble()) - SensorManager.GRAVITY_EARTH
             if (gForce <= SHAKE_THRESHOLD) return
 
-            val now = System.currentTimeMillis()
-
-            // Cooldown after a confirmed shake already fired — prevents the tail end of the
-            // same physical gesture from immediately starting a new pulse count.
-            if (now - lastShakeTime < DEBOUNCE_MS) return
-
-            // Ignore samples too close to the last counted pulse — several accelerometer
-            // readings in a row from one single motion shouldn't count as separate pulses.
-            if (now - lastPulseTime < MIN_PULSE_GAP_MS) return
-
-            if (now - pulseWindowStart > PULSE_WINDOW_MS) {
-                // Window expired (or this is the first pulse) — start counting fresh.
-                pulseWindowStart = now
-                pulseCount = 1
-            } else {
-                pulseCount += 1
-            }
-            lastPulseTime = now
-
-            if (pulseCount >= REQUIRED_PULSES) {
-                lastShakeTime = now
-                pulseCount = 0
+            if (pulseTracker.onSample(System.currentTimeMillis())) {
                 onShake()
             }
         }
@@ -68,7 +46,7 @@ class ShakeDetector(context: Context, private val onShake: () -> Unit) {
     }
 
     fun start() {
-        pulseCount = 0
+        pulseTracker.reset()
         accelerometer?.let {
             sensorManager?.registerListener(listener, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
@@ -76,16 +54,10 @@ class ShakeDetector(context: Context, private val onShake: () -> Unit) {
 
     fun stop() {
         sensorManager?.unregisterListener(listener)
-        pulseCount = 0
+        pulseTracker.reset()
     }
 
     companion object {
         private const val SHAKE_THRESHOLD = 18.0
-        private const val DEBOUNCE_MS = 1200L
-        // A deliberate shake is several quick back-and-forth spikes; pocket/bag jostling from
-        // walking is far less rhythmic and rarely clears this many pulses inside the window.
-        private const val REQUIRED_PULSES = 3
-        private const val PULSE_WINDOW_MS = 900L
-        private const val MIN_PULSE_GAP_MS = 100L
     }
 }
