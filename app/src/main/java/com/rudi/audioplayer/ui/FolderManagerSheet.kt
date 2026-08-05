@@ -8,9 +8,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -45,6 +47,13 @@ fun FolderManagerSheet(
     onRemoveCustomFolder: (String) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val haptic = LocalHapticFeedback.current
+    // Berbeda dari hapus-di-antrean/playlist (bisa di-undo instan), izin folder yang sudah
+    // dilepas (releasePersistableUriPermission) tidak bisa dikembalikan tanpa user memilih
+    // ulang lewat system picker — jadi bukan kandidat pola Undo Snackbar yang sama. Konfirmasi
+    // dulu di sini justru lebih jujur daripada tombol "Urungkan" yang sebenarnya tidak akan
+    // benar-benar berhasil mengembalikan akses.
+    var folderPendingRemoval by remember { mutableStateOf<CustomFolderInfo?>(null) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -143,7 +152,7 @@ fun FolderManagerSheet(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
-                        IconButton(onClick = { onRemoveCustomFolder(folder.uri) }) {
+                        IconButton(onClick = { folderPendingRemoval = folder }) {
                             Icon(Icons.Default.Close, contentDescription = "Hapus folder tambahan")
                         }
                     }
@@ -184,5 +193,32 @@ fun FolderManagerSheet(
                 }
             }
         }
+    }
+
+    folderPendingRemoval?.let { folder ->
+        AlertDialog(
+            onDismissRequest = { folderPendingRemoval = null },
+            title = { Text("Hapus folder tambahan?") },
+            text = {
+                Text(
+                    "\"${folder.displayName}\" tidak akan dipindai lagi. Untuk menambahkannya " +
+                        "kembali, kamu perlu memilihnya ulang lewat pemilih folder sistem."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onRemoveCustomFolder(folder.uri)
+                    folderPendingRemoval = null
+                }) {
+                    Text("Hapus", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { folderPendingRemoval = null }) {
+                    Text("Batal")
+                }
+            }
+        )
     }
 }

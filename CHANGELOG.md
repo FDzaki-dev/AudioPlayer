@@ -10,6 +10,61 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 26 — Audit konsistensi feedback interaksi (segmen "feedback")
+Scope: apa yang terjadi/diharapkan saat user berinteraksi dengan app — **beda cakupan** dari
+audit haptic Batch 25 (favorit, long-press-select Library, rating bintang — sudah selesai
+duluan, tidak disentuh ulang di sini).
+
+- **Gap 1 — `LockScreen.kt` nol haptic sama sekali**: layar dengan interaksi paling sering
+  (tiap buka app) justru satu-satunya yang tidak punya tactile feedback apa pun, termasuk
+  saat PIN salah (cuma teks merah, diam total)
+  - **Fix**: haptic `TextHandleMove` tiap tombol angka & backspace; haptic `LongPress` +
+    animasi shake 300ms (`Animatable` + `keyframes`, offset ±10dp/±8dp/±4dp) khusus saat PIN
+    salah atau kena lockout
+- **Gap 2 — semua slider di app nol haptic saat rilis jari**: seek bar & slider volume di
+  `NowPlayingScreen.kt`, slider band equalizer + preset chip di `EqualizerSheet.kt`
+  - **Fix**: `onValueChangeFinished` (slider) / `onClick` (chip) → haptic `TextHandleMove`.
+    Slider volume sebelumnya malah tidak punya `onValueChangeFinished` sama sekali (cuma
+    `onValueChange` kontinu) — ditambah tanpa ubah perilaku live-drag-nya
+- **Gap 3 — hapus folder tambahan (`FolderManagerSheet.kt`) langsung hilang, nol feedback,
+  nol konfirmasi**: dicek dulu ke kode `PlayerViewModel.removeCustomFolder()` sebelum
+  nyontek pola Undo Snackbar yang sudah ada (dipakai di queue/playlist) —
+  `releasePersistableUriPermission()` yang dipanggilnya **tidak bisa** di-undo asli, akses
+  URI itu hilang permanen kecuali user pilih ulang lewat SAF picker. Undo Snackbar di sini
+  jadi tombol "Urungkan" yang bohong
+  - **Fix**: `AlertDialog` konfirmasi ("Hapus folder tambahan?" + penjelasan perlu pilih
+    ulang) sebelum manggil `onRemoveCustomFolder`, bukan undo palsu
+- **Gap 4 — 6 titik masih pakai `Toast.makeText` mentah** (`LibraryScreen.kt` x4: playNext,
+  addToQueue, 2x konfirmasi tambah-ke-playlist tunggal + bulk; `DiagnosticLogSheet.kt` x1:
+  salin log; `SignatureMatcherSheet.kt` x1: salin laporan) — Toast ikut style OS (bukan tema
+  gelap/terang "Ink & Brass"), posisinya juga beda dari `SnackbarHost` yang sudah dipakai
+  untuk undo queue/playlist
+  - **Fix**: kanal baru `PlayerViewModel.infoMessage` (`MutableStateFlow<String?>`,
+    `showInfoMessage()`/`consumeInfoMessage()` — pola one-shot sama persis dengan
+    `celebrationMessage`/`actionErrorMessage`/`undoableAction` yang sudah ada), dirender
+    lewat `snackbarHostState.showSnackbar(..., duration = Short)` di `MainActivity.kt`.
+    Param baru `onInfoMessage: (String) -> Unit` di-thread: `MainActivity` →
+    `LibraryScreen`/`SettingsScreen` → `DiagnosticLogSheet`/`SignatureMatcherSheet`
+  - Sekalian: tombol "Hapus" (clear log) di `DiagnosticLogSheet.kt` sebelumnya nol feedback
+    juga (padahal aksi destruktif, walau data lokal berisiko rendah) — ditambah haptic
+    `LongPress` + konfirmasi via `infoMessage`
+- 10 file Kotlin disentuh dalam satu tema kohesif (feedback-consistency, presedennya sama
+  kayak Batch 6 — smoothness pass lintas banyak file): `PlayerViewModel.kt`,
+  `MainActivity.kt`, `LockScreen.kt`, `NowPlayingScreen.kt`, `EqualizerSheet.kt`,
+  `FolderManagerSheet.kt`, `LibraryScreen.kt`, `DiagnosticLogSheet.kt`,
+  `SignatureMatcherSheet.kt`, `SettingsScreen.kt`. Tidak ada file baru/dihapus
+- `import android.widget.Toast` dihapus dari 3 file yang sudah tidak butuh lagi (sudah
+  dicek tidak ada sisa pemakaian lain); `LocalContext` juga dihapus dari
+  `DiagnosticLogSheet.kt` (tidak dipakai lagi setelah Toast hilang) dan dari
+  `SignatureLogDialog` privat di `SignatureMatcherSheet.kt` (composable luar tetap pakai
+  `LocalContext` untuk `ApkSignatureChecker.inspect`, tidak disentuh)
+- **Batas jaminan**: environment ini tidak punya `kotlinc`/compiler — verifikasi terbatas ke
+  analisis statis (brace/paren balance dicek manual per file, semua seimbang) + baca-ulang
+  tiap referensi silang (import, parameter, pemanggil). **Belum diverifikasi build/runtime
+  sungguhan** — cek hasil GitHub Actions setelah push
+- `versionName` naik `3.8` → `3.9` (`app/build.gradle.kts`, edit parsial 1 baris — Protected
+  File)
+
 ## Batch 25 — 2 bug user-reported: navigasi numpuk & skip sendiri di background
 - **Bug 1 — MiniPlayerBar numpuk kalau di-tap cepat berkali-kali**: `onExpand` MiniPlayerBar
   di `MainActivity.kt` manggil `navController.navigate("now_playing")` tanpa

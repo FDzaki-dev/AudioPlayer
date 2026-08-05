@@ -45,7 +45,8 @@ fun SettingsScreen(
     shakeToSkipEnabled: Boolean,
     onToggleShakeToSkip: (Boolean) -> Unit,
     radioAutoContinueEnabled: Boolean,
-    onToggleRadioAutoContinue: (Boolean) -> Unit
+    onToggleRadioAutoContinue: (Boolean) -> Unit,
+    onInfoMessage: (String) -> Unit
 ) {
     var showSignatureMatcher by remember { mutableStateOf(false) }
     var showDiagnosticLog by remember { mutableStateOf(false) }
@@ -266,10 +267,10 @@ fun SettingsScreen(
     }
 
     if (showSignatureMatcher) {
-        SignatureMatcherSheet(onDismiss = { showSignatureMatcher = false })
+        SignatureMatcherSheet(onDismiss = { showSignatureMatcher = false }, onInfoMessage = onInfoMessage)
     }
     if (showDiagnosticLog) {
-        DiagnosticLogSheet(onDismiss = { showDiagnosticLog = false })
+        DiagnosticLogSheet(onDismiss = { showDiagnosticLog = false }, onInfoMessage = onInfoMessage)
     }
 }
 

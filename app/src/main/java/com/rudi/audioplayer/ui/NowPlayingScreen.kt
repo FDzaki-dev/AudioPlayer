@@ -409,7 +409,10 @@ fun NowPlayingScreen(
             Slider(
                 value = sliderPosition,
                 onValueChange = { sliderPosition = it },
-                onValueChangeFinished = { onSeek(sliderPosition.toLong()) },
+                onValueChangeFinished = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onSeek(sliderPosition.toLong())
+                },
                 valueRange = 0f..(uiState.duration.coerceAtLeast(1L).toFloat()),
                 colors = SliderDefaults.colors(
                     thumbColor = animatedAccent,
@@ -640,6 +643,7 @@ private fun AdvancedControlsSheet(
     onOpenEqualizer: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val haptic = LocalHapticFeedback.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -697,6 +701,7 @@ private fun AdvancedControlsSheet(
                 Slider(
                     value = volume,
                     onValueChange = onSetVolume,
+                    onValueChangeFinished = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
                     valueRange = 0f..1f,
                     colors = SliderDefaults.colors(
                         thumbColor = MaterialTheme.colorScheme.secondary,

@@ -382,6 +382,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val playbackErrorMessage by playerViewModel.playbackErrorMessage.collectAsStateWithLifecycle()
     val actionErrorMessage by playerViewModel.actionErrorMessage.collectAsStateWithLifecycle()
     val undoableAction by playerViewModel.undoableAction.collectAsStateWithLifecycle()
+    val infoMessage by playerViewModel.infoMessage.collectAsStateWithLifecycle()
     val currentRating by playerViewModel.currentRating.collectAsStateWithLifecycle()
     val lockEnabled by playerViewModel.lockEnabled.collectAsStateWithLifecycle()
     val biometricEnabled by playerViewModel.biometricEnabled.collectAsStateWithLifecycle()
@@ -465,6 +466,15 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             snackbarHostState.showSnackbar(message)
         } finally {
             playerViewModel.consumeActionErrorMessage()
+        }
+    }
+
+    LaunchedEffect(infoMessage) {
+        val message = infoMessage ?: return@LaunchedEffect
+        try {
+            snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
+        } finally {
+            playerViewModel.consumeInfoMessage()
         }
     }
 
@@ -611,7 +621,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     customFolders = customFolders,
                     onAddCustomFolder = { uri -> playerViewModel.addCustomFolder(uri) },
                     onRemoveCustomFolder = { uri -> playerViewModel.removeCustomFolder(uri) },
-                    onDeleteSongs = { songs -> deleteSongsFromDevice(songs) }
+                    onDeleteSongs = { songs -> deleteSongsFromDevice(songs) },
+                    onInfoMessage = { message -> playerViewModel.showInfoMessage(message) }
                 )
             }
             composable("settings") {
@@ -628,7 +639,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     shakeToSkipEnabled = shakeToSkipEnabled,
                     onToggleShakeToSkip = { enabled -> playerViewModel.setShakeToSkipEnabled(enabled) },
                     radioAutoContinueEnabled = radioAutoContinueEnabled,
-                    onToggleRadioAutoContinue = { enabled -> playerViewModel.setRadioAutoContinueEnabled(enabled) }
+                    onToggleRadioAutoContinue = { enabled -> playerViewModel.setRadioAutoContinueEnabled(enabled) },
+                    onInfoMessage = { message -> playerViewModel.showInfoMessage(message) }
                 )
             }
             composable(

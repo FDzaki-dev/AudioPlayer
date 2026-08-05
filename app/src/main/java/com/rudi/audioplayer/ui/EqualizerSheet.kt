@@ -7,6 +7,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
@@ -34,6 +36,7 @@ fun EqualizerSheet(
     onBoldPresetSelect: (EqualizerController.BoldPreset) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val haptic = LocalHapticFeedback.current
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         Column(
@@ -87,7 +90,10 @@ fun EqualizerSheet(
                         val (preset, label) = boldPresetOptions[index]
                         FilterChip(
                             selected = state.boldPreset == preset.name,
-                            onClick = { onBoldPresetSelect(preset) },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onBoldPresetSelect(preset)
+                            },
                             label = { Text(label) }
                         )
                     }
@@ -105,7 +111,10 @@ fun EqualizerSheet(
                         items(state.presets.size, key = { index -> state.presets[index] }) { index ->
                             FilterChip(
                                 selected = state.selectedPreset == index,
-                                onClick = { onPresetSelect(index) },
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onPresetSelect(index)
+                                },
                                 enabled = state.enabled,
                                 label = { Text(state.presets[index]) }
                             )
@@ -135,6 +144,7 @@ fun EqualizerSheet(
                             onValueChange = { newValue ->
                                 onBandChange(band.index, newValue.roundToInt().toShort())
                             },
+                            onValueChangeFinished = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
                             valueRange = state.minLevel.toFloat()..state.maxLevel.toFloat(),
                             enabled = state.enabled,
                             colors = SliderDefaults.colors(

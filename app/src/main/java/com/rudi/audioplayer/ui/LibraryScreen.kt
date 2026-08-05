@@ -1,7 +1,6 @@
 package com.rudi.audioplayer.ui
 
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
@@ -86,7 +85,8 @@ fun LibraryScreen(
     customFolders: List<CustomFolderInfo>,
     onAddCustomFolder: (Uri) -> Unit,
     onRemoveCustomFolder: (String) -> Unit,
-    onDeleteSongs: (List<Song>) -> Unit
+    onDeleteSongs: (List<Song>) -> Unit,
+    onInfoMessage: (String) -> Unit
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -146,11 +146,13 @@ fun LibraryScreen(
 
     val playNext: (Song) -> Unit = {
         onPlayNext(it)
-        Toast.makeText(context, "Diputar setelah lagu ini", Toast.LENGTH_SHORT).show()
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        onInfoMessage("Diputar setelah lagu ini")
     }
     val addToQueue: (Song) -> Unit = {
         onAddToQueue(it)
-        Toast.makeText(context, "Ditambahkan ke antrean", Toast.LENGTH_SHORT).show()
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        onInfoMessage("Ditambahkan ke antrean")
     }
     val addToPlaylist: (Song) -> Unit = { songForPlaylistDialog = it }
     var undoHideIds by remember { mutableStateOf<List<Long>>(emptyList()) }
@@ -336,19 +338,17 @@ fun LibraryScreen(
             playlists = playlists,
             onAddToExisting = { playlist ->
                 val added = onAddSongToPlaylist(playlist.id, pendingSong.id)
-                if (added) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                Toast.makeText(
-                    context,
-                    if (added) "Ditambahkan ke \"${playlist.name}\"" else "Sudah ada di \"${playlist.name}\"",
-                    Toast.LENGTH_SHORT
-                ).show()
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onInfoMessage(
+                    if (added) "Ditambahkan ke \"${playlist.name}\"" else "Sudah ada di \"${playlist.name}\""
+                )
                 songForPlaylistDialog = null
             },
             onCreateAndAdd = { name ->
                 val playlist = onCreatePlaylist(name)
                 onAddSongToPlaylist(playlist.id, pendingSong.id)
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                Toast.makeText(context, "Dibuat & ditambahkan ke \"${playlist.name}\"", Toast.LENGTH_SHORT).show()
+                onInfoMessage("Dibuat & ditambahkan ke \"${playlist.name}\"")
                 songForPlaylistDialog = null
             },
             onDismiss = { songForPlaylistDialog = null }
@@ -363,14 +363,16 @@ fun LibraryScreen(
                 playlists = playlists,
                 onAddToExisting = { playlist ->
                     selectedIds.forEach { id -> onAddSongToPlaylist(playlist.id, id) }
-                    Toast.makeText(context, "Ditambahkan ke \"${playlist.name}\"", Toast.LENGTH_SHORT).show()
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onInfoMessage("Ditambahkan ke \"${playlist.name}\"")
                     songForBulkPlaylistDialog = false
                     exitSelectionMode()
                 },
                 onCreateAndAdd = { name ->
                     val playlist = onCreatePlaylist(name)
                     selectedIds.forEach { id -> onAddSongToPlaylist(playlist.id, id) }
-                    Toast.makeText(context, "Dibuat & ditambahkan ke \"${playlist.name}\"", Toast.LENGTH_SHORT).show()
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onInfoMessage("Dibuat & ditambahkan ke \"${playlist.name}\"")
                     songForBulkPlaylistDialog = false
                     exitSelectionMode()
                 },

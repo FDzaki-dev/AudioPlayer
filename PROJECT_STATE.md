@@ -6,6 +6,31 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 26** — Audit feedback interaksi (scope: "apa yang terjadi/diharapkan saat user
+berinteraksi dengan app"), cakupannya **beda dari** audit haptic Batch 25 (favorit,
+long-press-select, rating bintang — itu semua sudah kelar duluan). 4 gap ditemukan &
+dibenarkan: (1) `LockScreen` — layar paling sering dipencet tiap buka app, ternyata nol
+haptic sama sekali termasuk saat PIN salah; ditambah haptic per digit/backspace + haptic
+tegas & shake 300ms (keyframes) khusus saat salah/lockout. (2) Semua slider (seek bar &
+volume di `NowPlayingScreen`, band + preset di `EqualizerSheet`) nol haptic saat rilis
+jari; ditambah `onValueChangeFinished`/`onClick` haptic ringan. (3) Hapus folder tambahan
+di `FolderManagerSheet` langsung hilang tanpa konfirmasi ATAU undo — dicek dulu ke kode:
+`releasePersistableUriPermission` itu **tidak bisa** di-undo asli (butuh user pilih ulang
+lewat SAF picker), jadi pola Undo Snackbar yang sudah ada (queue/playlist) **sengaja tidak
+dipakai** di sini karena akan jadi tombol "Urungkan" yang bohong; solusinya AlertDialog
+konfirmasi sebelum hapus. (4) 6 titik (`LibraryScreen` x4, `DiagnosticLogSheet`,
+`SignatureMatcherSheet`) masih pakai `Toast.makeText` mentah — ganggu identitas visual
+"Ink & Brass" (Toast ikut style OS, bukan tema app) dan beda posisi dari SnackbarHost yang
+sudah ada; disatukan ke kanal baru `PlayerViewModel.infoMessage` (pola one-shot StateFlow
+sama seperti `celebrationMessage`/`actionErrorMessage`/`undoableAction` yang sudah ada),
+dirender lewat Snackbar bertema di `MainActivity`. Sekalian dibenerin: tombol "Hapus" di
+`DiagnosticLogSheet` (clear log) sebelumnya nol feedback juga padahal aksi destruktif.
+**Batas jaminan: analisis statis kode saja (brace/paren balance dicek manual, tidak ada
+kotlinc di environment ini) — belum diverifikasi runtime/emulator.** `versionName` naik
+3.8 → 3.9. 10 file Kotlin disentuh dalam 1 tema kohesif (feedback-consistency pass, sama
+presedennya kayak Batch 6) + 1 baris `app/build.gradle.kts` (version bump, Protected File
+edit parsial).
+
 **Batch 25** — 2 bug user-reported diperbaiki. (1) MiniPlayerBar `onExpand` navigate ke
 `now_playing` tanpa `launchSingleTop` → numpuk di backstack kalau di-tap cepat, fix: tambah
 `launchSingleTop = true`. (2) Lagu skip sendiri saat app di-swipe dari Recents → root cause

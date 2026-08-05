@@ -32,7 +32,7 @@ android {
         // versionCode auto-increments with git history (see gitCommitCount() above) so it can
         // never be forgotten. versionName stays a deliberate, human-readable string set per
         // release — kept in sync with the zip filename and commit message for that update.
-        versionName = "3.8"
+        versionName = "3.9"
     }
 
     signingConfigs {

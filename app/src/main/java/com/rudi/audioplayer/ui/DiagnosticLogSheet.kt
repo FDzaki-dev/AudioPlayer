@@ -1,6 +1,5 @@
 package com.rudi.audioplayer.ui
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -10,8 +9,9 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -26,9 +26,9 @@ import com.rudi.audioplayer.util.AppLogger
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DiagnosticLogSheet(onDismiss: () -> Unit) {
-    val context = LocalContext.current
+fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
     val clipboard = LocalClipboardManager.current
+    val haptic = LocalHapticFeedback.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var logText by remember { mutableStateOf(AppLogger.readLog()) }
 
@@ -75,7 +75,8 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit) {
                 OutlinedButton(
                     onClick = {
                         clipboard.setText(AnnotatedString(logText))
-                        Toast.makeText(context, "Log disalin ke papan klip", Toast.LENGTH_SHORT).show()
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onInfoMessage("Log disalin ke papan klip")
                     },
                     enabled = logText.isNotBlank(),
                     modifier = Modifier.weight(1f)
@@ -88,6 +89,8 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit) {
                     onClick = {
                         AppLogger.clearLog()
                         logText = ""
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onInfoMessage("Log diagnostik dihapus")
                     },
                     enabled = logText.isNotBlank(),
                     modifier = Modifier.weight(1f)

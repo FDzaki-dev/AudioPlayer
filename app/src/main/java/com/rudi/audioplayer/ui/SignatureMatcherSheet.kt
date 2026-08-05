@@ -2,7 +2,6 @@ package com.rudi.audioplayer.ui
 
 import android.content.Context
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -18,8 +17,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -35,7 +36,7 @@ import com.rudi.audioplayer.util.ApkSignatureResult
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SignatureMatcherSheet(onDismiss: () -> Unit) {
+fun SignatureMatcherSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -120,7 +121,7 @@ fun SignatureMatcherSheet(onDismiss: () -> Unit) {
 
     if (showLogDialog) {
         val report = buildReport(oldResult, newResult, matchState)
-        SignatureLogDialog(report = report, onDismiss = { showLogDialog = false })
+        SignatureLogDialog(report = report, onDismiss = { showLogDialog = false }, onInfoMessage = onInfoMessage)
     }
 }
 
@@ -163,9 +164,9 @@ private fun ApkPickerRow(label: String, result: ApkSignatureResult?, onPick: () 
 
 /** Full copyable report — this is the dialog the user gets instead of Android's bare "OK" popup. */
 @Composable
-private fun SignatureLogDialog(report: String, onDismiss: () -> Unit) {
+private fun SignatureLogDialog(report: String, onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
     val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -186,7 +187,8 @@ private fun SignatureLogDialog(report: String, onDismiss: () -> Unit) {
         confirmButton = {
             TextButton(onClick = {
                 clipboard.setText(AnnotatedString(report))
-                Toast.makeText(context, "Laporan disalin ke papan klip", Toast.LENGTH_SHORT).show()
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onInfoMessage("Laporan disalin ke papan klip")
             }) {
                 Text("Salin ke Papan Klip")
             }

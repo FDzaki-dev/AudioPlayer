@@ -1,5 +1,7 @@
 package com.rudi.audioplayer.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,6 +15,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.AppLockStore
 import kotlinx.coroutines.delay
@@ -31,6 +35,30 @@ fun LockScreen(
     var error by remember { mutableStateOf(false) }
     var lockedOutUntil by remember { mutableStateOf(initialLockedOutUntil) }
     var remainingSeconds by remember { mutableStateOf(0) }
+    val haptic = LocalHapticFeedback.current
+    // Sebelumnya layar paling "tactile" di app ini (dipencet berkali-kali tiap buka app)
+    // justru satu-satunya yang nol haptic — termasuk saat PIN salah, yang cuma keliatan dari
+    // teks merah tanpa getaran atau gerakan sama sekali.
+    val shakeOffset = remember { Animatable(0f) }
+
+    LaunchedEffect(error) {
+        if (error) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            shakeOffset.animateTo(
+                targetValue = 0f,
+                animationSpec = keyframes {
+                    durationMillis = 300
+                    0f at 0
+                    -10f at 50
+                    10f at 100
+                    -8f at 150
+                    8f at 200
+                    -4f at 250
+                    0f at 300
+                }
+            )
+        }
+    }
 
     LaunchedEffect(lockedOutUntil) {
         val until = lockedOutUntil ?: return@LaunchedEffect
@@ -50,6 +78,7 @@ fun LockScreen(
 
     fun handleDigit(digit: String) {
         if (locked) return
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         error = false
         if (entered.length < 6) entered += digit
         if (entered.length == 6) {
@@ -85,7 +114,10 @@ fun LockScreen(
         Text("Masukkan PIN", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(24.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.offset(x = shakeOffset.value.dp)
+        ) {
             repeat(6) { index ->
                 val filled = index < entered.length
                 Box(
@@ -144,6 +176,7 @@ fun LockScreen(
             PinKey(label = "0", enabled = !locked) { handleDigit("0") }
             Box(
                 modifier = Modifier.size(64.dp).clip(CircleShape).clickable(enabled = !locked) {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     error = false
                     if (entered.isNotEmpty()) entered = entered.dropLast(1)
                 },

@@ -211,6 +211,22 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         _actionErrorMessage.value = null
     }
 
+    // Same one-shot pattern again, untuk konfirmasi ringan non-error dan non-undoable
+    // (mis. "disalin ke papan klip", "ditambahkan ke antrean") — sebelumnya beberapa layar
+    // pakai Toast mentah untuk ini, yang mengabaikan tema gelap/terang app dan posisinya beda
+    // dari SnackbarHost yang sudah ada. Disatukan lewat kanal ini supaya semua konfirmasi
+    // ringan tampil konsisten.
+    private val _infoMessage = MutableStateFlow<String?>(null)
+    val infoMessage: StateFlow<String?> = _infoMessage.asStateFlow()
+
+    fun showInfoMessage(message: String) {
+        _infoMessage.value = message
+    }
+
+    fun consumeInfoMessage() {
+        _infoMessage.value = null
+    }
+
     /** Carries both the Snackbar message and the exact action that reverses it — the Snackbar
      * itself doesn't need to know *what* was removed, only how to undo it. */
     data class UndoableAction(val message: String, val undo: () -> Unit)
