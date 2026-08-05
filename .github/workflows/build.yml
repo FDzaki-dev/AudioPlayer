@@ -1,0 +1,84 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Wajib: GITHUB_TOKEN bawaan cuma read-only ke contents secara default — action
+    # pembuat Release di bawah butuh izin tulis buat bikin tag + release + upload asset.
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history, not a shallow clone — the version scheme below counts total
+          # commits, and a shallow checkout would silently under-count that.
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
+
+      - name: Run unit tests
+        # Empat file test JVM murni (src/test) sudah ada di repo sejak beberapa batch lalu,
+        # tapi workflow ini sebelumnya langsung assembleRelease tanpa pernah menjalankannya —
+        # artinya kalau ada test yang gagal, itu tidak pernah menghentikan build. Dijalankan
+        # di sini, sebelum decode keystore, supaya gagal cepat tanpa buang waktu ke langkah
+        # signing kalau logikanya sendiri sudah salah.
+        run: gradle testDebugUnitTest --no-daemon
+
+      - name: Decode signing keystore
+        run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > ${{ github.workspace }}/app/release.keystore
+
+      - name: Report signing status
+        run: |
+          if [ -s "${{ github.workspace }}/app/release.keystore" ]; then
+            echo "✅ Stable release keystore decoded ($(wc -c < "${{ github.workspace }}/app/release.keystore") bytes) — build will use it."
+          else
+            echo "⚠️ No keystore decoded (SIGNING_KEYSTORE_BASE64 secret missing/empty) — falling back to debug signing."
+          fi
+
+      - name: Determine version name
+        id: version
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "name=1.0.$COUNT" >> "$GITHUB_OUTPUT"
+          echo "tag=v1.0.$COUNT-release" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: 1.0.$COUNT (commit $SHORT_SHA)"
+
+      - name: Build Release APK
+        env:
+          SIGNING_KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: gradle assembleRelease --no-daemon
+
+      - name: Rename APK to match version
+        run: |
+          mkdir -p renamed
+          cp app/build/outputs/apk/release/app-release.apk "renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk"
+
+      - name: Create GitHub Release with signed APK
+        # softprops/action-gh-release menempel file APK langsung sebagai release asset —
+        # BUKAN CI artifact. Release asset di-serve GitHub apa adanya (tidak dibungkus .zip
+        # otomatis seperti actions/upload-artifact), dan permanen/publik-diunduh tanpa login,
+        # sesuai aturan: APK signed harus jadi asset rilis GitHub, dilarang dibungkus .zip.
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          files: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk

@@ -113,6 +113,20 @@ tidak tergantung import operator). Tidak ada perubahan behavior/fitur. `versionN
 ## Riwayat insiden kronologis (jangan dihapus)
 Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu konteksnya.
 
+- **Batch 27** — ZIP hasil batch ini sempat dibungkus folder (`AudioPlayer/`), padahal aturan
+  proyek jelas: "file proyek langsung di root ZIP". Karena Termux update command sudah
+  `unzip -d ~/projects/AudioPlayer/` (destinasi = folder repo itu sendiri), pembungkusan ini
+  bikin nested-duplicate — persis pola gejala yang sudah dicatat sebelumnya di sesi lama
+  ("Recurring cruft... nested duplicate AudioPlayer-main/ folder"), tapi kali ini sampai
+  ter-push ke `main`. **Bug kedua, lebih parah**: exclude flag `-x '*.git*'` saat zip
+  ternyata juga mencocokkan `.gitignore` dan `.github/` (substring `.git` ada di keduanya) —
+  ini persis bug yang sudah pernah diperbaiki dulu ("`-x "*.git*"` inadvertently excluded
+  `.github/workflows/`", lihat `recent-work`), tapi terulang lagi di batch ini karena
+  ditulis ulang dari nol tanpa cek riwayat. Akibatnya CI fix Gap 1 (Batch 27 sendiri) nyaris
+  tidak pernah benar-benar terkirim. **Fix**: `-x '.git/*'` (scoped, bukan wildcard longgar)
+  + isi ZIP di-diff eksplisit terhadap `FILE_MANIFEST.txt` sebelum dikirim, bukan cuma
+  dicek di folder kerja sebelum di-zip.
+
 - **Batch 7** — Bug reorder-key Queue: key lama gabungan id+posisi merusak animasi tiap
   reorder karena terikat ke posisi, bukan identitas lagu.
 - **Batch 9** — Bug yang sama ternyata ada juga di PlaylistScreen. Terpisah, snackbar Undo
