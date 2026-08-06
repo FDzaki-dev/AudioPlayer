@@ -6,6 +6,16 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 32** — Hotfix build gagal dari Batch 31. `log_fail_93.zip` (build #93):
+`Unresolved reference: matchParentSize` di `Utils.kt` (`AlbumArt`). Root cause:
+`matchParentSize()` adalah extension `BoxScope`, bukan `Modifier` — Batch 31 menulisnya
+salah sebagai `Modifier.matchParentSize()`. Fix 1 baris: buang prefix `Modifier.`, pakai
+implicit receiver `BoxScope` dari lambda `Box { }` pembungkusnya. Tidak ada usage lain
+fungsi ini di project. **Belum diverifikasi build/runtime asli (tidak ada compiler di
+environment kerja) — hanya analisis root-cause dari log CI + baca signature Compose
+`BoxScope.matchParentSize()` vs `Modifier.matchParentSize()` yang tidak ada.**
+`versionName` tetap otomatis dari commit count (tidak disentuh batch ini).
+
 **Batch 31** — Polish UI/UX pass pertama (dari audit statis, user pilih 5 dari daftar temuan
 lebih luas). 8 file, 1 tema kohesif. (1) Album-art fallback: helper baru `AlbumArt` di
 `Utils.kt` (Coil `SubcomposeAsyncImage`, `error` slot → ikon nada musik di atas

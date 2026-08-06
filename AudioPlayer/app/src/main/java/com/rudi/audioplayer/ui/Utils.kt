@@ -58,7 +58,7 @@ fun AlbumArt(
                 model = albumArtUri(albumId),
                 contentDescription = null,
                 contentScale = contentScale,
-                modifier = Modifier.matchParentSize(),
+                modifier = matchParentSize(),
                 loading = {},
                 error = { if (showIcon) AlbumArtFallbackIcon() }
             )

@@ -10,6 +10,17 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 32 — Hotfix build gagal dari Batch 31
+`log_fail_93.zip` (build #93) dianalisis: `Utils.kt` gagal kompilasi di `AlbumArt` —
+`Unresolved reference: matchParentSize`. Root cause: `matchParentSize()` adalah extension
+function milik `BoxScope`, bukan `Modifier` — kode Batch 31 menulisnya sebagai
+`Modifier.matchParentSize()` (menempel di `Modifier`, padahal fungsinya tidak terdaftar di
+sana). Fix: hapus prefix `Modifier.`, panggil `matchParentSize()` langsung memakai
+implicit receiver `BoxScope` dari lambda `Box { }` tempat `SubcomposeAsyncImage` berada —
+1 baris, 1 file, tidak menyentuh helper `AlbumArt` lainnya. Tidak ada usage lain fungsi ini
+di project (dicek `grep`). `versionName` tetap otomatis dari commit count (tidak disentuh
+batch ini).
+
 ## Batch 31 — Polish UI/UX pass pertama
 Permintaan: "Fokus Polish UI dan UX sampai masuk tahap akhir". Dikerjakan lewat audit statis
 dulu (12 screen/sheet) → user pilih 5 dari daftar temuan untuk batch ini.
