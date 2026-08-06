@@ -10,6 +10,34 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 31 — Polish UI/UX pass pertama
+Permintaan: "Fokus Polish UI dan UX sampai masuk tahap akhir". Dikerjakan lewat audit statis
+dulu (12 screen/sheet) → user pilih 5 dari daftar temuan untuk batch ini.
+
+- **Album-art fallback**: helper `AlbumArt` baru (`Utils.kt`, Coil `SubcomposeAsyncImage`)
+  menggantikan `AsyncImage` mentah di 6 titik (Home x2, LibraryScreen x2, MiniPlayerBar,
+  NowPlayingScreen x2) — lagu tanpa cover art sebelumnya cuma nampilin ruang kosong, sekarang
+  ikon nada musik di atas `surfaceVariant`. Backdrop blur NowPlaying pakai `showIcon = false`
+  (ikon akan jadi gumpalan gak jelas kalau kena blur 60dp)
+- **Empty state disatukan**: 3 pola beda (komponen `EmptyState` di Library/Playlist, custom
+  inline di Home, `Text` abu polos di Queue/FolderManager) → semua pakai `EmptyState`.
+  Ditambah parameter `modifier` opsional (default sama seperti sebelumnya, 5 pemanggilan lama
+  tidak berubah) supaya aman dipakai di `LazyColumn` item dan bottom sheet
+- **Ellipsis nama artis**: 4 lokasi (Home x2, MiniPlayerBar, LibraryScreen) punya
+  `maxLines=1` tanpa `TextOverflow.Ellipsis` — nama panjang kepotong mendadak. Judul lagu di
+  lokasi sama sengaja tidak disentuh (pakai `basicMarquee()`, bukan potongan)
+  Semua status batch di atas belum diverifikasi runtime/emulator.
+- **Touch target**: tombol tutup `FeatureHintBanner` 28dp → 40dp (di bawah standar
+  aksesibilitas 44dp+)
+- **Animasi list**: `animateItemPlacement()` ditambah ke folder list `FolderManagerSheet`,
+  konsisten dengan Library/Playlist/Queue
+- Beres-beres: import Coil `AsyncImage` dan `Icons.Default.LibraryMusic`/`TextAlign` yang jadi
+  tidak terpakai dihapus dari 4 file
+
+**Ditemukan tapi tidak dikerjakan** (di luar 5 pilihan user, disimpan untuk batch lanjutan):
+judul album di grid Library juga `maxLines=1` tanpa ellipsis; token spacing (dp) tidak
+seragam antar file, belum ada `Spacing.kt` terpusat.
+
 ## Batch 30 — Otomatisasi & minimalisasi versionName
 Permintaan: "otomatisasi dan minimalisasi yang terkait" bump versi. Ditemukan saat cek
 `build.yml`: `versionName` app (`3.9`, manual) dan tag GitHub Release (`v1.0.<commit-count>`,

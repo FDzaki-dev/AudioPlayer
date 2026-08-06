@@ -69,8 +69,8 @@ import androidx.compose.ui.unit.dp
 import android.content.Context
 import android.media.AudioManager
 import android.view.WindowManager
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.media3.common.Player
-import coil.compose.AsyncImage
 import com.rudi.audioplayer.data.OnboardingHintStore
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
@@ -199,10 +199,10 @@ fun NowPlayingScreen(
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        AsyncImage(
-            model = song?.albumId?.let { albumArtUri(it) },
-            contentDescription = null,
+        AlbumArt(
+            albumId = song?.albumId,
             contentScale = ContentScale.Crop,
+            showIcon = false,
             modifier = Modifier
                 .fillMaxSize()
                 .blur(60.dp)
@@ -389,7 +389,12 @@ fun NowPlayingScreen(
             maxLines = 1,
             modifier = Modifier.basicMarquee()
         )
-        Text(song?.artist ?: "-", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+        Text(
+            song?.artist ?: "-",
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
         Spacer(modifier = Modifier.height(6.dp))
         StarRatingRow(rating = currentRating, onRate = onSetRating, accentColor = animatedAccent)
 
@@ -872,9 +877,8 @@ private fun AlbumArtHero(
                 .blur(90.dp)
                 .background(accentColor.copy(alpha = 0.38f), CircleShape)
         )
-        AsyncImage(
-            model = albumId?.let { albumArtUri(it) },
-            contentDescription = null,
+        AlbumArt(
+            albumId = albumId,
             modifier = Modifier
                 .size(280.dp)
                 .shadow(

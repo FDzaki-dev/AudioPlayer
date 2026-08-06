@@ -25,8 +25,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
 
@@ -67,9 +67,8 @@ fun MiniPlayerBar(
                 .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = albumArtUri(song.albumId),
-                contentDescription = null,
+            AlbumArt(
+                albumId = song.albumId,
                 modifier = Modifier
                     .size(44.dp)
                     .clip(RoundedCornerShape(14.dp))
@@ -85,6 +84,7 @@ fun MiniPlayerBar(
                 Text(
                     song.artist,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

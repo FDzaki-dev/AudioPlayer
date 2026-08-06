@@ -88,11 +88,12 @@ fun QueueSheet(
             )
 
             if (queue.isEmpty()) {
-                Text(
-                    text = "Antrean kosong.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(20.dp)
+                EmptyState(
+                    title = "Antrean kosong",
+                    subtitle = "Tambahkan lagu lewat \"Putar Berikutnya\" atau \"Tambah ke Antrean\".",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp, horizontal = 20.dp)
                 )
             }
 

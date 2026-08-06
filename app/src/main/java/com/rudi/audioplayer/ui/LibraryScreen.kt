@@ -54,8 +54,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.rudi.audioplayer.data.CustomFolderInfo
 import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.OnboardingHintStore
@@ -484,9 +484,8 @@ private fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> U
                         .fillMaxWidth()
                         .clickable { selectedAlbum = album }
                 ) {
-                    AsyncImage(
-                        model = albumArtUri(albumSongs.first().albumId),
-                        contentDescription = null,
+                    AlbumArt(
+                        albumId = albumSongs.first().albumId,
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
@@ -964,9 +963,8 @@ private fun SongRow(
                 Checkbox(checked = isSelected, onCheckedChange = { onToggleSelect() })
                 Spacer(modifier = Modifier.width(4.dp))
             }
-            AsyncImage(
-                model = albumArtUri(song.albumId),
-                contentDescription = null,
+            AlbumArt(
+                albumId = song.albumId,
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(20.dp))
@@ -982,6 +980,7 @@ private fun SongRow(
                 Text(
                     song.artist,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary
                 )
@@ -1056,12 +1055,13 @@ fun EmptyState(
     title: String,
     subtitle: String,
     actionLabel: String? = null,
-    onAction: (() -> Unit)? = null
+    onAction: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+        .fillMaxSize()
+        .padding(32.dp)
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
+        modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {

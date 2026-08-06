@@ -13,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
@@ -76,12 +75,12 @@ fun FolderManagerSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             if (folders.isEmpty()) {
-                Text(
-                    "Belum ada folder terdeteksi.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(24.dp)
+                EmptyState(
+                    title = "Belum ada folder terdeteksi",
+                    subtitle = "Folder musik di perangkat kamu akan muncul di sini.",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp, horizontal = 24.dp)
                 )
             }
 
@@ -90,7 +89,8 @@ fun FolderManagerSheet(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                            .padding(horizontal = 20.dp, vertical = 10.dp)
+                            .animateItemPlacement(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {

@@ -6,6 +6,35 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 31** — Polish UI/UX pass pertama (dari audit statis, user pilih 5 dari daftar temuan
+lebih luas). 8 file, 1 tema kohesif. (1) Album-art fallback: helper baru `AlbumArt` di
+`Utils.kt` (Coil `SubcomposeAsyncImage`, `error` slot → ikon nada musik di atas
+`surfaceVariant`, `loading` slot sengaja kosong biar cover asli gak kedip) menggantikan
+`AsyncImage` mentah di 6 titik (Home x2, LibraryScreen x2, MiniPlayerBar, NowPlayingScreen
+x2) — sebelumnya lagu tanpa cover art cuma nampilin ruang kosong. Backdrop blur NowPlaying
+sengaja `showIcon = false` (ikon bakal jadi gumpalan gak jelas kalau di-blur 60dp). (2) Empty
+state disatukan ke komponen `EmptyState` yang sudah ada (LibraryScreen.kt) — sebelumnya 3
+pola beda (komponen penuh di Library/Playlist, custom inline icon+text di Home, `Text` abu
+polos di Queue/FolderManager); `EmptyState` ditambah parameter `modifier` opsional (default
+tetap `fillMaxSize().padding(32.dp)`, gak ubah 5 pemanggilan lama) supaya bisa dipakai di
+`LazyColumn` item (Home) dan bottom sheet (Queue, FolderManager) tanpa crash fillMaxSize di
+context yang gak punya bounded height. (3) Nama artis kepotong tanpa "..." di 4 lokasi
+high-traffic (Home x2, MiniPlayerBar, LibraryScreen) — `maxLines=1` tanpa
+`TextOverflow.Ellipsis` — ditambahkan; judul lagu di lokasi sama sengaja dibiarkan (pakai
+`basicMarquee()`, overflow ditangani lewat scroll bukan potongan). (4) Tombol tutup
+`FeatureHintBanner` 28dp → 40dp (di bawah standar target sentuh aksesibilitas). (5)
+`animateItemPlacement()` ditambah ke list folder `FolderManagerSheet` (konsisten dengan
+Library/Playlist/Queue). Import Coil `AsyncImage` & ikon `LibraryMusic`/`TextAlign` yang jadi
+gak kepake dibersihkan dari 4 file. **Batas jaminan: analisis statis saja (brace/paren
+balance dicek manual, tidak ada kotlinc di environment ini) — belum diverifikasi
+runtime/emulator, termasuk perilaku `SubcomposeAsyncImage` yang baru pertama kali dipakai di
+proyek ini (sebelumnya cuma `AsyncImage` biasa).** Ditemukan tapi belum dikerjakan (di luar
+scope batch ini, bukan dipilih user): auditor menemukan judul album di grid Library juga
+`maxLines=1` tanpa ellipsis, dan token spacing gak seragam (dp value ad-hoc per file, gak ada
+`Spacing.kt`) — keduanya dianggap dampak rendah, disimpan untuk batch lanjutan kalau
+diminta. `versionName` tetap otomatis dari commit count (tidak disentuh batch ini).
+
+## Batch 30
 **Batch 30** — Otomatisasi & minimalisasi versionName. Ditemukan lewat cek `build.yml` untuk
 jawab permintaan ini: `versionName` app (manual, `3.9`) dan tag GitHub Release (otomatis,
 `v1.0.<commit-count>`) adalah dua angka tak nyambung. Fix: `versionName` sekarang turunan

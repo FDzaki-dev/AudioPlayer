@@ -47,7 +47,7 @@ fun FeatureHintBanner(text: String, onDismiss: () -> Unit, modifier: Modifier = 
                 modifier = Modifier.weight(1f, fill = true)
             )
             Spacer(modifier = Modifier.width(8.dp))
-            IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+            IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Tutup", modifier = Modifier.size(16.dp))
             }
         }
