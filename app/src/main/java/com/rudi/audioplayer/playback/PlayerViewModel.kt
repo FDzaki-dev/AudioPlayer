@@ -20,7 +20,6 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.rudi.audioplayer.util.AppLogger
-import com.google.common.util.concurrent.MoreExecutors
 import com.rudi.audioplayer.data.CrossfadeStore
 import com.rudi.audioplayer.data.CustomFolderInfo
 import com.rudi.audioplayer.data.CustomFolderScanner
@@ -51,6 +50,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.Executor
 
 data class PlaybackUiState(
     val currentSong: Song? = null,
@@ -352,7 +352,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             controller = controllerFuture.get()
             controller?.addListener(playerListener)
             startPositionLoop()
-        }, MoreExecutors.directExecutor())
+        }, Executor { it.run() }) // same-thread executor — Guava's directExecutor() had no special behavior beyond this
         ensureLibraryLoaded()
         registerLibraryContentObserver()
     }

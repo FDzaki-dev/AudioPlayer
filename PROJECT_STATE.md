@@ -6,6 +6,23 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 28** — Optimasi ukuran APK. Audit eksternal baru (skor 9.3/10) taruh ukuran APK di
+prioritas #1 — beda urutan dari self-review internal Batch 27 (taruh di posisi terakhir);
+dipilih karena satu-satunya yang hasilnya bisa dicek objektif dari ukuran APK output CI
+tanpa runner. 2 perubahan: (1) `androidResources { localeFilters += listOf("en") }` di
+`app/build.gradle.kts` — buang resource terjemahan AndroidX/Compose/Media3/Coil untuk
+locale yang tidak dipakai (app sendiri cuma punya `values/` default, tidak kesentuh). (2)
+`com.google.guava:guava` penuh diganti `androidx.concurrent:concurrent-futures:1.3.0` —
+cuma pernah dipakai untuk `ListenableFuture`/`SettableFuture` (`PlaybackService`, demi API
+session callback Media3) dan `MoreExecutors.directExecutor()` (`PlayerViewModel`).
+`SettableFuture` → `CallbackToFutureAdapter`, `directExecutor()` → `Executor { it.run() }`
+polos. `ListenableFuture` tetap ada sebagai tipe lewat shim kecil
+`com.google.guava:listenablefuture:1.0` (dependency transitif concurrent-futures), bukan
+guava penuh lagi. **Batas jaminan: analisis statis saja — ukuran APK sebelum/sesudah baru
+kelihatan dari artifact GitHub Release setelah push ini.** Prioritas #2-5 dari audit baru
+(error handling, testing, technical debt, maintainability) belum disentuh — batch
+berikutnya. `versionName` tetap `3.9`.
+
 **Batch 27** — Fondasi testing otomatis. Dari self-review internal (skor 8.8/10, prioritas:
 testing → performa → memori/battery → refactor business logic → benchmark → ukuran APK),
 dikerjakan prioritas #1 dulu. 2 gap: (1) CI (`.github/workflows/build.yml`) tidak pernah

@@ -19,8 +19,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
+import androidx.concurrent.futures.CallbackToFutureAdapter
 import com.google.common.util.concurrent.ListenableFuture
-import com.google.common.util.concurrent.SettableFuture
 import com.rudi.audioplayer.MainActivity
 import com.rudi.audioplayer.R
 import com.rudi.audioplayer.data.MusicRepository
@@ -331,21 +331,22 @@ class PlaybackService : MediaLibraryService() {
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
-            val future = SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
-            serviceScope.launch {
-                val saved = loadSavedQueueItems()
-                if (saved != null) {
-                    future.set(
-                        MediaSession.MediaItemsWithStartPosition(saved.items, saved.startIndex, saved.startPositionMs)
-                    )
-                } else {
-                    // Nothing to resume (fresh install, or the saved songs are all gone) —
-                    // fail the future rather than hand back an empty/fake item, which is what
-                    // used to leave a dead, control-less notification stuck on screen.
-                    future.setException(IllegalStateException("Tidak ada antrean tersimpan untuk dilanjutkan"))
+            return CallbackToFutureAdapter.getFuture { completer ->
+                serviceScope.launch {
+                    val saved = loadSavedQueueItems()
+                    if (saved != null) {
+                        completer.set(
+                            MediaSession.MediaItemsWithStartPosition(saved.items, saved.startIndex, saved.startPositionMs)
+                        )
+                    } else {
+                        // Nothing to resume (fresh install, or the saved songs are all gone) —
+                        // fail the future rather than hand back an empty/fake item, which is what
+                        // used to leave a dead, control-less notification stuck on screen.
+                        completer.setException(IllegalStateException("Tidak ada antrean tersimpan untuk dilanjutkan"))
+                    }
                 }
+                "onPlaybackResumption" // debug tag only, shown if this future leaks/never completes
             }
-            return future
         }
     }
 

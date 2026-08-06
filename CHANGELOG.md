@@ -10,6 +10,34 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 28 — Optimasi ukuran APK
+Audit eksternal terbaru (skor 9.3/10) menandai ukuran APK sebagai prioritas #1 (beda urutan
+dari self-review internal Batch 27 yang taruh ini di posisi terakhir — dua sumber, dua
+urutan; dipilih ukuran APK karena satu-satunya dari daftar itu yang hasilnya bisa dicek
+objektif dari ukuran file APK output CI, tanpa butuh runner/emulator untuk verifikasi).
+
+- **Locale filtering** (`app/build.gradle.kts`): app ini cuma punya satu set resource
+  `values/` sendiri (tanpa `values-xx`), tapi AndroidX/Compose/Media3/Coil masing-masing
+  bawa puluhan string hasil terjemahan (kebanyakan label aksesibilitas) untuk locale yang
+  tidak pernah dipakai app ini. `androidResources { localeFilters += listOf("en") }`
+  membatasi resource dari library ke locale itu saja — tidak menyentuh string app sendiri
+  (default/tanpa-qualifier selalu ikut apa pun locale filter-nya)
+- **Guava penuh → `androidx.concurrent:concurrent-futures`**: `com.google.guava:guava`
+  cuma pernah dipakai untuk 3 hal — `ListenableFuture`/`SettableFuture` di
+  `PlaybackService.onPlaybackResumption` dan `MoreExecutors.directExecutor()` di
+  `PlayerViewModel` (keduanya cuma demi memenuhi API session callback Media3 yang memang
+  mengembalikan `ListenableFuture`). Diganti: `SettableFuture` → `CallbackToFutureAdapter`
+  (alur set/setException async lewat coroutine sama persis, cuma lewat `Completer`, bukan
+  future yang di-`set()` langsung), `MoreExecutors.directExecutor()` → `Executor { it.run() }`
+  polos (tidak ada perilaku khusus di baliknya selain itu). `ListenableFuture` sebagai tipe
+  tetap ada — datang dari shim kecil `com.google.guava:listenablefuture:1.0` yang jadi
+  dependency transitif `concurrent-futures`, bukan lagi jar Guava penuh
+- **Batas jaminan**: seperti biasa analisis statis saja (tidak ada kotlinc di environment
+  ini) — verifikasi ukuran APK sebelum/sesudah baru bisa dilihat dari artifact GitHub
+  Release setelah push ini. Prioritas #2-5 dari audit baru (error handling, testing,
+  technical debt, maintainability) sengaja belum disentuh — batch berikutnya. Tidak ada
+  perubahan behavior/fitur user-facing. `versionName` tetap `3.9`.
+
 ## Batch 27 — Fondasi testing otomatis
 Self-review internal proyek (skor 8.8/10) menandai prioritas berikutnya: bukan fitur baru,
 tapi stabilitas/testing/pengurangan technical debt. Batch ini mengerjakan prioritas

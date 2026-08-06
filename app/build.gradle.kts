@@ -97,6 +97,15 @@ android {
         resources.excludes.add("/META-INF/{AL2.0,LGPL2.1}")
     }
 
+    // Batch 28: app itself only ships a single default (unqualified) `values/` resource set —
+    // no `values-xx` locale variants of its own — but AndroidX/Compose/Media3/Coil each bundle
+    // dozens of translated strings (mostly a11y labels) for locales this app never uses. This
+    // restricts packaged library resources to just "en", cutting dead translation weight from
+    // the release APK without touching anything this app's own UI text depends on.
+    androidResources {
+        localeFilters += listOf("en")
+    }
+
     // The unit tests under src/test are plain JVM tests (no Robolectric, no emulator) — any
     // Android SDK call they happen to touch (e.g. Uri.parse while building a test fixture)
     // would otherwise throw "not mocked" instead of just returning a harmless default.
@@ -149,7 +158,12 @@ dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.fragment:fragment-ktx:1.7.1")
 
-    implementation("com.google.guava:guava:33.2.1-android")
+    // Batch 28: replaces full com.google.guava:guava (only ever used here for ListenableFuture/
+    // SettableFuture/MoreExecutors.directExecutor() to satisfy Media3's session-callback API
+    // surface, which returns ListenableFuture). concurrent-futures pulls in just the tiny
+    // com.google.guava:listenablefuture:1.0 interface shim, not the full Guava jar — same
+    // ListenableFuture type, none of the rest of Guava's collections/cache/etc. weight.
+    implementation("androidx.concurrent:concurrent-futures:1.3.0")
 
     // Pure-JVM unit tests only (src/test) — no Robolectric/instrumentation, so these run in
     // seconds with no emulator and are cheap enough to actually get written and kept up to date.
