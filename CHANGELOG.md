@@ -10,16 +10,32 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
-## Batch 32 — Hotfix build gagal dari Batch 31
+## Batch 33 — Hotfix build gagal dari Batch 32 (koreksi diagnosis Batch 32 sendiri)
+`log_fail_94.zip` (build #94) dianalisis: error identik dengan sebelum Batch 32 —
+`Unresolved reference: matchParentSize` di `Utils.kt` baris 16 (import) & 61 (call).
+**Diagnosis Batch 32 ternyata salah.** Root cause sebenarnya: `matchParentSize()` bukan
+extension biasa milik `BoxScope`, tapi member extension function milik `Modifier` yang
+dideklarasikan *di dalam* interface `BoxScope` (`fun Modifier.matchParentSize(): Modifier`
+di dalam `interface BoxScope`, lihat source resmi `androidx.compose.foundation.layout.Box.kt`).
+Artinya: (1) tidak bisa diimpor sebagai fungsi top-level — import Batch 31 sudah salah
+sejak awal; (2) pemanggilannya tetap wajib pakai prefix `Modifier.` walau di dalam lambda
+`Box { }`, karena hanya dispatch receiver (`BoxScope`) yang implicit, extension receiver
+(`Modifier`) tetap harus eksplisit. Fix: hapus baris import yang salah, kembalikan
+pemanggilan ke `Modifier.matchParentSize()`. Tidak ada usage lain fungsi ini di project
+(dicek `grep`). **Pelajaran**: pesan error compiler Batch 32 ("receiver type mismatch...
+`Modifier.matchParentSize()` defined in `BoxScope`") sudah menyebutkan signature yang
+benar secara eksplisit di teksnya sendiri — salah dibaca sebagai instruksi membuang
+prefix `Modifier.`, padahal maksudnya kebalikan itu. `versionName` tetap otomatis dari
+commit count (tidak disentuh batch ini).
+
+## Batch 32 — Hotfix build gagal dari Batch 31 (⚠️ diagnosis salah — lihat Batch 33)
 `log_fail_93.zip` (build #93) dianalisis: `Utils.kt` gagal kompilasi di `AlbumArt` —
-`Unresolved reference: matchParentSize`. Root cause: `matchParentSize()` adalah extension
-function milik `BoxScope`, bukan `Modifier` — kode Batch 31 menulisnya sebagai
-`Modifier.matchParentSize()` (menempel di `Modifier`, padahal fungsinya tidak terdaftar di
-sana). Fix: hapus prefix `Modifier.`, panggil `matchParentSize()` langsung memakai
-implicit receiver `BoxScope` dari lambda `Box { }` tempat `SubcomposeAsyncImage` berada —
-1 baris, 1 file, tidak menyentuh helper `AlbumArt` lainnya. Tidak ada usage lain fungsi ini
-di project (dicek `grep`). `versionName` tetap otomatis dari commit count (tidak disentuh
-batch ini).
+`Unresolved reference: matchParentSize`. Root cause **yang disimpulkan saat itu** (keliru):
+`matchParentSize()` dianggap extension function biasa milik `BoxScope`, bukan `Modifier` —
+kode Batch 31 dianggap salah menulis `Modifier.matchParentSize()`. Fix yang diterapkan:
+hapus prefix `Modifier.`. **Fix ini yang justru menyebabkan build #94 gagal lagi dengan
+error identik** — root cause sebenarnya dan fix yang benar ada di entri Batch 33 di atas.
+`versionName` tetap otomatis dari commit count (tidak disentuh batch ini).
 
 ## Batch 31 — Polish UI/UX pass pertama
 Permintaan: "Fokus Polish UI dan UX sampai masuk tahap akhir". Dikerjakan lewat audit statis

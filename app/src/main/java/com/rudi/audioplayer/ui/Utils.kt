@@ -13,7 +13,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
@@ -58,7 +57,7 @@ fun AlbumArt(
                 model = albumArtUri(albumId),
                 contentDescription = null,
                 contentScale = contentScale,
-                modifier = matchParentSize(),
+                modifier = Modifier.matchParentSize(),
                 loading = {},
                 error = { if (showIcon) AlbumArtFallbackIcon() }
             )
