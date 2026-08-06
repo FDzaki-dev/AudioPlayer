@@ -19,6 +19,14 @@ fun gitCommitCount(): Int = try {
 }
 
 val appVersionCode = gitCommitCount()
+// Batch 30: versionName now derives from the same git-commit-count basis as versionCode,
+// instead of a separately hand-maintained string. Two wins: (1) never needs a manual bump
+// again — same "never forget" guarantee gitCommitCount() already gave versionCode; (2) the
+// in-app version now numerically matches the CI-generated GitHub Release tag/APK filename
+// (both land on "1.0.<count>") — both independently run `git rev-list --count HEAD` against
+// the same commit, so they can't drift apart. Nothing in .github/workflows/build.yml needed
+// to change to get that match.
+val appVersionName = "1.0.$appVersionCode"
 
 android {
     namespace = "com.rudi.audioplayer"
@@ -29,10 +37,16 @@ android {
         minSdk = 23
         targetSdk = 34
         versionCode = appVersionCode
-        // versionCode auto-increments with git history (see gitCommitCount() above) so it can
-        // never be forgotten. versionName stays a deliberate, human-readable string set per
-        // release — kept in sync with the zip filename and commit message for that update.
-        versionName = "3.9"
+        // versionCode and versionName both auto-derive from git commit count (see
+        // gitCommitCount()/appVersionName above) — neither needs a manual bump.
+        versionName = appVersionName
+        // Batch 29 (hotfix): Batch 28 used androidResources.localeFilters, which doesn't exist
+        // yet on this project's AGP 8.4.1 (confirmed by CI: "Unresolved reference:
+        // localeFilters" — that DSL landed in a later AGP release than what's pinned here).
+        // resourceConfigurations does the same job (drop unused library translation resources)
+        // and is fully supported on 8.4.1 — only deprecated starting AGP 8.8, which this
+        // project isn't on.
+        resourceConfigurations += listOf("en")
     }
 
     signingConfigs {
@@ -95,15 +109,6 @@ android {
     }
     packaging {
         resources.excludes.add("/META-INF/{AL2.0,LGPL2.1}")
-    }
-
-    // Batch 28: app itself only ships a single default (unqualified) `values/` resource set —
-    // no `values-xx` locale variants of its own — but AndroidX/Compose/Media3/Coil each bundle
-    // dozens of translated strings (mostly a11y labels) for locales this app never uses. This
-    // restricts packaged library resources to just "en", cutting dead translation weight from
-    // the release APK without touching anything this app's own UI text depends on.
-    androidResources {
-        localeFilters += listOf("en")
     }
 
     // The unit tests under src/test are plain JVM tests (no Robolectric, no emulator) — any

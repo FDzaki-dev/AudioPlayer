@@ -10,6 +10,57 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 30 — Otomatisasi & minimalisasi versionName
+Permintaan: "otomatisasi dan minimalisasi yang terkait" bump versi. Ditemukan saat cek
+`build.yml`: `versionName` app (`3.9`, manual) dan tag GitHub Release (`v1.0.<commit-count>`,
+otomatis) adalah **dua angka yang tidak nyambung** — sumber kebingungan/friksi yang dimaksud.
+
+- `versionName` sekarang ikut turunan dari `gitCommitCount()` yang sama dipakai
+  `versionCode` — pola `1.0.<jumlah commit>`. Tidak ada lagi string manual yang perlu diingat
+  atau dibump
+- **Efek samping otomatis, tanpa nyentuh `.github/workflows/build.yml` sama sekali**: karena
+  CI juga menghitung `git rev-list --count HEAD` dari commit yang sama untuk tag rilis, nomor
+  di app (`Settings → AudioPlayer versi 1.0.254`) dan nomor di nama file APK/tag GitHub
+  Release (`AudioPlayer-v1.0.254-release.apk`) sekarang **selalu match** — dua perhitungan
+  independen, git history yang sama, hasil dijamin sama
+- **Catatan jujur (trade-off, bukan dianggap masalah karena ini yang diminta)**: tampilan di
+  `SettingsScreen` (`"AudioPlayer versi ${VERSION_NAME} (build ${VERSION_CODE})"`) sekarang
+  menampilkan dua angka yang mirip (`1.0.254` dan `254`) — tidak lagi ada nomor rilis
+  "kurasi" bergaya `3.9`/`4.0`. Kalau nanti ingin nomor yang lebih rapi user-facing lagi,
+  ini bisa direvisi lagi terpisah
+- Dokumentasi disinkronkan: README.md § "Standar Penomoran Versi" + PROJECT_STATE.md §
+  "Konvensi penamaan ZIP & versi" ditulis ulang, keduanya masih menyebut skema manual lama
+  sebelum batch ini
+- **Efek ke pelaporan batch selanjutnya**: baris "`versionName` tetap X" yang biasa ditulis
+  di tiap entri Batch/PROJECT_STATE **tidak relevan lagi mulai batch ini** — `versionName`
+  sekarang otomatis naik tiap commit sama seperti `versionCode`, bukan keputusan per-batch
+- **Batas jaminan**: analisis statis saja. Perubahan murni satu baris ekspresi Kotlin
+  (`val appVersionName = "1.0.$appVersionCode"`), risiko kegagalan build sangat rendah
+  dibanding Batch 28 (tidak ada DSL/API baru yang perlu diverifikasi terhadap versi AGP)
+
+## Batch 29 — Hotfix build gagal Batch 28
+`log_fail_91.zip` (test-output.log, build #91) dianalisis: `androidResources { localeFilters
++= listOf("en") }` dari Batch 28 gagal kompilasi — `e: Unresolved reference: localeFilters`
+di `app/build.gradle.kts:106`. Root cause: `localeFilters` di blok `androidResources` memang
+DSL AGP yang benar secara konsep, tapi baru tersedia di rilis AGP setelah 8.4.1 (versi yang
+dipakai project ini) — bukan sejak AGP 8.0 seperti yang diasumsikan Batch 28.
+
+- **Fix**: ganti ke `resourceConfigurations += listOf("en")` di `defaultConfig` — DSL lama
+  tapi terverifikasi didukung penuh di AGP 8.4.1 (baru deprecated mulai AGP 8.8, project ini
+  belum di sana). Hasil akhir identik dengan niat Batch 28: buang resource terjemahan
+  AndroidX/Compose/Media3/Coil untuk locale selain "en"
+- Perubahan Guava → `androidx.concurrent:concurrent-futures` dari Batch 28 **tidak
+  disentuh** — bukan sumber kegagalan build ini (error murni di baris `localeFilters`,
+  gagal sebelum sempat compile Kotlin sama sekali)
+- **Pelajaran**: klaim "tersedia sejak AGP X" dari sumber pihak ketiga (blog, artikel) tidak
+  cukup tanpa verifikasi ke changelog resmi AGP per versi — Batch 28 percaya klaim itu tanpa
+  cross-check ke versi AGP project (`8.4.1`) secara spesifik. Ke depan: DSL Gradle baru wajib
+  dicek terhadap nomor versi AGP project ini persis, bukan generalisasi "AGP 8.0+"
+- **Batas jaminan**: analisis statis saja (tidak ada kotlinc di environment ini) —
+  `resourceConfigurations` adalah DSL yang sudah lama stabil (bertahun-tahun, pra-AGP 8.0),
+  jadi risiko kegagalan yang sama jauh lebih rendah dari Batch 28, tapi verifikasi sungguhan
+  tetap baru terjadi di push ini. `versionName` tetap `3.9`.
+
 ## Batch 28 — Optimasi ukuran APK
 Audit eksternal terbaru (skor 9.3/10) menandai ukuran APK sebagai prioritas #1 (beda urutan
 dari self-review internal Batch 27 yang taruh ini di posisi terakhir — dua sumber, dua

@@ -68,9 +68,11 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Shake-to-Skip**: opsi di Pengaturan (nonaktif secara default — gesture fisik harus sengaja diaktifkan user) untuk lompat ke lagu berikutnya dengan mengocok HP selagi musik diputar. Pakai accelerometer dengan debounce (satu kocokan = satu skip, bukan rentetan), dan sensor cuma aktif selagi musik benar-benar berjalan — hemat baterai, tidak kepicu asal di kantong saat idle
 
 ## Standar Penomoran Versi
-`versionCode` (nomor internal, tidak terlihat user) naik otomatis mengikuti jumlah commit git — jadi tidak akan pernah lupa di-bump dan APK baru selalu dikenali "lebih baru" oleh Android. `versionName` (nomor yang terlihat user, misal `3.8`) tetap dikontrol manual, dibump sesekali di titik-titik rilis yang dianggap layak, bukan tiap batch.
+`versionCode` dan `versionName` (Batch 30) **sama-sama otomatis**, keduanya turunan dari jumlah commit git (`gitCommitCount()` di `app/build.gradle.kts`) — tidak ada lagi angka yang perlu diingat/dibump manual. `versionName` berpola `1.0.<jumlah commit>`, contoh `1.0.254`.
 
-Nama file ZIP hasil tiap batch pengembangan (`AudioPlayer-batchN-release.zip`) melacak nomor batch percakapan, **bukan** `versionName` — keduanya sengaja dipisah: `versionName` untuk rilis yang user-facing, nomor batch untuk melacak paket kerja per sesi supaya ZIP lama dan baru gampang dibedakan.
+Konsekuensi praktis: nomor yang tampil di app (`Settings → AudioPlayer versi 1.0.254 (build 254)`) dan nomor di tag GitHub Release/nama file APK (`AudioPlayer-v1.0.254-release.apk`) **selalu sama persis** — keduanya menghitung `git rev-list --count HEAD` dari commit yang sama, jadi tidak mungkin drift, walau dihitung di dua tempat terpisah (Gradle & `.github/workflows/build.yml`) dan tidak butuh salah satunya membaca dari yang lain.
+
+Nama file ZIP hasil tiap batch pengembangan (`AudioPlayer-batchN-release.zip`) tetap melacak nomor batch percakapan, **bukan** versionName/versionCode — ini sengaja tetap terpisah, karena nomor batch melacak paket kerja per sesi chat, sedangkan versionName/versionCode melacak histori commit git; keduanya naik dengan kecepatan berbeda (satu batch chat bisa berisi banyak commit).
 
 File APK hasil build dan asset GitHub Release membawa nomor versi di namanya, diakhiri `-release` (`AudioPlayer-v1.0.247-release.apk`) — bukan nama generik statis, dan sengaja **tanpa** short commit hash di belakang supaya nama file tetap stabil/gampang dikenali. Penamaan ini dikerjakan di level workflow CI (`.github/workflows/build.yml`), bukan dobel dengan Gradle, biar tidak saling tabrak.
 

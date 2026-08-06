@@ -6,6 +6,28 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 30** — Otomatisasi & minimalisasi versionName. Ditemukan lewat cek `build.yml` untuk
+jawab permintaan ini: `versionName` app (manual, `3.9`) dan tag GitHub Release (otomatis,
+`v1.0.<commit-count>`) adalah dua angka tak nyambung. Fix: `versionName` sekarang turunan
+`gitCommitCount()` yang sama dipakai `versionCode` (pola `1.0.<commit-count>`) — tidak ada
+lagi bump manual. Efek samping tanpa nyentuh CI workflow sama sekali: nomor di app dan nomor
+di nama file APK/tag Release sekarang selalu match (dua perhitungan independen, git history
+sama). Trade-off jujur: tampilan Settings sekarang dua angka mirip (`1.0.254` / `254`), tidak
+ada lagi nomor rilis "kurasi" gaya `3.9`. README § Standar Penomoran Versi + footer
+PROJECT_STATE.md disinkronkan. **Baris "`versionName` tetap X" di pelaporan batch sudah
+tidak relevan mulai batch ini** — naik otomatis tiap commit.
+
+**Batch 29** — Hotfix build gagal dari Batch 28. `log_fail_91.zip` (build #91) dianalisis:
+`androidResources { localeFilters += listOf("en") }` gagal kompilasi — `Unresolved
+reference: localeFilters`. Root cause: DSL itu benar secara konsep tapi baru ada di rilis
+AGP setelah 8.4.1 (versi project ini), bukan sejak AGP 8.0 seperti diasumsikan Batch 28.
+Fix: ganti ke `resourceConfigurations += listOf("en")` di `defaultConfig` — DSL lama, sudah
+lama stabil, terverifikasi didukung penuh di AGP 8.4.1. Hasil akhir (buang resource
+terjemahan library untuk locale selain "en") identik dengan niat Batch 28. Perubahan Guava→
+concurrent-futures dari Batch 28 tidak disentuh (bukan sumber kegagalan). **Pelajaran:
+klaim "tersedia sejak AGP X" dari sumber pihak ketiga butuh cross-check ke nomor AGP project
+ini persis, bukan digeneralisasi.** `versionName` tetap `3.9`.
+
 **Batch 28** — Optimasi ukuran APK. Audit eksternal baru (skor 9.3/10) taruh ukuran APK di
 prioritas #1 — beda urutan dari self-review internal Batch 27 (taruh di posisi terakhir);
 dipilih karena satu-satunya yang hasilnya bisa dicek objektif dari ukuran APK output CI
@@ -257,6 +279,18 @@ Ditulis supaya kesalahan yang sama tidak terulang di sesi baru yang tidak tahu k
   variasi kecil (mis. coba versi lain) — curigai bahwa root cause-nya beda level dari yang
   didiagnosis, cari penjelasan yang lebih dalam (di sini: dua CompositionLocal berbeda, bukan
   cuma soal versi) sebelum coba lagi.**
+- **Batch 29 — Build gagal total, `androidResources.localeFilters` (Batch 28) tidak dikenal
+  compiler**: `e: Unresolved reference: localeFilters` di `app/build.gradle.kts`, ditemukan
+  dari `log_fail_91.zip` (build #91) yang diupload user. DSL itu sendiri benar — dokumentasi
+  resmi Android menyebutnya cara modern untuk locale filtering — tapi baru tersedia mulai
+  rilis AGP setelah 8.4.1, dan project ini terkunci di 8.4.1 (`build.gradle.kts` root). Fix:
+  `defaultConfig { resourceConfigurations += listOf("en") }`, DSL lama yang sudah bertahun-
+  tahun stabil dan terverifikasi jalan di 8.4.1 (baru deprecated mulai AGP 8.8). **Pelajaran:
+  sumber pihak ketiga (blog/artikel) yang bilang "tersedia sejak AGP 8.0+" tidak otomatis
+  berarti tersedia di versi AGP project ini — DSL Gradle baru wajib dicek nomor AGP project
+  ini persis (di sini: 8.4.1) sebelum dipakai, bukan digeneralisasi dari klaim versi minimum
+  yang lebih rendah. Tanpa `kotlinc` di environment kerja, ini juga jenis kesalahan yang
+  hanya kelihatan lewat build CI yang benar-benar gagal — bukan dari baca kode statis.**
 
 ## Keputusan arsitektur utama
 Ringkasan penuh + alasan ada di README.md § "Keputusan Arsitektur". Poin paling kritis:
@@ -280,7 +314,7 @@ com.rudi.audioplayer/
 ```
 
 ## Konvensi penamaan ZIP & versi
-`AudioPlayer-batchN-release.zip` melacak nomor batch percakapan (bukan `versionName`).
-`versionCode` naik otomatis mengikuti jumlah commit git. `versionName` dibump manual hanya
-di titik rilis yang dianggap layak, bukan tiap batch. Detail lengkap di README.md §
-"Standar Penomoran Versi".
+`AudioPlayer-batchN-release.zip` melacak nomor batch percakapan (bukan versionName/versionCode).
+`versionCode` dan `versionName` (sejak Batch 30) sama-sama otomatis dari jumlah commit git —
+tidak ada lagi bump manual untuk keduanya. Detail lengkap di README.md § "Standar Penomoran
+Versi".
