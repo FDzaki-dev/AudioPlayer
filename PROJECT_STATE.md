@@ -6,6 +6,34 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 34** — Arahan baru mulai batch ini: **stop fitur baru, fokus debugging +
+optimalisasi performa & eksekusi sampai aplikasi matang**. Audit kode nyata (bukan asumsi)
+menemukan 2 hal, keduanya dikerjakan sekaligus atas persetujuan user:
+1. **Widget jank (performa)** — `pushWidgetUpdate()` di `PlaybackService` decode+crop+round
+   bitmap album-art secara síncron di **main thread** (lewat `WidgetUpdater.updateAll`),
+   dipanggil tiap `onMediaItemTransition` & `onIsPlayingChanged` — dua event paling sering
+   dan paling terlihat user (ganti lagu, tap play/pause). Fix: kerjaan berat dipindah ke
+   `serviceScope.launch(Dispatchers.IO)`, dengan `widgetUpdateJob` yang di-cancel sebelum
+   relaunch supaya skip/toggle cepat tidak bikin update lama nimpa update baru (race
+   kondisi art/state jadi stale). `saveState` (SharedPreferences) tetap di thread pemanggil
+   karena `.apply()` sudah async-safe sendiri.
+2. **Crash logger drift dari spec (debugging)** — `AppLogger.writePublicCrashLog` ternyata
+   sudah lama menyimpang dari spec awal ("FIFO Retention max 50, metadata lengkap
+   Version/OS/Model/Timestamp/Thread/StackTrace, nama file pakai UUID"): belum ada UUID di
+   nama file (risiko overwrite kalau crash-loop dalam detik yang sama), belum ada retensi
+   FIFO sama sekali (folder `Documents/AudioPlayer/logs` numpuk tanpa batas), metadata cuma
+   Timestamp+Thread+StackTrace (tidak ada Version/OS/Model — paling penting buat triage
+   lintas device/build). Fix: tambah `UUID.randomUUID()` di nama file, tambah blok
+   Version/OS/Model ke isi log (versi lewat `PackageInfoCompat.getLongVersionCode`, sudah
+   ada dependency `androidx.core:core-ktx` di `build.gradle.kts`), tambah
+   `enforceCrashLogRetention()` — query MediaStore by `RELATIVE_PATH` terurut
+   `DATE_ADDED DESC`, hapus sisa di luar 50 terbaru. Log privat (`diagnostic_log.txt`,
+   trim-by-size) tidak disentuh — itu mekanisme terpisah dan sudah benar.
+
+Kedua fix **belum diverifikasi build/runtime asli** (tidak ada compiler Android di
+environment kerja) — hanya analisis statis (grep + baca kode + cross-check API behavior).
+`versionName` tetap otomatis dari commit count (tidak disentuh batch ini).
+
 **Batch 33** — Hotfix build gagal dari Batch 32, **diagnosis Batch 32 sendiri ternyata
 salah**. `log_fail_94.zip` (build #94): error identik dengan sebelum Batch 32 —
 `Unresolved reference: matchParentSize` di `Utils.kt` baris 16 (import) & 61 (call).

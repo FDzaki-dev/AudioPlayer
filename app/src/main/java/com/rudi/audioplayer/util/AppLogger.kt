@@ -1,15 +1,18 @@
 package com.rudi.audioplayer.util
 
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import androidx.core.content.pm.PackageInfoCompat
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 
 /**
  * Local-only diagnostic log. Every entry is written to a single file in this app's private
@@ -34,6 +37,11 @@ object AppLogger {
     // Once the file crosses this size, the oldest half of its lines is dropped — keeps the
     // log useful (recent-first context for whatever just went wrong) without growing forever.
     private const val MAX_LOG_BYTES = 200_000L
+
+    // FIFO cap for the public Documents/AudioPlayer/logs folder — a crash loop must not fill
+    // the user's Documents with an unbounded number of files.
+    private const val MAX_CRASH_LOGS = 50
+    private val CRASH_LOG_RELATIVE_PATH = "${Environment.DIRECTORY_DOCUMENTS}/AudioPlayer/logs"
 
     private var logFile: File? = null
     private var appContext: Context? = null
@@ -98,22 +106,58 @@ object AppLogger {
     /** Writes a standalone crash report to the public Documents/AudioPlayer/logs folder so it's
      * reachable with a normal file manager even if the app can no longer be opened at all. Silently
      * does nothing below API 29 (pre-scoped-storage) rather than risk needing a storage permission
-     * mid-crash. */
+     * mid-crash.
+     *
+     * Batch 34: brought in line with the original crash-logger spec, which this had drifted from —
+     * filename now carries a UUID (two crashes in the same second no longer overwrite each other),
+     * content now includes app version + OS + device model (not just thread/stacktrace, which alone
+     * isn't enough to tell which build or which device a report came from), and a FIFO sweep now
+     * caps this folder at 50 files instead of growing forever. */
     private fun writePublicCrashLog(thread: Thread, throwable: Throwable) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
         val context = appContext ?: return
-        val fileName = "crash_${fileStampFormat.format(Date())}.txt"
+        val fileName = "crash_${fileStampFormat.format(Date())}_${UUID.randomUUID()}.txt"
+        val versionInfo = runCatching {
+            val info = context.packageManager.getPackageInfo(context.packageName, 0)
+            "${info.versionName} (${PackageInfoCompat.getLongVersionCode(info)})"
+        }.getOrDefault("unknown")
         val content = "Waktu: ${dateFormat.format(Date())}\n" +
+            "Versi Aplikasi: $versionInfo\n" +
+            "OS: Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n" +
+            "Perangkat: ${Build.MANUFACTURER} ${Build.MODEL}\n" +
             "Thread: ${thread.name}\n\n" +
             Log.getStackTraceString(throwable)
 
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
             put(MediaStore.MediaColumns.MIME_TYPE, "text/plain")
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOCUMENTS}/AudioPlayer/logs")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, CRASH_LOG_RELATIVE_PATH)
         }
         val resolver = context.contentResolver
         val uri = resolver.insert(MediaStore.Files.getContentUri("external"), values) ?: return
         resolver.openOutputStream(uri)?.use { it.write(content.toByteArray()) }
+        runCatching { enforceCrashLogRetention(context) }
+    }
+
+    /** Keeps only the newest [MAX_CRASH_LOGS] files in the public crash-log folder, oldest first
+     * out — a crash loop (the exact scenario this logger exists for) must not fill the user's
+     * Documents folder with an unbounded number of files. */
+    private fun enforceCrashLogRetention(context: Context) {
+        val resolver = context.contentResolver
+        val collection = MediaStore.Files.getContentUri("external")
+        val projection = arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DATE_ADDED)
+        val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} = ? AND ${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
+        val selectionArgs = arrayOf("$CRASH_LOG_RELATIVE_PATH/", "crash_%.txt")
+        val ids = mutableListOf<Long>()
+        resolver.query(collection, projection, selection, selectionArgs, "${MediaStore.MediaColumns.DATE_ADDED} DESC")?.use { cursor ->
+            val idCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+            while (cursor.moveToNext()) ids.add(cursor.getLong(idCol))
+        }
+        if (ids.size <= MAX_CRASH_LOGS) return
+        for (id in ids.drop(MAX_CRASH_LOGS)) {
+            runCatching {
+                resolver.delete(ContentUris.withAppendedId(collection, id), null, null)
+            }
+        }
     }
 }

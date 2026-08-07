@@ -60,6 +60,11 @@ class PlaybackService : MediaLibraryService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var shakeDetector: ShakeDetector? = null
     private var coldStartNotificationActive = false
+    // Batch 34: pushWidgetUpdate fires on every track transition and every play/pause tap —
+    // both high-frequency, high-visibility moments. Tracking the job lets a fast skip/toggle
+    // cancel a still-decoding older update instead of letting it land after a newer one and
+    // show stale art/state.
+    private var widgetUpdateJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -129,6 +134,12 @@ class PlaybackService : MediaLibraryService() {
 
     private fun pushWidgetUpdate(player: Player) {
         val metadata = player.currentMediaItem?.mediaMetadata
+        // saveState is cheap (SharedPreferences.apply() is already async-safe) and stays on
+        // the caller's thread; updateAll is the expensive part — it decodes, center-crops, and
+        // rounds the album-art bitmap, which used to block this listener's thread (main) on
+        // every track change and every play/pause tap. Batch 34: moved to IO, with the previous
+        // in-flight update cancelled so a fast skip/toggle can't have an older decode land after
+        // a newer one and show stale art.
         WidgetUpdater.saveState(
             context = this,
             title = metadata?.title?.toString(),
@@ -136,7 +147,10 @@ class PlaybackService : MediaLibraryService() {
             artworkUri = metadata?.artworkUri,
             isPlaying = player.isPlaying
         )
-        WidgetUpdater.updateAll(this)
+        widgetUpdateJob?.cancel()
+        widgetUpdateJob = serviceScope.launch(Dispatchers.IO) {
+            WidgetUpdater.updateAll(this@PlaybackService)
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaSession

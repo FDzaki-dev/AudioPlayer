@@ -10,6 +10,27 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 34 — Fokus baru: debugging + performa (bukan fitur baru)
+Arahan proyek berubah mulai batch ini: berhenti nambah fitur, fokus mematangkan yang sudah
+ada lewat debugging & optimalisasi. Audit kode nyata menemukan 2 masalah, dikerjakan
+sekaligus:
+- **Widget jank**: `PlaybackService.pushWidgetUpdate()` decode+crop+round bitmap album-art
+  di main thread, dipanggil tiap ganti lagu & tiap tap play/pause (`onMediaItemTransition`,
+  `onIsPlayingChanged`). Dipindah ke `serviceScope.launch(Dispatchers.IO)`, plus
+  `widgetUpdateJob?.cancel()` sebelum relaunch biar skip/toggle cepat nggak bikin update
+  lama nimpa balik update baru. `saveState` (SharedPreferences, sudah async-safe) tetap di
+  thread asal.
+- **Crash logger drift dari spec**: `AppLogger.writePublicCrashLog` belum pernah punya UUID
+  di nama file (risiko overwrite pas crash-loop), belum ada FIFO retention (folder
+  `Documents/AudioPlayer/logs` numpuk tanpa batas), metadata belum ada Version/OS/Model.
+  Ditambah `UUID.randomUUID()` di filename, blok metadata versi (`PackageInfoCompat`) + OS +
+  model perangkat, dan `enforceCrashLogRetention()` yang jaga folder tetap ≤50 file
+  (query MediaStore `RELATIVE_PATH`, urut `DATE_ADDED DESC`, hapus sisa di luar 50 terbaru).
+  Log privat (`diagnostic_log.txt`) tidak berubah.
+
+Belum diverifikasi build/runtime asli (tidak ada compiler di environment kerja) — hanya
+analisis statis. `versionName` tetap otomatis dari commit count.
+
 ## Batch 33 — Hotfix build gagal dari Batch 32 (koreksi diagnosis Batch 32 sendiri)
 `log_fail_94.zip` (build #94) dianalisis: error identik dengan sebelum Batch 32 —
 `Unresolved reference: matchParentSize` di `Utils.kt` baris 16 (import) & 61 (call).
