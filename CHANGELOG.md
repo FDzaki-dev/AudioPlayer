@@ -10,6 +10,59 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 38 — Fix dokumentasi drift tema + tambah tema custom Matte Noir
+Audit lanjutan menemukan `README.md`/`PROJECT_STATE.md` masih deskripsikan sistem tema lama
+("3 tema penuh": Ink & Brass/Midnight Bloom/Paper & Ink) dan klaim status bar "dipaksa kontras
+terang, tidak ikut mode terang/gelap sistem" — padahal `ui/theme/Theme.kt` sudah lama migrasi
+ke model Apple-style `SYSTEM`/`LIGHT`/`DARK` (komentar kode sendiri: *"replacing the old
+five-identity theme system"*), dan `MainActivity.kt:187` sudah `isAppearanceLightStatusBars =
+!isDarkTheme` (ikut tema, bukan dipaksa). Persis pola drift yang diperingatkan di Batch 17
+("fitur baru wajib langsung masuk README di batch yang sama, jangan ditunda") — kali ini
+migrasinya sendiri yang lolos tak terdokumentasi.
+
+Atas permintaan eksplisit, dikerjakan sekaligus dalam 1 tema kohesif (theme-system expansion):
+- **Apple (SYSTEM/LIGHT/DARK) dikukuhkan sebagai tema utama/default** — tidak ada perubahan
+  perilaku, `AppTheme.SYSTEM` tetap default di `AudioPlayerTheme()` & `ThemeStore`, cuma
+  ditegaskan lewat dokumentasi & komentar kode.
+- **Tema ke-4: `AppTheme.MATTE` ("Matte Noir")** — identitas custom yang sengaja dibuat
+  berkebalikan dari Apple, tapi tetap terasa "matte native ultra premium":
+  - Warna (`Color.kt`): `MatteBackground` #14120F (matte hangat, bukan hitam OLED murni),
+    `MatteAccent` #C9793C (tembaga, bukan biru `AppleAccent`), `MatteSuccess` #6B8F5A (hijau
+    matte teredam untuk role `tertiary`)
+  - Bentuk (`Theme.kt`, `MatteShapes`): sudut 4/6/8dp nyaris kotak — kebalikan `AppleShapes`
+    yang 14/20/28dp membulat generous
+  - Tipografi (`Type.kt`, `MatteTypography`): judul pakai `FontFamily.Serif` (font sistem
+    bawaan, tidak nambah aset font baru) untuk kesan editorial boutique-hi-fi, body tetap
+    sans-serif `Default` demi keterbacaan list panjang
+  - Statis selalu gelap (`resolveIsDark(MATTE) = true`) — tidak ikut mode sistem, sesuai
+    perilaku 3 tema identity lama sebelum migrasi
+- **`colorsFor()` refactor**: signature berubah dari `(isDark: Boolean)` jadi `(theme:
+  AppTheme, isDark: Boolean)` supaya bisa cabang ke `MatteColors` tanpa collision dengan
+  boolean dark/light Apple biasa. 1 pemanggil luar (`SettingsScreen.kt:288`, preview swatch
+  di kartu pemilih tema) disesuaikan; `resolveIsDark()` sendiri tidak berubah signature
+  (masih dipakai apa adanya oleh `MainActivity.kt:183` untuk ikon status/nav bar).
+- **Fix warna hardcode** (temuan sebelah, sekalian dikerjakan): `SignatureMatcherSheet.kt:96`
+  `Color(0xFF3FA34D)` (hijau MATCH signature APK) → `MaterialTheme.colorScheme.tertiary`,
+  jadi otomatis theme-aware di 4 tema (dulu MISMATCH/ERROR sudah pakai `colorScheme.error`,
+  MATCH-nya saja yang ketinggalan). Ini alasan `tertiary`/`onTertiary` ditambah ke
+  `AppleDarkColors`/`AppleLightColors` (pakai `AppleDarkSuccess`/`AppleLightSuccess`, hijau
+  sistem iOS) — dulu tidak diisi eksplisit (default M3 generik). Import `Color` yang jadi
+  tak terpakai di file itu ikut dibersihkan.
+
+9 file disentuh: `Theme.kt`, `Color.kt`, `Type.kt`, `SettingsScreen.kt`,
+`SignatureMatcherSheet.kt`, `README.md`, `PROJECT_STATE.md`, `CHANGELOG.md`,
+`FILE_MANIFEST.txt` (tak berubah isi, cuma diverifikasi tetap 107 — tidak ada file baru,
+semua penambahan masuk file existing). Diklaim sebagai **Atomic Change** (1 tema kohesif,
+lintas file saling bergantung — enum baru butuh scheme+shape+typography+1 pemanggil
+disesuaikan bareng, tidak bisa dipecah tanpa bikin build merah di antara commit).
+**Belum diverifikasi build/runtime asli** (tidak ada compiler Android di environment kerja) —
+dicek statis: brace/paren balance tiap file, `grep` seluruh pemanggil `colorsFor`/
+`resolveIsDark` untuk pastikan tidak ada yang lolos dari refactor signature.
+
+Ditemukan tapi belum dikerjakan: swatch preview `ThemeOptionCard` di `SettingsScreen.kt`
+belum menunjukkan bentuk sudut/tipografi khas Matte Noir (cuma warna) — kalau mau preview
+lebih representatif, perlu sentuh render swatch-nya juga (di luar scope batch ini).
+
 ## Batch 37 — Polish UI/UX: truncation tanpa ellipsis (lanjutan temuan Batch 31)
 Audit lanjutan menyisir seluruh `maxLines = 1` di `ui/*.kt` (21 titik) untuk cari yang belum
 punya `overflow = TextOverflow.Ellipsis` maupun `basicMarquee()` — pola yang sudah konsisten

@@ -41,3 +41,38 @@ val AppleTypography = Typography(
         letterSpacing = 0.6.sp
     )
 )
+
+// Matte Noir's typographic opposite: serif headlines (system serif, no bundled
+// font needed) for an editorial, boutique-hi-fi feel instead of Apple's crisp
+// sans — body text stays sans-serif so long lists remain just as legible.
+val MatteTypography = Typography(
+    titleLarge = TextStyle(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.Bold,
+        fontSize = 28.sp,
+        letterSpacing = 0.sp
+    ),
+    titleMedium = TextStyle(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 17.sp,
+        letterSpacing = 0.sp
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 15.sp,
+        letterSpacing = (-0.1).sp
+    ),
+    bodySmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 13.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 11.sp,
+        letterSpacing = 0.6.sp
+    )
+)

@@ -30,12 +30,9 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Kelola folder**: pilih folder mana saja yang mau disertakan/dikecualikan dari pemindaian musik otomatis, **plus tambahkan folder tambahan lewat izin sistem** (Storage Access Framework) untuk memindai audio yang belum terdeteksi MediaStore — bekerja penuh offline/lokal, tidak ada koneksi internet yang terlibat
 - **Widget lebih tahan banting**: diperbaiki supaya tetap merespons play/pause/next meski aplikasi sudah disingkirkan total dari recent apps — service langsung "lapor" ke sistem sebagai proses aktif begitu widget ditekan, sebelum sempat dibunuh oleh pengelola baterai agresif (relevan khususnya di skin seperti XOS/MIUI). Widget juga ikut update judul/artis/status main tiap kali lagu berganti
 - **Pencocok Signature APK**: alat diagnostik di Perpustakaan (ikon sidik jari) — pilih dua file APK (versi lama & baru), langsung ketahuan apakah keduanya ditandatangani dengan key yang sama tanpa perlu install dulu. Kalau beda, laporan lengkap (nama package, versi, SHA-256 tiap file) bisa disalin ke papan klip lewat dialog khusus (bisa di-scroll penuh) — bukan cuma tombol OK polos kayak dialog instalasi Android
-- **3 tema penuh** (bukan cuma ganti warna): tiap tema punya palet warna, jenis huruf, dan bahasa bentuk sudut sendiri-sendiri.
-  - **Ink & Brass** (gelap) — boutique hi-fi, emas hangat di atas hitam pekat, judul bertipe serif tegas
-  - **Midnight Bloom** (gelap) — jewel-tone, rose-orchid lembut di atas aubergine pekat, tipografi bold dengan tracking rapat, sudut sedang
-  - **Paper & Ink** (terang) — krem hangat + sienna terbakar, serif tipis gaya editorial cetak, sudut nyaris kotak
+- **4 tema**: keluarga utama gaya Apple (ikuti sistem, terang, gelap — palet iOS system color, sudut membulat generous) plus satu identitas custom, **Matte Noir**, yang sengaja dibuat berkebalikan: hitam matte hangat (bukan hitam/putih ekstrem ala Apple), aksen tembaga (bukan biru), judul bertipe serif (bukan sans khas SF Pro), sudut nyaris kotak (bukan membulat) — kesan hardware premium yang dikerjakan tangan, bukan permukaan native OS. Matte Noir statis (tidak ikut mode terang/gelap sistem, selalu gelap).
 
-  Dipilih lewat tab **Pengaturan** baru di navigasi bawah, tersimpan otomatis, diterapkan ulang tiap sesi
+  Dipilih lewat tab **Pengaturan** di navigasi bawah, tersimpan otomatis, diterapkan ulang tiap sesi
 - **Halaman Pengaturan**: tab baru di navigasi bawah — berisi pemilih tema dan info versi aplikasi (nomor versi + build)
 - **Filter Perpustakaan tersimpan**: tab yang terakhir dipilih (Lagu/Album/Artis/Folder/dst.) diingat di antar sesi
 - **Onboarding**: layar selamat datang menjelaskan kenapa izin dibutuhkan sebelum dialog izin muncul, dengan fallback "Buka Pengaturan Aplikasi" kalau izin ditolak permanen
@@ -43,7 +40,7 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 - **Navigasi gesture back**: gesture back sistem sekarang navigasi bertahap sesuai stack (Now Playing → Perpustakaan/Beranda), bukan langsung keluar aplikasi
 - **Now Playing lebih atmosferik**: backdrop blur dari album art (seperti Spotify/Apple Music) di belakang piringan hitam yang berputar, dipadu warna aksen dinamis per lagu
 - **Micro-interaction**: tombol play/pause, shuffle, repeat, favorit, dan navigasi lagu kini punya animasi "bounce" halus tiap ditekan — bukan cuma ganti ikon instan
-- **Status bar & navigation bar** dipaksa kontras terang, konsisten dengan tema gelap aplikasi, tidak ikut mode terang/gelap sistem
+- **Status bar & navigation bar** ikut mode terang/gelap tema aktif (ikon gelap di tema terang, ikon terang di tema gelap/Matte Noir) — bukan dipaksa satu arah
 - **Shimmer skeleton loading** kini konsisten di Beranda (bentuknya persis kartu asli), bukan cuma spinner generik
 - **Haptic diperluas**: reorder antrean, hapus dari antrean, dan berhasil tambah ke playlist masing-masing punya pola getar berbeda
 - **Search dikelompokkan**: hasil pencarian dipisah per Artis / Album / Lagu (bukan satu list rata), plus riwayat pencarian terbaru saat kolom pencarian masih kosong

@@ -285,7 +285,7 @@ fun SettingsScreen(
 
 @Composable
 private fun ThemeOptionCard(theme: AppTheme, selected: Boolean, onClick: () -> Unit) {
-    val previewColors = colorsFor(resolveIsDark(theme))
+    val previewColors = colorsFor(theme, resolveIsDark(theme))
 
     Surface(
         modifier = Modifier

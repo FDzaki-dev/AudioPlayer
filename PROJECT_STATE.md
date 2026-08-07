@@ -6,6 +6,25 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 38** — 2 hal: (1) fix dokumentasi drift tema (README/PROJECT_STATE masih deskripsikan
+"3 tema" lama Ink & Brass/Midnight Bloom/Paper & Ink + klaim status bar dipaksa gelap, padahal
+`Theme.kt` sudah lama migrasi ke model SYSTEM/LIGHT/DARK ala Apple dan `MainActivity.kt:187`
+sudah ikut tema — persis pola yang diperingatkan Batch 17); (2) atas permintaan eksplisit,
+tambah tema ke-4 **Matte Noir** — jadikan keluarga Apple (SYSTEM/LIGHT/DARK) tema utama/default
+(tidak berubah, tetap `AppTheme.SYSTEM`), plus satu identitas custom `AppTheme.MATTE` yang
+sengaja kebalikan Apple: matte hangat bukan hitam/putih ekstrem, aksen tembaga bukan biru,
+judul serif (`FontFamily.Serif`, font sistem — tidak nambah aset font) bukan sans, sudut
+4/6/8dp nyaris kotak bukan 14/20/28dp membulat, statis selalu gelap (tidak ikut sistem).
+Sekalian fix warna hardcode `SignatureMatcherSheet.kt:96` (`Color(0xFF3FA34D)` →
+`MaterialTheme.colorScheme.tertiary`) yang jadi alasan nambah role `tertiary`
+(sukses/match, hijau) ke skema Apple (`AppleDarkSuccess`/`AppleLightSuccess`) juga.
+9 file disentuh, 1 tema kohesif (theme-system expansion, atomic — enum+scheme+shape+
+typography+1 caller+2 doc+1 changelog tak terpisah tanpa saling pecah konsistensi).
+`colorsFor()` ganti signature dari `(isDark: Boolean)` jadi `(theme: AppTheme, isDark:
+Boolean)` — 1 pemanggil di luar `Theme.kt` (`SettingsScreen.kt:288`) sudah disesuaikan,
+dicek tak ada pemanggil lain (`grep` bersih). **Belum diverifikasi build/runtime asli**
+(tidak ada compiler Android di environment kerja) — analisis statis + brace/paren balance.
+
 **Batch 37** — Truncation tanpa ellipsis, lanjutan temuan Batch 31 yang dulu ditunda. Audit
 21 titik `maxLines = 1` di `ui/*.kt`, 4 gap ditemukan & dikerjakan (2 file): album di grid
 Library (`LibraryScreen.kt` ~499), judul lagu di daftar-lagu-dalam-album (~522), judul+artis
@@ -445,7 +464,7 @@ com.rudi.audioplayer/
 ├── data/      — Store & repository (SharedPreferences/MediaStore), model data (Song, Playlist)
 ├── playback/  — PlaybackService (MediaLibraryService), PlayerViewModel, Equalizer, ShakeDetector
 ├── ui/        — Semua Composable screen & sheet (Home, Library, NowPlaying, Settings, dst.)
-├── ui/theme/  — 3 tema (Ink & Brass, Midnight Bloom, Paper & Ink), warna, tipografi
+├── ui/theme/  — Apple SYSTEM/LIGHT/DARK (utama) + Matte Noir (custom, kebalikan), warna, tipografi
 ├── util/      — AppLogger (log diagnostik lokal), ApkSignatureChecker
 └── widget/    — Home screen widget (PlayerWidgetProvider, WidgetUpdater)
 ```

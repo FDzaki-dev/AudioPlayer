@@ -16,7 +16,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -93,7 +92,7 @@ fun SignatureMatcherSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit
             if (matchState != null) {
                 Spacer(modifier = Modifier.height(20.dp))
                 val (bannerColor, bannerIcon, bannerText) = when (matchState) {
-                    MatchState.MATCH -> Triple(Color(0xFF3FA34D), Icons.Default.CheckCircle, "Signature COCOK — key sama persis")
+                    MatchState.MATCH -> Triple(MaterialTheme.colorScheme.tertiary, Icons.Default.CheckCircle, "Signature COCOK — key sama persis")
                     MatchState.MISMATCH -> Triple(MaterialTheme.colorScheme.error, Icons.Default.Error, "Signature TIDAK COCOK — instalasi akan minta uninstall dulu")
                     MatchState.ERROR -> Triple(MaterialTheme.colorScheme.error, Icons.Default.Error, "Ada masalah membaca salah satu file")
                 }
