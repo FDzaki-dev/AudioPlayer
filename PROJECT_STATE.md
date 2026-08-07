@@ -6,6 +6,26 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 36** — Arahan melebar: sambil nunggu build hijau, debugging+optimalisasi TETAP jalan
+tapi sekarang juga polish UI/UX + detail kecil kenyamanan pemakaian (bukan lagi "stop fitur
+baru" ketat ala Batch 34). Audit Settings/Library/mini-player nemu 4 hal, user pilih semua:
+- `SetPinDialog` (Settings) kini `KeyboardType.NumberPassword` + `PasswordVisualTransformation`
+  — konsisten sama `LockScreen` yang sudah lama polished (dot mask, haptic, shake-on-error).
+- `LibrarySearchField` kini punya `ImeAction.Search` + `KeyboardActions` yang nutup keyboard
+  via `LocalSoftwareKeyboardController` — logika pencarian (live per keystroke) tidak berubah.
+- `MiniPlayerBar` kini punya garis `LinearProgressIndicator` 2dp glanceable-only (bukan
+  seekable) di tepi bawah, dari `uiState.position/duration` yang sudah ada. **Cek versi API
+  dulu sebelum pakai**: overload `progress: Float` sudah deprecated sejak Material3 1.2.0,
+  proyek ini pin compose-bom 2024.05.00 (~Material3 1.2.1) jadi pakai overload lambda
+  `progress: () -> Float`.
+- Teks "Tentang Aplikasi" di Settings disingkat dari `"AudioPlayer versi 1.0.254 (build 254)"`
+  jadi `"AudioPlayer versi 1.0.254"` — commit count yang sama sebelumnya nongol dua kali dalam
+  format beda (berantakan+kepanjangan). **Skema penomoran versi (git commit count,
+  `app/build.gradle.kts`, protected asset) TIDAK disentuh** — murni string tampilan.
+
+Belum diverifikasi build/runtime asli (tidak ada compiler Android di environment kerja) —
+analisis statis + audit versi API manual.
+
 **Batch 35** — Lanjutan arahan Batch 34 (debugging + optimalisasi performa, tanpa fitur baru).
 Audit statis menyisir file berisiko tinggi (`PlaybackService`, `PlayerViewModel`,
 `MusicRepository`, `AccentColorExtractor`, `EqualizerController`, `AppLogger`,

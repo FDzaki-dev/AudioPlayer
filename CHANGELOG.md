@@ -10,6 +10,45 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 36 — Polish UI/UX: 4 detail kecil yang bikin app lebih nyaman dipakai
+Arahan baru: sambil nunggu build hijau, fokus debugging+optimalisasi DAN polish UI/UX +
+detail kecil kenyamanan pemakaian. Audit statis di layar Settings/Library/mini-player
+menemukan 4 hal, semuanya dikerjakan atas persetujuan user (multi-select — user pilih
+semua):
+- **PIN dialog tidak konsisten & kurang privat**: `LockScreen` (unlock app) sudah lama pakai
+  PIN pad custom dengan dot mask + haptic + shake-on-error. Tapi `SetPinDialog` di Settings
+  ("Atur PIN"/"Ubah PIN") masih `OutlinedTextField` polos — PIN kelihatan jelas di layar
+  sambil diketik, dan keyboard yang muncul QWERTY penuh bukan numerik. Fix:
+  `KeyboardType.NumberPassword` (numeric pad + masking titik bawaan platform sekaligus, tanpa
+  perlu `VisualTransformation` manual terpisah) + `PasswordVisualTransformation()` eksplisit
+  di kedua field (PIN & konfirmasi PIN).
+- **Search Library tidak ada aksi keyboard**: `LibrarySearchField` tidak set `ImeAction` sama
+  sekali. Hasil pencarian sudah live/reaktif per keystroke, tapi tombol "Selesai/Cari" di
+  keyboard tidak melakukan apa-apa — satu-satunya cara nutup keyboard cuma tombol back atau
+  tap di luar field. Fix: `ImeAction.Search` + `KeyboardActions(onSearch = { ...hide() })`
+  lewat `LocalSoftwareKeyboardController`. Murni soal nutup keyboard, logika pencarian itu
+  sendiri tidak disentuh.
+- **Mini player tanpa indikator progres**: `uiState.position`/`duration` sudah di-tick tiap
+  detik (dipakai NowPlayingScreen) tapi mini bar tidak menampilkannya — user harus buka full
+  player cuma buat lihat sudah sampai mana. Fix: garis `LinearProgressIndicator` tipis (2dp) di
+  tepi bawah mini bar, glanceable-only (bukan `Slider`, tidak seekable) supaya tidak bikin
+  target sentuh baru yang konflik dengan `onExpand` di `Box` pembungkus. Pakai overload
+  `progress: () -> Float` (lambda) karena overload `Float` langsung sudah deprecated sejak
+  Material3 1.2.0 — proyek ini pin compose-bom 2024.05.00 (Material3 ~1.2.1) yang sudah
+  menyediakan overload lambda ini.
+- **Tampilan versi berantakan & kepanjangan**: teks "Tentang Aplikasi" sebelumnya
+  `"AudioPlayer versi 1.0.254 (build 254)"` — angka commit count yang sama (basis
+  `versionName`/`versionCode` dari Batch 30, lihat `app/build.gradle.kts`) muncul dua kali
+  dalam format berbeda, jadi keliatan berantakan dan lebih panjang dari perlu. Fix: cuma buang
+  suffix `"(build N)"` yang redundan — jadi `"AudioPlayer versi 1.0.254"`. **Skema penomoran
+  versi (auto dari git commit count) itu sendiri TIDAK diubah** — `app/build.gradle.kts`
+  (protected asset) tidak disentuh, ini murni perubahan string tampilan di `SettingsScreen.kt`.
+
+Belum diverifikasi build/runtime asli (tidak ada compiler Android di environment kerja) —
+hanya analisis statis + audit manual tiap API (mis. cek versi Material3 sebelum pakai overload
+`LinearProgressIndicator` lambda, supaya tidak kejadian lagi kayak kasus `localeFilters` di
+Batch 29).
+
 ## Batch 35 — Lanjutan debugging + performa: widget jank yang kelewat di Batch 34
 Audit statis lanjutan (arahan Batch 34 masih berlaku: tanpa fitur baru), menyisir file
 berisiko tinggi (`PlaybackService`, `PlayerViewModel`, `MusicRepository`,

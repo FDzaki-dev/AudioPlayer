@@ -15,6 +15,8 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -52,7 +54,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -598,6 +602,12 @@ private fun LibraryHeader(
 
 @Composable
 private fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, onClose: () -> Unit) {
+    // Batch 36: field ini sebelumnya tidak set ImeAction sama sekali — hasil pencarian sudah
+    // live/reaktif per keystroke, tapi tombol "Selesai/Cari" di keyboard tidak melakukan
+    // apa-apa, jadi satu-satunya cara nutup keyboard adalah tombol back atau tap di luar field.
+    // ImeAction.Search + hide() di sini murni soal menutup keyboard supaya hasil pencarian
+    // kelihatan penuh — tidak mengubah logika pencarian itu sendiri.
+    val keyboardController = LocalSoftwareKeyboardController.current
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
@@ -616,7 +626,9 @@ private fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, o
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
             unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+        ),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() })
     )
 }
 
