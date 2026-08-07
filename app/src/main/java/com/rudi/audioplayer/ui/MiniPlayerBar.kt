@@ -40,6 +40,11 @@ fun MiniPlayerBar(
 ) {
     val song = uiState.currentSong ?: return
     val haptic = LocalHapticFeedback.current
+    // Must match the shape frostedGlass() now derives from MaterialTheme.shapes.large,
+    // or the outer shadow/clip corners (this Box) would mismatch the inner tinted fill's
+    // corners — sharp under Matte Noir, soft-rounded under Apple.
+    val barShape = MaterialTheme.shapes.large
+    val isMatte = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.MatteBackground
     val animatedAccent by animateColorAsState(
         targetValue = accentColor ?: MaterialTheme.colorScheme.primary,
         animationSpec = tween(700),
@@ -53,8 +58,16 @@ fun MiniPlayerBar(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp)
-            .shadow(elevation = 12.dp, shape = RoundedCornerShape(24.dp))
-            .clip(RoundedCornerShape(24.dp))
+            .shadow(
+                // A deeper, copper-tinted shadow for Matte Noir instead of the default flat
+                // black — reads as the bar physically lifted off warm matte metal, not just
+                // "a rectangle with a generic drop shadow".
+                elevation = if (isMatte) 16.dp else 12.dp,
+                shape = barShape,
+                ambientColor = if (isMatte) com.rudi.audioplayer.ui.theme.MatteAccent.copy(alpha = 0.5f) else Color.Black,
+                spotColor = if (isMatte) com.rudi.audioplayer.ui.theme.MatteAccent.copy(alpha = 0.5f) else Color.Black
+            )
+            .clip(barShape)
             .frostedGlass()
             .clickable(onClick = onExpand)
     ) {

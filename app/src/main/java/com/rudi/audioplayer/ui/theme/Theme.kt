@@ -7,6 +7,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
@@ -38,6 +39,11 @@ private val AppleDarkColors = darkColorScheme(
     surfaceVariant = AppleDarkSurfaceVariant,
     onSurfaceVariant = AppleDarkSecondaryText,
     outline = AppleDarkSurfaceVariant,
+    // Unset previously — M3's darkColorScheme() factory silently fills any omitted role with
+    // its own purple baseline default, so every elevated Surface/Card/NavigationBar using
+    // automatic tonal elevation was tinting toward baseline purple instead of this app's own
+    // accent. Explicit surfaceTint fixes that leak for every M3 elevation overlay app-wide.
+    surfaceTint = AppleAccent,
     error = Color(0xFFFF453A)
 )
 
@@ -55,6 +61,7 @@ private val AppleLightColors = lightColorScheme(
     surfaceVariant = AppleLightSurfaceVariant,
     onSurfaceVariant = AppleLightSecondaryText,
     outline = AppleLightSurfaceVariant,
+    surfaceTint = AppleAccent,
     error = Color(0xFFFF3B30)
 )
 
@@ -72,7 +79,24 @@ private val MatteColors = darkColorScheme(
     surfaceVariant = MatteSurfaceVariant,
     onSurfaceVariant = MatteSecondaryText,
     outline = MatteSurfaceVariant,
+    // Copper surfaceTint means every elevated Card/Sheet/NavigationBar picks up a warm glow
+    // as elevation increases — the same mechanism Apple's own accent tint now uses above,
+    // but copper instead of blue makes elevation read as "warm light on matte metal" rather
+    // than "layer of glass", which is the whole point of this identity being the opposite.
+    surfaceTint = MatteAccent,
     error = MatteError
+)
+
+// Matte Noir's root-level depth cue: a soft copper glow at screen-center fading out to the
+// deep matte edges, like ambient light falling across a brushed-metal panel. Applied once
+// behind the whole app (MainActivity's root Surface) rather than per-screen, so every screen
+// gets the same "unique, not-flat" atmosphere for free without touching every UI file.
+fun matteDepthBrush(): Brush = Brush.radialGradient(
+    colors = listOf(
+        MatteAccent.copy(alpha = 0.10f),
+        MatteSurface,
+        MatteBackground
+    )
 )
 
 // A single, consistent "continuous curve" language across the whole app — Compose's Shapes

@@ -48,6 +48,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -70,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.SideEffect
@@ -91,7 +93,9 @@ import com.rudi.audioplayer.ui.LibraryScreen
 import com.rudi.audioplayer.ui.SettingsScreen
 import com.rudi.audioplayer.ui.MiniPlayerBar
 import com.rudi.audioplayer.ui.NowPlayingScreen
+import com.rudi.audioplayer.ui.theme.AppTheme
 import com.rudi.audioplayer.ui.theme.AudioPlayerTheme
+import com.rudi.audioplayer.ui.theme.matteDepthBrush
 import com.rudi.audioplayer.ui.theme.resolveIsDark
 
 class MainActivity : FragmentActivity() {
@@ -249,7 +253,21 @@ class MainActivity : FragmentActivity() {
                     }
                 }
 
-                Surface(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            // Root-level ambient glow, Matte Noir only — see matteDepthBrush()
+                            // in Theme.kt. Surface below is made transparent just for this case
+                            // so the gradient shows through; every other theme is 100% unchanged
+                            // (Surface keeps its normal opaque colorScheme.background fill).
+                            if (appTheme == AppTheme.MATTE) Modifier.background(matteDepthBrush()) else Modifier
+                        )
+                ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = if (appTheme == AppTheme.MATTE) Color.Transparent else MaterialTheme.colorScheme.background
+                ) {
                     when {
                         needsUnlock -> LockScreen(
                             biometricEnabled = biometricEnabled && isBiometricAvailable(),
@@ -270,6 +288,7 @@ class MainActivity : FragmentActivity() {
                         )
                     }
                 }
+                } // tutup Box (vignette Matte Noir, Batch 39)
             }
             } // tutup CompositionLocalProvider (Batch 24)
         }
@@ -388,6 +407,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val biometricEnabled by playerViewModel.biometricEnabled.collectAsStateWithLifecycle()
     val shakeToSkipEnabled by playerViewModel.shakeToSkipEnabled.collectAsStateWithLifecycle()
     val radioAutoContinueEnabled by playerViewModel.radioAutoContinueEnabled.collectAsStateWithLifecycle()
+    val appTheme by playerViewModel.appTheme.collectAsStateWithLifecycle()
 
     val deleteContext = LocalContext.current
     val deleteRequestLauncher = rememberLauncherForActivityResult(
@@ -529,7 +549,13 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     )
                 }
                 if (currentRoute == "home" || currentRoute == "library" || currentRoute == "settings") {
-                    NavigationBar {
+                    NavigationBar(
+                        // A visibly "lifted" bar for Matte Noir (higher tonal elevation → the
+                        // copper surfaceTint from Theme.kt shows through more strongly) instead
+                        // of the flatter default — reinforces the boutique-hardware depth cue
+                        // at the one piece of chrome that's always on screen.
+                        tonalElevation = if (appTheme == AppTheme.MATTE) 12.dp else NavigationBarDefaults.Elevation
+                    ) {
                         NavigationBarItem(
                             selected = currentRoute == "home",
                             onClick = {

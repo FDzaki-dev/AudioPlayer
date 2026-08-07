@@ -10,6 +10,58 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 39 — Matte Noir: efek kedalaman visual (respons user test Batch 38 "masih kureng")
+User test Batch 38 di HP asli: tema Matte Noir dirasa datar ("kureng"), minta ada efek
+kedalaman/3D yang bikin dia unik. Root cause yang ditemukan sekalian: `darkColorScheme()`/
+`lightColorScheme()` M3 diam-diam mengisi role yang tidak disebutkan eksplisit (termasuk
+`surfaceTint`, dipakai M3 untuk automatic tonal-elevation overlay — mekanisme utama M3
+menandakan kedalaman tanpa drop shadow manual) dengan baseline ungu default M3, BUKAN
+diturunkan dari `primary` custom app ini — jadi semua Surface/Card/NavigationBar yang pakai
+`tonalElevation` otomatis dapat tint ungu generik, bukan warna tema. 5 perubahan, 1 tema
+kohesif (Matte Noir depth pass):
+
+- **`surfaceTint` eksplisit** ditambah ke 3 skema warna (`Theme.kt`): `AppleAccent` untuk
+  kedua skema Apple, `MatteAccent` (tembaga) untuk Matte — sekarang setiap elevasi tonal
+  M3 di seluruh app pakai warna aksen tema asli, bukan ungu baseline tersembunyi.
+- **`frostedGlass()` (`BlurUtils.kt`)**, dipakai 6 file (`EqualizerSheet`, `FolderManagerSheet`,
+  `LyricsSheet`, `MiniPlayerBar`, `NowPlayingScreen`, `QueueSheet`) tanpa perlu disentuh
+  satu-satu: shape hardcode `RoundedCornerShape(24.dp)` → `MaterialTheme.shapes.large`
+  (ikut token tema aktif — 28dp Apple vs 8dp Matte), plus border edge jadi trim tembaga
+  `colorScheme.primary` alpha 0.35 khusus Matte (dulu abu-abu netral di semua tema) — kesan
+  bezel logam dikerjakan-tangan di sekeliling tiap sheet/mini-player.
+- **`matteDepthBrush()` baru (`Theme.kt`)**: radial gradient tembaga→matte-surface→matte-
+  background, dipasang sekali di root `Surface` (`MainActivity.kt`, dibungkus `Box` baru)
+  — cahaya ambient lembut di tengah layar meluruh ke gelap di tepi, kayak cahaya jatuh di
+  panel logam matte. Hanya aktif saat `AppTheme.MATTE` (Surface jadi `Color.Transparent`
+  supaya gradient di baliknya kelihatan); tema lain 100% tidak berubah (Surface tetap warna
+  solid seperti semula).
+- **`NavigationBar` (`MainActivity.kt`)**: `tonalElevation` 12dp khusus Matte (vs default
+  M3) — bareng fix `surfaceTint` di atas, bar bawah kelihatan "terangkat" hangat, bukan
+  cuma garis flat.
+- **`MiniPlayerBar.kt`**: shape ikut `MaterialTheme.shapes.large` juga (harus disamakan
+  dengan fix `frostedGlass` di atas — kalau tidak, shadow/clip luar 24dp hardcode bentrok
+  sama fill dalam yang sudah ikut tema, sudut jadi tidak konsisten/aneh), plus shadow
+  `ambientColor`/`spotColor` ditinta tembaga (`MatteAccent` alpha 0.5) & elevasi naik ke
+  16dp khusus Matte — dulu memakai default shadow hitam datar di semua tema.
+
+5 file kode disentuh (`Theme.kt`, `Color.kt` — tidak ada perubahan isi tambahan di luar yang
+sudah ada dari Batch 38, jadi tidak dihitung ulang di sini —, `BlurUtils.kt`,
+`MainActivity.kt`, `MiniPlayerBar.kt`) + `CHANGELOG.md`/`PROJECT_STATE.md`. Tidak ada file
+baru (0→0 di `FILE_MANIFEST.txt`). Diklaim **Atomic Change**: shape fix di `frostedGlass`
+dan `MiniPlayerBar` saling bergantung (harus konsisten bareng), root vignette butuh
+`appTheme` yang baru dikoleksi di scope `AppNavHost` juga bareng NavigationBar — dipecah
+antar-commit akan bikin state pertengahan yang visually broken.
+
+**Batas jaminan — ini yang paling penting dibaca sebelum test lagi**: seluruh pass ini
+murni analisis statis (brace/paren balance + grep cross-reference tiap pemanggil yang
+disentuh), **tidak ada compiler Android atau device/emulator di environment kerja** untuk
+benar-benar merender gradient/shadow/shape ini. Kombinasi warna & radius dipilih dari
+prinsip desain (kontras, hierarki tonal) bukan dari melihat hasil render — kalau efeknya
+ternyata masih kurang terasa, kurang match warnanya, atau performanya berat (radial
+gradient di layar tinggi resolusi/refresh rate tinggi bisa mahal — belum diukur), laporkan
+spesifik bagian mana yang masih kureng biar batch berikutnya bisa dikoreksi terarah,
+bukan tebak-tebak lagi.
+
 ## Batch 38 — Fix dokumentasi drift tema + tambah tema custom Matte Noir
 Audit lanjutan menemukan `README.md`/`PROJECT_STATE.md` masih deskripsikan sistem tema lama
 ("3 tema penuh": Ink & Brass/Midnight Bloom/Paper & Ink) dan klaim status bar "dipaksa kontras

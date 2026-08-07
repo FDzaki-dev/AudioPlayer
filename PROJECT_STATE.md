@@ -6,6 +6,21 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 39** — Respons user test Batch 38 di HP asli ("masih kureng"): Matte Noir dikasih
+efek kedalaman visual. Root cause: `darkColorScheme()`/`lightColorScheme()` M3 diam-diam
+isi `surfaceTint` (mekanisme utama M3 buat tonal-elevation depth) dengan ungu baseline
+kalau tidak disebut eksplisit — sekarang eksplisit tiap skema (`AppleAccent`/`MatteAccent`).
+Plus: `frostedGlass()` (`BlurUtils.kt`, dipakai 6 file) shape-nya ikut
+`MaterialTheme.shapes.large` (dulu hardcode 24dp, sekarang 8dp di Matte = boxy) + trim
+tembaga di border; `matteDepthBrush()` baru — radial gradient dipasang di root `Surface`
+`MainActivity.kt` (Matte-only, dibungkus `Box`, `Surface` jadi transparent supaya gradient
+kelihatan); `NavigationBar` tonalElevation 12dp khusus Matte; `MiniPlayerBar.kt` shape
+disamakan + shadow ambientColor/spotColor ditinta tembaga elevasi 16dp. 5 file kode +
+2 doc. **PENTING**: murni analisis statis, sama sekali belum pernah dirender — kalau user
+lapor "masih kureng" lagi, jangan asumsi solusinya menambah lebih banyak color/shadow tanpa
+tahu spesifik bagian mana yang dirasa kurang (radial gradient-nya kurang kuat? shape-nya
+belum kerasa? nav bar-nya masih flat? tanya spesifik dulu).
+
 **Batch 38** — 2 hal: (1) fix dokumentasi drift tema (README/PROJECT_STATE masih deskripsikan
 "3 tema" lama Ink & Brass/Midnight Bloom/Paper & Ink + klaim status bar dipaksa gelap, padahal
 `Theme.kt` sudah lama migrasi ke model SYSTEM/LIGHT/DARK ala Apple dan `MainActivity.kt:187`
