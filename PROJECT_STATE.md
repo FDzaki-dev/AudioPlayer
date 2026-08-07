@@ -6,6 +6,28 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 35** — Lanjutan arahan Batch 34 (debugging + optimalisasi performa, tanpa fitur baru).
+Audit statis menyisir file berisiko tinggi (`PlaybackService`, `PlayerViewModel`,
+`MusicRepository`, `AccentColorExtractor`, `EqualizerController`, `AppLogger`,
+`CustomFolderScanner`, `ShakeDetector`) plus seluruh `LazyColumn`/`LazyRow` di UI — semua
+bersih (key list konsisten, I/O sudah di `Dispatchers.IO`, sensor listener paired start/stop).
+1 temuan, dikerjakan atas persetujuan user:
+- **Widget jank belum tuntas dari Batch 34 (performa)** — `PlayerWidgetProvider.onUpdate()` &
+  `onAppWidgetOptionsChanged()` masih manggil `WidgetUpdater.updateAll()` (decode+crop+round
+  bitmap album-art) **langsung di main thread** — Batch 34 cuma mindahin call-site di
+  `PlaybackService`, dua call-site di sini kelewat karena `AppWidgetProvider` adalah
+  `BroadcastReceiver` biasa, bukan Service, jadi tidak otomatis kebagian `serviceScope`.
+  Lebih parah dari sisi `PlaybackService`: `onAppWidgetOptionsChanged` dikomentari sendiri di
+  kode lama sebagai "fires live as user drags resize handles" — decode blocking bisa numpuk
+  tiap event drag. Fix: `goAsync()` (API standar `BroadcastReceiver` buat kerja lanjut setelah
+  callback return tanpa blocking pemanggil) + `providerScope.launch(Dispatchers.IO)`,
+  `pendingResult.finish()` di `finally` supaya wakelock broadcast tetap dilepas walau
+  `updateAll` throw.
+
+**Belum diverifikasi build/runtime asli** (tidak ada compiler Android di environment kerja) —
+hanya analisis statis. `versionName` tetap otomatis dari commit count (tidak disentuh batch
+ini).
+
 **Batch 34** — Arahan baru mulai batch ini: **stop fitur baru, fokus debugging +
 optimalisasi performa & eksekusi sampai aplikasi matang**. Audit kode nyata (bukan asumsi)
 menemukan 2 hal, keduanya dikerjakan sekaligus atas persetujuan user:

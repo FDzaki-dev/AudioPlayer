@@ -10,6 +10,28 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 35 — Lanjutan debugging + performa: widget jank yang kelewat di Batch 34
+Audit statis lanjutan (arahan Batch 34 masih berlaku: tanpa fitur baru), menyisir file
+berisiko tinggi (`PlaybackService`, `PlayerViewModel`, `MusicRepository`,
+`AccentColorExtractor`, `EqualizerController`, `AppLogger`, `CustomFolderScanner`,
+`ShakeDetector`) dan seluruh `LazyColumn`/`LazyRow` di UI — semua bersih. 1 masalah
+ditemukan dan diperbaiki:
+- **Widget jank, sisi yang kelewat**: Batch 34 memindah `pushWidgetUpdate()` di
+  `PlaybackService` ke `Dispatchers.IO`, tapi `WidgetUpdater.updateAll()` (decode+crop+round
+  bitmap album-art yang sama) masih dipanggil langsung di dua tempat lain:
+  `PlayerWidgetProvider.onUpdate()` dan `.onAppWidgetOptionsChanged()`. `AppWidgetProvider`
+  adalah `BroadcastReceiver` biasa — `onReceive`-nya (dan turunannya) jalan di main thread
+  secara default, beda dari `PlaybackService` yang sudah punya `serviceScope` sendiri.
+  `onAppWidgetOptionsChanged` lebih berisiko lagi: komentar lama di kode sendiri bilang ini
+  "fires live as user drags resize handles" — decode blocking bisa numpuk tiap event drag,
+  bukan cuma sekali per update. Fix: `goAsync()` (API standar `BroadcastReceiver` untuk kerja
+  lanjut setelah callback return tanpa nge-block pemanggil) dibungkus
+  `providerScope.launch(Dispatchers.IO)`, dengan `pendingResult.finish()` di `finally` supaya
+  wakelock broadcast tetap dilepas walau `updateAll` throw.
+
+Belum diverifikasi build/runtime asli (tidak ada compiler di environment kerja) — hanya
+analisis statis. `versionName` tetap otomatis dari commit count.
+
 ## Batch 34 — Fokus baru: debugging + performa (bukan fitur baru)
 Arahan proyek berubah mulai batch ini: berhenti nambah fitur, fokus mematangkan yang sudah
 ada lewat debugging & optimalisasi. Audit kode nyata menemukan 2 masalah, dikerjakan
