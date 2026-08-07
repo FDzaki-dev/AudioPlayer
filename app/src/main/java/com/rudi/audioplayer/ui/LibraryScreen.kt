@@ -496,7 +496,7 @@ private fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> U
                             .clip(RoundedCornerShape(24.dp))
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(album, maxLines = 1, style = MaterialTheme.typography.titleMedium)
+                    Text(album, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
                     Text(
                         "${albumSongs.size} lagu",
                         maxLines = 1,
@@ -519,7 +519,7 @@ private fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> U
                             .padding(horizontal = 20.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(song.title, maxLines = 1, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                         Text(formatDuration(song.duration), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)

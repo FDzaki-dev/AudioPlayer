@@ -10,6 +10,34 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 37 — Polish UI/UX: truncation tanpa ellipsis (lanjutan temuan Batch 31)
+Audit lanjutan menyisir seluruh `maxLines = 1` di `ui/*.kt` (21 titik) untuk cari yang belum
+punya `overflow = TextOverflow.Ellipsis` maupun `basicMarquee()` — pola yang sudah konsisten
+dipakai di 17 titik lain. 4 gap ditemukan di 2 file, 1 tema kohesif (truncation-consistency
+pass, presedennya sama kayak Batch 31/6):
+- **`LibraryScreen.kt` — nama album di kartu grid Album** (baris ~499): temuan Batch 31 yang
+  dulu sengaja ditunda ("dampak rendah, disimpan untuk batch lanjutan kalau diminta") — kini
+  dikerjakan. Nama album panjang sebelumnya kepotong mendadak tanpa indikator visual.
+- **`LibraryScreen.kt` — judul lagu di daftar lagu dalam Album** (baris ~522, tampilan detail
+  album setelah tap salah satu album): `Row` dengan `Modifier.weight(1f)`, judul panjang
+  kepotong tanpa "..." — beda dari daftar lagu lain di Library (baris ~988) yang sudah pakai
+  `basicMarquee()`, dan `PlaylistScreen`/`QueueSheet` yang sudah pakai `TextOverflow.Ellipsis`.
+  Dipilih `Ellipsis` (bukan marquee) karena konteksnya list padat multi-baris, bukan satu
+  fokus item seperti mini-player/now-playing.
+- **`FolderManagerSheet.kt` — judul lagu & nama artis di daftar "Lagu Disembunyikan"** (baris
+  ~179, ~182): satu-satunya daftar lagu di seluruh app yang masih nol `Ellipsis` sama sekali
+  di kedua baris teksnya — folder/artis lain di file yang sama (baris ~151) sudah benar.
+Semua 4 titik memakai import `TextOverflow` yang sudah ada di kedua file (tidak perlu import
+baru). **Batas jaminan: analisis statis saja (brace/paren balance dicek manual & via script,
+tidak ada kotlinc di environment ini) — belum diverifikasi runtime.**
+
+Ditemukan tapi belum dikerjakan (di luar scope batch ini, sama seperti Batch 31): token
+spacing masih ad-hoc (356 literal `.dp` tersebar di `ui/*.kt`, tidak ada `Spacing.kt`
+terpusat) — scope refactor ini jauh melebihi batas 1 tema/10 file per batch, disimpan untuk
+batch besar terpisah kalau diminta eksplisit. Audit icon-only `IconButton` untuk
+`contentDescription` kosong (potensi gap aksesibilitas) — nihil, seluruh `IconButton` di
+proyek ini sudah punya label yang benar.
+
 ## Batch 36 — Polish UI/UX: 4 detail kecil yang bikin app lebih nyaman dipakai
 Arahan baru: sambil nunggu build hijau, fokus debugging+optimalisasi DAN polish UI/UX +
 detail kecil kenyamanan pemakaian. Audit statis di layar Settings/Library/mini-player

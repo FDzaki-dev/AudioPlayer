@@ -6,6 +6,16 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 37** — Truncation tanpa ellipsis, lanjutan temuan Batch 31 yang dulu ditunda. Audit
+21 titik `maxLines = 1` di `ui/*.kt`, 4 gap ditemukan & dikerjakan (2 file): album di grid
+Library (`LibraryScreen.kt` ~499), judul lagu di daftar-lagu-dalam-album (~522), judul+artis
+di daftar "Lagu Disembunyikan" `FolderManagerSheet.kt` (~179, ~182) — semua ditambah
+`overflow = TextOverflow.Ellipsis`, import sudah ada di kedua file. Ditemukan tapi belum
+dikerjakan: 356 literal `.dp` ad-hoc tanpa `Spacing.kt` terpusat (scope terlalu besar untuk
+1 batch), audit `IconButton` tanpa `contentDescription` (hasil: nihil, semua sudah benar).
+**Belum diverifikasi build/runtime asli** (tidak ada compiler Android di environment kerja) —
+analisis statis + script brace/paren balance.
+
 **Batch 36** — Arahan melebar: sambil nunggu build hijau, debugging+optimalisasi TETAP jalan
 tapi sekarang juga polish UI/UX + detail kecil kenyamanan pemakaian (bukan lagi "stop fitur
 baru" ketat ala Batch 34). Audit Settings/Library/mini-player nemu 4 hal, user pilih semua:
