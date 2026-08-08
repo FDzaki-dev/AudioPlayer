@@ -6,6 +6,12 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 47** — Hotfix compile error Batch 46 dari `log_fail_104.zip`: `MatteDepth.kt` pakai
+`by animateDpAsState(...)` / `by animateFloatAsState(...)` tapi lupa
+`import androidx.compose.runtime.getValue`. Fix: tambah import. 1 baris, 1 file. Exact match ke
+error log, bukan tebakan — confidence tinggi. Prioritas berikutnya masih sama: user
+verifikasi tampilan tema Matte hasil Batch 46 di device asli (belum pernah, sejak Batch 40).
+
 **Batch 46** — User kirim spec desain sendiri (`compose-skeuomorphism-lite.md`) karena tema
 Matte hasil Batch 40-44 dinilai "jelek banget asli". `matteEmboss()` di `MatteDepth.kt` ditulis
 ulang total mengikuti 3 poin spec (gradient top-down + bevel border, animasi tekan-fisik

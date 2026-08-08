@@ -38,6 +38,19 @@ diverifikasi runtime asli** (tidak ada compiler Android di environment kerja) �
 "kureng"/jelek, JANGAN ulangi pola nambah layer shadow/gradient lagi (sudah 4x gagal dengan pola
 itu, Batch 40→44); minta screenshot spesifik bagian mana yang salah dulu.
 
+## Batch 47 — Hotfix Batch 46: compileDebugKotlin FAILED, `by` delegate tanpa import getValue
+`log_fail_104.zip` → `MatteDepth.kt:59` & `:63`: `Type 'State<Dp>' has no method
+'getValue(...)' and thus it cannot serve as a delegate` pada `val animatedElevation by
+animateDpAsState(...)` dan `val scale by animateFloatAsState(...)`. Root cause: Batch 46
+menulis ulang file ini dari nol dan pakai sintaks `by` tapi lupa
+`import androidx.compose.runtime.getValue` (operator delegate `by` untuk `State<T>` butuh
+import eksplisit ini, bukan otomatis ikut `androidx.compose.runtime.Composable`). File lain
+yang disentuh Batch 46 (`NowPlayingScreen.kt`) tidak kena karena sudah punya
+`import androidx.compose.runtime.*` dari sebelumnya. Fix: tambah 1 baris import. 1 file, fix
+atomik. **Belum diverifikasi runtime asli** — tapi ini kesalahan compile-time yang exact match
+dengan error log (bukan tebakan), jadi confidence tinggi dibanding hotfix Batch 41/43
+sebelumnya yang sempat salah tebak duluan.
+
 ## Batch 45 — Fix bug lama: SignatureMatcherSheet bandingkan key signing yang SALAH kalau app pernah rotasi key
 User laporan "gak sinkron" di fitur pencocok signature APK (`SignatureMatcherSheet` +
 `ApkSignatureChecker`). Root cause di `ApkSignatureChecker.inspect()` (API 28+, jalur
