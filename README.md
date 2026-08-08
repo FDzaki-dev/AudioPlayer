@@ -106,9 +106,10 @@ tulis, ubah supaya menerima field mentah (`folderPath`, `id`) saja, bukan `Song`
 tanpa peduli isinya.
 
 ## Belum selesai / dalam pengerjaan
-- Shared-element transition sungguhan (mini player → Now Playing sebagai satu elemen visual) belum ada — versi sekarang pakai animasi scale-in sebagai pendekatan yang lebih aman (lihat catatan di riwayat commit)
-- Pull-to-refresh gesture di Library belum ada (cuma tombol manual + auto-refresh saat resume/ContentObserver) — proyek ini pakai Compose BOM 2024.05.00, dan API pull-to-refresh Material3 yang simpel baru stabil di versi BOM lebih baru; naikkan BOM berisiko ke komponen lain yang sudah jalan
-- Ekstraksi penuh string hardcode ke `strings.xml` (untuk i18n) belum dikerjakan — ada ratusan string tersebar di ~12 file, refactor mekanis sebesar itu belum aman dikerjakan tanpa akses compiler untuk verifikasi
+- Shared-element transition sungguhan (mini player → Now Playing sebagai satu elemen visual) belum ada — versi sekarang pakai animasi scale-in sebagai pendekatan yang lebih aman (lihat catatan di riwayat commit); butuh bump Compose BOM dari 2024.05.00
+- Pull-to-refresh gesture di Library belum ada (cuma tombol manual + auto-refresh saat resume/ContentObserver) — API pull-to-refresh Material3 yang simpel baru stabil di versi Compose BOM lebih baru; naikkan BOM berisiko ke komponen lain yang sudah jalan
+- Ekstraksi penuh string hardcode ke `strings.xml` (untuk i18n) belum dikerjakan — 339 string literal tersebar di banyak file (Batch 54 audit), refactor mekanis sebesar itu belum aman dikerjakan tanpa akses compiler untuk verifikasi
+- Migrasi ~340 literal `.dp` non-radius (padding/size/offset/blur) ke token spacing terpusat belum dikerjakan — mayoritas one-off/context-specific, beda dari corner-radius yang sudah disentralisasi ke `Spacing.kt`/`Radius` sejak Batch 54; risiko sweep besar tanpa compiler sama seperti poin string di atas
 - Belum pernah diuji di perangkat fisik sungguhan oleh siapa pun selain lewat deskripsi/screenshot — termasuk hasil build release dengan minify yang baru aktif sejak Batch 7
 
 ## Catatan jujur soal Gapless Playback

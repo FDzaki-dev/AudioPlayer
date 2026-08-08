@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.tactileEmboss
+import com.rudi.audioplayer.ui.theme.isTactileTheme
+import com.rudi.audioplayer.ui.theme.Radius
 
 @Composable
 fun MiniPlayerBar(
@@ -45,7 +47,7 @@ fun MiniPlayerBar(
     // or the outer shadow/clip corners (this Box) would mismatch the inner tinted fill's
     // corners — Tactile's own rounding vs Apple's.
     val barShape = MaterialTheme.shapes.large
-    val isTactile = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.TactileBackground
+    val isTactile = isTactileTheme()
     val animatedAccent by animateColorAsState(
         targetValue = accentColor ?: MaterialTheme.colorScheme.primary,
         animationSpec = tween(700),
@@ -88,7 +90,7 @@ fun MiniPlayerBar(
                 albumId = song.albumId,
                 modifier = Modifier
                     .size(44.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(Radius.ml))
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {

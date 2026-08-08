@@ -36,6 +36,7 @@ import com.rudi.audioplayer.ui.theme.AppTheme
 import com.rudi.audioplayer.ui.theme.colorsFor
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.resolveIsDark
+import com.rudi.audioplayer.ui.theme.Radius
 
 @Composable
 fun SettingsScreen(
@@ -298,9 +299,9 @@ private fun ThemeOptionCard(theme: AppTheme, selected: Boolean, onClick: () -> U
             .padding(horizontal = 20.dp)
             .then(
                 if (isTactilePreview)
-                    Modifier.tactileEmboss(shape = RoundedCornerShape(18.dp), elevation = if (selected) 12.dp else 8.dp)
+                    Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xl), elevation = if (selected) 12.dp else 8.dp)
                 else
-                    Modifier.clip(RoundedCornerShape(18.dp))
+                    Modifier.clip(RoundedCornerShape(Radius.xl))
             )
             .clickable(onClick = onClick),
         color = if (isTactilePreview) Color.Transparent else previewColors.surface,
@@ -310,7 +311,7 @@ private fun ThemeOptionCard(theme: AppTheme, selected: Boolean, onClick: () -> U
         tonalElevation = if (isTactilePreview) 0.dp else 4.dp,
         shadowElevation = if (isTactilePreview) 0.dp else if (selected) 6.dp else 0.dp,
         border = if (selected) BorderStroke(2.dp, previewColors.primary) else null,
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(Radius.xl)
     ) {
         Row(
             modifier = Modifier

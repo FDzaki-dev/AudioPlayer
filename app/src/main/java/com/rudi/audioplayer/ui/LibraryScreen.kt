@@ -53,6 +53,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.rudi.audioplayer.ui.theme.tactileEmboss
+import com.rudi.audioplayer.ui.theme.isTactileTheme
+import com.rudi.audioplayer.ui.theme.Radius
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -419,17 +421,17 @@ fun LibraryScreen(
             undoHideIds = emptyList()
         }
         Box(modifier = Modifier.fillMaxSize()) {
-            val isTactile = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.TactileBackground
+            val isTactile = isTactileTheme()
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
                     .fillMaxWidth()
                     .then(
-                        if (isTactile) Modifier.tactileEmboss(shape = RoundedCornerShape(20.dp), elevation = 10.dp)
+                        if (isTactile) Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xxl), elevation = 10.dp)
                         else Modifier
                     ),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(Radius.xxl),
                 color = if (isTactile) Color.Transparent else MaterialTheme.colorScheme.surface,
                 // Batch 48/49 lesson: don't rely on Surface's own contentColor-from-color
                 // fallback when color is Transparent — set it explicitly so this never
@@ -503,7 +505,7 @@ private fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> U
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
-                            .clip(RoundedCornerShape(24.dp))
+                            .clip(RoundedCornerShape(Radius.xxxl))
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(album, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
@@ -632,7 +634,7 @@ private fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, o
                 Icon(Icons.Default.Close, contentDescription = "Tutup pencarian")
             }
         },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(Radius.xxl),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
             unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
@@ -659,7 +661,7 @@ private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
             val selected = selectedTab == index
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(Radius.xxl))
                     .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
                     .clickable { onSelect(index) }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -675,7 +677,7 @@ private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
             Box {
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
+                        .clip(RoundedCornerShape(Radius.xxl))
                         .background(if (moreSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
                         .clickable { showMoreMenu = true }
                         .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -989,7 +991,7 @@ private fun SongRow(
                 albumId = song.albumId,
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(Radius.xxl))
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -1142,7 +1144,7 @@ private fun ShimmerRow() {
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(Radius.xxl))
                 .background(brush)
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -1151,7 +1153,7 @@ private fun ShimmerRow() {
                 modifier = Modifier
                     .fillMaxWidth(0.6f)
                     .height(14.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(Radius.xs))
                     .background(brush)
             )
             Spacer(modifier = Modifier.height(6.dp))
@@ -1159,7 +1161,7 @@ private fun ShimmerRow() {
                 modifier = Modifier
                     .fillMaxWidth(0.4f)
                     .height(11.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(Radius.xs))
                     .background(brush)
             )
         }

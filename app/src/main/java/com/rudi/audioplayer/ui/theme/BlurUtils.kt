@@ -37,7 +37,7 @@ fun Modifier.frostedGlass(
     // Real backdrop blur is not performed here because Modifier.blur() would blur foreground
     // content. The surface tint is intentionally opaque enough to preserve contrast (spec §7:
     // "Text remains readable... Glass must not become milky").
-    val isTactile = MaterialTheme.colorScheme.background == TactileBackground
+    val isTactile = isTactileTheme()
     // Shape now follows the active theme's own shape tokens instead of a hardcoded 24dp —
     // otherwise every sheet/mini-player using this modifier would keep Apple's soft rounding
     // even under Tactile's own shape identity.

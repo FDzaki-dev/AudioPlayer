@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.ui.theme.tactileEmboss
+import com.rudi.audioplayer.ui.theme.isTactileTheme
+import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.collections.immutable.ImmutableSet
 import java.util.Calendar
 
@@ -162,7 +164,7 @@ private fun HomeShimmerSection() {
                 .padding(horizontal = 20.dp)
                 .width(120.dp)
                 .height(18.dp)
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(Radius.xs))
                 .background(brush)
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -175,7 +177,7 @@ private fun HomeShimmerSection() {
                     Box(
                         modifier = Modifier
                             .size(120.dp)
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(Radius.xxl))
                             .background(brush)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -183,7 +185,7 @@ private fun HomeShimmerSection() {
                         modifier = Modifier
                             .fillMaxWidth(0.8f)
                             .height(14.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(Radius.xs))
                             .background(brush)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -191,7 +193,7 @@ private fun HomeShimmerSection() {
                         modifier = Modifier
                             .fillMaxWidth(0.5f)
                             .height(11.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(Radius.xs))
                             .background(brush)
                     )
                 }
@@ -235,7 +237,7 @@ private fun HomeGreeting(showShuffleAll: Boolean, onShuffleAll: () -> Unit) {
 
 @Composable
 private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
-    val isTactile = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.TactileBackground
+    val isTactile = isTactileTheme()
     // Batch 49: first thing the eye hits on Home, priority touch point for the tactile treatment.
     Surface(
         modifier = Modifier
@@ -245,7 +247,7 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
                 if (isTactile)
                     Modifier.tactileEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
                 else
-                    Modifier.clip(RoundedCornerShape(18.dp))
+                    Modifier.clip(RoundedCornerShape(Radius.xl))
             )
             .clickable(onClick = onClick),
         color = if (isTactile) Color.Transparent else MaterialTheme.colorScheme.surface,
@@ -261,7 +263,7 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
                 albumId = song.albumId,
                 modifier = Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(Radius.xxl))
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -327,7 +329,7 @@ private fun HomeSongCard(song: Song, onClick: () -> Unit) {
             albumId = song.albumId,
             modifier = Modifier
                 .size(120.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(Radius.xxl))
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(

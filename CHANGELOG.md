@@ -10,6 +10,38 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 54 — Technical debt cleanup (atomic change): dedup isTactile, hapus FQN inline & dead token, sentralisasi corner-radius
+User minta gabungkan daftar technical debt murni-kode (dari audit statis: isTactile terduplikasi,
+inline fully-qualified reference, dp literal tak tersentralisasi) dengan debt yang sudah tercatat
+di README.md ("Belum selesai / dalam pengerjaan") jadi 1 batch atomic. Bukan repaint tema, bukan
+fitur baru — murni pembersihan kode. Batch-limit exception dipakai (10 file tersentuh) karena ini
+satu perubahan logis yang saling terkait (semua berakar dari "duplikasi & sentralisasi token"),
+bukan gabungan paksa beberapa fitur independen.
+
+- `Theme.kt`: tambah `isTactileTheme()` composable helper — dipanggil dari `BlurUtils.kt`,
+  `HomeScreen.kt`, `LibraryScreen.kt`, `MiniPlayerBar.kt`, `NowPlayingScreen.kt` (2 tempat),
+  menggantikan `MaterialTheme.colorScheme.background == TactileBackground` yang sebelumnya
+  diketik ulang manual di 6 tempat. Perilaku identik.
+- 11 inline fully-qualified reference (`com.rudi.audioplayer.ui.theme.X` di tengah kode) diganti
+  jadi `import` biasa — `MiniPlayerBar.kt`, `LibraryScreen.kt`, `HomeScreen.kt`,
+  `NowPlayingScreen.kt`, `MainActivity.kt`.
+- `Color.kt`: hapus 5 token warna dead code (`TactileControl`, `TactileControlPressed`,
+  `GlassPressed`, `GlassWhite`, `TactileMutedText`) — 0 call site, sisa persiapan Batch 53 untuk
+  komponen tactile yang belum dibangun. Komentar penjelas ditinggalkan untuk batch masa depan.
+- **File baru `Spacing.kt`**: token `Radius` (9 nilai, 4dp-28dp) untuk corner-radius terpusat
+  (spec §19 "Spacing & Shape Language"). 32 titik `RoundedCornerShape(N.dp)` literal di 8 file
+  (`FeatureHintBanner.kt`, `HomeScreen.kt`, `LibraryScreen.kt`, `MiniPlayerBar.kt`,
+  `NowPlayingScreen.kt`, `SettingsScreen.kt`, `Theme.kt`) dimigrasi otomatis pakai script regex,
+  diverifikasi grep nihil literal tersisa + brace/paren balance check tiap file.
+- **Sengaja tidak dikerjakan** (didaftar, bukan disembunyikan): migrasi ~340 literal `.dp` non-
+  radius sisanya (terlalu one-off/context-specific untuk ditoken-kan aman), ekstraksi 339 string
+  ke `strings.xml` untuk i18n (README sudah catat alasan: refactor mekanis sebesar itu tak aman
+  tanpa compiler untuk verifikasi), pull-to-refresh Library & shared-element transition sungguhan
+  (butuh bump Compose BOM — keputusan dependency-version terpisah, bukan technical debt kode).
+- Total file: 108 → 109 (nambah `Spacing.kt`). `FILE_MANIFEST.txt` diperbarui.
+- **Belum diverifikasi build** — environment tidak punya `kotlinc`, verifikasi lewat grep +
+  brace/paren balance check per file, bukan compile sungguhan.
+
 ## Batch 53 — Timpa palet tema custom Tactile pakai spec AMOLED Hybrid Glassmorphism baru (compose-amoled-hybrid-glass-final.md)
 User kirim spec baru sekaligus perintah eksplisit: override total tema custom sebelumnya, terapkan
 100% ke SEMUA sektor yang langsung terlihat user, bukan cuma pilar utama. Spec baru ini secara

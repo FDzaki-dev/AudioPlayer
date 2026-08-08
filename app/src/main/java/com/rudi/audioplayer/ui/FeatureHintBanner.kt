@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.rudi.audioplayer.ui.theme.Radius
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lightbulb
@@ -28,7 +29,7 @@ import androidx.compose.ui.unit.dp
 fun FeatureHintBanner(text: String, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(Radius.ml),
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
     ) {
         Row(

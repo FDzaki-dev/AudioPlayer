@@ -94,18 +94,18 @@ private val TactileColors = darkColorScheme(
 // API only supports true rounded rectangles (Apple's real squircle/superellipse corners
 // aren't natively expressible), so generous rounding is the closest honest approximation.
 val AppleShapes = Shapes(
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(20.dp),
-    large = RoundedCornerShape(28.dp)
+    small = RoundedCornerShape(Radius.ml),
+    medium = RoundedCornerShape(Radius.xxl),
+    large = RoundedCornerShape(Radius.hero)
 )
 
 // Tactile's shape language — moderate, consistent rounding (not Apple's generous curve, not
 // sharp/boxy like the old Matte identity) since the tactile spec's realism comes from the
 // bevel/gradient/shadow treatment (tactileEmboss(), TactileDepth.kt), not from the shape itself.
 val TactileShapes = Shapes(
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(12.dp),
-    large = RoundedCornerShape(16.dp)
+    small = RoundedCornerShape(Radius.sm),
+    medium = RoundedCornerShape(Radius.md),
+    large = RoundedCornerShape(Radius.lg)
 )
 
 @Composable
@@ -119,6 +119,15 @@ fun resolveIsDark(theme: AppTheme): Boolean = when (theme) {
     // !isDarkTheme`), same as before.
     AppTheme.TACTILE -> true
 }
+
+// Batch 54 (technical debt pass) — this exact comparison
+// (`MaterialTheme.colorScheme.background == TactileBackground`) was hand-duplicated in 6 places
+// across the codebase (BlurUtils.kt, TactileDepth.kt call sites in HomeScreen/LibraryScreen/
+// MiniPlayerBar/NowPlayingScreen x2) every time a new screen needed to branch on the active
+// theme's identity. One shared helper here means future call sites (and any future rename of
+// the underlying identity token) only need to change in one place.
+@Composable
+fun isTactileTheme(): Boolean = MaterialTheme.colorScheme.background == TactileBackground
 
 fun colorsFor(theme: AppTheme, isDark: Boolean) = when (theme) {
     AppTheme.TACTILE -> TactileColors

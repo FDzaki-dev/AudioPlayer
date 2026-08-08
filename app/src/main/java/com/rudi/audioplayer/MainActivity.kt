@@ -97,6 +97,10 @@ import com.rudi.audioplayer.ui.NowPlayingScreen
 import com.rudi.audioplayer.ui.theme.AppTheme
 import com.rudi.audioplayer.ui.theme.AudioPlayerTheme
 import com.rudi.audioplayer.ui.theme.resolveIsDark
+import com.rudi.audioplayer.ui.theme.MidnightBlue
+import com.rudi.audioplayer.ui.theme.MidnightBlueAmbientAlpha
+import com.rudi.audioplayer.ui.theme.AmoledSurface
+import com.rudi.audioplayer.ui.theme.TactileHighlight
 
 class MainActivity : FragmentActivity() {
 
@@ -283,10 +287,10 @@ class MainActivity : FragmentActivity() {
                     Brush.linearGradient(
                         colors = listOf(
                             MaterialTheme.colorScheme.background,
-                            com.rudi.audioplayer.ui.theme.MidnightBlue.copy(
-                                alpha = com.rudi.audioplayer.ui.theme.MidnightBlueAmbientAlpha
+                            MidnightBlue.copy(
+                                alpha = MidnightBlueAmbientAlpha
                             ),
-                            com.rudi.audioplayer.ui.theme.AmoledSurface
+                            AmoledSurface
                         )
                     )
                 else null
@@ -597,8 +601,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 drawLine(
                                     brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
                                         listOf(
-                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.13f),
-                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.03f)
+                                            TactileHighlight.copy(alpha = 0.13f),
+                                            TactileHighlight.copy(alpha = 0.03f)
                                         )
                                     ),
                                     start = androidx.compose.ui.geometry.Offset(0f, 0f),

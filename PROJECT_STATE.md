@@ -6,6 +6,53 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 54 (technical debt pass, bukan tema/fitur)** — User minta gabungkan seluruh daftar
+technical debt murni-kode (hasil audit statis: grep + baca file, bukan dari testing) dengan
+technical debt yang sudah tercatat di segmen "Belum selesai / dalam pengerjaan" README.md, jadi
+1 batch atomic change. Dikerjakan (pakai batch-limit exception "Atomic Change" — 10 file
+tersentuh, lebih dari limit normal 10 file/1 modul, tapi ini satu perubahan logis yang saling
+terkait, bukan beberapa fitur independen digabung paksa):
+- **`isTactileTheme()` helper baru** di `Theme.kt` — mengganti 6 duplikat manual
+  `MaterialTheme.colorScheme.background == TactileBackground` (di `BlurUtils.kt`, `HomeScreen.kt`,
+  `LibraryScreen.kt`, `MiniPlayerBar.kt`, `NowPlayingScreen.kt` x2) jadi satu pemanggilan fungsi.
+  Perilaku identik, cuma DRY.
+- **11 inline fully-qualified reference** (`com.rudi.audioplayer.ui.theme.X` ditulis langsung di
+  tengah kode alih-alih lewat `import`) dibersihkan jadi import biasa — 5 file (`MiniPlayerBar.kt`,
+  `LibraryScreen.kt`, `HomeScreen.kt`, `NowPlayingScreen.kt`, `MainActivity.kt`). Sudah dicek grep:
+  tidak ada FQN inline tersisa di codebase (import legit seperti `import
+  com.rudi.audioplayer.ui.theme.frostedGlass` tidak disentuh, itu memang sudah bentuk yang benar).
+- **5 token warna dead code dihapus** dari `Color.kt`: `TactileControl`, `TactileControlPressed`,
+  `GlassPressed`, `GlassWhite`, `TactileMutedText` — 0 call site (grep-confirmed sebelum dihapus).
+  Disiapkan Batch 53 untuk komponen `TactileButton`/`TactileSwitch`/`TactileSlider` yang belum
+  pernah dibangun; ditinggalkan komentar penjelas supaya batch masa depan yang benar-benar
+  membangun komponen itu tahu kenapa tokennya hilang dan tinggal re-derive dari spec saat itu.
+- **`Spacing.kt` (file baru)** — token `Radius` (xs/sm/md/ml/lg/xl/xxl/xxxl/hero, literal
+  4/10/12/14/16/18/20/24/28dp) sebagai fondasi sistem spacing/shape terpusat (spec §19). Semua 32
+  titik `RoundedCornerShape(N.dp)` literal di seluruh codebase (8 file: `FeatureHintBanner.kt`,
+  `HomeScreen.kt`, `LibraryScreen.kt`, `MiniPlayerBar.kt`, `NowPlayingScreen.kt`,
+  `SettingsScreen.kt`, `Theme.kt`) dimigrasi ke token ini via script Python (regex match-and-
+  replace per file, bukan manual satu-satu) — sudah diverifikasi grep nihil literal
+  `RoundedCornerShape(N.dp)` tersisa, dan brace/paren count tiap file yang disentuh seimbang
+  sebelum/sesudah (proxy sanity-check tanpa compiler).
+- **Sengaja TIDAK dikerjakan batch ini** (didaftar transparan, bukan disembunyikan):
+  - **Migrasi penuh ~340 literal `.dp` non-radius sisanya** (padding/size/offset/blur radius) ke
+    `Spacing.kt` — beda dengan corner-radius yang punya segelintir nilai berulang jelas, mayoritas
+    literal ini one-off/context-specific (misal shadow offset `9.dp` di hero art `NowPlayingScreen`
+    yang memang di-tuning presisi untuk 1 tempat). Memaksakan token di sini berisiko kehilangan
+    presisi yang disengaja, dan sweep sebesar itu tanpa `kotlinc` untuk verifikasi adalah risiko
+    nyata — alasan yang sama persis yang sudah dipakai proyek ini sendiri di Batch 31/35.
+  - **Ekstraksi penuh 339 string literal ke `strings.xml`** (untuk i18n) — sudah didaftar duluan
+    di README.md "Belum selesai / dalam pengerjaan" dengan alasan identik (refactor mekanis
+    sebesar itu, ratusan titik tersebar di banyak file, tidak aman tanpa compiler untuk verifikasi
+    argumen format-string/urutan parameter tetap benar). Tidak diulang batch ini.
+  - **Pull-to-refresh gesture di Library** & **Shared-element transition sungguhan** (mini player
+    → Now Playing) — dua-duanya butuh bump Compose BOM dari 2024.05.00, yang berisiko ke komponen
+    lain yang sudah stabil jalan. Ini bukan technical debt murni kode (butuh keputusan
+    dependency-version terpisah), jadi tidak dipaksakan masuk batch "atomic" ini.
+- **Belum diverifikasi build/compile** — sama seperti setiap batch sebelumnya, environment kerja
+  ini tidak punya `kotlinc`. Verifikasi dilakukan lewat grep menyeluruh (nihil sisa referensi lama)
+  + brace/paren balance check per file, bukan compile sungguhan.
+
 **Batch 53** — User kirim spec baru `compose-amoled-hybrid-glass-final.md`, minta diterapkan
 100% ke tema custom Tactile (menggantikan palet flat Midnight Blue literal Batch 52 sepenuhnya —
 spec ini secara eksplisit mendaftar "a full Midnight Blue theme" sebagai anti-pattern di §24, jadi

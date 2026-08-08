@@ -57,21 +57,19 @@ val AmoledSurface = Color(0xFF070A0F) // spec §3 AmoledSurface — secondary ne
 // --- Level 1-2: Hybrid glass surfaces (spec §5) ----------------------------
 val TactileSurface = Color(0xFF0A0F16) // spec §5 GlassBase — Level 1 translucent glass (M3 `surface`)
 val TactileSurfaceVariant = Color(0xFF101722) // spec §5 GlassElevated — Level 2 elevated frosted glass ("raised" stop)
-val GlassPressed = Color(0xFF070B11) // spec §5 GlassPressed — recessed glass when a surface is pressed/active
 
 // --- Level 3-4: Tactile control surfaces (spec §10-13) ---------------------
-// Distinct-but-restrained glass tone for interactive controls (buttons, switches,
-// sliders, knobs) — one step lighter than GlassElevated so tactile chrome reads as
-// its own layer without becoming a bright card. No literal value given by the spec
-// for this role (same gap every prior batch's spec left); tuned to sit correctly
-// in the new (darker, glass-first) hierarchy.
-val TactileControl = Color(0xFF141C29)
-val TactileControlPressed = GlassPressed
+// Reserved for a future dedicated TactileButton/TactileSwitch/TactileSlider component set
+// (spec §23's `ui/components/` hierarchy — not built yet, same gap noted every batch since
+// Batch 52). Removed here (Batch 54 technical debt pass): TactileControl/TactileControlPressed/
+// GlassPressed/GlassWhite/TactileMutedText had zero call sites (grep-confirmed) — unused design
+// tokens rot silently, and their exact values will need re-deriving from whatever spec drives
+// that future component batch anyway, so keeping unused placeholders here added no real value.
+// Re-add when that component set is actually built.
 
 // --- Typography (spec §16) --------------------------------------------------
 val TactileText = Color(0xFFEAF0F8) // spec §16 TextPrimary
 val TactileSecondaryText = Color(0xFFAAB5C4) // spec §16 TextSecondary
-val TactileMutedText = Color(0xFF737E8C) // spec §16 TextMuted — captions/disabled, not previously modeled
 
 // --- Semantic status ---------------------------------------------------------
 // Not given literally by the spec (glass/tactile system has no error/success
@@ -96,5 +94,4 @@ val TactileAccent = Color(0xFF6670FF) // spec §6/§17 MidnightBlueAccent == Acc
 // border") — the highlight must read as reflected light, not an outline.
 val TactileHighlight = Color.White.copy(alpha = 0.065f) // spec §5 GlassHighlight
 val TactileEdge = Color.White.copy(alpha = 0.035f) // spec §5 GlassBorder
-val GlassWhite = Color.White.copy(alpha = 0.045f) // spec §5 GlassWhite — subtle wash, distinct from the border/highlight roles
 val TactileShadow = Color.Black.copy(alpha = 0.70f) // spec §5 GlassShadow

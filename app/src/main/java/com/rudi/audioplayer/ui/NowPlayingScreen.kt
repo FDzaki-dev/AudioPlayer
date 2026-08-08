@@ -82,6 +82,10 @@ import com.rudi.audioplayer.playback.EqualizerUiState
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.tactileEmboss
+import com.rudi.audioplayer.ui.theme.isTactileTheme
+import com.rudi.audioplayer.ui.theme.TactileHighlight
+import com.rudi.audioplayer.ui.theme.TactileShadow
+import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -812,10 +816,10 @@ private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit, accentColor: Color
 
 @Composable
 private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: Color, label: String? = null) {
-    val isTactile = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.TactileBackground
+    val isTactile = isTactileTheme()
     Surface(
-        modifier = if (isTactile) Modifier.tactileEmboss(shape = RoundedCornerShape(18.dp), elevation = 8.dp) else Modifier,
-        shape = RoundedCornerShape(18.dp),
+        modifier = if (isTactile) Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xl), elevation = 8.dp) else Modifier,
+        shape = RoundedCornerShape(Radius.xl),
         color = if (isTactile) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
         // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent fallback.
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -881,14 +885,14 @@ private fun AlbumArtHero(
             )
         }
     ) {
-        val isTactile = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.TactileBackground
+        val isTactile = isTactileTheme()
         // Batch 52: recolored again for the literal Midnight Blue spec
         // (compose-skeuomorphism-lite-midnight-blue.md) — same drawn top-down shadow +
         // vertical-gradient bevel border technique kept from Batch 45/46/49-51, no code changes
         // here at all; TactileHighlight/TactileShadow are plain white/black-based again this
         // batch (see Color.kt), so this hero art picks up the new palette automatically through
         // those same two token references.
-        val heroShape = if (isTactile) MaterialTheme.shapes.large else RoundedCornerShape(28.dp)
+        val heroShape = if (isTactile) MaterialTheme.shapes.large else RoundedCornerShape(Radius.hero)
         Box(
             modifier = Modifier
                 .size(300.dp)
@@ -906,7 +910,7 @@ private fun AlbumArtHero(
                                 val outline = heroShape.createOutline(size, layoutDirection, this)
                                 val outlinePath = Path().apply { addOutline(outline) }
                                 translate(top = 9.dp.toPx()) {
-                                    drawPath(outlinePath, color = com.rudi.audioplayer.ui.theme.TactileShadow.copy(alpha = 0.55f))
+                                    drawPath(outlinePath, color = TactileShadow.copy(alpha = 0.55f))
                                 }
                             }
                             .clip(heroShape)
@@ -915,8 +919,8 @@ private fun AlbumArtHero(
                                     1.5.dp,
                                     Brush.verticalGradient(
                                         listOf(
-                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.12f),
-                                            com.rudi.audioplayer.ui.theme.TactileShadow.copy(alpha = 0.32f)
+                                            TactileHighlight.copy(alpha = 0.12f),
+                                            TactileShadow.copy(alpha = 0.32f)
                                         )
                                     )
                                 ),
@@ -1060,7 +1064,7 @@ private fun TransitionModeOption(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
