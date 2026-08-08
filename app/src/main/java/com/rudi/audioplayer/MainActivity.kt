@@ -255,35 +255,68 @@ class MainActivity : FragmentActivity() {
 
                 // Batch 49: dropped the Matte-only "transparent Surface + ambient glow Box"
                 // trick entirely (matteDepthBrush() removed from Theme.kt) along with the rest
-                // of the Matte identity — Tactile's depth cue lives entirely in tactileEmboss()
-                // per-surface (TactileDepth.kt), not a root-level glow, so this Surface is now
-                // unconditionally opaque + explicit contentColor for every theme. This also
-                // permanently forecloses the whole Batch 48 bug class (invisible text from a
-                // Transparent-color Surface silently losing contentColor) — there is no longer
-                // any Transparent-color Surface at the root for any theme.
+                // of the Matte identity — this also permanently forecloses the whole Batch 48
+                // bug class (invisible text from a Transparent-color Surface silently losing
+                // contentColor), because contentColor is always passed explicitly below
+                // regardless of the color param, so contentColorFor()'s auto-derivation is never
+                // consulted for either branch.
+                //
+                // Batch 51: Tactile now needs an actual root-level visual again — the hybrid-
+                // glass dark-blue spec (compose-skeuomorphism-lite-hybrid-glass-dark-blue.md)
+                // §1.1/§2/§8 mandates a deep navy→dark-blue *gradient* atmosphere as the base
+                // layer ("avoid literal pure-black as the dominant visual field"), which a flat
+                // `color = colorScheme.background` can't express — colorScheme.background stays
+                // a single flat Color (TactileBackground) because M3's API requires one, but the
+                // Surface itself goes transparent for Tactile and the gradient is painted on a
+                // Box just inside it instead. This is NOT the Batch 48 trick reborn: contentColor
+                // is still always explicit here, so there is no Unspecified-content-color path
+                // for this Transparent case to fall into.
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
+                    color = if (appTheme == AppTheme.TACTILE) Color.Transparent else MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground
                 ) {
-                    when {
-                        needsUnlock -> LockScreen(
-                            biometricEnabled = biometricEnabled && isBiometricAvailable(),
-                            onVerifyPin = { pin -> playerViewModel.verifyPin(pin) },
-                            onUnlocked = { isUnlocked = true },
-                            onRequestBiometric = { showBiometricPrompt { isUnlocked = true } },
-                            initialLockedOutUntil = remember(needsUnlock) { playerViewModel.currentPinLockout() }
-                        )
-                        hasPermission -> AppNavHost(playerViewModel, isBiometricAvailable())
-                        !permissionRequested -> WelcomeScreen(
-                            onContinue = {
-                                permissionRequested = true
-                                launcher.launch(neededPermissions)
-                            }
-                        )
-                        else -> PermissionRationale(
-                            onRequest = { launcher.launch(neededPermissions) }
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(
+                                if (appTheme == AppTheme.TACTILE)
+                                    // Spec §3: single consistent light direction, top-left ->
+                                    // bottom-right, applied to the background atmosphere itself
+                                    // (not just component bevels) via a diagonal linear gradient
+                                    // between the spec's two §2 literal background stops.
+                                    Modifier.background(
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                com.rudi.audioplayer.ui.theme.TactileBackgroundTop,
+                                                MaterialTheme.colorScheme.background
+                                            ),
+                                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                                            end = androidx.compose.ui.geometry.Offset.Infinite
+                                        )
+                                    )
+                                else Modifier
+                            )
+                    ) {
+                        when {
+                            needsUnlock -> LockScreen(
+                                biometricEnabled = biometricEnabled && isBiometricAvailable(),
+                                onVerifyPin = { pin -> playerViewModel.verifyPin(pin) },
+                                onUnlocked = { isUnlocked = true },
+                                onRequestBiometric = { showBiometricPrompt { isUnlocked = true } },
+                                initialLockedOutUntil = remember(needsUnlock) { playerViewModel.currentPinLockout() }
+                            )
+                            hasPermission -> AppNavHost(playerViewModel, isBiometricAvailable())
+                            !permissionRequested -> WelcomeScreen(
+                                onContinue = {
+                                    permissionRequested = true
+                                    launcher.launch(neededPermissions)
+                                }
+                            )
+                            else -> PermissionRationale(
+                                onRequest = { launcher.launch(neededPermissions) }
+                            )
+                        }
                     }
                 }
             }
@@ -551,9 +584,11 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // tactileEmboss() uses elsewhere, applied here without restructuring
                     // NavigationBar's own internals (it's a whole M3 component, not a bare
                     // Surface tactileEmboss() could wrap directly).
-                    // Batch 50: alphas dropped 0.9/0.05 -> 0.10/0.02 for the dark spec's §4 rule
-                    // ("Do NOT use a bright Color.White border") — the old values were a
-                    // near-opaque white line, exactly what §4/§13 forbid.
+                    // Alphas unchanged since Batch 50 (0.10/0.02) — the hybrid-glass spec's own
+                    // §4 rule is the same ("Do NOT use a bright Color.White border"), and
+                    // TactileHighlight is now a spec-tinted cool blue-white instead of generic
+                    // white (see Color.kt), so this line just reads a hair bluer this batch with
+                    // no numeric change needed here.
                     NavigationBar(
                         modifier = if (appTheme == AppTheme.TACTILE)
                             Modifier.drawBehind {

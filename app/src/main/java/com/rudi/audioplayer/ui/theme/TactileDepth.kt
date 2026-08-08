@@ -21,28 +21,31 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Batch 50 — full repaint from the user-supplied compose-skeuomorphism-lite-dark.md spec, which
- * supersedes the Batch 49 light-palette version of this same function. Structure/signature is
- * unchanged (all 8 call sites keep working unmodified) — only the token values and alpha
- * constants change, per spec §1.1's own instruction: **"Do not simply invert a light theme.
- * Design the tactile lighting model specifically for dark surfaces."**
+ * Batch 51 — repainted again for the user-supplied compose-skeuomorphism-lite-hybrid-glass-
+ * dark-blue.md spec, which supersedes Batch 50's AMOLED-black version of this same function.
+ * Structure/signature is still unchanged (all 8 call sites keep working unmodified) — only the
+ * token *values* changed, this time entirely inside Color.kt: TactileSurfaceVariant/
+ * TactileSurface are now translucent (spec §2 literal 0xB8/0xCC alpha) instead of opaque, so the
+ * exact same `Brush.verticalGradient(TactileSurfaceVariant, TactileSurface)` call below now
+ * automatically composites as glass over whatever's drawn behind it (MainActivity.kt's new root
+ * gradient) — this is the spec §8 "hybrid glass" formula, achieved here with zero logic changes.
  *  1. Tactile depth (spec §4) — top-down `Brush.verticalGradient` using the spec's own literal
- *     §2 tokens (TactileSurfaceVariant -> TactileSurface, i.e. the "lifted" panel is a hair
- *     lighter than its recessed background), plus a bevel border. Spec §4's explicit dark-mode
- *     rule: "Do NOT use a bright Color.White border… highlight = very-low-alpha light tone,
- *     shadow = very-dark neutral" — border alphas below are deliberately far lower than the old
- *     light-theme version's (0.9/0.45), never a flat opaque edge.
- *  2. Micro-interactions (spec §6) — unchanged mechanism from Batch 49 (`pressed` still drives
+ *     §2 tokens, plus a bevel border. Spec §4's hybrid-glass rule: "Do NOT use a bright
+ *     Color.White border… highlight = very-low-alpha cool white/blue, shadow = deep navy/near-
+ *     black" — TactileHighlight/TactileShadow are themselves now tinted (not generic white/black
+ *     at low alpha, see Color.kt), so this file's own border-alpha *scaling* logic is unchanged
+ *     from Batch 50, it just scales cooler-tinted base colors now.
+ *  2. Micro-interactions (spec §6) — unchanged mechanism from Batch 49/50 (`pressed` still drives
  *     real animated depression via `animateDpAsState`/`animateFloatAsState`), still hand-drawn
  *     via `drawBehind` + `Outline`->`Path` rather than native `Modifier.shadow` for the same
  *     reason as ever: a black-on-near-black native shadow is exactly the failure mode that took
  *     5 batches to fix for Matte Noir (see PROJECT_STATE.md Batch 39-44) — this app's own alpha
- *     stays the single source of contrast truth instead of trusting platform shadow rendering
- *     against an AMOLED background.
+ *     stays the single source of contrast truth instead of trusting platform shadow rendering.
  *  3. Restrained skeuomorphism (spec §1.3/§8) — this stays the flat/structural-card treatment
  *     only; spec §7's fully tactile Button/Toggle/Slider components are a separate, larger
- *     scope (new files under `ui/components/`, per spec §12) not built this batch — sliders/
- *     toggles/switches remain plain Material3, same boundary carried over from Batch 49.
+ *     scope (new files under `ui/components/`, per spec §12) not built this batch either —
+ *     sliders/toggles/switches remain plain Material3, same boundary carried over from Batch
+ *     49/50.
  */
 @Composable
 fun Modifier.tactileEmboss(
@@ -63,12 +66,13 @@ fun Modifier.tactileEmboss(
     // token's own 0.055f/0.65f), so the numbers below are the final on-screen values.
     val borderTopAlpha = if (pressed) 0.04f else 0.09f
     val borderBottomAlpha = if (pressed) 0.15f else 0.30f
-    // The offset drop-shadow does the actual depth-communication work (spec §2: "Shadows: black
-    // or very-dark neutral where technically useful") — kept close to TactileShadow's own
-    // spec-literal 0.65f base rather than diluted further, or it disappears entirely against
-    // TactileBackground (0xFF05070A is already near-black; a faint black-on-black shadow reads
-    // as nothing at all — the exact Matte Noir mistake, not repeated here).
-    val shadowAlpha = if (pressed) 0.35f else 0.65f
+    // The offset drop-shadow does the actual depth-communication work (spec §2: "Shadows: deep
+    // navy/black with restrained opacity where technically useful") — kept close to
+    // TactileShadow's own spec-literal 0.68f base rather than diluted further, or it disappears
+    // against the app's still-very-dark background; a faint shadow-on-near-black reads as
+    // nothing at all — the exact Matte Noir mistake (PROJECT_STATE.md Batch 39-44), not
+    // repeated here even though this spec's background is a hair lighter than Batch 50's.
+    val shadowAlpha = if (pressed) 0.35f else 0.68f
 
     return this
         .scale(scale)

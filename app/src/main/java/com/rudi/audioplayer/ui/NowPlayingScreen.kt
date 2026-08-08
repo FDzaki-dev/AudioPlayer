@@ -882,11 +882,12 @@ private fun AlbumArtHero(
         }
     ) {
         val isTactile = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.TactileBackground
-        // Batch 50: recolored again for the dark-mode spec (compose-skeuomorphism-lite-dark.md)
-        // — same drawn top-down shadow + vertical-gradient bevel border technique kept from
-        // Batch 45/46/49, alphas brought in line with TactileDepth.kt's own Batch 50 values
-        // (spec §4: no bright border; spec §2: shadow stays close to full alpha or it vanishes
-        // against the near-black TactileBackground).
+        // Batch 51: recolored again for the hybrid-glass dark-blue spec
+        // (compose-skeuomorphism-lite-hybrid-glass-dark-blue.md) — same drawn top-down shadow +
+        // vertical-gradient bevel border technique kept from Batch 45/46/49/50, no code changes
+        // here at all; TactileHighlight/TactileShadow are now spec-tinted (cool-blue/navy
+        // instead of generic white/black, see Color.kt), so this hero art picks up the new
+        // palette automatically through those same two token references.
         val heroShape = if (isTactile) MaterialTheme.shapes.large else RoundedCornerShape(28.dp)
         Box(
             modifier = Modifier

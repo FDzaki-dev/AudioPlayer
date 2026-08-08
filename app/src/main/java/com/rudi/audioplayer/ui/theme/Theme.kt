@@ -17,7 +17,7 @@ enum class AppTheme(val storageKey: String, val displayName: String, val descrip
     SYSTEM("system", "Ikuti Sistem", "Menyesuaikan mode terang/gelap perangkat"),
     LIGHT("light", "Terang", "Latar putih bersih, khas iOS"),
     DARK("dark", "Gelap", "Hitam pekat, nyaman untuk layar OLED"),
-    TACTILE("tactile_lite", "Tactile", "Bevel gelap AMOLED terprogram, bukan gambar — permukaan yang terasa bisa disentuh");
+    TACTILE("tactile_lite", "Tactile", "Kaca biru-gelap terprogram, bukan gambar — permukaan translusen yang terasa bisa disentuh");
 
     companion object {
         fun fromStorageKey(key: String?): AppTheme = entries.find { it.storageKey == key } ?: SYSTEM
@@ -64,12 +64,14 @@ private val AppleLightColors = lightColorScheme(
     error = Color(0xFFFF3B30)
 )
 
-// Batch 50: darkColorScheme(), not lightColorScheme() — compose-skeuomorphism-lite-dark.md §1.1
-// makes dark mandatory for this identity ("No component may silently fall back to a bright/
-// light neumorphic appearance"), so the M3 scheme factory itself now matches. onPrimary/
-// onTertiary picked by the same luminance rule MiniPlayerBar.kt already uses elsewhere in this
-// app (>0.55 luminance -> black text): TactileAccent (0xFF4DA3FF) and TactileSuccess
-// (0xFF34D399) are both light-ish, so black reads better on them than white.
+// Batch 51: still darkColorScheme() — compose-skeuomorphism-lite-hybrid-glass-dark-blue.md §1.1
+// carries the same "no light-mode fallback" mandate forward from Batch 50 (§13: "must not
+// introduce a light-mode fallback"), it just changes what "dark" looks like (calm dark-blue
+// gradient + translucent glass instead of AMOLED-black). onPrimary/onTertiary still picked by
+// the same luminance rule MiniPlayerBar.kt uses elsewhere (>0.55 luminance -> black text):
+// TactileAccent (0xFF5B9DFF, re-checked this batch — luminance ≈0.59, still above the
+// threshold) and TactileSuccess (0xFF34D399, unchanged) are both light-ish, so black still
+// reads better on them than white.
 private val TactileColors = darkColorScheme(
     primary = TactileAccent,
     onPrimary = Color.Black,
@@ -111,10 +113,10 @@ fun resolveIsDark(theme: AppTheme): Boolean = when (theme) {
     AppTheme.SYSTEM -> isSystemInDarkTheme()
     AppTheme.LIGHT -> false
     AppTheme.DARK -> true
-    // Batch 50: flipped false -> true along with the palette itself — this also flips the
-    // status bar/nav bar icon color to light (MainActivity.kt's `isAppearanceLightStatusBars =
-    // !isDarkTheme`), which is now correct for the AMOLED-dark Tactile background instead of
-    // leaving dark icons stranded on a near-black bar.
+    // Still true since Batch 50 — the hybrid-glass dark-blue repaint this batch (spec
+    // compose-skeuomorphism-lite-hybrid-glass-dark-blue.md) is still unambiguously dark, so
+    // status bar/nav bar icons stay light (MainActivity.kt's `isAppearanceLightStatusBars =
+    // !isDarkTheme`), same as before.
     AppTheme.TACTILE -> true
 }
 

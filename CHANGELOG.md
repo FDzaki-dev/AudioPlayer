@@ -10,6 +10,84 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 51 — Timpa palet tema custom Tactile pakai spec hybrid-glass dark-blue baru (compose-skeuomorphism-lite-hybrid-glass-dark-blue.md)
+User kirim spec baru: masih dark-mode, tapi eksplisit menolak AMOLED-black sebagai tujuan
+(§1.1: "Pure/AMOLED-black styling is not the target") dan minta atmosfer gradient navy→biru-gelap
+plus permukaan kaca translusen ("hybrid glassmorphism"), diterapkan 100% menggantikan palet
+Batch 50. 6 file kode disentuh, 1 tema kohesif, atomic.
+
+**Root cause / kenapa ini bukan sekadar recolor lagi**: dua hal di spec ini tidak ada
+padanannya di spec Batch 49/50 manapun — (1) `Surface`/`SurfaceVariant` di tabel §2 secara
+eksplisit dikasih nilai literal ber-alpha-channel (0xCC/0xB8, bukan 0xFF opaque), artinya
+translucency itu sendiri adalah bagian dari desain token, bukan sesuatu yang ditambah lewat
+parameter `alpha` di modifier seperti sebelumnya; (2) §2/§8 minta *gradient* background, bukan
+flat color — sesuatu yang `MaterialTheme.colorScheme.background` (tipe `Color`, bukan `Brush`)
+secara struktural tidak bisa mengekspresikan sendirian.
+
+**File yang diubah:**
+- `Color.kt` — repaint total token Tactile dari §2 spec (literal): `TactileBackground`
+  0xFF050B18, `TactileBackgroundTop` (BARU) 0xFF0A1630, `TactileSurface` 0xCC101D35,
+  `TactileSurfaceVariant` 0xB8142745 (dua terakhir ini translusen — beda fundamental dari
+  Batch 50 yang opaque penuh), `TactileGlassOverlay` (BARU) 0x142E6AA3, `TactileAccent`
+  0xFF5B9DFF, `TactileHighlight` 0xFFEAF4FF/alpha 0.07f, `TactileEdge` 0xFF8FB9E8/alpha 0.10f,
+  `TactileShadow` 0xFF020817/alpha 0.68f — tiga terakhir ini sekarang punya warna dasar
+  ber-tint sendiri dari spec (bukan generic `Color.White`/`Color.Black` ber-alpha rendah
+  seperti Batch 50). `TactileText`/`TactileSecondaryText` tidak berubah nilainya (spec
+  kebetulan pakai literal identik Batch 50). `TactileControl`/`TactileControlPressed`
+  (tetap tanpa pemanggil) direfresh nilainya manual (tidak ada literal spec utk keduanya) biar
+  konsisten sama arah warna baru.
+- `MainActivity.kt` — root `Surface` untuk tema Tactile diganti `color = Color.Transparent`
+  (dari `MaterialTheme.colorScheme.background` datar), dibungkus `Box` baru dengan
+  `Brush.linearGradient(TactileBackgroundTop -> colorScheme.background, start = Offset(0f,0f),
+  end = Offset.Infinite)` — gradient diagonal kiri-atas→kanan-bawah sesuai arah cahaya spec
+  §3, dipakai juga di level atmosfer background per §8. Tema lain (Apple System/Light/Dark)
+  sama sekali tidak tersentuh — root Surface-nya tetap pakai jalur lama, opaque flat color.
+  **Penting soal keamanan pola ini**: `contentColor` tetap SELALU diisi eksplisit
+  (`MaterialTheme.colorScheme.onBackground`) di kedua cabang if/else color, jadi
+  `contentColorFor(Transparent)` tidak pernah dikonsultasi — beda akar masalah dari bug Batch
+  48 (Surface Transparent yang lupa isi `contentColor` sama sekali, sehingga Compose jatuh ke
+  fallback `LocalContentColor` yang belum di-set → hitam). NavigationBar catch-light line
+  (kode `TactileHighlight.copy(alpha=...)`) tidak disentuh — otomatis ikut warna baru lewat
+  Color.kt.
+- `BlurUtils.kt` (`frostedGlass()`, 6 caller: `LyricsSheet`, `QueueSheet`, `MiniPlayerBar`,
+  `FolderManagerSheet`, `NowPlayingScreen`, `EqualizerSheet`, semua tanpa override parameter)
+  — ditambah cabang khusus Tactile: `tint` dipakai apa adanya (translucency native dari
+  Color.kt terjaga) + layer `TactileGlassOverlay` ekstra di atasnya, alih-alih cabang lama
+  `.copy(alpha = alpha)` yang untuk Tactile akan MENIMPA alpha spec-literal jadi hampir
+  opaque (0.92f) — bug regresi kalau tidak diperbaiki, karena §2/§8 spec ini secara eksplisit
+  mensyaratkan permukaan glass yang translusen. Cabang non-Tactile (Apple System/Light/Dark)
+  sama sekali tidak berubah perilakunya.
+- `TactileDepth.kt` (`tactileEmboss()`, 8 caller tidak berubah) dan `NowPlayingScreen.kt`
+  (`AlbumArtHero`) — **nol perubahan logika**, cuma dokumentasi komentar diperbarui. Berkat
+  kedua file ini mereferensikan token Color.kt by-name (bukan hardcode literal), efek
+  hybrid-glass (translucency + tint biru) otomatis muncul begitu Color.kt berubah — pola yang
+  sama dipakai Batch 50 untuk merecolor Batch 49 tanpa menyentuh struktur kode.
+- `Theme.kt` — `TactileColors` tetap `darkColorScheme()` (spec §13 masih larang light-mode
+  fallback, tidak berubah dari Batch 50); `resolveIsDark(TACTILE)` tetap `true`; deskripsi
+  tampilan `AppTheme.TACTILE` (string yang muncul di UI picker tema) diupdate dari "Bevel gelap
+  AMOLED terprogram" jadi "Kaca biru-gelap terprogram… permukaan translusen" biar tidak
+  menyesatkan. `storageKey` ("tactile_lite") TIDAK berubah — ini masih identitas Tactile yang
+  sama, cuma repaint ketiga, jadi tidak perlu migrasi preferensi tersimpan seperti Batch 49.
+
+**Di luar cakupan, disengaja**: sama seperti Batch 49/50, spec §7/§12 minta komponen
+`TactileButton`/`TactileSwitch`/`TactileSlider` custom penuh di `ui/components/` — tidak
+dikerjakan batch ini supaya scope tetap atomic.
+
+**Risiko yang belum diaudit**: `colorScheme.surface`/`surfaceVariant` kini translusen secara
+default di seluruh `TactileColors` scheme, bukan cuma lewat `tactileEmboss()`/`frostedGlass()`
+— artinya Card/Surface M3 polos manapun di layar lain yang masih memanggil
+`colorScheme.surface` langsung (tanpa lewat 2 helper itu) ikut jadi translusen otomatis. Ini
+SESUAI mandat spec §8 (glass di seluruh hierarchy komponen), tapi belum diverifikasi apakah
+ada titik yang jadi kurang terbaca — khususnya komponen yang dirender di window Compose
+terpisah dari root gradient Box (misal `ModalBottomSheet`/`Dialog`), yang tidak akan punya
+gradient di baliknya untuk ditembus translucency-nya.
+
+**Belum diverifikasi runtime asli** (tidak ada compiler Android di environment kerja) —
+analisis statis + brace/paren balance dicek manual di semua file yang disentuh (lihat laporan
+build-check di bawah). Prioritas sesi berikutnya: build-test asli + verifikasi visual device,
+khususnya arah/kecepatan gradient root baru (`Offset.Infinite` untuk diagonal) dan titik
+translucency-tanpa-latar di atas.
+
 ## Batch 50 — Timpa palet tema custom Tactile pakai spec dark-mode baru (compose-skeuomorphism-lite-dark.md)
 User kirim spec baru khusus dark-mode/AMOLED, minta diterapkan 100% ke tema Tactile
 (menggantikan palet TERANG dari Batch 49). Spec §1.1 eksplisit: "Do not simply invert a light

@@ -32,38 +32,42 @@ val AppleAccent = Color(0xFF4F7CFF)
 val AppleDarkSuccess = Color(0xFF32D74B)
 val AppleLightSuccess = Color(0xFF34C759)
 
-// Tactile (Skeuomorphism-lite) — Batch 50: full repaint from the user-supplied
-// compose-skeuomorphism-lite-dark.md spec, which supersedes the Batch 49 light palette below
-// entirely. Spec §1.1 is explicit: "Do not simply invert a light theme" — this is a from-scratch
-// dark/AMOLED-first token set, not the old light values darkened. §2's suggested palette block
-// is used verbatim as literal values (not just inspiration), same treatment Batch 49 gave the
-// light spec's own example stops.
-val TactileBackground = Color(0xFF05070A) // spec §2 literal DarkBackground — near-black, AMOLED-safe
-val TactileSurface = Color(0xFF0B0F14) // spec §2 literal DarkSurface — main panels
-val TactileSurfaceVariant = Color(0xFF111720) // spec §2 literal DarkSurfaceVariant — secondary panels, one step lighter
-val TactileText = Color(0xFFE8EEF5) // spec §2 literal TextPrimary
-val TactileSecondaryText = Color(0xFFA8B3C0) // spec §2 literal TextSecondary
-val TactileAccent = Color(0xFF4DA3FF) // spec §2 literal Accent — cool blue; replaces the old light-theme burnt-orange, per spec §1.1 "design specifically for dark surfaces" rather than recolor-in-place
+// Tactile (Skeuomorphism-lite Hybrid Glass) — Batch 51: full repaint from the user-supplied
+// compose-skeuomorphism-lite-hybrid-glass-dark-blue.md spec, which supersedes the Batch 50
+// AMOLED-black palette below entirely. Spec §1.1 is explicit: "Pure/AMOLED-black styling is not
+// the target" — the whole point of this batch is replacing the near-black Batch 50 tokens with a
+// calm dark-blue *gradient* atmosphere plus translucent glass surfaces, not just another recolor
+// pass. §2's suggested palette block is used verbatim as literal values (same treatment every
+// prior spec-driven Tactile batch has given its own source's example stops).
+val TactileBackground = Color(0xFF050B18) // spec §2 literal DarkBackgroundBottom — flat fallback for colorScheme.background/equality checks (isTactile guards); the actual root visual is the 2-stop gradient below, not this flat value alone
+val TactileBackgroundTop = Color(0xFF0A1630) // spec §2 literal DarkBackgroundTop — gradient's top-left stop, paired with TactileBackground as the bottom-right stop (MainActivity.kt root Box, spec §3 top-left→bottom-right light direction)
+val TactileSurface = Color(0xCC101D35) // spec §2 literal DarkSurface — deliberately translucent (0xCC ≈ 80% opacity), not opaque like Batch 50: this is what makes panels read as "glass" over the gradient behind them, per spec §2/§8
+val TactileSurfaceVariant = Color(0xB8142745) // spec §2 literal DarkSurfaceVariant — more translucent again (0xB8 ≈ 72%), one step lighter/bluer than TactileSurface
+val TactileGlassOverlay = Color(0x142E6AA3) // spec §2 literal GlassOverlay — very-low-alpha blue wash layered on top of glass fills (BlurUtils.kt frostedGlass()) per spec §8's "subtle linear/radial gradient" formula step
+val TactileText = Color(0xFFE8EEF5) // spec §2 literal TextPrimary — unchanged from Batch 50, this spec keeps the same value
+val TactileSecondaryText = Color(0xFFA8B3C0) // spec §2 literal TextSecondary — unchanged from Batch 50, this spec keeps the same value
+val TactileAccent = Color(0xFF5B9DFF) // spec §2 literal Accent — slightly softer/lighter cool blue than Batch 50's 0xFF4DA3FF, tuned for the new lighter dark-blue surfaces instead of near-black ones
 // Not given literally by the spec (its §2 table lists the roles but only shows example values
-// for the ones above) — chosen to fit the same cool/restrained AMOLED palette, legible on
-// TactileBackground/TactileSurface at normal text sizes.
+// for the ones above) — carried over from Batch 50 unchanged, still fits this cooler-but-still-
+// restrained palette, legible on TactileBackground/TactileSurface at normal text sizes.
 val TactileError = Color(0xFFFF6B6B)
 val TactileSuccess = Color(0xFF34D399)
 
-// Interactive-control pair from spec §2's token table (`Control` / `ControlPressed`) — "distinct
-// dark surface" for tactile controls, "darker/recessed surface" when pressed. No literal value
-// given by the spec for these two; placed one step lighter than TactileSurfaceVariant (Control,
-// so it reads as "lifted" against structural panels) and one step darker than TactileBackground
-// itself (ControlPressed, so a press genuinely recesses below the app's own floor).
-val TactileControl = Color(0xFF141B24)
-val TactileControlPressed = Color(0xFF080B10)
+// Interactive-control pair from spec §2's token table (`Control` / `ControlPressed`) — "Opaque/
+// translucent blue-black glass" for tactile controls, "Deeper navy/recessed glass" when pressed.
+// No literal value given by the spec for these two (same gap as Batch 50); still unused by any
+// call site (grep confirms), prepared for the future TactileButton/TactileSwitch/TactileSlider
+// components spec §7/§12 asks for but this batch still doesn't build (see TactileDepth.kt doc).
+val TactileControl = Color(0xD4152840)
+val TactileControlPressed = Color(0xF0060D1C)
 
-// Bevel pair used by tactileEmboss() (TactileDepth.kt) — spec §4's dark-mode rule: "Do NOT use a
-// bright Color.White border… highlight = very-low-alpha light tone, shadow = very-dark neutral."
-// TactileHighlight/TactileEdge are spec §2 literal values (Color.White at 0.055f/0.035f alpha —
-// deliberately near-invisible on their own, not a flat opaque color); TactileShadow is also
-// spec-literal (Color.Black at 0.65f). tactileEmboss() further scales these down per-state
-// (pressed vs. normal), it never raises them — see that file's own alpha comments.
-val TactileHighlight = Color.White.copy(alpha = 0.055f)
-val TactileEdge = Color.White.copy(alpha = 0.035f) // spec §4 single-border-color token, used where a bevel gradient isn't needed
-val TactileShadow = Color.Black.copy(alpha = 0.65f)
+// Bevel pair used by tactileEmboss() (TactileDepth.kt) — spec §4's hybrid-glass rule: "Do NOT
+// use a bright Color.White border… highlight = very-low-alpha cool white/blue, shadow = deep
+// navy/near-black." Unlike Batch 50 (which used pure Color.White/Color.Black as the alpha base),
+// this spec gives its own tinted base colors for all three — TactileHighlight/TactileEdge/
+// TactileShadow below are all spec §2 literal values now, not generic white/black at low alpha.
+// tactileEmboss() further scales these down per-state (pressed vs. normal), it never raises them
+// — see that file's own alpha comments.
+val TactileHighlight = Color(0xFFEAF4FF).copy(alpha = 0.07f)
+val TactileEdge = Color(0xFF8FB9E8).copy(alpha = 0.10f) // spec §4 single-border-color token, used where a bevel gradient isn't needed
+val TactileShadow = Color(0xFF020817).copy(alpha = 0.68f)
