@@ -91,9 +91,14 @@ private val MatteColors = darkColorScheme(
 // deep matte edges, like ambient light falling across a brushed-metal panel. Applied once
 // behind the whole app (MainActivity's root Surface) rather than per-screen, so every screen
 // gets the same "unique, not-flat" atmosphere for free without touching every UI file.
+// Batch 40: alpha raised 0.10f -> 0.22f and a highlight stop added — Batch 39's version was
+// verified only by static analysis and, per on-device feedback, was too subtle to register as
+// "epic" against real screen brightness/ambient light. Combined app-wide with matteEmboss()
+// (MatteDepth.kt) at every card/bar touch point for a consistent single light source.
 fun matteDepthBrush(): Brush = Brush.radialGradient(
     colors = listOf(
-        MatteAccent.copy(alpha = 0.10f),
+        MatteHighlight.copy(alpha = 0.22f),
+        MatteAccent.copy(alpha = 0.16f),
         MatteSurface,
         MatteBackground
     )

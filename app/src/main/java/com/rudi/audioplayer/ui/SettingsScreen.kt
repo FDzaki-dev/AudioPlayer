@@ -27,12 +27,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.BuildConfig
 import com.rudi.audioplayer.ui.theme.AppTheme
 import com.rudi.audioplayer.ui.theme.colorsFor
+import com.rudi.audioplayer.ui.theme.matteEmboss
 import com.rudi.audioplayer.ui.theme.resolveIsDark
 
 @Composable
@@ -286,16 +288,24 @@ fun SettingsScreen(
 @Composable
 private fun ThemeOptionCard(theme: AppTheme, selected: Boolean, onClick: () -> Unit) {
     val previewColors = colorsFor(theme, resolveIsDark(theme))
+    // Batch 40: the Matte Noir row in this exact picker is the app's own "epic" showcase —
+    // it should demonstrate the depth treatment live, not sit flat like every other row.
+    val isMattePreview = theme == AppTheme.MATTE
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .then(
+                if (isMattePreview)
+                    Modifier.matteEmboss(shape = RoundedCornerShape(18.dp), elevation = if (selected) 14.dp else 8.dp)
+                else
+                    Modifier.clip(RoundedCornerShape(18.dp))
+            )
             .clickable(onClick = onClick),
-        color = previewColors.surface,
-        tonalElevation = 4.dp,
-        shadowElevation = if (selected) 6.dp else 0.dp,
+        color = if (isMattePreview) Color.Transparent else previewColors.surface,
+        tonalElevation = if (isMattePreview) 0.dp else 4.dp,
+        shadowElevation = if (isMattePreview) 0.dp else if (selected) 6.dp else 0.dp,
         border = if (selected) BorderStroke(2.dp, previewColors.primary) else null,
         shape = RoundedCornerShape(18.dp)
     ) {

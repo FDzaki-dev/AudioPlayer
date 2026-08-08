@@ -52,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.rudi.audioplayer.ui.theme.matteEmboss
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -418,15 +419,20 @@ fun LibraryScreen(
             undoHideIds = emptyList()
         }
         Box(modifier = Modifier.fillMaxSize()) {
+            val isMatte = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.MatteBackground
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .then(
+                        if (isMatte) Modifier.matteEmboss(shape = RoundedCornerShape(20.dp), elevation = 12.dp)
+                        else Modifier
+                    ),
                 shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp,
-                shadowElevation = 6.dp
+                color = if (isMatte) Color.Transparent else MaterialTheme.colorScheme.surface,
+                tonalElevation = if (isMatte) 0.dp else 6.dp,
+                shadowElevation = if (isMatte) 0.dp else 6.dp
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),

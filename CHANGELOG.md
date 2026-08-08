@@ -10,6 +10,52 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 40 — Matte Noir: "epic" depth pass menyeluruh (neumorphism + directional light)
+User diberi penjelasan 4 gaya kedalaman (neumorphism, skeuomorphic, glass gelap, elevasi+gradient
+terarah) sebelum memilih; keluhan awal "semua area belum kerasa premium" (bukan 1 titik spesifik)
+setelah Batch 39 murni analisis statis tanpa pernah dirender. Dipilih kombinasi neumorphism ringan
++ elevasi/gradient cahaya terarah, diterapkan lewat 1 helper terpusat baru supaya konsisten di
+semua touch point sekaligus (bukan tambal-sulam per file seperti Batch 39):
+
+- **`MatteDepth.kt` (baru)** — `Modifier.matteEmboss(shape, elevation, pressed)`: menggabungkan
+  (1) shadow dua-warna terarah (`ambientColor`/`spotColor` = `MatteUmbra`, coklat-hitam hangat,
+  bukan hitam pekat generik — tint berwarna cuma render di API 28+, di bawahnya fallback abu-abu
+  polos tanpa crash, minSdk 23 tetap aman), (2) `Brush.linearGradient` diagonal
+  `MatteHighlight → MatteSurface → MatteUmbra` menggantikan fill solid — mensimulasikan satu
+  sumber cahaya jatuh dari kiri-atas, inti dari "kedalaman 3D" yang diminta, dan (3) border 1dp
+  brush `MatteHighlight → transparent` di sisi kiri-atas yang sama — cue fisik neumorphism
+  (tepi panel yang "menangkap" cahaya) yang tidak bisa dipalsukan cuma dari tonalElevation datar.
+  Parameter `pressed` meredupkan ketiganya untuk state tertekan (efek "masuk ke permukaan").
+- **`Color.kt`**: 2 warna baru — `MatteHighlight` (krem-tembaga terang, catch-light) dan
+  `MatteUmbra` (hitam hangat nyaris-tapi-bukan-pekat, shadow) — dua ujung satu sumber cahaya yang
+  dipakai `matteEmboss()` di atas.
+- **`Theme.kt`**: `matteDepthBrush()` (glow ambient root, `MainActivity.kt`) alpha dinaikkan
+  0.10f → 0.22f + 1 stop highlight tambahan — versi Batch 39 (belum pernah dirender di device
+  asli) ternyata terlalu halus dibanding kecerahan layar/cahaya ambient sungguhan.
+- **7 touch point** dipasangi `matteEmboss()` (Matte-only, gated `isMatte`, tema lain 100% tidak
+  berubah): `MiniPlayerBar` (ganti shadow copper ad-hoc lama), `ContinueListeningCard` di
+  `HomeScreen` (sekaligus perbaiki shape hardcode 18dp yang dulu tidak ikut token tema),
+  Undo-snackbar `LibraryScreen`, `GestureIndicatorBadge` (badge volume/brightness)
+  `NowPlayingScreen`, `ThemeOptionCard` Matte Noir di `SettingsScreen` (jadi showcase depth
+  hidup di picker-nya sendiri), plus `NavigationBar` `MainActivity` (garis catch-light 2px tepi
+  atas, tanpa restrukturisasi internal komponen M3-nya).
+- **`AlbumArtHero` (`NowPlayingScreen`, fokus visual utama layar Now Playing)** dapat perlakuan
+  khusus lebih kuat dari `matteEmboss()` biasa: shape hardcode 28dp diganti `MaterialTheme.shapes.large`
+  (ikut token Matte yang sengaja nyaris kotak), 2 shadow ditumpuk (umbra tembaga 20dp + accent
+  glow lama 18dp tetap dipertahankan) + border catch-light 1.5dp — bukan dipindah ke helper
+  generik karena sudah punya accent-glow per-lagu sendiri yang perlu tetap jalan bersamaan.
+
+9 file (1 baru + 8 diedit), 1 tema kohesif (depth-system rollout, atomic — helper generik +
+2 file warna/brush dasar + 6 titik pemakaian tak terpisah tanpa saling pecah konsistensi visual).
+**Tetap belum diverifikasi build/runtime asli** (tidak ada compiler Android di environment
+kerja) — analisis statis + script brace/paren balance manual. Shadow berwarna
+(`ambientColor`/`spotColor`) hanya tampak penuh di API 28+; di device API 23-27 kembali ke abu-abu
+default (bukan crash, cuma kurang dramatis) — belum ada cara memverifikasi ini tanpa device fisik
+lawas. **Kalau user test lagi masih bilang "kureng"**: jangan ulangi pola menambah lebih banyak
+shadow/gradient tanpa tahu titik spesifik — Batch 39 & 40 sama-sama tidak pernah dirender
+sungguhan, jadi kemungkinan root cause selanjutnya bukan soal "kurang banyak efek" tapi sesuatu
+yang cuma kelihatan di layar asli (kontras warna, ukuran shadow relatif terhadap DPI, dll).
+
 ## Batch 39 — Matte Noir: efek kedalaman visual (respons user test Batch 38 "masih kureng")
 User test Batch 38 di HP asli: tema Matte Noir dirasa datar ("kureng"), minta ada efek
 kedalaman/3D yang bikin dia unik. Root cause yang ditemukan sekalian: `darkColorScheme()`/

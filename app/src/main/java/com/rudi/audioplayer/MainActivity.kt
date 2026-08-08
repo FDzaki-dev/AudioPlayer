@@ -70,6 +70,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -549,7 +550,27 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     )
                 }
                 if (currentRoute == "home" || currentRoute == "library" || currentRoute == "settings") {
+                    // Batch 40: tonalElevation alone still reads flat (no directional light) —
+                    // a 1-2px copper catch-light line along the top edge is the same border cue
+                    // matteEmboss() uses elsewhere, applied here without restructuring
+                    // NavigationBar's own internals (it's a whole M3 component, not a bare
+                    // Surface matteEmboss() could wrap directly).
                     NavigationBar(
+                        modifier = if (appTheme == AppTheme.MATTE)
+                            Modifier.drawBehind {
+                                drawLine(
+                                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                        listOf(
+                                            com.rudi.audioplayer.ui.theme.MatteHighlight.copy(alpha = 0.5f),
+                                            com.rudi.audioplayer.ui.theme.MatteHighlight.copy(alpha = 0.05f)
+                                        )
+                                    ),
+                                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                                    end = androidx.compose.ui.geometry.Offset(size.width, 0f),
+                                    strokeWidth = 2f
+                                )
+                            }
+                        else Modifier,
                         // A visibly "lifted" bar for Matte Noir (higher tonal elevation → the
                         // copper surfaceTint from Theme.kt shows through more strongly) instead
                         // of the flatter default — reinforces the boutique-hardware depth cue

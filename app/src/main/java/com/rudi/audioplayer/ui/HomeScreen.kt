@@ -17,11 +17,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.ui.theme.matteEmboss
 import kotlinx.collections.immutable.ImmutableSet
 import java.util.Calendar
 
@@ -233,14 +235,23 @@ private fun HomeGreeting(showShuffleAll: Boolean, onShuffleAll: () -> Unit) {
 
 @Composable
 private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
+    val isMatte = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.MatteBackground
+    // Batch 40: this card was hardcoded RoundedCornerShape(18.dp) regardless of theme (never
+    // picked up Matte Noir's sharp shape tokens) and used flat tonalElevation only — first
+    // thing the eye hits on Home, so it's a priority "epic" touch point.
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .then(
+                if (isMatte)
+                    Modifier.matteEmboss(shape = MaterialTheme.shapes.medium, elevation = 10.dp)
+                else
+                    Modifier.clip(RoundedCornerShape(18.dp))
+            )
             .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 4.dp
+        color = if (isMatte) Color.Transparent else MaterialTheme.colorScheme.surface,
+        tonalElevation = if (isMatte) 0.dp else 4.dp
     ) {
         Row(
             modifier = Modifier.padding(14.dp),

@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.matteEmboss
 
 @Composable
 fun MiniPlayerBar(
@@ -58,14 +59,16 @@ fun MiniPlayerBar(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp)
-            .shadow(
-                // A deeper, copper-tinted shadow for Matte Noir instead of the default flat
-                // black — reads as the bar physically lifted off warm matte metal, not just
-                // "a rectangle with a generic drop shadow".
-                elevation = if (isMatte) 16.dp else 12.dp,
-                shape = barShape,
-                ambientColor = if (isMatte) com.rudi.audioplayer.ui.theme.MatteAccent.copy(alpha = 0.5f) else Color.Black,
-                spotColor = if (isMatte) com.rudi.audioplayer.ui.theme.MatteAccent.copy(alpha = 0.5f) else Color.Black
+            .then(
+                // Batch 40: swapped the flat copper-tinted shadow for the shared matteEmboss()
+                // (directional shadow + diagonal gradient + catch-light border) so the bar
+                // reads as lifted matte metal, not just a rectangle with a bigger shadow.
+                // frostedGlass() below still draws the readable tinted fill on top, matching
+                // its own shape/border so corners line up under either theme.
+                if (isMatte)
+                    Modifier.matteEmboss(shape = barShape, elevation = 16.dp)
+                else
+                    Modifier.shadow(elevation = 12.dp, shape = barShape, ambientColor = Color.Black, spotColor = Color.Black)
             )
             .clip(barShape)
             .frostedGlass()

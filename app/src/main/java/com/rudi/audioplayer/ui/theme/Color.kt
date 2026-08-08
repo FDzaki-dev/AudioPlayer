@@ -45,3 +45,12 @@ val MatteSecondaryText = Color(0xFFA89A85)
 val MatteAccent = Color(0xFFC9793C)
 val MatteError = Color(0xFFE5584A)
 val MatteSuccess = Color(0xFF6B8F5A)
+
+// Batch 40 — neumorphic "emboss" depth pair, opposite ends of one consistent light source.
+// MatteHighlight: warm cream-copper catch-light (top-left edge/gradient stop) — brighter than
+// MatteAccent so it reads as light hitting the panel, not just "the accent color again".
+// MatteUmbra: near-black warm shadow (bottom-right shadow tint/gradient stop) — deliberately
+// NOT pure black (0xFF000000) so it stays "warm matte metal in shadow" rather than a flat
+// generic drop-shadow, consistent with the rest of the palette avoiding true-black extremes.
+val MatteHighlight = Color(0xFFE8B98A)
+val MatteUmbra = Color(0xFF080503)

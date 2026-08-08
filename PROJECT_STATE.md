@@ -6,6 +6,23 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 40** — Lanjutan langsung Batch 39 ("semua area belum kerasa premium", bukan 1 titik).
+User diberi penjelasan 4 gaya kedalaman dulu (neumorphism/skeuomorphic/glass gelap/elevasi+
+gradient terarah), pilih kombinasi neumorphism ringan + elevasi/gradient cahaya terarah. Dibuat
+1 helper terpusat `Modifier.matteEmboss()` (`MatteDepth.kt`, baru) — shadow dua-warna terarah
+(`MatteUmbra`) + gradient diagonal `MatteHighlight → MatteSurface → MatteUmbra` + border
+catch-light 1dp, gabungan neumorphism (border edge menangkap cahaya) + directional light
+(gradient, bukan tonalElevation datar) dalam 1 modifier reusable. Dipasang di 7 titik: mini
+player, ContinueListeningCard Home, undo-snackbar Library, GestureIndicatorBadge Now Playing,
+ThemeOptionCard Matte di Settings (showcase depth di picker-nya sendiri), NavigationBar
+(catch-light line 2px), plus `AlbumArtHero` dapat treatment lebih kuat manual (shape token +
+shadow ganda + border, tidak pakai helper generik karena sudah punya accent-glow per-lagu
+sendiri). `matteDepthBrush()` root alpha dinaikkan 0.10f→0.22f (versi lama kalah dari
+kecerahan layar asli). 9 file (1 baru+8 edit), 1 tema kohesif. **Tetap murni analisis
+statis, belum pernah dirender** — kalau "kureng" lagi di test HP, JANGAN ulangi pola nambah
+shadow/gradient lagi (sudah 2x coba begitu), curigai sesuatu yang cuma kelihatan di layar
+asli (kontras, ukuran relatif DPI) — lihat CHANGELOG.md Batch 40 untuk detail.
+
 **Batch 39** — Respons user test Batch 38 di HP asli ("masih kureng"): Matte Noir dikasih
 efek kedalaman visual. Root cause: `darkColorScheme()`/`lightColorScheme()` M3 diam-diam
 isi `surfaceTint` (mekanisme utama M3 buat tonal-elevation depth) dengan ungu baseline

@@ -11,6 +11,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -76,6 +77,7 @@ import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.matteEmboss
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -806,11 +808,13 @@ private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit, accentColor: Color
 
 @Composable
 private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: Color, label: String? = null) {
+    val isMatte = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.MatteBackground
     Surface(
+        modifier = if (isMatte) Modifier.matteEmboss(shape = RoundedCornerShape(18.dp), elevation = 8.dp) else Modifier,
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-        tonalElevation = 6.dp,
-        shadowElevation = 4.dp
+        color = if (isMatte) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        tonalElevation = if (isMatte) 0.dp else 6.dp,
+        shadowElevation = if (isMatte) 0.dp else 4.dp
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
@@ -871,6 +875,13 @@ private fun AlbumArtHero(
             )
         }
     ) {
+        val isMatte = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.MatteBackground
+        // Batch 40: the hero art always used a hardcoded 28dp round shape + a single
+        // accent-tinted shadow regardless of theme — the app's single biggest focal point, so
+        // Matte Noir gets its own shape token (near-square, matches MatteShapes) plus a second,
+        // deeper copper-umbra shadow layered under the existing accent glow for a real
+        // "floating slab of matte metal" read instead of a generic rounded photo.
+        val heroShape = if (isMatte) MaterialTheme.shapes.large else RoundedCornerShape(28.dp)
         Box(
             modifier = Modifier
                 .size(300.dp)
@@ -881,12 +892,19 @@ private fun AlbumArtHero(
             albumId = albumId,
             modifier = Modifier
                 .size(280.dp)
-                .shadow(
-                    elevation = 28.dp,
-                    shape = RoundedCornerShape(28.dp),
-                    spotColor = accentColor.copy(alpha = 0.45f)
+                .then(
+                    if (isMatte)
+                        Modifier
+                            .shadow(elevation = 20.dp, shape = heroShape, ambientColor = com.rudi.audioplayer.ui.theme.MatteUmbra, spotColor = com.rudi.audioplayer.ui.theme.MatteUmbra)
+                            .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.5f))
+                            .border(
+                                BorderStroke(1.5.dp, Brush.linearGradient(listOf(com.rudi.audioplayer.ui.theme.MatteHighlight.copy(alpha = 0.55f), Color.Transparent))),
+                                heroShape
+                            )
+                    else
+                        Modifier.shadow(elevation = 28.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.45f))
                 )
-                .clip(RoundedCornerShape(28.dp))
+                .clip(heroShape)
         )
     }
 }
