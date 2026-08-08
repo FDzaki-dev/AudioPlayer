@@ -29,14 +29,14 @@ fun Modifier.frostedGlass(
     // blurRadius is kept in the API for source compatibility with existing call sites.
     // Real backdrop blur is not performed here because Modifier.blur() would blur foreground
     // content. The surface tint is intentionally opaque enough to preserve contrast.
-    val isMatte = MaterialTheme.colorScheme.background == MatteBackground
+    val isTactile = MaterialTheme.colorScheme.background == TactileBackground
     // Shape now follows the active theme's own shape tokens instead of a hardcoded 24dp —
     // otherwise every sheet/mini-player using this modifier would keep Apple's soft rounding
-    // even under Matte Noir's deliberately sharp/boxy identity.
+    // even under Tactile's own shape identity.
     val shape = MaterialTheme.shapes.large
-    val edge = if (isMatte)
-        // A visible copper trim line instead of a faint neutral edge — reads as a machined
-        // metal bezel around the panel, reinforcing the "premium hardware" depth cue.
+    val edge = if (isTactile)
+        // A visible warm trim line instead of a faint neutral edge — reads as a machined
+        // bezel around the panel, reinforcing the tactile depth cue.
         MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
     else
         MaterialTheme.colorScheme.onSurface.copy(

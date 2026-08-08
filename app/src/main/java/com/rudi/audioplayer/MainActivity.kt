@@ -96,7 +96,6 @@ import com.rudi.audioplayer.ui.MiniPlayerBar
 import com.rudi.audioplayer.ui.NowPlayingScreen
 import com.rudi.audioplayer.ui.theme.AppTheme
 import com.rudi.audioplayer.ui.theme.AudioPlayerTheme
-import com.rudi.audioplayer.ui.theme.matteDepthBrush
 import com.rudi.audioplayer.ui.theme.resolveIsDark
 
 class MainActivity : FragmentActivity() {
@@ -254,20 +253,18 @@ class MainActivity : FragmentActivity() {
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .then(
-                            // Root-level ambient glow, Matte Noir only — see matteDepthBrush()
-                            // in Theme.kt. Surface below is made transparent just for this case
-                            // so the gradient shows through; every other theme is 100% unchanged
-                            // (Surface keeps its normal opaque colorScheme.background fill).
-                            if (appTheme == AppTheme.MATTE) Modifier.background(matteDepthBrush()) else Modifier
-                        )
-                ) {
+                // Batch 49: dropped the Matte-only "transparent Surface + ambient glow Box"
+                // trick entirely (matteDepthBrush() removed from Theme.kt) along with the rest
+                // of the Matte identity — Tactile's depth cue lives entirely in tactileEmboss()
+                // per-surface (TactileDepth.kt), not a root-level glow, so this Surface is now
+                // unconditionally opaque + explicit contentColor for every theme. This also
+                // permanently forecloses the whole Batch 48 bug class (invisible text from a
+                // Transparent-color Surface silently losing contentColor) — there is no longer
+                // any Transparent-color Surface at the root for any theme.
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = if (appTheme == AppTheme.MATTE) Color.Transparent else MaterialTheme.colorScheme.background
+                    color = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.onBackground
                 ) {
                     when {
                         needsUnlock -> LockScreen(
@@ -289,7 +286,6 @@ class MainActivity : FragmentActivity() {
                         )
                     }
                 }
-                } // tutup Box (vignette Matte Noir, Batch 39)
             }
             } // tutup CompositionLocalProvider (Batch 24)
         }
@@ -551,18 +547,18 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 }
                 if (currentRoute == "home" || currentRoute == "library" || currentRoute == "settings") {
                     // Batch 40: tonalElevation alone still reads flat (no directional light) —
-                    // a 1-2px copper catch-light line along the top edge is the same border cue
-                    // matteEmboss() uses elsewhere, applied here without restructuring
+                    // a 1-2px catch-light line along the top edge is the same border cue
+                    // tactileEmboss() uses elsewhere, applied here without restructuring
                     // NavigationBar's own internals (it's a whole M3 component, not a bare
-                    // Surface matteEmboss() could wrap directly).
+                    // Surface tactileEmboss() could wrap directly).
                     NavigationBar(
-                        modifier = if (appTheme == AppTheme.MATTE)
+                        modifier = if (appTheme == AppTheme.TACTILE)
                             Modifier.drawBehind {
                                 drawLine(
                                     brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
                                         listOf(
-                                            com.rudi.audioplayer.ui.theme.MatteHighlight.copy(alpha = 0.5f),
-                                            com.rudi.audioplayer.ui.theme.MatteHighlight.copy(alpha = 0.05f)
+                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.9f),
+                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.05f)
                                         )
                                     ),
                                     start = androidx.compose.ui.geometry.Offset(0f, 0f),
@@ -571,11 +567,11 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 )
                             }
                         else Modifier,
-                        // A visibly "lifted" bar for Matte Noir (higher tonal elevation → the
-                        // copper surfaceTint from Theme.kt shows through more strongly) instead
-                        // of the flatter default — reinforces the boutique-hardware depth cue
+                        // A visibly "lifted" bar for Tactile (higher tonal elevation → the
+                        // accent surfaceTint from Theme.kt shows through more strongly) instead
+                        // of the flatter default — reinforces the tactile-hardware depth cue
                         // at the one piece of chrome that's always on screen.
-                        tonalElevation = if (appTheme == AppTheme.MATTE) 12.dp else NavigationBarDefaults.Elevation
+                        tonalElevation = if (appTheme == AppTheme.TACTILE) 12.dp else NavigationBarDefaults.Elevation
                     ) {
                         NavigationBarItem(
                             selected = currentRoute == "home",

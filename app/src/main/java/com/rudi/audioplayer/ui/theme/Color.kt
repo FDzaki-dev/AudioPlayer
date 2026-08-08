@@ -32,25 +32,27 @@ val AppleAccent = Color(0xFF4F7CFF)
 val AppleDarkSuccess = Color(0xFF32D74B)
 val AppleLightSuccess = Color(0xFF34C759)
 
-// Matte Noir — the deliberate opposite of the Apple palette above: warm matte
-// darks instead of true-black/true-white extremes, brushed-copper instead of
-// cool blue, sharp corners instead of generous rounding. A single fixed
-// "boutique" identity (doesn't follow system light/dark) for anyone who wants
-// the app to feel like distinct premium hardware rather than an OS-native surface.
-val MatteBackground = Color(0xFF14120F)
-val MatteSurface = Color(0xFF1E1A16)
-val MatteSurfaceVariant = Color(0xFF2A241D)
-val MatteText = Color(0xFFEDE6DA)
-val MatteSecondaryText = Color(0xFFA89A85)
-val MatteAccent = Color(0xFFC9793C)
-val MatteError = Color(0xFFE5584A)
-val MatteSuccess = Color(0xFF6B8F5A)
+// Tactile (Skeuomorphism-lite) — Batch 49: replaces Matte Noir entirely, per the user-supplied
+// compose-skeuomorphism-lite.md spec. Deliberately a LIGHT palette — the spec's own §1 example
+// gradient stops (0xFFF8FAFC top-highlight -> 0xFFE2E8F0 shadow-side) are used verbatim as the
+// surface gradient here, not just as inspiration. Like Matte Noir before it, a single fixed
+// "boutique" identity that doesn't follow system light/dark — the spec's own §Accessibility
+// "Dark Mode Adaptation" guidance (swap highlights for glows) is a follow-up for a future dark
+// variant, out of scope for this batch to keep the theme-system replacement atomic.
+val TactileBackground = Color(0xFFEEF1F5)
+val TactileSurfaceHighlight = Color(0xFFF8FAFC) // spec §1 literal top-of-gradient stop
+val TactileSurfaceShadow = Color(0xFFE2E8F0) // spec §1 literal bottom-of-gradient stop
+val TactileSurfaceVariant = Color(0xFFE2E8F0)
+val TactileText = Color(0xFF1E293B)
+val TactileSecondaryText = Color(0xFF64748B)
+val TactileAccent = Color(0xFFB8622A) // warm burnt-orange, tactile-hardware mood, distinct hue from the old Matte copper
+val TactileError = Color(0xFFDC2626)
+val TactileSuccess = Color(0xFF16A34A)
 
-// Batch 40 — neumorphic "emboss" depth pair, opposite ends of one consistent light source.
-// MatteHighlight: warm cream-copper catch-light (top-left edge/gradient stop) — brighter than
-// MatteAccent so it reads as light hitting the panel, not just "the accent color again".
-// MatteUmbra: near-black warm shadow (bottom-right shadow tint/gradient stop) — deliberately
-// NOT pure black (0xFF000000) so it stays "warm matte metal in shadow" rather than a flat
-// generic drop-shadow, consistent with the rest of the palette avoiding true-black extremes.
-val MatteHighlight = Color(0xFFE8B98A)
-val MatteUmbra = Color(0xFF080503)
+// Bevel pair used by tactileEmboss() (TactileDepth.kt) — the spec's §1 "layering contrasting
+// light and dark borders" instruction, literally: a bright top-edge highlight fading down, a
+// muted slate shadow-edge fading up. TactileShadow is a muted slate gray, NOT near-black — this
+// theme has no true-black surface anywhere, so a shadow tuned for a dark theme (like Matte's old
+// MatteUmbra) would just look like a stray dark smudge here.
+val TactileHighlight = Color(0xFFFFFFFF)
+val TactileShadow = Color(0xFF94A3B8)

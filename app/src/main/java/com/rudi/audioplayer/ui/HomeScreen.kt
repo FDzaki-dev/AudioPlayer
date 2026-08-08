@@ -23,7 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.Song
-import com.rudi.audioplayer.ui.theme.matteEmboss
+import com.rudi.audioplayer.ui.theme.tactileEmboss
 import kotlinx.collections.immutable.ImmutableSet
 import java.util.Calendar
 
@@ -235,23 +235,23 @@ private fun HomeGreeting(showShuffleAll: Boolean, onShuffleAll: () -> Unit) {
 
 @Composable
 private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
-    val isMatte = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.MatteBackground
-    // Batch 40: this card was hardcoded RoundedCornerShape(18.dp) regardless of theme (never
-    // picked up Matte Noir's sharp shape tokens) and used flat tonalElevation only — first
-    // thing the eye hits on Home, so it's a priority "epic" touch point.
+    val isTactile = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.TactileBackground
+    // Batch 49: first thing the eye hits on Home, priority touch point for the tactile treatment.
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp)
             .then(
-                if (isMatte)
-                    Modifier.matteEmboss(shape = MaterialTheme.shapes.medium, elevation = 16.dp)
+                if (isTactile)
+                    Modifier.tactileEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
                 else
                     Modifier.clip(RoundedCornerShape(18.dp))
             )
             .clickable(onClick = onClick),
-        color = if (isMatte) Color.Transparent else MaterialTheme.colorScheme.surface,
-        tonalElevation = if (isMatte) 0.dp else 4.dp
+        color = if (isTactile) Color.Transparent else MaterialTheme.colorScheme.surface,
+        // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent fallback.
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = if (isTactile) 0.dp else 4.dp
     ) {
         Row(
             modifier = Modifier.padding(14.dp),

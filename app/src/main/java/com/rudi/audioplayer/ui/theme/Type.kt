@@ -42,19 +42,21 @@ val AppleTypography = Typography(
     )
 )
 
-// Matte Noir's typographic opposite: serif headlines (system serif, no bundled
-// font needed) for an editorial, boutique-hi-fi feel instead of Apple's crisp
-// sans — body text stays sans-serif so long lists remain just as legible.
-val MatteTypography = Typography(
+// Tactile (Skeuomorphism-lite) typography — Batch 49. The spec (compose-skeuomorphism-lite.md)
+// doesn't prescribe a typeface; sans-serif kept throughout (no separate serif/sans split like
+// the old Matte identity) since the tactile identity here comes from the surfaces themselves
+// (bevel/gradient/press), not from lettering — titles just go bolder than Apple's for a
+// "machined label" read.
+val TactileTypography = Typography(
     titleLarge = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.ExtraBold,
         fontSize = 28.sp,
         letterSpacing = 0.sp
     ),
     titleMedium = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Bold,
         fontSize = 17.sp,
         letterSpacing = 0.sp
     ),

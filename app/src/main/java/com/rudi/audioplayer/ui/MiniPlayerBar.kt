@@ -30,7 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
-import com.rudi.audioplayer.ui.theme.matteEmboss
+import com.rudi.audioplayer.ui.theme.tactileEmboss
 
 @Composable
 fun MiniPlayerBar(
@@ -43,9 +43,9 @@ fun MiniPlayerBar(
     val haptic = LocalHapticFeedback.current
     // Must match the shape frostedGlass() now derives from MaterialTheme.shapes.large,
     // or the outer shadow/clip corners (this Box) would mismatch the inner tinted fill's
-    // corners — sharp under Matte Noir, soft-rounded under Apple.
+    // corners — Tactile's own rounding vs Apple's.
     val barShape = MaterialTheme.shapes.large
-    val isMatte = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.MatteBackground
+    val isTactile = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.TactileBackground
     val animatedAccent by animateColorAsState(
         targetValue = accentColor ?: MaterialTheme.colorScheme.primary,
         animationSpec = tween(700),
@@ -60,13 +60,13 @@ fun MiniPlayerBar(
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .then(
-                // Batch 40: swapped the flat copper-tinted shadow for the shared matteEmboss()
-                // (directional shadow + diagonal gradient + catch-light border) so the bar
-                // reads as lifted matte metal, not just a rectangle with a bigger shadow.
+                // Batch 49: swapped matteEmboss() for the Tactile equivalent, tactileEmboss()
+                // (directional shadow + top-down gradient + bevel border) so the bar reads as
+                // a lifted tactile panel, not just a rectangle with a bigger shadow.
                 // frostedGlass() below still draws the readable tinted fill on top, matching
                 // its own shape/border so corners line up under either theme.
-                if (isMatte)
-                    Modifier.matteEmboss(shape = barShape, elevation = 16.dp)
+                if (isTactile)
+                    Modifier.tactileEmboss(shape = barShape, elevation = 16.dp)
                 else
                     Modifier.shadow(elevation = 12.dp, shape = barShape, ambientColor = Color.Black, spotColor = Color.Black)
             )

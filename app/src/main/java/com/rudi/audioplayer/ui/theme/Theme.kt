@@ -7,18 +7,17 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /** Light / Dark / Ikuti Sistem — the standard iOS appearance picker, main/default
- * theme family — plus one fixed boutique identity (Matte Noir) for anyone who wants
- * the app to look like distinct premium hardware instead of an OS-native surface. */
+ * theme family — plus one fixed boutique identity (Tactile) for anyone who wants
+ * the app to look like distinct programmatic hardware instead of an OS-native surface. */
 enum class AppTheme(val storageKey: String, val displayName: String, val description: String) {
     SYSTEM("system", "Ikuti Sistem", "Menyesuaikan mode terang/gelap perangkat"),
     LIGHT("light", "Terang", "Latar putih bersih, khas iOS"),
     DARK("dark", "Gelap", "Hitam pekat, nyaman untuk layar OLED"),
-    MATTE("matte_noir", "Matte Noir", "Hitam matte, aksen tembaga, judul serif — kebalikan gaya kaca Apple");
+    TACTILE("tactile_lite", "Tactile", "Bevel & tekstur terprogram, bukan gambar — permukaan yang terasa bisa disentuh");
 
     companion object {
         fun fromStorageKey(key: String?): AppTheme = entries.find { it.storageKey == key } ?: SYSTEM
@@ -65,43 +64,22 @@ private val AppleLightColors = lightColorScheme(
     error = Color(0xFFFF3B30)
 )
 
-private val MatteColors = darkColorScheme(
-    primary = MatteAccent,
+private val TactileColors = lightColorScheme(
+    primary = TactileAccent,
     onPrimary = Color.White,
-    secondary = MatteSecondaryText,
-    onSecondary = MatteBackground,
-    tertiary = MatteSuccess,
+    secondary = TactileSecondaryText,
+    onSecondary = TactileBackground,
+    tertiary = TactileSuccess,
     onTertiary = Color.White,
-    background = MatteBackground,
-    onBackground = MatteText,
-    surface = MatteSurface,
-    onSurface = MatteText,
-    surfaceVariant = MatteSurfaceVariant,
-    onSurfaceVariant = MatteSecondaryText,
-    outline = MatteSurfaceVariant,
-    // Copper surfaceTint means every elevated Card/Sheet/NavigationBar picks up a warm glow
-    // as elevation increases — the same mechanism Apple's own accent tint now uses above,
-    // but copper instead of blue makes elevation read as "warm light on matte metal" rather
-    // than "layer of glass", which is the whole point of this identity being the opposite.
-    surfaceTint = MatteAccent,
-    error = MatteError
-)
-
-// Matte Noir's root-level depth cue: a soft copper glow at screen-center fading out to the
-// deep matte edges, like ambient light falling across a brushed-metal panel. Applied once
-// behind the whole app (MainActivity's root Surface) rather than per-screen, so every screen
-// gets the same "unique, not-flat" atmosphere for free without touching every UI file.
-// Batch 40: alpha raised 0.10f -> 0.22f and a highlight stop added — Batch 39's version was
-// verified only by static analysis and, per on-device feedback, was too subtle to register as
-// "epic" against real screen brightness/ambient light. Combined app-wide with matteEmboss()
-// (MatteDepth.kt) at every card/bar touch point for a consistent single light source.
-fun matteDepthBrush(): Brush = Brush.radialGradient(
-    colors = listOf(
-        MatteHighlight.copy(alpha = 0.22f),
-        MatteAccent.copy(alpha = 0.16f),
-        MatteSurface,
-        MatteBackground
-    )
+    background = TactileBackground,
+    onBackground = TactileText,
+    surface = TactileSurfaceHighlight,
+    onSurface = TactileText,
+    surfaceVariant = TactileSurfaceVariant,
+    onSurfaceVariant = TactileSecondaryText,
+    outline = TactileSurfaceVariant,
+    surfaceTint = TactileAccent,
+    error = TactileError
 )
 
 // A single, consistent "continuous curve" language across the whole app — Compose's Shapes
@@ -113,12 +91,13 @@ val AppleShapes = Shapes(
     large = RoundedCornerShape(28.dp)
 )
 
-// Matte Noir's shape opposite: sharp, near-rectangular corners instead of Apple's
-// generous rounding — reads as machined/boutique hardware rather than soft glass.
-val MatteShapes = Shapes(
-    small = RoundedCornerShape(4.dp),
-    medium = RoundedCornerShape(6.dp),
-    large = RoundedCornerShape(8.dp)
+// Tactile's shape language — moderate, consistent rounding (not Apple's generous curve, not
+// sharp/boxy like the old Matte identity) since the tactile spec's realism comes from the
+// bevel/gradient/shadow treatment (tactileEmboss(), TactileDepth.kt), not from the shape itself.
+val TactileShapes = Shapes(
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp)
 )
 
 @Composable
@@ -126,11 +105,11 @@ fun resolveIsDark(theme: AppTheme): Boolean = when (theme) {
     AppTheme.SYSTEM -> isSystemInDarkTheme()
     AppTheme.LIGHT -> false
     AppTheme.DARK -> true
-    AppTheme.MATTE -> true
+    AppTheme.TACTILE -> false
 }
 
 fun colorsFor(theme: AppTheme, isDark: Boolean) = when (theme) {
-    AppTheme.MATTE -> MatteColors
+    AppTheme.TACTILE -> TactileColors
     else -> if (isDark) AppleDarkColors else AppleLightColors
 }
 
@@ -139,8 +118,8 @@ fun AudioPlayerTheme(theme: AppTheme = AppTheme.SYSTEM, content: @Composable () 
     val isDark = resolveIsDark(theme)
     MaterialTheme(
         colorScheme = colorsFor(theme, isDark),
-        typography = if (theme == AppTheme.MATTE) MatteTypography else AppleTypography,
-        shapes = if (theme == AppTheme.MATTE) MatteShapes else AppleShapes,
+        typography = if (theme == AppTheme.TACTILE) TactileTypography else AppleTypography,
+        shapes = if (theme == AppTheme.TACTILE) TactileShapes else AppleShapes,
         content = content
     )
 }

@@ -51,6 +51,82 @@ atomik. **Belum diverifikasi runtime asli** — tapi ini kesalahan compile-time 
 dengan error log (bukan tebakan), jadi confidence tinggi dibanding hotfix Batch 41/43
 sebelumnya yang sempat salah tebak duluan.
 
+## Batch 49 — Hapus total identitas "Matte Noir" lama, ganti dengan tema custom baru "Tactile" murni dari spec skeuomorphism-lite.md
+User minta eksplisit: hapus SEMUA jejak tema custom lama sampai bersih, baru terapkan spec baru
+— bukan overlay/patch di atas yang lama (beda dari Batch 46 yang cuma nulis ulang
+`matteEmboss()` tapi masih di palet gelap Matte). Atomic change, 11 file (di atas batas normal
+8-10 file, dijustifikasi sebagai 1 modul tema yang tidak bisa dipecah tanpa state build rusak
+di tengah jalan — hapus warna Matte sementara call site masih pakai nama lama = gagal compile):
+
+**Dihapus total:** `MatteDepth.kt` (file dihapus), semua `val Matte*` di `Color.kt`
+(`MatteBackground/Surface/SurfaceVariant/Text/SecondaryText/Accent/Error/Success/Highlight/
+Umbra`), `MatteTypography` (`Type.kt`), `MatteColors`/`MatteShapes`/`matteDepthBrush()`
+(`Theme.kt`), `AppTheme.MATTE` enum entry + storage key `"matte_noir"` (pengguna lama yang masih
+tersimpan preferensi ini otomatis fallback ke SYSTEM lewat `fromStorageKey()` — bukan crash,
+cuma reset preferensi, disengaja).
+
+**Diganti dengan (baru, bukan reskin):** `TactileDepth.kt` (`tactileEmboss()`, logic sama
+persis dengan hasil Batch 46/47 yang sudah teruji sesuai 3 poin spec — cuma direcolor total),
+`Color.kt` dapat palet TERANG baru (`TactileBackground/SurfaceHighlight/SurfaceShadow/
+SurfaceVariant/Text/SecondaryText/Accent/Error/Success/Highlight/Shadow`) — `TactileSurfaceHighlight`
+(0xFFF8FAFC) dan `TactileSurfaceShadow` (0xFFE2E8F0) adalah warna LITERAL dari contoh kode di
+spec §1, bukan cuma terinspirasi. `TactileTypography` (Type.kt, sans-serif semua, ExtraBold
+untuk title — spec tidak mensyaratkan font khusus). `TactileColors`/`TactileShapes`
+(`Theme.kt`) — `lightColorScheme` (bukan dark lagi), rounding 10/12/16dp (bukan sharp 4/6/8dp
+Matte, bukan juga rounding besar ala Apple).
+
+**Bonus fix arsitektural, mencegah kelas bug Batch 48 terulang selamanya:** root `Surface` di
+`MainActivity.kt` yang dulu pakai trik `color = Color.Transparent` (khusus Matte, buat ambient
+glow tembus) DIHAPUS total bersama `matteDepthBrush()` — sekarang root Surface SELALU opaque +
+`contentColor` eksplisit untuk semua tema, jadi tidak ada lagi Surface `Transparent` di root
+sama sekali. 4 titik Surface lain yang juga pakai pola `color = if (isMatte) Transparent else
+...` (mini player tak ada, tapi Library undo-bar, Settings ThemeOptionCard, Home
+ContinueListeningCard, NowPlaying GestureIndicatorBadge) SEMUA ditambah `contentColor` eksplisit
+juga sebagai pencegahan, bukan cuma di-rename ke Tactile — supaya kalau nanti ada tema
+Transparent lagi, tidak akan pernah lagi diam-diam jatuh ke `Color.Black` default Compose.
+
+**File yang disentuh (11):** `Color.kt`, `Type.kt`, `Theme.kt`, `TactileDepth.kt` (baru,
+`MatteDepth.kt` dihapus), `BlurUtils.kt`, `MiniPlayerBar.kt`, `LibraryScreen.kt`,
+`SettingsScreen.kt`, `HomeScreen.kt`, `NowPlayingScreen.kt`, `MainActivity.kt`.
+`FILE_MANIFEST.txt` diupdate (baris `MatteDepth.kt` → `TactileDepth.kt`).
+
+**Verifikasi sebelum packing:** brace/paren balance semua 11 file file OK; grep akhir
+`Matte|isMatte|matteEmboss|matteDepthBrush|MATTE|matte_noir` di seluruh `.kt` → nol hasil aktif
+(cuma komentar historis yang menyebut nama lama sebagai konteks, bukan simbol kode); dicek
+manual `import androidx.compose.runtime.getValue` ADA di `TactileDepth.kt` (pelajaran langsung
+dari kegagalan Batch 47 — operator `by` butuh import ini, jangan sampai lupa lagi). **Belum
+diverifikasi runtime asli** (tidak ada compiler Android di environment kerja) — tapi ini batch
+dengan cakupan terbesar sejauh ini, jadi risiko ada 1 typo/kasus tak terduga di suatu tempat
+lebih tinggi dari batch-batch kecil sebelumnya. **Prioritas mutlak sesi berikutnya: build actual
+di GitHub Actions + user verifikasi visual di device** sebelum nambah fitur/tema apapun lagi di
+atas ini.
+
+## Batch 48 — Fix nyata: teks nyaris invisible (bukan soal "jelek", ini bug kontras hitam-di-hitam)
+User kirim screenshot layar PIN pasca-reinstall Batch 47 — digit keypad & judul "Masukkan PIN"
+render HITAM di atas background nyaris-hitam. Root cause BUKAN di `MatteDepth.kt` (yang sudah
+benar sejak Batch 47), tapi di `MainActivity.kt` root `Surface` pembungkus seluruh konten
+(`needsUnlock -> LockScreen(...)` / `hasPermission -> AppNavHost(...)`), sisa trik Batch 40:
+`Surface(color = Color.Transparent)` khusus Matte theme supaya ambient-glow radial di belakang
+tembus. Masalahnya: `AudioPlayerTheme()` (`Theme.kt`) cuma bungkus `MaterialTheme(...)` — TIDAK
+PERNAH ada `Surface` di root, jadi `LocalContentColor` tidak pernah di-set ke `onBackground`
+sampai SUATU `Surface` men-set-nya. `Surface`'s default `contentColor` param dihitung dari
+`contentColorFor(color)`; untuk `color = Color.Transparent`, ini tidak cocok role manapun di
+ColorScheme → `Unspecified` → fallback ke `LocalContentColor` yang SEDANG AKTIF, yaitu default
+mentah Compose sendiri: `Color.Black` (belum pernah di-override). Jadi utk Matte theme, semua
+child di bawah Surface ini mestinya kena teks hitam — tapi Library kelihatan baik-baik saja
+karena tiap row list-nya punya Card/Surface sendiri dengan background opaque yang menghitung
+ulang contentColor dengan benar secara lokal. LockScreen (cuma `Column`+`Box` polos, tanpa
+Surface sendiri) satu-satunya layar yang membiarkan bug ini polos tanpa "penyelamat" lokal —
+makanya paling kentara di situ, meski secara teori seluruh app kena bug yang sama, cuma
+ketutupan oleh Surface/Card lokal di layar lain. Fix: set `contentColor` eksplisit
+`= MaterialTheme.colorScheme.onBackground` di `Surface` root itu — no-op untuk tema non-Matte
+(sudah benar lewat jalur `color` biasa di situ), memperbaiki kasus Matte yang transparent. 1
+file (`MainActivity.kt`), 1 blok, fix atomik. **Belum diverifikasi runtime asli** tapi ini akar
+masalah yang persis cocok sama gejala di screenshot (hitam-di-hitam, bukan cuma "kurang epic"),
+bukan tebakan kosong. **Batch ini adalah bug LAMA sejak Batch 40** (root cause-nya trik
+`Surface(color=Transparent)`), baru kelihatan sekarang karena baru sekarang LockScreen
+di-screenshot dalam kondisi Matte theme aktif — bukan regresi baru dari Batch 46/47.
+
 ## Batch 45 — Fix bug lama: SignatureMatcherSheet bandingkan key signing yang SALAH kalau app pernah rotasi key
 User laporan "gak sinkron" di fitur pencocok signature APK (`SignatureMatcherSheet` +
 `ApkSignatureChecker`). Root cause di `ApkSignatureChecker.inspect()` (API 28+, jalur

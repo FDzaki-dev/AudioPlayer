@@ -81,7 +81,7 @@ import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
-import com.rudi.audioplayer.ui.theme.matteEmboss
+import com.rudi.audioplayer.ui.theme.tactileEmboss
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -812,13 +812,15 @@ private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit, accentColor: Color
 
 @Composable
 private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: Color, label: String? = null) {
-    val isMatte = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.MatteBackground
+    val isTactile = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.TactileBackground
     Surface(
-        modifier = if (isMatte) Modifier.matteEmboss(shape = RoundedCornerShape(18.dp), elevation = 13.dp) else Modifier,
+        modifier = if (isTactile) Modifier.tactileEmboss(shape = RoundedCornerShape(18.dp), elevation = 8.dp) else Modifier,
         shape = RoundedCornerShape(18.dp),
-        color = if (isMatte) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-        tonalElevation = if (isMatte) 0.dp else 6.dp,
-        shadowElevation = if (isMatte) 0.dp else 4.dp
+        color = if (isTactile) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent fallback.
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = if (isTactile) 0.dp else 6.dp,
+        shadowElevation = if (isTactile) 0.dp else 4.dp
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
@@ -879,12 +881,11 @@ private fun AlbumArtHero(
             )
         }
     ) {
-        val isMatte = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.MatteBackground
-        // Batch 45: rewritten to match compose-skeuomorphism-lite.md — was a manual native
-        // Modifier.shadow() double-stack (confirmed invisible on Matte's near-black background,
-        // same root cause as Batch 40/41), now a single drawn top-down shadow + vertical-gradient
-        // bevel border, consistent with the rest of the Matte theme (MatteDepth.kt, same batch).
-        val heroShape = if (isMatte) MaterialTheme.shapes.large else RoundedCornerShape(28.dp)
+        val isTactile = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.TactileBackground
+        // Batch 49: recolored from Matte's dark palette to Tactile's light one (same drawn
+        // top-down shadow + vertical-gradient bevel border technique kept from Batch 45/46,
+        // now consistent with the rest of the Tactile theme, TactileDepth.kt, same batch).
+        val heroShape = if (isTactile) MaterialTheme.shapes.large else RoundedCornerShape(28.dp)
         Box(
             modifier = Modifier
                 .size(300.dp)
@@ -896,13 +897,13 @@ private fun AlbumArtHero(
             modifier = Modifier
                 .size(280.dp)
                 .then(
-                    if (isMatte)
+                    if (isTactile)
                         Modifier
                             .drawBehind {
                                 val outline = heroShape.createOutline(size, layoutDirection, this)
                                 val outlinePath = Path().apply { addOutline(outline) }
                                 translate(top = 9.dp.toPx()) {
-                                    drawPath(outlinePath, color = com.rudi.audioplayer.ui.theme.MatteUmbra.copy(alpha = 0.34f))
+                                    drawPath(outlinePath, color = com.rudi.audioplayer.ui.theme.TactileShadow.copy(alpha = 0.28f))
                                 }
                             }
                             .clip(heroShape)
@@ -911,8 +912,8 @@ private fun AlbumArtHero(
                                     1.5.dp,
                                     Brush.verticalGradient(
                                         listOf(
-                                            com.rudi.audioplayer.ui.theme.MatteHighlight.copy(alpha = 0.45f),
-                                            com.rudi.audioplayer.ui.theme.MatteUmbra.copy(alpha = 0.30f)
+                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.9f),
+                                            com.rudi.audioplayer.ui.theme.TactileShadow.copy(alpha = 0.40f)
                                         )
                                     )
                                 ),

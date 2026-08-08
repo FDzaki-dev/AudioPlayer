@@ -52,7 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import com.rudi.audioplayer.ui.theme.matteEmboss
+import com.rudi.audioplayer.ui.theme.tactileEmboss
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -419,20 +419,24 @@ fun LibraryScreen(
             undoHideIds = emptyList()
         }
         Box(modifier = Modifier.fillMaxSize()) {
-            val isMatte = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.MatteBackground
+            val isTactile = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.TactileBackground
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
                     .fillMaxWidth()
                     .then(
-                        if (isMatte) Modifier.matteEmboss(shape = RoundedCornerShape(20.dp), elevation = 18.dp)
+                        if (isTactile) Modifier.tactileEmboss(shape = RoundedCornerShape(20.dp), elevation = 10.dp)
                         else Modifier
                     ),
                 shape = RoundedCornerShape(20.dp),
-                color = if (isMatte) Color.Transparent else MaterialTheme.colorScheme.surface,
-                tonalElevation = if (isMatte) 0.dp else 6.dp,
-                shadowElevation = if (isMatte) 0.dp else 6.dp
+                color = if (isTactile) Color.Transparent else MaterialTheme.colorScheme.surface,
+                // Batch 48/49 lesson: don't rely on Surface's own contentColor-from-color
+                // fallback when color is Transparent — set it explicitly so this never
+                // regresses into invisible text like the LockScreen bug did.
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                tonalElevation = if (isTactile) 0.dp else 6.dp,
+                shadowElevation = if (isTactile) 0.dp else 6.dp
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),

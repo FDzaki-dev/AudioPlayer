@@ -6,6 +6,33 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 49** — User minta hapus SEMUA jejak tema custom "Matte Noir" lama sampai bersih, lalu
+terapkan tema custom baru murni dari `compose-skeuomorphism-lite.md`. Selesai: 11 file, atomic
+change. Matte Noir (semua warna, shape, typography, `MatteDepth.kt`, enum `AppTheme.MATTE`)
+DIHAPUS total, bukan direname doang. Diganti `AppTheme.TACTILE` — palet TERANG baru (warna
+`0xFFF8FAFC`/`0xFFE2E8F0` di `Color.kt` adalah literal contoh kode di spec §1, bukan
+interpretasi bebas), `TactileDepth.kt` (`tactileEmboss()`, logic sama dengan hasil Batch 46/47
+yang sudah sesuai spec, cuma direcolor). Bonus: root `Surface(color=Transparent)` trick di
+`MainActivity.kt` (biang kerok Batch 48) DIHAPUS TOTAL, bukan cuma di-patch — root Surface
+sekarang selalu opaque + `contentColor` eksplisit utk semua tema, jadi kelas bug itu tidak bisa
+terulang lagi sama sekali kedepannya. Storage key preferensi tema berubah dari `matte_noir` ke
+`tactile_lite` — user lama yang masih ada preferensi Matte tersimpan otomatis fallback ke
+SYSTEM (bukan crash, disengaja). Lihat CHANGELOG.md Batch 49 untuk detail penuh + daftar 11
+file. **Belum diverifikasi runtime asli** — batch ini cakupannya paling besar sejauh ini, jadi
+build-test asli + verifikasi visual device jadi prioritas MUTLAK sebelum lanjut fitur lain.
+Grep akhir `Matte` di seluruh kode aktif = 0 hasil (cuma komentar historis).
+
+**Batch 48** — User kirim screenshot: teks di LockScreen (judul "Masukkan PIN" + digit keypad)
+render HITAM di atas background nyaris-hitam Matte, nyaris tak terbaca. Root cause: root
+`Surface(color = Color.Transparent)` di `MainActivity.kt` (trik ambient-glow Batch 40) bikin
+`contentColorFor(Transparent)` jatuh ke `Unspecified` → fallback ke `LocalContentColor` yang
+belum pernah di-set (`AudioPlayerTheme()` cuma bungkus `MaterialTheme(...)`, tidak pernah pakai
+Surface) → default mentah Compose: `Color.Black`. LockScreen kena polos karena tidak punya
+Surface/Card lokal sendiri untuk "menyelamatkan" diri (beda dari Library yang tiap row list-nya
+py Surface sendiri). Fix saat itu: `contentColor = MaterialTheme.colorScheme.onBackground`
+eksplisit di Surface root. **Catatan: fix ini sudah DIGANTIKAN total oleh Batch 49** yang
+menghapus trik `Transparent` itu sepenuhnya, jadi detail fix Batch 48 ini historis saja.
+
 **Batch 47** — Hotfix compile error Batch 46 dari `log_fail_104.zip`: `MatteDepth.kt` pakai
 `by animateDpAsState(...)` / `by animateFloatAsState(...)` tapi lupa
 `import androidx.compose.runtime.getValue`. Fix: tambah import. 1 baris, 1 file. Exact match ke
