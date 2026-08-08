@@ -32,27 +32,38 @@ val AppleAccent = Color(0xFF4F7CFF)
 val AppleDarkSuccess = Color(0xFF32D74B)
 val AppleLightSuccess = Color(0xFF34C759)
 
-// Tactile (Skeuomorphism-lite) — Batch 49: replaces Matte Noir entirely, per the user-supplied
-// compose-skeuomorphism-lite.md spec. Deliberately a LIGHT palette — the spec's own §1 example
-// gradient stops (0xFFF8FAFC top-highlight -> 0xFFE2E8F0 shadow-side) are used verbatim as the
-// surface gradient here, not just as inspiration. Like Matte Noir before it, a single fixed
-// "boutique" identity that doesn't follow system light/dark — the spec's own §Accessibility
-// "Dark Mode Adaptation" guidance (swap highlights for glows) is a follow-up for a future dark
-// variant, out of scope for this batch to keep the theme-system replacement atomic.
-val TactileBackground = Color(0xFFEEF1F5)
-val TactileSurfaceHighlight = Color(0xFFF8FAFC) // spec §1 literal top-of-gradient stop
-val TactileSurfaceShadow = Color(0xFFE2E8F0) // spec §1 literal bottom-of-gradient stop
-val TactileSurfaceVariant = Color(0xFFE2E8F0)
-val TactileText = Color(0xFF1E293B)
-val TactileSecondaryText = Color(0xFF64748B)
-val TactileAccent = Color(0xFFB8622A) // warm burnt-orange, tactile-hardware mood, distinct hue from the old Matte copper
-val TactileError = Color(0xFFDC2626)
-val TactileSuccess = Color(0xFF16A34A)
+// Tactile (Skeuomorphism-lite) — Batch 50: full repaint from the user-supplied
+// compose-skeuomorphism-lite-dark.md spec, which supersedes the Batch 49 light palette below
+// entirely. Spec §1.1 is explicit: "Do not simply invert a light theme" — this is a from-scratch
+// dark/AMOLED-first token set, not the old light values darkened. §2's suggested palette block
+// is used verbatim as literal values (not just inspiration), same treatment Batch 49 gave the
+// light spec's own example stops.
+val TactileBackground = Color(0xFF05070A) // spec §2 literal DarkBackground — near-black, AMOLED-safe
+val TactileSurface = Color(0xFF0B0F14) // spec §2 literal DarkSurface — main panels
+val TactileSurfaceVariant = Color(0xFF111720) // spec §2 literal DarkSurfaceVariant — secondary panels, one step lighter
+val TactileText = Color(0xFFE8EEF5) // spec §2 literal TextPrimary
+val TactileSecondaryText = Color(0xFFA8B3C0) // spec §2 literal TextSecondary
+val TactileAccent = Color(0xFF4DA3FF) // spec §2 literal Accent — cool blue; replaces the old light-theme burnt-orange, per spec §1.1 "design specifically for dark surfaces" rather than recolor-in-place
+// Not given literally by the spec (its §2 table lists the roles but only shows example values
+// for the ones above) — chosen to fit the same cool/restrained AMOLED palette, legible on
+// TactileBackground/TactileSurface at normal text sizes.
+val TactileError = Color(0xFFFF6B6B)
+val TactileSuccess = Color(0xFF34D399)
 
-// Bevel pair used by tactileEmboss() (TactileDepth.kt) — the spec's §1 "layering contrasting
-// light and dark borders" instruction, literally: a bright top-edge highlight fading down, a
-// muted slate shadow-edge fading up. TactileShadow is a muted slate gray, NOT near-black — this
-// theme has no true-black surface anywhere, so a shadow tuned for a dark theme (like Matte's old
-// MatteUmbra) would just look like a stray dark smudge here.
-val TactileHighlight = Color(0xFFFFFFFF)
-val TactileShadow = Color(0xFF94A3B8)
+// Interactive-control pair from spec §2's token table (`Control` / `ControlPressed`) — "distinct
+// dark surface" for tactile controls, "darker/recessed surface" when pressed. No literal value
+// given by the spec for these two; placed one step lighter than TactileSurfaceVariant (Control,
+// so it reads as "lifted" against structural panels) and one step darker than TactileBackground
+// itself (ControlPressed, so a press genuinely recesses below the app's own floor).
+val TactileControl = Color(0xFF141B24)
+val TactileControlPressed = Color(0xFF080B10)
+
+// Bevel pair used by tactileEmboss() (TactileDepth.kt) — spec §4's dark-mode rule: "Do NOT use a
+// bright Color.White border… highlight = very-low-alpha light tone, shadow = very-dark neutral."
+// TactileHighlight/TactileEdge are spec §2 literal values (Color.White at 0.055f/0.035f alpha —
+// deliberately near-invisible on their own, not a flat opaque color); TactileShadow is also
+// spec-literal (Color.Black at 0.65f). tactileEmboss() further scales these down per-state
+// (pressed vs. normal), it never raises them — see that file's own alpha comments.
+val TactileHighlight = Color.White.copy(alpha = 0.055f)
+val TactileEdge = Color.White.copy(alpha = 0.035f) // spec §4 single-border-color token, used where a bevel gradient isn't needed
+val TactileShadow = Color.Black.copy(alpha = 0.65f)

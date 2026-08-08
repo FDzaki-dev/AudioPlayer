@@ -6,6 +6,52 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 50** — User kirim spec baru `compose-skeuomorphism-lite-dark.md`, minta diterapkan 100%
+ke tema custom Tactile (menggantikan palet TERANG Batch 49 sepenuhnya — spec §1.1 eksplisit:
+"Do not simply invert a light theme. Design the tactile lighting model specifically for dark
+surfaces", jadi ini bukan sekadar "gelapkan" nilai lama, tapi token diambil ulang dari §2 spec
+secara literal). 6 file kode + 3 file dokumentasi, 1 tema kohesif (atomic).
+- `Color.kt` — seluruh palet Tactile diganti dari nol: `TactileBackground` 0xFF05070A (AMOLED),
+  `TactileSurface` 0xFF0B0F14, `TactileSurfaceVariant` 0xFF111720, `TactileText` 0xFFE8EEF5,
+  `TactileSecondaryText` 0xFFA8B3C0, `TactileAccent` 0xFF4DA3FF (biru dingin, ganti tembaga
+  hangat lama), `TactileHighlight`/`TactileEdge`/`TactileShadow` (Color.White/Black ber-alpha
+  rendah, literal spec §2) — semua ini nilai literal dari contoh kode spec, bukan tebakan.
+  Ditambah 2 token baru dari tabel §2 yang belum ada pemanggilnya batch ini tapi disiapkan untuk
+  komponen tactile masa depan: `TactileControl`/`TactileControlPressed` (tidak ada nilai literal
+  di spec, diturunkan sendiri agar konsisten dengan hierarki gelap-terang §2). `TactileError`/
+  `TactileSuccess` juga tidak ada literal spec, dipilih manual agar cocok skema biru-dingin.
+- `TactileDepth.kt` (`tactileEmboss()`) — signature tidak berubah (8 titik pemanggil otomatis
+  ikut), tapi seluruh alpha border/shadow ditulis ulang mengikuti aturan dark-mode spec §4
+  ("Do NOT use a bright Color.White border") — border top/bottom turun dari 0.9/0.45 ke
+  0.09/0.30 (normal), 0.35/0.20 ke 0.04/0.15 (pressed); shadow drop-nya sendiri justru
+  dipertahankan dekat alpha penuh (0.65 spec-literal, bukan diturunkan) karena background sudah
+  nyaris hitam — **pelajaran dari saga Matte Noir Batch 39-44 dipakai lagi di sini**: bayangan
+  hitam-di-atas-hitam yang terlalu tipis alpha-nya akan hilang total, bukan sekadar "restrained".
+- `Theme.kt` — `TactileColors` ganti dari `lightColorScheme()` ke `darkColorScheme()`;
+  `resolveIsDark(TACTILE)` dibalik `false` → `true` (otomatis membalik ikon status bar/nav bar
+  jadi terang lewat `MainActivity.kt` yang sudah ada, tidak perlu disentuh manual); `onPrimary`/
+  `onTertiary` dipilih `Color.Black` lewat aturan luminance yang sama dipakai `MiniPlayerBar.kt`
+  (>0.55 → hitam) karena `TactileAccent`/`TactileSuccess` baru cukup terang.
+- `NowPlayingScreen.kt` (AlbumArtHero) + `MainActivity.kt` (garis catch-light NavigationBar) —
+  2 titik manual (bukan lewat `tactileEmboss()`) direcolor & alpha-nya diselaraskan ke aturan
+  yang sama: NavigationBar 0.9/0.05 → 0.10/0.02 (dulu praktis garis putih nyaris opaque,
+  langsung melanggar §4); AlbumArtHero border 0.9/0.40 → 0.12/0.32, shadow 0.28 → 0.55, glow
+  aksen lagu 0.5 → 0.42 (spec §9 izinkan glow di elemen selected/active seperti ini, tapi tetap
+  "restrained").
+- `BlurUtils.kt` — trim aksen di `frostedGlass()` (dipakai 6 file) alpha 0.35 → 0.22, sekadar
+  penyesuaian restraint karena aksen biru baru terasa lebih terang dari tembaga lama di alpha
+  yang sama.
+- **Di luar cakupan, disengaja**: spec §7/§12 minta komponen `TactileButton`/`TactileSwitch`/
+  `TactileSlider` custom penuh di `ui/components/` — batas ini SAMA seperti batas Batch 49
+  (slider/toggle/switch tetap Material3 polos), tidak diperluas batch ini supaya scope tetap
+  atomic. Kalau user mau cakupan itu juga, itu kerja terpisah yang lebih besar (file baru,
+  bukan cuma recolor).
+- **Belum diverifikasi runtime asli** (tidak ada compiler Android di environment kerja) —
+  analisis statis + brace/paren balance dicek manual di semua file yang disentuh. Prioritas
+  sesi berikutnya: build-test asli + verifikasi visual device untuk tema Tactile versi gelap
+  ini (belum pernah dirender sama sekali, sama seperti nasib versi terang Batch 49 sebelum
+  sempat diverifikasi).
+
 **Batch 49** — User minta hapus SEMUA jejak tema custom "Matte Noir" lama sampai bersih, lalu
 terapkan tema custom baru murni dari `compose-skeuomorphism-lite.md`. Selesai: 11 file, atomic
 change. Matte Noir (semua warna, shape, typography, `MatteDepth.kt`, enum `AppTheme.MATTE`)

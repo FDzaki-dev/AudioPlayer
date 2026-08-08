@@ -10,6 +10,45 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 50 — Timpa palet tema custom Tactile pakai spec dark-mode baru (compose-skeuomorphism-lite-dark.md)
+User kirim spec baru khusus dark-mode/AMOLED, minta diterapkan 100% ke tema Tactile
+(menggantikan palet TERANG dari Batch 49). Spec §1.1 eksplisit: "Do not simply invert a light
+theme" — jadi token diambil ulang literal dari spec §2, bukan sekadar menggelapkan nilai lama.
+6 file kode + 3 dokumentasi, 1 tema kohesif (atomic).
+
+1. **Color.kt** — palet Tactile diganti total: `TactileBackground` 0xFF05070A,
+   `TactileSurface` 0xFF0B0F14, `TactileSurfaceVariant` 0xFF111720, `TactileText` 0xFFE8EEF5,
+   `TactileSecondaryText` 0xFFA8B3C0, `TactileAccent` 0xFF4DA3FF (biru dingin, ganti tembaga),
+   `TactileHighlight`/`TactileEdge`/`TactileShadow` (Color.White/Black alpha rendah) — semua
+   nilai literal §2 spec. `TactileControl`/`TactileControlPressed` ditambah dari tabel token §2
+   (belum ada pemanggil, disiapkan untuk komponen tactile masa depan). `TactileError`/
+   `TactileSuccess` tidak ada literal di spec, dipilih manual agar cocok skema biru-dingin.
+2. **TactileDepth.kt (`tactileEmboss()`)** — signature tidak berubah (8 pemanggil otomatis
+   ikut). Alpha border diturunkan drastis mengikuti spec §4 ("Do NOT use a bright Color.White
+   border"): top/bottom 0.9/0.45 → 0.09/0.30 (normal), 0.35/0.20 → 0.04/0.15 (pressed). Shadow
+   drop justru DIPERTAHANKAN dekat alpha penuh (0.65, literal spec) — pelajaran dari saga Matte
+   Noir Batch 39-44 dipakai lagi: bayangan hitam-di-atas-hitam yang alpha-nya terlalu rendah
+   hilang total, bukan sekadar "restrained".
+3. **Theme.kt** — `TactileColors`: `lightColorScheme()` → `darkColorScheme()`;
+   `resolveIsDark(TACTILE)` `false` → `true` (otomatis membalik ikon status bar/nav bar jadi
+   terang, `MainActivity.kt` tidak perlu disentuh manual untuk itu); `onPrimary`/`onTertiary`
+   pakai aturan luminance yang sama dengan `MiniPlayerBar.kt` (>0.55 → hitam).
+4. **NowPlayingScreen.kt (AlbumArtHero) + MainActivity.kt (garis NavigationBar)** — 2 titik
+   manual di luar `tactileEmboss()` diselaraskan ke aturan sama: NavigationBar 0.9/0.05 →
+   0.10/0.02 (dulu nyaris garis putih opaque, melanggar §4 langsung); AlbumArtHero border
+   0.9/0.40 → 0.12/0.32, shadow 0.28 → 0.55, glow aksen lagu 0.5 → 0.42 (§9 izinkan glow di
+   elemen selected/active, tetap direstrain).
+5. **BlurUtils.kt** — trim aksen `frostedGlass()` (6 pemanggil) alpha 0.35 → 0.22, penyesuaian
+   restraint karena aksen biru baru terasa lebih terang dari tembaga lama di alpha yang sama.
+
+**Di luar cakupan, disengaja**: spec §7/§12 minta komponen `TactileButton`/`TactileSwitch`/
+`TactileSlider` custom penuh di `ui/components/` — batas ini sama seperti Batch 49
+(slider/toggle/switch tetap Material3 polos). Bukan diabaikan, tapi scope terpisah & lebih besar
+dari "recolor tema" kalau user memang mau cakupan itu juga.
+
+**Belum diverifikasi runtime asli** (tidak ada compiler Android di environment kerja) — analisis
+statis + brace/paren balance dicek manual di semua file yang disentuh.
+
 ## Batch 46 — Timpa tema custom Matte Noir pakai spec user "Skeuomorphism-lite" (compose-skeuomorphism-lite.md)
 User bilang hasil Batch 40-44 "jelek banget asli" dan kirim markdown spec desain sendiri untuk
 dipakai. Ditimpa total, bukan tempel di atas yang lama: `MatteDepth.kt` (`matteEmboss()`)

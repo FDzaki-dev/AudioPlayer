@@ -35,9 +35,12 @@ fun Modifier.frostedGlass(
     // even under Tactile's own shape identity.
     val shape = MaterialTheme.shapes.large
     val edge = if (isTactile)
-        // A visible warm trim line instead of a faint neutral edge — reads as a machined
-        // bezel around the panel, reinforcing the tactile depth cue.
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+        // A visible accent trim line instead of a faint neutral edge — reads as a machined
+        // bezel around the panel, reinforcing the tactile depth cue. Batch 50: alpha trimmed
+        // 0.35f -> 0.22f for the dark spec's §9/§13 restrained-glow rule (was tuned for the old
+        // light theme's copper accent; the new cool-blue accent reads brighter at the same alpha
+        // against a near-black panel).
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
     else
         MaterialTheme.colorScheme.onSurface.copy(
             alpha = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.14f else 0.24f

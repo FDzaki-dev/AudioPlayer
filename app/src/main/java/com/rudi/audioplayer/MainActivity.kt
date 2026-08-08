@@ -551,14 +551,17 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // tactileEmboss() uses elsewhere, applied here without restructuring
                     // NavigationBar's own internals (it's a whole M3 component, not a bare
                     // Surface tactileEmboss() could wrap directly).
+                    // Batch 50: alphas dropped 0.9/0.05 -> 0.10/0.02 for the dark spec's §4 rule
+                    // ("Do NOT use a bright Color.White border") — the old values were a
+                    // near-opaque white line, exactly what §4/§13 forbid.
                     NavigationBar(
                         modifier = if (appTheme == AppTheme.TACTILE)
                             Modifier.drawBehind {
                                 drawLine(
                                     brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
                                         listOf(
-                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.9f),
-                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.05f)
+                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.10f),
+                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.02f)
                                         )
                                     ),
                                     start = androidx.compose.ui.geometry.Offset(0f, 0f),

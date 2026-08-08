@@ -882,9 +882,11 @@ private fun AlbumArtHero(
         }
     ) {
         val isTactile = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.TactileBackground
-        // Batch 49: recolored from Matte's dark palette to Tactile's light one (same drawn
-        // top-down shadow + vertical-gradient bevel border technique kept from Batch 45/46,
-        // now consistent with the rest of the Tactile theme, TactileDepth.kt, same batch).
+        // Batch 50: recolored again for the dark-mode spec (compose-skeuomorphism-lite-dark.md)
+        // — same drawn top-down shadow + vertical-gradient bevel border technique kept from
+        // Batch 45/46/49, alphas brought in line with TactileDepth.kt's own Batch 50 values
+        // (spec §4: no bright border; spec §2: shadow stays close to full alpha or it vanishes
+        // against the near-black TactileBackground).
         val heroShape = if (isTactile) MaterialTheme.shapes.large else RoundedCornerShape(28.dp)
         Box(
             modifier = Modifier
@@ -903,7 +905,7 @@ private fun AlbumArtHero(
                                 val outline = heroShape.createOutline(size, layoutDirection, this)
                                 val outlinePath = Path().apply { addOutline(outline) }
                                 translate(top = 9.dp.toPx()) {
-                                    drawPath(outlinePath, color = com.rudi.audioplayer.ui.theme.TactileShadow.copy(alpha = 0.28f))
+                                    drawPath(outlinePath, color = com.rudi.audioplayer.ui.theme.TactileShadow.copy(alpha = 0.55f))
                                 }
                             }
                             .clip(heroShape)
@@ -912,14 +914,18 @@ private fun AlbumArtHero(
                                     1.5.dp,
                                     Brush.verticalGradient(
                                         listOf(
-                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.9f),
-                                            com.rudi.audioplayer.ui.theme.TactileShadow.copy(alpha = 0.40f)
+                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.12f),
+                                            com.rudi.audioplayer.ui.theme.TactileShadow.copy(alpha = 0.32f)
                                         )
                                     )
                                 ),
                                 heroShape
                             )
-                            .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.5f))
+                            // Localized accent glow on the hero art is spec-sanctioned (§9: "Use
+                            // [glow] for… selected states… important tactile edges") since this
+                            // is the one always-active/selected surface on the whole screen —
+                            // alpha trimmed from the old 0.5f for restraint per §9/§13.
+                            .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
                     else
                         Modifier.shadow(elevation = 28.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.45f))
                 )

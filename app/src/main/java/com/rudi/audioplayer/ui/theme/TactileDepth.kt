@@ -21,27 +21,28 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Batch 49 — replaces MatteDepth.kt / matteEmboss() entirely, alongside the rest of the Matte
- * Noir identity (Color.kt, Type.kt, Theme.kt, this file), following the user-supplied
- * compose-skeuomorphism-lite.md spec on a fresh light palette instead of recoloring the old
- * dark one. Same three spec points as the Batch 46/47 rewrite of matteEmboss() carried over
- * (that engineering was already close to the spec, just wearing the wrong palette + a
- * still-present root content-color bug elsewhere — see MainActivity.kt Batch 48/49 notes):
- *  1. Tactile depth (spec §1) — one top-down `Brush.verticalGradient` using the spec's own
- *     literal example stops (TactileSurfaceHighlight 0xFFF8FAFC -> TactileSurfaceShadow
- *     0xFFE2E8F0), plus a vertical-gradient bevel border (bright top edge -> muted slate-gray
- *     bottom edge) instead of a glow ring — "layering contrasting light and dark borders".
- *  2. Micro-interactions (spec §2) — `pressed` drives real animated depression
- *     (`animateDpAsState`/`animateFloatAsState`: shadow collapses, scale settles to 0.985).
- *  3. Isolated accents (spec §3) — this stays the flat/structural-card treatment (low default
- *     elevation, single shadow layer, restrained alpha). Sliders/toggles/switches are left on
- *     plain Material3 components, not skinned by this modifier — same boundary as before.
- *
- * Shadow is still hand-drawn via `drawBehind` + `Outline`->`Path`, not native `Modifier.shadow`
- * — no longer because native shadow is invisible (that was specifically a near-black-background
- * problem, see the old MatteDepth.kt history), but kept for the same reason it was adopted: our
- * own alpha value is the single source of truth for contrast, consistent across every surface
- * regardless of API level or background brightness, light theme or not.
+ * Batch 50 — full repaint from the user-supplied compose-skeuomorphism-lite-dark.md spec, which
+ * supersedes the Batch 49 light-palette version of this same function. Structure/signature is
+ * unchanged (all 8 call sites keep working unmodified) — only the token values and alpha
+ * constants change, per spec §1.1's own instruction: **"Do not simply invert a light theme.
+ * Design the tactile lighting model specifically for dark surfaces."**
+ *  1. Tactile depth (spec §4) — top-down `Brush.verticalGradient` using the spec's own literal
+ *     §2 tokens (TactileSurfaceVariant -> TactileSurface, i.e. the "lifted" panel is a hair
+ *     lighter than its recessed background), plus a bevel border. Spec §4's explicit dark-mode
+ *     rule: "Do NOT use a bright Color.White border… highlight = very-low-alpha light tone,
+ *     shadow = very-dark neutral" — border alphas below are deliberately far lower than the old
+ *     light-theme version's (0.9/0.45), never a flat opaque edge.
+ *  2. Micro-interactions (spec §6) — unchanged mechanism from Batch 49 (`pressed` still drives
+ *     real animated depression via `animateDpAsState`/`animateFloatAsState`), still hand-drawn
+ *     via `drawBehind` + `Outline`->`Path` rather than native `Modifier.shadow` for the same
+ *     reason as ever: a black-on-near-black native shadow is exactly the failure mode that took
+ *     5 batches to fix for Matte Noir (see PROJECT_STATE.md Batch 39-44) — this app's own alpha
+ *     stays the single source of contrast truth instead of trusting platform shadow rendering
+ *     against an AMOLED background.
+ *  3. Restrained skeuomorphism (spec §1.3/§8) — this stays the flat/structural-card treatment
+ *     only; spec §7's fully tactile Button/Toggle/Slider components are a separate, larger
+ *     scope (new files under `ui/components/`, per spec §12) not built this batch — sliders/
+ *     toggles/switches remain plain Material3, same boundary carried over from Batch 49.
  */
 @Composable
 fun Modifier.tactileEmboss(
@@ -57,9 +58,17 @@ fun Modifier.tactileEmboss(
         targetValue = if (pressed) 0.985f else 1f,
         label = "tactileEmbossScale"
     )
-    val borderTopAlpha = if (pressed) 0.35f else 0.9f
-    val borderBottomAlpha = if (pressed) 0.20f else 0.45f
-    val shadowAlpha = if (pressed) 0.08f else 0.18f
+    // Border stays a whisper per spec §4/§13 ("no bright white border", "no excessive glow") —
+    // these are absolute alphas (Color.copy replaces alpha, it doesn't multiply the base
+    // token's own 0.055f/0.65f), so the numbers below are the final on-screen values.
+    val borderTopAlpha = if (pressed) 0.04f else 0.09f
+    val borderBottomAlpha = if (pressed) 0.15f else 0.30f
+    // The offset drop-shadow does the actual depth-communication work (spec §2: "Shadows: black
+    // or very-dark neutral where technically useful") — kept close to TactileShadow's own
+    // spec-literal 0.65f base rather than diluted further, or it disappears entirely against
+    // TactileBackground (0xFF05070A is already near-black; a faint black-on-black shadow reads
+    // as nothing at all — the exact Matte Noir mistake, not repeated here).
+    val shadowAlpha = if (pressed) 0.35f else 0.65f
 
     return this
         .scale(scale)
@@ -73,7 +82,7 @@ fun Modifier.tactileEmboss(
         .clip(shape)
         .background(
             Brush.verticalGradient(
-                colors = listOf(TactileSurfaceHighlight, TactileSurfaceShadow)
+                colors = listOf(TactileSurfaceVariant, TactileSurface)
             )
         )
         .border(
