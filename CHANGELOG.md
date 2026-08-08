@@ -10,6 +10,34 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 46 — Timpa tema custom Matte Noir pakai spec user "Skeuomorphism-lite" (compose-skeuomorphism-lite.md)
+User bilang hasil Batch 40-44 "jelek banget asli" dan kirim markdown spec desain sendiri untuk
+dipakai. Ditimpa total, bukan tempel di atas yang lama: `MatteDepth.kt` (`matteEmboss()`)
+ditulis ulang dari nol mengikuti 3 poin spec:
+1. **Tactile depth (spec §1)** — dari gradient diagonal 3-warna + 2 layer shadow offset
+   ("epic" stack Batch 42) jadi 1 gradient vertikal atas→bawah + 1 shadow tunggal, plus bevel
+   border gradient vertikal (terang di atas → gelap di bawah) menggantikan ring catch-light
+   satu sisi — persis instruksi spec "layering contrasting light and dark borders".
+2. **Micro-interactions (spec §2)** — param `pressed` sekarang benar-benar animasi
+   (`animateDpAsState`/`animateFloatAsState`: elevation collapse + scale 0.985) bukan swap
+   alpha instan seperti sebelumnya — efek "fisik ketekan" sesuai spec.
+3. **Isolated accents (spec §3)** — intensitas diturunkan di semua parameter default (alpha,
+   elevation) supaya `matteEmboss()` sekarang treatment untuk card struktural yang flat/minimal,
+   bukan efek berat di semua titik. Sesuai spec, slider/toggle sengaja TIDAK diskin dengan
+   modifier ini — tetap komponen Material3 biasa, tidak diubah batch ini.
+Karena signature (`shape`/`elevation`/`pressed`) tidak berubah, 5 dari 6 pemanggil lama (mini
+player, Home, Library, Settings, NavigationBar di `MainActivity.kt`) otomatis ikut tampilan baru
+tanpa disentuh sama sekali. Satu pemanggil manual yang TIDAK lewat `matteEmboss()` — AlbumArtHero
+di `NowPlayingScreen.kt`, sengaja beda sejak Batch 40 — juga ditulis ulang ke teknik yang sama
+(shadow gambar-manual + border gradient vertikal) supaya konsisten 1 bahasa visual, sekalian
+buang native `Modifier.shadow` ganda yang sudah terbukti invisible di background nyaris-hitam
+(temuan Batch 40/41, sekarang dikonfirmasi ulang berlaku juga di titik ini). 2 file disentuh
+(`MatteDepth.kt` ditulis ulang penuh, `NowPlayingScreen.kt` 1 blok + 3 baris import). **Belum
+diverifikasi runtime asli** (tidak ada compiler Android di environment kerja) — analisis statis
++ brace/paren balance. Prioritas sesi berikutnya: user test di device asli — kalau masih
+"kureng"/jelek, JANGAN ulangi pola nambah layer shadow/gradient lagi (sudah 4x gagal dengan pola
+itu, Batch 40→44); minta screenshot spesifik bagian mana yang salah dulu.
+
 ## Batch 45 — Fix bug lama: SignatureMatcherSheet bandingkan key signing yang SALAH kalau app pernah rotasi key
 User laporan "gak sinkron" di fitur pencocok signature APK (`SignatureMatcherSheet` +
 `ApkSignatureChecker`). Root cause di `ApkSignatureChecker.inspect()` (API 28+, jalur

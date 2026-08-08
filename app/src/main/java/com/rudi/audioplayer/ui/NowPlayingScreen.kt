@@ -55,9 +55,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -876,11 +880,10 @@ private fun AlbumArtHero(
         }
     ) {
         val isMatte = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.MatteBackground
-        // Batch 40: the hero art always used a hardcoded 28dp round shape + a single
-        // accent-tinted shadow regardless of theme — the app's single biggest focal point, so
-        // Matte Noir gets its own shape token (near-square, matches MatteShapes) plus a second,
-        // deeper copper-umbra shadow layered under the existing accent glow for a real
-        // "floating slab of matte metal" read instead of a generic rounded photo.
+        // Batch 45: rewritten to match compose-skeuomorphism-lite.md — was a manual native
+        // Modifier.shadow() double-stack (confirmed invisible on Matte's near-black background,
+        // same root cause as Batch 40/41), now a single drawn top-down shadow + vertical-gradient
+        // bevel border, consistent with the rest of the Matte theme (MatteDepth.kt, same batch).
         val heroShape = if (isMatte) MaterialTheme.shapes.large else RoundedCornerShape(28.dp)
         Box(
             modifier = Modifier
@@ -895,12 +898,27 @@ private fun AlbumArtHero(
                 .then(
                     if (isMatte)
                         Modifier
-                            .shadow(elevation = 20.dp, shape = heroShape, ambientColor = com.rudi.audioplayer.ui.theme.MatteUmbra, spotColor = com.rudi.audioplayer.ui.theme.MatteUmbra)
-                            .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.5f))
+                            .drawBehind {
+                                val outline = heroShape.createOutline(size, layoutDirection, this)
+                                val outlinePath = Path().apply { addOutline(outline) }
+                                translate(top = 9.dp.toPx()) {
+                                    drawPath(outlinePath, color = com.rudi.audioplayer.ui.theme.MatteUmbra.copy(alpha = 0.34f))
+                                }
+                            }
+                            .clip(heroShape)
                             .border(
-                                BorderStroke(1.5.dp, Brush.linearGradient(listOf(com.rudi.audioplayer.ui.theme.MatteHighlight.copy(alpha = 0.55f), Color.Transparent))),
+                                BorderStroke(
+                                    1.5.dp,
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            com.rudi.audioplayer.ui.theme.MatteHighlight.copy(alpha = 0.45f),
+                                            com.rudi.audioplayer.ui.theme.MatteUmbra.copy(alpha = 0.30f)
+                                        )
+                                    )
+                                ),
                                 heroShape
                             )
+                            .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.5f))
                     else
                         Modifier.shadow(elevation = 28.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.45f))
                 )

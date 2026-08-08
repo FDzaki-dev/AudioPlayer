@@ -6,6 +6,16 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 46** — User kirim spec desain sendiri (`compose-skeuomorphism-lite.md`) karena tema
+Matte hasil Batch 40-44 dinilai "jelek banget asli". `matteEmboss()` di `MatteDepth.kt` ditulis
+ulang total mengikuti 3 poin spec (gradient top-down + bevel border, animasi tekan-fisik
+sungguhan, intensitas diturunkan/flat untuk card struktural). Signature tidak berubah jadi
+5 pemanggil lama ikut otomatis; 1 titik manual (AlbumArtHero, `NowPlayingScreen.kt`) ditulis
+ulang manual juga biar konsisten + sekalian buang native `Modifier.shadow` yang sudah lama
+terbukti invisible di background gelap. Lihat CHANGELOG.md Batch 46 untuk detail penuh. **Belum
+diverifikasi device** — kalau user masih bilang jelek, JANGAN tambah shadow/gradient lagi (pola
+gagal berulang Batch 40-44), minta screenshot + bagian spesifik yang salah.
+
 **Batch 45** — User lapor bug "gak sinkron" di segmen signature key matching. Ditemukan:
 `ApkSignatureChecker.inspect()` ambil `signingCertificateHistory.firstOrNull()` (cabang
 single-signer) — array ini oldest→newest per dokumentasi resmi `SigningInfo`, jadi
