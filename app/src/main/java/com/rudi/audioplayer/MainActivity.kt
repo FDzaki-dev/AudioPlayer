@@ -72,7 +72,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.SideEffect
@@ -261,43 +260,20 @@ class MainActivity : FragmentActivity() {
                 // regardless of the color param, so contentColorFor()'s auto-derivation is never
                 // consulted for either branch.
                 //
-                // Batch 51: Tactile now needs an actual root-level visual again — the hybrid-
-                // glass dark-blue spec (compose-skeuomorphism-lite-hybrid-glass-dark-blue.md)
-                // §1.1/§2/§8 mandates a deep navy→dark-blue *gradient* atmosphere as the base
-                // layer ("avoid literal pure-black as the dominant visual field"), which a flat
-                // `color = colorScheme.background` can't express — colorScheme.background stays
-                // a single flat Color (TactileBackground) because M3's API requires one, but the
-                // Surface itself goes transparent for Tactile and the gradient is painted on a
-                // Box just inside it instead. This is NOT the Batch 48 trick reborn: contentColor
-                // is still always explicit here, so there is no Unspecified-content-color path
-                // for this Transparent case to fall into.
+                // Batch 52: reverted the Batch 51 transparent-Surface + gradient-Box trick — the
+                // new spec (compose-skeuomorphism-lite-midnight-blue.md) §2 gives `Background`
+                // as a single flat literal token (0xFF191970), not a two-stop gradient pair, and
+                // §1.1 describes it as "near-black / AMOLED-safe dark", a flat description. A
+                // plain `color = colorScheme.background` now expresses the spec correctly again,
+                // same shape as the non-Tactile branch (contentColor stays explicit either way,
+                // so this was never dependent on the Batch 48 Unspecified-content-color bug
+                // class regardless of which branch runs).
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = if (appTheme == AppTheme.TACTILE) Color.Transparent else MaterialTheme.colorScheme.background,
+                    color = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .then(
-                                if (appTheme == AppTheme.TACTILE)
-                                    // Spec §3: single consistent light direction, top-left ->
-                                    // bottom-right, applied to the background atmosphere itself
-                                    // (not just component bevels) via a diagonal linear gradient
-                                    // between the spec's two §2 literal background stops.
-                                    Modifier.background(
-                                        Brush.linearGradient(
-                                            colors = listOf(
-                                                com.rudi.audioplayer.ui.theme.TactileBackgroundTop,
-                                                MaterialTheme.colorScheme.background
-                                            ),
-                                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                                            end = androidx.compose.ui.geometry.Offset.Infinite
-                                        )
-                                    )
-                                else Modifier
-                            )
-                    ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
                         when {
                             needsUnlock -> LockScreen(
                                 biometricEnabled = biometricEnabled && isBiometricAvailable(),
@@ -584,11 +560,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // tactileEmboss() uses elsewhere, applied here without restructuring
                     // NavigationBar's own internals (it's a whole M3 component, not a bare
                     // Surface tactileEmboss() could wrap directly).
-                    // Alphas unchanged since Batch 50 (0.10/0.02) — the hybrid-glass spec's own
+                    // Alphas unchanged since Batch 50 (0.10/0.02) — the new midnight-blue spec's
                     // §4 rule is the same ("Do NOT use a bright Color.White border"), and
-                    // TactileHighlight is now a spec-tinted cool blue-white instead of generic
-                    // white (see Color.kt), so this line just reads a hair bluer this batch with
-                    // no numeric change needed here.
+                    // TactileHighlight is plain Color.White-based again this batch (see
+                    // Color.kt), so no numeric change is needed here either.
                     NavigationBar(
                         modifier = if (appTheme == AppTheme.TACTILE)
                             Modifier.drawBehind {

@@ -17,7 +17,7 @@ enum class AppTheme(val storageKey: String, val displayName: String, val descrip
     SYSTEM("system", "Ikuti Sistem", "Menyesuaikan mode terang/gelap perangkat"),
     LIGHT("light", "Terang", "Latar putih bersih, khas iOS"),
     DARK("dark", "Gelap", "Hitam pekat, nyaman untuk layar OLED"),
-    TACTILE("tactile_lite", "Tactile", "Kaca biru-gelap terprogram, bukan gambar — permukaan translusen yang terasa bisa disentuh");
+    TACTILE("tactile_lite", "Tactile", "Midnight Blue taktil terprogram, bukan gambar — permukaan gelap pekat dengan bevel fisik");
 
     companion object {
         fun fromStorageKey(key: String?): AppTheme = entries.find { it.storageKey == key } ?: SYSTEM
@@ -64,17 +64,18 @@ private val AppleLightColors = lightColorScheme(
     error = Color(0xFFFF3B30)
 )
 
-// Batch 51: still darkColorScheme() — compose-skeuomorphism-lite-hybrid-glass-dark-blue.md §1.1
-// carries the same "no light-mode fallback" mandate forward from Batch 50 (§13: "must not
-// introduce a light-mode fallback"), it just changes what "dark" looks like (calm dark-blue
-// gradient + translucent glass instead of AMOLED-black). onPrimary/onTertiary still picked by
-// the same luminance rule MiniPlayerBar.kt uses elsewhere (>0.55 luminance -> black text):
-// TactileAccent (0xFF5B9DFF, re-checked this batch — luminance ≈0.59, still above the
-// threshold) and TactileSuccess (0xFF34D399, unchanged) are both light-ish, so black still
-// reads better on them than white.
+// Batch 52: still darkColorScheme() — compose-skeuomorphism-lite-midnight-blue.md §1.1 carries
+// the same "no light-mode fallback" mandate forward (§13: "must not introduce a light-mode
+// fallback"), it just changes what "dark" looks like again (literal Midnight Blue #191970,
+// opaque surfaces, no glass). onPrimary/onTertiary picked by the same luminance rule
+// MiniPlayerBar.kt uses elsewhere (>0.55 luminance -> black text): this batch's new
+// TactileAccent (0xFF7278FF) is noticeably less bright than Batch 51's 0xFF5B9DFF — simple luma
+// ≈0.52, below the threshold — so onPrimary flips to Color.White this batch (Batch 51's
+// Color.Black would now be low-contrast). TactileSuccess (0xFF34D399, unchanged) stays above the
+// threshold, so onTertiary stays Color.Black as before.
 private val TactileColors = darkColorScheme(
     primary = TactileAccent,
-    onPrimary = Color.Black,
+    onPrimary = Color.White,
     secondary = TactileSecondaryText,
     onSecondary = TactileBackground,
     tertiary = TactileSuccess,
@@ -113,9 +114,9 @@ fun resolveIsDark(theme: AppTheme): Boolean = when (theme) {
     AppTheme.SYSTEM -> isSystemInDarkTheme()
     AppTheme.LIGHT -> false
     AppTheme.DARK -> true
-    // Still true since Batch 50 — the hybrid-glass dark-blue repaint this batch (spec
-    // compose-skeuomorphism-lite-hybrid-glass-dark-blue.md) is still unambiguously dark, so
-    // status bar/nav bar icons stay light (MainActivity.kt's `isAppearanceLightStatusBars =
+    // Still true since Batch 50 — the literal Midnight Blue repaint this batch (spec
+    // compose-skeuomorphism-lite-midnight-blue.md) is still unambiguously dark, so status
+    // bar/nav bar icons stay light (MainActivity.kt's `isAppearanceLightStatusBars =
     // !isDarkTheme`), same as before.
     AppTheme.TACTILE -> true
 }

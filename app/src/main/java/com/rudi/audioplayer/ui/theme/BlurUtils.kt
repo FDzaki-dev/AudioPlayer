@@ -37,30 +37,20 @@ fun Modifier.frostedGlass(
     val edge = if (isTactile)
         // A visible accent trim line instead of a faint neutral edge — reads as a machined
         // bezel around the panel, reinforcing the tactile depth cue. Alpha stays 0.22f from
-        // Batch 50 for the spec's §9/§13 restrained-glow rule; TactileAccent's Batch 51 value
-        // (0xFF5B9DFF) is close enough in brightness to the old one that this didn't need
+        // Batch 50 for the spec's §9/§13 restrained-glow rule; TactileAccent's Batch 52 value
+        // (0xFF7278FF) is close enough in brightness to the old one that this didn't need
         // re-tuning.
         MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
     else
         MaterialTheme.colorScheme.onSurface.copy(
             alpha = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.14f else 0.24f
         )
-    return if (isTactile) {
-        // Batch 51 — compose-skeuomorphism-lite-hybrid-glass-dark-blue.md §2/§8: TactileSurface
-        // now carries its own baked-in translucency (0xCC alpha, spec-literal DarkSurface), so
-        // this branch paints `tint` at its own native alpha instead of the generic branch's
-        // `.copy(alpha = alpha)` — that would *replace* the spec's ~80%-opacity glass with a
-        // flat 0.92f, discarding the exact translucency the hybrid-glass surface system is built
-        // on. A second, very-low-alpha TactileGlassOverlay wash (also spec §2 literal) layers a
-        // faint cool-blue tint on top, matching §8's layered glass formula ("translucent navy
-        // fill" + "subtle linear/radial gradient") without a real blur pass.
-        this
-            .background(tint, shape)
-            .background(TactileGlassOverlay, shape)
-            .border(1.dp, edge, shape)
-    } else {
-        this
-            .background(tint.copy(alpha = alpha), shape)
-            .border(1.dp, edge, shape)
-    }
+    // Batch 52 — compose-skeuomorphism-lite-midnight-blue.md defines no glass/translucency
+    // concept (§2's Surface/SurfaceVariant literals are opaque 0xFF, and there is no
+    // GlassOverlay token), so the Batch 51 Tactile-only branch that layered a glass-overlay wash
+    // on top of a natively-translucent tint is gone: Tactile now shares the exact same generic
+    // `tint.copy(alpha = alpha)` treatment as every other theme, same as Batch 50.
+    return this
+        .background(tint.copy(alpha = alpha), shape)
+        .border(1.dp, edge, shape)
 }
