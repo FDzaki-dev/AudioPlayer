@@ -8,6 +8,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
@@ -56,6 +57,7 @@ fun MiniPlayerBar(
     // Album-art accents can be very bright or very dark. Choose the control icon
     // color from luminance so the primary action remains readable in every case.
     val accentContentColor = if (animatedAccent.luminance() > 0.55f) Color.Black else Color.White
+    val miniPlayPauseShape = if (isTactile) MaterialTheme.shapes.medium else CircleShape
 
     Box(
         modifier = Modifier
@@ -116,12 +118,22 @@ fun MiniPlayerBar(
                     onPlayPause()
                 },
                 interactionSource = playPauseInteraction,
+                // Batch 55 — matches the same shape/emboss treatment now on the full Now Playing
+                // screen's transport button (NowPlayingScreen.kt), scaled down for the mini bar's
+                // smaller footprint, so the identity difference is visible everywhere the play
+                // button appears, not just after opening the full player.
+                shape = miniPlayPauseShape,
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = animatedAccent,
                     contentColor = accentContentColor
                 ),
                 modifier = Modifier
                     .size(40.dp)
+                    .then(
+                        if (isTactile)
+                            Modifier.tactileEmboss(shape = miniPlayPauseShape, elevation = 6.dp)
+                        else Modifier
+                    )
                     .bouncyPress(playPauseInteraction, pressedScale = 0.82f)
             ) {
                 AnimatedContent(targetState = uiState.isPlaying, label = "miniPlayPause") { playing ->

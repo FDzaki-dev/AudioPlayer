@@ -6,6 +6,42 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 56 (versionCode/versionName reset — bukan tema/fitur)** — User minta reset angka versi
+app karena `1.0.<total commit history>` sudah kelihatan besar/tidak sedap dipandang di picker.
+`gitCommitCount()` (`app/build.gradle.kts`) & CI (`.github/workflows/build.yml` "Determine version
+name") diubah dari `git rev-list --count HEAD` (total history) ke `git rev-list --count
+v-reset..HEAD` dengan fallback ke `HEAD` kalau tag belum ada — jadi angkanya restart dari kecil
+TANPA rewrite/squash git history (log/blame lama tetap utuh). **Wajib 1x setup manual di Termux
+setelah ZIP ini di-push** (belum dijalankan otomatis dari sini karena butuh akses git remote user):
+```
+git tag v-reset && git push origin v-reset
+```
+Tanpa tag ini, kedua sisi (gradle & CI) otomatis fallback ke hitungan lama (tidak breaking,
+cuma belum ke-reset). 2 file protected disentuh (`app/build.gradle.kts`,
+`.github/workflows/build.yml`) — edit parsial saja (fungsi diganti, sisa file & signing config
+tidak disentuh).
+
+**Batch 55 (Tactile identity polish, atomic change)** — User minta polish tema custom Tactile
+biar perbedaannya sama tema utama (Apple) makin kelihatan. Audit codebase: warna/tipografi/shape/
+kaca sudah dibedakan sejak Batch 49-54 (lihat entri Batch 53 di bawah), tapi tombol play/pause —
+kontrol paling sering dilihat sepanjang sesi dengar musik (mini bar + Now Playing) — masih render
+byte-identik di kedua tema (`FilledIconButton` circle default M3, tanpa bevel apa pun). Itu satu
+titik terbesar yang bikin identitas Tactile "hilang" begitu musik diputar. Detail lengkap di
+`CHANGELOG.md` Batch 55; ringkas:
+- Tombol play/pause utama (`NowPlayingScreen.kt`, 68dp) & mini player (`MiniPlayerBar.kt`, 40dp):
+  Tactile sekarang `MaterialTheme.shapes.medium` (rounded-square) + `tactileEmboss()`, Apple tetap
+  `CircleShape` + shadow biasa seperti sebelumnya — tidak berubah.
+- `AlbumArtHero`'s border: `Brush.verticalGradient` (peninggalan sebelum aturan diagonal spec §9
+  Batch 53) diganti `Brush.linearGradient` — satu-satunya border Tactile yang belum ikut arah
+  cahaya diagonal top-left→bottom-right yang dipakai di tempat lain.
+- **Belum diverifikasi visual/compile** — sama seperti setiap batch tema sebelumnya (tidak ada
+  `kotlinc`/emulator di environment ini), diverifikasi lewat baca-manual + brace/paren balance
+  check (seimbang di kedua file yang disentuh).
+- **Sengaja TIDAK dikerjakan**: custom thumb/track untuk kedua `Slider` (seek bar utama & volume
+  dalam-aplikasi) — masih M3 default identik di kedua tema. Butuh slot `thumb`/`track` composable
+  (custom draw, bukan sekadar modifier tempel), risiko lebih tinggi tanpa compiler — kandidat
+  batch polish berikutnya.
+
 **Batch 54 (technical debt pass, bukan tema/fitur)** — User minta gabungkan seluruh daftar
 technical debt murni-kode (hasil audit statis: grep + baca file, bukan dari testing) dengan
 technical debt yang sudah tercatat di segmen "Belum selesai / dalam pengerjaan" README.md, jadi

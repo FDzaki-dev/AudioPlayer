@@ -8,12 +8,26 @@ plugins {
 // which can silently break the update path on some devices/launchers even when the
 // signing certificate is correct. Counting git commits gives a versionCode that's
 // guaranteed to increase with every push, with no manual step to forget.
+//
+// Batch 56: counts commits since the "v-reset" tag instead of the whole repo history.
+// After many batches the raw full-history count had grown large/ugly to look at in the
+// version picker; this restarts the visible number from near-zero WITHOUT rewriting git
+// history (no squash, no force-push — history stays intact for git blame/log). One-time
+// setup (do this once in Termux, after this ZIP is pushed):
+//   git tag v-reset && git push origin v-reset
+// Every push after that tag exists counts from it; versionCode/versionName still only ever
+// go up (rev-list --count is monotonic within the same range), so the update-path guarantee
+// above is unaffected. Falls back to full HEAD count if the tag isn't present yet (so the
+// very first build before you create the tag, or a shallow clone missing tags, still builds).
 fun gitCommitCount(): Int = try {
-    val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
-        .redirectErrorStream(true)
-        .start()
-    process.waitFor()
-    process.inputStream.bufferedReader().readText().trim().toIntOrNull() ?: 1
+    fun count(range: String): Int? {
+        val process = ProcessBuilder("git", "rev-list", "--count", range)
+            .redirectErrorStream(true)
+            .start()
+        process.waitFor()
+        return process.inputStream.bufferedReader().readText().trim().toIntOrNull()
+    }
+    maxOf(1, count("v-reset..HEAD") ?: count("HEAD") ?: 1)
 } catch (e: Exception) {
     1 // local build outside a git checkout, or git unavailable — never fail the build over this
 }

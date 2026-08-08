@@ -10,6 +10,53 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 56 — Reset versionCode/versionName ke basis tag `v-reset` (bukan tema/fitur)
+User minta reset nomor versi app, `1.0.<total commit history>` sudah terasa besar/tidak sedap
+dipandang. 2 file protected disentuh (edit parsial, bukan replace total).
+
+- `app/build.gradle.kts` — `gitCommitCount()`: `git rev-list --count HEAD` (total history) →
+  `git rev-list --count v-reset..HEAD`, fallback ke `HEAD` count kalau tag `v-reset` belum ada
+  (biar build pertama sebelum tag dibuat tetap jalan). `maxOf(1, ...)` ditambah karena commit
+  tepat di tag itu sendiri akan menghasilkan 0 (Android tidak terima versionCode < 1).
+- `.github/workflows/build.yml` — step "Determine version name": rumus disamakan persis (COUNT
+  pakai `2>/dev/null ||` fallback yang sama) supaya tag GitHub Release & angka di dalam APK tidak
+  drift satu sama lain (dua tempat independen yang sama-sama jalankan `git rev-list`, harus tetap
+  identik seperti alasan awal Batch 30 kenapa keduanya digabung ke satu basis).
+- **Setup manual 1x wajib** (di luar cakupan ZIP ini — tidak ada akses ke git remote user dari
+  sini): `git tag v-reset && git push origin v-reset`, sekali saja setelah ZIP ini di-push. Tidak
+  breaking kalau lupa — kedua sisi fallback ke hitungan lama sampai tag dibuat.
+- git history TIDAK di-rewrite/squash (tidak ada force-push) — cuma cara menghitung versionCode
+  yang berubah, bukan datanya.
+
+## Batch 55 — Tactile identity polish (atomic change): play/pause button shape+emboss, diagonal border fix
+User minta polish tema custom Tactile biar perbedaannya sama tema utama (Apple) makin kelihatan.
+Audit: warna/tipografi/shape/kaca sudah dibedakan sejak Batch 49-54, tapi tombol play/pause —
+kontrol paling sering dilihat di seluruh app (mini bar + Now Playing) — masih render identik di
+kedua tema (`FilledIconButton` circle default M3, tanpa bevel). Itu satu-satunya titik besar yang
+bikin identitas Tactile "hilang" pas lagi dengar musik. 3 file kode tersentuh (1 modul UI, atomic).
+
+- `NowPlayingScreen.kt`: tombol play/pause utama (68dp) sekarang pakai `MaterialTheme.shapes.medium`
+  (rounded-square, bahasa bentuk Tactile) alih-alih `CircleShape` Apple, dibungkus `tactileEmboss()`
+  (elevation 10dp) khusus tema Tactile — jadi terbaca sebagai tombol fisik terangkat, bukan cuma
+  lingkaran warna aksen. `isTactile` di-hoist ke scope `NowPlayingScreen()` (sebelumnya cuma
+  dihitung di 2 composable anak).
+- `MiniPlayerBar.kt`: tombol play/pause (40dp) dapat perlakuan sama (shape + `tactileEmboss()`
+  elevation 6dp, lebih kecil sesuai ukuran bar) — perbedaan identitas kelihatan dari mini player
+  juga, tidak cuma setelah buka full player.
+- `NowPlayingScreen.kt` — `AlbumArtHero`: border hero art masih pakai `Brush.verticalGradient`
+  peninggalan Batch 45/46 (sebelum aturan diagonal spec §9 diadopsi Batch 53) — satu-satunya
+  border Tactile di codebase yang belum ikut arah cahaya diagonal top-left→bottom-right yang
+  dipakai `BlurUtils.kt`/`TactileDepth.kt`. Diganti ke `Brush.linearGradient` (konsisten, bukan
+  perubahan visual besar, cuma menyamakan arah bevel).
+- **Belum diverifikasi visual/compile** (sama seperti setiap batch tema sebelumnya, environment
+  ini tidak punya `kotlinc`/emulator) — verifikasi lewat baca-manual + brace/paren balance check
+  tiap file yang disentuh (semua seimbang).
+- **Sengaja tidak dikerjakan** (didaftar transparan): custom thumb/track untuk `Slider` (seek bar
+  utama & volume dalam-aplikasi) — kedua slider masih M3 default identik di kedua tema. Butuh
+  slot `thumb`/`track` composable (tersedia di Material3 1.2.1 yang dipakai proyek ini) tapi
+  bentuknya lebih rumit (custom draw, bukan modifier tempel) dan berisiko lebih tinggi tanpa
+  compiler untuk verifikasi — kandidat batch polish berikutnya, bukan dipaksakan masuk sini.
+
 ## Batch 54 — Technical debt cleanup (atomic change): dedup isTactile, hapus FQN inline & dead token, sentralisasi corner-radius
 User minta gabungkan daftar technical debt murni-kode (dari audit statis: isTactile terduplikasi,
 inline fully-qualified reference, dp literal tak tersentralisasi) dengan debt yang sudah tercatat

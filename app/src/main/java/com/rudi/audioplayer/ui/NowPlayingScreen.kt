@@ -128,6 +128,11 @@ fun NowPlayingScreen(
 ) {
     val song = uiState.currentSong
     val haptic = LocalHapticFeedback.current
+    // Batch 55 (Tactile polish) — hoisted here (was only computed inside GestureIndicatorBadge/
+    // AlbumArtHero before) so the main transport row below can also branch on it: the play/pause
+    // button was the single most-seen control that still rendered byte-identical between Apple
+    // and Tactile (default M3 circular FilledIconButton, no shape/bevel difference at all).
+    val isTactile = isTactileTheme()
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
     var showQueueSheet by remember { mutableStateOf(false) }
@@ -473,18 +478,30 @@ fun NowPlayingScreen(
                 Icon(Icons.Default.SkipPrevious, contentDescription = "Sebelumnya", modifier = Modifier.size(36.dp))
             }
             val playPauseInteraction = remember { MutableInteractionSource() }
+            // Batch 55 — Tactile gets its own shape language here too (moderate rounded-square,
+            // matching TactileShapes.medium, same "machined control" read as every other tactile
+            // surface) instead of silently inheriting Apple's circular filledShape default; wrapped
+            // in tactileEmboss() so the app's single most-used button reads as a lifted hardware
+            // key (diagonal bevel + drop shadow), not just a flat colored disc like Apple's.
+            val playPauseShape = if (isTactile) MaterialTheme.shapes.medium else CircleShape
             FilledIconButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onPlayPause()
                 },
                 interactionSource = playPauseInteraction,
+                shape = playPauseShape,
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = animatedAccent,
                     contentColor = MaterialTheme.colorScheme.background
                 ),
                 modifier = Modifier
                     .size(68.dp)
+                    .then(
+                        if (isTactile)
+                            Modifier.tactileEmboss(shape = playPauseShape, elevation = 10.dp)
+                        else Modifier
+                    )
                     .bouncyPress(playPauseInteraction, pressedScale = 0.85f)
             ) {
                 AnimatedContent(targetState = uiState.isPlaying, label = "playPause") { playing ->
@@ -917,7 +934,14 @@ private fun AlbumArtHero(
                             .border(
                                 BorderStroke(
                                     1.5.dp,
-                                    Brush.verticalGradient(
+                                    // Batch 55 — was verticalGradient, the one remaining spot in the
+                                    // whole Tactile identity still drawing top-down light instead of
+                                    // spec §9's diagonal top-left -> bottom-right (BlurUtils.kt's
+                                    // edgeBrush and TactileDepth.kt's tactileEmboss() border both
+                                    // already use linearGradient's default diagonal — this hero art
+                                    // border was the one inconsistent leftover from Batch 45/46,
+                                    // predating the diagonal rule adopted in Batch 53).
+                                    Brush.linearGradient(
                                         listOf(
                                             TactileHighlight.copy(alpha = 0.12f),
                                             TactileShadow.copy(alpha = 0.32f)

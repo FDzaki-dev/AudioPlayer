@@ -57,7 +57,10 @@ jobs:
       - name: Determine version name
         id: version
         run: |
-          COUNT=$(git rev-list --count HEAD)
+          # Batch 56: same "count since v-reset tag, fallback to full history" scheme as
+          # app/build.gradle.kts' gitCommitCount() — must stay identical or the CI-tagged
+          # release name would drift from the number baked into the APK itself.
+          COUNT=$(git rev-list --count v-reset..HEAD 2>/dev/null || git rev-list --count HEAD)
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "name=1.0.$COUNT" >> "$GITHUB_OUTPUT"
           echo "tag=v1.0.$COUNT-release" >> "$GITHUB_OUTPUT"
