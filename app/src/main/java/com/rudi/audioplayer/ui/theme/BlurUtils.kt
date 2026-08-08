@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -19,6 +20,12 @@ import androidx.compose.ui.unit.dp
  *
  * The visual result is still glass-like when placed over artwork/ambient color, while avoiding
  * the common "beautiful but unreadable" failure mode caused by blurring the foreground.
+ *
+ * Batch 53 — compose-amoled-hybrid-glass-final.md is this project's primary material for the
+ * Tactile identity (spec §4: "Every major elevated surface should feel like a translucent layer
+ * floating above the AMOLED canvas"). This is the one shared call site every glass surface in the
+ * app routes through (Home/Library cards, MiniPlayerBar, NowPlaying panels, every bottom sheet —
+ * grep confirms), so the spec's glass rules are expressed centrally here rather than per screen.
  */
 @Composable
 fun Modifier.frostedGlass(
@@ -28,29 +35,28 @@ fun Modifier.frostedGlass(
 ): Modifier {
     // blurRadius is kept in the API for source compatibility with existing call sites.
     // Real backdrop blur is not performed here because Modifier.blur() would blur foreground
-    // content. The surface tint is intentionally opaque enough to preserve contrast.
+    // content. The surface tint is intentionally opaque enough to preserve contrast (spec §7:
+    // "Text remains readable... Glass must not become milky").
     val isTactile = MaterialTheme.colorScheme.background == TactileBackground
     // Shape now follows the active theme's own shape tokens instead of a hardcoded 24dp —
     // otherwise every sheet/mini-player using this modifier would keep Apple's soft rounding
     // even under Tactile's own shape identity.
     val shape = MaterialTheme.shapes.large
-    val edge = if (isTactile)
-        // A visible accent trim line instead of a faint neutral edge — reads as a machined
-        // bezel around the panel, reinforcing the tactile depth cue. Alpha stays 0.22f from
-        // Batch 50 for the spec's §9/§13 restrained-glow rule; TactileAccent's Batch 52 value
-        // (0xFF7278FF) is close enough in brightness to the old one that this didn't need
-        // re-tuning.
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-    else
-        MaterialTheme.colorScheme.onSurface.copy(
+    // Batch 53 — spec §8 "Glass edge / highlight" + §9 "Lighting model" (single simulated light,
+    // top-left -> bottom-right): a flat single-color border reads as a printed outline, not
+    // reflected light. A diagonal two-stop brush (GlassHighlight fading to GlassBorder) is the
+    // minimum structure needed to express "highlight top-left, recede bottom-right" without a
+    // bespoke per-corner draw. Spec §8 explicitly forbids plain Color.White here — TactileHighlight/
+    // TactileEdge are already pre-scaled low-alpha tokens (0.065f / 0.035f), never raised.
+    val edgeBrush = if (isTactile)
+        Brush.linearGradient(colors = listOf(TactileHighlight, TactileEdge))
+    else {
+        val flat = MaterialTheme.colorScheme.onSurface.copy(
             alpha = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.14f else 0.24f
         )
-    // Batch 52 — compose-skeuomorphism-lite-midnight-blue.md defines no glass/translucency
-    // concept (§2's Surface/SurfaceVariant literals are opaque 0xFF, and there is no
-    // GlassOverlay token), so the Batch 51 Tactile-only branch that layered a glass-overlay wash
-    // on top of a natively-translucent tint is gone: Tactile now shares the exact same generic
-    // `tint.copy(alpha = alpha)` treatment as every other theme, same as Batch 50.
+        Brush.linearGradient(colors = listOf(flat, flat))
+    }
     return this
         .background(tint.copy(alpha = alpha), shape)
-        .border(1.dp, edge, shape)
+        .border(1.dp, edgeBrush, shape)
 }

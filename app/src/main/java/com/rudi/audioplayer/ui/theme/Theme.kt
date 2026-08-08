@@ -17,7 +17,7 @@ enum class AppTheme(val storageKey: String, val displayName: String, val descrip
     SYSTEM("system", "Ikuti Sistem", "Menyesuaikan mode terang/gelap perangkat"),
     LIGHT("light", "Terang", "Latar putih bersih, khas iOS"),
     DARK("dark", "Gelap", "Hitam pekat, nyaman untuk layar OLED"),
-    TACTILE("tactile_lite", "Tactile", "Midnight Blue taktil terprogram, bukan gambar — permukaan gelap pekat dengan bevel fisik");
+    TACTILE("tactile_lite", "Tactile", "AMOLED hybrid glassmorphism — kaca gelap premium dengan sentuhan Midnight Blue tipis dan kontrol taktil");
 
     companion object {
         fun fromStorageKey(key: String?): AppTheme = entries.find { it.storageKey == key } ?: SYSTEM
@@ -64,15 +64,14 @@ private val AppleLightColors = lightColorScheme(
     error = Color(0xFFFF3B30)
 )
 
-// Batch 52: still darkColorScheme() — compose-skeuomorphism-lite-midnight-blue.md §1.1 carries
-// the same "no light-mode fallback" mandate forward (§13: "must not introduce a light-mode
-// fallback"), it just changes what "dark" looks like again (literal Midnight Blue #191970,
-// opaque surfaces, no glass). onPrimary/onTertiary picked by the same luminance rule
-// MiniPlayerBar.kt uses elsewhere (>0.55 luminance -> black text): this batch's new
-// TactileAccent (0xFF7278FF) is noticeably less bright than Batch 51's 0xFF5B9DFF — simple luma
-// ≈0.52, below the threshold — so onPrimary flips to Color.White this batch (Batch 51's
-// Color.Black would now be low-contrast). TactileSuccess (0xFF34D399, unchanged) stays above the
-// threshold, so onTertiary stays Color.Black as before.
+// Batch 53: still darkColorScheme() — compose-amoled-hybrid-glass-final.md §24 carries the
+// "no light-mode fallback" mandate forward implicitly (a light AMOLED surface is a contradiction
+// in terms), it just changes what "dark" looks like again (AMOLED-black foundation, translucent
+// glass surfaces, Midnight Blue demoted to an ambient-only ingredient — spec §6). onPrimary
+// picked by the same luminance rule MiniPlayerBar.kt uses elsewhere (>0.55 luminance -> black
+// text): TactileAccent (0xFF6670FF) simple luma ≈0.49, below the threshold, so onPrimary stays
+// Color.White. TactileSuccess (0xFF34D399, unchanged) stays above the threshold, so onTertiary
+// stays Color.Black as before.
 private val TactileColors = darkColorScheme(
     primary = TactileAccent,
     onPrimary = Color.White,

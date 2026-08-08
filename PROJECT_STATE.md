@@ -6,6 +6,54 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 53** — User kirim spec baru `compose-amoled-hybrid-glass-final.md`, minta diterapkan
+100% ke tema custom Tactile (menggantikan palet flat Midnight Blue literal Batch 52 sepenuhnya —
+spec ini secara eksplisit mendaftar "a full Midnight Blue theme" sebagai anti-pattern di §24, jadi
+Batch 52 sendiri sekarang jadi contoh yang harus dihindari). Diterapkan ke SEMUA sektor yang
+langsung terlihat user (bukan cuma 6 pilar/screen utama): 4 file token/util pusat
+(`Color.kt`/`Theme.kt`/`BlurUtils.kt`/`TactileDepth.kt`) + `MainActivity.kt` (root ambient
+gradient + navbar). Karena setiap screen/sheet (Home, Library, MiniPlayer, NowPlaying, Settings,
+semua bottom sheet) sudah merutekan visualnya lewat `frostedGlass()`/`tactileEmboss()`/
+`MaterialTheme.colorScheme` alih-alih warna literal per-file, rewrite terpusat ini otomatis
+menjangkau semuanya tanpa perlu menyentuh tiap file screen satu-satu (dikonfirmasi lewat grep:
+15 file `ui/*.kt` semua konsumsi salah satu dari ketiga titik pusat itu).
+- `Color.kt` — repaint total mengikuti hierarki spec §2 (AMOLED > glass > Midnight Blue ambient >
+  tactile > accent): `TactileBackground` sekarang AMOLED near-black §3 literal 0xFF030508 (bukan
+  flat Midnight Blue 0xFF191970 lagi), `TactileSurface`/`TactileSurfaceVariant` sekarang §5
+  `GlassBase`/`GlassElevated` literal 0xFF0A0F16/0xFF101722, `TactileText`/`TactileSecondaryText`
+  ganti ke §16 `TextPrimary`/`TextSecondary` 0xFFEAF0F8/0xFFAAB5C4, `TactileAccent` sekarang §17
+  `AccentBlue` 0xFF6670FF. Token baru: `AmoledSurface`, `GlassPressed`, `GlassWhite`,
+  `TactileMutedText`, `MidnightBlue` (0xFF191970 — sekarang HANYA ambient, tidak lagi jadi
+  background), `MidnightBlueAmbientAlpha` (0.06f). `TactileHighlight`/`TactileEdge` naik dari
+  0.055f/0.035f ke §5 literal `GlassHighlight`/`GlassBorder` 0.065f/0.035f. `TactileError`/
+  `TactileSuccess` tidak berubah (spec ini juga tidak beri token error/success literal, sama
+  seperti setiap batch tema custom sebelumnya).
+- `Theme.kt` — `TactileColors` re-wire ke token baru (fungsinya sama, cuma nilai berubah lewat
+  Color.kt); `AppTheme.TACTILE.description` diperbarui dari deskripsi "Midnight Blue taktil" ke
+  deskripsi glass-first yang sesuai identitas baru. `onPrimary` tetap `Color.White` (AccentBlue
+  0xFF6670FF luma ≈0.49, masih di bawah threshold 0.55).
+- `BlurUtils.kt` — `frostedGlass()`'s `edgeBrush` untuk Tactile diganti dari solid
+  `primary.copy(alpha=0.22f)` ("accent trim line", melanggar §8 "border harus subtle, bukan
+  accent") ke `Brush.linearGradient(TactileHighlight, TactileEdge)` — diagonal top-left→bottom-
+  right sesuai §9 "Lighting model", bukan lagi warna aksen solid di sekeliling setiap panel glass.
+- `TactileDepth.kt` — `tactileEmboss()`'s bevel gradient ganti dari `verticalGradient` ke
+  `linearGradient` (default Offset.Zero→Offset.Infinite = diagonal top-left→bottom-right, sesuai
+  §9) memakai token `TactileSurfaceVariant`/`TactileSurface` yang sekarang sudah berarti glass
+  bukan bevel opaque. Border/shadow alpha di-re-tune mengikuti base token baru (0.065f/0.70f).
+- `MainActivity.kt` — root `Surface` untuk Tactile sekarang `Color.Transparent` + `Box.background`
+  dengan `Brush.linearGradient(background, MidnightBlue.copy(alpha=MidnightBlueAmbientAlpha),
+  AmoledSurface)` — ini SATU-SATUNYA tempat `MidnightBlue` dipakai sebagai warna nyata di layar
+  (§6 "Correct use": hanya sebagai ambient gradient, bukan flat surface), tema lain tidak berubah
+  (tetap flat `colorScheme.background`). NavigationBar `tonalElevation` Tactile diturunkan dari
+  12.dp ke 6.dp — pada 12.dp, `surfaceTint` (=TactileAccent, biru) membuat seluruh nav bar
+  kelihatan biru dulu sebelum "AMOLED glass" (melanggar §2 "Golden Rule" dan §15), 6.dp tetap
+  kelihatan terangkat (Level 2 glass) tanpa wash aksen mendominasi.
+- **Belum diverifikasi visual** (sama seperti setiap batch tema custom sebelumnya, environment
+  kerja ini tidak punya `kotlinc`/emulator): build-test asli + verifikasi visual device disarankan
+  sebelum rilis, khususnya diagonal border baru (`Brush.linearGradient` di `BlurUtils.kt`/
+  `TactileDepth.kt`) dan root ambient gradient (`MainActivity.kt`) — grep sudah dicek nihil
+  referensi token lama yang terlewat, tapi belum diverifikasi visual.
+
 **Batch 52** — User kirim spec baru `compose-skeuomorphism-lite-midnight-blue.md`, minta
 diterapkan 100% ke tema custom Tactile (menggantikan palet hybrid-glass Batch 51 sepenuhnya —
 spec header eksplisit 2x pakai kata "Literal" dan "Mandatory visual baseline: Literal Midnight

@@ -10,6 +10,53 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 53 — Timpa palet tema custom Tactile pakai spec AMOLED Hybrid Glassmorphism baru (compose-amoled-hybrid-glass-final.md)
+User kirim spec baru sekaligus perintah eksplisit: override total tema custom sebelumnya, terapkan
+100% ke SEMUA sektor yang langsung terlihat user, bukan cuma pilar utama. Spec baru ini secara
+eksplisit mendaftar "a full Midnight Blue theme" (persis Batch 52) sebagai anti-pattern (§24),
+jadi ini bukan sekadar retuning nilai — arah visual identitasnya berbalik: AMOLED-black + glass
+translucent jadi material utama, Midnight Blue turun jadi ambient gradient tipis saja (§6), dan
+tactile/skeuomorphism dibatasi ke kontrol interaktif (§10).
+
+Pola implementasi sama seperti Batch 50-52: 4 file token/util pusat (`Color.kt`, `Theme.kt`,
+`BlurUtils.kt`, `TactileDepth.kt`) disentuh untuk mendefinisikan ulang makna token, tanpa
+mengubah struktur/signature `frostedGlass()` atau `tactileEmboss()` — jadi ke-15 file `ui/*.kt`
+yang sudah memakai keduanya otomatis ikut berubah tampilannya tanpa disentuh satu per satu. Beda
+dari batch-batch sebelumnya: `MainActivity.kt` juga disentuh kali ini (root ambient gradient +
+navbar tonal elevation), karena §6 spec ini secara eksplisit minta Midnight Blue cuma boleh muncul
+sebagai gradient di layer ambient/root — sesuatu yang tidak bisa diekspresikan lewat token warna
+solid saja.
+
+- **`Color.kt`**: repaint total mengikuti §2 hierarki (AMOLED > glass > Midnight Blue ambient >
+  tactile > accent). `TactileBackground` → §3 `AmoledBlack` 0xFF030508. `TactileSurface`/
+  `TactileSurfaceVariant` → §5 `GlassBase`/`GlassElevated` 0xFF0A0F16/0xFF101722 (sebelumnya
+  opaque bevel Batch 52, sekarang translucent-glass-reading). `TactileText`/`TactileSecondaryText`
+  → §16 `TextPrimary`/`TextSecondary`. `TactileAccent` → §17 `AccentBlue` 0xFF6670FF.
+  `TactileHighlight`/`TactileEdge` naik ke §5 `GlassHighlight`/`GlassBorder` (0.065f/0.035f,
+  masih jauh di bawah `Color.White` polos sesuai §8). Token baru: `AmoledSurface`, `GlassPressed`,
+  `GlassWhite`, `TactileMutedText`, `MidnightBlue` (kini murni ambient, bukan background lagi),
+  `MidnightBlueAmbientAlpha`.
+- **`Theme.kt`**: `TactileColors` re-wire otomatis lewat token baru; deskripsi picker tema
+  diperbarui dari framing "Midnight Blue taktil" ke framing glass-first.
+- **`BlurUtils.kt`**: `frostedGlass()` border Tactile ganti dari solid accent-trim
+  (`primary.copy(alpha=0.22f)`, melanggar §8) ke `Brush.linearGradient(TactileHighlight,
+  TactileEdge)` diagonal, sesuai §9 lighting model (satu arah cahaya top-left→bottom-right
+  konsisten di semua komponen).
+- **`TactileDepth.kt`**: `tactileEmboss()` bevel gradient ganti `verticalGradient` →
+  `linearGradient` (diagonal top-left→bottom-right, §9), border/shadow alpha di-re-tune ke base
+  token baru.
+- **`MainActivity.kt`**: root `Surface` Tactile sekarang transparan + `Box.background(Brush)`
+  3-stop (`background` → `MidnightBlue.copy(alpha=MidnightBlueAmbientAlpha)` → `AmoledSurface`) —
+  satu-satunya tempat `MidnightBlue` benar-benar dirender di layar, sesuai §6 "Correct use"; tema
+  lain (System/Light/Dark) tidak disentuh, tetap flat. `NavigationBar` `tonalElevation` Tactile
+  diturunkan 12.dp → 6.dp supaya `surfaceTint` (aksen biru) tidak mendominasi nav bar sebelum
+  "AMOLED glass" (§2 Golden Rule, §15).
+- Tidak ada file ditambah/dihapus batch ini (murni repaint token + util pusat) — total file tetap
+  108, `FILE_MANIFEST.txt` tidak berubah.
+- **Belum diverifikasi visual** — sama seperti Batch 50-52, environment kerja tidak punya
+  `kotlinc`/emulator. Disarankan build-test asli sebelum rilis produksi, khususnya brush diagonal
+  baru dan root ambient gradient.
+
 ## Batch 52 — Timpa palet tema custom Tactile pakai spec literal Midnight Blue baru (compose-skeuomorphism-lite-midnight-blue.md)
 User kirim spec baru: masih dark-mode, tapi kali ini header spec eksplisit pakai kata "Literal"
 dua kali dan "Mandatory visual baseline: Literal Midnight Blue (#191970) — MANDATORY" — diterapkan

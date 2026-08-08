@@ -72,6 +72,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.SideEffect
@@ -268,9 +269,34 @@ class MainActivity : FragmentActivity() {
                 // same shape as the non-Tactile branch (contentColor stays explicit either way,
                 // so this was never dependent on the Batch 48 Unspecified-content-color bug
                 // class regardless of which branch runs).
+                // Batch 53 — compose-amoled-hybrid-glass-final.md §6 "Correct use": Midnight Blue
+                // is only ever an atmospheric gradient ingredient, applied at the root ambient
+                // layer (spec §7's conceptual stack starts with "Ambient background -> subtle
+                // Midnight Blue gradient"), never as a flat surface color (§6 "Incorrect use").
+                // `color = colorScheme.background` alone (the pre-Batch-53 approach) is flat and
+                // AMOLED-only; layering a very-low-alpha diagonal Midnight Blue wash on top via a
+                // background Brush (Tactile only — every other theme keeps its plain flat color)
+                // is the minimum change needed to express this one spec rule without touching any
+                // other screen file, since this Surface is the single shared root every screen
+                // renders inside.
+                val tactileRootBrush = if (appTheme == AppTheme.TACTILE)
+                    Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.background,
+                            com.rudi.audioplayer.ui.theme.MidnightBlue.copy(
+                                alpha = com.rudi.audioplayer.ui.theme.MidnightBlueAmbientAlpha
+                            ),
+                            com.rudi.audioplayer.ui.theme.AmoledSurface
+                        )
+                    )
+                else null
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (tactileRootBrush != null) Modifier.background(tactileRootBrush) else Modifier
+                        ),
+                    color = if (tactileRootBrush != null) Color.Transparent else MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -560,18 +586,19 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // tactileEmboss() uses elsewhere, applied here without restructuring
                     // NavigationBar's own internals (it's a whole M3 component, not a bare
                     // Surface tactileEmboss() could wrap directly).
-                    // Alphas unchanged since Batch 50 (0.10/0.02) — the new midnight-blue spec's
-                    // §4 rule is the same ("Do NOT use a bright Color.White border"), and
-                    // TactileHighlight is plain Color.White-based again this batch (see
-                    // Color.kt), so no numeric change is needed here either.
+                    // Batch 53 — spec §15 "Navigation should be calm... Do not turn every
+                    // navigation item into a glowing glass capsule" + §5 GlassHighlight is now
+                    // 0.065f (was 0.055f pre-Batch-53), so the catch-light line's own alphas are
+                    // re-matched to that new base (0.13f/0.03f) to keep the same relative
+                    // brightness step it always had.
                     NavigationBar(
                         modifier = if (appTheme == AppTheme.TACTILE)
                             Modifier.drawBehind {
                                 drawLine(
                                     brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
                                         listOf(
-                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.10f),
-                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.02f)
+                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.13f),
+                                            com.rudi.audioplayer.ui.theme.TactileHighlight.copy(alpha = 0.03f)
                                         )
                                     ),
                                     start = androidx.compose.ui.geometry.Offset(0f, 0f),
@@ -580,11 +607,15 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 )
                             }
                         else Modifier,
-                        // A visibly "lifted" bar for Tactile (higher tonal elevation → the
-                        // accent surfaceTint from Theme.kt shows through more strongly) instead
-                        // of the flatter default — reinforces the tactile-hardware depth cue
-                        // at the one piece of chrome that's always on screen.
-                        tonalElevation = if (appTheme == AppTheme.TACTILE) 12.dp else NavigationBarDefaults.Elevation
+                        // Batch 53: lowered from 12.dp — spec §15 keeps navigation "calm and
+                        // immediately understandable" and explicitly warns against every item (or
+                        // in this case, the whole bar) reading as an accent-tinted glow. M3's
+                        // tonalElevation overlay scales with elevation and this app's
+                        // surfaceTint is the accent color (Theme.kt), so 12.dp let the bar itself
+                        // read as "blue" before "glass" — 6.dp keeps a legible elevated-glass lift
+                        // (Level 2, spec §4) without the accent wash dominating the one piece of
+                        // chrome that's always on screen.
+                        tonalElevation = if (appTheme == AppTheme.TACTILE) 6.dp else NavigationBarDefaults.Elevation
                     ) {
                         NavigationBarItem(
                             selected = currentRoute == "home",
