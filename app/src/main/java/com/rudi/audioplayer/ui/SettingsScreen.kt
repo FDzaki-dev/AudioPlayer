@@ -298,7 +298,7 @@ private fun ThemeOptionCard(theme: AppTheme, selected: Boolean, onClick: () -> U
             .padding(horizontal = 20.dp)
             .then(
                 if (isMattePreview)
-                    Modifier.matteEmboss(shape = RoundedCornerShape(18.dp), elevation = if (selected) 14.dp else 8.dp)
+                    Modifier.matteEmboss(shape = RoundedCornerShape(18.dp), elevation = if (selected) 20.dp else 13.dp)
                 else
                     Modifier.clip(RoundedCornerShape(18.dp))
             )

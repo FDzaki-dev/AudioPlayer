@@ -245,7 +245,7 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
             .padding(horizontal = 20.dp, vertical = 8.dp)
             .then(
                 if (isMatte)
-                    Modifier.matteEmboss(shape = MaterialTheme.shapes.medium, elevation = 10.dp)
+                    Modifier.matteEmboss(shape = MaterialTheme.shapes.medium, elevation = 16.dp)
                 else
                     Modifier.clip(RoundedCornerShape(18.dp))
             )

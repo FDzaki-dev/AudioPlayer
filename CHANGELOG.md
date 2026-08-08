@@ -10,6 +10,102 @@ Playing/Settings, dst.) sudah terangkum sebagai satu kesatuan di daftar fitur pa
 `README.md` — tidak dipecah ulang per batch di sini karena detail per-batch-nya sudah tidak
 tersedia.
 
+## Batch 45 — Fix bug lama: SignatureMatcherSheet bandingkan key signing yang SALAH kalau app pernah rotasi key
+User laporan "gak sinkron" di fitur pencocok signature APK (`SignatureMatcherSheet` +
+`ApkSignatureChecker`). Root cause di `ApkSignatureChecker.inspect()` (API 28+, jalur
+`GET_SIGNING_CERTIFICATES`): saat `hasMultipleSigners() == false` (kasus normal, app
+bersertifikat tunggal), kode ambil `signingInfo.signingCertificateHistory.firstOrNull()`.
+Menurut dokumentasi resmi `SigningInfo.getSigningCertificateHistory()`: array ini terurut
+**oldest→newest**, sertifikat original di index 0, sertifikat **AKTIF/current** di index
+**terakhir**. `.firstOrNull()` diam-diam ambil sertifikat PALING LAMA, bukan yang dipakai
+sekarang — untuk app mana pun yang pernah melalui APK Signature Scheme v3 key rotation, hasil
+SHA-256 yang dibandingkan bukan key yang sebenarnya menentukan apakah Android mengizinkan
+update in-place. Ini persis sumber "gak sinkron": hasil MATCH/MISMATCH di UI bisa berbeda dari
+apa yang sebenarnya dilakukan installer Android. Fix: `.lastOrNull()` untuk cabang
+`signingCertificateHistory`. Cabang `hasMultipleSigners() == true` (`apkContentsSigners`)
+tidak diubah — app multi-signer tidak bisa rotasi key sama sekali, jadi urutan tidak relevan
+di situ. 1 file (`ApkSignatureChecker.kt`), fix atomik. **Belum diverifikasi runtime asli**
+(tidak ada compiler Android di environment kerja) — analisis statis + brace/paren balance +
+cross-check langsung ke dokumentasi resmi `SigningInfo` (bukan asumsi/tebakan, lihat pelajaran
+Batch 14/33 soal ini). Kasus paling mungkin memicu laporan user: salah satu dari 2 APK yang
+dibandingkan (biasanya "APK Lama") pernah dirilis dengan key rotation aktif.
+
+## Batch 44 — Hotfix Batch 43 (fix-nya sendiri salah): drawOutline tidak pernah ada
+`log_fail_6.zip` user tunjukkan build masih gagal setelah Batch 43 — dengan pesan
+`Unresolved reference: drawOutline` yang sama, **termasuk di baris import itu sendiri**
+(`import androidx.compose.ui.graphics.drawscope.drawOutline`). Itu petunjuk kunci: kalau
+importnya sendiri unresolved, artinya tidak ada simbol top-level bernama itu di path tersebut
+sama sekali — bukan soal lupa import seperti dugaan Batch 43.
+
+Verifikasi langsung ke source resmi AOSP `DrawScope.kt` (bukan cuma dokumentasi/blog):
+interface `DrawScope` **tidak punya fungsi `drawOutline`** — anggota resminya cuma
+`drawLine`/`drawRect`/`drawRoundRect`/`drawCircle`/`drawOval`/`drawArc`/`drawPath`/
+`drawPoints`. Fungsi `drawOutline` yang dipakai Batch 42 itu tidak pernah eksis — dugaan awal
+"itu member DrawScope" salah total. Konversi `Outline` yang benar: `Path().apply {
+addOutline(outline) }` (extension asli `androidx.compose.ui.graphics.addOutline`, dikonfirmasi
+ada di listing resmi paket itu), lalu digambar pakai `drawPath(path, color)` — member asli
+`DrawScope`, tidak perlu import apa pun. Fix: ganti 2 pemanggilan `drawOutline(...)` jadi
+`Path().apply { addOutline(outline) }` + `drawPath(outlinePath, color = ...)`, hapus import
+`drawOutline` yang tidak valid, tambah import `Path` dan `addOutline`. **Pelajaran: nama fungsi
+yang terlihat masuk akal (mirip pola `translate` yang memang valid) BUKAN bukti fungsi itu
+ada — begitu error "unresolved" muncul bahkan di baris import-nya sendiri, itu sinyal untuk
+verifikasi ke source/reference resmi API tersebut dulu, bukan menambah import lain dengan
+tebakan nama yang mirip.** Belum diverifikasi ulang di device asli — prioritas sesi berikutnya
+tetap sama: pastikan build sukses dulu, baru cek shadow benar-benar kelihatan.
+
+## Batch 43 — Hotfix build gagal dari Batch 42: `drawOutline` unresolved reference
+Build CI gagal total di `compileDebugKotlin`, ditemukan dari `log_fail_5.zip` (test-output.log)
+yang diupload user: `Unresolved reference: drawOutline` di 2 baris `MatteDepth.kt` (dalam
+`drawBehind {}` yang ditambah Batch 42). Root cause simpel: `drawOutline(outline, color)` di
+dalam `DrawScope` adalah **extension function** di `androidx.compose.ui.graphics.drawscope`
+(bukan method bawaan `DrawScope` seperti `drawRect`/`drawCircle`), jadi wajib diimpor eksplisit
+sama seperti `translate` yang di baris sebelahnya sudah benar diimpor — cuma `drawOutline`-nya
+yang lupa. Fix: tambah `import androidx.compose.ui.graphics.drawscope.drawOutline`. **Pelajaran:
+saat menambah pemanggilan fungsi baru di dalam lambda `DrawScope` (`drawBehind`/`Canvas`/dst.),
+cek satu per satu apakah tiap fungsi itu method resmi `DrawScope` atau extension function
+terpisah — keduanya terlihat identik dipanggil tanpa prefix di dalam lambda, tapi cuma yang
+kedua butuh import manual. Tanpa `kotlinc` di environment kerja, kesalahan sekelas ini hanya
+kelihatan dari build CI yang benar-benar gagal, bukan dari baca kode statis — semakin
+menguatkan kenapa `log_fail_*.zip` dari user harus selalu dicek duluan sebelum menebak.**
+
+## Batch 42 — Hotfix Batch 41 (lagi): ganti native shadow ke manual drawBehind
+Screenshot device asli setelah Batch 41 dipasang (elevation dinaikkan) menunjukkan shadow
+`matteEmboss()` **masih** nyaris tak kelihatan di semua 6 titik (Beranda, Pengaturan tema,
+dst) — cuma border seleksi oranye yang kelihatan beda, bukan shadow-nya. Kesimpulan: fix
+elevation Batch 41 tidak cukup karena akar masalahnya lebih dalam dari sekadar elevation atau
+warna — opacity shadow native `Modifier.shadow` (RenderNode ambient/spot) punya batas atas
+(cap) yang rendah begitu background di belakangnya sudah gelap pekat, dan tidak ada nilai
+elevation yang bisa mendorongnya lewat batas itu.
+
+Fix: `Modifier.shadow` dibuang total dari `matteEmboss()`, diganti shadow manual lewat
+`Modifier.drawBehind` — ambil `Outline` dari `shape` yang sama, gambar 2 layer (halo lebar
+alpha 0.30f + core rapat alpha 0.5f, keduanya `MatteUmbra`) yang di-offset ke kanan-bawah
+proporsional terhadap `elevation`. Kontras shadow sekarang murni dikontrol alpha channel yang
+kita set sendiri, bukan API OS — jadi tidak bisa lagi diam-diam mendegradasi jadi tak terlihat
+seperti yang terjadi 2x berturut-turut (Batch 40, 41). Trade-off: bukan blur Gaussian fisik
+asli, cuma silhouette offset — cukup untuk kontras yang pasti terlihat, bukan estetika shadow
+paling halus. **Pelajaran: begitu 1 pendekatan (native platform shadow) gagal terlihat 2x
+berturut-turut dengan variasi parameter berbeda (warna lalu elevation), jangan coba variasi
+parameter ketiga di API yang sama — ganti total ke mekanisme yang kontrasnya kita kontrol
+langsung, bukan diserahkan ke platform.** Belum diverifikasi ulang di device asli.
+
+## Batch 41 — Hotfix Batch 40: shadow matteEmboss() invisible di device asli
+Ditemukan dari screenshot render asli (bukan cuma baca kode) setelah Batch 40 dipasang.
+Root cause: `MatteUmbra` (0xFF080503) cuma ~12 unit lebih gelap dari `MatteBackground`
+(0xFF14120F) — warna shadow-nya "ada" di kode tapi nyaris tak terlihat karena kontras
+mepet. Ditambah, tint warna (`ambientColor`/`spotColor`) di `Modifier.shadow` native cuma
+mengubah HUE, bukan opacity — opacity shadow dikontrol `elevation`, bukan kontras warnanya.
+Fix: naikkan `elevation` di semua 6 titik pakai `matteEmboss()` (bukan ganti warna) supaya
+shadow native render dengan spread/opacity cukup: default 10dp→16dp, dan tiap call-site
+eksplisit disesuaikan sebanding (MiniPlayerBar tetap 16dp, LibraryScreen 12→18dp,
+SettingsScreen 8/14→13/20dp selected, HomeScreen 10→16dp, NowPlayingScreen 8→13dp). Highlight
+gradient stop juga dinaikkan (0.14f→0.24f non-pressed, 0.05f→0.09f pressed) — dites di kartu
+kecil (mini-player, badge) yang sebelumnya kelihatan flat di skala render asli. Umbra alpha di
+gradient fill 0.45f→0.65f. **Pelajaran: tuning warna/opacity untuk efek shadow Compose native
+tidak cukup dicek dari baca kode/nilai hex saja — kontras warna vs elevation-driven opacity
+harus divalidasi di screenshot render asli sebelum dianggap selesai, persis seperti yang sudah
+diwanti-wanti di Batch 40 sendiri.**
+
 ## Batch 40 — Matte Noir: "epic" depth pass menyeluruh (neumorphism + directional light)
 User diberi penjelasan 4 gaya kedalaman (neumorphism, skeuomorphic, glass gelap, elevasi+gradient
 terarah) sebelum memilih; keluhan awal "semua area belum kerasa premium" (bukan 1 titik spesifik)

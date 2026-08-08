@@ -45,12 +45,19 @@ object ApkSignatureChecker {
 
             val signatureBytes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val signingInfo = info.signingInfo
-                val certs = if (signingInfo?.hasMultipleSigners() == true) {
-                    signingInfo.apkContentsSigners
+                if (signingInfo?.hasMultipleSigners() == true) {
+                    // Multi-signer apps can't rotate keys — order is irrelevant, any entry
+                    // represents "the" current signer set.
+                    signingInfo.apkContentsSigners?.firstOrNull()?.toByteArray()
                 } else {
-                    signingInfo?.signingCertificateHistory
+                    // signingCertificateHistory is ordered oldest→newest (original cert at
+                    // index 0, CURRENT cert at the LAST index) — see SigningInfo docs. Taking
+                    // firstOrNull() here silently compared the ORIGINAL signing key instead of
+                    // the current one for any app that has ever rotated its signing key, which
+                    // could report MATCH/MISMATCH inconsistently with what Android's installer
+                    // actually enforces.
+                    signingInfo?.signingCertificateHistory?.lastOrNull()?.toByteArray()
                 }
-                certs?.firstOrNull()?.toByteArray()
             } else {
                 @Suppress("DEPRECATION")
                 info.signatures?.firstOrNull()?.toByteArray()

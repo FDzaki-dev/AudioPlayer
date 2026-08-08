@@ -810,7 +810,7 @@ private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit, accentColor: Color
 private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: Color, label: String? = null) {
     val isMatte = MaterialTheme.colorScheme.background == com.rudi.audioplayer.ui.theme.MatteBackground
     Surface(
-        modifier = if (isMatte) Modifier.matteEmboss(shape = RoundedCornerShape(18.dp), elevation = 8.dp) else Modifier,
+        modifier = if (isMatte) Modifier.matteEmboss(shape = RoundedCornerShape(18.dp), elevation = 13.dp) else Modifier,
         shape = RoundedCornerShape(18.dp),
         color = if (isMatte) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
         tonalElevation = if (isMatte) 0.dp else 6.dp,

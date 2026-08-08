@@ -6,6 +6,51 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 45** — User lapor bug "gak sinkron" di segmen signature key matching. Ditemukan:
+`ApkSignatureChecker.inspect()` ambil `signingCertificateHistory.firstOrNull()` (cabang
+single-signer) — array ini oldest→newest per dokumentasi resmi `SigningInfo`, jadi
+`firstOrNull()` salah ambil sertifikat ORIGINAL, bukan yang AKTIF sekarang. Untuk app yang
+pernah key rotation, ini bikin hasil MATCH/MISMATCH di UI tidak sinkron dengan keputusan
+instalasi Android yang sebenarnya. Fix: ganti ke `.lastOrNull()`. Lihat CHANGELOG.md Batch 45
+untuk detail. **Belum diverifikasi runtime asli** — kalau user masih lapor "gak sinkron"
+setelah ini, minta contoh 2 APK spesifik yang dipakai test (terutama apakah salah satunya
+pernah rilis dengan key rotation) sebelum menebak sisi lain.
+
+**Batch 44** — Fix Batch 43 ternyata salah juga: `drawOutline` **tidak pernah ada** di API
+Compose (dicek langsung ke source AOSP `DrawScope.kt` — cuma ada drawLine/drawRect/
+drawRoundRect/drawCircle/drawOval/drawArc/drawPath/drawPoints). Fix benar: `Path().apply {
+addOutline(outline) }` lalu `drawPath(path, color)`. Lihat CHANGELOG.md Batch 44. **Ini fix
+build ketiga berturut-turut untuk fitur shadow yang sama (Batch 42→43→44) — kalau build masih
+gagal setelah ini, JANGAN tebak nama API lagi; cari signature persis di source AOSP dulu
+sebelum tulis kode. Kalau build akhirnya sukses, shadow visual-nya SENDIRI masih belum pernah
+diverifikasi di device sama sekali sejak Batch 42 — itu prioritas berikutnya.**
+
+**Batch 43** — Hotfix build gagal dari Batch 42: `log_fail_5.zip` user tunjukkan
+`compileDebugKotlin` gagal, `Unresolved reference: drawOutline` di `MatteDepth.kt` (2 baris).
+Sebab: `drawOutline` itu extension function `DrawScope`, bukan method bawaan — lupa diimpor
+padahal `translate` di baris sebelahnya sudah benar. Fix: tambah 1 baris import. Belum ada
+perubahan logika/tampilan lain dari Batch 42. **Prioritas sesi berikutnya masih sama seperti
+Batch 42: verifikasi shadow manual ini benar-benar kelihatan di device asli — build sekarang
+seharusnya sukses, tapi efek visualnya sendiri belum pernah dirender sama sekali.**
+
+**Batch 42** — Hotfix Batch 41 (lagi): shadow `matteEmboss()` masih invisible di device asli
+setelah elevation dinaikkan (bukti screenshot). Root cause lebih dalam: opacity shadow native
+`Modifier.shadow` punya cap rendah yang tidak bisa didorong lewat elevation di background
+gelap pekat. Fix: buang native shadow total, ganti manual `drawBehind` + `Outline` 2-layer
+(`MatteUmbra` alpha 0.30f/0.5f) offset kanan-bawah — kontras sekarang dikontrol alpha kita
+sendiri, bukan platform. Lihat CHANGELOG.md Batch 42 untuk detail lengkap. **BELUM
+diverifikasi di device — ini prioritas #1 sesi berikutnya. Kalau masih kurang kontras, jangan
+otak-atik alpha kecil-kecilan lagi (sudah 2 fix gagal dengan pola itu); screenshot ulang dan
+ukur kontras aktual (color picker) sebelum nebak angka lagi.**
+
+**Batch 41** — Hotfix Batch 40 dari screenshot render asli: shadow `matteEmboss()` nyaris tak
+kelihatan (`MatteUmbra` cuma ~12 unit lebih gelap dari `MatteBackground`, dan tint warna native
+shadow cuma ubah hue bukan opacity). Fix di `MatteDepth.kt` + 5 call-site: elevation dinaikkan
+di semua titik (bukan ganti warna — opacity shadow dikontrol elevation), highlight/umbra alpha
+gradient dinaikkan. Lihat CHANGELOG.md Batch 41 untuk angka lengkap. **Belum diverifikasi ulang
+di device — kalau masih kurang kontras, jangan naikkan elevation lagi tanpa batas; pertimbangkan
+manual scrim/blur overlay independen dari native shadow API sebagai gantinya.**
+
 **Batch 40** — Lanjutan langsung Batch 39 ("semua area belum kerasa premium", bukan 1 titik).
 User diberi penjelasan 4 gaya kedalaman dulu (neumorphism/skeuomorphic/glass gelap/elevasi+
 gradient terarah), pilih kombinasi neumorphism ringan + elevasi/gradient cahaya terarah. Dibuat

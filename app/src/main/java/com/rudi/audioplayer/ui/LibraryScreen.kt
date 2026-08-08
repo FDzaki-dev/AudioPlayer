@@ -426,7 +426,7 @@ fun LibraryScreen(
                     .padding(16.dp)
                     .fillMaxWidth()
                     .then(
-                        if (isMatte) Modifier.matteEmboss(shape = RoundedCornerShape(20.dp), elevation = 12.dp)
+                        if (isMatte) Modifier.matteEmboss(shape = RoundedCornerShape(20.dp), elevation = 18.dp)
                         else Modifier
                     ),
                 shape = RoundedCornerShape(20.dp),
