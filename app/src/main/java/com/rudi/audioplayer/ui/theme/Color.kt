@@ -95,3 +95,45 @@ val TactileAccent = Color(0xFF6670FF) // spec §6/§17 MidnightBlueAccent == Acc
 val TactileHighlight = Color.White.copy(alpha = 0.065f) // spec §5 GlassHighlight
 val TactileEdge = Color.White.copy(alpha = 0.035f) // spec §5 GlassBorder
 val TactileShadow = Color.Black.copy(alpha = 0.70f) // spec §5 GlassShadow
+
+// ============================================================================
+// SKEUOMORPHISM DARK LITE — Batch 57. No external spec file supplied for this
+// theme (unlike Tactile's spec-driven batches 49-55) — palette dirancang
+// sendiri sesuai definisi umum "skeuomorphism dark-lite": panel netral gelap
+// yang terbaca timbul/fisik lewat bevel highlight+shadow lembut, bukan lewat
+// warna aksen mencolok. Sengaja dibedakan dari Tactile (AMOLED near-black +
+// hue biru dingin) lewat basis abu-abu hangat (bukan biru) + aksen tembaga
+// hangat, supaya kedua tema custom tidak terasa jadi varian satu sama lain.
+// ============================================================================
+
+// --- Foundation --------------------------------------------------------------
+// Charcoal netral, bukan AMOLED near-black — skeuomorphism butuh jarak
+// kontras yang cukup antara background & panel timbul supaya bevelnya
+// terbaca "fisik", beda tujuan dari Tactile yang justru menargetkan OLED
+// near-black sebagai lapisan dasar kaca.
+val SkeuDarkBackground = Color(0xFF16181C)
+val SkeuDarkSurface = Color(0xFF23262B) // panel timbul level 1
+val SkeuDarkSurfaceVariant = Color(0xFF2C3036) // panel timbul level 2 (lebih terangkat)
+
+// --- Typography ----------------------------------------------------------------
+val SkeuDarkText = Color(0xFFF3EFE7) // krem hangat, bukan putih murni (nuansa "kertas/kulit")
+val SkeuDarkSecondaryText = Color(0xFFA8A29A) // abu hangat sekunder
+
+// --- Semantic status -------------------------------------------------------------
+val SkeuDarkError = Color(0xFFE5675A)
+val SkeuDarkSuccess = Color(0xFF7FB86B)
+
+// --- Accent ------------------------------------------------------------------
+// Tembaga/amber hangat — sengaja beda hue dari AppleAccent (biru) & TactileAccent
+// (biru-ungu dingin), supaya identitas ketiga tema tidak saling tumpang tindih.
+val SkeuDarkAccent = Color(0xFFCB8B4B)
+
+// --- Bevel tokens (dipakai skeuEmboss() & frostedGlass()'s Skeu branch) ------
+// Pola sama seperti TactileHighlight/Edge/Shadow (dua-stop diagonal untuk
+// border, alpha tunggal untuk shadow) tapi nilainya sendiri: highlight sedikit
+// lebih kuat (bevel skeuomorphic butuh catch-light lebih jelas biar "timbul"
+// terbaca di atas charcoal, bukan AMOLED-black), shadow lebih rendah (kontras
+// dasarnya sudah lebih tinggi dari AMOLED jadi tak perlu shadow sekuat Tactile).
+val SkeuHighlight = Color.White.copy(alpha = 0.10f)
+val SkeuEdge = Color.Black.copy(alpha = 0.12f)
+val SkeuShadow = Color.Black.copy(alpha = 0.55f)

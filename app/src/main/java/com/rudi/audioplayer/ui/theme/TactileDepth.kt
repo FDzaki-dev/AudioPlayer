@@ -13,6 +13,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.addOutline
@@ -53,30 +54,41 @@ import androidx.compose.ui.unit.dp
  *     reserved for selected/focused states elsewhere (NavigationBar selection, active controls),
  *     not this general-purpose elevation primitive.
  */
+// Batch 57 — extracted as the shared mechanism behind both tactileEmboss() (unchanged
+// behavior/signature/defaults below, delegates here with Tactile's own tokens) and the new
+// skeuEmboss() (Skeuomorphism Dark Lite's own tokens). Structure/animation/drop-shadow math is
+// identical for both identities — only the four surface colors differ — so this avoids a second
+// hand-copied 55-line function drifting out of sync with the original the next time either one
+// gets a polish pass.
 @Composable
-fun Modifier.tactileEmboss(
-    shape: Shape = MaterialTheme.shapes.medium,
-    elevation: Dp = 8.dp,
-    pressed: Boolean = false
+private fun Modifier.embossSurface(
+    shape: Shape,
+    elevation: Dp,
+    pressed: Boolean,
+    surfaceTop: Color,
+    surfaceBottom: Color,
+    highlight: Color,
+    shadow: Color,
+    label: String
 ): Modifier {
     val animatedElevation by animateDpAsState(
         targetValue = if (pressed) elevation / 4 else elevation,
-        label = "tactileEmbossElevation"
+        label = "${label}Elevation"
     )
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.985f else 1f,
-        label = "tactileEmbossScale"
+        label = "${label}Scale"
     )
     // Border stays a whisper per spec §8 ("never a bright white border") / §18 ("no excessive
-    // glow") — these are absolute alphas (Color.copy replaces alpha, it doesn't multiply the base
-    // token's own 0.065f/0.70f), so the numbers below are the final on-screen values.
+    // glow") — these are absolute alphas (Color.copy replaces alpha entirely, it doesn't
+    // multiply the base token's own alpha), so the numbers below are the final on-screen values,
+    // same as the original single-theme version of this function.
     val borderTopAlpha = if (pressed) 0.03f else 0.065f
     val borderBottomAlpha = if (pressed) 0.15f else 0.30f
     // The offset drop-shadow does the actual depth-communication work (spec §5: "GlassShadow").
-    // Kept at TactileShadow's own spec-literal 0.70f base rather than diluted further, or it
-    // disappears against the app's now much darker AMOLED background; a faint shadow-on-near-
-    // black reads as nothing at all — the exact Matte Noir mistake (PROJECT_STATE.md Batch 39-44),
-    // not repeated here.
+    // Kept at the token's own base rather than diluted further, or it disappears against a dark
+    // background; a faint shadow-on-near-black reads as nothing at all — the exact Matte Noir
+    // mistake (PROJECT_STATE.md Batch 39-44), not repeated here.
     val shadowAlpha = if (pressed) 0.35f else 0.70f
 
     return this
@@ -85,27 +97,63 @@ fun Modifier.tactileEmboss(
             val outline = shape.createOutline(size, layoutDirection, this)
             val outlinePath = Path().apply { addOutline(outline) }
             translate(top = animatedElevation.toPx() * 0.45f) {
-                drawPath(outlinePath, color = TactileShadow.copy(alpha = shadowAlpha))
+                drawPath(outlinePath, color = shadow.copy(alpha = shadowAlpha))
             }
         }
         .clip(shape)
         .background(
-            // Diagonal top-left -> bottom-right glass gradient (spec §9) between the two glass
-            // levels (GlassElevated "raised" -> GlassBase), replacing the old vertical bevel.
-            Brush.linearGradient(
-                colors = listOf(TactileSurfaceVariant, TactileSurface)
-            )
+            // Diagonal top-left -> bottom-right gradient (spec §9) between the two elevated
+            // surface levels, replacing the old vertical bevel.
+            Brush.linearGradient(colors = listOf(surfaceTop, surfaceBottom))
         )
         .border(
             BorderStroke(
                 1.dp,
                 Brush.linearGradient(
                     colors = listOf(
-                        TactileHighlight.copy(alpha = borderTopAlpha),
-                        TactileShadow.copy(alpha = borderBottomAlpha)
+                        highlight.copy(alpha = borderTopAlpha),
+                        shadow.copy(alpha = borderBottomAlpha)
                     )
                 )
             ),
             shape
         )
 }
+
+@Composable
+fun Modifier.tactileEmboss(
+    shape: Shape = MaterialTheme.shapes.medium,
+    elevation: Dp = 8.dp,
+    pressed: Boolean = false
+): Modifier = this.embossSurface(
+    shape = shape,
+    elevation = elevation,
+    pressed = pressed,
+    surfaceTop = TactileSurfaceVariant,
+    surfaceBottom = TactileSurface,
+    highlight = TactileHighlight,
+    shadow = TactileShadow,
+    label = "tactileEmboss"
+)
+
+// Batch 57 — Skeuomorphism Dark Lite's own emboss primitive: same mechanism as tactileEmboss()
+// (see embossSurface() above) with Skeu's own charcoal/copper tokens instead of Tactile's
+// AMOLED-glass ones. Not yet wired into any screen this batch (same precedent as Tactile itself,
+// which was added in Theme.kt/TactileDepth.kt across Batch 45-48 before NowPlayingScreen.kt's
+// play/pause button picked it up in Batch 55) — the theme picker row (SettingsScreen.kt) is the
+// one call site this batch, giving the toggle a live preview of its own identity.
+@Composable
+fun Modifier.skeuEmboss(
+    shape: Shape = MaterialTheme.shapes.medium,
+    elevation: Dp = 8.dp,
+    pressed: Boolean = false
+): Modifier = this.embossSurface(
+    shape = shape,
+    elevation = elevation,
+    pressed = pressed,
+    surfaceTop = SkeuDarkSurfaceVariant,
+    surfaceBottom = SkeuDarkSurface,
+    highlight = SkeuHighlight,
+    shadow = SkeuShadow,
+    label = "skeuEmboss"
+)

@@ -1,5 +1,65 @@
 # Changelog
 
+## Batch 57 — Toggle tema custom baru: Skeuomorphism Dark Lite
+User minta tema custom ketiga (kedua di luar keluarga Apple), tanpa spesifikasi eksternal
+disediakan — palet dirancang sendiri sesuai definisi umum skeuomorphism dark-lite, sengaja
+dibedakan dari Tactile (AMOLED-glass, hue biru dingin) lewat basis charcoal netral hangat + panel
+timbul fisik + aksen tembaga. Atomic change, 6 file disentuh (di atas limit normal 10 file/1
+modul secara jumlah file oke, tapi lintas beberapa file `ui/theme/` + 1 layar + `MainActivity.kt`
+karena satu toggle tema baru inheren menyentuh setiap titik dispatch tema yang sudah ada — bukan
+beberapa fitur independen digabung paksa):
+
+- `AppTheme` (`Theme.kt`) — entry baru `SKEU_DARK_LITE` (`storageKey = "skeu_dark_lite"`).
+  `ThemeStore.kt`/`AppTheme.fromStorageKey()` generic by design (Batch-batch sebelumnya), tidak
+  perlu diubah — persistensi & picker (`SettingsScreen.kt`'s `AppTheme.entries.toList()`) otomatis
+  ikut tema baru ini.
+- `Color.kt` — token baru: `SkeuDarkBackground` (`#16181C`), `SkeuDarkSurface`/`SkeuDarkSurfaceVariant`
+  (panel level 1/2), `SkeuDarkText`/`SkeuDarkSecondaryText`, `SkeuDarkAccent` (`#CB8B4B`, tembaga
+  hangat — sengaja beda hue dari `AppleAccent`/`TactileAccent`), `SkeuDarkError`/`SkeuDarkSuccess`,
+  `SkeuHighlight`/`SkeuEdge`/`SkeuShadow` (pola sama seperti `TactileHighlight`/`TactileEdge`/
+  `TactileShadow`, nilai sendiri).
+- `Theme.kt` — `SkeuDarkColors` (`darkColorScheme`, `onPrimary = Color.Black` karena SkeuDarkAccent
+  luma ≈0.60 di atas threshold 0.55 — beda dari Apple/Tactile yang `onPrimary = Color.White`),
+  `SkeuDarkShapes` (12/16/20dp — satu tingkat lebih membulat dari `TactileShapes` di tiap ukuran,
+  supaya ketiga keluarga shape tidak ada yang identik), `resolveIsDark()` (selalu gelap, sama
+  precedent Tactile — "Dark Lite" di nama bukan hint mode terang), `colorsFor()`, `isSkeuTheme()`
+  helper (pola sama `isTactileTheme()`, Batch 54 dedup rationale), dan `AudioPlayerTheme()`
+  dispatch shapes 3 arah. Typography: sengaja reuse `AppleTypography` (tidak ada spec type-scale
+  terpisah diminta — identitas Skeu ini dibawa lewat warna/shape/bevel, bukan tipografi).
+- `TactileDepth.kt` — `tactileEmboss()` di-refactor jadi wrapper tipis di atas `embossSurface()`
+  privat baru (parameter: shape/elevation/pressed/surfaceTop/surfaceBottom/highlight/shadow) —
+  perilaku & signature publik 100% tidak berubah (diverifikasi: parameter default sama, urutan
+  operasi drawBehind→clip→background→border sama persis dengan versi sebelum refactor, cuma
+  literal token diganti parameter). `skeuEmboss()` baru — wrapper sama dengan token Skeu. Belum
+  dipanggil di layar manapun (tombol play/pause dst.) — kandidat batch polish berikutnya, sama
+  seperti histori Tactile sendiri (Batch 45-48 bangun primitif dulu, Batch 55 baru pasang ke
+  tombol play/pause).
+- `BlurUtils.kt` — `frostedGlass()`'s `edgeBrush` digeneralisasi dari 2 arah (`isTactile`/else) ke
+  3 arah (`isTactile`/`isSkeu`/else) — Skeu dapat border bevel diagonal sendiri
+  (`SkeuHighlight`→`SkeuEdge`), bukan fallback flat Apple.
+- `SettingsScreen.kt` — baris tema di pemilih (`ThemeOptionCard`) untuk Skeu sekarang pratinjau
+  hidup pakai `skeuEmboss()` (pola sama seperti baris Tactile sejak Batch 49), bukan kartu flat
+  seperti Light/Dark/System. Import `skeuEmboss` ditambah.
+- `MainActivity.kt` — NavigationBar catch-light line + `tonalElevation` 6.dp (sebelumnya
+  hardcoded `appTheme == AppTheme.TACTILE`) digeneralisasi lewat `navCatchLightColor` (null untuk
+  Apple/Light/Dark, `TactileHighlight` untuk Tactile, `SkeuHighlight` untuk Skeu) — kedua identitas
+  "panel fisik" dapat efek yang sama, alasan sama seperti Batch 53 (tonalElevation tinggi + accent
+  surfaceTint bikin nav bar kelihatan warna aksen dulu sebelum identitas panelnya). Root ambient
+  gradient (`tactileRootBrush`) SENGAJA tidak diperluas ke Skeu — itu memang Tactile-only (glass
+  ambient), Skeu flat by design (panel timbul solid, bukan lapisan kaca berlapis), jadi root
+  Surface-nya otomatis pakai `color = colorScheme.background` flat seperti Apple, tidak perlu
+  sentuhan tambahan di sana.
+- **Belum diverifikasi visual/compile** — sama seperti setiap batch tema sebelumnya (tidak ada
+  `kotlinc`/emulator di environment ini), diverifikasi lewat baca-manual + brace/paren balance
+  check (seimbang di semua 6 file yang disentuh) + grep exhaustiveness check (`when` atas
+  `AppTheme` di `resolveIsDark()`/`colorsFor()`/`AudioPlayerTheme()` sudah mencakup entry baru,
+  tidak ada `when` lain atas `AppTheme` di codebase yang butuh cabang tambahan).
+- **Sengaja TIDAK dikerjakan** (didaftar transparan): bevel/emboss di kontrol individual
+  (play/pause button, slider, dst.) untuk tema Skeu — `skeuEmboss()` sudah siap pakai tapi baru
+  dipasang di 1 tempat (baris pemilih tema); root ambient gradient khusus Skeu (disengaja flat,
+  lihat di atas); tipografi custom untuk Skeu (reuse Apple).
+
+
 Satu entri per batch pengembangan. Ditulis supaya sesi chat AI yang baru (atau siapa pun
 yang baru gabung ke proyek ini) bisa langsung baca file ini dan tahu histori keputusan,
 tanpa harus gali `git log` atau riwayat chat lama yang sudah tidak bisa diakses lagi.

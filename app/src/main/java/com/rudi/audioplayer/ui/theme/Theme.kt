@@ -17,7 +17,10 @@ enum class AppTheme(val storageKey: String, val displayName: String, val descrip
     SYSTEM("system", "Ikuti Sistem", "Menyesuaikan mode terang/gelap perangkat"),
     LIGHT("light", "Terang", "Latar putih bersih, khas iOS"),
     DARK("dark", "Gelap", "Hitam pekat, nyaman untuk layar OLED"),
-    TACTILE("tactile_lite", "Tactile", "AMOLED hybrid glassmorphism — kaca gelap premium dengan sentuhan Midnight Blue tipis dan kontrol taktil");
+    TACTILE("tactile_lite", "Tactile", "AMOLED hybrid glassmorphism — kaca gelap premium dengan sentuhan Midnight Blue tipis dan kontrol taktil"),
+    // Batch 57 — kedua custom theme (bukan Light/Dark/System) sekarang identitas fisik yang
+    // beda pendekatan: Tactile = kaca gelap AMOLED, ini = panel timbul charcoal hangat.
+    SKEU_DARK_LITE("skeu_dark_lite", "Skeuomorphism Dark Lite", "Panel gelap netral timbul dengan bevel lembut dan aksen tembaga hangat");
 
     companion object {
         fun fromStorageKey(key: String?): AppTheme = entries.find { it.storageKey == key } ?: SYSTEM
@@ -90,6 +93,28 @@ private val TactileColors = darkColorScheme(
     error = TactileError
 )
 
+// Batch 57 — Skeuomorphism Dark Lite's own color role mapping. onPrimary picked by the same
+// luminance rule used elsewhere (>0.55 luminance -> black text): SkeuDarkAccent (0xFFCB8B4B)
+// simple luma ≈0.60, above the threshold, so onPrimary is Color.Black (unlike Apple/Tactile's
+// cooler, darker accents which stay Color.White).
+private val SkeuDarkColors = darkColorScheme(
+    primary = SkeuDarkAccent,
+    onPrimary = Color.Black,
+    secondary = SkeuDarkSecondaryText,
+    onSecondary = SkeuDarkBackground,
+    tertiary = SkeuDarkSuccess,
+    onTertiary = Color.Black,
+    background = SkeuDarkBackground,
+    onBackground = SkeuDarkText,
+    surface = SkeuDarkSurface,
+    onSurface = SkeuDarkText,
+    surfaceVariant = SkeuDarkSurfaceVariant,
+    onSurfaceVariant = SkeuDarkSecondaryText,
+    outline = SkeuDarkSurfaceVariant,
+    surfaceTint = SkeuDarkAccent,
+    error = SkeuDarkError
+)
+
 // A single, consistent "continuous curve" language across the whole app — Compose's Shapes
 // API only supports true rounded rectangles (Apple's real squircle/superellipse corners
 // aren't natively expressible), so generous rounding is the closest honest approximation.
@@ -108,6 +133,16 @@ val TactileShapes = Shapes(
     large = RoundedCornerShape(Radius.lg)
 )
 
+// Batch 57 — Skeuomorphism Dark Lite's shape language: one notch more rounded than Tactile at
+// every step (md/lg/xxl vs Tactile's sm/md/lg), reading as soft physical buttons/panels rather
+// than Tactile's moderate glass-panel rounding or Apple's generous continuous curve. Distinct
+// 3-value set from both other theme families so no two themes share a shape token.
+val SkeuDarkShapes = Shapes(
+    small = RoundedCornerShape(Radius.md),
+    medium = RoundedCornerShape(Radius.lg),
+    large = RoundedCornerShape(Radius.xxl)
+)
+
 @Composable
 fun resolveIsDark(theme: AppTheme): Boolean = when (theme) {
     AppTheme.SYSTEM -> isSystemInDarkTheme()
@@ -118,6 +153,9 @@ fun resolveIsDark(theme: AppTheme): Boolean = when (theme) {
     // bar/nav bar icons stay light (MainActivity.kt's `isAppearanceLightStatusBars =
     // !isDarkTheme`), same as before.
     AppTheme.TACTILE -> true
+    // Batch 57 — "Dark Lite" in the name is its identity, not a light-mode hint: no light
+    // variant this batch, same precedent as Tactile (no light-mode fallback).
+    AppTheme.SKEU_DARK_LITE -> true
 }
 
 // Batch 54 (technical debt pass) — this exact comparison
@@ -129,8 +167,16 @@ fun resolveIsDark(theme: AppTheme): Boolean = when (theme) {
 @Composable
 fun isTactileTheme(): Boolean = MaterialTheme.colorScheme.background == TactileBackground
 
+// Batch 57 — same pattern as isTactileTheme() (Batch 54 dedup rationale applies identically):
+// one shared helper instead of hand-duplicating this comparison at every future call site that
+// needs to branch on the Skeu identity (frostedGlass() this batch; more likely as the theme
+// gets polish passes the same way Tactile did across Batch 49-55).
+@Composable
+fun isSkeuTheme(): Boolean = MaterialTheme.colorScheme.background == SkeuDarkBackground
+
 fun colorsFor(theme: AppTheme, isDark: Boolean) = when (theme) {
     AppTheme.TACTILE -> TactileColors
+    AppTheme.SKEU_DARK_LITE -> SkeuDarkColors
     else -> if (isDark) AppleDarkColors else AppleLightColors
 }
 
@@ -139,8 +185,14 @@ fun AudioPlayerTheme(theme: AppTheme = AppTheme.SYSTEM, content: @Composable () 
     val isDark = resolveIsDark(theme)
     MaterialTheme(
         colorScheme = colorsFor(theme, isDark),
+        // Batch 57 — Skeu reuses AppleTypography (no separate type-scale spec supplied for this
+        // theme; skeuomorphic identity here is carried by color/shape/bevel, not custom type).
         typography = if (theme == AppTheme.TACTILE) TactileTypography else AppleTypography,
-        shapes = if (theme == AppTheme.TACTILE) TactileShapes else AppleShapes,
+        shapes = when (theme) {
+            AppTheme.TACTILE -> TactileShapes
+            AppTheme.SKEU_DARK_LITE -> SkeuDarkShapes
+            else -> AppleShapes
+        },
         content = content
     )
 }

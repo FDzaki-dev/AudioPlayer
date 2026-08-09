@@ -6,6 +6,26 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 57 (toggle tema custom baru: Skeuomorphism Dark Lite)** — User minta tema custom ketiga
+(kedua di luar keluarga Apple/Light/Dark/System), tanpa spec eksternal — palet charcoal netral
+hangat + panel timbul + aksen tembaga (`#CB8B4B`), sengaja dibedakan dari Tactile (AMOLED-glass,
+hue biru). Detail lengkap di `CHANGELOG.md` Batch 57; ringkas:
+- `AppTheme.SKEU_DARK_LITE` baru (`Theme.kt`) + token warna (`Color.kt`) + `SkeuDarkColors`/
+  `SkeuDarkShapes`/`isSkeuTheme()` (`Theme.kt`) + `skeuEmboss()` (`TactileDepth.kt`, refactor
+  `tactileEmboss()` jadi wrapper `embossSurface()` privat bersama — signature/perilaku publik
+  `tactileEmboss()` tidak berubah) + `frostedGlass()` 3-arah (`BlurUtils.kt`) + pratinjau hidup di
+  `SettingsScreen.kt` + catch-light NavigationBar digeneralisasi (`MainActivity.kt`).
+- `ThemeStore.kt`/`AppTheme.fromStorageKey()`/`SettingsScreen.kt`'s `AppTheme.entries.toList()`
+  loop TIDAK disentuh — sudah generic sejak awal, toggle baru otomatis muncul & tersimpan.
+- **Belum diverifikasi visual/compile** (sama seperti setiap batch tema sebelumnya, tidak ada
+  `kotlinc`/emulator di sini) — grep exhaustiveness check atas semua `when (AppTheme)` di codebase
+  sudah dilakukan (3 titik, semua sudah mencakup entry baru), brace/paren balance semua 6 file
+  yang disentuh seimbang.
+- **Sengaja TIDAK dikerjakan** (sama presedan Tactile Batch 45-48→55): `skeuEmboss()` belum
+  dipasang ke kontrol individual (play/pause, slider) — baru dipakai 1 tempat (baris pemilih
+  tema). Root ambient gradient khusus Skeu — disengaja flat (bukan gap, keputusan desain: identitas
+  Skeu adalah panel solid, bukan lapisan kaca). Tipografi custom Skeu — reuse `AppleTypography`.
+
 **Batch 56 (versionCode/versionName reset — bukan tema/fitur)** — User minta reset angka versi
 app karena `1.0.<total commit history>` sudah kelihatan besar/tidak sedap dipandang di picker.
 `gitCommitCount()` (`app/build.gradle.kts`) & CI (`.github/workflows/build.yml` "Determine version

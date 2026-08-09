@@ -101,6 +101,7 @@ import com.rudi.audioplayer.ui.theme.MidnightBlue
 import com.rudi.audioplayer.ui.theme.MidnightBlueAmbientAlpha
 import com.rudi.audioplayer.ui.theme.AmoledSurface
 import com.rudi.audioplayer.ui.theme.TactileHighlight
+import com.rudi.audioplayer.ui.theme.SkeuHighlight
 
 class MainActivity : FragmentActivity() {
 
@@ -595,14 +596,24 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // 0.065f (was 0.055f pre-Batch-53), so the catch-light line's own alphas are
                     // re-matched to that new base (0.13f/0.03f) to keep the same relative
                     // brightness step it always had.
+                    // Batch 57: the catch-light line + raised tonalElevation is a "physical
+                    // panel" cue, not Tactile-specific — Skeuomorphism Dark Lite is the same
+                    // kind of identity (raised surface catching light from top-left) just with
+                    // its own warmer highlight token, so it gets the same treatment here with
+                    // SkeuHighlight instead of TactileHighlight. Apple/Light/Dark stay untouched.
+                    val navCatchLightColor = when (appTheme) {
+                        AppTheme.TACTILE -> TactileHighlight
+                        AppTheme.SKEU_DARK_LITE -> SkeuHighlight
+                        else -> null
+                    }
                     NavigationBar(
-                        modifier = if (appTheme == AppTheme.TACTILE)
+                        modifier = if (navCatchLightColor != null)
                             Modifier.drawBehind {
                                 drawLine(
                                     brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
                                         listOf(
-                                            TactileHighlight.copy(alpha = 0.13f),
-                                            TactileHighlight.copy(alpha = 0.03f)
+                                            navCatchLightColor.copy(alpha = 0.13f),
+                                            navCatchLightColor.copy(alpha = 0.03f)
                                         )
                                     ),
                                     start = androidx.compose.ui.geometry.Offset(0f, 0f),
@@ -618,8 +629,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         // surfaceTint is the accent color (Theme.kt), so 12.dp let the bar itself
                         // read as "blue" before "glass" — 6.dp keeps a legible elevated-glass lift
                         // (Level 2, spec §4) without the accent wash dominating the one piece of
-                        // chrome that's always on screen.
-                        tonalElevation = if (appTheme == AppTheme.TACTILE) 6.dp else NavigationBarDefaults.Elevation
+                        // chrome that's always on screen. Batch 57: Skeu shares this same 6.dp —
+                        // same reasoning (SkeuDarkAccent as surfaceTint would otherwise dominate).
+                        tonalElevation = if (navCatchLightColor != null) 6.dp else NavigationBarDefaults.Elevation
                     ) {
                         NavigationBarItem(
                             selected = currentRoute == "home",

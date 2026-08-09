@@ -35,6 +35,7 @@ import com.rudi.audioplayer.BuildConfig
 import com.rudi.audioplayer.ui.theme.AppTheme
 import com.rudi.audioplayer.ui.theme.colorsFor
 import com.rudi.audioplayer.ui.theme.tactileEmboss
+import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.resolveIsDark
 import com.rudi.audioplayer.ui.theme.Radius
 
@@ -291,25 +292,30 @@ private fun ThemeOptionCard(theme: AppTheme, selected: Boolean, onClick: () -> U
     val previewColors = colorsFor(theme, resolveIsDark(theme))
     // Batch 49: the Tactile row in this exact picker is the app's own showcase —
     // it should demonstrate the depth treatment live, not sit flat like every other row.
+    // Batch 57: Skeuomorphism Dark Lite gets the same live-showcase treatment via its own
+    // skeuEmboss() primitive — both custom "physical panel" identities now demo themselves.
     val isTactilePreview = theme == AppTheme.TACTILE
+    val isSkeuPreview = theme == AppTheme.SKEU_DARK_LITE
+    val isEmbossPreview = isTactilePreview || isSkeuPreview
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
             .then(
-                if (isTactilePreview)
-                    Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xl), elevation = if (selected) 12.dp else 8.dp)
-                else
-                    Modifier.clip(RoundedCornerShape(Radius.xl))
+                when {
+                    isTactilePreview -> Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xl), elevation = if (selected) 12.dp else 8.dp)
+                    isSkeuPreview -> Modifier.skeuEmboss(shape = RoundedCornerShape(Radius.xl), elevation = if (selected) 12.dp else 8.dp)
+                    else -> Modifier.clip(RoundedCornerShape(Radius.xl))
+                }
             )
             .clickable(onClick = onClick),
-        color = if (isTactilePreview) Color.Transparent else previewColors.surface,
+        color = if (isEmbossPreview) Color.Transparent else previewColors.surface,
         // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent-color
         // fallback chain (that's exactly what caused the invisible-text LockScreen bug).
         contentColor = previewColors.onSurface,
-        tonalElevation = if (isTactilePreview) 0.dp else 4.dp,
-        shadowElevation = if (isTactilePreview) 0.dp else if (selected) 6.dp else 0.dp,
+        tonalElevation = if (isEmbossPreview) 0.dp else 4.dp,
+        shadowElevation = if (isEmbossPreview) 0.dp else if (selected) 6.dp else 0.dp,
         border = if (selected) BorderStroke(2.dp, previewColors.primary) else null,
         shape = RoundedCornerShape(Radius.xl)
     ) {
