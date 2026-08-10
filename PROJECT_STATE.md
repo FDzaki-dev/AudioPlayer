@@ -6,6 +6,24 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 62 (Vibes radikal lepas batasan mode + CI compile time dipangkas drastis)** — 2
+instruksi digabung. (1) Ambient root wash (Midnight Blue Tactile, dulu digated ke mode gelap
+di Batch 61) sekarang trait IDENTITAS murni — tampil di kedua mode tanpa gate, alpha mode
+terang jauh lebih tinggi (kontras terbalik). Skeu dapat ambient wash tembaga sendiri utk
+pertama kali (dulu selalu flat). Bevel `tactileEmboss()`/`skeuEmboss()` alpha dinaikkan
+signifikan di kedua mode, sengaja menyimpang dari nada "restrained" spec asli atas instruksi
+eksplisit user. `MainActivity.kt` disentuh (edit parsial, protected) — var `tactileRootBrush`
+→ `identityRootBrush`. **Belum diverifikasi visual** — tuning baru, terutama shadow Tactile
+dark 0.90f cukup ekstrem sesuai literal "radikal".
+(2) CI compile time: `gradle.properties` (caching/parallel/configureondemand/incremental +
+heap naik ke 3072m), `.github/workflows/build.yml` (edit parsial, protected) — checkout
+partial-clone (`filter: blob:none`), 2 invocation Gradle (test lalu build) digabung jadi 1
+(`testDebugUnitTest assembleRelease` sekali jalan, fail-fast tetap terjaga tanpa flag
+tambahan), step diurut ulang (decode keystore + determine version duluan karena tidak butuh
+Gradle). TIDAK menyentuh minify/shrinkResources release (risiko integritas rilis, bukan
+waktu compile) atau langkah publish GitHub Release itu sendiri. Detail lengkap di
+`CHANGELOG.md` Batch 62.
+
 **Batch 61 (Pisah total identitas tema dari mode: Tactile & Skeu otonom di Light/Dark)** — User
 koreksi Batch 60: identitas Tactile/Skeuomorphism (dulu hardcode gelap permanen) harus dicabut
 dari 1 mode & dikendalikan langsung oleh toggle mode yang sama dgn Apple. `AppTheme` enum lama

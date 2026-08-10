@@ -19,6 +19,13 @@ jobs:
           # Full history, not a shallow clone — the version scheme below counts total
           # commits, and a shallow checkout would silently under-count that.
           fetch-depth: 0
+          # Batch 62 — partial clone (blob:none): commit graph/metadata masih lengkap
+          # (jadi git rev-list --count di bawah tetap akurat), tapi isi file historis lama
+          # TIDAK ikut didownload di awal — cuma di-fetch on-demand kalau ada yang benar-
+          # benar butuh isinya. Checkout tetap dapat semua file di HEAD (yang dipakai
+          # build) seperti biasa. Ini murni memangkas waktu clone, bukan mengurangi data
+          # yang tersedia buat langkah manapun di bawah.
+          filter: blob:none
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -30,18 +37,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.7
-
-      - name: Run unit tests
-        # Empat file test JVM murni (src/test) sudah ada di repo sejak beberapa batch lalu,
-        # tapi workflow ini sebelumnya langsung assembleRelease tanpa pernah menjalankannya —
-        # artinya kalau ada test yang gagal, itu tidak pernah menghentikan build. Dijalankan
-        # di sini, sebelum decode keystore, supaya gagal cepat tanpa buang waktu ke langkah
-        # signing kalau logikanya sendiri sudah salah.
-        # `set -o pipefail` wajib — tanpa itu, exit code pipeline ini ikut `tee` (selalu 0),
-        # bukan `gradle`, jadi step ini akan selalu "sukses" walau test-nya gagal.
-        run: |
-          set -o pipefail
-          gradle testDebugUnitTest --no-daemon 2>&1 | tee test-output.log
+          # Batch 62 — cache Gradle User Home (dependency jar, wrapper dist, dan build
+          # cache dari org.gradle.caching=true di gradle.properties) otomatis tersimpan
+          # antar-run lewat actions/cache di balik layar action ini. Tidak perlu setup
+          # actions/cache manual terpisah — action ini sudah menanganinya sejak v3.
 
       - name: Decode signing keystore
         run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > ${{ github.workspace }}/app/release.keystore
@@ -66,7 +65,21 @@ jobs:
           echo "tag=v1.0.$COUNT-release" >> "$GITHUB_OUTPUT"
           echo "Resolved version: 1.0.$COUNT (commit $SHORT_SHA)"
 
-      - name: Build Release APK
+      - name: Test + Build Release APK
+        # Batch 62 — dulu 2 invocation Gradle terpisah (testDebugUnitTest, lalu
+        # assembleRelease di step lain) = 2x fase configuration project penuh (parsing
+        # build.gradle.kts, resolusi dependency graph, setup plugin Compose compiler,
+        # dst) — salah satu biaya tetap terbesar per run Gradle, terlepas dari cache.
+        # Digabung jadi 1 invocation: `gradle testDebugUnitTest assembleRelease` bikin
+        # Gradle configure project SEKALI utk kedua task, bukan dua kali.
+        # Fail-fast tetap terjaga tanpa flag tambahan apa pun: default Gradle behavior
+        # (tanpa --continue) langsung stop begitu testDebugUnitTest gagal — assembleRelease
+        # dalam invocation yang sama TIDAK akan pernah mulai jalan, persis seperti
+        # perilaku 2-step yang lama, cuma tanpa overhead configuration ganda.
+        # Urutan step di workflow ini sudah disusun ulang supaya keystore decode +
+        # version determination (keduanya tidak butuh Gradle sama sekali) selesai LEBIH
+        # DULU sebelum satu-satunya invocation Gradle ini, jadi env var SIGNING_* di bawah
+        # sudah siap sejak awal invocation seperti sebelumnya.
         env:
           SIGNING_KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
@@ -74,7 +87,7 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           set -o pipefail
-          gradle assembleRelease --no-daemon 2>&1 | tee build-output.log
+          gradle testDebugUnitTest assembleRelease --no-daemon --build-cache 2>&1 | tee build-output.log
 
       - name: Rename APK to match version
         run: |
@@ -93,18 +106,16 @@ jobs:
           files: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk
 
       - name: Upload failure log artifact
-        # Kalau step manapun di atas gagal (test atau build) — dijalankan terakhir supaya
-        # nangkep kegagalan dari step manapun, bukan cuma satu step tertentu. Isinya:
-        # output mentah kedua step (test-output.log/build-output.log, kalau step itu sempat
-        # jalan) + laporan HTML/XML JUnit kalau ada. Nama pakai run number (selalu tersedia,
-        # beda dari steps.version yang ke-skip kalau test gagal duluan) supaya gampang
-        # dicari tanpa harus download seluruh raw log lewat UI Actions.
+        # Batch 62 — dulu 2 log file terpisah (test-output.log, build-output.log) karena
+        # 2 step Gradle terpisah; sekarang cuma 1 (build-output.log, dari step gabungan di
+        # atas) yang isinya sudah mencakup output test maupun build sekaligus (satu
+        # invocation, satu stream log berurutan). Path test-output.log dihapus dari daftar
+        # supaya tidak tampil "file not found" palsu di setiap kegagalan.
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: log_fail_${{ github.run_number }}
           path: |
-            test-output.log
             build-output.log
             app/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/

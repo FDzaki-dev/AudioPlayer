@@ -85,6 +85,13 @@ val TactileSuccess = Color(0xFF34D399)
 // navigation, or inactive components (spec §6 "must NOT dominate").
 val MidnightBlue = Color(0xFF191970) // spec §6 literal
 val MidnightBlueAmbientAlpha = 0.06f // spec §6 literal ambient-gradient alpha
+// Batch 62 — user instruksi eksplisit: "radikal", "tanpa mengikuti batasan light/dark
+// system" — ambient wash Midnight Blue (dulu Batch 61 digated hanya utk mode gelap,
+// dianggap "trait mode" bukan "trait identitas") sekarang SENGAJA tampil di kedua mode.
+// Alpha mode-terang dinaikkan jauh di atas versi gelap (0.06f) karena kontrasnya
+// terbalik total: di atas AMOLED nyaris-hitam, wash biru tipis 6% sudah cukup terbaca;
+// di atas kanvas nyaris-putih, alpha sekecil itu akan nyaris tak kelihatan sama sekali.
+val MidnightBlueLightAmbientAlpha = 0.16f
 
 // --- Accent system (spec §17) — restrained cool-blue, functional only -------
 val TactileAccent = Color(0xFF6670FF) // spec §6/§17 MidnightBlueAccent == AccentBlue
@@ -160,6 +167,15 @@ val SkeuDarkAccent = Color(0xFFCB8B4B)
 // sudah lebih tinggi dari AMOLED jadi tak perlu shadow sekuat Tactile).
 val SkeuHighlight = Color.White.copy(alpha = 0.10f)
 val SkeuShadow = Color.Black.copy(alpha = 0.55f)
+// Batch 62 — user instruksi "perkuat vibes tiap tema custom secara radikal": Skeu
+// sebelumnya TIDAK PERNAH punya ambient root wash sama sekali (identitasnya "panel
+// solid" murni flat, beda dari Tactile yang sejak Batch 53 sudah punya wash Midnight
+// Blue). Sekarang diberi wash tembaga sendiri di root screen (MainActivity.kt) — simetris
+// dengan perlakuan Tactile, tidak digated ke 1 mode saja (prinsip sama: identitas, bukan
+// trait mode). Alpha dark jauh lebih rendah dari light utk alasan kontras sama seperti
+// MidnightBlueLightAmbientAlpha di atas.
+val SkeuAmbientAlphaDark = 0.05f
+val SkeuAmbientAlphaLight = 0.12f
 // Batch 58 — SkeuEdge (dulu 0xFF000000 alpha 0.12f, dipakai sebagai stop kedua
 // border frostedGlass()'s Skeu branch) dihapus: diganti SkeuShadow di sana
 // (BlurUtils.kt) supaya border-nya kebaca bevel terukir/carved, bukan lagi rim

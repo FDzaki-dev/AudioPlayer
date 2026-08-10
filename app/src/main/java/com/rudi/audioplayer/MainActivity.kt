@@ -100,9 +100,16 @@ import com.rudi.audioplayer.ui.theme.AudioPlayerTheme
 import com.rudi.audioplayer.ui.theme.resolveIsDark
 import com.rudi.audioplayer.ui.theme.MidnightBlue
 import com.rudi.audioplayer.ui.theme.MidnightBlueAmbientAlpha
+import com.rudi.audioplayer.ui.theme.MidnightBlueLightAmbientAlpha
 import com.rudi.audioplayer.ui.theme.AmoledSurface
 import com.rudi.audioplayer.ui.theme.TactileHighlight
+import com.rudi.audioplayer.ui.theme.TactileLightSurfaceVariant
 import com.rudi.audioplayer.ui.theme.SkeuHighlight
+import com.rudi.audioplayer.ui.theme.SkeuDarkAccent
+import com.rudi.audioplayer.ui.theme.SkeuDarkSurfaceVariant
+import com.rudi.audioplayer.ui.theme.SkeuLightSurfaceVariant
+import com.rudi.audioplayer.ui.theme.SkeuAmbientAlphaDark
+import com.rudi.audioplayer.ui.theme.SkeuAmbientAlphaLight
 
 class MainActivity : FragmentActivity() {
 
@@ -290,24 +297,50 @@ class MainActivity : FragmentActivity() {
                 // Tactile (AMOLED-only per spec §6/§7); di mode terang Tactile sekarang pakai
                 // kanvas flat seperti identitas lain (identitas & mode sudah dipisah total —
                 // ambient wash adalah detail visual mode-gelap, bukan trait Tactile itu sendiri).
-                val tactileRootBrush = if (appThemeIdentity == ThemeIdentity.TACTILE && isDarkTheme)
-                    Brush.linearGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.background,
-                            MidnightBlue.copy(
-                                alpha = MidnightBlueAmbientAlpha
-                            ),
-                            AmoledSurface
-                        )
+                // Batch 62 — DIBATALKAN atas instruksi eksplisit user: "perkuat vibes tiap tema
+                // custom secara radikal, tanpa mengikuti batasan light/dark system". Ambient wash
+                // sekarang trait IDENTITAS (selalu tampil, di kedua mode, dgn alpha & stop warna
+                // masing-masing dituning per mode — lihat Color.kt) — bukan lagi trait mode.
+                // Skeu (dulu flat total, tidak pernah punya wash) sekarang dapat wash tembaga
+                // sendiri, simetris dengan Tactile, sama-sama lintas mode.
+                val identityRootBrush = when (appThemeIdentity) {
+                    ThemeIdentity.TACTILE -> Brush.linearGradient(
+                        colors = if (isDarkTheme)
+                            listOf(
+                                MaterialTheme.colorScheme.background,
+                                MidnightBlue.copy(alpha = MidnightBlueAmbientAlpha),
+                                AmoledSurface
+                            )
+                        else
+                            listOf(
+                                MaterialTheme.colorScheme.background,
+                                MidnightBlue.copy(alpha = MidnightBlueLightAmbientAlpha),
+                                TactileLightSurfaceVariant
+                            )
                     )
-                else null
+                    ThemeIdentity.SKEU_DARK_LITE -> Brush.linearGradient(
+                        colors = if (isDarkTheme)
+                            listOf(
+                                MaterialTheme.colorScheme.background,
+                                SkeuDarkAccent.copy(alpha = SkeuAmbientAlphaDark),
+                                SkeuDarkSurfaceVariant
+                            )
+                        else
+                            listOf(
+                                MaterialTheme.colorScheme.background,
+                                SkeuDarkAccent.copy(alpha = SkeuAmbientAlphaLight),
+                                SkeuLightSurfaceVariant
+                            )
+                    )
+                    else -> null
+                }
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
                         .then(
-                            if (tactileRootBrush != null) Modifier.background(tactileRootBrush) else Modifier
+                            if (identityRootBrush != null) Modifier.background(identityRootBrush) else Modifier
                         ),
-                    color = if (tactileRootBrush != null) Color.Transparent else MaterialTheme.colorScheme.background,
+                    color = if (identityRootBrush != null) Color.Transparent else MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {

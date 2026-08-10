@@ -157,12 +157,17 @@ fun Modifier.tactileEmboss(
         highlight = if (isDark) TactileHighlight else TactileLightHighlight,
         shadow = if (isDark) TactileShadow else TactileLightShadow,
         label = "tactileEmboss",
-        borderTopAlphaNormal = if (isDark) 0.065f else 0.90f,
-        borderTopAlphaPressed = if (isDark) 0.03f else 0.50f,
-        borderBottomAlphaNormal = if (isDark) 0.30f else 0.18f,
-        borderBottomAlphaPressed = if (isDark) 0.15f else 0.09f,
-        shadowAlphaNormal = if (isDark) 0.70f else 0.22f,
-        shadowAlphaPressed = if (isDark) 0.35f else 0.11f
+        // Batch 62 — user: "perkuat vibes radikal, tanpa mengikuti batasan light/dark
+        // system". Alpha border/shadow dinaikkan jauh di atas versi Batch 61 (dulu 0.065/
+        // 0.03/0.30/0.15/0.70/0.35) di KEDUA mode — bevel sekarang jauh lebih dramatis/
+        // glossy, sengaja menyimpang dari nada "restrained" spec asli (compose-amoled-
+        // hybrid-glass-final.md §9 menyarankan subtlety) atas instruksi eksplisit user.
+        borderTopAlphaNormal = if (isDark) 0.16f else 1.0f,
+        borderTopAlphaPressed = if (isDark) 0.08f else 0.65f,
+        borderBottomAlphaNormal = if (isDark) 0.55f else 0.30f,
+        borderBottomAlphaPressed = if (isDark) 0.30f else 0.16f,
+        shadowAlphaNormal = if (isDark) 0.90f else 0.34f,
+        shadowAlphaPressed = if (isDark) 0.55f else 0.18f
     )
 }
 
@@ -186,11 +191,13 @@ fun Modifier.skeuEmboss(
         highlight = if (isDark) SkeuHighlight else SkeuLightHighlight,
         shadow = if (isDark) SkeuShadow else SkeuLightShadow,
         label = "skeuEmboss",
-        borderTopAlphaNormal = if (isDark) 0.10f else 0.95f,
-        borderTopAlphaPressed = if (isDark) 0.045f else 0.55f,
-        borderBottomAlphaNormal = if (isDark) 0.24f else 0.28f,
-        borderBottomAlphaPressed = if (isDark) 0.12f else 0.14f,
-        shadowAlphaNormal = if (isDark) 0.55f else 0.30f,
-        shadowAlphaPressed = if (isDark) 0.28f else 0.15f
+        // Batch 62 — sama alasan dgn tactileEmboss() di atas: bevel dinaikkan jauh lebih
+        // dramatis di kedua mode, radikal & tidak lagi ditahan-tahan demi konvensi mode terang.
+        borderTopAlphaNormal = if (isDark) 0.22f else 1.0f,
+        borderTopAlphaPressed = if (isDark) 0.11f else 0.70f,
+        borderBottomAlphaNormal = if (isDark) 0.46f else 0.48f,
+        borderBottomAlphaPressed = if (isDark) 0.24f else 0.26f,
+        shadowAlphaNormal = if (isDark) 0.75f else 0.46f,
+        shadowAlphaPressed = if (isDark) 0.42f else 0.24f
     )
 }

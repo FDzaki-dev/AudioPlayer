@@ -1,5 +1,57 @@
 # Changelog
 
+## Batch 62 — Vibes radikal (lepas batasan mode) + CI compile time dipangkas drastis
+2 instruksi user digabung 1 batch: (1) "perkuat vibes tiap tema custom secara radikal,
+tanpa mengikuti batasan light/dark system", (2) "terapkan semua cara pangkas waktu compile
+GitHub Action secara drastis". 6 file disentuh (1 protected — edit parsial: `MainActivity.kt`,
+1 protected — edit parsial: `.github/workflows/build.yml`).
+
+**Vibes radikal:**
+- Ambient root wash (dulu Batch 53 Midnight Blue Tactile-only, lalu Batch 61 digated ke mode
+  gelap saja) sekarang trait IDENTITAS murni — tampil di KEDUA mode, tanpa gate `isDarkTheme`
+  sama sekali (`MainActivity.kt`, var direname `tactileRootBrush` → `identityRootBrush`
+  karena sekarang menangani 2 identitas). Alpha mode terang jauh lebih tinggi dari versi
+  gelap (`MidnightBlueLightAmbientAlpha` 0.16f vs 0.06f) — kontrasnya terbalik, alpha kecil
+  yang cukup di atas AMOLED nyaris tak kelihatan di atas kanvas terang.
+- **Skeu dapat ambient wash sendiri untuk pertama kali** (`SkeuAmbientAlphaDark`/
+  `SkeuAmbientAlphaLight` di `Color.kt`) — dulu selalu flat total ("panel solid, bukan kaca"),
+  sekarang simetris dengan Tactile: wash tembaga tipis di root, lintas mode juga.
+- Bevel `tactileEmboss()`/`skeuEmboss()` (`TactileDepth.kt`): semua alpha border/shadow
+  dinaikkan signifikan di kedua mode (contoh Tactile light: border-top normal 0.90f→1.0f,
+  shadow normal 0.22f→0.34f; Tactile dark: border-top 0.065f→0.16f, shadow 0.70f→0.90f) —
+  sengaja menyimpang dari nada "restrained" spec asli demi instruksi eksplisit user.
+- **Belum diverifikasi visual** — nilai alpha adalah tuning baru tanpa referensi device,
+  kandidat penyesuaian lanjutan begitu dicoba nyata (terutama shadow normal 0.90f Tactile
+  dark yang cukup ekstrem, sesuai literal permintaan "radikal").
+
+**CI compile time (murni proses, TIDAK mengubah output APK — minify/shrinkResources release
+sengaja tidak disentuh karena itu risiko integritas rilis, bukan cuma waktu compile):**
+- `gradle.properties`: `org.gradle.caching=true` (build cache lintas-run, otomatis ikut
+  ke-cache oleh `setup-gradle@v3` yang sudah dipakai workflow — tidak perlu ubah apa pun lagi
+  di situ), `org.gradle.parallel=true`, `org.gradle.configureondemand=true`,
+  `kotlin.incremental=true`, heap dinaikkan 2048m→3072m.
+- `.github/workflows/build.yml`:
+  - Checkout: tambah `filter: blob:none` (partial clone) — commit history/metadata tetap
+    lengkap (jadi `git rev-list --count` di step "Determine version name" tetap akurat),
+    tapi isi file historis lama tidak ikut didownload di awal.
+  - **2 invocation Gradle digabung jadi 1**: `gradle testDebugUnitTest assembleRelease` (dulu
+    2 step terpisah = 2x fase configuration project penuh). Fail-fast TETAP terjaga tanpa
+    flag tambahan — default Gradle (tanpa `--continue`) langsung stop begitu
+    `testDebugUnitTest` gagal, `assembleRelease` di invocation yang sama tidak akan pernah
+    mulai, persis perilaku lama.
+  - Step diurut ulang: decode keystore + determine version (keduanya tidak butuh Gradle sama
+    sekali) sekarang jalan SEBELUM satu-satunya invocation Gradle, supaya env var
+    `SIGNING_*` sudah siap sejak awal invocation seperti alur lama.
+  - `--build-cache` ditambahkan eksplisit ke command Gradle (redundant-safe dengan
+    `org.gradle.caching=true` di gradle.properties, tapi eksplisit di CLI memastikan aktif
+    walau properties file entah kenapa tidak terbaca).
+  - "Upload failure log artifact": `test-output.log` dihapus dari daftar path (sekarang cuma
+    ada 1 log gabungan, `build-output.log`) — mencegah warning "file not found" palsu.
+- **Release Blocking Rule dicek**: tidak ada perubahan pada `.github/workflows/` yang
+  menghapus/mengubah publish "GitHub Release" (masih `softprops/action-gh-release@v2`,
+  masih pakai `secrets.SIGNING_*` yang sama, masih upload `.apk` langsung sebagai release
+  asset) — murni percepatan proses di sekitarnya.
+
 ## Batch 61 — Pisah total identitas tema dari mode: Tactile & Skeu kini otonom di Light/Dark
 User koreksi Batch 60: maksudnya bukan cuma UI toggle, tapi identitas Tactile & Skeuomorphism
 (dulu hardcode gelap permanen lewat `resolveIsDark()`) harus DICABUT dari 1 mode dan dikendalikan
