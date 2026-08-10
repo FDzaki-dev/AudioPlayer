@@ -49,7 +49,12 @@ permukaan kaca lainnya.
   (12/16/20dp vs 10/12/16dp), border panel bergaya ukiran (highlight→shadow, bukan lagi rim kaca
   lembut). Batch 58: `skeuEmboss()` sekarang juga dipasang di mini player (bar & tombol
   play/pause), tombol play/pause utama Now Playing, dan badge indikator gesture (geser
-  kecerahan/volume) — sebelumnya baru dipakai di baris pemilih tema saja.
+  kecerahan/volume) — sebelumnya baru dipakai di baris pemilih tema saja. Batch 59: diperluas lagi
+  ke kartu "Lanjutkan Mendengarkan" (Beranda), banner undo-sembunyikan-lagu (Perpustakaan), dan
+  border/shadow piringan album Now Playing (sebelumnya ketiganya jatuh ke tampilan flat/
+  shadow-polos ala Apple untuk Skeu); mini player juga diperbaiki supaya `skeuEmboss()`-nya
+  sendiri yang tampil penuh di layar (sebelumnya ketutup lapisan `frostedGlass()` bersama yang
+  dipasang di titik yang sama — lihat CHANGELOG.md Batch 59).
 
   Dipilih lewat tab **Pengaturan** di navigasi bawah, tersimpan otomatis, diterapkan ulang tiap sesi
 - **Halaman Pengaturan**: tab baru di navigasi bawah — berisi pemilih tema dan info versi aplikasi (nomor versi + build)

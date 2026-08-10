@@ -87,6 +87,8 @@ import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.TactileHighlight
 import com.rudi.audioplayer.ui.theme.TactileShadow
+import com.rudi.audioplayer.ui.theme.SkeuHighlight
+import com.rudi.audioplayer.ui.theme.SkeuShadow
 import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -921,13 +923,18 @@ private fun AlbumArtHero(
         }
     ) {
         val isTactile = isTactileTheme()
+        // Batch 59 — same gap as HomeScreen/LibraryScreen/MiniPlayerBar: this hero art (the
+        // single largest, most-looked-at surface on the whole screen) was Tactile-only, Skeu
+        // fell into the generic Apple shadow-only branch below with no bevel of its own at all.
+        val isSkeu = isSkeuTheme()
+        val isPanelTheme = isTactile || isSkeu
         // Batch 52: recolored again for the literal Midnight Blue spec
         // (compose-skeuomorphism-lite-midnight-blue.md) — same drawn top-down shadow +
         // vertical-gradient bevel border technique kept from Batch 45/46/49-51, no code changes
         // here at all; TactileHighlight/TactileShadow are plain white/black-based again this
         // batch (see Color.kt), so this hero art picks up the new palette automatically through
         // those same two token references.
-        val heroShape = if (isTactile) MaterialTheme.shapes.large else RoundedCornerShape(Radius.hero)
+        val heroShape = if (isPanelTheme) MaterialTheme.shapes.large else RoundedCornerShape(Radius.hero)
         Box(
             modifier = Modifier
                 .size(300.dp)
@@ -939,42 +946,71 @@ private fun AlbumArtHero(
             modifier = Modifier
                 .size(280.dp)
                 .then(
-                    if (isTactile)
-                        Modifier
-                            .drawBehind {
-                                val outline = heroShape.createOutline(size, layoutDirection, this)
-                                val outlinePath = Path().apply { addOutline(outline) }
-                                translate(top = 9.dp.toPx()) {
-                                    drawPath(outlinePath, color = TactileShadow.copy(alpha = 0.55f))
+                    when {
+                        isTactile ->
+                            Modifier
+                                .drawBehind {
+                                    val outline = heroShape.createOutline(size, layoutDirection, this)
+                                    val outlinePath = Path().apply { addOutline(outline) }
+                                    translate(top = 9.dp.toPx()) {
+                                        drawPath(outlinePath, color = TactileShadow.copy(alpha = 0.55f))
+                                    }
                                 }
-                            }
-                            .clip(heroShape)
-                            .border(
-                                BorderStroke(
-                                    1.5.dp,
-                                    // Batch 55 — was verticalGradient, the one remaining spot in the
-                                    // whole Tactile identity still drawing top-down light instead of
-                                    // spec §9's diagonal top-left -> bottom-right (BlurUtils.kt's
-                                    // edgeBrush and TactileDepth.kt's tactileEmboss() border both
-                                    // already use linearGradient's default diagonal — this hero art
-                                    // border was the one inconsistent leftover from Batch 45/46,
-                                    // predating the diagonal rule adopted in Batch 53).
-                                    Brush.linearGradient(
-                                        listOf(
-                                            TactileHighlight.copy(alpha = 0.12f),
-                                            TactileShadow.copy(alpha = 0.32f)
+                                .clip(heroShape)
+                                .border(
+                                    BorderStroke(
+                                        1.5.dp,
+                                        // Batch 55 — was verticalGradient, the one remaining spot in the
+                                        // whole Tactile identity still drawing top-down light instead of
+                                        // spec §9's diagonal top-left -> bottom-right (BlurUtils.kt's
+                                        // edgeBrush and TactileDepth.kt's tactileEmboss() border both
+                                        // already use linearGradient's default diagonal — this hero art
+                                        // border was the one inconsistent leftover from Batch 45/46,
+                                        // predating the diagonal rule adopted in Batch 53).
+                                        Brush.linearGradient(
+                                            listOf(
+                                                TactileHighlight.copy(alpha = 0.12f),
+                                                TactileShadow.copy(alpha = 0.32f)
+                                            )
                                         )
-                                    )
-                                ),
-                                heroShape
-                            )
-                            // Localized accent glow on the hero art is spec-sanctioned (§9: "Use
-                            // [glow] for… selected states… important tactile edges") since this
-                            // is the one always-active/selected surface on the whole screen —
-                            // alpha trimmed from the old 0.5f for restraint per §9/§13.
-                            .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
-                    else
-                        Modifier.shadow(elevation = 28.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.45f))
+                                    ),
+                                    heroShape
+                                )
+                                // Localized accent glow on the hero art is spec-sanctioned (§9: "Use
+                                // [glow] for… selected states… important tactile edges") since this
+                                // is the one always-active/selected surface on the whole screen —
+                                // alpha trimmed from the old 0.5f for restraint per §9/§13.
+                                .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
+                        isSkeu ->
+                            // Batch 59 — same drawn-shadow + clip + border mechanism as Tactile above,
+                            // Skeu's own tokens/alphas: shadow lower (0.40f vs 0.55f, consistent with
+                            // Skeu's "shadow lebih rendah" design principle from Batch 57/58), border
+                            // highlight stronger (0.16f vs 0.12f, Skeu's own stronger catch-light) —
+                            // reads as a carved frame around the art, not a re-skinned copy of Tactile's.
+                            Modifier
+                                .drawBehind {
+                                    val outline = heroShape.createOutline(size, layoutDirection, this)
+                                    val outlinePath = Path().apply { addOutline(outline) }
+                                    translate(top = 9.dp.toPx()) {
+                                        drawPath(outlinePath, color = SkeuShadow.copy(alpha = 0.40f))
+                                    }
+                                }
+                                .clip(heroShape)
+                                .border(
+                                    BorderStroke(
+                                        1.5.dp,
+                                        Brush.linearGradient(
+                                            listOf(
+                                                SkeuHighlight.copy(alpha = 0.16f),
+                                                SkeuShadow.copy(alpha = 0.40f)
+                                            )
+                                        )
+                                    ),
+                                    heroShape
+                                )
+                                .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
+                        else -> Modifier.shadow(elevation = 28.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.45f))
+                    }
                 )
                 .clip(heroShape)
         )

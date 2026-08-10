@@ -53,7 +53,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.rudi.audioplayer.ui.theme.tactileEmboss
+import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
+import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.Radius
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -422,23 +424,30 @@ fun LibraryScreen(
         }
         Box(modifier = Modifier.fillMaxSize()) {
             val isTactile = isTactileTheme()
+            // Batch 59 — same Tactile-only gap pattern fixed elsewhere this batch: Skeu fell
+            // into the Apple-else flat-Surface branch here.
+            val isSkeu = isSkeuTheme()
+            val isPanelTheme = isTactile || isSkeu
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
                     .fillMaxWidth()
                     .then(
-                        if (isTactile) Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xxl), elevation = 10.dp)
-                        else Modifier
+                        when {
+                            isTactile -> Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xxl), elevation = 10.dp)
+                            isSkeu -> Modifier.skeuEmboss(shape = RoundedCornerShape(Radius.xxl), elevation = 10.dp)
+                            else -> Modifier
+                        }
                     ),
                 shape = RoundedCornerShape(Radius.xxl),
-                color = if (isTactile) Color.Transparent else MaterialTheme.colorScheme.surface,
+                color = if (isPanelTheme) Color.Transparent else MaterialTheme.colorScheme.surface,
                 // Batch 48/49 lesson: don't rely on Surface's own contentColor-from-color
                 // fallback when color is Transparent — set it explicitly so this never
                 // regresses into invisible text like the LockScreen bug did.
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                tonalElevation = if (isTactile) 0.dp else 6.dp,
-                shadowElevation = if (isTactile) 0.dp else 6.dp
+                tonalElevation = if (isPanelTheme) 0.dp else 6.dp,
+                shadowElevation = if (isPanelTheme) 0.dp else 6.dp
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),

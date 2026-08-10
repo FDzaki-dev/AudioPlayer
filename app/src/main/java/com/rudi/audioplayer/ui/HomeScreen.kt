@@ -24,7 +24,9 @@ import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.ui.theme.tactileEmboss
+import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
+import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.collections.immutable.ImmutableSet
 import java.util.Calendar
@@ -238,22 +240,28 @@ private fun HomeGreeting(showShuffleAll: Boolean, onShuffleAll: () -> Unit) {
 @Composable
 private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
     val isTactile = isTactileTheme()
-    // Batch 49: first thing the eye hits on Home, priority touch point for the tactile treatment.
+    // Batch 59 — was Tactile-only since Batch 49; Skeu fell into the Apple-else branch (flat
+    // clipped Surface, opaque but no bevel of its own) despite this being the first card the eye
+    // hits on Home, same priority spot Tactile got here. Same pattern as Batch 58's
+    // NowPlayingScreen/MiniPlayerBar rollout.
+    val isSkeu = isSkeuTheme()
+    val isPanelTheme = isTactile || isSkeu
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp)
             .then(
-                if (isTactile)
-                    Modifier.tactileEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
-                else
-                    Modifier.clip(RoundedCornerShape(Radius.xl))
+                when {
+                    isTactile -> Modifier.tactileEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
+                    isSkeu -> Modifier.skeuEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
+                    else -> Modifier.clip(RoundedCornerShape(Radius.xl))
+                }
             )
             .clickable(onClick = onClick),
-        color = if (isTactile) Color.Transparent else MaterialTheme.colorScheme.surface,
+        color = if (isPanelTheme) Color.Transparent else MaterialTheme.colorScheme.surface,
         // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent fallback.
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = if (isTactile) 0.dp else 4.dp
+        tonalElevation = if (isPanelTheme) 0.dp else 4.dp
     ) {
         Row(
             modifier = Modifier.padding(14.dp),

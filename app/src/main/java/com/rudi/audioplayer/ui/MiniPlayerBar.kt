@@ -73,8 +73,9 @@ fun MiniPlayerBar(
                 // Batch 49: swapped matteEmboss() for the Tactile equivalent, tactileEmboss()
                 // (directional shadow + top-down gradient + bevel border) so the bar reads as
                 // a lifted tactile panel, not just a rectangle with a bigger shadow.
-                // frostedGlass() below still draws the readable tinted fill on top, matching
-                // its own shape/border so corners line up under either theme.
+                // frostedGlass() further below still draws the readable tinted fill on top for
+                // Tactile/Apple, matching its own shape/border so corners line up — Skeu opts out
+                // of it since Batch 59 (see comment there).
                 when {
                     isTactile -> Modifier.tactileEmboss(shape = barShape, elevation = 16.dp)
                     isSkeu -> Modifier.skeuEmboss(shape = barShape, elevation = 16.dp)
@@ -82,7 +83,17 @@ fun MiniPlayerBar(
                 }
             )
             .clip(barShape)
-            .frostedGlass()
+            // Batch 59 — Skeu skips frostedGlass() here: skeuEmboss() above already paints a
+            // complete opaque background + its own tuned bevel border (Batch 58's
+            // frostedGlass()/embossSurface() fixes), so stacking frostedGlass() on top would just
+            // re-cover both with its own flat fill + border again, exactly the "still hybrid, not
+            // autonomous" gap flagged this batch — the mini bar would visually read identical to
+            // whatever frostedGlass() draws regardless of skeuEmboss(), wasting its distinct bevel
+            // and its press-elevation/scale animation. Tactile/Apple unchanged: Tactile's identity
+            // is deliberately hybrid glass-over-emboss (this file's earlier comment, still true for
+            // Tactile only), and Apple has no background of its own before this — frostedGlass() is
+            // the only fill it gets.
+            .then(if (isSkeu) Modifier else Modifier.frostedGlass())
             .clickable(onClick = onExpand)
     ) {
         Row(

@@ -6,6 +6,54 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 59 (Skeu "otonom" — tuntaskan gap identitas + filter pending jadi 1 batch low-risk)** —
+2 instruksi digabung: (1) user observasi: semua tema custom yang pernah dikerjakan selalu ada
+sisa "flat/hybrid" yang bikin identitasnya nggak benar-benar otonom; (2) gabungkan seluruh
+daftar pending (dikirim balasan sebelumnya) jadi 1 batch atomic, TAPI hanya yang low-risk.
+Hasil audit pending: dari 6 item, 4 di antaranya ditolak masuk batch ini karena memang bukan
+low-risk (lihat "Sengaja TIDAK dikerjakan" di bawah) — sisa 2 area yang benar-benar aman
+dieksekusi kebetulan JUGA persis instruksi (1): titik-titik `isTactileTheme()`-only yang masih
+menyisakan Skeu di cabang default Apple (flat, tanpa bevel sendiri) — pola yang sama sudah
+terbukti aman 6x di Batch 58, di-generalisasi lagi ke titik yang tersisa. 4 file kode disentuh:
+- `HomeScreen.kt` (`ContinueListeningCard`) — kartu pertama yang kelihatan di Beranda, dulu
+  Tactile-only, Skeu sekarang dapat `skeuEmboss()` sendiri.
+- `LibraryScreen.kt` (banner undo-sembunyikan-lagu) — sama, dulu Tactile-only.
+- `NowPlayingScreen.kt` (`AlbumArtHero`) — permukaan terbesar di seluruh app (piringan album
+  280dp), dulu Tactile-only (border bevel + shadow custom), Skeu jatuh ke cabang shadow polos
+  Apple tanpa border sama sekali. Sekarang dapat border+shadow versi sendiri (SkeuHighlight
+  0.16f / SkeuShadow 0.40f — lebih kuat catch-light-nya & lebih rendah shadow-nya dari Tactile,
+  konsisten dengan prinsip desain Skeu sejak Batch 57/58).
+- `MiniPlayerBar.kt` — **perbaikan arsitektur, bukan cuma nambah cabang baru**: outer Box bar
+  ternyata satu-satunya titik di app yang memasang `skeuEmboss()` DAN `frostedGlass()` di
+  modifier chain yang sama. Karena `frostedGlass()` untuk Skeu sudah full-opaque sejak Batch 58,
+  background+border `skeuEmboss()` di situ selalu ketutup total oleh `frostedGlass()` yang
+  digambar belakangan — persis definisi "tidak otonom, masih hybrid" yang dikeluhkan: identitas
+  Skeu sendiri secara visual tidak pernah benar-benar sampai ke layar di titik itu. Fix: Skeu
+  sekarang skip `frostedGlass()` di Box ini (`skeuEmboss()`-nya sendiri sudah background+border
+  lengkap), Tactile/Apple TIDAK diubah (Tactile emang sengaja hybrid glass-over-emboss by
+  spec/nama, Apple gak punya background lain selain dari `frostedGlass()`).
+- **Tactile sengaja TIDAK disentuh sama sekali batch ini** — nama/identitas/spec Tactile
+  ("Premium AMOLED Hybrid Glassmorphism", spec eksternal yang di-supply user sendiri di Batch 53)
+  memang literal "hybrid" secara desain, bukan cacat. Observasi user soal "selalu ada unsur
+  flat/hybrid" ditafsirkan sebagai gap penerapan tema-nya sendiri yang belum tuntas ke semua
+  layar (leftover default Apple), bukan permintaan menghapus konsep hybrid dari Tactile.
+- **Sengaja TIDAK dikerjakan (ditolak karena bukan low-risk, sesuai instruksi eksplisit user)**:
+  1) Shared-element transition & 2) Pull-to-refresh — keduanya butuh bump Compose BOM dari
+  2024.05.00, versi baru bisa mempengaruhi komponen lain yang sudah jalan, tanpa compiler risiko
+  terlalu tinggi. 3) 339 string hardcode → `strings.xml` dan 4) ~340 literal `.dp` → token
+  spacing — sweep mekanis skala besar lintas puluhan file, tanpa compiler untuk verifikasi tiap
+  perubahan risikonya kumulatif tinggi meski satu-satu kecil. 5) Lirik otomatis (fetch dari
+  internet) — fitur baru (API/network call, state loading/error baru), bukan polish existing
+  code, scope-nya beda kelas. 6) `TactileButton`/`TactileSwitch`/`TactileSlider` custom (spec
+  §7/§12, item yang paling langsung menjawab keluhan "flat" tapi juga paling berisiko) — custom
+  draw + custom drag-gesture handling untuk slider seek/volume adalah kontrol paling sering
+  dipakai di app, kalau salah taruh bisa merusak fungsi inti; ditolak dari batch **low-risk** ini
+  secara sadar, tetap kandidat batch terpisah kalau user mau ambil risikonya. 7) "belum pernah
+  diuji di device fisik" — bukan kerja kode, tidak bisa dieksekusi dari sisi ini.
+- **Belum diverifikasi visual/compile** — sama seperti semua batch tema sebelumnya (tidak ada
+  `kotlinc`/emulator di environment ini); brace/paren balance dicek otomatis di ke-4 file Kotlin
+  (seimbang), grep konfirmasi 0 duplikat import.
+
 **Batch 58 (polish Skeuomorphism Dark Lite: hilangkan sisa glassmorphism)** — User lapor lewat
 screenshot: kesan glassmorphism di app masih terlalu kuat, minta tema custom terbaru (Skeu,
 Batch 57) di-polish sampai "matang". Root cause: `frostedGlass()` (`BlurUtils.kt`) — satu helper

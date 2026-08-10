@@ -1,5 +1,47 @@
 # Changelog
 
+## Batch 59 — Skeu "otonom": tuntaskan gap identitas + filter pending jadi 1 batch low-risk
+Gabungan 2 instruksi user: tema custom selalu ada sisa "flat/hybrid" yang bikin identitasnya
+nggak otonom (tolong diperbaiki) + gabungkan semua item pending jadi 1 batch atomic, tapi hanya
+yang low-risk. Lihat PROJECT_STATE.md Batch 59 untuk rasional lengkap kenapa 6 dari 8 item
+pending ditolak masuk batch ini (bukan low-risk) dan kenapa 2 sisanya (gap wiring `skeuEmboss()`)
+kebetulan juga langsung menjawab keluhan "flat/hybrid".
+
+- `HomeScreen.kt` — `ContinueListeningCard`: import `skeuEmboss`/`isSkeuTheme` ditambah, cabang
+  `if (isTactile)` jadi `when { isTactile / isSkeu / else }`, `isPanelTheme = isTactile || isSkeu`
+  dipakai untuk `color`/`tonalElevation`.
+- `LibraryScreen.kt` — banner undo-sembunyikan-lagu: perubahan identik pola di atas.
+- `NowPlayingScreen.kt` — import `SkeuHighlight`/`SkeuShadow`/`isSkeuTheme` ditambah.
+  `AlbumArtHero`: `heroShape` sekarang `if (isPanelTheme)` (bukan `isTactile` saja). Blok
+  `drawBehind`+`clip`+`border`+`shadow` Tactile disalin jadi cabang `isSkeu` terpisah (bukan
+  fungsi bersama — duplikasi disengaja untuk minim risiko tanpa compiler), pakai
+  `SkeuShadow.copy(alpha=0.40f)` untuk shadow (Tactile: `TactileShadow` 0.55f) dan
+  `Brush.linearGradient(SkeuHighlight.copy(alpha=0.16f), SkeuShadow.copy(alpha=0.40f))` untuk
+  border (Tactile: `TactileHighlight`/`TactileShadow` 0.12f/0.32f) — angka dipilih meneruskan
+  prinsip Skeu sejak Batch 57/58 ("catch-light lebih kuat, shadow lebih rendah dari Tactile").
+- `MiniPlayerBar.kt` — perbaikan arsitektur (bukan cuma nambah cabang tema baru): outer bar Box
+  adalah satu-satunya titik di app yang memasang `skeuEmboss()` DAN `frostedGlass()` sekaligus di
+  chain yang sama. Karena `frostedGlass()` Skeu sudah full-opaque sejak Batch 58, layer kedua ini
+  selalu menutup total background+border `skeuEmboss()` di bawahnya — identitas Skeu sendiri
+  secara visual tidak pernah sampai ke layar di titik ini, definisi persis "masih hybrid, tidak
+  otonom". Fix: `.then(if (isSkeu) Modifier else Modifier.frostedGlass())` menggantikan
+  `.frostedGlass()` polos — Skeu skip, Tactile/Apple tidak berubah. Komentar lama di baris atasnya
+  ("under either theme") diperbaiki karena sudah tidak akurat lagi untuk Skeu.
+- **Tactile TIDAK disentuh sama sekali** — namanya sendiri "Hybrid Glassmorphism" (spec eksternal
+  Batch 53 yang di-supply user), hybrid itu memang identitasnya, bukan bug. Keluhan user
+  ditafsirkan sebagai gap penerapan (leftover default Apple di titik-titik yang belum ke-cover),
+  bukan permintaan menghilangkan konsep hybrid dari Tactile.
+- **Ditolak dari batch ini (bukan low-risk)**: shared-element transition & pull-to-refresh (butuh
+  bump Compose BOM), sweep `strings.xml`/token spacing (mekanis besar lintas banyak file, tanpa
+  compiler risikonya kumulatif), lirik otomatis (fitur baru berbasis network, bukan polish),
+  `TactileButton`/`TactileSwitch`/`TactileSlider` custom (custom drag-gesture di kontrol paling
+  sering dipakai — risiko tertinggi kalau salah, sengaja ditunda ke batch terpisah kalau user mau
+  ambil risikonya), verifikasi device fisik (bukan kerja kode).
+- **Belum diverifikasi visual/compile** (tidak ada `kotlinc`/emulator di environment ini) —
+  brace/paren balance dicek otomatis di ke-4 file Kotlin (seimbang), grep konfirmasi 0 duplikat
+  import di tiap file yang disentuh.
+
+
 ## Batch 58 — Polish Skeuomorphism Dark Lite: hilangkan sisa glassmorphism
 User lapor lewat screenshot bahwa kesan glassmorphism di app masih terlalu kuat, minta tema
 custom terbaru (Skeuomorphism Dark Lite, Batch 57) di-polish sampai "matang". Lihat
