@@ -6,6 +6,25 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 68 (Fix album art hilang total — regresi Batch 67 — + widget tak sinkron ganti tema)** —
+2 bug user laporkan dari 1 sesi debug. (1) Album art hilang di SEMUA lagu di seluruh UI (Library/
+Home/MiniPlayerBar/NowPlaying): Batch 67 arahkan `AlbumArt` ke `song.uri` tapi lupa Coil butuh
+model yang memang bisa didekode sebagai gambar — `song.uri` itu file audio, jadi Coil selalu
+gagal decode & jatuh ke ikon fallback utk semua lagu (persis skenario "belum diverifikasi visual"
+yang ditulis Batch 67 sendiri). Fix: `AudioArtFetcher.kt` baru — custom Coil Fetcher yang cegat
+MIME `audio/*` lalu ekstrak art pakai `loadThumbnail()`/`MediaMetadataRetriever` (pola yang sama
+dgn widget/PlaybackService/AccentColorExtractor yang TIDAK kena bug ini krn mereka bypass Coil).
+Didaftarkan di `AudioPlayerApplication.kt`. (2) Widget tidak pernah redraw saat user ganti tema:
+`PlayerViewModel.setThemeIdentity/setThemeMode` gak pernah panggil `WidgetUpdater.updateAll()`
+(0 call path, dikonfirmasi grep), DAN widget layout gak punya palet terang sama sekali. Fix:
+`widget_background_light.xml` baru + `widget_root` id di 2 layout widget + `WidgetUpdater.kt`
+baca `ThemeStore` (fungsi baru `resolveIsDark()`) + `PlayerViewModel` panggil `updateAll()`
+setelah ganti tema. **Pola relevan utk batch depan**: kalau ada state global baru (tema, dll)
+yang perlu tercermin di widget, JANGAN asumsikan widget otomatis ikut — selalu grep
+`WidgetUpdater.updateAll(` call sites dulu. **Belum diverifikasi visual di device** — sama
+seperti Batch 67, ini kelas bug yang idealnya dicek langsung di HP sebelum dianggap tuntas.
+Detail lengkap: `CHANGELOG.md` Batch 68.
+
 **Batch 67 (Fix root cause FileNotFoundException album art — playback+widget+UI)** — Root
 cause ditemukan lewat analisa `log_*.txt` (fitur Repack ke Dokumen, Batch 66): URI legacy
 `content://media/external/audio/albumart/$albumId` (tabel cache sering kosong di API 29+)

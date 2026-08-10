@@ -5,13 +5,16 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.widget.RemoteViews
 import com.rudi.audioplayer.MainActivity
 import com.rudi.audioplayer.R
+import com.rudi.audioplayer.data.ThemeStore
 import com.rudi.audioplayer.playback.PlaybackService
+import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.util.AppLogger
 
 /**
@@ -27,6 +30,17 @@ object WidgetUpdater {
     private const val KEY_ARTWORK_URI = "artwork_uri"
     private const val KEY_IS_PLAYING = "is_playing"
     private const val COMPACT_WIDTH_THRESHOLD_DP = 180
+
+    // Batch 68: fix "widget nggak pernah sinkron pas ganti tema" — widget_player(.compact).xml
+    // used to hardcode the dark palette permanently (no light counterpart, and nothing ever
+    // called updateAll() when the user flipped the in-app theme toggle), so the widget just
+    // never moved regardless of ThemeMode. Root cause was 2-fold, fixed together: (1) no call
+    // path from PlayerViewModel.setThemeMode/setThemeIdentity to WidgetUpdater.updateAll —
+    // added there — and (2) the layout itself had no light variant to switch to — added here.
+    private const val TITLE_COLOR_DARK = 0xFFFFFFFF.toInt()
+    private const val ARTIST_COLOR_DARK = 0xFF98989D.toInt()
+    private const val TITLE_COLOR_LIGHT = 0xFF1C1C1E.toInt()
+    private const val ARTIST_COLOR_LIGHT = 0xFF6E6E73.toInt()
 
     const val ACTION_TOGGLE_PLAY = "com.rudi.audioplayer.widget.TOGGLE_PLAY"
     const val ACTION_NEXT = "com.rudi.audioplayer.widget.NEXT"
@@ -53,6 +67,7 @@ object WidgetUpdater {
         val artworkUriRaw = prefs.getString(KEY_ARTWORK_URI, null)
         val isPlaying = prefs.getBoolean(KEY_IS_PLAYING, false)
         val albumArt = artworkUriRaw?.let { loadAlbumArtBitmap(context, Uri.parse(it)) }
+        val isDark = resolveIsDark(context, ThemeStore(context).getMode())
 
         for (id in ids) {
             // Widgets can be resized independently by the user, so each one gets its own
@@ -64,9 +79,17 @@ object WidgetUpdater {
 
             val views = RemoteViews(context.packageName, if (isCompact) R.layout.widget_player_compact else R.layout.widget_player)
 
+            views.setInt(
+                R.id.widget_root,
+                "setBackgroundResource",
+                if (isDark) R.drawable.widget_background else R.drawable.widget_background_light
+            )
+
             if (!isCompact) {
                 views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
                 views.setTextViewText(R.id.widget_artist, artist ?: "Buka AudioPlayer")
+                views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
+                views.setTextColor(R.id.widget_artist, if (isDark) ARTIST_COLOR_DARK else ARTIST_COLOR_LIGHT)
                 views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
                 views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))
             }
@@ -93,6 +116,18 @@ object WidgetUpdater {
             if (!isCompact) views.setOnClickPendingIntent(R.id.widget_title, openAppPending)
 
             manager.updateAppWidget(id, views)
+        }
+    }
+
+    /** Mirrors [com.rudi.audioplayer.ui.theme.colorsFor]'s SYSTEM branch (Compose's
+     * `isSystemInDarkTheme()`) using the plain-Android equivalent, since this runs outside
+     * any Composable. */
+    private fun resolveIsDark(context: Context, mode: ThemeMode): Boolean = when (mode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> {
+            val nightFlags = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+            nightFlags == Configuration.UI_MODE_NIGHT_YES
         }
     }
 

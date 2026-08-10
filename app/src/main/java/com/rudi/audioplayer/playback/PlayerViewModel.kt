@@ -40,6 +40,7 @@ import com.rudi.audioplayer.data.ThemeStore
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.widget.WidgetUpdater
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.CancellationException
@@ -502,11 +503,18 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     fun setThemeIdentity(identity: ThemeIdentity) {
         themeStore.setIdentity(identity)
         _themeIdentity.value = identity
+        // Batch 68: widget never redrew on theme switch — nothing called updateAll() from
+        // here before. Identity itself doesn't change widget colors (Tactile/Skeu stay
+        // dark-only), but keeping both setters symmetrical avoids the same bug resurfacing
+        // if a future batch gives the widget an identity-aware look too.
+        WidgetUpdater.updateAll(appContext)
     }
 
     fun setThemeMode(mode: ThemeMode) {
         themeStore.setMode(mode)
         _themeMode.value = mode
+        // Batch 68: this is the call that actually flips the widget's light/dark background.
+        WidgetUpdater.updateAll(appContext)
     }
 
     private fun loadCustomFolderInfos(): List<CustomFolderInfo> =

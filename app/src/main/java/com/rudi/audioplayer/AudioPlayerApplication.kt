@@ -4,6 +4,7 @@ import android.app.Application
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.AudioArtFetcher
 
 /** Every AsyncImage in the app (Library grid/list rows, Home, MiniPlayerBar, Now Playing)
  * uses Coil's default singleton ImageLoader unless it builds its own request — so configuring
@@ -19,6 +20,10 @@ class AudioPlayerApplication : Application(), ImageLoaderFactory {
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
             .crossfade(200)
+            // Batch 68: extracts embedded art from song.uri instead of Coil's default
+            // fetcher trying (and failing) to decode audio bytes as an image. See
+            // AudioArtFetcher kdoc for the full regression story.
+            .components { add(AudioArtFetcher.Factory(this@AudioPlayerApplication)) }
             .build()
     }
 }

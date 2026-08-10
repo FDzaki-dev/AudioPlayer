@@ -1,5 +1,49 @@
 # Changelog
 
+## Batch 68 — Fix album art hilang total (regresi Batch 67) + widget tidak sinkron saat ganti tema
+
+**Bug 1 — Album art hilang di semua lagu (Library/Home/MiniPlayerBar/NowPlaying):**
+Root cause: regresi dari Batch 67. `Utils.kt`'s `AlbumArt` composable dialihkan ke `song.uri`
+(URI audio si lagu sendiri), lalu diberikan langsung ke Coil (`SubcomposeAsyncImage`) sebagai
+`model`. Fetcher bawaan Coil untuk `content://` (`ContentUriFetcher`) mendekode byte-nya sebagai
+gambar (`BitmapFactory`/`ImageDecoder`) — itu cuma jalan kalau URI-nya memang gambar. `song.uri`
+adalah file audio, jadi decode-nya gagal untuk SEMUA lagu, `error{}` selalu jatuh ke ikon
+"no cover". Batch 67 sendiri sudah menandai "belum diverifikasi visual di device" — ini yang
+kejadian. 3 titik non-Coil yang disentuh Batch 67 (widget/`PlaybackService`/
+`AccentColorExtractor`) TIDAK kena bug ini karena mereka pakai `contentResolver.loadThumbnail()`
+langsung, bukan lewat Coil — itu sebabnya widget/notifikasi/accent-color tetap benar sementara
+UI di layar total hilang.
+Fix: file baru `AudioArtFetcher.kt` — custom Coil `Fetcher` yang mencegat URI ber-MIME `audio/*`
+sebelum fetcher bawaan Coil, lalu ekstrak artwork tertanam pakai pola yang sama persis dengan
+3 titik non-Coil (`loadThumbnail()` API 29+, `MediaMetadataRetriever.embeddedPicture` fallback
+API 23-28). Didaftarkan sekali di `AudioPlayerApplication.kt` (edit parsial, tidak menyentuh
+`crossfade`) lewat `ImageLoader.Builder().components { add(...) }` — otomatis berlaku ke semua
+4 pemakai `AlbumArt` tanpa ubah signature composable-nya sama sekali. Hanya mencegat MIME
+`audio/*`, jadi tidak akan pernah bentrok kalau nanti Coil dipakai untuk gambar asli.
+
+**Bug 2 — Widget tidak pernah sinkron saat ganti tema:** Root cause 2 lapis. (1)
+`PlayerViewModel.setThemeIdentity()`/`setThemeMode()` (sejak `ThemeStore` dipecah 2-key di
+Batch 61) tidak pernah memanggil `WidgetUpdater.updateAll()` — grep konfirmasi 0 call path dari
+perubahan tema ke widget sebelum batch ini, jadi widget cuma redraw kalau lagu ganti atau sistem
+minta (`onUpdate`/resize). (2) `widget_player(.compact).xml` cuma punya 1 palet warna hardcode
+(gelap, `#1C1C1E`) — tidak ada varian terang sama sekali, jadi walau dipanggil pun tidak ada apa-
+apa untuk ditukar. Fix: `widget_background_light.xml` baru (`#F2F2F7`) sebagai pasangan
+`widget_background.xml`; root `LinearLayout` kedua layout widget dikasih id (`widget_root`)
+supaya bisa ditarget `RemoteViews.setInt(..., "setBackgroundResource", ...)`; `WidgetUpdater.kt`
+baca `ThemeStore(context).getMode()` (fungsi baru `resolveIsDark()`, meniru cabang
+`isSystemInDarkTheme()` punya Compose lewat `Configuration.uiMode` karena kelas ini di luar
+Composable) lalu pilih background+warna teks title/artist sesuai; `PlayerViewModel.kt`
+(`setThemeIdentity`/`setThemeMode`) sekarang panggil `WidgetUpdater.updateAll(appContext)`
+setelah nyimpen state. `ThemeIdentity` (Tactile/Skeu) sengaja TIDAK dikasih palet widget sendiri
+— keduanya dark-only per desain sejak Batch 61, jadi tidak ada yang perlu disinkronkan di sana;
+`setThemeIdentity` tetap ikut manggil `updateAll()` untuk jaga simetri kalau nanti identity-aware
+widget ditambah.
+5 file kode disentuh (`AudioArtFetcher.kt` baru, `AudioPlayerApplication.kt`, `WidgetUpdater.kt`,
+`PlayerViewModel.kt`, `widget_background_light.xml` baru) + 2 layout XML (id attribute saja).
+Tidak ada protected asset disentuh. **Belum diverifikasi visual di device** — brace balance +
+grep call-path dicek otomatis, tapi ini persis kelas bug yang butuh mata di layar fisik (Batch 67
+adalah contoh kenapa itu penting).
+
 ## Batch 67 — Fix root cause FileNotFoundException album art (playback + widget + UI)
 8 file disentuh (tidak ada protected asset).
 
