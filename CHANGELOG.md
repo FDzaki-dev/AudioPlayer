@@ -1,5 +1,28 @@
 # Changelog
 
+## Batch 60 — Rombak arsitektur picker tema: card select-only → Switch on-off (Light/Dark)
+User minta sektor tema di Settings dirombak dari "button 1 arah" (card select-only, tidak ada
+jalan balik langsung) jadi toggle on-off yang fleksibel untuk mode Light/Dark. 1 file disentuh
+(`SettingsScreen.kt`), tidak ada perubahan pada `AppTheme` enum/`Theme.kt`/`ThemeStore.kt` (data
+model & storage key tetap sama persis — low risk, tidak ada migrasi diperlukan):
+- Trio card `System`/`Light`/`Dark` (dulu bagian dari loop `AppTheme.entries` yang sama dengan
+  Tactile & Skeu) diganti komponen baru `ThemeModeToggleSection` — 2 `Switch` M3 saling
+  menyesuaikan: "Ikuti Sistem" (ON = `AppTheme.SYSTEM`) dan "Mode Gelap" (disabled otomatis saat
+  Ikuti Sistem ON atau saat tema kustom Tactile/Skeu aktif, karena keduanya dark-only by design —
+  `resolveIsDark()` tidak diubah). Mematikan "Ikuti Sistem" jatuh ke `DARK`/`LIGHT` sesuai posisi
+  "Mode Gelap" terakhir (tidak pernah reset ke default).
+- `ThemeOptionCard` (card visual dengan live swatch warna) TIDAK dihapus — masih dipakai untuk
+  Tactile & Skeu Dark Lite (2 custom identity, bukan bagian keluarga Light/Dark), sekarang di-`filter`
+  dari loop lama alih-alih `AppTheme.entries.toList()` mentah.
+- **Belum diverifikasi visual/compile** (tidak ada `kotlinc`/emulator di environment ini) — brace/
+  paren balance file dicek otomatis (seimbang), grep konfirmasi hanya 1 titik pemanggil lama
+  (`items(AppTheme.entries...)`) yang tersentuh, tidak ada call site lain ke `ThemeOptionCard`
+  yang perlu disesuaikan.
+- **Sengaja TIDAK dikerjakan**: styling Switch mengikuti M3 default (belum di-custom warna per
+  tema seperti `skeuEmboss()`/`tactileEmboss()`) — Switch hanya muncul saat tema aktif adalah
+  System/Light/Dark (Apple family), jadi selalu pakai `AppleAccent` M3 default; polish visual
+  Switch jika diinginkan adalah kandidat batch terpisah.
+
 ## Batch 59 — Skeu "otonom": tuntaskan gap identitas + filter pending jadi 1 batch low-risk
 Gabungan 2 instruksi user: tema custom selalu ada sisa "flat/hybrid" yang bikin identitasnya
 nggak otonom (tolong diperbaiki) + gabungkan semua item pending jadi 1 batch atomic, tapi hanya

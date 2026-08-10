@@ -92,7 +92,19 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        items(AppTheme.entries.toList(), key = { it.name }) { theme ->
+        item {
+            // Batch 60 — rombak arsitektur picker tema: trio System/Light/Dark yang tadinya
+            // 3 card select-only (1 arah, tidak bisa "switch balik" secara langsung) sekarang
+            // jadi 2 Switch on-off yang saling menyesuaikan (Ikuti Sistem + Mode Gelap).
+            // Tactile & Skeu Dark Lite tetap card di bawah (custom identity, bukan light/dark).
+            ThemeModeToggleSection(currentTheme = currentTheme, onSelectTheme = onSelectTheme)
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        items(
+            AppTheme.entries.filter { it != AppTheme.SYSTEM && it != AppTheme.LIGHT && it != AppTheme.DARK },
+            key = { it.name }
+        ) { theme ->
             ThemeOptionCard(
                 theme = theme,
                 selected = theme == currentTheme,
@@ -284,6 +296,81 @@ fun SettingsScreen(
     }
     if (showDiagnosticLog) {
         DiagnosticLogSheet(onDismiss = { showDiagnosticLog = false }, onInfoMessage = onInfoMessage)
+    }
+}
+
+// Batch 60 — pengganti trio card System/Light/Dark: 2 Switch on-off yang saling menyesuaikan.
+// "Ikuti Sistem" ON mengunci "Mode Gelap" (disabled, ikut nilai sistem). Saat tema kustom
+// (Tactile/Skeu, keduanya dark-only by design — lihat resolveIsDark()) aktif, "Mode Gelap" juga
+// disabled karena keduanya tidak punya varian terang; menyalakan/mematikannya di state itu akan
+// membawa user balik ke keluarga Apple Light/Dark (perilaku yang sama seperti menekan card
+// Light/Dark manual), bukan mengubah tema kustom itu sendiri.
+@Composable
+private fun ThemeModeToggleSection(currentTheme: AppTheme, onSelectTheme: (AppTheme) -> Unit) {
+    val isCustomTheme = currentTheme == AppTheme.TACTILE || currentTheme == AppTheme.SKEU_DARK_LITE
+    val followSystem = currentTheme == AppTheme.SYSTEM
+    // Preferensi gelap/terang yang "diingat" toggle ini walau lagi disabled (System atau tema
+    // kustom aktif) — default ke gelap: satu-satunya kasus currentTheme eksplisit terang adalah
+    // AppTheme.LIGHT sendiri.
+    val isDarkChecked = currentTheme != AppTheme.LIGHT
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .clip(RoundedCornerShape(Radius.xl)),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 4.dp
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Ikuti Sistem", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Otomatis menyesuaikan mode terang/gelap perangkat",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                Switch(
+                    checked = followSystem,
+                    onCheckedChange = { checked ->
+                        onSelectTheme(
+                            when {
+                                checked -> AppTheme.SYSTEM
+                                isDarkChecked -> AppTheme.DARK
+                                else -> AppTheme.LIGHT
+                            }
+                        )
+                    }
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Mode Gelap", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        when {
+                            isCustomTheme -> "Nonaktif — tema kustom aktif selalu gelap"
+                            followSystem -> "Nonaktif — mengikuti pengaturan sistem"
+                            isDarkChecked -> "Aktif"
+                            else -> "Nonaktif"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                Switch(
+                    checked = isDarkChecked,
+                    enabled = !followSystem && !isCustomTheme,
+                    onCheckedChange = { checked ->
+                        onSelectTheme(if (checked) AppTheme.DARK else AppTheme.LIGHT)
+                    }
+                )
+            }
+        }
     }
 }
 

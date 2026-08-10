@@ -6,6 +6,16 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 60 (Rombak arsitektur picker tema: card select-only → Switch on-off Light/Dark)** — User
+minta sektor tema di Settings diubah dari card select-only 1 arah jadi toggle on-off fleksibel
+untuk Light/Dark. 1 file disentuh (`SettingsScreen.kt`), `AppTheme` enum/`Theme.kt`/`ThemeStore.kt`
+TIDAK diubah (storage key & data model sama persis, tidak perlu migrasi). Ganti trio card
+System/Light/Dark dengan `ThemeModeToggleSection` (2 `Switch` M3: "Ikuti Sistem" + "Mode Gelap",
+saling disable/enable sesuai state). Card Tactile/Skeu Dark Lite tetap ada di bawahnya (custom
+identity, dark-only, di luar cakupan toggle Light/Dark). Detail lengkap di `CHANGELOG.md` Batch 60.
+**Belum diverifikasi visual/compile** (tidak ada kotlinc/emulator di sini) — brace/paren balance
+dicek otomatis (seimbang).
+
 **Batch 59 (Skeu "otonom" — tuntaskan gap identitas + filter pending jadi 1 batch low-risk)** —
 2 instruksi digabung: (1) user observasi: semua tema custom yang pernah dikerjakan selalu ada
 sisa "flat/hybrid" yang bikin identitasnya nggak benar-benar otonom; (2) gabungkan seluruh
