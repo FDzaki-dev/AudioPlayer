@@ -65,6 +65,7 @@ class PlaybackService : MediaLibraryService() {
     // show stale art/state.
     private var widgetUpdateJob: Job? = null
 
+    @UnstableApi
     override fun onCreate() {
         super.onCreate()
 
@@ -128,6 +129,7 @@ class PlaybackService : MediaLibraryService() {
 
         mediaSession = MediaLibrarySession.Builder(this, player, PlaybackSessionCallback())
             .setSessionActivity(sessionActivityIntent)
+            .setBitmapLoader(SongArtBitmapLoader(this, serviceScope))
             .build()
     }
 
@@ -401,4 +403,55 @@ class PlaybackService : MediaLibraryService() {
         // deleted from disk since it was last played).
         private const val MAX_HANDOFF_WAIT_MS = 8000L
     }
+}
+
+/**
+ * Batch 69 — fixes the system media notification / lock-screen "pill" showing no artwork at
+ * all (in-app art was fine post-Batch-68, but the notification stayed blank). Root cause: since
+ * Batch 67, [MediaMetadata.artworkUri] is set to the song's own MediaStore content URI
+ * (`song.uri`) — correct for [android.content.ContentResolver.loadThumbnail], which has
+ * special-cased handling for audio files. Media3's DEFAULT [BitmapLoader] doesn't know that
+ * special case: it just opens the URI as a raw byte stream and tries to decode it straight as
+ * an image, which silently fails for an audio file (same failure class Batch 68's
+ * `AudioArtFetcher` already fixed for Coil in the UI — this is that same bug hitting a second,
+ * separate loader Batch 68 didn't touch). This class replicates the same loadThumbnail()-first
+ * approach as [com.rudi.audioplayer.widget.WidgetUpdater] and `AudioArtFetcher`, so the system
+ * notification, lock screen, and Android Auto/Bluetooth artwork all resolve it correctly too.
+ */
+@androidx.media3.common.util.UnstableApi
+private class SongArtBitmapLoader(
+    private val context: android.content.Context,
+    private val scope: CoroutineScope
+) : androidx.media3.common.util.BitmapLoader {
+
+    override fun decodeBitmap(data: ByteArray): ListenableFuture<android.graphics.Bitmap> =
+        CallbackToFutureAdapter.getFuture { completer ->
+            scope.launch(Dispatchers.IO) {
+                val bitmap = android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size)
+                if (bitmap != null) completer.set(bitmap)
+                else completer.setException(IllegalArgumentException("Gagal decode bitmap dari byte array"))
+            }
+            "decodeBitmap"
+        }
+
+    override fun loadBitmap(uri: android.net.Uri): ListenableFuture<android.graphics.Bitmap> =
+        CallbackToFutureAdapter.getFuture { completer ->
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        context.contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null)
+                    } else {
+                        context.contentResolver.openInputStream(uri)?.use {
+                            android.graphics.BitmapFactory.decodeStream(it)
+                        }
+                    }
+                    if (bitmap != null) completer.set(bitmap)
+                    else completer.setException(java.io.FileNotFoundException("Tidak ada artwork utk $uri"))
+                } catch (e: Exception) {
+                    AppLogger.e("SongArtBitmapLoader", "Gagal muat artwork notifikasi", e)
+                    completer.setException(e)
+                }
+            }
+            "loadBitmap($uri)"
+        }
 }

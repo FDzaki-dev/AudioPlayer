@@ -60,6 +60,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.translate
@@ -503,7 +504,15 @@ fun NowPlayingScreen(
                 shape = playPauseShape,
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = animatedAccent,
-                    contentColor = MaterialTheme.colorScheme.background
+                    // Batch 69: dulu `MaterialTheme.colorScheme.background` — warna latar
+                    // HALAMAN, sama sekali tidak berkaitan dengan warna lingkaran tombol ini
+                    // sendiri (animatedAccent, aksen dinamis per lagu). Kalau kebetulan
+                    // keduanya senasib gelap (mode gelap + aksen gelap) atau senasib terang,
+                    // ikon menyatu sempurna dengan lingkarannya -> "gak kelihatan sama
+                    // sekali" / "box kosong". Fix: pola luminance yang sama persis dgn
+                    // MiniPlayerBar.kt (accentContentColor) — kontras terhadap animatedAccent
+                    // itu sendiri, bukan warna halaman.
+                    contentColor = if (animatedAccent.luminance() > 0.55f) Color.Black else Color.White
                 ),
                 modifier = Modifier
                     .size(68.dp)

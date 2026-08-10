@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -52,6 +53,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
@@ -73,6 +78,7 @@ import com.rudi.audioplayer.data.SearchHistoryStore
 import com.rudi.audioplayer.data.Song
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentSetOf
+import kotlinx.collections.immutable.toPersistentSet
 
 @Composable
 fun LibraryScreen(
@@ -308,7 +314,8 @@ fun LibraryScreen(
                 selectionMode = selectionMode,
                 selectedIds = selectedIds,
                 onToggleSelect = { id -> toggleSelect(id) },
-                onEnterSelectionMode = { id -> selectionMode = true; selectedIds = persistentSetOf(id) }
+                onEnterSelectionMode = { id -> selectionMode = true; selectedIds = persistentSetOf(id) },
+                onSweepSelectRange = { ids -> selectionMode = true; selectedIds = ids }
             )
             selectedTab == 1 -> AlbumGridView(
                 songs = filteredSongs,
@@ -873,11 +880,54 @@ private fun SongListView(
     selectionMode: Boolean = false,
     selectedIds: ImmutableSet<Long> = persistentSetOf(),
     onToggleSelect: (Long) -> Unit = {},
-    onEnterSelectionMode: (Long) -> Unit = {}
+    onEnterSelectionMode: (Long) -> Unit = {},
+    onSweepSelectRange: (ImmutableSet<Long>) -> Unit = {}
 ) {
-    LazyColumn {
+    val haptic = LocalHapticFeedback.current
+    // Batch 70 — root-coordinate bounds of every currently-composed row, refreshed as
+    // LazyColumn recycles/composes items. Keyed by index (not song id) since that's what a
+    // contiguous "from here to here" range is naturally expressed in.
+    val rowBoundsInRoot = remember(songs) { mutableStateMapOf<Int, ClosedFloatingPointRange<Float>>() }
+    var containerCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var sweepAnchorIndex by remember { mutableStateOf<Int?>(null) }
+    var sweepLastIndex by remember { mutableStateOf<Int?>(null) }
+
+    fun indexAt(rootY: Float): Int? = rowBoundsInRoot.entries.firstOrNull { rootY in it.value }?.key
+
+    LazyColumn(
+        modifier = Modifier
+            .onGloballyPositioned { containerCoordinates = it }
+            .pointerInput(songs) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { offset ->
+                        val root = containerCoordinates?.localToRoot(offset) ?: return@detectDragGesturesAfterLongPress
+                        val idx = indexAt(root.y) ?: return@detectDragGesturesAfterLongPress
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        sweepAnchorIndex = idx
+                        sweepLastIndex = idx
+                        onSweepSelectRange(persistentSetOf(songs[idx].id))
+                    },
+                    onDrag = { change, _ ->
+                        val anchor = sweepAnchorIndex ?: return@detectDragGesturesAfterLongPress
+                        change.consume()
+                        val root = containerCoordinates?.localToRoot(change.position) ?: return@detectDragGesturesAfterLongPress
+                        val idx = indexAt(root.y) ?: return@detectDragGesturesAfterLongPress
+                        if (idx == sweepLastIndex) return@detectDragGesturesAfterLongPress
+                        sweepLastIndex = idx
+                        val range = minOf(anchor, idx)..maxOf(anchor, idx)
+                        onSweepSelectRange(range.map { songs[it].id }.toPersistentSet())
+                    },
+                    onDragEnd = { sweepAnchorIndex = null; sweepLastIndex = null },
+                    onDragCancel = { sweepAnchorIndex = null; sweepLastIndex = null }
+                )
+            }
+    ) {
         itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
             SongRow(
+                modifier = Modifier.onGloballyPositioned { coords ->
+                    val top = coords.positionInRoot().y
+                    rowBoundsInRoot[index] = top..(top + coords.size.height)
+                },
                 song = song,
                 isFavorite = favoriteIds.contains(song.id),
                 onFavoriteToggle = { onFavoriteToggle(song.id) },
@@ -966,12 +1016,13 @@ private fun SongRow(
     selectionMode: Boolean = false,
     isSelected: Boolean = false,
     onToggleSelect: () -> Unit = {},
-    onEnterSelectionMode: () -> Unit = {}
+    onEnterSelectionMode: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
-    Box {
+    Box(modifier = modifier) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

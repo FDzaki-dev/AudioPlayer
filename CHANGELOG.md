@@ -1,5 +1,69 @@
 # Changelog
 
+## Batch 70 — Fitur baru: sweep-select (tekan-lama lalu geser) di tab Lagu
+1 file disentuh (`LibraryScreen.kt`, tidak ada protected asset). Menjawab laporan user
+"pemilihan lagu masih satu-satu, bikin pegel" (sesi Batch 69) — user pilih mekanisme
+"tekan-lama lalu drag jari nyapu ke bawah/atas" dari 3 opsi yang ditawarkan.
+
+- Infrastruktur multi-select (selectionMode/selectedIds/checkbox, bulk "Tambah ke Playlist")
+  SUDAH ADA sebelumnya — yang hilang cuma cara masuk-banyak-lagu-sekaligus, sebelumnya wajib
+  tap checkbox satu per satu setelah tekan-lama.
+- Fix: `SongListView`'s `LazyColumn` sekarang punya `pointerInput` +
+  `detectDragGesturesAfterLongPress` di level container (bukan per-row) — tekan-lama 1 lagu
+  (masuk selection mode seperti biasa via `SongRow.onLongClick` yang sudah ada), lalu TANPA
+  angkat jari, geser ke atas/bawah -> `selectedIds` di-replace dengan rentang kontigu dari lagu
+  anchor sampai lagu di bawah jari saat ini (`onSweepSelectRange`, callback baru, prop baru di
+  `SongListView`/dipanggil dari `LibraryScreen`). Posisi tiap baris dilacak via
+  `onGloballyPositioned`+`positionInRoot()` (koordinat root, direfresh tiap baris
+  compose/recycle), posisi jari dikonversi ke koordinat root yang sama via `localToRoot()`
+  supaya hit-test-nya konsisten.
+- `SongRow` dapat parameter `modifier` baru (default `Modifier`) supaya `SongListView` bisa
+  nempel `onGloballyPositioned` per baris tanpa ubah pemanggil lain (`GroupedListView`, tab
+  Favorit, dll — semua masih pakai default, tidak disentuh).
+- **Scope**: baru diterapkan di tab "Lagu" (Library) — TIDAK di `PlaylistScreen.kt` (list lagu
+  di dalam playlist), TIDAK di grup album/artis, TIDAK di tab Favorit. Kalau user mau gesture
+  yang sama di tempat lain, itu batch terpisah (pola row-bounds-tracking di atas bisa dipakai
+  ulang).
+- **Belum diverifikasi visual di device** — gesture Compose custom (`pointerInput` di level
+  LazyColumn bareng `combinedClickable` per-row) rawan konflik gesture-detection kalau meleset
+  asumsi; scroll normal (swipe cepat tanpa jeda) seharusnya tidak kesenggol karena
+  `detectDragGesturesAfterLongPress` cuma aktif setelah threshold tekan-lama (~500ms) terpenuhi
+  duluan, tapi ini kelas bug yang paling akurat dicek langsung di HP.
+
+## Batch 69 — Fix tombol Play/Pause tak terlihat + artwork notifikasi/pill kosong
+2 file disentuh (tidak ada protected asset). 2 dari 5 laporan bug user pada sesi ini (sisanya:
+lihat catatan di PROJECT_STATE.md — widget perlu konfirmasi rebuild APK, 2 lainnya perlu info
+tambahan dari user sebelum bisa di-diagnosis).
+
+**Bug A — Tombol Play/Pause utama di Now Playing tak kelihatan (default theme) / jadi box
+kosong aneh (custom theme):**
+- Root cause: `FilledIconButton` play/pause (`NowPlayingScreen.kt`) set `contentColor =
+  MaterialTheme.colorScheme.background` — warna latar HALAMAN, sama sekali tidak berkaitan
+  dengan `animatedAccent` (warna lingkaran tombol itu sendiri, aksen dinamis per lagu sejak
+  Batch 67). Begitu kebetulan keduanya senasib (sama-sama gelap atau sama-sama terang), ikon
+  menyatu sempurna dengan lingkarannya -> tak kelihatan / kotak kosong.
+- Fix: pola `luminance() > 0.55f -> Black else White` yang sudah dipakai `MiniPlayerBar.kt`
+  (`accentContentColor`) untuk kasus identik, sekarang direplikasi di sini — kontras dihitung
+  dari `animatedAccent` sendiri, bukan warna halaman.
+
+**Bug B — Artwork kosong di notifikasi & lock-screen "pill" media control (Image 4):**
+- Root cause: sejak Batch 67, `MediaMetadata.artworkUri` diisi `song.uri` (URI file audio,
+  benar utk `ContentResolver.loadThumbnail()` yang punya penanganan khusus file audio) — tapi
+  `BitmapLoader` BAWAAN Media3 tidak tahu itu, cuma buka URI itu sebagai stream mentah lalu
+  coba decode langsung sebagai gambar, yang diam-diam gagal utk file audio. Kelas bug PERSIS
+  sama dengan yang Batch 68 perbaiki di Coil (`AudioArtFetcher`) — tapi `BitmapLoader` Media3
+  itu loader terpisah yang tidak ikut kesentuh Batch 68.
+- Fix: `PlaybackService.kt` — class baru `SongArtBitmapLoader` (implementasi
+  `androidx.media3.common.util.BitmapLoader`) yang pakai `loadThumbnail()` (API 29+) / fallback
+  `openInputStream()+BitmapFactory` — pola sama persis dgn `WidgetUpdater`/`AudioArtFetcher`.
+  Didaftarkan via `MediaLibrarySession.Builder.setBitmapLoader(...)`. `onCreate()` ditandai
+  `@UnstableApi` (pola opt-in per-fungsi yang sudah dipakai file ini, lihat
+  `onPlaybackResumption`).
+- **Pola relevan utk batch depan**: artwork punya SEKARANG 4 loader terpisah yang masing-masing
+  butuh fix sendiri kalau sumber URI-nya berubah lagi — Coil (`AudioArtFetcher`), widget
+  (`WidgetUpdater.loadAlbumArtBitmap`), `AccentColorExtractor`, dan sekarang MediaSession
+  (`SongArtBitmapLoader`). Grep ke-4-nya kalau ganti skema URI artwork lagi.
+
 ## Batch 68 — Fix album art hilang total (regresi Batch 67) + widget tidak sinkron saat ganti tema
 
 **Bug 1 — Album art hilang di semua lagu (Library/Home/MiniPlayerBar/NowPlaying):**

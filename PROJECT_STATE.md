@@ -6,6 +6,51 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 70 (Fitur sweep-select: tekan-lama lalu geser, tab Lagu)** — Jawaban atas laporan
+"pemilihan lagu satu-satu bikin pegel" (Batch 69). User pilih mekanisme via pertanyaan
+klarifikasi: tekan-lama 1 lagu lalu (tanpa angkat jari) geser ke atas/bawah buat pilih rentang
+lagu sekaligus. Infrastruktur selection mode/checkbox/bulk-add-to-playlist SUDAH ADA dari
+sebelumnya — yang ditambah cuma gesture-nya: `LibraryScreen.kt`'s `SongListView` dapat
+`pointerInput`+`detectDragGesturesAfterLongPress` di level `LazyColumn`, row bounds dilacak via
+`onGloballyPositioned`+`positionInRoot()`/`localToRoot()`. `SongRow` dapat param `modifier`
+baru (default aman, pemanggil lain tak berubah). **Scope cuma tab Lagu** — belum di
+`PlaylistScreen.kt`, grup album/artis, atau tab Favorit; kalau diminta lagi di tempat lain,
+pola row-bounds-tracking ini reusable. **Belum diverifikasi visual di device** — gesture custom
+Compose (kombinasi `pointerInput` container + `combinedClickable` per-row) kelas bug yang
+idealnya dicek langsung di HP: pastikan scroll normal tab Lagu masih mulus (harusnya aman,
+`detectDragGesturesAfterLongPress` cuma ambil alih setelah threshold ~500ms tekan-lama
+terpenuhi), dan sweep beneran nyeleksi rentang yang benar saat LazyColumn di-scroll +
+sweep dalam satu gesture yang sama (kasus rows recycle di tengah drag — belum ditest).
+Detail: `CHANGELOG.md` Batch 70.
+
+**Batch 69 (Fix tombol Play/Pause tak kelihatan + artwork notifikasi/pill kosong)** — User
+laporkan 5 bug dari 1 sesi (screenshot + deskripsi), 2 sudah diperbaiki, 3 masih OPEN (perlu
+info tambahan atau konfirmasi user sebelum lanjut):
+- **FIXED — Play/Pause button di Now Playing tak kelihatan/box kosong**: `contentColor`-nya
+  salah ambil dari `colorScheme.background` (warna halaman) bukan dari `animatedAccent` (warna
+  lingkaran tombol sendiri) — begitu keduanya senasib gelap/terang, ikon menyatu jadi invisible.
+  Fix pakai pola luminance yang sama dgn `MiniPlayerBar.kt`. `NowPlayingScreen.kt`.
+- **FIXED — Artwork kosong di notifikasi/lock-screen pill**: Media3 `BitmapLoader` bawaan gak
+  tahu cara baca `song.uri` (URI file audio, bukan gambar) — bug sekelas yg Batch 68 perbaiki
+  di Coil, tapi loader beda yg gak ikut kesentuh. Fix: `SongArtBitmapLoader` baru di
+  `PlaybackService.kt`, didaftar via `setBitmapLoader()`. **Sekarang ada 4 loader artwork
+  terpisah** (Coil/`AudioArtFetcher`, widget/`WidgetUpdater`, `AccentColorExtractor`, MediaSession/
+  `SongArtBitmapLoader`) — kalau skema URI artwork berubah lagi, ke-4-nya wajib digrep & dicek.
+- **OPEN — Widget "gak ada perubahan sama sekali" biarpun ganti tema**: kode `WidgetUpdater`/
+  `PlayerViewModel`/layout widget (Batch 68) sudah diaudit ulang di sesi ini — SECARA KODE
+  terlihat benar (baca `ThemeStore`, panggil `updateAll()` di kedua setter, `widget_root` id +
+  `widget_background_light.xml` ada). Kemungkinan besar user masih test pakai APK versi lama
+  (build Batch 68 belum sempat diinstall ulang) — **perlu konfirmasi user sudah rebuild+install
+  APK terbaru sebelum diasumsikan masih bug**.
+- **OPEN — Player stuck/looping tanpa sebab**: TIDAK ADA data diagnostik dari laporan ini
+  (cuma screenshot UI, bukan log). Minta user reproduce lalu export log terbaru lewat "Repack ke
+  Dokumen" (Batch 64) begitu kejadian, baru bisa didiagnosis.
+- **OPEN — "Slide to choose" multi-select lagu dari playlist buatan**: feature request (bukan
+  bug) — swipe/drag multi-select belum ada sama sekali di playlist manapun, saat ini memang
+  cuma tap satu-satu. Perlu klarifikasi desain interaksi dari user sebelum diimplementasi
+  (mis. long-press lalu drag, atau checkbox mode).
+Detail lengkap: `CHANGELOG.md` Batch 69.
+
 **Batch 68 (Fix album art hilang total — regresi Batch 67 — + widget tak sinkron ganti tema)** —
 2 bug user laporkan dari 1 sesi debug. (1) Album art hilang di SEMUA lagu di seluruh UI (Library/
 Home/MiniPlayerBar/NowPlaying): Batch 67 arahkan `AlbumArt` ke `song.uri` tapi lupa Coil butuh
