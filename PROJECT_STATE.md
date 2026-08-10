@@ -6,6 +6,23 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 66 (Fix feedback "Repack ke Dokumen" ketutup ModalBottomSheet)** — Root cause:
+Snackbar dari `onInfoMessage` dirender oleh `Scaffold` di `MainActivity`, tapi
+`ModalBottomSheet` ada di layer terpisah DI ATASNYA, jadi Snackbar itu invisible selama sheet
+terbuka -> user kira tombol macet. `DiagnosticLogSheet.kt` (tidak ada protected asset) sekarang
+punya banner sukses/gagal inline di dalam sheet (state `exportResult`, auto-hilang 2.5 detik),
+haptic dibedakan sukses vs gagal. `onInfoMessage` tetap dipanggil sbg fallback. **Pola ini
+relevan utk sheet/dialog lain yg juga cuma pakai `onInfoMessage`** — kalau nanti ada keluhan
+serupa, cek dulu apakah komponennya jenis Modal (Bottom Sheet/Dialog) sebelum nambah state
+lokal lain. Detail: `CHANGELOG.md` Batch 66.
+
+**Batch 65 (Fix nama APK rilis bentrok saat CI di-rerun manual)** — Root cause "unduhan
+duplikat": tag/nama file APK (`v1.0.$COUNT-release`) cuma dari jumlah commit, jadi re-run
+manual workflow di commit yg sama = nama file identik = HP bikin "(1).apk" duplikat.
+`.github/workflows/build.yml` (edit parsial, protected): tag jadi
+`v1.0.$COUNT-release-run${{ github.run_number }}` — unik per run CI. `appVersionName`/
+`appVersionCode` APK (dari `gitCommitCount()`) TIDAK berubah. Detail: `CHANGELOG.md` Batch 65.
+
 **Batch 64 (Tombol Log Diagnostik: Salin -> Repack ke Dokumen)** — `DiagnosticLogSheet.kt`
 tombol copy-clipboard diganti `AppLogger.exportLogToDocuments(context)`: tulis snapshot log
 saat ini ke `log_<timestamp>_<uuid>.txt` di `Documents/AudioPlayer/logs` (MediaStore API 29+,

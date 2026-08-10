@@ -1,5 +1,31 @@
 # Changelog
 
+## Batch 66 — Fix: feedback "Repack ke Dokumen" tidak terlihat (ketutup ModalBottomSheet)
+1 file disentuh (tidak ada protected asset).
+
+- Root cause: `onInfoMessage` sudah memicu Snackbar via `MainActivity`, tapi `ModalBottomSheet`
+  dirender di layer/window terpisah DI ATAS `Scaffold` — jadi Snackbar itu tampil ketutup sheet
+  yang masih terbuka. User pencet "Repack ke Dokumen", tidak lihat apa-apa, dikira macet/gagal.
+- Fix: `DiagnosticLogSheet.kt` sekarang punya banner feedback inline di dalam sheet itu sendiri
+  (state `exportResult`), muncul tepat di bawah tombol dgn ikon CheckCircle (sukses, hijau
+  primaryContainer) / ErrorOutline (gagal, errorContainer) + teks status, auto-hilang 2.5 detik
+  (`LaunchedEffect` + `delay`). Haptic juga dibedakan: TextHandleMove (sukses) vs LongPress
+  (gagal) — dulu selalu sama terlepas hasil. Panggilan `onInfoMessage` tetap dipertahankan
+  (tidak merugikan, tetap berguna kalau sheet sudah tertutup duluan).
+
+## Batch 65 — Fix: nama APK rilis bentrok saat CI di-rerun manual (penyebab "duplikat unduhan")
+1 file disentuh (1 protected, edit parsial: `.github/workflows/build.yml`).
+
+- Root cause: tag/nama file APK rilis (`v1.0.$COUNT-release`) murni dari jumlah commit sejak
+  `v-reset`. Re-run manual workflow pada commit yang sama (tanpa commit baru) -> `$COUNT` sama
+  -> tag & nama file APK identik dgn rilis sebelumnya -> `softprops/action-gh-release` overwrite
+  release lama, dan di sisi HP nama file yang sama persis bikin duplikat "(1).apk" di folder
+  Unduhan alih-alih dikenali sebagai build baru.
+- Fix: tag rilis sekarang `v1.0.$COUNT-release-run${{ github.run_number }}` —
+  `github.run_number` unik per eksekusi workflow, jadi re-run pada commit sama tetap hasilkan
+  tag & nama file APK baru. `appVersionName`/`appVersionCode` di APK itu sendiri (dari
+  `gitCommitCount()` di `app/build.gradle.kts`) TIDAK diubah — tetap murni dari jumlah commit.
+
 ## Batch 64 — Ganti tombol "Salin" -> "Repack ke Dokumen" di Log Diagnostik
 1 file disentuh (tidak ada protected asset).
 

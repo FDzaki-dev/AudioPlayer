@@ -62,8 +62,13 @@ jobs:
           COUNT=$(git rev-list --count v-reset..HEAD 2>/dev/null || git rev-list --count HEAD)
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "name=1.0.$COUNT" >> "$GITHUB_OUTPUT"
-          echo "tag=v1.0.$COUNT-release" >> "$GITHUB_OUTPUT"
-          echo "Resolved version: 1.0.$COUNT (commit $SHORT_SHA)"
+          # run_number ditempel di tag/nama file (bukan di appVersionName APK itu sendiri —
+          # itu tetap murni dari COUNT, lihat gitCommitCount() di app/build.gradle.kts) supaya
+          # re-run manual pada commit yang sama tidak pernah menghasilkan tag/nama file identik
+          # dengan rilis sebelumnya (dulu nama file APK bentrok -> hasil unduhan di HP jadi
+          # duplikat "(1).apk" alih-alih dikenali sebagai build baru).
+          echo "tag=v1.0.$COUNT-release-run${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: 1.0.$COUNT (commit $SHORT_SHA, run ${{ github.run_number }})"
 
       - name: Test + Build Release APK
         # Batch 62 — dulu 2 invocation Gradle terpisah (testDebugUnitTest, lalu

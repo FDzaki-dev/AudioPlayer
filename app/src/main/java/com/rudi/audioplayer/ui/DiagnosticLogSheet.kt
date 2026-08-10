@@ -1,13 +1,18 @@
 package com.rudi.audioplayer.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -16,6 +21,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.util.AppLogger
+import kotlinx.coroutines.delay
 
 /**
  * Read-only viewer for AppLogger's local diagnostic log — errors it caught, and the
@@ -30,6 +36,18 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
     val haptic = LocalHapticFeedback.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var logText by remember { mutableStateOf(AppLogger.readLog()) }
+    // Inline feedback instead of relying solely on onInfoMessage's Snackbar: ModalBottomSheet
+    // renders in its own layer above Scaffold, so a Snackbar fired while this sheet is open is
+    // visually stuck behind it — user taps "Repack ke Dokumen" and sees nothing happen, easy to
+    // mistake for a hang. This banner lives inside the sheet itself, so it's always visible.
+    var exportResult by remember { mutableStateOf<Boolean?>(null) }
+
+    LaunchedEffect(exportResult) {
+        if (exportResult != null) {
+            delay(2500)
+            exportResult = null
+        }
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -74,7 +92,10 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                 OutlinedButton(
                     onClick = {
                         val ok = AppLogger.exportLogToDocuments(context)
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        haptic.performHapticFeedback(
+                            if (ok) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
+                        )
+                        exportResult = ok
                         onInfoMessage(
                             if (ok) "Log disimpan ke Documents/AudioPlayer/logs"
                             else "Gagal menyimpan log (perlu Android 10+)"
@@ -100,6 +121,36 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                     Icon(Icons.Default.DeleteOutline, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Hapus")
+                }
+            }
+
+            exportResult?.let { ok ->
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = if (ok) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Icon(
+                        if (ok) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = if (ok) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        if (ok) "Tersimpan di Documents/AudioPlayer/logs"
+                        else "Gagal menyimpan (perlu Android 10 ke atas)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (ok) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.onErrorContainer
+                    )
                 }
             }
         }
