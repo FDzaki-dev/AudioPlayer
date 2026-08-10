@@ -1,5 +1,78 @@
 # Changelog
 
+## Batch 58 — Polish Skeuomorphism Dark Lite: hilangkan sisa glassmorphism
+User lapor lewat screenshot bahwa kesan glassmorphism di app masih terlalu kuat, minta tema
+custom terbaru (Skeuomorphism Dark Lite, Batch 57) di-polish sampai "matang". Lihat
+PROJECT_STATE.md Batch 58 untuk ringkasan lengkap + rasional per file. Detail teknis:
+
+- `BlurUtils.kt` (`frostedGlass()`) — Skeu sekarang dipaksa `alpha = 1f` (full opaque) di dalam
+  fungsi, mengabaikan default parameter `alpha` (0.92f/0.96f) yang tadinya dipakai semua tema
+  tanpa kecuali. Aman: grep konfirmasi tidak ada satupun dari 6 call site (`LyricsSheet.kt`,
+  `QueueSheet.kt`, `MiniPlayerBar.kt`, `FolderManagerSheet.kt`, `NowPlayingScreen.kt`,
+  `EqualizerSheet.kt`) yang pernah pass parameter `alpha` eksplisit. Border Skeu diganti dari
+  `Brush.linearGradient(SkeuHighlight, SkeuEdge)` (rim kaca lembut alpha 0.10f→0.12f, pola sama
+  persis dengan Tactile) ke `Brush.linearGradient(SkeuHighlight, SkeuShadow)` (alpha 0.10f→0.55f,
+  transisi jauh lebih kontras — kebaca sebagai tepi terukir, bukan reflected light kaca). Lebar
+  border Skeu naik 1.dp→1.5.dp. Tactile branch (`TactileHighlight`/`TactileEdge`, alpha default)
+  TIDAK disentuh — identitas Tactile memang glassmorphism by design, bukan target batch ini.
+- `Color.kt` — `SkeuEdge` (`Color.Black.copy(alpha=0.12f)`) dihapus, 0 call site tersisa setelah
+  perubahan di atas (grep-confirmed sebelum dihapus, mengikuti presedan pembersihan token mati
+  Batch 54). Komentar blok token bevel Skeu diperbarui (referensi ke "Edge" diganti "Shadow").
+- `TactileDepth.kt` (`embossSurface()`, mesin privat bersama `tactileEmboss()`/`skeuEmboss()`) —
+  6 nilai alpha (`borderTopAlpha`/`borderBottomAlpha`/`shadowAlpha`, masing-masing varian
+  normal/pressed) yang tadinya literal hardcode langsung di body fungsi sekarang jadi parameter
+  eksplisit dengan default = angka literal Tactile yang lama persis
+  (0.065f/0.03f, 0.30f/0.15f, 0.70f/0.35f) — `tactileEmboss()` tidak pass parameter baru ini sama
+  sekali, jadi perilakunya byte-identik dengan sebelum batch ini. Root cause bug yang diperbaiki:
+  sebelumnya, `highlight.copy(alpha = borderTopAlpha)` / `shadow.copy(alpha = shadowAlpha)`
+  MENGGANTI (bukan mengalikan) alpha yang sudah dibawa `highlight`/`shadow` — jadi `SkeuHighlight`
+  (dibuat dengan alpha 0.10f) dan `SkeuShadow` (alpha 0.55f) di Color.kt selalu ditimpa balik ke
+  angka Tactile (0.065f/0.070f) setiap kali `skeuEmboss()` dipanggil, walau komentar Color.kt
+  sudah lama bilang keduanya "sengaja beda" dari Tactile. `skeuEmboss()` sekarang pass angka
+  sendiri: `borderTopAlphaNormal/Pressed = 0.10f/0.045f`, `borderBottomAlphaNormal/Pressed =
+  0.24f/0.12f` (lebih rendah dari Tactile 0.30f/0.15f, sesuai komentar "shadow lebih rendah"),
+  `shadowAlphaNormal/Pressed = 0.55f/0.28f` (akhirnya memakai alpha asli `SkeuShadow`, bukan lagi
+  angka Tactile).
+- `MiniPlayerBar.kt` — import `skeuEmboss`/`isSkeuTheme` ditambah. Bar luar: cabang `when` baru
+  (`isTactile`/`isSkeu`/else) menggantikan `if/else` lama, Skeu sekarang dapat
+  `skeuEmboss(shape=barShape, elevation=16.dp)` alih-alih fallback `Modifier.shadow()` Apple.
+  `miniPlayPauseShape`: `if (isTactile || isSkeu) MaterialTheme.shapes.medium else CircleShape` —
+  `MaterialTheme.shapes.medium` otomatis resolve ke `SkeuDarkShapes.medium` (beda dari
+  `TactileShapes.medium`) lewat `AudioPlayerTheme()`, tidak perlu token shape baru. Tombol
+  play/pause mini (40dp): cabang `when` yang sama, Skeu dapat `skeuEmboss(shape=..., elevation=
+  6.dp)` (sebelumnya nol depth cue sama sekali, fallback `Modifier` polos).
+- `NowPlayingScreen.kt` — import ditambah sama seperti di atas. `isSkeu` di-hoist di level
+  composable utama (sama seperti `isTactile` sejak Batch 55) dan dipakai di 2 titik: (1) tombol
+  play/pause utama (68dp) — `playPauseShape` sekarang `if (isTactile || isSkeu)
+  MaterialTheme.shapes.medium else CircleShape` + `skeuEmboss(shape=playPauseShape,
+  elevation=10.dp)`, persis presedan Tactile Batch 55; (2) `GestureIndicatorBadge` (badge popup
+  geser kecerahan/volume) — sebelumnya `isTactile`-only, cabang else-nya (dipakai Skeu) masih
+  `Surface` translusen (`colorScheme.surface.copy(alpha=0.9f)` + `tonalElevation=6.dp` +
+  `shadowElevation=4.dp`, mekanisme M3 tonal-elevation-blend, kasus glassmorphism lain yang
+  kelewat) — sekarang `isPanelTheme = isTactile || isSkeu` dipakai untuk semua 4 parameter
+  (`modifier`/`color`/`tonalElevation`/`shadowElevation`), Skeu dapat `Color.Transparent` +
+  `skeuEmboss()` + elevasi 0.dp sama seperti Tactile.
+- `README.md` — paragraf tema Skeuomorphism Dark Lite diperbarui (opaque/panel solid, border
+  ukiran, daftar titik baru yang dapat `skeuEmboss()`).
+- **Catatan arsitektur, bukan bug baru**: pada Box luar `MiniPlayerBar`, `skeuEmboss()` dan
+  `frostedGlass()` sama-sama dipasang di modifier chain yang sama (Tactile sudah begini sejak
+  lama). Karena `frostedGlass()` untuk Skeu sekarang opaque (lihat di atas), background+border
+  gradient `skeuEmboss()` di titik itu ketutup penuh oleh background+border `frostedGlass()` yang
+  digambar belakangan dalam chain — hanya drop-shadow `skeuEmboss()` (digambar via `drawBehind`
+  sebelum `.clip()`, jadi tidak ikut ketutup/ke-clip) yang tetap kelihatan. Sama persis dengan
+  bagaimana Tactile sudah bekerja selama ini (bukan regresi), tapi juga bukan yang paling efisien
+  — kandidat polish lanjutan kalau animasi scale/elevation `skeuEmboss()` di titik itu ingin
+  benar-benar terlihat penuh (lepas dari `frostedGlass()` pada Box yang sama).
+- **Belum diverifikasi visual/compile** (tidak ada `kotlinc`/emulator di environment ini) —
+  brace/paren balance dicek otomatis di semua 5 file Kotlin yang disentuh (seimbang), grep
+  konfirmasi `SkeuEdge` 0 call site tersisa dan `frostedGlass()` 0 call site yang pass `alpha`
+  eksplisit sebelum perubahan diterapkan.
+- **Sengaja TIDAK dikerjakan**: `HomeScreen.kt` (`ContinueListeningCard`) dan `LibraryScreen.kt`
+  (row list) juga punya cabang `isTactile`-only, tapi audit menunjukkan cabang else-nya (dipakai
+  Skeu) sudah `MaterialTheme.colorScheme.surface` TANPA `.copy(alpha=...)` — sudah opaque dari
+  awal, bukan kontributor kesan glassmorphism, jadi di luar scope perbaikan spesifik batch ini.
+
+
 ## Batch 57 — Toggle tema custom baru: Skeuomorphism Dark Lite
 User minta tema custom ketiga (kedua di luar keluarga Apple), tanpa spesifikasi eksternal
 disediakan — palet dirancang sendiri sesuai definisi umum skeuomorphism dark-lite, sengaja

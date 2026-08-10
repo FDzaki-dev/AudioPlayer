@@ -129,11 +129,14 @@ val SkeuDarkSuccess = Color(0xFF7FB86B)
 val SkeuDarkAccent = Color(0xFFCB8B4B)
 
 // --- Bevel tokens (dipakai skeuEmboss() & frostedGlass()'s Skeu branch) ------
-// Pola sama seperti TactileHighlight/Edge/Shadow (dua-stop diagonal untuk
-// border, alpha tunggal untuk shadow) tapi nilainya sendiri: highlight sedikit
-// lebih kuat (bevel skeuomorphic butuh catch-light lebih jelas biar "timbul"
-// terbaca di atas charcoal, bukan AMOLED-black), shadow lebih rendah (kontras
-// dasarnya sudah lebih tinggi dari AMOLED jadi tak perlu shadow sekuat Tactile).
+// Pola sama seperti TactileHighlight/Shadow (dua-stop diagonal untuk border,
+// alpha tunggal untuk shadow) tapi nilainya sendiri: highlight sedikit lebih
+// kuat (bevel skeuomorphic butuh catch-light lebih jelas biar "timbul" terbaca
+// di atas charcoal, bukan AMOLED-black), shadow lebih rendah (kontras dasarnya
+// sudah lebih tinggi dari AMOLED jadi tak perlu shadow sekuat Tactile).
 val SkeuHighlight = Color.White.copy(alpha = 0.10f)
-val SkeuEdge = Color.Black.copy(alpha = 0.12f)
 val SkeuShadow = Color.Black.copy(alpha = 0.55f)
+// Batch 58 — SkeuEdge (dulu 0xFF000000 alpha 0.12f, dipakai sebagai stop kedua
+// border frostedGlass()'s Skeu branch) dihapus: diganti SkeuShadow di sana
+// (BlurUtils.kt) supaya border-nya kebaca bevel terukir/carved, bukan lagi rim
+// kaca lembut ala Tactile — grep dicek nihil pemanggil lain sebelum dihapus.

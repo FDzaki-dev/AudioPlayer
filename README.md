@@ -36,16 +36,20 @@ sering dilihat — sekarang punya bentuk rounded-square + emboss taktil sendiri,
 flat Apple; border hero art album disamakan ke arah bevel diagonal yang sama seperti seluruh
 permukaan kaca lainnya.
 
-  **Skeuomorphism Dark Lite** (Batch 57) — identitas custom kedua, tanpa spesifikasi eksternal
-  (dirancang sendiri sesuai definisi umum skeuomorphism dark-lite, beda dari batch-batch tema
-  Tactile yang selalu berbasis spec file yang di-supply user). Wajib gelap juga, tapi arah
-  visualnya sengaja dibedakan dari Tactile: fondasi charcoal netral hangat (`#16181C`, bukan
-  AMOLED near-black berhue biru Tactile) dengan panel timbul (bukan kaca translusen) lewat bevel
-  highlight/shadow sendiri (`skeuEmboss()`, mekanisme sama dengan `tactileEmboss()` tapi token
-  warnanya beda), aksen tembaga hangat (`#CB8B4B`, bukan biru dingin), sudut lebih membulat satu
-  tingkat dari Tactile di tiap ukuran (12/16/20dp vs 10/12/16dp). Baru ditampilkan lewat pratinjau
-  hidup di baris pemilih tema (Pengaturan) — bevel di kontrol lain (tombol play/pause, dst.,
-  seperti yang Tactile dapat bertahap di Batch 49-55) belum digarap batch ini.
+  **Skeuomorphism Dark Lite** (Batch 57, di-polish Batch 58) — identitas custom kedua, tanpa
+  spesifikasi eksternal (dirancang sendiri sesuai definisi umum skeuomorphism dark-lite, beda
+  dari batch-batch tema Tactile yang selalu berbasis spec file yang di-supply user). Wajib gelap
+  juga, tapi arah visualnya sengaja dibedakan dari Tactile: fondasi charcoal netral hangat
+  (`#16181C`, bukan AMOLED near-black berhue biru Tactile) dengan panel timbul **solid/opaque**
+  (bukan kaca translusen sama sekali — Batch 58 menghapus sisa translusensi yang tadinya masih
+  ikut terwarisi dari helper `frostedGlass()` bersama) lewat bevel highlight/shadow sendiri
+  (`skeuEmboss()`, mekanisme sama dengan `tactileEmboss()` tapi token warna & intensitas bevel-nya
+  sendiri — catch-light lebih kuat, shadow lebih rendah dari Tactile), aksen tembaga hangat
+  (`#CB8B4B`, bukan biru dingin), sudut lebih membulat satu tingkat dari Tactile di tiap ukuran
+  (12/16/20dp vs 10/12/16dp), border panel bergaya ukiran (highlight→shadow, bukan lagi rim kaca
+  lembut). Batch 58: `skeuEmboss()` sekarang juga dipasang di mini player (bar & tombol
+  play/pause), tombol play/pause utama Now Playing, dan badge indikator gesture (geser
+  kecerahan/volume) — sebelumnya baru dipakai di baris pemilih tema saja.
 
   Dipilih lewat tab **Pengaturan** di navigasi bawah, tersimpan otomatis, diterapkan ulang tiap sesi
 - **Halaman Pengaturan**: tab baru di navigasi bawah — berisi pemilih tema dan info versi aplikasi (nomor versi + build)

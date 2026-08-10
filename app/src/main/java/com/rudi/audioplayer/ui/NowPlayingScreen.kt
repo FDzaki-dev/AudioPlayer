@@ -82,7 +82,9 @@ import com.rudi.audioplayer.playback.EqualizerUiState
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.tactileEmboss
+import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
+import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.TactileHighlight
 import com.rudi.audioplayer.ui.theme.TactileShadow
 import com.rudi.audioplayer.ui.theme.Radius
@@ -133,6 +135,11 @@ fun NowPlayingScreen(
     // button was the single most-seen control that still rendered byte-identical between Apple
     // and Tactile (default M3 circular FilledIconButton, no shape/bevel difference at all).
     val isTactile = isTactileTheme()
+    // Batch 58 — same hoist reasoning as isTactile above: the play/pause button and
+    // GestureIndicatorBadge still rendered Skeu byte-identical to Apple (default M3 circle +
+    // translucent 0.9f-alpha Surface) despite Skeu having had its own skeuEmboss() primitive
+    // ready since Batch 57 — the exact gap Batch 57's own PROJECT_STATE entry flagged.
+    val isSkeu = isSkeuTheme()
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
     var showQueueSheet by remember { mutableStateOf(false) }
@@ -483,7 +490,7 @@ fun NowPlayingScreen(
             // surface) instead of silently inheriting Apple's circular filledShape default; wrapped
             // in tactileEmboss() so the app's single most-used button reads as a lifted hardware
             // key (diagonal bevel + drop shadow), not just a flat colored disc like Apple's.
-            val playPauseShape = if (isTactile) MaterialTheme.shapes.medium else CircleShape
+            val playPauseShape = if (isTactile || isSkeu) MaterialTheme.shapes.medium else CircleShape
             FilledIconButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -498,9 +505,11 @@ fun NowPlayingScreen(
                 modifier = Modifier
                     .size(68.dp)
                     .then(
-                        if (isTactile)
-                            Modifier.tactileEmboss(shape = playPauseShape, elevation = 10.dp)
-                        else Modifier
+                        when {
+                            isTactile -> Modifier.tactileEmboss(shape = playPauseShape, elevation = 10.dp)
+                            isSkeu -> Modifier.skeuEmboss(shape = playPauseShape, elevation = 10.dp)
+                            else -> Modifier
+                        }
                     )
                     .bouncyPress(playPauseInteraction, pressedScale = 0.85f)
             ) {
@@ -834,14 +843,23 @@ private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit, accentColor: Color
 @Composable
 private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: Color, label: String? = null) {
     val isTactile = isTactileTheme()
+    // Batch 58 — was falling into the Apple-else branch (translucent 0.9f-alpha Surface, another
+    // literal glassmorphism cue) for Skeu; now gets the same opaque + embossed treatment Tactile
+    // already had, consistent with the rest of this batch's frostedGlass()/skeuEmboss() fixes.
+    val isSkeu = isSkeuTheme()
+    val isPanelTheme = isTactile || isSkeu
     Surface(
-        modifier = if (isTactile) Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xl), elevation = 8.dp) else Modifier,
+        modifier = when {
+            isTactile -> Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xl), elevation = 8.dp)
+            isSkeu -> Modifier.skeuEmboss(shape = RoundedCornerShape(Radius.xl), elevation = 8.dp)
+            else -> Modifier
+        },
         shape = RoundedCornerShape(Radius.xl),
-        color = if (isTactile) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        color = if (isPanelTheme) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
         // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent fallback.
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = if (isTactile) 0.dp else 6.dp,
-        shadowElevation = if (isTactile) 0.dp else 4.dp
+        tonalElevation = if (isPanelTheme) 0.dp else 6.dp,
+        shadowElevation = if (isPanelTheme) 0.dp else 4.dp
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),

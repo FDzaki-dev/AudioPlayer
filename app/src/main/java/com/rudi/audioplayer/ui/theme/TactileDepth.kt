@@ -69,7 +69,23 @@ private fun Modifier.embossSurface(
     surfaceBottom: Color,
     highlight: Color,
     shadow: Color,
-    label: String
+    label: String,
+    // Batch 58 — these six used to be literals hardcoded straight into the body below (same
+    // values for every caller). That silently discarded whatever alpha `highlight`/`shadow`
+    // already carried (Color.copy REPLACES alpha, it doesn't multiply) — harmless for Tactile
+    // only because these literals happened to be tuned to exactly match TactileHighlight/
+    // TactileShadow's own baked alpha in the first place (Batch 53), but it meant Skeu's own
+    // SkeuHighlight (0.10f, deliberately stronger per Color.kt's comment) and SkeuShadow (0.55f,
+    // deliberately lower) were quietly overwritten back to Tactile's numbers whenever
+    // skeuEmboss() ran — Skeu's bevel never actually rendered as its own designed intensity.
+    // Defaults below are the exact previous Tactile literals, so tactileEmboss() (which doesn't
+    // pass these) is byte-identical to before; skeuEmboss() now passes its own tuned values.
+    borderTopAlphaNormal: Float = 0.065f,
+    borderTopAlphaPressed: Float = 0.03f,
+    borderBottomAlphaNormal: Float = 0.30f,
+    borderBottomAlphaPressed: Float = 0.15f,
+    shadowAlphaNormal: Float = 0.70f,
+    shadowAlphaPressed: Float = 0.35f
 ): Modifier {
     val animatedElevation by animateDpAsState(
         targetValue = if (pressed) elevation / 4 else elevation,
@@ -81,15 +97,14 @@ private fun Modifier.embossSurface(
     )
     // Border stays a whisper per spec §8 ("never a bright white border") / §18 ("no excessive
     // glow") — these are absolute alphas (Color.copy replaces alpha entirely, it doesn't
-    // multiply the base token's own alpha), so the numbers below are the final on-screen values,
-    // same as the original single-theme version of this function.
-    val borderTopAlpha = if (pressed) 0.03f else 0.065f
-    val borderBottomAlpha = if (pressed) 0.15f else 0.30f
+    // multiply the base token's own alpha), so the numbers below are the final on-screen values.
+    val borderTopAlpha = if (pressed) borderTopAlphaPressed else borderTopAlphaNormal
+    val borderBottomAlpha = if (pressed) borderBottomAlphaPressed else borderBottomAlphaNormal
     // The offset drop-shadow does the actual depth-communication work (spec §5: "GlassShadow").
     // Kept at the token's own base rather than diluted further, or it disappears against a dark
     // background; a faint shadow-on-near-black reads as nothing at all — the exact Matte Noir
     // mistake (PROJECT_STATE.md Batch 39-44), not repeated here.
-    val shadowAlpha = if (pressed) 0.35f else 0.70f
+    val shadowAlpha = if (pressed) shadowAlphaPressed else shadowAlphaNormal
 
     return this
         .scale(scale)
@@ -138,10 +153,12 @@ fun Modifier.tactileEmboss(
 
 // Batch 57 — Skeuomorphism Dark Lite's own emboss primitive: same mechanism as tactileEmboss()
 // (see embossSurface() above) with Skeu's own charcoal/copper tokens instead of Tactile's
-// AMOLED-glass ones. Not yet wired into any screen this batch (same precedent as Tactile itself,
-// which was added in Theme.kt/TactileDepth.kt across Batch 45-48 before NowPlayingScreen.kt's
-// play/pause button picked it up in Batch 55) — the theme picker row (SettingsScreen.kt) is the
-// one call site this batch, giving the toggle a live preview of its own identity.
+// AMOLED-glass ones. Batch 58: wired into MiniPlayerBar.kt/NowPlayingScreen.kt (mirroring the
+// same rollout Tactile got in Batch 55), and now passes its own bevel alphas explicitly instead
+// of silently inheriting Tactile's (see embossSurface()'s Batch 58 comment above) — highlight
+// stronger (0.10f vs Tactile's 0.065f, Color.kt's own long-standing design comment), shadow
+// lower (0.55f vs 0.70f) so the bevel reads as a distinct, more restrained "carved panel" instead
+// of a re-skinned copy of Tactile's glass-tuned depth cue.
 @Composable
 fun Modifier.skeuEmboss(
     shape: Shape = MaterialTheme.shapes.medium,
@@ -155,5 +172,11 @@ fun Modifier.skeuEmboss(
     surfaceBottom = SkeuDarkSurface,
     highlight = SkeuHighlight,
     shadow = SkeuShadow,
-    label = "skeuEmboss"
+    label = "skeuEmboss",
+    borderTopAlphaNormal = 0.10f,
+    borderTopAlphaPressed = 0.045f,
+    borderBottomAlphaNormal = 0.24f,
+    borderBottomAlphaPressed = 0.12f,
+    shadowAlphaNormal = 0.55f,
+    shadowAlphaPressed = 0.28f
 )

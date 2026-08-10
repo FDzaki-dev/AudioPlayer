@@ -32,7 +32,9 @@ import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.tactileEmboss
+import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
+import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.Radius
 
 @Composable
@@ -49,6 +51,10 @@ fun MiniPlayerBar(
     // corners — Tactile's own rounding vs Apple's.
     val barShape = MaterialTheme.shapes.large
     val isTactile = isTactileTheme()
+    // Batch 58 — Skeu now gets the same "physical panel" branch as Tactile here (previously fell
+    // into the Apple-else default: plain shadow + a now-fully-opaque frostedGlass() fill, which
+    // read closer to a flat card than Skeu's own bevelled identity).
+    val isSkeu = isSkeuTheme()
     val animatedAccent by animateColorAsState(
         targetValue = accentColor ?: MaterialTheme.colorScheme.primary,
         animationSpec = tween(700),
@@ -57,7 +63,7 @@ fun MiniPlayerBar(
     // Album-art accents can be very bright or very dark. Choose the control icon
     // color from luminance so the primary action remains readable in every case.
     val accentContentColor = if (animatedAccent.luminance() > 0.55f) Color.Black else Color.White
-    val miniPlayPauseShape = if (isTactile) MaterialTheme.shapes.medium else CircleShape
+    val miniPlayPauseShape = if (isTactile || isSkeu) MaterialTheme.shapes.medium else CircleShape
 
     Box(
         modifier = Modifier
@@ -69,10 +75,11 @@ fun MiniPlayerBar(
                 // a lifted tactile panel, not just a rectangle with a bigger shadow.
                 // frostedGlass() below still draws the readable tinted fill on top, matching
                 // its own shape/border so corners line up under either theme.
-                if (isTactile)
-                    Modifier.tactileEmboss(shape = barShape, elevation = 16.dp)
-                else
-                    Modifier.shadow(elevation = 12.dp, shape = barShape, ambientColor = Color.Black, spotColor = Color.Black)
+                when {
+                    isTactile -> Modifier.tactileEmboss(shape = barShape, elevation = 16.dp)
+                    isSkeu -> Modifier.skeuEmboss(shape = barShape, elevation = 16.dp)
+                    else -> Modifier.shadow(elevation = 12.dp, shape = barShape, ambientColor = Color.Black, spotColor = Color.Black)
+                }
             )
             .clip(barShape)
             .frostedGlass()
@@ -130,9 +137,11 @@ fun MiniPlayerBar(
                 modifier = Modifier
                     .size(40.dp)
                     .then(
-                        if (isTactile)
-                            Modifier.tactileEmboss(shape = miniPlayPauseShape, elevation = 6.dp)
-                        else Modifier
+                        when {
+                            isTactile -> Modifier.tactileEmboss(shape = miniPlayPauseShape, elevation = 6.dp)
+                            isSkeu -> Modifier.skeuEmboss(shape = miniPlayPauseShape, elevation = 6.dp)
+                            else -> Modifier
+                        }
                     )
                     .bouncyPress(playPauseInteraction, pressedScale = 0.82f)
             ) {
