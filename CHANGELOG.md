@@ -1,5 +1,15 @@
 # Changelog
 
+## Batch 64 — Ganti tombol "Salin" -> "Repack ke Dokumen" di Log Diagnostik
+1 file disentuh (tidak ada protected asset).
+
+- `DiagnosticLogSheet.kt`: tombol copy-to-clipboard diganti `AppLogger.exportLogToDocuments(context)`
+  — menulis isi log saat ini ke file baru `log_<timestamp>_<uuid>.txt` di folder publik
+  `Documents/AudioPlayer/logs` (folder sama dgn crash_*.txt), via MediaStore API 29+, tanpa
+  permission baru. Icon ganti dari ContentCopy -> Archive.
+- `AppLogger.kt`: tambah `exportLogToDocuments()` + `enforceExportLogRetention()` (FIFO 20 file,
+  scoped ke prefix `log_` saja — retensi 50 file `crash_*.txt` yang sudah ada tidak disentuh).
+
 ## Batch 63 — Ganti total aksen tembaga -> Titanium+Silver metalik + baseline Skeu tidak identik lagi
 2 instruksi user: (1) "ganti total accent tembaga -> Titanium+silver metallic", (2) "semua
 Theme custom wajib menampilkan visual secara otonom tanpa menggunakan baseline yang identik".

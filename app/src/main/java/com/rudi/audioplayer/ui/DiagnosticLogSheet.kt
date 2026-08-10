@@ -4,15 +4,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,7 +26,7 @@ import com.rudi.audioplayer.util.AppLogger
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
-    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var logText by remember { mutableStateOf(AppLogger.readLog()) }
@@ -74,16 +73,19 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
                     onClick = {
-                        clipboard.setText(AnnotatedString(logText))
+                        val ok = AppLogger.exportLogToDocuments(context)
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onInfoMessage("Log disalin ke papan klip")
+                        onInfoMessage(
+                            if (ok) "Log disimpan ke Documents/AudioPlayer/logs"
+                            else "Gagal menyimpan log (perlu Android 10+)"
+                        )
                     },
                     enabled = logText.isNotBlank(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = null)
+                    Icon(Icons.Default.Archive, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Salin")
+                    Text("Repack ke Dokumen")
                 }
                 OutlinedButton(
                     onClick = {

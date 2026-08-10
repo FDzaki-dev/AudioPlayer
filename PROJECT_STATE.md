@@ -6,6 +6,14 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 64 (Tombol Log Diagnostik: Salin -> Repack ke Dokumen)** — `DiagnosticLogSheet.kt`
+tombol copy-clipboard diganti `AppLogger.exportLogToDocuments(context)`: tulis snapshot log
+saat ini ke `log_<timestamp>_<uuid>.txt` di `Documents/AudioPlayer/logs` (MediaStore API 29+,
+folder sama dgn crash_*.txt, no permission baru). FIFO retensi 20 file scoped prefix `log_`
+(fungsi baru `enforceExportLogRetention`, terpisah dari retensi 50 file `crash_*.txt` yang
+sudah ada — tidak disentuh). Icon tombol ContentCopy → Archive. Tidak ada protected asset
+disentuh. Detail lengkap di `CHANGELOG.md` Batch 64.
+
 **Batch 63 (Ganti total aksen tembaga → Titanium+Silver metalik + baseline Skeu tidak identik
 lagi)** — 2 instruksi: ganti total accent tembaga Skeu → Titanium+Silver metalik, dan semua
 tema custom wajib visual otonom tanpa baseline identik. `SkeuDarkAccent` (tembaga, sejak

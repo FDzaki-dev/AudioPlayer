@@ -86,6 +86,53 @@ object AppLogger {
         runCatching { logFile?.writeText("") }
     }
 
+    // FIFO cap for exported log_*.txt files in the same public folder — mirrors the crash-log
+    // retention policy so manual exports can't grow the Documents folder unbounded either.
+    private const val MAX_EXPORT_LOGS = 20
+
+    /** Repacks the current in-app diagnostic log into a standalone log_<timestamp>.txt file inside
+     * the public Documents/AudioPlayer/logs folder (same folder crash reports use via MediaStore,
+     * API 29+, no storage permission needed) so it can be pulled off with any file manager instead
+     * of only living in the clipboard. Returns true on success, false if there's nothing to export,
+     * the write failed, or the device is below API 29. */
+    fun exportLogToDocuments(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+        val text = readLog()
+        if (text.isBlank()) return false
+        return runCatching {
+            val fileName = "log_${fileStampFormat.format(Date())}_${UUID.randomUUID()}.txt"
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, "text/plain")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, CRASH_LOG_RELATIVE_PATH)
+            }
+            val resolver = context.applicationContext.contentResolver
+            val uri = resolver.insert(MediaStore.Files.getContentUri("external"), values) ?: return false
+            resolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) }
+            enforceExportLogRetention(context)
+            true
+        }.getOrDefault(false)
+    }
+
+    /** Keeps only the newest [MAX_EXPORT_LOGS] exported log_*.txt files — same FIFO idea as
+     * [enforceCrashLogRetention], scoped to the "log_" prefix so it never touches crash_*.txt. */
+    private fun enforceExportLogRetention(context: Context) {
+        val resolver = context.applicationContext.contentResolver
+        val collection = MediaStore.Files.getContentUri("external")
+        val projection = arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DATE_ADDED)
+        val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} = ? AND ${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
+        val selectionArgs = arrayOf("$CRASH_LOG_RELATIVE_PATH/", "log_%.txt")
+        val ids = mutableListOf<Long>()
+        resolver.query(collection, projection, selection, selectionArgs, "${MediaStore.MediaColumns.DATE_ADDED} DESC")?.use { cursor ->
+            val idCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+            while (cursor.moveToNext()) ids.add(cursor.getLong(idCol))
+        }
+        if (ids.size <= MAX_EXPORT_LOGS) return
+        for (id in ids.drop(MAX_EXPORT_LOGS)) {
+            runCatching { resolver.delete(ContentUris.withAppendedId(collection, id), null, null) }
+        }
+    }
+
     @Synchronized
     private fun appendEntry(level: String, message: String) {
         val file = logFile ?: return
