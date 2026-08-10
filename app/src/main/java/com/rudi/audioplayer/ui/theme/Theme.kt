@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 enum class ThemeIdentity(val storageKey: String, val displayName: String, val description: String) {
     APPLE("apple", "Apple", "Tampilan bersih khas iOS, mengikuti mode terang/gelap yang dipilih"),
     TACTILE("tactile_lite", "Tactile", "Kaca premium dengan sentuhan Midnight Blue tipis dan kontrol taktil — kini otonom di mode terang maupun gelap"),
-    SKEU_DARK_LITE("skeu_dark_lite", "Skeuomorphism", "Panel timbul dengan bevel lembut dan aksen tembaga hangat — kini otonom di mode terang maupun gelap");
+    SKEU_DARK_LITE("skeu_dark_lite", "Skeuomorphism", "Panel timbul dengan bevel lembut dan aksen Titanium&Silver metalik — kini otonom di mode terang maupun gelap");
 
     companion object {
         fun fromStorageKey(key: String?): ThemeIdentity = entries.find { it.storageKey == key } ?: APPLE
@@ -139,10 +139,11 @@ private val TactileLightColors = lightColorScheme(
 // Batch 57 — Skeuomorphism's own color role mapping (DARK expression). Batch 61: renamed
 // SkeuDarkColors kept as-is (name already had "Dark" — now explicitly paired with SkeuLightColors
 // below instead of being the only variant). onPrimary picked by the same luminance rule used
-// elsewhere (>0.55 luminance -> black text): SkeuDarkAccent (0xFFCB8B4B) simple luma ≈0.60, above
+// elsewhere (>0.55 luminance -> black text): SkeuAccent (0xFFB6BAC0, Titanium+Silver metalik
+// sejak Batch 63 — dulu tembaga 0xFFCB8B4B) simple luma ≈0.73, tetap jauh di atas
 // the threshold, so onPrimary is Color.Black in BOTH variants (accent shared across light/dark).
 private val SkeuDarkColors = darkColorScheme(
-    primary = SkeuDarkAccent,
+    primary = SkeuAccent,
     onPrimary = Color.Black,
     secondary = SkeuDarkSecondaryText,
     onSecondary = SkeuDarkBackground,
@@ -155,13 +156,13 @@ private val SkeuDarkColors = darkColorScheme(
     surfaceVariant = SkeuDarkSurfaceVariant,
     onSurfaceVariant = SkeuDarkSecondaryText,
     outline = SkeuDarkSurfaceVariant,
-    surfaceTint = SkeuDarkAccent,
+    surfaceTint = SkeuAccent,
     error = SkeuDarkError
 )
 
 // Batch 61 — Skeuomorphism's own LIGHT expression (Color.kt "SKEUOMORPHISM — LIGHT VARIANT").
 private val SkeuLightColors = lightColorScheme(
-    primary = SkeuDarkAccent,
+    primary = SkeuAccent,
     onPrimary = Color.Black,
     secondary = SkeuLightSecondaryText,
     onSecondary = SkeuLightBackground,
@@ -174,7 +175,7 @@ private val SkeuLightColors = lightColorScheme(
     surfaceVariant = SkeuLightSurfaceVariant,
     onSurfaceVariant = SkeuLightSecondaryText,
     outline = SkeuLightSurfaceVariant,
-    surfaceTint = SkeuDarkAccent,
+    surfaceTint = SkeuAccent,
     error = SkeuDarkError
 )
 
@@ -226,7 +227,7 @@ fun resolveIsDark(mode: ThemeMode): Boolean = when (mode) {
 fun isTactileTheme(): Boolean = MaterialTheme.colorScheme.primary == TactileAccent
 
 @Composable
-fun isSkeuTheme(): Boolean = MaterialTheme.colorScheme.primary == SkeuDarkAccent
+fun isSkeuTheme(): Boolean = MaterialTheme.colorScheme.primary == SkeuAccent
 
 fun colorsFor(identity: ThemeIdentity, isDark: Boolean) = when (identity) {
     ThemeIdentity.TACTILE -> if (isDark) TactileDarkColors else TactileLightColors

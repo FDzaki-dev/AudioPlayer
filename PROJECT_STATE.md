@@ -6,6 +6,18 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 63 (Ganti total aksen tembaga → Titanium+Silver metalik + baseline Skeu tidak identik
+lagi)** — 2 instruksi: ganti total accent tembaga Skeu → Titanium+Silver metalik, dan semua
+tema custom wajib visual otonom tanpa baseline identik. `SkeuDarkAccent` (tembaga, sejak
+Batch 53) dihapus permanen → `SkeuAccent` (silver-gray) + token `TitaniumDark`/
+`SilverHighlight` baru. Undertone hangat Skeu (krem/parchment) ikut digeser dingin (platinum/
+silver) di `Color.kt` — konsekuensi koherensi desain dari ganti keluarga logam. Ambient wash
+Skeu (baru Batch 62, dulu 3-stop identik dgn Tactile) diganti struktur 4-stop `colorStops`
+custom ("brushed metal streak") — Tactile tidak disentuh. `MainActivity.kt` (edit parsial,
+protected) rename `SkeuDarkAccent`→`SkeuAccent` + brush baru pakai spread-operator vararg
+(`Brush.linearGradient(*arrayOf(...))`). **Belum diverifikasi visual** — palet & efek streak
+baru, tanpa referensi device. Detail lengkap di `CHANGELOG.md` Batch 63.
+
 **Batch 62 (Vibes radikal lepas batasan mode + CI compile time dipangkas drastis)** — 2
 instruksi digabung. (1) Ambient root wash (Midnight Blue Tactile, dulu digated ke mode gelap
 di Batch 61) sekarang trait IDENTITAS murni — tampil di kedua mode tanpa gate, alpha mode

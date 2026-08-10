@@ -132,9 +132,11 @@ val TactileLightShadow = Color(0xFF1B2436).copy(alpha = 0.18f)
 // theme (unlike Tactile's spec-driven batches 49-55) — palette dirancang
 // sendiri sesuai definisi umum "skeuomorphism dark-lite": panel netral gelap
 // yang terbaca timbul/fisik lewat bevel highlight+shadow lembut, bukan lewat
-// warna aksen mencolok. Sengaja dibedakan dari Tactile (AMOLED near-black +
-// hue biru dingin) lewat basis abu-abu hangat (bukan biru) + aksen tembaga
-// hangat, supaya kedua tema custom tidak terasa jadi varian satu sama lain.
+// warna aksen mencolok. Batch 63 — aksen tembaga hangat (identitas awal) diganti
+// total Titanium+Silver metalik dingin; pembeda dari Tactile (AMOLED near-black +
+// hue biru dingin) sekarang murni lewat STRUKTUR (bevel timbul + brushed-metal
+// streak, bukan lagi lewat temperatur warna), supaya kedua tema custom tetap
+// tidak terasa jadi varian satu sama lain walau sama-sama netral dingin sekarang.
 // ============================================================================
 
 // --- Foundation --------------------------------------------------------------
@@ -147,17 +149,31 @@ val SkeuDarkSurface = Color(0xFF23262B) // panel timbul level 1
 val SkeuDarkSurfaceVariant = Color(0xFF2C3036) // panel timbul level 2 (lebih terangkat)
 
 // --- Typography ----------------------------------------------------------------
-val SkeuDarkText = Color(0xFFF3EFE7) // krem hangat, bukan putih murni (nuansa "kertas/kulit")
-val SkeuDarkSecondaryText = Color(0xFFA8A29A) // abu hangat sekunder
+// Batch 63 — undertone digeser dari krem hangat ("kertas/kulit") ke abu-perak dingin,
+// supaya koheren dgn pergantian aksen tembaga -> Titanium+Silver metalik di bawah
+// (metal dingin di atas typography hangat akan terasa nabrak/tidak otonom).
+val SkeuDarkText = Color(0xFFEDEFF2) // hampir-putih dingin, nuansa "logam disikat"
+val SkeuDarkSecondaryText = Color(0xFFA6ABB2) // abu dingin sekunder
 
 // --- Semantic status -------------------------------------------------------------
 val SkeuDarkError = Color(0xFFE5675A)
 val SkeuDarkSuccess = Color(0xFF7FB86B)
 
 // --- Accent ------------------------------------------------------------------
-// Tembaga/amber hangat — sengaja beda hue dari AppleAccent (biru) & TactileAccent
-// (biru-ungu dingin), supaya identitas ketiga tema tidak saling tumpang tindih.
-val SkeuDarkAccent = Color(0xFFCB8B4B)
+// Batch 63 — GANTI TOTAL atas instruksi eksplisit user: tembaga/amber hangat
+// (0xFFCB8B4B, identitas sejak Batch 53) DIHAPUS PERMANEN, diganti keluarga
+// Titanium+Silver metalik. SkeuAccent (representasi flat, dipakai di role M3
+// primary/surfaceTint & isSkeuTheme() — role itu cuma bisa 1 Color, bukan Brush)
+// + 3 token gradient (Titanium.../SilverHighlight) di bawah untuk efek "brushed
+// metal" nyata di elemen non-M3-role (root ambient wash — lihat MainActivity.kt).
+// Hue sengaja dingin-netral, kontras total dgn AppleAccent (biru) & TactileAccent
+// (biru-ungu) — sekarang murni dibedakan lewat TEMPERATUR (dingin vs dingin lain)
+// bukan lagi lewat hue hangat-vs-dingin seperti sebelumnya; pembeda utama Skeu kini
+// ada di STRUKTUR (bevel timbul + brushed-metal streak), bukan lagi warna hangat.
+val SkeuAccent = Color(0xFFB6BAC0)
+val TitaniumDark = Color(0xFF6B6F75)
+val TitaniumLight = Color(0xFFCDD1D6)
+val SilverHighlight = Color(0xFFF2F3F5)
 
 // --- Bevel tokens (dipakai skeuEmboss() & frostedGlass()'s Skeu branch) ------
 // Pola sama seperti TactileHighlight/Shadow (dua-stop diagonal untuk border,
@@ -167,13 +183,12 @@ val SkeuDarkAccent = Color(0xFFCB8B4B)
 // sudah lebih tinggi dari AMOLED jadi tak perlu shadow sekuat Tactile).
 val SkeuHighlight = Color.White.copy(alpha = 0.10f)
 val SkeuShadow = Color.Black.copy(alpha = 0.55f)
-// Batch 62 — user instruksi "perkuat vibes tiap tema custom secara radikal": Skeu
-// sebelumnya TIDAK PERNAH punya ambient root wash sama sekali (identitasnya "panel
-// solid" murni flat, beda dari Tactile yang sejak Batch 53 sudah punya wash Midnight
-// Blue). Sekarang diberi wash tembaga sendiri di root screen (MainActivity.kt) — simetris
-// dengan perlakuan Tactile, tidak digated ke 1 mode saja (prinsip sama: identitas, bukan
-// trait mode). Alpha dark jauh lebih rendah dari light utk alasan kontras sama seperti
-// MidnightBlueLightAmbientAlpha di atas.
+// Batch 62 — ambient root wash Skeu pertama kali (dulu selalu flat total).
+// Batch 63 — sumber warna wash diganti dari SkeuDarkAccent (tembaga, sudah tidak ada)
+// ke TitaniumDark/SilverHighlight, DAN strukturnya sendiri diganti dari resep 3-stop
+// yang sama persis dgn Tactile (background->tint->surfaceVariant) menjadi 4-stop
+// "brushed-metal streak" (lihat MainActivity.kt) — supaya Tactile & Skeu tidak lagi
+// berbagi baseline struktural yang identik, sesuai instruksi eksplisit user.
 val SkeuAmbientAlphaDark = 0.05f
 val SkeuAmbientAlphaLight = 0.12f
 // Batch 58 — SkeuEdge (dulu 0xFF000000 alpha 0.12f, dipakai sebagai stop kedua
@@ -183,16 +198,17 @@ val SkeuAmbientAlphaLight = 0.12f
 
 // ============================================================================
 // SKEUOMORPHISM — LIGHT VARIANT — Batch 61. Sama alasan dengan TACTILE LIGHT di
-// atas: identitas Skeu dipisah total dari mode gelap/terang. Basis dibalik dari
-// charcoal netral ke krem/parchment hangat — skeuomorphism butuh jarak kontras
-// yang cukup antara background & panel timbul supaya bevelnya tetap terbaca
-// "fisik" walau di mode terang, bukan charcoal yang cuma dibalik jadi putih polos
-// (itu akan menghapus jarak kontras panel-vs-background yang jadi ciri khasnya).
+// atas: identitas Skeu dipisah total dari mode gelap/terang.
+// Batch 63 — basis digeser lagi dari krem/parchment hangat (cocok dgn tembaga lama)
+// ke platinum/silver dingin (cocok dgn Titanium+Silver baru) — tetap mempertahankan
+// jarak kontras background->panel yang jadi ciri khas bevel Skeu, cuma temperatur
+// warnanya yang dibalik total supaya identitasnya tetap 1 kesatuan koheren, bukan
+// aksen dingin di atas kanvas hangat yang terasa "nabrak".
 // ============================================================================
-val SkeuLightBackground = Color(0xFFEDE6DA) // krem hangat netral
-val SkeuLightSurface = Color(0xFFF7F2E9) // panel timbul level 1
-val SkeuLightSurfaceVariant = Color(0xFFFFFBF3) // panel timbul level 2 (lebih terangkat)
-val SkeuLightText = Color(0xFF2B241B)
-val SkeuLightSecondaryText = Color(0xFF6E6152)
+val SkeuLightBackground = Color(0xFFE4E6E9) // platinum/silver netral
+val SkeuLightSurface = Color(0xFFF2F3F5) // panel timbul level 1
+val SkeuLightSurfaceVariant = Color(0xFFFAFBFC) // panel timbul level 2 (lebih terangkat)
+val SkeuLightText = Color(0xFF212327)
+val SkeuLightSecondaryText = Color(0xFF63676D)
 val SkeuLightHighlight = Color.White
-val SkeuLightShadow = Color(0xFF3A2E1D).copy(alpha = 0.30f)
+val SkeuLightShadow = Color(0xFF23262B).copy(alpha = 0.30f)

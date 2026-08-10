@@ -1,5 +1,35 @@
 # Changelog
 
+## Batch 63 — Ganti total aksen tembaga -> Titanium+Silver metalik + baseline Skeu tidak identik lagi
+2 instruksi user: (1) "ganti total accent tembaga -> Titanium+silver metallic", (2) "semua
+Theme custom wajib menampilkan visual secara otonom tanpa menggunakan baseline yang identik".
+3 file disentuh (1 protected, edit parsial: `MainActivity.kt`).
+
+- **`SkeuDarkAccent` (0xFFCB8B4B, tembaga/amber hangat, identitas sejak Batch 53) DIHAPUS
+  PERMANEN**, diganti `SkeuAccent` (0xFFB6BAC0, silver-gray metalik) + 3 token gradient baru
+  (`TitaniumDark` 0xFF6B6F75, `TitaniumLight` 0xFF9BA0A6 [belum dipakai, disiapkan utk polish
+  lanjutan], `SilverHighlight` 0xFFF2F3F5). Rename `SkeuDarkAccent`→`SkeuAccent` konsisten di
+  3 file (`Color.kt`, `Theme.kt` — role M3 `primary`/`surfaceTint` + `isSkeuTheme()`
+  comparison, `MainActivity.kt`).
+- **Undertone hangat (krem/parchment/kulit) Skeu ikut digeser ke dingin (platinum/silver)**
+  di `Color.kt` — `SkeuDarkText`/`SecondaryText`, `SkeuLightBackground`/`Surface`/
+  `SurfaceVariant`/`Text`/`SecondaryText`/`Shadow` semua direvisi. Alasan: aksen dingin di
+  atas kanvas hangat akan terasa "nabrak"/tidak koheren — konsekuensi desain wajar dari
+  "ganti total" family logam (tembaga=hangat vs titanium=dingin), bukan scope creep.
+- **Struktur ambient wash Skeu (baru di Batch 62) diganti total dari Tactile** (poin 2 user)
+  — dulu 3-stop `background→tint→surfaceVariant` PERSIS sama resepnya dgn Tactile, cuma beda
+  warna. Sekarang 4-stop dgn `colorStops` custom: `TitaniumDark→SilverHighlight(1.8x alpha)
+  →TitaniumDark` ditumpuk sempit di fraction 0.55-0.68 (bukan disebar rata) meniru 1 garis
+  kilau pantulan cahaya di logam disikat ("brushed metal streak"), baru turun ke
+  `surfaceVariant` di stop akhir. Tactile TIDAK disentuh (3-stop lama tetap, sudah unik sejak
+  awal — cuma Skeu yang dulu ikut-ikutan pakai resep sama).
+- `ThemeIdentity.SKEU_DARK_LITE.description` diupdate ("aksen tembaga hangat" → "aksen
+  Titanium&Silver metalik").
+- **Belum diverifikasi visual** — baik palet netral-dingin baru maupun efek streak metalik
+  adalah desain baru tanpa referensi device fisik.
+- **Sengaja TIDAK dikerjakan**: `TitaniumLight` disiapkan sbg token tapi belum dipakai di
+  mana pun — cadangan kalau butuh stop gradient ke-4 saat polish visual lanjutan.
+
 ## Batch 62 — Vibes radikal (lepas batasan mode) + CI compile time dipangkas drastis
 2 instruksi user digabung 1 batch: (1) "perkuat vibes tiap tema custom secara radikal,
 tanpa mengikuti batasan light/dark system", (2) "terapkan semua cara pangkas waktu compile

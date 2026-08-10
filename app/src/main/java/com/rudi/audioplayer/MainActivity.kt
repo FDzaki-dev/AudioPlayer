@@ -105,7 +105,9 @@ import com.rudi.audioplayer.ui.theme.AmoledSurface
 import com.rudi.audioplayer.ui.theme.TactileHighlight
 import com.rudi.audioplayer.ui.theme.TactileLightSurfaceVariant
 import com.rudi.audioplayer.ui.theme.SkeuHighlight
-import com.rudi.audioplayer.ui.theme.SkeuDarkAccent
+import com.rudi.audioplayer.ui.theme.SkeuAccent
+import com.rudi.audioplayer.ui.theme.TitaniumDark
+import com.rudi.audioplayer.ui.theme.SilverHighlight
 import com.rudi.audioplayer.ui.theme.SkeuDarkSurfaceVariant
 import com.rudi.audioplayer.ui.theme.SkeuLightSurfaceVariant
 import com.rudi.audioplayer.ui.theme.SkeuAmbientAlphaDark
@@ -293,16 +295,18 @@ class MainActivity : FragmentActivity() {
                 // is the minimum change needed to express this one spec rule without touching any
                 // other screen file, since this Surface is the single shared root every screen
                 // renders inside.
-                // Batch 61 — Midnight Blue ambient wash tetap eksklusif utk ekspresi GELAP
-                // Tactile (AMOLED-only per spec §6/§7); di mode terang Tactile sekarang pakai
-                // kanvas flat seperti identitas lain (identitas & mode sudah dipisah total —
-                // ambient wash adalah detail visual mode-gelap, bukan trait Tactile itu sendiri).
                 // Batch 62 — DIBATALKAN atas instruksi eksplisit user: "perkuat vibes tiap tema
                 // custom secara radikal, tanpa mengikuti batasan light/dark system". Ambient wash
                 // sekarang trait IDENTITAS (selalu tampil, di kedua mode, dgn alpha & stop warna
                 // masing-masing dituning per mode — lihat Color.kt) — bukan lagi trait mode.
-                // Skeu (dulu flat total, tidak pernah punya wash) sekarang dapat wash tembaga
-                // sendiri, simetris dengan Tactile, sama-sama lintas mode.
+                // Batch 63 — Skeu tidak lagi berbagi resep 3-stop yang identik dgn Tactile (user:
+                // "wajib menampilkan visual secara otonom tanpa baseline yang identik"). Tactile
+                // tetap 3-stop even wash (kaca atmosferik, structure lama tidak berubah). Skeu naik
+                // jadi 4-stop dgn colorStops custom — TitaniumDark & SilverHighlight ditumpuk jadi
+                // 1 "kilau" sempit (bukan blend rata sepanjang gradient) meniru pantulan cahaya di
+                // logam disikat ("brushed metal streak"), lalu turun lagi ke SkeuSurfaceVariant.
+                // Warnanya pun sudah bukan lagi turunan SkeuAccent tembaga (dihapus total) — murni
+                // TitaniumDark/SilverHighlight, keluarga token baru khusus utk efek metalik ini.
                 val identityRootBrush = when (appThemeIdentity) {
                     ThemeIdentity.TACTILE -> Brush.linearGradient(
                         colors = if (isDarkTheme)
@@ -318,22 +322,25 @@ class MainActivity : FragmentActivity() {
                                 TactileLightSurfaceVariant
                             )
                     )
-                    ThemeIdentity.SKEU_DARK_LITE -> Brush.linearGradient(
-                        colors = if (isDarkTheme)
-                            listOf(
-                                MaterialTheme.colorScheme.background,
-                                SkeuDarkAccent.copy(alpha = SkeuAmbientAlphaDark),
-                                SkeuDarkSurfaceVariant
+                    ThemeIdentity.SKEU_DARK_LITE -> {
+                        val streakAlpha = if (isDarkTheme) SkeuAmbientAlphaDark else SkeuAmbientAlphaLight
+                        val streakEnd = if (isDarkTheme) SkeuDarkSurfaceVariant else SkeuLightSurfaceVariant
+                        Brush.linearGradient(
+                            *arrayOf(
+                                0.00f to MaterialTheme.colorScheme.background,
+                                0.55f to TitaniumDark.copy(alpha = streakAlpha),
+                                // Titik kilau sempit (0.60-0.68) ditumpuk tepat setelah TitaniumDark
+                                // — rentang fraction yang sengaja disempitkan (bukan disebar rata
+                                // seperti resep 3-stop Tactile) supaya terbaca sebagai satu garis
+                                // pantulan cahaya di logam, bukan gradasi warna yang mulus.
+                                0.62f to SilverHighlight.copy(alpha = streakAlpha * 1.8f),
+                                0.68f to TitaniumDark.copy(alpha = streakAlpha),
+                                1.00f to streakEnd
                             )
-                        else
-                            listOf(
-                                MaterialTheme.colorScheme.background,
-                                SkeuDarkAccent.copy(alpha = SkeuAmbientAlphaLight),
-                                SkeuLightSurfaceVariant
-                            )
-                    )
+                        )                    }
                     else -> null
                 }
+
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
@@ -669,7 +676,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         // read as "blue" before "glass" — 6.dp keeps a legible elevated-glass lift
                         // (Level 2, spec §4) without the accent wash dominating the one piece of
                         // chrome that's always on screen. Batch 57: Skeu shares this same 6.dp —
-                        // same reasoning (SkeuDarkAccent as surfaceTint would otherwise dominate).
+                        // same reasoning (SkeuAccent as surfaceTint would otherwise dominate).
                         tonalElevation = if (navCatchLightColor != null) 6.dp else NavigationBarDefaults.Elevation
                     ) {
                         NavigationBarItem(
