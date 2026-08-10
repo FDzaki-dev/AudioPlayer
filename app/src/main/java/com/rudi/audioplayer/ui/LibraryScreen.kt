@@ -315,7 +315,7 @@ fun LibraryScreen(
                 selectedIds = selectedIds,
                 onToggleSelect = { id -> toggleSelect(id) },
                 onEnterSelectionMode = { id -> selectionMode = true; selectedIds = persistentSetOf(id) },
-                onSweepSelectRange = { ids -> selectionMode = true; selectedIds = ids }
+                onSweepSelectRange = { ids -> selectionMode = true; selectedIds = ids.toPersistentSet() }
             )
             selectedTab == 1 -> AlbumGridView(
                 songs = filteredSongs,

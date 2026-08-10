@@ -6,6 +6,15 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 71 (Fix 2 error compile CI dari log_fail_124)** — `SongArtBitmapLoader` (Batch 69)
+kurang override `BitmapLoader.supportsMimeType()` (abstract tanpa default di Media3 1.3.1) —
+ditambah, `true` utk mime `image/*`. `LibraryScreen.kt` `onSweepSelectRange` (Batch 70)
+assign `ImmutableSet<Long>` ke var `PersistentSet<Long>` — ditambah `.toPersistentSet()`.
+**Pola relevan utk batch depan**: kalau nambah `override fun` dari interface pihak ketiga
+(Media3, dll), selalu cek changelog/release notes versi library yang dipakai (lihat
+`app/build.gradle.kts`) utk method abstract baru — jangan asumsikan signature interface sama
+dgn versi yang diingat dari training. Detail lengkap: `CHANGELOG.md` Batch 71.
+
 **Batch 70 (Fitur sweep-select: tekan-lama lalu geser, tab Lagu)** — Jawaban atas laporan
 "pemilihan lagu satu-satu bikin pegel" (Batch 69). User pilih mekanisme via pertanyaan
 klarifikasi: tekan-lama 1 lagu lalu (tanpa angkat jari) geser ke atas/bawah buat pilih rentang

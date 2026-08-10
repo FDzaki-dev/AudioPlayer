@@ -454,4 +454,12 @@ private class SongArtBitmapLoader(
             }
             "loadBitmap($uri)"
         }
+
+    // Media3 1.3.1's BitmapLoader interface declares this abstract (no default) — it's what
+    // MediaSession asks before handing raw bytes to decodeBitmap() to decide if this loader
+    // can even attempt it. loadBitmap(uri) above is what actually resolves song.uri (via
+    // loadThumbnail()/MediaMetadataRetriever, not this path), so this only needs to cover the
+    // byte-array path decodeBitmap() itself handles: standard image formats BitmapFactory
+    // already decodes natively.
+    override fun supportsMimeType(mimeType: String): Boolean = mimeType.startsWith("image/")
 }

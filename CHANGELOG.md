@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 71 — Fix 2 error compile dari CI Batch 70 (log_fail_124)
+
+CI gagal di `:app:compileDebugKotlin`/`compileReleaseKotlin`, 2 error:
+
+1. `PlaybackService.kt:422` — `SongArtBitmapLoader` (dari Batch 69) tidak implement
+   `BitmapLoader.supportsMimeType(String): Boolean`. Fungsi ini abstract tanpa default di
+   Media3 1.3.1 (sebelumnya lolos compile lokal kemungkinan krn cache/versi Media3 berbeda saat
+   Batch 69 ditulis) — MediaSession memanggilnya utk cek apakah loader ini sanggup nangani
+   sebuah mime type sebelum kirim raw bytes ke `decodeBitmap()`. Fix: override, `true` utk
+   `mimeType.startsWith("image/")` — konsisten dgn `decodeBitmap()` yang memang cuma pakai
+   `BitmapFactory` (format image standar), bukan jalur `loadBitmap(uri)` yang justru resolve
+   `song.uri` via `loadThumbnail()`/`MediaMetadataRetriever`.
+2. `LibraryScreen.kt:318` — `onSweepSelectRange = { ids -> ...; selectedIds = ids }` gagal
+   krn parameter lambda `ids` bertipe `ImmutableSet<Long>` (signature `onSweepSelectRange:
+   (ImmutableSet<Long>) -> Unit` di `SongListView`) sementara `selectedIds` bertipe
+   `PersistentSet<Long>` (perlu `.add()/.remove()` di tempat lain, jadi tipenya tidak diubah).
+   `ImmutableSet` adalah supertype `PersistentSet`, assign langsung tidak valid. Fix:
+   `selectedIds = ids.toPersistentSet()` — import-nya sudah ada di file, 1 baris saja.
+
+2 file kode disentuh, 1 baris tiap file (kecuali override baru = 8 baris). Tidak ada protected
+asset, tidak ada perubahan behavior selain memperbaiki compile.
+
 ## Batch 70 — Fitur baru: sweep-select (tekan-lama lalu geser) di tab Lagu
 1 file disentuh (`LibraryScreen.kt`, tidak ada protected asset). Menjawab laporan user
 "pemilihan lagu masih satu-satu, bikin pegel" (sesi Batch 69) — user pilih mekanisme
