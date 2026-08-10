@@ -37,7 +37,8 @@ import com.rudi.audioplayer.data.ShakeSettingsStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.PlaylistStore
 import com.rudi.audioplayer.data.ThemeStore
-import com.rudi.audioplayer.ui.theme.AppTheme
+import com.rudi.audioplayer.ui.theme.ThemeIdentity
+import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.data.Song
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.toPersistentSet
@@ -138,8 +139,12 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val crossfadeStore = CrossfadeStore(appContext)
     private val customFolderStore = CustomFolderStore(appContext)
     private val themeStore = ThemeStore(appContext)
-    private val _appTheme = MutableStateFlow(themeStore.getTheme())
-    val appTheme: StateFlow<AppTheme> = _appTheme.asStateFlow()
+    // Batch 61 — dulu 1 StateFlow<AppTheme> gabungan; sekarang 2 StateFlow independen supaya
+    // identitas tema & mode terang/gelap bisa diubah terpisah dari mana pun (SettingsScreen).
+    private val _themeIdentity = MutableStateFlow(themeStore.getIdentity())
+    val themeIdentity: StateFlow<ThemeIdentity> = _themeIdentity.asStateFlow()
+    private val _themeMode = MutableStateFlow(themeStore.getMode())
+    val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
     private val customFolderScanner = CustomFolderScanner(appContext)
 
     private val _customFolders = MutableStateFlow(loadCustomFolderInfos())
@@ -494,9 +499,14 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         refreshLibrary()
     }
 
-    fun setAppTheme(theme: AppTheme) {
-        themeStore.setTheme(theme)
-        _appTheme.value = theme
+    fun setThemeIdentity(identity: ThemeIdentity) {
+        themeStore.setIdentity(identity)
+        _themeIdentity.value = identity
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        themeStore.setMode(mode)
+        _themeMode.value = mode
     }
 
     private fun loadCustomFolderInfos(): List<CustomFolderInfo> =

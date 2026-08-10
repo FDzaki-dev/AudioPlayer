@@ -1,5 +1,60 @@
 # Changelog
 
+## Batch 61 — Pisah total identitas tema dari mode: Tactile & Skeu kini otonom di Light/Dark
+User koreksi Batch 60: maksudnya bukan cuma UI toggle, tapi identitas Tactile & Skeuomorphism
+(dulu hardcode gelap permanen lewat `resolveIsDark()`) harus DICABUT dari 1 mode dan dikendalikan
+langsung oleh toggle mode yang sama dengan Apple — supaya "nuansa otonom"-nya keluar maksimal di
+kedua mode, bukan cuma dark. Rearsitektur data model, 8 file disentuh (2 protected — edit
+parsial saja: `MainActivity.kt`):
+- **`AppTheme` enum (5 nilai campur identity+mode) dihapus total**, diganti 2 enum independen di
+  `Theme.kt`: `ThemeIdentity` (APPLE/TACTILE/SKEU_DARK_LITE — "wajah" tema) & `ThemeMode`
+  (SYSTEM/LIGHT/DARK — terang/gelap, berlaku sama ke ketiganya). `resolveIsDark()` sekarang murni
+  fungsi dari `ThemeMode`, sudah tidak tahu-menahu identitas apa yang aktif.
+- **`Color.kt`**: token LIGHT baru utk Tactile & Skeuomorphism (background/surface/text/bevel
+  masing-masing) — bukan sekadar invert warna, didesain ulang per identitas (Tactile light =
+  kaca bening di atas kanvas nyaris-putih dingin; Skeu light = panel krem/parchment hangat),
+  accent/success/error tetap sama di kedua mode per identitas (sengaja, biar identitas tetap
+  "satu" walau mode beda).
+- **`Theme.kt`**: `colorsFor(identity, isDark)` sekarang punya 4 skema (Apple×2, Tactile×2,
+  Skeu×2, dari 3 sebelumnya). `isTactileTheme()`/`isSkeuTheme()` (dipakai 5 file lain tanpa perlu
+  disentuh — `MiniPlayerBar.kt`, `BlurUtils.kt`, `LibraryScreen.kt`, `HomeScreen.kt`,
+  `NowPlayingScreen.kt`) diganti perbandingannya dari `background` (beda tiap mode, jadi tidak
+  bisa match keduanya) ke `primary`/accent (sama di kedua mode per identitas by design) —
+  fix diam-diam yang WAJIB, kalau tidak diubah kedua helper ini akan selalu `false` di mode
+  terang. `LocalIsDarkTheme` (CompositionLocal baru) di-provide sekali di `AudioPlayerTheme()`
+  supaya `tactileEmboss()`/`skeuEmboss()`/`frostedGlass()` bisa baca mode aktif tanpa param baru
+  di puluhan call site.
+- **`TactileDepth.kt`**: `tactileEmboss()`/`skeuEmboss()` sekarang baca `LocalIsDarkTheme` dan
+  pilih token+alpha border/shadow sendiri utk light vs dark (alpha di-tuning ulang khusus varian
+  terang — kontrasnya terbalik dari versi AMOLED/charcoal gelap).
+- **`BlurUtils.kt`**: `frostedGlass()`'s default `alpha` (dulu hardcode compare ke
+  `AppleLightBackground`, jadi salah untuk Tactile/Skeu light) & `edgeBrush` Tactile/Skeu
+  sekarang branch ke `LocalIsDarkTheme`, pakai token light barunya sendiri.
+- **`ThemeStore.kt`**: 1 key (`selected_theme`) → 2 key (`selected_identity`, `selected_mode`) +
+  migrasi otomatis dari key lama (Tactile/Skeu lama → identity sama + mode DARK; Light/Dark lama
+  → Apple + mode sama; System lama → Apple + SYSTEM) — user existing tidak kehilangan preferensi.
+- **`PlayerViewModel.kt`**: `appTheme: StateFlow<AppTheme>` + `setAppTheme()` → 2 StateFlow
+  independen (`themeIdentity`, `themeMode`) + 2 setter (`setThemeIdentity`/`setThemeMode`).
+- **`MainActivity.kt`** (edit parsial, protected): semua referensi `AppTheme.TACTILE`/
+  `SKEU_DARK_LITE` → `ThemeIdentity`, `AudioPlayerTheme(theme=...)` → `AudioPlayerTheme(identity=,
+  mode=)`, `SettingsScreen(...)` dipanggil dgn 2 state + 2 callback. Midnight Blue ambient wash
+  root (Tactile-only sejak Batch 53) digated tambahan `&& isDarkTheme` — ambient AMOLED itu
+  spesifik ekspresi gelap Tactile, bukan trait identitas Tactile itu sendiri (light Tactile pakai
+  kanvas flat seperti identitas lain).
+- **`SettingsScreen.kt`**: 2 section terpisah — toggle mode (dari Batch 60, sekarang berlaku
+  sama ke SEMUA identitas, bukan cuma Apple) di atas, lalu 3 card identitas (Apple/Tactile/
+  Skeuomorphism) di bawah, live-preview tiap card sekarang pakai `isDark` dari mode AKTIF
+  (bukan `resolveIsDark(identity)` yang statis) — jadi toggle "Mode Gelap" langsung mengubah
+  swatch preview Tactile/Skeu di real time, bukti visual langsung bahwa identitasnya otonom.
+- **Belum diverifikasi visual/compile** (tidak ada kotlinc/emulator) — brace/paren balance
+  seimbang di ke-8 file; grep konfirmasi 0 referensi `AppTheme` aktif tersisa di seluruh
+  `app/src/main/java` (hanya di komentar historis) dan 0 call site lain ke `isTactileTheme()`/
+  `isSkeuTheme()`/`tactileEmboss()`/`skeuEmboss()`/`frostedGlass()` yang perlu ikut diubah
+  (signature publiknya tidak berubah).
+- **Sengaja TIDAK dikerjakan**: nilai token warna LIGHT baru (Tactile & Skeu) adalah desain baru
+  tanpa spec eksternal (sama presedan Skeu Batch 57) — belum pernah dilihat di device fisik,
+  kandidat polish lanjutan kalau kontras/keterbacaannya perlu disesuaikan setelah dicoba nyata.
+
 ## Batch 60 — Rombak arsitektur picker tema: card select-only → Switch on-off (Light/Dark)
 User minta sektor tema di Settings dirombak dari "button 1 arah" (card select-only, tidak ada
 jalan balik langsung) jadi toggle on-off yang fleksibel untuk mode Light/Dark. 1 file disentuh

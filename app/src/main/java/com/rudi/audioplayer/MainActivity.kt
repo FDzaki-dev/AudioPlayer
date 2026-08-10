@@ -94,7 +94,8 @@ import com.rudi.audioplayer.ui.LibraryScreen
 import com.rudi.audioplayer.ui.SettingsScreen
 import com.rudi.audioplayer.ui.MiniPlayerBar
 import com.rudi.audioplayer.ui.NowPlayingScreen
-import com.rudi.audioplayer.ui.theme.AppTheme
+import com.rudi.audioplayer.ui.theme.ThemeIdentity
+import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.AudioPlayerTheme
 import com.rudi.audioplayer.ui.theme.resolveIsDark
 import com.rudi.audioplayer.ui.theme.MidnightBlue
@@ -183,13 +184,14 @@ class MainActivity : FragmentActivity() {
             CompositionLocalProvider(
                 androidx.lifecycle.compose.LocalLifecycleOwner provides androidx.compose.ui.platform.LocalLifecycleOwner.current
             ) {
-            val appTheme by playerViewModel.appTheme.collectAsStateWithLifecycle()
-            AudioPlayerTheme(theme = appTheme) {
+            val appThemeIdentity by playerViewModel.themeIdentity.collectAsStateWithLifecycle()
+            val appThemeMode by playerViewModel.themeMode.collectAsStateWithLifecycle()
+            AudioPlayerTheme(identity = appThemeIdentity, mode = appThemeMode) {
                 // enableEdgeToEdge() above only sets the *initial* system bar icon style once,
                 // at process start — it never reacts to the in-app theme picker. Without this,
                 // switching to "Terang" leaves status/nav bar icons stuck light-on-light
                 // (styled for the dark theme they started in) and effectively invisible.
-                val isDarkTheme = resolveIsDark(appTheme)
+                val isDarkTheme = resolveIsDark(appThemeMode)
                 val decorView = LocalView.current
                 SideEffect {
                     WindowCompat.getInsetsController(window, decorView).apply {
@@ -284,7 +286,11 @@ class MainActivity : FragmentActivity() {
                 // is the minimum change needed to express this one spec rule without touching any
                 // other screen file, since this Surface is the single shared root every screen
                 // renders inside.
-                val tactileRootBrush = if (appTheme == AppTheme.TACTILE)
+                // Batch 61 — Midnight Blue ambient wash tetap eksklusif utk ekspresi GELAP
+                // Tactile (AMOLED-only per spec §6/§7); di mode terang Tactile sekarang pakai
+                // kanvas flat seperti identitas lain (identitas & mode sudah dipisah total —
+                // ambient wash adalah detail visual mode-gelap, bukan trait Tactile itu sendiri).
+                val tactileRootBrush = if (appThemeIdentity == ThemeIdentity.TACTILE && isDarkTheme)
                     Brush.linearGradient(
                         colors = listOf(
                             MaterialTheme.colorScheme.background,
@@ -444,7 +450,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val biometricEnabled by playerViewModel.biometricEnabled.collectAsStateWithLifecycle()
     val shakeToSkipEnabled by playerViewModel.shakeToSkipEnabled.collectAsStateWithLifecycle()
     val radioAutoContinueEnabled by playerViewModel.radioAutoContinueEnabled.collectAsStateWithLifecycle()
-    val appTheme by playerViewModel.appTheme.collectAsStateWithLifecycle()
+    val appThemeIdentity by playerViewModel.themeIdentity.collectAsStateWithLifecycle()
 
     val deleteContext = LocalContext.current
     val deleteRequestLauncher = rememberLauncherForActivityResult(
@@ -601,9 +607,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // kind of identity (raised surface catching light from top-left) just with
                     // its own warmer highlight token, so it gets the same treatment here with
                     // SkeuHighlight instead of TactileHighlight. Apple/Light/Dark stay untouched.
-                    val navCatchLightColor = when (appTheme) {
-                        AppTheme.TACTILE -> TactileHighlight
-                        AppTheme.SKEU_DARK_LITE -> SkeuHighlight
+                    val navCatchLightColor = when (appThemeIdentity) {
+                        ThemeIdentity.TACTILE -> TactileHighlight
+                        ThemeIdentity.SKEU_DARK_LITE -> SkeuHighlight
                         else -> null
                     }
                     NavigationBar(
@@ -729,10 +735,13 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 )
             }
             composable("settings") {
-                val appTheme by playerViewModel.appTheme.collectAsStateWithLifecycle()
+                val settingsThemeIdentity by playerViewModel.themeIdentity.collectAsStateWithLifecycle()
+                val settingsThemeMode by playerViewModel.themeMode.collectAsStateWithLifecycle()
                 SettingsScreen(
-                    currentTheme = appTheme,
-                    onSelectTheme = { theme -> playerViewModel.setAppTheme(theme) },
+                    currentThemeIdentity = settingsThemeIdentity,
+                    currentThemeMode = settingsThemeMode,
+                    onSelectThemeIdentity = { identity -> playerViewModel.setThemeIdentity(identity) },
+                    onSelectThemeMode = { mode -> playerViewModel.setThemeMode(mode) },
                     lockEnabled = lockEnabled,
                     biometricEnabled = biometricEnabled,
                     biometricAvailable = biometricAvailable,

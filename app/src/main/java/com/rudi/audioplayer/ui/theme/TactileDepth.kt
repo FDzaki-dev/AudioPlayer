@@ -140,43 +140,57 @@ fun Modifier.tactileEmboss(
     shape: Shape = MaterialTheme.shapes.medium,
     elevation: Dp = 8.dp,
     pressed: Boolean = false
-): Modifier = this.embossSurface(
-    shape = shape,
-    elevation = elevation,
-    pressed = pressed,
-    surfaceTop = TactileSurfaceVariant,
-    surfaceBottom = TactileSurface,
-    highlight = TactileHighlight,
-    shadow = TactileShadow,
-    label = "tactileEmboss"
-)
+): Modifier {
+    // Batch 61 — identitas Tactile sekarang otonom di kedua mode (lihat Theme.kt), jadi bevel-nya
+    // juga wajib pilih token light/dark sendiri lewat LocalIsDarkTheme, bukan lagi hardcode token
+    // gelap terus-menerus seperti sebelum Batch 61. Alpha border/shadow juga dituning ulang khusus
+    // varian terang (kontrasnya terbalik: highlight putih di atas kanvas terang nyaris tak
+    // kelihatan di alpha rendah, jadi butuh alpha jauh lebih tinggi; shadow sebaliknya perlu lebih
+    // rendah dari versi AMOLED-nya supaya tidak jadi noda gelap kasar di atas kanvas terang).
+    val isDark = LocalIsDarkTheme.current
+    return this.embossSurface(
+        shape = shape,
+        elevation = elevation,
+        pressed = pressed,
+        surfaceTop = if (isDark) TactileSurfaceVariant else TactileLightSurfaceVariant,
+        surfaceBottom = if (isDark) TactileSurface else TactileLightSurface,
+        highlight = if (isDark) TactileHighlight else TactileLightHighlight,
+        shadow = if (isDark) TactileShadow else TactileLightShadow,
+        label = "tactileEmboss",
+        borderTopAlphaNormal = if (isDark) 0.065f else 0.90f,
+        borderTopAlphaPressed = if (isDark) 0.03f else 0.50f,
+        borderBottomAlphaNormal = if (isDark) 0.30f else 0.18f,
+        borderBottomAlphaPressed = if (isDark) 0.15f else 0.09f,
+        shadowAlphaNormal = if (isDark) 0.70f else 0.22f,
+        shadowAlphaPressed = if (isDark) 0.35f else 0.11f
+    )
+}
 
-// Batch 57 — Skeuomorphism Dark Lite's own emboss primitive: same mechanism as tactileEmboss()
-// (see embossSurface() above) with Skeu's own charcoal/copper tokens instead of Tactile's
-// AMOLED-glass ones. Batch 58: wired into MiniPlayerBar.kt/NowPlayingScreen.kt (mirroring the
-// same rollout Tactile got in Batch 55), and now passes its own bevel alphas explicitly instead
-// of silently inheriting Tactile's (see embossSurface()'s Batch 58 comment above) — highlight
-// stronger (0.10f vs Tactile's 0.065f, Color.kt's own long-standing design comment), shadow
-// lower (0.55f vs 0.70f) so the bevel reads as a distinct, more restrained "carved panel" instead
-// of a re-skinned copy of Tactile's glass-tuned depth cue.
+// Batch 57 — Skeuomorphism's own emboss primitive: same mechanism as tactileEmboss()
+// (see embossSurface() above) with Skeu's own charcoal/copper (dark) or cream/copper (light)
+// tokens instead of Tactile's AMOLED-glass ones. Batch 61 — same LocalIsDarkTheme branching as
+// tactileEmboss() above, now that Skeu also has its own autonomous light expression.
 @Composable
 fun Modifier.skeuEmboss(
     shape: Shape = MaterialTheme.shapes.medium,
     elevation: Dp = 8.dp,
     pressed: Boolean = false
-): Modifier = this.embossSurface(
-    shape = shape,
-    elevation = elevation,
-    pressed = pressed,
-    surfaceTop = SkeuDarkSurfaceVariant,
-    surfaceBottom = SkeuDarkSurface,
-    highlight = SkeuHighlight,
-    shadow = SkeuShadow,
-    label = "skeuEmboss",
-    borderTopAlphaNormal = 0.10f,
-    borderTopAlphaPressed = 0.045f,
-    borderBottomAlphaNormal = 0.24f,
-    borderBottomAlphaPressed = 0.12f,
-    shadowAlphaNormal = 0.55f,
-    shadowAlphaPressed = 0.28f
-)
+): Modifier {
+    val isDark = LocalIsDarkTheme.current
+    return this.embossSurface(
+        shape = shape,
+        elevation = elevation,
+        pressed = pressed,
+        surfaceTop = if (isDark) SkeuDarkSurfaceVariant else SkeuLightSurfaceVariant,
+        surfaceBottom = if (isDark) SkeuDarkSurface else SkeuLightSurface,
+        highlight = if (isDark) SkeuHighlight else SkeuLightHighlight,
+        shadow = if (isDark) SkeuShadow else SkeuLightShadow,
+        label = "skeuEmboss",
+        borderTopAlphaNormal = if (isDark) 0.10f else 0.95f,
+        borderTopAlphaPressed = if (isDark) 0.045f else 0.55f,
+        borderBottomAlphaNormal = if (isDark) 0.24f else 0.28f,
+        borderBottomAlphaPressed = if (isDark) 0.12f else 0.14f,
+        shadowAlphaNormal = if (isDark) 0.55f else 0.30f,
+        shadowAlphaPressed = if (isDark) 0.28f else 0.15f
+    )
+}

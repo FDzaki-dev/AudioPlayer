@@ -30,7 +30,12 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun Modifier.frostedGlass(
     tint: Color = MaterialTheme.colorScheme.surface,
-    alpha: Float = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.96f else 0.92f,
+    // Batch 61 — was `if (background == AppleLightBackground)`, a comparison that only ever
+    // matched the Apple identity's own light background, so Tactile/Skeu's light expressions
+    // (different background tokens entirely) silently fell through to the dark-tuned 0.92f.
+    // LocalIsDarkTheme is identity-agnostic by construction, so this now works correctly no
+    // matter which of the 3 identities is active.
+    alpha: Float = if (LocalIsDarkTheme.current) 0.92f else 0.96f,
     blurRadius: Dp = 24.dp
 ): Modifier {
     // blurRadius is kept in the API for source compatibility with existing call sites.
@@ -39,6 +44,7 @@ fun Modifier.frostedGlass(
     // "Text remains readable... Glass must not become milky").
     val isTactile = isTactileTheme()
     val isSkeu = isSkeuTheme()
+    val isDark = LocalIsDarkTheme.current
     // Shape now follows the active theme's own shape tokens instead of a hardcoded 24dp —
     // otherwise every sheet/mini-player using this modifier would keep Apple's soft rounding
     // even under Tactile's/Skeu's own shape identity.
@@ -50,22 +56,28 @@ fun Modifier.frostedGlass(
     // explicitly "panel solid, bukan lapisan kaca", so it never should have inherited that look.
     // Forced to full opacity here regardless of the `alpha` param — no call site in this codebase
     // passes one explicitly (grepped), so this can't silently clobber an intentional override.
+    // Batch 61 — still forced opaque in BOTH modes: "solid panel, not glass" is an identity trait
+    // of Skeu, not something the light/dark toggle should be able to override.
     val effectiveAlpha = if (isSkeu) 1f else alpha
     // Batch 53 — spec §8 "Glass edge / highlight" + §9 "Lighting model" (single simulated light,
     // top-left -> bottom-right): a flat single-color border reads as a printed outline, not
     // reflected light. A diagonal two-stop brush (Highlight fading to a second stop) is the
     // minimum structure needed to express "highlight top-left, recede bottom-right" without a
-    // bespoke per-corner draw. Spec §8 explicitly forbids plain Color.White here — Tactile keeps
-    // its original pre-scaled low-alpha pair (TactileHighlight/TactileEdge, 0.065f/0.035f),
-    // unchanged, since Tactile's identity is deliberately glass and isn't what this batch fixes.
+    // bespoke per-corner draw. Batch 61 — both Tactile and Skeu now branch on `isDark` for their
+    // own light-tuned token pair (Color.kt "LIGHT VARIANT" sections); Apple's flat branch already
+    // handled its own light/dark via the background comparison below, unchanged.
     val edgeBrush = when {
-        isTactile -> Brush.linearGradient(colors = listOf(TactileHighlight, TactileEdge))
+        isTactile -> Brush.linearGradient(
+            colors = if (isDark) listOf(TactileHighlight, TactileEdge) else listOf(TactileLightHighlight, TactileLightEdge)
+        )
         // Batch 58 — second stop swapped from SkeuEdge (a near-invisible 0.12f rim, the same
         // "soft glass sheen" shape Tactile uses) to SkeuShadow (0.55f, a real carved shadow).
         // The border now reads as an engraved bevel — catch-light fading into recessed shadow —
         // instead of a glowing glass-card rim, matching skeuEmboss()'s own border language
         // (TactileDepth.kt) so panel edges and control edges read as one consistent material.
-        isSkeu -> Brush.linearGradient(colors = listOf(SkeuHighlight, SkeuShadow))
+        isSkeu -> Brush.linearGradient(
+            colors = if (isDark) listOf(SkeuHighlight, SkeuShadow) else listOf(SkeuLightHighlight, SkeuLightShadow)
+        )
         else -> {
             val flat = MaterialTheme.colorScheme.onSurface.copy(
                 alpha = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.14f else 0.24f

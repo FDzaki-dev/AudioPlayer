@@ -32,7 +32,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.BuildConfig
-import com.rudi.audioplayer.ui.theme.AppTheme
+import com.rudi.audioplayer.ui.theme.ThemeIdentity
+import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.colorsFor
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
@@ -41,8 +42,10 @@ import com.rudi.audioplayer.ui.theme.Radius
 
 @Composable
 fun SettingsScreen(
-    currentTheme: AppTheme,
-    onSelectTheme: (AppTheme) -> Unit,
+    currentThemeIdentity: ThemeIdentity,
+    currentThemeMode: ThemeMode,
+    onSelectThemeIdentity: (ThemeIdentity) -> Unit,
+    onSelectThemeMode: (ThemeMode) -> Unit,
     lockEnabled: Boolean,
     biometricEnabled: Boolean,
     biometricAvailable: Boolean,
@@ -84,7 +87,8 @@ fun SettingsScreen(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                "Setiap tema punya warna, jenis huruf, dan bentuk sudutnya sendiri — bukan cuma ganti warna.",
+                "Setiap tema punya warna, jenis huruf, dan bentuk sudutnya sendiri — dan sekarang " +
+                    "tampil otonom di kedua mode, bukan cuma versi gelap.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.padding(horizontal = 20.dp)
@@ -93,22 +97,33 @@ fun SettingsScreen(
         }
 
         item {
-            // Batch 60 — rombak arsitektur picker tema: trio System/Light/Dark yang tadinya
-            // 3 card select-only (1 arah, tidak bisa "switch balik" secara langsung) sekarang
-            // jadi 2 Switch on-off yang saling menyesuaikan (Ikuti Sistem + Mode Gelap).
-            // Tactile & Skeu Dark Lite tetap card di bawah (custom identity, bukan light/dark).
-            ThemeModeToggleSection(currentTheme = currentTheme, onSelectTheme = onSelectTheme)
+            // Batch 61 — mode terang/gelap dipisah TOTAL dari identitas tema (dulu Tactile &
+            // Skeu terkunci gelap permanen, digabung 1 enum dengan System/Light/Dark). Toggle
+            // ini sekarang berlaku sama untuk KETIGA identitas — pindah "Mode Gelap" langsung
+            // mengubah ekspresi Tactile/Skeu yang lagi aktif juga, bukan cuma Apple.
+            ThemeModeToggleSection(currentThemeMode = currentThemeMode, onSelectThemeMode = onSelectThemeMode)
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                "Identitas Tema",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Warna, tipografi, dan bentuk sudut — mengikuti mode terang/gelap di atas.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        items(
-            AppTheme.entries.filter { it != AppTheme.SYSTEM && it != AppTheme.LIGHT && it != AppTheme.DARK },
-            key = { it.name }
-        ) { theme ->
+        items(ThemeIdentity.entries.toList(), key = { it.name }) { identity ->
             ThemeOptionCard(
-                theme = theme,
-                selected = theme == currentTheme,
-                onClick = { onSelectTheme(theme) }
+                identity = identity,
+                isDark = resolveIsDark(currentThemeMode),
+                selected = identity == currentThemeIdentity,
+                onClick = { onSelectThemeIdentity(identity) }
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -299,20 +314,15 @@ fun SettingsScreen(
     }
 }
 
-// Batch 60 — pengganti trio card System/Light/Dark: 2 Switch on-off yang saling menyesuaikan.
-// "Ikuti Sistem" ON mengunci "Mode Gelap" (disabled, ikut nilai sistem). Saat tema kustom
-// (Tactile/Skeu, keduanya dark-only by design — lihat resolveIsDark()) aktif, "Mode Gelap" juga
-// disabled karena keduanya tidak punya varian terang; menyalakan/mematikannya di state itu akan
-// membawa user balik ke keluarga Apple Light/Dark (perilaku yang sama seperti menekan card
-// Light/Dark manual), bukan mengubah tema kustom itu sendiri.
+// Batch 61 — dulu (Batch 60) toggle ini punya cabang `isCustomTheme` yang men-disable "Mode
+// Gelap" saat Tactile/Skeu aktif (karena keduanya dulu dark-only). Sekarang KETIGA identitas
+// otonom di kedua mode, jadi toggle ini murni soal ThemeMode saja — tidak lagi butuh tahu
+// identitas apa yang sedang aktif sama sekali (parameter identity dihapus total).
 @Composable
-private fun ThemeModeToggleSection(currentTheme: AppTheme, onSelectTheme: (AppTheme) -> Unit) {
-    val isCustomTheme = currentTheme == AppTheme.TACTILE || currentTheme == AppTheme.SKEU_DARK_LITE
-    val followSystem = currentTheme == AppTheme.SYSTEM
-    // Preferensi gelap/terang yang "diingat" toggle ini walau lagi disabled (System atau tema
-    // kustom aktif) — default ke gelap: satu-satunya kasus currentTheme eksplisit terang adalah
-    // AppTheme.LIGHT sendiri.
-    val isDarkChecked = currentTheme != AppTheme.LIGHT
+private fun ThemeModeToggleSection(currentThemeMode: ThemeMode, onSelectThemeMode: (ThemeMode) -> Unit) {
+    val followSystem = currentThemeMode == ThemeMode.SYSTEM
+    // Preferensi gelap/terang yang "diingat" toggle ini walau lagi disabled (Ikuti Sistem ON).
+    val isDarkChecked = currentThemeMode != ThemeMode.LIGHT
 
     Surface(
         modifier = Modifier
@@ -335,11 +345,11 @@ private fun ThemeModeToggleSection(currentTheme: AppTheme, onSelectTheme: (AppTh
                 Switch(
                     checked = followSystem,
                     onCheckedChange = { checked ->
-                        onSelectTheme(
+                        onSelectThemeMode(
                             when {
-                                checked -> AppTheme.SYSTEM
-                                isDarkChecked -> AppTheme.DARK
-                                else -> AppTheme.LIGHT
+                                checked -> ThemeMode.SYSTEM
+                                isDarkChecked -> ThemeMode.DARK
+                                else -> ThemeMode.LIGHT
                             }
                         )
                     }
@@ -353,10 +363,9 @@ private fun ThemeModeToggleSection(currentTheme: AppTheme, onSelectTheme: (AppTh
                     Text("Mode Gelap", style = MaterialTheme.typography.bodyMedium)
                     Text(
                         when {
-                            isCustomTheme -> "Nonaktif — tema kustom aktif selalu gelap"
                             followSystem -> "Nonaktif — mengikuti pengaturan sistem"
-                            isDarkChecked -> "Aktif"
-                            else -> "Nonaktif"
+                            isDarkChecked -> "Aktif — berlaku untuk tema apa pun yang dipilih"
+                            else -> "Nonaktif — berlaku untuk tema apa pun yang dipilih"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary
@@ -364,9 +373,9 @@ private fun ThemeModeToggleSection(currentTheme: AppTheme, onSelectTheme: (AppTh
                 }
                 Switch(
                     checked = isDarkChecked,
-                    enabled = !followSystem && !isCustomTheme,
+                    enabled = !followSystem,
                     onCheckedChange = { checked ->
-                        onSelectTheme(if (checked) AppTheme.DARK else AppTheme.LIGHT)
+                        onSelectThemeMode(if (checked) ThemeMode.DARK else ThemeMode.LIGHT)
                     }
                 )
             }
@@ -375,14 +384,18 @@ private fun ThemeModeToggleSection(currentTheme: AppTheme, onSelectTheme: (AppTh
 }
 
 @Composable
-private fun ThemeOptionCard(theme: AppTheme, selected: Boolean, onClick: () -> Unit) {
-    val previewColors = colorsFor(theme, resolveIsDark(theme))
+private fun ThemeOptionCard(identity: ThemeIdentity, isDark: Boolean, selected: Boolean, onClick: () -> Unit) {
+    // Batch 61 — dulu preview selalu pakai resolveIsDark(theme) (identitas kustom hardcode
+    // gelap). Sekarang isDark datang dari mode aktif (param), jadi preview live INI benar-benar
+    // menunjukkan bagaimana identitas tersebut tampil di mode yang lagi dipilih user —
+    // demonstrasi langsung bahwa identitasnya sekarang otonom, bukan asumsi statis lagi.
+    val previewColors = colorsFor(identity, isDark)
     // Batch 49: the Tactile row in this exact picker is the app's own showcase —
     // it should demonstrate the depth treatment live, not sit flat like every other row.
     // Batch 57: Skeuomorphism Dark Lite gets the same live-showcase treatment via its own
     // skeuEmboss() primitive — both custom "physical panel" identities now demo themselves.
-    val isTactilePreview = theme == AppTheme.TACTILE
-    val isSkeuPreview = theme == AppTheme.SKEU_DARK_LITE
+    val isTactilePreview = identity == ThemeIdentity.TACTILE
+    val isSkeuPreview = identity == ThemeIdentity.SKEU_DARK_LITE
     val isEmbossPreview = isTactilePreview || isSkeuPreview
 
     Surface(
@@ -439,13 +452,13 @@ private fun ThemeOptionCard(theme: AppTheme, selected: Boolean, onClick: () -> U
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    theme.displayName,
+                    identity.displayName,
                     style = MaterialTheme.typography.titleMedium,
                     color = previewColors.onSurface
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    theme.description,
+                    identity.description,
                     style = MaterialTheme.typography.bodySmall,
                     color = previewColors.onSurfaceVariant
                 )

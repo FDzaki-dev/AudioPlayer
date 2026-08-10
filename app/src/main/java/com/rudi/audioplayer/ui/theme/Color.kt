@@ -97,6 +97,30 @@ val TactileEdge = Color.White.copy(alpha = 0.035f) // spec §5 GlassBorder
 val TactileShadow = Color.Black.copy(alpha = 0.70f) // spec §5 GlassShadow
 
 // ============================================================================
+// TACTILE — LIGHT VARIANT — Batch 61. User instruksi eksplisit: identitas
+// light/dark tema custom "dicabut dan dipisahkan total" dari toggle mode —
+// Tactile sekarang punya ekspresi terang sendiri, bukan cuma versi gelap yang
+// dipaksa tampil terus. Konsepnya tetap "kaca" (spec asli §4/§5), hanya basisnya
+// dibalik: kaca bening di atas kanvas nyaris-putih dingin (echo hue Midnight
+// Blue lewat undertone biru samar di background), bukan kaca gelap di atas
+// AMOLED. TactileAccent/TactileSuccess/TactileError TIDAK diduplikasi — accent
+// yang sama sengaja tetap legible di kedua mode (itsendiri sudah divalidasi
+// oleh perhitungan luminance onPrimary di Theme.kt).
+// ============================================================================
+val TactileLightBackground = Color(0xFFF5F7FB) // nyaris-putih, undertone biru dingin tipis
+val TactileLightSurface = Color(0xFFFFFFFF)
+val TactileLightSurfaceVariant = Color(0xFFE8ECF5)
+val TactileLightText = Color(0xFF12141A)
+val TactileLightSecondaryText = Color(0xFF5B6472)
+// Catch-light & rim untuk kaca terang: highlight putih penuh (dipakai embossSurface()'s
+// alpha-replace, bukan alpha bawaan token ini) + rim biru-gelap lembut sebagai stop kedua —
+// pola sama seperti TactileHighlight->TactileEdge versi gelap, kontrasnya dibalik supaya tetap
+// terbaca di atas kanvas terang (rim putih-di-atas-putih nyaris tak kelihatan).
+val TactileLightHighlight = Color.White
+val TactileLightEdge = Color(0xFF1B2436).copy(alpha = 0.06f)
+val TactileLightShadow = Color(0xFF1B2436).copy(alpha = 0.18f)
+
+// ============================================================================
 // SKEUOMORPHISM DARK LITE — Batch 57. No external spec file supplied for this
 // theme (unlike Tactile's spec-driven batches 49-55) — palette dirancang
 // sendiri sesuai definisi umum "skeuomorphism dark-lite": panel netral gelap
@@ -140,3 +164,19 @@ val SkeuShadow = Color.Black.copy(alpha = 0.55f)
 // border frostedGlass()'s Skeu branch) dihapus: diganti SkeuShadow di sana
 // (BlurUtils.kt) supaya border-nya kebaca bevel terukir/carved, bukan lagi rim
 // kaca lembut ala Tactile — grep dicek nihil pemanggil lain sebelum dihapus.
+
+// ============================================================================
+// SKEUOMORPHISM — LIGHT VARIANT — Batch 61. Sama alasan dengan TACTILE LIGHT di
+// atas: identitas Skeu dipisah total dari mode gelap/terang. Basis dibalik dari
+// charcoal netral ke krem/parchment hangat — skeuomorphism butuh jarak kontras
+// yang cukup antara background & panel timbul supaya bevelnya tetap terbaca
+// "fisik" walau di mode terang, bukan charcoal yang cuma dibalik jadi putih polos
+// (itu akan menghapus jarak kontras panel-vs-background yang jadi ciri khasnya).
+// ============================================================================
+val SkeuLightBackground = Color(0xFFEDE6DA) // krem hangat netral
+val SkeuLightSurface = Color(0xFFF7F2E9) // panel timbul level 1
+val SkeuLightSurfaceVariant = Color(0xFFFFFBF3) // panel timbul level 2 (lebih terangkat)
+val SkeuLightText = Color(0xFF2B241B)
+val SkeuLightSecondaryText = Color(0xFF6E6152)
+val SkeuLightHighlight = Color.White
+val SkeuLightShadow = Color(0xFF3A2E1D).copy(alpha = 0.30f)
