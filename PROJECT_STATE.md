@@ -6,6 +6,19 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 67 (Fix root cause FileNotFoundException album art — playback+widget+UI)** — Root
+cause ditemukan lewat analisa `log_*.txt` (fitur Repack ke Dokumen, Batch 66): URI legacy
+`content://media/external/audio/albumart/$albumId` (tabel cache sering kosong di API 29+)
+dipakai di 8 tempat — `AccentColorExtractor`, `PlaybackService`, `PlayerViewModel` (semua sudah
+tercatat error di log), TAPI JUGA di `Utils.kt`'s `AlbumArt` composable (dipakai
+MiniPlayerBar/LibraryScreen/HomeScreen/NowPlayingScreen) yang gagalnya senyap krn Coil
+`error{}` fallback ke ikon musik — celah ini baru ketahuan dari audit kode, bukan dari log.
+Fix: semua diganti `song.uri` (URI file audio sendiri, didukung `loadThumbnail()` native).
+`albumArtUri()` helper lama di `Utils.kt` dihapus total, tidak ada pemanggil tersisa (sudah
+di-grep ulang). Tidak ada protected asset disentuh. **Belum diverifikasi visual di device** —
+kalau art masih hilang di device tertentu setelah rebuild, kemungkinan besar song itu memang
+tidak punya embedded art sama sekali (bukan lagi bug URI). Detail: `CHANGELOG.md` Batch 67.
+
 **Batch 66 (Fix feedback "Repack ke Dokumen" ketutup ModalBottomSheet)** — Root cause:
 Snackbar dari `onInfoMessage` dirender oleh `Scaffold` di `MainActivity`, tapi
 `ModalBottomSheet` ada di layer terpisah DI ATASNYA, jadi Snackbar itu invisible selama sheet

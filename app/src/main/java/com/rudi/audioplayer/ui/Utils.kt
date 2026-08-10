@@ -1,7 +1,6 @@
 package com.rudi.audioplayer.ui
 
 import android.app.Activity
-import android.content.ContentUris
 import android.content.Context
 import android.content.ContextWrapper
 import android.net.Uri
@@ -27,9 +26,6 @@ import androidx.compose.ui.layout.ContentScale
 import coil.compose.SubcomposeAsyncImage
 import java.util.Locale
 
-fun albumArtUri(albumId: Long): Uri =
-    ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId)
-
 /**
  * Shared album-art loader with one themed "no cover" fallback, used everywhere art is shown
  * (Home, Library, MiniPlayerBar, Now Playing) instead of each screen leaving a blank space
@@ -40,10 +36,16 @@ fun albumArtUri(albumId: Long): Uri =
  * note icon would just smear into a shapeless blob once blurred — the tinted background alone
  * reads better there. `loading` is intentionally blank (not the fallback icon) so songs that
  * *do* have art don't flash the icon first while Coil decodes.
+ *
+ * Batch 67: [artworkUri] is the song's own MediaStore content URI (`song.uri`), not an
+ * albumId-derived URI. Used to build `content://media/external/audio/albumart/$albumId`
+ * (the deprecated per-album cache authority) — that table is frequently empty on modern
+ * Android, so most albums silently fell back to the icon below even when the song actually
+ * has embedded art. Coil resolves a song's own content URI reliably instead.
  */
 @Composable
 fun AlbumArt(
-    albumId: Long?,
+    artworkUri: Uri?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,
     showIcon: Boolean = true
@@ -52,9 +54,9 @@ fun AlbumArt(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        if (albumId != null) {
+        if (artworkUri != null) {
             SubcomposeAsyncImage(
-                model = albumArtUri(albumId),
+                model = artworkUri,
                 contentDescription = null,
                 contentScale = contentScale,
                 modifier = Modifier.matchParentSize(),

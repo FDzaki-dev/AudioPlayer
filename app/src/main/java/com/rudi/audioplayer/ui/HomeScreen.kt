@@ -268,7 +268,7 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             AlbumArt(
-                albumId = song.albumId,
+                artworkUri = song.uri,
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(Radius.xxl))
@@ -334,7 +334,7 @@ private fun HomeSongCard(song: Song, onClick: () -> Unit) {
             .clickable(onClick = onClick)
     ) {
         AlbumArt(
-            albumId = song.albumId,
+            artworkUri = song.uri,
             modifier = Modifier
                 .size(120.dp)
                 .clip(RoundedCornerShape(Radius.xxl))

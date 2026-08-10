@@ -510,7 +510,7 @@ private fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> U
                         .clickable { selectedAlbum = album }
                 ) {
                     AlbumArt(
-                        albumId = albumSongs.first().albumId,
+                        artworkUri = albumSongs.first().uri,
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
@@ -997,7 +997,7 @@ private fun SongRow(
                 Spacer(modifier = Modifier.width(4.dp))
             }
             AlbumArt(
-                albumId = song.albumId,
+                artworkUri = song.uri,
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(Radius.xxl))

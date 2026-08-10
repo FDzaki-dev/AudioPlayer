@@ -1,5 +1,32 @@
 # Changelog
 
+## Batch 67 — Fix root cause FileNotFoundException album art (playback + widget + UI)
+8 file disentuh (tidak ada protected asset).
+
+- **Root cause** (ditemukan dari analisa `log_*.txt` hasil Repack ke Dokumen, Batch 66): semua
+  jalur pemuatan album art membangun URI legacy
+  `content://media/external/audio/albumart/$albumId` — tabel cache authority ini sering kosong
+  di Android modern (API 29+), jadi `loadThumbnail()`/`openInputStream()` gagal konsisten
+  `FileNotFoundException` untuk banyak album (log AccentColorExtractor + WidgetUpdater
+  menunjukkan >80 entri sejak Batch 22, 2 hari terakhir saja).
+- Bug yang sama diam-diam ada di jalur UI (`AlbumArt` composable, `Utils.kt`) — Coil
+  `error{}` fallback bikin gagalnya senyap (jatuh ke ikon musik) dan TIDAK pernah tercatat ke
+  log, jadi baru ketahuan lewat audit kode setelah root cause di jalur playback ditemukan.
+- **Fix**: semua sumber art diganti pakai `song.uri` (URI file audio-nya sendiri dari
+  `MusicRepository`) — didukung `loadThumbnail()` native via `MediaMetadataRetriever`
+  fallback, tidak bergantung tabel cache lama.
+  - `AccentColorExtractor.extract()`: param `albumId: Long?` → `songUri: Uri?`.
+  - `PlaybackService.kt` (`loadSavedQueueItems`) & `PlayerViewModel.kt` (`mediaItemFor`,
+    `updateAccentColor`): `setArtworkUri(...)` pakai `song.uri` langsung, hapus konstruksi URI
+    legacy.
+  - `Utils.kt`: `AlbumArt` composable param `albumId: Long?` → `artworkUri: Uri?`; fungsi
+    helper `albumArtUri()` (khusus legacy authority) dihapus, tidak dipakai lagi di mana pun.
+  - `MiniPlayerBar.kt`, `LibraryScreen.kt` (x2), `HomeScreen.kt` (x2), `NowPlayingScreen.kt`
+    (backdrop blur + `AlbumArtHero`, x2): semua call site diupdate ke `artworkUri = song.uri`.
+- Dampak: album art seharusnya jauh lebih sering tampil benar di Home/Library/MiniPlayer/Now
+  Playing/widget/notifikasi, dan warna aksen dinamis (`AccentColorExtractor`) lebih sering
+  berhasil diekstrak alih-alih jatuh ke aksen statis. **Belum diverifikasi visual di device.**
+
 ## Batch 66 — Fix: feedback "Repack ke Dokumen" tidak terlihat (ketutup ModalBottomSheet)
 1 file disentuh (tidak ada protected asset).
 

@@ -594,7 +594,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         accentColorJob?.cancel()
         accentColorJob = viewModelScope.launch {
             val color = withContext(Dispatchers.IO) {
-                AccentColorExtractor.extract(appContext, song?.albumId)
+                AccentColorExtractor.extract(appContext, song?.uri)
             }
             _accentColor.value = color
         }
@@ -721,7 +721,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     }
 
     private fun mediaItemFor(song: Song): MediaItem {
-        val artworkUri = android.net.Uri.parse("content://media/external/audio/albumart/${song.albumId}")
+        // Batch 67: song.uri (bukan URI legacy "content://media/external/audio/albumart/$id")
+        // — lihat catatan sama di PlaybackService.loadSavedQueueItems().
         return MediaItem.Builder()
             .setMediaId(song.id.toString())
             .setUri(song.uri)
@@ -730,7 +731,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                     .setTitle(song.title)
                     .setArtist(song.artist)
                     .setAlbumTitle(song.album)
-                    .setArtworkUri(artworkUri)
+                    .setArtworkUri(song.uri)
                     .build()
             )
             .build()

@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -293,7 +292,12 @@ class PlaybackService : MediaLibraryService() {
         if (orderedSongs.isEmpty()) return null
 
         val items = orderedSongs.map { song ->
-            val artworkUri = Uri.parse("content://media/external/audio/albumart/${song.albumId}")
+            // Batch 67: dulu URI legacy "content://media/external/audio/albumart/$albumId" —
+            // tabel cache albumart itu sering kosong di Android modern (khususnya API 29+),
+            // jadi FileNotFoundException konsisten utk banyak album (lihat log diagnostik,
+            // ratusan entri sejak Batch 22). song.uri (URI file audio-nya sendiri, dari
+            // MusicRepository) didukung loadThumbnail() secara native — framework fallback ke
+            // MediaMetadataRetriever buat ekstrak art embedded, tidak bergantung cache lama itu.
             MediaItem.Builder()
                 .setMediaId(song.id.toString())
                 .setUri(song.uri)
@@ -302,7 +306,7 @@ class PlaybackService : MediaLibraryService() {
                         .setTitle(song.title)
                         .setArtist(song.artist)
                         .setAlbumTitle(song.album)
-                        .setArtworkUri(artworkUri)
+                        .setArtworkUri(song.uri)
                         .build()
                 )
                 .build()

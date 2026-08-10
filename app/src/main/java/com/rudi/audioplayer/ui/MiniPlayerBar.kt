@@ -107,7 +107,7 @@ fun MiniPlayerBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             AlbumArt(
-                albumId = song.albumId,
+                artworkUri = song.uri,
                 modifier = Modifier
                     .size(44.dp)
                     .clip(RoundedCornerShape(Radius.ml))

@@ -16,15 +16,20 @@ import com.rudi.audioplayer.util.AppLogger
  */
 object AccentColorExtractor {
 
-    /** Blocking/IO work — always call this from a background dispatcher. */
-    fun extract(context: Context, albumId: Long?): Color? {
-        if (albumId == null) return null
+    /** Blocking/IO work — always call this from a background dispatcher.
+     * [songUri] is the song's own MediaStore content URI (e.g. `song.uri` from
+     * [com.rudi.audioplayer.data.Song]) — not the legacy per-album "albumart" authority, which
+     * relies on a cache table that's frequently empty on modern Android and threw
+     * FileNotFoundException on most songs (see diagnostic log history, Batch 22 onward).
+     * loadThumbnail() on the song's own URI is the framework-supported path: it falls back to
+     * MediaMetadataRetriever internally to pull embedded art, no legacy cache needed. */
+    fun extract(context: Context, songUri: Uri?): Color? {
+        if (songUri == null) return null
         return try {
-            val uri = Uri.parse("content://media/external/audio/albumart/$albumId")
             val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                context.contentResolver.loadThumbnail(uri, Size(160, 160), null)
+                context.contentResolver.loadThumbnail(songUri, Size(160, 160), null)
             } else {
-                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+                context.contentResolver.openInputStream(songUri)?.use { BitmapFactory.decodeStream(it) }
             } ?: return null
 
             val palette = Palette.from(bitmap).generate()

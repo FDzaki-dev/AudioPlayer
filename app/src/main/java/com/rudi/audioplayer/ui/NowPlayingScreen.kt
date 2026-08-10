@@ -1,5 +1,6 @@
 package com.rudi.audioplayer.ui
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -224,7 +225,7 @@ fun NowPlayingScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         AlbumArt(
-            albumId = song?.albumId,
+            artworkUri = song?.uri,
             contentScale = ContentScale.Crop,
             showIcon = false,
             modifier = Modifier
@@ -391,7 +392,7 @@ fun NowPlayingScreen(
                     }
             ) {
                 AlbumArtHero(
-                    albumId = song?.albumId,
+                    artworkUri = song?.uri,
                     accentColor = animatedAccent,
                     onSwipeNext = onNext,
                     onSwipePrevious = onPrevious
@@ -893,7 +894,7 @@ private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: 
  * the old spinning vinyl. Horizontal swipe-to-skip gesture logic is unchanged from before. */
 @Composable
 private fun AlbumArtHero(
-    albumId: Long?,
+    artworkUri: Uri?,
     accentColor: Color,
     onSwipeNext: () -> Unit,
     onSwipePrevious: () -> Unit
@@ -942,7 +943,7 @@ private fun AlbumArtHero(
                 .background(accentColor.copy(alpha = 0.38f), CircleShape)
         )
         AlbumArt(
-            albumId = albumId,
+            artworkUri = artworkUri,
             modifier = Modifier
                 .size(280.dp)
                 .then(
