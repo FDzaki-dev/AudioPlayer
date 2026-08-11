@@ -6,6 +6,28 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 73 (Fix sweep-select tak bisa dilanjutkan + Skeuomorphism 2.0 Hyper-Realism UI)** —
+2 instruksi. (1) Sweep-select: `onDragStart` di `SongListView` (`LibraryScreen.kt`) selalu
+replace total seleksi dgn `persistentSetOf(songs[idx].id)` tiap gesture baru dimulai — begitu
+user kepentok tepi list, angkat jari, long-press lagi buat lanjut, seleksi lama hilang diganti 1
+lagu. Ikut ditemukan: closure gesture baca `selectedIds` basi (pointerInput cuma restart saat
+`songs` berubah). Fix: `rememberUpdatedState(selectedIds)` + `sweepBaseSelection` snapshot per-
+gesture, tiap update sweep sekarang UNION dgn base bukan replace. (2) Skeuomorphism diredesain
+total jadi "Hyper-Realism UI" — dilepas dari `embossSurface()` bersama Tactile (dulu berbagi
+mekanisme, sekarang independen), 7 layer fisik baru di `skeuEmboss()`: ambient occlusion, cast
+shadow 2-layer, base surface 4-stop curved-metal (opaque via `lerp()`, bukan alpha — identitas
+"panel solid" dari Batch 58 tetap terjaga), brushed-metal grain (`TileMode.Repeat`), specular
+glint (radial, meredup saat ditekan), double-bevel border (outer + inner groove inset). 5 file:
+`TactileDepth.kt` (skeuEmboss independen), `Color.kt` (bevel diperkuat + 12 token baru),
+`BlurUtils.kt` (edge brush Skeu jadi brushed-stripe, bukan lagi sama strukturnya dgn Tactile),
+`MainActivity.kt` (protected, parsial — root wash Skeu +1 layer grain), `NowPlayingScreen.kt`
+(AlbumArtHero Skeu ikut bahasa hyper-realism). Tactile TIDAK disentuh sama sekali. **Belum
+diverifikasi visual/compile** (tidak ada kotlinc/emulator) — brace/paren seimbang di semua file,
+grep konfirmasi semua token lama masih konsisten dirujuk. Prioritas sesi berikutnya: rebuild +
+cek langsung di device, teknik `TileMode.Repeat` grain belum pernah dirender di codebase ini
+sebelumnya jadi paling berisiko meleset dari niat visual (terlalu halus/terlalu kasar). Detail
+lengkap: `CHANGELOG.md` Batch 73.
+
 **Batch 72 (Fix sweep-select gesture conflict + hardening widget theme call)** — Sweep-select
 (Batch 70) tidak pernah jalan krn bentrok dgn `combinedClickable.onLongClick` (Batch 66) di
 `SongRow` — 2 pengenal long-press pada sentuhan fisik yang sama, satu (row-level) membatalkan

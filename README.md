@@ -36,25 +36,16 @@ sering dilihat — sekarang punya bentuk rounded-square + emboss taktil sendiri,
 flat Apple; border hero art album disamakan ke arah bevel diagonal yang sama seperti seluruh
 permukaan kaca lainnya.
 
-  **Skeuomorphism Dark Lite** (Batch 57, di-polish Batch 58) — identitas custom kedua, tanpa
-  spesifikasi eksternal (dirancang sendiri sesuai definisi umum skeuomorphism dark-lite, beda
-  dari batch-batch tema Tactile yang selalu berbasis spec file yang di-supply user). Wajib gelap
-  juga, tapi arah visualnya sengaja dibedakan dari Tactile: fondasi charcoal netral hangat
-  (`#16181C`, bukan AMOLED near-black berhue biru Tactile) dengan panel timbul **solid/opaque**
-  (bukan kaca translusen sama sekali — Batch 58 menghapus sisa translusensi yang tadinya masih
-  ikut terwarisi dari helper `frostedGlass()` bersama) lewat bevel highlight/shadow sendiri
-  (`skeuEmboss()`, mekanisme sama dengan `tactileEmboss()` tapi token warna & intensitas bevel-nya
-  sendiri — catch-light lebih kuat, shadow lebih rendah dari Tactile), aksen tembaga hangat
-  (`#CB8B4B`, bukan biru dingin), sudut lebih membulat satu tingkat dari Tactile di tiap ukuran
-  (12/16/20dp vs 10/12/16dp), border panel bergaya ukiran (highlight→shadow, bukan lagi rim kaca
-  lembut). Batch 58: `skeuEmboss()` sekarang juga dipasang di mini player (bar & tombol
-  play/pause), tombol play/pause utama Now Playing, dan badge indikator gesture (geser
-  kecerahan/volume) — sebelumnya baru dipakai di baris pemilih tema saja. Batch 59: diperluas lagi
-  ke kartu "Lanjutkan Mendengarkan" (Beranda), banner undo-sembunyikan-lagu (Perpustakaan), dan
-  border/shadow piringan album Now Playing (sebelumnya ketiganya jatuh ke tampilan flat/
-  shadow-polos ala Apple untuk Skeu); mini player juga diperbaiki supaya `skeuEmboss()`-nya
-  sendiri yang tampil penuh di layar (sebelumnya ketutup lapisan `frostedGlass()` bersama yang
-  dipasang di titik yang sama — lihat CHANGELOG.md Batch 59).
+  **Skeuomorphism 2.0 — Hyper-Realism UI** (Batch 57, redesain total Batch 73) — identitas custom
+  kedua, otonom penuh dari Tactile (tidak lagi berbagi mekanisme bevel `embossSurface()` maupun
+  struktur border sejak Batch 73). Panel dibaca seperti logam fisik yang dipahat ke kanvas, lewat
+  7 layer di `skeuEmboss()`: ambient occlusion (bayangan kontak di dasar panel) + cast drop-shadow
+  terpisah, permukaan gradient 4-stop ("curved metal", selalu opaque), tekstur brushed-metal grain
+  berulang, kilau specular tunggal (radial, meredup saat ditekan), dan border ganda (bevel luar +
+  inner groove terukir). Fondasi tetap charcoal netral dgn aksen Titanium+Silver metalik dingin,
+  wajib gelap-mode-independen (punya ekspresi terang sendiri sejak Batch 61). Dipasang di mini
+  player, tombol play/pause (mini & Now Playing), piringan album hero, kartu "Lanjutkan
+  Mendengarkan", banner undo-sembunyikan-lagu, badge indikator gesture, dan baris pemilih tema.
 
   Dipilih lewat tab **Pengaturan** di navigasi bawah, tersimpan otomatis, diterapkan ulang tiap sesi
 - **Halaman Pengaturan**: tab baru di navigasi bawah — berisi pemilih tema dan info versi aplikasi (nomor versi + build)

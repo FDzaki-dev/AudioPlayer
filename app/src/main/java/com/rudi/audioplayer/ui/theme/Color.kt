@@ -128,25 +128,28 @@ val TactileLightEdge = Color(0xFF1B2436).copy(alpha = 0.06f)
 val TactileLightShadow = Color(0xFF1B2436).copy(alpha = 0.18f)
 
 // ============================================================================
-// SKEUOMORPHISM DARK LITE — Batch 57. No external spec file supplied for this
-// theme (unlike Tactile's spec-driven batches 49-55) — palette dirancang
-// sendiri sesuai definisi umum "skeuomorphism dark-lite": panel netral gelap
-// yang terbaca timbul/fisik lewat bevel highlight+shadow lembut, bukan lewat
-// warna aksen mencolok. Batch 63 — aksen tembaga hangat (identitas awal) diganti
-// total Titanium+Silver metalik dingin; pembeda dari Tactile (AMOLED near-black +
-// hue biru dingin) sekarang murni lewat STRUKTUR (bevel timbul + brushed-metal
-// streak, bukan lagi lewat temperatur warna), supaya kedua tema custom tetap
-// tidak terasa jadi varian satu sama lain walau sama-sama netral dingin sekarang.
+// SKEUOMORPHISM 2.0 — HYPER-REALISM UI — Batch 73. Ganti total arah dari "dark
+// lite" (Batch 57-63, sekadar bevel highlight+shadow lembut) ke identitas
+// fisik yang jauh lebih dramatis: panel dibaca seperti benda logam sungguhan
+// yang dipahat/ditekan ke kanvas — bukan cuma kartu dgn pinggiran terang/gelap
+// tipis. Dirancang OTONOM total, tidak menumpang baseline Tactile (AMOLED-glass
+// biru dingin) — semua nilai & mekanisme (specular glint, brushed-metal grain,
+// ambient occlusion, double-bevel carved edge) di bawah ini murni milik Skeu
+// sendiri, tidak ada satu pun turunan langsung dari token Tactile manapun.
+// Nama token lama (SkeuAccent/SkeuHighlight/SkeuShadow/SkeuAmbientAlpha*/
+// SkeuDarkSurfaceVariant/SkeuLightSurfaceVariant) DIPERTAHANKAN karena masih
+// dirujuk langsung dari MainActivity.kt (protected) & NowPlayingScreen.kt —
+// nilainya diperkuat/diperdalam untuk kontras hyper-realism, bukan diganti
+// nama, supaya blast-radius edit tetap terkendali dalam 1 batch atomic.
 // ============================================================================
 
 // --- Foundation --------------------------------------------------------------
-// Charcoal netral, bukan AMOLED near-black — skeuomorphism butuh jarak
-// kontras yang cukup antara background & panel timbul supaya bevelnya
-// terbaca "fisik", beda tujuan dari Tactile yang justru menargetkan OLED
-// near-black sebagai lapisan dasar kaca.
-val SkeuDarkBackground = Color(0xFF16181C)
+// Charcoal netral, kontras dinaikkan sedikit dari versi Dark Lite lama supaya
+// bevel timbul yang jauh lebih dalam (lihat TactileDepth.kt skeuEmboss()) tetap
+// punya "ruang" kontras yang jelas antara kanvas & permukaan panel.
+val SkeuDarkBackground = Color(0xFF121417)
 val SkeuDarkSurface = Color(0xFF23262B) // panel timbul level 1
-val SkeuDarkSurfaceVariant = Color(0xFF2C3036) // panel timbul level 2 (lebih terangkat)
+val SkeuDarkSurfaceVariant = Color(0xFF2E3238) // panel timbul level 2 (lebih terangkat)
 
 // --- Typography ----------------------------------------------------------------
 // Batch 63 — undertone digeser dari krem hangat ("kertas/kulit") ke abu-perak dingin,
@@ -176,13 +179,11 @@ val TitaniumLight = Color(0xFFCDD1D6)
 val SilverHighlight = Color(0xFFF2F3F5)
 
 // --- Bevel tokens (dipakai skeuEmboss() & frostedGlass()'s Skeu branch) ------
-// Pola sama seperti TactileHighlight/Shadow (dua-stop diagonal untuk border,
-// alpha tunggal untuk shadow) tapi nilainya sendiri: highlight sedikit lebih
-// kuat (bevel skeuomorphic butuh catch-light lebih jelas biar "timbul" terbaca
-// di atas charcoal, bukan AMOLED-black), shadow lebih rendah (kontras dasarnya
-// sudah lebih tinggi dari AMOLED jadi tak perlu shadow sekuat Tactile).
-val SkeuHighlight = Color.White.copy(alpha = 0.10f)
-val SkeuShadow = Color.Black.copy(alpha = 0.55f)
+// Batch 73 — Hyper-Realism: highlight & shadow dinaikkan lebih jauh lagi dari
+// Batch 62/63 (0.10f/0.55f) — panel sekarang harus terbaca sebagai objek fisik
+// bertekstur logam yang dipahat, bukan kartu dgn pinggiran lembut.
+val SkeuHighlight = Color.White.copy(alpha = 0.16f)
+val SkeuShadow = Color.Black.copy(alpha = 0.65f)
 // Batch 62 — ambient root wash Skeu pertama kali (dulu selalu flat total).
 // Batch 63 — sumber warna wash diganti dari SkeuDarkAccent (tembaga, sudah tidak ada)
 // ke TitaniumDark/SilverHighlight, DAN strukturnya sendiri diganti dari resep 3-stop
@@ -195,6 +196,34 @@ val SkeuAmbientAlphaLight = 0.12f
 // border frostedGlass()'s Skeu branch) dihapus: diganti SkeuShadow di sana
 // (BlurUtils.kt) supaya border-nya kebaca bevel terukir/carved, bukan lagi rim
 // kaca lembut ala Tactile — grep dicek nihil pemanggil lain sebelum dihapus.
+
+// --- HYPER-REALISM layer set (Batch 73) — sepenuhnya baru, tidak ada padanan
+// di Tactile sama sekali. 4 mekanisme fisik ditambahkan di atas bevel dasar:
+// (1) Specular — titik kilau logam tunggal, jauh lebih terang dari highlight
+//     bevel biasa, dipakai sebagai radial-gradient glint kecil di kuadran
+//     kiri-atas tiap panel (skeuEmboss()) — mensimulasikan pantulan cahaya
+//     langsung di permukaan logam disikat, bukan cuma tepi terang generik.
+// (2) Ambient occlusion — bayangan kontak lembut tepat di dasar tiap panel
+//     timbul, terpisah dari drop-shadow utama (yang mensimulasikan jarak
+//     panel-ke-kanvas), AO ini mensimulasikan cahaya yang terhalang tepat
+//     di lipatan sudut panel.
+// (3) Inner groove — garis gelap sangat tipis persis di DALAM tepi panel
+//     (bukan di luar seperti border bevel biasa) — kesan tepi panel "diukir
+//     turun" sedikit sebelum permukaannya naik, ciri khas hyper-realism vs
+//     bevel datar single-layer.
+// (4) Brushed-metal grain — stripe diagonal ultra-halus berulang (dipakai via
+//     TileMode.Repeat pada Brush.linearGradient dgn segmen pendek), overlay
+//     tipis di atas base gradient untuk tekstur logam disikat yang nyata,
+//     bukan cuma gradasi warna polos.
+val SkeuSpecular = Color.White.copy(alpha = 0.55f)
+val SkeuAmbientOcclusion = Color.Black.copy(alpha = 0.40f)
+val SkeuInnerGroove = Color.Black.copy(alpha = 0.50f)
+val SkeuBrushGrainLight = Color.White.copy(alpha = 0.05f)
+val SkeuBrushGrainDark = Color.Black.copy(alpha = 0.07f)
+// Pressed-state: glint hampir padam (logam "menjauh" dari sumber cahaya saat
+// ditekan), groove dalam menguat (permukaan benar-benar masuk ke kanvas).
+val SkeuSpecularPressed = Color.White.copy(alpha = 0.10f)
+val SkeuInnerGroovePressed = Color.Black.copy(alpha = 0.70f)
 
 // ============================================================================
 // SKEUOMORPHISM — LIGHT VARIANT — Batch 61. Sama alasan dengan TACTILE LIGHT di
@@ -211,4 +240,14 @@ val SkeuLightSurfaceVariant = Color(0xFFFAFBFC) // panel timbul level 2 (lebih t
 val SkeuLightText = Color(0xFF212327)
 val SkeuLightSecondaryText = Color(0xFF63676D)
 val SkeuLightHighlight = Color.White
-val SkeuLightShadow = Color(0xFF23262B).copy(alpha = 0.30f)
+val SkeuLightShadow = Color(0xFF23262B).copy(alpha = 0.38f)
+
+// --- HYPER-REALISM layer set — LIGHT (Batch 73) — kontras dibalik dari versi
+// gelap (glint & groove tetap harus terbaca legibel di atas kanvas terang).
+val SkeuLightSpecular = Color.White
+val SkeuLightAmbientOcclusion = Color(0xFF23262B).copy(alpha = 0.22f)
+val SkeuLightInnerGroove = Color(0xFF23262B).copy(alpha = 0.28f)
+val SkeuLightBrushGrainLight = Color.White.copy(alpha = 0.55f)
+val SkeuLightBrushGrainDark = Color(0xFF23262B).copy(alpha = 0.05f)
+val SkeuLightSpecularPressed = Color.White.copy(alpha = 0.25f)
+val SkeuLightInnerGroovePressed = Color(0xFF23262B).copy(alpha = 0.42f)

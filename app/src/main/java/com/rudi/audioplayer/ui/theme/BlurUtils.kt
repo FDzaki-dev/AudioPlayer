@@ -5,8 +5,10 @@ import androidx.compose.foundation.border
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -70,13 +72,16 @@ fun Modifier.frostedGlass(
         isTactile -> Brush.linearGradient(
             colors = if (isDark) listOf(TactileHighlight, TactileEdge) else listOf(TactileLightHighlight, TactileLightEdge)
         )
-        // Batch 58 — second stop swapped from SkeuEdge (a near-invisible 0.12f rim, the same
-        // "soft glass sheen" shape Tactile uses) to SkeuShadow (0.55f, a real carved shadow).
-        // The border now reads as an engraved bevel — catch-light fading into recessed shadow —
-        // instead of a glowing glass-card rim, matching skeuEmboss()'s own border language
-        // (TactileDepth.kt) so panel edges and control edges read as one consistent material.
+        // Batch 73 — Hyper-Realism: no longer a plain 2-stop diagonal (that was structurally
+        // identical to Tactile's own edgeBrush, exactly the "not autonomous" gap this batch
+        // fixes). Skeu's panel edge now reads as a brushed-metal rim: a short repeating
+        // highlight/shadow segment (TileMode.Repeat — same technique as skeuEmboss()'s grain
+        // overlay in TactileDepth.kt) instead of one smooth gradient sweep.
         isSkeu -> Brush.linearGradient(
-            colors = if (isDark) listOf(SkeuHighlight, SkeuShadow) else listOf(SkeuLightHighlight, SkeuLightShadow)
+            colors = if (isDark) listOf(SkeuHighlight, SkeuShadow) else listOf(SkeuLightHighlight, SkeuLightShadow),
+            start = Offset(0f, 0f),
+            end = Offset(6f, 6f),
+            tileMode = TileMode.Repeat
         )
         else -> {
             val flat = MaterialTheme.colorScheme.onSurface.copy(

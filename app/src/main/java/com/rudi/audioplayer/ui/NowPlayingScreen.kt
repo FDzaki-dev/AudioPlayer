@@ -61,6 +61,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.translate
@@ -89,8 +90,11 @@ import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.TactileHighlight
 import com.rudi.audioplayer.ui.theme.TactileShadow
+import com.rudi.audioplayer.ui.theme.SkeuAmbientOcclusion
 import com.rudi.audioplayer.ui.theme.SkeuHighlight
+import com.rudi.audioplayer.ui.theme.SkeuInnerGroove
 import com.rudi.audioplayer.ui.theme.SkeuShadow
+import com.rudi.audioplayer.ui.theme.SkeuSpecular
 import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -992,20 +996,37 @@ private fun AlbumArtHero(
                                 // alpha trimmed from the old 0.5f for restraint per §9/§13.
                                 .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
                         isSkeu ->
-                            // Batch 59 — same drawn-shadow + clip + border mechanism as Tactile above,
-                            // Skeu's own tokens/alphas: shadow lower (0.40f vs 0.55f, consistent with
-                            // Skeu's "shadow lebih rendah" design principle from Batch 57/58), border
-                            // highlight stronger (0.16f vs 0.12f, Skeu's own stronger catch-light) —
-                            // reads as a carved frame around the art, not a re-skinned copy of Tactile's.
+                            // Batch 73 — Hyper-Realism polish: this hero art is the single
+                            // largest surface in the app, so it gets the same specular-glint +
+                            // inner-groove double-bevel language as skeuEmboss() (TactileDepth.kt)
+                            // instead of the older single flat border — a manual draw here
+                            // (not routed through skeuEmboss() itself) because this Box also
+                            // carries the per-song accent .shadow() glow below, which needs to
+                            // stay a separate/final layer.
                             Modifier
                                 .drawBehind {
                                     val outline = heroShape.createOutline(size, layoutDirection, this)
                                     val outlinePath = Path().apply { addOutline(outline) }
+                                    // Ambient occlusion, then heavier cast shadow — same 2-layer
+                                    // technique as skeuEmboss().
+                                    translate(top = 3.dp.toPx()) {
+                                        drawPath(outlinePath, color = SkeuAmbientOcclusion)
+                                    }
                                     translate(top = 9.dp.toPx()) {
                                         drawPath(outlinePath, color = SkeuShadow.copy(alpha = 0.40f))
                                     }
                                 }
                                 .clip(heroShape)
+                                .drawBehind {
+                                    // Specular glint — brighter, single reflection point, top-left.
+                                    drawRect(
+                                        brush = Brush.radialGradient(
+                                            colors = listOf(SkeuSpecular.copy(alpha = 0.35f), Color.Transparent),
+                                            center = Offset(size.width * 0.22f, size.height * 0.16f),
+                                            radius = size.minDimension * 0.55f
+                                        )
+                                    )
+                                }
                                 .border(
                                     BorderStroke(
                                         1.5.dp,
@@ -1018,6 +1039,8 @@ private fun AlbumArtHero(
                                     ),
                                     heroShape
                                 )
+                                .padding(1.dp)
+                                .border(BorderStroke(1.dp, SkeuInnerGroove), heroShape)
                                 .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
                         else -> Modifier.shadow(elevation = 28.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.45f))
                     }

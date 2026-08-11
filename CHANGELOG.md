@@ -1,5 +1,63 @@
 # Changelog
 
+## Batch 73 — Fix sweep-select tak bisa dilanjutkan + Skeuomorphism 2.0 (Hyper-Realism UI)
+
+**Bug fixed — sweep-select "kepentok", long-press baru mereset bukan melanjutkan:**
+Root cause di `LibraryScreen.kt`'s `SongListView`: `detectDragGesturesAfterLongPress.onDragStart`
+SELALU memanggil `onSweepSelectRange(persistentSetOf(songs[idx].id))` — set baru isi 1 lagu,
+menimpa total apa pun yang sudah terpilih dari sweep/tap sebelumnya. Jadi begitu user kepentok
+tepi layar (list tidak auto-scroll dalam 1 gesture), angkat jari, lalu long-press lagi buat
+lanjut, seleksi lama langsung hilang diganti 1 lagu baru. Bug kedua yang ikut ditemukan: closure
+`onDragStart`/`onDrag` membaca parameter `selectedIds` langsung, padahal `pointerInput(songs)`
+cuma restart kalau `songs` berubah — jadi nilai `selectedIds` yang dibaca gesture bisa basi
+(snapshot lama), tidak ikut update walau ada tap-toggle lain di antara 2 sweep. Fix: `selectedIds`
+dibaca lewat `rememberUpdatedState` (selalu terbaru), `sweepBaseSelection` (snapshot base sebelum
+gesture aktif dimulai) diambil di `onDragStart`, dan setiap update sweep (start maupun drag)
+sekarang UNION dgn base itu — bukan replace total. 1 file (`LibraryScreen.kt`), signature publik
+tidak berubah.
+
+**Skeuomorphism 2.0 — "Hyper-Realism UI" (permintaan eksplisit: total, otonom, tanpa numpang
+baseline tema lain):** Batch 57-63 ("Skeuomorphism Dark Lite") masih berbagi mekanisme dasar
+(`embossSurface()`) dgn Tactile & border 2-stop yang strukturnya identik — cukup buat identitas
+tapi bukan lagi "hyper-realism". Redesain total, 5 file, 1 tema kohesif (atomic):
+- `TactileDepth.kt` — `skeuEmboss()` DILEPAS dari `embossSurface()` bersama Tactile, jadi fungsi
+  independen penuh dengan 7 layer fisik: (1) ambient occlusion (bayangan kontak lembut, terpisah
+  dari cast shadow), (2) cast drop-shadow lebih berat dari Tactile, (3) base surface 4-stop
+  diagonal ("curved metal", bukan 2-warna datar) — stop akhir sengaja opaque lewat `lerp()` ke
+  hitam/putih, BUKAN `Color.copy(alpha=...)`, supaya identitas "panel solid tak pernah translusen"
+  (dari Batch 58) tetap terjaga di gradient baru ini, (4) brushed-metal grain — overlay stripe
+  diagonal berulang via `Brush.linearGradient(start, end pendek, TileMode.Repeat)`, (5) specular
+  glint — radial-gradient kilau tunggal kuadran kiri-atas, jauh lebih terang dari highlight bevel
+  biasa, meredup drastis saat ditekan, (6) outer bevel border (bahasa arah cahaya diagonal yang
+  sama dgn Tactile, tapi token & intensitas 100% milik Skeu sendiri), (7) inner groove — border
+  kedua di-inset 1dp, kesan tepi panel "diukir turun" sebelum permukaan naik (double-bevel).
+- `Color.kt` — token bevel dasar diperkuat (`SkeuHighlight` 0.10f→0.16f, `SkeuShadow` 0.55f→0.65f,
+  `SkeuDarkBackground` sedikit lebih gelap utk ruang kontras), + 12 token baru (dark+light):
+  `SkeuSpecular(Pressed)`, `SkeuAmbientOcclusion`, `SkeuInnerGroove(Pressed)`,
+  `SkeuBrushGrainLight/Dark` — semua murni milik Skeu, tidak ada padanan/turunan di token Tactile.
+- `BlurUtils.kt` — `frostedGlass()`'s Skeu edge brush diganti dari 2-stop smooth gradient (sama
+  strukturnya dgn Tactile) jadi brushed-metal repeating stripe (`TileMode.Repeat`, teknik sama
+  dgn grain di atas) — sekarang benar-benar berbeda struktur dari Tactile, bukan cuma beda warna.
+- `MainActivity.kt` (protected, edit parsial) — root ambient wash Skeu dapat 1 layer overlay
+  tambahan: brushed-metal grain di level seluruh kanvas app (bukan cuma per-panel), pakai token
+  `SkeuBrushGrainLight/Dark` baru. Tactile TIDAK disentuh sama sekali, root wash-nya tetap 3-stop
+  lama — kedua identitas sengaja dijaga tidak berbagi layer struktural apa pun lagi.
+- `NowPlayingScreen.kt` — `AlbumArtHero` (permukaan terbesar di app) manual-draw Skeu-nya
+  diselaraskan ke bahasa hyper-realism yang sama (AO+cast shadow 2-layer, specular glint, inner
+  groove) — bukan lewat `skeuEmboss()` (Box ini masih perlu susun accent-glow `.shadow()` sendiri
+  di layer akhir), tapi teknik identik supaya konsisten se-app.
+- **Sengaja TIDAK disentuh**: Tactile (semua file/token/mekanismenya) — instruksi eksplisit user
+  cuma minta Skeu yang di-redesign; `embossSurface()` privat di `TactileDepth.kt` sekarang murni
+  Tactile-only (dipakai `tactileEmboss()` saja), dibiarkan namanya generik krn masih dokumentasi
+  historis yang jelas di komentar function-nya.
+- **Belum diverifikasi visual/compile** (tidak ada `kotlinc`/emulator di environment kerja) —
+  brace/paren balance dicek otomatis di ke-5 file (seimbang), grep konfirmasi token lama
+  (`SkeuHighlight`/`SkeuShadow`/`SkeuAccent`/dst.) semua masih dirujuk konsisten, tidak ada nama
+  yang berubah/hilang yang masih dipanggil di tempat lain. Prioritas sesi berikutnya: rebuild +
+  lihat langsung di device — brushed-metal grain (teknik `TileMode.Repeat` segmen pendek) belum
+  pernah dirender sebelumnya di codebase ini, paling berisiko terlihat terlalu halus/kasar di
+  device fisik dibanding niat desainnya.
+
 ## Batch 72 — Fix sweep-select (gesture conflict) + hardening widget theme call + widget masih perlu 1 langkah manual dari user
 
 **Bug 1 fixed — Sweep-select "gak berfungsi sama sekali":** Root cause: gesture conflict.

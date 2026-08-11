@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -12,12 +13,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -171,10 +175,36 @@ fun Modifier.tactileEmboss(
     )
 }
 
-// Batch 57 — Skeuomorphism's own emboss primitive: same mechanism as tactileEmboss()
-// (see embossSurface() above) with Skeu's own charcoal/copper (dark) or cream/copper (light)
-// tokens instead of Tactile's AMOLED-glass ones. Batch 61 — same LocalIsDarkTheme branching as
-// tactileEmboss() above, now that Skeu also has its own autonomous light expression.
+// Batch 73 — SKEUOMORPHISM 2.0 / HYPER-REALISM. No longer delegates to the shared
+// embossSurface() mechanism above (that function is now Tactile-only) — Skeu's physical-panel
+// identity needs layers Tactile's restrained glass-panel primitive was never designed for
+// (specular glint, ambient occlusion, an inner carved groove, brushed-metal grain), so sharing
+// the function any further would mean bolting Skeu-only branches onto Tactile's primitive or
+// smuggling Tactile-shaped assumptions into Skeu — either way the two identities stop being
+// independently editable, which is the exact "not autonomous, still hybrid" complaint this
+// batch exists to fix. Draw order (back to front), all in one drawBehind before .clip():
+//   1. Ambient occlusion — soft, slightly-oversized dark ring UNDER the panel (contact shadow
+//      at the base, distinct from #2's cast shadow which simulates panel-to-canvas distance).
+//   2. Cast drop-shadow — same translated-outline technique as embossSurface(), offset further
+//      down-right than Tactile's for a heavier, more physical sense of elevation.
+// Then, after .clip(shape):
+//   3. Base surface — 4-stop diagonal gradient (not a flat 2-color bevel) simulating a subtly
+//      curved metal surface rather than a flat painted panel.
+//   4. Brushed-metal grain — a second background layer: Brush.linearGradient with a very short
+//      start->end segment + TileMode.Repeat, which repeats that short diagonal stripe across
+//      the whole surface — the standard Compose technique for a brushed-metal/hairline texture
+//      without a custom Shader. Alpha is low enough to read as texture, not banding.
+//   5. Specular glint — a small radial-gradient highlight anchored top-left, far brighter than
+//      any bevel highlight, standing in for a direct reflection off brushed metal. Dims sharply
+//      when pressed (light source reads as "moving away" as the panel physically recedes).
+// Finally, two border strokes stacked (both after .clip()):
+//   6. Outer bevel — catch-light (top-left) fading to shadow (bottom-right), same diagonal
+//      lighting model as Tactile's border for cross-theme consistency of *direction*, but
+//      Skeu's own tokens/alphas (already much stronger — see Color.kt).
+//   7. Inner groove — a second, thinner stroke INSET from the outer edge (drawn via a second
+//      border pass at reduced size through padding), reading as the panel being carved down
+//      slightly before its surface rises — the double-bevel signature of hyper-realism vs a
+//      single flat highlight/shadow border.
 @Composable
 fun Modifier.skeuEmboss(
     shape: Shape = MaterialTheme.shapes.medium,
@@ -182,22 +212,106 @@ fun Modifier.skeuEmboss(
     pressed: Boolean = false
 ): Modifier {
     val isDark = LocalIsDarkTheme.current
-    return this.embossSurface(
-        shape = shape,
-        elevation = elevation,
-        pressed = pressed,
-        surfaceTop = if (isDark) SkeuDarkSurfaceVariant else SkeuLightSurfaceVariant,
-        surfaceBottom = if (isDark) SkeuDarkSurface else SkeuLightSurface,
-        highlight = if (isDark) SkeuHighlight else SkeuLightHighlight,
-        shadow = if (isDark) SkeuShadow else SkeuLightShadow,
-        label = "skeuEmboss",
-        // Batch 62 — sama alasan dgn tactileEmboss() di atas: bevel dinaikkan jauh lebih
-        // dramatis di kedua mode, radikal & tidak lagi ditahan-tahan demi konvensi mode terang.
-        borderTopAlphaNormal = if (isDark) 0.22f else 1.0f,
-        borderTopAlphaPressed = if (isDark) 0.11f else 0.70f,
-        borderBottomAlphaNormal = if (isDark) 0.46f else 0.48f,
-        borderBottomAlphaPressed = if (isDark) 0.24f else 0.26f,
-        shadowAlphaNormal = if (isDark) 0.75f else 0.46f,
-        shadowAlphaPressed = if (isDark) 0.42f else 0.24f
+    val surfaceTop = if (isDark) SkeuDarkSurfaceVariant else SkeuLightSurfaceVariant
+    val surfaceMid = if (isDark) SkeuDarkSurface else SkeuLightSurface
+    // Deliberately opaque (lerp toward black/white, never Color.copy(alpha=...)) — Skeu's
+    // "solid panel, never translucent glass" identity (established Batch 58) still applies to
+    // this new 4-stop curved-metal gradient; only the endpoint darkens, it never lets whatever
+    // is layered underneath show through.
+    val surfaceBottom = if (isDark) lerp(surfaceMid, Color.Black, 0.18f) else lerp(surfaceMid, Color.Black, 0.06f)
+    val highlight = if (isDark) SkeuHighlight else SkeuLightHighlight
+    val shadow = if (isDark) SkeuShadow else SkeuLightShadow
+    val ao = if (isDark) SkeuAmbientOcclusion else SkeuLightAmbientOcclusion
+    val grainLight = if (isDark) SkeuBrushGrainLight else SkeuLightBrushGrainLight
+    val grainDark = if (isDark) SkeuBrushGrainDark else SkeuLightBrushGrainDark
+    val specular = if (isDark) {
+        if (pressed) SkeuSpecularPressed else SkeuSpecular
+    } else {
+        if (pressed) SkeuLightSpecularPressed else SkeuLightSpecular
+    }
+    val groove = if (isDark) {
+        if (pressed) SkeuInnerGroovePressed else SkeuInnerGroove
+    } else {
+        if (pressed) SkeuLightInnerGroovePressed else SkeuLightInnerGroove
+    }
+
+    val animatedElevation by animateDpAsState(
+        targetValue = if (pressed) elevation / 5 else elevation,
+        label = "skeuEmbossElevation"
     )
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.978f else 1f,
+        label = "skeuEmbossScale"
+    )
+    val specularAlphaMul by animateFloatAsState(
+        targetValue = if (pressed) 0.25f else 1f,
+        label = "skeuEmbossSpecular"
+    )
+
+    val outerBorderAlpha = if (pressed) 0.55f else 1f
+    val brushGrain = Brush.linearGradient(
+        colors = listOf(grainLight, grainDark),
+        start = Offset(0f, 0f),
+        end = Offset(3f, 3f),
+        tileMode = TileMode.Repeat
+    )
+
+    return this
+        .scale(scale)
+        .drawBehind {
+            val outline = shape.createOutline(size, layoutDirection, this)
+            val outlinePath = Path().apply { addOutline(outline) }
+            // 1. Ambient occlusion — wider, softer, closer to the panel base.
+            translate(top = animatedElevation.toPx() * 0.15f) {
+                drawPath(outlinePath, color = ao)
+            }
+            // 2. Cast shadow — heavier offset than Tactile's for a more physical drop.
+            translate(top = animatedElevation.toPx() * 0.65f) {
+                drawPath(outlinePath, color = shadow)
+            }
+        }
+        .clip(shape)
+        // 3. Base surface — curved-metal 4-stop diagonal.
+        .background(
+            Brush.linearGradient(
+                *arrayOf(
+                    0.0f to surfaceTop,
+                    0.35f to surfaceMid,
+                    0.7f to surfaceMid,
+                    1.0f to surfaceBottom
+                )
+            )
+        )
+        // 4. Brushed-metal grain overlay.
+        .background(brushGrain)
+        // 5. Specular glint — small radial highlight, top-left quadrant.
+        .drawBehind {
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        specular.copy(alpha = specular.alpha * specularAlphaMul),
+                        Color.Transparent
+                    ),
+                    center = Offset(size.width * 0.24f, size.height * 0.18f),
+                    radius = size.minDimension.coerceAtLeast(1f) * 0.65f
+                )
+            )
+        }
+        // 6. Outer bevel border — diagonal catch-light -> shadow.
+        .border(
+            BorderStroke(
+                1.5.dp,
+                Brush.linearGradient(
+                    colors = listOf(
+                        highlight.copy(alpha = highlight.alpha * outerBorderAlpha),
+                        shadow.copy(alpha = shadow.alpha * outerBorderAlpha)
+                    )
+                )
+            ),
+            shape
+        )
+        // 7. Inner groove — inset second stroke, reads as a carved recess just inside the
+        // outer edge before the panel's own surface begins.
+        .padding(1.dp)
+        .border(BorderStroke(1.dp, groove), shape)
 }

@@ -890,6 +890,23 @@ private fun SongListView(
     var containerCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var sweepAnchorIndex by remember { mutableStateOf<Int?>(null) }
     var sweepLastIndex by remember { mutableStateOf<Int?>(null) }
+    // Batch 73 — fix "sweep-select kepentok, long-press baru mereset bukan melanjutkan": a
+    // second sweep gesture (e.g. user hit the edge of the visible list, lifted their finger,
+    // and long-pressed again to keep extending the selection) used to always start from
+    // `persistentSetOf(songs[idx].id)` — a brand-new single-item set — discarding whatever was
+    // already selected from the PREVIOUS sweep/tap. `selectedIds` is read via
+    // rememberUpdatedState because this pointerInput block is only relaunched when `songs`
+    // changes, not when `selectedIds` changes — without this, onDragStart/onDrag would close
+    // over a stale snapshot of the selection from whenever the gesture detector was last
+    // (re)installed, silently undoing selection changes made by taps in between sweeps too.
+    val currentSelectedIds by rememberUpdatedState(selectedIds)
+    // Snapshot of the selection that existed before the CURRENT sweep gesture began — every
+    // sweep-in-progress update below is (this base) UNION (range just swept), so lifting the
+    // finger and starting a new long-press-drag extends on top of prior selections instead of
+    // replacing them. Captured once per gesture in onDragStart, not read continuously, so that
+    // dragging back-and-forth within one continuous gesture still behaves like a plain range
+    // select (shrinking the range removes rows again) rather than only ever growing.
+    var sweepBaseSelection by remember { mutableStateOf(persistentSetOf<Long>()) }
 
     fun indexAt(rootY: Float): Int? = rowBoundsInRoot.entries.firstOrNull { rootY in it.value }?.key
 
@@ -904,7 +921,8 @@ private fun SongListView(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         sweepAnchorIndex = idx
                         sweepLastIndex = idx
-                        onSweepSelectRange(persistentSetOf(songs[idx].id))
+                        sweepBaseSelection = currentSelectedIds.toPersistentSet()
+                        onSweepSelectRange(sweepBaseSelection.add(songs[idx].id))
                     },
                     onDrag = { change, _ ->
                         val anchor = sweepAnchorIndex ?: return@detectDragGesturesAfterLongPress
@@ -914,7 +932,8 @@ private fun SongListView(
                         if (idx == sweepLastIndex) return@detectDragGesturesAfterLongPress
                         sweepLastIndex = idx
                         val range = minOf(anchor, idx)..maxOf(anchor, idx)
-                        onSweepSelectRange(range.map { songs[it].id }.toPersistentSet())
+                        val sweptIds = range.map { songs[it].id }
+                        onSweepSelectRange(sweepBaseSelection.addAll(sweptIds))
                     },
                     onDragEnd = { sweepAnchorIndex = null; sweepLastIndex = null },
                     onDragCancel = { sweepAnchorIndex = null; sweepLastIndex = null }
