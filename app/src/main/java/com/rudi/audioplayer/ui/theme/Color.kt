@@ -123,7 +123,14 @@ val TactileLightSecondaryText = Color(0xFF5B6472)
 // alpha-replace, bukan alpha bawaan token ini) + rim biru-gelap lembut sebagai stop kedua —
 // pola sama seperti TactileHighlight->TactileEdge versi gelap, kontrasnya dibalik supaya tetap
 // terbaca di atas kanvas terang (rim putih-di-atas-putih nyaris tak kelihatan).
-val TactileLightHighlight = Color.White
+// Batch 74 — fix: token ini sejak Batch 61 tidak pernah dikasih alpha (opaque penuh),
+// berbeda dari SEMUA token Highlight/Edge lain di file ini (semua ber-alpha rendah).
+// Dipakai LANGSUNG (bukan lewat .copy(alpha=...) override) sebagai stop gradient border
+// di BlurUtils.kt's frostedGlass() — jadi border Tactile Light selama ini garis putih
+// SOLID, persis "bright white border" yang komentar proyek sendiri bilang harus dihindari
+// (lihat TactileDepth.kt baris ~102). Diberi alpha 0.55f: cukup terbaca sebagai catch-light
+// di atas kanvas terang, tapi tidak lagi opaque.
+val TactileLightHighlight = Color.White.copy(alpha = 0.55f)
 val TactileLightEdge = Color(0xFF1B2436).copy(alpha = 0.06f)
 val TactileLightShadow = Color(0xFF1B2436).copy(alpha = 0.18f)
 
@@ -239,7 +246,15 @@ val SkeuLightSurface = Color(0xFFF2F3F5) // panel timbul level 1
 val SkeuLightSurfaceVariant = Color(0xFFFAFBFC) // panel timbul level 2 (lebih terangkat)
 val SkeuLightText = Color(0xFF212327)
 val SkeuLightSecondaryText = Color(0xFF63676D)
-val SkeuLightHighlight = Color.White
+// Batch 74 — bug sama persis dengan TactileLightHighlight di atas (opaque penuh sejak
+// Batch 61, tidak pernah dikasih alpha). Dipakai langsung di frostedGlass()'s Skeu edge
+// (BlurUtils.kt) DAN di skeuEmboss()'s outer bevel border (TactileDepth.kt, Batch 73 —
+// pola `highlight.alpha * outerBorderAlpha` di situ MENGALIKAN, jadi alpha 1.0 yang salah
+// ini lolos bulat-bulat jadi border putih solid 1.5dp di setiap panel Skeu Light).
+// Alpha 0.65f dipilih lebih tinggi dari Tactile (0.55f) — konsisten dengan SkeuHighlight
+// dark (0.16f) yang juga lebih kuat dari TactileHighlight dark (0.065f), sesuai identitas
+// bevel Skeu yang memang lebih tegas/"hyper-realism".
+val SkeuLightHighlight = Color.White.copy(alpha = 0.65f)
 val SkeuLightShadow = Color(0xFF23262B).copy(alpha = 0.38f)
 
 // --- HYPER-REALISM layer set — LIGHT (Batch 73) — kontras dibalik dari versi

@@ -90,11 +90,19 @@ import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.TactileHighlight
 import com.rudi.audioplayer.ui.theme.TactileShadow
+import com.rudi.audioplayer.ui.theme.TactileLightHighlight
+import com.rudi.audioplayer.ui.theme.TactileLightShadow
 import com.rudi.audioplayer.ui.theme.SkeuAmbientOcclusion
 import com.rudi.audioplayer.ui.theme.SkeuHighlight
 import com.rudi.audioplayer.ui.theme.SkeuInnerGroove
 import com.rudi.audioplayer.ui.theme.SkeuShadow
 import com.rudi.audioplayer.ui.theme.SkeuSpecular
+import com.rudi.audioplayer.ui.theme.SkeuLightAmbientOcclusion
+import com.rudi.audioplayer.ui.theme.SkeuLightHighlight
+import com.rudi.audioplayer.ui.theme.SkeuLightInnerGroove
+import com.rudi.audioplayer.ui.theme.SkeuLightShadow
+import com.rudi.audioplayer.ui.theme.SkeuLightSpecular
+import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
 import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -942,6 +950,15 @@ private fun AlbumArtHero(
         // fell into the generic Apple shadow-only branch below with no bevel of its own at all.
         val isSkeu = isSkeuTheme()
         val isPanelTheme = isTactile || isSkeu
+        // Batch 74 — fix: this manual draw (unlike skeuEmboss()/tactileEmboss(), which both
+        // already branch on LocalIsDarkTheme) hardcoded dark-only tokens (TactileHighlight/
+        // TactileShadow, SkeuHighlight/SkeuShadow/SkeuAmbientOcclusion/SkeuSpecular/
+        // SkeuInnerGroove) with no light-mode branch at all — since Batch 61 made Tactile/Skeu
+        // fully autonomous per light/dark mode, this hero art (the single largest surface on
+        // the whole screen) has been silently drawing dark bevel colors over a light-mode panel
+        // this whole time. Fixed below via isDark + light-token fallback, matching the pattern
+        // skeuEmboss()/tactileEmboss() already use.
+        val isDark = LocalIsDarkTheme.current
         // Batch 52: recolored again for the literal Midnight Blue spec
         // (compose-skeuomorphism-lite-midnight-blue.md) — same drawn top-down shadow +
         // vertical-gradient bevel border technique kept from Batch 45/46/49-51, no code changes
@@ -961,13 +978,15 @@ private fun AlbumArtHero(
                 .size(280.dp)
                 .then(
                     when {
-                        isTactile ->
+                        isTactile -> {
+                            val heroHighlight = if (isDark) TactileHighlight else TactileLightHighlight
+                            val heroShadow = if (isDark) TactileShadow else TactileLightShadow
                             Modifier
                                 .drawBehind {
                                     val outline = heroShape.createOutline(size, layoutDirection, this)
                                     val outlinePath = Path().apply { addOutline(outline) }
                                     translate(top = 9.dp.toPx()) {
-                                        drawPath(outlinePath, color = TactileShadow.copy(alpha = 0.55f))
+                                        drawPath(outlinePath, color = heroShadow.copy(alpha = if (isDark) 0.55f else 0.30f))
                                     }
                                 }
                                 .clip(heroShape)
@@ -983,8 +1002,8 @@ private fun AlbumArtHero(
                                         // predating the diagonal rule adopted in Batch 53).
                                         Brush.linearGradient(
                                             listOf(
-                                                TactileHighlight.copy(alpha = 0.12f),
-                                                TactileShadow.copy(alpha = 0.32f)
+                                                heroHighlight.copy(alpha = if (isDark) 0.12f else heroHighlight.alpha),
+                                                heroShadow.copy(alpha = if (isDark) 0.32f else heroShadow.alpha)
                                             )
                                         )
                                     ),
@@ -995,7 +1014,8 @@ private fun AlbumArtHero(
                                 // is the one always-active/selected surface on the whole screen —
                                 // alpha trimmed from the old 0.5f for restraint per §9/§13.
                                 .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
-                        isSkeu ->
+                        }
+                        isSkeu -> {
                             // Batch 73 — Hyper-Realism polish: this hero art is the single
                             // largest surface in the app, so it gets the same specular-glint +
                             // inner-groove double-bevel language as skeuEmboss() (TactileDepth.kt)
@@ -1003,6 +1023,12 @@ private fun AlbumArtHero(
                             // (not routed through skeuEmboss() itself) because this Box also
                             // carries the per-song accent .shadow() glow below, which needs to
                             // stay a separate/final layer.
+                            // Batch 74 — light/dark token branch added (see isDark comment above).
+                            val heroAo = if (isDark) SkeuAmbientOcclusion else SkeuLightAmbientOcclusion
+                            val heroShadow = if (isDark) SkeuShadow else SkeuLightShadow
+                            val heroSpecular = if (isDark) SkeuSpecular else SkeuLightSpecular
+                            val heroHighlight = if (isDark) SkeuHighlight else SkeuLightHighlight
+                            val heroGroove = if (isDark) SkeuInnerGroove else SkeuLightInnerGroove
                             Modifier
                                 .drawBehind {
                                     val outline = heroShape.createOutline(size, layoutDirection, this)
@@ -1010,10 +1036,10 @@ private fun AlbumArtHero(
                                     // Ambient occlusion, then heavier cast shadow — same 2-layer
                                     // technique as skeuEmboss().
                                     translate(top = 3.dp.toPx()) {
-                                        drawPath(outlinePath, color = SkeuAmbientOcclusion)
+                                        drawPath(outlinePath, color = heroAo)
                                     }
                                     translate(top = 9.dp.toPx()) {
-                                        drawPath(outlinePath, color = SkeuShadow.copy(alpha = 0.40f))
+                                        drawPath(outlinePath, color = heroShadow.copy(alpha = if (isDark) 0.40f else heroShadow.alpha))
                                     }
                                 }
                                 .clip(heroShape)
@@ -1021,7 +1047,10 @@ private fun AlbumArtHero(
                                     // Specular glint — brighter, single reflection point, top-left.
                                     drawRect(
                                         brush = Brush.radialGradient(
-                                            colors = listOf(SkeuSpecular.copy(alpha = 0.35f), Color.Transparent),
+                                            colors = listOf(
+                                                heroSpecular.copy(alpha = if (isDark) 0.35f else heroSpecular.alpha * 0.6f),
+                                                Color.Transparent
+                                            ),
                                             center = Offset(size.width * 0.22f, size.height * 0.16f),
                                             radius = size.minDimension * 0.55f
                                         )
@@ -1032,16 +1061,17 @@ private fun AlbumArtHero(
                                         1.5.dp,
                                         Brush.linearGradient(
                                             listOf(
-                                                SkeuHighlight.copy(alpha = 0.16f),
-                                                SkeuShadow.copy(alpha = 0.40f)
+                                                heroHighlight.copy(alpha = if (isDark) 0.16f else heroHighlight.alpha),
+                                                heroShadow.copy(alpha = if (isDark) 0.40f else heroShadow.alpha)
                                             )
                                         )
                                     ),
                                     heroShape
                                 )
                                 .padding(1.dp)
-                                .border(BorderStroke(1.dp, SkeuInnerGroove), heroShape)
+                                .border(BorderStroke(1.dp, heroGroove), heroShape)
                                 .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
+                        }
                         else -> Modifier.shadow(elevation = 28.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.45f))
                     }
                 )

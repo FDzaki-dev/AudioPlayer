@@ -6,6 +6,24 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 74 (Debug UI pass: opaque-white-border bug + AlbumArtHero light-mode gap)** — Audit
+"debugging UI sampai matang" (bukan laporan user), fokus ke file paling berisiko dari Batch 73
+yang belum diverifikasi visual. 2 bug nyata ditemukan & diperbaiki, keduanya sudah ada sejak
+Batch 61 (autonomi Light/Dark) tapi baru kelihatan dari baca kode teliti: (1) `TactileLightHighlight`/
+`SkeuLightHighlight` = `Color.White` TANPA alpha (opaque penuh) — beda dari semua token bevel lain
+yang ber-alpha rendah — dipakai langsung sbg stop border di `frostedGlass()` (semua sheet/mini
+player/card) & `skeuEmboss()` (Batch 73's outer border, pola kali bukan ganti alpha) → border
+Tactile Light & Skeu Light selama ini garis putih SOLID, persis "bright white border" yang
+komentar proyek sendiri larang. Fix: alpha 0.55f/0.65f. (2) `AlbumArtHero` (`NowPlayingScreen.kt`,
+piringan album 280dp, permukaan terbesar di app) manual-draw Tactile & Skeu-nya TIDAK PERNAH baca
+`LocalIsDarkTheme` sejak Batch 61 — selalu pakai token dark-only meski mode aktif terang, jadi di
+Light mode hero art digambar dgn shadow/AO/specular gelap di atas panel terang. Fix: `isDark`
+ditambah, kedua cabang pilih token Light/Dark yang sesuai (5 token Skeu, 2 token Tactile). 2 file
+(`Color.kt`, `NowPlayingScreen.kt`), tidak ada protected asset. **Belum diverifikasi visual** —
+tapi fix ini justru PALING relevan dicek di Light mode (Tactile Light & Skeu Light, terutama hero
+art Now Playing) karena itu titik yang selama ini salah tapi tidak pernah dilihat langsung sejak
+Batch 61. Detail lengkap: `CHANGELOG.md` Batch 74.
+
 **Batch 73 (Fix sweep-select tak bisa dilanjutkan + Skeuomorphism 2.0 Hyper-Realism UI)** —
 2 instruksi. (1) Sweep-select: `onDragStart` di `SongListView` (`LibraryScreen.kt`) selalu
 replace total seleksi dgn `persistentSetOf(songs[idx].id)` tiap gesture baru dimulai — begitu

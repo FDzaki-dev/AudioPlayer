@@ -1,5 +1,47 @@
 # Changelog
 
+## Batch 74 — Debug UI pass: opaque-white-border bug + AlbumArtHero light-mode gap
+Audit "debugging UI sampai matang" (bukan laporan user spesifik) menyisir file yang paling
+berisiko dari Batch 73 (Skeu Hyper-Realism, belum diverifikasi visual) — 2 bug nyata ditemukan,
+keduanya sudah ada sejak Batch 61 (autonomi Light/Dark) tapi baru kelihatan sekarang lewat baca
+kode teliti, bukan dari laporan device.
+
+**Bug 1 — `TactileLightHighlight`/`SkeuLightHighlight` = `Color.White` tanpa alpha (opaque
+penuh):** Sejak Batch 61, kedua token ini didefinisikan tanpa `.copy(alpha=...)` — beda dari
+SEMUA token Highlight/Edge/Shadow lain di `Color.kt` yang semua ber-alpha rendah (`TactileHighlight`
+0.065f, `TactileLightEdge` 0.06f, `SkeuHighlight` 0.16f, `SkeuLightShadow` 0.38f, dst). Dipakai
+LANGSUNG tanpa override alpha di 2 tempat: `BlurUtils.kt`'s `frostedGlass()` edge brush (Tactile
+Light & Skeu Light, dipakai SEMUA sheet/mini-player/card lewat helper bersama) dan `TactileDepth.kt`'s
+`skeuEmboss()` outer border (Batch 73, pola `highlight.alpha * outerBorderAlpha` MENGALIKAN bukan
+mengganti, jadi alpha 1.0 yang salah lolos bulat-bulat). Hasilnya: border/bevel Tactile Light &
+Skeu Light selama ini garis putih SOLID — persis "bright white border" yang dilarang eksplisit di
+komentar proyek sendiri (`TactileDepth.kt` baris ~102, mengutip prinsip spec). Fix: `Color.kt` —
+`TactileLightHighlight` diberi alpha 0.55f, `SkeuLightHighlight` diberi alpha 0.65f (lebih tinggi,
+konsisten dgn `SkeuHighlight` dark 0.16f > `TactileHighlight` dark 0.065f — identitas Skeu memang
+bevel lebih tegas).
+
+**Bug 2 — `AlbumArtHero` (`NowPlayingScreen.kt`, permukaan terbesar di seluruh app) tidak baca
+mode terang/gelap sama sekali:** Sejak Batch 61 memisah total identitas Tactile/Skeu dari mode
+Light/Dark (keduanya sekarang otonom di kedua mode, lihat `Theme.kt`), `skeuEmboss()`/
+`tactileEmboss()` sudah benar baca `LocalIsDarkTheme` — tapi `AlbumArtHero` manual-draw-nya (bukan
+lewat 2 fungsi itu, karena perlu susun accent-glow `.shadow()` sendiri sebagai layer akhir) masih
+hardcode token DARK-ONLY (`TactileHighlight`/`TactileShadow`, `SkeuAmbientOcclusion`/`SkeuHighlight`/
+`SkeuShadow`/`SkeuSpecular`/`SkeuInnerGroove`) tanpa cabang isDark apa pun — lolos dari audit Batch
+59/73 karena keduanya fokus ke "Skeu dapat treatment sendiri" bukan "light-mode gap". Efeknya: di
+Tactile Light / Skeu Light, hero art (piringan album 280dp) selama ini digambar pakai warna
+ambient-occlusion/cast-shadow/specular GELAP di atas panel terang — kemungkinan besar terlihat
+kotor/terlalu gelap dibanding sisa panel Light-mode lain yang sudah benar. Fix: `isDark = 
+LocalIsDarkTheme.current` ditambah, kedua cabang (`isTactile`/`isSkeu`) sekarang pilih token
+Light/Dark yang sesuai (`TactileLightHighlight`/`TactileLightShadow`, `SkeuLight*` — 5 token),
+alpha override disesuaikan supaya versi Light pakai alpha bawaan token (sudah tepat, bukan lagi
+angka literal yang di-tuning cuma untuk Dark).
+
+2 file disentuh (`Color.kt`, `NowPlayingScreen.kt`), tidak ada protected asset. **Masih belum
+diverifikasi visual di device** (tidak ada kotlinc/emulator) — brace/paren balance dicek otomatis
+(seimbang di kedua file), tapi fix ini sendiri PALING PENTING justru untuk dicek di Light mode
+device fisik (Tactile Light & Skeu Light, terutama hero art Now Playing) karena itulah titik yang
+selama ini tidak pernah benar sejak Batch 61 tapi juga tidak pernah dilihat langsung.
+
 ## Batch 73 — Fix sweep-select tak bisa dilanjutkan + Skeuomorphism 2.0 (Hyper-Realism UI)
 
 **Bug fixed — sweep-select "kepentok", long-press baru mereset bukan melanjutkan:**
