@@ -191,7 +191,7 @@ fun Modifier.tactileEmboss(
 //   3. Base surface — 4-stop diagonal gradient (not a flat 2-color bevel) simulating a subtly
 //      curved metal surface rather than a flat painted panel.
 //   4. Brushed-metal grain — a second background layer: Brush.linearGradient with a very short
-//      start->end segment + TileMode.Repeat, which repeats that short diagonal stripe across
+//      start->end segment + TileMode.Repeated, which repeats that short diagonal stripe across
 //      the whole surface — the standard Compose technique for a brushed-metal/hairline texture
 //      without a custom Shader. Alpha is low enough to read as texture, not banding.
 //   5. Specular glint — a small radial-gradient highlight anchored top-left, far brighter than
@@ -253,7 +253,7 @@ fun Modifier.skeuEmboss(
         colors = listOf(grainLight, grainDark),
         start = Offset(0f, 0f),
         end = Offset(3f, 3f),
-        tileMode = TileMode.Repeat
+        tileMode = TileMode.Repeated
     )
 
     return this

@@ -1,5 +1,21 @@
 # Changelog
 
+## Batch 75 — Fix 3 error compile dari CI Batch 74 (log_fail_128)
+
+CI gagal di `:app:compileDebugKotlin`/`compileReleaseKotlin`: `Unresolved reference: Repeat` di
+3 titik (`MainActivity.kt:361`, `BlurUtils.kt:84`, `TactileDepth.kt:256`) — ketiganya bagian dari
+teknik "grain"/brushed-metal streak Skeu Hyper-Realism (Batch 73): `Brush.linearGradient(...,
+tileMode = TileMode.Repeat)`. `TileMode.Repeat` bukan anggota enum `androidx.compose.ui.graphics.
+TileMode` yang valid — nama yang benar adalah `TileMode.Repeated` (entries-nya: Clamp, Repeated,
+Mirror, Decal). Fix: ganti `TileMode.Repeat` -> `TileMode.Repeated` di ketiga titik (murni
+perbaikan nama enum, tidak ada perubahan visual/logic apa pun dari yang dimaksud Batch 73) +
+komentar yang menyebut nama lama ikut diperbaiki biar tidak menyesatkan pembaca berikutnya.
+Import `TileMode` sendiri sudah benar di ketiga file (dicek), jadi bukan itu masalahnya.
+
+3 file kode disentuh, 1 baris kode tiap file. Tidak ada protected asset, tidak ada perubahan
+visual — batch ini murni memperbaiki compile agar hasil Skeu Hyper-Realism (Batch 73/74) bisa
+akhirnya di-build dan diverifikasi visual di device.
+
 ## Batch 74 — Debug UI pass: opaque-white-border bug + AlbumArtHero light-mode gap
 Audit "debugging UI sampai matang" (bukan laporan user spesifik) menyisir file yang paling
 berisiko dari Batch 73 (Skeu Hyper-Realism, belum diverifikasi visual) — 2 bug nyata ditemukan,

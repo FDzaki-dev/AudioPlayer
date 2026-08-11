@@ -348,7 +348,7 @@ class MainActivity : FragmentActivity() {
                 }
                 // Batch 73 — Skeuomorphism 2.0/Hyper-Realism: a second, much subtler overlay
                 // layer on top of identityRootBrush, root-level brushed-metal grain (same
-                // short-segment + TileMode.Repeat technique as skeuEmboss()'s panel-level grain
+                // short-segment + TileMode.Repeated technique as skeuEmboss()'s panel-level grain
                 // in TactileDepth.kt) so the *whole app canvas* reads as brushed metal, not just
                 // individual panels — Tactile's root wash has no equivalent layer at all, kept
                 // that way deliberately so the two identities stay visually independent.
@@ -358,7 +358,7 @@ class MainActivity : FragmentActivity() {
                         else listOf(SkeuLightBrushGrainLight, SkeuLightBrushGrainDark),
                         start = Offset(0f, 0f),
                         end = Offset(5f, 5f),
-                        tileMode = TileMode.Repeat
+                        tileMode = TileMode.Repeated
                     )
                 } else null
 

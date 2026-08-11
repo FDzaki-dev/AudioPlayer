@@ -75,13 +75,13 @@ fun Modifier.frostedGlass(
         // Batch 73 — Hyper-Realism: no longer a plain 2-stop diagonal (that was structurally
         // identical to Tactile's own edgeBrush, exactly the "not autonomous" gap this batch
         // fixes). Skeu's panel edge now reads as a brushed-metal rim: a short repeating
-        // highlight/shadow segment (TileMode.Repeat — same technique as skeuEmboss()'s grain
+        // highlight/shadow segment (TileMode.Repeated — same technique as skeuEmboss()'s grain
         // overlay in TactileDepth.kt) instead of one smooth gradient sweep.
         isSkeu -> Brush.linearGradient(
             colors = if (isDark) listOf(SkeuHighlight, SkeuShadow) else listOf(SkeuLightHighlight, SkeuLightShadow),
             start = Offset(0f, 0f),
             end = Offset(6f, 6f),
-            tileMode = TileMode.Repeat
+            tileMode = TileMode.Repeated
         )
         else -> {
             val flat = MaterialTheme.colorScheme.onSurface.copy(

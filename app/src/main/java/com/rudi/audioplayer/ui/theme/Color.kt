@@ -219,7 +219,7 @@ val SkeuAmbientAlphaLight = 0.12f
 //     turun" sedikit sebelum permukaannya naik, ciri khas hyper-realism vs
 //     bevel datar single-layer.
 // (4) Brushed-metal grain — stripe diagonal ultra-halus berulang (dipakai via
-//     TileMode.Repeat pada Brush.linearGradient dgn segmen pendek), overlay
+//     TileMode.Repeated pada Brush.linearGradient dgn segmen pendek), overlay
 //     tipis di atas base gradient untuk tekstur logam disikat yang nyata,
 //     bukan cuma gradasi warna polos.
 val SkeuSpecular = Color.White.copy(alpha = 0.55f)
