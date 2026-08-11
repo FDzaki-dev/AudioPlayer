@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 110 file
+# Total: 111 file
 
 .github/workflows/build.yml
 .gitignore
@@ -9,6 +9,7 @@ CHANGELOG.md
 FILE_MANIFEST.txt
 PROJECT_STATE.md
 README.md
+ROADMAP_15_FITUR_OFFLINE.md
 app/build.gradle.kts
 app/compose_stability_config.conf
 app/proguard-rules.pro

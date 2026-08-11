@@ -1,5 +1,23 @@
 # Changelog
 
+## Batch 77 — Dokumentasi: roadmap 15 fitur generik 100% offline (belum ada implementasi kode)
+User minta dokumentasi roadmap 15 fitur generik 100% offline yang belum tersedia di project.
+Murni dokumentasi, 0 perubahan kode/behavior aplikasi.
+
+- File baru `ROADMAP_15_FITUR_OFFLINE.md` (root repo) — 15 fitur dipilih dengan syarat: generik
+  (bukan niche), 100% jalan lokal tanpa izin INTERNET (konsisten klaim privasi app), dan belum
+  ada di `FILE_MANIFEST.txt`/daftar Fitur v1 README. Tiap entri: deskripsi, alasan, perkiraan
+  kompleksitas, dependency/risiko teknis utama. Daftar: (1) Editor Tag Metadata ID3, (2) Smart
+  Playlist Otomatis, (3) Editor Lirik LRC Tap-to-Sync, (4) A-B Repeat & Bookmark, (5) Ringtone
+  Cutter, (6) Pencari & Pembersih Duplikat, (7) Cadangan & Pulihkan Data Lokal, (8) Trim
+  Keheningan Otomatis, (9) Visualizer Audio, (10) Dashboard Statistik Dengar, (11) Floating Mini
+  Player, (12) Mode Audiobook/Podcast, (13) Konverter Format Audio Lokal, (14) Vault Lagu
+  Privat, (15) Alarm Musik. Ditutup tabel ringkasan prioritas (effort/risiko) sebagai saran
+  urutan eksekusi, bukan keputusan final.
+- `FILE_MANIFEST.txt` diperbarui (110 → 111 file).
+- Tidak ada protected asset disentuh, tidak ada kode aplikasi diubah — batch ini murni
+  dokumentasi perencanaan untuk keputusan batch berikutnya.
+
 ## Batch 76 — Lanjutan pangkas waktu compile CI (sampai habis semua lever aman)
 
 Instruksi eksplisit user: lanjutkan pemangkasan waktu compiler GitHub Actions (Batch 62) sampai

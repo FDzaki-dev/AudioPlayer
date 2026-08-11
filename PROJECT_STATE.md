@@ -6,6 +6,14 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 77 (Dokumentasi: roadmap 15 fitur generik 100% offline)** — Murni dokumentasi, 0 kode
+disentuh. File baru `ROADMAP_15_FITUR_OFFLINE.md` (root repo): 15 fitur generik yang belum ada
+di project, semuanya bisa jalan 100% lokal tanpa izin INTERNET, tiap entri dilengkapi perkiraan
+kompleksitas + risiko teknis + dependency yang dibutuhkan kalau nanti dieksekusi. Ditutup tabel
+prioritas (effort/risiko rendah→tinggi) sebagai saran urutan, BUKAN keputusan/commitment —
+murni referensi kalau user mau pilih salah satu untuk batch implementasi berikutnya. Detail
+lengkap: `CHANGELOG.md` Batch 77.
+
 **Batch 76 (Lanjutan pangkas waktu compile CI sampai habis)** — Configuration cache diaktifkan
 (`org.gradle.configuration-cache=true` + `problems=warn` sbg jaring pengaman, lever terbesar yg
 belum disentuh Batch 62) + step `actions/cache@v4` baru khusus `.gradle/configuration-cache`
