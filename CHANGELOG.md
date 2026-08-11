@@ -1,5 +1,50 @@
 # Changelog
 
+## Batch 72 — Fix sweep-select (gesture conflict) + hardening widget theme call + widget masih perlu 1 langkah manual dari user
+
+**Bug 1 fixed — Sweep-select "gak berfungsi sama sekali":** Root cause: gesture conflict.
+`SongRow`'s `combinedClickable(onLongClick = { ... onEnterSelectionMode() })` (Batch 66) dan
+`SongListView`'s `detectDragGesturesAfterLongPress` di LazyColumn (Batch 70, fitur sweep) adalah
+DUA pengenal long-press yang SALING TIDAK TAHU satu sama lain, berebut sentuhan fisik yang
+persis sama — `combinedClickable` (di row, lebih dalam) melacak tekanan/ripple-nya sendiri dan
+menandai pointer "consumed" sebagai bagian dari pengenalan long-click-nya sendiri, yang otomatis
+membatalkan `awaitLongPressOrCancellation` milik detektor sweep di LazyColumn (lebih luar)
+sebelum sempat selesai. Akibatnya sweep nyaris tidak pernah benar-benar terpicu — persis "cuman
+omong kosong". Fix: `onLongClick` pada `SongRow` dihapus (jadi `clickable` polos, cuma
+`onClick`) — `onDragStart` sweep sendiri sudah mereproduksi "tekan-tahan 1 baris = pilih baris
+itu" (tanpa perlu drag), jadi tidak ada fungsi yang hilang. Entry point "Pilih" di menu ⋮ tiap
+baris (line ~1119) tetap ada sebagai cara masuk mode pilih tanpa gesture sama sekali.
+
+**Bug 2 & 3 — Widget (Play/Pause icon tak pernah ganti, warna/tema tak pernah sinkron):** Ditinjau
+ulang MENYELURUH `WidgetUpdater.kt`, `PlayerWidgetProvider.kt`, `PlaybackService.kt`
+(listener→pushWidgetUpdate→saveState+updateAll, applyWidgetAction, onStartCommand),
+`PlayerViewModel.setThemeMode/setThemeIdentity` — SEMUA jalur kode (icon play/pause via
+`isPlaying`→`setImageViewResource`, background via `resolveIsDark`→`setInt(...,
+"setBackgroundResource", ...)`, title/artist/art) memakai `views` RemoteViews yang SAMA, urutan
+panggilan yang sama, dipush lewat `manager.updateAppWidget(id, views)` yang sama — tidak
+ditemukan cabang kode yang secara logis bisa membuat HANYA icon+background gagal sementara
+title/artist/art (yang terbukti jalan — lihat screenshot terbaru user, judul/artis/art akurat)
+berhasil, dari SATU pemanggilan fungsi yang sama. Satu bug nyata yang ditemukan & diperbaiki:
+`PlayerViewModel.setThemeMode/setThemeIdentity` memanggil `WidgetUpdater.updateAll()` LANGSUNG
+di Main thread (dipanggil dari klik Compose) — padahal `updateAll()` melakukan decode
+bitmap+crop+round (I/O+CPU blocking), pola yang sama yang sudah dihindari `PlaybackService`
+sejak Batch 34. Dipindah ke `viewModelScope.launch(Dispatchers.IO)`. **Tapi ini kemungkinan
+BUKAN akar masalah utama** — main-thread blocking biasanya bikin lambat/jank, bukan gagal total
+permanen.
+**Dugaan kuat akar masalah sebenarnya (butuh konfirmasi user, bukan sesuatu yang bisa
+diperbaiki lewat kode)**: widget yang PERTAMA KALI ditempel ke home screen sebelum Batch 68
+mungkin masih memakai RemoteViews/id widget versi lama yang di-cache oleh launcher (OneUI/MIUI
+dkk dikenal melakukan ini lintas update APK) — `widget_root` (id background) ditambahkan di
+Batch 68; kalau widget instance yang ditempel itu sendiri tidak pernah dilepas & ditempel ulang
+sejak itu, TIDAK ADA perbaikan kode yang akan pernah terlihat di layar, walau logic-nya 100%
+benar. **User WAJIB coba: hapus widget dari home screen, lalu tempel ulang yang baru** — kalau
+setelah itu icon play/pause & warna tema masih tidak berubah, itu baru konfirmasi bug kode
+sungguhan dan perlu logcat/screen record dari user utk lanjut diagnosa (tidak bisa ditebak lagi
+dari pembacaan kode statis semata).
+
+3 file kode disentuh (`LibraryScreen.kt`, `PlayerViewModel.kt`; `WidgetUpdater.kt` tidak
+diubah — sudah diperiksa ulang menyeluruh dan tidak ditemukan bug). Tidak ada protected asset.
+
 ## Batch 71 — Fix 2 error compile dari CI Batch 70 (log_fail_124)
 
 CI gagal di `:app:compileDebugKotlin`/`compileReleaseKotlin`, 2 error:

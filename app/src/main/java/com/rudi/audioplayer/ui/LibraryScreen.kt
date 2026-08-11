@@ -13,7 +13,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
@@ -1026,20 +1025,20 @@ private fun SongRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .combinedClickable(
-                    onClick = { if (selectionMode) onToggleSelect() else onClick() },
-                    onLongClick = {
-                        if (selectionMode) {
-                            onToggleSelect()
-                        } else {
-                            // Matches the long-press-to-multi-select haptic convention most
-                            // large Android apps (Gmail, Photos) use — this screen was
-                            // silently skipping it before.
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onEnterSelectionMode()
-                        }
-                    }
-                )
+                // Batch 72: this used to also carry onLongClick -> onEnterSelectionMode()
+                // (Batch 66) — a second, INDEPENDENT long-press recognizer on the exact same
+                // touch as SongListView's new sweep-select detectDragGesturesAfterLongPress
+                // (Batch 70, wraps the whole LazyColumn). Two unrelated long-press gesture
+                // families racing for the same physical touch is why sweep-select "did
+                // literally nothing" — combinedClickable's own press/ripple tracking marks the
+                // pointer consumed as part of recognizing ITS long click, which cancels the
+                // outer sweep detector's awaitLongPressOrCancellation before it can ever fire.
+                // Sweep's own onDragStart already reproduces plain "press-and-hold this row"
+                // (calls onSweepSelectRange with just that one id when the finger never
+                // leaves it), so this isn't lost functionality — "Pilih" in the row's overflow
+                // menu (search onEnterSelectionMode() below) remains as the explicit-tap entry
+                // point into selection mode.
+                .clickable(onClick = { if (selectionMode) onToggleSelect() else onClick() })
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

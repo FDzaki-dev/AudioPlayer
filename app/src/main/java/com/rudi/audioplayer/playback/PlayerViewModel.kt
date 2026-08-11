@@ -507,14 +507,22 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // here before. Identity itself doesn't change widget colors (Tactile/Skeu stay
         // dark-only), but keeping both setters symmetrical avoids the same bug resurfacing
         // if a future batch gives the widget an identity-aware look too.
-        WidgetUpdater.updateAll(appContext)
+        // Batch 72: moved off the caller's thread (this fires directly from a Compose click
+        // handler on Main) — WidgetUpdater.updateAll() decodes/crops/rounds a bitmap
+        // (loadThumbnail + Canvas work), the exact class of blocking disk+CPU work
+        // PlaybackService.pushWidgetUpdate already avoids doing on Main (see its own Batch 34
+        // note). Not the root cause of the widget staying visually frozen across theme
+        // switches — see PROJECT_STATE.md for what's still unconfirmed there — but leaving
+        // Main-thread I/O in a newly-added call path is a real bug on its own regardless.
+        viewModelScope.launch(Dispatchers.IO) { WidgetUpdater.updateAll(appContext) }
     }
 
     fun setThemeMode(mode: ThemeMode) {
         themeStore.setMode(mode)
         _themeMode.value = mode
         // Batch 68: this is the call that actually flips the widget's light/dark background.
-        WidgetUpdater.updateAll(appContext)
+        // Batch 72: see setThemeIdentity() above — same Main-thread-I/O fix applied here.
+        viewModelScope.launch(Dispatchers.IO) { WidgetUpdater.updateAll(appContext) }
     }
 
     private fun loadCustomFolderInfos(): List<CustomFolderInfo> =

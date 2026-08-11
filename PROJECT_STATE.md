@@ -6,6 +6,27 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 72 (Fix sweep-select gesture conflict + hardening widget theme call)** — Sweep-select
+(Batch 70) tidak pernah jalan krn bentrok dgn `combinedClickable.onLongClick` (Batch 66) di
+`SongRow` — 2 pengenal long-press pada sentuhan fisik yang sama, satu (row-level) membatalkan
+yang lain (LazyColumn-level sweep). Fix: `onLongClick` di `SongRow` dihapus, sweep-nya sendiri
+sudah cover kasus "tekan-tahan 1 baris tanpa drag." **Widget (icon play/pause tak ganti +
+warna/tema tak sinkron): DITINJAU ULANG MENYELURUH, kode-nya benar** (dicek baris-per-baris,
+semua properti dipush lewat RemoteViews+updateAppWidget yang sama persis dgn title/artist/art
+yang TERBUKTI berhasil) — 1 bug nyata diperbaiki (main-thread I/O di
+`setThemeMode`/`setThemeIdentity`, dipindah ke IO dispatcher) tapi itu bukan penjelasan yang
+memuaskan utk "sama sekali tidak berubah, 2 update berturut-turut." **BUTUH TINDAKAN USER**:
+lepas widget dari home screen, tempel ulang yang baru — kemungkinan besar launcher meng-cache
+RemoteViews/id widget lama dari SEBELUM Batch 68 (`widget_root` id ditambahkan Batch 68) dan
+tidak pernah re-bind ke instance widget yang sudah lama nempel. Kalau setelah lepas+tempel ulang
+MASIH sama, itu baru bug kode sungguhan — minta user kirim logcat atau screen record widget
+sebelum lanjut coba lagi, jangan tebak-tebak dari kode statis lagi. **Pola relevan utk batch
+depan**: kalau ada custom `pointerInput`/`detectDragGestures*` yang dipasang di container
+(LazyColumn/Column) yang ITEM-ITEM di dalamnya juga punya `clickable`/`combinedClickable`
+sendiri, selalu curigai gesture conflict duluan sebelum curiga logic salah — dua pengenal
+gesture independent nyaris selalu saling sabotase kalau menyasar sentuhan yang sama. Detail
+lengkap: `CHANGELOG.md` Batch 72.
+
 **Batch 71 (Fix 2 error compile CI dari log_fail_124)** — `SongArtBitmapLoader` (Batch 69)
 kurang override `BitmapLoader.supportsMimeType()` (abstract tanpa default di Media3 1.3.1) —
 ditambah, `true` utk mime `image/*`. `LibraryScreen.kt` `onSweepSelectRange` (Batch 70)
