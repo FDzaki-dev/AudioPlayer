@@ -19,6 +19,7 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.ListenableFuture
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.data.CrossfadeStore
 import com.rudi.audioplayer.data.CustomFolderInfo
@@ -75,6 +76,14 @@ data class PlaybackUiState(
 class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     private var controller: MediaController? = null
+    // Batch 78 — fix: onCleared() called `controller?.release()`, which is a no-op if
+    // controllerFuture hasn't resolved yet (controller still null at that point — e.g. the
+    // ViewModel is cleared almost immediately after connect(), a fast rotation/nav-away before
+    // the Media3 session handshake finishes). Nothing then ever cancels/releases the in-flight
+    // future, so its listener stays registered and the async connection to PlaybackService keeps
+    // resolving after the ViewModel is already gone — a real (if narrow-window) connection leak.
+    // Kept as a field so onCleared() can always reach it, resolved or not.
+    private var controllerFuture: ListenableFuture<MediaController>? = null
     private var currentQueue: List<Song> = emptyList()
     private var currentQueueSlotIds: List<Long> = emptyList()
     private var nextQueueSlotId: Long = 0L
@@ -353,9 +362,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     fun connect() {
         val sessionToken = SessionToken(appContext, ComponentName(appContext, PlaybackService::class.java))
-        val controllerFuture = MediaController.Builder(appContext, sessionToken).buildAsync()
-        controllerFuture.addListener({
-            controller = controllerFuture.get()
+        val future = MediaController.Builder(appContext, sessionToken).buildAsync()
+        controllerFuture = future
+        future.addListener({
+            controller = future.get()
             controller?.addListener(playerListener)
             startPositionLoop()
         }, Executor { it.run() }) // same-thread executor — Guava's directExecutor() had no special behavior beyond this
@@ -983,7 +993,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         libraryAutoRefreshJob?.cancel()
         libraryContentObserver?.let { runCatching { appContext.contentResolver.unregisterContentObserver(it) } }
         equalizerController.release()
-        controller?.release()
+        // Batch 78 — MediaController.releaseFuture() handles BOTH cases correctly: cancels the
+        // future if the async connect() handshake hasn't resolved yet, or releases the resolved
+        // controller if it has. `controller?.release()` alone only covered the second case.
+        controllerFuture?.let { MediaController.releaseFuture(it) }
         super.onCleared()
     }
 

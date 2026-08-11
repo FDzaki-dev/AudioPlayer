@@ -941,6 +941,22 @@ private fun SongListView(
             }
     ) {
         itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
+            // Batch 78 — fix: rowBoundsInRoot only ever got entries WRITTEN (onGloballyPositioned),
+            // never REMOVED. Once a row scrolled far enough to leave composition (LazyColumn
+            // recycling), its bounds entry stayed in the map forever at its last known (now stale)
+            // position — Batch 70 flagged this exact scroll-during-sweep scenario as "belum
+            // ditest" without root-causing it. Concretely: user sweeps, lifts finger, scrolls the
+            // list normally (unclaimed by detectDragGesturesAfterLongPress since it never reaches
+            // long-press threshold), then long-presses again — indexAt() does
+            // `entries.firstOrNull { rootY in it.value }` over a map that can contain both live
+            // entries (current on-screen positions) AND stale ones (disposed rows' old positions,
+            // which now overlap completely different rows after the scroll) — whichever the map
+            // happens to hit first wins, so the sweep could silently anchor on/extend through the
+            // wrong songs. DisposableEffect removes each row's own entry the moment it leaves
+            // composition, so the map only ever holds bounds for rows actually on screen right now.
+            DisposableEffect(index) {
+                onDispose { rowBoundsInRoot.remove(index) }
+            }
             SongRow(
                 modifier = Modifier.onGloballyPositioned { coords ->
                     val top = coords.positionInRoot().y

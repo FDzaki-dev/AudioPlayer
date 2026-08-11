@@ -1,5 +1,56 @@
 # Changelog
 
+## Batch 78 — Debugging pass menyeluruh ("debugging semua area")
+User minta audit debugging lintas seluruh codebase (bukan laporan bug spesifik). Audit statis
+sistematis per area (data/, playback/, ui/, ui/theme/, util/, widget/) — cursor/stream leaks,
+GlobalScope, runBlocking, `!!`, listener register/unregister balance, thread-safety widget,
+lifecycle service, brace/paren balance token Skeu Hyper-Realism (Batch 73-75, ditandai "belum
+pernah berhasil di-compile" — dibaca ulang baris-per-baris, semua token Color.kt yang dirujuk
+TactileDepth.kt/BlurUtils.kt/MainActivity.kt/NowPlayingScreen.kt terkonfirmasi ADA & valid,
+tidak ada bug baru ditemukan di situ selain fix TileMode Batch 75 yang sudah beres — **masih
+tetap belum diverifikasi visual/compile sungguhan**, statis-read tidak bisa gantikan itu).
+2 bug nyata ditemukan & diperbaiki, scope 2 file (di bawah batas 10 file/1 modul, tidak perlu
+atomic-change exception):
+
+- **`LibraryScreen.kt` — sweep-select bisa nyeleksi baris yang salah setelah list di-scroll**.
+  Root cause baru dari gap yang Batch 70 sendiri sudah tandai "belum ditest" tanpa pernah
+  di-root-cause: `rowBoundsInRoot` (map index->posisi Y) HANYA PERNAH DITULIS lewat
+  `onGloballyPositioned`, tidak pernah DIHAPUS. Begitu sebuah baris di-scroll cukup jauh hingga
+  keluar dari komposisi (LazyColumn recycle), entry lamanya tetap nongkrong di map dengan posisi
+  Y basi selamanya. Skenario nyata: user sweep, angkat jari, scroll list biasa (gesture ini lolos
+  dari `detectDragGesturesAfterLongPress` karena tidak pernah tembus threshold long-press, jadi
+  scroll normal LazyColumn tetap jalan seperti biasa), lalu long-press lagi buat lanjut sweep —
+  `indexAt()` (`entries.firstOrNull { rootY in it.value }`) bisa kena entry basi yang posisi
+  Y-nya sekarang kebetulan overlap baris yang benar-benar berbeda pasca-scroll, sehingga sweep
+  diam-diam nyeleksi lagu yang salah. Fix: `DisposableEffect(index) { onDispose { ... remove(index) } }`
+  di tiap item `itemsIndexed` — entry dihapus persis saat barisnya keluar dari komposisi, jadi map
+  cuma pernah berisi baris yang benar-benar tampil di layar saat itu juga. **Pola relevan utk
+  batch depan**: kombinasi `mutableStateMapOf` yang ditulis dari `onGloballyPositioned` container
+  yang isinya di-recycle (LazyColumn/LazyRow) SELALU butuh pasangan cleanup di sisi disposal —
+  kalau cuma nulis tanpa hapus, itu bug delay-timer, bukan langsung kelihatan dari baca kode
+  sekali baca sepintas.
+- **`PlayerViewModel.kt` — koneksi `MediaController` bisa bocor kalau ViewModel di-clear sebelum
+  handshake async-nya selesai**. `onCleared()` lama cuma panggil `controller?.release()` — kalau
+  `controllerFuture` (dari `connect()`) belum resolve saat itu (mis. rotasi/navigasi sangat
+  cepat sesaat setelah `connect()` dipanggil), `controller` masih `null`, jadi baris itu no-op:
+  future yang masih in-flight TIDAK PERNAH di-cancel/release, listener-nya tetap terpasang, dan
+  proses konek ke `PlaybackService` terus jalan di background walau ViewModel-nya sudah tidak ada
+  yang pegang — koneksi bocor (jendela sempit, tapi nyata). Fix: `controllerFuture` disimpan
+  sebagai field (dulu cuma `val` lokal di `connect()`), `onCleared()` sekarang panggil
+  `MediaController.releaseFuture(controllerFuture)` — API resmi Media3 yang menangani KEDUA
+  kasus sekaligus (cancel future yang belum resolve, ATAU release controller yang sudah resolve).
+
+**Area yang diaudit tapi TIDAK ditemukan bug baru** (dicek, bukan dilewati): seluruh cursor/stream
+I/O (semua sudah `.use{}`), tidak ada `GlobalScope`/`runBlocking`/`!!` di manapun, receiver/listener
+register-unregister balance (`ShakeDetector`, `PlaybackService.onDestroy`), thread-safety
+`WidgetUpdater.updateAll` (dipanggil dari `Dispatchers.IO` di kedua call site), `AppLogger.kt`
+crash-logger (cocok dgn spec MediaStore API 29+/FIFO 50/metadata lengkap di
+`PROJECT_STATE.md`/system prompt), `.first()`/`.last()` unsafe-access candidates di
+`LibraryScreen.kt` (ketiganya dijaga `groupBy`/empty-check, aman). **Belum diverifikasi
+compile/visual sungguhan** — sama seperti batch-batch sebelumnya, tidak ada `kotlinc`/emulator di
+environment kerja ini; prioritas berikutnya kalau user minta lanjut: rebuild CI + install APK,
+terutama uji sweep-select pasca-scroll (fix di atas) secara langsung di device.
+
 ## Batch 77 — Dokumentasi: roadmap 15 fitur generik 100% offline (belum ada implementasi kode)
 User minta dokumentasi roadmap 15 fitur generik 100% offline yang belum tersedia di project.
 Murni dokumentasi, 0 perubahan kode/behavior aplikasi.
