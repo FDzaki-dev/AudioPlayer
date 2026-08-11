@@ -1,5 +1,48 @@
 # Changelog
 
+## Batch 76 — Lanjutan pangkas waktu compile CI (sampai habis semua lever aman)
+
+Instruksi eksplisit user: lanjutkan pemangkasan waktu compiler GitHub Actions (Batch 62) sampai
+habis. 3 file kode disentuh (2 protected — edit parsial: `.github/workflows/build.yml`,
+`app/build.gradle.kts`), semua murni proses build, **kecuali 1 item yang eksplisit BUKAN
+zero-effect (ditandai di bawah, bukan disembunyikan)**.
+
+**Diterapkan:**
+- `gradle.properties`: heap `-Xmx3072m` -> `-Xmx4096m` + `-XX:+UseParallelGC` eksplisit (runner
+  ubuntu-latest 7GB RAM, 3072m di ujung bawah rekomendasi umum AGP+Compose; Parallel GC overhead
+  bookkeeping-nya lebih rendah drpd G1 default utk proses build berumur pendek/sekali-jalan).
+- **Configuration cache** (`org.gradle.configuration-cache=true`) — lever terbesar yang belum
+  disentuh Batch 62: skip SELURUH fase configuration (parsing build script, evaluasi plugin,
+  resolusi dependency graph) kalau input sama persis dgn run sebelumnya, beda dari build cache
+  yang cuma cache OUTPUT task. `problems=warn` dipasang sbg jaring pengaman krn kombinasi AGP
+  8.4.1 + Compose compiler ext 1.5.14 + Kotlin 1.9.24 belum pernah diverifikasi config-cache-
+  compatible di sini (tidak ada compiler Android tersedia utk cek langsung) — kalau ada bagian
+  yg belum kompatibel, Gradle cuma WARN & lanjut normal, TIDAK gagalkan CI run.
+  `.github/workflows/build.yml`: `--configuration-cache` ditambah eksplisit di CLI (redundant-
+  safe pattern yg sama dgn `--build-cache` Batch 62) + step `actions/cache@v4` BARU utk
+  `.gradle/configuration-cache` — direktori ini project-local, TIDAK ikut ter-cache oleh
+  `setup-gradle@v3` yang cuma menyasar Gradle User Home (`~/.gradle`), jadi tanpa step ini
+  config cache selalu "cold" tiap run dan kehilangan sebagian besar manfaatnya. Cache key
+  berbasis hash `*.gradle.kts`+`gradle.properties` (otomatis cache-miss aman kalau berubah,
+  BUKAN error — Gradle sendiri juga validasi fingerprint di dalam entry-nya).
+
+**Diterapkan TAPI bukan zero-effect (baca sebelum anggap ini "gratis"):**
+- `app/build.gradle.kts`: `lint { checkReleaseBuilds = false }` — melepas `lintVitalRelease`
+  (subset lint fatal: manifest merger, translasi hilang, dll) dari dependency `assembleRelease`.
+  TIDAK mengubah 1 byte pun APK (lint murni analisis statis) — tapi INI MENGURANGI 1 lapis
+  verifikasi otomatis yang tadinya jalan tiap release build. `./gradlew lint`/`lintRelease`
+  tetap bisa dijalankan manual kapan pun; ini cuma lepas pengait otomatisnya dari CI.
+
+**SENGAJA TIDAK diterapkan (lever terbesar yang tersisa, terlalu berisiko tanpa compiler utk
+verifikasi):** migrasi Kotlin 1.9.24 -> 2.0+ (compiler K2, umumnya ~2x lebih cepat dari K1).
+Bukan cuma bump versi — Compose compiler pindah dari `composeOptions.kotlinCompilerExtensionVersion`
+(cara lama, dipakai proyek ini) ke plugin Gradle `org.jetbrains.kotlin.plugin.compose` terpisah
+(cara Kotlin 2.0+), dan SEMUA dependency perlu kompatibel Kotlin-2.0. Ini migrasi ekosistem
+sungguhan, bukan "murni proses" — kalau ada 1 saja dependency/API yang belum siap, build bisa
+gagal total dan TIDAK ada compiler Android di sini utk memverifikasi sebelum push. **Kandidat
+batch terpisah kalau user mau lanjut** — bukan sesuatu yang aman diselipkan diam-diam di batch
+pemangkasan waktu compile biasa.
+
 ## Batch 75 — Fix 3 error compile dari CI Batch 74 (log_fail_128)
 
 CI gagal di `:app:compileDebugKotlin`/`compileReleaseKotlin`: `Unresolved reference: Repeat` di

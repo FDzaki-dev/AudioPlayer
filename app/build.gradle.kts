@@ -124,6 +124,18 @@ android {
     packaging {
         resources.excludes.add("/META-INF/{AL2.0,LGPL2.1}")
     }
+    // Batch 76 — "pangkas waktu compile sampai habis": lanjutan Batch 62. AGP secara default
+    // menjalankan lintVitalRelease sebagai dependency assembleRelease (subset lint fokus
+    // isu fatal — manifest merger, translasi hilang, dst) SEBELUM APK release dirakit. Ini
+    // TIDAK mengubah 1 byte pun output APK (lint murni analisis statis, tidak pernah menulis
+    // apa pun ke APK) — tapi juga bukan "zero-cost": ini genuinely MENGURANGI 1 lapis
+    // verifikasi otomatis yang tadinya jalan tiap release build, jadi beda dari lever Batch 62
+    // yang sepenuhnya tanpa efek samping. Catatan jujur, bukan disembunyikan: `./gradlew lint`/
+    // `lintRelease` tetap bisa dijalankan manual kapan pun kalau perlu cek fatal-lint issues;
+    // ini cuma melepas pengait OTOMATISnya dari tiap assembleRelease di CI.
+    lint {
+        checkReleaseBuilds = false
+    }
 
     // The unit tests under src/test are plain JVM tests (no Robolectric, no emulator) — any
     // Android SDK call they happen to touch (e.g. Uri.parse while building a test fixture)

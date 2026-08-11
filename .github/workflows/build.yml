@@ -42,6 +42,23 @@ jobs:
           # antar-run lewat actions/cache di balik layar action ini. Tidak perlu setup
           # actions/cache manual terpisah — action ini sudah menanganinya sejak v3.
 
+      - name: Cache Gradle configuration cache
+        # Batch 76 — configuration cache (gradle.properties) disimpan project-local di
+        # <repo>/.gradle/configuration-cache, BUKAN di Gradle User Home (~/.gradle) — jadi
+        # TIDAK ikut ter-cache otomatis oleh setup-gradle@v3 di atas (yang cuma menyasar
+        # ~/.gradle) walau flag-nya sudah aktif. Tanpa step ini, config cache tetap valid
+        # tapi selalu "cold" (fresh) setiap run, kehilangan sebagian besar manfaatnya.
+        # Key berbasis hash file build script — otomatis invalid (cache miss, bukan error)
+        # kalau build.gradle.kts/gradle.properties berubah; Gradle sendiri JUGA
+        # memvalidasi fingerprint input di dalam entry cache-nya, jadi key yang meleset pun
+        # cuma berakhir cache-miss aman, tidak pernah dipakai kalau sudah stale/salah.
+        uses: actions/cache@v4
+        with:
+          path: .gradle/configuration-cache
+          key: config-cache-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle.properties') }}
+          restore-keys: |
+            config-cache-${{ runner.os }}-
+
       - name: Decode signing keystore
         run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > ${{ github.workspace }}/app/release.keystore
 
@@ -85,6 +102,9 @@ jobs:
         # version determination (keduanya tidak butuh Gradle sama sekali) selesai LEBIH
         # DULU sebelum satu-satunya invocation Gradle ini, jadi env var SIGNING_* di bawah
         # sudah siap sejak awal invocation seperti sebelumnya.
+        # Batch 76 — `--configuration-cache` ditambah eksplisit di CLI (sama alasan dgn
+        # `--build-cache`: redundant-safe dgn gradle.properties, tapi eksplisit memastikan
+        # aktif walau properties file entah kenapa tidak terbaca).
         env:
           SIGNING_KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
@@ -92,7 +112,7 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           set -o pipefail
-          gradle testDebugUnitTest assembleRelease --no-daemon --build-cache 2>&1 | tee build-output.log
+          gradle testDebugUnitTest assembleRelease --no-daemon --build-cache --configuration-cache 2>&1 | tee build-output.log
 
       - name: Rename APK to match version
         run: |
