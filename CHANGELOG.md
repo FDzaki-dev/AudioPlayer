@@ -1,5 +1,67 @@
 # Changelog
 
+## Batch 83 — Ganti total identitas "Apple" -> "Facet": geometri chamfer otonom (layout only, warna belum disentuh)
+Instruksi user: "UI/UX aplikasi yang premium+expensive 'otonom'. gak menjiplak apple music atau
+apps apapun". Klarifikasi lewat 2 pertanyaan tappable: (1) masuk sebagai apa — jawaban "Ganti
+total identitas 'Apple'" (bukan tema ke-4 baru, bukan redesign ketiga identitas jadi satu). (2)
+arah material/mood — dijawab "Ink & Platinum", TAPI sebelum implementasi warna dimulai user
+mengoreksi: **"Indentitas 'layout' only. theme gak usah redesign dulu"** — jadi batch ini murni
+GEOMETRI/SHAPE, palet Ink & Platinum ditunda ke batch warna terpisah nanti, 0 token warna
+disentuh (`AppleDarkColors`/`AppleLightColors`/`AppleAccent` di `Color.kt` sama persis).
+
+**Kenapa "Apple" perlu diganti**: `AppleShapes`'s comment lama secara eksplisit bilang generous-
+rounded shape itu "closest honest approximation" dari squircle Apple sendiri — literal pengakuan
+kalau shape language identitas ini memang meniru Apple Music/iOS. Play/pause button-nya juga
+`CircleShape` polos — tombol transport paling ikonik Apple Music. Diganti dgn 1 motif baru:
+**chamfer sudut tunggal** (`CutCornerShape` bawaan Compose Foundation, potongan diagonal — bukan
+kurva) di `topEnd` saja, 3 sudut lain tetap tajam (0dp) — kesan gem/kartu terpotong presisi,
+BEDA dari kedua identitas lain di app ini juga (Tactile/Skeu sama-sama rounded-semua-sudut), jadi
+bukan cuma "bukan Apple Music" tapi genuinely otonom dari ketiganya. Magnitude dp radius lama
+dipertahankan (Radius.md/xl/hero) — cuma geometri yg berubah (potong vs lengkung, 1 sudut vs 4),
+skala/footprint tetap sama.
+
+**5 file, di bawah batas normal** (10 file/1 modul), murni shape — tidak perlu Atomic Change
+exception:
+1. **`ui/theme/Theme.kt`** — `AppleShapes` redefinisi total (CutCornerShape topEnd, 3 magnitude).
+   `ThemeIdentity.APPLE` displayName "Apple"->"Facet", description ditulis ulang. `storageKey
+   "apple"` & nama konstanta enum `APPLE` SENGAJA TIDAK diganti (preferensi tema tersimpan user
+   yg sudah pernah pilih identitas ini tetap valid) — pola sama dgn `SKEU_DARK_LITE` (Batch 79).
+2. **`ui/MiniPlayerBar.kt`** — play/pause button: `if (isTactile||isSkeu) MaterialTheme.shapes.
+   medium else CircleShape` disederhanakan jadi selalu `MaterialTheme.shapes.medium` (tiap
+   identitas beda lewat Shapes-nya sendiri sekarang, gak perlu percabangan lagi) — import
+   `CircleShape` yg jadi tak terpakai ikut dihapus.
+3. **`ui/NowPlayingScreen.kt`** — 2 fix: (a) play/pause button sama persis pola #2. (b)
+   `heroShape` piringan album (surface TERBESAR di seluruh app) ternyata hardcode
+   `RoundedCornerShape(Radius.hero)` utk Apple — bypass total dari sistem shape, ditemukan saat
+   audit, disamakan jadi `MaterialTheme.shapes.large` spt identitas lain. Doc-comment fungsi yg
+   masih bilang "Apple Music-style hero art" diperbarui.
+4. **`ui/HomeScreen.kt`** — `ContinueListeningCard` (kartu pertama yg kelihatan di Home) punya
+   bypass sama (`RoundedCornerShape(Radius.xl)` hardcode utk Apple, sementara Tactile/Skeu di
+   baris yg sama persis sudah pakai `MaterialTheme.shapes.medium`) — disamakan.
+5. **`ui/SettingsScreen.kt`** — baris preview pemilih tema: sama bypass, TAPI fix-nya SENGAJA
+   BUKAN `MaterialTheme.shapes.medium` — composable ini preview SEMUA identitas dalam 1 list
+   sementara cuma satu yg pernah jadi tema aktif app sungguhan, jadi `MaterialTheme` ambient di
+   sini merefleksikan identitas yg lagi AKTIF, bukan tentu identitas yg baris ini preview (alasan
+   sama persis kenapa `previewColors` di atasnya resolve warna lewat `colorsFor(identity, isDark)`
+   bukan `MaterialTheme.colorScheme`). Fix: referensi langsung `AppleShapes.medium` (import baru).
+
+**Diaudit, SENGAJA TIDAK diubah**: `LockScreen.kt`'s PIN keypad (Batch 82 baru kasih
+`tactileEmboss()`/`skeuEmboss()` ke Tactile/Skeu, `else` Apple masih `CircleShape` polos) —
+dicek, circle di SEMUA 3 identitas sekalian (bukan cuma Apple), keputusan desain Batch 82 yg
+disengaja (keypad numerik, circle adalah pola ergonomis universal di hampir semua keypad OS,
+bukan ciri khas Apple Music) — mengubah cuma Apple di sini akan bikin 1 grid tombol campur 2
+bentuk beda tanpa alasan fungsional yg jelas, jadi dibiarkan. `LibraryScreen.kt`'s banner undo-
+hide-lagu — shape hardcode di situ SAMA utk ketiga identitas (bukan Apple-only bypass), di luar
+scope batch ini.
+
+**README.md diperbarui** (paragraf "5 tema" — masih mendeskripsikan "gaya Apple ... sudut
+membulat generous ala iOS"), 0 protected asset disentuh, brace/paren balance ke-5 file kode
+dicek manual & seimbang. **Palet warna "Ink & Platinum" BELUM diimplementasikan** — instruksi
+user eksplisit menunda ini; kalau user minta lanjut ke warna, itu jadi batch terpisah (Color.kt
+`AppleDarkColors`/`AppleLightColors`/`AppleAccent`, kemungkinan juga root ambient wash di
+`MainActivity.kt` spt yg Tactile/Skeu masing-masing sudah punya). **Masih belum diverifikasi
+compile/visual sungguhan di device** — sama seperti seluruh batch sebelumnya.
+
 ## Batch 82 — "debugging+Polish UI": audit lintas ui/ + fix state-leak LyricsSheet + tactile/skeu untuk LockScreen
 Arahan user: "debugging+Polish UI" (generik, bukan laporan bug spesifik). Audit statis lintas
 semua file `ui/` (MiniPlayerBar, EqualizerSheet, QueueSheet, FolderManagerSheet, LyricsSheet,

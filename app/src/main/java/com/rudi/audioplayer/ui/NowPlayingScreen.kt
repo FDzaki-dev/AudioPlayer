@@ -502,12 +502,11 @@ fun NowPlayingScreen(
                 Icon(Icons.Default.SkipPrevious, contentDescription = "Sebelumnya", modifier = Modifier.size(36.dp))
             }
             val playPauseInteraction = remember { MutableInteractionSource() }
-            // Batch 55 — Tactile gets its own shape language here too (moderate rounded-square,
-            // matching TactileShapes.medium, same "machined control" read as every other tactile
-            // surface) instead of silently inheriting Apple's circular filledShape default; wrapped
-            // in tactileEmboss() so the app's single most-used button reads as a lifted hardware
-            // key (diagonal bevel + drop shadow), not just a flat colored disc like Apple's.
-            val playPauseShape = if (isTactile || isSkeu) MaterialTheme.shapes.medium else CircleShape
+            // Batch 83 — was `if (isTactile || isSkeu) MaterialTheme.shapes.medium else
+            // CircleShape`: the circle here was a direct Apple Music transport-button mirror.
+            // AppleShapes (Theme.kt) now carries its own autonomous chamfered geometry, so every
+            // identity shares the same theme-relative reference — no per-identity branch needed.
+            val playPauseShape = MaterialTheme.shapes.medium
             FilledIconButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -911,9 +910,10 @@ private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: 
     }
 }
 
-/** Apple Music-style hero art: a large rounded-square image with a soft ambient glow
- * (tinted by the same accent color already extracted from this song's artwork) instead of
- * the old spinning vinyl. Horizontal swipe-to-skip gesture logic is unchanged from before. */
+/** Large hero album art with a soft ambient glow (tinted by the same accent color already
+ * extracted from this song's artwork) instead of the old spinning vinyl. Shape is fully
+ * theme-relative (MaterialTheme.shapes.large) since Batch 83 — Facet's own chamfered geometry
+ * applies here too, not just Apple Music's rounded-square (see Theme.kt's AppleShapes). */
 @Composable
 private fun AlbumArtHero(
     artworkUri: Uri?,
@@ -950,7 +950,9 @@ private fun AlbumArtHero(
         // single largest, most-looked-at surface on the whole screen) was Tactile-only, Skeu
         // fell into the generic Apple shadow-only branch below with no bevel of its own at all.
         val isSkeu = isSkeuTheme()
-        val isPanelTheme = isTactile || isSkeu
+        // Batch 83 — isPanelTheme (isTactile || isSkeu) removed here: its only use was the old
+        // `if (isPanelTheme) MaterialTheme.shapes.large else RoundedCornerShape(Radius.hero)`
+        // heroShape branch just below, now unconditional for every identity (see that comment).
         // Batch 74 — fix: this manual draw (unlike skeuEmboss()/tactileEmboss(), which both
         // already branch on LocalIsDarkTheme) hardcoded dark-only tokens (TactileHighlight/
         // TactileShadow, SkeuHighlight/SkeuShadow/SkeuAmbientOcclusion/SkeuSpecular/
@@ -966,7 +968,13 @@ private fun AlbumArtHero(
         // here at all; TactileHighlight/TactileShadow are plain white/black-based again this
         // batch (see Color.kt), so this hero art picks up the new palette automatically through
         // those same two token references.
-        val heroShape = if (isPanelTheme) MaterialTheme.shapes.large else RoundedCornerShape(Radius.hero)
+        // Batch 83 — was `if (isPanelTheme) MaterialTheme.shapes.large else
+        // RoundedCornerShape(Radius.hero)`: Apple's hero art (the single largest, most-looked-at
+        // surface on this whole screen) bypassed the theme shape system entirely, hardcoding the
+        // exact same generous-rounded geometry the old AppleShapes.large used — so even after
+        // Theme.kt's chamfer redesign this art would have silently stayed round. Now fully
+        // theme-relative like every other identity's own surfaces.
+        val heroShape = MaterialTheme.shapes.large
         Box(
             modifier = Modifier
                 .size(300.dp)

@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -29,8 +30,19 @@ import androidx.compose.ui.unit.dp
 // SENGAJA TIDAK diganti (preferensi tema tersimpan milik user yang sudah pernah pilih identitas
 // ini tetap valid/tidak ter-reset) — pola blast-radius-terkendali yang sama dgn kenapa nama
 // fungsi skeuEmboss()/token Skeu* di Color.kt juga tidak diganti nama, cuma isi/mekanismenya.
+// Batch 83 — APPLE's user-facing identity renamed "Apple" -> "Facet" atas instruksi eksplisit
+// user: "UI/UX yang premium+expensive 'otonom', gak menjiplak apple music atau apps apapun" ->
+// klarifikasi lanjutan: ganti TOTAL identitas Apple (bukan tema ke-4), tapi LAYOUT/shape saja
+// dulu — palet warna (AppleDarkColors/AppleLightColors/AppleAccent) SENGAJA TIDAK disentuh batch
+// ini (redesign warna ditunda, instruksi eksplisit user "theme gak usah redesign dulu"). Yang
+// diganti: AppleShapes di bawah (generous-rounded "squircle" ala iOS -> chamfered single-corner
+// language, lihat komentar AppleShapes) + 3 kontrol yg sebelumnya hardcode CircleShape lepas dari
+// sistem shape sama sekali (MiniPlayerBar/NowPlayingScreen play-pause, LockScreen PIN keypad) —
+// storageKey "apple" & nama konstanta enum APPLE SENGAJA TIDAK diganti (preferensi tema
+// tersimpan milik user yang sudah pernah pilih identitas ini tetap valid), pola blast-radius-
+// terkendali yang sama dgn SKEU_DARK_LITE (Batch 79) & fungsi skeuEmboss() (nama tetap, isi ganti).
 enum class ThemeIdentity(val storageKey: String, val displayName: String, val description: String) {
-    APPLE("apple", "Apple", "Tampilan bersih khas iOS, mengikuti mode terang/gelap yang dipilih"),
+    APPLE("apple", "Facet", "Geometri chamfer otonom — satu sudut terpotong tegas di tiap panel, bukan generous-rounded ala iOS"),
     TACTILE("tactile_lite", "Tactile", "Kaca premium dengan sentuhan Midnight Blue tipis dan kontrol taktil — kini otonom di mode terang maupun gelap"),
     SKEU_DARK_LITE("skeu_dark_lite", "Neumorphism", "Panel lembut menyatu dgn kanvas, dual soft-shadow ultra realistic, aksen Titanium dominan dgn sentuhan Zamrud — otonom di mode terang maupun gelap");
 
@@ -185,13 +197,22 @@ private val SkeuLightColors = lightColorScheme(
     error = SkeuDarkError
 )
 
-// A single, consistent "continuous curve" language across the whole app — Compose's Shapes
-// API only supports true rounded rectangles (Apple's real squircle/superellipse corners
-// aren't natively expressible), so generous rounding is the closest honest approximation.
+// Batch 83 — was generous RoundedCornerShape ("closest honest approximation" of Apple's own
+// squircle, per the removed comment here) — literally an admission this shape language existed
+// to resemble Apple Music's own rounded-corner cards/sheets. Replaced with a single-corner
+// CHAMFER (CutCornerShape, a native Compose Foundation shape — a diagonal cut, not a curve) on
+// topEnd only, other 3 corners left sharp (0dp) — reads as a cut/faceted edge (cut-gem, tailored
+// notch, a folded-corner card), a motif none of this app's 3 identities nor Apple Music/most
+// music apps use (Tactile/Skeu are both uniform-all-corner RoundedCornerShape families — see
+// TactileShapes/SkeuDarkShapes below — so this is also now visually distinct from both of THOSE,
+// not just from Apple Music). Same dp magnitudes as the old radii (Radius.md/xl/hero) kept for
+// scale continuity — footprint size unchanged, only the corner GEOMETRY changed (cut vs round,
+// one corner vs four) — deliberately "layout only" per user's explicit instruction this batch,
+// zero color-token changes anywhere in this file or Color.kt.
 val AppleShapes = Shapes(
-    small = RoundedCornerShape(Radius.ml),
-    medium = RoundedCornerShape(Radius.xxl),
-    large = RoundedCornerShape(Radius.hero)
+    small = CutCornerShape(topEnd = Radius.md),
+    medium = CutCornerShape(topEnd = Radius.xl),
+    large = CutCornerShape(topEnd = Radius.hero)
 )
 
 // Tactile's shape language — moderate, consistent rounding (not Apple's generous curve, not

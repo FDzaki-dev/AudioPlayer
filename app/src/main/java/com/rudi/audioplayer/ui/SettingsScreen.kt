@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.BuildConfig
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
 import com.rudi.audioplayer.ui.theme.ThemeMode
+import com.rudi.audioplayer.ui.theme.AppleShapes
 import com.rudi.audioplayer.ui.theme.colorsFor
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
@@ -406,7 +407,17 @@ private fun ThemeOptionCard(identity: ThemeIdentity, isDark: Boolean, selected: 
                 when {
                     isTactilePreview -> Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xl), elevation = if (selected) 12.dp else 8.dp)
                     isSkeuPreview -> Modifier.skeuEmboss(shape = RoundedCornerShape(Radius.xl), elevation = if (selected) 12.dp else 8.dp)
-                    else -> Modifier.clip(RoundedCornerShape(Radius.xl))
+                    // Batch 83 — was `RoundedCornerShape(Radius.xl)` (same literal as the two
+                    // branches above) — now shows Facet's own chamfer in its preview row, same
+                    // "demonstrate live" intent this comment block already states for
+                    // Tactile/Skeu. Deliberately references AppleShapes DIRECTLY rather than
+                    // `MaterialTheme.shapes.medium` — this composable previews EVERY identity in
+                    // a list while only one is ever the app's actual active theme, so the ambient
+                    // MaterialTheme here reflects whichever identity is currently ACTIVE, not
+                    // necessarily the `identity` this specific row is previewing (the same reason
+                    // `previewColors` above resolves colors via `colorsFor(identity, isDark)`
+                    // instead of `MaterialTheme.colorScheme`, not ambient lookup).
+                    else -> Modifier.clip(AppleShapes.medium)
                 }
             )
             .clickable(onClick = onClick),

@@ -254,7 +254,12 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
                 when {
                     isTactile -> Modifier.tactileEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
                     isSkeu -> Modifier.skeuEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
-                    else -> Modifier.clip(RoundedCornerShape(Radius.xl))
+                    // Batch 83 — was `RoundedCornerShape(Radius.xl)`, a hardcoded escape from the
+                    // theme shape system (same gap as MiniPlayerBar/NowPlayingScreen's old
+                    // CircleShape hardcodes) — now theme-relative like the Tactile/Skeu branches
+                    // just above, so Facet's chamfer applies to the first card the eye hits on
+                    // Home too, not just the mini player/hero art.
+                    else -> Modifier.clip(MaterialTheme.shapes.medium)
                 }
             )
             .clickable(onClick = onClick),
