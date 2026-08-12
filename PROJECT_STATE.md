@@ -6,6 +6,31 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 82 (Arahan "debugging+Polish UI" — audit lintas ui/, 2 file)** — Audit statis sistematis
+semua file `ui/`, fokus pola `remember { mutableStateOf(paramTurunan) }` tanpa key (kandidat
+state-leak kalau composable tetap ter-mount lintas perubahan data). 1 bug nyata + 1 polish:
+1. **Bug — `LyricsSheet.kt`**: `editing`/`draft` unkeyed `remember`, padahal diturunkan dari
+   `rawLyrics`. Sheet bisa tetap terbuka lintas pergantian lagu (media-session eksternal —
+   headset/notifikasi/widget — bisa ganti lagu tanpa lewat sheet ini), state lama nyangkut ke
+   lagu baru; worst-case draft lirik lagu A ke-simpan ke lagu B. Fix: `remember(rawLyrics) {...}`
+   di keduanya. Diaudit: `PlaylistScreen.kt` TextInputDialog **mirip tapi TIDAK bug** — modal
+   AlertDialog, selalu di-mount fresh per `if (showRenameDialog)`, tidak ada jalur eksternal
+   mengubah `selectedPlaylist` selagi dialog terbuka.
+2. **Polish — `LockScreen.kt`**: layar PIN (paling sering disentuh, tiap cold-open App Lock)
+   satu-satunya kontrol frekuensi-tinggi yang belum dapat identitas Tactile/Skeu (`CircleShape`
+   polos sejak sebelum Batch 79). `PinKey` + `RoundGlyphButton` (baru, gantikan 2 `Box` inline
+   fingerprint/backspace yg terpisah) sekarang pakai `tactileEmboss()`/`skeuEmboss()` +
+   `pressed` dari `collectIsPressedAsState()` + `bouncyPress()`, sama pola dengan transport
+   button Now Playing. **Apple theme 0 perubahan** (cabang `else` tetap CircleShape polos).
+   State/alur verifikasi PIN tidak disentuh.
+
+0 protected asset disentuh, brace/paren balance kedua file dicek manual & seimbang. **Masih
+belum diverifikasi compile/visual sungguhan di device** — sama seperti seluruh batch
+sebelumnya, tidak ada `kotlinc`/emulator di environment kerja ini; prioritas berikutnya kalau
+user minta lanjut: rebuild CI + install APK, cek (a) lirik tidak lagi nyasar antar-lagu saat
+auto-advance sambil sheet terbuka, (b) 3 tombol LockScreen (digit/fingerprint/backspace) kebaca
+tactile/skeu-nya di kedua tema. Detail lengkap: `CHANGELOG.md` Batch 82.
+
 **Batch 81 (Fix "Ambient Light gak bocor" — bagian instruksi user Batch 79 yg belum tersentuh)** —
 Instruksi asli user Batch 79 punya 4 bagian: Titanium dominan, sentuhan Zamrud, depth ultra
 realistic, DAN "Ambient Light yang gak bocor". Batch 79/80 tuntaskan 3 bagian pertama dgn baik,

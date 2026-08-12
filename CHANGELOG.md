@@ -1,5 +1,48 @@
 # Changelog
 
+## Batch 82 — "debugging+Polish UI": audit lintas ui/ + fix state-leak LyricsSheet + tactile/skeu untuk LockScreen
+Arahan user: "debugging+Polish UI" (generik, bukan laporan bug spesifik). Audit statis lintas
+semua file `ui/` (MiniPlayerBar, EqualizerSheet, QueueSheet, FolderManagerSheet, LyricsSheet,
+LockScreen, PlaylistScreen, dll — file per file, fokus ke pola `remember` tanpa key yang
+menyimpan nilai turunan dari parameter yang bisa berubah). 1 bug nyata ditemukan (bukan cuma
+gaya penulisan) + 1 gap polish disepakati, 2 file, di bawah batas normal:
+
+1. **Bug — `LyricsSheet.kt` state leak lintas lagu**: `editing`/`draft` di-`remember` TANPA key,
+   padahal nilai awalnya diturunkan dari parameter `rawLyrics`. Sheet ini tetap ter-mount kalau
+   lagu berganti SAAT sheet masih terbuka — media-session eksternal (tombol headset, notifikasi,
+   widget) bisa memicu ganti lagu tanpa lewat UI screen ini sama sekali, jadi `showLyricsSheet`
+   di `NowPlayingScreen.kt` tidak punya alasan untuk balik `false` hanya karena lagu berganti.
+   Skenario nyata: lagu A belum ada lirik (sheet auto masuk mode edit, `draft=""`), user mulai
+   ngetik draft tapi belum simpan, lagu A habis lalu lanjut otomatis ke lagu B (yang SUDAH punya
+   lirik) — `editing`/`draft` yang tak berkunci tetap nyangkut ke nilai lagu A, kalau user lalu
+   tap "Simpan" draft lagu A ke-lirik-B secara diam-diam. Fix: `remember(rawLyrics) { ... }` di
+   kedua state — keduanya sekarang otomatis derive ulang tiap prop `rawLyrics` berubah (lagu
+   ganti), membuang draft belum-tersimpan alih-alih salah lampir ke lagu yang salah (lebih aman
+   kehilangan draft daripada draft nyasar). **Diaudit, TIDAK bug serupa**: `PlaylistScreen.kt`'s
+   `TextInputDialog`'s `initialValue` awalnya kelihatan mirip tapi TIDAK — dialog itu modal
+   (AlertDialog, scrim penuh) dan hanya pernah di-mount lewat `if (showRenameDialog)` yang
+   di-reset tiap buka/tutup, tidak ada jalur eksternal yang bisa mengubah `selectedPlaylist` saat
+   dialog terbuka seperti media-session bisa mengubah lagu.
+2. **Polish — `LockScreen.kt` (layar PIN unlock) belum ikut identitas Tactile/Skeu**: layar
+   paling sering disentuh di app ini (tiap cold-open kalau App Lock aktif) masih pakai
+   `CircleShape` polos untuk semua tombol angka + fingerprint + backspace, padahal MiniPlayerBar,
+   NowPlayingScreen, LibraryScreen, SettingsScreen semua sudah dapat `tactileEmboss()`/
+   `skeuEmboss()` sejak Batch 49/55/79. Fix: `PinKey` (tombol angka) dan `RoundGlyphButton` baru
+   (fingerprint + backspace, sebelumnya `Box` inline terpisah, sekarang 1 composable dipakai
+   ulang) keduanya pilih `tactileEmboss(shape=CircleShape, elevation=6.dp, pressed=isPressed)` /
+   `skeuEmboss(...)` lewat `isTactileTheme()`/`isSkeuTheme()`, `pressed` diikat ke
+   `MutableInteractionSource.collectIsPressedAsState()` (pola sama seperti transport button Now
+   Playing) + `bouncyPress()` untuk scale-down saat ditekan. **Apple theme TIDAK berubah sama
+   sekali** — cabang `else` tetap `CircleShape` polos persis sebelumnya. State `entered`/`error`/
+   `lockedOutUntil` dan alur verifikasi PIN tidak disentuh sama sekali, murni ganti tampilan+
+   feedback sentuh 3 tombol.
+
+Tidak ada protected asset disentuh. Brace/paren balance kedua file dicek (`{`/`}`/`(`/`)` sama
+persis). **Belum diverifikasi compile/visual sungguhan di device** — sama seperti seluruh batch
+sebelumnya, tidak ada `kotlinc`/emulator di environment kerja ini; prioritas berikutnya kalau
+user minta lanjut: rebuild CI + install APK, cek transisi pressed/concave di 8 tombol LockScreen
+(digit 0-9 dikurangi yang duplikat, fingerprint, backspace) kebaca di kedua tema.
+
 ## Batch 81 — Fix "Ambient Light gak bocor" (bagian instruksi user Batch 79 yg belum tersentuh) + bug clip sisi-terang hero art
 Instruksi asli user (Batch 79): "Titanium dominan + sedikit sentuhan Zamrud + depth ultra
 realistic + Ambient Light yang gak 'bocor'". Batch 79/80 sudah menuntaskan 3 bagian pertama

@@ -28,8 +28,18 @@ fun LyricsSheet(
     onDelete: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var editing by remember { mutableStateOf(rawLyrics.isNullOrBlank()) }
-    var draft by remember { mutableStateOf(rawLyrics.orEmpty()) }
+    // Batch 82 debug fix — keyed on `rawLyrics` (was bare `remember`, 0 key). This sheet stays
+    // mounted across a track change if the song advances (headset button, notification, widget —
+    // all bypass this screen entirely) while the sheet is still open: `showLyricsSheet` has no
+    // reason to flip false just because the underlying song did. Unkeyed `remember` meant
+    // `editing`/`draft` kept whatever the PREVIOUS song left behind — worst case, an unsaved
+    // draft typed for song A silently overwrote song B's real lyrics if "Simpan" was tapped right
+    // after the auto-advance. Keying on `rawLyrics` (the exact prop these two derive from) makes
+    // both re-derive fresh every time the sheet is showing a different song's lyrics, discarding
+    // any unsaved draft along with it — losing an un-saved edit on track change is much safer
+    // than mis-attributing it to the wrong song.
+    var editing by remember(rawLyrics) { mutableStateOf(rawLyrics.isNullOrBlank()) }
+    var draft by remember(rawLyrics) { mutableStateOf(rawLyrics.orEmpty()) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         Column(

@@ -2,8 +2,11 @@ package com.rudi.audioplayer.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -14,11 +17,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.AppLockStore
+import com.rudi.audioplayer.ui.theme.isSkeuTheme
+import com.rudi.audioplayer.ui.theme.isTactileTheme
+import com.rudi.audioplayer.ui.theme.skeuEmboss
+import com.rudi.audioplayer.ui.theme.tactileEmboss
 import kotlinx.coroutines.delay
 
 @Composable
@@ -40,6 +48,14 @@ fun LockScreen(
     // justru satu-satunya yang nol haptic — termasuk saat PIN salah, yang cuma keliatan dari
     // teks merah tanpa getaran atau gerakan sama sekali.
     val shakeOffset = remember { Animatable(0f) }
+    // Polish — this is the single most-tapped screen in the app (every cold open when App Lock
+    // is on) but its number pad was still the plain flat CircleShape from before Tactile/Skeu
+    // existed (Batch 79+) — every other frequently-tapped control (mini player, Now Playing
+    // transport, Settings) already got the tactile/skeu identity. Apple theme is untouched below
+    // (falls through to the original flat circle), so this only changes something for the two
+    // themes that are supposed to look "pressable" everywhere.
+    val isTactile = isTactileTheme()
+    val isSkeu = isSkeuTheme()
 
     LaunchedEffect(error) {
         if (error) {
@@ -157,30 +173,34 @@ fun LockScreen(
         rows.forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 row.forEach { digit ->
-                    PinKey(label = digit, enabled = !locked) { handleDigit(digit) }
+                    PinKey(label = digit, enabled = !locked, isTactile = isTactile, isSkeu = isSkeu) { handleDigit(digit) }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             if (biometricEnabled) {
-                Box(
-                    modifier = Modifier.size(64.dp).clip(CircleShape).clickable(enabled = !locked) { onRequestBiometric() },
-                    contentAlignment = Alignment.Center
+                RoundGlyphButton(
+                    enabled = !locked,
+                    isTactile = isTactile,
+                    isSkeu = isSkeu,
+                    onClick = onRequestBiometric
                 ) {
                     Icon(Icons.Default.Fingerprint, contentDescription = "Buka dengan sidik jari", modifier = Modifier.size(28.dp))
                 }
             } else {
                 Spacer(modifier = Modifier.size(64.dp))
             }
-            PinKey(label = "0", enabled = !locked) { handleDigit("0") }
-            Box(
-                modifier = Modifier.size(64.dp).clip(CircleShape).clickable(enabled = !locked) {
+            PinKey(label = "0", enabled = !locked, isTactile = isTactile, isSkeu = isSkeu) { handleDigit("0") }
+            RoundGlyphButton(
+                enabled = !locked,
+                isTactile = isTactile,
+                isSkeu = isSkeu,
+                onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     error = false
                     if (entered.isNotEmpty()) entered = entered.dropLast(1)
-                },
-                contentAlignment = Alignment.Center
+                }
             ) {
                 Icon(Icons.Default.Backspace, contentDescription = "Hapus", modifier = Modifier.size(22.dp))
             }
@@ -195,15 +215,70 @@ private fun formatLockoutTime(totalSeconds: Int): String {
 }
 
 @Composable
-private fun PinKey(label: String, enabled: Boolean = true, onClick: () -> Unit) {
+private fun PinKey(
+    label: String,
+    enabled: Boolean = true,
+    isTactile: Boolean = false,
+    isSkeu: Boolean = false,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
     Box(
         modifier = Modifier
             .size(64.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = if (enabled) 1f else 0.4f))
-            .clickable(enabled = enabled, onClick = onClick),
+            .then(
+                when {
+                    isTactile -> Modifier.tactileEmboss(shape = CircleShape, elevation = 6.dp, pressed = isPressed)
+                    isSkeu -> Modifier.skeuEmboss(shape = CircleShape, elevation = 6.dp, pressed = isPressed)
+                    else -> Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.surface)
+                }
+            )
+            .alpha(if (enabled) 1f else 0.4f)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = onClick
+            )
+            .bouncyPress(interactionSource, pressedScale = 0.9f),
         contentAlignment = Alignment.Center
     ) {
         Text(label, style = MaterialTheme.typography.titleLarge)
+    }
+}
+
+/** Fingerprint/backspace: same round tactile/skeu treatment as [PinKey], smaller glyph instead of a digit. */
+@Composable
+private fun RoundGlyphButton(
+    enabled: Boolean,
+    isTactile: Boolean,
+    isSkeu: Boolean,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    Box(
+        modifier = Modifier
+            .size(64.dp)
+            .then(
+                when {
+                    isTactile -> Modifier.tactileEmboss(shape = CircleShape, elevation = 6.dp, pressed = isPressed)
+                    isSkeu -> Modifier.skeuEmboss(shape = CircleShape, elevation = 6.dp, pressed = isPressed)
+                    else -> Modifier.clip(CircleShape)
+                }
+            )
+            .alpha(if (enabled) 1f else 0.4f)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = onClick
+            )
+            .bouncyPress(interactionSource, pressedScale = 0.9f),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
     }
 }
