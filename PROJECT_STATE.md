@@ -6,6 +6,39 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 79 (Upgrade identitas Skeuomorphism -> Neumorphism)** — Instruksi eksplisit user:
+"Titanium dominan + sedikit sentuhan Zamrud + depth ultra realistic". **Atomic Change, 6 file**
+lintas ui/theme + MainActivity.kt (protected/parsial) + ui/NowPlayingScreen.kt — dikecualikan dari
+batas normal 10 file/1 modul krn identitas visual harus konsisten di SEMUA titik panggil
+sekaligus (kalau dipecah antar-batch, ada jendela UI campur separuh Hyper-Realism lama/separuh
+Neumorphism baru). Ringkasan (detail lengkap: `CHANGELOG.md` Batch 79):
+- `skeuEmboss()` (TactileDepth.kt) ditulis ulang total: dual soft-shadow multi-layer (bukan lagi
+  panel-logam 4-stop + grain + specular-glint + outer-bevel + inner-groove 7-layer Hyper-Realism)
+  — sisi gelap kanan-bawah 3 layer, sisi terang kiri-atas 2 layer, offset+alpha bertingkat meniru
+  soft-blur box-shadow ganda CSS neumorphism (DrawScope Compose gaada blur asli tanpa RenderEffect
+  API 31+). **0 border/grain sama sekali** — ciri paling khas neumorphism generik. Pressed =
+  CONCAVE (`dir=-1f` membalik SELURUH sisi terang/gelap, bukan cuma mengecil elevasi).
+- Grain/groove token (`SkeuBrushGrain*`, `SkeuInnerGroove*`) **dihapus total** dari Color.kt
+  (grep-confirmed 0 caller). Token baru: `SkeuNeuSurfaceDark/Light` (panel fill hampir sewarna
+  kanvas, TIDAK menyentuh role M3 `surface`/`surfaceVariant` di Theme.kt) +
+  `SkeuEmerald`/`SkeuLightEmerald` (aksen zamrud baru).
+- Sentuhan Zamrud: 3 titik SENGAJA kecil/jarang (bukan role M3 apa pun, supaya Titanium tetap
+  satu-satunya token di primary/surfaceTint = "Titanium dominan" literal) — (1) inti glow
+  skeuEmboss() HANYA saat pressed, (2) 1 color-stop tambahan di root ambient streak
+  (MainActivity.kt, alpha sengaja lebih rendah dari kilau silver utama), (3) inti sisi terang
+  hero art NowPlayingScreen.kt SELALU berbaur sedikit (alpha 0.14f, permanen — beda dari
+  skeuEmboss() krn hero art statis, tidak punya state pressed).
+- `frostedGlass()` (BlurUtils.kt) Skeu skip `.border()` total (dulu brushed-metal repeating rim).
+- `Theme.kt`: `SKEU_DARK_LITE.displayName` "Skeuomorphism"->"Neumorphism" + description baru.
+  `storageKey` "skeu_dark_lite" **sengaja tidak diganti** (preferensi tema tersimpan user tetap
+  valid, tidak ter-reset).
+- Live-preview swatch di `SettingsScreen.kt` **tidak disentuh sama sekali** — manggil
+  `Modifier.skeuEmboss()` langsung, otomatis ikut render Neumorphism baru.
+- **Belum diverifikasi compile/visual sungguhan di device** — statis-read only, tidak ada
+  `kotlinc`/emulator di environment kerja ini (konsisten sama seperti batch-batch sebelumnya).
+  Prioritas berikutnya kalau user minta lanjut: rebuild CI + install APK, cek dual-shadow +
+  emerald touch + transisi pressed/concave beneran kebaca di layar HP asli.
+
 **Batch 78 (Debugging pass menyeluruh — "debugging semua area")** — Audit statis sistematis
 lintas SEMUA area (data/, playback/, ui/, ui/theme/, util/, widget/), bukan laporan user. 2 bug
 nyata ditemukan & diperbaiki (2 file):

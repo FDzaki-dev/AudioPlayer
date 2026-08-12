@@ -5,10 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -72,17 +70,6 @@ fun Modifier.frostedGlass(
         isTactile -> Brush.linearGradient(
             colors = if (isDark) listOf(TactileHighlight, TactileEdge) else listOf(TactileLightHighlight, TactileLightEdge)
         )
-        // Batch 73 — Hyper-Realism: no longer a plain 2-stop diagonal (that was structurally
-        // identical to Tactile's own edgeBrush, exactly the "not autonomous" gap this batch
-        // fixes). Skeu's panel edge now reads as a brushed-metal rim: a short repeating
-        // highlight/shadow segment (TileMode.Repeated — same technique as skeuEmboss()'s grain
-        // overlay in TactileDepth.kt) instead of one smooth gradient sweep.
-        isSkeu -> Brush.linearGradient(
-            colors = if (isDark) listOf(SkeuHighlight, SkeuShadow) else listOf(SkeuLightHighlight, SkeuLightShadow),
-            start = Offset(0f, 0f),
-            end = Offset(6f, 6f),
-            tileMode = TileMode.Repeated
-        )
         else -> {
             val flat = MaterialTheme.colorScheme.onSurface.copy(
                 alpha = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.14f else 0.24f
@@ -93,7 +80,16 @@ fun Modifier.frostedGlass(
     // Batch 58 — Skeu's now-stronger bevel border reads better a hair over the glass-theme
     // hairline (1.dp); Tactile/Apple unchanged.
     val edgeWidth = if (isSkeu) 1.5.dp else 1.dp
-    return this
-        .background(tint.copy(alpha = effectiveAlpha), shape)
-        .border(edgeWidth, edgeBrush, shape)
+    val base = this.background(tint.copy(alpha = effectiveAlpha), shape)
+    // Batch 79 — NEUMORPHISM: Skeu no longer draws ANY edge/border here at all (was a
+    // brushed-metal repeating-stripe rim, Batch 73's isSkeu branch above — deleted along with
+    // every other border in this identity's redesign, see TactileDepth.kt's skeuEmboss()).
+    // Genuine neumorphism has NO line of any kind around a panel — depth comes exclusively from
+    // dual-shadow (skeuEmboss()) or, for sheets/panels that only route through frostedGlass()
+    // without also being wrapped in skeuEmboss(), from the panel simply being a flat
+    // near-background tone (SkeuNeuSurfaceDark/Light isn't literally used here — this modifier
+    // still takes whatever `tint` the caller passes — but Skeu's own solid-opaque identity,
+    // Batch 58, already reads as a distinct shape without needing a drawn line). Tactile/Apple
+    // unchanged — still get their edgeBrush border exactly as before.
+    return if (isSkeu) base else base.border(edgeWidth, edgeBrush, shape)
 }

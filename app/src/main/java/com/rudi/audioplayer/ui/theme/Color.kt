@@ -204,33 +204,46 @@ val SkeuAmbientAlphaLight = 0.12f
 // (BlurUtils.kt) supaya border-nya kebaca bevel terukir/carved, bukan lagi rim
 // kaca lembut ala Tactile — grep dicek nihil pemanggil lain sebelum dihapus.
 
-// --- HYPER-REALISM layer set (Batch 73) — sepenuhnya baru, tidak ada padanan
-// di Tactile sama sekali. 4 mekanisme fisik ditambahkan di atas bevel dasar:
-// (1) Specular — titik kilau logam tunggal, jauh lebih terang dari highlight
-//     bevel biasa, dipakai sebagai radial-gradient glint kecil di kuadran
-//     kiri-atas tiap panel (skeuEmboss()) — mensimulasikan pantulan cahaya
-//     langsung di permukaan logam disikat, bukan cuma tepi terang generik.
-// (2) Ambient occlusion — bayangan kontak lembut tepat di dasar tiap panel
-//     timbul, terpisah dari drop-shadow utama (yang mensimulasikan jarak
-//     panel-ke-kanvas), AO ini mensimulasikan cahaya yang terhalang tepat
-//     di lipatan sudut panel.
-// (3) Inner groove — garis gelap sangat tipis persis di DALAM tepi panel
-//     (bukan di luar seperti border bevel biasa) — kesan tepi panel "diukir
-//     turun" sedikit sebelum permukaannya naik, ciri khas hyper-realism vs
-//     bevel datar single-layer.
-// (4) Brushed-metal grain — stripe diagonal ultra-halus berulang (dipakai via
-//     TileMode.Repeated pada Brush.linearGradient dgn segmen pendek), overlay
-//     tipis di atas base gradient untuk tekstur logam disikat yang nyata,
-//     bukan cuma gradasi warna polos.
+// --- NEUMORPHISM layer set (Batch 79 — supersedes Batch 73's HYPER-REALISM layer set;
+// "upgrade Skeuomorphism -> Neumorphism" atas instruksi eksplisit user). SkeuSpecular/
+// SkeuAmbientOcclusion NAMANYA DIPERTAHANKAN (masih dipakai TactileDepth.kt & NowPlayingScreen.kt,
+// pola blast-radius-terkendali yang sama seperti Batch 73 dulu) tapi PERANNYA bergeser: dulu
+// masing-masing 1 layer tunggal (glint radial / kontak-shadow tunggal), sekarang jadi layer
+// TERKUAT/TERDEKAT dari tumpukan multi-layer dual-shadow skeuEmboss() yang baru — teknik
+// "banyak layer offset+alpha bertingkat" yang meniru soft-shadow blur ganda ala CSS neumorphism
+// klasik (DrawScope Compose tidak punya blur asli tanpa RenderEffect API 31+). SkeuInnerGroove/
+// SkeuBrushGrain*/SkeuInnerGroovePressed DIHAPUS TOTAL (grep-confirmed, 0 caller lain setelah
+// redesign) — neumorphism generik TIDAK PUNYA border/groove/tekstur SAMA SEKALI, kedalamannya
+// murni dari bayangan, ini justru penyederhanaan besar dari 7-layer Hyper-Realism lama.
+// "Ultra realistic depth" (instruksi eksplisit user) diterjemahkan sebagai KONTRAS TINGGI pada
+// alpha layer-layer ini (jauh di atas neumorphism generik yang sering nyaris tak kelihatan),
+// bukan sebagai lebih banyak jenis layer.
 val SkeuSpecular = Color.White.copy(alpha = 0.55f)
 val SkeuAmbientOcclusion = Color.Black.copy(alpha = 0.40f)
-val SkeuInnerGroove = Color.Black.copy(alpha = 0.50f)
-val SkeuBrushGrainLight = Color.White.copy(alpha = 0.05f)
-val SkeuBrushGrainDark = Color.Black.copy(alpha = 0.07f)
-// Pressed-state: glint hampir padam (logam "menjauh" dari sumber cahaya saat
-// ditekan), groove dalam menguat (permukaan benar-benar masuk ke kanvas).
+// Pressed-state: sisi terang/gelap TERTUKAR di skeuEmboss() (bukan cuma diredupkan) — bahasa
+// visual baku neumorphism utk "permukaan masuk ke kanvas" (concave), lihat TactileDepth.kt.
 val SkeuSpecularPressed = Color.White.copy(alpha = 0.10f)
-val SkeuInnerGroovePressed = Color.Black.copy(alpha = 0.70f)
+
+// --- Panel fill Neumorphism (Batch 79, BARU) — hampir sewarna dengan SkeuDarkBackground/
+// SkeuLightBackground, BUKAN turunan SkeuDarkSurface/SkeuLightSurfaceVariant (dua token itu
+// TETAP dipakai apa adanya utk role M3 surface/surfaceVariant di Theme.kt — Card/Sheet/
+// NavigationBar M3 polos di luar skeuEmboss() sengaja TIDAK ikut berubah kontrasnya, supaya
+// blast radius perubahan ini tetap murni di dalam skeuEmboss() sendiri). Prinsip inti
+// neumorphism: panel terbaca "dipahat dari material yang sama dengan kanvas", bukan lagi
+// panel logam 4-stop yang jelas beda warna dari kanvas seperti Hyper-Realism lama.
+val SkeuNeuSurfaceDark = Color(0xFF191C21)
+val SkeuNeuSurfaceLight = Color(0xFFE8EAED)
+
+// --- Aksen Zamrud (Batch 79, BARU) — "aksen Titanium yang dominan dengan sedikit sentuhan
+// zamrud" per instruksi eksplisit user. SkeuAccent (Titanium+Silver) TIDAK diganti/disentuh —
+// tetap satu-satunya token di role M3 primary/surfaceTint, jadi Titanium tetap dominan di
+// semua tempat yang otomatis mengikuti M3 (NavigationBar terpilih, tombol, dst). Emerald HANYA
+// dipakai di 2 titik kecil yang sengaja dipilih manual (bukan lewat role M3 apa pun, supaya
+// mustahil "menyebar" tanpa sengaja ke tempat lain): (1) inti glow skeuEmboss() saat DITEKAN
+// saja (tidak pernah terlihat di state normal), (2) satu color-stop sempit tambahan di root
+// ambient streak (MainActivity.kt, protected/parsial).
+val SkeuEmerald = Color(0xFF2FA37C)
+val SkeuLightEmerald = Color(0xFF1E7A5C)
 
 // ============================================================================
 // SKEUOMORPHISM — LIGHT VARIANT — Batch 61. Sama alasan dengan TACTILE LIGHT di
@@ -257,12 +270,11 @@ val SkeuLightSecondaryText = Color(0xFF63676D)
 val SkeuLightHighlight = Color.White.copy(alpha = 0.65f)
 val SkeuLightShadow = Color(0xFF23262B).copy(alpha = 0.38f)
 
-// --- HYPER-REALISM layer set — LIGHT (Batch 73) — kontras dibalik dari versi
-// gelap (glint & groove tetap harus terbaca legibel di atas kanvas terang).
+// --- NEUMORPHISM layer set — LIGHT (Batch 79, supersedes Batch 73's Hyper-Realism light
+// set) — kontras tetap dibalik dari versi gelap seperti sebelumnya (spec/AO harus tetap legibel
+// di atas kanvas terang), tapi SkeuLightInnerGroove/SkeuLightBrushGrainLight/Dark/
+// SkeuLightInnerGroovePressed DIHAPUS TOTAL sama seperti versi gelap (lihat komentar di atas —
+// grep-confirmed 0 caller lain setelah redesign).
 val SkeuLightSpecular = Color.White
 val SkeuLightAmbientOcclusion = Color(0xFF23262B).copy(alpha = 0.22f)
-val SkeuLightInnerGroove = Color(0xFF23262B).copy(alpha = 0.28f)
-val SkeuLightBrushGrainLight = Color.White.copy(alpha = 0.55f)
-val SkeuLightBrushGrainDark = Color(0xFF23262B).copy(alpha = 0.05f)
 val SkeuLightSpecularPressed = Color.White.copy(alpha = 0.25f)
-val SkeuLightInnerGroovePressed = Color(0xFF23262B).copy(alpha = 0.42f)

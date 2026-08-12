@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -13,12 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
@@ -175,36 +172,36 @@ fun Modifier.tactileEmboss(
     )
 }
 
-// Batch 73 — SKEUOMORPHISM 2.0 / HYPER-REALISM. No longer delegates to the shared
-// embossSurface() mechanism above (that function is now Tactile-only) — Skeu's physical-panel
-// identity needs layers Tactile's restrained glass-panel primitive was never designed for
-// (specular glint, ambient occlusion, an inner carved groove, brushed-metal grain), so sharing
-// the function any further would mean bolting Skeu-only branches onto Tactile's primitive or
-// smuggling Tactile-shaped assumptions into Skeu — either way the two identities stop being
-// independently editable, which is the exact "not autonomous, still hybrid" complaint this
-// batch exists to fix. Draw order (back to front), all in one drawBehind before .clip():
-//   1. Ambient occlusion — soft, slightly-oversized dark ring UNDER the panel (contact shadow
-//      at the base, distinct from #2's cast shadow which simulates panel-to-canvas distance).
-//   2. Cast drop-shadow — same translated-outline technique as embossSurface(), offset further
-//      down-right than Tactile's for a heavier, more physical sense of elevation.
-// Then, after .clip(shape):
-//   3. Base surface — 4-stop diagonal gradient (not a flat 2-color bevel) simulating a subtly
-//      curved metal surface rather than a flat painted panel.
-//   4. Brushed-metal grain — a second background layer: Brush.linearGradient with a very short
-//      start->end segment + TileMode.Repeated, which repeats that short diagonal stripe across
-//      the whole surface — the standard Compose technique for a brushed-metal/hairline texture
-//      without a custom Shader. Alpha is low enough to read as texture, not banding.
-//   5. Specular glint — a small radial-gradient highlight anchored top-left, far brighter than
-//      any bevel highlight, standing in for a direct reflection off brushed metal. Dims sharply
-//      when pressed (light source reads as "moving away" as the panel physically recedes).
-// Finally, two border strokes stacked (both after .clip()):
-//   6. Outer bevel — catch-light (top-left) fading to shadow (bottom-right), same diagonal
-//      lighting model as Tactile's border for cross-theme consistency of *direction*, but
-//      Skeu's own tokens/alphas (already much stronger — see Color.kt).
-//   7. Inner groove — a second, thinner stroke INSET from the outer edge (drawn via a second
-//      border pass at reduced size through padding), reading as the panel being carved down
-//      slightly before its surface rises — the double-bevel signature of hyper-realism vs a
-//      single flat highlight/shadow border.
+// Batch 79 — NEUMORPHISM. "Upgrade Skeuomorphism -> Neumorphism" atas instruksi eksplisit user:
+// aksen Titanium tetap dominan (SkeuAccent dkk. TIDAK disentuh — tetap satu-satunya token di
+// role M3 primary/surfaceTint), sedikit sentuhan Zamrud/Emerald baru (SkeuEmerald, Color.kt),
+// dan "depth ultra realistic". Bukan penghalusan Hyper-Realism (Batch 73-75) — diganti total,
+// draw order (back to front) beda arsitektur:
+//   1-2. Dual soft-shadow, masing-masing 3-4 layer offset+alpha bertingkat (faux-blur via
+//        tumpukan, DrawScope Compose tidak punya blur asli tanpa RenderEffect API 31+): sisi
+//        GELAP (kanan-bawah normal) pakai SkeuAmbientOcclusion sbg layer terdekat/terkuat +
+//        SkeuShadow sbg 2 layer terjauh/lebih tipis; sisi TERANG (kiri-atas normal) pakai
+//        SkeuSpecular sbg layer terdekat/terkuat + SkeuHighlight sbg 2 layer terjauh. SEMUA
+//        digambar SEBELUM .clip() (persis pola embossSurface()/Hyper-Realism lama) supaya boleh
+//        meluber sedikit di luar tepi shape, itu yang bikin bayangannya kebaca "lembut", bukan
+//        garis tegas.
+//   3. Base surface — SATU warna flat (SkeuNeuSurfaceDark/Light, BARU, Color.kt) yang sengaja
+//      hampir sewarna kanvas — bukan lagi gradient panel-logam 4-stop. Prinsip inti neumorphism:
+//      panel terbaca "dipahat dari material yang sama dengan kanvas"; kedalaman 100% tanggung
+//      jawab dual-shadow di atas, BUKAN dari kontras warna panel-vs-kanvas.
+//   TIDAK ADA lagi (dihapus total dari Hyper-Realism): brushed-metal grain (neumorphism itu
+//   MULUS, tanpa tekstur), outer bevel border, inner groove border (neumorphism TIDAK PUNYA
+//   garis batas SAMA SEKALI — ciri paling khas gaya ini; kedalaman murni dari bayangan, bukan
+//   garis. Ini penyederhanaan besar dari 7-layer Hyper-Realism lama, bukan penambahan).
+// Pressed = CONCAVE, bukan cuma mengecil: `dir = -1f` membalik sisi mana yang terang/gelap
+// (kanan-bawah jadi terang, kiri-atas jadi gelap) — bahasa visual baku neumorphism utk
+// "permukaan masuk ke kanvas", beda dari Tactile/Hyper-Realism lama yg cuma meredupkan/
+// mengecilkan elevasi tanpa membalik sisi.
+// Sentuhan Zamrud: SATU titik kecil saja — inti sisi terang berbaur ke SkeuEmerald HANYA saat
+// pressed (animatedFloat emeraldGlow, 0 saat normal) — kesan permata kecil di logam titanium yg
+// menyala redup pas panel ditekan. Sengaja "sedikit" (1 layer, alpha rendah, cuma nyala saat
+// interaksi) persis instruksi user "Titanium dominan, sedikit sentuhan zamrud" — Emerald TIDAK
+// pernah dipakai di role M3 apa pun supaya mustahil menyebar tanpa sengaja.
 @Composable
 fun Modifier.skeuEmboss(
     shape: Shape = MaterialTheme.shapes.medium,
@@ -212,106 +209,65 @@ fun Modifier.skeuEmboss(
     pressed: Boolean = false
 ): Modifier {
     val isDark = LocalIsDarkTheme.current
-    val surfaceTop = if (isDark) SkeuDarkSurfaceVariant else SkeuLightSurfaceVariant
-    val surfaceMid = if (isDark) SkeuDarkSurface else SkeuLightSurface
-    // Deliberately opaque (lerp toward black/white, never Color.copy(alpha=...)) — Skeu's
-    // "solid panel, never translucent glass" identity (established Batch 58) still applies to
-    // this new 4-stop curved-metal gradient; only the endpoint darkens, it never lets whatever
-    // is layered underneath show through.
-    val surfaceBottom = if (isDark) lerp(surfaceMid, Color.Black, 0.18f) else lerp(surfaceMid, Color.Black, 0.06f)
-    val highlight = if (isDark) SkeuHighlight else SkeuLightHighlight
-    val shadow = if (isDark) SkeuShadow else SkeuLightShadow
-    val ao = if (isDark) SkeuAmbientOcclusion else SkeuLightAmbientOcclusion
-    val grainLight = if (isDark) SkeuBrushGrainLight else SkeuLightBrushGrainLight
-    val grainDark = if (isDark) SkeuBrushGrainDark else SkeuLightBrushGrainDark
-    val specular = if (isDark) {
+    val panelFill = if (isDark) SkeuNeuSurfaceDark else SkeuNeuSurfaceLight
+    val lightNear = if (isDark) {
         if (pressed) SkeuSpecularPressed else SkeuSpecular
     } else {
         if (pressed) SkeuLightSpecularPressed else SkeuLightSpecular
     }
-    val groove = if (isDark) {
-        if (pressed) SkeuInnerGroovePressed else SkeuInnerGroove
-    } else {
-        if (pressed) SkeuLightInnerGroovePressed else SkeuLightInnerGroove
-    }
+    val lightFar = if (isDark) SkeuHighlight else SkeuLightHighlight
+    val darkNear = if (isDark) SkeuAmbientOcclusion else SkeuLightAmbientOcclusion
+    val darkFar = if (isDark) SkeuShadow else SkeuLightShadow
+    val emerald = if (isDark) SkeuEmerald else SkeuLightEmerald
 
     val animatedElevation by animateDpAsState(
-        targetValue = if (pressed) elevation / 5 else elevation,
+        targetValue = if (pressed) elevation * 0.6f else elevation,
         label = "skeuEmbossElevation"
     )
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.978f else 1f,
         label = "skeuEmbossScale"
     )
-    val specularAlphaMul by animateFloatAsState(
-        targetValue = if (pressed) 0.25f else 1f,
-        label = "skeuEmbossSpecular"
+    val emeraldGlow by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        label = "skeuEmbossEmeraldGlow"
     )
 
-    val outerBorderAlpha = if (pressed) 0.55f else 1f
-    val brushGrain = Brush.linearGradient(
-        colors = listOf(grainLight, grainDark),
-        start = Offset(0f, 0f),
-        end = Offset(3f, 3f),
-        tileMode = TileMode.Repeated
-    )
+    // Concave flip: -1f saat pressed membalik SELURUH diagonal terang/gelap, bukan sekadar
+    // memperkecil offset-nya (itu bedanya dengan Tactile — lihat komentar di atas fungsi).
+    val dir = if (pressed) -1f else 1f
 
     return this
         .scale(scale)
         .drawBehind {
             val outline = shape.createOutline(size, layoutDirection, this)
             val outlinePath = Path().apply { addOutline(outline) }
-            // 1. Ambient occlusion — wider, softer, closer to the panel base.
-            translate(top = animatedElevation.toPx() * 0.15f) {
-                drawPath(outlinePath, color = ao)
+            val basePx = animatedElevation.toPx()
+            // Sisi GELAP — kanan-bawah normal / kiri-atas saat pressed.
+            translate(left = basePx * 0.28f * dir, top = basePx * 0.28f * dir) {
+                drawPath(outlinePath, color = darkNear)
             }
-            // 2. Cast shadow — heavier offset than Tactile's for a more physical drop.
-            translate(top = animatedElevation.toPx() * 0.65f) {
-                drawPath(outlinePath, color = shadow)
+            translate(left = basePx * 0.60f * dir, top = basePx * 0.60f * dir) {
+                drawPath(outlinePath, color = darkFar.copy(alpha = darkFar.alpha * 0.7f))
+            }
+            translate(left = basePx * 1.05f * dir, top = basePx * 1.05f * dir) {
+                drawPath(outlinePath, color = darkFar.copy(alpha = darkFar.alpha * 0.35f))
+            }
+            // Sisi TERANG — kiri-atas normal / kanan-bawah saat pressed. Inti (lightNear) diikat
+            // emeraldGlow: saat 0 (normal) murni specular putih/perak seperti biasa, saat 1
+            // (pressed penuh) berbaur ke SkeuEmerald — satu-satunya titik non-titanium di
+            // seluruh fungsi ini.
+            val nearColor = if (emeraldGlow > 0f) {
+                lerp(lightNear, emerald, emeraldGlow * 0.55f)
+            } else lightNear
+            translate(left = -basePx * 0.28f * dir, top = -basePx * 0.28f * dir) {
+                drawPath(outlinePath, color = nearColor)
+            }
+            translate(left = -basePx * 0.60f * dir, top = -basePx * 0.60f * dir) {
+                drawPath(outlinePath, color = lightFar.copy(alpha = lightFar.alpha * 0.7f))
             }
         }
         .clip(shape)
-        // 3. Base surface — curved-metal 4-stop diagonal.
-        .background(
-            Brush.linearGradient(
-                *arrayOf(
-                    0.0f to surfaceTop,
-                    0.35f to surfaceMid,
-                    0.7f to surfaceMid,
-                    1.0f to surfaceBottom
-                )
-            )
-        )
-        // 4. Brushed-metal grain overlay.
-        .background(brushGrain)
-        // 5. Specular glint — small radial highlight, top-left quadrant.
-        .drawBehind {
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        specular.copy(alpha = specular.alpha * specularAlphaMul),
-                        Color.Transparent
-                    ),
-                    center = Offset(size.width * 0.24f, size.height * 0.18f),
-                    radius = size.minDimension.coerceAtLeast(1f) * 0.65f
-                )
-            )
-        }
-        // 6. Outer bevel border — diagonal catch-light -> shadow.
-        .border(
-            BorderStroke(
-                1.5.dp,
-                Brush.linearGradient(
-                    colors = listOf(
-                        highlight.copy(alpha = highlight.alpha * outerBorderAlpha),
-                        shadow.copy(alpha = shadow.alpha * outerBorderAlpha)
-                    )
-                )
-            ),
-            shape
-        )
-        // 7. Inner groove — inset second stroke, reads as a carved recess just inside the
-        // outer edge before the panel's own surface begins.
-        .padding(1.dp)
-        .border(BorderStroke(1.dp, groove), shape)
+        // Base surface — flat, hampir sewarna kanvas. Kedalaman 100% dari dual-shadow di atas.
+        .background(panelFill)
 }

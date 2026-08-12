@@ -1,6 +1,75 @@
 # Changelog
 
+## Batch 79 — Upgrade identitas Skeuomorphism -> Neumorphism (Titanium dominan + sentuhan Zamrud + depth ultra realistic)
+Instruksi eksplisit user: "upgrade skeuomorphism -> Neumorphism dengan accent Titanium yang
+dominan dengan sedikit sentuhan zamrud, dan juga depth ultra realistic". **Impact Report / alasan
+Atomic Change** (6 file, di atas batas normal 10 file/1 modul TAPI lintas 3 sub-area — ui/theme,
+MainActivity.kt root, ui/NowPlayingScreen.kt — jadi dikecualikan sbg Atomic Change: identitas
+visual HARUS konsisten di semua titik panggil sekaligus, kalau dipecah jadi >1 batch akan ada
+jendela waktu UI campur aduk separuh Hyper-Realism lama + separuh Neumorphism baru):
+
+1. **`ui/theme/Color.kt`** — token grain (`SkeuBrushGrainLight/Dark`,
+   `SkeuLightBrushGrainLight/Dark`) & groove (`SkeuInnerGroove(Pressed)`,
+   `SkeuLightInnerGroove(Pressed)`) **DIHAPUS TOTAL** (grep-confirmed 0 caller lain sebelum
+   hapus, prosedur sama seperti Batch 54/58) — neumorphism generik tidak punya tekstur/garis
+   batas sama sekali. `SkeuSpecular`/`SkeuAmbientOcclusion`/`SkeuHighlight`/`SkeuShadow`
+   (+ pasangan Light) **nama & value dipertahankan** tapi PERANNYA bergeser jadi layer
+   terkuat/terlemah dari tumpukan dual-shadow baru (bukan glint/AO/bevel-border terpisah lagi).
+   2 token baru: `SkeuNeuSurfaceDark/Light` (panel fill neumorphic, hampir sewarna kanvas — TIDAK
+   menyentuh `SkeuDarkSurface`/`SkeuLightSurfaceVariant` yg dipakai role M3 di Theme.kt, supaya
+   Card/Sheet/NavigationBar M3 polos di luar skeuEmboss() tidak ikut berubah kontrasnya) dan
+   `SkeuEmerald`/`SkeuLightEmerald` (aksen zamrud baru, `0xFF2FA37C`/`0xFF1E7A5C`).
+2. **`ui/theme/TactileDepth.kt`** — `skeuEmboss()` ditulis ulang total: dual soft-shadow
+   multi-layer (sisi gelap kanan-bawah 3 layer, sisi terang kiri-atas 2 layer, offset makin jauh
+   + alpha makin tipis meniru soft-blur box-shadow ganda CSS neumorphism — DrawScope Compose
+   tidak punya blur asli tanpa RenderEffect API 31+, jadi "ultra realistic" di sini = KONTRAS
+   TINGGI pada alpha tiap layer, jauh di atas neumorphism generik yg sering nyaris tak
+   kelihatan). Pressed = CONCAVE (`dir = -1f` membalik SELURUH sisi terang/gelap, bukan cuma
+   mengecil elevasi kayak Tactile) — bahasa visual baku neumorphism "permukaan masuk ke kanvas".
+   Grain overlay + outer-bevel-border + inner-groove-border **dihapus total** (0 border sama
+   sekali). Sentuhan Zamrud: inti sisi terang berbaur `SkeuEmerald` HANYA saat pressed
+   (`emeraldGlow` animatedFloat 0->1), 1 layer saja, alpha rendah — permanen 0 di state normal.
+   Import dirapikan: `padding`/`Offset`/`TileMode` dihapus (tidak dipakai lagi), `lerp` tetap.
+3. **`ui/theme/BlurUtils.kt`** — `frostedGlass()`'s Skeu edge branch (brushed-metal repeating
+   rim) **dihapus total**, Skeu sekarang skip `.border()` sepenuhnya (`return if (isSkeu) base
+   else base.border(...)`) — neumorphism tidak pernah punya garis pinggir jenis apa pun. Import
+   `Offset`/`TileMode` dihapus (unused).
+4. **`MainActivity.kt`** (protected, edit parsial) — root ambient wash Skeu: grain overlay
+   (`skeuGrainBrush`, brushed-metal repeating texture di seluruh kanvas app) **dihapus total**
+   dari Surface modifier chain. Streak 4-stop Titanium/Silver **tidak diubah** (tetap dominan,
+   sesuai instruksi user) + 1 stop BARU di fraction 0.76 (`SkeuEmerald`/`SkeuLightEmerald`,
+   alpha `streakAlpha * 0.9f` — sengaja lebih rendah dari kilau silver `*1.8f` di 0.62, supaya
+   kebaca vena emerald tipis, bukan aksen kedua yg bersaing). Import token grain dihapus, import
+   `Offset`/`TileMode` dihapus (sudah tidak dipakai sama sekali di file ini setelah grain hilang
+   — 1 pemakaian Offset lain di file ini pakai fully-qualified name, tidak butuh import).
+5. **`ui/NowPlayingScreen.kt`** — hero art Skeu branch ditulis ulang menyamai arsitektur
+   `skeuEmboss()` baru (dual soft-shadow multi-layer, 0 border/groove). Sentuhan Zamrud DI SINI
+   beda logika dari skeuEmboss(): hero art statis/tidak punya state pressed, jadi inti sisi
+   terang SELALU berbaur `SkeuEmerald` sedikit (alpha campur 0.14f, permanen) — satu-satunya
+   permukaan yg dapat sentuhan permanen krn ini satu-satunya surface always-active/terbesar di
+   layar (prinsip sama dgn komentar §9 branch Tactile soal accent glow always-active, existing
+   sebelum batch ini). Import `SkeuInnerGroove`/`SkeuLightInnerGroove`/`Offset` dihapus, `lerp`
+   + `SkeuEmerald`/`SkeuLightEmerald` ditambah.
+6. **`ui/theme/Theme.kt`** — `SKEU_DARK_LITE.displayName` **"Skeuomorphism" -> "Neumorphism"**,
+   `description` ditulis ulang. **`storageKey` "skeu_dark_lite" SENGAJA TIDAK diganti** (preferensi
+   tema tersimpan user yg sudah pernah pilih identitas ini tetap valid, tidak ter-reset ke Apple).
+
+**Tidak disentuh sama sekali** (di luar scope instruksi user, verified via grep): `SkeuAccent`/
+`TitaniumDark`/`TitaniumLight`/`SilverHighlight` (role M3 primary/surfaceTint — Titanium tetap
+SATU-SATUNYA token di situ, memenuhi "Titanium dominan" secara literal), `SkeuDarkBackground/
+Surface/SurfaceVariant` + pasangan Light (role M3 background/surface/surfaceVariant — supaya
+Card/Sheet/NavigationBar M3 polos di luar panel custom TIDAK ikut berubah kontrasnya),
+`SkeuDarkShapes` (shape language tidak diminta berubah), `ui/SettingsScreen.kt` (live-preview
+swatch di situ manggil `Modifier.skeuEmboss()` langsung — otomatis ikut render Neumorphism baru
+TANPA perlu diedit sama sekali, sudah diverifikasi via grep line 408).
+
+**Belum diverifikasi compile/visual sungguhan di device** — tidak ada `kotlinc`/emulator di
+environment kerja ini (sama seperti tiap batch sebelumnya); prioritas berikutnya kalau user minta
+lanjut: rebuild CI + install APK, cek dual-shadow neumorphic + emerald touch beneran kebaca di
+layar HP asli (terutama transisi pressed/concave skeuEmboss() & hero art NowPlayingScreen).
+
 ## Batch 78 — Debugging pass menyeluruh ("debugging semua area")
+
 User minta audit debugging lintas seluruh codebase (bukan laporan bug spesifik). Audit statis
 sistematis per area (data/, playback/, ui/, ui/theme/, util/, widget/) — cursor/stream leaks,
 GlobalScope, runBlocking, `!!`, listener register/unregister balance, thread-safety widget,

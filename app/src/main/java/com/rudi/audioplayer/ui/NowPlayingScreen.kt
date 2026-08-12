@@ -61,11 +61,11 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -94,12 +94,12 @@ import com.rudi.audioplayer.ui.theme.TactileLightHighlight
 import com.rudi.audioplayer.ui.theme.TactileLightShadow
 import com.rudi.audioplayer.ui.theme.SkeuAmbientOcclusion
 import com.rudi.audioplayer.ui.theme.SkeuHighlight
-import com.rudi.audioplayer.ui.theme.SkeuInnerGroove
 import com.rudi.audioplayer.ui.theme.SkeuShadow
 import com.rudi.audioplayer.ui.theme.SkeuSpecular
+import com.rudi.audioplayer.ui.theme.SkeuEmerald
+import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
 import com.rudi.audioplayer.ui.theme.SkeuLightAmbientOcclusion
 import com.rudi.audioplayer.ui.theme.SkeuLightHighlight
-import com.rudi.audioplayer.ui.theme.SkeuLightInnerGroove
 import com.rudi.audioplayer.ui.theme.SkeuLightShadow
 import com.rudi.audioplayer.ui.theme.SkeuLightSpecular
 import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
@@ -1016,60 +1016,56 @@ private fun AlbumArtHero(
                                 .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
                         }
                         isSkeu -> {
-                            // Batch 73 — Hyper-Realism polish: this hero art is the single
-                            // largest surface in the app, so it gets the same specular-glint +
-                            // inner-groove double-bevel language as skeuEmboss() (TactileDepth.kt)
-                            // instead of the older single flat border — a manual draw here
-                            // (not routed through skeuEmboss() itself) because this Box also
-                            // carries the per-song accent .shadow() glow below, which needs to
-                            // stay a separate/final layer.
-                            // Batch 74 — light/dark token branch added (see isDark comment above).
+                            // Batch 79 — NEUMORPHISM upgrade: sama arsitektur dual-shadow dgn
+                            // skeuEmboss() (TactileDepth.kt, Batch 79) — sisi gelap kanan-bawah
+                            // (AO dekat + shadow jauh, 3 layer offset+alpha bertingkat), sisi
+                            // terang kiri-atas (specular dekat + highlight jauh, 2 layer) — TIDAK
+                            // ADA lagi border/inner-groove sama sekali (neumorphism generik tidak
+                            // punya garis batas, kedalaman murni dari bayangan). Manual draw di
+                            // sini (bukan lewat skeuEmboss() langsung) tetap dipertahankan karena
+                            // Box ini juga membawa .shadow() accent glow per-lagu di bawah, yang
+                            // perlu tetap jadi layer terpisah/paling akhir.
                             val heroAo = if (isDark) SkeuAmbientOcclusion else SkeuLightAmbientOcclusion
                             val heroShadow = if (isDark) SkeuShadow else SkeuLightShadow
                             val heroSpecular = if (isDark) SkeuSpecular else SkeuLightSpecular
                             val heroHighlight = if (isDark) SkeuHighlight else SkeuLightHighlight
-                            val heroGroove = if (isDark) SkeuInnerGroove else SkeuLightInnerGroove
+                            val emerald = if (isDark) SkeuEmerald else SkeuLightEmerald
+                            // Sentuhan Zamrud di hero art beda dari skeuEmboss(): hero art statis
+                            // (tidak punya state pressed), jadi di sini SELALU berbaur sedikit,
+                            // bukan cuma nyala saat interaksi — alpha campur sangat rendah
+                            // (0.14f), sengaja jadi satu-satunya permukaan yg dapat sentuhan
+                            // permanen krn ini satu-satunya surface always-active/terbesar di
+                            // layar (§9 komentar branch Tactile di atas soal accent glow
+                            // always-active — prinsip sama, diterapkan ke Emerald di sini).
+                            val heroSpecularTinted = lerp(heroSpecular, emerald, 0.14f)
                             Modifier
                                 .drawBehind {
                                     val outline = heroShape.createOutline(size, layoutDirection, this)
                                     val outlinePath = Path().apply { addOutline(outline) }
-                                    // Ambient occlusion, then heavier cast shadow — same 2-layer
-                                    // technique as skeuEmboss().
-                                    translate(top = 3.dp.toPx()) {
+                                    // Sisi GELAP — kanan-bawah, 3 layer offset makin jauh + alpha
+                                    // makin tipis (faux-blur bertingkat, sama teknik skeuEmboss()).
+                                    translate(left = 3.dp.toPx(), top = 3.dp.toPx()) {
                                         drawPath(outlinePath, color = heroAo)
                                     }
-                                    translate(top = 9.dp.toPx()) {
-                                        drawPath(outlinePath, color = heroShadow.copy(alpha = if (isDark) 0.40f else heroShadow.alpha))
+                                    translate(left = 8.dp.toPx(), top = 8.dp.toPx()) {
+                                        drawPath(outlinePath, color = heroShadow.copy(alpha = (if (isDark) 0.40f else heroShadow.alpha) * 0.75f))
+                                    }
+                                    translate(left = 14.dp.toPx(), top = 14.dp.toPx()) {
+                                        drawPath(outlinePath, color = heroShadow.copy(alpha = (if (isDark) 0.40f else heroShadow.alpha) * 0.35f))
                                     }
                                 }
                                 .clip(heroShape)
                                 .drawBehind {
-                                    // Specular glint — brighter, single reflection point, top-left.
-                                    drawRect(
-                                        brush = Brush.radialGradient(
-                                            colors = listOf(
-                                                heroSpecular.copy(alpha = if (isDark) 0.35f else heroSpecular.alpha * 0.6f),
-                                                Color.Transparent
-                                            ),
-                                            center = Offset(size.width * 0.22f, size.height * 0.16f),
-                                            radius = size.minDimension * 0.55f
-                                        )
-                                    )
+                                    val outline = heroShape.createOutline(size, layoutDirection, this)
+                                    val outlinePath = Path().apply { addOutline(outline) }
+                                    // Sisi TERANG — kiri-atas, 2 layer, inti-nya berbaur Emerald.
+                                    translate(left = -3.dp.toPx(), top = -3.dp.toPx()) {
+                                        drawPath(outlinePath, color = heroSpecularTinted.copy(alpha = if (isDark) 0.35f else heroSpecular.alpha * 0.6f))
+                                    }
+                                    translate(left = -8.dp.toPx(), top = -8.dp.toPx()) {
+                                        drawPath(outlinePath, color = heroHighlight.copy(alpha = (if (isDark) 0.16f else heroHighlight.alpha) * 0.7f))
+                                    }
                                 }
-                                .border(
-                                    BorderStroke(
-                                        1.5.dp,
-                                        Brush.linearGradient(
-                                            listOf(
-                                                heroHighlight.copy(alpha = if (isDark) 0.16f else heroHighlight.alpha),
-                                                heroShadow.copy(alpha = if (isDark) 0.40f else heroShadow.alpha)
-                                            )
-                                        )
-                                    ),
-                                    heroShape
-                                )
-                                .padding(1.dp)
-                                .border(BorderStroke(1.dp, heroGroove), heroShape)
                                 .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
                         }
                         else -> Modifier.shadow(elevation = 28.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.45f))

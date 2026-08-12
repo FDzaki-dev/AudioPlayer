@@ -71,9 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -114,10 +112,8 @@ import com.rudi.audioplayer.ui.theme.SkeuDarkSurfaceVariant
 import com.rudi.audioplayer.ui.theme.SkeuLightSurfaceVariant
 import com.rudi.audioplayer.ui.theme.SkeuAmbientAlphaDark
 import com.rudi.audioplayer.ui.theme.SkeuAmbientAlphaLight
-import com.rudi.audioplayer.ui.theme.SkeuBrushGrainDark
-import com.rudi.audioplayer.ui.theme.SkeuBrushGrainLight
-import com.rudi.audioplayer.ui.theme.SkeuLightBrushGrainDark
-import com.rudi.audioplayer.ui.theme.SkeuLightBrushGrainLight
+import com.rudi.audioplayer.ui.theme.SkeuEmerald
+import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
 
 class MainActivity : FragmentActivity() {
 
@@ -331,6 +327,14 @@ class MainActivity : FragmentActivity() {
                     ThemeIdentity.SKEU_DARK_LITE -> {
                         val streakAlpha = if (isDarkTheme) SkeuAmbientAlphaDark else SkeuAmbientAlphaLight
                         val streakEnd = if (isDarkTheme) SkeuDarkSurfaceVariant else SkeuLightSurfaceVariant
+                        // Batch 79 — NEUMORPHISM upgrade: satu stop Zamrud/Emerald sempit tambahan
+                        // di 0.76 (SkeuEmerald/SkeuLightEmerald, Color.kt), alpha jauh lebih rendah
+                        // dari kilau silver di 0.62 (*0.9f vs *1.8f) — "sedikit sentuhan zamrud" yg
+                        // literal per instruksi user, dibaca sebagai satu vena emerald tipis di
+                        // logam titanium, bukan aksen kedua yang bersaing dgn kilau silver utama.
+                        // Titanium tetap dominan (TitaniumDark/SilverHighlight, 3 dari 4 stop asli,
+                        // tidak diubah sama sekali) — Emerald cuma stop TAMBAHAN, bukan pengganti.
+                        val emerald = if (isDarkTheme) SkeuEmerald else SkeuLightEmerald
                         Brush.linearGradient(
                             *arrayOf(
                                 0.00f to MaterialTheme.colorScheme.background,
@@ -341,35 +345,18 @@ class MainActivity : FragmentActivity() {
                                 // pantulan cahaya di logam, bukan gradasi warna yang mulus.
                                 0.62f to SilverHighlight.copy(alpha = streakAlpha * 1.8f),
                                 0.68f to TitaniumDark.copy(alpha = streakAlpha),
+                                0.76f to emerald.copy(alpha = streakAlpha * 0.9f),
                                 1.00f to streakEnd
                             )
                         )                    }
                     else -> null
                 }
-                // Batch 73 — Skeuomorphism 2.0/Hyper-Realism: a second, much subtler overlay
-                // layer on top of identityRootBrush, root-level brushed-metal grain (same
-                // short-segment + TileMode.Repeated technique as skeuEmboss()'s panel-level grain
-                // in TactileDepth.kt) so the *whole app canvas* reads as brushed metal, not just
-                // individual panels — Tactile's root wash has no equivalent layer at all, kept
-                // that way deliberately so the two identities stay visually independent.
-                val skeuGrainBrush = if (appThemeIdentity == ThemeIdentity.SKEU_DARK_LITE) {
-                    Brush.linearGradient(
-                        colors = if (isDarkTheme) listOf(SkeuBrushGrainLight, SkeuBrushGrainDark)
-                        else listOf(SkeuLightBrushGrainLight, SkeuLightBrushGrainDark),
-                        start = Offset(0f, 0f),
-                        end = Offset(5f, 5f),
-                        tileMode = TileMode.Repeated
-                    )
-                } else null
 
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
                         .then(
                             if (identityRootBrush != null) Modifier.background(identityRootBrush) else Modifier
-                        )
-                        .then(
-                            if (skeuGrainBrush != null) Modifier.background(skeuGrainBrush) else Modifier
                         ),
                     color = if (identityRootBrush != null) Color.Transparent else MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground

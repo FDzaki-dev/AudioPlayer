@@ -23,10 +23,16 @@ import androidx.compose.ui.unit.dp
 // Setiap identitas kustom (Tactile, Skeuomorphism) sekarang wajib py varian
 // LIGHT & DARK sendiri (lihat Color.kt) supaya "keluar maksimal" di kedua mode,
 // bukan cuma versi gelapnya yang dipoles.
+// Batch 79 — SKEU_DARK_LITE's user-facing identity upgraded "Skeuomorphism" -> "Neumorphism"
+// atas instruksi eksplisit user (aksen Titanium dominan + sedikit sentuhan Zamrud + depth ultra
+// realistic — lihat TactileDepth.kt skeuEmboss() utk mekanisme baru). storageKey "skeu_dark_lite"
+// SENGAJA TIDAK diganti (preferensi tema tersimpan milik user yang sudah pernah pilih identitas
+// ini tetap valid/tidak ter-reset) — pola blast-radius-terkendali yang sama dgn kenapa nama
+// fungsi skeuEmboss()/token Skeu* di Color.kt juga tidak diganti nama, cuma isi/mekanismenya.
 enum class ThemeIdentity(val storageKey: String, val displayName: String, val description: String) {
     APPLE("apple", "Apple", "Tampilan bersih khas iOS, mengikuti mode terang/gelap yang dipilih"),
     TACTILE("tactile_lite", "Tactile", "Kaca premium dengan sentuhan Midnight Blue tipis dan kontrol taktil — kini otonom di mode terang maupun gelap"),
-    SKEU_DARK_LITE("skeu_dark_lite", "Skeuomorphism", "Panel timbul dengan bevel lembut dan aksen Titanium&Silver metalik — kini otonom di mode terang maupun gelap");
+    SKEU_DARK_LITE("skeu_dark_lite", "Neumorphism", "Panel lembut menyatu dgn kanvas, dual soft-shadow ultra realistic, aksen Titanium dominan dgn sentuhan Zamrud — otonom di mode terang maupun gelap");
 
     companion object {
         fun fromStorageKey(key: String?): ThemeIdentity = entries.find { it.storageKey == key } ?: APPLE
