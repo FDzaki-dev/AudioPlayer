@@ -1,5 +1,60 @@
 # Changelog
 
+## Batch 81 — Fix "Ambient Light gak bocor" (bagian instruksi user Batch 79 yg belum tersentuh) + bug clip sisi-terang hero art
+Instruksi asli user (Batch 79): "Titanium dominan + sedikit sentuhan Zamrud + depth ultra
+realistic + Ambient Light yang gak 'bocor'". Batch 79/80 sudah menuntaskan 3 bagian pertama
+dengan baik (diverifikasi via audit statis batch ini), tapi bagian ke-4 ("gak bocor") belum
+pernah ditangani secara eksplisit — dual-shadow `skeuEmboss()`/hero art digambar di
+`drawBehind{}` SEBELUM `.clip()` tanpa batas area apa pun, dan Compose TIDAK meng-clip
+`drawBehind{}` ke bounds layout-nya sendiri secara default: bayangan lebar (elevation besar,
+mis. MiniPlayerBar's 16.dp) bisa kegambar nimpa sibling di sekitarnya (row lain, NavigationBar
+di bawah MiniPlayerBar) tanpa warning apa pun saat compile. 2 file, di bawah batas normal
+(10 file/1 modul), tidak perlu Atomic Change exception — scope murni containment fix + 1 bug
+tak terkait yg ditemukan saat audit, bukan redesign identitas baru:
+
+1. **`ui/theme/TactileDepth.kt`** — `skeuEmboss()`'s dual-shadow draw (5 layer, kedua sisi)
+   sekarang dibungkus 1 `clipRect()` dengan halo **proporsional ke `elevation`** (`basePx * 1.3f`
+   — margin di atas offset terjauh yg dipakai, `1.05f`, supaya bentuk bayangan tidak ikut
+   terpotong) — bayangan dijamin tidak pernah meluber lebih jauh dari itu, untuk `elevation`
+   berapa pun yg dikirim caller manapun (MiniPlayerBar/LibraryScreen/SettingsScreen/HomeScreen/
+   NowPlayingScreen — grep-confirmed semua tetap manggil fungsi yg sama, signature tidak
+   berubah). Import `clipRect` ditambah.
+2. **`ui/NowPlayingScreen.kt`** — AlbumArtHero's `isSkeu` branch, 2 fix sekaligus (ditemukan saat
+   audit utk containment fix di atas, bukan laporan user):
+   - **Bug ditemukan**: sisi TERANG (specular+highlight) selama ini digambar di `drawBehind{}`
+     TERPISAH **SETELAH** `.clip(heroShape)`, sedangkan sisi GELAP (AO+shadow) digambar SEBELUM
+     `.clip()` — artinya sisi terang selama ini kepotong tepat di tepi shape, tidak pernah
+     benar-benar bisa "meluber ke luar" sebagai soft-shadow seperti sisi gelap, beda arsitektur
+     dari `skeuEmboss()` sendiri (yg menggambar KEDUA sisi dalam 1 `drawBehind` yg sama sebelum
+     `.clip()`). Fix: disatukan ke 1 `drawBehind{}` sebelum `.clip()`, sama pola dgn
+     `skeuEmboss()`.
+   - **Containment**: `drawBehind{}` gabungan di atas dibungkus `clipRect()` dgn halo tetap
+     18.dp (hero art ukurannya selalu tetap 280.dp, offset terjauh yg dipakai cuma 14.dp literal
+     — beda dari `skeuEmboss()` yg proporsional ke param `elevation`).
+   - Emerald glint (Batch 80) TIDAK dipindah — tetap 1 `drawBehind{}` terpisah SETELAH `.clip()`,
+     sudah benar di posisi situ (dia "permata di permukaan", bukan bayangan yg perlu meluber).
+   - Import `clipRect` ditambah.
+
+**Verifikasi audit sebelum fix** (grep + baca manual, bukan asumsi): `SkeuAccent`/`TitaniumDark`/
+`TitaniumLight`/`SilverHighlight` masih 100% tidak tersentuh di role M3 primary/surfaceTint
+(Titanium tetap dominan, terverifikasi ulang) — token grain/groove lama (`SkeuBrushGrain*`,
+`SkeuInnerGroove*`) 0 caller tersisa di seluruh codebase (grep bersih) — `FILE_MANIFEST.txt`
+dicek cocok 100% dgn file tree aktual (112/112, tidak ada desync) — brace/paren balance dicek
+manual di kedua file yg diedit (`{`/`}` dan `(`/`)` masing-masing seimbang persis).
+
+**README.md juga diperbarui** (di luar 2 file kode di atas, murni dokumentasi) — paragraf tema
+custom kedua masih menjelaskan "Skeuomorphism 2.0 — Hyper-Realism UI" 7-layer lama (grain,
+border ganda, dst.) yg sudah tidak ada sejak Batch 79, ditulis ulang jadi deskripsi Neumorphism
+yg akurat (dual soft-shadow, 0 border/grain, concave saat pressed, Titanium dominan + sentuhan
+Zamrud, containment Batch 81 ini).
+
+**Titanium tetap dominan, cakupan Zamrud tidak bertambah** — batch ini murni containment +
+1 bug clip, 0 perubahan warna/token accent apa pun. **Masih belum diverifikasi compile/visual
+sungguhan di device** — sama seperti Batch 79/80, tidak ada `kotlinc`/emulator di environment
+kerja ini; prioritas berikutnya kalau user minta lanjut: rebuild CI + install APK, khususnya cek
+MiniPlayerBar (elevation 16.dp, kasus containment paling ketat) & hero art tidak lagi kepotong
+di sisi terangnya.
+
 ## Batch 80 — Fix visibilitas Zamrud (respons langsung ke feedback user: "mana zamrudnya??")
 User feedback setelah Batch 79: "yang kelihatan cuman Titanium dominan. mana zamrud nya??".
 Root cause di 3 titik sekaligus: (1) `skeuEmboss()` — emerald di-lerp-blend 55% ke arah

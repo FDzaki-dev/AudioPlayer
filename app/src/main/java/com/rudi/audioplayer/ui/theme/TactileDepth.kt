@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -202,6 +203,10 @@ fun Modifier.tactileEmboss(
 // menyala redup pas panel ditekan. Sengaja "sedikit" (1 layer, alpha rendah, cuma nyala saat
 // interaksi) persis instruksi user "Titanium dominan, sedikit sentuhan zamrud" — Emerald TIDAK
 // pernah dipakai di role M3 apa pun supaya mustahil menyebar tanpa sengaja.
+// Batch 81 — tambahan: dual-shadow di bawah sekarang dibungkus clipRect() (lihat komentar di
+// dalam fungsi) supaya "Ambient Light gak bocor" (bagian instruksi user yg belum tersentuh di
+// Batch 79/80) — bayangan dijamin tidak meluber ke sibling lain, halo-nya proporsional ke
+// `elevation` jadi tidak pernah memotong bentuk bayangannya sendiri.
 @Composable
 fun Modifier.skeuEmboss(
     shape: Shape = MaterialTheme.shapes.medium,
@@ -252,22 +257,40 @@ fun Modifier.skeuEmboss(
             val outline = shape.createOutline(size, layoutDirection, this)
             val outlinePath = Path().apply { addOutline(outline) }
             val basePx = animatedElevation.toPx()
-            // Sisi GELAP — kanan-bawah normal / kiri-atas saat pressed.
-            translate(left = basePx * 0.28f * dir, top = basePx * 0.28f * dir) {
-                drawPath(outlinePath, color = darkNear)
-            }
-            translate(left = basePx * 0.60f * dir, top = basePx * 0.60f * dir) {
-                drawPath(outlinePath, color = darkFar.copy(alpha = darkFar.alpha * 0.7f))
-            }
-            translate(left = basePx * 1.05f * dir, top = basePx * 1.05f * dir) {
-                drawPath(outlinePath, color = darkFar.copy(alpha = darkFar.alpha * 0.35f))
-            }
-            // Sisi TERANG — kiri-atas normal / kanan-bawah saat pressed.
-            translate(left = -basePx * 0.28f * dir, top = -basePx * 0.28f * dir) {
-                drawPath(outlinePath, color = lightNear)
-            }
-            translate(left = -basePx * 0.60f * dir, top = -basePx * 0.60f * dir) {
-                drawPath(outlinePath, color = lightFar.copy(alpha = lightFar.alpha * 0.7f))
+            // Batch 81 — fix: "Ambient Light yang gak bocor" (instruksi eksplisit user, belum
+            // ditangani Batch 79/80). Compose TIDAK meng-clip drawBehind{} ke bounds layout-nya
+            // sendiri by default — bayangan lebar/menjauh bisa kegambar nimpa sibling di
+            // sekitarnya (row LazyColumn lain, MiniPlayerBar yg cuma berjarak tipis dari
+            // NavigationBar di bawahnya, dst) tanpa ada warning apa pun saat compile. Seluruh
+            // dual-shadow di bawah (kedua sisi, 5 layer) sekarang dibungkus 1 clipRect() dgn
+            // halo TETAP proporsional ke elevation (1.3x offset terjauh yg dipakai, 1.05x) —
+            // bayangan dijamin TIDAK PERNAH meluber lebih jauh dari itu, utk elevation berapa pun
+            // yg dikirim caller (MiniPlayerBar's 16.dp termasuk), tanpa memotong bentuknya sendiri
+            // (halo > offset terjauh, jadi bayangan tetap utuh, cuma areanya yg dibatasi tegas).
+            val haloPx = basePx * 1.3f
+            clipRect(
+                left = -haloPx,
+                top = -haloPx,
+                right = size.width + haloPx,
+                bottom = size.height + haloPx
+            ) {
+                // Sisi GELAP — kanan-bawah normal / kiri-atas saat pressed.
+                translate(left = basePx * 0.28f * dir, top = basePx * 0.28f * dir) {
+                    drawPath(outlinePath, color = darkNear)
+                }
+                translate(left = basePx * 0.60f * dir, top = basePx * 0.60f * dir) {
+                    drawPath(outlinePath, color = darkFar.copy(alpha = darkFar.alpha * 0.7f))
+                }
+                translate(left = basePx * 1.05f * dir, top = basePx * 1.05f * dir) {
+                    drawPath(outlinePath, color = darkFar.copy(alpha = darkFar.alpha * 0.35f))
+                }
+                // Sisi TERANG — kiri-atas normal / kanan-bawah saat pressed.
+                translate(left = -basePx * 0.28f * dir, top = -basePx * 0.28f * dir) {
+                    drawPath(outlinePath, color = lightNear)
+                }
+                translate(left = -basePx * 0.60f * dir, top = -basePx * 0.60f * dir) {
+                    drawPath(outlinePath, color = lightFar.copy(alpha = lightFar.alpha * 0.7f))
+                }
             }
         }
         .clip(shape)

@@ -36,16 +36,23 @@ sering dilihat — sekarang punya bentuk rounded-square + emboss taktil sendiri,
 flat Apple; border hero art album disamakan ke arah bevel diagonal yang sama seperti seluruh
 permukaan kaca lainnya.
 
-  **Skeuomorphism 2.0 — Hyper-Realism UI** (Batch 57, redesain total Batch 73) — identitas custom
-  kedua, otonom penuh dari Tactile (tidak lagi berbagi mekanisme bevel `embossSurface()` maupun
-  struktur border sejak Batch 73). Panel dibaca seperti logam fisik yang dipahat ke kanvas, lewat
-  7 layer di `skeuEmboss()`: ambient occlusion (bayangan kontak di dasar panel) + cast drop-shadow
-  terpisah, permukaan gradient 4-stop ("curved metal", selalu opaque), tekstur brushed-metal grain
-  berulang, kilau specular tunggal (radial, meredup saat ditekan), dan border ganda (bevel luar +
-  inner groove terukir). Fondasi tetap charcoal netral dgn aksen Titanium+Silver metalik dingin,
-  wajib gelap-mode-independen (punya ekspresi terang sendiri sejak Batch 61). Dipasang di mini
-  player, tombol play/pause (mini & Now Playing), piringan album hero, kartu "Lanjutkan
-  Mendengarkan", banner undo-sembunyikan-lagu, badge indikator gesture, dan baris pemilih tema.
+  **Neumorphism — Titanium & Emerald** (Batch 57, redesain total Batch 73, upgrade identitas dari
+  Skeuomorphism ke Neumorphism Batch 79-81) — identitas custom kedua, otonom penuh dari Tactile
+  (tidak berbagi mekanisme bevel `embossSurface()` maupun struktur border). Panel dibaca "dipahat
+  dari material yang sama dengan kanvas" — bukan lagi panel logam bertekstur seperti sebelumnya —
+  lewat dual soft-shadow multi-layer di `skeuEmboss()`: sisi gelap (kanan-bawah) & sisi terang
+  (kiri-atas) masing-masing beberapa layer offset+alpha bertingkat meniru soft-blur box-shadow
+  ganda ala neumorphism klasik, dibatasi `clipRect()` supaya bayangannya tidak pernah meluber ke
+  komponen lain di sekitarnya. **0 border, 0 tekstur grain** — ciri khas neumorphism, kedalaman
+  murni dari bayangan. Tertekan (pressed) = *concave*, sisi terang/gelap terbalik total (bukan
+  cuma mengecil), kesan permukaan masuk ke kanvas. Fondasi tetap charcoal/platinum netral dengan
+  aksen Titanium+Silver metalik dingin yang dominan (satu-satunya token di role warna utama), plus
+  sentuhan Zamrud/Emerald kecil & disengaja (glint permata kecil saat panel ditekan, satu vena
+  tipis di ambient wash layar utama, dan titik permanen di piringan album) — bukan aksen yang
+  bersaing dengan Titanium. Wajib gelap-mode-independen (punya ekspresi terang sendiri sejak
+  Batch 61). Dipasang di mini player, tombol play/pause (mini & Now Playing), piringan album hero,
+  kartu "Lanjutkan Mendengarkan", banner undo-sembunyikan-lagu, badge indikator gesture, dan baris
+  pemilih tema.
 
   Dipilih lewat tab **Pengaturan** di navigasi bawah, tersimpan otomatis, diterapkan ulang tiap sesi
 - **Halaman Pengaturan**: tab baru di navigasi bawah — berisi pemilih tema dan info versi aplikasi (nomor versi + build)

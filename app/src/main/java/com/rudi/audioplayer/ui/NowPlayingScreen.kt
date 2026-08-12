@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -1025,6 +1026,17 @@ private fun AlbumArtHero(
                             // sini (bukan lewat skeuEmboss() langsung) tetap dipertahankan karena
                             // Box ini juga membawa .shadow() accent glow per-lagu di bawah, yang
                             // perlu tetap jadi layer terpisah/paling akhir.
+                            // Batch 81 — fix 2 hal: (1) sisi TERANG dulu ada di drawBehind TERPISAH
+                            // SETELAH .clip(heroShape) (beda dari sisi gelap yg SEBELUM .clip()) —
+                            // artinya sisi terang selama ini kepotong tepat di tepi shape, tidak
+                            // pernah benar-benar "meluber ke luar" sebagai bayangan lembut kayak
+                            // sisi gelap, beda arsitektur dari skeuEmboss() sendiri yg gambar KEDUA
+                            // sisi dalam 1 drawBehind sebelum .clip(). Disatukan di bawah, sama
+                            // pola dgn skeuEmboss(). (2) clipRect() halo ditambahkan (fix "Ambient
+                            // Light gak bocor", instruksi user yg belum tersentuh Batch 79/80) —
+                            // hero art ini panel TERBESAR di app, jadi juga yg paling berisiko
+                            // numpang-nimpa MiniPlayerBar/tombol kontrol di bawahnya kalau tidak
+                            // dibatasi.
                             val heroAo = if (isDark) SkeuAmbientOcclusion else SkeuLightAmbientOcclusion
                             val heroShadow = if (isDark) SkeuShadow else SkeuLightShadow
                             val heroSpecular = if (isDark) SkeuSpecular else SkeuLightSpecular
@@ -1043,31 +1055,49 @@ private fun AlbumArtHero(
                                 .drawBehind {
                                     val outline = heroShape.createOutline(size, layoutDirection, this)
                                     val outlinePath = Path().apply { addOutline(outline) }
-                                    // Sisi GELAP — kanan-bawah, 3 layer offset makin jauh + alpha
-                                    // makin tipis (faux-blur bertingkat, sama teknik skeuEmboss()).
-                                    translate(left = 3.dp.toPx(), top = 3.dp.toPx()) {
-                                        drawPath(outlinePath, color = heroAo)
-                                    }
-                                    translate(left = 8.dp.toPx(), top = 8.dp.toPx()) {
-                                        drawPath(outlinePath, color = heroShadow.copy(alpha = (if (isDark) 0.40f else heroShadow.alpha) * 0.75f))
-                                    }
-                                    translate(left = 14.dp.toPx(), top = 14.dp.toPx()) {
-                                        drawPath(outlinePath, color = heroShadow.copy(alpha = (if (isDark) 0.40f else heroShadow.alpha) * 0.35f))
+                                    // Halo tetap (18.dp) — offset terjauh yg dipakai di bawah cuma
+                                    // 14.dp (literal, bukan proporsional ke param elevation kayak
+                                    // skeuEmboss(), krn hero art ini ukurannya selalu tetap 280.dp),
+                                    // jadi 18.dp cukup longgar utk tidak memotong bentuk bayangan
+                                    // sendiri, sekaligus jadi batas tegas yg dijamin tidak dilewati.
+                                    val haloPx = 18.dp.toPx()
+                                    clipRect(
+                                        left = -haloPx,
+                                        top = -haloPx,
+                                        right = size.width + haloPx,
+                                        bottom = size.height + haloPx
+                                    ) {
+                                        // Sisi GELAP — kanan-bawah, 3 layer offset makin jauh +
+                                        // alpha makin tipis (faux-blur bertingkat, sama teknik
+                                        // skeuEmboss()).
+                                        translate(left = 3.dp.toPx(), top = 3.dp.toPx()) {
+                                            drawPath(outlinePath, color = heroAo)
+                                        }
+                                        translate(left = 8.dp.toPx(), top = 8.dp.toPx()) {
+                                            drawPath(outlinePath, color = heroShadow.copy(alpha = (if (isDark) 0.40f else heroShadow.alpha) * 0.75f))
+                                        }
+                                        translate(left = 14.dp.toPx(), top = 14.dp.toPx()) {
+                                            drawPath(outlinePath, color = heroShadow.copy(alpha = (if (isDark) 0.40f else heroShadow.alpha) * 0.35f))
+                                        }
+                                        // Sisi TERANG — kiri-atas, 2 layer, murni Titanium/Silver.
+                                        // Batch 81: dipindah ke sini (sebelum .clip()), sisi gelap
+                                        // di atas — dulu di drawBehind terpisah SETELAH .clip(),
+                                        // jadi tak pernah bisa meluber sama sekali (lihat komentar
+                                        // Batch 81 di atas).
+                                        translate(left = -3.dp.toPx(), top = -3.dp.toPx()) {
+                                            drawPath(outlinePath, color = heroSpecular.copy(alpha = if (isDark) 0.35f else heroSpecular.alpha * 0.6f))
+                                        }
+                                        translate(left = -8.dp.toPx(), top = -8.dp.toPx()) {
+                                            drawPath(outlinePath, color = heroHighlight.copy(alpha = (if (isDark) 0.16f else heroHighlight.alpha) * 0.7f))
+                                        }
                                     }
                                 }
                                 .clip(heroShape)
                                 .drawBehind {
-                                    val outline = heroShape.createOutline(size, layoutDirection, this)
-                                    val outlinePath = Path().apply { addOutline(outline) }
-                                    // Sisi TERANG — kiri-atas, 2 layer, murni Titanium/Silver.
-                                    translate(left = -3.dp.toPx(), top = -3.dp.toPx()) {
-                                        drawPath(outlinePath, color = heroSpecular.copy(alpha = if (isDark) 0.35f else heroSpecular.alpha * 0.6f))
-                                    }
-                                    translate(left = -8.dp.toPx(), top = -8.dp.toPx()) {
-                                        drawPath(outlinePath, color = heroHighlight.copy(alpha = (if (isDark) 0.16f else heroHighlight.alpha) * 0.7f))
-                                    }
                                     // Zamrud — glint bulat kecil terpisah, pojok kiri-atas, warna
-                                    // murni (bukan blend) supaya genuinely kebaca hijau.
+                                    // murni (bukan blend) supaya genuinely kebaca hijau. Sengaja
+                                    // tetap SETELAH .clip() (beda dari dual-shadow di atas) — ini
+                                    // permata di PERMUKAAN panel, bukan bayangan yg perlu meluber.
                                     drawRect(
                                         brush = Brush.radialGradient(
                                             colors = listOf(emerald.copy(alpha = heroEmeraldAlpha), Color.Transparent),
