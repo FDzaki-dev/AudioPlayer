@@ -327,14 +327,19 @@ class MainActivity : FragmentActivity() {
                     ThemeIdentity.SKEU_DARK_LITE -> {
                         val streakAlpha = if (isDarkTheme) SkeuAmbientAlphaDark else SkeuAmbientAlphaLight
                         val streakEnd = if (isDarkTheme) SkeuDarkSurfaceVariant else SkeuLightSurfaceVariant
-                        // Batch 79 — NEUMORPHISM upgrade: satu stop Zamrud/Emerald sempit tambahan
-                        // di 0.76 (SkeuEmerald/SkeuLightEmerald, Color.kt), alpha jauh lebih rendah
-                        // dari kilau silver di 0.62 (*0.9f vs *1.8f) — "sedikit sentuhan zamrud" yg
-                        // literal per instruksi user, dibaca sebagai satu vena emerald tipis di
-                        // logam titanium, bukan aksen kedua yang bersaing dgn kilau silver utama.
-                        // Titanium tetap dominan (TitaniumDark/SilverHighlight, 3 dari 4 stop asli,
-                        // tidak diubah sama sekali) — Emerald cuma stop TAMBAHAN, bukan pengganti.
+                        // Batch 80 — fix: Batch 79's emerald stop used `streakAlpha * 0.9f`, tapi
+                        // streakAlpha itself sudah sangat kecil (0.05f gelap / 0.12f terang) —
+                        // hasil akhirnya cuma alpha ~0.045/0.108, praktis tak kelihatan (user:
+                        // "yang kelihatan cuman Titanium dominan, mana zamrudnya??"). Beda dgn
+                        // SilverHighlight yg walau alpha kecil tetap kebaca krn warnanya nyaris
+                        // putih (kontras tinggi thd background gelap/terang), warna emerald yg
+                        // medium-saturation butuh alpha jauh lebih tinggi buat kebaca sama sekali.
+                        // Sekarang pakai alpha TETAP (tidak lagi diturunkan dari streakAlpha),
+                        // sengaja masih di bawah level accent-glow biasa (~0.42-0.45f di tempat
+                        // lain di app ini) supaya tetap terbaca "sentuhan", bukan aksen utama —
+                        // tapi genuinely visible, bukan cuma teknis-ada-di-kode.
                         val emerald = if (isDarkTheme) SkeuEmerald else SkeuLightEmerald
+                        val emeraldStreakAlpha = if (isDarkTheme) 0.30f else 0.36f
                         Brush.linearGradient(
                             *arrayOf(
                                 0.00f to MaterialTheme.colorScheme.background,
@@ -345,7 +350,7 @@ class MainActivity : FragmentActivity() {
                                 // pantulan cahaya di logam, bukan gradasi warna yang mulus.
                                 0.62f to SilverHighlight.copy(alpha = streakAlpha * 1.8f),
                                 0.68f to TitaniumDark.copy(alpha = streakAlpha),
-                                0.76f to emerald.copy(alpha = streakAlpha * 0.9f),
+                                0.76f to emerald.copy(alpha = emeraldStreakAlpha),
                                 1.00f to streakEnd
                             )
                         )                    }

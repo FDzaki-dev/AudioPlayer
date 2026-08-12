@@ -6,6 +6,30 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 80 (Fix visibilitas Zamrud — respons langsung feedback user "mana zamrudnya??")** —
+Batch 79 sengaja bikin emerald sangat halus (blend rendah + cuma nyala saat pressed + alpha
+diturunkan dari nilai kecil), efeknya kebablasan: user lihat UI/screenshot idle dan emerald-nya
+betul-betul 0% kelihatan di 3 titik sekaligus. Fix, 3 file (di bawah batas normal, TANPA perlu
+Atomic Change exception — scope = subset 3 dari 6 file Batch 79, tuning angka + 1 teknik render,
+bukan redesign baru):
+1. `skeuEmboss()` (TactileDepth.kt) — emerald sekarang radial glint TERPISAH (warna murni, bukan
+   di-blend ke `lightNear` putih) — alpha baseline 0.20f idle (genuinely visible tapi tetap
+   "sedikit") naik ke 0.52f saat pressed. Posisi ikut `dir` (concave-flip yg sama dgn sisi
+   terang/gelap).
+2. Root ambient wash (MainActivity.kt, protected/parsial) — alpha stop emerald diganti dari
+   `streakAlpha * 0.9f` (~0.045-0.108, tak kelihatan) jadi alpha TETAP 0.30f/0.36f, independen
+   dari streakAlpha yang kecil.
+3. Hero art (NowPlayingScreen.kt) — lerp-blend 14% ke `heroSpecular` dihapus, diganti radial
+   glint terpisah warna murni, alpha tetap 0.35f/0.42f, permanen (statis, no pressed state).
+
+**Titanium tetap dominan** — 0 perubahan di role M3 primary/surfaceTint (`SkeuAccent` dkk. sama
+sekali tidak disentuh); ini murni menaikkan visibilitas 3 titik emerald yang sudah direncanakan
+Batch 79 supaya genuinely kebaca, bukan menambah cakupan/dominasi emerald baru. Detail lengkap:
+`CHANGELOG.md` Batch 80. **Masih belum diverifikasi compile/visual sungguhan di device** — sama
+seperti batch-batch sebelumnya, tidak ada `kotlinc`/emulator di environment kerja ini; prioritas
+berikutnya kalau user minta lanjut: rebuild CI + install APK, cek genuinely kelihatan zamrud-nya
+di layar HP asli.
+
 **Batch 79 (Upgrade identitas Skeuomorphism -> Neumorphism)** — Instruksi eksplisit user:
 "Titanium dominan + sedikit sentuhan Zamrud + depth ultra realistic". **Atomic Change, 6 file**
 lintas ui/theme + MainActivity.kt (protected/parsial) + ui/NowPlayingScreen.kt — dikecualikan dari

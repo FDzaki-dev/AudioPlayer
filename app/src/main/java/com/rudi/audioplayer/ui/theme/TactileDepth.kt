@@ -12,13 +12,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -228,8 +228,17 @@ fun Modifier.skeuEmboss(
         targetValue = if (pressed) 0.978f else 1f,
         label = "skeuEmbossScale"
     )
-    val emeraldGlow by animateFloatAsState(
-        targetValue = if (pressed) 1f else 0f,
+    // Batch 80 — fix: Batch 79's emerald ONLY appeared blended into lightNear (near-white/silver
+    // specular) and ONLY while actively pressed — user feedback: "yang kelihatan cuman Titanium
+    // dominan, mana zamrudnya??", karena (a) lerp 55% ke arah putih terang nyaris tak mengubah
+    // hue yang terlihat mata (mixing a small % of saturated color into near-opaque white mostly
+    // just desaturates it, it doesn't read as that color), dan (b) alpha 0 total saat idle —
+    // kalau user cuma lihat screenshot/UI diam, emerald-nya betul-betul 0%, bukan cuma "sedikit".
+    // Fix: emerald sekarang LAYER SENDIRI (radial glint kecil, bukan di-blend ke lightNear) +
+    // baseline idle > 0 (0.20f, tetap "sedikit" tapi genuinely visible) yang naik ke 0.52f saat
+    // pressed (efek "permata menyala" yang jelas kelihatan pas disentuh).
+    val emeraldAlpha by animateFloatAsState(
+        targetValue = if (pressed) 0.52f else 0.20f,
         label = "skeuEmbossEmeraldGlow"
     )
 
@@ -253,15 +262,9 @@ fun Modifier.skeuEmboss(
             translate(left = basePx * 1.05f * dir, top = basePx * 1.05f * dir) {
                 drawPath(outlinePath, color = darkFar.copy(alpha = darkFar.alpha * 0.35f))
             }
-            // Sisi TERANG — kiri-atas normal / kanan-bawah saat pressed. Inti (lightNear) diikat
-            // emeraldGlow: saat 0 (normal) murni specular putih/perak seperti biasa, saat 1
-            // (pressed penuh) berbaur ke SkeuEmerald — satu-satunya titik non-titanium di
-            // seluruh fungsi ini.
-            val nearColor = if (emeraldGlow > 0f) {
-                lerp(lightNear, emerald, emeraldGlow * 0.55f)
-            } else lightNear
+            // Sisi TERANG — kiri-atas normal / kanan-bawah saat pressed.
             translate(left = -basePx * 0.28f * dir, top = -basePx * 0.28f * dir) {
-                drawPath(outlinePath, color = nearColor)
+                drawPath(outlinePath, color = lightNear)
             }
             translate(left = -basePx * 0.60f * dir, top = -basePx * 0.60f * dir) {
                 drawPath(outlinePath, color = lightFar.copy(alpha = lightFar.alpha * 0.7f))
@@ -270,4 +273,19 @@ fun Modifier.skeuEmboss(
         .clip(shape)
         // Base surface — flat, hampir sewarna kanvas. Kedalaman 100% dari dual-shadow di atas.
         .background(panelFill)
+        // Batch 80 — Zamrud, layer TERPISAH (bukan blend) di atas panelFill: titik radial kecil
+        // di kuadran sisi-terang (ikut `dir` — kiri-atas normal, kanan-bawah pressed), warna murni
+        // SkeuEmerald sendiri, jadi selalu kebaca sebagai hijau, bukan cuma putih yang sedikit
+        // kurang saturasi.
+        .drawBehind {
+            val cx = if (dir > 0f) size.width * 0.18f else size.width * 0.82f
+            val cy = if (dir > 0f) size.height * 0.16f else size.height * 0.84f
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(emerald.copy(alpha = emeraldAlpha), Color.Transparent),
+                    center = Offset(cx, cy),
+                    radius = size.minDimension.coerceAtLeast(1f) * 0.32f
+                )
+            )
+        }
 }

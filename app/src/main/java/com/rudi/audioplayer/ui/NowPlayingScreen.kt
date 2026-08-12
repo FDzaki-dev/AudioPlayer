@@ -61,11 +61,11 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -1030,14 +1030,15 @@ private fun AlbumArtHero(
                             val heroSpecular = if (isDark) SkeuSpecular else SkeuLightSpecular
                             val heroHighlight = if (isDark) SkeuHighlight else SkeuLightHighlight
                             val emerald = if (isDark) SkeuEmerald else SkeuLightEmerald
-                            // Sentuhan Zamrud di hero art beda dari skeuEmboss(): hero art statis
-                            // (tidak punya state pressed), jadi di sini SELALU berbaur sedikit,
-                            // bukan cuma nyala saat interaksi — alpha campur sangat rendah
-                            // (0.14f), sengaja jadi satu-satunya permukaan yg dapat sentuhan
-                            // permanen krn ini satu-satunya surface always-active/terbesar di
-                            // layar (§9 komentar branch Tactile di atas soal accent glow
-                            // always-active — prinsip sama, diterapkan ke Emerald di sini).
-                            val heroSpecularTinted = lerp(heroSpecular, emerald, 0.14f)
+                            // Batch 80 — fix: Batch 79's emerald di hero art cuma lerp-blend 14%
+                            // ke arah heroSpecular (putih/perak nyaris opaque) — di layar HP nyaris
+                            // tak berubah dari putih polos (user: "yang kelihatan cuman Titanium
+                            // dominan, mana zamrudnya??"). Sekarang jadi radial glint TERPISAH
+                            // (warna emerald murni, bukan campuran) di pojok kiri-atas, alpha tetap
+                            // & jauh lebih tinggi (0.35f/0.42f) — permanen (hero art statis, tidak
+                            // ada state pressed spt skeuEmboss()), genuinely kebaca sebagai titik
+                            // hijau di logam titanium, bukan cuma teknis-ada-di-kode.
+                            val heroEmeraldAlpha = if (isDark) 0.35f else 0.42f
                             Modifier
                                 .drawBehind {
                                     val outline = heroShape.createOutline(size, layoutDirection, this)
@@ -1058,13 +1059,22 @@ private fun AlbumArtHero(
                                 .drawBehind {
                                     val outline = heroShape.createOutline(size, layoutDirection, this)
                                     val outlinePath = Path().apply { addOutline(outline) }
-                                    // Sisi TERANG — kiri-atas, 2 layer, inti-nya berbaur Emerald.
+                                    // Sisi TERANG — kiri-atas, 2 layer, murni Titanium/Silver.
                                     translate(left = -3.dp.toPx(), top = -3.dp.toPx()) {
-                                        drawPath(outlinePath, color = heroSpecularTinted.copy(alpha = if (isDark) 0.35f else heroSpecular.alpha * 0.6f))
+                                        drawPath(outlinePath, color = heroSpecular.copy(alpha = if (isDark) 0.35f else heroSpecular.alpha * 0.6f))
                                     }
                                     translate(left = -8.dp.toPx(), top = -8.dp.toPx()) {
                                         drawPath(outlinePath, color = heroHighlight.copy(alpha = (if (isDark) 0.16f else heroHighlight.alpha) * 0.7f))
                                     }
+                                    // Zamrud — glint bulat kecil terpisah, pojok kiri-atas, warna
+                                    // murni (bukan blend) supaya genuinely kebaca hijau.
+                                    drawRect(
+                                        brush = Brush.radialGradient(
+                                            colors = listOf(emerald.copy(alpha = heroEmeraldAlpha), Color.Transparent),
+                                            center = Offset(size.width * 0.16f, size.height * 0.14f),
+                                            radius = size.minDimension.coerceAtLeast(1f) * 0.28f
+                                        )
+                                    )
                                 }
                                 .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
                         }

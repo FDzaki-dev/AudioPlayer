@@ -1,5 +1,42 @@
 # Changelog
 
+## Batch 80 — Fix visibilitas Zamrud (respons langsung ke feedback user: "mana zamrudnya??")
+User feedback setelah Batch 79: "yang kelihatan cuman Titanium dominan. mana zamrud nya??".
+Root cause di 3 titik sekaligus: (1) `skeuEmboss()` — emerald di-lerp-blend 55% ke arah
+`lightNear` yang nyaris putih opaque (mixing sedikit warna saturasi ke putih nyaris tidak
+mengubah hue yg terlihat mata) DAN alpha 0 total saat idle (cuma nyala saat pressed — kalau user
+lihat UI diam/screenshot, emerald-nya betul-betul 0%), (2) root ambient wash (MainActivity.kt) —
+alpha emerald diturunkan dari `streakAlpha` yg sudah sangat kecil (0.05f/0.12f) dikali 0.9f,
+hasil akhir ~0.045-0.108, praktis tak kelihatan, (3) hero art (NowPlayingScreen.kt) — sama pola
+lerp-blend-ke-putih spt skeuEmboss(), 14% blend nyaris tak berubah dari putih polos. Fix di
+ketiganya: emerald sekarang SELALU layer terpisah dgn warna murni (bukan di-blend ke warna lain)
++ alpha tetap yang jauh lebih tinggi, bukan diturunkan dari nilai lain yang sudah kecil:
+1. `TactileDepth.kt` `skeuEmboss()` — radial glint kecil terpisah (warna `SkeuEmerald`/
+   `SkeuLightEmerald` murni) di kuadran sisi-terang, alpha baseline 0.20f (idle, tetap "sedikit"
+   tapi genuinely visible) naik ke 0.52f saat pressed ("permata menyala" saat disentuh) — bukan
+   lagi blend ke `lightNear`. Posisi ikut `dir` (kiri-atas normal, kanan-bawah pressed, konsisten
+   dgn concave-flip sisi terang/gelap). Import `Offset` dikembalikan (perlu lagi utk radial
+   gradient), import `lerp` dihapus (tidak dipakai lagi di file ini).
+2. `MainActivity.kt` (protected, parsial) — root ambient wash: alpha stop emerald di 0.76 diganti
+   dari `streakAlpha * 0.9f` (~0.045-0.108, tak kelihatan) jadi alpha TETAP 0.30f gelap/0.36f
+   terang (independen dari streakAlpha yg kecil) — masih di bawah accent-glow biasa app ini
+   (~0.42-0.45f di tempat lain) supaya tetap "sentuhan", tapi genuinely terlihat sbg vena hijau
+   mengikuti kilau silver di 0.62, bukan cuma teknis-ada-di-kode.
+3. `ui/NowPlayingScreen.kt` — hero art: lerp-blend 14% ke `heroSpecular` **dihapus**, diganti
+   radial glint terpisah (warna murni) di pojok kiri-atas, alpha tetap 0.35f gelap/0.42f terang,
+   permanen (hero art statis, tidak ada state pressed). Import `lerp` dihapus (tidak dipakai lagi
+   di file ini), import `Offset` dikembalikan.
+
+**Titanium tetap dominan** — tidak ada satu pun perubahan di role M3 primary/surfaceTint
+(`SkeuAccent` dkk. sama sekali tidak disentuh); ini murni menaikkan visibilitas 3 titik emerald
+yg sudah direncanakan di Batch 79 supaya benar-benar kebaca, bukan menambah cakupan/dominasi
+emerald baru. 3 file diedit (di bawah batas 10 file/1 modul, tidak perlu Atomic Change exception
+kali ini — scope sudah persis sama dgn 3 dari 6 file Batch 79, cuma tuning angka + 1 teknik
+render yg diganti, bukan redesign baru). **Masih belum diverifikasi compile/visual sungguhan di
+device** — sama seperti Batch 79, tidak ada kotlinc/emulator di environment kerja ini; prioritas
+berikutnya kalau user minta lanjut: rebuild CI + install APK, cek genuinely kelihatan zamrud-nya
+di layar HP asli (terutama radial glint di panel/hero art, dan streak root wash).
+
 ## Batch 79 — Upgrade identitas Skeuomorphism -> Neumorphism (Titanium dominan + sentuhan Zamrud + depth ultra realistic)
 Instruksi eksplisit user: "upgrade skeuomorphism -> Neumorphism dengan accent Titanium yang
 dominan dengan sedikit sentuhan zamrud, dan juga depth ultra realistic". **Impact Report / alasan
