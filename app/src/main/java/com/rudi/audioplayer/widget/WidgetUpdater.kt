@@ -37,10 +37,18 @@ object WidgetUpdater {
     // never moved regardless of ThemeMode. Root cause was 2-fold, fixed together: (1) no call
     // path from PlayerViewModel.setThemeMode/setThemeIdentity to WidgetUpdater.updateAll —
     // added there — and (2) the layout itself had no light variant to switch to — added here.
-    private const val TITLE_COLOR_DARK = 0xFFFFFFFF.toInt()
-    private const val ARTIST_COLOR_DARK = 0xFF98989D.toInt()
-    private const val TITLE_COLOR_LIGHT = 0xFF1C1C1E.toInt()
-    private const val ARTIST_COLOR_LIGHT = 0xFF6E6E73.toInt()
+    //
+    // Batch 84 — values swapped to the EXACT SkeuDarkText/SkeuDarkSecondaryText/SkeuLightText/
+    // SkeuLightSecondaryText hex from Color.kt (was a separate, slightly-off ad-hoc palette:
+    // pure #FFFFFF instead of the cooler near-white #EDEFF2, etc.) as part of "redesign widget
+    // theme -> Neumorphism, hardcode": this is isDark/light MODE, a different axis from the
+    // Tactile/Skeu/Apple theme picker, left untouched — but the actual color VALUES on both
+    // sides of that axis now come from the app's one canonical Neumorphism palette instead of
+    // an independent set that happened to look similar.
+    private const val TITLE_COLOR_DARK = 0xFFEDEFF2.toInt()
+    private const val ARTIST_COLOR_DARK = 0xFFA6ABB2.toInt()
+    private const val TITLE_COLOR_LIGHT = 0xFF212327.toInt()
+    private const val ARTIST_COLOR_LIGHT = 0xFF63676D.toInt()
 
     const val ACTION_TOGGLE_PLAY = "com.rudi.audioplayer.widget.TOGGLE_PLAY"
     const val ACTION_NEXT = "com.rudi.audioplayer.widget.NEXT"
@@ -83,6 +91,16 @@ object WidgetUpdater {
                 R.id.widget_root,
                 "setBackgroundResource",
                 if (isDark) R.drawable.widget_background else R.drawable.widget_background_light
+            )
+
+            // Batch 84 — play/pause disc now also has a dark/light pair (was 1 file reused for
+            // both, fine back when it was a flat solid red that read okay either way; the new
+            // Neumorphism SkeuEmerald/SkeuLightEmerald pair genuinely needs to switch like the
+            // panel background above does, same reasoning).
+            views.setInt(
+                R.id.widget_play_pause,
+                "setBackgroundResource",
+                if (isDark) R.drawable.widget_play_button_bg else R.drawable.widget_play_button_bg_light
             )
 
             if (!isCompact) {

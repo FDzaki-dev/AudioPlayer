@@ -6,41 +6,19 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
-**Batch 83 (Ganti total identitas "Apple" -> "Facet": geometri chamfer otonom, layout only)** —
-Instruksi user: "UI/UX premium+expensive 'otonom', gak menjiplak apple music atau apps apapun".
-Klarifikasi 2 tap: (1) ganti TOTAL identitas Apple (bukan tema ke-4, bukan redesign gabung
-ketiganya). (2) awalnya dijawab arah warna "Ink & Platinum", TAPI user lalu koreksi: **"Indentitas
-'layout' only. theme gak usah redesign dulu"** — jadi batch ini murni SHAPE, 0 token warna
-disentuh (`AppleDarkColors`/`AppleLightColors`/`AppleAccent` sama persis). Motif baru: chamfer
-sudut tunggal (`CutCornerShape` topEnd saja, 3 sudut lain tajam/0dp — potongan diagonal, bukan
-kurva) menggantikan generous-rounded lama yang commentnya sendiri eksplisit bilang itu tiruan
-squircle Apple. BEDA juga dari Tactile/Skeu (keduanya rounded-semua-sudut) — genuinely otonom
-dari ketiganya, bukan cuma "bukan Apple Music". 5 file:
-1. `Theme.kt` — `AppleShapes` full redefinisi (CutCornerShape). `ThemeIdentity.APPLE` displayName
-   "Apple"->"Facet" + description ditulis ulang. `storageKey "apple"`/nama enum `APPLE` TIDAK
-   diganti (kompatibilitas preferensi tersimpan user, pola sama dgn `SKEU_DARK_LITE` Batch 79).
-2. `MiniPlayerBar.kt` & `NowPlayingScreen.kt` — tombol play/pause: hardcode `CircleShape` utk
-   Apple (padahal Tactile/Skeu di baris sama sudah `MaterialTheme.shapes.medium`) disamakan jadi
-   selalu theme-relative, gak perlu percabangan lagi. `NowPlayingScreen.kt` juga: `heroShape`
-   piringan album (surface TERBESAR di app) ternyata hardcode `RoundedCornerShape(Radius.hero)`
-   utk Apple — bypass total, ditemukan saat audit, disamakan.
-3. `HomeScreen.kt` (`ContinueListeningCard`) & `SettingsScreen.kt` (preview pemilih tema) — bypass
-   serupa. SettingsScreen fix-nya SENGAJA beda: referensi langsung `AppleShapes.medium`, BUKAN
-   `MaterialTheme.shapes.medium` — composable itu preview SEMUA identitas dalam 1 list, ambient
-   `MaterialTheme` di situ merefleksikan identitas yg lagi AKTIF bukan yg lagi di-preview per
-   baris (alasan sama persis kenapa `previewColors` di atasnya pakai `colorsFor(identity, isDark)`
-   bukan `MaterialTheme.colorScheme` langsung).
-
-**Diaudit, SENGAJA TIDAK diubah**: `LockScreen.kt` PIN keypad — circle-nya dipakai di SEMUA 3
-identitas sekaligus (bukan Apple-only bypass), keputusan desain Batch 82 yg disengaja (keypad
-numerik, circle = pola ergonomis universal, bukan ciri Apple Music) — diganti cuma di Apple akan
-bikin 1 grid tombol campur 2 bentuk tanpa alasan fungsional. `LibraryScreen.kt` banner undo-hide —
-shape hardcode-nya SAMA utk ketiga identitas, di luar scope. **Palet "Ink & Platinum" BELUM
-diimplementasikan** — ditunda eksplisit oleh user, calon batch terpisah kalau diminta lanjut
-(Color.kt + kemungkinan root ambient wash `MainActivity.kt` spt Tactile/Skeu masing-masing sudah
-punya). README.md paragraf "5 tema" diperbarui. 0 protected asset disentuh, brace/paren balance
-ke-5 file kode dicek manual & seimbang. Masih belum diverifikasi compile/visual sungguhan di
-device. Detail lengkap: `CHANGELOG.md` Batch 83.
+**Batch 84 (Arahan "redesign theme widget lama -> Neumorphism hardcode" — 5 file)** — Widget
+home-screen (RemoteViews, bukan Compose, jadi tidak pernah bisa ikut ThemeStore Tactile/Skeu/
+Apple) diganti render Neumorphism SELALU ("di-hardcode"), apapun tema di dalam app. Sumbu
+gelap/terang (`isDark`, terpisah dari pilihan tema) tidak disentuh. `widget_background(_light).xml`:
+solid polos → `layer-list` base `SkeuNeuSurfaceDark`/`Light` + dual-shadow gradient diagonal
+(135°/315°, alpha sisi "far" token asli, 0 border). `widget_play_button_bg.xml` (redesign) +
+`_light.xml` (BARU): oval merah `#FA233B` peninggalan lama → disc `SkeuEmerald`/`SkeuLightEmerald`
+(dipilih drpd Titanium krn ikon play/pause putih polos, kontras lebih baik). `WidgetUpdater.kt`:
+warna teks diganti ke hex PERSIS token Color.kt (bukan palet ad-hoc terpisah), + tombol
+play/pause sekarang `setBackgroundResource` switch dark/light sama pola dgn root.
+`FILE_MANIFEST.txt` 111→112 (1 file baru). 0 protected asset lain disentuh. **Belum diverifikasi
+visual sungguhan di device** — no emulator/RemoteViews preview di environment kerja ini. Detail
+lengkap: `CHANGELOG.md` Batch 84.
 
 **Batch 82 (Arahan "debugging+Polish UI" — audit lintas ui/, 2 file)** — Audit statis sistematis
 semua file `ui/`, fokus pola `remember { mutableStateOf(paramTurunan) }` tanpa key (kandidat

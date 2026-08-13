@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 111 file
+# Total: 112 file
 
 .github/workflows/build.yml
 .gitignore
@@ -79,6 +79,7 @@ app/src/main/res/drawable/ic_widget_previous.png
 app/src/main/res/drawable/widget_background.xml
 app/src/main/res/drawable/widget_background_light.xml
 app/src/main/res/drawable/widget_play_button_bg.xml
+app/src/main/res/drawable/widget_play_button_bg_light.xml
 app/src/main/res/layout/widget_player.xml
 app/src/main/res/layout/widget_player_compact.xml
 app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml

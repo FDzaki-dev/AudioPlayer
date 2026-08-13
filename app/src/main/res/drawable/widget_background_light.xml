@@ -1,6 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="#F2F2F7" />
-    <corners android:radius="24dp" />
-</shape>
+<!--
+    Batch 84 — pasangan terang dari widget_background.xml, lihat komentar lengkap di sana.
+    Base panel: SkeuNeuSurfaceLight (#E8EAED). Highlight LEBIH KUAT dari sisi gelap (0.45 vs
+    0.16) — putih di atas kanvas yang sudah terang nyaris tak kelihatan kalau alpha-nya sama
+    kayak sisi gelap, pola sama seperti kenapa SkeuLightHighlight (0.65) > SkeuHighlight (0.16)
+    di Color.kt. Shadow pakai warna SkeuLightShadow (#23262B, bukan hitam murni) — sama seperti
+    token aslinya, base sudah terang jadi shadow-nya boleh sedikit lebih redup (0.30).
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#E8EAED" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#73FFFFFF"
+                android:endColor="#00FFFFFF" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="315"
+                android:startColor="#4D23262B"
+                android:endColor="#0023262B" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+</layer-list>
