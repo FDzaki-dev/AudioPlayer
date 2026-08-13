@@ -87,13 +87,27 @@ permukaan kaca lainnya.
 - **Shake-to-Skip**: opsi di Pengaturan (nonaktif secara default — gesture fisik harus sengaja diaktifkan user) untuk lompat ke lagu berikutnya dengan mengocok HP selagi musik diputar. Pakai accelerometer dengan debounce (satu kocokan = satu skip, bukan rentetan), dan sensor cuma aktif selagi musik benar-benar berjalan — hemat baterai, tidak kepicu asal di kantong saat idle
 
 ## Standar Penomoran Versi
-`versionCode` dan `versionName` (Batch 30) **sama-sama otomatis**, keduanya turunan dari jumlah commit git (`gitCommitCount()` di `app/build.gradle.kts`) — tidak ada lagi angka yang perlu diingat/dibump manual. `versionName` berpola `1.0.<jumlah commit>`, contoh `1.0.254`.
+`versionCode` dan `versionName` (Batch 30, formula `versionName` diperbarui Batch 86) **sama-sama
+otomatis**, keduanya turunan dari jumlah commit git (`gitCommitCount()` di `app/build.gradle.kts`)
+— tidak ada lagi angka yang perlu diingat/dibump manual. `versionName` berpola
+`MAJOR.MINOR.PATCH` dengan `MINOR = jumlah_commit / 50` dan `PATCH = jumlah_commit % 50` (jadi
+genuinely naik seiring waktu — `1.0.x` → `1.1.x` → `1.2.x` dst — bukan nomor tengah yang beku
+selamanya di `1.0` seperti skema lama), contoh commit ke-267 → `1.5.17`. `MAJOR` (`1`) tetap
+konstanta yang di-set manual dengan sengaja — sama seperti hampir semua skema semver "otomatis"
+lain (termasuk tooling semantic-release), bump MAJOR selalu butuh sinyal breaking-change dari
+manusia, bukan sesuatu yang aman dihitung otomatis dari jumlah commit.
 
-Konsekuensi praktis: nomor yang tampil di app (`Settings → AudioPlayer versi 1.0.254 (build 254)`) dan nomor di tag GitHub Release/nama file APK (`AudioPlayer-v1.0.254-release.apk`) **selalu sama persis** — keduanya menghitung `git rev-list --count HEAD` dari commit yang sama, jadi tidak mungkin drift, walau dihitung di dua tempat terpisah (Gradle & `.github/workflows/build.yml`) dan tidak butuh salah satunya membaca dari yang lain.
+Konsekuensi praktis: nomor yang tampil di app (`Settings → AudioPlayer versi 1.5.17 (build 267)`)
+dan nomor di tag GitHub Release/nama file APK (`AudioPlayer-v1.5.17-release-run42.apk`) **selalu
+sama persis** — keduanya menghitung `git rev-list --count HEAD` dari commit yang sama lalu
+formula MAJOR.MINOR.PATCH yang identik, jadi tidak mungkin drift, walau dihitung di dua tempat
+terpisah (Gradle & `.github/workflows/build.yml`) dan tidak butuh salah satunya membaca dari yang
+lain — kalau `commitsPerMinor` diubah di salah satu tempat, HARUS diubah sama di yang satunya
+juga (dicatat sebagai komentar di kedua file).
 
 Nama file ZIP hasil tiap batch pengembangan (`AudioPlayer-batchN-release.zip`) tetap melacak nomor batch percakapan, **bukan** versionName/versionCode — ini sengaja tetap terpisah, karena nomor batch melacak paket kerja per sesi chat, sedangkan versionName/versionCode melacak histori commit git; keduanya naik dengan kecepatan berbeda (satu batch chat bisa berisi banyak commit).
 
-File APK hasil build dan asset GitHub Release membawa nomor versi di namanya, diakhiri `-release` (`AudioPlayer-v1.0.247-release.apk`) — bukan nama generik statis, dan sengaja **tanpa** short commit hash di belakang supaya nama file tetap stabil/gampang dikenali. Penamaan ini dikerjakan di level workflow CI (`.github/workflows/build.yml`), bukan dobel dengan Gradle, biar tidak saling tabrak.
+File APK hasil build dan asset GitHub Release membawa nomor versi di namanya, diakhiri `-release-run<nomor run>` (`AudioPlayer-v1.5.17-release-run42.apk`) — bukan nama generik statis, dan sengaja **tanpa** short commit hash di belakang supaya nama file tetap stabil/gampang dikenali. Penamaan ini dikerjakan di level workflow CI (`.github/workflows/build.yml`), bukan dobel dengan Gradle, biar tidak saling tabrak.
 
 ## Keputusan Arsitektur
 Ringkasan kenapa, bukan cuma apa — supaya sesi kerja berikutnya (chat AI baru sekalipun) tidak perlu menebak ulang alasan di balik hal-hal yang tidak jelas kalau cuma baca kode.

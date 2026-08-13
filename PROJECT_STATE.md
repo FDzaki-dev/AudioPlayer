@@ -6,6 +6,42 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 86 ("bump version statis -> otomatis+dinamis", diklarifikasi dulu via ask_user_input_v0
+— 3 file, 2 di antaranya PROTECTED)** — `versionName` app: prefix `"1.0."` yang selama ini beku
+permanen (cuma commit-count di belakang yang jalan) diganti MAJOR.MINOR.PATCH genuinely dinamis
+(`MINOR = commit_count / 50`, `PATCH = commit_count % 50`, jadi `1.0.x → 1.1.x → 1.2.x` seiring
+waktu). MAJOR (`= 1`) tetap konstanta manual SENGAJA (standar semver — MAJOR selalu gate di
+belakang keputusan manusia, bukan oversight). `versionCode` TIDAK diubah (tetap commit count
+mentah, internal-only). `app/build.gradle.kts` DAN `.github/workflows/build.yml` (2 PROTECTED
+asset) harus diubah BERSAMAAN dgn formula identik (`commitsPerMinor`/`COMMITS_PER_MINOR = 50` di
+kedua tempat) — kalau salah satu diubah tanpa yang lain, tag GitHub Release drift dari
+versionName sungguhan di APK (invariant yg sama dijaga sejak Batch 30/56). `README.md` bagian
+"Standar Penomoran Versi" diupdate contoh, sekalian 1 ketidaksesuaian kecil pre-existing
+diperbaiki (`-release.apk` → `-release-run<N>.apk`, menyesuaikan tag CI yang sebenarnya).
+
+⚠️ **Belum diverifikasi compile/CI sungguhan** — risiko tertinggi sejauh ini krn 2 protected
+asset tersentuh bersamaan, no gradle/GitHub Actions run di environment kerja ini. Prioritas
+paling atas kalau user push: jalankan 1 CI run penuh, cek step "Determine version name" tidak
+error, dan versionName yg tampil di app SAMA PERSIS dgn tag GitHub Release. Detail lengkap:
+`CHANGELOG.md` Batch 86.
+
+**Batch 85 (Fix "kurang efek depth/3D" — feedback screenshot device sungguhan, 4 file)** —
+Gradient LINEAR diagonal Batch 84 (dual-shadow panel+disc widget) ternyata nyaris tak kelihatan
+di layar sungguhan (nyebar merata ke seluruh bidang, alpha "far/lemah" token asli terlalu halus
+utk bidang seluas ini). Diganti gradient RADIAL dipusatkan di pojok (highlight kiri-atas,
+shadow kanan-bawah) + alpha dinaikkan signifikan — radial falloff sendiri yg jaga area tetap
+sempit jadi aman lebih tinggi. `gradientRadius` dp fix (140dp panel/40dp disc, bukan persen —
+minSdk 23, `%p` butuh API 29+). 0 file baru. **Belum diverifikasi visual utk perubahan Batch 85
+ini sendiri** (Batch 84 sudah, via screenshot user). Detail lengkap: `CHANGELOG.md` Batch 85.
+
+Pending dari user, BELUM dikerjakan (butuh klarifikasi, ditanya di chat, bukan diasumsikan):
+"bump version statis -> otomatis+dinamis" — ambigu, versionCode/versionName di
+`app/build.gradle.kts` SUDAH 100% otomatis dari git commit count sejak Batch 30/56 (dikonfirmasi
+ulang di sesi Batch 83). Kemungkinan yang dimaksud malah nomor "vN" di NAMA FILE ZIP output
+(dipilih manual tiap batch oleh asisten, sempat skip v83 krn batch itu audit-only) — atau hal
+lain. Jangan asumsikan salah satu tanpa konfirmasi user dulu, protected asset (build.gradle.kts)
+resikonya CI/release rusak kalau salah tebak.
+
 **Batch 84 (Arahan "redesign theme widget lama -> Neumorphism hardcode" — 5 file)** — Widget
 home-screen (RemoteViews, bukan Compose, jadi tidak pernah bisa ikut ThemeStore Tactile/Skeu/
 Apple) diganti render Neumorphism SELALU ("di-hardcode"), apapun tema di dalam app. Sumbu

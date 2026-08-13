@@ -1,14 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Batch 84 — pasangan terang dari widget_play_button_bg.xml (BARU, dulu cuma ada 1 file dipakai
-    utk kedua mode — bug kecil: tombol merah solid dulu sebenarnya sudah "mode-agnostic" secara
-    kebetulan krn cukup gelap buat kontras di kedua mode, tapi begitu base-nya jadi SkeuEmerald,
-    versi dark (#2FA37C) itu sendiri masih oke di kanvas terang tapi kurang match dgn
-    SkeuLightEmerald yg dipakai app utk role sama di mode terang — jadi tetap dipisah biar
-    konsisten 1-ke-1 dgn Color.kt, bukan krn ada masalah kontras). SkeuLightEmerald (#1E7A5C,
-    lebih gelap dari versi dark) — sama seperti alasannya di Color.kt, perlu lebih gelap biar
-    kebaca di atas kanvas terang (SkeuNeuSurfaceLight #E8EAED).
--->
+<!-- Batch 85 — pasangan terang, lihat widget_play_button_bg.xml + widget_background.xml. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="oval">
@@ -18,18 +9,22 @@
     <item>
         <shape android:shape="oval">
             <gradient
-                android:type="linear"
-                android:angle="135"
-                android:startColor="#59FFFFFF"
+                android:type="radial"
+                android:centerX="0.18"
+                android:centerY="0.18"
+                android:gradientRadius="40dp"
+                android:startColor="#99FFFFFF"
                 android:endColor="#00FFFFFF" />
         </shape>
     </item>
     <item>
         <shape android:shape="oval">
             <gradient
-                android:type="linear"
-                android:angle="315"
-                android:startColor="#3323262B"
+                android:type="radial"
+                android:centerX="0.85"
+                android:centerY="0.85"
+                android:gradientRadius="40dp"
+                android:startColor="#6623262B"
                 android:endColor="#0023262B" />
         </shape>
     </item>

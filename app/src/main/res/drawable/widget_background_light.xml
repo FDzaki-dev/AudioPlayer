@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Batch 84 — pasangan terang dari widget_background.xml, lihat komentar lengkap di sana.
-    Base panel: SkeuNeuSurfaceLight (#E8EAED). Highlight LEBIH KUAT dari sisi gelap (0.45 vs
-    0.16) — putih di atas kanvas yang sudah terang nyaris tak kelihatan kalau alpha-nya sama
-    kayak sisi gelap, pola sama seperti kenapa SkeuLightHighlight (0.65) > SkeuHighlight (0.16)
-    di Color.kt. Shadow pakai warna SkeuLightShadow (#23262B, bukan hitam murni) — sama seperti
-    token aslinya, base sudah terang jadi shadow-nya boleh sedikit lebih redup (0.30).
--->
+<!-- Batch 85 — pasangan terang, lihat komentar lengkap di widget_background.xml. Highlight lebih
+     kuat lagi drpd sisi gelap (0.60 vs 0.35) — putih di atas kanvas terang butuh alpha jauh lebih
+     tinggi biar kebaca, pola sama seperti SkeuLightHighlight > SkeuHighlight di Color.kt. Shadow
+     pakai warna SkeuLightShadow (#23262B, bukan hitam murni), alpha lebih rendah dari sisi gelap
+     (0.40 vs 0.55) krn base sudah terang jadi shadow lebih mudah kebaca meski lebih redup. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
@@ -17,9 +14,11 @@
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:type="linear"
-                android:angle="135"
-                android:startColor="#73FFFFFF"
+                android:type="radial"
+                android:centerX="0.05"
+                android:centerY="0.08"
+                android:gradientRadius="140dp"
+                android:startColor="#99FFFFFF"
                 android:endColor="#00FFFFFF" />
             <corners android:radius="24dp" />
         </shape>
@@ -27,9 +26,11 @@
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:type="linear"
-                android:angle="315"
-                android:startColor="#4D23262B"
+                android:type="radial"
+                android:centerX="0.95"
+                android:centerY="0.92"
+                android:gradientRadius="140dp"
+                android:startColor="#6623262B"
                 android:endColor="#0023262B" />
             <corners android:radius="24dp" />
         </shape>

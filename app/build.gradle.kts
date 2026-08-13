@@ -37,10 +37,26 @@ val appVersionCode = gitCommitCount()
 // instead of a separately hand-maintained string. Two wins: (1) never needs a manual bump
 // again — same "never forget" guarantee gitCommitCount() already gave versionCode; (2) the
 // in-app version now numerically matches the CI-generated GitHub Release tag/APK filename
-// (both land on "1.0.<count>") — both independently run `git rev-list --count HEAD` against
-// the same commit, so they can't drift apart. Nothing in .github/workflows/build.yml needed
+// (both land on "1.0.<count>" at the time). Nothing in .github/workflows/build.yml needed
 // to change to get that match.
-val appVersionName = "1.0.$appVersionCode"
+//
+// Batch 86 — user: "bump version statis -> otomatis+dinamis". versionCode was already fully
+// auto; versionName was ALREADY derived from it too (this comment, since Batch 30) — but the
+// "1.0." prefix itself was a literal hardcoded string that would sit frozen forever no matter
+// how much development happened, only the trailing number ever moved. MINOR is now dynamic
+// too — genuinely evolves over time (1.0.x -> 1.1.x -> 1.2.x -> ...) instead of parking at
+// "1.0" permanently. MAJOR is kept as a small manually-set constant ON PURPOSE, not an
+// oversight: in virtually every real-world semver scheme — including fully "automated"
+// release-please/semantic-release style tooling — MAJOR is gated behind an explicit human
+// signal for breaking changes; blindly auto-incrementing MAJOR from a commit count would just
+// be "static" in a different, more misleading way (a number that looks meaningful but isn't).
+// versionCode itself is UNCHANGED (still the raw monotonic commit count, not derived from
+// major/minor/patch) — it's an internal Android install-ordering integer only, nothing
+// user-facing ever reads it, so it's kept dead-simple rather than adding arithmetic that could
+// risk non-monotonicity later for zero benefit.
+private const val versionMajor = 1
+private const val commitsPerMinor = 50 // tunable — how many commits before minor ticks over
+val appVersionName = "$versionMajor.${appVersionCode / commitsPerMinor}.${appVersionCode % commitsPerMinor}"
 
 android {
     namespace = "com.rudi.audioplayer"

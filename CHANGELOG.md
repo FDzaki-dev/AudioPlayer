@@ -1,5 +1,69 @@
 # Changelog
 
+## Batch 86 — versionName: "1.0.<count>" statis -> MAJOR.MINOR.PATCH dinamis (klarifikasi dulu)
+User: "sekalian juga bump version statis -> otomatis+dinamis" (Batch 84/85). Ambigu — sempat
+ditanya balik ke user (ask_user_input_v0) krn `versionCode`/`versionName` SUDAH 100% otomatis
+dari git commit count sejak Batch 30/56, jadi bukan itu yang literally "statis". User konfirmasi:
+maksudnya skema `versionCode`/`versionName` app itu sendiri, "mungkin mau diubah caranya". Yang
+ternyata benar-benar statis: prefix `"1.0."` di `appVersionName = "1.0.$appVersionCode"` — cuma
+angka terakhir yang pernah bergerak, MAJOR.MINOR selamanya beku di `1.0` walau development jalan
+terus. 3 file:
+
+1. **`app/build.gradle.kts`** (protected, edit parsial): `appVersionName` sekarang
+   `"$versionMajor.${appVersionCode / commitsPerMinor}.${appVersionCode % commitsPerMinor}"`.
+   MINOR = commit_count / 50, PATCH = commit_count % 50 — genuinely naik seiring waktu
+   (`1.0.x` → `1.1.x` → `1.2.x` dst), bukan cuma angka ketiga yang jalan sendirian. MAJOR
+   (`versionMajor = 1`) TETAP konstanta manual — SENGAJA, bukan setengah-kerja: nyaris semua
+   skema semver "otomatis" (termasuk tooling semantic-release) tetap gate MAJOR di belakang
+   sinyal breaking-change manusia, auto-increment MAJOR dari commit count cuma pindah masalah
+   "statis" ke tempat yang lebih menyesatkan (angka yg keliatan bermakna padahal enggak).
+   `versionCode` (integer urutan install internal Android, tidak pernah dibaca user) TIDAK
+   diubah — tetap `gitCommitCount()` mentah, sengaja tidak diturunkan dari
+   major/minor/patch biar tidak menambah risiko non-monotonic demi 0 manfaat nyata.
+2. **`.github/workflows/build.yml`** (protected, edit parsial) — step "Determine version name"
+   HARUS diubah formula yang sama persis (`COMMITS_PER_MINOR=50` di bash, harus manual disamakan
+   kalau angka di Gradle pernah diubah — dicatat di komentar KEDUA file), atau tag GitHub
+   Release/nama file APK akan drift dari versionName yang benar-benar ke-baked di APK — persis
+   invariant yang dijaga sejak Batch 56/30. Tag jadi `v$VERSION_NAME-release-run<N>` (dulu
+   `v1.0.$COUNT-release-run<N>`).
+3. **`README.md`** — bagian "Standar Penomoran Versi" diupdate contoh & penjelasan formula baru
+   (sekalian perbaiki 1 ketidaksesuaian kecil pre-existing yang ketemu pas nulis ulang bagian
+   ini: contoh nama APK di dokumen lama nulis `-release.apk` polos, padahal tag sungguhan dari
+   Batch 56 sudah `-release-run<N>.apk`, jadi diselaraskan ke pola tag CI yang aktual).
+
+0 file baru, 0 protected asset LAIN disentuh (dotfiles/manifest/keystore semua utuh). Brace/paren
+`build.gradle.kts` seimbang, `build.yml` divalidasi `yaml.safe_load`. **Belum diverifikasi
+compile/CI sungguhan** (no gradle/emulator/GitHub Actions run di environment kerja ini) — risiko
+TERBESAR sejauh ini krn 2 file protected sekaligus tersentuh; prioritas kalau user push: cek 1
+run CI penuh, pastikan `Determine version name` step tidak exit dgn error bash (`$((...))`
+arithmetic Kotlin-style di Gradle vs bash sudah ditulis terpisah, tapi belum pernah benar-benar
+dieksekusi keduanya berdampingan).
+
+## Batch 85 — Fix "kurang efek depth/3D" (screenshot device sungguhan) di widget Neumorphism
+User kirim screenshot widget di device asli (Batch 84 sudah ke-install) — dual-shadow LINEAR
+diagonal Batch 84 memang sudah ada di kode, tapi tersebar merata ke SELURUH panel/disc jadi
+nyaris tak kelihatan di layar sungguhan (alpha "far/lemah" yang dipilih meniru border tipis
+skeuEmboss(), ternyata terlalu halus untuk bidang seluas panel widget). 4 file (widget/drawable,
+sama seperti Batch 84):
+
+- `widget_background.xml`/`_light.xml`, `widget_play_button_bg.xml`/`_light.xml`: gradient
+  LINEAR diagonal (135°/315°) diganti gradient RADIAL dipusatkan PERSIS di pojok (centerX/Y
+  ~0.05-0.18 utk highlight, ~0.85-0.95 utk shadow) — cahaya/bayangan ngumpul di 1 titik pojok
+  jauh lebih kebaca sebagai "sumber cahaya" drpd wash tipis merata ke semua arah. Alpha juga
+  dinaikkan signifikan (panel: putih 0x29→0x59/0x99, hitam 0x59→0x8C/0x66; disc: 0x40→0x80/0x99)
+  — kali ini AMAN pakai alpha lebih tinggi krn falloff radial sendiri yang menjaga area tetap
+  sempit (beda dari linear Batch 84 yang nyebar penuh, jadi alpha tinggi disana akan kelihatan
+  "banjir 1 warna" bukan cuma di pojok).
+- `gradientRadius` pakai nilai dp fix (140dp panel, 40dp disc) — BUKAN persen (`%`/`%p` butuh API
+  29+, minSdk app 23), jadi proporsinya bisa sedikit beda kalau widget di-resize sangat
+  kecil/besar oleh user — trade-off diterima, dicatat di komentar kode.
+
+0 file baru, 0 protected asset lain disentuh (drawable bukan protected). Ke-4 XML divalidasi
+well-formed. **Masih belum diverifikasi visual sungguhan di device untuk perubahan Batch 85 ini
+sendiri** — Batch 84 SUDAH diverifikasi user via screenshot (makanya user bisa kasih feedback
+spesifik "kurang depth"), tapi versi radial yang baru ini belum; kalau efeknya kebalik-jadi-
+berlebihan, kemungkinan besar cukup turunkan alpha lagi, bukan ganti pendekatan.
+
 ## Batch 84 — Redesign widget home-screen lama -> Neumorphism, di-hardcode
 Arahan user: "redesign theme widget lama -> 'Neumorphism' hardcode". Widget home-screen
 (`widget/`, `res/drawable/widget_*`, `res/layout/widget_player*.xml`) itu RemoteViews murni,

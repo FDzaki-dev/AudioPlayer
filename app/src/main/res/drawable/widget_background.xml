@@ -1,25 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Batch 84 — redesign "Neumorphism, hardcode" (instruksi eksplisit user). Widget home-screen ini
-    RemoteViews murni (bukan Compose), jadi TIDAK BISA ikut ThemeStore/pilihan Tactile-Skeu-Apple
-    yang aktif di dalam app — RemoteViews cuma bisa reference id drawable resource yang sudah
-    dikompilasi, tidak bisa jalanin Modifier.drawBehind() dinamis kayak skeuEmboss() di
-    TactileDepth.kt. Makanya "di-hardcode": widget SELALU render gaya Neumorphism, apapun tema
-    yang lagi aktif di dalam app (isDark/light MODE di WidgetUpdater.kt TIDAK diubah/dihapus —
-    itu sumbu terpisah, gelap/terang, bukan pilihan Tactile/Skeu/Apple).
-
-    Palet persis sama dengan token asli di Color.kt (bukan angka karang-karangan baru):
-    - Base panel: SkeuNeuSurfaceDark (#191C21)
-    - Dual-shadow diagonal: arah sama seperti skeuEmboss() — terang kiri-atas (135°) turun ke
-      gelap kanan-bawah (315°), meniru cahaya-datang-dari-kiri-atas yang sama di seluruh app.
-    - Alpha startColor dipilih dari sisi "far/lemah" token asli (SkeuHighlight 0.16 / mendekati
-      SkeuAmbientOcclusion 0.40) bukan sisi "near/kuat" (SkeuSpecular 0.55) — gradient di sini
-      menyebar ke SELURUH panel widget (jauh lebih luas dari border tipis skeuEmboss()), kalau
-      pakai alpha kuat satu sudut jadi keputihan/kehitaman berlebih di widget sekecil ini.
-    - 0 border/stroke sama sekali — konsisten dengan identitas Neumorphism di seluruh app
-      ("TIDAK ADA border/grain sama sekali", lihat komentar Color.kt baris ~196-208).
-
-    Belum diverifikasi visual sungguhan di device (no emulator di environment kerja).
+    Batch 84/85 — Neumorphism widget (lihat Batch 84 utk konteks lengkap kenapa "di-hardcode").
+    Batch 85: user feedback dari screenshot device sungguhan — "kurang efek depth/3D" — 2 layer
+    gradient LINEAR diagonal Batch 84 nyebar rata ke SELURUH panel, di widget sebesar ini jadi
+    nyaris tak kelihatan (alpha far/lemah token asli ternyata terlalu halus utk bidang seluas
+    ini, beda konteks dari border tipis skeuEmboss()). Diganti gradient RADIAL dipusatkan PERSIS
+    di pojok (bukan nyebar diagonal merata) — cahaya/bayangan mengumpul di 1 titik pojok itu jauh
+    lebih kebaca sebagai "sumber cahaya" drpd wash tipis merata, dan alpha dinaikkan signifikan
+    (bukan lagi sisi "far" token asli — di widget ini falloff radial sendiri yang membuat area
+    tetap sempit, jadi aman pakai alpha lebih tinggi tanpa banjir 1 warna). `gradientRadius` fix
+    140dp (bukan persen — `%`/`%p` butuh API 29+, minSdk app ini 23), jadi proporsinya bisa
+    sedikit beda di widget yang di-resize sangat kecil/besar oleh user — trade-off diterima.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
@@ -31,9 +22,11 @@
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:type="linear"
-                android:angle="135"
-                android:startColor="#29FFFFFF"
+                android:type="radial"
+                android:centerX="0.05"
+                android:centerY="0.08"
+                android:gradientRadius="140dp"
+                android:startColor="#59FFFFFF"
                 android:endColor="#00FFFFFF" />
             <corners android:radius="24dp" />
         </shape>
@@ -41,9 +34,11 @@
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:type="linear"
-                android:angle="315"
-                android:startColor="#59000000"
+                android:type="radial"
+                android:centerX="0.95"
+                android:centerY="0.92"
+                android:gradientRadius="140dp"
+                android:startColor="#8C000000"
                 android:endColor="#00000000" />
             <corners android:radius="24dp" />
         </shape>
