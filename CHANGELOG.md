@@ -1,5 +1,32 @@
 # Changelog
 
+## Batch 87 — Hotfix CI FAILED: `const val` tidak valid di badan script .gradle.kts
+User upload `log_fail_139.zip` (build-output.log dari CI run yang gagal) — Batch 86 (`versionMajor`/
+`commitsPerMinor`) memang belum pernah diverifikasi compile sungguhan (sudah dicatat sebagai
+resiko tertinggi di CHANGELOG Batch 86), dan benar gagal:
+```
+e: app/build.gradle.kts:57:9: Const 'val' are only allowed on top level, in named objects,
+   or in companion objects
+```
+Root cause: `const val` butuh top-level Kotlin FILE/package asli, sebuah `object`, atau
+`companion object` — badan SCRIPT `.gradle.kts` (dikompilasi jadi anggota implicit Script class)
+BUKAN salah satu dari itu, walau `val` polos di lokasi yang sama persis (`appVersionCode`,
+`appVersionName`, dst — semua di file ini) terbukti jalan normal. Asumsi salah dari saya di Batch
+86: kebiasaan `private const val` dari kode app Kotlin biasa (sah di dalam class/companion
+object) kebawa ke build script, beda konteks.
+
+Fix (1 file, `app/build.gradle.kts`, protected — edit parsial): `private const val` → `val`
+polos untuk `versionMajor`/`commitsPerMinor`, drop `private` sekalian biar konsisten sama semua
+deklarasi lain di file ini (tidak ada satu pun yang pakai `private`). Formula
+`appVersionName` itu sendiri TIDAK berubah, cuma cara deklarasi 2 konstanta pendukungnya.
+`.github/workflows/build.yml` (bash, bukan Kotlin) TIDAK kena bug ini sama sekali — sudah benar
+dari Batch 86, tidak disentuh lagi.
+
+Brace/paren `build.gradle.kts` dicek ulang, seimbang. **Masih belum ada CI run baru yang
+membuktikan fix ini sungguhan lolos** — cuma menghilangkan 1 kesalahan sintaks spesifik yang
+sudah dikonfirmasi dari log asli; kemungkinan (kecil) ada lapisan error lain yang baru kelihatan
+setelah baris ini lolos compile, belum bisa dipastikan tanpa run CI baru.
+
 ## Batch 86 — versionName: "1.0.<count>" statis -> MAJOR.MINOR.PATCH dinamis (klarifikasi dulu)
 User: "sekalian juga bump version statis -> otomatis+dinamis" (Batch 84/85). Ambigu — sempat
 ditanya balik ke user (ask_user_input_v0) krn `versionCode`/`versionName` SUDAH 100% otomatis

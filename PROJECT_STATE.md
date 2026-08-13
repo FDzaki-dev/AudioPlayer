@@ -6,6 +6,17 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 87 (Hotfix CI FAILED — user upload `log_fail_139.zip`, 1 file PROTECTED)** — Batch 86
+gagal compile sungguhan di CI: `const val` (`versionMajor`/`commitsPerMinor`) tidak valid di
+badan script `.gradle.kts` ("Const 'val' are only allowed on top level, in named objects, or in
+companion objects" — script body bukan salah satu dari itu, beda dari `.kt` file/class biasa).
+Fix: `private const val` → `val` polos, konsisten dgn semua deklarasi lain di file ini. Formula
+versionName sendiri (MAJOR.MINOR.PATCH dari commit count) TIDAK berubah. ⚠️ **Belum ada CI run
+baru yang membuktikan fix ini lolos** — baru menghilangkan 1 error spesifik yang terkonfirmasi
+dari log asli. Prioritas paling atas kalau user push: pastikan run CI berikutnya BENAR-BENAR
+hijau sebelum dianggap selesai — jangan andalkan audit statis lagi untuk area ini, sudah terbukti
+sekali meleset. Detail lengkap: `CHANGELOG.md` Batch 87.
+
 **Batch 86 ("bump version statis -> otomatis+dinamis", diklarifikasi dulu via ask_user_input_v0
 — 3 file, 2 di antaranya PROTECTED)** — `versionName` app: prefix `"1.0."` yang selama ini beku
 permanen (cuma commit-count di belakang yang jalan) diganti MAJOR.MINOR.PATCH genuinely dinamis

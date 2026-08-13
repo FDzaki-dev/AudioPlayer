@@ -54,8 +54,18 @@ val appVersionCode = gitCommitCount()
 // major/minor/patch) — it's an internal Android install-ordering integer only, nothing
 // user-facing ever reads it, so it's kept dead-simple rather than adding arithmetic that could
 // risk non-monotonicity later for zero benefit.
-private const val versionMajor = 1
-private const val commitsPerMinor = 50 // tunable — how many commits before minor ticks over
+// Batch 87 — CI build FAILED (log_fail_139.zip, uploaded by user): "Const 'val' are only
+// allowed on top level, in named objects, or in companion objects". `const val` needs true
+// Kotlin file/package top-level, an object, or a companion object — a .gradle.kts SCRIPT body
+// doesn't qualify as any of those (it compiles to members of an implicit Script class), even
+// though the rest of this file's plain `val`s (appVersionCode, appVersionName, etc.) work fine
+// at that same script-body location. Wrong assumption on my part in Batch 86 — carried over the
+// "private const val" convention from regular Kotlin app source (where it's fine, e.g. inside a
+// class/companion object) into a build script, where it isn't. Dropped `const` (and `private`,
+// to match every other declaration in this file — none of them use it either); plain `val` has
+// no such restriction and was already proven working by every other line here.
+val versionMajor = 1
+val commitsPerMinor = 50 // tunable — how many commits before minor ticks over
 val appVersionName = "$versionMajor.${appVersionCode / commitsPerMinor}.${appVersionCode % commitsPerMinor}"
 
 android {
