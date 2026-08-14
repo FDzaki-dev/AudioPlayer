@@ -490,6 +490,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsStateWithLifecycle()
     val statsVersion by playerViewModel.statsVersion.collectAsStateWithLifecycle()
     val playlists by playerViewModel.playlists.collectAsStateWithLifecycle()
+    val smartPlaylists by playerViewModel.smartPlaylists.collectAsStateWithLifecycle()
     val accentColor by playerViewModel.accentColor.collectAsStateWithLifecycle()
     val equalizerState by playerViewModel.equalizerState.collectAsStateWithLifecycle()
     val crossfadeEnabled by playerViewModel.crossfadeEnabled.collectAsStateWithLifecycle()
@@ -791,6 +792,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     onAddSongToPlaylist = { id, songId -> playerViewModel.addSongToPlaylist(id, songId) },
                     onRemoveSongFromPlaylist = { id, songId -> playerViewModel.removeSongFromPlaylist(id, songId) },
                     onMoveSongInPlaylist = { id, from, to -> playerViewModel.moveSongInPlaylist(id, from, to) },
+                    smartPlaylists = smartPlaylists,
+                    onCreateSmartPlaylist = { playlist -> playerViewModel.createSmartPlaylist(playlist) },
+                    onUpdateSmartPlaylist = { playlist -> playerViewModel.updateSmartPlaylist(playlist) },
+                    onDeleteSmartPlaylist = { id -> playerViewModel.deleteSmartPlaylist(id) },
                     customFolders = customFolders,
                     onAddCustomFolder = { uri -> playerViewModel.addCustomFolder(uri) },
                     onRemoveCustomFolder = { uri -> playerViewModel.removeCustomFolder(uri) },

@@ -73,7 +73,9 @@ import com.rudi.audioplayer.data.CustomFolderInfo
 import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.OnboardingHintStore
 import com.rudi.audioplayer.data.Playlist
+import com.rudi.audioplayer.data.RatingStore
 import com.rudi.audioplayer.data.SearchHistoryStore
+import com.rudi.audioplayer.data.SmartPlaylist
 import com.rudi.audioplayer.data.Song
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentSetOf
@@ -96,6 +98,10 @@ fun LibraryScreen(
     onAddSongToPlaylist: (String, Long) -> Boolean,
     onRemoveSongFromPlaylist: (String, Long) -> Unit,
     onMoveSongInPlaylist: (String, Int, Int) -> Unit,
+    smartPlaylists: List<SmartPlaylist>,
+    onCreateSmartPlaylist: (SmartPlaylist) -> SmartPlaylist,
+    onUpdateSmartPlaylist: (SmartPlaylist) -> Unit,
+    onDeleteSmartPlaylist: (String) -> Unit,
     customFolders: List<CustomFolderInfo>,
     onAddCustomFolder: (Uri) -> Unit,
     onRemoveCustomFolder: (String) -> Unit,
@@ -105,6 +111,7 @@ fun LibraryScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val filterStore = remember { LibraryFilterStore(context) }
+    val ratingStore = remember { RatingStore(context) }
     val hintStore = remember(context) { OnboardingHintStore(context) }
     var showLibraryHint by remember { mutableStateOf(!hintStore.hasSeenLibraryHint()) }
     val searchHistoryStore = remember { SearchHistoryStore(context) }
@@ -149,6 +156,13 @@ fun LibraryScreen(
     val hiddenSongsList = remember(rawSongs, filterVersion) {
         val hiddenIds = filterStore.getHiddenSongIds()
         rawSongs.filter { hiddenIds.contains(it.id) }
+    }
+
+    // Chip options for the Smart Playlist builder's folder filter — same source (folderName,
+    // not folderPath) the Folder tab already groups by, so what the user picks here matches
+    // what they see there.
+    val availableFolderNames = remember(rawSongs) {
+        rawSongs.map { it.folderName }.distinct().sorted()
     }
 
     // Normalize searchable fields once per visible-library change. This avoids repeating
@@ -295,6 +309,19 @@ fun LibraryScreen(
                 onRenamePlaylist = onRenamePlaylist,
                 onRemoveSongFromPlaylist = onRemoveSongFromPlaylist,
                 onMoveSongInPlaylist = onMoveSongInPlaylist
+            )
+            selectedTab == 6 -> SmartPlaylistTabView(
+                // Same allSongs = rawSongs precedent as the manual Playlist tab right above
+                // (tab 5) — hidden/excluded-folder filtering is a Library-tab-only display
+                // concern, not applied to either playlist kind.
+                allSongs = rawSongs,
+                availableFolders = availableFolderNames,
+                smartPlaylists = smartPlaylists,
+                ratingOf = { id -> ratingStore.getRating(id) },
+                onSongClick = onSongClick,
+                onCreate = onCreateSmartPlaylist,
+                onUpdate = onUpdateSmartPlaylist,
+                onDelete = onDeleteSmartPlaylist
             )
             filteredSongs.isEmpty() -> EmptyState(
                 title = "Tidak ditemukan",
@@ -662,9 +689,9 @@ private fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, o
 @Composable
 private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
     val primaryLabels = listOf("Lagu", "Album", "Artis")
-    val moreLabels = listOf("Folder", "Favorit", "Playlist") // indices 3, 4, 5
+    val moreLabels = listOf("Folder", "Favorit", "Playlist", "Otomatis") // indices 3, 4, 5, 6
     var showMoreMenu by remember { mutableStateOf(false) }
-    val moreSelected = selectedTab in 3..5
+    val moreSelected = selectedTab in 3..6
     val moreChipLabel = if (moreSelected) moreLabels[selectedTab - 3] else "Lainnya"
 
     LazyRow(

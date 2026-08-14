@@ -12,5 +12,8 @@ data class Song(
     val dateAdded: Long,
     val uri: Uri,
     val folderName: String,
-    val folderPath: String
+    val folderPath: String,
+    /** Release year from embedded metadata, 0 = unknown. Default keeps every existing call
+     *  site (test fixtures included) source-compatible without needing to pass it. */
+    val year: Int = 0
 )

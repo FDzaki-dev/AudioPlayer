@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 112 file
+# Total: 118 file
 
 .github/workflows/build.yml
 .gitignore
@@ -36,6 +36,9 @@ app/src/main/java/com/rudi/audioplayer/data/RadioSettingsStore.kt
 app/src/main/java/com/rudi/audioplayer/data/RatingStore.kt
 app/src/main/java/com/rudi/audioplayer/data/SearchHistoryStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ShakeSettingsStore.kt
+app/src/main/java/com/rudi/audioplayer/data/SmartPlaylist.kt
+app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistEngine.kt
+app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistStore.kt
 app/src/main/java/com/rudi/audioplayer/data/Song.kt
 app/src/main/java/com/rudi/audioplayer/data/ThemeStore.kt
 app/src/main/java/com/rudi/audioplayer/playback/AccentColorExtractor.kt
@@ -60,6 +63,7 @@ app/src/main/java/com/rudi/audioplayer/ui/PlaylistScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/QueueSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SettingsScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/SignatureMatcherSheet.kt
+app/src/main/java/com/rudi/audioplayer/ui/SmartPlaylistScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/Utils.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/BlurUtils.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Color.kt
@@ -110,6 +114,7 @@ app/src/test/java/com/rudi/audioplayer/data/LibraryFilterStoreTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LyricsParserTest.kt
 app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryFolderNameTest.kt
 app/src/test/java/com/rudi/audioplayer/data/PinLockoutPolicyTest.kt
+app/src/test/java/com/rudi/audioplayer/data/SmartPlaylistEngineTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt

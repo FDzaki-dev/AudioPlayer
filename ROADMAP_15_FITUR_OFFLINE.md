@@ -22,14 +22,17 @@ ditulis balik ke file audio asli.
 - **Risiko**: menulis file audio user berisiko korupsi kalau ada bug; wajib ada backup/dry-run
   sebelum overwrite, dan uji ekstensif per format (MP3/FLAC/M4A tag scheme beda-beda).
 
-## 2. Smart Playlist Otomatis
-Playlist yang isinya otomatis mengikuti kriteria (genre, tahun rilis, rentang durasi, rating
+## 2. Smart Playlist Otomatis ✅ SELESAI (Batch 89)
+Playlist yang isinya otomatis mengikuti kriteria (~~genre~~, tahun rilis, rentang durasi, rating
 bintang, folder) — bukan playlist manual isi-tangan seperti fitur Playlist yang sudah ada.
 - **Kenapa**: playlist manual saat ini butuh isi-tangan tiap lagu; smart playlist auto-update
   begitu ada lagu baru yang cocok kriteria.
 - **Kompleksitas**: Sedang. Query filter di atas `MusicRepository`/`RatingStore` yang sudah ada,
   UI builder kriteria (chip filter) baru.
 - **Risiko**: rendah — murni query lokal, tidak menyentuh file.
+- **Catatan implementasi**: genre TIDAK dikerjakan — MediaStore taruh genre di tabel `Genres`
+  terpisah (query per-lagu / N+1), beda dari YEAR yang satu kolom `MediaStore.Audio.Media.YEAR`
+  langsung. Detail lengkap: `CHANGELOG.md` Batch 89.
 
 ## 3. Editor Lirik LRC Tap-to-Sync
 Buat file LRC baru dari nol dengan menekan tombol "tandai baris ini" sambil lagu diputar —

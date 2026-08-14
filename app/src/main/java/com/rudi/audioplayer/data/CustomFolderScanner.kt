@@ -61,6 +61,12 @@ class CustomFolderScanner(private val context: Context) {
             val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
                 ?.takeIf { it.isNotBlank() } ?: "Tidak Diketahui"
             val album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: ""
+            // METADATA_KEY_YEAR isn't always a bare "YYYY" (some taggers write "YYYY-MM-DD" or
+            // similar) — take the leading digit run so "2015" out of "2015-03-01" still parses,
+            // instead of toIntOrNull() failing on the whole string and silently dropping it.
+            val year = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_YEAR)
+                ?.takeWhile { it.isDigit() }
+                ?.toIntOrNull() ?: 0
 
             Song(
                 id = stableId(doc.uri),
@@ -75,7 +81,8 @@ class CustomFolderScanner(private val context: Context) {
                 dateAdded = doc.lastModified() / 1000,
                 uri = doc.uri,
                 folderName = folderLabel,
-                folderPath = "Folder Tambahan/$folderLabel"
+                folderPath = "Folder Tambahan/$folderLabel",
+                year = year
             )
         } catch (e: Exception) {
             // File ini sudah lolos filter ekstensi audio tapi metadatanya tidak terbaca (file

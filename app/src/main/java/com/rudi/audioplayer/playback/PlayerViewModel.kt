@@ -37,6 +37,8 @@ import com.rudi.audioplayer.data.RadioSettingsStore
 import com.rudi.audioplayer.data.ShakeSettingsStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.PlaylistStore
+import com.rudi.audioplayer.data.SmartPlaylist
+import com.rudi.audioplayer.data.SmartPlaylistStore
 import com.rudi.audioplayer.data.ThemeStore
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
 import com.rudi.audioplayer.ui.theme.ThemeMode
@@ -175,6 +177,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     private val _playlists = MutableStateFlow(playlistStore.getPlaylists())
     val playlists: StateFlow<List<Playlist>> = _playlists.asStateFlow()
+
+    private val smartPlaylistStore = SmartPlaylistStore(appContext)
+    private val _smartPlaylists = MutableStateFlow(smartPlaylistStore.getSmartPlaylists())
+    val smartPlaylists: StateFlow<List<SmartPlaylist>> = _smartPlaylists.asStateFlow()
 
     private val _favoriteIds = MutableStateFlow(loadFavoriteIds())
     val favoriteIds: StateFlow<ImmutableSet<Long>> = _favoriteIds.asStateFlow()
@@ -858,6 +864,24 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     fun moveSongInPlaylist(playlistId: String, from: Int, to: Int) {
         playlistStore.moveSong(playlistId, from, to)
         _playlists.value = playlistStore.getPlaylists()
+    }
+
+    /** [playlist.id] from the builder UI is a throwaway draft value — [SmartPlaylistStore]
+     *  replaces it with a real UUID, so the returned value (not the argument) is the one to use. */
+    fun createSmartPlaylist(playlist: SmartPlaylist): SmartPlaylist {
+        val created = smartPlaylistStore.createSmartPlaylist(playlist)
+        _smartPlaylists.value = smartPlaylistStore.getSmartPlaylists()
+        return created
+    }
+
+    fun updateSmartPlaylist(playlist: SmartPlaylist) {
+        smartPlaylistStore.updateSmartPlaylist(playlist)
+        _smartPlaylists.value = smartPlaylistStore.getSmartPlaylists()
+    }
+
+    fun deleteSmartPlaylist(id: String) {
+        smartPlaylistStore.deleteSmartPlaylist(id)
+        _smartPlaylists.value = smartPlaylistStore.getSmartPlaylists()
     }
 
     fun getLyrics(songId: Long): String? = lyricsStore.getLyrics(songId)

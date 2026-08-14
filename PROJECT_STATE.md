@@ -6,6 +6,30 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 89 (Fitur baru: Playlist Otomatis / Smart Playlist, Atomic Change 11 file kode)** —
+Dari `ROADMAP_15_FITUR_OFFLINE.md`. Playlist berbasis aturan (folder, rentang durasi, rating
+minimum, rentang tahun rilis, kata kunci) — beda dari playlist manual yang sudah ada
+(`PlaylistStore`, simpan daftar ID lagu tetap), Smart Playlist cuma simpan kriteria dan
+`SmartPlaylistEngine` resolve daftar lagu LIVE tiap dibuka, jadi lagu baru yang cocok otomatis
+ikut masuk. Numpang di tab Library yang sudah ada ("Otomatis", tab ke-6 di dropdown "Lainnya")
+— **bukan** route NavHost baru, jadi permukaan protected asset (`MainActivity.kt`) yang
+tersentuh minimal (cuma thread StateFlow + 3 callback baru ke pemanggilan `LibraryScreen(...)`
+yang sudah ada, 0 perubahan struktur `NavHost`/route).
+3 file data baru (`SmartPlaylist.kt` model, `SmartPlaylistEngine.kt` pure matcher/resolver,
+`SmartPlaylistStore.kt` persist JSON) + `SmartPlaylistScreen.kt` (tab view + builder sheet) +
+`SmartPlaylistEngineTest.kt` (11 unit test). `Song.kt` dapat field baru `year: Int = 0`
+(default → backward-compatible ke semua call site lama termasuk fixture test) supaya kriteria
+"rentang tahun rilis" bisa jalan — diisi dari `MediaStore.Audio.Media.YEAR`
+(`MusicRepository.kt`) & `METADATA_KEY_YEAR` (`CustomFolderScanner.kt`).
+**Genre sengaja di-skip** dari roadmap — MediaStore taruh genre di tabel terpisah (query
+per-lagu, N+1), risiko/kompleksitas lebih tinggi dari sisa kriteria di batch ini, belum
+dijadwalkan. Builder pakai text field angka (menit/tahun), bukan slider — alasan sama README
+soal drag-gesture custom tanpa compiler buat verifikasi. Brace/paren tiap file dicek manual &
+seimbang. **Belum diverifikasi compile/runtime Gradle sungguhan** (tidak ada JDK/Android SDK/
+kotlinc di sandbox ini) — prioritas berikutnya: `./gradlew testDebugUnitTest` verifikasi 11
+test baru, lalu build APK asli + cek tab "Otomatis" render & builder sheet berfungsi di device.
+Detail lengkap: `CHANGELOG.md` Batch 89.
+
 **Batch 88 (Fix bug mini player dobel di Now Playing + sederhanakan hierarki tombol)** — User
 laporan "hierarki tombol nya terlalu membingungkan bagi user awam" + screenshot layar Now
 Playing yang nunjukkan floating mini player nongol lagi di bawah, nimpa/mepetin kontrol layar
@@ -1473,7 +1497,8 @@ Ringkasan penuh + alasan ada di README.md § "Keputusan Arsitektur". Poin paling
 ## Struktur package (ringkas)
 ```
 com.rudi.audioplayer/
-├── data/      — Store & repository (SharedPreferences/MediaStore), model data (Song, Playlist)
+├── data/      — Store & repository (SharedPreferences/MediaStore), model data (Song, Playlist,
+│                SmartPlaylist — rule-based, resolve live via SmartPlaylistEngine)
 ├── playback/  — PlaybackService (MediaLibraryService), PlayerViewModel, Equalizer, ShakeDetector
 ├── ui/        — Semua Composable screen & sheet (Home, Library, NowPlaying, Settings, dst.)
 ├── ui/theme/  — Apple SYSTEM/LIGHT/DARK (utama) + Matte Noir (custom, kebalikan), warna, tipografi

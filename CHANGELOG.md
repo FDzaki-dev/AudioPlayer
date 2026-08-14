@@ -1,5 +1,57 @@
 # Changelog
 
+## Batch 89 — Fitur baru: Playlist Otomatis (Smart Playlist)
+Fitur dari ROADMAP_15_FITUR_OFFLINE.md. Playlist berbasis aturan, bukan daftar lagu statis:
+sekali diatur (folder, rentang durasi, rating minimum, rentang tahun rilis, kata kunci), lagu
+baru yang cocok otomatis ikut masuk tanpa user isi manual — beda dari playlist manual yang
+sudah ada (`PlaylistStore`), yang menyimpan daftar ID lagu tetap. Atomic Change (>10 file) —
+fitur ini menyentuh data+ui+viewmodel+MainActivity sekaligus, tidak bisa dipecah tanpa state
+setengah-jadi yang crash (mis. tab UI tanpa data, atau data tanpa entry point).
+
+**Baru (5 file):**
+1. `data/SmartPlaylist.kt` — model kriteria (semua opsional, AND bukan OR kalau digabung).
+2. `data/SmartPlaylistEngine.kt` — pure matcher/resolver, terpisah dari Context/Store persis
+   pola `LibraryFilterStore.shouldKeep` supaya testable tanpa Android runtime.
+3. `data/SmartPlaylistStore.kt` — persist JSON ke SharedPreferences, pola sama `PlaylistStore`.
+4. `ui/SmartPlaylistScreen.kt` — `SmartPlaylistTabView` (list + detail, cermin struktur
+   `PlaylistTabView`) + `SmartPlaylistBuilderSheet` (bottom sheet buat/ubah aturan).
+5. `test/.../SmartPlaylistEngineTest.kt` — 11 unit test (folder, durasi, rating, tahun,
+   keyword, gabungan kriteria, resolve), pola `mock(Uri::class.java)` sama
+   `LibrarySearchIndexTest.kt`.
+
+**Diedit (6 file):**
+1. `data/Song.kt` — tambah `val year: Int = 0` (default → semua call site lama, termasuk
+   fixture test, tetap kompatibel tanpa diubah).
+2. `data/MusicRepository.kt` — ambil kolom `MediaStore.Audio.Media.YEAR`.
+3. `data/CustomFolderScanner.kt` — ambil `METADATA_KEY_YEAR` dari `MediaMetadataRetriever`,
+   ambil digit awal saja (`takeWhile { it.isDigit() }`) supaya format non-standar semacam
+   "2015-03-01" tetap kebaca "2015", bukan gagal total.
+4. `playback/PlayerViewModel.kt` — `smartPlaylistStore` + `StateFlow<List<SmartPlaylist>>` +
+   create/update/delete, pola identik blok playlist manual yang sudah ada.
+5. `ui/LibraryScreen.kt` — tab ke-6 "Otomatis" di dropdown "Lainnya" (`moreLabels` sekarang 4
+   item, `moreSelected` range `3..6`, dropdown loop sudah dinamis dari list jadi tidak perlu
+   sentuh UI dropdown-nya sendiri), instance lokal `RatingStore` (pola sama `filterStore`
+   lokal di file yang sama), turunkan daftar nama folder unik buat chip builder.
+6. `MainActivity.kt` (**protected, edit parsial**) — collect `smartPlaylists` StateFlow +
+   3 callback baru, disisipkan ke pemanggilan `LibraryScreen(...)` yang sudah ada. Tidak
+   menyentuh `NavHost`/struktur route sama sekali — Smart Playlist numpang di tab Library yang
+   sudah ada, bukan route baru, jadi permukaan protected asset yang tersentuh seminimal
+   mungkin.
+
+**Sengaja di luar cakupan batch ini:**
+- **Genre** — kriteria genre di roadmap sengaja di-skip. `Song` tidak simpan genre, dan
+  MediaStore taruh genre di tabel `Genres` terpisah (query per-lagu / N+1, bukan satu kolom
+  langsung seperti YEAR) — risiko & kompleksitas lebih tinggi dari sisa fitur di batch ini.
+  Belum dijadwalkan ke batch berikutnya.
+- Builder pakai text field angka (menit/tahun), bukan slider — konsisten sama alasan yang
+  sudah dicatat README soal drag-gesture tanpa compiler buat verifikasi.
+
+Brace/paren tiap file yang disentuh dicek manual & seimbang (`python3 -c "s.count('{')..."`).
+**Belum diverifikasi compile/runtime Gradle sungguhan** — tidak ada JDK/Android SDK/kotlinc di
+sandbox ini, jadi review murni statis (baca ulang tiap import/signature/call site yang
+disambungkan). Jalankan `./gradlew testDebugUnitTest` di Termux untuk verifikasi test baru,
+dan build APK asli untuk verifikasi UI baru sebelum rilis produksi.
+
 ## Batch 88 — Fix bug mini player dobel di Now Playing + sederhanakan hierarki tombol (feedback user + screenshot)
 User laporan: "hierarki tombol nya terlalu membingungkan bagi user awam", disertai screenshot
 layar Now Playing yang menunjukkan floating mini player nongol lagi di bawah, menimpa/mepetin
