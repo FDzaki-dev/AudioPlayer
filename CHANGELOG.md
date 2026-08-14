@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 88 — Fix bug mini player dobel di Now Playing + sederhanakan hierarki tombol (feedback user + screenshot)
+User laporan: "hierarki tombol nya terlalu membingungkan bagi user awam", disertai screenshot
+layar Now Playing yang menunjukkan floating mini player nongol lagi di bawah, menimpa/mepetin
+kontrol layar penuh di atasnya. 2 file:
+
+1. **Bug nyata — `MainActivity.kt`**: `AnimatedVisibility` mini player di `bottomBar` Scaffold
+   cuma dicek `uiState.currentSong != null`, TANPA cek route sama sekali — beda dari kondisi
+   NavigationBar tepat di bawahnya yang sudah benar mengecualikan `"now_playing"`. Akibatnya
+   mini player tetap muncul dobel walau user sudah di layar Now Playing sendiri — root cause
+   sungguhan screenshot user. Fix: tambah `&& currentRoute != "now_playing"`.
+2. **Sederhanakan top bar — `NowPlayingScreen.kt`**: 5 ikon berbobot sama (Tutup/Favorit/
+   Antrean/Lirik/Lanjutan) tanpa hierarki jelas. Antrean & Lirik (dipakai situasional, bukan
+   tiap sesi dengar) digabung ke sheet "Kontrol Lanjutan" yang sudah ada — pola yang sama
+   persis yang sudah dipakai Timer/Kecepatan/Equalizer di sheet itu (doc-comment fungsinya
+   sendiri sudah bilang tujuannya "instead of ... crowding the main top bar", tinggal
+   diterapkan konsisten ke 2 ikon yang masih tertinggal). Top bar sekarang 3 ikon: Tutup,
+   Favorit, Lanjutan (⋮).
+
+Brace/paren balance kedua file dicek manual & seimbang. Rating bintang & susunan lain di bawah
+piringan album TIDAK disentuh batch ini — fokus murni ke bug dobel + konsolidasi ikon top bar
+yang paling langsung match keluhan user. Masih belum diverifikasi visual sungguhan di device.
+
 ## Batch 87 — Hotfix CI FAILED: `const val` tidak valid di badan script .gradle.kts
 User upload `log_fail_139.zip` (build-output.log dari CI run yang gagal) — Batch 86 (`versionMajor`/
 `commitsPerMinor`) memang belum pernah diverifikasi compile sungguhan (sudah dicatat sebagai

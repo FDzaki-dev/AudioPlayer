@@ -6,6 +6,16 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 88 (Fix bug mini player dobel di Now Playing + sederhanakan hierarki tombol)** — User
+laporan "hierarki tombol nya terlalu membingungkan bagi user awam" + screenshot layar Now
+Playing yang nunjukkan floating mini player nongol lagi di bawah, nimpa/mepetin kontrol layar
+penuh di atasnya. 2 file: (1) `MainActivity.kt` — bug nyata, `AnimatedVisibility` mini player
+di `bottomBar` cuma cek `currentSong != null` TANPA cek route, beda dari NavigationBar tepat di
+bawahnya yang sudah benar exclude `"now_playing"` — fix tambah `&& currentRoute != "now_playing"`.
+(2) `NowPlayingScreen.kt` — top bar disederhanakan dari 5 ikon jadi 3 (Tutup/Favorit/Lanjutan),
+Antrean & Lirik dipindah gabung ke sheet "Kontrol Lanjutan" yang sudah ada (pola sama dgn
+Timer/Kecepatan/Equalizer di situ). Detail lengkap: `CHANGELOG.md` Batch 88.
+
 **Batch 87 (Hotfix CI FAILED — user upload `log_fail_139.zip`, 1 file PROTECTED)** — Batch 86
 gagal compile sungguhan di CI: `const val` (`versionMajor`/`commitsPerMinor`) tidak valid di
 badan script `.gradle.kts` ("Const 'val' are only allowed on top level, in named objects, or in

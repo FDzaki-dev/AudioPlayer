@@ -288,20 +288,6 @@ fun NowPlayingScreen(
                     tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                 )
             }
-            IconButton(onClick = { showQueueSheet = true }) {
-                Icon(
-                    Icons.Default.QueueMusic,
-                    contentDescription = "Antrean putar",
-                    tint = MaterialTheme.colorScheme.secondary
-                )
-            }
-            IconButton(onClick = { showLyricsSheet = true }) {
-                Icon(
-                    Icons.Default.Article,
-                    contentDescription = "Lirik",
-                    tint = MaterialTheme.colorScheme.secondary
-                )
-            }
             IconButton(onClick = { showAdvancedSheet = true }) {
                 Icon(
                     Icons.Default.MoreVert,
@@ -676,6 +662,20 @@ fun NowPlayingScreen(
             volume = uiState.volume,
             onSetVolume = onSetVolume,
             onDismiss = { showAdvancedSheet = false },
+            // Fix hierarki tombol (feedback user, screenshot layar Now Playing): top bar tadinya
+            // 5 ikon berbobot sama (Tutup/Favorit/Antrean/Lirik/Lanjutan) — membingungkan karena
+            // tidak ada yang menonjol sebagai aksi utama. Antrean & Lirik (dipakai situasional,
+            // bukan tiap sesi dengar) sekarang gabung ke sheet "Kontrol Lanjutan" yang sama,
+            // persis pola yang sudah dipakai Timer/Kecepatan/Equalizer di sheet ini (lihat
+            // doc-comment fungsi ini). Top bar sekarang cuma 3 ikon: Tutup, Favorit, Lanjutan.
+            onOpenQueue = {
+                showAdvancedSheet = false
+                showQueueSheet = true
+            },
+            onOpenLyrics = {
+                showAdvancedSheet = false
+                showLyricsSheet = true
+            },
             onOpenSleepTimer = {
                 showAdvancedSheet = false
                 showSleepTimerDialog = true
@@ -693,9 +693,9 @@ fun NowPlayingScreen(
     }
 }
 
-/** Houses the controls a casual listener rarely touches day-to-day — sleep timer, playback
- * speed, equalizer, and the in-app volume attenuation — behind one "Lanjutan" entry point
- * instead of six equal-weight icons crowding the main Now Playing top bar. */
+/** Houses the controls a casual listener rarely touches mid-song — antrean, lirik, sleep timer,
+ * playback speed, equalizer, and the in-app volume attenuation — behind one "Lanjutan" entry
+ * point instead of crowding the main Now Playing top bar with equal-weight icons. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AdvancedControlsSheet(
@@ -704,6 +704,8 @@ private fun AdvancedControlsSheet(
     volume: Float,
     onSetVolume: (Float) -> Unit,
     onDismiss: () -> Unit,
+    onOpenQueue: () -> Unit,
+    onOpenLyrics: () -> Unit,
     onOpenSleepTimer: () -> Unit,
     onOpenSpeed: () -> Unit,
     onOpenEqualizer: () -> Unit
@@ -723,6 +725,18 @@ private fun AdvancedControlsSheet(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
             )
 
+            AdvancedControlRow(
+                icon = Icons.Default.QueueMusic,
+                label = "Antrean Putar",
+                value = null,
+                onClick = onOpenQueue
+            )
+            AdvancedControlRow(
+                icon = Icons.Default.Article,
+                label = "Lirik",
+                value = null,
+                onClick = onOpenLyrics
+            )
             AdvancedControlRow(
                 icon = Icons.Default.Timer,
                 label = "Sleep Timer",

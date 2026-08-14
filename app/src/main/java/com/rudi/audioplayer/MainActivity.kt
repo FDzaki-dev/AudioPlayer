@@ -634,7 +634,15 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         bottomBar = {
             Column {
                 AnimatedVisibility(
-                    visible = uiState.currentSong != null,
+                    // Fix bug (user screenshot: Now Playing screen showed a redundant floating
+                    // mini player bar overlapping the full screen's own controls below it) —
+                    // this condition only checked `currentSong != null`, with no route check at
+                    // all, unlike the NavigationBar condition right below it which correctly
+                    // excludes "now_playing". So the mini player kept rendering even while the
+                    // user was already ON the Now Playing screen, duplicating the play/pause
+                    // control and crowding the transport row beneath it — the actual root cause
+                    // of "hierarki tombol nya terlalu membingungkan".
+                    visible = uiState.currentSong != null && currentRoute != "now_playing",
                     enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                     exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
                 ) {
