@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
@@ -151,6 +152,14 @@ fun NowPlayingScreen(
     onEqualizerBandChange: (Int, Short) -> Unit,
     onEqualizerPresetSelect: (Int) -> Unit,
     onEqualizerBoldPresetSelect: (EqualizerController.BoldPreset) -> Unit,
+    visualizerEnabled: Boolean,
+    visualizerSupported: Boolean,
+    visualizerPermissionGranted: Boolean,
+    visualizerBars: FloatArray,
+    onOpenVisualizer: () -> Unit,
+    onCloseVisualizer: () -> Unit,
+    onToggleVisualizerEnabled: (Boolean) -> Unit,
+    onRequestVisualizerPermission: () -> Unit,
     onBack: () -> Unit
 ) {
     val song = uiState.currentSong
@@ -170,6 +179,7 @@ fun NowPlayingScreen(
     var showQueueSheet by remember { mutableStateOf(false) }
     var showLyricsSheet by remember { mutableStateOf(false) }
     var showEqualizerSheet by remember { mutableStateOf(false) }
+    var showVisualizerSheet by remember { mutableStateOf(false) }
     var showAdvancedSheet by remember { mutableStateOf(false) }
     var showAbRepeatBookmarkSheet by remember { mutableStateOf(false) }
 
@@ -688,6 +698,22 @@ fun NowPlayingScreen(
         )
     }
 
+    if (showVisualizerSheet) {
+        VisualizerSheet(
+            enabled = visualizerEnabled,
+            supported = visualizerSupported,
+            permissionGranted = visualizerPermissionGranted,
+            bars = visualizerBars,
+            accentColor = animatedAccent,
+            onDismiss = {
+                showVisualizerSheet = false
+                onCloseVisualizer()
+            },
+            onToggleEnabled = onToggleVisualizerEnabled,
+            onRequestPermission = onRequestVisualizerPermission
+        )
+    }
+
     if (showAdvancedSheet) {
         AdvancedControlsSheet(
             sleepTimerRemainingMs = sleepTimerRemainingMs,
@@ -725,6 +751,11 @@ fun NowPlayingScreen(
             onOpenAbRepeatBookmark = {
                 showAdvancedSheet = false
                 showAbRepeatBookmarkSheet = true
+            },
+            onOpenVisualizer = {
+                showAdvancedSheet = false
+                onOpenVisualizer()
+                showVisualizerSheet = true
             }
         )
     }
@@ -746,7 +777,8 @@ private fun AdvancedControlsSheet(
     onOpenSleepTimer: () -> Unit,
     onOpenSpeed: () -> Unit,
     onOpenEqualizer: () -> Unit,
-    onOpenAbRepeatBookmark: () -> Unit
+    onOpenAbRepeatBookmark: () -> Unit,
+    onOpenVisualizer: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val haptic = LocalHapticFeedback.current
@@ -798,6 +830,12 @@ private fun AdvancedControlsSheet(
                 label = "Repeat A-B & Bookmark",
                 value = null,
                 onClick = onOpenAbRepeatBookmark
+            )
+            AdvancedControlRow(
+                icon = Icons.Default.GraphicEq,
+                label = "Visualizer Audio",
+                value = null,
+                onClick = onOpenVisualizer
             )
 
             HorizontalDivider(

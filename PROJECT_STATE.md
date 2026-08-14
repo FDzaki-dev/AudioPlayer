@@ -6,6 +6,49 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 92 (Fitur baru: Visualizer Audio, 7 file kode + 4 file dokumentasi)** — Dari
+`ROADMAP_15_FITUR_OFFLINE.md` item #9. Sheet baru "Visualizer Audio" di Now Playing → Kontrol
+Lanjutan (pola sama Timer/Kecepatan/Equalizer/Repeat A-B), spectrum bar 24-bar dari
+`android.media.audiofx.Visualizer`.
+
+**Riset izin duluan**: `RECORD_AUDIO` ternyata wajib di SEMUA versi Android untuk audio session
+apa pun (bukan "beberapa versi" seperti dugaan awal di roadmap, tidak ada pengecualian "baca
+audio sendiri"). Diminta on-demand (baru saat toggle dinyalakan di sheet), bukan di onboarding
+wajib — `visualizerPermissionLauncher` (`MainActivity.kt`), auto-nyala kalau granted (user tak
+perlu tap switch 2x). `AndroidManifest.xml` (protected, edit parsial) dapat komentar panjang
+kenapa izin ini bukan berarti app merekam suara.
+
+`AudioVisualizerController.kt` (baru, `playback/`) — bungkus `Visualizer`, attach ke
+`PlaybackAudioSession.sessionId` (mekanisme sharing session ID sama persis `EqualizerController`
+pakai — satu-satunya cara tahu `audioSessionId` ExoPlayer karena `PlayerViewModel` cuma pegang
+`MediaController`). Capture rate ditahan ~15fps, FFT byte array dikelompokkan jadi 24 bar
+magnitude ternormalisasi. **2 bug method-vs-property ditemukan & diperbaiki sebelum final**:
+`getMaxCaptureRate()` itu `static` (harus `Visualizer.getMaxCaptureRate()`, bukan lewat
+instance); `setCaptureSize()`/`setEnabled()` keduanya return `Int` bukan `void` — Kotlin tidak
+bisa treat sebagai property assignable, wajib method call eksplisit (`viz.setCaptureSize(...)`,
+bukan `viz.captureSize = ...`) — persis alasan `EqualizerController.kt` lama sudah selalu pakai
+`eq.setEnabled(...)` eksplisit.
+
+`VisualizerSettingsStore.kt` (baru, pola `ShakeSettingsStore`) + `VisualizerSheet.kt` (baru, shell
+sama `EqualizerSheet.kt`, `SpectrumBars` — Canvas custom KEDUA di codebase setelah
+`WeeklyTrendChart` Batch 90) + `PlayerViewModel.kt` (`ensureVisualizerAttached()`/
+`setVisualizerEnabled()`/`stopVisualizerCapture()` — beda dari equalizer, capture cuma jalan
+selagi sheet terbuka, tidak ada alasan tetap capture kalau tidak terlihat) + `NowPlayingScreen.kt`
+(8 param baru, 1 row baru ikon `GraphicEq`) + `MainActivity.kt` (protected, edit parsial — 3
+`collectAsStateWithLifecycle()` + permission launcher + 8 param diteruskan).
+
+**Keputusan scope eksplisit**: spectrum bar HANYA capture selagi sheet terbuka, TIDAK dirender
+permanen di layar Now Playing utama — `FloatArray` bukan tipe stabil buat Compose compiler,
+thread terus-menerus ke seluruh `NowPlayingScreen` berisiko recomposition ~15fps termasuk animasi
+album art/blur, risiko jank yang tak bisa diverifikasi tanpa device.
+
+Brace/paren 7 file kode dicek otomatis & seimbang. **Belum diverifikasi compile/runtime Gradle
+sungguhan** — prioritas berikutnya: `./gradlew assembleDebug`, cek di device (1) dialog permission
+muncul benar saat toggle pertama kali, (2) bar spectrum genuinely sinkron lagu (bukan statis/acak
+— bug paling gampang lolos tanpa device), (3) capture size 512 didukung device asli, (4) tidak ada
+jank di Now Playing selagi sheet terbuka, (5) `Visualizer` benar ter-release saat sheet ditutup.
+Detail lengkap: `CHANGELOG.md` Batch 92.
+
 **Batch 91 (Fitur baru: A-B Repeat & Bookmark Posisi, Atomic Change 8 file kode + 5 file
 dokumentasi)** — Dari `ROADMAP_15_FITUR_OFFLINE.md` item #4. Sheet baru "Repeat A-B & Bookmark"
 di Now Playing → Kontrol Lanjutan (pola sama Timer/Kecepatan/Equalizer).

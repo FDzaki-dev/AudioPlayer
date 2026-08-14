@@ -45,8 +45,10 @@ app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistEngine.kt
 app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistStore.kt
 app/src/main/java/com/rudi/audioplayer/data/Song.kt
 app/src/main/java/com/rudi/audioplayer/data/ThemeStore.kt
+app/src/main/java/com/rudi/audioplayer/data/VisualizerSettingsStore.kt
 app/src/main/java/com/rudi/audioplayer/playback/AbRepeatLogic.kt
 app/src/main/java/com/rudi/audioplayer/playback/AccentColorExtractor.kt
+app/src/main/java/com/rudi/audioplayer/playback/AudioVisualizerController.kt
 app/src/main/java/com/rudi/audioplayer/playback/EqualizerController.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlaybackAudioSession.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlaybackService.kt
@@ -72,6 +74,7 @@ app/src/main/java/com/rudi/audioplayer/ui/SignatureMatcherSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SmartPlaylistScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/StatsDashboardScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/Utils.kt
+app/src/main/java/com/rudi/audioplayer/ui/VisualizerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/BlurUtils.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Color.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Spacing.kt

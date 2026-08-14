@@ -44,6 +44,7 @@ import com.rudi.audioplayer.data.PlaylistStore
 import com.rudi.audioplayer.data.SmartPlaylist
 import com.rudi.audioplayer.data.SmartPlaylistStore
 import com.rudi.audioplayer.data.ThemeStore
+import com.rudi.audioplayer.data.VisualizerSettingsStore
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.data.Song
@@ -153,6 +154,15 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val bookmarkStore = BookmarkStore(appContext)
     private val equalizerController = EqualizerController(appContext)
     val equalizerState: StateFlow<EqualizerUiState> = equalizerController.state
+
+    // --- Visualizer Audio (Roadmap #9, Batch 92) ---
+    private val visualizerSettingsStore = VisualizerSettingsStore(appContext)
+    private val audioVisualizerController = AudioVisualizerController()
+    val visualizerBars: StateFlow<FloatArray> = audioVisualizerController.bars
+    val visualizerSupported: StateFlow<Boolean> = audioVisualizerController.supported
+
+    private val _visualizerEnabled = MutableStateFlow(visualizerSettingsStore.isEnabled())
+    val visualizerEnabled: StateFlow<Boolean> = _visualizerEnabled.asStateFlow()
 
     private val crossfadeStore = CrossfadeStore(appContext)
     private val customFolderStore = CustomFolderStore(appContext)
@@ -971,6 +981,36 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     fun useBoldEqualizerPreset(preset: EqualizerController.BoldPreset) = equalizerController.useBoldPreset(preset)
 
+    // --- Visualizer Audio (Roadmap #9, Batch 92) ---
+
+    /** Call when the Visualizer sheet opens. Unlike [ensureEqualizerAttached] (unconditional —
+     * the equalizer must keep affecting real audio in the background regardless of whether its
+     * sheet is open), this is gated on the user's own on/off preference: attaching starts an
+     * active OS-level capture, and there's no reason to spend that battery/CPU unless the user
+     * has actually opted in. Does NOT request RECORD_AUDIO itself — see AudioVisualizerController's
+     * doc comment for why that's deliberately the UI layer's job (MainActivity), not this one's. */
+    fun ensureVisualizerAttached() {
+        if (_visualizerEnabled.value) audioVisualizerController.attach(PlaybackAudioSession.sessionId)
+    }
+
+    fun setVisualizerEnabled(enabled: Boolean) {
+        visualizerSettingsStore.setEnabled(enabled)
+        _visualizerEnabled.value = enabled
+        if (enabled) {
+            audioVisualizerController.attach(PlaybackAudioSession.sessionId)
+        } else {
+            audioVisualizerController.release()
+        }
+    }
+
+    /** Called when the Visualizer sheet closes. Stops the OS-level capture but deliberately
+     * leaves the persisted on/off preference untouched, so it silently reattaches (via
+     * [ensureVisualizerAttached]) next time the sheet opens — the user shouldn't need to flip the
+     * switch again just because they navigated away and back. */
+    fun stopVisualizerCapture() {
+        audioVisualizerController.release()
+    }
+
     /** Ramps volume down toward the end of a track, just before the next one begins. */
     private fun startFadeOut() {
         fadeJob?.cancel()
@@ -1084,6 +1124,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         libraryAutoRefreshJob?.cancel()
         libraryContentObserver?.let { runCatching { appContext.contentResolver.unregisterContentObserver(it) } }
         equalizerController.release()
+        audioVisualizerController.release()
         // Batch 78 — MediaController.releaseFuture() handles BOTH cases correctly: cancels the
         // future if the async connect() handshake hasn't resolved yet, or releases the resolved
         // controller if it has. `controller?.release()` alone only covered the second case.

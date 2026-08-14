@@ -101,7 +101,7 @@ opsional bisa di-toggle per-user.
   senyap secara musikal (bukan silence teknis) — wajib ada toggle on/off + threshold yang
   bisa disesuaikan, jangan default agresif.
 
-## 9. Visualizer Audio (Waveform/Spectrum)
+## 9. Visualizer Audio (Waveform/Spectrum) ✅ SELESAI (Batch 92)
 Animasi visual real-time (waveform bergerak atau spectrum bar) sinkron dengan audio yang
 sedang diputar, ditampilkan di Now Playing.
 - **Kenapa**: elemen visual yang lazim ada di audio player premium, memperkuat identitas
@@ -112,6 +112,14 @@ sedang diputar, ditampilkan di Now Playing.
 - **Risiko**: `Visualizer` butuh izin `RECORD_AUDIO` di beberapa versi Android (walau cuma baca
   sinyal internal player, bukan mic sungguhan) — perlu dicek behaviour per API level, dan pastikan
   tidak menambah battery drain signifikan (throttle refresh rate).
+- **Catatan implementasi**: dikonfirmasi lewat riset — `RECORD_AUDIO` ternyata wajib di SEMUA versi
+  Android untuk audio session apa pun (bukan cuma versi tertentu seperti dugaan awal di atas),
+  tidak ada pengecualian "sesi sendiri". Izin diminta on-demand (baru saat user nyalakan toggle di
+  sheet, bukan di onboarding wajib) via `visualizerPermissionLauncher` di `MainActivity.kt`. Refresh
+  rate ditahan ke ~15fps (`AudioVisualizerController.TARGET_CAPTURE_RATE_MILLIHZ`). Sesi audio dipakai
+  ulang dari `PlaybackAudioSession` (mekanisme yang sama dipakai `EqualizerController`, ekualizer
+  tidak punya cara lain baca `audioSessionId` ExoPlayer karena hanya pegang `MediaController`).
+  Detail lengkap & risiko yang belum diverifikasi di device: `CHANGELOG.md` Batch 92.
 
 ## 10. Dashboard Statistik Dengar Lokal ✅ SELESAI (Batch 90)
 Visualisasi grafik dari data yang sebenarnya sudah dikumpulkan (`PlayStatsStore`,

@@ -511,8 +511,32 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val shakeToSkipEnabled by playerViewModel.shakeToSkipEnabled.collectAsStateWithLifecycle()
     val radioAutoContinueEnabled by playerViewModel.radioAutoContinueEnabled.collectAsStateWithLifecycle()
     val appThemeIdentity by playerViewModel.themeIdentity.collectAsStateWithLifecycle()
+    val visualizerEnabled by playerViewModel.visualizerEnabled.collectAsStateWithLifecycle()
+    val visualizerSupported by playerViewModel.visualizerSupported.collectAsStateWithLifecycle()
+    val visualizerBars by playerViewModel.visualizerBars.collectAsStateWithLifecycle()
 
     val deleteContext = LocalContext.current
+
+    // Batch 92 (Roadmap #9, Visualizer Audio) — RECORD_AUDIO is a dangerous permission (API 23+),
+    // deliberately requested here on-demand (only when the user turns the Visualizer on inside
+    // its own sheet) rather than folded into the mandatory onboarding flow above — an optional
+    // visual effect asking for a microphone-sounding permission at first launch would be a real
+    // privacy/UX overreach for a feature most people will never open.
+    val visualizerPermissionContext = LocalContext.current
+    var visualizerPermissionGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(visualizerPermissionContext, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val visualizerPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        visualizerPermissionGranted = granted
+        // Granting here means the user just tapped "on" wanting the visualizer active right now
+        // — flip it on immediately instead of making them go tap the switch a second time.
+        if (granted) playerViewModel.setVisualizerEnabled(true)
+    }
     val deleteRequestLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
@@ -895,6 +919,14 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     onEqualizerBandChange = { band, level -> playerViewModel.setEqualizerBand(band, level) },
                     onEqualizerPresetSelect = { index -> playerViewModel.useEqualizerPreset(index) },
                     onEqualizerBoldPresetSelect = { preset -> playerViewModel.useBoldEqualizerPreset(preset) },
+                    visualizerEnabled = visualizerEnabled,
+                    visualizerSupported = visualizerSupported,
+                    visualizerPermissionGranted = visualizerPermissionGranted,
+                    visualizerBars = visualizerBars,
+                    onOpenVisualizer = { playerViewModel.ensureVisualizerAttached() },
+                    onCloseVisualizer = { playerViewModel.stopVisualizerCapture() },
+                    onToggleVisualizerEnabled = { playerViewModel.setVisualizerEnabled(it) },
+                    onRequestVisualizerPermission = { visualizerPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
                     onBack = { navController.popBackStack() }
                 )
             }

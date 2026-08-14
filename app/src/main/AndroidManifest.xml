@@ -8,6 +8,16 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
+    <!-- Batch 92 (Roadmap #9, Visualizer Audio) — required by android.media.audiofx.Visualizer
+         for ANY audio session, including this app's own playback (there is no exception for
+         visualizing your own audio, confirmed against the platform's own class docs). Nothing is
+         actually recorded or stored: the platform only lets this app read low-quality FFT/
+         waveform samples of its own currently-playing track. Declaring it here is required for
+         the app to be allowed to ask; the actual runtime prompt (API 23+) only fires when the
+         user explicitly turns the Visualizer on in Now Playing → Kontrol Lanjutan, never at
+         first launch — see VisualizerSheet.kt / MainActivity.kt's visualizerPermissionLauncher. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:name=".AudioPlayerApplication"
         android:allowBackup="true"

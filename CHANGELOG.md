@@ -1,5 +1,96 @@
 # Changelog
 
+## Batch 92 — Fitur baru: Visualizer Audio (roadmap item #9)
+Dari `ROADMAP_15_FITUR_OFFLINE.md` item #9. Spectrum bar real-time di sheet baru "Visualizer
+Audio", dibuka dari "Kontrol Lanjutan" (Now Playing → titik tiga) — pola sama seperti
+Timer/Kecepatan/Equalizer/Repeat A-B di sheet itu.
+
+**Riset izin duluan sebelum nulis kode** — roadmap butir risiko awal cuma bilang "butuh
+`RECORD_AUDIO` di beberapa versi Android". Dicek ulang: `android.media.audiofx.Visualizer` wajib
+`RECORD_AUDIO` di SEMUA versi Android untuk audio session apa pun, termasuk sesi milik aplikasi
+sendiri — tidak ada pengecualian "baca audio sendiri" seperti dugaan awal. Keputusan: minta izin
+ini **on-demand** (baru saat user aktifkan toggle di sheet), bukan dilempar ke alur onboarding
+wajib di awal — fitur visual opsional yang minta izin semirip mikrofon di first-launch dianggap
+overreach untuk fitur yang mayoritas user mungkin tidak pernah buka.
+
+`AndroidManifest.xml` (protected, edit parsial) — tambah `<uses-permission RECORD_AUDIO>` dengan
+komentar panjang menjelaskan kenapa (tidak ada rekaman/penyimpanan suara sungguhan, murni baca
+sinyal FFT lagu yang sedang diputar sendiri).
+
+`AudioVisualizerController.kt` (baru, `playback/`) — bungkus `android.media.audiofx.Visualizer`.
+Attach ke `PlaybackAudioSession.sessionId` — mekanisme sharing session ID yang sama persis dipakai
+`EqualizerController` (Batch-batch lama), satu-satunya cara `PlayerViewModel` tahu
+`audioSessionId` ExoPlayer karena yang dipegang cuma `MediaController`, bukan instance ExoPlayer
+langsung. Capture size 512 (`coerceIn` ke `Visualizer.getCaptureSizeRange()`), capture rate
+ditahan ke ~15fps (`min(Visualizer.getMaxCaptureRate(), 15000)`) — sesuai catatan risiko roadmap
+soal battery drain, spectrum bar tidak perlu lebih mulus dari itu untuk terlihat "hidup". FFT byte
+array (format `[DC, Nyquist, Re1, Im1, Re2, Im2, ...]` per dokumentasi platform) dikelompokkan ke
+24 bar magnitude ternormalisasi 0f..1f, clip di 90f (titik potong empiris supaya noise baseline
+saat bagian senyap tidak ikut membesar-mengecil mengikuti skala per-frame).
+
+**2 bug method-vs-property ketemu & diperbaiki sebelum file final** (dicek manual terhadap
+dokumentasi kelas `Visualizer`/`AudioEffect`, bukan cuma asumsi): `getMaxCaptureRate()` ternyata
+`static` — harus dipanggil `Visualizer.getMaxCaptureRate()`, bukan lewat instance. `setCaptureSize()`
+dan `setEnabled()` keduanya return `Int` (status code), bukan `void` — Kotlin cuma bikin property
+`var` otomatis dari pasangan getter/setter Java kalau setter-nya return `Unit`, jadi keduanya wajib
+tetap method call eksplisit (`viz.setCaptureSize(...)`, `viz.setEnabled(...)`), bukan sintaks
+property (`viz.captureSize = ...`, `viz.enabled = ...`) — persis alasan `EqualizerController.kt`
+lama juga sudah selalu pakai `eq.setEnabled(...)` eksplisit, bukan kebetulan gaya penulisan.
+
+`VisualizerSettingsStore.kt` (baru, `data/`) — toggle on/off persisten, pola identik
+`ShakeSettingsStore` (default off, fitur yang butuh izin sensitif harus sengaja dinyalakan user).
+
+`VisualizerSheet.kt` (baru, `ui/`) — header + `Switch`, pola shell sama `EqualizerSheet.kt`
+(`frostedGlass()`). Teks status berubah 4 kondisi (izin belum ada / tidak didukung / nonaktif /
+aktif) — kalimat izin ditulis eksplisit "BUKAN untuk merekam suara" karena `RECORD_AUDIO` adalah
+permission yang paling gampang disalahpahami user awam. `SpectrumBars` — Canvas custom kedua di
+codebase ini (setelah `WeeklyTrendChart`, Batch 90), sengaja dibuat minimal (rounded bar + track
+transparan buat bar senyap, 0 gridline/axis) untuk alasan sama: tidak ada compiler/emulator di
+sandbox ini untuk verifikasi visual langsung.
+
+`PlayerViewModel.kt` — `ensureVisualizerAttached()` (dipanggil saat sheet dibuka, cuma attach kalau
+toggle sudah on — beda dari `ensureEqualizerAttached()` yang unconditional karena ekualizer harus
+tetap mempengaruhi audio nyata di background, visualizer cuma gambar piksel jadi tidak ada alasan
+tetap capture kalau tidak terlihat), `setVisualizerEnabled()` (toggle + attach/release),
+`stopVisualizerCapture()` (dipanggil saat sheet ditutup — release capture tapi sengaja TIDAK
+mengubah preference tersimpan, supaya reattach otomatis lain kali sheet dibuka tanpa user perlu
+nyalakan switch ulang). `audioVisualizerController.release()` ditambah di `onCleared()`.
+
+`NowPlayingScreen.kt` — 8 parameter baru (state + 4 callback), 1 baris baru di
+`AdvancedControlsSheet` ("Visualizer Audio", ikon `Icons.Default.GraphicEq`, baru diimpor — sudah
+dipakai di layar Welcome `MainActivity.kt` untuk highlight generik, tidak konflik), 1 blok
+pemanggilan sheet baru.
+
+`MainActivity.kt` (protected, edit parsial) — `visualizerPermissionLauncher`
+(`ActivityResultContracts.RequestPermission()`), diminta cuma saat user coba nyalakan toggle dari
+sheet, bukan di alur onboarding izin wajib yang sudah ada. Kalau permission granted saat itu juga,
+langsung `setVisualizerEnabled(true)` — supaya user tidak perlu tap switch 2x untuk 1 niat. 3
+`collectAsStateWithLifecycle()` baru + 8 parameter baru diteruskan ke `NowPlayingScreen(...)` yang
+sudah ada. 0 perubahan struktur NavHost/route.
+
+**Keputusan scope yang sengaja dibuat** (ditulis eksplisit, bukan disembunyikan): spectrum bar
+HANYA capture selama sheet "Visualizer Audio" terbuka, TIDAK dirender sebagai elemen ambient
+permanen di layar Now Playing utama (mis. di belakang album art). Roadmap menyebut "ditampilkan di
+Now Playing" — diinterpretasikan sebagai "bisa diakses dari Now Playing" (sama seperti Equalizer/
+Repeat A-B yang juga cuma lewat sheet, bukan elemen permanen), bukan "harus selalu tampil di layar
+utama". Alasan: `FloatArray` bukan tipe stabil buat Compose compiler, kalau di-thread terus-menerus
+ke seluruh `NowPlayingScreen` (bukan cuma saat sheet-nya sendiri terbuka) berisiko memicu
+recomposition ~15fps untuk keseluruhan layar (termasuk animasi album art/blur) — risiko jank yang
+tidak bisa diverifikasi tanpa device sungguhan, jadi diperkecil permukaannya duluan.
+
+Brace/paren 7 file kode dicek otomatis & seimbang. `FILE_MANIFEST.txt` di-diff eksplisit terhadap
+isi ZIP sebelum dikirim. **Belum diverifikasi compile/runtime Gradle sungguhan** (tidak ada JDK/
+Android SDK/kotlinc di sandbox ini) — prioritas berikutnya: `./gradlew assembleDebug`, lalu cek di
+device: (1) dialog permission `RECORD_AUDIO` benar muncul saat toggle dinyalakan pertama kali, teks
+rasional dari Android-nya sendiri tidak bikin user takut; (2) bar spectrum benar bergerak sinkron
+lagu yang diputar (bukan angka acak/statis — bug paling gampang lolos tanpa device sungguhan); (3)
+capture size 512 & `getCaptureSizeRange()` benar didukung di device asli (fallback `coerceIn` sudah
+ada tapi belum pernah dilihat jalan); (4) tidak ada jank terasa di layar Now Playing selama sheet
+Visualizer terbuka, terutama di device kelas bawah; (5) `Visualizer` benar ter-release saat sheet
+ditutup (cek battery/CPU tidak terus jalan di background lewat `adb shell dumpsys media.audio_flinger`
+atau semacamnya) — `stopVisualizerCapture()` sudah dipanggil di `onDismiss`, tapi urutan lifecycle
+`ModalBottomSheet` vs callback ini belum pernah dilihat jalan sungguhan.
+
 ## Batch 91 — Fitur baru: A-B Repeat & Bookmark Posisi (roadmap item #4)
 Dari `ROADMAP_15_FITUR_OFFLINE.md` item #4. 2 fitur terkait digabung 1 sheet baru "Repeat A-B &
 Bookmark", dibuka dari "Kontrol Lanjutan" (Now Playing → titik tiga) — pola sama seperti
