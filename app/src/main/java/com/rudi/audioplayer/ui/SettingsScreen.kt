@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -56,7 +57,8 @@ fun SettingsScreen(
     onToggleShakeToSkip: (Boolean) -> Unit,
     radioAutoContinueEnabled: Boolean,
     onToggleRadioAutoContinue: (Boolean) -> Unit,
-    onInfoMessage: (String) -> Unit
+    onInfoMessage: (String) -> Unit,
+    onOpenStats: () -> Unit
 ) {
     var showSignatureMatcher by remember { mutableStateOf(false) }
     var showDiagnosticLog by remember { mutableStateOf(false) }
@@ -178,6 +180,30 @@ fun SettingsScreen(
                         onToggleRadioAutoContinue(it)
                     }
                 )
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenStats() }
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.QueryStats, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text("Statistik Dengar", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Total putar, tren mingguan, artis favorit, jam favorit",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
             }
         }
 

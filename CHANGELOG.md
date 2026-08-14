@@ -1,5 +1,95 @@
 # Changelog
 
+## Batch 90 — Fitur baru: Dashboard Statistik Dengar Lokal (roadmap item #10)
+Dari `ROADMAP_15_FITUR_OFFLINE.md`: "data sudah dikumpulkan (`PlayStatsStore`,
+`ListeningHistoryStore`)... belum ada halaman statistik dedicated." Ditambahkan layar baru,
+diakses dari Pengaturan → "Statistik Dengar".
+
+**Isi dashboard** (4 kartu):
+1. **Ringkasan** — total lagu diputar (`PlayStatsStore.totalPlayCount()`, sudah ada) + estimasi
+   waktu dengar total, dihitung `durasi lagu × jumlah putar` per lagu lalu dijumlah
+   (`ListeningStatsEngine.totalListeningMs`). Ini estimasi, bukan log posisi kontinu — app tidak
+   pernah mencatat berapa lama tepatnya tiap sesi dengar berlangsung (cuma momen "lagu mulai
+   diputar"), jadi asumsinya tiap lagu yang tercatat diputar dianggap selesai penuh, konsisten
+   dengan cara `PlayStatsStore` sendiri menghitung "1 putaran" (di momen mulai, bukan selesai).
+2. **Tren 7 Hari Terakhir** — grafik batang dari `ListeningHistoryStore.getCountsForLastDays(7)`
+   (fungsi baru, murni pass-through baca key tanggal yang sudah ada, 0 skema data baru).
+   Digambar via `Canvas` custom di `StatsDashboardScreen.kt` (`WeeklyTrendChart`) — **chart
+   custom pertama di codebase ini**. Sengaja dibuat sangat minimal (rounded bar + track abu-abu
+   buat slot hari kosong, 0 gridline/axis/teks-di-atas-Canvas) untuk membatasi permukaan
+   kesalahan render: environment kerja ini tidak punya compiler Android untuk verifikasi visual,
+   jadi API yang dipakai dibatasi ke yang paling basic & paling dikonfirmasi ada di
+   `DrawScope` (`drawRoundRect`, `Offset`, `Size`, `CornerRadius` — semua bagian inti
+   `androidx.compose.ui.graphics`/`.geometry`, bukan API eksotis). Label hari (Sen/Sel/dst)
+   dirender sebagai `Text` composable biasa di bawah Canvas, BUKAN digambar di atas Canvas
+   sebagai native text — menghindari kelas bug "tebak nama API Compose yang jarang dipakai"
+   yang sudah 3x menyebabkan hotfix build gagal berturut-turut di riwayat proyek ini
+   (Batch 42→43→44, saga `drawOutline`).
+3. **Jam Favorit Dengar** — data BARU, sebelum batch ini app tidak pernah mencatat jam berapa
+   lagu diputar (`ListeningHistoryStore` cuma granularitas per-hari via `LocalDate` key, bukan
+   per-jam). `HourlyListenStore.kt` (baru): 24 counter flat (`hour_0`..`hour_23` di
+   SharedPreferences), `recordPlay()` increment bucket jam saat ini
+   (`Calendar.HOUR_OF_DAY`), `getHourlyCounts(): IntArray`. **Sengaja file terpisah**, bukan
+   memperluas skema key tanggal `ListeningHistoryStore` yang sudah lama dipakai dan berisi data
+   histori dengar user lama — menambah dimensi jam ke situ berarti migrasi format data existing
+   (risiko), sedangkan 24 counter baru yang berdiri sendiri risikonya nol (tidak menyentuh data
+   lama sama sekali, dan tidak pernah tumbuh tak terbatas karena cuma 24 key tetap).
+4. **Artis Paling Sering** — top 5 artis berdasar total play count lintas SEMUA lagu mereka
+   (bukan cuma dari daftar top-N lagu individual seperti `getTopArtistMix()` yang sudah ada,
+   yang cuma menyisir 50 lagu ter-top dulu baru cari artis dominan di situ — pendekatan lama itu
+   cukup untuk "1 artis dominan" tapi under-count kalau mau ranking 5 artis penuh karena artis
+   dengan banyak lagu ber-play-count sedang-sedang saja bisa kalah dari artis dengan 1 lagu
+   sangat sering diputar). Perlu akses ke SEMUA play count, bukan cuma top-N — `PlayStatsStore`
+   dapat fungsi baru `getAllCounts(): Map<Long, Int>` (murni additive, `getMostPlayedIds()` lama
+   tidak diubah/dipakai fungsi lain manapun tetap jalan sama).
+
+**Arsitektur**: `ListeningStatsEngine.kt` (baru, `data/`) — pure aggregator
+(`topArtists`/`totalListeningMs`/`peakHour`/`weeklyTrend`/`buildSnapshot`), sama sekali tidak
+menyentuh `Context`/SharedPreferences langsung — pola identik `SmartPlaylistEngine` (Batch 89),
+yang sendiri meneruskan pola "extract pure function dari store berbasis Context" yang
+dirintis Batch 27 (`ShakePulseTracker`, dll). Ini yang bikin `ListeningStatsEngineTest.kt` (13
+test baru) bisa jalan di JVM murni tanpa Robolectric — termasuk kasus tepi yang sengaja dites:
+tie-breaking `peakHour` (pilih jam paling awal kalau count sama), artis dengan nama kosong
+di-exclude, play count untuk lagu yang sudah tidak ada di library (dihapus dari device) di-skip
+alih-alih crash.
+
+`PlayerViewModel.kt`: `hourlyListenStore` diinstansiasi di samping store terkait
+lain, `recordPlay()`-nya dipanggil TEPAT di titik yang sama dengan
+`playStatsStore.recordPlay()`/`listeningHistoryStore.recordPlay()` (dalam
+`onMediaItemTransition`) — 1 event "lagu mulai diputar" konsisten tercatat ke ketiga store
+sekaligus, tidak ada jalur yang bisa mencatat ke 2 dari 3 store lalu lupa yang ketiga. Fungsi
+baru `getListeningStats(allSongs): ListeningStatsEngine.Snapshot` jadi satu-satunya entry point
+yang dipanggil UI, mengumpulkan data mentah dari 3 store lalu delegasikan seluruh perhitungan
+ke engine — `PlayerViewModel` sendiri tidak punya logika agregasi apa pun, murni wiring.
+
+**File disentuh** (9 kode + 5 dokumentasi, Atomic Change — 1 fitur kohesif data+VM+UI+nav+docs,
+sama presedennya dengan Batch 89's 11 file):
+- Baru: `HourlyListenStore.kt`, `ListeningStatsEngine.kt`, `StatsDashboardScreen.kt`,
+  `ListeningStatsEngineTest.kt`
+- Edit: `PlayStatsStore.kt` (+`getAllCounts()`), `ListeningHistoryStore.kt`
+  (+`getCountsForLastDays()`), `PlayerViewModel.kt`, `MainActivity.kt` (protected, parsial —
+  1 route + 1 callback), `SettingsScreen.kt` (1 menu row, non-protected)
+- Dokumentasi: `README.md`, `ROADMAP_15_FITUR_OFFLINE.md` (item #10 ditandai selesai, pola sama
+  item #2 Batch 89), `FILE_MANIFEST.txt` (118→122), `PROJECT_STATE.md`, `CHANGELOG.md` (ini)
+
+Brace/paren 9 file kode dicek otomatis & seimbang. `FILE_MANIFEST.txt` di-diff eksplisit
+terhadap isi folder kerja sebelum di-zip (122/122 match) — pelajaran Batch 27 revisi 1 (ZIP
+nested-folder + `-x '*.git*'` salah exclude `.github/`) diterapkan lagi supaya tidak terulang.
+
+**Sengaja TIDAK dikerjakan**: genre listening breakdown (MediaStore taruh genre di tabel
+terpisah, query per-lagu N+1 — sama alasan Smart Playlist Batch 89 skip kriteria genre), streak
+harian ("berapa hari berturut-turut dengar musik" — butuh logika gap-detection tambahan di luar
+scope 4 kartu yang diminta roadmap), dan export/share data statistik (fitur terpisah, bukan
+bagian dashboard read-only ini).
+
+**Belum diverifikasi compile/runtime Gradle sungguhan** (tidak ada JDK/Android SDK/kotlinc di
+sandbox ini) — prioritas berikutnya: `./gradlew testDebugUnitTest` verifikasi 13 test baru,
+lalu build APK asli + cek tab "Statistik Dengar" render benar di device. **`WeeklyTrendChart`
+adalah risiko visual tertinggi di batch ini** (Canvas custom pertama, lihat riwayat insiden
+Batch 40-44 soal fitur shadow/chart custom yang butuh 2-3 iterasi sebelum benar secara visual
+walau compile-nya sendiri sukses) — kalau bar terlihat kepotong/tidak proporsional di device,
+cek dulu `size.height`/`fraction` sebelum menambah lapisan gambar baru.
+
 ## Batch 89 — Fitur baru: Playlist Otomatis (Smart Playlist)
 Fitur dari ROADMAP_15_FITUR_OFFLINE.md. Playlist berbasis aturan, bukan daftar lagu statis:
 sekali diatur (folder, rentang durasi, rating minimum, rentang tahun rilis, kata kunci), lagu

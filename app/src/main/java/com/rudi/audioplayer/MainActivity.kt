@@ -92,6 +92,7 @@ import com.rudi.audioplayer.ui.HomeScreen
 import com.rudi.audioplayer.ui.LockScreen
 import com.rudi.audioplayer.ui.LibraryScreen
 import com.rudi.audioplayer.ui.SettingsScreen
+import com.rudi.audioplayer.ui.StatsDashboardScreen
 import com.rudi.audioplayer.ui.MiniPlayerBar
 import com.rudi.audioplayer.ui.NowPlayingScreen
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
@@ -821,7 +822,17 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     onToggleShakeToSkip = { enabled -> playerViewModel.setShakeToSkipEnabled(enabled) },
                     radioAutoContinueEnabled = radioAutoContinueEnabled,
                     onToggleRadioAutoContinue = { enabled -> playerViewModel.setRadioAutoContinueEnabled(enabled) },
-                    onInfoMessage = { message -> playerViewModel.showInfoMessage(message) }
+                    onInfoMessage = { message -> playerViewModel.showInfoMessage(message) },
+                    onOpenStats = { navController.navigate("stats_dashboard") }
+                )
+            }
+            composable("stats_dashboard") {
+                val statsSnapshot = remember(librarySongs, statsVersion) {
+                    playerViewModel.getListeningStats(librarySongs)
+                }
+                StatsDashboardScreen(
+                    snapshot = statsSnapshot,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(

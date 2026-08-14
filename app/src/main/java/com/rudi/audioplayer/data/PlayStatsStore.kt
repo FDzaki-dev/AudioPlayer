@@ -54,6 +54,20 @@ class PlayStatsStore(context: Context) {
             .filter { it.key.startsWith(COUNT_PREFIX) }
             .sumOf { (it.value as? Int) ?: 0 }
 
+    /** Raw play count per song ID, every song that has ever been played (not just top-N).
+     * Used by ListeningStatsEngine for full-library aggregation (e.g. top artists), where
+     * capping at a fixed top-N id list like getMostPlayedIds() would silently under-count
+     * artists whose plays are spread across many low-count songs. */
+    fun getAllCounts(): Map<Long, Int> =
+        prefs.all.entries
+            .filter { it.key.startsWith(COUNT_PREFIX) }
+            .mapNotNull { (key, value) ->
+                val id = key.removePrefix(COUNT_PREFIX).toLongOrNull()
+                val count = value as? Int
+                if (id != null && count != null && count > 0) id to count else null
+            }
+            .toMap()
+
     companion object {
         private const val PREFS_NAME = "play_stats"
         private const val COUNT_PREFIX = "count_"

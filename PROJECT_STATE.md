@@ -6,6 +6,44 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 90 (Fitur baru: Dashboard Statistik Dengar Lokal, Atomic Change 9 file kode + 5 file
+dokumentasi)** — Dari `ROADMAP_15_FITUR_OFFLINE.md` item #10. Layar baru di
+Pengaturan → "Statistik Dengar": total lagu diputar, estimasi waktu dengar (durasi × jumlah
+putar per lagu — bukan log posisi kontinu, jadi ini estimasi best-effort, bukan angka presisi),
+grafik batang tren 7 hari terakhir (Canvas custom — **chart pertama di codebase ini**, sengaja
+dibuat minimal: cuma rounded-bar, tanpa gridline/axis/text-di-canvas, supaya area kesalahan
+render kecil tanpa compiler untuk verifikasi), jam favorit dengar (dari 24 bucket jam-dalam-hari,
+all-time), dan 5 artis paling sering diputar.
+
+Route baru `stats_dashboard` (`MainActivity.kt`, protected — edit parsial, cuma nambah 1
+composable + 1 callback ke `SettingsScreen`, 0 perubahan struktur route lain). Data lama sudah
+cukup untuk sebagian besar (`PlayStatsStore`, `ListeningHistoryStore`), **kecuali jam favorit**
+— sebelum batch ini app tidak pernah mencatat jam berapa lagu diputar (`ListeningHistoryStore`
+cuma granularitas per-hari, bukan per-jam). Ditambah `HourlyListenStore.kt` baru (24 counter
+flat per jam) — sengaja file terpisah, BUKAN memperluas skema key `ListeningHistoryStore` yang
+sudah ada, supaya nol risiko migrasi untuk histori dengar yang sudah tersimpan user lama.
+
+7 file data/logic + `ListeningStatsEngine.kt` baru (pure aggregator — `topArtists`,
+`totalListeningMs`, `peakHour`, `buildSnapshot` — pola sama seperti `SmartPlaylistEngine` Batch
+89, Context-free supaya bisa di-unit-test tanpa Robolectric) + `ListeningStatsEngineTest.kt`
+(13 unit test) + `StatsDashboardScreen.kt` (UI, reuse pola `StatSectionCard` conditional
+Tactile/Skeu emboss dari `ContinueListeningCard` Batch 59) + `PlayerViewModel.kt` (wire
+`hourlyListenStore` di titik `recordPlay` yang sama dgn `playStatsStore`/
+`listeningHistoryStore`, + 1 fungsi `getListeningStats()`) + `SettingsScreen.kt` (1 menu row
+baru, non-protected). `PlayStatsStore`/`ListeningHistoryStore` masing-masing dapat 1 fungsi
+tambahan (`getAllCounts()`/`getCountsForLastDays()`) — murni additive, 0 fungsi lama diubah.
+
+Brace/paren semua 9 file kode dicek otomatis & seimbang. `FILE_MANIFEST.txt` di-diff eksplisit
+terhadap isi ZIP sebelum dikirim (bukan cuma dicek di folder kerja) — 122/122 match, pelajaran
+dari insiden Batch 27 revisi 1 (ZIP nested + exclude flag salah) diterapkan lagi di sini.
+**Belum diverifikasi compile/runtime Gradle sungguhan** (tidak ada JDK/Android SDK/kotlinc di
+sandbox ini) — prioritas berikutnya: `./gradlew testDebugUnitTest` verifikasi 13 test baru
+(ekstra hati-hati ke `peakHour` tie-breaking & `totalListeningMs` overflow untuk library besar),
+lalu build APK asli + cek tab "Statistik Dengar" render benar di device, KHUSUSNYA
+`WeeklyTrendChart` (Canvas custom pertama di app ini — paling berisiko meleset visual dari
+niatnya dibanding bagian lain batch ini yang murni reuse pola existing). Detail lengkap:
+`CHANGELOG.md` Batch 90.
+
 **Batch 89 (Fitur baru: Playlist Otomatis / Smart Playlist, Atomic Change 11 file kode)** —
 Dari `ROADMAP_15_FITUR_OFFLINE.md`. Playlist berbasis aturan (folder, rentang durasi, rating
 minimum, rentang tahun rilis, kata kunci) — beda dari playlist manual yang sudah ada

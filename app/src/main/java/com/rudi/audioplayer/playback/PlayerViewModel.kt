@@ -30,7 +30,9 @@ import com.rudi.audioplayer.data.LyricsStore
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.AppLockStore
+import com.rudi.audioplayer.data.HourlyListenStore
 import com.rudi.audioplayer.data.ListeningHistoryStore
+import com.rudi.audioplayer.data.ListeningStatsEngine
 import com.rudi.audioplayer.data.PlayStatsStore
 import com.rudi.audioplayer.data.RatingStore
 import com.rudi.audioplayer.data.RadioSettingsStore
@@ -98,6 +100,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val ratingStore = RatingStore(appContext)
     private val appLockStore = AppLockStore(appContext)
     private val listeningHistoryStore = ListeningHistoryStore(appContext)
+    private val hourlyListenStore = HourlyListenStore(appContext)
     private val shakeSettingsStore = ShakeSettingsStore(appContext)
     private val radioSettingsStore = RadioSettingsStore(appContext)
 
@@ -287,6 +290,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             song?.let {
                 playStatsStore.recordPlay(it.id)
                 listeningHistoryStore.recordPlay(it.id)
+                hourlyListenStore.recordPlay()
                 _statsVersion.value += 1
                 checkListeningMilestone()
             }
@@ -819,6 +823,18 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val songMap = allSongs.associateBy { it.id }
         return playStatsStore.getMostPlayedIds(limit).mapNotNull { songMap[it] }
     }
+
+    /** Assembles the Stats Dashboard snapshot (Batch 90) — thin wrapper collecting raw data
+     * from PlayStatsStore/ListeningHistoryStore/HourlyListenStore and delegating all actual
+     * math to ListeningStatsEngine (Context-free, unit-tested). */
+    fun getListeningStats(allSongs: List<Song>): ListeningStatsEngine.Snapshot =
+        ListeningStatsEngine.buildSnapshot(
+            songs = allSongs,
+            counts = playStatsStore.getAllCounts(),
+            totalPlays = playStatsStore.totalPlayCount(),
+            rawDailyCounts = listeningHistoryStore.getCountsForLastDays(7),
+            hourlyCounts = hourlyListenStore.getHourlyCounts()
+        )
 
     fun createPlaylist(name: String): Playlist {
         val playlist = playlistStore.createPlaylist(name.trim().ifBlank { "Playlist Baru" })

@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 118 file
+# Total: 122 file
 
 .github/workflows/build.yml
 .gitignore
@@ -21,8 +21,10 @@ app/src/main/java/com/rudi/audioplayer/data/CrossfadeStore.kt
 app/src/main/java/com/rudi/audioplayer/data/CustomFolderScanner.kt
 app/src/main/java/com/rudi/audioplayer/data/CustomFolderStore.kt
 app/src/main/java/com/rudi/audioplayer/data/FavoritesStore.kt
+app/src/main/java/com/rudi/audioplayer/data/HourlyListenStore.kt
 app/src/main/java/com/rudi/audioplayer/data/LibraryFilterStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ListeningHistoryStore.kt
+app/src/main/java/com/rudi/audioplayer/data/ListeningStatsEngine.kt
 app/src/main/java/com/rudi/audioplayer/data/LyricsParser.kt
 app/src/main/java/com/rudi/audioplayer/data/LyricsStore.kt
 app/src/main/java/com/rudi/audioplayer/data/MusicRepository.kt
@@ -64,6 +66,7 @@ app/src/main/java/com/rudi/audioplayer/ui/QueueSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SettingsScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/SignatureMatcherSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SmartPlaylistScreen.kt
+app/src/main/java/com/rudi/audioplayer/ui/StatsDashboardScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/Utils.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/BlurUtils.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Color.kt
@@ -111,6 +114,7 @@ app/src/main/res/xml/data_extraction_rules.xml
 app/src/main/res/xml/shortcuts.xml
 app/src/main/res/xml/widget_player_info.xml
 app/src/test/java/com/rudi/audioplayer/data/LibraryFilterStoreTest.kt
+app/src/test/java/com/rudi/audioplayer/data/ListeningStatsEngineTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LyricsParserTest.kt
 app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryFolderNameTest.kt
 app/src/test/java/com/rudi/audioplayer/data/PinLockoutPolicyTest.kt

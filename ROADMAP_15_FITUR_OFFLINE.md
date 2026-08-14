@@ -109,7 +109,7 @@ sedang diputar, ditampilkan di Now Playing.
   sinyal internal player, bukan mic sungguhan) — perlu dicek behaviour per API level, dan pastikan
   tidak menambah battery drain signifikan (throttle refresh rate).
 
-## 10. Dashboard Statistik Dengar Lokal
+## 10. Dashboard Statistik Dengar Lokal ✅ SELESAI (Batch 90)
 Visualisasi grafik dari data yang sebenarnya sudah dikumpulkan (`PlayStatsStore`,
 `ListeningHistoryStore`) — jam favorit dengar musik, genre/artis paling sering, tren mingguan,
 dll — saat ini datanya cuma dipakai untuk "Paling Sering Diputar" di Beranda, belum ada halaman

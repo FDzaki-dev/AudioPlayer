@@ -24,6 +24,18 @@ class ListeningHistoryStore(context: Context) {
         return (prefs.getStringSet(key, emptySet()) ?: emptySet()).mapNotNull { it.toLongOrNull() }
     }
 
+    /** Play counts for each of the last [days] calendar days (oldest first, today last) —
+     * powers the weekly trend chart on the Stats Dashboard (Batch 90). Reuses the same
+     * per-date key format already written by recordPlay()/getSongIdsForDate(), no new
+     * storage shape needed. */
+    fun getCountsForLastDays(days: Int): List<Pair<LocalDate, Int>> {
+        val today = LocalDate.now()
+        return (days - 1 downTo 0).map { offset ->
+            val date = today.minusDays(offset.toLong())
+            date to getSongIdsForDate(date).size
+        }
+    }
+
     private fun pruneOldEntries() {
         val cutoff = LocalDate.now().minusYears(2)
         val editor = prefs.edit()
