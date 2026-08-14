@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 122 file
+# Total: 127 file
 
 .github/workflows/build.yml
 .gitignore
@@ -17,6 +17,8 @@ app/src/main/AndroidManifest.xml
 app/src/main/java/com/rudi/audioplayer/AudioPlayerApplication.kt
 app/src/main/java/com/rudi/audioplayer/MainActivity.kt
 app/src/main/java/com/rudi/audioplayer/data/AppLockStore.kt
+app/src/main/java/com/rudi/audioplayer/data/Bookmark.kt
+app/src/main/java/com/rudi/audioplayer/data/BookmarkStore.kt
 app/src/main/java/com/rudi/audioplayer/data/CrossfadeStore.kt
 app/src/main/java/com/rudi/audioplayer/data/CustomFolderScanner.kt
 app/src/main/java/com/rudi/audioplayer/data/CustomFolderStore.kt
@@ -43,6 +45,7 @@ app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistEngine.kt
 app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistStore.kt
 app/src/main/java/com/rudi/audioplayer/data/Song.kt
 app/src/main/java/com/rudi/audioplayer/data/ThemeStore.kt
+app/src/main/java/com/rudi/audioplayer/playback/AbRepeatLogic.kt
 app/src/main/java/com/rudi/audioplayer/playback/AccentColorExtractor.kt
 app/src/main/java/com/rudi/audioplayer/playback/EqualizerController.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlaybackAudioSession.kt
@@ -50,6 +53,7 @@ app/src/main/java/com/rudi/audioplayer/playback/PlaybackService.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlayerViewModel.kt
 app/src/main/java/com/rudi/audioplayer/playback/ShakeDetector.kt
 app/src/main/java/com/rudi/audioplayer/playback/ShakePulseTracker.kt
+app/src/main/java/com/rudi/audioplayer/ui/ABRepeatBookmarkSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/DiagnosticLogSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/EqualizerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/FeatureHintBanner.kt
@@ -119,6 +123,7 @@ app/src/test/java/com/rudi/audioplayer/data/LyricsParserTest.kt
 app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryFolderNameTest.kt
 app/src/test/java/com/rudi/audioplayer/data/PinLockoutPolicyTest.kt
 app/src/test/java/com/rudi/audioplayer/data/SmartPlaylistEngineTest.kt
+app/src/test/java/com/rudi/audioplayer/playback/AbRepeatLogicTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt

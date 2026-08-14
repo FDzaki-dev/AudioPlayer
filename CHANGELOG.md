@@ -1,5 +1,64 @@
 # Changelog
 
+## Batch 91 — Fitur baru: A-B Repeat & Bookmark Posisi (roadmap item #4)
+Dari `ROADMAP_15_FITUR_OFFLINE.md` item #4. 2 fitur terkait digabung 1 sheet baru "Repeat A-B &
+Bookmark", dibuka dari "Kontrol Lanjutan" (Now Playing → titik tiga) — pola sama seperti
+Timer/Kecepatan/Equalizer di sheet itu.
+
+**A-B Repeat** — tandai Titik A & Titik B di posisi putar saat ini, playback otomatis loncat
+balik ke A begitu posisi lewat B, berulang terus sampai dihapus/lagu ganti. Boundary check
+diekstrak ke `AbRepeatLogic.kt` (baru, `playback/`) — pure `object`, 0 dependency Context, pola
+identik `SmartPlaylistEngine`/`ListeningStatsEngine` (Batch 89/90) supaya testable murni JVM
+tanpa Robolectric. `isActive()`/`shouldLoopBack()` sengaja treat B<=A atau salah satu null
+sebagai "belum aktif" (bukan crash/loop di 1 titik) — kasus umum kalau user tap "Tandai B"
+sebelum "Tandai A". `AbRepeatLogicTest.kt` (baru, 7 test) termasuk kasus tepi pointA=0L (awal
+lagu) supaya tidak salah dianggap "belum diatur" (beda dari null sentinel).
+
+`PlayerViewModel.kt`: state `_abRepeatPointA`/`_abRepeatPointB` (StateFlow, bukan bagian
+`PlaybackUiState` — dicek tiap tick 500ms di `startPositionLoop()`, tidak perlu memicu
+recomposition uiState penuh setiap kali). Dicek tepat setelah update position/duration di loop
+yang sama, `seekTo(pointA)` kalau `AbRepeatLogic.shouldLoopBack(...)` true. Kedua titik direset
+otomatis di `onMediaItemTransition` (ganti lagu) — A-B Repeat scoped ke 1 lagu, titik B lagu
+lama yang kebawa ke lagu baru berisiko diam-diam memotong intro lagu baru kalau posisinya
+kebetulan pas. `setAbRepeatPointA()` juga menghapus titik B lama kalau B<=A baru (mencegah state
+"aktif tapi diam" tanpa penjelasan ke user kenapa loop tidak jalan).
+
+**Bookmark Posisi** — tandai beberapa titik favorit per-lagu (intro/reff/solo dll), tap untuk
+lompat langsung, hapus per-bookmark. `Bookmark.kt` (baru, `data/`) — model
+`{id, label, positionMs}`. `BookmarkStore.kt` (baru) — JSON array per song ID di
+SharedPreferences, pola storage sama `SmartPlaylistStore` (parse-with-fallback, JSONArray),
+key-per-song sama `LyricsStore` (`KEY_PREFIX + songId`). **Beda dari `PlaybackStateStore`
+existing** — itu cuma ingat 1 posisi terakhir untuk seluruh antrean (resume), ini banyak titik
+bernama per-lagu individual.
+
+`ABRepeatBookmarkSheet.kt` (baru, `ui/`) — UI kedua fitur, kartu A/B (`OutlinedButton` tampil
+posisi mm:ss atau "Tandai"), status teks aktif/nonaktif, list bookmark (`LazyColumn`, tap-untuk-
+lompat + ikon hapus per-row), dialog kecil untuk nama bookmark (default "Tanda mm:ss", bisa
+diedit) — pola `AlertDialog` sederhana yang sama dengan dialog rename `PlaylistScreen.kt`, tidak
+diekspor/dishare (cuma 1 pemanggil lain), dibuat lokal di file ini.
+
+`NowPlayingScreen.kt` — 8 parameter baru (state A/B + 6 callback), 1 baris baru di
+`AdvancedControlsSheet` ("Repeat A-B & Bookmark", ikon `Icons.Default.Repeat` yang sudah
+diimpor, tidak nambah import baru), 1 blok pemanggilan sheet baru dgn pola `remember(song.id)`
+sama seperti `lyricsText` (Batch 82) — list bookmark di-refresh manual setelah
+tambah/hapus (`bookmarks = onGetBookmarks(song.id)`) karena bukan StateFlow, sama seperti pola
+lyrics existing.
+
+`MainActivity.kt` (protected, edit parsial) — 2 `collectAsStateWithLifecycle()` baru
+(`abRepeatPointA`/`abRepeatPointB`) + 8 parameter baru diteruskan ke pemanggilan
+`NowPlayingScreen(...)` yang sudah ada. 0 perubahan struktur NavHost/route — sama seperti
+Batch 89/90, numpang di layar yang sudah ada, bukan route baru.
+
+Brace/paren 8 file kode dicek otomatis & seimbang. `FILE_MANIFEST.txt` di-diff eksplisit
+terhadap isi ZIP sebelum dikirim (127/127 match). **Belum diverifikasi compile/runtime Gradle
+sungguhan** (tidak ada JDK/Android SDK/kotlinc di sandbox ini) — prioritas berikutnya:
+`./gradlew testDebugUnitTest` verifikasi 7 test baru, lalu build APK asli + cek di device:
+(1) A-B Repeat benar-benar loncat balik ke A tepat saat posisi lewat B, tanpa jeda/glitch audio
+terasa; (2) titik A/B benar hilang otomatis begitu lagu ganti (manual atau auto-advance); (3)
+bookmark tersimpan lintas restart app (SharedPreferences, seharusnya aman tapi belum dilihat
+langsung); (4) sheet "Repeat A-B & Bookmark" render benar di kedua tema custom (Tactile/Skeu) —
+sheet ini reuse `frostedGlass()` yang sudah ada, risiko rendah, tapi belum pernah dilihat.
+
 ## Batch 90 — Fitur baru: Dashboard Statistik Dengar Lokal (roadmap item #10)
 Dari `ROADMAP_15_FITUR_OFFLINE.md`: "data sudah dikumpulkan (`PlayStatsStore`,
 `ListeningHistoryStore`)... belum ada halaman statistik dedicated." Ditambahkan layar baru,

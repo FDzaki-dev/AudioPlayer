@@ -6,6 +6,44 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 91 (Fitur baru: A-B Repeat & Bookmark Posisi, Atomic Change 8 file kode + 5 file
+dokumentasi)** — Dari `ROADMAP_15_FITUR_OFFLINE.md` item #4. Sheet baru "Repeat A-B & Bookmark"
+di Now Playing → Kontrol Lanjutan (pola sama Timer/Kecepatan/Equalizer).
+
+**A-B Repeat**: tandai Titik A & B di posisi saat ini, playback loncat balik ke A begitu lewat
+B, berulang sampai dihapus/lagu ganti. Boundary check di `AbRepeatLogic.kt` baru — pure
+`object`, 0 Context, pola sama `SmartPlaylistEngine`/`ListeningStatsEngine` (Batch 89/90),
+`isActive()`/`shouldLoopBack()` treat B<=A atau salah satu null sebagai "belum aktif" (bukan
+crash/loop-di-1-titik) — `AbRepeatLogicTest.kt` 7 test termasuk kasus tepi pointA=0L (jangan
+disalahartikan sebagai "belum diatur"). State `_abRepeatPointA`/`_abRepeatPointB`
+(`PlayerViewModel.kt`, StateFlow terpisah dari `PlaybackUiState` — dicek tiap tick 500ms di
+`startPositionLoop()` yang sudah ada, tidak perlu memicu recomposition uiState penuh). Direset
+otomatis di `onMediaItemTransition` — scoped 1 lagu, titik B lagu lama yang kebawa ke lagu baru
+berisiko diam-diam memotong intro. `setAbRepeatPointA()` sekalian hapus titik B lama kalau
+B<=A baru (cegah state "aktif tapi diam" tanpa penjelasan).
+
+**Bookmark Posisi**: tandai beberapa titik favorit per-lagu (intro/reff/solo dll, dinamai
+sendiri), tap-untuk-lompat, hapus per-bookmark. `Bookmark.kt`+`BookmarkStore.kt` baru — JSON per
+song ID, pola storage sama `SmartPlaylistStore`, key-per-song sama `LyricsStore`. **Beda dari
+`PlaybackStateStore` existing** (itu cuma 1 posisi resume utk seluruh antrean, ini banyak titik
+bernama per-lagu).
+
+`ABRepeatBookmarkSheet.kt` baru (UI kedua fitur) + `NowPlayingScreen.kt` (8 parameter baru, 1
+row baru di `AdvancedControlsSheet` pakai ikon `Repeat` yang sudah diimpor — 0 import baru,
+pola `remember(song.id)` sama seperti `lyricsText` Batch 82) + `MainActivity.kt` (protected,
+edit parsial — 2 `collectAsStateWithLifecycle()` + 8 parameter diteruskan ke pemanggilan
+`NowPlayingScreen(...)` yang sudah ada, 0 perubahan struktur NavHost/route, numpang layar
+existing sama seperti Batch 89/90).
+
+Brace/paren semua 8 file kode dicek otomatis & seimbang. `FILE_MANIFEST.txt` di-diff eksplisit
+terhadap isi ZIP sebelum dikirim — 127/127 match. **Belum diverifikasi compile/runtime Gradle
+sungguhan** (tidak ada JDK/Android SDK/kotlinc di sandbox ini) — prioritas berikutnya:
+`./gradlew testDebugUnitTest` verifikasi 7 test baru, lalu build APK asli + cek di device: (1)
+A-B Repeat loncat balik ke A tepat saat lewat B tanpa glitch audio terasa, (2) titik A/B hilang
+otomatis saat lagu ganti (manual & auto-advance), (3) bookmark tersimpan lintas restart app,
+(4) sheet render benar di kedua tema custom (Tactile/Skeu, reuse `frostedGlass()` existing,
+risiko rendah tapi belum pernah dilihat). Detail lengkap: `CHANGELOG.md` Batch 91.
+
 **Batch 90 (Fitur baru: Dashboard Statistik Dengar Lokal, Atomic Change 9 file kode + 5 file
 dokumentasi)** — Dari `ROADMAP_15_FITUR_OFFLINE.md` item #10. Layar baru di
 Pengaturan → "Statistik Dengar": total lagu diputar, estimasi waktu dengar (durasi × jumlah

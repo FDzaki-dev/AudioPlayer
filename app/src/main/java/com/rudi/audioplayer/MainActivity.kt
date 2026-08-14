@@ -489,6 +489,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val uiState by playerViewModel.uiState.collectAsStateWithLifecycle()
     val favoriteIds by playerViewModel.favoriteIds.collectAsStateWithLifecycle()
     val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsStateWithLifecycle()
+    val abRepeatPointA by playerViewModel.abRepeatPointA.collectAsStateWithLifecycle()
+    val abRepeatPointB by playerViewModel.abRepeatPointB.collectAsStateWithLifecycle()
     val statsVersion by playerViewModel.statsVersion.collectAsStateWithLifecycle()
     val playlists by playerViewModel.playlists.collectAsStateWithLifecycle()
     val smartPlaylists by playerViewModel.smartPlaylists.collectAsStateWithLifecycle()
@@ -879,6 +881,14 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     onGetLyrics = { id -> playerViewModel.getLyrics(id) },
                     onSaveLyrics = { id, text -> playerViewModel.saveLyrics(id, text) },
                     onDeleteLyrics = { id -> playerViewModel.deleteLyrics(id) },
+                    abRepeatPointA = abRepeatPointA,
+                    abRepeatPointB = abRepeatPointB,
+                    onSetAbRepeatPointA = { playerViewModel.setAbRepeatPointA(it) },
+                    onSetAbRepeatPointB = { playerViewModel.setAbRepeatPointB(it) },
+                    onClearAbRepeat = { playerViewModel.clearAbRepeat() },
+                    onGetBookmarks = { id -> playerViewModel.getBookmarks(id) },
+                    onAddBookmark = { id, label, positionMs -> playerViewModel.addBookmark(id, label, positionMs) },
+                    onDeleteBookmark = { id, bookmarkId -> playerViewModel.deleteBookmark(id, bookmarkId) },
                     equalizerState = equalizerState,
                     onOpenEqualizer = { playerViewModel.ensureEqualizerAttached() },
                     onToggleEqualizerEnabled = { playerViewModel.setEqualizerEnabled(it) },

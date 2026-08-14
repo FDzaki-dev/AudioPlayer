@@ -137,6 +137,14 @@ fun NowPlayingScreen(
     onGetLyrics: (Long) -> String?,
     onSaveLyrics: (Long, String) -> Unit,
     onDeleteLyrics: (Long) -> Unit,
+    abRepeatPointA: Long?,
+    abRepeatPointB: Long?,
+    onSetAbRepeatPointA: (Long) -> Unit,
+    onSetAbRepeatPointB: (Long) -> Unit,
+    onClearAbRepeat: () -> Unit,
+    onGetBookmarks: (Long) -> List<com.rudi.audioplayer.data.Bookmark>,
+    onAddBookmark: (Long, String, Long) -> Unit,
+    onDeleteBookmark: (Long, String) -> Unit,
     equalizerState: EqualizerUiState,
     onOpenEqualizer: () -> Unit,
     onToggleEqualizerEnabled: (Boolean) -> Unit,
@@ -163,6 +171,7 @@ fun NowPlayingScreen(
     var showLyricsSheet by remember { mutableStateOf(false) }
     var showEqualizerSheet by remember { mutableStateOf(false) }
     var showAdvancedSheet by remember { mutableStateOf(false) }
+    var showAbRepeatBookmarkSheet by remember { mutableStateOf(false) }
 
     // --- Swipe gesture: brightness (left of album art) & audio volume (right of album art) ---
     val gestureScope = rememberCoroutineScope()
@@ -644,6 +653,30 @@ fun NowPlayingScreen(
         )
     }
 
+    if (showAbRepeatBookmarkSheet && song != null) {
+        var bookmarks by remember(song.id) { mutableStateOf(onGetBookmarks(song.id)) }
+        ABRepeatBookmarkSheet(
+            songId = song.id,
+            positionMs = uiState.position,
+            pointAMs = abRepeatPointA,
+            pointBMs = abRepeatPointB,
+            bookmarks = bookmarks,
+            onDismiss = { showAbRepeatBookmarkSheet = false },
+            onSetPointA = onSetAbRepeatPointA,
+            onSetPointB = onSetAbRepeatPointB,
+            onClearAbRepeat = onClearAbRepeat,
+            onSeek = onSeek,
+            onAddBookmark = { label, positionMs ->
+                onAddBookmark(song.id, label, positionMs)
+                bookmarks = onGetBookmarks(song.id)
+            },
+            onDeleteBookmark = { bookmarkId ->
+                onDeleteBookmark(song.id, bookmarkId)
+                bookmarks = onGetBookmarks(song.id)
+            }
+        )
+    }
+
     if (showEqualizerSheet) {
         EqualizerSheet(
             state = equalizerState,
@@ -688,6 +721,10 @@ fun NowPlayingScreen(
                 showAdvancedSheet = false
                 onOpenEqualizer()
                 showEqualizerSheet = true
+            },
+            onOpenAbRepeatBookmark = {
+                showAdvancedSheet = false
+                showAbRepeatBookmarkSheet = true
             }
         )
     }
@@ -708,7 +745,8 @@ private fun AdvancedControlsSheet(
     onOpenLyrics: () -> Unit,
     onOpenSleepTimer: () -> Unit,
     onOpenSpeed: () -> Unit,
-    onOpenEqualizer: () -> Unit
+    onOpenEqualizer: () -> Unit,
+    onOpenAbRepeatBookmark: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val haptic = LocalHapticFeedback.current
@@ -754,6 +792,12 @@ private fun AdvancedControlsSheet(
                 label = "Equalizer",
                 value = null,
                 onClick = onOpenEqualizer
+            )
+            AdvancedControlRow(
+                icon = Icons.Default.Repeat,
+                label = "Repeat A-B & Bookmark",
+                value = null,
+                onClick = onOpenAbRepeatBookmark
             )
 
             HorizontalDivider(

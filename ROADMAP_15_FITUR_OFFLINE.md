@@ -43,13 +43,17 @@ pelengkap fitur Lirik yang sudah ada (saat ini cuma bisa tempel LRC yang sudah j
   sudah ada (format penyimpanan tidak berubah, cuma cara membuatnya).
 - **Risiko**: rendah.
 
-## 4. A-B Repeat & Bookmark Posisi
+## 4. A-B Repeat & Bookmark Posisi ✅ SELESAI (Batch 91)
 Ulang segmen tertentu dalam lagu (titik A ke titik B berulang), dan tandai beberapa posisi
 favorit dalam satu file (intro/reff/part solo) untuk lompat cepat.
 - **Kenapa**: berguna untuk latihan musik/bahasa, atau podcast/audiobook panjang.
 - **Kompleksitas**: Sedang. State baru di `PlayerViewModel` (pointA/pointB), listener posisi
   yang sudah ada (`position` tick) tinggal dipakai ulang untuk cek boundary.
 - **Risiko**: rendah — murni logic playback, tidak menyentuh file.
+- **Catatan implementasi**: boundary check diekstrak ke `AbRepeatLogic.kt` (pure object, pola
+  sama seperti `SmartPlaylistEngine`/`ListeningStatsEngine`) supaya testable tanpa Robolectric.
+  Bookmark disimpan per-lagu via `BookmarkStore.kt` (JSON, pola sama `SmartPlaylistStore`).
+  Detail lengkap: `CHANGELOG.md` Batch 91.
 
 ## 5. Pemangkas & Pembuat Nada Dering (Ringtone Cutter)
 Potong bagian lagu (drag range di waveform/seekbar) lalu set langsung sebagai nada dering,

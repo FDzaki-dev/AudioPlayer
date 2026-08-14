@@ -21,6 +21,8 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.data.Bookmark
+import com.rudi.audioplayer.data.BookmarkStore
 import com.rudi.audioplayer.data.CrossfadeStore
 import com.rudi.audioplayer.data.CustomFolderInfo
 import com.rudi.audioplayer.data.CustomFolderScanner
@@ -148,6 +150,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     fun currentPinLockout(): Long? = appLockStore.lockedOutUntil()
     private val playlistStore = PlaylistStore(appContext)
     private val lyricsStore = LyricsStore(appContext)
+    private val bookmarkStore = BookmarkStore(appContext)
     private val equalizerController = EqualizerController(appContext)
     val equalizerState: StateFlow<EqualizerUiState> = equalizerController.state
 
@@ -191,6 +194,14 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val _sleepTimerRemaining = MutableStateFlow<Long?>(null)
     val sleepTimerRemaining: StateFlow<Long?> = _sleepTimerRemaining.asStateFlow()
     private var sleepTimerJob: Job? = null
+
+    // A-B Repeat (Roadmap #4, Batch 91) — points live here rather than in PlaybackUiState
+    // because they're checked every 500ms tick in startPositionLoop() and don't need to
+    // trigger a full uiState recomposition on their own; the sheet observes them directly.
+    private val _abRepeatPointA = MutableStateFlow<Long?>(null)
+    val abRepeatPointA: StateFlow<Long?> = _abRepeatPointA.asStateFlow()
+    private val _abRepeatPointB = MutableStateFlow<Long?>(null)
+    val abRepeatPointB: StateFlow<Long?> = _abRepeatPointB.asStateFlow()
 
     private val _accentColor = MutableStateFlow<Color?>(null)
     val accentColor: StateFlow<Color?> = _accentColor.asStateFlow()
@@ -302,6 +313,12 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 startFadeIn()
             }
             fadedOutForIndex = -1
+
+            // A-B Repeat is scoped to one song, never carried to the next — a stale point B
+            // from the previous track would either never trigger (positions rarely line up) or
+            // worse, silently clip the start of a new song if it happened to be short enough.
+            _abRepeatPointA.value = null
+            _abRepeatPointB.value = null
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
@@ -567,6 +584,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                     // This prevents needless recompositions across the whole player UI.
                     if (currentState.position != position || currentState.duration != duration) {
                         _uiState.value = currentState.copy(position = position, duration = duration)
+                    }
+
+                    if (AbRepeatLogic.shouldLoopBack(position, _abRepeatPointA.value, _abRepeatPointB.value)) {
+                        c.seekTo(_abRepeatPointA.value ?: 0L)
                     }
 
                     if (_crossfadeEnabled.value && c.isPlaying && duration > 0) {
@@ -905,6 +926,36 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     fun saveLyrics(songId: Long, text: String) = lyricsStore.setLyrics(songId, text)
 
     fun deleteLyrics(songId: Long) = lyricsStore.deleteLyrics(songId)
+
+    // --- A-B Repeat (Roadmap #4, Batch 91) ---
+
+    fun setAbRepeatPointA(positionMs: Long) {
+        _abRepeatPointA.value = positionMs
+        // Setting a new A after B was already placed behind it would leave A-B repeat
+        // silently inactive (AbRepeatLogic.isActive requires B strictly after A) with no
+        // feedback why — clearing the stale B forces the user to re-mark B deliberately.
+        val currentB = _abRepeatPointB.value
+        if (currentB != null && currentB <= positionMs) _abRepeatPointB.value = null
+    }
+
+    fun setAbRepeatPointB(positionMs: Long) {
+        _abRepeatPointB.value = positionMs
+    }
+
+    fun clearAbRepeat() {
+        _abRepeatPointA.value = null
+        _abRepeatPointB.value = null
+    }
+
+    // --- Bookmark Posisi (Roadmap #4, Batch 91) ---
+
+    fun getBookmarks(songId: Long): List<Bookmark> = bookmarkStore.getBookmarks(songId)
+
+    fun addBookmark(songId: Long, label: String, positionMs: Long): Bookmark =
+        bookmarkStore.addBookmark(songId, label, positionMs)
+
+    fun deleteBookmark(songId: Long, bookmarkId: String) =
+        bookmarkStore.deleteBookmark(songId, bookmarkId)
 
     /** Attaches the equalizer to the current playback session. Call when the Equalizer sheet opens.
      * Safe to call repeatedly. */
