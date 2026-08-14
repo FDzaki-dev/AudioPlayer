@@ -17,6 +17,7 @@ app/src/main/AndroidManifest.xml
 app/src/main/java/com/rudi/audioplayer/AudioPlayerApplication.kt
 app/src/main/java/com/rudi/audioplayer/MainActivity.kt
 app/src/main/java/com/rudi/audioplayer/data/AppLockStore.kt
+app/src/main/java/com/rudi/audioplayer/data/AudiobookModeStore.kt
 app/src/main/java/com/rudi/audioplayer/data/Bookmark.kt
 app/src/main/java/com/rudi/audioplayer/data/BookmarkStore.kt
 app/src/main/java/com/rudi/audioplayer/data/CrossfadeStore.kt

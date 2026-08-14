@@ -1,5 +1,59 @@
 # Changelog
 
+## Batch 93 — Fitur baru: Mode Audiobook/Podcast (roadmap item #12)
+Dari `ROADMAP_15_FITUR_OFFLINE.md` item #12. Ingat kecepatan putar & posisi terakhir per-lagu
+individual (bukan speed global yang sekarang berlaku ke semua lagu), plus tampilan "menit
+tersisa" alih-alih total durasi — untuk file panjang (podcast/audiobook) yang di-opt-in manual.
+
+**Bukan extend `PlaybackStateStore`** (dugaan awal roadmap) — dicek ulang dulu isi filenya: itu
+murni resume 1 QUEUE global (daftar ID lagu + index + posisi), skema field-nya tidak natural
+diperluas jadi per-song tanpa merusak bentuk aslinya. `AudiobookModeStore.kt` (baru, `data/`) —
+1 record JSON per lagu (`{enabled, speed, lastPositionMs}`), pola storage sama `BookmarkStore`
+(key-per-song `KEY_PREFIX + songId`) tapi 1 object bukan array (state tunggal per lagu, bukan
+list yang bisa nambah). Nonaktifkan toggle = hapus record sepenuhnya (bukan simpan
+`enabled=false`), pola sama `BookmarkStore` menghapus key saat daftar bookmark kosong.
+
+**Opt-in per-lagu, bukan fitur genre/heuristik durasi** — sempat dipertimbangkan "auto-deteksi
+audiobook dari durasi panjang", ditolak: app sudah lama sengaja skip metadata Genre (Batch 89,
+alasan N+1 query MediaStore) dan heuristik durasi rawan salah tebak (lagu instrumental panjang,
+DJ mix, dll juga bisa panjang tanpa jadi audiobook) — toggle manual per-lagu, sama filosofi
+proyek ini di tempat lain (silence-trim roadmap item #8 eksplisit larang "default agresif").
+
+`PlayerViewModel.kt`: `setAudiobookModeEnabled()` — toggle scoped ke `currentSong` yang sedang
+dibuka, seed speed dari speed yang SEDANG berjalan saat momen toggle ON (biar nyalain toggle
+tidak diam-diam lompat ke speed lain), sekalian persist posisi saat ini juga (bukan nunggu tick
+periodik ~5 detik — celah kecil kalau app di-kill tepat setelah toggle ON). `onMediaItemTransition`
+— begitu lagu pindah, cek `audiobookModeStore.get(song.id)`, kalau enabled: `setPlaybackSpeed()`
++ `seekTo()` ke nilai tersimpan, **sengaja di-skip untuk `MEDIA_ITEM_TRANSITION_REASON_REPEAT`**
+(loop Repeat Satu Lagu) — kalau tidak di-skip, tiap loop bakal seek balik ke posisi lama yang
+sudah stale alih-alih restart bersih dari 0, fight sama perilaku repeat-one sendiri. Progress
+save (`persistPlaybackState()`, cadence ~5 detik-saat-main + langsung-saat-pause yang sudah ada
+utk `PlaybackStateStore`) diperluas sekalian panggil `audiobookModeStore.updateProgress()` —
+no-op internal kalau lagu itu tidak di-opt-in, jadi aman dipanggil unconditional tiap tick tanpa
+cek toggle dulu di titik itu.
+
+`NowPlayingScreen.kt`: toggle baru ("Mode Audiobook/Podcast", `Switch`) ditaruh di dialog
+"Pengaturan Putar" yang SUDAH ADA (`SpeedDialog`, bukan sheet/dialog baru — home paling natural
+buat kontrol speed per-file karena memang tentang speed). Teks durasi kanan (posisi/durasi di
+bawah seek bar) berubah format jadi `-mm:ss` (sisa waktu, konvensi umum podcast player Spotify/
+Apple/Google — dipilih drpd kalimat Indonesia panjang, universal & langsung beda visual dari
+angka durasi biasa) saat `audiobookModeEnabled` true utk lagu yang sedang main. 3 parameter baru
+diteruskan ke `SpeedDialog` + `NowPlayingScreen`.
+
+`MainActivity.kt` (protected, edit parsial) — 1 `collectAsStateWithLifecycle()` baru + 2
+parameter diteruskan ke `NowPlayingScreen(...)` yang sudah ada. 0 perubahan struktur NavHost.
+
+Brace/paren 4 file kode dicek otomatis & seimbang. `FILE_MANIFEST.txt` di-diff eksplisit
+terhadap isi ZIP sebelum dikirim. **Belum diverifikasi compile/runtime Gradle sungguhan** (tidak
+ada JDK/Android SDK/kotlinc di sandbox ini) — prioritas berikutnya: `./gradlew assembleDebug`,
+lalu cek di device: (1) toggle ON lalu pindah ke lagu lain lalu balik lagi — speed & posisi
+benar kembali tepat seperti terakhir; (2) Repeat Satu Lagu pada lagu yang di-opt-in TIDAK ikut
+seek balik ke posisi lama tiap loop (ini titik paling gampang lolos tanpa device — kalau guard
+`MEDIA_ITEM_TRANSITION_REASON_REPEAT`-nya salah, gejalanya bakal lagu "macet" muter ulang dari
+tengah terus, bukan dari awal); (3) teks `-mm:ss` update benar mengikuti posisi berjalan,
+bukan angka statis; (4) toggle OFF benar menghapus record tersimpan (grep SharedPreferences
+`audiobook_mode` kosong setelah semua lagu di-toggle off).
+
 ## Batch 92 — Fitur baru: Visualizer Audio (roadmap item #9)
 Dari `ROADMAP_15_FITUR_OFFLINE.md` item #9. Spectrum bar real-time di sheet baru "Visualizer
 Audio", dibuka dari "Kontrol Lanjutan" (Now Playing → titik tiga) — pola sama seperti

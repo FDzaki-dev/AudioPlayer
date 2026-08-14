@@ -152,6 +152,8 @@ fun NowPlayingScreen(
     onEqualizerBandChange: (Int, Short) -> Unit,
     onEqualizerPresetSelect: (Int) -> Unit,
     onEqualizerBoldPresetSelect: (EqualizerController.BoldPreset) -> Unit,
+    audiobookModeEnabled: Boolean,
+    onToggleAudiobookMode: (Boolean) -> Unit,
     visualizerEnabled: Boolean,
     visualizerSupported: Boolean,
     visualizerPermissionGranted: Boolean,
@@ -477,7 +479,15 @@ fun NowPlayingScreen(
                 color = MaterialTheme.colorScheme.secondary
             )
             Text(
-                formatDuration(uiState.duration),
+                // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — "menit tersisa" alih-alih
+                // total durasi untuk file yang di-opt-in mode ini, format "-mm:ss" sama seperti
+                // konvensi umum podcast player (Spotify/Apple/Google Podcasts) — universal tanpa
+                // perlu kata tambahan, dan langsung beda dari total durasi biasa secara visual.
+                if (audiobookModeEnabled) {
+                    "-" + formatDuration((uiState.duration - uiState.position).coerceAtLeast(0))
+                } else {
+                    formatDuration(uiState.duration)
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.secondary
             )
@@ -628,9 +638,11 @@ fun NowPlayingScreen(
         SpeedDialog(
             currentSpeed = uiState.playbackSpeed,
             crossfadeEnabled = crossfadeEnabled,
+            audiobookModeEnabled = audiobookModeEnabled,
             onDismiss = { showSpeedDialog = false },
             onSelect = onSetSpeed,
-            onToggleCrossfade = onSetCrossfadeEnabled
+            onToggleCrossfade = onSetCrossfadeEnabled,
+            onToggleAudiobookMode = onToggleAudiobookMode
         )
     }
 
@@ -1262,9 +1274,11 @@ private fun SleepTimerDialog(
 private fun SpeedDialog(
     currentSpeed: Float,
     crossfadeEnabled: Boolean,
+    audiobookModeEnabled: Boolean,
     onDismiss: () -> Unit,
     onSelect: (Float) -> Unit,
-    onToggleCrossfade: (Boolean) -> Unit
+    onToggleCrossfade: (Boolean) -> Unit,
+    onToggleAudiobookMode: (Boolean) -> Unit
 ) {
     val options = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
     AlertDialog(
@@ -1288,6 +1302,28 @@ private fun SpeedDialog(
                             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                     }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — per-song opt-in, scoped to
+                // whichever song is loaded when this dialog is open (PlayerViewModel keys the
+                // saved state off currentSong.id, not a global setting).
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Mode Audiobook/Podcast", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Ingat kecepatan & posisi khusus lagu ini, terpisah dari lagu lain",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                    Switch(checked = audiobookModeEnabled, onCheckedChange = onToggleAudiobookMode)
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))

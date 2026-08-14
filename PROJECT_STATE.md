@@ -6,6 +6,39 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 93 (Fitur baru: Mode Audiobook/Podcast, 4 file kode + 4 file dokumentasi)** — Dari
+`ROADMAP_15_FITUR_OFFLINE.md` item #12. Ingat kecepatan & posisi terakhir per-lagu individual
+(bukan speed global yang berlaku ke semua lagu), tampilan "menit tersisa" (`-mm:ss`) untuk file
+yang di-opt-in.
+
+**Bukan extend `PlaybackStateStore`** seperti dugaan awal roadmap (dicek dulu isi filenya — itu
+murni resume 1 QUEUE global, tidak natural diperluas per-song). `AudiobookModeStore.kt` (baru,
+`data/`) — 1 record JSON per lagu, pola sama `BookmarkStore` (key-per-song) tapi object tunggal
+bukan array. **Opt-in manual per-lagu, bukan heuristik durasi/genre** — genre sudah lama sengaja
+di-skip (Batch 89, N+1 query), heuristik durasi rawan salah tebak (instrumental panjang, DJ mix).
+
+`PlayerViewModel.kt`: `setAudiobookModeEnabled()` (seed speed dari yang sedang jalan + persist
+posisi langsung, bukan nunggu tick ~5s), `onMediaItemTransition` resume speed+posisi lagu yang
+di-opt-in — **sengaja skip untuk `MEDIA_ITEM_TRANSITION_REASON_REPEAT`** (Repeat Satu Lagu),
+kalau tidak di-skip tiap loop bakal seek balik ke posisi lama alih-alih restart bersih dari 0.
+`persistPlaybackState()` (cadence ~5s-saat-main + langsung-saat-pause yang sudah ada) diperluas
+sekalian save progress audiobook (no-op internal kalau lagu tidak di-opt-in).
+
+`NowPlayingScreen.kt` — toggle baru ditaruh di dialog "Pengaturan Putar" yang SUDAH ADA (bukan
+sheet baru — home paling natural karena memang soal speed per-file), teks durasi kanan berubah
+`-mm:ss` (konvensi podcast player) saat mode aktif untuk lagu yang sedang main. `MainActivity.kt`
+(protected, edit parsial) — 1 `collectAsStateWithLifecycle()` + 2 parameter diteruskan. 0
+perubahan struktur NavHost.
+
+Brace/paren 4 file kode dicek otomatis & seimbang. `FILE_MANIFEST.txt` di-diff eksplisit
+terhadap isi ZIP — match. **Belum diverifikasi compile/runtime Gradle sungguhan** — prioritas
+berikutnya: `./gradlew assembleDebug`, cek di device (1) toggle ON lalu pindah lagu lalu balik —
+speed & posisi kembali tepat, (2) **Repeat Satu Lagu pada lagu ter-opt-in TIDAK seek balik tiap
+loop** (titik paling berisiko meleset tanpa device — kalau guard reason-nya salah, lagu akan
+terlihat "macet" muter dari tengah terus bukan dari awal), (3) teks `-mm:ss` update mengikuti
+posisi berjalan bukan statis, (4) toggle OFF benar menghapus record tersimpan. Detail lengkap:
+`CHANGELOG.md` Batch 93.
+
 **Batch 92 (Fitur baru: Visualizer Audio, 7 file kode + 4 file dokumentasi)** — Dari
 `ROADMAP_15_FITUR_OFFLINE.md` item #9. Sheet baru "Visualizer Audio" di Now Playing → Kontrol
 Lanjutan (pola sama Timer/Kecepatan/Equalizer/Repeat A-B), spectrum bar 24-bar dari

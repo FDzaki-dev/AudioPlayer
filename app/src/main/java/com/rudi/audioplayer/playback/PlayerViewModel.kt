@@ -21,6 +21,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.data.AudiobookModeStore
 import com.rudi.audioplayer.data.Bookmark
 import com.rudi.audioplayer.data.BookmarkStore
 import com.rudi.audioplayer.data.CrossfadeStore
@@ -152,6 +153,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val playlistStore = PlaylistStore(appContext)
     private val lyricsStore = LyricsStore(appContext)
     private val bookmarkStore = BookmarkStore(appContext)
+    private val audiobookModeStore = AudiobookModeStore(appContext)
+    private val _audiobookModeEnabled = MutableStateFlow(false)
+    /** Whether the CURRENT song (whatever's playing/loaded right now) has Roadmap #12 opted in —
+     * recomputed on every song transition, not a per-song lookup table exposed to the UI. */
+    val audiobookModeEnabled: StateFlow<Boolean> = _audiobookModeEnabled.asStateFlow()
     private val equalizerController = EqualizerController(appContext)
     val equalizerState: StateFlow<EqualizerUiState> = equalizerController.state
 
@@ -318,6 +324,20 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             updateAccentColor(song)
             _currentRating.value = song?.let { ratingStore.getRating(it.id) } ?: 0
             persistPlaybackState()
+
+            // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — resume THIS song's own remembered
+            // speed + position, independent of whatever speed the previous track left behind
+            // (that "carries over to every song" behavior is exactly what the roadmap flags as
+            // the thing this feature replaces, per-song, for opted-in files). Skipped on
+            // MEDIA_ITEM_TRANSITION_REASON_REPEAT (REPEAT_MODE_ONE looping the same item) — re-
+            // seeking to a stale saved position on every loop would fight repeat-one's own
+            // restart-from-zero behavior instead of just looping cleanly.
+            val audiobookState = song?.let { audiobookModeStore.get(it.id) }
+            _audiobookModeEnabled.value = audiobookState?.enabled == true
+            if (audiobookState?.enabled == true && reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+                controller?.setPlaybackSpeed(audiobookState.speed)
+                if (audiobookState.lastPositionMs > 0) controller?.seekTo(audiobookState.lastPositionMs)
+            }
 
             if (_crossfadeEnabled.value) {
                 startFadeIn()
@@ -628,12 +648,18 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // interacts with the player.
         val songIds = currentQueue.map { it.id }
         val positionMs = c.currentPosition.coerceAtLeast(0)
+        val currentSongId = currentQueue.getOrNull(index)?.id
+        val speed = _uiState.value.playbackSpeed
         viewModelScope.launch(Dispatchers.IO) {
             playbackStateStore.save(
                 songIds = songIds,
                 index = index,
                 positionMs = positionMs
             )
+            // Roadmap #12 (Batch 93) — no-ops internally if this song was never opted into
+            // audiobook mode, so it's safe to call unconditionally at the same cadence as the
+            // save above (~5s while playing, immediately on pause via onIsPlayingChanged).
+            if (currentSongId != null) audiobookModeStore.updateProgress(currentSongId, speed, positionMs)
         }
     }
 
@@ -955,6 +981,22 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     fun clearAbRepeat() {
         _abRepeatPointA.value = null
         _abRepeatPointB.value = null
+    }
+
+    // --- Mode Audiobook/Podcast (Roadmap #12, Batch 93) ---
+
+    /** Toggled from the "Pengaturan Putar" (speed) dialog, scoped to whatever song is currently
+     * loaded. Seeds the saved speed with what's already playing at the moment of opting in (see
+     * [AudiobookModeStore.setEnabled]), then immediately persists the current position too —
+     * without this second call, a fresh toggle-on would sit with `lastPositionMs = 0` until the
+     * next periodic tick (~5s), which is a needless window to lose if the app is killed right
+     * after enabling. */
+    fun setAudiobookModeEnabled(enabled: Boolean) {
+        val songId = _uiState.value.currentSong?.id ?: return
+        val speed = _uiState.value.playbackSpeed
+        audiobookModeStore.setEnabled(songId, enabled, speed)
+        if (enabled) audiobookModeStore.updateProgress(songId, speed, _uiState.value.position)
+        _audiobookModeEnabled.value = enabled
     }
 
     // --- Bookmark Posisi (Roadmap #4, Batch 91) ---

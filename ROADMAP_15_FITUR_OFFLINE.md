@@ -144,7 +144,7 @@ play/pause/next tanpa perlu buka app AudioPlayer.
   lain) — perlu penjelasan jelas di onboarding kenapa dibutuhkan, dan pastikan tidak
   mengganggu app lain (touch pass-through di luar area bubble).
 
-## 12. Mode Audiobook/Podcast (Per-File Speed & Posisi)
+## 12. Mode Audiobook/Podcast (Per-File Speed & Posisi) ✅ SELESAI (Batch 93)
 Ingat kecepatan putar dan posisi terakhir secara individual per-file (bukan pengaturan speed
 global yang sekarang berlaku ke semua lagu), plus tampilan progres "menit tersisa" alih-alih
 cuma posisi/durasi total — relevan untuk file audio panjang (podcast, buku audio, kuliah).
@@ -154,6 +154,13 @@ cuma posisi/durasi total — relevan untuk file audio panjang (podcast, buku aud
   (speed, lastPosition sudah ada secara umum lewat resume, tinggal di-scope per-song bukan
   global-terakhir-saja).
 - **Risiko**: rendah — perluasan data model yang sudah ada, bukan sistem baru dari nol.
+- **Catatan implementasi**: bukan extend `PlaybackStateStore` seperti dugaan awal (itu tetap
+  murni resume 1 QUEUE global) — dibuat `AudiobookModeStore.kt` terpisah, 1 record JSON per lagu
+  (opt-in via toggle di dialog "Pengaturan Putar" yang sudah ada). Resume speed+posisi dipasang
+  di `onMediaItemTransition`, sengaja di-skip untuk `MEDIA_ITEM_TRANSITION_REASON_REPEAT` (loop
+  Repeat Satu Lagu) supaya tidak fight sama restart-dari-nol repeat-one. "Menit tersisa" pakai
+  format `-mm:ss` (konvensi umum podcast player). Detail lengkap: `CHANGELOG.md` Batch 93.
+
 
 ## 13. Konverter Format Audio Lokal
 Konversi file antar format umum (MP3 ↔ WAV ↔ FLAC ↔ M4A) langsung di perangkat, hasil disimpan

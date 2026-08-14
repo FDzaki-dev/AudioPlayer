@@ -514,6 +514,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val visualizerEnabled by playerViewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerSupported by playerViewModel.visualizerSupported.collectAsStateWithLifecycle()
     val visualizerBars by playerViewModel.visualizerBars.collectAsStateWithLifecycle()
+    val audiobookModeEnabled by playerViewModel.audiobookModeEnabled.collectAsStateWithLifecycle()
 
     val deleteContext = LocalContext.current
 
@@ -919,6 +920,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     onEqualizerBandChange = { band, level -> playerViewModel.setEqualizerBand(band, level) },
                     onEqualizerPresetSelect = { index -> playerViewModel.useEqualizerPreset(index) },
                     onEqualizerBoldPresetSelect = { preset -> playerViewModel.useBoldEqualizerPreset(preset) },
+                    audiobookModeEnabled = audiobookModeEnabled,
+                    onToggleAudiobookMode = { playerViewModel.setAudiobookModeEnabled(it) },
                     visualizerEnabled = visualizerEnabled,
                     visualizerSupported = visualizerSupported,
                     visualizerPermissionGranted = visualizerPermissionGranted,
