@@ -6,6 +6,24 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 99 (Audit kompatibilitas mundur Android 14 ke bawah, 0 file kode diubah, 2 file
+dokumentasi)** — Instruksi user: "terapkan backward compatibility support untuk Android 14
+kebawah". Audit 28 titik `Build.VERSION.SDK_INT`/`VERSION_CODES` di 10 file, fokus khusus kode
+`specialUse` foreground service Batch 98 (fitur Android 14/API 34-only, paling berisiko).
+
+**Hasil: 0 bug, 0 file diubah** — semua titik sudah benar dibungkus `if (SDK_INT >= level_yang_
+tepat)` dengan fallback API lama yang valid. Kunci: `FOREGROUND_SERVICE_TYPE_SPECIAL_USE`
+(constant API 34) di-inline compiler jadi integer literal, jalur pemanggilannya sendiri sudah
+digate `>= UPSIDE_DOWN_CAKE` jadi tidak pernah tereksekusi di device <34. `<service
+foregroundServiceType="specialUse">` + `<property>` di manifest adalah atribut biner statis
+di-resolve AAPT2 SAAT BUILD (compileSdk 34), bukan divalidasi ulang terhadap versi OS device
+saat parsing runtime — OS lama baca int itu tanpa peduli namanya, tidak crash di device manapun
+≥ minSdk 23. 1 titik redundan (bukan bug) ditemukan di `BubbleBootReceiver` (cek `SDK_INT>=M`
+yang selalu true karena minSdk sudah 23=M) — dibiarkan, cuma gaya penulisan bukan risiko.
+
+**Kesimpulan**: proyek sudah backward-compatible penuh ke `minSdk 23` termasuk fitur Android
+14-only terbaru. Detail lengkap per-titik: `CHANGELOG.md` Batch 99.
+
 **Batch 98 (Sempurnakan Floating Mini Player/Bubble — reliabilitas & completeness, 4 file —
 1 baru + 3 diedit, 1 protected)** — Lanjutan instruksi user "sempurnakan 100% fungsionalitas".
 Batch 97 (sesi sebelumnya) sengaja cuma fix 1 bug jank, menyisakan 3 celah completeness yang

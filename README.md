@@ -8,9 +8,10 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 98:** Floating Mini Player (Bubble) sekarang foreground service
-> beneran (lebih tahan dibunuh OS), auto-restart setelah HP reboot, dan penanganan state
-> antrean kosong. Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
+> 🆕 **Update terbaru — Batch 99:** Audit kompatibilitas mundur Android 14 ke bawah — 28 titik
+> version-gate di 10 file diverifikasi, 0 bug ditemukan, proyek sudah aman sampai `minSdk 23`
+> termasuk fitur Android 14-only terbaru. Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru
+> di paling atas).
 
 > **Mulai dari sini kalau ini sesi/percakapan baru:** baca `PROJECT_STATE.md` (status +
 > riwayat insiden ringkas), `CHANGELOG.md` (histori tiap batch), dan bagian "Keputusan

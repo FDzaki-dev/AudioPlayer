@@ -1,5 +1,51 @@
 # Changelog
 
+## Batch 99 — Audit kompatibilitas mundur Android 14 ke bawah (0 kode diubah)
+Instruksi user: "terapkan backward compatibility support untuk Android 14 kebawah". Fokus
+audit: kode `specialUse` foreground service dari Batch 98 (fitur khusus Android 14/API 34,
+paling berisiko pecah di versi lebih rendah) + audit ulang menyeluruh SEMUA titik version-gate
+di proyek, bukan cuma yang baru.
+
+**Metode**: `grep -rn "Build.VERSION.SDK_INT\|Build.VERSION_CODES"` di seluruh `app/src/main/
+java` — ketemu 28 titik di 10 file. Tiap titik dicek manual: (1) API level minimum ASLI dari
+symbol/constant/method yang dipanggil (dicocokkan ke dokumentasi resmi Android per level), (2)
+apakah pemanggilannya benar-benar dibungkus `if (SDK_INT >= level_yang_benar)` dengan fallback
+yang valid di cabang else-nya untuk versi di bawahnya.
+
+**Hasil — 0 bug ditemukan, 0 file diubah**. Titik-titik kunci yang diverifikasi:
+- `ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE` (constant API 34) — di-inline compiler
+  jadi integer literal saat build (bukan lookup runtime ke class platform), dan jalur
+  pemanggilannya sendiri SUDAH dibungkus `SDK_INT >= UPSIDE_DOWN_CAKE` di
+  `FloatingBubbleService.startForegroundWithNotification()` — aman dipanggil di device API
+  berapa pun, termasuk di bawah 34, karena baris itu memang tidak pernah dieksekusi di sana.
+- 3-arg `startForeground(id, notification, type)` (method-nya sendiri ada sejak API 29) — kode
+  ini malah LEBIH konservatif dari yang wajib: baru dipakai mulai API 34 (bukan 29), karena
+  tidak ada tipe FGS lain yang cocok untuk rentang 29-33. Di bawah 34 fallback ke overload
+  2-argumen lama.
+- `<service android:foregroundServiceType="specialUse">` + `<property android:name="android.
+  app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE">` di manifest — atribut biner statis yang di-resolve
+  AAPT2 jadi integer SAAT BUILD (pakai compileSdk 34), bukan divalidasi ulang terhadap versi OS
+  device saat parsing di runtime — OS lama membaca int itu tanpa tahu/peduli namanya
+  "specialUse", tidak menyebabkan crash instalasi maupun runtime di device manapun ≥ minSdk 23.
+- 6 titik lain (`NotificationChannel`/`IMPORTANCE_MIN` API 26, `TYPE_APPLICATION_OVERLAY` API
+  26, `startForegroundService()` API 26, `STOP_FOREGROUND_REMOVE` API 24, `loadThumbnail()` API
+  29, plus semua titik version-gate pra-Batch-95 di `PlaybackService.kt`/`WidgetUpdater.kt`/
+  `AudioArtFetcher.kt`/`AccentColorExtractor.kt`/`MusicRepository.kt`/`ApkSignatureChecker.kt`/
+  `MainActivity.kt`) — semua sudah dibungkus `if/else` yang benar dengan fallback API lama yang
+  valid, pola konsisten di seluruh proyek sejak batch-batch sebelumnya.
+- Satu titik REDUNDAN (bukan bug, cuma tidak perlu): `BubbleBootReceiver`'s
+  `SDK_INT >= Build.VERSION_CODES.M` sebelum `Settings.canDrawOverlays()` — karena `minSdk`
+  proyek ini sudah 23 (=M persis), kondisi itu SELALU true di device manapun yang bisa install
+  app ini sama sekali. Dibiarkan apa adanya (defensif eksplisit tidak salah, cuma tidak
+  esensial) — tidak disentuh karena bukan risiko, hanya gaya penulisan.
+
+**Kesimpulan**: proyek ini SUDAH backward-compatible penuh sampai `minSdk 23` (Android 6.0)
+termasuk fitur Android 14-only terbaru (Batch 98). Tidak ada perubahan kode yang diperlukan
+dari audit ini. Kalau user pernah mengalami crash/perilaku aneh spesifik di device Android
+tertentu, laporkan versi Android + langkah reproduksi supaya bisa diselidiki spesifik — audit
+statis ini tidak menggantikan pengujian di device fisik sungguhan (sama seperti seluruh proyek,
+belum ada JDK/Android SDK di sandbox untuk build/run nyata).
+
 ## Batch 98 — Sempurnakan Floating Mini Player (Bubble): reliabilitas & completeness
 Lanjutan instruksi user "sempurnakan 100% fungsionalitas Floating Mini Player" — Batch 97
 (sesi sebelumnya) sudah membenahi 1 bug jank main-thread tapi sengaja TIDAK menyentuh 3 celah
