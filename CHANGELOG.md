@@ -1,5 +1,28 @@
 # Changelog
 
+## Batch 94 — Dokumentasi: rapikan urutan & "welcome-ability" README (murni dokumentasi, 0 kode)
+Permintaan user: rapikan dokumentasi proyek + pastikan info terbaru selalu tampil paling atas
+di semua file dokumentasi + tambah shortcut unduh APK dari GitHub Release di README.
+
+**Audit urutan newest-first di `CHANGELOG.md`** — ditemukan 3 blok riwayat lama yang tidak
+urut turun sempurna (sisa dari penulisan manual bertahap, bukan proses otomatis): Batch
+15 & 14 sempat tertulis setelah Batch 7 (harusnya di antara Batch 16 dan Batch 12), dan
+Batch 49 & 48 tertulis di antara Batch 46/47 (harusnya sebelum Batch 47). Kedua blok
+dipindah ke posisi numerik yang benar — isi tiap entri tidak diubah sama sekali, murni
+reposisi. `PROJECT_STATE.md` dicek dengan cara sama (Batch 93 → 6, ditambah `## Batch 30`
+sebagai transisi format lama) — sudah urut turun sempurna, tidak ada perubahan. Bagian
+"Riwayat insiden kronologis" di `PROJECT_STATE.md` sengaja **tidak** disortir ulang — label
+filenya sendiri eksplisit "kronologis" (tertua → terbaru), beda tujuan dari daftar batch di
+atasnya. `FILE_MANIFEST.txt` (alfabetis per path) dan `ROADMAP_15_FITUR_OFFLINE.md`
+(bernomor per-item roadmap, bukan kronologis) tidak relevan dengan aturan newest-first —
+dibiarkan apa adanya.
+
+**README.md** — ditambah bagian "📥 Unduh Aplikasi" persis di bawah judul (link relatif
+`../../releases/latest`, otomatis resolve ke rilis GitHub terbaru repo manapun tempat file
+ini di-hosting, tidak perlu hardcode nama owner/repo), callout "🆕 Update terbaru" merujuk ke
+Batch 93 (batch fitur terakhir) yang WAJIB disinkronkan manual tiap ada batch fitur baru, dan
+Daftar Isi (TOC) mengingat file README sudah >180 baris tanpa navigasi sebelumnya.
+
 ## Batch 93 — Fitur baru: Mode Audiobook/Podcast (roadmap item #12)
 Dari `ROADMAP_15_FITUR_OFFLINE.md` item #12. Ingat kecepatan putar & posisi terakhir per-lagu
 individual (bukan speed global yang sekarang berlaku ke semua lagu), plus tampilan "menit
@@ -1827,47 +1850,6 @@ dari "recolor tema" kalau user memang mau cakupan itu juga.
 **Belum diverifikasi runtime asli** (tidak ada compiler Android di environment kerja) — analisis
 statis + brace/paren balance dicek manual di semua file yang disentuh.
 
-## Batch 46 — Timpa tema custom Matte Noir pakai spec user "Skeuomorphism-lite" (compose-skeuomorphism-lite.md)
-User bilang hasil Batch 40-44 "jelek banget asli" dan kirim markdown spec desain sendiri untuk
-dipakai. Ditimpa total, bukan tempel di atas yang lama: `MatteDepth.kt` (`matteEmboss()`)
-ditulis ulang dari nol mengikuti 3 poin spec:
-1. **Tactile depth (spec §1)** — dari gradient diagonal 3-warna + 2 layer shadow offset
-   ("epic" stack Batch 42) jadi 1 gradient vertikal atas→bawah + 1 shadow tunggal, plus bevel
-   border gradient vertikal (terang di atas → gelap di bawah) menggantikan ring catch-light
-   satu sisi — persis instruksi spec "layering contrasting light and dark borders".
-2. **Micro-interactions (spec §2)** — param `pressed` sekarang benar-benar animasi
-   (`animateDpAsState`/`animateFloatAsState`: elevation collapse + scale 0.985) bukan swap
-   alpha instan seperti sebelumnya — efek "fisik ketekan" sesuai spec.
-3. **Isolated accents (spec §3)** — intensitas diturunkan di semua parameter default (alpha,
-   elevation) supaya `matteEmboss()` sekarang treatment untuk card struktural yang flat/minimal,
-   bukan efek berat di semua titik. Sesuai spec, slider/toggle sengaja TIDAK diskin dengan
-   modifier ini — tetap komponen Material3 biasa, tidak diubah batch ini.
-Karena signature (`shape`/`elevation`/`pressed`) tidak berubah, 5 dari 6 pemanggil lama (mini
-player, Home, Library, Settings, NavigationBar di `MainActivity.kt`) otomatis ikut tampilan baru
-tanpa disentuh sama sekali. Satu pemanggil manual yang TIDAK lewat `matteEmboss()` — AlbumArtHero
-di `NowPlayingScreen.kt`, sengaja beda sejak Batch 40 — juga ditulis ulang ke teknik yang sama
-(shadow gambar-manual + border gradient vertikal) supaya konsisten 1 bahasa visual, sekalian
-buang native `Modifier.shadow` ganda yang sudah terbukti invisible di background nyaris-hitam
-(temuan Batch 40/41, sekarang dikonfirmasi ulang berlaku juga di titik ini). 2 file disentuh
-(`MatteDepth.kt` ditulis ulang penuh, `NowPlayingScreen.kt` 1 blok + 3 baris import). **Belum
-diverifikasi runtime asli** (tidak ada compiler Android di environment kerja) — analisis statis
-+ brace/paren balance. Prioritas sesi berikutnya: user test di device asli — kalau masih
-"kureng"/jelek, JANGAN ulangi pola nambah layer shadow/gradient lagi (sudah 4x gagal dengan pola
-itu, Batch 40→44); minta screenshot spesifik bagian mana yang salah dulu.
-
-## Batch 47 — Hotfix Batch 46: compileDebugKotlin FAILED, `by` delegate tanpa import getValue
-`log_fail_104.zip` → `MatteDepth.kt:59` & `:63`: `Type 'State<Dp>' has no method
-'getValue(...)' and thus it cannot serve as a delegate` pada `val animatedElevation by
-animateDpAsState(...)` dan `val scale by animateFloatAsState(...)`. Root cause: Batch 46
-menulis ulang file ini dari nol dan pakai sintaks `by` tapi lupa
-`import androidx.compose.runtime.getValue` (operator delegate `by` untuk `State<T>` butuh
-import eksplisit ini, bukan otomatis ikut `androidx.compose.runtime.Composable`). File lain
-yang disentuh Batch 46 (`NowPlayingScreen.kt`) tidak kena karena sudah punya
-`import androidx.compose.runtime.*` dari sebelumnya. Fix: tambah 1 baris import. 1 file, fix
-atomik. **Belum diverifikasi runtime asli** — tapi ini kesalahan compile-time yang exact match
-dengan error log (bukan tebakan), jadi confidence tinggi dibanding hotfix Batch 41/43
-sebelumnya yang sempat salah tebak duluan.
-
 ## Batch 49 — Hapus total identitas "Matte Noir" lama, ganti dengan tema custom baru "Tactile" murni dari spec skeuomorphism-lite.md
 User minta eksplisit: hapus SEMUA jejak tema custom lama sampai bersih, baru terapkan spec baru
 — bukan overlay/patch di atas yang lama (beda dari Batch 46 yang cuma nulis ulang
@@ -1943,6 +1925,47 @@ masalah yang persis cocok sama gejala di screenshot (hitam-di-hitam, bukan cuma 
 bukan tebakan kosong. **Batch ini adalah bug LAMA sejak Batch 40** (root cause-nya trik
 `Surface(color=Transparent)`), baru kelihatan sekarang karena baru sekarang LockScreen
 di-screenshot dalam kondisi Matte theme aktif — bukan regresi baru dari Batch 46/47.
+
+## Batch 47 — Hotfix Batch 46: compileDebugKotlin FAILED, `by` delegate tanpa import getValue
+`log_fail_104.zip` → `MatteDepth.kt:59` & `:63`: `Type 'State<Dp>' has no method
+'getValue(...)' and thus it cannot serve as a delegate` pada `val animatedElevation by
+animateDpAsState(...)` dan `val scale by animateFloatAsState(...)`. Root cause: Batch 46
+menulis ulang file ini dari nol dan pakai sintaks `by` tapi lupa
+`import androidx.compose.runtime.getValue` (operator delegate `by` untuk `State<T>` butuh
+import eksplisit ini, bukan otomatis ikut `androidx.compose.runtime.Composable`). File lain
+yang disentuh Batch 46 (`NowPlayingScreen.kt`) tidak kena karena sudah punya
+`import androidx.compose.runtime.*` dari sebelumnya. Fix: tambah 1 baris import. 1 file, fix
+atomik. **Belum diverifikasi runtime asli** — tapi ini kesalahan compile-time yang exact match
+dengan error log (bukan tebakan), jadi confidence tinggi dibanding hotfix Batch 41/43
+sebelumnya yang sempat salah tebak duluan.
+
+## Batch 46 — Timpa tema custom Matte Noir pakai spec user "Skeuomorphism-lite" (compose-skeuomorphism-lite.md)
+User bilang hasil Batch 40-44 "jelek banget asli" dan kirim markdown spec desain sendiri untuk
+dipakai. Ditimpa total, bukan tempel di atas yang lama: `MatteDepth.kt` (`matteEmboss()`)
+ditulis ulang dari nol mengikuti 3 poin spec:
+1. **Tactile depth (spec §1)** — dari gradient diagonal 3-warna + 2 layer shadow offset
+   ("epic" stack Batch 42) jadi 1 gradient vertikal atas→bawah + 1 shadow tunggal, plus bevel
+   border gradient vertikal (terang di atas → gelap di bawah) menggantikan ring catch-light
+   satu sisi — persis instruksi spec "layering contrasting light and dark borders".
+2. **Micro-interactions (spec §2)** — param `pressed` sekarang benar-benar animasi
+   (`animateDpAsState`/`animateFloatAsState`: elevation collapse + scale 0.985) bukan swap
+   alpha instan seperti sebelumnya — efek "fisik ketekan" sesuai spec.
+3. **Isolated accents (spec §3)** — intensitas diturunkan di semua parameter default (alpha,
+   elevation) supaya `matteEmboss()` sekarang treatment untuk card struktural yang flat/minimal,
+   bukan efek berat di semua titik. Sesuai spec, slider/toggle sengaja TIDAK diskin dengan
+   modifier ini — tetap komponen Material3 biasa, tidak diubah batch ini.
+Karena signature (`shape`/`elevation`/`pressed`) tidak berubah, 5 dari 6 pemanggil lama (mini
+player, Home, Library, Settings, NavigationBar di `MainActivity.kt`) otomatis ikut tampilan baru
+tanpa disentuh sama sekali. Satu pemanggil manual yang TIDAK lewat `matteEmboss()` — AlbumArtHero
+di `NowPlayingScreen.kt`, sengaja beda sejak Batch 40 — juga ditulis ulang ke teknik yang sama
+(shadow gambar-manual + border gradient vertikal) supaya konsisten 1 bahasa visual, sekalian
+buang native `Modifier.shadow` ganda yang sudah terbukti invisible di background nyaris-hitam
+(temuan Batch 40/41, sekarang dikonfirmasi ulang berlaku juga di titik ini). 2 file disentuh
+(`MatteDepth.kt` ditulis ulang penuh, `NowPlayingScreen.kt` 1 blok + 3 baris import). **Belum
+diverifikasi runtime asli** (tidak ada compiler Android di environment kerja) — analisis statis
++ brace/paren balance. Prioritas sesi berikutnya: user test di device asli — kalau masih
+"kureng"/jelek, JANGAN ulangi pola nambah layer shadow/gradient lagi (sudah 4x gagal dengan pola
+itu, Batch 40→44); minta screenshot spesifik bagian mana yang salah dulu.
 
 ## Batch 45 — Fix bug lama: SignatureMatcherSheet bandingkan key signing yang SALAH kalau app pernah rotasi key
 User laporan "gak sinkron" di fitur pencocok signature APK (`SignatureMatcherSheet` +
@@ -2775,6 +2798,28 @@ duluan, tidak disentuh ulang di sini).
 - `PROJECT_STATE.md` dan `FILE_MANIFEST.txt` ditambahkan di root, sesuai standar proyek yang
   belum sempat diterapkan ke repo ini sebelumnya
 
+## Batch 15 — Persiapan lanjut di sesi lain
+- Ditambah komentar level-file di `PlaybackService.kt` yang eksplisit menunjuk ke CHANGELOG
+  Batch 10-14 dan mengingatkan supaya asumsi soal API Media3 dicek ulang ke dokumentasi
+  resmi/source code sebelum diubah — file ini yang paling sering jadi sumber asumsi salah
+  sepanjang riwayat batch di atas
+- README ditambah catatan "mulai dari sini" di paling atas untuk sesi chat baru mana pun
+- Referensi basi "Media3 `MediaSessionService`" di README diperbaiki jadi `MediaLibraryService`
+  (sudah pindah sejak Batch 12, belum sempat disinkronkan)
+- Dipertimbangkan tapi tidak dikerjakan: menambah tahap compile-check terpisah di CI sebelum
+  build release penuh — dicek dulu ke `.github/workflows/build.yml`, ternyata
+  `compileReleaseKotlin` (tempat error Batch 14 ketahuan) sudah gagal duluan sebelum tahap
+  minify/sign yang mahal, jadi tidak ada keuntungan waktu yang jelas untuk saat ini
+
+## Batch 14 — Hotfix build error dari Batch 12
+- `MediaLibrarySession` ternyata nested di dalam `MediaLibraryService`
+  (`MediaLibraryService.MediaLibrarySession`), bukan class top-level di package
+  `androidx.media3.session` seperti yang ditulis di Batch 12 — dicek ulang langsung ke source
+  code resmi androidx/media (konsisten dari versi 1.0.0 sampai rilis terbaru) untuk
+  memastikan sebelum memperbaiki
+- Satu baris import yang salah; semua pemakaian lain di file itu otomatis benar begitu
+  import-nya benar
+
 ## Batch 12 — Playback Resumption resmi
 - `PlaybackService` dipindah dari `MediaSessionService` ke `MediaLibraryService` — prasyarat
   resmi Google supaya kartu resume media di System UI bisa muncul
@@ -2842,28 +2887,6 @@ duluan, tidak disentuh ulang di sini).
   per-slot yang ikut lagu saat dipindah
 - Beberes repo: folder duplikat `AudioPlayer-main/AudioPlayer-main/` dan file nyasar
   `ession.MediaSession` dihapus
-
-## Batch 15 — Persiapan lanjut di sesi lain
-- Ditambah komentar level-file di `PlaybackService.kt` yang eksplisit menunjuk ke CHANGELOG
-  Batch 10-14 dan mengingatkan supaya asumsi soal API Media3 dicek ulang ke dokumentasi
-  resmi/source code sebelum diubah — file ini yang paling sering jadi sumber asumsi salah
-  sepanjang riwayat batch di atas
-- README ditambah catatan "mulai dari sini" di paling atas untuk sesi chat baru mana pun
-- Referensi basi "Media3 `MediaSessionService`" di README diperbaiki jadi `MediaLibraryService`
-  (sudah pindah sejak Batch 12, belum sempat disinkronkan)
-- Dipertimbangkan tapi tidak dikerjakan: menambah tahap compile-check terpisah di CI sebelum
-  build release penuh — dicek dulu ke `.github/workflows/build.yml`, ternyata
-  `compileReleaseKotlin` (tempat error Batch 14 ketahuan) sudah gagal duluan sebelum tahap
-  minify/sign yang mahal, jadi tidak ada keuntungan waktu yang jelas untuk saat ini
-
-## Batch 14 — Hotfix build error dari Batch 12
-- `MediaLibrarySession` ternyata nested di dalam `MediaLibraryService`
-  (`MediaLibraryService.MediaLibrarySession`), bukan class top-level di package
-  `androidx.media3.session` seperti yang ditulis di Batch 12 — dicek ulang langsung ke source
-  code resmi androidx/media (konsisten dari versi 1.0.0 sampai rilis terbaru) untuk
-  memastikan sebelum memperbaiki
-- Satu baris import yang salah; semua pemakaian lain di file itu otomatis benar begitu
-  import-nya benar
 
 ## Batch 6 dan sebelumnya
 Lihat daftar fitur di `README.md` — detail per-batch untuk rentang ini tidak tercatat

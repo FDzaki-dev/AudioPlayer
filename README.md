@@ -1,6 +1,16 @@
 # Audio Player
 
-Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
+Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer. 100% offline, tanpa izin
+INTERNET sama sekali.
+
+### 📥 Unduh Aplikasi
+**[⬇️ Download APK terbaru — GitHub Release](../../releases/latest)** — sudah ditandatangani
+(signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
+memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
+
+> 🆕 **Update terbaru — Batch 93:** Mode Audiobook/Podcast (ingat kecepatan & posisi putar
+> per-lagu individual, tampilan sisa waktu `-mm:ss`). Riwayat lengkap ada di `CHANGELOG.md`
+> (selalu terbaru di paling atas).
 
 > **Mulai dari sini kalau ini sesi/percakapan baru:** baca `PROJECT_STATE.md` (status +
 > riwayat insiden ringkas), `CHANGELOG.md` (histori tiap batch), dan bagian "Keputusan
@@ -8,6 +18,17 @@ Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer.
 > `PlaybackService.kt`, `AppLockStore.kt`, atau `app/build.gradle.kts`. Konteks percakapan
 > lama tidak ikut ke sesi baru; dua file itu sudah pernah menyebabkan asumsi salah yang baru
 > ketahuan setelah build gagal (lihat Batch 10-14 di CHANGELOG).
+
+## Daftar Isi
+- [📥 Unduh Aplikasi](#-unduh-aplikasi)
+- [Fitur v1](#fitur-v1)
+- [Standar Penomoran Versi](#standar-penomoran-versi)
+- [Keputusan Arsitektur](#keputusan-arsitektur)
+- [Testing](#testing)
+- [Belum selesai / dalam pengerjaan](#belum-selesai--dalam-pengerjaan)
+- [Catatan jujur soal Gapless Playback](#catatan-jujur-soal-gapless-playback)
+- [Build](#build)
+- [Rencana v2](#rencana-v2-belum-dibuat)
 
 ## Fitur v1
 - Scan otomatis semua file audio di perangkat via MediaStore (mendukung codec mainstream: MP3, AAC/M4A, FLAC, WAV, OGG/Vorbis, OPUS, AMR — apa pun yang bisa diindeks sistem)

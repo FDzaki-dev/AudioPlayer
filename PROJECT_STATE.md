@@ -6,6 +6,24 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 94 (Dokumentasi: rapikan urutan newest-first + "welcome-ability" README, 0 file kode,
+2 file dokumentasi diedit)** — Permintaan user: pastikan info terbaru selalu di paling atas
+di semua file dokumentasi + tambah shortcut unduh APK GitHub Release di README.
+
+`CHANGELOG.md` — audit urutan ditemukan 2 blok riwayat lama tidak urut sempurna turun
+(Batch 15/14 setelah Batch 7, harusnya sebelum Batch 12; Batch 49/48 di antara 46/47,
+harusnya sebelum 47) — dipindah ke posisi numerik benar, isi entri tidak diubah. File ini
+sekarang (dan sebelumnya) sudah urut turun sempurna, tidak disentuh. "Riwayat insiden
+kronologis" di bawah sengaja **tidak** ikut disortir — label filenya eksplisit kronologis
+(tertua→terbaru), beda tujuan dari daftar batch. `FILE_MANIFEST.txt` (alfabetis) &
+`ROADMAP_15_FITUR_OFFLINE.md` (bernomor per-item) di luar cakupan aturan newest-first.
+
+`README.md` — bagian baru "📥 Unduh Aplikasi" di bawah judul (link relatif
+`../../releases/latest`, auto-resolve ke GitHub Release terbaru tanpa hardcode nama
+repo/owner), callout "🆕 Update terbaru" (**wajib disinkronkan manual** tiap ada batch fitur
+baru — saat ini menunjuk Batch 93), dan Daftar Isi (TOC) untuk navigasi (file sudah >180
+baris, sebelumnya tanpa TOC).
+
 **Batch 93 (Fitur baru: Mode Audiobook/Podcast, 4 file kode + 4 file dokumentasi)** — Dari
 `ROADMAP_15_FITUR_OFFLINE.md` item #12. Ingat kecepatan & posisi terakhir per-lagu individual
 (bukan speed global yang berlaku ke semua lagu), tampilan "menit tersisa" (`-mm:ss`) untuk file
