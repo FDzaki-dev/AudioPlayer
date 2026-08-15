@@ -87,6 +87,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.rudi.audioplayer.bubble.FloatingBubbleService
 import com.rudi.audioplayer.playback.PlayerViewModel
 import com.rudi.audioplayer.ui.HomeScreen
 import com.rudi.audioplayer.ui.LockScreen
@@ -515,6 +516,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val visualizerSupported by playerViewModel.visualizerSupported.collectAsStateWithLifecycle()
     val visualizerBars by playerViewModel.visualizerBars.collectAsStateWithLifecycle()
     val audiobookModeEnabled by playerViewModel.audiobookModeEnabled.collectAsStateWithLifecycle()
+    val floatingBubbleEnabled by playerViewModel.floatingBubbleEnabled.collectAsStateWithLifecycle()
 
     val deleteContext = LocalContext.current
 
@@ -538,6 +540,51 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         // — flip it on immediately instead of making them go tap the switch a second time.
         if (granted) playerViewModel.setVisualizerEnabled(true)
     }
+    // Roadmap #11, Floating Mini Player — SYSTEM_ALERT_WINDOW BUKAN runtime permission dialog
+    // biasa (tidak ada callback granted/denied yang bisa diandalkan lintas OEM dari hasil
+    // Activity-nya sendiri) — pola yang benar adalah buka layar sistem lalu cek ulang langsung
+    // ke Settings.canDrawOverlays() begitu user kembali, bukan percaya result code seperti
+    // visualizerPermissionLauncher di atas.
+    val overlayPermissionContext = LocalContext.current
+    val overlayPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (Settings.canDrawOverlays(overlayPermissionContext)) {
+            playerViewModel.setFloatingBubbleEnabled(true)
+            overlayPermissionContext.startService(Intent(overlayPermissionContext, FloatingBubbleService::class.java))
+        }
+        // Ditolak/dibatalkan: toggle di SettingsScreen tetap OFF (floatingBubbleEnabled tidak
+        // pernah diset true di sini), tidak perlu penanganan tambahan.
+    }
+
+    fun toggleFloatingBubble(enabled: Boolean) {
+        if (!enabled) {
+            playerViewModel.setFloatingBubbleEnabled(false)
+            overlayPermissionContext.stopService(Intent(overlayPermissionContext, FloatingBubbleService::class.java))
+            return
+        }
+        if (Settings.canDrawOverlays(overlayPermissionContext)) {
+            playerViewModel.setFloatingBubbleEnabled(true)
+            overlayPermissionContext.startService(Intent(overlayPermissionContext, FloatingBubbleService::class.java))
+        } else {
+            overlayPermissionLauncher.launch(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:${overlayPermissionContext.packageName}")
+                )
+            )
+        }
+    }
+
+    // Restart bubble sekali per proses kalau sesi SEBELUMNYA menyalakannya dan izin masih ada
+    // (proses baru = Service lama ikut mati, START_STICKY tidak menolong lintas proses baru) —
+    // tanpa ini, user harus manual matik-nyalakan toggle lagi tiap kali app di-kill total.
+    LaunchedEffect(Unit) {
+        if (floatingBubbleEnabled && Settings.canDrawOverlays(overlayPermissionContext)) {
+            overlayPermissionContext.startService(Intent(overlayPermissionContext, FloatingBubbleService::class.java))
+        }
+    }
+
     val deleteRequestLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
@@ -849,6 +896,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     onToggleShakeToSkip = { enabled -> playerViewModel.setShakeToSkipEnabled(enabled) },
                     radioAutoContinueEnabled = radioAutoContinueEnabled,
                     onToggleRadioAutoContinue = { enabled -> playerViewModel.setRadioAutoContinueEnabled(enabled) },
+                    floatingBubbleEnabled = floatingBubbleEnabled,
+                    onToggleFloatingBubble = { enabled -> toggleFloatingBubble(enabled) },
                     onInfoMessage = { message -> playerViewModel.showInfoMessage(message) },
                     onOpenStats = { navController.navigate("stats_dashboard") }
                 )

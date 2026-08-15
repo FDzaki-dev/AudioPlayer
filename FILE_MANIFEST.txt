@@ -1,7 +1,8 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 127 file
+# Total: 134 file (dihitung ulang & diverifikasi Batch 95 — header sebelumnya "127" sudah
+# stale/tidak sinkron dengan isi list sejak sebelum batch ini, dikoreksi sekalian)
 
 .github/workflows/build.yml
 .gitignore
@@ -16,6 +17,7 @@ app/proguard-rules.pro
 app/src/main/AndroidManifest.xml
 app/src/main/java/com/rudi/audioplayer/AudioPlayerApplication.kt
 app/src/main/java/com/rudi/audioplayer/MainActivity.kt
+app/src/main/java/com/rudi/audioplayer/bubble/FloatingBubbleService.kt
 app/src/main/java/com/rudi/audioplayer/data/AppLockStore.kt
 app/src/main/java/com/rudi/audioplayer/data/AudiobookModeStore.kt
 app/src/main/java/com/rudi/audioplayer/data/Bookmark.kt
@@ -24,6 +26,7 @@ app/src/main/java/com/rudi/audioplayer/data/CrossfadeStore.kt
 app/src/main/java/com/rudi/audioplayer/data/CustomFolderScanner.kt
 app/src/main/java/com/rudi/audioplayer/data/CustomFolderStore.kt
 app/src/main/java/com/rudi/audioplayer/data/FavoritesStore.kt
+app/src/main/java/com/rudi/audioplayer/data/FloatingBubbleStore.kt
 app/src/main/java/com/rudi/audioplayer/data/HourlyListenStore.kt
 app/src/main/java/com/rudi/audioplayer/data/LibraryFilterStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ListeningHistoryStore.kt
@@ -95,6 +98,7 @@ app/src/main/res/drawable/widget_background.xml
 app/src/main/res/drawable/widget_background_light.xml
 app/src/main/res/drawable/widget_play_button_bg.xml
 app/src/main/res/drawable/widget_play_button_bg_light.xml
+app/src/main/res/layout/bubble_mini_player.xml
 app/src/main/res/layout/widget_player.xml
 app/src/main/res/layout/widget_player_compact.xml
 app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml

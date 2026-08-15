@@ -18,6 +18,13 @@
          first launch — see VisualizerSheet.kt / MainActivity.kt's visualizerPermissionLauncher. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Roadmap #11, Floating Mini Player — izin sensitif "gambar di atas app lain", wajib
+         diminta eksplisit lewat Settings.ACTION_MANAGE_OVERLAY_PERMISSION (bukan runtime
+         permission dialog biasa). Hanya diminta saat user menyalakan toggle bubble sendiri di
+         Settings, sama pola on-demand seperti RECORD_AUDIO Batch 92 di atas — lihat
+         FloatingBubbleService.kt / MainActivity.kt's overlayPermissionLauncher. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application
         android:name=".AudioPlayerApplication"
         android:allowBackup="true"
@@ -53,6 +60,13 @@
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
+        <!-- Roadmap #11, Floating Mini Player — bukan foreground service (lihat catatan
+             "Batasan jujur" di FloatingBubbleService.kt), exported="false" karena hanya
+             dinyalakan dari dalam app sendiri, tidak pernah oleh komponen app lain. -->
+        <service
+            android:name=".bubble.FloatingBubbleService"
+            android:exported="false" />
 
         <!-- Lets Bluetooth devices and the Android System UI media-resumption feature relaunch
              this service and hand it a MEDIA_BUTTON intent even after the app process has been

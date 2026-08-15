@@ -1,5 +1,72 @@
 # Changelog
 
+## Batch 95 — Fitur baru: Floating Mini Player / Bubble (roadmap item #11)
+Dari `ROADMAP_15_FITUR_OFFLINE.md` item #11 (Kompleksitas: Tinggi). Mini player mengambang di
+atas app lain mana pun (mirip chat bubble Messenger) — play/pause/prev/next tanpa perlu buka
+AudioPlayer, pelengkap widget home-screen yang sudah ada.
+
+**Izin & toggle**: `SYSTEM_ALERT_WINDOW` (baru di `AndroidManifest.xml`) diminta HANYA saat user
+menyalakan toggle "Mini Player Mengambang (Bubble)" baru di Settings (opt-in, off by default,
+filosofi sama `ShakeSettingsStore`) — bukan di onboarding wajib. `Settings.ACTION_MANAGE_
+OVERLAY_PERMISSION` dipakai (bukan runtime permission dialog `ActivityResultContracts.
+RequestPermission` biasa seperti RECORD_AUDIO Batch 92 — overlay adalah "special permission",
+tidak ada callback granted/denied yang bisa diandalkan lintas OEM dari hasil Activity-nya
+sendiri), status sebenarnya dicek ulang langsung ke `Settings.canDrawOverlays()` begitu user
+kembali dari layar sistem. `FloatingBubbleStore.kt` (baru, `data/`) simpan preferensi + posisi
+drag terakhir, pola identik `ShakeSettingsStore`.
+
+**Kenapa plain View, bukan Compose**: `FloatingBubbleService.kt` (baru, `bubble/`) memasang
+window lewat `WindowManager` di luar Activity manapun — sebuah `ComposeView` di posisi ini butuh
+`LifecycleOwner`/`SavedStateRegistryOwner` rakitan manual sebelum Compose mau nempel, kompleksitas
+nyata untuk pil 3-tombol tanpa scroll/animasi rumit. `bubble_mini_player.xml` (layout baru) reuse
+`widget_background.xml`/`widget_play_button_bg.xml`/`ic_widget_*.png` APA ADANYA — identitas
+visual bubble otomatis konsisten dengan widget, 0 drawable baru dibuat. Selalu varian gelap
+(bukan ikut light/dark toggle in-app widget) — bubble mengambang di atas app apa pun termasuk
+bertema terang, butuh 1 kontras yang konsisten di segala kondisi.
+
+**Kontrol/state**: `MediaController` asli dikoneksikan langsung dari Service (pola sama persis
+`PlayerViewModel.connect()` — `SessionToken` + `MediaController.Builder(...).buildAsync()`) untuk
+update LIVE play/pause/art lewat `Player.Listener`, bukan polling. Tap tombol pakai controller
+langsung kalau sudah konek; kalau belum, fallback ke Intent `WidgetUpdater.ACTION_TOGGLE_PLAY/
+NEXT/PREVIOUS` ke `PlaybackService` — kontrak Intent yang SUDAH ADA dari widget dipakai apa
+adanya, 0 action constant baru perlu ditambah. Artwork pakai `contentResolver.loadThumbnail()`
+langsung di URI lagu (pola identik `AudioArtFetcher`/`WidgetUpdater`, lihat catatan Batch 68 di
+`AudioArtFetcher.kt` kenapa pendekatan lain pernah gagal total untuk kasus ini).
+
+**Drag & pass-through**: `OnTouchListener` di root layout, dibedakan drag-vs-tap lewat TOTAL
+jarak gerak (bukan cuma delta awal-akhir — jari gemetar kecil tidak salah dianggap drag), posisi
+di-clamp ke batas layar via `DisplayMetrics` + disimpan ke `FloatingBubbleStore` tiap selesai
+drag. Tombol play/prev/next tetap dapat klik normal tanpa logic pemisah manual — `ImageButton`
+clickable otomatis mengonsumsi `ACTION_DOWN` duluan sebelum ke `OnTouchListener` root. Touch
+pass-through ke app di bawah bubble didapat STRUKTURAL dari window `WRAP_CONTENT` (bukan
+`MATCH_PARENT` + flag manual per-event) — area di luar pill otomatis tembus.
+
+`MainActivity.kt` (protected, edit parsial) — `overlayPermissionLauncher`
+(`StartActivityForResult`) + `toggleFloatingBubble()` + `LaunchedEffect(Unit)` yang me-restart
+Service sekali per proses kalau sesi sebelumnya menyalakannya & izin masih ada (proses baru =
+Service lama ikut mati, `START_STICKY` tidak menolong lintas proses). `PlayerViewModel.kt` —
+`floatingBubbleEnabled` StateFlow, pola identik `shakeToSkipEnabled` (ViewModel murni simpan
+preferensi, TIDAK start/stop Service Android sendiri — butuh Context Activity untuk permission
+launcher-nya).
+
+**Batasan jujur** (dicatat, bukan diklaim selesai 100%): `FloatingBubbleService` BUKAN foreground
+service — window overlay yang tampil sudah menaikkan importance proses mendekati "visible" di
+kebanyakan device, tapi skin Android sangat agresif (lihat catatan OEM yang sama di README §
+Keputusan Arsitektur) tetap bisa membunuhnya sewaktu-waktu; ini keterbatasan platform yang sama
+seperti widget, bukan sesuatu yang bisa dijamin dari kode manapun. Belum diverifikasi di
+perangkat fisik sungguhan (sama seperti seluruh proyek ini, lihat README § Belum selesai).
+
+**Impact Report (Atomic Change)**: 11 file disentuh (2 baru: `FloatingBubbleStore.kt`,
+`FloatingBubbleService.kt`, `bubble_mini_player.xml`; 4 diedit:
+`AndroidManifest.xml`[protected]/`MainActivity.kt`[protected]/`PlayerViewModel.kt`/
+`SettingsScreen.kt`; 4 dokumentasi wajib sinkron) — melebihi batas normal 10 file/1 modul,
+dideklarasikan sebagai Atomic Change karena 1 fitur koheren yang membentang izin+service+store+
+toggle UI+dokumentasi wajib; memecahnya jadi >1 batch akan meninggalkan kode mati (mis. Service
+tanpa toggle) atau melanggar aturan proyek sendiri soal dokumentasi wajib sinkron. Sekalian
+dikoreksi: header `FILE_MANIFEST.txt` sempat tertulis "127 file" padahal isi list sebenarnya
+sudah 131 sebelum batch ini (drift lama, bukan dari batch ini) — dihitung ulang manual jadi 134
+(131 + 3 file baru batch ini), diverifikasi cocok 100% dengan isi direktori project.
+
 ## Batch 94 — Dokumentasi: rapikan urutan & "welcome-ability" README (murni dokumentasi, 0 kode)
 Permintaan user: rapikan dokumentasi proyek + pastikan info terbaru selalu tampil paling atas
 di semua file dokumentasi + tambah shortcut unduh APK dari GitHub Release di README.

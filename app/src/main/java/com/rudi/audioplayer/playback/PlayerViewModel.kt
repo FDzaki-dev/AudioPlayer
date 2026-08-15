@@ -107,6 +107,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val hourlyListenStore = HourlyListenStore(appContext)
     private val shakeSettingsStore = ShakeSettingsStore(appContext)
     private val radioSettingsStore = RadioSettingsStore(appContext)
+    private val floatingBubbleStore = com.rudi.audioplayer.data.FloatingBubbleStore(appContext)
 
     private val _shakeToSkipEnabled = MutableStateFlow(shakeSettingsStore.isEnabled())
     val shakeToSkipEnabled: StateFlow<Boolean> = _shakeToSkipEnabled.asStateFlow()
@@ -114,6 +115,18 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     fun setShakeToSkipEnabled(enabled: Boolean) {
         shakeSettingsStore.setEnabled(enabled)
         _shakeToSkipEnabled.value = enabled
+    }
+
+    // Roadmap #11, Floating Mini Player — nilai ini murni CATATAN preferensi user (dicek lagi
+    // via Settings.canDrawOverlays() di MainActivity sebelum benar-benar start/stop service);
+    // ViewModel sengaja tidak start/stop Service Android di sini (butuh Context Activity utk
+    // permission launcher-nya), murni simpan preferensi seperti store lain di file ini.
+    private val _floatingBubbleEnabled = MutableStateFlow(floatingBubbleStore.isEnabled())
+    val floatingBubbleEnabled: StateFlow<Boolean> = _floatingBubbleEnabled.asStateFlow()
+
+    fun setFloatingBubbleEnabled(enabled: Boolean) {
+        floatingBubbleStore.setEnabled(enabled)
+        _floatingBubbleEnabled.value = enabled
     }
 
     private val _radioAutoContinueEnabled = MutableStateFlow(radioSettingsStore.isEnabled())

@@ -6,6 +6,39 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 95 (Fitur baru: Floating Mini Player/Bubble, roadmap #11, Atomic Change 11 file — 3
+baru + 4 kode diedit + 4 dokumentasi)** — Mini player mengambang di atas app lain mana pun
+(play/pause/prev/next), butuh izin sensitif `SYSTEM_ALERT_WINDOW`, opt-in via toggle baru di
+Settings (off by default).
+
+`FloatingBubbleService.kt` (baru, `bubble/`) — plain Android View lewat `WindowManager`
+(BUKAN Compose — ComposeView di luar Activity butuh LifecycleOwner/SavedStateRegistryOwner
+rakitan manual, kompleksitas tidak sepadan utk pil 3-tombol). `bubble_mini_player.xml` (layout
+baru) reuse drawable widget APA ADANYA (`widget_background.xml`, `widget_play_button_bg.xml`,
+`ic_widget_*.png`) — 0 asset baru, identitas visual otomatis konsisten widget↔bubble.
+`FloatingBubbleStore.kt` (baru, `data/`) simpan toggle + posisi drag terakhir, pola identik
+`ShakeSettingsStore`.
+
+**Kontrol**: `MediaController` asli dikoneksikan langsung dari Service (pola sama
+`PlayerViewModel.connect()`) utk update LIVE, fallback ke Intent `WidgetUpdater.ACTION_TOGGLE_
+PLAY/NEXT/PREVIOUS` yang SUDAH ADA ke `PlaybackService` (0 action constant baru). Artwork pakai
+`contentResolver.loadThumbnail()` langsung di URI lagu, pola identik `AudioArtFetcher`.
+
+**Permission**: `Settings.ACTION_MANAGE_OVERLAY_PERMISSION` (bukan runtime permission dialog
+biasa — tidak ada callback granted/denied yang bisa diandalkan lintas OEM), status dicek ulang
+via `Settings.canDrawOverlays()` begitu user kembali dari layar sistem. `MainActivity.kt`
+(protected, edit parsial) — `overlayPermissionLauncher` + `toggleFloatingBubble()` +
+`LaunchedEffect(Unit)` restart Service sekali per proses kalau sesi sebelumnya ON & izin masih
+ada (proses baru = Service lama ikut mati). `PlayerViewModel.kt` — `floatingBubbleEnabled`
+StateFlow murni simpan preferensi (TIDAK start/stop Service sendiri, butuh Context Activity).
+
+**Batasan jujur**: bukan foreground service (window overlay tampil = importance proses
+mendekati "visible" di kebanyakan device, tapi skin agresif tetap bisa membunuhnya — sama
+seperti keterbatasan widget). Belum diverifikasi di device fisik. **Atomic Change**: 11 file
+(>10 batas normal) — dideklarasikan karena 1 fitur koheren membentang izin+service+store+UI+
+dokumentasi wajib, memecah jadi >1 batch akan meninggalkan kode mati. Detail lengkap:
+`CHANGELOG.md` Batch 95.
+
 **Batch 94 (Dokumentasi: rapikan urutan newest-first + "welcome-ability" README, 0 file kode,
 2 file dokumentasi diedit)** — Permintaan user: pastikan info terbaru selalu di paling atas
 di semua file dokumentasi + tambah shortcut unduh APK GitHub Release di README.

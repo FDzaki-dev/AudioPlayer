@@ -8,9 +8,9 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 93:** Mode Audiobook/Podcast (ingat kecepatan & posisi putar
-> per-lagu individual, tampilan sisa waktu `-mm:ss`). Riwayat lengkap ada di `CHANGELOG.md`
-> (selalu terbaru di paling atas).
+> 🆕 **Update terbaru — Batch 95:** Floating Mini Player (Bubble) — kontrol play/pause/prev/next
+> mengambang di atas app lain mana pun, opt-in lewat toggle di Settings. Riwayat lengkap ada di
+> `CHANGELOG.md` (selalu terbaru di paling atas).
 
 > **Mulai dari sini kalau ini sesi/percakapan baru:** baca `PROJECT_STATE.md` (status +
 > riwayat insiden ringkas), `CHANGELOG.md` (histori tiap batch), dan bagian "Keputusan
@@ -53,6 +53,7 @@ memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 - **Kontrol volume** langsung dari Now Playing (slider attenuasi internal app, terpisah dari volume sistem)
 - **Kelola folder**: pilih folder mana saja yang mau disertakan/dikecualikan dari pemindaian musik otomatis, **plus tambahkan folder tambahan lewat izin sistem** (Storage Access Framework) untuk memindai audio yang belum terdeteksi MediaStore — bekerja penuh offline/lokal, tidak ada koneksi internet yang terlibat
 - **Widget lebih tahan banting**: diperbaiki supaya tetap merespons play/pause/next meski aplikasi sudah disingkirkan total dari recent apps — service langsung "lapor" ke sistem sebagai proses aktif begitu widget ditekan, sebelum sempat dibunuh oleh pengelola baterai agresif (relevan khususnya di skin seperti XOS/MIUI). Widget juga ikut update judul/artis/status main tiap kali lagu berganti
+- **Mini Player Mengambang (Bubble)**: pelengkap widget — kontrol play/pause/prev/next mengambang di atas app lain mana pun (mirip chat bubble Messenger), bisa digeser ke mana saja di layar, posisi tersimpan otomatis. Opt-in dari Settings (nonaktif default), butuh izin sistem "tampil di atas app lain" yang diminta eksplisit saat toggle dinyalakan
 - **Pencocok Signature APK**: alat diagnostik di Perpustakaan (ikon sidik jari) — pilih dua file APK (versi lama & baru), langsung ketahuan apakah keduanya ditandatangani dengan key yang sama tanpa perlu install dulu. Kalau beda, laporan lengkap (nama package, versi, SHA-256 tiap file) bisa disalin ke papan klip lewat dialog khusus (bisa di-scroll penuh) — bukan cuma tombol OK polos kayak dialog instalasi Android
 - **5 tema**: keluarga utama gaya Apple (ikuti sistem, terang, gelap — palet iOS system color, sudut membulat generous) plus dua identitas custom. **Tactile**, murni dari spesifikasi desain Premium AMOLED Hybrid Glassmorphism yang di-supply user (`compose-amoled-hybrid-glass-final.md`, Batch 53 — menggantikan varian literal Midnight Blue Batch 52, hybrid-glass Batch 51, AMOLED-hitam Batch 50, varian terang Batch 49, & Matte Noir sebelumnya). Wajib gelap (bukan ikut sistem, selalu gelap), fondasi AMOLED near-black (`#030508`) dengan permukaan kaca translusen (level glass §5) sebagai material utama, Midnight Blue (`#191970`) HANYA sebagai gradient ambient tipis di layar root (bukan warna latar datar lagi), aksen biru restrain (`#6670FF`), bevel/bayangan gambar-tangan diagonal (bukan aset tekstur bitmap) lewat satu helper terpusat `tactileEmboss()` — bukan sekadar ganti warna datar. Border & glow sengaja direstrain (alpha rendah, literal 0.065/0.035/0.70 dari spec, brush diagonal top-left→bottom-right, bukan border putih terang); sliders/toggles/switches tetap komponen Material3 polos (di luar cakupan batch ini, kandidat
 polish berikutnya). Batch 55: tombol play/pause (mini player & Now Playing) — kontrol paling

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Roadmap #11 — Floating Mini Player. Sengaja reuse drawable widget home-screen apa adanya
+     (widget_background.xml, widget_play_button_bg.xml, ic_widget_*.png) — identitas visual
+     bubble & widget jadi konsisten otomatis, dan 0 asset baru perlu dibuat. Selalu varian
+     GELAP (bukan widget_background_light) — bubble mengambang di atas app APAPUN termasuk yang
+     bertema terang, jadi butuh 1 kontras yang konsisten & jelas terbaca di semua kondisi
+     background, bukan ikut light/dark toggle in-app seperti widget. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/bubble_root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/widget_background"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="8dp"
+    android:elevation="8dp">
+
+    <ImageView
+        android:id="@+id/bubble_album_art"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:scaleType="centerCrop"
+        android:contentDescription="Sampul album" />
+
+    <ImageButton
+        android:id="@+id/bubble_prev"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginStart="6dp"
+        android:padding="5dp"
+        android:background="@android:color/transparent"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_widget_previous"
+        android:contentDescription="Sebelumnya" />
+
+    <ImageButton
+        android:id="@+id/bubble_play_pause"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="4dp"
+        android:padding="9dp"
+        android:background="@drawable/widget_play_button_bg"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_widget_play"
+        android:contentDescription="Putar" />
+
+    <ImageButton
+        android:id="@+id/bubble_next"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginStart="4dp"
+        android:padding="5dp"
+        android:background="@android:color/transparent"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_widget_next"
+        android:contentDescription="Berikutnya" />
+
+</LinearLayout>

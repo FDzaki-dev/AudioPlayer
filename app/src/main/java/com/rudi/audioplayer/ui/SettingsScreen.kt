@@ -57,6 +57,8 @@ fun SettingsScreen(
     onToggleShakeToSkip: (Boolean) -> Unit,
     radioAutoContinueEnabled: Boolean,
     onToggleRadioAutoContinue: (Boolean) -> Unit,
+    floatingBubbleEnabled: Boolean,
+    onToggleFloatingBubble: (Boolean) -> Unit,
     onInfoMessage: (String) -> Unit,
     onOpenStats: () -> Unit
 ) {
@@ -178,6 +180,29 @@ fun SettingsScreen(
                     onCheckedChange = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onToggleRadioAutoContinue(it)
+                    }
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Mini Player Mengambang (Bubble)", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Kontrol play/pause/next di atas app lain mana pun — butuh izin " +
+                            "\"tampil di atas app lain\", diminta lewat pengaturan sistem saat " +
+                            "dinyalakan",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                Switch(
+                    checked = floatingBubbleEnabled,
+                    onCheckedChange = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onToggleFloatingBubble(it)
                     }
                 )
             }

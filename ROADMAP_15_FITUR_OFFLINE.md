@@ -132,7 +132,7 @@ statistik dedicated.
   di atas data yang sudah tersimpan, tidak ada perubahan data model.
 - **Risiko**: rendah.
 
-## 11. Floating Mini Player (Bubble Mode)
+## 11. Floating Mini Player (Bubble Mode) ✅ SELESAI (Batch 95)
 Mini player mengambang di atas aplikasi lain (mirip chat bubble Messenger/PiP video), kontrol
 play/pause/next tanpa perlu buka app AudioPlayer.
 - **Kenapa**: pelengkap Widget yang sudah ada — widget di home screen, bubble ini bisa diakses
@@ -143,6 +143,16 @@ play/pause/next tanpa perlu buka app AudioPlayer.
 - **Risiko**: overlay permission sering jadi red flag di mata user (sering disalahgunakan app
   lain) — perlu penjelasan jelas di onboarding kenapa dibutuhkan, dan pastikan tidak
   mengganggu app lain (touch pass-through di luar area bubble).
+- **Catatan implementasi**: `FloatingBubbleService.kt` (baru, `bubble/`) — plain Android View
+  (BUKAN Compose, hindar kompleksitas LifecycleOwner rakitan sendiri di luar Activity) yang
+  reuse drawable widget home-screen apa adanya (0 asset baru). Toggle opt-in di Settings
+  (`FloatingBubbleStore.kt`), permission diminta via `Settings.ACTION_MANAGE_OVERLAY_PERMISSION`
+  + re-check `Settings.canDrawOverlays()` (bukan runtime permission dialog biasa). Kontrol pakai
+  `MediaController` asli (live update, pola sama `PlayerViewModel.connect()`) dengan fallback
+  Intent ke `PlaybackService` lewat kontrak `WidgetUpdater.ACTION_*` yang SUDAH ADA (0 action
+  constant baru). Touch pass-through di luar bubble didapat struktural dari window
+  `WRAP_CONTENT` (bukan flag manual per-event). Posisi drag tersimpan & di-restore antar sesi.
+  Detail lengkap: `CHANGELOG.md` Batch 95.
 
 ## 12. Mode Audiobook/Podcast (Per-File Speed & Posisi) ✅ SELESAI (Batch 93)
 Ingat kecepatan putar dan posisi terakhir secara individual per-file (bukan pengaturan speed
