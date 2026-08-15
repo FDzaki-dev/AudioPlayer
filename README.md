@@ -8,8 +8,8 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 96:** Trim Keheningan Otomatis (Silence Skip) — percepat bagian
-> hening saat playback, opt-in lewat toggle di Settings (pakai deteksi bawaan Media3). Riwayat
+> 🆕 **Update terbaru — Batch 97:** Floating Mini Player (Bubble) tidak lagi nge-jank app lain
+> saat ganti lagu — decode artwork dipindah dari main thread ke background thread. Riwayat
 > lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
 
 > **Mulai dari sini kalau ini sesi/percakapan baru:** baca `PROJECT_STATE.md` (status +

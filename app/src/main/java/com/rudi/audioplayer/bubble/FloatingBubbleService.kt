@@ -30,6 +30,12 @@ import com.rudi.audioplayer.data.FloatingBubbleStore
 import com.rudi.audioplayer.playback.PlaybackService
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.widget.WidgetUpdater
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.Executor
 import kotlin.math.abs
 
@@ -63,6 +69,17 @@ import kotlin.math.abs
  * cukup untuk kebanyakan device), tapi tidak ada jaminan 100% di skin yang sangat agresif —
  * keterbatasan platform yang sama seperti widget, bukan sesuatu yang bisa dijamin dari kode
  * manapun.
+ *
+ * **Batch 97 — artwork decode dipindah ke background thread**: `refreshBubbleContent()` dulu
+ * memanggil `loadAlbumArtBitmap()` (I/O blocking — `contentResolver.loadThumbnail()` atau
+ * `MediaMetadataRetriever`) langsung di `Player.Listener.onEvents()`, yang jalan di main thread
+ * — root cause class yang SAMA PERSIS dengan widget jank Batch 34/35 ("decode bitmap sinkron di
+ * main thread tiap ganti lagu"), tapi dampaknya lebih parah di sini: overlay ini digambar di
+ * atas SELURUH app lain, jadi tiap ganti lagu berisiko nge-jank UI thread app manapun yang
+ * sedang dibuka user, bukan cuma UI AudioPlayer sendiri. Fix: `bubbleScope.launch { ... }` +
+ * `withContext(Dispatchers.IO)` untuk decode, `bubbleArtJob?.cancel()` sebelum tiap relaunch
+ * (pola identik `widgetUpdateJob` di `PlaybackService.kt` — skip/next cepat berturut-turut tidak
+ * boleh bikin hasil decode lama landing belakangan menimpa art lagu yang lebih baru).
  */
 class FloatingBubbleService : Service() {
 
@@ -71,6 +88,8 @@ class FloatingBubbleService : Service() {
     private var bubbleView: View? = null
     private var controller: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
+    private val bubbleScope = CoroutineScope(Dispatchers.Main + Job())
+    private var bubbleArtJob: Job? = null
 
     private val playerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
@@ -101,6 +120,7 @@ class FloatingBubbleService : Service() {
         super.onDestroy()
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
+        bubbleScope.cancel() // batalkan bubbleArtJob yang mungkin masih in-flight sekalian
         bubbleView?.let { view -> runCatching { windowManager.removeView(view) } }
         bubbleView = null
     }
@@ -242,10 +262,22 @@ class FloatingBubbleService : Service() {
             if (player.isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
         )
 
-        val albumArt = view.findViewById<ImageView>(R.id.bubble_album_art)
+        // Play/pause icon di atas murni ganti drawable resource — murah, aman tetap sync. Cuma
+        // decode artwork (I/O blocking) yang wajib pindah background thread, lihat catatan
+        // "Batch 97" di kelas ini.
         val artworkUri = player.currentMediaItem?.mediaMetadata?.artworkUri
-        val bitmap = artworkUri?.let { loadAlbumArtBitmap(it) }
-        if (bitmap != null) albumArt.setImageBitmap(bitmap) else albumArt.setImageResource(R.mipmap.ic_launcher)
+        bubbleArtJob?.cancel()
+        if (artworkUri == null) {
+            view.findViewById<ImageView>(R.id.bubble_album_art).setImageResource(R.mipmap.ic_launcher)
+            return
+        }
+        bubbleArtJob = bubbleScope.launch {
+            val bitmap = withContext(Dispatchers.IO) { loadAlbumArtBitmap(artworkUri) }
+            // bubbleView bisa saja sudah null (Service di-destroy selagi decode jalan) — re-cek,
+            // jangan pakai `view` closure lama yang mungkin sudah dilepas dari WindowManager.
+            val albumArt = bubbleView?.findViewById<ImageView>(R.id.bubble_album_art) ?: return@launch
+            if (bitmap != null) albumArt.setImageBitmap(bitmap) else albumArt.setImageResource(R.mipmap.ic_launcher)
+        }
     }
 
     /** Sama persis pendekatan AudioArtFetcher/WidgetUpdater — loadThumbnail() langsung di URI

@@ -1,5 +1,47 @@
 # Changelog
 
+## Batch 97 — Sempurnakan Floating Mini Player (Bubble): fix jank main-thread
+Instruksi user: "sempurnakan 100% fungsionalitas dari Floating Mini Player (Bubble Mode)".
+Audit statis `FloatingBubbleService.kt` (Batch 95) menemukan 1 bug nyata, 1 file disentuh.
+
+**Bug — artwork decode blocking main thread**: `refreshBubbleContent()` (dipanggil dari
+`Player.Listener.onEvents()`, main thread) memanggil `loadAlbumArtBitmap()` secara SINKRON —
+`contentResolver.loadThumbnail()` (API 29+) atau `MediaMetadataRetriever` (fallback lama)
+keduanya I/O blocking. Root cause class-nya SAMA PERSIS dengan widget jank yang sudah pernah
+diperbaiki di Batch 34/35 ("decode bitmap sinkron di main thread tiap event ganti lagu/toggle
+play"), tapi dampaknya di sini berpotensi lebih terasa: bubble ini window overlay yang digambar
+di ATAS app lain apa pun yang sedang dibuka user — jank di titik ini bukan cuma bikin AudioPlayer
+sendiri seret, tapi berisiko nge-stutter UI thread app manapun yang kebetulan lagi dipakai user
+saat itu.
+
+**Fix**: `bubbleScope` baru (`CoroutineScope(Dispatchers.Main + Job())`, pola identik
+`serviceScope` di `PlaybackService.kt`) + `bubbleArtJob` (pola identik `widgetUpdateJob`) —
+`bubbleArtJob?.cancel()` dipanggil SEBELUM tiap relaunch (skip/next cepat berturut-turut tidak
+lagi berisiko hasil decode lagu lama landing belakangan menimpa art lagu yang lebih baru, race
+condition yang sebelumnya mungkin walau jarang kena karena decode-nya sendiri sinkron/blocking).
+Decode pindah ke `withContext(Dispatchers.IO)`, update `ImageView` balik ke main thread via
+`bubbleScope.launch`. Icon play/pause (`setImageResource`, murni ganti drawable resource, 0 I/O)
+sengaja TETAP sync — tidak ada alasan menambah kompleksitas async untuk yang sudah murah.
+`bubbleScope.cancel()` ditambah di `onDestroy()` (mencegah job in-flight coba update View yang
+sudah dilepas dari `WindowManager` kalau Service di-kill selagi decode masih jalan — dijaga
+ganda dengan re-`findViewById` dari `bubbleView` terbaru, bukan closure `view` lama, tepat
+sebelum update UI).
+
+**Di luar cakupan, disengaja**: fitur/kontrol baru (mis. tombol tutup/dismiss di bubble,
+mengonversi jadi foreground service) TIDAK ditambahkan — permintaan "sempurnakan
+fungsionalitas" dibaca sebagai "benarkan bug/gap yang mengganggu fungsi yang SUDAH ada", bukan
+memperluas scope 3-tombol pill sesuai roadmap asli. Status "bukan foreground service" tetap
+keputusan desain sengaja dari Batch 95 (lihat docstring kelas ini) — belum ada laporan/bukti
+baru yang mengubah trade-off itu, jadi tidak disentuh ulang tanpa alasan konkret. "Belum
+diverifikasi di device fisik" (Batch 95) masih berlaku sama seperti sebelumnya.
+
+**Verifikasi**: brace/paren balance dicek otomatis (seimbang, 52/52 `{}`, 139/139 `()`).
+**Belum diverifikasi compile/runtime Gradle sungguhan** (tidak ada JDK/Android SDK/kotlinc di
+sandbox ini, sama seperti semua batch sebelumnya) — prioritas berikutnya kalau user push:
+`./gradlew assembleDebug`, lalu cek di device khususnya (1) bubble tetap responsif/tidak nge-lag
+app lain saat skip lagu cepat berturut-turut, (2) art tidak pernah salah tampil (lagu lama
+menimpa lagu baru) saat spam next/previous.
+
 ## Batch 96 — Fitur baru: Trim Keheningan Otomatis / Silence Skip (roadmap item #8)
 Dari `ROADMAP_15_FITUR_OFFLINE.md` item #8 (Kompleksitas: Sedang-Tinggi, awalnya dikira butuh
 analisis amplitude PCM manual). Toggle baru "Lewati Keheningan Otomatis" di Settings —

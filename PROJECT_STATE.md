@@ -6,6 +6,27 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 97 (Sempurnakan Floating Mini Player/Bubble — fix bug jank main-thread, 1 file)** —
+Instruksi user: "sempurnakan 100% fungsionalitas dari Floating Mini Player (Bubble Mode)".
+Audit `FloatingBubbleService.kt` (Batch 95) nemu 1 bug nyata: `refreshBubbleContent()` decode
+artwork (`loadThumbnail()`/`MediaMetadataRetriever`, keduanya I/O blocking) SINKRON di
+`Player.Listener.onEvents()` (main thread) — root cause class SAMA PERSIS widget jank Batch
+34/35, tapi lebih parah di sini krn bubble ini overlay window di ATAS app lain apa pun, jank-nya
+berisiko nyeret UI thread app yang lagi dibuka user, bukan cuma AudioPlayer sendiri.
+
+Fix: `bubbleScope` (`CoroutineScope(Dispatchers.Main + Job())`, pola sama `serviceScope`
+`PlaybackService.kt`) + `bubbleArtJob` (pola sama `widgetUpdateJob`) — `cancel()` sebelum tiap
+relaunch (skip/next cepat tidak lagi berisiko art lagu lama menimpa lagu baru), decode pindah
+`withContext(Dispatchers.IO)`, update `ImageView` balik main thread. Icon play/pause (murni
+`setImageResource`, 0 I/O) sengaja TETAP sync. `bubbleScope.cancel()` ditambah `onDestroy()` +
+re-`findViewById` dari `bubbleView` terbaru (bukan closure lama) sebelum update UI, jaga-jaga
+Service di-kill selagi decode masih jalan.
+
+**Sengaja TIDAK ditambah**: tombol tutup/dismiss di bubble, konversi ke foreground service —
+dibaca sebagai "benarkan bug fungsi existing", bukan perluasan scope 3-tombol pill sesuai
+roadmap asli. Status bukan-foreground-service tetap keputusan sengaja Batch 95, tidak diubah
+tanpa bukti/laporan baru. Detail lengkap: `CHANGELOG.md` Batch 97.
+
 **Batch 96 (Fitur baru: Trim Keheningan Otomatis/Silence Skip, roadmap #8, 5 file — 1 baru + 3
 kode diedit + 1 protected)** — Toggle baru "Lewati Keheningan Otomatis" di Settings.
 
