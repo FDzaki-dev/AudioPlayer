@@ -1,8 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 134 file (dihitung ulang & diverifikasi Batch 95 — header sebelumnya "127" sudah
-# stale/tidak sinkron dengan isi list sejak sebelum batch ini, dikoreksi sekalian)
+# Total: 135 file
 
 .github/workflows/build.yml
 .gitignore
@@ -44,6 +43,7 @@ app/src/main/java/com/rudi/audioplayer/data/RadioSettingsStore.kt
 app/src/main/java/com/rudi/audioplayer/data/RatingStore.kt
 app/src/main/java/com/rudi/audioplayer/data/SearchHistoryStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ShakeSettingsStore.kt
+app/src/main/java/com/rudi/audioplayer/data/SilenceSkipStore.kt
 app/src/main/java/com/rudi/audioplayer/data/SmartPlaylist.kt
 app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistEngine.kt
 app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistStore.kt

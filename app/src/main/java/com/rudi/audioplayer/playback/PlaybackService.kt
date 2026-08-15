@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.media3.common.AudioAttributes
@@ -18,13 +19,17 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import androidx.concurrent.futures.CallbackToFutureAdapter
+import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.rudi.audioplayer.MainActivity
 import com.rudi.audioplayer.R
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.ShakeSettingsStore
+import com.rudi.audioplayer.data.SilenceSkipStore
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
@@ -83,6 +88,14 @@ class PlaybackService : MediaLibraryService() {
             // major music app.
             .setHandleAudioBecomingNoisy(true)
             .build()
+
+        // Roadmap #8, Trim Keheningan Otomatis — dibaca sekali di sini untuk proses BARU (mis.
+        // setelah app di-kill total lalu playback resumption memanggil onCreate lagi); toggle
+        // LIVE saat Service ini sudah jalan datang lewat onCustomCommand di bawah, bukan lewat
+        // baca ulang store ini. setSkipSilenceEnabled() ada di ExoPlayer, BUKAN di interface
+        // Player umum — makanya MediaController (dipakai PlayerViewModel/UI) tidak bisa
+        // memanggilnya langsung, dan custom SessionCommand ini yang jadi jembatannya.
+        player.setSkipSilenceEnabled(SilenceSkipStore(this).isEnabled())
 
         // ExoPlayer assigns its own audio session ID lazily (once the AudioTrack is created).
         // PlayerViewModel talks to playback only through a MediaController, which doesn't expose
@@ -336,10 +349,31 @@ class PlaybackService : MediaLibraryService() {
             session: MediaSession,
             controller: MediaSession.ControllerInfo
         ): MediaSession.ConnectionResult {
+            // Roadmap #8 — nambah 1 custom SessionCommand di atas default bawaan, ini satu-nya
+            // cara MediaController (PlayerViewModel) bisa "menjangkau" setSkipSilenceEnabled()
+            // milik ExoPlayer, karena method itu tidak ada di interface Player yang diekspos
+            // MediaController secara umum.
+            val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                .add(SessionCommand(ACTION_SET_SKIP_SILENCE, Bundle.EMPTY))
+                .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailablePlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS)
-                .setAvailableSessionCommands(MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS)
+                .setAvailableSessionCommands(sessionCommands)
                 .build()
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle
+        ): ListenableFuture<SessionResult> {
+            if (customCommand.customAction == ACTION_SET_SKIP_SILENCE) {
+                val enabled = args.getBoolean(EXTRA_SKIP_SILENCE_ENABLED, false)
+                (mediaSession?.player as? ExoPlayer)?.setSkipSilenceEnabled(enabled)
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            return super.onCustomCommand(session, controller, customCommand, args)
         }
 
         // Lets Bluetooth devices and the Android System UI media-resumption feature restart
@@ -402,6 +436,11 @@ class PlaybackService : MediaLibraryService() {
         // forever in the rare case playback never actually starts (e.g. every saved song was
         // deleted from disk since it was last played).
         private const val MAX_HANDOFF_WAIT_MS = 8000L
+
+        // Roadmap #8, Trim Keheningan Otomatis — nama custom SessionCommand + key Bundle-nya,
+        // dipakai bareng PlayerViewModel.setSilenceSkipEnabled() lewat MediaController.
+        const val ACTION_SET_SKIP_SILENCE = "com.rudi.audioplayer.ACTION_SET_SKIP_SILENCE"
+        const val EXTRA_SKIP_SILENCE_ENABLED = "skip_silence_enabled"
     }
 }
 

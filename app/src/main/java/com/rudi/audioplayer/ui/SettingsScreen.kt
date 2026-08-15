@@ -59,6 +59,8 @@ fun SettingsScreen(
     onToggleRadioAutoContinue: (Boolean) -> Unit,
     floatingBubbleEnabled: Boolean,
     onToggleFloatingBubble: (Boolean) -> Unit,
+    silenceSkipEnabled: Boolean,
+    onToggleSilenceSkip: (Boolean) -> Unit,
     onInfoMessage: (String) -> Unit,
     onOpenStats: () -> Unit
 ) {
@@ -203,6 +205,30 @@ fun SettingsScreen(
                     onCheckedChange = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onToggleFloatingBubble(it)
+                    }
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Lewati Keheningan Otomatis", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Percepat bagian hening saat lagu diputar (pakai deteksi bawaan " +
+                            "Media3, belum ada slider sensitivitas). Bisa memotong intro/outro " +
+                            "yang memang senyap secara musikal — coba dulu, matikan lagi kalau " +
+                            "terasa mengganggu",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                Switch(
+                    checked = silenceSkipEnabled,
+                    onCheckedChange = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onToggleSilenceSkip(it)
                     }
                 )
             }

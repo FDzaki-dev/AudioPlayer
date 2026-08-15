@@ -1,5 +1,51 @@
 # Changelog
 
+## Batch 96 — Fitur baru: Trim Keheningan Otomatis / Silence Skip (roadmap item #8)
+Dari `ROADMAP_15_FITUR_OFFLINE.md` item #8 (Kompleksitas: Sedang-Tinggi, awalnya dikira butuh
+analisis amplitude PCM manual). Toggle baru "Lewati Keheningan Otomatis" di Settings —
+mempercepat bagian hening saat playback tanpa perlu buka app.
+
+**Temuan yang memangkas kompleksitas drastis**: Media3/ExoPlayer 1.3.1 sudah punya solusi
+bawaan `ExoPlayer.setSkipSilenceEnabled(Boolean)` (memakai `SilenceSkippingAudioProcessor`
+internal di audio pipeline) — draf awal roadmap ini mengira perlu riset baca frame PCM manual
+sendiri; ternyata tidak sama sekali. **0 kode analisis amplitude custom ditulis di batch ini.**
+
+**Kenapa perlu custom SessionCommand (bukan langsung panggil dari ViewModel)**:
+`setSkipSilenceEnabled()` adalah method milik `ExoPlayer` secara spesifik, BUKAN bagian
+interface `Player` umum yang diekspos `MediaController` — `PlayerViewModel` (yang cuma pegang
+`MediaController`, bukan `ExoPlayer` asli, karena hidup di proses UI sedangkan `ExoPlayer` asli
+hidup di `PlaybackService`) tidak bisa memanggilnya langsung. Dijembatani lewat 1
+`SessionCommand` baru: `PlaybackService.ACTION_SET_SKIP_SILENCE` diadvertise di
+`PlaybackSessionCallback.onConnect()` (ditambahkan ke atas `DEFAULT_SESSION_COMMANDS` lewat
+`.buildUpon().add(...)`), ditangani di `onCustomCommand()` baru yang meng-cast
+`mediaSession?.player as? ExoPlayer` lalu memanggil `setSkipSilenceEnabled()` langsung.
+`PlayerViewModel.setSilenceSkipEnabled()` mengirim command ini via
+`controller?.sendCustomCommand(...)` sekaligus simpan preferensi ke `SilenceSkipStore.kt`
+(baru, `data/`, pola identik `ShakeSettingsStore`) — kalau `controller` belum sempat konek
+saat toggle ditekan, tidak fatal: `PlaybackService.onCreate()` sendiri membaca
+`SilenceSkipStore` langsung saat `ExoPlayer` pertama kali dibuat, jadi tetap sinkron begitu
+Service benar-benar start (2 jalur baca yang saling melengkapi, bukan saling gantung).
+
+**Default & UI**: OFF by default (sesuai catatan risiko roadmap sendiri — threshold bawaan bisa
+memotong intro/outro yang memang senyap secara musikal, bukan cuma silence teknis), teks di
+Settings menyebutkan jujur ini pakai "deteksi bawaan Media3" tanpa slider sensitivitas custom,
+dan menyarankan user coba dulu lalu matikan kalau terasa mengganggu — bukan diklaim sempurna.
+**Belum ada threshold/sensitivitas yang bisa diatur** di batch ini (butuh kustomisasi
+`AudioSink`/`DefaultRenderersFactory` level rendah untuk itu, di luar scope MVP toggle
+on/off) — dicatat sebagai batasan disengaja, bukan bug, konsisten dengan pola "Catatan jujur"
+proyek ini (lihat README § Catatan jujur soal Gapless Playback untuk pola serupa).
+
+**File**: `SilenceSkipStore.kt` (baru, `data/`). `PlaybackService.kt` (edit) — import
+`SessionCommand`/`SessionResult`/`Futures`/`Bundle` baru, `player.setSkipSilenceEnabled(...)`
+di `onCreate()` (baca sekali untuk proses baru), `onConnect()` + `onCustomCommand()` baru di
+`PlaybackSessionCallback`, 2 konstanta baru di companion object. `PlayerViewModel.kt` (edit) —
+`silenceSkipEnabled` StateFlow + `setSilenceSkipEnabled()`. `SettingsScreen.kt` (edit) — toggle
+row baru. `MainActivity.kt` (protected, edit parsial) — collect state + wiring ke
+`SettingsScreen`.
+
+**Verifikasi**: brace/paren balance manual OK di semua file Kotlin yang disentuh (belum
+di-build fisik, sama seperti batch-batch sebelumnya).
+
 ## Batch 95 — Fitur baru: Floating Mini Player / Bubble (roadmap item #11)
 Dari `ROADMAP_15_FITUR_OFFLINE.md` item #11 (Kompleksitas: Tinggi). Mini player mengambang di
 atas app lain mana pun (mirip chat bubble Messenger) — play/pause/prev/next tanpa perlu buka

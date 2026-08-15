@@ -89,7 +89,7 @@ file lokal (share/copy manual), tanpa cloud/akun.
 - **Risiko**: rendah-sedang — pastikan tidak menimpa data existing tanpa konfirmasi, dan skema
   JSON perlu versioned dari awal supaya backup lama tetap bisa dipulihkan setelah app di-update.
 
-## 8. Trim Keheningan Otomatis (Silence Skip)
+## 8. Trim Keheningan Otomatis (Silence Skip) ✅ SELESAI (Batch 96)
 Deteksi bagian hening (silence) di awal/akhir file lalu lewati otomatis saat transisi lagu,
 opsional bisa di-toggle per-user.
 - **Kenapa**: banyak file dari sumber tertentu punya beberapa detik hening yang mengganggu
@@ -100,6 +100,15 @@ opsional bisa di-toggle per-user.
 - **Risiko**: kalau threshold silence salah, bisa memotong bagian intro/outro yang memang
   senyap secara musikal (bukan silence teknis) — wajib ada toggle on/off + threshold yang
   bisa disesuaikan, jangan default agresif.
+- **Catatan implementasi**: ternyata Media3/ExoPlayer sudah punya solusi bawaan siap pakai —
+  `ExoPlayer.setSkipSilenceEnabled(Boolean)` (via `SilenceSkippingAudioProcessor` internal),
+  BUKAN method di interface `Player` umum jadi tidak bisa dipanggil langsung dari
+  `MediaController`. Dijembatani lewat 1 custom `SessionCommand` baru
+  (`PlaybackService.ACTION_SET_SKIP_SILENCE`). Riset PCM manual dari draf awal roadmap ini
+  jadi TIDAK diperlukan sama sekali — 0 analisis amplitude custom ditulis. Toggle off by
+  default (sesuai catatan risiko di atas), **belum ada slider sensitivitas/threshold custom**
+  di batch ini — pakai threshold bawaan ExoPlayer apa adanya, disebutkan jujur di teks
+  Settings. Detail lengkap: `CHANGELOG.md` Batch 96.
 
 ## 9. Visualizer Audio (Waveform/Spectrum) ✅ SELESAI (Batch 92)
 Animasi visual real-time (waveform bergerak atau spectrum bar) sinkron dengan audio yang

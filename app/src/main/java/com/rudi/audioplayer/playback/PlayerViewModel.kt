@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.database.ContentObserver
 import android.net.Uri
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
@@ -18,6 +19,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.rudi.audioplayer.util.AppLogger
@@ -40,6 +42,7 @@ import com.rudi.audioplayer.data.PlayStatsStore
 import com.rudi.audioplayer.data.RatingStore
 import com.rudi.audioplayer.data.RadioSettingsStore
 import com.rudi.audioplayer.data.ShakeSettingsStore
+import com.rudi.audioplayer.data.SilenceSkipStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.PlaylistStore
 import com.rudi.audioplayer.data.SmartPlaylist
@@ -127,6 +130,26 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     fun setFloatingBubbleEnabled(enabled: Boolean) {
         floatingBubbleStore.setEnabled(enabled)
         _floatingBubbleEnabled.value = enabled
+    }
+
+    // Roadmap #8, Trim Keheningan Otomatis — beda pola dari toggle lain di atas: nilainya
+    // TIDAK cukup disimpan ke store doang, harus juga di-relay LIVE ke ExoPlayer di
+    // PlaybackService lewat custom SessionCommand (ACTION_SET_SKIP_SILENCE), karena
+    // setSkipSilenceEnabled() adalah method ExoPlayer, bukan bagian interface Player umum yang
+    // diekspos MediaController — lihat PlaybackService.onCustomCommand().
+    private val silenceSkipStore = SilenceSkipStore(appContext)
+    private val _silenceSkipEnabled = MutableStateFlow(silenceSkipStore.isEnabled())
+    val silenceSkipEnabled: StateFlow<Boolean> = _silenceSkipEnabled.asStateFlow()
+
+    fun setSilenceSkipEnabled(enabled: Boolean) {
+        silenceSkipStore.setEnabled(enabled)
+        _silenceSkipEnabled.value = enabled
+        val args = Bundle().apply { putBoolean(PlaybackService.EXTRA_SKIP_SILENCE_ENABLED, enabled) }
+        controller?.sendCustomCommand(SessionCommand(PlaybackService.ACTION_SET_SKIP_SILENCE, Bundle.EMPTY), args)
+        // controller == null (belum sempat konek): tidak fatal — PlaybackService baca nilai
+        // yang baru saja disimpan store di atas sendiri saat ExoPlayer-nya pertama kali dibuat
+        // (lihat onCreate di PlaybackService.kt), jadi tetap sinkron begitu Service benar-benar
+        // start.
     }
 
     private val _radioAutoContinueEnabled = MutableStateFlow(radioSettingsStore.isEnabled())

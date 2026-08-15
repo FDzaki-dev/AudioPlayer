@@ -6,6 +6,26 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 96 (Fitur baru: Trim Keheningan Otomatis/Silence Skip, roadmap #8, 5 file — 1 baru + 3
+kode diedit + 1 protected)** — Toggle baru "Lewati Keheningan Otomatis" di Settings.
+
+**Temuan kunci**: Media3/ExoPlayer 1.3.1 sudah punya `ExoPlayer.setSkipSilenceEnabled(Boolean)`
+bawaan — draf roadmap awal mengira perlu analisis PCM manual, ternyata TIDAK, 0 kode amplitude
+custom ditulis. Method ini milik `ExoPlayer` spesifik (bukan interface `Player` umum), jadi
+`MediaController` (dipegang `PlayerViewModel`) tidak bisa panggil langsung — dijembatani 1
+custom `SessionCommand` baru (`PlaybackService.ACTION_SET_SKIP_SILENCE`), diadvertise di
+`onConnect()`, ditangani di `onCustomCommand()` baru yang cast ke `ExoPlayer` lalu panggil
+method-nya. 2 jalur baca saling melengkapi: `PlaybackService.onCreate()` baca
+`SilenceSkipStore` langsung utk proses baru, `PlayerViewModel.setSilenceSkipEnabled()` kirim
+command LIVE + simpan ke store yang sama utk Service yang sudah jalan.
+
+`SilenceSkipStore.kt` (baru, `data/`, pola identik `ShakeSettingsStore`) — OFF by default
+(sesuai risiko roadmap: threshold bawaan bisa memotong intro/outro musikal). **Belum ada
+slider sensitivitas/threshold custom** — pakai default ExoPlayer apa adanya, disebutkan jujur
+di teks Settings, dicatat sebagai batasan disengaja bukan bug (konsisten pola "Catatan jujur"
+proyek, lihat README § Gapless Playback untuk pola serupa). `MainActivity.kt` (protected, edit
+parsial) — collect state + wiring `SettingsScreen`. Detail lengkap: `CHANGELOG.md` Batch 96.
+
 **Batch 95 (Fitur baru: Floating Mini Player/Bubble, roadmap #11, Atomic Change 11 file — 3
 baru + 4 kode diedit + 4 dokumentasi)** — Mini player mengambang di atas app lain mana pun
 (play/pause/prev/next), butuh izin sensitif `SYSTEM_ALERT_WINDOW`, opt-in via toggle baru di

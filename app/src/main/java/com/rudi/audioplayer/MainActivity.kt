@@ -517,6 +517,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val visualizerBars by playerViewModel.visualizerBars.collectAsStateWithLifecycle()
     val audiobookModeEnabled by playerViewModel.audiobookModeEnabled.collectAsStateWithLifecycle()
     val floatingBubbleEnabled by playerViewModel.floatingBubbleEnabled.collectAsStateWithLifecycle()
+    val silenceSkipEnabled by playerViewModel.silenceSkipEnabled.collectAsStateWithLifecycle()
 
     val deleteContext = LocalContext.current
 
@@ -898,6 +899,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     onToggleRadioAutoContinue = { enabled -> playerViewModel.setRadioAutoContinueEnabled(enabled) },
                     floatingBubbleEnabled = floatingBubbleEnabled,
                     onToggleFloatingBubble = { enabled -> toggleFloatingBubble(enabled) },
+                    silenceSkipEnabled = silenceSkipEnabled,
+                    onToggleSilenceSkip = { enabled -> playerViewModel.setSilenceSkipEnabled(enabled) },
                     onInfoMessage = { message -> playerViewModel.showInfoMessage(message) },
                     onOpenStats = { navController.navigate("stats_dashboard") }
                 )
