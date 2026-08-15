@@ -25,6 +25,15 @@
          FloatingBubbleService.kt / MainActivity.kt's overlayPermissionLauncher. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <!-- Batch 98 — FloatingBubbleService jadi foreground service beneran (tipe "specialUse",
+         API 34+ belum punya kategori resmi utk "overlay window") supaya bertahan hidup seandal
+         PlaybackService, bukan cuma "mendekati visible" seperti sebelumnya (Batch 95/97). Lihat
+         FloatingBubbleService.kt untuk detail trade-off + CHANGELOG Batch 98. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Batch 98 — bubble otomatis nyala lagi setelah HP restart kalau toggle-nya sebelumnya
+         ON, tanpa user harus buka app dulu. Lihat BubbleBootReceiver.kt. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:name=".AudioPlayerApplication"
         android:allowBackup="true"
@@ -61,12 +70,31 @@
             </intent-filter>
         </service>
 
-        <!-- Roadmap #11, Floating Mini Player — bukan foreground service (lihat catatan
-             "Batasan jujur" di FloatingBubbleService.kt), exported="false" karena hanya
-             dinyalakan dari dalam app sendiri, tidak pernah oleh komponen app lain. -->
+        <!-- Roadmap #11, Floating Mini Player. Batch 98: sekarang foreground service beneran
+             (tipe "specialUse"), bukan lagi murni mengandalkan importance dari window overlay
+             yang tampil. exported="false" — cuma dinyalakan dari dalam app sendiri (Settings
+             toggle) atau BubbleBootReceiver (juga internal), tidak pernah komponen app lain. -->
         <service
             android:name=".bubble.FloatingBubbleService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="floating_bubble_mini_player" />
+        </service>
+
+        <!-- Batch 98 — restart bubble otomatis setelah reboot HP kalau togglenya sebelumnya ON
+             & izin overlay masih ada, tanpa perlu user buka app dulu (sebelumnya cuma restart
+             saat app dibuka manual, lihat MainActivity's LaunchedEffect). exported="false":
+             sistem tetap bisa broadcast BOOT_COMPLETED ke receiver internal — atribut ini cuma
+             mencegah APP LAIN memicunya secara manual. -->
+        <receiver
+            android:name=".bubble.BubbleBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Lets Bluetooth devices and the Android System UI media-resumption feature relaunch
              this service and hand it a MEDIA_BUTTON intent even after the app process has been

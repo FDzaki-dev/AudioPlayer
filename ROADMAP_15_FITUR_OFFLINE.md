@@ -162,6 +162,12 @@ play/pause/next tanpa perlu buka app AudioPlayer.
   constant baru). Touch pass-through di luar bubble didapat struktural dari window
   `WRAP_CONTENT` (bukan flag manual per-event). Posisi drag tersimpan & di-restore antar sesi.
   Detail lengkap: `CHANGELOG.md` Batch 95.
+- **Penyempurnaan pasca-rilis**: Batch 97 — artwork decode dipindah ke background thread (fix
+  bug jank main-thread yang berisiko nge-stutter UI thread APP LAIN yang sedang dibuka user,
+  bukan cuma AudioPlayer sendiri). Batch 98 — jadi foreground service beneran (tipe `specialUse`,
+  sebelumnya cuma "mendekati visible"), auto-restart setelah reboot HP (`BubbleBootReceiver.kt`
+  baru), state antrean kosong ditangani (tombol dim + tap buka app, bukan no-op senyap), posisi
+  di-clamp ulang saat rotasi layar. Detail lengkap: `CHANGELOG.md` Batch 97 & 98.
 
 ## 12. Mode Audiobook/Podcast (Per-File Speed & Posisi) ✅ SELESAI (Batch 93)
 Ingat kecepatan putar dan posisi terakhir secara individual per-file (bukan pengaturan speed

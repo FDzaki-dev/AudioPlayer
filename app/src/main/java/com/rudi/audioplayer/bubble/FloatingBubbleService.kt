@@ -1,8 +1,13 @@
 package com.rudi.audioplayer.bubble
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Outline
@@ -20,6 +25,7 @@ import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.widget.ImageButton
 import android.widget.ImageView
+import androidx.core.app.NotificationCompat
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -63,12 +69,24 @@ import kotlin.math.abs
  * fullscreen — area di luar pill 100% tembus ke app di bawahnya secara struktural, bukan
  * sesuatu yang perlu ditangani manual per-event.
  *
- * **Batasan jujur** (skin Android agresif membunuh proses background — lihat catatan OEM yang
- * sama di README § Keputusan Arsitektur): service ini BUKAN foreground service (window overlay
- * yang sedang tampil sudah menaikkan importance proses mendekati "visible" selama ada di layar,
- * cukup untuk kebanyakan device), tapi tidak ada jaminan 100% di skin yang sangat agresif —
- * keterbatasan platform yang sama seperti widget, bukan sesuatu yang bisa dijamin dari kode
- * manapun.
+ * **Batch 98 — jadi foreground service beneran**: sebelumnya (Batch 95) BUKAN foreground —
+ * cuma mengandalkan window overlay yang tampil menaikkan importance proses "mendekati visible",
+ * dan skin Android agresif tetap bisa membunuhnya kapan saja (dicatat sebagai "batasan jujur").
+ * Sekarang `startForeground()` dipanggil beneran (tipe `specialUse`, API 34+ belum punya
+ * kategori resmi utk "overlay window") — trade-off sadar: 1 notifikasi importance MIN ekstra
+ * selama bubble aktif (nyaris tidak kelihatan — MIN disembunyikan dari status bar, cuma muncul
+ * kalau notification shade ditarik turun), demi kepastian bubble TIDAK dibunuh OS selama masih
+ * dianggap app aktif, sama level proteksi seperti [PlaybackService]. Restart setelah reboot HP
+ * ditangani [BubbleBootReceiver], bukan di sini.
+ *
+ * **Batch 98 — state antrean kosong**: sebelumnya tombol play/prev/next tetap "aktif" walau
+ * tidak ada lagu dimuat sama sekali (tap play = no-op senyap yang membingungkan). Sekarang
+ * [hasQueue] dicek tiap update — kalau kosong, tombol jadi setengah transparan dan tap-nya
+ * membuka app alih-alih coba mainkan apa pun.
+ *
+ * **Batch 98 — rotasi layar**: posisi bubble di-clamp ulang di [onConfigurationChanged] —
+ * sebelumnya rotasi bisa membuat bubble kepental separuh di luar layar (mis. y besar di
+ * portrait jadi melebihi tinggi layar landscape yang lebih pendek) sampai user drag manual.
  *
  * **Batch 97 — artwork decode dipindah ke background thread**: `refreshBubbleContent()` dulu
  * memanggil `loadAlbumArtBitmap()` (I/O blocking — `contentResolver.loadThumbnail()` atau
@@ -86,10 +104,16 @@ class FloatingBubbleService : Service() {
     private lateinit var windowManager: WindowManager
     private lateinit var bubbleStore: FloatingBubbleStore
     private var bubbleView: View? = null
+    private var layoutParams: WindowManager.LayoutParams? = null
     private var controller: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private val bubbleScope = CoroutineScope(Dispatchers.Main + Job())
     private var bubbleArtJob: Job? = null
+
+    // Optimistic default TRUE — sebelum controller sempat konek, tap tombol tetap harus jatuh
+    // ke fallback Intent lama (lihat sendPlaybackAction), bukan langsung dianggap "kosong".
+    // Baru di-set FALSE kalau controller SUDAH konek dan benar-benar mengonfirmasi antrean 0.
+    private var hasQueue = true
 
     private val playerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
@@ -108,6 +132,7 @@ class FloatingBubbleService : Service() {
         super.onCreate()
         bubbleStore = FloatingBubbleStore(this)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        startForegroundWithNotification()
         addBubbleView()
         connectController()
     }
@@ -116,13 +141,74 @@ class FloatingBubbleService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val view = bubbleView ?: return
+        val params = layoutParams ?: return
+        val metrics = resources.displayMetrics
+        val maxX = (metrics.widthPixels - view.width).coerceAtLeast(0)
+        val maxY = (metrics.heightPixels - view.height).coerceAtLeast(0)
+        val clampedX = params.x.coerceIn(0, maxX)
+        val clampedY = params.y.coerceIn(0, maxY)
+        if (clampedX != params.x || clampedY != params.y) {
+            params.x = clampedX
+            params.y = clampedY
+            runCatching { windowManager.updateViewLayout(view, params) }
+            bubbleStore.savePosition(params.x, params.y)
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         bubbleScope.cancel() // batalkan bubbleArtJob yang mungkin masih in-flight sekalian
         bubbleView?.let { view -> runCatching { windowManager.removeView(view) } }
         bubbleView = null
+    }
+
+    /** Foreground promotion (Batch 98) — lihat catatan trade-off importance MIN di KDoc kelas
+     * ini. Ikon & channel-creation-guard meniru persis pola `PlaybackService.
+     * startForegroundColdStartNotification()` untuk konsistensi gaya di seluruh proyek. */
+    private fun startForegroundWithNotification() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = getSystemService(NotificationManager::class.java)
+            if (manager.getNotificationChannel(NOTIFICATION_CHANNEL_ID) == null) {
+                manager.createNotificationChannel(
+                    NotificationChannel(
+                        NOTIFICATION_CHANNEL_ID,
+                        "Mini Player Mengambang",
+                        NotificationManager.IMPORTANCE_MIN
+                    )
+                )
+            }
+        }
+
+        val openAppIntent = Intent(this, MainActivity::class.java)
+        val contentPendingIntent = PendingIntent.getActivity(
+            this, 102, openAppIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("Mini Player Mengambang aktif")
+            .setContentText("Ketuk untuk buka AudioPlayer. Matikan lewat Settings kalau tidak dibutuhkan.")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setOngoing(true)
+            .setContentIntent(contentPendingIntent)
+            .build()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun connectController() {
@@ -169,6 +255,7 @@ class FloatingBubbleService : Service() {
             x = saved?.first ?: 0
             y = saved?.second ?: 200
         }
+        layoutParams = params
 
         setupDrag(view, params)
         setupControls(view)
@@ -181,14 +268,16 @@ class FloatingBubbleService : Service() {
      * gerak (bukan cuma delta awal-akhir, supaya jari gemetar kecil tidak salah dianggap drag).
      * Tombol play/pause/prev/next tetap dapat event klik normal — ImageButton clickable
      * mengonsumsi ACTION_DOWN duluan sebelum sempat ke OnTouchListener root ini, jadi drag/tap
-     * di sini otomatis cuma aktif di luar area ke-3 tombol tanpa perlu logic pemisah manual. */
+     * di sini otomatis cuma aktif di luar area ke-3 tombol tanpa perlu logic pemisah manual.
+     * Batch 98: DisplayMetrics dibaca ULANG tiap ACTION_MOVE (bukan di-cache sekali di awal
+     * seperti sebelumnya) — device bisa saja rotasi PAS lagi di-drag, metrics yang di-cache di
+     * awal akan basi. */
     private fun setupDrag(view: View, params: WindowManager.LayoutParams) {
         var initialX = 0
         var initialY = 0
         var initialTouchX = 0f
         var initialTouchY = 0f
         var totalMovement = 0f
-        val metrics = resources.displayMetrics
 
         view.setOnTouchListener { v, event ->
             when (event.action) {
@@ -205,6 +294,7 @@ class FloatingBubbleService : Service() {
                     val dy = event.rawY - initialTouchY
                     totalMovement += abs(dx) + abs(dy)
                     if (totalMovement > TOUCH_SLOP) {
+                        val metrics = resources.displayMetrics
                         val maxX = (metrics.widthPixels - v.width).coerceAtLeast(0)
                         val maxY = (metrics.heightPixels - v.height).coerceAtLeast(0)
                         params.x = (initialX + dx.toInt()).coerceIn(0, maxX)
@@ -228,13 +318,13 @@ class FloatingBubbleService : Service() {
 
     private fun setupControls(view: View) {
         view.findViewById<ImageButton>(R.id.bubble_play_pause).setOnClickListener {
-            sendPlaybackAction(WidgetUpdater.ACTION_TOGGLE_PLAY)
+            if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_TOGGLE_PLAY) else openApp()
         }
         view.findViewById<ImageButton>(R.id.bubble_prev).setOnClickListener {
-            sendPlaybackAction(WidgetUpdater.ACTION_PREVIOUS)
+            if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_PREVIOUS) else openApp()
         }
         view.findViewById<ImageButton>(R.id.bubble_next).setOnClickListener {
-            sendPlaybackAction(WidgetUpdater.ACTION_NEXT)
+            if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_NEXT) else openApp()
         }
     }
 
@@ -258,9 +348,19 @@ class FloatingBubbleService : Service() {
 
     private fun refreshBubbleContent(player: Player) {
         val view = bubbleView ?: return
-        view.findViewById<ImageButton>(R.id.bubble_play_pause).setImageResource(
-            if (player.isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
-        )
+        hasQueue = player.mediaItemCount > 0
+
+        val playPause = view.findViewById<ImageButton>(R.id.bubble_play_pause)
+        val prev = view.findViewById<ImageButton>(R.id.bubble_prev)
+        val next = view.findViewById<ImageButton>(R.id.bubble_next)
+        playPause.setImageResource(if (player.isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play)
+        // Batch 98 — indikasi visual antrean kosong: tombol tetap kelihatan (bukan disembunyikan
+        // total, biar bentuk pill tidak "loncat" ukuran) tapi setengah transparan, dan tap-nya
+        // membuka app alih-alih coba mainkan apa pun (lihat setupControls).
+        val alpha = if (hasQueue) 1f else 0.4f
+        playPause.alpha = alpha
+        prev.alpha = alpha
+        next.alpha = alpha
 
         // Play/pause icon di atas murni ganti drawable resource — murah, aman tetap sync. Cuma
         // decode artwork (I/O blocking) yang wajib pindah background thread, lihat catatan
@@ -302,5 +402,7 @@ class FloatingBubbleService : Service() {
 
     companion object {
         private const val TOUCH_SLOP = 12f
+        private const val NOTIFICATION_CHANNEL_ID = "floating_bubble"
+        private const val NOTIFICATION_ID = 7002 // beda dari COLD_START_NOTIFICATION_ID (7001)
     }
 }

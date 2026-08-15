@@ -1,5 +1,74 @@
 # Changelog
 
+## Batch 98 — Sempurnakan Floating Mini Player (Bubble): reliabilitas & completeness
+Lanjutan instruksi user "sempurnakan 100% fungsionalitas Floating Mini Player" — Batch 97
+(sesi sebelumnya) sudah membenahi 1 bug jank main-thread tapi sengaja TIDAK menyentuh 3 celah
+completeness lain yang sudah teridentifikasi sejak Batch 95 sendiri ("batasan jujur" di
+docstring-nya). Batch ini menutup celah-celah itu: **4 file** (1 baru, 3 diedit — 1 di
+antaranya protected).
+
+**1. Jadi foreground service beneran** (celah terbesar): sebelumnya `FloatingBubbleService`
+BUKAN foreground — cuma mengandalkan window overlay yang tampil menaikkan importance proses
+"mendekati visible", dan skin Android agresif tetap bisa membunuhnya kapan saja (persis yang
+dicatat sebagai "batasan jujur" di Batch 95). Sekarang `startForeground()` dipanggil beneran
+di `onCreate()`, tipe `specialUse` (API 34+ belum punya kategori resmi utk "overlay window",
+`specialUse` adalah kategori umum yang dimaksudkan persis utk kasus begini — butuh
+`FOREGROUND_SERVICE_SPECIAL_USE` permission baru + `<property android:name="android.app.
+PROPERTY_SPECIAL_USE_FGS_SUBTYPE">` di manifest). **Trade-off yang disadari & didokumentasikan
+jujur**: nambah 1 notifikasi importance MIN selama bubble aktif — hampir tidak kelihatan (MIN
+disembunyikan dari status bar icon, cuma muncul kalau notification shade ditarik turun) tapi
+tetap ada, demi kepastian bubble TIDAK dibunuh OS selama masih dianggap app aktif (level
+proteksi yang sama seperti `PlaybackService`). Channel/notification builder meniru persis pola
+`PlaybackService.startForegroundColdStartNotification()` untuk konsistensi gaya.
+
+**2. Auto-restart setelah reboot HP**: sebelumnya bubble cuma restart lagi kalau user MEMBUKA
+app secara manual (`MainActivity`'s `LaunchedEffect(Unit)`) — HP di-restart + user belum sempat
+buka app = bubble mati permanen walau togglenya sebenarnya ON. `BubbleBootReceiver.kt` (baru,
+`bubble/`) dengar `BOOT_COMPLETED`, cek ulang `FloatingBubbleStore.isEnabled()` DAN
+`Settings.canDrawOverlays()` (izin overlay bisa dicabut user dari Pengaturan sistem kapan saja
+tanpa lewat toggle app ini sama sekali — device settings selalu menang atas preferensi in-app),
+baru restart service kalau keduanya lolos. `LaunchedEffect` di `MainActivity` TETAP ada sebagai
+jaring pengaman kedua untuk kasus proses mati TANPA reboot (force-stop manual / OOM kill).
+
+**3. State antrean kosong ditangani**: sebelumnya tombol play/prev/next tetap "aktif" penuh
+walau tidak ada lagu dimuat sama sekali di `PlaybackService` — tap play jadi no-op senyap yang
+membingungkan (`ExoPlayer` kosong tidak melakukan apa-apa, tanpa umpan balik apa pun ke user).
+`refreshBubbleContent()` sekarang cek `player.mediaItemCount > 0` tiap update, simpan ke
+`hasQueue`. Kalau kosong: 3 tombol jadi alpha 0.4 (tetap kelihatan bentuknya, pill tidak
+"loncat" ukuran) dan tap-nya membuka app alih-alih coba mainkan apa pun. Default `hasQueue =
+true` sebelum controller sempat konek (optimistic) — supaya tap paling awal tetap jatuh ke
+fallback Intent lama yang sudah ada, bukan langsung dianggap kosong secara keliru.
+
+**4. Posisi bubble di-clamp ulang saat rotasi layar**: sebelumnya rotasi bisa membuat bubble
+kepental separuh di luar layar (mis. `y` besar yang valid di portrait jadi melebihi tinggi
+layar landscape yang lebih pendek) sampai user drag manual untuk "menemukan" bubble-nya lagi.
+`onConfigurationChanged()` baru re-clamp `layoutParams` (dipromosikan dari local var ke field
+class supaya bisa diakses dari sini) ke `DisplayMetrics` terkini, `updateViewLayout()` +
+`savePosition()` kalau posisi berubah. Sekalian: `DisplayMetrics` di `setupDrag()`'s
+`ACTION_MOVE` sekarang dibaca ULANG tiap event (sebelumnya di-cache sekali di awal — device
+rotasi PAS lagi di-drag akan pakai metrics basi, celah kecil tapi nyata).
+
+**MainActivity.kt (protected, edit parsial)**: 3 titik pemanggilan service (permission-granted
+callback, `toggleFloatingBubble`, `LaunchedEffect`) disatukan ke 1 helper `startBubbleService()`
+baru yang API-gated (`startForegroundService()` di O+, `startService()` di bawahnya) — WAJIB
+sekarang karena Service benar-benar memanggil `startForeground()` sendiri (sebelumnya `startService()`
+polos masih "kebetulan jalan" karena Service tidak pernah benar-benar foreground).
+
+**Di luar cakupan, disengaja** (konsisten pola "Catatan jujur" proyek — lihat README §
+Gapless Playback untuk pola serupa): tombol dismiss/close di bubble itu sendiri TIDAK
+ditambahkan (drag-to-dismiss dipertimbangkan, ditolak — risiko UX nyata: dismiss diam-diam
+tanpa konfirmasi/umpan balik visual terasa seperti bug, bukan fitur; Settings toggle tetap
+satu-satunya jalur mematikan, sudah cukup jelas & aman). Threshold/sensitivitas custom untuk
+apa pun TIDAK relevan di sini (itu domainnya Batch 96/Silence Skip, bukan bubble). "Belum
+diverifikasi di device fisik" (Batch 95/97) masih berlaku sama — tidak ada JDK/Android SDK di
+sandbox ini untuk build/run sungguhan.
+
+**Verifikasi**: brace/paren balance dicek manual di semua file yang disentuh — seimbang di
+semua. Belum di-build fisik (sama seperti semua batch sebelumnya) — prioritas berikutnya kalau
+user push & build: (1) notifikasi MIN benar-benar tidak mengganggu di device asli, (2) bubble
+survive force-stop + reboot dengan urutan test toggle ON → reboot → cek bubble muncul TANPA
+buka app, (3) rotasi layar berulang tidak pernah membuat bubble hilang dari jangkauan.
+
 ## Batch 97 — Sempurnakan Floating Mini Player (Bubble): fix jank main-thread
 Instruksi user: "sempurnakan 100% fungsionalitas dari Floating Mini Player (Bubble Mode)".
 Audit statis `FloatingBubbleService.kt` (Batch 95) menemukan 1 bug nyata, 1 file disentuh.

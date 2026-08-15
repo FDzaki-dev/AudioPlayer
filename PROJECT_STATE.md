@@ -6,6 +6,39 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 98 (Sempurnakan Floating Mini Player/Bubble — reliabilitas & completeness, 4 file —
+1 baru + 3 diedit, 1 protected)** — Lanjutan instruksi user "sempurnakan 100% fungsionalitas".
+Batch 97 (sesi sebelumnya) sengaja cuma fix 1 bug jank, menyisakan 3 celah completeness yang
+sudah dicatat sejak Batch 95 sendiri ("batasan jujur") — batch ini menutupnya.
+
+**1. Foreground service beneran**: sebelumnya cuma mengandalkan window overlay tampil utk
+importance "mendekati visible", skin agresif tetap bisa membunuh kapan saja. `startForeground()`
+dipanggil di `onCreate()` (tipe `specialUse` API 34+, `FOREGROUND_SERVICE_SPECIAL_USE` permission
++ `<property>` baru di manifest). Trade-off disadari & dicatat jujur: 1 notifikasi importance
+MIN ekstra selama bubble aktif (nyaris tak kelihatan — MIN sembunyi dari status bar).
+
+**2. Auto-restart setelah reboot**: `BubbleBootReceiver.kt` (baru, `bubble/`) dengar
+`BOOT_COMPLETED`, cek `FloatingBubbleStore.isEnabled()` DAN `Settings.canDrawOverlays()` (izin
+bisa dicabut dari luar app kapan saja) sebelum restart — sebelumnya cuma restart saat app
+dibuka manual.
+
+**3. State antrean kosong**: `hasQueue` baru (`player.mediaItemCount > 0`) — kosong = 3 tombol
+alpha 0.4 + tap buka app (bukan no-op senyap). Default optimistic `true` sebelum controller
+konek, supaya fallback Intent lama tetap jalan di tap paling awal.
+
+**4. Rotasi layar**: `layoutParams` dipromosikan local var → field class, `onConfigurationChanged()`
+baru re-clamp posisi ke `DisplayMetrics` terkini + `updateViewLayout()`/`savePosition()` kalau
+berubah. `DisplayMetrics` di `setupDrag()`'s `ACTION_MOVE` juga dibaca ulang tiap event (bukan
+cache basi).
+
+`MainActivity.kt` (protected, edit parsial) — 3 titik start service disatukan ke helper
+`startBubbleService()` API-gated (`startForegroundService()` WAJIB sekarang di O+, sebelumnya
+`startService()` polos "kebetulan jalan").
+
+**Sengaja TIDAK ditambah**: tombol dismiss di bubble (drag-to-dismiss ditolak — risiko UX
+dismiss diam-diam tanpa konfirmasi). "Belum diverifikasi device fisik" masih berlaku sama.
+Detail lengkap: `CHANGELOG.md` Batch 98.
+
 **Batch 97 (Sempurnakan Floating Mini Player/Bubble — fix bug jank main-thread, 1 file)** —
 Instruksi user: "sempurnakan 100% fungsionalitas dari Floating Mini Player (Bubble Mode)".
 Audit `FloatingBubbleService.kt` (Batch 95) nemu 1 bug nyata: `refreshBubbleContent()` decode
@@ -21,11 +54,6 @@ relaunch (skip/next cepat tidak lagi berisiko art lagu lama menimpa lagu baru), 
 `setImageResource`, 0 I/O) sengaja TETAP sync. `bubbleScope.cancel()` ditambah `onDestroy()` +
 re-`findViewById` dari `bubbleView` terbaru (bukan closure lama) sebelum update UI, jaga-jaga
 Service di-kill selagi decode masih jalan.
-
-**Sengaja TIDAK ditambah**: tombol tutup/dismiss di bubble, konversi ke foreground service —
-dibaca sebagai "benarkan bug fungsi existing", bukan perluasan scope 3-tombol pill sesuai
-roadmap asli. Status bukan-foreground-service tetap keputusan sengaja Batch 95, tidak diubah
-tanpa bukti/laporan baru. Detail lengkap: `CHANGELOG.md` Batch 97.
 
 **Batch 96 (Fitur baru: Trim Keheningan Otomatis/Silence Skip, roadmap #8, 5 file — 1 baru + 3
 kode diedit + 1 protected)** — Toggle baru "Lewati Keheningan Otomatis" di Settings.

@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 135 file
+# Total: 136 file
 
 .github/workflows/build.yml
 .gitignore
@@ -16,6 +16,7 @@ app/proguard-rules.pro
 app/src/main/AndroidManifest.xml
 app/src/main/java/com/rudi/audioplayer/AudioPlayerApplication.kt
 app/src/main/java/com/rudi/audioplayer/MainActivity.kt
+app/src/main/java/com/rudi/audioplayer/bubble/BubbleBootReceiver.kt
 app/src/main/java/com/rudi/audioplayer/bubble/FloatingBubbleService.kt
 app/src/main/java/com/rudi/audioplayer/data/AppLockStore.kt
 app/src/main/java/com/rudi/audioplayer/data/AudiobookModeStore.kt

@@ -547,12 +547,23 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     // ke Settings.canDrawOverlays() begitu user kembali, bukan percaya result code seperti
     // visualizerPermissionLauncher di atas.
     val overlayPermissionContext = LocalContext.current
+
+    // Batch 98 — FloatingBubbleService sekarang foreground service beneran (lihat KDoc kelasnya)
+    // dan MEMANGGIL startForeground() SENDIRI di onCreate(), jadi caller wajib pakai
+    // startForegroundService() (bukan startService() biasa) di Android O+ — pola yang sama
+    // persis sudah dipakai di PlaybackService/FloatingBubbleService's sendPlaybackAction
+    // fallback, sekarang disatukan di 1 helper biar tidak diketik ulang 3x di bawah.
+    fun startBubbleService(context: android.content.Context) {
+        val intent = Intent(context, FloatingBubbleService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
+    }
+
     val overlayPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
         if (Settings.canDrawOverlays(overlayPermissionContext)) {
             playerViewModel.setFloatingBubbleEnabled(true)
-            overlayPermissionContext.startService(Intent(overlayPermissionContext, FloatingBubbleService::class.java))
+            startBubbleService(overlayPermissionContext)
         }
         // Ditolak/dibatalkan: toggle di SettingsScreen tetap OFF (floatingBubbleEnabled tidak
         // pernah diset true di sini), tidak perlu penanganan tambahan.
@@ -566,7 +577,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         }
         if (Settings.canDrawOverlays(overlayPermissionContext)) {
             playerViewModel.setFloatingBubbleEnabled(true)
-            overlayPermissionContext.startService(Intent(overlayPermissionContext, FloatingBubbleService::class.java))
+            startBubbleService(overlayPermissionContext)
         } else {
             overlayPermissionLauncher.launch(
                 Intent(
@@ -578,11 +589,13 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     }
 
     // Restart bubble sekali per proses kalau sesi SEBELUMNYA menyalakannya dan izin masih ada
-    // (proses baru = Service lama ikut mati, START_STICKY tidak menolong lintas proses baru) —
-    // tanpa ini, user harus manual matik-nyalakan toggle lagi tiap kali app di-kill total.
+    // (proses baru = Service lama ikut mati, START_STICKY tidak menolong lintas proses baru).
+    // Batch 98: ini kini cuma jaring pengaman tambahan — BubbleBootReceiver sudah menutup celah
+    // "HP restart, app belum dibuka" lebih dulu; effect ini tetap perlu untuk kasus proses mati
+    // TANPA reboot (mis. app di-force-stop manual, atau OOM kill lalu user buka app lagi).
     LaunchedEffect(Unit) {
         if (floatingBubbleEnabled && Settings.canDrawOverlays(overlayPermissionContext)) {
-            overlayPermissionContext.startService(Intent(overlayPermissionContext, FloatingBubbleService::class.java))
+            startBubbleService(overlayPermissionContext)
         }
     }
 
