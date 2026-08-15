@@ -1,5 +1,84 @@
 # Changelog
 
+## Batch 100 — Floating Mini Player: minimize ke tepi, auto-trigger tanpa buka app, QS Tile
+Lanjutan 3 instruksi user yang sebelumnya sempat ditangani sebagian di sesi lain (Batch 98
+cuma menuntaskan foreground service, 2 celah lain terlewat/salah dibaca). **7 file** (4 baru,
+3 diedit — 2 di antaranya protected).
+
+**1. Minimize ke tepi layar (koreksi keputusan Batch 98)** — CHANGELOG Batch 98 mencatat
+"tombol dismiss/close di bubble itu sendiri TIDAK ditambahkan... ditolak" — itu salah baca
+instruksi. Permintaan aslinya jelas: "wajib bisa di-minimize... BUKAN di-close total", beda
+konsep dari dismiss. Diperbaiki di sini: `FloatingBubbleService.kt`'s `bubbleView` sekarang
+`FrameLayout` berisi 2 child (`bubble_mini_player.xml` pill penuh yang sudah ada + `bubble_
+minimized.xml` baru, tab bundar 48dp), toggle visibility antara keduanya lewat `minimize()`/
+`expand()` — Service & notifikasi foreground TIDAK pernah berhenti, cuma tampilannya yang
+menciut. Tombol baru `bubble_minimize` (ikon `ic_bubble_minimize.xml`, chevron Material
+standar) di pill. `snapMinimizedToNearestEdge()`: begitu minimized, X SELALU dipaksa ke tepi
+0 atau `screenWidth - lebarTab` terdekat (chat-head style, gaya Messenger) — dipanggil saat
+tap minimize, saat lepas drag ketika minimized, DAN saat rotasi layar (`onConfigurationChanged`
+sekarang re-snap penuh alih-alih cuma clamp untuk state ini). `expand()` memulihkan X terakhir
+sebelum diminimize (`lastExpandedX`, in-memory), di-clamp ulang via `container.post{}` supaya
+lebar pill yang baru saja terlihat lagi sudah ke-measure sebelum dipakai hitung batas kanan.
+Tap-vs-drag di tab minimized pakai ulang pembeda `totalMovement` yang sudah ada — tap
+memanggil `expand()`, bukan `openApp()` seperti pill biasa. `FloatingBubbleStore.kt`: `KEY_
+MINIMIZED` baru, dibaca ulang tiap Service start supaya sesi berikutnya lanjut dari state
+terakhir.
+
+**2. Auto-trigger tanpa buka app** — sebelumnya bubble CUMA start dari `MainActivity` (buka
+app manual) atau `BubbleBootReceiver` (reboot HP) — tekan play di WIDGET homescreen, tombol
+notifikasi media, atau tombol headset SAAT APP BELUM PERNAH DIBUKA sama sekali tidak pernah
+menyalakan bubble walau togglenya ON. `PlaybackService.kt`'s `onIsPlayingChanged(true)` — SATU
+titik yang selalu jalan di titik manapun playback benar-benar mulai, dari entry point apa
+pun — sekarang panggil `maybeStartFloatingBubble()` baru: cek ulang `FloatingBubbleStore.
+isEnabled()` DAN `Settings.canDrawOverlays()` (2 syarat yang sama seperti `BubbleBootReceiver`,
+device settings selalu menang atas preferensi in-app), baru start service kalau keduanya
+lolos. Aman dipanggil berulang tiap event play — start service yang sudah jalan cuma
+re-deliver `onStartCommand()`, `onCreate()` tidak pernah dipanggil ulang, tidak ada risiko
+window overlay dobel ke-`addView()`.
+
+**3. Quick Settings Tile baru** — `BubbleTileService.kt` (baru, `bubble/`), toggle bubble
+langsung dari shade notifikasi tanpa buka app sama sekali. Baca/tulis preferensi LANGSUNG ke
+`FloatingBubbleStore` (SharedPreferences) — BUKAN lewat `PlayerViewModel`'s StateFlow, karena
+System UI bisa instansiasi `TileService` kapan pun tanpa `MainActivity`/ViewModel pernah hidup
+di sesi itu. Kalau izin overlay belum granted, tap tile buka `Settings.ACTION_MANAGE_
+OVERLAY_PERMISSION` lewat `startActivityAndCollapse` (bukan langsung toggle) — API-gated:
+overload `PendingIntent` di API 34+ (yang lama di-`@Suppress("DEPRECATION")` untuk di bawahnya,
+QS Tile custom sendiri baru ada sejak API 24/`minSdk` 23 di project ini, makanya class ini
+diberi `@RequiresApi(Build.VERSION_CODES.N)` — device API 23 tidak pernah menginstansiasi
+class ini sama sekali karena fitur QS Tile custom belum ada di situ, tapi anotasi tetap wajib
+biar lint `NewApi` tidak menganggap ini API di bawah `minSdk` tanpa pengaman). Ikon baru
+`ic_bubble_tile.xml` (lingkaran cincin generik, QS tile system selalu render 1 warna terlepas
+dari isi file). Manifest: `<service>` baru `exported="true"` + `permission="...BIND_QUICK_
+SETTINGS_TILE"` (kontrak resmi API ini, BEDA dari service internal lain di file yang sengaja
+`exported="false"`) + intent-filter `QS_TILE`.
+
+**4. Sinkronisasi state Settings ↔ Tile** — konsekuensi jujur dari poin 3: kalau app KEBETULAN
+sedang kebuka bareng saat tile ditoggle, switch bubble di SettingsScreen bisa nunjukin state
+BASI (`StateFlow` tidak auto-observe perubahan `SharedPreferences` dari komponen lain).
+`PlayerViewModel.kt`: `refreshFloatingBubbleEnabled()` baru, baca ulang dari store.
+`MainActivity.kt` (protected, edit parsial): `DisposableEffect(lifecycleOwner)` + `Lifecycle
+EventObserver` manual (BUKAN `LifecycleEventEffect` — proyek ini pernah kena masalah nyata
+soal `LocalLifecycleOwner` CompositionLocal, lihat Batch 23-24, `addObserver()` manual adalah
+API lifecycle polos yang tidak lewat titik gagal historis itu) memanggil `refreshFloating
+BubbleEnabled()` tiap `ON_RESUME`.
+
+**AndroidManifest.xml (protected, edit parsial)**: `<service>` `BubbleTileService` baru
+(detail poin 3 di atas). Tidak ada `<uses-permission>` baru — `BIND_QUICK_SETTINGS_TILE`
+adalah `android:permission` di level `<service>` (App INI yang mensyaratkan siapa pun yang
+mem-bind harus punya izin itu — System UI sudah otomatis punya), bukan izin yang app ini minta
+sendiri, beda kelas dari `SYSTEM_ALERT_WINDOW`/`FOREGROUND_SERVICE_SPECIAL_USE` sebelumnya.
+
+**Verifikasi**: brace/paren balance dicek semua file .kt yang disentuh (seimbang semua), semua
+file .xml baru/diedit divalidasi well-formed lewat `xml.etree.ElementTree` (valid semua),
+`FILE_MANIFEST.txt` di-diff ulang terhadap tree aktual (140/140 cocok setelah update). Belum
+di-build fisik (tidak ada JDK/Android SDK di sandbox ini, sama seperti semua batch sebelumnya)
+— prioritas berikutnya kalau user push & build: (1) minimize/expand tidak nge-lag atau
+nyisain artefak visual pas toggle cepat berturut-turut, (2) tab minimized benar-benar nempel
+tepi & tidak kepotong sebagian di device nyata (khususnya device dengan notch/punch-hole di
+tepi layar), (3) QS tile state (`STATE_ACTIVE`/`STATE_INACTIVE`) ke-refresh benar begitu shade
+dibuka ulang, (4) auto-trigger dari widget play benar-benar memunculkan bubble di device yang
+app-nya belum pernah dibuka sama sekali sejak install.
+
 ## Batch 99 — Audit kompatibilitas mundur Android 14 ke bawah (0 kode diubah)
 Instruksi user: "terapkan backward compatibility support untuk Android 14 kebawah". Fokus
 audit: kode `specialUse` foreground service dari Batch 98 (fitur khusus Android 14/API 34,

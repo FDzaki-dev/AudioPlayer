@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Batch 100 — glyph chevron-left standar Material (dipakai apa adanya, bukan gambar custom)
+     buat tombol "minimize ke tepi" di bubble_mini_player.xml. Putih solid, konsisten sama
+     ic_widget_*.png yang juga putih di atas widget_background gelap. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M15.41,7.41L14,6l-6,6l6,6l1.41,-1.41L10.83,12z" />
+</vector>

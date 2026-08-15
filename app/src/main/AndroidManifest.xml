@@ -96,6 +96,21 @@
             </intent-filter>
         </receiver>
 
+        <!-- Batch 100 (Roadmap #11 lanjutan) — Quick Settings Tile: toggle bubble langsung dari
+             shade notifikasi tanpa buka app. exported="true" + permission BIND_QUICK_SETTINGS_TILE
+             WAJIB persis begini (kontrak resmi API QS Tile, System UI yang bind lintas proses) —
+             beda dari service internal lain di file ini yang sengaja exported="false". -->
+        <service
+            android:name=".bubble.BubbleTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_bubble_tile"
+            android:label="Mini Player Mengambang"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <!-- Lets Bluetooth devices and the Android System UI media-resumption feature relaunch
              this service and hand it a MEDIA_BUTTON intent even after the app process has been
              killed — required for MediaSession.Callback.onPlaybackResumption() to ever fire. -->

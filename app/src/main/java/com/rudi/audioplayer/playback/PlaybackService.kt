@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.media3.common.AudioAttributes
@@ -26,6 +27,8 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.rudi.audioplayer.MainActivity
 import com.rudi.audioplayer.R
+import com.rudi.audioplayer.bubble.FloatingBubbleService
+import com.rudi.audioplayer.data.FloatingBubbleStore
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.ShakeSettingsStore
@@ -120,6 +123,14 @@ class PlaybackService : MediaLibraryService() {
                 } else {
                     shakeDetector?.stop()
                 }
+                // Roadmap #11 lanjutan (Batch 100) — sebelumnya bubble CUMA start dari
+                // MainActivity/BubbleBootReceiver, jadi entry point lain (widget play di
+                // homescreen, tombol notifikasi media, tombol headset) tidak pernah menyalakan
+                // bubble walau togglenya ON, kecuali app-nya sendiri sempat dibuka duluan. Ini
+                // Service yang SELALU hidup di titik manapun playback benar-benar mulai —
+                // dengar isPlaying di sini (bukan tebak per-entry-point di widget/QS tile
+                // masing-masing) otomatis menutup semua celah sekaligus dari SATU tempat.
+                if (isPlaying) maybeStartFloatingBubble()
                 // The cold-start placeholder is a plain NotificationCompat notification, not
                 // a MediaStyle one Media3 keeps in sync automatically — without this, its
                 // action button was permanently stuck on whatever label it had at the instant
@@ -144,6 +155,22 @@ class PlaybackService : MediaLibraryService() {
             .setSessionActivity(sessionActivityIntent)
             .setBitmapLoader(SongArtBitmapLoader(this, serviceScope))
             .build()
+    }
+
+    /** Roadmap #11 lanjutan (Batch 100) — dipanggil tiap `isPlaying` jadi true, DARI MANA PUN
+     * playback itu dipicu (widget, notifikasi, headset, MainActivity). Aman dipanggil berulang:
+     * start service yang sudah jalan cuma re-deliver `onStartCommand()` (no-op, `onCreate()`
+     * TIDAK dipanggil ulang — lihat FloatingBubbleService, view overlay tidak pernah dobel
+     * ditambahkan). Dua syarat WAJIB dicek ulang tiap kali (bukan cuma sekali di awal proses):
+     * [FloatingBubbleStore.isEnabled] preferensi user, DAN `Settings.canDrawOverlays` — izin
+     * overlay bisa dicabut user dari Pengaturan sistem kapan saja tanpa lewat toggle app ini
+     * sama sekali, device settings selalu menang atas preferensi in-app (pola sama persis
+     * BubbleBootReceiver.kt). */
+    private fun maybeStartFloatingBubble() {
+        if (!FloatingBubbleStore(this).isEnabled()) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) return
+        val intent = Intent(this, FloatingBubbleService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
     }
 
     private fun pushWidgetUpdate(player: Player) {

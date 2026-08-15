@@ -31,10 +31,22 @@ class FloatingBubbleStore(context: Context) {
         prefs.edit().putInt(KEY_POS_X, x).putInt(KEY_POS_Y, y).apply()
     }
 
+    /** Batch 100 — status "diminimize ke tepi layar" (chat-head style), SENGAJA terpisah dari
+     * [isEnabled]: minimize cuma menyembunyikan pill penuh jadi tab kecil nempel tepi kiri/kanan
+     * (Service TETAP hidup, notifikasi foreground TETAP ada) — bukan mematikan fitur bubble sama
+     * sekali, itu tetap murni lewat toggle Settings/[isEnabled]. Dibaca lagi tiap Service start
+     * supaya sesi berikutnya lanjut dari state terakhir user, bukan selalu reset ke pill penuh. */
+    fun isMinimized(): Boolean = prefs.getBoolean(KEY_MINIMIZED, false)
+
+    fun setMinimized(minimized: Boolean) {
+        prefs.edit().putBoolean(KEY_MINIMIZED, minimized).apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "floating_bubble_settings"
         private const val KEY_ENABLED = "enabled"
         private const val KEY_POS_X = "pos_x"
         private const val KEY_POS_Y = "pos_y"
+        private const val KEY_MINIMIZED = "minimized"
     }
 }

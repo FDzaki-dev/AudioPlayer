@@ -23,6 +23,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import androidx.core.app.NotificationCompat
@@ -88,6 +89,22 @@ import kotlin.math.abs
  * sebelumnya rotasi bisa membuat bubble kepental separuh di luar layar (mis. y besar di
  * portrait jadi melebihi tinggi layar landscape yang lebih pendek) sampai user drag manual.
  *
+ * **Batch 100 — minimize ke tepi layar (chat-head style)**: 3 celah dari instruksi lanjutan
+ * user ("tombol close/foreground service", "trigger tanpa buka app", "wajib bisa di-minimize,
+ * bukan di-close total") — Batch 98 sudah menuntaskan foreground service, tapi bagian
+ * minimize-nya waktu itu SALAH DIBACA sebagai "tombol dismiss/close" dan sengaja ditolak
+ * ("Di luar cakupan" di CHANGELOG Batch 98). Instruksi aslinya jelas beda: minimize BUKAN
+ * dismiss — Service/notifikasi TETAP hidup, cuma tampilan pill-nya yang menciut jadi tab
+ * bundar kecil nempel tepi layar, tap lagi untuk buka penuh. Koreksi keputusan itu di sini.
+ *
+ * Implementasi: [bubbleView] sekarang [FrameLayout] berisi 2 child sekaligus (`bubble_mini_
+ * player.xml` pill penuh + `bubble_minimized.xml` tab 48dp), cuma salah satu yang `VISIBLE`
+ * (yang lain `GONE`) — window `WRAP_CONTENT` otomatis menciut/membesar ikut ukuran child yang
+ * kelihatan, TANPA perlu remove+re-add view/window terpisah tiap toggle. [setupDrag]'s
+ * pembeda tap-vs-drag (lihat KDoc-nya) dipakai ulang apa adanya untuk kedua state — tap di tab
+ * minimized memanggil [expand] alih-alih [openApp], drag+lepas saat minimized memicu
+ * [snapMinimizedToNearestEdge] alih-alih cuma simpan posisi bebas seperti pill penuh.
+ *
  * **Batch 97 — artwork decode dipindah ke background thread**: `refreshBubbleContent()` dulu
  * memanggil `loadAlbumArtBitmap()` (I/O blocking — `contentResolver.loadThumbnail()` atau
  * `MediaMetadataRetriever`) langsung di `Player.Listener.onEvents()`, yang jalan di main thread
@@ -104,6 +121,16 @@ class FloatingBubbleService : Service() {
     private lateinit var windowManager: WindowManager
     private lateinit var bubbleStore: FloatingBubbleStore
     private var bubbleView: View? = null
+    // Batch 100 — child dari bubbleView (FrameLayout), disimpan terpisah supaya minimize()/
+    // expand() tidak perlu findViewById ulang tiap toggle.
+    private var expandedView: View? = null
+    private var minimizedView: View? = null
+    private var isMinimized = false
+    // Posisi X terakhir SEBELUM diminimize, dipulihkan saat expand() lagi — murni in-memory
+    // (tidak perlu persist terpisah dari FloatingBubbleStore.savePosition biasa: kalau Service
+    // mati total lalu restart, posisi tersimpan yang dibaca ulang toh sudah posisi APAPUN state
+    // terakhir, expanded atau minimized, cukup akurat untuk titik awal).
+    private var lastExpandedX: Int? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     private var controller: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -145,6 +172,13 @@ class FloatingBubbleService : Service() {
         super.onConfigurationChanged(newConfig)
         val view = bubbleView ?: return
         val params = layoutParams ?: return
+        // Batch 100 — kalau lagi minimized, X SELALU harus tetap di tepi 0/maxX (bukan cuma
+        // di-clamp masuk batas layar baru) — re-snap penuh, bukan clamp biasa yang bisa saja
+        // menyisakan X "nyaris tepi tapi bukan tepi" pas rotasi mengubah lebar layar.
+        if (isMinimized) {
+            snapMinimizedToNearestEdge()
+            return
+        }
         val metrics = resources.displayMetrics
         val maxX = (metrics.widthPixels - view.width).coerceAtLeast(0)
         val maxY = (metrics.heightPixels - view.height).coerceAtLeast(0)
@@ -224,17 +258,23 @@ class FloatingBubbleService : Service() {
     }
 
     private fun addBubbleView() {
-        val view = LayoutInflater.from(this).inflate(R.layout.bubble_mini_player, null)
-        bubbleView = view
+        // Batch 100 — container tunggal berisi KEDUA tampilan (pill penuh + tab minimized)
+        // sekaligus, cuma salah satunya VISIBLE. 1 window WindowManager saja untuk keduanya:
+        // toggle visibility, bukan remove+re-add view/window tiap minimize/expand — lebih
+        // sederhana & tanpa risiko flicker/race dibanding gonta-ganti window.
+        val container = FrameLayout(this)
+        val expanded = LayoutInflater.from(this).inflate(R.layout.bubble_mini_player, container, false)
+        val minimized = LayoutInflater.from(this).inflate(R.layout.bubble_minimized, container, false)
+        container.addView(expanded)
+        container.addView(minimized)
+        bubbleView = container
+        expandedView = expanded
+        minimizedView = minimized
 
-        val albumArt = view.findViewById<ImageView>(R.id.bubble_album_art)
-        albumArt.clipToOutline = true
-        albumArt.outlineProvider = object : ViewOutlineProvider() {
-            override fun getOutline(v: View, outline: Outline) {
-                outline.setOval(0, 0, v.width, v.height)
-            }
-        }
-        albumArt.setImageResource(R.mipmap.ic_launcher)
+        applyOvalClip(expanded.findViewById(R.id.bubble_album_art))
+        applyOvalClip(minimized.findViewById(R.id.bubble_minimized_art))
+        expanded.findViewById<ImageView>(R.id.bubble_album_art).setImageResource(R.mipmap.ic_launcher)
+        minimized.findViewById<ImageView>(R.id.bubble_minimized_art).setImageResource(R.mipmap.ic_launcher)
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -243,6 +283,7 @@ class FloatingBubbleService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
+        isMinimized = bubbleStore.isMinimized()
         val saved = bubbleStore.getPosition()
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -257,11 +298,29 @@ class FloatingBubbleService : Service() {
         }
         layoutParams = params
 
-        setupDrag(view, params)
-        setupControls(view)
+        expanded.visibility = if (isMinimized) View.GONE else View.VISIBLE
+        minimized.visibility = if (isMinimized) View.VISIBLE else View.GONE
+        if (!isMinimized) lastExpandedX = params.x
 
-        runCatching { windowManager.addView(view, params) }
+        setupDrag(container, params)
+        setupControls(expanded)
+
+        runCatching { windowManager.addView(container, params) }
             .onFailure { AppLogger.e("FloatingBubbleService", "Gagal memasang overlay bubble", it) }
+
+        // Sesi sebelumnya diakhiri dalam keadaan minimized — posisi tersimpan mungkin bukan
+        // posisi tepi yang valid lagi (mis. rotasi/resolusi beda sejak terakhir disimpan).
+        // Snap ulang begitu container ke-layout, konsisten sama kondisi minimize() manapun.
+        if (isMinimized) snapMinimizedToNearestEdge()
+    }
+
+    private fun applyOvalClip(imageView: ImageView) {
+        imageView.clipToOutline = true
+        imageView.outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(v: View, outline: Outline) {
+                outline.setOval(0, 0, v.width, v.height)
+            }
+        }
     }
 
     /** Drag-untuk-pindah + tap-untuk-buka-app di area kosong pill, dibedakan lewat TOTAL jarak
@@ -306,6 +365,12 @@ class FloatingBubbleService : Service() {
                 MotionEvent.ACTION_UP -> {
                     if (totalMovement > TOUCH_SLOP) {
                         bubbleStore.savePosition(params.x, params.y)
+                        // Batch 100 — mode minimized SELALU "nempel" tepi terdekat begitu jari
+                        // dilepas, tidak boleh mengambang bebas di tengah layar seperti pill
+                        // penuh (itu yang membedakan visual "minimized" dari "expanded biasa").
+                        if (isMinimized) snapMinimizedToNearestEdge()
+                    } else if (isMinimized) {
+                        expand()
                     } else {
                         openApp()
                     }
@@ -325,6 +390,66 @@ class FloatingBubbleService : Service() {
         }
         view.findViewById<ImageButton>(R.id.bubble_next).setOnClickListener {
             if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_NEXT) else openApp()
+        }
+        view.findViewById<ImageButton>(R.id.bubble_minimize).setOnClickListener { minimize() }
+    }
+
+    /** Ciutkan pill penuh jadi tab 48dp nempel tepi layar. Service/notifikasi foreground TIDAK
+     * disentuh — cuma toggle visibility 2 child dalam [bubbleView] yang sama, lihat KDoc "Batch
+     * 100" di kelas ini untuk kenapa ini BUKAN tombol close/dismiss. */
+    private fun minimize() {
+        if (isMinimized) return
+        val params = layoutParams ?: return
+        isMinimized = true
+        lastExpandedX = params.x
+        expandedView?.visibility = View.GONE
+        minimizedView?.visibility = View.VISIBLE
+        bubbleStore.setMinimized(true)
+        snapMinimizedToNearestEdge()
+    }
+
+    /** Kebalikan [minimize] — dipanggil dari tap (bukan drag) di atas tab minimized (lihat
+     * [setupDrag]). X dipulihkan ke posisi SEBELUM diminimize ([lastExpandedX]), di-clamp ULANG
+     * terhadap lebar pill penuh yang baru saja terlihat lagi (`container.post{}` menunggu satu
+     * layout pass supaya `container.width` yang dibaca adalah ukuran pill, bukan sisa ukuran
+     * tab 48dp dari frame sebelumnya). */
+    private fun expand() {
+        if (!isMinimized) return
+        val container = bubbleView as? FrameLayout ?: return
+        val params = layoutParams ?: return
+        isMinimized = false
+        minimizedView?.visibility = View.GONE
+        expandedView?.visibility = View.VISIBLE
+        bubbleStore.setMinimized(false)
+        container.post {
+            val maxX = (resources.displayMetrics.widthPixels - container.width).coerceAtLeast(0)
+            params.x = (lastExpandedX ?: params.x).coerceIn(0, maxX)
+            runCatching { windowManager.updateViewLayout(container, params) }
+            bubbleStore.savePosition(params.x, params.y)
+        }
+    }
+
+    /** Chat-head-style "nempel tepi": X dipaksa ke 0 (kiri) atau `screenWidth - lebarTab`
+     * (kanan) — mana pun yang lebih dekat dari posisi X saat ini, TIDAK PERNAH mengambang bebas
+     * di tengah layar selagi minimized. `container.post{}` supaya ukuran tab yang SEBENARNYA
+     * (dari `layout_width="48dp"` di bubble_minimized.xml, sudah ke-measure oleh sistem) yang
+     * dipakai hitung tepi kanan — bukan angka dp ditebak manual dari kode, yang gampang meleset
+     * kalau ukuran layout diubah lagi nanti dan lupa disinkronkan ke sini. */
+    private fun snapMinimizedToNearestEdge() {
+        val container = bubbleView as? FrameLayout ?: return
+        val params = layoutParams ?: return
+        container.post {
+            val width = container.width.takeIf { it > 0 } ?: return@post
+            val metrics = resources.displayMetrics
+            val screenWidth = metrics.widthPixels
+            val nearestRight = (params.x + width / 2) > screenWidth / 2
+            params.x = if (nearestRight) (screenWidth - width).coerceAtLeast(0) else 0
+            // Y juga di-clamp (bukan cuma X yang "dipaksa tepi") — rotasi bisa mengubah tinggi
+            // layar juga, Y lama yang valid di orientasi sebelumnya bisa jadi melebihi batas.
+            val maxY = (metrics.heightPixels - container.height).coerceAtLeast(0)
+            params.y = params.y.coerceIn(0, maxY)
+            runCatching { windowManager.updateViewLayout(container, params) }
+            bubbleStore.savePosition(params.x, params.y)
         }
     }
 
@@ -364,19 +489,30 @@ class FloatingBubbleService : Service() {
 
         // Play/pause icon di atas murni ganti drawable resource — murah, aman tetap sync. Cuma
         // decode artwork (I/O blocking) yang wajib pindah background thread, lihat catatan
-        // "Batch 97" di kelas ini.
+        // "Batch 97" di kelas ini. Batch 100: art di-set ke KEDUA ImageView (pill penuh +
+        // tab minimized) sekaligus, biar yang lagi disembunyikan pun tetap sudah sinkron begitu
+        // user expand() nanti — bukan nunggu event lagu berganti lagi baru ke-update.
         val artworkUri = player.currentMediaItem?.mediaMetadata?.artworkUri
         bubbleArtJob?.cancel()
         if (artworkUri == null) {
             view.findViewById<ImageView>(R.id.bubble_album_art).setImageResource(R.mipmap.ic_launcher)
+            view.findViewById<ImageView>(R.id.bubble_minimized_art).setImageResource(R.mipmap.ic_launcher)
             return
         }
         bubbleArtJob = bubbleScope.launch {
             val bitmap = withContext(Dispatchers.IO) { loadAlbumArtBitmap(artworkUri) }
             // bubbleView bisa saja sudah null (Service di-destroy selagi decode jalan) — re-cek,
             // jangan pakai `view` closure lama yang mungkin sudah dilepas dari WindowManager.
-            val albumArt = bubbleView?.findViewById<ImageView>(R.id.bubble_album_art) ?: return@launch
-            if (bitmap != null) albumArt.setImageBitmap(bitmap) else albumArt.setImageResource(R.mipmap.ic_launcher)
+            val root = bubbleView ?: return@launch
+            val expandedArt = root.findViewById<ImageView>(R.id.bubble_album_art)
+            val minimizedArt = root.findViewById<ImageView>(R.id.bubble_minimized_art)
+            if (bitmap != null) {
+                expandedArt.setImageBitmap(bitmap)
+                minimizedArt.setImageBitmap(bitmap)
+            } else {
+                expandedArt.setImageResource(R.mipmap.ic_launcher)
+                minimizedArt.setImageResource(R.mipmap.ic_launcher)
+            }
         }
     }
 

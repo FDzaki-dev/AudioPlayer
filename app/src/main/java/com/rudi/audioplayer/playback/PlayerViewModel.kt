@@ -132,6 +132,15 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         _floatingBubbleEnabled.value = enabled
     }
 
+    /** Batch 100 — bubble sekarang bisa ditoggle dari LUAR ViewModel ini sama sekali (Quick
+     * Settings Tile, lihat BubbleTileService.kt, baca/tulis langsung ke [floatingBubbleStore]
+     * tanpa lewat StateFlow di sini). Dipanggil dari MainActivity's resume-effect supaya switch
+     * di SettingsScreen tidak nyangkut nunjukin state basi kalau user toggle dari tile lalu
+     * balik ke app. */
+    fun refreshFloatingBubbleEnabled() {
+        _floatingBubbleEnabled.value = floatingBubbleStore.isEnabled()
+    }
+
     // Roadmap #8, Trim Keheningan Otomatis — beda pola dari toggle lain di atas: nilainya
     // TIDAK cukup disimpan ke store doang, harus juga di-relay LIVE ke ExoPlayer di
     // PlaybackService lewat custom SessionCommand (ACTION_SET_SKIP_SILENCE), karena

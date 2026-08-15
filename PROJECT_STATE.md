@@ -6,6 +6,37 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 100 (Floating Mini Player: minimize ke tepi, auto-trigger tanpa buka app, QS Tile, 7
+file — 4 baru + 3 diedit, 2 protected)** — Lanjutan 3 instruksi user yang sebelumnya cuma
+tertangani sebagian (Batch 98, sesi lain, cuma menuntaskan foreground service + SALAH BACA
+"minimize" sebagai "close/dismiss" lalu menolaknya — dikoreksi di sini).
+
+1. **Minimize ke tepi**: `FloatingBubbleService.kt`'s `bubbleView` sekarang `FrameLayout` 2
+child (pill penuh + `bubble_minimized.xml` baru, tab 48dp) — toggle visibility via `minimize()`
+/`expand()`, Service/notifikasi TIDAK pernah berhenti. `snapMinimizedToNearestEdge()`:
+chat-head-style, X selalu dipaksa ke tepi 0/`screenWidth-lebarTab` terdekat — dipanggil saat
+minimize, lepas-drag ketika minimized, DAN rotasi layar. Tombol baru `bubble_minimize` (ikon
+`ic_bubble_minimize.xml`). `FloatingBubbleStore.kt`: `isMinimized()`/`setMinimized()` baru.
+
+2. **Auto-trigger tanpa buka app**: `PlaybackService.kt`'s `onIsPlayingChanged(true)` — SATU
+titik yang selalu jalan dari entry point apa pun (widget/notifikasi/headset) — panggil
+`maybeStartFloatingBubble()` baru, cek `isEnabled()` + `canDrawOverlays()` ulang tiap kali
+(sama pola `BubbleBootReceiver`).
+
+3. **Quick Settings Tile**: `BubbleTileService.kt` baru (`@RequiresApi(N)`, QS Tile custom
+baru ada API 24, 1 di atas `minSdk` 23 — class ini tidak pernah diinstansiasi sistem di device
+API 23), baca/tulis LANGSUNG ke `FloatingBubbleStore` (bukan lewat ViewModel StateFlow — System
+UI bisa instansiasi tanpa `MainActivity` pernah hidup). Ikon `ic_bubble_tile.xml`. Manifest:
+`<service exported="true" permission="...BIND_QUICK_SETTINGS_TILE">` + intent-filter `QS_TILE`.
+
+4. **Sinkronisasi**: `PlayerViewModel.refreshFloatingBubbleEnabled()` + `MainActivity.kt`
+(protected, edit parsial) `DisposableEffect` + `LifecycleEventObserver` MANUAL (bukan
+`LifecycleEventEffect` — pola sengaja dipilih menghindari titik gagal historis `Local
+LifecycleOwner`, lihat Batch 23-24) di `ON_RESUME`, supaya switch Settings tidak basi kalau
+bubble ditoggle dari tile saat app masih hidup di background.
+
+Belum di-build fisik. Detail lengkap: `CHANGELOG.md` Batch 100.
+
 **Batch 99 (Audit kompatibilitas mundur Android 14 ke bawah, 0 file kode diubah, 2 file
 dokumentasi)** — Instruksi user: "terapkan backward compatibility support untuk Android 14
 kebawah". Audit 28 titik `Build.VERSION.SDK_INT`/`VERSION_CODES` di 10 file, fokus khusus kode

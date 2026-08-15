@@ -61,6 +61,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,8 +75,11 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.SideEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.core.view.WindowCompat
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -597,6 +601,25 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         if (floatingBubbleEnabled && Settings.canDrawOverlays(overlayPermissionContext)) {
             startBubbleService(overlayPermissionContext)
         }
+    }
+
+    // Batch 100 — bubble sekarang bisa ditoggle dari LUAR app sepenuhnya (Quick Settings Tile,
+    // lihat BubbleTileService.kt — baca/tulis langsung ke FloatingBubbleStore, tidak lewat
+    // ViewModel StateFlow di atas sama sekali). Tanpa ini, switch bubble di SettingsScreen bisa
+    // nunjukin state BASI kalau user toggle dari tile lalu balik ke app yang masih hidup di
+    // background (StateFlow tidak auto-observe SharedPreferences dari komponen lain). Re-sync
+    // tiap ON_RESUME — observer manual (bukan LifecycleEventEffect) sengaja dipilih: proyek ini
+    // pernah kena masalah nyata soal LocalLifecycleOwner CompositionLocal (lihat CHANGELOG Batch
+    // 23-24), addObserver() manual adalah API lifecycle polos yang tidak lewat titik gagal itu.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                playerViewModel.refreshFloatingBubbleEnabled()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val deleteRequestLauncher = rememberLauncherForActivityResult(

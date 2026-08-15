@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Batch 100 — bentuk "diminimize" bubble: tab bundar kecil nempel tepi kiri/kanan layar
+     (chat-head style), ukuran TETAP 48dp x 48dp (bukan wrap_content) supaya FloatingBubbleService
+     bisa hitung batas tepi tanpa nunggu measurement pass tambahan. Reuse widget_play_button_bg
+     (warna aksen bulat yang sudah ada) sebagai background — 0 drawable baru untuk background,
+     cuma ikon chevron minimize yang baru (lihat ic_bubble_minimize.xml). -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/bubble_minimized_root"
+    android:layout_width="48dp"
+    android:layout_height="48dp"
+    android:background="@drawable/widget_play_button_bg"
+    android:elevation="8dp">
+
+    <ImageView
+        android:id="@+id/bubble_minimized_art"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="center"
+        android:scaleType="centerCrop"
+        android:contentDescription="Buka mini player" />
+
+</FrameLayout>

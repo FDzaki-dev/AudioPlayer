@@ -55,4 +55,18 @@
         android:src="@drawable/ic_widget_next"
         android:contentDescription="Berikutnya" />
 
+    <!-- Batch 100 — minimize ke tepi layar (BUKAN tombol close/dismiss, lihat FloatingBubbleService
+         KDoc). Ukuran hit-area sengaja sama dengan bubble_prev/bubble_next (28dp) biar konsisten,
+         padding lebih besar karena glyph chevron lebih kecil dari ikon widget play/prev/next. -->
+    <ImageButton
+        android:id="@+id/bubble_minimize"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginStart="2dp"
+        android:padding="7dp"
+        android:background="@android:color/transparent"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_bubble_minimize"
+        android:contentDescription="Kecilkan ke tepi layar" />
+
 </LinearLayout>

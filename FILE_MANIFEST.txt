@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 136 file
+# Total: 140 file
 
 .github/workflows/build.yml
 .gitignore
@@ -17,6 +17,7 @@ app/src/main/AndroidManifest.xml
 app/src/main/java/com/rudi/audioplayer/AudioPlayerApplication.kt
 app/src/main/java/com/rudi/audioplayer/MainActivity.kt
 app/src/main/java/com/rudi/audioplayer/bubble/BubbleBootReceiver.kt
+app/src/main/java/com/rudi/audioplayer/bubble/BubbleTileService.kt
 app/src/main/java/com/rudi/audioplayer/bubble/FloatingBubbleService.kt
 app/src/main/java/com/rudi/audioplayer/data/AppLockStore.kt
 app/src/main/java/com/rudi/audioplayer/data/AudiobookModeStore.kt
@@ -91,6 +92,8 @@ app/src/main/java/com/rudi/audioplayer/util/AppLogger.kt
 app/src/main/java/com/rudi/audioplayer/util/AudioArtFetcher.kt
 app/src/main/java/com/rudi/audioplayer/widget/PlayerWidgetProvider.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetUpdater.kt
+app/src/main/res/drawable/ic_bubble_minimize.xml
+app/src/main/res/drawable/ic_bubble_tile.xml
 app/src/main/res/drawable/ic_widget_next.png
 app/src/main/res/drawable/ic_widget_pause.png
 app/src/main/res/drawable/ic_widget_play.png
@@ -100,6 +103,7 @@ app/src/main/res/drawable/widget_background_light.xml
 app/src/main/res/drawable/widget_play_button_bg.xml
 app/src/main/res/drawable/widget_play_button_bg_light.xml
 app/src/main/res/layout/bubble_mini_player.xml
+app/src/main/res/layout/bubble_minimized.xml
 app/src/main/res/layout/widget_player.xml
 app/src/main/res/layout/widget_player_compact.xml
 app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
