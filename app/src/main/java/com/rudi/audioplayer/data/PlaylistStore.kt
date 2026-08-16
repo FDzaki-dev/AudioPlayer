@@ -53,6 +53,15 @@ class PlaylistStore(context: Context) {
         save(getPlaylists().filterNot { it.id == id })
     }
 
+    /** Batch 101 — pasangan undo [deletePlaylist]: simpan balik objek [Playlist] APA ADANYA
+     *  (id/name/songIds asli, bukan lewat [createPlaylist] yang generate id baru) supaya
+     *  playlist yang dibatalkan hapusnya kembali identik seperti sebelum dihapus. Ditaruh di
+     *  akhir list — konsisten dgn urutan tampil playlist lain yg baru dibuat. */
+    fun restorePlaylist(playlist: Playlist) {
+        if (getPlaylists().any { it.id == playlist.id }) return
+        save(getPlaylists() + playlist)
+    }
+
     fun renamePlaylist(id: String, newName: String) {
         save(getPlaylists().map { if (it.id == id) it.copy(name = newName) else it })
     }

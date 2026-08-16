@@ -29,12 +29,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import com.rudi.audioplayer.ui.adaptive.AppWidthClass
+import com.rudi.audioplayer.ui.adaptive.rememberAppWidthClass
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOff
@@ -672,6 +677,16 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
+    // Batch 101 — Adaptive (multi-device). widthClass dihitung dari LocalConfiguration, jadi
+    // otomatis berubah live saat rotasi/lipat-buka foldable/resize split-screen — TIDAK perlu
+    // di-remember manual. showTwoPane sengaja exclude currentRoute == "now_playing" supaya
+    // panel kanan tidak dobel dengan layar penuh Now Playing kalau user tetap memaksa navigasi
+    // ke sana (mis. lewat deep link) selagi di lebar Expanded.
+    val widthClass = rememberAppWidthClass()
+    val showTwoPane = widthClass == AppWidthClass.EXPANDED &&
+        uiState.currentSong != null &&
+        currentRoute != "now_playing"
+
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(celebrationMessage) {
@@ -726,6 +741,68 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         }
     }
 
+    // Batch 101 — Adaptive (multi-device). Body NowPlayingScreen() yg sebelumnya inline persis
+    // sekali di composable("now_playing") sekarang dibungkus 1 lambda dgn parameter `onBack`,
+    // dipakai DUA tempat: (1) composable("now_playing") seperti biasa di Compact/Medium dgn
+    // onBack = popBackStack(), (2) panel persisten kanan di Expanded (lihat showTwoPane) dgn
+    // onBack = no-op — panel BUKAN entry back-stack, popBackStack() di situ justru akan keluar
+    // dari layar kiri (Home/Library) yg sedang tampil, bukan menutup panel. 0 parameter lain yg
+    // berubah, isi NowPlayingScreen(...) copy persis dari sebelumnya.
+    val nowPlayingContent: @Composable (onBack: () -> Unit) -> Unit = { onBackAction ->
+        NowPlayingScreen(
+            uiState = uiState,
+            isFavorite = uiState.currentSong?.let { favoriteIds.contains(it.id) } ?: false,
+            currentRating = currentRating,
+            onSetRating = { stars -> playerViewModel.setCurrentSongRating(stars) },
+            sleepTimerRemainingMs = sleepTimerRemaining,
+            accentColor = accentColor,
+            onPlayPause = { playerViewModel.togglePlayPause() },
+            onNext = { playerViewModel.next() },
+            onPrevious = { playerViewModel.previous() },
+            onSeek = { playerViewModel.seekTo(it) },
+            onShuffle = { playerViewModel.toggleShuffle() },
+            onRepeat = { playerViewModel.cycleRepeatMode() },
+            onToggleFavorite = { uiState.currentSong?.let { playerViewModel.toggleFavorite(it.id) } },
+            onSetSleepTimer = { playerViewModel.setSleepTimer(it) },
+            onCancelSleepTimer = { playerViewModel.cancelSleepTimer() },
+            onSetSpeed = { playerViewModel.setPlaybackSpeed(it) },
+            crossfadeEnabled = crossfadeEnabled,
+            onSetCrossfadeEnabled = { playerViewModel.setCrossfadeEnabled(it) },
+            onSetVolume = { playerViewModel.setVolume(it) },
+            onPlayQueueIndex = { playerViewModel.playFromQueueIndex(it) },
+            onMoveQueueItem = { from, to -> playerViewModel.moveQueueItem(from, to) },
+            onRemoveFromQueue = { playerViewModel.removeFromQueue(it) },
+            onGetLyrics = { id -> playerViewModel.getLyrics(id) },
+            onSaveLyrics = { id, text -> playerViewModel.saveLyrics(id, text) },
+            onDeleteLyrics = { id -> playerViewModel.deleteLyrics(id) },
+            abRepeatPointA = abRepeatPointA,
+            abRepeatPointB = abRepeatPointB,
+            onSetAbRepeatPointA = { playerViewModel.setAbRepeatPointA(it) },
+            onSetAbRepeatPointB = { playerViewModel.setAbRepeatPointB(it) },
+            onClearAbRepeat = { playerViewModel.clearAbRepeat() },
+            onGetBookmarks = { id -> playerViewModel.getBookmarks(id) },
+            onAddBookmark = { id, label, positionMs -> playerViewModel.addBookmark(id, label, positionMs) },
+            onDeleteBookmark = { id, bookmarkId -> playerViewModel.deleteBookmark(id, bookmarkId) },
+            equalizerState = equalizerState,
+            onOpenEqualizer = { playerViewModel.ensureEqualizerAttached() },
+            onToggleEqualizerEnabled = { playerViewModel.setEqualizerEnabled(it) },
+            onEqualizerBandChange = { band, level -> playerViewModel.setEqualizerBand(band, level) },
+            onEqualizerPresetSelect = { index -> playerViewModel.useEqualizerPreset(index) },
+            onEqualizerBoldPresetSelect = { preset -> playerViewModel.useBoldEqualizerPreset(preset) },
+            audiobookModeEnabled = audiobookModeEnabled,
+            onToggleAudiobookMode = { playerViewModel.setAudiobookModeEnabled(it) },
+            visualizerEnabled = visualizerEnabled,
+            visualizerSupported = visualizerSupported,
+            visualizerPermissionGranted = visualizerPermissionGranted,
+            visualizerBars = visualizerBars,
+            onOpenVisualizer = { playerViewModel.ensureVisualizerAttached() },
+            onCloseVisualizer = { playerViewModel.stopVisualizerCapture() },
+            onToggleVisualizerEnabled = { playerViewModel.setVisualizerEnabled(it) },
+            onRequestVisualizerPermission = { visualizerPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+            onBack = onBackAction
+        )
+    }
+
     Scaffold(
         snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
@@ -755,7 +832,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // user was already ON the Now Playing screen, duplicating the play/pause
                     // control and crowding the transport row beneath it — the actual root cause
                     // of "hierarki tombol nya terlalu membingungkan".
-                    visible = uiState.currentSong != null && currentRoute != "now_playing",
+                    visible = uiState.currentSong != null && currentRoute != "now_playing" && !showTwoPane,
                     enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                     exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
                 ) {
@@ -768,7 +845,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         }
                     )
                 }
-                if (currentRoute == "home" || currentRoute == "library" || currentRoute == "settings") {
+                if (widthClass == AppWidthClass.COMPACT &&
+                    (currentRoute == "home" || currentRoute == "library" || currentRoute == "settings")
+                ) {
                     // Batch 40: tonalElevation alone still reads flat (no directional light) —
                     // a 1-2px catch-light line along the top edge is the same border cue
                     // tactileEmboss() uses elsewhere, applied here without restructuring
@@ -854,10 +933,57 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             }
         }
     ) { padding ->
+        Row(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+        ) {
+            // Batch 101 — Adaptive: NavigationRail permanen di Medium/Expanded (tablet, foldable
+            // terbuka, Chromebook, split-screen lebar) menggantikan NavigationBar bawah — hemat
+            // tinggi layar & memanfaatkan ruang horizontal yang nganggur di layar lebar. Compact
+            // (HP potret biasa) TIDAK tersentuh sama sekali, NavigationBar bawah tetap seperti
+            // semula persis (lihat guard widthClass == COMPACT di atas).
+            if (widthClass != AppWidthClass.COMPACT) {
+                NavigationRail {
+                    NavigationRailItem(
+                        selected = currentRoute == "home",
+                        onClick = {
+                            navController.navigate("home") {
+                                popUpTo("home") { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
+                        icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                        label = { Text("Beranda") }
+                    )
+                    NavigationRailItem(
+                        selected = currentRoute == "library",
+                        onClick = {
+                            navController.navigate("library") {
+                                popUpTo("home")
+                                launchSingleTop = true
+                            }
+                        },
+                        icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
+                        label = { Text("Perpustakaan") }
+                    )
+                    NavigationRailItem(
+                        selected = currentRoute == "settings",
+                        onClick = {
+                            navController.navigate("settings") {
+                                popUpTo("home")
+                                launchSingleTop = true
+                            }
+                        },
+                        icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                        label = { Text("Pengaturan") }
+                    )
+                }
+            }
+        Box(modifier = Modifier.weight(1f)) {
         NavHost(
             navController = navController,
-            startDestination = "home",
-            modifier = Modifier.padding(padding)
+            startDestination = "home"
         ) {
             composable("home") {
                 HomeScreen(
@@ -968,60 +1094,28 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     ) + fadeOut(tween(300))
                 }
             ) {
-                NowPlayingScreen(
-                    uiState = uiState,
-                    isFavorite = uiState.currentSong?.let { favoriteIds.contains(it.id) } ?: false,
-                    currentRating = currentRating,
-                    onSetRating = { stars -> playerViewModel.setCurrentSongRating(stars) },
-                    sleepTimerRemainingMs = sleepTimerRemaining,
-                    accentColor = accentColor,
-                    onPlayPause = { playerViewModel.togglePlayPause() },
-                    onNext = { playerViewModel.next() },
-                    onPrevious = { playerViewModel.previous() },
-                    onSeek = { playerViewModel.seekTo(it) },
-                    onShuffle = { playerViewModel.toggleShuffle() },
-                    onRepeat = { playerViewModel.cycleRepeatMode() },
-                    onToggleFavorite = { uiState.currentSong?.let { playerViewModel.toggleFavorite(it.id) } },
-                    onSetSleepTimer = { playerViewModel.setSleepTimer(it) },
-                    onCancelSleepTimer = { playerViewModel.cancelSleepTimer() },
-                    onSetSpeed = { playerViewModel.setPlaybackSpeed(it) },
-                    crossfadeEnabled = crossfadeEnabled,
-                    onSetCrossfadeEnabled = { playerViewModel.setCrossfadeEnabled(it) },
-                    onSetVolume = { playerViewModel.setVolume(it) },
-                    onPlayQueueIndex = { playerViewModel.playFromQueueIndex(it) },
-                    onMoveQueueItem = { from, to -> playerViewModel.moveQueueItem(from, to) },
-                    onRemoveFromQueue = { playerViewModel.removeFromQueue(it) },
-                    onGetLyrics = { id -> playerViewModel.getLyrics(id) },
-                    onSaveLyrics = { id, text -> playerViewModel.saveLyrics(id, text) },
-                    onDeleteLyrics = { id -> playerViewModel.deleteLyrics(id) },
-                    abRepeatPointA = abRepeatPointA,
-                    abRepeatPointB = abRepeatPointB,
-                    onSetAbRepeatPointA = { playerViewModel.setAbRepeatPointA(it) },
-                    onSetAbRepeatPointB = { playerViewModel.setAbRepeatPointB(it) },
-                    onClearAbRepeat = { playerViewModel.clearAbRepeat() },
-                    onGetBookmarks = { id -> playerViewModel.getBookmarks(id) },
-                    onAddBookmark = { id, label, positionMs -> playerViewModel.addBookmark(id, label, positionMs) },
-                    onDeleteBookmark = { id, bookmarkId -> playerViewModel.deleteBookmark(id, bookmarkId) },
-                    equalizerState = equalizerState,
-                    onOpenEqualizer = { playerViewModel.ensureEqualizerAttached() },
-                    onToggleEqualizerEnabled = { playerViewModel.setEqualizerEnabled(it) },
-                    onEqualizerBandChange = { band, level -> playerViewModel.setEqualizerBand(band, level) },
-                    onEqualizerPresetSelect = { index -> playerViewModel.useEqualizerPreset(index) },
-                    onEqualizerBoldPresetSelect = { preset -> playerViewModel.useBoldEqualizerPreset(preset) },
-                    audiobookModeEnabled = audiobookModeEnabled,
-                    onToggleAudiobookMode = { playerViewModel.setAudiobookModeEnabled(it) },
-                    visualizerEnabled = visualizerEnabled,
-                    visualizerSupported = visualizerSupported,
-                    visualizerPermissionGranted = visualizerPermissionGranted,
-                    visualizerBars = visualizerBars,
-                    onOpenVisualizer = { playerViewModel.ensureVisualizerAttached() },
-                    onCloseVisualizer = { playerViewModel.stopVisualizerCapture() },
-                    onToggleVisualizerEnabled = { playerViewModel.setVisualizerEnabled(it) },
-                    onRequestVisualizerPermission = { visualizerPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
-                    onBack = { navController.popBackStack() }
-                )
+                nowPlayingContent { navController.popBackStack() }
             }
         }
+        } // tutup Box(weight) pembungkus NavHost (Batch 101)
+
+            // Batch 101 — Panel Now Playing persisten sisi kanan, HANYA di lebar Expanded
+            // (>=840dp) selama ada lagu aktif & user tidak sedang di route "now_playing"
+            // (showTwoPane, dihitung di atas). Garis pemisah 1dp tipis pakai outlineVariant
+            // (token M3 khusus utk garis pemisah low-emphasis, bukan warna aksen) supaya
+            // terbaca sebagai batas panel, bukan elemen dekoratif baru.
+            if (showTwoPane) {
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+                Box(modifier = Modifier.width(420.dp).fillMaxHeight()) {
+                    nowPlayingContent { }
+                }
+            }
+        } // tutup Row adaptif (Batch 101)
     }
 }
 

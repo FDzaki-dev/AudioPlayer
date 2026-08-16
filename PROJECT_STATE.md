@@ -6,6 +6,33 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 101 (Adaptive layout multi-device + undo hapus playlist, 5 file — 1 baru + 4 diedit, 1
+protected)** — Instruksi user: audit UX/frontend (dijawab di chat, bukan kode), lalu gabung
+semua perbaikan KECUALI TalkBack/Tema/Lokalisasi jadi 1 batch, utamakan adaptive layout.
+
+1. **Adaptive layout (prioritas)**: `ui/adaptive/WindowAdaptive.kt` baru —
+`rememberAppWidthClass()` (COMPACT<600dp/MEDIUM<840dp/EXPANDED>=840dp, breakpoint identik
+rekomendasi resmi M3, dihitung dari `LocalConfiguration.screenWidthDp` — SENGAJA tidak nambah
+dependency `material3-window-size-class` di `build.gradle.kts`). `MainActivity.kt`'s
+`AppNavHost` (protected, edit parsial): `NavigationRail` gantikan `NavigationBar` bawah di
+Medium/Expanded (Compact 0 berubah); `NowPlayingScreen(...)` diekstrak jadi lambda
+`nowPlayingContent(onBack)` dipakai di route `now_playing` normal DAN panel two-pane 420dp
+persisten kanan yang muncul di Expanded selama ada lagu aktif (`showTwoPane`).
+`MiniPlayerBar`/`NavigationBar` auto-hide saat panel tampil, cegah kontrol dobel.
+
+2. **Undo hapus playlist**: `deletePlaylist()`/`deleteSmartPlaylist()` (`PlayerViewModel.kt`)
+sebelumnya PERMANEN 1 tap tanpa undo (beda dari `removeFromQueue` yang sudah pakai pola
+`UndoableAction`) — sekarang snapshot dulu + `UndoableAction`, dgn `PlaylistStore.
+restorePlaylist()`/`SmartPlaylistStore.restoreSmartPlaylist()` baru (simpan balik objek APA
+ADANYA, bukan lewat `create*()` yg generate id baru).
+
+**Sengaja TIDAK digarap** dari audit awal setelah dicek lebih dalam kodenya, bukan gap nyata:
+loading state Playlist/SmartPlaylist (baca SharedPreferences sinkron, bukan async), predictive
+back (manifest `enableOnBackInvokedCallback` sudah ada sebelum batch ini + `ModalBottomSheet`
+M3 sudah tangani standar). Dua-pane Library/Playlist→detail juga belum digarap (di luar scope,
+NowPlaying diprioritaskan krn paling sering dibuka). Belum di-build fisik. Detail lengkap:
+`CHANGELOG.md` Batch 101.
+
 **Batch 100 (Floating Mini Player: minimize ke tepi, auto-trigger tanpa buka app, QS Tile, 7
 file — 4 baru + 3 diedit, 2 protected)** — Lanjutan 3 instruksi user yang sebelumnya cuma
 tertangani sebagian (Batch 98, sesi lain, cuma menuntaskan foreground service + SALAH BACA

@@ -1,5 +1,58 @@
 # Changelog
 
+## Batch 101 — Adaptive layout multi-device (rail + two-pane) & undo hapus playlist
+Instruksi user: audit UX/frontend, gabung semua perbaikan (kecuali TalkBack/Tema/Lokalisasi)
+dalam 1 batch, utamakan multi-device/adaptive layout. **5 file** (1 baru, 4 diedit — 1 di
+antaranya `MainActivity.kt`, protected, edit parsial).
+
+**1. Adaptive layout — celah UX terbesar dari audit** (roadmap baru, bukan dari 15 fitur
+offline). Sebelumnya app fixed layout HP di SEMUA lebar layar — tablet/foldable
+terbuka/Chromebook/split-screen lebar tetap dapat satu kolom sempit dgn ruang horizontal
+nganggur besar, plus NavigationBar bawah termakan gesture bar di layar lebar.
+
+`ui/adaptive/WindowAdaptive.kt` (baru) — `AppWidthClass` (COMPACT/MEDIUM/EXPANDED) dihitung
+dari `LocalConfiguration.screenWidthDp`, breakpoint 600dp/840dp SAMA PERSIS rekomendasi resmi
+Material 3 window size classes. Sengaja TIDAK menambah dependency
+`material3-window-size-class` baru di `build.gradle.kts` (protected) — breakpoint dp manual
+sudah cukup akurat utk kebutuhan app ini (pilih rail-vs-bar & satu-vs-dua-pane), 0 risiko
+tambahan di dependency graph. Reactive otomatis thd rotasi/lipat-buka foldable/resize
+split-screen krn `LocalConfiguration` sendiri sudah reactive.
+
+`MainActivity.kt` (protected, edit parsial) — 2 perubahan struktural di `AppNavHost`:
+- **NavigationRail** menggantikan `NavigationBar` bawah di Medium/Expanded (guard
+  `widthClass == COMPACT` ditambah ke kondisi render `NavigationBar` yang sudah ada) — Compact
+  (HP potret biasa, mayoritas user) **0 perubahan perilaku**, NavigationBar bawah tetap identik.
+- **Two-pane** di Expanded: `NowPlayingScreen(...)` (dulu inline sekali di
+  `composable("now_playing")`) diekstrak jadi 1 lambda `nowPlayingContent(onBack)` dipakai 2
+  tempat — layar penuh seperti biasa (Compact/Medium, `onBack = popBackStack()`) DAN panel
+  persisten 420dp di sisi kanan (Expanded selama ada lagu aktif, `onBack = {}` krn panel bukan
+  entry back-stack). `MiniPlayerBar` + `NavigationBar` disembunyikan otomatis saat panel
+  tampil (`showTwoPane`) supaya kontrol transport tidak dobel.
+
+**Belum digarap** (di luar scope batch ini, murni styling bukan layout): dua-pane utk
+Library→detail folder atau Playlist→isi playlist — skip krn kompleksitas restrukturisasi nav
+graph tidak sepadan blast-radius-nya utk batch pertama fitur ini, NowPlaying yang paling sering
+dibuka jadi prioritas.
+
+**2. Undo hapus playlist** — audit temukan `deletePlaylist()`/`deleteSmartPlaylist()` hapus
+PERMANEN 1 tap tanpa jalan balik sama sekali (beda dari `removeFromQueue`/
+`removeSongFromPlaylist` yang sejak awal sudah pakai pola `UndoableAction` + Snackbar
+"Urungkan"). `PlaylistStore.restorePlaylist()`/`SmartPlaylistStore.restoreSmartPlaylist()`
+(baru) simpan balik objek APA ADANYA (id/nama/isi asli, bukan lewat `create*()` yang generate
+id baru) sebelum dihapus, `PlayerViewModel` kedua fungsi delete sekarang snapshot dulu +
+publish `UndoableAction` — konsisten dgn pola undo yang sudah ada, 0 dialog konfirmasi baru
+ditambahkan (sengaja, ikut konvensi snackbar-undo yang sudah dipakai di app ini alih-alih
+modal).
+
+**Ditemukan TAPI TIDAK digarap (sudah bukan gap nyata setelah dicek kode)**:
+- *Loading state Playlist/SmartPlaylist*: keduanya baca SharedPreferences sinkron (bukan I/O
+  async) — 0 loading state yang berguna ditambahkan di sini, audit awal kurang presisi.
+- *Predictive back*: manifest sudah `enableOnBackInvokedCallback="true"` (ada sebelum batch
+  ini) + `ModalBottomSheet`/`NavHost` M3 menangani back gesture standar lewat itu — tidak ada
+  bug konkret ditemukan yang butuh kode tambahan di compose-bom 2024.05.00 saat ini.
+
+Belum di-build fisik.
+
 ## Batch 100 — Floating Mini Player: minimize ke tepi, auto-trigger tanpa buka app, QS Tile
 Lanjutan 3 instruksi user yang sebelumnya sempat ditangani sebagian di sesi lain (Batch 98
 cuma menuntaskan foreground service, 2 celah lain terlewat/salah dibaca). **7 file** (4 baru,

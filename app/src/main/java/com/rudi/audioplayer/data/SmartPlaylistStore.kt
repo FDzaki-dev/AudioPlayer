@@ -78,6 +78,14 @@ class SmartPlaylistStore(context: Context) {
         save(getSmartPlaylists().filterNot { it.id == id })
     }
 
+    /** Batch 101 — pasangan undo [deleteSmartPlaylist], sama polanya dgn
+     *  [PlaylistStore.restorePlaylist]: simpan balik kriteria APA ADANYA (bukan lewat
+     *  [createSmartPlaylist] yang sengaja generate id baru). */
+    fun restoreSmartPlaylist(playlist: SmartPlaylist) {
+        if (getSmartPlaylists().any { it.id == playlist.id }) return
+        save(getSmartPlaylists() + playlist)
+    }
+
     companion object {
         private const val PREFS_NAME = "smart_playlists"
         private const val KEY_SMART_PLAYLISTS = "smart_playlists_json"

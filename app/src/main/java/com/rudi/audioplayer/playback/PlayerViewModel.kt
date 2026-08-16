@@ -944,9 +944,19 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         return playlist
     }
 
+    /** Batch 101 — sebelumnya hapus permanen 1 tap tanpa jalan balik sama sekali (gap UX nyata:
+     *   1 playlist berisi puluhan lagu bisa hilang cuma krn salah tap). Sekarang ikut pola
+     *  [UndoableAction] yang sama dgn [removeFromQueue]/[removeSongFromPlaylist] — snapshot
+     *  [Playlist] penuh diambil SEBELUM dihapus supaya undo mengembalikan persis (nama + urutan
+     *  lagu), bukan bikin playlist kosong baru. */
     fun deletePlaylist(id: String) {
+        val removed = playlistStore.getPlaylists().find { it.id == id } ?: return
         playlistStore.deletePlaylist(id)
         _playlists.value = playlistStore.getPlaylists()
+        _undoableAction.value = UndoableAction("Playlist \"${removed.name}\" dihapus") {
+            playlistStore.restorePlaylist(removed)
+            _playlists.value = playlistStore.getPlaylists()
+        }
     }
 
     fun renamePlaylist(id: String, newName: String) {
@@ -997,9 +1007,17 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         _smartPlaylists.value = smartPlaylistStore.getSmartPlaylists()
     }
 
+    /** Batch 101 — sama alasannya dgn [deletePlaylist]: hapus permanen 1 tap tanpa undo adalah
+     *  gap UX, apalagi smart playlist bisa berisi kriteria yang disusun manual (folder/durasi/
+     *  rating/tahun/kata kunci) yang merepotkan diketik ulang kalau ke-tap hapus tidak sengaja. */
     fun deleteSmartPlaylist(id: String) {
+        val removed = smartPlaylistStore.getSmartPlaylists().find { it.id == id } ?: return
         smartPlaylistStore.deleteSmartPlaylist(id)
         _smartPlaylists.value = smartPlaylistStore.getSmartPlaylists()
+        _undoableAction.value = UndoableAction("Playlist otomatis \"${removed.name}\" dihapus") {
+            smartPlaylistStore.restoreSmartPlaylist(removed)
+            _smartPlaylists.value = smartPlaylistStore.getSmartPlaylists()
+        }
     }
 
     fun getLyrics(songId: Long): String? = lyricsStore.getLyrics(songId)
