@@ -1,5 +1,35 @@
 # Changelog
 
+## Batch 107 — Bersihkan tag & judul GitHub Release
+2 file (1 protected). Permintaan langsung user dari screenshot halaman Releases repo: (1) tag
+`v1.0.47-release-run159` → hapus kata "release" (run number sendiri sudah cukup unik); (2) judul
+rilis yang tampil di daftar Releases dibuat minimalis, cuma nomor versi (`v1.0.47`), tapi tetap
+sinkron dengan APK.
+
+**`.github/workflows/build.yml`** — step "Determine version name": output `tag` sekarang
+`v$VERSION_NAME-run${{ github.run_number }}` (dulu ada `-release-` di tengah). Output baru
+`release_name` = `v$VERSION_NAME` (tanpa run number sama sekali) — khusus untuk judul tampilan,
+terpisah dari `tag` yang tetap wajib unik per run (invariant Batch 65: tag/nama file APK harus
+beda tiap run walau commit sama, atau hasil unduhan APK bentrok "(1).apk" duplikat di HP). Step
+"Create GitHub Release": `tag_name: tag` (tidak berubah), `name: release_name` (dulu `name: tag`
+— inilah sebabnya judul rilis dulu ikut menampilkan run number). Step "Rename APK to match
+version" tidak diedit sama sekali — sudah otomatis ikut pola baru karena membaca
+`steps.version.outputs.tag` secara dinamis, hasilnya `AudioPlayer-v1.0.47-run159.apk`.
+
+Kedua output (`tag` & `release_name`) diturunkan dari `$VERSION_NAME` yang sama, dihitung sekali
+di baris yang sama — formula MAJOR.MINOR.PATCH-nya sendiri (Batch 86) sama sekali tidak disentuh,
+jadi invariant "app, tag, dan nama file APK selalu match" (Batch 30/56/86) tetap terjaga; yang
+berubah cuma REPRESENTASI tag vs judul, bukan sumber angkanya.
+
+**`README.md`** § Standar Penomoran Versi — 2 contoh (`AudioPlayer-v1.5.17-release-run42.apk`)
+diupdate ke pola baru (`AudioPlayer-v1.5.17-run42.apk`), + 1 paragraf baru menjelaskan kenapa tag
+& judul rilis sengaja beda representasi sekarang.
+
+YAML divalidasi lewat `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/build.yml'))"`
+— parse sukses. **Belum diverifikasi CI run sungguhan** (tidak ada akses GitHub Actions di
+environment kerja ini) — prioritas berikutnya: 1 run penuh, cek tag baru terbentuk benar tanpa
+"-release" DAN judul di halaman Releases genuinely tampil minimalis.
+
 ## Batch 106 — Gap List #5: SAF parity dengan MediaStore
 4 file diedit, 0 baru. Audit 8 sub-item checklist #5, hasil: 2 gap nyata + 1 dokumentasi basi
 diperbaiki, 2 sub-item dicek dan sudah benar sejak lama, sisanya (bitrate/sampleRate/dst.,

@@ -126,7 +126,7 @@ lain (termasuk tooling semantic-release), bump MAJOR selalu butuh sinyal breakin
 manusia, bukan sesuatu yang aman dihitung otomatis dari jumlah commit.
 
 Konsekuensi praktis: nomor yang tampil di app (`Settings → AudioPlayer versi 1.5.17 (build 267)`)
-dan nomor di tag GitHub Release/nama file APK (`AudioPlayer-v1.5.17-release-run42.apk`) **selalu
+dan nomor di tag GitHub Release/nama file APK (`AudioPlayer-v1.5.17-run42.apk`) **selalu
 sama persis** — keduanya menghitung `git rev-list --count HEAD` dari commit yang sama lalu
 formula MAJOR.MINOR.PATCH yang identik, jadi tidak mungkin drift, walau dihitung di dua tempat
 terpisah (Gradle & `.github/workflows/build.yml`) dan tidak butuh salah satunya membaca dari yang
@@ -135,7 +135,9 @@ juga (dicatat sebagai komentar di kedua file).
 
 Nama file ZIP hasil tiap batch pengembangan (`AudioPlayer-batchN-release.zip`) tetap melacak nomor batch percakapan, **bukan** versionName/versionCode — ini sengaja tetap terpisah, karena nomor batch melacak paket kerja per sesi chat, sedangkan versionName/versionCode melacak histori commit git; keduanya naik dengan kecepatan berbeda (satu batch chat bisa berisi banyak commit).
 
-File APK hasil build dan asset GitHub Release membawa nomor versi di namanya, diakhiri `-release-run<nomor run>` (`AudioPlayer-v1.5.17-release-run42.apk`) — bukan nama generik statis, dan sengaja **tanpa** short commit hash di belakang supaya nama file tetap stabil/gampang dikenali. Penamaan ini dikerjakan di level workflow CI (`.github/workflows/build.yml`), bukan dobel dengan Gradle, biar tidak saling tabrak.
+File APK hasil build dan asset GitHub Release membawa nomor versi di namanya, diakhiri `-run<nomor run>` (`AudioPlayer-v1.5.17-run42.apk`) — bukan nama generik statis, dan sengaja **tanpa** short commit hash di belakang supaya nama file tetap stabil/gampang dikenali. Penamaan ini dikerjakan di level workflow CI (`.github/workflows/build.yml`), bukan dobel dengan Gradle, biar tidak saling tabrak. Kata "release" yang dulu ada di antara versi & run number dihapus (Batch 107) — run number sendiri sudah cukup bikin nama unik per run, "release" di tengah cuma noise.
+
+**Tag vs judul rilis (Batch 107)** — git tag (`v1.5.17-run42`, dipakai `tag_name` di workflow) tetap wajib menyertakan run number supaya unik per run (alasan sama seperti nama file APK di atas, lihat juga Batch 65). Judul rilis yang tampil di daftar Releases repo (`name` di workflow) SENGAJA dipisah dari tag — cuma nomor versi polos (`v1.5.17`, tanpa run number), biar daftar rilis di halaman repo enak dibaca. Keduanya diturunkan dari `$VERSION_NAME` yang sama persis di satu baris workflow, jadi tetap tidak mungkin drift satu sama lain maupun dari APK — cuma dua representasi berbeda dari angka yang sama (unik-untuk-tag vs minimalis-untuk-tampilan).
 
 ## Keputusan Arsitektur
 Ringkasan kenapa, bukan cuma apa — supaya sesi kerja berikutnya (chat AI baru sekalipun) tidak perlu menebak ulang alasan di balik hal-hal yang tidak jelas kalau cuma baca kode.

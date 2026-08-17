@@ -6,6 +6,39 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 107 (Permintaan user langsung dari screenshot GitHub Releases — bersihkan tag & judul
+rilis, 2 file, 1 protected)** — 2 hal: (1) hapus `-release` dari tag/nama file APK (sudah punya
+`-run<N>` sendiri, "release" di tengah cuma noise, tidak nambah informasi keunikan apa pun);
+(2) judul rilis yang tampil di daftar Releases repo (screenshot user: `v1.0.47-release-run159`,
+gambar 2) dibuat minimalis — cuma nomor versi.
+
+`.github/workflows/build.yml` (protected, edit parsial) — step "Determine version name" sekarang
+punya 2 output terpisah, bukan 1: `tag` (`v$VERSION_NAME-run<run_number>`, WAJIB tetap unik per
+run — invariant Batch 65, kalau tidak unik nama file APK bentrok lagi jadi "(1).apk" duplikat)
+dan `release_name` baru (`v$VERSION_NAME` polos, tanpa run number — ini yang jadi judul di
+daftar Releases). Step "Create GitHub Release" — `tag_name` tetap pakai `tag`, `name` sekarang
+pakai `release_name` (dulu keduanya sama-sama pakai `tag`, itu sebabnya judul rilis ikut
+menampilkan run number yang user rasa berantakan). Step "Rename APK" TIDAK disentuh — sudah
+otomatis ikut berubah krn membaca `steps.version.outputs.tag` secara dinamis (jadi
+`AudioPlayer-v1.0.47-run159.apk`, bukan lagi `-release-run159`).
+
+**Tetap sinkron dengan APK** (syarat eksplisit user) — `tag` dan `release_name` SAMA-SAMA
+diturunkan dari `$VERSION_NAME` yang dihitung SEKALI di baris yang sama (formula identik dengan
+`gitCommitCount()` di `app/build.gradle.kts`, invariant Batch 30/56/86 tidak disentuh) — cuma 2
+representasi beda dari angka yang sama (unik-untuk-tag vs minimalis-untuk-judul), bukan 2 sumber
+angka independen yang bisa drift.
+
+`README.md` § Standar Penomoran Versi — 2 contoh lama (`AudioPlayer-v1.5.17-release-run42.apk`)
+diperbarui ke pola baru, + paragraf baru menjelaskan kenapa tag & judul rilis sekarang sengaja
+beda representasi.
+
+YAML divalidasi (`python3 -c "import yaml; yaml.safe_load(...)"`) — parse sukses, tidak ada
+syntax error. **Belum diverifikasi CI run sungguhan** (tidak ada akses GitHub Actions di
+environment kerja ini) — prioritas berikutnya kalau user push: pastikan 1 run penuh sukses,
+tag baru `vX.Y.Z-runN` (tanpa "-release") kebentuk benar, DAN judul rilis di halaman Releases
+repo genuinely tampil minimalis (`vX.Y.Z` polos) sesuai screenshot yang diminta user diperbaiki.
+Detail lengkap: `CHANGELOG.md` Batch 107.
+
 **Batch 106 (Gap List #5 — SAF parity, 4 file diedit)** — Lanjutan langsung Gap List (#4 Batch
 105 selesai). Audit `CustomFolderScanner.kt`/`PlayerViewModel.kt` terhadap 8 sub-item checklist
 #5: 2 gap nyata + 1 dokumentasi basi ditemukan & dibenarkan, sisanya (dedupe vs MediaStore,

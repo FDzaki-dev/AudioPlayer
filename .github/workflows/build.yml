@@ -91,12 +91,25 @@ jobs:
           VERSION_NAME="$VERSION_MAJOR.$MINOR.$PATCH"
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          # run_number ditempel di tag/nama file (bukan di appVersionName APK itu sendiri —
-          # itu tetap murni dari COUNT, lihat gitCommitCount() di app/build.gradle.kts) supaya
-          # re-run manual pada commit yang sama tidak pernah menghasilkan tag/nama file identik
+          # run_number ditempel di TAG (bukan di appVersionName APK itu sendiri — itu tetap
+          # murni dari COUNT, lihat gitCommitCount() di app/build.gradle.kts) supaya re-run
+          # manual pada commit yang sama tidak pernah menghasilkan tag/nama file identik
           # dengan rilis sebelumnya (dulu nama file APK bentrok -> hasil unduhan di HP jadi
-          # duplikat "(1).apk" alih-alih dikenali sebagai build baru).
-          echo "tag=v$VERSION_NAME-release-run${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          # duplikat "(1).apk" alih-alih dikenali sebagai build baru, lihat Batch 65).
+          #
+          # "-release" dulu ada di antara versi & run number (v1.0.47-release-run159) —
+          # dihapus atas permintaan user: run number sendiri sudah cukup bikin tag unik per
+          # run, kata "release" di tengah tidak menambah informasi apa pun.
+          echo "tag=v$VERSION_NAME-run${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          # Nama TAMPILAN rilis (judul yang muncul di daftar Releases repo) SENGAJA dipisah
+          # dari tag di atas — tag wajib unik per run (alasan sama seperti komentar di atas),
+          # tapi judul yang dilihat user tidak perlu ikut menampilkan run number itu; cukup
+          # nomor versi polos, identik dengan yang tampil di Settings app
+          # ("AudioPlayer versi $VERSION_NAME"). Dua output terpisah, TAPI keduanya diturunkan
+          # dari $VERSION_NAME yang SAMA di baris ini — tetap sinkron dengan APK
+          # (app/build.gradle.kts' gitCommitCount() menghitung commit yang sama persis),
+          # cuma beda representasi (unik-untuk-tag vs minimalis-untuk-tampilan).
+          echo "release_name=v$VERSION_NAME" >> "$GITHUB_OUTPUT"
           echo "Resolved version: $VERSION_NAME (commit $SHORT_SHA, run ${{ github.run_number }})"
 
       - name: Test + Build Release APK
@@ -136,10 +149,15 @@ jobs:
         # BUKAN CI artifact. Release asset di-serve GitHub apa adanya (tidak dibungkus .zip
         # otomatis seperti actions/upload-artifact), dan permanen/publik-diunduh tanpa login,
         # sesuai aturan: APK signed harus jadi asset rilis GitHub, dilarang dibungkus .zip.
+        #
+        # tag_name pakai `tag` (unik per run, wajib beda tiap kali — lihat komentar step
+        # "Determine version name" di atas), name pakai `release_name` (minimalis, cuma
+        # nomor versi) — sengaja BEDA field, supaya daftar Releases di halaman repo tampil
+        # rapi ("v1.0.47") sementara git tag di baliknya tetap unik ("v1.0.47-run159").
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.release_name }}
           files: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk
 
       - name: Upload failure log artifact
