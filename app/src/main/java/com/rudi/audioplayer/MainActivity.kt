@@ -1074,7 +1074,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     silenceSkipEnabled = silenceSkipEnabled,
                     onToggleSilenceSkip = { enabled -> playerViewModel.setSilenceSkipEnabled(enabled) },
                     onInfoMessage = { message -> playerViewModel.showInfoMessage(message) },
-                    onOpenStats = { navController.navigate("stats_dashboard") }
+                    onOpenStats = { navController.navigate("stats_dashboard") },
+                    songs = librarySongs,
+                    onDeleteSongs = { songs -> deleteSongsFromDevice(songs) }
                 )
             }
             composable("stats_dashboard") {

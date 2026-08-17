@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.BuildConfig
+import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.colorsFor
@@ -63,11 +65,17 @@ fun SettingsScreen(
     silenceSkipEnabled: Boolean,
     onToggleSilenceSkip: (Boolean) -> Unit,
     onInfoMessage: (String) -> Unit,
-    onOpenStats: () -> Unit
+    onOpenStats: () -> Unit,
+    // Gap List #2 (Duplicate Detection). songs = current in-memory library snapshot (same
+    // source LibraryScreen/StatsDashboard use), onDeleteSongs reuses MainActivity's existing
+    // deleteSongsFromDevice — no new deletion path, just a new manual entry point into it.
+    songs: List<Song> = emptyList(),
+    onDeleteSongs: (List<Song>) -> Unit = {}
 ) {
     var showSignatureMatcher by remember { mutableStateOf(false) }
     var showDiagnosticLog by remember { mutableStateOf(false) }
     var showBackupRestore by remember { mutableStateOf(false) }
+    var showDuplicateFinder by remember { mutableStateOf(false) }
     var showAdvancedSettings by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
@@ -291,6 +299,30 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { showDuplicateFinder = true }
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text("Deteksi File Duplikat", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Cari lagu/file kembar di library — hapus manual, tidak ada yang otomatis",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
                     .clickable { showAdvancedSettings = !showAdvancedSettings }
                     .padding(horizontal = 20.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -417,6 +449,14 @@ fun SettingsScreen(
     }
     if (showBackupRestore) {
         BackupRestoreSheet(onDismiss = { showBackupRestore = false }, onInfoMessage = onInfoMessage)
+    }
+
+    if (showDuplicateFinder) {
+        DuplicateFinderSheet(
+            songs = songs,
+            onDismiss = { showDuplicateFinder = false },
+            onDeleteSongs = onDeleteSongs
+        )
     }
 }
 

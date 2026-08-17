@@ -6,6 +6,59 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 117 (Gap List "Wajib" #2 — Duplicate Detection, 2 file baru + 2 diedit)** — Audit ulang
+(`AudioPlayer_Coding_Gap_Updated.md`) menandai 4 item "Wajib": Tag/Metadata Editor, Duplicate
+Detection, Gradle Wrapper, Release Lint Gate. Duplicate Detection dikerjakan duluan — murni Kotlin
+tanpa dependency binary/network, scope realistis untuk 1 batch (beda dari Tag Editor yang butuh
+penulisan ID3/Vorbis/MP4 tag per format, atau Gradle Wrapper yang butuh `gradle-wrapper.jar`
+biner asli yang TIDAK bisa dibuat dari lingkungan kerja ini — tidak ada akses network/`gradle`
+lokal untuk generate-nya secara sah, lihat catatan di bawah).
+
+`DuplicateDetector.kt` (baru, `data/`) — murni fungsi list-in/groups-out, 0 Context/I/O, 2
+grouping TERPISAH secara sengaja: (1) "duplikat entri library" pakai signature identik
+`PlayerViewModel.dedupeSignature()` (title+artist+durasi dibulatkan ke detik) — 2 entri bisa
+match ini walau file fisiknya beda; (2) "duplikat file fisik" pakai heuristik (fileSize, durasi)
+— bukan hash byte-per-byte (biaya I/O per lagu yang sama-sama dihindari di keputusan
+bitrate/codec/genre sebelumnya), lagu `fileSize <= 0` dikecualikan. Tidak ada logic hapus di file
+ini sama sekali (gap doc eksplisit: "Jangan melakukan delete otomatis").
+
+`DuplicateFinderSheet.kt` (baru, `ui/`) — ModalBottomSheet tinggi 90% layar, 2 seksi (library vs
+fisik) dari `DuplicateDetector`, checkbox per-lagu (manual, tidak ada default tercentang), tombol
+"Hapus N Terpilih" hanya aktif kalau ada seleksi → `AlertDialog` konfirmasi eksplisit sebelum
+`onDeleteSongs` dipanggil. **0 baris delete baru ditulis** — `onDeleteSongs` diteruskan dari
+`MainActivity.deleteSongsFromDevice` yang sudah ada (persis pola `onDeleteSongs` LibraryScreen),
+yang di Android 10+ tetap lewat dialog konfirmasi sistem (scoped storage) sebagai lapis kedua.
+
+`SettingsScreen.kt` (diedit) — 1 row menu baru "Deteksi File Duplikat" (pola identik "Cadangkan &
+Pulihkan"), 2 param baru `songs: List<Song> = emptyList()` dan `onDeleteSongs: (List<Song>) -> Unit
+= {}` — DEFAULT VALUE sengaja dipasang (bukan cuma nullable) supaya call site lama/test fixture
+lain yang mungkin memanggil `SettingsScreen(...)` tanpa 2 param ini tetap compile tanpa disentuh.
+`MainActivity.kt` (diedit, **protected asset — edit parsial**) — 2 baris ditambah ke pemanggilan
+`SettingsScreen(...)` yang sudah ada (`songs = librarySongs`, `onDeleteSongs = { deleteSongsFromDevice(it) }`),
+keduanya reuse variable/fungsi yang sudah ada, 0 fungsi baru ditulis di file ini.
+
+**Gradle Wrapper (gap #3) SENGAJA DILEWATI batch ini, bukan lupa**: `gradlew`/`gradlew.bat` teks
+scriptnya bisa ditulis manual, tapi `gradle/wrapper/gradle-wrapper.jar` adalah file JAR biner
+(bukan teks) yang resminya di-generate oleh `gradle wrapper` task atau didownload dari
+`services.gradle.org` — lingkungan kerja batch ini tidak punya `gradle` terpasang maupun akses
+network (dicek eksplisit, `curl` ke `raw.githubusercontent.com` ditolak proxy egress). Menulis
+wrapper TANPA jar asli (mis. taruh placeholder/file kosong) akan membuat `./gradlew` gagal total
+dengan error yang membingungkan — lebih aman terang-terangan skip daripada kasih wrapper rusak.
+**Prioritas kalau user sendiri punya akses**: jalankan `gradle wrapper --gradle-version 8.7` sekali
+di project (device Termux mana pun yang sudah punya `gradle` dari `setup-gradle` cache atau
+install manual), commit hasil `gradlew`/`gradlew.bat`/`gradle/wrapper/*` sekali — setelahnya CI
+BISA disederhanakan balik ke `./gradlew` biasa (saat ini pakai `gradle` binary dari
+`setup-gradle@v3` sebagai workaround, lihat komentar Batch 62/76 di `.github/workflows/build.yml`
+baris ~224-226).
+
+**Belum diverifikasi compile/runtime Gradle sungguhan** — prioritas berikutnya kalau user push:
+(1) `./gradlew`/`gradle testDebugUnitTest assembleRelease` build bersih, (2) buka Setelan →
+"Deteksi File Duplikat" dengan library yang punya duplikat sungguhan (copy 1 lagu ke 2 folder
+untuk uji "Duplikat File Fisik", atau tag ulang 1 file supaya title/artist sama tapi durasi mirip
+untuk uji "Duplikat Entri Library"), pastikan checkbox & tombol hapus jalan, dan pastikan delete
+via `MediaStore.createDeleteRequest` (Android 11+) tetap munculkan dialog sistem seperti biasa.
+Detail lengkap: `CHANGELOG.md` Batch 117.
+
 **Batch 116 (Gap List #11 — Genre metadata first-class, 8 file kode + 1 dokumentasi)** — Item
 kedua daftar "Sangat disarankan" (lanjut Batch 115). Genre di-skip sejak Batch 89 dengan alasan
 "N+1 query per lagu" — dicek ulang, alasan itu cuma berlaku untuk pendekatan naif (query per

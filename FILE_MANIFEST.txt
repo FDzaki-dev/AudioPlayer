@@ -32,6 +32,7 @@ app/src/main/java/com/rudi/audioplayer/data/BookmarkStore.kt
 app/src/main/java/com/rudi/audioplayer/data/CrossfadeStore.kt
 app/src/main/java/com/rudi/audioplayer/data/CustomFolderScanner.kt
 app/src/main/java/com/rudi/audioplayer/data/CustomFolderStore.kt
+app/src/main/java/com/rudi/audioplayer/data/DuplicateDetector.kt
 app/src/main/java/com/rudi/audioplayer/data/FavoritesStore.kt
 app/src/main/java/com/rudi/audioplayer/data/FloatingBubbleStore.kt
 app/src/main/java/com/rudi/audioplayer/data/HourlyListenStore.kt
@@ -72,6 +73,7 @@ app/src/main/java/com/rudi/audioplayer/playback/ShakePulseTracker.kt
 app/src/main/java/com/rudi/audioplayer/ui/ABRepeatBookmarkSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/BackupRestoreSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/DiagnosticLogSheet.kt
+app/src/main/java/com/rudi/audioplayer/ui/DuplicateFinderSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/EqualizerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/FeatureHintBanner.kt
 app/src/main/java/com/rudi/audioplayer/ui/FolderManagerSheet.kt
