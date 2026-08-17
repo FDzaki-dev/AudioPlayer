@@ -712,7 +712,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             playbackStateStore.save(
                 songIds = songIds,
                 index = index,
-                positionMs = positionMs
+                positionMs = positionMs,
+                repeatMode = c.repeatMode,
+                shuffleEnabled = c.shuffleModeEnabled
             )
             // Roadmap #12 (Batch 93) — no-ops internally if this song was never opted into
             // audiobook mode, so it's safe to call unconditionally at the same cadence as the
@@ -765,6 +767,12 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val resolvedSongs = saved.songIds.mapNotNull { songMap[it] }
         if (resolvedSongs.isEmpty()) return
         val newIndex = saved.index.coerceIn(0, resolvedSongs.size - 1)
+        // Gap List #6 (Batch 108) — repeat/shuffle sebelumnya tidak pernah dipulihkan, selalu
+        // reset ke off tiap resume walau user terakhir kali mengaktifkannya. Diset SEBELUM
+        // playQueue() supaya shuffle order (kalau ada) berlaku sejak media item pertama kali
+        // di-set, bukan re-shuffle setelah queue sudah jalan.
+        controller?.repeatMode = saved.repeatMode
+        controller?.shuffleModeEnabled = saved.shuffleEnabled
         playQueue(resolvedSongs, newIndex, saved.positionMs, autoPlay)
     }
 

@@ -1,5 +1,36 @@
 # Changelog
 
+## Batch 108 — Gap List #6: Durable playback state (repeat/shuffle)
+2 file: `PlaybackStateStore.kt` (diedit), `PlayerViewModel.kt` (diedit).
+
+Checklist Gap List #6 diaudit satu per satu: current track/posisi/queue sudah persist sejak
+lama, checkpoint sudah cukup sering (~5s saat playing + immediate saat pause) & tidak berlebihan.
+Gap nyata yang ditemukan: **repeat mode dan shuffle tidak pernah dipersist**, jadi selalu reset
+ke off tiap kali app dibuka ulang meski user terakhir aktifkan keduanya.
+
+- `SavedPlaybackState` (`PlaybackStateStore.kt`) — 2 field baru: `repeatMode: Int`,
+  `shuffleEnabled: Boolean`.
+- `save()` — signature dapat 2 parameter baru, diisi dari `controller.repeatMode` /
+  `controller.shuffleModeEnabled` di titik checkpoint yang sama (`persistPlaybackState()`),
+  tidak ada I/O tambahan.
+- `load()` — sekarang dibungkus `try/catch` eksplisit: state corrupt/incompatible di masa depan
+  jatuh ke `null` (dianggap kosong) bukan melempar exception ke `resumeFromSaved()`. Ditambah
+  `KEY_SCHEMA_VERSION`/`SCHEMA_VERSION` const untuk dokumentasi kontrak data (belum ada logic
+  migrasi bertingkat — belum perlu, field baru pakai default aman lewat `getInt`/`getBoolean`).
+- `PlayerViewModel.resumeFromSaved()` — set `controller.repeatMode` dan
+  `controller.shuffleModeEnabled` SEBELUM memanggil `playQueue()`, supaya kalau shuffle aktif,
+  urutan shuffle terbentuk sejak media item pertama kali di-set ke controller (bukan re-shuffle
+  setelah queue sudah berjalan dengan urutan asli).
+
+**Diaudit & sengaja TIDAK diubah**: volume (`userTargetVolume`) bukan preferensi user — itu
+murni level fade internal untuk true crossfade (Batch 102), nilainya balik ke `1f` di luar
+window fade. Mempersistnya lintas sesi tidak berarti apa-apa untuk pengalaman user.
+
+Belum diverifikasi compile/runtime Gradle sungguhan (tidak ada JDK/Android SDK/kotlinc di
+sandbox kerja). Prioritas verifikasi berikutnya: build APK asli, matikan app total dengan
+shuffle ON + repeat-one aktif, buka lagi, pastikan keduanya genuinely kepulihkan di UI dan
+`MediaController` — bukan cuma diverifikasi lewat baca kode.
+
 ## Batch 107 — Bersihkan tag & judul GitHub Release
 2 file (1 protected). Permintaan langsung user dari screenshot halaman Releases repo: (1) tag
 `v1.0.47-release-run159` → hapus kata "release" (run number sendiri sudah cukup unik); (2) judul

@@ -6,6 +6,25 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 108 (Gap List #6 — Durable playback state: repeat/shuffle, 2 file)** — Audit
+`PlaybackStateStore.kt`/`PlayerViewModel.kt` terhadap checklist #6: track/posisi/queue sudah
+persist sejak lama (checkpoint tiap ~5s saat playing + immediate on pause, Batch-batch awal),
+tapi **repeat mode & shuffle selalu reset ke off tiap resume** — gap nyata, belum pernah
+ditangani. `SavedPlaybackState` dapat 2 field baru (`repeatMode`, `shuffleEnabled`), `save()`
+menyimpannya dari `controller.repeatMode`/`controller.shuffleModeEnabled` di titik checkpoint
+yang sama (zero I/O tambahan). `resumeFromSaved()` set repeat/shuffle ke controller SEBELUM
+`playQueue()` (bukan sesudah) supaya shuffle order berlaku sejak media item pertama di-set,
+bukan re-shuffle setelah queue sudah jalan. Ditambah `SCHEMA_VERSION` (const, belum dipakai utk
+migrasi bertingkat — cuma dokumentasi kontrak) + `load()` dibungkus try/catch eksplisit: state
+corrupt/incompatible jatuh ke `null` (dianggap tidak ada state, mulai kosong), bukan crash
+resume — SharedPreferences typed getters sendiri sudah aman ClassCastException, ini jaring
+pengaman tambahan untuk kasus masa depan. Volume (`userTargetVolume`) SENGAJA tidak dipersist —
+diaudit, itu murni level fade internal crossfade (Batch 102), bukan preferensi user yang berarti
+disimpan lintas sesi. Brace/paren 2 file dicek otomatis & seimbang. **Belum diverifikasi
+compile/runtime Gradle sungguhan** — prioritas berikutnya kalau user push: matikan app dengan
+shuffle/repeat-one aktif, buka lagi, pastikan keduanya genuinely kepulihkan (bukan cuma baca
+kode). Detail lengkap: `CHANGELOG.md` Batch 108.
+
 **Batch 107 (Permintaan user langsung dari screenshot GitHub Releases — bersihkan tag & judul
 rilis, 2 file, 1 protected)** — 2 hal: (1) hapus `-release` dari tag/nama file APK (sudah punya
 `-run<N>` sendiri, "release" di tengah cuma noise, tidak nambah informasi keunikan apa pun);
