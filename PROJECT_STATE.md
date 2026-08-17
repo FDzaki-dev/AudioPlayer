@@ -6,6 +6,26 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 110 (Audit deformasi layout UI: normal di Android 16, kacau di Android 15 ke bawah — 2
+file diedit, keduanya dokumentasi, 0 kode app diubah)** — Instruksi user eksplisit: dokumentasi
+lengkap dulu sebelum eksekusi fix. Audit `grep` insets keyword ke SEMUA 20 file `ui/*.kt`: **0
+hasil di semua file** — tidak ada satu pun screen yang handle `WindowInsets` manual. Root cause:
+`enableEdgeToEdge()` aktif global (`MainActivity.kt:188`) tapi satu-satunya sumber insets-padding
+di app ini adalah `contentWindowInsets` bawaan `Scaffold` di `AppNavHost` — sementara 3 screen
+(`WelcomeScreen`, `PermissionRationale`, `LockScreen`, `MainActivity.kt:380-401`) render DI LUAR
+`Scaffold` itu, genuinely nol proteksi status/nav bar. Ditambah: `windowLayoutInDisplayCutoutMode`
+tidak dideklarasikan di manifest, dan `compileSdk`/`targetSdk` masih 34 (Android 15/16 API surface
+belum resmi disasar — gap yang sudah sadar dicatat sejak Batch 99). `rememberAppWidthClass()`
+sudah dicek eksplisit dan DIRULED OUT (murni `LocalConfiguration.screenWidthDp`, aman lintas API
+23+, bukan sumber bug). Hipotesis kenapa OS16 tampak normal vs OS15 ke bawah kacau (confidence
+sedang, bukan pasti tanpa device test): gesture-nav (lazim di device OS16 test) = overlay tipis,
+overlap nyaris tak kelihatan; 3-button nav (masih umum di device OS15 ke bawah/budget) = bar
+opaque tetap makan tinggi layar, overlap kelihatan nyata. Confidence diagnosis kode: 85%. **Scope
+fix disiapkan untuk batch berikutnya (BELUM dieksekusi)**: insets padding di 3 screen di atas +
+deklarasi `windowLayoutInDisplayCutoutMode` — estimasi 3 file, 0 protected asset inti tersentuh
+(`MainActivity.kt` protected, tapi editnya akan parsial di 2 private composable saja). Detail
+lengkap: `CHANGELOG.md` Batch 110.
+
 **Batch 109 (Gap List #7 — Sleep timer process-resilient, 3 file — 1 baru + 2 diedit)** —
 Sebelumnya sleep timer HANYA hidup sebagai `viewModelScope.launch` murni: kalau `PlayerViewModel`
 di-clear (proses di-kill total selagi `PlaybackService` foreground diminta system tetap

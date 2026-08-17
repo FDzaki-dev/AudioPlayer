@@ -1,5 +1,57 @@
 # Changelog
 
+## Batch 110 — Audit deformasi layout UI: normal di Android 16, kacau di Android 15 ke bawah (0 kode app diubah)
+Instruksi user: audit kenapa layout tampak normal di OS 16 tapi kacau di OS 15 ke bawah. **2 file
+diedit, keduanya dokumentasi** (`PROJECT_STATE.md`, `CHANGELOG.md`) — audit murni, TIDAK ada kode
+app yang disentuh batch ini (fix nyata sengaja ditunda ke batch terpisah atas instruksi eksplisit
+user: "dokumentasi lengkap dulu, baru eksekusi").
+
+**Metode**: `grep -c` insets keyword (`statusBarsPadding|navigationBarsPadding|safeDrawingPadding|
+WindowInsets|imePadding`) ke seluruh 20 file `app/src/main/java/com/rudi/audioplayer/ui/*.kt` +
+baca penuh `MainActivity.kt` (1165 baris) + cek `AndroidManifest.xml` (cutout mode) +
+`app/build.gradle.kts` (compileSdk/targetSdk) + `ui/adaptive/WindowAdaptive.kt`.
+
+**Temuan terkonfirmasi (bukan dugaan)**:
+1. `enableEdgeToEdge()` aktif global di `MainActivity.kt:188`, berlaku semua API 23+ (androidx
+   compat) — TAPI **0 dari 20 file** `ui/*.kt` memakai insets modifier apa pun. Satu-satunya
+   sumber insets-padding di seluruh app adalah `contentWindowInsets` bawaan `Scaffold` (default,
+   tidak dioverride) di `AppNavHost`.
+2. 3 screen render **di luar** `Scaffold` itu: `WelcomeScreen`, `PermissionRationale`,
+   `LockScreen` (`MainActivity.kt:380-401`, langsung di dalam `Surface`/`Box` polos) — genuinely
+   nol proteksi status bar/nav bar/cutout. `LockScreen` paling berisiko (screen pertama yang
+   tampil tiap app dibuka ulang kalau PIN lock aktif).
+3. `AndroidManifest.xml` tidak mendeklarasikan `windowLayoutInDisplayCutoutMode` — default
+   behavior-nya berbeda per API tier (belum pernah diuji eksplisit).
+4. `compileSdk`/`targetSdk` masih **34** (`app/build.gradle.kts:73,78`) — Android 15/16 API
+   surface belum resmi disasar sama sekali. Ini BUKAN temuan baru — sudah tercatat sebagai gap
+   sadar di Batch 99 ("Android 15/16-spesifik butuh targetSdk dinaikkan dulu... sengaja batch
+   terpisah") dan `MANUAL_QA_CHECKLIST.md` ("Android 15/16 behavior" masuk daftar belum
+   tervalidasi device fisik).
+
+**Diruled out (dicek, bukan diasumsikan aman)**: `rememberAppWidthClass()`
+(`ui/adaptive/WindowAdaptive.kt`) — murni baca `LocalConfiguration.screenWidthDp`, API yang
+sama persis dan reaktif sejak API 23, tidak ada percabangan versi sama sekali → bukan sumber
+perbedaan perilaku lintas OS.
+
+**Hipotesis kenapa OS 16 tampak "normal" vs OS 15 ke bawah "kacau"** (confidence sedang — butuh
+screenshot pembanding device fisik untuk dipastikan, dicatat jujur sebagai hipotesis bukan
+kesimpulan final): gesture-nav (lazim di device test OS 16) menyisakan overlay tipis/transparan
+di atas konten sehingga overlap nyaris tak kelihatan; 3-button nav (masih umum di device
+budget/OS lama) memakan tinggi layar tetap & opaque, sehingga teks/tombol di 3 screen tanpa
+insets di atas kepotong nyata. Perbedaan tinggi status bar/notch antar generasi device turut
+memperbesar gap ini — bukan murni soal nomor versi OS, tapi versi OS berkorelasi kuat dengan
+jenis navigasi & device tier yang lebih umum dipakai.
+
+**Confidence diagnosis kode: 85%** (temuan 1-4 pasti dari pembacaan kode langsung; korelasi
+spesifik "OS 16 vs OS 15" butuh 1 laporan/screenshot device fisik untuk naik ke ~95%+).
+
+**Scope fix yang disiapkan untuk batch berikutnya** (belum dieksekusi batch ini): tambah insets
+padding (`safeDrawingPadding()` atau setara) ke `WelcomeScreen`/`PermissionRationale`/
+`LockScreen`, plus deklarasi eksplisit `windowLayoutInDisplayCutoutMode` di manifest. Estimasi
+3 file, 0 protected asset inti tersentuh (`MainActivity.kt` sendiri termasuk protected — edit
+akan bersifat parsial, hanya di 2 private composable function + 1 tambahan modifier di
+`LockScreen` yang filenya sendiri tidak protected).
+
 ## Batch 109 — Gap List #7: Sleep timer process-resilient
 3 file: `SleepTimerStore.kt` (baru), `PlaybackService.kt` (diedit, protected), `PlayerViewModel.kt`
 (diedit).
