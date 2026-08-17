@@ -68,6 +68,27 @@ class CustomFolderScanner(private val context: Context) {
                 ?.takeWhile { it.isDigit() }
                 ?.toIntOrNull() ?: 0
 
+            // Gap List #4 — same MediaMetadataRetriever pass already open for title/artist/
+            // album/year above, so these four cost nothing extra (no second retriever pass).
+            val albumArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
+                ?.takeIf { it.isNotBlank() }
+            val composer = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_COMPOSER)
+                ?.takeIf { it.isNotBlank() }
+            // METADATA_KEY_CD_TRACK_NUMBER can be "5" or "5/12" depending on tagger — same
+            // leading-digit-run parse as year, reused via MusicRepository's pure helper so
+            // both MediaStore and SAF paths agree on the parsing rule.
+            val trackNumber = MusicRepository.parseTrackOrDiscString(
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)
+            )
+            val discNumber = MusicRepository.parseTrackOrDiscString(
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DISC_NUMBER)
+            )
+            val mimeType = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+                ?.takeIf { it.isNotBlank() }
+            // DocumentFile.length() is metadata already cached by the provider (not a
+            // read-the-whole-file operation) — safe to call per song during scan.
+            val fileSize = doc.length()
+
             Song(
                 id = stableId(doc.uri),
                 title = title,
@@ -82,7 +103,13 @@ class CustomFolderScanner(private val context: Context) {
                 uri = doc.uri,
                 folderName = folderLabel,
                 folderPath = "Folder Tambahan/$folderLabel",
-                year = year
+                year = year,
+                albumArtist = albumArtist,
+                composer = composer,
+                trackNumber = trackNumber,
+                discNumber = discNumber,
+                fileSize = fileSize,
+                mimeType = mimeType
             )
         } catch (e: Exception) {
             // File ini sudah lolos filter ekstensi audio tapi metadatanya tidak terbaca (file

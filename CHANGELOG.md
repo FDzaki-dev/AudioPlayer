@@ -1,5 +1,59 @@
 # Changelog
 
+## Batch 105 — Gap List #4: Metadata model diperkuat
+4 file (3 diedit + 1 baru). Scope sengaja dipersempit ke field yang bisa didapat TANPA I/O
+tambahan — dibaca dari row cursor MediaStore yang sama (bulk scan, sekali query) atau dari pass
+`MediaMetadataRetriever` yang SAF sudah buka (satu kali per file, sudah ada sejak awal). Field
+yang butuh pass retriever KEDUA per file saat scan (bitrate, sampleRate, channelCount, codec
+terverifikasi, kehadiran embedded artwork) **sengaja belum** — biaya N+1 di seluruh library,
+alasan sama persis dengan genre yang sudah lama di-skip Batch 89 (genre juga punya gap list
+item sendiri, #11, untuk follow-up). Kandidat pendekatan nanti: fetch on-demand per-lagu (sheet
+\"Info Lagu\"), bukan biaya bulk-scan yang dibayar semua orang walau tak pernah dilihat.
+
+**1. `Song.kt`** — 6 field baru: `albumArtist`, `composer` (String?, null=absen),
+`trackNumber`/`discNumber` (Int?, 1-based, null=absen), `fileSize` (Long, 0=unknown — harusnya
+tak pernah terjadi, SIZE MediaStore & `DocumentFile.length()` SAF selalu ada), `mimeType`
+(String?, dipakai sbg container/format — bukan codec terverifikasi, itu butuh probe level
+decoder, di luar cakupan). Semua nullable/default-0 di posisi TERAKHIR constructor — 0 call
+site lama (test fixture termasuk, semua named-arg) yang perlu diubah, dicek grep dulu.
+
+**2. `MusicRepository.kt`** — projection query tambah `ALBUM_ARTIST`/`COMPOSER`/`SIZE`/
+`MIME_TYPE` (kolom inti, selalu ada di semua level API, aman `getColumnIndexOrThrow`) + cabang
+track/disc: API 30+ (`Build.VERSION_CODES.R`) pakai kolom string `cd_track_number`/`disc_number`
+BARU (literal string, bukan konstanta `MediaStore.Audio.AudioColumns.*` — supaya file ini tetap
+kompail lepas dari compileSdk stub tanpa gate tambahan, kontrak nama kolomnya sendiri tetap
+stabil API 30+ platform); pre-30 fallback ke kolom `TRACK` lama (int gabungan
+`disc*1000+track`, konvensi resmi AOSP MediaProvider). Kedua parser jadi fungsi murni testable
+di companion: `parseTrackOrDiscString(String?)` (ambil leading digit run, jadi \"5\" maupun
+\"5/12\" sama-sama kena parse ke `5`) dan `parseLegacyTrackColumn(Int)` (decode gabungan
+disc/track, `<=0` → keduanya absen).
+
+**3. `CustomFolderScanner.kt`** — 4 `extractMetadata()` tambahan di pass `MediaMetadataRetriever`
+yang SUDAH terbuka (`METADATA_KEY_ALBUMARTIST`/`COMPOSER`/`CD_TRACK_NUMBER`/`DISC_NUMBER`/
+`MIMETYPE`) — 0 pass tambahan, sama disc/track parser dipanggil lewat
+`MusicRepository.parseTrackOrDiscString()` (internal, sama modul, dipakai lintas file biar
+MediaStore & SAF sepakat 1 aturan parsing) supaya tidak duplikat logic. `fileSize` dari
+`doc.length()` (metadata provider yang sudah di-cache, bukan baca isi file).
+
+**4. `MusicRepositoryTrackDiscTest.kt` (baru)** — 9 test: `parseTrackOrDiscString` (bare number,
+\"N/M\", null/blank/\"0\"/non-numeric → null, whitespace trim) + `parseLegacyTrackColumn`
+(track-only <1000, disc+track gabungan, 0/negatif → keduanya null, disc-only dgn track 0).
+
+**Belum digarap batch ini, sengaja**: field bitrate/sampleRate/channelCount/codec-terverifikasi/
+embedded-artwork-presence (butuh retriever pass kedua, N+1 — lihat penjelasan scope di atas),
+genre (item gap list terpisah, #11), UI display field-field baru ini (Song sudah bawa datanya,
+belum ada layar/sheet yang menampilkannya — kandidat batch polish berikutnya kalau user mau).
+
+Brace/paren 4 file dicek otomatis & seimbang. Grep dikonfirmasi 0 call site `Song(...)` lain
+di luar `MusicRepository.kt`/`CustomFolderScanner.kt`/test fixtures (semua named-arg, aman).
+`FILE_MANIFEST.txt` 148→149. **Belum diverifikasi compile/test sungguhan** (tidak ada kotlinc
+di sandbox ini) — semua API yang dipakai (`MediaStore.Audio.Media.ALBUM_ARTIST/COMPOSER/SIZE/
+MIME_TYPE`, `MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST/COMPOSER/CD_TRACK_NUMBER/
+DISC_NUMBER/MIMETYPE`) adalah konstanta lama & stabil sejak API awal, risiko compile rendah.
+Prioritas berikutnya: `gradle testDebugUnitTest` verifikasi 9 test baru, lalu lanjut Gap List
+item #5 (SAF parity dengan MediaStore) atau #6 (Durable playback state, sudah sebagian besar
+ada per audit Batch 104).
+
 ## Batch 104 — Batch 103 CI CONFIRMED PASSING + Gap List #3/#5: SAF song identity
 User upload `instrumentation_test_report_156.zip` (JUnit HTML report dari CI run sungguhan) —
 **Batch 103's 7 instrumentation test SEMUA HIJAU** (`PlaybackTransportTest`: play/pause, seek,

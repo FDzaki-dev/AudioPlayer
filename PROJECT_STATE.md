@@ -6,6 +6,16 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 105 (Gap List #4 — Metadata model diperkuat, 4 file — 3 diedit + 1 baru)** — `Song.kt`
+dapat 6 field baru (`albumArtist`, `composer`, `trackNumber`, `discNumber`, `fileSize`,
+`mimeType`), semua nullable/default-0 di posisi terakhir constructor jadi 0 call site lama perlu
+diubah. Diisi dari `MusicRepository.kt` (kolom MediaStore yang sudah ada di row yang sama, +
+cabang API 30+/pre-30 utk track/disc) dan `CustomFolderScanner.kt` (extractMetadata tambahan di
+pass retriever SAF yang sudah terbuka) — **zero I/O tambahan**, tidak ada query/pass kedua.
+Field yang BUTUH pass kedua per file (bitrate/sampleRate/channelCount/codec/embedded-artwork)
+sengaja belum — N+1 cost, alasan sama genre (Batch 89). `MusicRepositoryTrackDiscTest.kt` baru,
+9 test parser murni. Belum diverifikasi compile. Detail lengkap: `CHANGELOG.md` Batch 105.
+
 **Batch 104 (Konfirmasi CI Batch 103 HIJAU + Gap List #3/#5 — SAF song identity, 2 file)** — User
 upload `instrumentation_test_report_156.zip`: 7 instrumentation test Batch 103 **SEMUA HIJAU**
 di CI sungguhan (7/7 success, 0 fail) — pertama kalinya proyek ini punya bukti eksekusi runtime
