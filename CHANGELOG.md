@@ -1,5 +1,45 @@
 # Changelog
 
+## Batch 109 — Gap List #7: Sleep timer process-resilient
+3 file: `SleepTimerStore.kt` (baru), `PlaybackService.kt` (diedit, protected), `PlayerViewModel.kt`
+(diedit).
+
+Checklist Gap List #7 diaudit: sleep timer sebelumnya HANYA `viewModelScope.launch` — kalau
+`PlayerViewModel` di-clear (proses di-kill total selagi `PlaybackService` foreground masih
+diminta system tetap hidup), timer hilang tanpa jejak, lagu terus main tanpa batas.
+
+- `SleepTimerStore.kt` — SharedPreferences 1 key: `endAt` (epoch millis absolut, bukan durasi).
+- `PlaybackService.kt` — eksekusi pause sungguhan dipindah ke `serviceScope` (Service, bukan
+  ViewModel). `ACTION_SET_SLEEP_TIMER` custom `SessionCommand` baru (pola identik 2 command yang
+  sudah ada). `scheduleSleepTimer(endAtMillis)`/`cancelSleepTimer()` — cancel job lama + tulis/
+  hapus store SELALU bersamaan (atomic). `resumeSleepTimerFromStore()` dipanggil di `onCreate`
+  setelah `mediaSession` siap: restore sisa waktu yang benar kalau belum lewat, atau pause sekali
+  + bersihkan kalau sudah lewat selagi proses mati (bukan diam-diam diabaikan, bukan juga dobel-
+  eksekusi di restart berikutnya). `onTaskRemoved()` (queue kosong → `stopSelf()`) sekalian
+  `cancelSleepTimer()`.
+- `PlayerViewModel.kt` — `setSleepTimer()`/`cancelSleepTimer()` kirim command ke Service (bukan
+  lagi `controller?.pause()` langsung dari ViewModel). Coroutine ViewModel yang tersisa murni
+  kosmetik (tampilan countdown UI, dihitung ulang dari `endAt - now()` tiap tick supaya tidak
+  drift). `init {}` baru: baca `SleepTimerStore` saat ViewModel dibuat, restore tampilan
+  countdown kalau ada timer aktif tersisa dari ViewModel sebelumnya — cuma soal UI, tidak
+  memengaruhi apakah timer akan benar-benar berbunyi.
+
+**Kenapa bukan `AlarmManager`**: Service ini sudah foreground selama playback (sejak migrasi
+`MediaLibraryService` Batch 12) — coroutine di scope Service sudah cukup untuk skenario yang
+relevan (proses mati SELAGI foreground service masih terkait). `AlarmManager` menambah
+kompleksitas (exact-alarm permission API 31+) untuk skenario di luar cakupan realistis fitur ini
+(reboot/force-stop total persis di tengah sleep timer aktif).
+
+**Insiden proses (bukan bug kode)**: 1 `str_replace` sempat memotong docstring
+`maybeStartFloatingBubble()` (kehilangan pembuka `/**`) saat menyisipkan pemanggilan
+`resumeSleepTimerFromStore()` di akhir `onCreate()` — ketahuan & diperbaiki dari audit
+brace/paren otomatis sebelum repack, bukan lolos ke ZIP.
+
+Belum diverifikasi compile/runtime Gradle sungguhan (tidak ada JDK/Android SDK/kotlinc di
+sandbox kerja). Prioritas verifikasi berikutnya: set sleep timer, force-stop app dari App Info
+(simulasi kill proses), tunggu lewat deadline, buka lagi app — pastikan lagu genuinely sudah
+ter-pause dan tidak ada crash log baru.
+
 ## Batch 108 — Gap List #6: Durable playback state (repeat/shuffle)
 2 file: `PlaybackStateStore.kt` (diedit), `PlayerViewModel.kt` (diedit).
 

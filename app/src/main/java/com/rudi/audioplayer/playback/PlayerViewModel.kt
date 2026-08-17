@@ -253,6 +253,30 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val _sleepTimerRemaining = MutableStateFlow<Long?>(null)
     val sleepTimerRemaining: StateFlow<Long?> = _sleepTimerRemaining.asStateFlow()
     private var sleepTimerJob: Job? = null
+    private val sleepTimerStore = com.rudi.audioplayer.data.SleepTimerStore(appContext)
+
+    init {
+        // Gap List #7 (Batch 109) — restore TAMPILAN countdown setelah ViewModel dibuat ulang
+        // (mis. proses sempat mati, user buka app lagi selagi Service masih menghitung mundur
+        // di background). Eksekusi nyata (pause tepat waktu) tidak bergantung pada blok ini
+        // sama sekali — itu urusan `PlaybackService.resumeSleepTimerFromStore()`, sudah jalan
+        // sendiri begitu Service dibuat, terlepas dari ViewModel ini pernah query store atau
+        // tidak. Blok ini murni supaya UI tidak "lupa" ada timer aktif kalau layar dibuka ulang.
+        val endAt = sleepTimerStore.getEndAt()
+        if (endAt != null && endAt > System.currentTimeMillis()) {
+            _sleepTimerRemaining.value = endAt - System.currentTimeMillis()
+            sleepTimerJob = viewModelScope.launch {
+                while (true) {
+                    val remaining = endAt - System.currentTimeMillis()
+                    if (remaining <= 0) break
+                    _sleepTimerRemaining.value = remaining
+                    delay(1000)
+                }
+                _sleepTimerRemaining.value = null
+            }
+        }
+    }
+
 
     // A-B Repeat (Roadmap #4, Batch 91) — points live here rather than in PlaybackUiState
     // because they're checked every 500ms tick in startPositionLoop() and don't need to
@@ -1211,15 +1235,33 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     fun setSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()
-        var remaining = minutes * 60_000L
-        _sleepTimerRemaining.value = remaining
+        val endAt = System.currentTimeMillis() + minutes * 60_000L
+        _sleepTimerRemaining.value = minutes * 60_000L
+        // Gap List #7 (Batch 109) — eksekusi NYATA (pause sungguhan saat waktu habis) sekarang
+        // dijadwalkan di PlaybackService lewat custom SessionCommand (survive kalau ViewModel
+        // ini di-clear/proses mati), bukan cuma coroutine ViewModel seperti sebelumnya. Loop di
+        // bawah ini SEKARANG murni kosmetik — cuma menghitung mundur angka yang ditampilkan UI;
+        // kalau loop ini hilang (ViewModel di-clear), timer TETAP akan berbunyi tepat waktu dari
+        // sisi Service, cuma UI tidak lagi menampilkan angka mundurnya sampai ViewModel baru
+        // dibuat ulang dan query ulang ke store.
+        val args = Bundle().apply { putLong(PlaybackService.EXTRA_SLEEP_TIMER_END_AT, endAt) }
+        controller?.sendCustomCommand(SessionCommand(PlaybackService.ACTION_SET_SLEEP_TIMER, Bundle.EMPTY), args)
+        // controller == null di sini BUKAN kasus aman-diabaikan seperti toggle lain
+        // (setSilenceSkipEnabled dkk membaca ulang store-nya sendiri di Service.onCreate) —
+        // sleep timer adalah aksi sekali-jalan, bukan setting persisten yang di-load ulang.
+        // Tapi secara praktis sleep timer cuma bisa dipicu dari UI Now Playing yang mensyaratkan
+        // playback sudah berjalan, jadi MediaController.connect() sudah pasti selesai di titik
+        // ini.
         sleepTimerJob = viewModelScope.launch {
-            while (remaining > 0) {
+            while (true) {
+                // Dihitung ulang dari endAt - now() tiap tick (bukan sekadar decrement lokal)
+                // supaya angka yang ditampilkan tidak drift dari deadline sungguhan yang
+                // dipegang Service, walau app sempat di-throttle di background.
+                val remaining = endAt - System.currentTimeMillis()
+                if (remaining <= 0) break
+                _sleepTimerRemaining.value = remaining
                 delay(1000)
-                remaining -= 1000
-                _sleepTimerRemaining.value = remaining.coerceAtLeast(0)
             }
-            controller?.pause()
             _sleepTimerRemaining.value = null
         }
     }
@@ -1228,6 +1270,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         sleepTimerJob?.cancel()
         sleepTimerJob = null
         _sleepTimerRemaining.value = null
+        // -1L = sentinel batal (Bundle tidak bisa bawa Long? null) — lihat
+        // PlaybackService.onCustomCommand(ACTION_SET_SLEEP_TIMER).
+        val args = Bundle().apply { putLong(PlaybackService.EXTRA_SLEEP_TIMER_END_AT, -1L) }
+        controller?.sendCustomCommand(SessionCommand(PlaybackService.ACTION_SET_SLEEP_TIMER, Bundle.EMPTY), args)
     }
 
     override fun onCleared() {

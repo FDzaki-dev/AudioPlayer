@@ -50,6 +50,7 @@ app/src/main/java/com/rudi/audioplayer/data/RadioSettingsStore.kt
 app/src/main/java/com/rudi/audioplayer/data/RatingStore.kt
 app/src/main/java/com/rudi/audioplayer/data/SearchHistoryStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ShakeSettingsStore.kt
+app/src/main/java/com/rudi/audioplayer/data/SleepTimerStore.kt
 app/src/main/java/com/rudi/audioplayer/data/SilenceSkipStore.kt
 app/src/main/java/com/rudi/audioplayer/data/SmartPlaylist.kt
 app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistEngine.kt

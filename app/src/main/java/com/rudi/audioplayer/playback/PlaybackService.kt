@@ -69,6 +69,10 @@ class PlaybackService : MediaLibraryService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var shakeDetector: ShakeDetector? = null
     private var coldStartNotificationActive = false
+    // Gap List #7 (Batch 109) — job eksekusi sleep timer, hidup di scope Service (bukan
+    // ViewModel) supaya tidak ikut mati kalau Activity/ViewModel di-clear duluan.
+    private var sleepTimerJob: Job? = null
+    private val sleepTimerStore by lazy { com.rudi.audioplayer.data.SleepTimerStore(this) }
     // Batch 102 (Gap List #1, True Crossfade) — lihat CrossfadeEngine.kt untuk mekanisme penuh.
     private var crossfadeEngine: CrossfadeEngine? = null
     // Batch 34: pushWidgetUpdate fires on every track transition and every play/pause tap —
@@ -209,6 +213,14 @@ class PlaybackService : MediaLibraryService() {
             .setSessionActivity(sessionActivityIntent)
             .setBitmapLoader(SongArtBitmapLoader(this, serviceScope))
             .build()
+        // Gap List #7 (Batch 109) — dicek paling awal, sebelum apa pun lain: kalau ada sleep
+        // timer tersisa dari sebelum proses mati (Playback Resumption me-restart Service ini
+        // dari nol), jadwalkan ulang berdasarkan timestamp absolut yang tersimpan, BUKAN mulai
+        // hitung dari awal lagi. Kalau ternyata deadline-nya sudah lewat selagi proses mati,
+        // pause sekali (tetap harus dieksekusi walau telat) lalu bersihkan — bukan diam-diam
+        // diabaikan. Dipanggil di sini (bukan di awal onCreate) karena butuh `mediaSession`
+        // sudah terbentuk untuk bisa memanggil `.pause()`.
+        resumeSleepTimerFromStore()
     }
 
     /** Roadmap #11 lanjutan (Batch 100) — dipanggil tiap `isPlaying` jadi true, DARI MANA PUN
@@ -220,6 +232,51 @@ class PlaybackService : MediaLibraryService() {
      * overlay bisa dicabut user dari Pengaturan sistem kapan saja tanpa lewat toggle app ini
      * sama sekali, device settings selalu menang atas preferensi in-app (pola sama persis
      * BubbleBootReceiver.kt). */
+    /** Gap List #7 (Batch 109) — dipanggil dari `onCustomCommand` (ViewModel set sleep timer
+     * baru) DAN dari `resumeSleepTimerFromStore` (restore setelah proses/Service dibuat ulang).
+     * `endAtMillis` SELALU absolut (epoch millis), bukan durasi — supaya kalkulasi sisa waktu
+     * benar di kedua kasus pemanggilan tanpa cabang kode terpisah. Cancel job lama + tulis store
+     * dilakukan BERSAMAAN di sini (bukan di 2 tempat terpisah) supaya "atomic": tidak pernah ada
+     * kondisi job baru jalan sementara store masih menunjuk deadline lama, atau sebaliknya. */
+    private fun scheduleSleepTimer(endAtMillis: Long) {
+        sleepTimerJob?.cancel()
+        sleepTimerStore.setEndAt(endAtMillis)
+        sleepTimerJob = serviceScope.launch {
+            val remaining = endAtMillis - System.currentTimeMillis()
+            if (remaining > 0) delay(remaining)
+            // Dicek lagi setelah delay (bukan diasumsikan job ini masih valid): kalau
+            // dibatalkan/diganti timer baru selagi delay berjalan, coroutine ini otomatis
+            // berhenti di titik `delay()` lewat cancellation, baris di bawah TIDAK tereksekusi
+            // — itulah yang mencegah timer lama sempat ganda mem-pause setelah digantikan.
+            mediaSession?.player?.pause()
+            sleepTimerStore.setEndAt(null)
+        }
+    }
+
+    /** Membatalkan job + membersihkan store BERSAMAAN — simetris dengan scheduleSleepTimer(),
+     * mencegah state "job jalan tapi store sudah kosong" atau sebaliknya. */
+    private fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        sleepTimerStore.setEndAt(null)
+    }
+
+    /** Dipanggil sekali di `onCreate`, setelah `mediaSession` terbentuk. Menangani 2 kasus:
+     * (1) proses sempat mati SELAGI timer masih berjalan, deadline belum lewat — lanjutkan
+     * delay dari sisa waktu yang benar, BUKAN mulai hitung ulang dari durasi awal; (2) proses
+     * mati cukup lama sampai deadline sudah lewat sebelum Service sempat hidup lagi — tetap
+     * pause sekali (aksi yang seharusnya terjadi tidak boleh hilang diam-diam cuma karena
+     * telat), lalu bersihkan store supaya tidak pause berulang di restart berikutnya. */
+    private fun resumeSleepTimerFromStore() {
+        val endAt = sleepTimerStore.getEndAt() ?: return
+        if (endAt <= System.currentTimeMillis()) {
+            mediaSession?.player?.pause()
+            sleepTimerStore.setEndAt(null)
+        } else {
+            scheduleSleepTimer(endAt)
+        }
+    }
+
     private fun maybeStartFloatingBubble() {
         if (!FloatingBubbleStore(this).isEnabled()) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) return
@@ -437,6 +494,7 @@ class PlaybackService : MediaLibraryService() {
             val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
                 .add(SessionCommand(ACTION_SET_SKIP_SILENCE, Bundle.EMPTY))
                 .add(SessionCommand(ACTION_SET_CROSSFADE_ENABLED, Bundle.EMPTY))
+                .add(SessionCommand(ACTION_SET_SLEEP_TIMER, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailablePlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS)
@@ -462,6 +520,14 @@ class PlaybackService : MediaLibraryService() {
                 // crossfade yang sedang berlangsung (lihat CrossfadeEngine.abort()).
                 val enabled = args.getBoolean(EXTRA_CROSSFADE_ENABLED, false)
                 crossfadeEngine?.setEnabled(enabled)
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            if (customCommand.customAction == ACTION_SET_SLEEP_TIMER) {
+                // Gap List #7 (Batch 109) — endAt == -1L artinya "batalkan timer" (ViewModel
+                // tidak bisa kirim null lewat Bundle primitif, -1L jadi sentinel eksplisit).
+                // Timer punya deadline absolut, bukan durasi — lihat scheduleSleepTimer().
+                val endAt = args.getLong(EXTRA_SLEEP_TIMER_END_AT, -1L)
+                if (endAt <= 0L) cancelSleepTimer() else scheduleSleepTimer(endAt)
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
             return super.onCustomCommand(session, controller, customCommand, args)
@@ -504,6 +570,11 @@ class PlaybackService : MediaLibraryService() {
         // empty queue. A *paused* session with real songs in it stays exactly as visible and
         // controllable from the notification/lock screen as it was right before the swipe.
         if (player == null || player.mediaItemCount == 0) {
+            // Gap List #7 (Batch 109) — antrean kosong = tidak ada apa pun lagi untuk
+            // di-pause nanti. Timer yang masih tersimpan di sini jadi tidak berarti apa-apa,
+            // dibersihkan sekalian daripada dibiarkan nyangkut lalu nge-trigger pause kosong
+            // di proses berikutnya.
+            cancelSleepTimer()
             stopSelf()
         }
     }
@@ -540,6 +611,11 @@ class PlaybackService : MediaLibraryService() {
         // Batch 102, Gap List #1 (True Crossfade) — lihat CrossfadeEngine.kt.
         const val ACTION_SET_CROSSFADE_ENABLED = "com.rudi.audioplayer.ACTION_SET_CROSSFADE_ENABLED"
         const val EXTRA_CROSSFADE_ENABLED = "crossfade_enabled"
+
+        // Gap List #7 (Batch 109) — sleep timer process-resilient. EXTRA berisi deadline
+        // ABSOLUT (epoch millis), bukan durasi menit — lihat PlaybackService.scheduleSleepTimer().
+        const val ACTION_SET_SLEEP_TIMER = "com.rudi.audioplayer.ACTION_SET_SLEEP_TIMER"
+        const val EXTRA_SLEEP_TIMER_END_AT = "sleep_timer_end_at"
     }
 }
 

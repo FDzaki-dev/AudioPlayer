@@ -6,6 +6,49 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 109 (Gap List #7 — Sleep timer process-resilient, 3 file — 1 baru + 2 diedit)** —
+Sebelumnya sleep timer HANYA hidup sebagai `viewModelScope.launch` murni: kalau `PlayerViewModel`
+di-clear (proses di-kill total selagi `PlaybackService` foreground diminta system tetap
+hidup/di-restart lewat Playback Resumption), timer hilang diam-diam, lagu terus main tanpa batas
+tanpa jejak apa pun.
+
+1. **`SleepTimerStore.kt` (baru)** — SharedPreferences kecil, simpan 1 nilai: `endAt` ABSOLUT
+   (epoch millis), bukan "sisa menit" — supaya sisa waktu bisa dihitung ulang benar dari
+   `endAt - now()` di titik proses mana pun, tanpa perlu tahu berapa lama proses sempat mati.
+2. **`PlaybackService.kt` (protected, edit parsial)** — eksekusi NYATA (pause sungguhan)
+   dipindah ke sini, `serviceScope` (bukan ViewModel scope). Custom `SessionCommand` baru
+   (`ACTION_SET_SLEEP_TIMER`, pola identik `ACTION_SET_SKIP_SILENCE`/`ACTION_SET_CROSSFADE_ENABLED`
+   yang sudah ada) jadi jembatan ViewModel→Service. `scheduleSleepTimer()`/`cancelSleepTimer()`
+   SELALU cancel job lama + tulis/hapus store BERSAMAAN (atomic — tidak pernah ada state job
+   jalan tapi store kosong atau sebaliknya). `resumeSleepTimerFromStore()` dipanggil sekali di
+   `onCreate` (setelah `mediaSession` terbentuk): kalau ada `endAt` tersimpan & belum lewat,
+   lanjutkan delay dari SISA waktu yang benar (bukan mulai dari awal lagi); kalau sudah lewat
+   selagi proses mati, tetap pause sekali (aksi tidak boleh hilang cuma karena telat) lalu
+   bersihkan — mencegah pause ganda di restart berikutnya. `onTaskRemoved()` (antrean kosong →
+   `stopSelf()`) sekalian `cancelSleepTimer()` — playback dihentikan total, timer jadi tidak
+   berarti apa-apa kalau dibiarkan nyangkut.
+3. **`PlayerViewModel.kt` (diedit)** — `setSleepTimer()`/`cancelSleepTimer()` sekarang MENGIRIM
+   command ke Service (eksekusi asli di sana), coroutine ViewModel yang tersisa MURNI kosmetik
+   (cuma angka countdown UI, dihitung ulang dari `endAt - now()` tiap tick — bukan decrement
+   lokal — supaya tidak drift). `init {}` baru: baca `SleepTimerStore` sekali saat ViewModel
+   dibuat, kalau ada timer aktif tersisa dari sebelum ViewModel ini ada, tampilan countdown
+   langsung terisi lagi — TIDAK memengaruhi apakah timer benar-benar akan berbunyi (itu murni
+   urusan Service), cuma soal UI tidak "lupa" ada timer jalan.
+
+**Kenapa bukan `AlarmManager`**: sengaja tidak dipakai — Service ini sudah foreground selama
+playback jalan (prasyarat arsitektur sejak migrasi `MediaLibraryService` Batch 12), jadi
+coroutine di scope Service sudah cukup resilient untuk kasus yang benar-benar relevan (proses
+mati SELAGI masih ada foreground service terkait). `AlarmManager` akan menambah kompleksitas
+(exact-alarm permission API 31+, dll) untuk skenario yang sangat sempit (device reboot/force-stop
+total di TENGAH sleep timer aktif) yang di luar cakupan realistis fitur ini.
+
+Brace/paren 3 file dicek otomatis & seimbang setelah 1 kesalahan `str_replace` (docstring
+`maybeStartFloatingBubble` sempat terpotong) ditemukan & diperbaiki sebelum repack. **Belum
+diverifikasi compile/runtime Gradle sungguhan** (tidak ada JDK/Android SDK/kotlinc di sandbox
+kerja) — prioritas berikutnya kalau user push: set sleep timer, force-stop app dari App Info
+(mensimulasikan kill proses), tunggu lewat deadline, buka lagi app, pastikan (1) lagu genuinely
+sudah ter-pause, (2) tidak ada crash log baru. Detail lengkap: `CHANGELOG.md` Batch 109.
+
 **Batch 108 (Gap List #6 — Durable playback state: repeat/shuffle, 2 file)** — Audit
 `PlaybackStateStore.kt`/`PlayerViewModel.kt` terhadap checklist #6: track/posisi/queue sudah
 persist sejak lama (checkpoint tiap ~5s saat playing + immediate on pause, Batch-batch awal),
