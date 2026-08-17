@@ -1,5 +1,48 @@
 # Changelog
 
+## Batch 104 — Batch 103 CI CONFIRMED PASSING + Gap List #3/#5: SAF song identity
+User upload `instrumentation_test_report_156.zip` (JUnit HTML report dari CI run sungguhan) —
+**Batch 103's 7 instrumentation test SEMUA HIJAU** (`PlaybackTransportTest`: play/pause, seek,
+next, previous, repeat-off/all/one, shuffle toggle — 7/7 success, 0 failure, 0 skipped). Ini CI
+run pertama proyek ini yang benar-benar dieksekusi di emulator (bukan lagi analisis statis) —
+`reactivecircus/android-emulator-runner@v2` + API 30 + `runOnMainSync`/listener-latch pattern
+Batch 103 terbukti jalan tanpa perlu hotfix. `MANUAL_QA_CHECKLIST.md` (audio focus/Bluetooth/
+lock-screen/dll) masih berlaku apa adanya — di luar cakupan emulator CI standar.
+
+**2 file — Gap List #3 & #5 (URI.hashCode() sebagai identitas)**: `CustomFolderScanner.kt`'s
+`stableId()` (ID lagu SAF) sebelumnya `String.hashCode()` Java (32-bit) masuk ke 31 bit —
+ruang collision cuma ~2.1 miliar bucket dari algoritma yang publicly-known lemah, birthday-bound
+collision realistis mulai puluhan ribu URI (library SAF besar bisa kena). Diganti FNV-1a 64-bit
+atas byte UTF-8 URI, dimasking ke 63 bit lalu dinegasikan (`stableId()` di `CustomFolderScanner`,
+sekarang delegasi ke fungsi murni `Companion.stableId(String)` — dipisah biar testable tanpa
+Robolectric, pola sama `MusicRepository.deriveFolderName` Batch 27). Ruang collision sekarang
+~2^63, birthday-bound baru mulai ~3 miliar URI berbeda — bukan lagi guaranteed-unique (masih
+hash, bukan registry), tapi gap-nya sekarang astronomis lebih kecil, dicatat jujur di komentar
+kode. **Namespace MediaStore vs SAF sudah eksplisit dari sign bit** (MediaStore `_ID` selalu
+non-negative, SAF `stableId()` selalu negative) — tidak perlu tag tipe tambahan.
+
+`CustomFolderScannerStableIdTest.kt` (baru) — 4 test: determinism (URI sama → id sama), 2 URI
+beda → id beda, semua id selalu negatif (0 kemungkinan tabrakan dgn MediaStore), 500 URI
+near-identical (`track_1.mp3`...`track_500.mp3`) → 500 id distinct (sanity-check avalanche,
+bukan bukti matematis nol-collision — tidak mungkin dibuktikan lewat unit test biasa).
+
+**Validasi queue existing yang sudah cukup baik** (dicek, bukan diabaikan — bagian dari gap #3
+\"validasi queue item sebelum restore\"/\"tangani URI tak tersedia\"/\"bersihkan orphan\"):
+`PlayerViewModel.resumeFromSaved()` sudah `saved.songIds.mapNotNull { songMap[it] }` — id yang
+tidak ada lagi di scan terbaru (file dihapus/uri SAF revoked) otomatis ke-drop, urutan sisanya
+tetap terjaga (`mapNotNull` preserve order). Orphan tidak permanen nyangkut — `persistPlaybackState()`
+jalan tiap ~5 detik saat main + langsung saat pause, jadi queue yang sudah dibersihkan otomatis
+ter-flush ke storage di siklus berikutnya. Tidak ada perubahan diperlukan di titik ini.
+
+Brace/paren 2 file kode dicek otomatis & seimbang. `FILE_MANIFEST.txt` 147→148. **Belum
+diverifikasi compile/test sungguhan** (tidak ada kotlinc di sandbox ini) — tapi pola FNV-1a murni
+Kotlin standard-library (`Long`/`Byte` arithmetic, `toByteArray(Charsets.UTF_8)`), 0 API baru yang
+berisiko meleset. Prioritas berikutnya kalau user push: `gradle testDebugUnitTest` verifikasi 4
+test baru, lalu Gap List item #3 sisanya (`3. Queue identity` checklist lain sudah tercakup lewat
+audit di atas — item ini sekarang bisa dicentang) dan lanjut ke item #4 (Metadata model
+diperkuat) atau #6 (Durable playback state, sudah sebagian besar ada) sesuai prioritas P0/P1
+gap list. Detail lengkap: `CustomFolderScanner.kt` komentar `stableId()`.
+
 ## Batch 103 — Gap List #2: Integration/device instrumentation testing
 Item P0 kedua di `AudioPlayer_Coding_Gap_List.md`. **9 file** (5 baru + 2 file kode diedit + 2
 asset WAV biner baru, 2 di antaranya protected — `app/build.gradle.kts` & `.github/workflows/

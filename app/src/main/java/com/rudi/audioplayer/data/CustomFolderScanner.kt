@@ -95,15 +95,41 @@ class CustomFolderScanner(private val context: Context) {
         }
     }
 
-    /** Deterministic negative ID from the file's URI — MediaStore IDs are always
-     * non-negative, so this can never collide with a real scanned song. */
-    private fun stableId(uri: Uri): Long {
-        val hash = uri.toString().hashCode().toLong()
-        return -(hash and 0x7FFFFFFFL) - 1L
-    }
+    /** Deterministic negative ID from the file's URI. Negative space is reserved
+     * exclusively for SAF-sourced songs — MediaStore IDs (`MusicRepository`) are always
+     * non-negative real `_ID` values, so the sign bit alone already separates the two
+     * identity namespaces explicitly; no extra tagging needed.
+     *
+     * Gap list #3/#5: this used to be `String.hashCode()` (Java's 32-bit hash) masked to
+     * 31 bits — only ~2.1 billion buckets, and the 32-bit algorithm itself is a weak,
+     * publicly-known-collision-prone mix (birthday-bound collisions expected past roughly
+     * tens of thousands of distinct URIs, well within reach of a large SAF-scanned library).
+     * Replaced with 64-bit FNV-1a over the URI's UTF-8 bytes (masked to 63 bits, so the
+     * result always stays negative after negation) — collision space is ~2^63, birthday-bound
+     * collision only expected past ~3 billion distinct URIs. Still technically a hash (not a
+     * registry-backed guaranteed-unique key), but that gap is now astronomically smaller and
+     * the algorithm itself has no known practical weakness. */
+    private fun stableId(uri: Uri): Long = Companion.stableId(uri.toString())
 
     companion object {
         private const val MAX_DEPTH = 6
         private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "aac", "flac", "wav", "ogg", "opus", "amr", "wma")
+
+        /** Pure, Context-free — kept in the companion so it's unit-testable without
+         * Robolectric (same pattern as `MusicRepository.deriveFolderName`, Batch 27). */
+        fun stableId(uriString: String): Long {
+            val fnvHash = fnv1a64(uriString)
+            return -(fnvHash and 0x7FFFFFFFFFFFFFFFL) - 1L
+        }
+
+        private fun fnv1a64(input: String): Long {
+            var hash = -3750763034362895579L // FNV offset basis (0xcbf29ce484222325)
+            val prime = 1099511628211L // FNV prime
+            for (byte in input.toByteArray(Charsets.UTF_8)) {
+                hash = hash xor (byte.toLong() and 0xFF)
+                hash *= prime
+            }
+            return hash
+        }
     }
 }

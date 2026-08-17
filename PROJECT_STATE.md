@@ -6,6 +6,19 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 104 (Konfirmasi CI Batch 103 HIJAU + Gap List #3/#5 — SAF song identity, 2 file)** — User
+upload `instrumentation_test_report_156.zip`: 7 instrumentation test Batch 103 **SEMUA HIJAU**
+di CI sungguhan (7/7 success, 0 fail) — pertama kalinya proyek ini punya bukti eksekusi runtime
+asli, bukan cuma analisis statis. Lalu lanjut item gap list berikutnya: `CustomFolderScanner.kt`'s
+`stableId()` (identitas lagu SAF) diganti dari `String.hashCode()` 32-bit (lemah, birthday-bound
+collision realistis di library besar) ke FNV-1a 64-bit murni (ruang collision ~2^63) — fungsi
+dipisah ke `Companion.stableId(String)` biar testable tanpa Robolectric (`CustomFolderScannerStableIdTest.kt`
+baru, 4 test). Namespace MediaStore(non-negative)/SAF(negative) sudah eksplisit lewat sign bit,
+tidak perlu tag tambahan. Queue restore (`PlayerViewModel.resumeFromSaved()`) diaudit — sudah
+`mapNotNull` drop orphan + preserve order + auto-flush lewat `persistPlaybackState()` periodik,
+tidak perlu diubah. **Belum diverifikasi compile sungguhan** (tidak ada kotlinc di sandbox) tapi
+FNV-1a murni Kotlin stdlib, 0 API eksternal baru. Detail lengkap: `CHANGELOG.md` Batch 104.
+
 **Batch 103 (Gap List #2 — Integration/device testing playback, 9 file — 5 baru + 2 diedit + 2
 asset biner baru, 2 protected, Atomic Change)** — Item P0 kedua di `AudioPlayer_Coding_Gap_List.
 md`. Proyek ini sebelumnya 0% instrumentation test (cuma `app/src/test`, pure-JVM) — lihat
