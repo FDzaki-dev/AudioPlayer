@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.QueryStats
+import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -66,6 +67,7 @@ fun SettingsScreen(
 ) {
     var showSignatureMatcher by remember { mutableStateOf(false) }
     var showDiagnosticLog by remember { mutableStateOf(false) }
+    var showBackupRestore by remember { mutableStateOf(false) }
     var showAdvancedSettings by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
@@ -265,6 +267,30 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { showBackupRestore = true }
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.SettingsBackupRestore, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text("Cadangkan & Pulihkan", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Simpan playlist, favorit, rating & pengaturan ke 1 file lokal",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
                     .clickable { showAdvancedSettings = !showAdvancedSettings }
                     .padding(horizontal = 20.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -388,6 +414,9 @@ fun SettingsScreen(
     }
     if (showDiagnosticLog) {
         DiagnosticLogSheet(onDismiss = { showDiagnosticLog = false }, onInfoMessage = onInfoMessage)
+    }
+    if (showBackupRestore) {
+        BackupRestoreSheet(onDismiss = { showBackupRestore = false }, onInfoMessage = onInfoMessage)
     }
 }
 

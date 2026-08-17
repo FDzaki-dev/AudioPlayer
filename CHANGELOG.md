@@ -1,5 +1,67 @@
 # Changelog
 
+## Batch 115 — Gap List #10: Backup/restore data lokal
+Item "Sangat disarankan" pertama setelah 10 item "Wajib" P0/P1 (1-9) tuntas. Sebelum batch ini
+tidak ada mekanisme apa pun untuk mengeluarkan data app (playlist, favorit, rating, dst.) ke
+luar SharedPreferences privat — uninstall/ganti device berarti semua hilang total, tidak ada
+jalan keluar.
+
+**`BackupManager.kt` (baru, `data/`)** — bundel prefs yang di-whitelist jadi 1 file JSON,
+ditulis ke `Documents/AudioPlayer/backups/backup_<timestamp>_<uuid>.json` lewat MediaStore
+(API 29+, pola identik `AppLogger.exportLogToDocuments`, tanpa izin storage tambahan), FIFO
+retensi 20 file (pola sama retensi log/crash). Whitelist 17 prefs: playlist, playlist otomatis,
+favorit, rating, bookmark, mode audiobook, riwayat dengar, statistik putar, statistik jam
+dengar, folder/lagu disembunyikan, tema, crossfade, lewati keheningan, kocok-utk-lewati, radio
+otomatis, visualizer, mini player mengambang.
+
+**Sengaja dikecualikan dari whitelist** (didokumentasikan di KDoc file, bukan kelupaan):
+`app_lock` (PIN/lockout — data keamanan, tidak aman dimuat ulang dari file yang bisa disalin ke
+device lain), `custom_folders` (URI SAF terikat device+install asal, restore mentah cuma
+menghasilkan entri folder mati), `onboarding_hints` (state UI sekali-pakai), `search_history`
+(nilai rendah, di luar scope), `sleep_timer` (state timer yang sedang berjalan, hampir pasti
+sudah lewat kalau di-restore di sesi lain).
+
+**Serialisasi tipe-aman**: `SharedPreferences` bisa berisi String/Int/Long/Float/Boolean/
+`Set<String>` — JSON tidak membedakan Int/Long/Float secara native, jadi tiap value dibungkus
+`{"type": ..., "value": ...}` eksplisit supaya round-trip export→import tidak diam-diam
+mengubah tipe (mis. Int jadi Long, yang bisa bikin `ClassCastException` di pemanggil lama yang
+masih pakai `prefs.getInt(...)`).
+
+**Validasi sebelum overwrite (guard destruktif)**: `readAndValidate()` (parse + cek
+`schemaVersion` dikenal, `null` kalau JSON rusak/format tidak dikenal) dipisah total dari
+`applyBackup()` (eksekusi nyata) — di antara keduanya, UI wajib tampilkan ringkasan jumlah item
+per kategori lewat `AlertDialog` dan user harus tap "Timpa & Pulihkan" secara eksplisit. Restore
+per-prefs bersifat REPLACE penuh (clear lalu isi ulang) bukan merge — deterministik, hasil akhir
+selalu sama persis isi file; prefs whitelist yang TIDAK ada di file (backup lama dari sebelum
+sebuah fitur ada) sengaja tidak disentuh sama sekali.
+
+**`BackupRestoreSheet.kt` (baru, `ui/`)** — tombol "Buat Backup Sekarang" + "Pulihkan dari
+File" (SAF `ActivityResultContracts.OpenDocument()`, mime `application/json`). **Keputusan
+arsitektur**: launcher SAF dideklarasikan LANGSUNG di sheet ini, bukan di-drilling dari
+`MainActivity.kt` seperti launcher-launcher lain di proyek ini (`visualizerPermissionLauncher`,
+`overlayPermissionLauncher`) — `rememberLauncherForActivityResult` cuma butuh
+`ActivityResultRegistryOwner`, yang tersedia di seluruh pohon Compose Activity yang sama
+termasuk di dalam `ModalBottomSheet`, jadi tidak ada alasan menambah parameter/launcher ke
+`MainActivity.kt` (protected asset) untuk fitur yang lingkupnya murni 1 sheet — **0 baris
+`MainActivity.kt` disentuh batch ini**. Banner hasil inline (pola sama `DiagnosticLogSheet`,
+alasan sama: Snackbar `onInfoMessage` ketutup layer `ModalBottomSheet`).
+
+**`SettingsScreen.kt` (diedit)** — 1 row menu baru "Cadangkan & Pulihkan" ditaruh di level
+teratas (bukan di dalam submenu "Lanjutan" — ini fitur mainstream, bukan alat developer), di
+antara "Statistik Dengar" dan divider "Lanjutan".
+
+**Batasan jujur, sengaja BELUM digarap**: StateFlow yang sudah di-cache di memori
+`PlayerViewModel` (favorit, playlist, dst.) TIDAK otomatis re-read dari SharedPreferences
+begitu `applyBackup()` menimpanya langsung di layer data — restore berhasil ke disk, tapi UI
+yang sedang terbuka bisa menampilkan data lama sampai app ditutup-buka ulang. Dialog konfirmasi
+sudah eksplisit bilang ini ke user (bukan disembunyikan). Memaksa setiap StateFlow terkait
+re-load dari `PlayerViewModel` butuh nambah 1 fungsi refresh generik lintas semua store yang
+di-whitelist — di luar scope batch ini, kandidat polish lanjutan kalau user lapor kejadian nyata
+di device. Belum diverifikasi compile/runtime Gradle sungguhan (tidak ada JDK/Android SDK di
+sandbox ini) — prioritas berikutnya kalau user push: buat backup, uninstall+install ulang app
+(atau `pm clear`), pulihkan dari file, pastikan playlist/favorit/rating benar-benar kembali
+setelah app dibuka ulang.
+
 ## Batch 114 — Gap List #9: Library/database consistency
 Audit checklist #9 terhadap arsitektur nyata app ini: tidak ada Room/SQL sama sekali — library
 selalu live-query `MediaStore` (`MusicRepository.getAllSongs()`, fresh tiap panggilan, tidak ada

@@ -6,6 +6,33 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 115 (Gap List #10 — Backup/restore data lokal, 3 file — 2 baru + 1 diedit)** — Item
+pertama dari daftar "Sangat disarankan" setelah 10 item "Wajib" P0/P1 (crossfade sampai database
+consistency) tuntas di Batch 102-114. `BackupManager.kt` (baru, `data/`) — export 17 prefs
+whitelist (playlist, playlist otomatis, favorit, rating, bookmark, mode audiobook, riwayat/
+statistik dengar, folder/lagu disembunyikan, tema, & 6 pengaturan toggle) jadi 1 file JSON ke
+`Documents/AudioPlayer/backups/` lewat MediaStore (pola identik `AppLogger`, FIFO retensi 20).
+**Sengaja dikecualikan** (didokumentasikan di KDoc, bukan kelupaan): `app_lock` (PIN — data
+keamanan), `custom_folders` (URI SAF terikat device asal, restore mentah = folder mati),
+`onboarding_hints`/`search_history`/`sleep_timer` (nilai rendah/state transien). Tiap value
+`SharedPreferences` (String/Int/Long/Float/Boolean/`Set<String>`) dibungkus tag tipe eksplisit
+di JSON — round-trip export→import tidak diam-diam mengubah Int jadi Long. `readAndValidate()`
+(parse+cek schemaVersion) dipisah dari `applyBackup()` (eksekusi) — UI wajib tampilkan ringkasan
+jumlah item per kategori + user tap konfirmasi eksplisit sebelum data ditimpa (guard "jangan overwrite destruktif tanpa validasi"), restore per-prefs REPLACE penuh bukan merge.
+`BackupRestoreSheet.kt` (baru, `ui/`) — tombol export + import (SAF `OpenDocument`, mime
+`application/json`). **Launcher SAF dideklarasikan langsung di sheet ini** (bukan di-drilling ke
+`MainActivity.kt`) — `rememberLauncherForActivityResult` cuma butuh `ActivityResultRegistryOwner`
+dan itu tersedia di seluruh pohon Compose Activity termasuk di dalam `ModalBottomSheet`, jadi
+**0 baris `MainActivity.kt` disentuh batch ini**. `SettingsScreen.kt` (diedit) — 1 row menu
+baru "Cadangkan & Pulihkan" di level teratas (bukan submenu "Lanjutan" — ini fitur mainstream).
+**Batasan jujur**: StateFlow yang sudah di-cache `PlayerViewModel` (favorit/playlist/dst.) TIDAK
+otomatis re-read begitu `applyBackup()` menimpa SharedPreferences langsung — restore berhasil ke
+disk, tapi UI yang sedang terbuka bisa tampil data lama sampai app ditutup-buka ulang (dialog
+konfirmasi sudah bilang ini eksplisit ke user). Brace/paren 3 file dicek seimbang. **Belum
+diverifikasi compile/runtime Gradle sungguhan** — prioritas berikutnya kalau user push: buat
+backup, `pm clear`/uninstall-install ulang, pulihkan dari file, pastikan playlist/favorit/rating
+benar-benar kembali setelah app dibuka ulang. Detail lengkap: `CHANGELOG.md` Batch 115.
+
 **Batch 114 (Gap List #9 — Library/database consistency, 4 file diedit)** — Audit checklist #9:
 app ini tidak pakai Room/SQL (murni MediaStore live-query + SharedPreferences/JSON stores), jadi
 "duplicate song record" & "rescan idempotent" SUDAH aman by construction (`getAllSongs()` selalu
