@@ -158,3 +158,68 @@ jobs:
             app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
           retention-days: 14
+
+  # Batch 103 (Gap List #2, Integration/device testing playback) — job TERPISAH dari `build` di
+  # atas, sengaja TANPA `needs:` ke arah manapun: kalau emulator di sini gagal/flaky/lambat,
+  # publish GitHub Release APK di job `build` tetap jalan normal, tidak pernah ikut terblokir.
+  # Trade-off yang disadari: emulator boot + jalankan test menambah beberapa menit total waktu
+  # CI di SETIAP push ke main (job ini jalan paralel, bukan nambah durasi job `build`, tapi tetap
+  # menambah biaya runner-minutes total) — kalau ini kerasa berat, ubah `on:` job ini sendiri jadi
+  # `workflow_dispatch` manual saja; belum dilakukan di batch ini krn gap list secara eksplisit
+  # minta instrumentation test benar-benar tereksekusi (bukan cuma tertulis), bukan cuma opsional.
+  instrumentation-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
+
+      - name: Enable KVM (emulator hardware acceleration)
+        # Tanpa ini emulator jalan lewat software rendering murni — jauh lebih lambat, kadang
+        # timeout duluan sebelum sempat boot. GitHub-hosted ubuntu-latest runner sudah mendukung
+        # KVM sejak beberapa waktu lalu, cuma perlu izin device node-nya dibuka eksplisit di sini.
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run instrumentation tests
+        # api-level 30 (Android 11) dipilih sbg titik tengah wajar: cukup baru utk relevan,
+        # cukup lama utk boot cepat & stabil di emulator CI. SENGAJA BUKAN api-level 35/36 utk
+        # menyasar "Android 15/16 behavior" di gap list item #2 — compileSdk/targetSdk proyek
+        # ini sendiri masih 34 (app/build.gradle.kts), jadi menyasar API di atasnya di sini tidak
+        # akan mengetes apa pun yang app-nya sendiri belum menyasar. Lihat MANUAL_QA_CHECKLIST.md
+        # bagian "Android 15/16-spesifik" utk kenapa itu sengaja jadi batch terpisah.
+        # `gradle` (bukan `./gradlew`) dipakai persis spt job `build` di atas — proyek ini belum
+        # menyertakan Gradle Wrapper (gap list item #19, belum digarap), setup-gradle@v3 di atas
+        # yang menyediakan binary `gradle` versi 8.7 di PATH utk job ini.
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          profile: pixel_5
+          disable-animations: true
+          script: gradle connectedDebugAndroidTest --no-daemon
+
+      - name: Upload instrumentation test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumentation_test_report_${{ github.run_number }}
+          path: app/build/reports/androidTests/connected/
+          if-no-files-found: ignore
+          retention-days: 14

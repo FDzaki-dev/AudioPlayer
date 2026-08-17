@@ -1,5 +1,112 @@
 # Changelog
 
+## Batch 103 — Gap List #2: Integration/device instrumentation testing
+Item P0 kedua di `AudioPlayer_Coding_Gap_List.md`. **9 file** (5 baru + 2 file kode diedit + 2
+asset WAV biner baru, 2 di antaranya protected — `app/build.gradle.kts` & `.github/workflows/
+build.yml`, keduanya edit parsial). Diklasifikasikan sebagai **Atomic Change**: test code, gradle
+wiring-nya, dan CI job yang menjalankannya adalah 1 deliverable yang saling bergantung — test
+tanpa gradle wiring tidak kompail, test tanpa CI job tidak pernah benar-benar jalan (workflow
+Termux-only user ini tidak punya emulator/device lokal buat `./gradlew connectedAndroidTest`
+manual), jadi memecahnya jadi >1 batch cuma menunda nilainya tanpa mengurangi risiko.
+
+**Sebelum batch ini**: proyek 100% pure-JVM test (`app/src/test`) saja — komentar yang SUDAH ada
+sebelum batch ini di `app/build.gradle.kts` sendiri jujur bilang kenapa: "no Robolectric/
+instrumentation, so these run in seconds with no emulator and are cheap enough to actually get
+written and kept up to date." Menambah instrumentation test berarti juga wajib menambah tempat
+utk itu benar2 dieksekusi — makanya CI job baru masuk batch yang sama.
+
+**1. `app/src/androidTest/java/com/rudi/audioplayer/playback/PlaybackServiceTestHelper.kt`
+(baru)** — shared boilerplate koneksi `MediaController` SUNGGUHAN ke `PlaybackService` SUNGGUHAN
+yang sedang jalan (bukan fake Player/mock session — device test yang menguji integrasi
+sungguhan, sesuai nama gap list item-nya). 3 detail teknis yang sengaja ditulis presisi krn mudah
+salah:
+- `MediaController.Builder(...).buildAsync()` WAJIB dipanggil dari thread yang punya Looper
+(lewat `InstrumentationRegistry.getInstrumentation().runOnMainSync {}`) — thread test
+instrumentation default TIDAK punya Looper, langsung exception kalau dipanggil polos.
+- Menunggu future SELESAI dilakukan DI LUAR blok `runOnMainSync` itu, via listener + `CountDown
+Latch` di thread test — bukan `.get()` blocking di dalam `runOnMainSync` yang sama, karena itu
+deadlock: main thread yang diblokir justru thread yang perlu memproses handshake koneksinya
+sendiri.
+- Queue test 2 track diputar lewat `file://` (hasil copy byte asset test APK ke `cacheDir` app),
+BUKAN `asset:///` — `asset:///` di-resolve relatif ke Context yang membangun ExoPlayer-nya, dan
+ExoPlayer sungguhan hidup di dalam `PlaybackService` dgn Context APP (`app/src/main`), sedangkan
+`app/src/androidTest/assets/` masuk ke APK TEST yang terpisah, cuma bisa dibaca lewat
+`InstrumentationRegistry.getInstrumentation().context` (instrumentation context) — bukan lewat
+`targetContext` yang dipakai ExoPlayer app sungguhan. Salah pakai `asset:///` di sini akan
+compile mulus tapi gagal runtime (file "not found") — dicek manual sebelum ditulis, bukan
+kebetulan ketemu benar.
+
+Dua file WAV test (`app/src/androidTest/assets/test_tone_a.wav` 440Hz/3 detik,
+`test_tone_b.wav` 660Hz/2 detik) dibuat lokal lewat modul stdlib Python `wave` (nada sinus murni,
+fade in/out 50ms cegah klik) — bukan lagu sungguhan, nol isu hak cipta, nol kebutuhan akses
+network utk unduh sample.
+
+**2. `app/src/androidTest/java/com/rudi/audioplayer/playback/PlaybackTransportTest.kt`
+(baru)** — 7 test method: `playThenPause_updatesIsPlaying`, `seekTo_movesPlaybackPosition`,
+`skipToNext_advancesToSecondTrack`, `skipToPrevious_returnsToFirstTrack`,
+`repeatModeOne_loopsSameTrackPastItsOwnDuration` (betul2 menunggu lewat 3 detik durasi asli
+track A, verifikasi ExoPlayer benar mengulang bukan lanjut ke track berikutnya — bukan cuma
+mengecek nilai setter `repeatMode`), `repeatModeAll_wrapsFromLastTrackBackToFirst`,
+`shuffleToggle_reportsEnabledState`. Semua assertion async lewat helper `waitUntil()` polling
+(bukan baca state segera setelah kirim command — command lewat `MediaController` itu round-trip
+Binder/session sungguhan, butuh waktu, walau kecil).
+
+**3. `app/build.gradle.kts` (protected, edit parsial)** — `testInstrumentationRunner =
+"androidx.test.runner.AndroidJUnitRunner"` (baru, sebelumnya field ini tidak ada sama sekali di
+`defaultConfig`) + 3 dependency baru: `androidx.test.ext:junit:1.2.1`, `androidx.test:
+runner:1.6.1`, `androidx.test:core:1.6.1` (`androidTestImplementation`). Sengaja TIDAK menambah
+Guava/`concurrent-futures` apa pun tambahan — `com.google.common.util.concurrent.Futures`/
+`ListenableFuture`/`MoreExecutors` yang dipakai `PlaybackServiceTestHelper.kt` sudah terbukti
+kompail lewat `PlaybackService.kt` yang sudah ada duluan di proyek ini (dicek via `grep import`
+sebelum menulis kode, bukan asumsi) — dan `androidTest` 1-modul (bukan modul Gradle terpisah)
+secara default AGP mewarisi classpath `implementation` milik `main`, jadi tidak perlu
+dideklarasikan ulang.
+
+**4. `.github/workflows/build.yml` (protected, edit parsial)** — job baru `instrumentation-
+tests`, divalidasi YAML-nya (`python3 -c "import yaml; yaml.safe_load(...)"`) sebelum di-zip,
+bukan cuma dicek visual indentasinya. **Sengaja independen** — TIDAK ada `needs:` ke job `build`
+maupun sebaliknya, supaya kegagalan/flaky-nya emulator TIDAK PERNAH memblokir publish GitHub
+Release APK (job `build` tetap jalan & sukses normal terlepas hasil job ini). Pakai
+`reactivecircus/android-emulator-runner@v2` (action pihak ketiga paling umum dipakai utk
+kebutuhan ini, KVM diaktifkan eksplisit dulu di runner ubuntu-latest via udev rule supaya boot
+emulator tidak lambat/timeout), `api-level: 30` (BUKAN 35/36 — `compileSdk`/`targetSdk` app ini
+sendiri masih 34, menyasar API di atasnya tidak akan mengetes perilaku apa pun yang app-nya
+sendiri belum menyasar; lihat `MANUAL_QA_CHECKLIST.md`), command `gradle connectedDebugAndroidTest`
+(BUKAN `./gradlew` — proyek ini belum menyertakan Gradle Wrapper sama sekali, gap list item #19,
+sengaja bukan bagian batch ini; `gradle` binary versi 8.7 sudah disiapkan di PATH job ini lewat
+step `setup-gradle@v3` yang sama persis dgn job `build`).
+
+**5. `MANUAL_QA_CHECKLIST.md` (baru, root)** — pasangan jujur `PlaybackTransportTest.kt`: item
+gap list #2 yang secara eksplisit diminta (Bluetooth/media output, lock-screen controls,
+notification controls, headset fisik play-pause/next/previous, audio focus real hardware,
+process death di device fisik, background playback jangka panjang, Android 15/16 behavior) TIDAK
+ditulis sebagai instrumentation test palsu/mock yang cuma memverifikasi mock-nya sendiri —
+ditulis sbg checklist manual bertanda-tangan-device, dgn alasan teknis jujur kenapa tiap kategori
+butuh device fisik/tooling di luar scope batch ini.
+
+**Sengaja BELUM digarap / batasan disadari** (dicatat, bukan terlewat — lihat juga
+`PROJECT_STATE.md`):
+- Semua 7 item di atas yang masuk `MANUAL_QA_CHECKLIST.md` — alasan per-kategori ada di file itu
+sendiri, bukan diulang di sini.
+- Android 15/16-spesifik butuh `targetSdk` dinaikkan dulu (perubahan protected-asset berisiko
+tinggi tersendiri: predictive back, foreground service type enforcement, perilaku notifikasi,
+dll bisa berubah) — SENGAJA batch terpisah, tidak digabung diam-diam ke sini walau sama-sama
+soal "testing".
+- Job CI baru menambah runner-minutes GitHub Actions tiap push ke `main` (jalan paralel, bukan
+menambah durasi job `build`, tapi tetap biaya total run-menit bertambah) — kalau ini kerasa
+berat/mahal, `on:` job `instrumentation-tests` ini sendiri bisa diubah ke `workflow_dispatch`
+manual saja di batch berikutnya; belum dilakukan di sini krn gap list eksplisit minta test
+BENAR-BENAR tereksekusi, bukan cuma tertulis dan didiamkan.
+- **Belum pernah benar-benar dijalankan** — tidak ada akses emulator/device Android di sesi kerja
+batch ini. Confidence berdasar: (a) pola resmi Media3/androidx.test yang sudah lama stabil dan
+dicek detail thread-safety-nya manual (bukan tebakan, lihat 3 poin teknis di atas), (b)
+`Futures`/`MoreExecutors`/`ListenableFuture` yang sudah TERBUKTI kompail di file lain proyek ini
+sebelum batch ini ditulis. Titik paling mungkin gagal pertama kali kalau CI merah: konfigurasi
+KVM `reactivecircus/android-emulator-runner` yang kebijakan runner GitHub-nya bisa berubah
+sewaktu-waktu, atau nama task `connectedDebugAndroidTest` yang perlu persis sesuai variant/
+applicationId proyek ini — kalau CI gagal di titik ini, kirim `log_fail_*`/artifact
+`instrumentation_test_report_*`-nya, bukan `build-output.log` job `build` (beda job, beda log).
+
 ## Batch 102 — Gap List #1: True Crossfade (dual-instance overlap sungguhan)
 Dari `AudioPlayer_Coding_Gap_List.md` (upload user), P0 pertama di daftar prioritas: "Fade
 Halus" sebelumnya cuma efek volume 1 pemutar, bukan crossfade sungguhan. **4 file** (1 baru, 3

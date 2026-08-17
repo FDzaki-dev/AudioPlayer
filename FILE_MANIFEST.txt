@@ -1,18 +1,23 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 142 file
+# Total: 147 file
 
 .github/workflows/build.yml
 .gitignore
 CHANGELOG.md
 FILE_MANIFEST.txt
+MANUAL_QA_CHECKLIST.md
 PROJECT_STATE.md
 README.md
 ROADMAP_15_FITUR_OFFLINE.md
 app/build.gradle.kts
 app/compose_stability_config.conf
 app/proguard-rules.pro
+app/src/androidTest/assets/test_tone_a.wav
+app/src/androidTest/assets/test_tone_b.wav
+app/src/androidTest/java/com/rudi/audioplayer/playback/PlaybackServiceTestHelper.kt
+app/src/androidTest/java/com/rudi/audioplayer/playback/PlaybackTransportTest.kt
 app/src/main/AndroidManifest.xml
 app/src/main/java/com/rudi/audioplayer/AudioPlayerApplication.kt
 app/src/main/java/com/rudi/audioplayer/MainActivity.kt

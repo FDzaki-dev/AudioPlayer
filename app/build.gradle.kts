@@ -87,6 +87,13 @@ android {
         // and is fully supported on 8.4.1 — only deprecated starting AGP 8.8, which this
         // project isn't on.
         resourceConfigurations += listOf("en")
+
+        // Batch 103 (Gap List #2, Instrumentation testing) — runner default AndroidJUnitRunner
+        // dari androidx.test, dibutuhkan supaya app/src/androidTest bisa dieksekusi lewat
+        // `./gradlew connectedAndroidTest` (device/emulator fisik) atau job CI baru di
+        // .github/workflows/build.yml. Tidak berlaku sama sekali utk build release biasa —
+        // murni metadata utk target test task, nol dampak ke APK yang di-Release.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -231,4 +238,16 @@ dependencies {
     // instance via bytecode proxying instead of calling into the stubbed platform class, so
     // test fixtures that need *a* Uri (without caring what it resolves to) can get one safely.
     testImplementation("org.mockito:mockito-core:5.12.0")
+
+    // Batch 103 (Gap List #2) — src/androidTest, BEDA dari src/test di atas: ini jalan di
+    // device/emulator sungguhan (bukan pure-JVM), lewat `./gradlew connectedAndroidTest` atau
+    // job CI baru "instrumentation-tests" di .github/workflows/build.yml (emulator, job
+    // TERPISAH dari job release `build` — release tidak pernah ikut gagal kalau job ini
+    // flaky/lambat). Baru ditambah sekarang justru karena kebutuhannya sudah ada: menguji
+    // MediaController sungguhan bicara ke PlaybackService sungguhan (play/pause/seek/skip/
+    // repeat/shuffle) butuh Android runtime beneran, bukan sesuatu yang bisa disimulasikan
+    // pure-JVM seperti test di atas.
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.1")
+    androidTestImplementation("androidx.test:core:1.6.1")
 }

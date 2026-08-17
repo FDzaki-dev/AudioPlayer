@@ -6,6 +6,61 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 103 (Gap List #2 — Integration/device testing playback, 9 file — 5 baru + 2 diedit + 2
+asset biner baru, 2 protected, Atomic Change)** — Item P0 kedua di `AudioPlayer_Coding_Gap_List.
+md`. Proyek ini sebelumnya 0% instrumentation test (cuma `app/src/test`, pure-JVM) — lihat
+komentar jujur yang sudah ada di `app/build.gradle.kts` sebelum batch ini ("no
+Robolectric/instrumentation... cheap enough to actually get written").
+
+1. **`app/src/androidTest/` (baru)** — `PlaybackServiceTestHelper.kt`: sambungkan
+`MediaController` sungguhan ke `PlaybackService` sungguhan (bukan fake/mock), lewat
+`runOnMainSync` (wajib — `MediaController.Builder` butuh thread berlooper) + listener+latch
+(bukan blocking `.get()` di main thread — itu deadlock, main thread yg justru harus proses
+handshake koneksinya sendiri). `PlaybackTransportTest.kt`: 7 test — play/pause, seek, next,
+previous, repeat-off/all/one (repeat-one betul2 nunggu lewat durasi asli track, bukan cuma cek
+setter), shuffle toggle. Queue test pakai 2 file WAV SINTETIS (`test_tone_a.wav` 440Hz/3s,
+`test_tone_b.wav` 660Hz/2s, dibuat lewat `wave` stdlib Python, nol isu hak cipta, nol network) —
+disalin dari asset test APK ke `cacheDir` app lalu diputar via `file://` (BUKAN `asset:///`, krn
+`asset:///` resolve ke Context ExoPlayer yg sedang jalan sungguhan di `PlaybackService` — itu
+Context APP, bukan Context test APK, jadi tidak akan pernah ketemu file di
+`androidTest/assets/`).
+
+2. **`app/build.gradle.kts` (protected, edit parsial)** — `testInstrumentationRunner` baru
+(sebelumnya tidak ada sama sekali) + 3 `androidTestImplementation` (`androidx.test.ext:junit`,
+`androidx.test:runner`, `androidx.test:core`). `Futures`/`MoreExecutors`/`ListenableFuture` dari
+`com.google.common.util.concurrent` TIDAK perlu dependency baru — sudah terbukti kompail lewat
+`PlaybackService.kt` yang sudah ada, androidTest source set otomatis warisi classpath `main`
+(perilaku AGP standar utk androidTest 1-modul, bukan modul terpisah).
+
+3. **`.github/workflows/build.yml` (protected)** — job baru `instrumentation-tests`, SENGAJA
+paralel/independen (tanpa `needs:` ke job `build`) — emulator flaky/lambat tidak pernah
+menghalangi publish GitHub Release. `reactivecircus/android-emulator-runner@v2`, API 30 (bukan
+35/36 — `compileSdk`/`targetSdk` app ini sendiri masih 34, menyasar API di atas itu tidak
+mengetes apa pun yg app-nya belum menyasar), pakai `gradle` bukan `./gradlew` (proyek ini belum
+punya Gradle Wrapper — gap list item #19, batch terpisah).
+
+4. **`MANUAL_QA_CHECKLIST.md` (baru, root)** — item yang JUJUR tidak bisa diotomasi berarti lewat
+emulator CI standar: audio focus (panggilan telepon/duck), Bluetooth (media output
+switch/tombol fisik), lock-screen & notification controls, headset kabel, process death di
+device fisik, background playback jangka panjang, Android 15/16-spesifik (ditandai eksplisit
+"belum bisa diuji berarti" krn app belum menyasar SDK itu).
+
+**Sengaja BELUM digarap** (dicatat, bukan terlewat):
+- Audio focus/Bluetooth/lock-screen/notification/headset fisik — lihat `MANUAL_QA_CHECKLIST.md`,
+alasannya di situ.
+- Android 15/16 behavior testing — butuh naikkan `targetSdk` dulu (protected, berisiko tinggi
+tersendiri), batch terpisah.
+- CI job baru menambah runner-minutes tiap push (trade-off disadari, dicatat di
+`CHANGELOG.md` — bisa diubah ke `workflow_dispatch` manual kalau terasa berat).
+- Belum pernah benar-benar dijalankan (tidak ada akses emulator/device di sesi kerja ini) —
+confidence berdasar pola resmi Media3/androidx.test yang sudah lama stabil + `Futures`/
+`MoreExecutors` yang sudah terbukti kompail di file lain proyek ini, BUKAN dari eksekusi CI
+aktual. Titik paling mungkin gagal pertama kali: `reactivecircus/android-emulator-runner`
+konfigurasi KVM di runner GitHub yg bisa berubah kebijakannya, atau `gradle connectedDebug
+AndroidTest` butuh task name persis sesuai `applicationId`/variant proyek ini.
+
+Detail lengkap: `CHANGELOG.md` Batch 103.
+
 **Batch 102 (Gap List #1 — True Crossfade, 4 file — 1 baru + 3 diedit, 1 protected)** — Dari
 `AudioPlayer_Coding_Gap_List.md` yang user upload, item P0 pertama di daftar prioritas. "Fade
 Halus" sebelumnya BUKAN crossfade sungguhan — cuma satu ExoPlayer yang volume-nya dilandaikan
