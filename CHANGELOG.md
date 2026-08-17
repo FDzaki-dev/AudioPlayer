@@ -1,5 +1,57 @@
 # Changelog
 
+## Batch 114 — Gap List #9: Library/database consistency
+Audit checklist #9 terhadap arsitektur nyata app ini: tidak ada Room/SQL sama sekali — library
+selalu live-query `MediaStore` (`MusicRepository.getAllSongs()`, fresh tiap panggilan, tidak ada
+tabel lokal yang bisa basi) + folder tambahan via SAF (`CustomFolderScanner`, juga stateless per
+scan), digabung dengan `dedupeSignature()` di `refreshLibrary()`. Konsekuensinya, 2 sub-item
+checklist (**duplicate song record**, **rescan idempotent**) sudah aman by construction — tidak
+ada state inkremental yang bisa drift, tiap refresh menghasilkan snapshot ulang dari nol. Dedup
+SAF-vs-MediaStore sendiri sudah diverifikasi benar di Batch 106, dicek ulang di sini tanpa
+perubahan.
+
+Gap nyata ada di 2 sub-item lain: **"bersihkan item yang sudah dihapus"** dan **"pastikan
+playlist/favorite/history tidak menunjuk entity yang sudah hilang"**. Sebelum batch ini, tidak
+ada mekanisme apa pun untuk itu — `FavoritesStore`/`RatingStore`/`PlaylistStore` cuma pernah
+ditulis/dibaca lewat aksi user langsung, tidak pernah divalidasi ulang terhadap library yang
+sesungguhnya. Kalau sebuah file favorit dihapus/dipindah dari storage, ID-nya numpuk selamanya di
+SharedPreferences — tidak salah secara fungsional (UI yang me-lookup by ID otomatis tidak
+menampilkannya lagi), tapi tetap dead weight yang tidak pernah dibersihkan, dan `playlist.songIds.size`
+jadi tidak lagi mencerminkan jumlah lagu yang benar-benar bisa diputar.
+
+**3 file store (edit parsial, masing-masing 1 fungsi baru `pruneOrphans(validIds: Set<Long>)`)**:
+1. **`FavoritesStore.kt`** — filter `getFavorites()` terhadap `validIds`, tulis ulang hanya kalau
+   ukurannya berubah (no-op write kalau semua masih valid).
+2. **`RatingStore.kt`** — beda pola penyimpanan dari Favorites (per-song key `rating_<id>`, bukan
+   1 Set), jadi enumerasi `prefs.all.keys`, buang key yang prefix-nya cocok tapi ID-nya tidak ada
+   di `validIds` atau gagal parse.
+3. **`PlaylistStore.kt`** — filter `songIds` tiap playlist terhadap `validIds`, `save()` hanya
+   kalau hasil filter beda dari sebelumnya (`Playlist` data class, perbandingan list by value).
+   **Playlist itu sendiri TIDAK ikut terhapus** walau `songIds`-nya jadi kosong — nama yang user
+   pilih sendiri, kosong bukan alasan untuk menghilangkannya tanpa izin eksplisit (konsisten
+   dengan aturan "Strict Delete Guard").
+
+**`PlayerViewModel.kt` (edit parsial)** — `refreshLibrary()`, tepat setelah
+`_librarySongs.value = songs` di dalam guard `generation == libraryRefreshGeneration` yang sudah
+ada (supaya prune selalu berjalan terhadap hasil scan TERBARU, bukan scan basi yang sudah
+di-cancel): hitung `validIds` dari `songs.map { it.id }`, panggil ketiga `pruneOrphans()` di atas,
+lalu `_playlists.value = playlistStore.getPlaylists()` supaya UI playlist ikut ter-refresh kalau
+memang ada yang berubah.
+
+**Sengaja TIDAK diterapkan ke `listeningHistoryStore`/`playStatsStore`**: keduanya catatan
+historis ("pernah diputar tanggal X", dipakai fitur Kilas Balik/Stats Dashboard), bukan pointer
+state-saat-ini seperti favorite/rating/playlist. Dangling ID di situ semantiknya wajar (riwayat
+tetap riwayat walau filenya sudah tidak ada) dan aman — kalau user coba putar ulang dari Kilas
+Balik untuk lagu yang sudah hilang, itu sudah tertangani rapi oleh kategorisasi error Batch 113,
+bukan sesuatu yang perlu "dibersihkan" duluan.
+
+Brace/paren ke-4 file dicek seimbang. **Belum diverifikasi compile/runtime Gradle sungguhan** —
+tidak ada JDK/Android SDK di sandbox kerja. Verifikasi berikutnya (butuh push + build + device
+fisik): favoritkan/beri rating/masukkan ke playlist sebuah lagu, hapus file-nya langsung dari
+File Manager (bukan lewat app), buka lagi app / trigger refresh library, pastikan favorit &
+rating lagu itu hilang dari daftar dan `songIds` playlist berkurang — tanpa playlist itu sendiri
+ikut hilang.
+
 ## Batch 113 — Gap List #8: Playback error recovery
 Checklist Gap List #8 diaudit terhadap `onPlayerError` (`PlayerViewModel.kt`). Sebelumnya: 1
 pesan generik untuk SEMUA jenis error, auto-skip ke track berikut tanpa batas apa pun selama

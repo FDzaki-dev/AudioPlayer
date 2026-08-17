@@ -101,6 +101,17 @@ class PlaylistStore(context: Context) {
         )
     }
 
+    /** Gap List #9 — a playlist entry pointing at a deleted/moved file is dead weight (not a
+     *  record worth keeping, unlike listening history): it inflates the displayed song count
+     *  and would just hit "file tidak ditemukan" (Batch 113) the moment it's played. Only
+     *  song IDs are pruned, never the playlist itself — an empty playlist is still a playlist
+     *  the user named on purpose. No-op (no write) if nothing was actually stale. */
+    fun pruneOrphans(validIds: Set<Long>) {
+        val playlists = getPlaylists()
+        val cleaned = playlists.map { it.copy(songIds = it.songIds.filter { id -> id in validIds }) }
+        if (cleaned != playlists) save(cleaned)
+    }
+
     companion object {
         private const val PREFS_NAME = "playlists"
         private const val KEY_PLAYLISTS = "playlists_json"

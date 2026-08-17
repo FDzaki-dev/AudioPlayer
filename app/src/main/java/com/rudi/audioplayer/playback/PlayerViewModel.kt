@@ -641,6 +641,18 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 // older, slower scan overwrite the newer result.
                 if (generation == libraryRefreshGeneration) {
                     _librarySongs.value = songs
+                    // Gap List #9 — orphan cleanup: favorites/ratings/playlist entries pointing
+                    // at a song no longer in the freshly-scanned library are dead weight (file
+                    // deleted/moved/permission revoked). Deliberately NOT applied to
+                    // listeningHistoryStore/playStatsStore — those are historical records ("you
+                    // played this on this date"), not current-state pointers, so a dangling ID
+                    // there is expected and fine (replaying it just surfaces Batch 113's error
+                    // message, not a crash). Each prune is a no-op write if nothing was stale.
+                    val validIds = songs.mapTo(mutableSetOf()) { it.id }
+                    favoritesStore.pruneOrphans(validIds)
+                    ratingStore.pruneOrphans(validIds)
+                    playlistStore.pruneOrphans(validIds)
+                    _playlists.value = playlistStore.getPlaylists()
                 }
             } catch (e: CancellationException) {
                 throw e

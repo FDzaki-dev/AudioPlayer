@@ -17,6 +17,23 @@ class RatingStore(context: Context) {
         }
     }
 
+    /** Gap List #9 — same reasoning as `FavoritesStore.pruneOrphans`: a star rating for a
+     *  deleted file is dead weight, not a record worth keeping. Keys are per-song
+     *  (`rating_<id>`), so this enumerates `prefs.all` rather than a single stored set. */
+    fun pruneOrphans(validIds: Set<Long>) {
+        val editor = prefs.edit()
+        var changed = false
+        for (key in prefs.all.keys) {
+            if (!key.startsWith(KEY_PREFIX)) continue
+            val id = key.removePrefix(KEY_PREFIX).toLongOrNull()
+            if (id == null || id !in validIds) {
+                editor.remove(key)
+                changed = true
+            }
+        }
+        if (changed) editor.apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "ratings"
         private const val KEY_PREFIX = "rating_"

@@ -6,6 +6,23 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 114 (Gap List #9 — Library/database consistency, 4 file diedit)** — Audit checklist #9:
+app ini tidak pakai Room/SQL (murni MediaStore live-query + SharedPreferences/JSON stores), jadi
+"duplicate song record" & "rescan idempotent" SUDAH aman by construction (`getAllSongs()` selalu
+query fresh, dedup SAF-vs-MediaStore via `dedupeSignature()` sudah dicek benar sejak Batch 106,
+diverifikasi ulang — 0 perubahan di situ). Gap nyata: "bersihkan item yang sudah dihapus" +
+"playlist/favorite tidak menunjuk entity yang sudah hilang" — belum ada mekanisme apa pun,
+favorit/rating/playlist-entry untuk file yang dihapus/dipindah numpuk selamanya di storage,
+tidak pernah dibersihkan. **`FavoritesStore.kt`/`RatingStore.kt`/`PlaylistStore.kt`** masing-
+masing dapat `pruneOrphans(validIds: Set<Long>)` (no-op write kalau tidak ada yang stale).
+Dipanggil dari **`PlayerViewModel.kt`**'s `refreshLibrary()`, tepat setelah `_librarySongs.value`
+diisi hasil scan terbaru. **Sengaja TIDAK diterapkan** ke `listeningHistoryStore`/`playStatsStore`
+— itu catatan historis ("pernah diputar tanggal X"), bukan pointer state-saat-ini, dangling ID di
+situ wajar & aman (replay lagu yang sudah hilang cukup ditangani pesan error Batch 113, bukan
+dihapus riwayatnya). Playlist yang jadi kosong akibat prune TETAP dipertahankan sebagai playlist
+(bukan ikut terhapus) — nama yang user pilih sendiri. Brace/paren 4 file dicek seimbang. **Belum
+diverifikasi compile/runtime Gradle sungguhan**. Detail lengkap: `CHANGELOG.md` Batch 114.
+
 **Batch 113 (Gap List #8 — Playback error recovery, 1 file diedit)** — Audit
 `onPlayerError` (`PlayerViewModel.kt`) vs checklist #8: sebelumnya 1 pesan generik untuk semua
 jenis error ("file mungkin dihapus atau rusak") + auto-skip tanpa batas kalau `hasNextMediaItem()`
