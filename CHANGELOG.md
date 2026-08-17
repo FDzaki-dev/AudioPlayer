@@ -38,10 +38,24 @@ diubah. **Pelajaran: gaya ringkas `fun x(): T = ...` menggoda dipakai untuk func
 apa pun, tapi begitu isinya butuh early-return di tengah jalan, wajib block body — cek pola ini
 saat menulis, jangan nunggu ketahuan dari CI log.**
 
+### Fix2 — Crash device sungguhan (`crash_20260817_111602`, Android 15, Infinix X6850)
+`IllegalStateException: MediaController method is called from a wrong thread`, thread
+`DefaultDispatcher-worker-2` — terjadi berulang tiap ~5 detik selama playback (checkpoint
+interval `persistPlaybackState()`). Root cause: `c.repeatMode`/`c.shuffleModeEnabled` (field
+baru Fix ini) dibaca DI DALAM `viewModelScope.launch(Dispatchers.IO)`, bukan di main thread
+seperti `songIds`/`positionMs`/`index` yang sudah lama benar. `MediaController` melempar
+exception ini kalau method-nya dipanggil dari thread mana pun selain thread yang membuat
+controller (main). Fix: `repeatMode`/`shuffleEnabled` dibaca sebagai `val` lokal di main thread
+tepat SEBELUM `launch(Dispatchers.IO)`, dikirim ke `save()` sebagai parameter biasa — pola
+sekarang identik dengan field lama, tidak ada lagi akses `MediaController` di dalam lambda
+background dispatcher manapun di fungsi ini.
+
+Crash nyata pertama proyek ini yang ketahuan lewat crash logger (Batch 22) sejak fitur itu ada.
 Belum diverifikasi compile/runtime Gradle sungguhan setelah fix ini (tidak ada JDK/Android
 SDK/kotlinc di sandbox kerja). Prioritas verifikasi berikutnya: build APK asli, matikan app
 total dengan shuffle ON + repeat-one aktif, buka lagi, pastikan keduanya genuinely kepulihkan
-di UI dan `MediaController` — bukan cuma diverifikasi lewat baca kode.
+di UI dan `MediaController`, DAN tidak ada crash log baru muncul selama playback berjalan lebih
+dari beberapa menit.
 
 ## Batch 107 — Bersihkan tag & judul GitHub Release
 2 file (1 protected). Permintaan langsung user dari screenshot halaman Releases repo: (1) tag

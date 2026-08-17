@@ -27,10 +27,28 @@ di block body. Diperbaiki: `fun load(): T? { return try { ... } catch { ... } }`
 eksplisit, `return` di dalam try/catch sah. **Pelajaran: `return` awal (early-return) di dalam
 body tidak boleh dicampur dengan gaya singkat `fun x() = ...` (expression body) sependek apa
 pun, meski tanpa early-return sah-sah saja — cek pola ini SEBELUM push tiap kali menulis
-function baru bergaya ringkas.** Belum diverifikasi CI run berikutnya (belum ada akses GitHub
-Actions di sandbox ini) — prioritas berikutnya kalau user push ulang: pastikan compile hijau,
-lalu matikan app dengan shuffle/repeat-one aktif, buka lagi, pastikan keduanya genuinely
-kepulihkan (bukan cuma baca kode). Detail lengkap: `CHANGELOG.md` Batch 108.
+function baru bergaya ringkas.**
+
+**Push kedua crash di device sungguhan (crash log `crash_20260817_111602`, Android 15, Infinix
+X6850)** — `IllegalStateException: MediaController method is called from a wrong thread`, thread
+`DefaultDispatcher-worker-2`. Root cause: fix Batch 108 sendiri (repeat/shuffle persistence)
+salah taruh `c.repeatMode`/`c.shuffleModeEnabled` DI DALAM `viewModelScope.launch(Dispatchers.IO)`
+— MediaController wajib diakses dari thread yang membuatnya (main), method apa pun yang dipanggil
+dari thread lain melempar exception ini. `songIds`/`positionMs`/`currentMediaItemIndex` sudah
+lama benar dibaca DI LUAR coroutine (di main thread) sebelum `launch`; 2 field baru Batch 108
+tidak ikut pola yang sama. Fix: `repeatMode`/`shuffleEnabled` dibaca sebagai `val` di main thread
+tepat sebelum `launch(Dispatchers.IO)`, lalu dikirim sebagai parameter biasa — pola identik
+dengan field lama. **Pelajaran: SETIAP kali menambah field baru yang sumbernya `MediaController`
+ke dalam blok yang sebagian jalan di background dispatcher, wajib baca nilainya DI LUAR blok
+`launch` itu dulu — jangan asumsikan aman cuma karena field lain di file yang sama sudah benar,
+tiap penambahan baru harus dicek pola threading-nya sendiri.** Ini crash nyata pertama proyek
+ini yang ketahuan lewat crash logger (Batch 22) sejak logger itu ada — kena tiap ~5 detik selama
+playback jalan (checkpoint interval), jadi dampaknya besar meski baru 1 device yang melaporkan.
+
+Belum diverifikasi compile Gradle sungguhan setelah fix ini — prioritas berikutnya kalau user
+push ulang: pastikan compile hijau, lalu matikan app dengan shuffle/repeat-one aktif, buka lagi,
+pastikan keduanya genuinely kepulihkan (bukan cuma baca kode) DAN tidak ada crash log baru
+selama playback berjalan lebih dari beberapa menit. Detail lengkap: `CHANGELOG.md` Batch 108.
 
 **Batch 107 (Permintaan user langsung dari screenshot GitHub Releases — bersihkan tag & judul
 rilis, 2 file, 1 protected)** — 2 hal: (1) hapus `-release` dari tag/nama file APK (sudah punya

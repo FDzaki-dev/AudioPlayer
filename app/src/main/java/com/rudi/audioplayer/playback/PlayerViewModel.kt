@@ -708,13 +708,23 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val positionMs = c.currentPosition.coerceAtLeast(0)
         val currentSongId = currentQueue.getOrNull(index)?.id
         val speed = _uiState.value.playbackSpeed
+        // Batch 108 fix2 (crash log 20260817_111602) — `c.repeatMode`/`c.shuffleModeEnabled`
+        // WAJIB dibaca di sini, di main thread, sebelum masuk `launch(Dispatchers.IO)`.
+        // MediaController melempar IllegalStateException ("called from a wrong thread") kalau
+        // method-nya diakses dari thread mana pun selain thread yang membuatnya (main) — sama
+        // seperti `currentPosition`/`currentMediaItemIndex` di atas yang sudah lama benar
+        // dibaca di luar coroutine. Repeat/shuffle (ditambah Batch 108) sempat salah taruh di
+        // DALAM lambda IO, jadi ikut girang dieksekusi di background thread pool tiap checkpoint
+        // ~5 detik — crash nyata pertama app ini yang ketahuan lewat crash logger sejak Batch 22.
+        val repeatMode = c.repeatMode
+        val shuffleEnabled = c.shuffleModeEnabled
         viewModelScope.launch(Dispatchers.IO) {
             playbackStateStore.save(
                 songIds = songIds,
                 index = index,
                 positionMs = positionMs,
-                repeatMode = c.repeatMode,
-                shuffleEnabled = c.shuffleModeEnabled
+                repeatMode = repeatMode,
+                shuffleEnabled = shuffleEnabled
             )
             // Roadmap #12 (Batch 93) — no-ops internally if this song was never opted into
             // audiobook mode, so it's safe to call unconditionally at the same cadence as the
