@@ -1,5 +1,75 @@
 # Changelog
 
+## Batch 119 — Roadmap #14: Vault Lagu Privat (PIN-gated song vault)
+Item "Sangat disarankan" berikutnya dari `ROADMAP_15_FITUR_OFFLINE.md` — Sedang/Rendah risiko,
+infrastruktur PIN (`AppLockStore`/`PinLockoutPolicy`) dan pola filter-tampilan
+(`LibraryFilterStore`) sudah ada tinggal diikuti polanya, sesuai catatan roadmap sendiri.
+
+**`VaultStore.kt`** (baru, `data/`) — PIN mgmt INDEPENDEN dari `AppLockStore` (prefs `vault`
+sendiri, hash/salt/fail-count/lockout sendiri) — bukan reuse `AppLockStore` dengan prefs name
+beda, supaya app-lock dan vault-lock 100% tidak bisa saling kontaminasi state, dan supaya user
+bisa punya app tidak terkunci tapi lagu tertentu tetap terkunci (atau sebaliknya) tanpa
+keduanya saling terikat. Formula lockout escalating TETAP dipakai bersama lewat
+`PinLockoutPolicy` (sudah `internal object` murni Context-free, memang dibuat untuk reuse ini),
+cuma plumbing hash/storage-nya yang diduplikasi (~15 baris). Juga simpan `Set<Long>` ID lagu
+yang divault + `pruneOrphans(validIds)` (pola sama persis `FavoritesStore`/`RatingStore`, Gap
+List #9) + `apply(songs)` — one-liner exclude vaulted, dirantai di call site yang sama seperti
+`LibraryFilterStore.apply()` sudah dipasang.
+
+**`VaultSheet.kt`** (baru, `ui/`) — 3 state: belum ada PIN (form setup 6 digit + konfirmasi,
+pola sama `SetPinDialog` di `SettingsScreen.kt`) → ada PIN tapi belum unlock sesi ini (form PIN
++ countdown lockout live via `LaunchedEffect`+`delay(1000)`, pola sama `LockScreen.kt`) → sudah
+unlock (list lagu vaulted + tombol "Keluarkan" per lagu, tombol "Tambah" buka dialog picker
+cari-lalu-tap dari SELURUH lagu library yang belum divault, tombol "Nonaktifkan Vault" dengan
+`AlertDialog` konfirmasi eksplisit — jelas menyebut jumlah lagu yang akan kembali normal).
+State unlock sengaja session-only (`remember` biasa, bukan disimpan) — sheet dibuang & PIN
+diminta lagi tiap kali dibuka ulang, konsisten dengan "vault" yang namanya memang untuk dibuka-
+tutup sengaja, bukan status permanen. **MVP disengaja, dicatat jujur**: sheet ini murni
+manajemen keanggotaan (tambah/keluarkan), TIDAK ada tombol putar langsung dari sini — memutar
+lagu yang divault berarti mengeluarkannya dulu. Menahan scope ini menghindari perlu
+menyambungkan sheet ke `MediaController`/`PlayerViewModel` penuh di batch pertamanya; kandidat
+polish lanjutan kalau diminta.
+
+**`HomeScreen.kt`/`LibraryScreen.kt`** (diedit) — `VaultStore(context).apply(...)` dirantai
+SETELAH `LibraryFilterStore(context).apply(rawSongs)` yang sudah ada di kedua titik filter
+utama (1 baris tiap file). Sengaja TIDAK menyentuh `LibraryFilterStore.kt` sama sekali —
+`LibraryFilterStoreTest.kt` yang sudah ada (4 test) tetap valid tanpa perlu ditinjau ulang,
+dan 2 store tetap independen (vault bisa nonaktif total tanpa mempengaruhi hidden-folder/
+hidden-song sama sekali). **Batasan jujur**: Vault dikelola dari Settings, bukan dari
+Home/Library — perubahan keanggotaan vault baru tercermin di kedua layar itu begitu
+`remember(rawSongs, ...)`-nya re-run (navigasi ulang ke layar itu), bukan live sinkron seketika
+selagi kedua layar itu tetap terbuka di background. Kelas keterbatasan yang sama sudah diterima
+project ini untuk penulisan lintas-store lain (lihat Batch 115, Backup/Restore).
+
+**`SettingsScreen.kt`** (diedit) — 1 row menu baru "Vault Lagu Privat" (pola identik "Deteksi
+File Duplikat" tepat di atasnya) + render `VaultSheet`. **0 param baru** ke fungsi
+`SettingsScreen(...)` — `songs: List<Song>` sudah ada dari Batch 117 (Duplicate Detection),
+dipakai ulang apa adanya sebagai daftar kandidat lagu untuk ditambahkan ke vault.
+
+**`PlayerViewModel.kt`** (diedit) — `vaultStore` field baru + `vaultStore.pruneOrphans(validIds)`
+dipanggil di `refreshLibrary()` tepat di sebelah `favoritesStore.pruneOrphans`/
+`ratingStore.pruneOrphans`/`playlistStore.pruneOrphans` yang sudah ada (Gap List #9 precedent).
+
+**`README.md`** — 1 baris fitur baru ditambah ke daftar Fitur v1 (persis di bawah Tag Editor,
+area privasi/manajemen lagu) + banner "Update terbaru" disinkronkan ke Batch 119 (sebelumnya
+masih menunjuk Batch 100 — staleness lama pre-existing, cuma baris ini yang disentuh, bukan
+audit penuh seluruh README).
+
+**`ROADMAP_15_FITUR_OFFLINE.md`** — item #14 ditandai ✅ SELESAI + catatan implementasi + baris
+tabel prioritas.
+
+6 file kode disentuh (2 baru + 4 diedit), 0 protected asset. Brace/paren semua file kode dicek
+otomatis & seimbang. `FILE_MANIFEST.txt` diperbarui (158→160, 2 file baru) sebelum repack, bukan
+cuma dicek di folder kerja. **Belum diverifikasi compile/runtime Gradle sungguhan** (tidak ada
+JDK/Android SDK/kotlinc di sandbox ini, konsisten sama semua batch sebelumnya) — prioritas
+berikutnya kalau user push: (1) `./gradlew assembleDebug` build bersih, (2) di device: atur PIN
+vault, tambah 1 lagu ke vault, konfirmasi lagu itu genuinely hilang dari Beranda & Library
+(bukan cuma UI vault yang bilang begitu), (3) tutup app / buka ulang sheet Vault, pastikan PIN
+diminta lagi (session-only by design, bukan bug kalau memang minta ulang), (4) coba PIN salah
+5x berturut-turut, pastikan lockout & countdown-nya jalan sama seperti App Lock, (5) nonaktifkan
+vault, pastikan SEMUA lagu yang tadi divault kembali normal di Beranda/Library tanpa perlu
+restart app.
+
 ## Batch 118 — Gap List "Wajib" #1: Tag/Metadata Editor (MVP: MediaStore + MP3)
 Item terakhir dari 4 "Wajib" yang REALISTIS dikerjakan di lingkungan kerja ini (Gradle Wrapper
 butuh `gradle-wrapper.jar` biner, Release Lint Gate butuh baseline lint sungguhan — keduanya

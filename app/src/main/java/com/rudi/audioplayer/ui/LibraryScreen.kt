@@ -77,6 +77,7 @@ import com.rudi.audioplayer.data.RatingStore
 import com.rudi.audioplayer.data.SearchHistoryStore
 import com.rudi.audioplayer.data.SmartPlaylist
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.data.VaultStore
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toPersistentSet
@@ -111,6 +112,7 @@ fun LibraryScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val filterStore = remember { LibraryFilterStore(context) }
+    val vaultStore = remember { VaultStore(context) }
     val ratingStore = remember { RatingStore(context) }
     val hintStore = remember(context) { OnboardingHintStore(context) }
     var showLibraryHint by remember { mutableStateOf(!hintStore.hasSeenLibraryHint()) }
@@ -137,7 +139,11 @@ fun LibraryScreen(
         if (selectedIds.isEmpty()) selectionMode = false
     }
 
-    val songs = remember(rawSongs, filterVersion) { filterStore.apply(rawSongs) }
+    // Roadmap #14 — vaulted songs excluded here the same way as hidden ones; the Vault itself
+    // is managed from Settings, so this list won't reflect a vault change made there until this
+    // screen is re-entered (remember block re-runs on remount) — same class of staleness the
+    // project already accepts for other cross-screen store writes (see Backup/Restore, Batch 115).
+    val songs = remember(rawSongs, filterVersion) { vaultStore.apply(filterStore.apply(rawSongs)) }
 
     val folderSummaries = remember(rawSongs, filterVersion) {
         val excluded = filterStore.getExcludedFolders()

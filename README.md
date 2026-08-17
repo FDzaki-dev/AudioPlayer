@@ -8,11 +8,9 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 100:** Floating Mini Player sekarang bisa di-minimize ke tepi
-> layar (chat-head style, bukan di-close), nyala otomatis begitu playback mulai dari widget/
-> notifikasi/headset TANPA perlu buka app dulu, dan punya Quick Settings Tile sendiri buat
-> toggle cepat dari shade. Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling
-> atas).
+> 🆕 **Update terbaru — Batch 119:** Vault Lagu Privat baru — sembunyikan lagu total dari
+> Beranda/Library di balik PIN 6 digit sendiri (Roadmap #14). Riwayat lengkap ada di
+> `CHANGELOG.md` (selalu terbaru di paling atas).
 
 > **Mulai dari sini kalau ini sesi/percakapan baru:** baca `PROJECT_STATE.md` (status +
 > riwayat insiden ringkas), `CHANGELOG.md` (histori tiap batch), dan bagian "Keputusan
@@ -50,6 +48,7 @@ memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 - **Playlist Otomatis (Smart Playlist)**: berbeda dari playlist manual — atur aturan sekali (folder, genre, rentang durasi, rating minimum, rentang tahun rilis, kata kunci judul/artis/album), lagu yang cocok (termasuk lagu baru yang ditambahkan belakangan) otomatis ikut masuk tanpa perlu diisi manual. Tersedia di tab "Otomatis" pada Perpustakaan (dropdown "Lainnya")
 - **Genre metadata**: dibaca dari tabel `Genres`/`Genres.Members` MediaStore (satu map id→nama dibangun sekali per scan, bukan query per-lagu) untuk lagu MediaStore, dan dari tag file langsung untuk lagu folder tambahan (SAF). Ikut dalam pencarian Perpustakaan & tersedia sebagai kriteria exact-match Playlist Otomatis
 - **Edit Info Lagu (Tag Editor)**: tulis balik metadata (judul/artis/album/artis album/genre/komposer/no. track/no. disc) langsung ke file — tersedia lewat "Kontrol Lanjutan" di Now Playing. **Cakupan MVP saat ini**: lagu MediaStore format MP3 saja (lihat "Belum selesai / dalam pengerjaan" untuk batasan format lain & lagu folder tambahan)
+- **Vault Lagu Privat**: Pengaturan → "Vault Lagu Privat" — sembunyikan lagu tertentu TOTAL dari Beranda/Library (beda dari "sembunyikan lagu" biasa yang murni toggle tampilan), dilindungi PIN 6 digit sendiri (independen dari PIN Kunci Aplikasi, hash+salt+lockout escalating sama seperti itu). Tambah/keluarkan lagu dari sheet Vault sendiri; nonaktifkan vault otomatis mengembalikan semua lagu ke tampilan normal (file fisik tidak pernah disentuh). **Cakupan MVP**: murni manajemen keanggotaan, belum ada tombol putar langsung dari sheet Vault (keluarkan dulu dari vault untuk memutar)
 - **Statistik Dengar**: dashboard di Pengaturan → "Statistik Dengar" — total lagu diputar, estimasi waktu dengar (durasi × jumlah putar), grafik tren 7 hari terakhir, jam favorit dengar musik (dari 24 jam-dalam-hari, seluruh riwayat), dan artis paling sering. Semua dihitung langsung dari data yang sudah dikumpulkan (`PlayStatsStore`/`ListeningHistoryStore`), plus 1 pencatat baru (`HourlyListenStore`) khusus untuk jam favorit
 - **Repeat A-B & Bookmark Posisi**: dari Now Playing → Kontrol Lanjutan → "Repeat A-B & Bookmark". Tandai Titik A & B untuk mengulang satu bagian lagu terus-menerus (latihan musik/bahasa, podcast/audiobook) — direset otomatis tiap ganti lagu. Bookmark Posisi menandai beberapa titik favorit per-lagu (intro/reff/solo dll, diberi nama sendiri) untuk lompat cepat kapan pun, tersimpan permanen per lagu
 - **Lirik**: tambahkan lirik sendiri per lagu (tempel teks biasa, atau format LRC `[mm:ss.xx]` untuk lirik yang otomatis mengikuti posisi putar dan auto-scroll)

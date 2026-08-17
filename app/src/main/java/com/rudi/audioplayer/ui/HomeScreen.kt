@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.LibraryFilterStore
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.data.VaultStore
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
@@ -47,7 +48,11 @@ fun HomeScreen(
     onShuffleAll: (List<Song>) -> Unit
 ) {
     val context = LocalContext.current
-    val songs = remember(rawSongs) { LibraryFilterStore(context).apply(rawSongs) }
+    // Roadmap #14 — vaulted songs are excluded here the same one-line way hidden songs already
+    // are; VaultStore.apply is a no-op pass-through whenever the vault is empty/unused.
+    val songs = remember(rawSongs) {
+        VaultStore(context).apply(LibraryFilterStore(context).apply(rawSongs))
+    }
 
     val continueSong = remember(songs) { if (songs.isEmpty()) null else resumePreview(songs) }
     val favoriteSongs = remember(songs, favoriteIds) { songs.filter { favoriteIds.contains(it.id) } }

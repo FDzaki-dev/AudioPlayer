@@ -200,7 +200,7 @@ sebagai file baru.
   sebelum eksekusi, termasuk cek lisensi library encoder yang dipakai (beberapa encoder MP3
   historically ada isu paten/lisensi, walau sudah expired di kebanyakan yurisdiksi sejak 2017).
 
-## 14. Vault — Kunci & Sembunyikan Lagu Privat
+## 14. Vault — Kunci & Sembunyikan Lagu Privat ✅ SELESAI (Batch 119)
 Folder/koleksi terpisah yang dilindungi PIN sendiri (bisa pakai PIN yang sama dengan App Lock
 atau PIN kedua terpisah) untuk menyembunyikan lagu tertentu total dari tampilan Library utama
 — beda dari fitur "Kelola folder → sembunyikan folder" yang sudah ada (itu untuk folder scan,
@@ -211,6 +211,16 @@ ini untuk lagu individual dengan proteksi akses, bukan cuma exclude dari index).
   sudah PBKDF2+salt+lockout) untuk PIN vault, tinggal tambah filter tampilan di
   `LibraryFilterStore` (pola sama seperti `shouldKeep` yang sudah ada, tambah 1 kriteria).
 - **Risiko**: rendah — banyak infrastruktur sudah ada tinggal disambungkan ulang.
+- **Catatan implementasi**: PIN vault dibuat INDEPENDEN dari `AppLockStore` (prefs sendiri,
+  bukan reuse — lihat `VaultStore.kt` KDoc untuk alasan), bukan opsi "pakai PIN App Lock yang
+  sama" seperti disebut deskripsi awal — 2 lock yang boleh beda status (app tidak terkunci,
+  lagu tetap terkunci) lebih aman dipisah total daripada dibuat opsional-sama. Filter tampilan
+  di Home/Library JUSTRU tidak menyentuh `LibraryFilterStore` sama sekali (beda dari perkiraan
+  awal) — `VaultStore.apply()` dipasang terpisah, dirantai di call site yang sama persis
+  seperti `LibraryFilterStore.apply()` sudah dipasang, supaya 2 store tetap independen dan
+  `LibraryFilterStoreTest.kt` yang sudah ada tidak perlu disentuh sama sekali. **MVP**: sheet
+  Vault murni manajemen keanggotaan (tambah/keluarkan lagu), belum ada tombol putar langsung
+  dari situ. Detail lengkap: `CHANGELOG.md` Batch 119.
 
 ## 15. Alarm Musik (Wake-Up Alarm)
 Kebalikan dari Sleep Timer yang sudah ada — alarm yang membunyikan lagu/playlist pilihan
@@ -236,7 +246,7 @@ saran titik mulai kalau user mau eksekusi bertahap:
 | 4 | A-B Repeat & Bookmark | Sedang | Rendah |
 | 2 | Smart Playlist Otomatis | Sedang | Rendah |
 | 12 | Mode Audiobook/Podcast | Sedang | Rendah |
-| 14 | Vault Lagu Privat | Sedang | Rendah |
+| 14 | Vault Lagu Privat ✅ | Sedang | Rendah |
 | 3 | Editor Lirik LRC Tap-to-Sync | Sedang | Rendah |
 | 7 | Cadangan & Pulihkan Data | Sedang | Sedang |
 | 5 | Ringtone Cutter | Sedang | Sedang |

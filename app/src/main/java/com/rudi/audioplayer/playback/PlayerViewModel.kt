@@ -48,6 +48,7 @@ import com.rudi.audioplayer.data.PlaylistStore
 import com.rudi.audioplayer.data.SmartPlaylist
 import com.rudi.audioplayer.data.SmartPlaylistStore
 import com.rudi.audioplayer.data.ThemeStore
+import com.rudi.audioplayer.data.VaultStore
 import com.rudi.audioplayer.data.VisualizerSettingsStore
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
 import com.rudi.audioplayer.ui.theme.ThemeMode
@@ -121,6 +122,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val playStatsStore = PlayStatsStore(appContext)
     private val ratingStore = RatingStore(appContext)
     private val appLockStore = AppLockStore(appContext)
+    private val vaultStore = VaultStore(appContext)
     private val listeningHistoryStore = ListeningHistoryStore(appContext)
     private val hourlyListenStore = HourlyListenStore(appContext)
     private val shakeSettingsStore = ShakeSettingsStore(appContext)
@@ -709,6 +711,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                     favoritesStore.pruneOrphans(validIds)
                     ratingStore.pruneOrphans(validIds)
                     playlistStore.pruneOrphans(validIds)
+                    // Roadmap #14 — same orphan-cleanup precedent (Gap List #9): a vaulted ID
+                    // pointing at a song no longer in the freshly-scanned library is dead
+                    // weight, not a record worth keeping.
+                    vaultStore.pruneOrphans(validIds)
                     _playlists.value = playlistStore.getPlaylists()
                 }
             } catch (e: CancellationException) {

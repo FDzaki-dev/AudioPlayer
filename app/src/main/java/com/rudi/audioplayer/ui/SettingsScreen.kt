@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.SettingsBackupRestore
@@ -76,6 +77,7 @@ fun SettingsScreen(
     var showDiagnosticLog by remember { mutableStateOf(false) }
     var showBackupRestore by remember { mutableStateOf(false) }
     var showDuplicateFinder by remember { mutableStateOf(false) }
+    var showVault by remember { mutableStateOf(false) }
     var showAdvancedSettings by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
@@ -323,6 +325,30 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { showVault = true }
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text("Vault Lagu Privat", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Sembunyikan lagu tertentu total dari Beranda/Library, dilindungi PIN sendiri",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
                     .clickable { showAdvancedSettings = !showAdvancedSettings }
                     .padding(horizontal = 20.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -456,6 +482,13 @@ fun SettingsScreen(
             songs = songs,
             onDismiss = { showDuplicateFinder = false },
             onDeleteSongs = onDeleteSongs
+        )
+    }
+
+    if (showVault) {
+        VaultSheet(
+            songs = songs,
+            onDismiss = { showVault = false }
         )
     }
 }
