@@ -86,6 +86,14 @@ data class PlaybackUiState(
 
 class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
+    companion object {
+        // Gap List #8 — batas berapa kali auto-skip boleh mental beruntun dari error ke error
+        // sebelum berhenti total, bukan angka sembarang: cukup toleran untuk beberapa file
+        // rusak/hilang tersebar di tengah queue (kasus normal), tapi tetap memutus loop kalau
+        // sisa queue ternyata bermasalah semua.
+        private const val MAX_CONSECUTIVE_PLAYBACK_ERRORS = 5
+    }
+
     private var controller: MediaController? = null
     // Batch 78 — fix: onCleared() called `controller?.release()`, which is a no-op if
     // controllerFuture hasn't resolved yet (controller still null at that point — e.g. the
@@ -98,6 +106,13 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private var currentQueue: List<Song> = emptyList()
     private var currentQueueSlotIds: List<Long> = emptyList()
     private var nextQueueSlotId: Long = 0L
+    // Gap List #8 (Playback error recovery) — jaga-jaga terhadap error beruntun (mis. seluruh
+    // sisa queue nunjuk file yang sudah dihapus semua): tanpa batas ini, auto-skip di
+    // onPlayerError bisa mental dari 1 lagu rusak ke lagu rusak berikutnya tanpa henti (silent
+    // infinite loop, tiap iterasi nembak Snackbar error baru). Direset ke 0 begitu playback
+    // beneran jalan lagi (onIsPlayingChanged(true)) — bukan cuma pindah track, harus BENAR
+    // ISPLAYING true.
+    private var consecutiveErrorCount = 0
 
     private fun newSlotIds(count: Int): List<Long> = List(count) { nextQueueSlotId++ }
 
@@ -371,6 +386,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
             if (!isPlaying) persistPlaybackState()
+            // Gap List #8 — sinyal paling jujur bahwa playback beneran pulih (bukan cuma
+            // pindah index): reset counter error beruntun di sini, bukan di
+            // onMediaItemTransition (yang juga terpanggil untuk track yang UJUNG-UJUNGNYA error
+            // lagi sebelum sempat isPlaying=true).
+            if (isPlaying) consecutiveErrorCount = 0
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -448,15 +468,53 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             val index = controller?.currentMediaItemIndex ?: -1
             val song = currentQueue.getOrNull(index)
             val label = song?.let { "${it.title} — ${it.artist}" } ?: "Lagu ini"
-            AppLogger.e("PlayerViewModel", "Playback error pada index=$index ($label)", error)
-            _playbackErrorMessage.value = "$label tidak bisa diputar (file mungkin dihapus atau rusak)."
+            // Gap List #8 — bedakan alasan gagal (file hilang/izin ditolak/format tidak
+            // didukung/rusak/lainnya) alih-alih 1 pesan generik untuk semua kasus; reason
+            // pendek ini juga yang disimpan ke AppLogger untuk diagnostics, bukan cuma stack
+            // trace mentah.
+            val reason = describePlaybackErrorReason(error)
+            AppLogger.e("PlayerViewModel", "Playback error pada index=$index ($label) — $reason", error)
 
+            consecutiveErrorCount++
             val c = controller
+            if (consecutiveErrorCount >= MAX_CONSECUTIVE_PLAYBACK_ERRORS) {
+                // Skip otomatis TIDAK lagi aman diteruskan — kemungkinan besar sisa queue
+                // bermasalah semua (mis. folder sumbernya baru dicabut/dihapus total). Hentikan
+                // di sini alih-alih terus mental dari 1 track rusak ke track rusak berikutnya
+                // tanpa henti; user dapat 1 pesan jelas, bukan Snackbar error beruntun.
+                c?.pause()
+                _playbackErrorMessage.value =
+                    "Beberapa lagu berturut-turut gagal diputar ($reason). Playback dihentikan — " +
+                        "periksa apakah file/folder musik kamu masih ada."
+                consecutiveErrorCount = 0
+                return
+            }
+
+            _playbackErrorMessage.value = "$label tidak bisa diputar ($reason)."
             if (c != null && c.hasNextMediaItem()) {
                 c.seekToNextMediaItem()
                 c.play()
             }
         }
+    }
+
+    private fun describePlaybackErrorReason(error: PlaybackException): String = when (error.errorCode) {
+        PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
+            "file tidak ditemukan, mungkin sudah dihapus atau dipindah"
+        PlaybackException.ERROR_CODE_IO_NO_PERMISSION ->
+            "izin akses file ditolak"
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED ->
+            "file rusak/format tidak valid"
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+        PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+        PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ->
+            "format/codec tidak didukung perangkat ini"
+        else -> "kesalahan pemutaran tidak diketahui"
     }
 
     /**

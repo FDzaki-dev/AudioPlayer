@@ -1,5 +1,55 @@
 # Changelog
 
+## Batch 113 — Gap List #8: Playback error recovery
+Checklist Gap List #8 diaudit terhadap `onPlayerError` (`PlayerViewModel.kt`). Sebelumnya: 1
+pesan generik untuk SEMUA jenis error, auto-skip ke track berikut tanpa batas apa pun selama
+`hasNextMediaItem()` true — aman untuk kasus umum (1-2 file rusak tersebar), tapi kalau seluruh
+sisa queue bermasalah (folder sumber dicabut/dihapus total di storage eksternal), ini jadi silent
+infinite loop: tiap `seekToNextMediaItem()` + `play()` cuma memicu `onPlayerError` lagi buat track
+berikutnya, tanpa henti, tiap iterasi nembak `_playbackErrorMessage` baru (Snackbar spam).
+
+**`PlayerViewModel.kt` (edit parsial, 1 file)**:
+1. `describePlaybackErrorReason(error: PlaybackException): String` (baru, private) — map
+   `error.errorCode` ke 4 kategori manusiawi: `ERROR_CODE_IO_FILE_NOT_FOUND` → file
+   hilang/dipindah, `ERROR_CODE_IO_NO_PERMISSION` → izin ditolak, kelompok
+   `PARSING_CONTAINER/MANIFEST_MALFORMED` → rusak/format tidak valid, kelompok
+   `PARSING_*_UNSUPPORTED` + `DECODER_INIT_FAILED` + `DECODER_QUERY_FAILED` +
+   `DECODING_FAILED` + `DECODING_FORMAT_EXCEEDS_CAPABILITIES` + `DECODING_FORMAT_UNSUPPORTED` →
+   format/codec tidak didukung; else → generik. Dipakai di 2 tempat: pesan `_playbackErrorMessage`
+   ke user DAN argumen `AppLogger.e(...)` untuk diagnostics — sebelumnya log cuma nangkep stack
+   trace mentah tanpa reason terkategorisasi.
+2. `consecutiveErrorCount` (private var, class-level, di-reset tiap `onCleared`/lifecycle ViewModel
+   baru secara alami) + `MAX_CONSECUTIVE_PLAYBACK_ERRORS = 5` (companion object const) —
+   `onPlayerError` sekarang increment counter ini SEBELUM decide auto-skip. Di bawah ambang:
+   perilaku sama seperti sebelumnya (skip + play track berikut), cuma pesannya sekarang
+   terkategorisasi. Begitu ambang (5) tercapai: `controller?.pause()` dipanggil (BUKAN skip lagi),
+   1 pesan jelas ditampilkan ("Beberapa lagu berturut-turut gagal diputar (...). Playback
+   dihentikan — periksa apakah file/folder musik kamu masih ada."), counter direset ke 0 supaya
+   user bisa coba lagi manual tanpa nyangkut permanen di state "terlalu banyak error".
+3. Reset counter: `onIsPlayingChanged(isPlaying: Boolean)` sekarang set `consecutiveErrorCount = 0`
+   saat `isPlaying == true` — sengaja BUKAN di `onMediaItemTransition` (yang tetap terpanggil
+   untuk track yang ujung-ujungnya error lagi sebelum sempat benar-benar main), `isPlaying=true`
+   adalah sinyal paling jujur bahwa satu track berhasil pulih.
+
+**Kenapa angka 5 (bukan konstanta lain)**: cukup toleran untuk pola realistis (2-3 file rusak
+tersebar acak di tengah queue panjang, kasus paling umum menurut gap list) tanpa membiarkan loop
+tak berkesudahan kalau sumbernya sistemik (folder dicabut total) — dipilih sebagai angka bulat
+wajar, bukan hasil tuning empiris (belum ada device/telemetry test untuk kalibrasi lebih presisi,
+dicatat sebagai gap tersendiri kalau nanti perlu disesuaikan).
+
+**Yang SENGAJA belum disentuh di batch ini (di luar scope, tidak digabung supaya batch tetap
+fokus)**: retry logic per kategori error (mis. retry sekali khusus buat error IO transient),
+representasi error per-song di UI Library/Queue (sekarang murni Snackbar sekali tampil, hilang
+begitu di-dismiss/auto-timeout) — keduanya tercatat sebagai lanjutan Gap List #8 kalau diperlukan.
+
+Brace/paren `PlayerViewModel.kt` dicek seimbang (196 `{` / 196 `}`, 722 `(` / 722 `)`) setelah
+edit. **Belum diverifikasi compile/runtime Gradle sungguhan** — tidak ada JDK/Android SDK di
+sandbox kerja. Verifikasi berikutnya (butuh push + build + device fisik): matikan Wi-Fi/lepas SD
+card yang berisi beberapa lagu di queue (simulasi file hilang), pastikan pesan error sekarang
+menyebut kategori yang masuk akal ("file tidak ditemukan..." bukan generik), lalu coba skenario
+seluruh queue nunjuk folder yang sudah dihapus — pastikan playback berhenti bersih dengan 1 pesan
+setelah 5 percobaan, bukan Snackbar spam tanpa henti.
+
 ## Batch 112 — Fix baris tombol transport Now Playing ke-clip/hilang (root cause terpisah dari Batch 110/111)
 User lapor via screenshot: baris tombol shuffle/prev/play/next/repeat di Now Playing masih hilang
 dari layar SETELAH Batch 111. Investigasi ulang menemukan ini BUKAN kasus insets yang sama.

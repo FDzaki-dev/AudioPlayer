@@ -6,6 +6,22 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 113 (Gap List #8 — Playback error recovery, 1 file diedit)** — Audit
+`onPlayerError` (`PlayerViewModel.kt`) vs checklist #8: sebelumnya 1 pesan generik untuk semua
+jenis error ("file mungkin dihapus atau rusak") + auto-skip tanpa batas kalau `hasNextMediaItem()`
+— risiko nyata: kalau SISA queue rusak semua (folder sumber dicabut total), auto-skip mental dari
+error ke error tanpa henti (silent infinite loop, Snackbar spam). 2 gap utama ditutup: (1)
+`describePlaybackErrorReason()` baru — map `PlaybackException.errorCode` ke 4 kategori (file
+hilang/izin ditolak/format tidak didukung/rusak-malformed) + fallback generik, dipakai baik di
+pesan user maupun log diagnostics. (2) `consecutiveErrorCount` + `MAX_CONSECUTIVE_PLAYBACK_ERRORS`
+(5) — auto-skip cuma jalan di bawah ambang ini; kalau tercapai, `pause()` + 1 pesan jelas
+("beberapa lagu berturut-turut gagal..."), BUKAN terus mental. Counter direset di
+`onIsPlayingChanged(true)` (sinyal paling jujur playback beneran pulih, bukan cuma pindah index
+yang berujung error lagi). Brace/paren dicek seimbang (196/196, 722/722). Item gap list #8 yang
+BELUM disentuh (di luar scope batch ini, sengaja tidak digabung): retry logic per-error-type,
+UI state error per-song di Library/Queue (saat ini murni Snackbar sekali tampil). **Belum
+diverifikasi compile/runtime Gradle sungguhan**. Detail lengkap: `CHANGELOG.md` Batch 113.
+
 **Batch 112 (Fix baris tombol transport Now Playing ke-clip/hilang — root cause TERPISAH dari
 Batch 110/111, 1 file diedit)** — User lapor (screenshot): baris tombol shuffle/prev/play/next/
 repeat di Now Playing masih "deformasi" SETELAH Batch 111. Ternyata bukan kasus yang sama:
