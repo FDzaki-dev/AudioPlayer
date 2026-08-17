@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.BrightnessHigh
 import androidx.compose.material.icons.filled.BrightnessLow
 import androidx.compose.material.icons.filled.BrightnessMedium
@@ -164,6 +165,10 @@ fun NowPlayingScreen(
     onCloseVisualizer: () -> Unit,
     onToggleVisualizerEnabled: (Boolean) -> Unit,
     onRequestVisualizerPermission: () -> Unit,
+    // Gap List "Wajib" #1 (Tag Editor) — fire-and-forget, sama pola onSaveLyrics/onAddBookmark
+    // di atas: hasil sukses/gagal muncul lewat Snackbar infoMessage/actionErrorMessage yang
+    // sudah ada di MainActivity, bukan callback result langsung ke sini.
+    onSaveSongTags: (com.rudi.audioplayer.data.Song, com.rudi.audioplayer.data.Id3TagWriter.EditableTags) -> Unit,
     onBack: () -> Unit
 ) {
     val song = uiState.currentSong
@@ -186,6 +191,7 @@ fun NowPlayingScreen(
     var showVisualizerSheet by remember { mutableStateOf(false) }
     var showAdvancedSheet by remember { mutableStateOf(false) }
     var showAbRepeatBookmarkSheet by remember { mutableStateOf(false) }
+    var showSongInfoEditSheet by remember { mutableStateOf(false) }
 
     // --- Swipe gesture: brightness (left of album art) & audio volume (right of album art) ---
     val gestureScope = rememberCoroutineScope()
@@ -785,6 +791,21 @@ fun NowPlayingScreen(
                 showAdvancedSheet = false
                 onOpenVisualizer()
                 showVisualizerSheet = true
+            },
+            onOpenSongInfoEdit = {
+                showAdvancedSheet = false
+                showSongInfoEditSheet = true
+            }
+        )
+    }
+
+    if (showSongInfoEditSheet && song != null) {
+        SongInfoEditSheet(
+            song = song,
+            onDismiss = { showSongInfoEditSheet = false },
+            onSave = { tags ->
+                onSaveSongTags(song, tags)
+                showSongInfoEditSheet = false
             }
         )
     }
@@ -807,7 +828,8 @@ private fun AdvancedControlsSheet(
     onOpenSpeed: () -> Unit,
     onOpenEqualizer: () -> Unit,
     onOpenAbRepeatBookmark: () -> Unit,
-    onOpenVisualizer: () -> Unit
+    onOpenVisualizer: () -> Unit,
+    onOpenSongInfoEdit: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val haptic = LocalHapticFeedback.current
@@ -865,6 +887,12 @@ private fun AdvancedControlsSheet(
                 label = "Visualizer Audio",
                 value = null,
                 onClick = onOpenVisualizer
+            )
+            AdvancedControlRow(
+                icon = Icons.Default.Edit,
+                label = "Edit Info Lagu",
+                value = null,
+                onClick = onOpenSongInfoEdit
             )
 
             HorizontalDivider(

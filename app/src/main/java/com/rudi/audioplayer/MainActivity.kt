@@ -647,6 +647,21 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         }
     }
 
+    // Gap List "Wajib" #1 (Tag Editor) — pola identik deleteRequestLauncher di atas, untuk
+    // dialog izin tulis MediaStore.createWriteRequest (Android 11+). ViewModel yang simpan
+    // lagu/tag yang tertunda; launcher ini cuma jembatan Activity-result → hasil boolean.
+    val tagWriteConsentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        playerViewModel.onTagWriteConsentResult(result.resultCode == android.app.Activity.RESULT_OK)
+    }
+    val pendingTagWriteConsent by playerViewModel.pendingTagWriteConsent.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingTagWriteConsent) {
+        pendingTagWriteConsent?.let { sender ->
+            tagWriteConsentLauncher.launch(IntentSenderRequest.Builder(sender).build())
+        }
+    }
+
     fun deleteSongsFromDevice(songs: List<com.rudi.audioplayer.data.Song>) {
         if (songs.isEmpty()) return
         val resolver = deleteContext.contentResolver
@@ -809,6 +824,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             onCloseVisualizer = { playerViewModel.stopVisualizerCapture() },
             onToggleVisualizerEnabled = { playerViewModel.setVisualizerEnabled(it) },
             onRequestVisualizerPermission = { visualizerPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+            onSaveSongTags = { song, tags -> playerViewModel.requestSaveTags(song, tags) },
             onBack = onBackAction
         )
     }

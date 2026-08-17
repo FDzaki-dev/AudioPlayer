@@ -1,5 +1,94 @@
 # Changelog
 
+## Batch 118 — Gap List "Wajib" #1: Tag/Metadata Editor (MVP: MediaStore + MP3)
+Item terakhir dari 4 "Wajib" yang REALISTIS dikerjakan di lingkungan kerja ini (Gradle Wrapper
+butuh `gradle-wrapper.jar` biner, Release Lint Gate butuh baseline lint sungguhan — keduanya
+butuh `gradle`/Android SDK terpasang, tidak ada di sandbox ini, sama seperti dicatat Batch 117).
+
+**Scope sengaja dipersempit, 2 keputusan besar dicek dulu sebelum nulis kode (bukan ditebak):**
+1. **Format: MP3/ID3v2.3 saja.** FLAC (Vorbis comment), OGG, M4A (atom `moov/udta/meta`), WMA
+   masing-masing format biner TOTAL BEDA — nulis writer yang benar untuk semuanya sekaligus
+   tanpa compiler/device sungguhan untuk verifikasi adalah risiko tinggi (file musik user bisa
+   rusak). MP3 dipilih duluan: format paling umum + struktur paling sederhana untuk ditulis
+   aman (tag selalu di awal file, byte audio sesudahnya tidak pernah didekode/disentuh).
+2. **Sumber: lagu MediaStore saja, BUKAN lagu folder tambahan (SAF).** Dicek ulang ke
+   `PlayerViewModel.addCustomFolder()`: folder tambahan cuma diberi
+   `FLAG_GRANT_READ_URI_PERMISSION` saat ditambahkan (baca saja) — bukan diasumsikan, benar-benar
+   dibaca dari kode. Menulis ke file SAF butuh alur izin tulis terpisah yang belum ada. Sengaja
+   dicatat sebagai gap tersisa, bukan dipaksakan dengan asumsi izin yang keliru.
+
+Kedua batasan itu ditampilkan APA ADANYA ke user di `SongInfoEditSheet` (pesan beda untuk tiap
+alasan: "folder tambahan belum didukung" vs "format belum didukung, baru MP3") — bukan disembunyikan
+atau digagalkan diam-diam.
+
+**`Id3TagWriter.kt`** (baru, `data/`, 0 Context/Android — murni `InputStream`/`OutputStream`) —
+`buildTag()` susun blok ID3v2.3 baru (frame teks UTF-16LE+BOM, konsisten untuk semua field
+termasuk TRCK/TPOS numerik — encoding seragam = lebih sedikit percabangan/bug). `rewrite()`
+baca 10 byte header lama untuk deteksi ukuran tag ID3v2 LAMA (syncsafe int di offset 6-9), lalu
+alirkan tag baru + byte audio asli (byte-for-byte, tidak pernah didekode) ke output. ID3v1 (128
+byte trailer di akhir file, kalau ada) SENGAJA tidak disentuh/dihapus — kosmetik minor (player
+modern prioritaskan ID3v2 kalau keduanya ada), dicatat sebagai gap kosmetik, bukan dianggap
+selesai.
+
+**`TagEditor.kt`** (baru, `data/`) — orkestrasi Context/I/O. Alur consent Android 11+ pakai
+`MediaStore.createWriteRequest()` (API resmi, pola identik `createDeleteRequest` yang sudah
+dipakai `MainActivity.deleteSongsFromDevice`); Android 10 pakai pola resmi
+`RecoverableSecurityException` (coba tulis dulu, tangkap exception-nya kalau app ini bukan
+pemilik file). **Alur tulis fisik 2 langkah demi keamanan file user**: (1) tulis hasil rewrite
+ke file SEMENTARA di cache app dulu — file asli 0% tersentuh kalau ada bug di langkah ini; (2)
+baru salin isi file sementara itu ke `song.uri` asli (mode "rwt"). Risiko residual dicatat jujur
+di komentar kode: langkah (2) tetap 1 operasi truncate+write ke file asli — kalau app di-kill
+paksa PAS di tengah itu, file bisa berakhir TERPOTONG (bukan "rusak diam-diam dengan audio
+salah" — kegagalan yang terdeteksi, bukan korupsi senyap). Android tidak punya primitif rename
+atomik lintas provider yang bisa diandalkan untuk menghilangkan risiko ini sepenuhnya — TIDAK
+diklaim 100% aman. Setelah sukses, `MediaScannerConnection.scanFile()` dipanggil supaya index
+MediaStore (termasuk tabel Genres, Gap List #11) sinkron tanpa nunggu scan device berikutnya.
+
+**`SongInfoEditSheet.kt`** (baru, `ui/`) — form edit (judul/artis/album/artis album/genre/
+komposer/no. track/no. disc), field angka difilter `isDigit()` saja. Pesan "belum didukung"
+dicerminkan APA ADANYA dari logika `TagEditor.editabilityCheck` (dua alasan berbeda, bukan 1
+pesan generik) — TIDAK divalidasi ulang dengan logika terpisah yang berisiko beda dari sumber
+kebenarannya, sheet tetap kirim `onSave` apa pun hasil pengecekannya sendiri, TagEditor yang
+jadi otoritas final.
+
+**`PlayerViewModel.kt`** (diedit) — `requestSaveTags()`/`onTagWriteConsentResult()` +
+`pendingTagWriteConsent: StateFlow<IntentSender?>` (pola identik `pendingDeleteRequest` yang
+sudah ada di `MainActivity` untuk hapus lagu). Sukses/gagal lewat kanal `infoMessage`/
+`actionErrorMessage` yang sudah ada — 0 kanal Snackbar baru ditulis.
+
+**`MainActivity.kt`** (diedit, **protected asset — edit parsial**) — `tagWriteConsentLauncher`
+(pola identik `deleteRequestLauncher` tepat di atasnya) + `LaunchedEffect` observe
+`pendingTagWriteConsent`, dan 1 baris param baru `onSaveSongTags` ke pemanggilan
+`NowPlayingScreen(...)` yang sudah ada (dipakai via `nowPlayingContent` lambda Batch 101 — 1
+titik edit, otomatis berlaku untuk mode Compact/Medium DAN panel Expanded).
+
+**`NowPlayingScreen.kt`** (diedit) — 1 param baru `onSaveSongTags`, 1 baris menu baru "Edit Info
+Lagu" (ikon `Edit`) di `AdvancedControlsSheet` (pola identik Visualizer/Equalizer/dst.), sheet
+baru dipasang persis pola `LyricsSheet`/`ABRepeatBookmarkSheet` (key di `song.id`, supaya draft
+tidak salah lagu kalau track ganti sementara sheet terbuka).
+
+**`Id3TagWriterTest.kt`** (baru, `test/`) — murni logic biner (syncsafe encode/decode, frame
+builder, `rewrite()` in-memory pakai `ByteArrayInputStream`/`ByteArrayOutputStream`) — 0 Context,
+jalan tanpa Robolectric sama seperti test lain di project. `TagEditor.kt` sendiri (butuh
+Context/ContentResolver) TIDAK diuji di layer ini — sama pembagian seperti
+`MusicRepositoryTrackDiscTest` yang cuma uji helper parse murni, bukan `MusicRepository` yang
+butuh cursor.
+
+7 file kode (4 baru + 3 diedit) + `FILE_MANIFEST.txt`/dokumentasi. Brace/paren semua file kode
+dicek otomatis & seimbang. `FILE_MANIFEST.txt` diverifikasi 100% match isi fisik (158/158, sort
+diff bersih). 0 protected asset lain tersentuh selain `MainActivity.kt` (edit parsial, sesuai
+aturan).
+
+**Belum diverifikasi compile/runtime Gradle sungguhan** — prioritas berikutnya kalau user push:
+(1) `./gradlew`/`gradle testDebugUnitTest` (pastikan `Id3TagWriterTest.kt` hijau — terutama
+assert syncsafe & panjang frame, itu bagian paling gampang salah-hitung-manual), (2)
+`assembleRelease`, (3) di device sungguhan: pilih lagu MP3 dari MediaStore, buka "Edit Info
+Lagu", ubah judul, Simpan, **verifikasi dengan player LAIN (bukan app ini)** bahwa file benar
+berubah — jangan cuma percaya UI app ini sendiri karena itu bisa saja cuma baca ulang state lama
+yang di-refresh, bukan bukti file fisik benar tertulis, (4) uji lagu dari folder tambahan (SAF)
+memang menampilkan pesan "belum didukung", bukan macet/crash, (5) uji lagu non-MP3 (kalau ada di
+library test) sama halnya. Detail lengkap sudah di changelog entry ini sendiri (batch ini besar).
+
 ## Batch 117 — Gap List "Wajib" #2: Duplicate Detection
 Audit ulang (`AudioPlayer_Coding_Gap_Updated.md`) menandai 4 item "Wajib" pasca gap list lama
 tuntas: Tag/Metadata Editor, Duplicate Detection, Gradle Wrapper, Release Lint Gate. Duplicate

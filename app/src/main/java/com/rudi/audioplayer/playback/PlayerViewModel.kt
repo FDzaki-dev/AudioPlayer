@@ -360,6 +360,63 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         _infoMessage.value = null
     }
 
+    // --- Gap List "Wajib" #1 — Tag/Metadata Editor ---
+    private val tagEditor by lazy { com.rudi.audioplayer.data.TagEditor(appContext) }
+
+    // Android 11+ butuh persetujuan lewat dialog sistem sebelum menulis tag ke file yang app
+    // ini tidak "miliki" (MediaStore.createWriteRequest) — MainActivity observe StateFlow ini,
+    // launch dialognya, lalu panggil balik onTagWriteConsentResult(). Song/tags yang tertunda
+    // disimpan di sini (bukan dikirim lewat Intent) supaya tidak perlu di-serialize.
+    private val _pendingTagWriteConsent = MutableStateFlow<android.content.IntentSender?>(null)
+    val pendingTagWriteConsent: StateFlow<android.content.IntentSender?> = _pendingTagWriteConsent.asStateFlow()
+    private var pendingTagWriteSong: Song? = null
+    private var pendingTagWriteTags: com.rudi.audioplayer.data.Id3TagWriter.EditableTags? = null
+
+    fun requestSaveTags(song: Song, tags: com.rudi.audioplayer.data.Id3TagWriter.EditableTags) {
+        viewModelScope.launch(Dispatchers.IO) {
+            when (val result = tagEditor.writeTags(song, tags)) {
+                is com.rudi.audioplayer.data.TagEditor.TagWriteResult.Success -> {
+                    showInfoMessage("Metadata disimpan")
+                    refreshLibrary()
+                }
+                is com.rudi.audioplayer.data.TagEditor.TagWriteResult.NeedsConsent -> {
+                    pendingTagWriteSong = song
+                    pendingTagWriteTags = tags
+                    _pendingTagWriteConsent.value = result.intentSender
+                }
+                is com.rudi.audioplayer.data.TagEditor.TagWriteResult.Unsupported ->
+                    _actionErrorMessage.value = result.reason
+                is com.rudi.audioplayer.data.TagEditor.TagWriteResult.Failure ->
+                    _actionErrorMessage.value = "Gagal menyimpan metadata: ${result.reason}"
+            }
+        }
+    }
+
+    /** Dipanggil MainActivity setelah dialog izin tulis (dari [pendingTagWriteConsent]) selesai. */
+    fun onTagWriteConsentResult(granted: Boolean) {
+        _pendingTagWriteConsent.value = null
+        val song = pendingTagWriteSong
+        val tags = pendingTagWriteTags
+        pendingTagWriteSong = null
+        pendingTagWriteTags = null
+        if (!granted) {
+            _actionErrorMessage.value = "Izin ditolak — metadata tidak disimpan."
+            return
+        }
+        if (song == null || tags == null) return
+        viewModelScope.launch(Dispatchers.IO) {
+            when (val result = tagEditor.writeTagsWithConsent(song, tags)) {
+                is com.rudi.audioplayer.data.TagEditor.TagWriteResult.Success -> {
+                    showInfoMessage("Metadata disimpan")
+                    refreshLibrary()
+                }
+                is com.rudi.audioplayer.data.TagEditor.TagWriteResult.Failure ->
+                    _actionErrorMessage.value = "Gagal menyimpan metadata: ${result.reason}"
+                else -> {}
+            }
+        }
+    }
+
     /** Carries both the Snackbar message and the exact action that reverses it — the Snackbar
      * itself doesn't need to know *what* was removed, only how to undo it. */
     data class UndoableAction(val message: String, val undo: () -> Unit)

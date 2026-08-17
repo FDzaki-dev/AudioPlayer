@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 152 file
+# Total: 158 file
 
 .github/workflows/build.yml
 .gitignore
@@ -36,6 +36,7 @@ app/src/main/java/com/rudi/audioplayer/data/DuplicateDetector.kt
 app/src/main/java/com/rudi/audioplayer/data/FavoritesStore.kt
 app/src/main/java/com/rudi/audioplayer/data/FloatingBubbleStore.kt
 app/src/main/java/com/rudi/audioplayer/data/HourlyListenStore.kt
+app/src/main/java/com/rudi/audioplayer/data/Id3TagWriter.kt
 app/src/main/java/com/rudi/audioplayer/data/LibraryFilterStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ListeningHistoryStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ListeningStatsEngine.kt
@@ -58,6 +59,7 @@ app/src/main/java/com/rudi/audioplayer/data/SmartPlaylist.kt
 app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistEngine.kt
 app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistStore.kt
 app/src/main/java/com/rudi/audioplayer/data/Song.kt
+app/src/main/java/com/rudi/audioplayer/data/TagEditor.kt
 app/src/main/java/com/rudi/audioplayer/data/ThemeStore.kt
 app/src/main/java/com/rudi/audioplayer/data/VisualizerSettingsStore.kt
 app/src/main/java/com/rudi/audioplayer/playback/AbRepeatLogic.kt
@@ -89,6 +91,7 @@ app/src/main/java/com/rudi/audioplayer/ui/QueueSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SettingsScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/SignatureMatcherSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SmartPlaylistScreen.kt
+app/src/main/java/com/rudi/audioplayer/ui/SongInfoEditSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/StatsDashboardScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/Utils.kt
 app/src/main/java/com/rudi/audioplayer/ui/VisualizerSheet.kt
@@ -143,6 +146,7 @@ app/src/main/res/xml/data_extraction_rules.xml
 app/src/main/res/xml/shortcuts.xml
 app/src/main/res/xml/widget_player_info.xml
 app/src/test/java/com/rudi/audioplayer/data/CustomFolderScannerStableIdTest.kt
+app/src/test/java/com/rudi/audioplayer/data/Id3TagWriterTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LibraryFilterStoreTest.kt
 app/src/test/java/com/rudi/audioplayer/data/ListeningStatsEngineTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LyricsParserTest.kt
