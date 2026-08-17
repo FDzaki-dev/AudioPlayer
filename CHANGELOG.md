@@ -1,5 +1,59 @@
 # Changelog
 
+## Batch 106 — Gap List #5: SAF parity dengan MediaStore
+4 file diedit, 0 baru. Audit 8 sub-item checklist #5, hasil: 2 gap nyata + 1 dokumentasi basi
+diperbaiki, 2 sub-item dicek dan sudah benar sejak lama, sisanya (bitrate/sampleRate/dst.,
+duplicate hash 32-bit) sudah tertutup di Batch 104/105.
+
+**1. `CustomFolderStore.kt`** — `CustomFolderInfo` dapat field baru `permissionGranted: Boolean
+= true`. Default `true` supaya construction site lama (kalaupun ada) tidak berubah perilaku
+diam-diam; satu-satunya tempat yang pernah mengisi nilai nyata adalah
+`PlayerViewModel.loadCustomFolderInfos()` di bawah.
+
+**2. `PlayerViewModel.kt`** — `hasPersistedReadPermission(uri)` baru, cek langsung ke
+`ContentResolver.persistedUriPermissions` (satu-satunya sumber valid — sistem tidak pernah
+memberi callback saat izin dicabut dari luar app). Dipanggil di 2 titik: (a)
+`loadCustomFolderInfos()` — isi field baru `permissionGranted` tiap kali daftar folder dibangun
+ulang; (b) `refreshLibrary()` — sekarang refresh `_customFolders` di awal tiap scan (badge tidak
+basi kalau cuma dihitung sekali saat add/remove), DAN skip `scan()` sama sekali untuk folder yang
+sudah dikonfirmasi tidak berizin (sebelumnya selalu coba scan dulu, gagal `SecurityException`,
+log — sekarang skip lebih awal, bukan lagi kegagalan I/O yang perlu dicatat berulang tiap refresh
+untuk kondisi yang sudah diketahui).
+
+**3. `CustomFolderScanner.kt`** — dua perubahan: (a) `MAX_DEPTH` 6→20 (gap list tandai "terlalu
+sempit" — struktur `Musik/Artis/Album/CD1/...` realistis bisa >6 level lewat sebagian file
+manager/sync tool yang nambah 1 level nesting; 20 tetap hard ceiling, bukan dihapus, karena
+traversal ini rekursif jadi tetap butuh batas aman terhadap tree yang sengaja/korup nge-nest
+sangat dalam); (b) komentar `albumId = -1L` ditulis ulang — versi lama klaim lagu SAF "tidak ada
+artwork lookup". Audit silang ke `AudioArtFetcher.kt`/`PlaybackService.kt`'s
+`SongArtBitmapLoader`/`AccentColorExtractor.kt`/`WidgetUpdater.kt` (semua 4 loader artwork di
+app) menunjukkan itu sudah basi sejak Batch 67-69 — keempatnya baca artwork lewat `song.uri`
+generik (bukan `albumId`), yang bekerja identik untuk content URI dokumen SAF seperti URI
+MediaStore. Diperbaiki jadi akurat: lagu SAF sudah dapat artwork tertanam asli, cuma yang benar-
+benar tidak punya artwork tertanam yang jatuh ke placeholder — sama seperti lagu MediaStore.
+
+**4. `FolderManagerSheet.kt`** — badge teks merah baru di bawah nama folder tambahan yang
+`permissionGranted == false`: "Izin dicabut — lagunya tidak lagi terpindai. Hapus lalu pilih
+ulang." Tombol hapus yang sudah ada (Batch 26, sudah toleran ke `releasePersistableUriPermission`
+yang gagal karena izin memang sudah hilang) tidak perlu diubah — badge ini murni membuat
+penyebabnya kelihatan di UI, bukan mengubah alur hapus.
+
+**Diaudit, TIDAK ada perubahan (sudah benar sejak lama, dicek eksplisit)**: dedupe SAF-vs-
+MediaStore (`refreshLibrary()`'s `dedupeSignature()`+`dedupedCustomSongs`, prefer salinan
+MediaStore) dan idempotensi refresh (`libraryRefreshGeneration` counter cegah scan lama menimpa
+scan baru) — keduanya sudah ada dan benar, tidak disentuh.
+
+**Sengaja BELUM digarap**: "metadata extraction SAF sedekat mungkin dengan MediaStore" dari
+checklist #5 — sudah paritas sejak Batch 105 (genre/bitrate/sampleRate/channelCount/codec
+sama-sama absen di KEDUA sumber, jadi bukan gap SAF-spesifik, gap umum item #4/#11 terpisah).
+
+Brace/paren 4 file dicek otomatis & seimbang. **Belum diverifikasi compile/runtime Gradle
+sungguhan** (tidak ada JDK/Android SDK/kotlinc di sandbox ini) — prioritas berikutnya:
+`./gradlew testDebugUnitTest` lalu build APK asli + cek di device (1) cabut izin folder
+tambahan lewat Settings sistem, buka Kelola Perpustakaan, pastikan badge merah muncul, (2) lagu
+folder SAF yang punya embedded art genuinely tampil (bukan cuma diverifikasi baca-kode), (3)
+scan folder dalam (>6 level) tidak lagi terpotong di level 6.
+
 ## Batch 105 — Gap List #4: Metadata model diperkuat
 4 file (3 diedit + 1 baru). Scope sengaja dipersempit ke field yang bisa didapat TANPA I/O
 tambahan — dibaca dari row cursor MediaStore yang sama (bulk scan, sekali query) atau dari pass

@@ -145,13 +145,26 @@ fun FolderManagerSheet(
                             .padding(horizontal = 20.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            folder.displayName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                folder.displayName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            // Gap List #5 — izin bisa dicabut dari luar app kapan saja tanpa
+                            // pemberitahuan apa pun ke app; sebelumnya lagu folder ini cuma
+                            // diam-diam hilang dari library tanpa penjelasan ("kok folder saya
+                            // kosong" versi kedua, setelah Batch 16 menutup celah yang serupa
+                            // saat izin AWAL gagal). Badge ini bikin sebabnya kelihatan di UI.
+                            if (!folder.permissionGranted) {
+                                Text(
+                                    "Izin dicabut — lagunya tidak lagi terpindai. Hapus lalu pilih ulang.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
                         IconButton(onClick = { folderPendingRemoval = folder }) {
                             Icon(Icons.Default.Close, contentDescription = "Hapus folder tambahan")
                         }

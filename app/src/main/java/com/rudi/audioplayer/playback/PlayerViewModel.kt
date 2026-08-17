@@ -518,6 +518,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val generation = ++libraryRefreshGeneration
         libraryRefreshJob = viewModelScope.launch {
             _libraryLoading.value = true
+            // Gap List #5: refresh the permission-status badge every scan, not just right
+            // after add/remove — a grant can be revoked from outside the app at any time
+            // with no callback, so "was true last time we checked" can go stale silently.
+            _customFolders.value = loadCustomFolderInfos()
             try {
                 val songs = withContext(Dispatchers.IO) {
                     val mediaStoreSongs = musicRepository.getAllSongs()
@@ -525,8 +529,16 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                         .map(::dedupeSignature)
                         .toHashSet()
                     val customSongs = customFolderStore.getFolderUris().asSequence().flatMap { uriString ->
+                        val uri = Uri.parse(uriString)
+                        // Gap List #5: check the OS grant BEFORE attempting to scan, not just
+                        // catch the SecurityException after the fact. A revoked grant would
+                        // otherwise throw + log identically on every single refresh forever
+                        // (content observer fires often) — this makes the "already known gone"
+                        // case a cheap no-op instead of a repeated failed IO attempt + log spam,
+                        // while still logging once here for the case a permission check itself
+                        // errors out (different from "permission confirmed absent").
+                        if (!hasPersistedReadPermission(uri)) return@flatMap emptySequence()
                         try {
-                            val uri = Uri.parse(uriString)
                             customFolderScanner.scan(uri, folderLabelFor(uri)).asSequence()
                         } catch (e: Exception) {
                             // Lagu-lagu folder ini hilang diam-diam dari library sampai kejadian
@@ -639,7 +651,19 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private fun loadCustomFolderInfos(): List<CustomFolderInfo> =
         customFolderStore.getFolderUris().map { uriString ->
             val uri = Uri.parse(uriString)
-            CustomFolderInfo(uri = uriString, displayName = folderLabelFor(uri))
+            CustomFolderInfo(
+                uri = uriString,
+                displayName = folderLabelFor(uri),
+                permissionGranted = hasPersistedReadPermission(uri)
+            )
+        }
+
+    /** Gap List #5 — the only reliable way to know a SAF grant is still alive: the system
+     * never tells the app when a grant is revoked from outside (no broadcast/callback), so
+     * this has to be checked freshly against the live list rather than cached anywhere. */
+    private fun hasPersistedReadPermission(uri: Uri): Boolean =
+        appContext.contentResolver.persistedUriPermissions.any {
+            it.uri == uri && it.isReadPermission
         }
 
     private fun folderLabelFor(treeUri: Uri): String =

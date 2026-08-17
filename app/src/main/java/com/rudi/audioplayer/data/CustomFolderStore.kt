@@ -2,10 +2,19 @@ package com.rudi.audioplayer.data
 
 import android.content.Context
 
-/** A folder the user granted access to manually via the system folder picker. */
+/** A folder the user granted access to manually via the system folder picker.
+ *
+ * Gap List #5 (SAF parity — "Tangani permission revoke"): [permissionGranted] reflects
+ * whether the OS still lists an active read grant for [uri] at the moment this was built
+ * (checked against `ContentResolver.persistedUriPermissions`, the only reliable source —
+ * grants can be revoked from outside the app, e.g. system Settings > "Manage other apps'
+ * files" style screens, with zero broadcast to the app). Defaults `true` for older
+ * construction sites; `PlayerViewModel.loadCustomFolderInfos()` is the only place that ever
+ * computes the real value. */
 data class CustomFolderInfo(
     val uri: String,
-    val displayName: String
+    val displayName: String,
+    val permissionGranted: Boolean = true
 )
 
 /**

@@ -94,9 +94,15 @@ class CustomFolderScanner(private val context: Context) {
                 title = title,
                 artist = artist,
                 album = album,
-                // No MediaStore album ID exists for SAF-sourced files, so there's no
-                // artwork lookup for these tracks yet — they show the app's default
-                // placeholder art instead of embedded cover art.
+                // No MediaStore album ID exists for SAF-sourced files (-1L is the "not a
+                // MediaStore row" sentinel), but that no longer means no artwork: every art
+                // loader in the app (AudioArtFetcher/Coil, PlaybackService's
+                // SongArtBitmapLoader, AccentColorExtractor, WidgetUpdater) already reads
+                // embedded art generically off `song.uri` via loadThumbnail()/
+                // MediaMetadataRetriever (Batch 67-69) — which works identically for a SAF
+                // document content:// URI as it does for a MediaStore one. So SAF songs get
+                // real embedded cover art wherever the file has one; only files with no
+                // embedded art at all fall back to the placeholder, same as MediaStore songs.
                 albumId = -1L,
                 duration = duration,
                 dateAdded = doc.lastModified() / 1000,
@@ -139,7 +145,13 @@ class CustomFolderScanner(private val context: Context) {
     private fun stableId(uri: Uri): Long = Companion.stableId(uri.toString())
 
     companion object {
-        private const val MAX_DEPTH = 6
+        // Gap List #5: was 6 — flagged as "too narrow" (real libraries organized like
+        // Musik/Artis/Album/CD1/... can exceed that in a few hops, and some file managers/
+        // sync tools add an extra nesting level on top). 20 is generous headroom for any
+        // realistic real-world folder tree while still being a hard ceiling against a
+        // pathological structure (this is walked recursively, so an unbounded depth is a
+        // stack-growth/latency risk on a folder tree crafted or corrupted to nest deeply).
+        private const val MAX_DEPTH = 20
         private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "aac", "flac", "wav", "ogg", "opus", "amr", "wma")
 
         /** Pure, Context-free — kept in the companion so it's unit-testable without

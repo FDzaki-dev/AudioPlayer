@@ -6,6 +6,64 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 106 (Gap List #5 — SAF parity, 4 file diedit)** — Lanjutan langsung Gap List (#4 Batch
+105 selesai). Audit `CustomFolderScanner.kt`/`PlayerViewModel.kt` terhadap 8 sub-item checklist
+#5: 2 gap nyata + 1 dokumentasi basi ditemukan & dibenarkan, sisanya (dedupe vs MediaStore,
+refresh idempotent) ternyata SUDAH benar sejak lama (dicek eksplisit, bukan diasumsikan).
+
+1. **"Tangani permission revoke" (gap nyata, belum pernah ditangani)** — izin SAF folder
+   tambahan bisa dicabut dari LUAR app kapan saja (layar sistem semacam "Kelola akses file"),
+   tanpa broadcast/callback apa pun ke app. Sebelumnya: `scan()` lempar `SecurityException`,
+   ditangkap, dicatat ke log, lagu folder itu diam-diam hilang dari library SELAMANYA tanpa
+   penjelasan ke user — persis kelas bug "kok folder saya kosong" yang Batch 16 sudah tutup
+   untuk kegagalan izin AWAL, tapi belum untuk pencabutan BELAKANGAN. Fix: `CustomFolderInfo`
+   dapat field baru `permissionGranted: Boolean`, dihitung ulang tiap kali (satu-satunya sumber
+   valid: `ContentResolver.persistedUriPermissions`, dicek fresh — tidak bisa di-cache) lewat
+   `PlayerViewModel.hasPersistedReadPermission()` baru. `loadCustomFolderInfos()` DAN
+   `refreshLibrary()` (badge basi kalau cuma dihitung sekali saat add/remove) sama-sama panggil
+   ini. `FolderManagerSheet.kt` — badge teks merah muncul di folder yang izinnya sudah dicabut,
+   mengarahkan user hapus lalu pilih ulang (tombol hapus yang sudah ada dari Batch 26 sudah
+   toleran ke `releasePersistableUriPermission` yang gagal karena izin memang sudah hilang,
+   tidak perlu diubah).
+2. **`refreshLibrary()` skip-scan folder yang sudah dikonfirmasi tidak berizin** — sebelumnya
+   tiap refresh (content observer MediaStore fire cukup sering) selalu coba `scan()` ulang lalu
+   gagal lagi dengan `SecurityException` yang sama, log spam tanpa henti untuk kondisi yang
+   sudah diketahui. Sekarang cek `hasPersistedReadPermission()` DULU sebelum coba scan — kalau
+   sudah dikonfirmasi tidak ada izin, skip diam-diam (bukan exception yang ditangkap, jadi bukan
+   kegagalan I/O yang perlu dicatat tiap kali) alih-alih exception-catch-log berulang.
+3. **`MAX_DEPTH` 6→20** — ditandai gap list "terlalu sempit". Struktur folder musik nyata
+   (`Musik/Artis/Album/CD1/...`) bisa lebih dari 6 level lewat beberapa file manager/sync tool
+   yang menambah 1 level nesting ekstra. 20 tetap jadi hard ceiling (bukan dihapus total) karena
+   traversal ini rekursif — folder tree yang dibuat/korup sengaja nge-nest sangat dalam tetap
+   punya batas aman.
+4. **Komentar `albumId = -1L` diperbaiki, bukan cuma kosmetik** — komentar lama klaim lagu SAF
+   "tidak ada artwork lookup, jatuh ke placeholder default". Ternyata SUDAH TIDAK BENAR sejak
+   Batch 67-69: `AudioArtFetcher`/`SongArtBitmapLoader`/`AccentColorExtractor`/`WidgetUpdater`
+   semua baca artwork generik lewat `song.uri` (bukan `albumId`) via `loadThumbnail()`/
+   `MediaMetadataRetriever` — mekanisme yang sama persis bekerja untuk content URI dokumen SAF
+   seperti untuk URI MediaStore. Jadi lagu SAF SUDAH dapat artwork tertanam asli di mana pun
+   filenya punya itu; cuma file tanpa artwork tertanam sama sekali yang jatuh ke placeholder,
+   identik dengan lagu MediaStore. Ditemukan lewat audit silang 4 file artwork sebelum menulis
+   ulang komentar, bukan tebakan.
+
+**Sub-item #5 yang diaudit & TERNYATA SUDAH BENAR (dicek eksplisit, bukan terlewat)**: "Pastikan
+custom-folder scan tidak menduplikasi MediaStore entry" — `refreshLibrary()`'s
+`dedupeSignature()`(title+artist+duration-bucketed) + `dedupedCustomSongs` sudah ada sejak lama,
+prefer salinan MediaStore. "Pastikan refresh library aman/idempotent" — `libraryRefreshGeneration`
+counter sudah cegah scan lama menimpa hasil scan baru. Kedua ini TIDAK disentuh batch ini.
+
+**Sengaja BELUM digarap dari checklist #5** (dicatat, bukan terlewat): "Metadata extraction SAF
+sedekat mungkin dengan MediaStore" — sudah sedekat yang aman tanpa pass kedua sejak Batch 105
+(genre/bitrate/sampleRate/channelCount/codec sama-sama belum ada di KEDUA sumber, jadi sudah
+paritas, bukan gap SAF-spesifik). Brace/paren 4 file dicek otomatis & seimbang. **Belum
+diverifikasi compile/runtime Gradle sungguhan** (tidak ada JDK/Android SDK/kotlinc di sandbox
+ini) — prioritas berikutnya: `./gradlew testDebugUnitTest` lalu build APK asli + cek di device
+(1) badge "Izin dicabut" benar muncul setelah user cabut izin folder dari Settings sistem lalu
+buka lagi Kelola Perpustakaan, (2) `MAX_DEPTH` 20 tidak berdampak terasa ke waktu scan folder
+besar, (3) artwork SAF genuinely tampil untuk file yang punya embedded art (klaim komentar baru
+di poin 4 belum pernah dilihat langsung, cuma diverifikasi lewat baca kode 4 file artwork).
+Detail lengkap: `CHANGELOG.md` Batch 106.
+
 **Batch 105 (Gap List #4 — Metadata model diperkuat, 4 file — 3 diedit + 1 baru)** — `Song.kt`
 dapat 6 field baru (`albumArtist`, `composer`, `trackNumber`, `discNumber`, `fileSize`,
 `mimeType`), semua nullable/default-0 di posisi terakhir constructor jadi 0 call site lama perlu
