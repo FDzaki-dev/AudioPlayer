@@ -116,6 +116,9 @@ fun LockScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            // Batch 111 — LockScreen render di luar Scaffold (MainActivity.kt), tidak dapat
+            // contentWindowInsets. Sama root cause dengan WelcomeScreen/PermissionRationale.
+            .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center

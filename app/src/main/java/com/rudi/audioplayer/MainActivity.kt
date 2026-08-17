@@ -36,6 +36,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import com.rudi.audioplayer.ui.adaptive.AppWidthClass
@@ -415,6 +418,13 @@ private fun WelcomeScreen(onContinue: () -> Unit) {
                     listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.background)
                 )
             )
+            // Batch 111 — layar ini render DI LUAR Scaffold (lihat setContent di MainActivity),
+            // jadi tidak dapat contentWindowInsets bawaan Scaffold sama sekali. Di gesture-nav
+            // (Android 16 test device) bar cuma overlay tipis nyaris tak kelihatan; di 3-button
+            // nav (masih umum Android 15 ke bawah) bar opaque menutupi konten — insets manual di
+            // sini yang menutup gap-nya. Padding fixed 32dp tetap di bawah (jarak visual dari
+            // konten ke insets), bukan pengganti.
+            .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -1125,6 +1135,8 @@ private fun PermissionRationale(onRequest: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            // Batch 111 — sama seperti WelcomeScreen, layar ini juga render di luar Scaffold.
+            .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally

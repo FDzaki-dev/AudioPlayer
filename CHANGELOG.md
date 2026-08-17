@@ -1,5 +1,42 @@
 # Changelog
 
+## Batch 111 — Fix deformasi layout UI Android 15 ke bawah (eksekusi scope Batch 110)
+Lanjutan langsung Batch 110 (audit). Root cause tidak diulang di sini — lihat entry Batch 110 di
+bawah. Fix diterapkan:
+
+1. **`MainActivity.kt` (protected, edit parsial — 2 private composable + import)**
+   - Import baru: `androidx.compose.foundation.layout.WindowInsets`,
+     `androidx.compose.foundation.layout.safeDrawing`,
+     `androidx.compose.foundation.layout.windowInsetsPadding`.
+   - `WelcomeScreen`: root `Column` modifier dapat `.windowInsetsPadding(WindowInsets.safeDrawing)`
+     disisipkan SEBELUM `.padding(32.dp)` yang sudah ada (padding fixed tetap dipertahankan sebagai
+     jarak visual, insets padding menutup gap status/nav bar yang sebelumnya nol).
+   - `PermissionRationale`: modifier sama persis ditambahkan di root `Column`.
+2. **`LockScreen.kt` (edit parsial — root `Column` saja)** — `.windowInsetsPadding(WindowInsets.safeDrawing)`
+   ditambahkan di posisi sama (sebelum `.padding(32.dp)`). File ini sudah pakai wildcard import
+   `androidx.compose.foundation.layout.*`, jadi tidak perlu import baru.
+3. **`AndroidManifest.xml` (protected, edit parsial — 1 atribut)** — `<activity>` MainActivity
+   dapat `android:windowLayoutInDisplayCutoutMode="shortEdges"`, eksplisit dinyatakan (sebelumnya
+   tidak ada sama sekali di manifest), selaras dengan `enableEdgeToEdge()` yang sudah aktif global
+   sejak sebelumnya.
+
+**Yang SENGAJA tidak disentuh**: `AppNavHost`/`Scaffold` (`contentWindowInsets` bawaan sudah benar
+untuk semua screen di dalamnya — bukan sumber bug, lihat audit Batch 110). `compileSdk`/`targetSdk`
+tetap 34 (di luar scope batch ini, gap terpisah, sudah tercatat sejak Batch 99/110). Title/judul
+lagu yang scroll bergerak sendiri di Now Playing (`basicMarquee()`) — user eksplisit menegaskan itu
+BUKAN bug, itu perilaku marquee yang disengaja untuk teks panjang; nol perubahan terkait itu di
+batch ini.
+
+**Verifikasi statis**: brace/paren `MainActivity.kt` (245 `{` / 245 `}`, 563 `(` / 563 `)`) dan
+`LockScreen.kt` (48/48, 128/128) seimbang setelah edit. Manifest divalidasi `xmllint --noout`
+(valid). **Belum diverifikasi compile/runtime Gradle sungguhan** — tidak ada JDK/Android SDK di
+sandbox kerja. Verifikasi berikutnya (butuh push + build sungguhan): build & install ke device
+Android 15 3-button-nav, buka app fresh-install (WelcomeScreen → izin ditolak sekali →
+PermissionRationale) dan device dengan App Lock aktif (LockScreen), pastikan konten tidak lagi
+ketiban status bar di atas atau nav bar di bawah. Kalau masih ada overlap setelah ini: cek apakah
+device test benar-benar 3-button nav (bukan gesture), dan cek `Theme.App.Starting` (splash theme)
+tidak override edge-to-edge sebelum `setContent` sempat jalan.
+
 ## Batch 110 — Audit deformasi layout UI: normal di Android 16, kacau di Android 15 ke bawah (0 kode app diubah)
 Instruksi user: audit kenapa layout tampak normal di OS 16 tapi kacau di OS 15 ke bawah. **2 file
 diedit, keduanya dokumentasi** (`PROJECT_STATE.md`, `CHANGELOG.md`) — audit murni, TIDAK ada kode

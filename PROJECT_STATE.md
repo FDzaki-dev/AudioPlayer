@@ -6,6 +6,28 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 111 (Fix deformasi layout UI Android 15 ke bawah — eksekusi scope Batch 110, 3 file
+diedit)** — Root cause & diagnosis lengkap: lihat Batch 110 di bawah (tidak diulang di sini).
+Fix: tambah `.windowInsetsPadding(WindowInsets.safeDrawing)` (sebelum `.padding(32.dp)` fixed
+yang sudah ada, bukan pengganti) di 3 titik: `WelcomeScreen` (`MainActivity.kt`, private
+composable), `PermissionRationale` (`MainActivity.kt`, private composable), `LockScreen`
+(`LockScreen.kt`, root `Column`). Ketiganya render di luar `Scaffold` (`setContent` di
+`MainActivity.onCreate`) sehingga sebelumnya nol proteksi insets. `MainActivity.kt` dapat 3
+import baru (`WindowInsets`, `safeDrawing`, `windowInsetsPadding`); `LockScreen.kt` sudah pakai
+wildcard `foundation.layout.*`, tidak perlu import baru. Manifest (protected, edit parsial 1
+atribut): `<activity>` MainActivity dapat `android:windowLayoutInDisplayCutoutMode="shortEdges"`
+— eksplisit dinyatakan (sebelumnya tidak dideklarasikan sama sekali), konsisten dengan
+`enableEdgeToEdge()` yang sudah aktif. `compileSdk`/`targetSdk` 34 TIDAK dinaikkan di batch ini
+(di luar scope yang disetujui, tetap gap tercatat terpisah). **Catatan eksplisit dari user**:
+title/judul lagu yang bergerak sendiri (`basicMarquee()` di Now Playing) BUKAN bagian dari bug
+deformasi ini — perilaku itu memang disengaja (marquee scroll teks panjang), tidak disentuh sama
+sekali di batch ini. Brace/paren `MainActivity.kt` (245/245, 563/563) & `LockScreen.kt` (48/48,
+128/128) dicek seimbang; manifest XML valid (`xmllint`). **Belum diverifikasi compile/runtime
+Gradle sungguhan** (tidak ada JDK/Android SDK di sandbox) — prioritas berikutnya kalau user push:
+build & install ke device Android 15 3-button-nav sungguhan, cek WelcomeScreen/PermissionRationale
+saat first-launch dan LockScreen kalau App Lock aktif, pastikan konten tidak lagi ketiban status
+bar/nav bar. Detail lengkap: `CHANGELOG.md` Batch 111.
+
 **Batch 110 (Audit deformasi layout UI: normal di Android 16, kacau di Android 15 ke bawah — 2
 file diedit, keduanya dokumentasi, 0 kode app diubah)** — Instruksi user eksplisit: dokumentasi
 lengkap dulu sebelum eksekusi fix. Audit `grep` insets keyword ke SEMUA 20 file `ui/*.kt`: **0
