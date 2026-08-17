@@ -1349,9 +1349,14 @@ private fun SpeedDialog(
                     onClick = { onToggleCrossfade(false) }
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+                // Batch 102 — subtitle diperbarui: sebelum ini cuma volume 1 pemutar yang
+                // dilandaikan turun-naik di sekitar titik ganti lagu (jeda senyap singkat tetap
+                // ada, cuma disamarkan). Sekarang lagu berikutnya benar-benar mulai main
+                // (overlap) SEBELUM lagu ini habis — dua sumber suara sungguhan tumpang tindih,
+                // bukan cuma efek volume. Lihat CrossfadeEngine.kt.
                 TransitionModeOption(
                     title = "Fade Halus",
-                    subtitle = "Volume melandai turun lalu naik lagi di tiap pergantian lagu",
+                    subtitle = "Lagu berikutnya mulai main sebelum lagu ini habis, saling menumpuk lalu bertukar halus",
                     selected = crossfadeEnabled,
                     onClick = { onToggleCrossfade(true) }
                 )

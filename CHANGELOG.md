@@ -1,5 +1,104 @@
 # Changelog
 
+## Batch 102 — Gap List #1: True Crossfade (dual-instance overlap sungguhan)
+Dari `AudioPlayer_Coding_Gap_List.md` (upload user), P0 pertama di daftar prioritas: "Fade
+Halus" sebelumnya cuma efek volume 1 pemutar, bukan crossfade sungguhan. **4 file** (1 baru, 3
+diedit — 1 di antaranya `PlaybackService.kt`, file paling berisiko di proyek ini per catatan
+class doc-nya sendiri, edit parsial).
+
+**Kenapa ini sulit, dan pendekatan yang DIHINDARI**: cara paling jelas kelihatan untuk "true
+crossfade" adalah dua `ExoPlayer` yang gantian jadi pemilik `MediaSession` lewat
+`MediaSession.setPlayer()`. Sebelum menulis kode, ini dicek dulu lewat web search — hasilnya:
+API itu memang ada, tapi dilaporkan tidak reliable (GitHub issue `androidx/media#764`, "the
+entire media session just seems to end when I switch players in this way"), dan alternatif
+resmi yang disarankan maintainer-nya (`ForwardingSimpleBasePlayer`) baru tersedia dari media3
+1.4.0 — proyek ini pin di 1.3.1 (`build.gradle.kts`), dan sudah 2x kena insiden dari bump versi
+dependency yang dipaksakan tanpa akses compiler untuk verifikasi (Batch 23/24, Batch 29).
+Bumping media3 demi 1 fitur, dengan risiko harus ikut memperbaiki API session lain yang mungkin
+berubah bentuk (`onPlaybackResumption`, dll — sudah pernah jadi masalah sebelumnya juga), dinilai
+tidak sepadan untuk batch ini.
+
+**Desain yang dipakai** — `playback/CrossfadeEngine.kt` (baru): `sessionPlayer` (ExoPlayer yang
+sudah ada, dipegang `MediaSession`) TIDAK PERNAH diganti. `overlapPlayer`: ExoPlayer kedua,
+privat, tidak pernah diekspos ke session/notifikasi/UI, hanya pegang SATU `MediaItem` (track
+berikutnya) di satu waktu.
+
+1. **Mulai overlap** (`maybeStartCrossfade()`, dipanggil tiap tick polling 250ms dari
+`PlaybackService`) — begitu sisa waktu `sessionPlayer` \<= 3 detik (durasi crossfade tetap,
+belum dibuat bisa diatur user — lihat "Belum digarap"), item berikutnya diambil lewat
+`sessionPlayer.nextMediaItemIndex` (API stabil Player interface, otomatis sudah menghormati mode
+shuffle & repeat yang sedang aktif — TIDAK ada logic shuffle/repeat baru ditulis ulang di sini
+sama sekali, jadi nol risiko baru di area itu). `overlapPlayer` di-`setMediaItem`+`prepare`+
+`play` dari volume 0, lalu volume di-ramp bersilangan: `sessionPlayer` turun ke 0, `overlapPlayer`
+naik ke volume target — **dua sumber suara sungguhan tumpang tindih di output audio selama
+jendela itu**, ini bagian yang sebelumnya tidak ada sama sekali (dulu cuma 1 pemutar, jeda senyap
+tetap ada walau disamarkan volume).
+
+2. **Handback senyap** (`onSessionAutoTransition()`, dipanggil dari
+`onMediaItemTransition(reason=AUTO)`) — `sessionPlayer` DIBIARKAN mencapai transisi otomatisnya
+sendiri tanpa campur tangan sama sekali (lagi-lagi: queue/timeline-nya tidak disentuh). Begitu
+itu terjadi, volumenya sudah ~0 (hasil ramp di atas) — jadi AMAN diseek diam-diam ke posisi
+`overlapPlayer.currentPosition` (seek yang tidak terdengar karena volume nol, ini kunci kenapa
+tidak perlu trik lebih rumit), lalu kendali ditukar balik lewat ramp pendek 400ms
+(`sessionPlayer` naik, `overlapPlayer` turun ke 0 lalu di-`pause`+`clearMediaItems`). Karena
+posisi keduanya persis sinkron (hasil seek), ramp balik ini tidak menghasilkan gema/dobel suara.
+
+3. **Pembatalan aman** — `onSessionManualDiscontinuity(reason)` dipanggil dari
+`onPositionDiscontinuity` `sessionPlayer` utk SEMUA reason; kalau `SEEK` (skip tombol, seek bar,
+headset, notifikasi, lock screen, Bluetooth — apa pun yang bikin `Player` diseek dari luar) DAN
+bukan seek internal milik langkah 2 di atas (dibedakan lewat flag `internalSeekInFlight`),
+crossfade yang sedang jalan langsung dibatalkan (`overlapPlayer` di-pause+clear, volume
+`sessionPlayer` dipulihkan). `onSessionPlayWhenReadyChanged(isPlaying)` dipanggil dari
+`onIsPlayingChanged` — pause manual mid-crossfade ikut membekukan `overlapPlayer`, resume ikut
+melanjutkannya, supaya tidak ada skenario lagu berikutnya kedengaran main sendiri padahal user
+sudah menekan jeda. Repeat-one (`Player.REPEAT_MODE_ONE`) di-skip total di
+`maybeStartCrossfade()` — "next" track dlm mode itu adalah dirinya sendiri, bukan target
+crossfade yang masuk akal, ini poin eksplisit di gap list ("pastikan repeat-one tidak memicu
+crossfade yang salah"). `overlapPlayer.onPlayerError` fail-safe: kalau file berikutnya gagal
+disiapkan (terhapus/rusak/izin dicabut sejak queue dibangun), crossfade dibatalkan bersih —
+sengaja tidak pernah membiarkan `sessionPlayer` macet di volume rendah tanpa jalan keluar.
+
+**`PlaybackService.kt`** (protected, edit parsial) — `overlapPlayer` dibangun dengan
+`setAudioAttributes(audioAttributes, /*handleAudioFocus=*/false)` +
+`setHandleAudioBecomingNoisy(false)` (sengaja: cuma `sessionPlayer` yang boleh urus fokus audio
+& auto-pause headset lepas — dua `ExoPlayer` sama-sama minta fokus akan bentrok). Custom
+`SessionCommand` baru `ACTION_SET_CROSSFADE_ENABLED`/`EXTRA_CROSSFADE_ENABLED` didaftarkan di
+`onConnect`, pola identik `ACTION_SET_SKIP_SILENCE` yang sudah ada (jembatan satu-satunya dari
+`MediaController` sisi UI ke `ExoPlayer`/`CrossfadeEngine` mentah sisi Service — `Player`
+interface umum tidak mengekspos ini). Loop `serviceScope.launch { while(isActive) {...; delay
+(250) } }` baru — no-op murah lewat guard `enabled`/`isPlaying` internal `CrossfadeEngine` kalau
+fitur mati/lagi tidak main. `overlapPlayer.release()` eksplisit di `onDestroy` (tidak ikut kebawa
+`mediaSession.player.release()` krn memang bukan bagian dari session).
+
+**`PlayerViewModel.kt`** — `startFadeIn()`/`startFadeOut()`/`animateVolume()`/`fadeJob`/
+`fadedOutForIndex`/konstanta `FADE_DURATION_MS`(3000L)/`FADE_FLOOR`(0.15f) dihapus total, semua
+logic-nya pindah ke `CrossfadeEngine` (server-side, krn ExoPlayer mentah tidak pernah diekspos ke
+ViewModel yang cuma pegang `MediaController`). `setCrossfadeEnabled(Boolean)` sekarang relay
+lewat custom command di atas, bukan lagi manipulasi volume langsung. `crossfadeEnabled:
+StateFlow<Boolean>` dan signature `setCrossfadeEnabled()` TIDAK berubah — jadi UI konsumen
+(`NowPlayingScreen.kt`) tidak perlu perubahan logic, cuma teks subtitle toggle "Fade Halus"
+diperbarui (dulu bilang "volume melandai", sekarang jujur bilang "lagu berikutnya mulai main
+sebelum lagu ini habis"). `README.md` § *Catatan jujur soal Gapless Playback* diperbarui senada.
+
+**Belum digarap / batasan disadari** (dicatat, bukan terlewat — lihat juga `PROJECT_STATE.md`):
+- Durasi crossfade masih hardcode 3000ms (`CrossfadeEngine.crossfadeDurationMs`), belum ada UI
+untuk user atur sendiri (mis. slider 1–8 detik) — gap list tidak secara eksplisit minta ini utk
+item #1, jadi sengaja belum ditambah supaya batch ini tetap fokus 1 hal.
+- Equalizer/Visualizer terikat ke `PlaybackAudioSession.sessionId` milik `sessionPlayer`;
+`overlapPlayer` (ExoPlayer/AudioTrack terpisah) punya audio session id sendiri, jadi EQ/
+visualizer belum ikut memengaruhi ~3 detik overlap suara lagu yang baru masuk. Sempit dampaknya
+(kedua fitur opt-in), belum diprioritaskan.
+- Slider volume yang digeser tepat saat crossfade sedang ramp akan terasa "menyusul" sesaat —
+ramp ini menulis `sessionPlayer.volume` tiap tick sampai selesai (<3 detik). Transient, bukan bug
+fungsional, didokumentasikan sebagai trade-off sadar di `CrossfadeEngine.kt` sendiri.
+- **Belum pernah di-build fisik** — tidak ada akses compiler/Gradle di sesi kerja batch ini.
+Confidence "seharusnya benar" berdasar API Media3 yang sudah lama stabil lintas versi
+(`Player.Listener`, `ExoPlayer.Builder`, `seekTo`/`setVolume`/`clearMediaItems`/
+`nextMediaItemIndex`), BUKAN dari hasil compile aktual — dicek satu per satu manual, bukan
+tebakan. Kalau ada error compile, titik paling mungkin: nama konstanta
+`Player.MEDIA_ITEM_TRANSITION_REASON_AUTO`/`Player.DISCONTINUITY_REASON_SEEK` atau signature
+`onPositionDiscontinuity` 3-parameter di versi media3 1.3.1 yang terpasang persis.
+
 ## Batch 101 — Adaptive layout multi-device (rail + two-pane) & undo hapus playlist
 Instruksi user: audit UX/frontend, gabung semua perbaikan (kecuali TalkBack/Tema/Lokalisasi)
 dalam 1 batch, utamakan multi-device/adaptive layout. **5 file** (1 baru, 4 diedit — 1 di

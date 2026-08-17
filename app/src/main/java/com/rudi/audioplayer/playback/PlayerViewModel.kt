@@ -229,8 +229,6 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val _customFolders = MutableStateFlow(loadCustomFolderInfos())
     val customFolders: StateFlow<List<CustomFolderInfo>> = _customFolders.asStateFlow()
     private var userTargetVolume = 1f
-    private var fadeJob: Job? = null
-    private var fadedOutForIndex = -1
     private var positionTick = 0
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
@@ -384,10 +382,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 if (audiobookState.lastPositionMs > 0) controller?.seekTo(audiobookState.lastPositionMs)
             }
 
-            if (_crossfadeEnabled.value) {
-                startFadeIn()
-            }
-            fadedOutForIndex = -1
+            // Batch 102 — dulu di sini ada startFadeIn() (fade volume single-player). True
+            // crossfade sekarang seluruhnya dikelola CrossfadeEngine di PlaybackService (dua
+            // ExoPlayer overlap sungguhan) — ViewModel ini cuma pegang MediaController, tidak
+            // punya akses ke ExoPlayer mentah, jadi tidak ada lagi kerja fade di sisi sini sama
+            // sekali. Lihat CrossfadeEngine.kt.
 
             // A-B Repeat is scoped to one song, never carried to the next — a stale point B
             // from the previous track would either never trigger (positions rarely line up) or
@@ -663,16 +662,6 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
                     if (AbRepeatLogic.shouldLoopBack(position, _abRepeatPointA.value, _abRepeatPointB.value)) {
                         c.seekTo(_abRepeatPointA.value ?: 0L)
-                    }
-
-                    if (_crossfadeEnabled.value && c.isPlaying && duration > 0) {
-                        val remaining = duration - position
-                        val currentIndex = c.currentMediaItemIndex
-                        val hasNext = currentIndex < currentQueue.size - 1 || c.repeatMode != Player.REPEAT_MODE_OFF
-                        if (remaining in 1..FADE_DURATION_MS && hasNext && fadedOutForIndex != currentIndex) {
-                            fadedOutForIndex = currentIndex
-                            startFadeOut()
-                        }
                     }
 
                     positionTick++
@@ -1116,40 +1105,19 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         audioVisualizerController.release()
     }
 
-    /** Ramps volume down toward the end of a track, just before the next one begins. */
-    private fun startFadeOut() {
-        fadeJob?.cancel()
-        fadeJob = viewModelScope.launch {
-            animateVolume(from = userTargetVolume, to = userTargetVolume * FADE_FLOOR)
-        }
-    }
-
-    /** Ramps volume back up at the start of a new track, softening the transition. */
-    private fun startFadeIn() {
-        fadeJob?.cancel()
-        controller?.setVolume(userTargetVolume * FADE_FLOOR)
-        fadeJob = viewModelScope.launch {
-            animateVolume(from = userTargetVolume * FADE_FLOOR, to = userTargetVolume)
-        }
-    }
-
-    private suspend fun animateVolume(from: Float, to: Float) {
-        val steps = 24
-        val stepDelay = FADE_DURATION_MS / steps
-        for (i in 0..steps) {
-            val fraction = i / steps.toFloat()
-            controller?.setVolume((from + (to - from) * fraction).coerceIn(0f, 1f))
-            delay(stepDelay)
-        }
-    }
-
+    // Batch 102 (Gap List #1, True Crossfade) — startFadeOut()/startFadeIn()/animateVolume()
+    // yang dulu ada di sini (single-player volume envelope) sudah dihapus total. True crossfade
+    // sekarang dikerjakan CrossfadeEngine di PlaybackService lewat overlap dua ExoPlayer
+    // sungguhan — ViewModel ini cuma relay toggle on/off-nya lewat custom SessionCommand
+    // (ACTION_SET_CROSSFADE_ENABLED), pola identik setSilenceSkipEnabled() di atas, karena
+    // ExoPlayer mentah/CrossfadeEngine tidak diekspos lewat MediaController.
     fun setCrossfadeEnabled(enabled: Boolean) {
         crossfadeStore.setEnabled(enabled)
         _crossfadeEnabled.value = enabled
-        if (!enabled) {
-            fadeJob?.cancel()
-            controller?.setVolume(userTargetVolume)
-        }
+        val args = Bundle().apply { putBoolean(PlaybackService.EXTRA_CROSSFADE_ENABLED, enabled) }
+        controller?.sendCustomCommand(SessionCommand(PlaybackService.ACTION_SET_CROSSFADE_ENABLED, Bundle.EMPTY), args)
+        // controller == null: sama seperti setSilenceSkipEnabled(), tidak fatal — PlaybackService
+        // baca CrossfadeStore langsung di onCreate-nya sendiri begitu benar-benar start.
     }
 
     fun togglePlayPause() {
@@ -1180,7 +1148,6 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     fun setVolume(volume: Float) {
         userTargetVolume = volume.coerceIn(0f, 1f)
-        fadeJob?.cancel()
         controller?.setVolume(userTargetVolume)
     }
 
@@ -1223,7 +1190,6 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     override fun onCleared() {
         sleepTimerJob?.cancel()
-        fadeJob?.cancel()
         accentColorJob?.cancel()
         libraryRefreshJob?.cancel()
         libraryAutoRefreshJob?.cancel()
@@ -1237,8 +1203,4 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         super.onCleared()
     }
 
-    companion object {
-        private const val FADE_DURATION_MS = 3000L
-        private const val FADE_FLOOR = 0.15f
-    }
 }

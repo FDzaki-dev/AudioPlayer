@@ -6,6 +6,67 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 102 (Gap List #1 — True Crossfade, 4 file — 1 baru + 3 diedit, 1 protected)** — Dari
+`AudioPlayer_Coding_Gap_List.md` yang user upload, item P0 pertama di daftar prioritas. "Fade
+Halus" sebelumnya BUKAN crossfade sungguhan — cuma satu ExoPlayer yang volume-nya dilandaikan
+turun lalu naik di sekitar titik ganti lagu (jeda senyap tetap ada, cuma disamarkan). Batch ini
+ganti jadi overlap dua sumber suara sungguhan.
+
+1. **`playback/CrossfadeEngine.kt` (baru)** — mesin dual-ExoPlayer. `sessionPlayer` (yang sudah
+ada, dipegang `MediaSession`) TIDAK PERNAH diganti/di-swap — sengaja dihindari, sudah dicek lewat
+web search: `MediaSession.setPlayer()` hot-swap dilaporkan bisa bikin session-nya berhenti total
+(GitHub `androidx/media#764`), dan alternatif resminya (`ForwardingSimpleBasePlayer`) baru ada
+dari media3 1.4.0 — proyek ini pin di 1.3.1 (lihat alasan di `PlaybackService.kt`, sudah 2x kena
+insiden dari bump versi yang dipaksakan tanpa compiler: Batch 23/24, Batch 29). Sebagai
+gantinya: `overlapPlayer`, ExoPlayer KEDUA yang privat (tidak pernah disentuh session/notifikasi/
+UI), cuma pegang SATU MediaItem berikutnya, mulai main ~3 detik sebelum `sessionPlayer` habis,
+lalu volume di-ramp bersilangan (sessionPlayer turun, overlapPlayer naik) — tumpang tindih
+sungguhan di output audio. `sessionPlayer` DIBIARKAN mencapai transisi otomatisnya sendiri
+(queue/shuffle/repeat-nya sama sekali tidak disentuh/di-reimplement — nol risiko baru di area
+itu); begitu itu terjadi dia sudah senyap (volume ~0), jadi aman diseek diam-diam ke posisi
+`overlapPlayer` (seek yang tidak terdengar krn volumenya nol) lalu bertukar kendali balik lewat
+ramp singkat 400ms — sync posisi persis, jadi ramp balik ini tidak menghasilkan gema.
+Skip/seek manual (tombol, notifikasi, headset, lock screen) mem-batalkan crossfade yang sedang
+jalan lewat `onPositionDiscontinuity(reason=SEEK)` (dibedakan dari seek internal milik engine ini
+sendiri via flag `internalSeekInFlight`); pause manual ikut membekukan `overlapPlayer` lewat
+`onIsPlayingChanged`. Repeat-one sengaja di-skip total (next item = diri sendiri = bukan
+crossfade yang masuk akal). `onPlayerError` di `overlapPlayer` fail-safe ke "batal crossfade kali
+ini", tidak pernah macet di volume rendah.
+
+2. **`PlaybackService.kt` (protected, edit parsial)** — bikin `overlapPlayer`
+(`handleAudioFocus=false`, `setHandleAudioBecomingNoisy(false)`, cuma `sessionPlayer` yang boleh
+urus fokus audio), custom `SessionCommand` baru `ACTION_SET_CROSSFADE_ENABLED` (pola identik
+`ACTION_SET_SKIP_SILENCE`), hook 3 listener (`onMediaItemTransition` reason AUTO,
+`onPositionDiscontinuity`, `onIsPlayingChanged`) ke `CrossfadeEngine`, loop polling 250ms baru,
+release `overlapPlayer` eksplisit di `onDestroy` (tidak ikut kebawa `mediaSession.player.
+release()`).
+
+3. **`PlayerViewModel.kt`** — `startFadeIn()`/`startFadeOut()`/`animateVolume()`/
+`fadedOutForIndex`/`FADE_DURATION_MS`/`FADE_FLOOR` dihapus total (pindah ke `CrossfadeEngine`).
+`setCrossfadeEnabled()` sekarang relay lewat custom command persis pola
+`setSilenceSkipEnabled()` yang sudah ada, karena ExoPlayer mentah tidak diekspos lewat
+`MediaController`. `crossfadeEnabled: StateFlow<Boolean>` + `setCrossfadeEnabled()` — API publik
+ke UI TIDAK berubah signature-nya, jadi `NowPlayingScreen.kt` cuma perlu update teks subtitle
+toggle (`ui/NowPlayingScreen.kt`, bukan file "protected" tapi disebut krn ikut diedit), tidak ada
+perubahan logic di sana.
+
+**Batasan yang disadari, sengaja BELUM dibereskan** (dicatat, bukan terlewat):
+- Equalizer/Visualizer terikat ke `PlaybackAudioSession.sessionId` (audio session id
+`sessionPlayer`) — `overlapPlayer` punya audio session id sendiri (ExoPlayer/AudioTrack
+terpisah), jadi EQ/visualizer belum ikut memengaruhi ~3 detik overlap suara lagu yang baru masuk.
+Sempit dampaknya (fitur opt-in), belum jadi prioritas.
+- Slider volume yang digeser TEPAT saat crossfade sedang ramp bisa terasa "menyusul" sesaat —
+ramp engine ini overwrite `sessionPlayer.volume` tiap tick sampai selesai (<3 detik). Transient,
+bukan bug fungsional.
+- Belum di-build fisik (tidak ada akses compiler/Gradle di sesi kerja ini) — confidence
+"seharusnya benar" berdasar API Media3 yang stabil lintas versi (`Player.Listener`,
+`ExoPlayer.Builder`, `seekTo`/`setVolume`/`clearMediaItems`), BUKAN dari hasil compile aktual.
+Prioritas verifikasi pertama kali dicoba: dengarkan baik-baik momen pergantian lagu dgn "Fade
+Halus" ON — kalau ada gema/dobel suara sepersekian detik di titik handback, cek dulu
+`CrossfadeEngine.onSessionAutoTransition()`.
+
+Detail lengkap: `CHANGELOG.md` Batch 102.
+
 **Batch 101 (Adaptive layout multi-device + undo hapus playlist, 5 file — 1 baru + 4 diedit, 1
 protected)** — Instruksi user: audit UX/frontend (dijawab di chat, bukan kode), lalu gabung
 semua perbaikan KECUALI TalkBack/Tema/Lokalisasi jadi 1 batch, utamakan adaptive layout.

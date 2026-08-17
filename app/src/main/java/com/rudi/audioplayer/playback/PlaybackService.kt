@@ -28,6 +28,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.rudi.audioplayer.MainActivity
 import com.rudi.audioplayer.R
 import com.rudi.audioplayer.bubble.FloatingBubbleService
+import com.rudi.audioplayer.data.CrossfadeStore
 import com.rudi.audioplayer.data.FloatingBubbleStore
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
@@ -40,6 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -67,6 +69,8 @@ class PlaybackService : MediaLibraryService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var shakeDetector: ShakeDetector? = null
     private var coldStartNotificationActive = false
+    // Batch 102 (Gap List #1, True Crossfade) — lihat CrossfadeEngine.kt untuk mekanisme penuh.
+    private var crossfadeEngine: CrossfadeEngine? = null
     // Batch 34: pushWidgetUpdate fires on every track transition and every play/pause tap —
     // both high-frequency, high-visibility moments. Tracking the job lets a fast skip/toggle
     // cancel a still-decoding older update instead of letting it land after a newer one and
@@ -100,6 +104,20 @@ class PlaybackService : MediaLibraryService() {
         // memanggilnya langsung, dan custom SessionCommand ini yang jadi jembatannya.
         player.setSkipSilenceEnabled(SilenceSkipStore(this).isEnabled())
 
+        // Batch 102 (Gap List #1, True Crossfade) — overlapPlayer adalah ExoPlayer KEDUA, privat,
+        // TIDAK PERNAH disentuh MediaSession/notifikasi/UI. handleAudioFocus & becomingNoisy
+        // sengaja false: cuma `player` (session) yang boleh mengurus fokus audio & auto-pause
+        // headset lepas, dua ExoPlayer yang sama-sama minta fokus akan bentrok. Detail mekanisme
+        // lengkap + kenapa MediaSession.setPlayer() hot-swap SENGAJA dihindari: lihat
+        // CrossfadeEngine.kt (dokumentasi kelasnya) dan CHANGELOG.md Batch 102.
+        val overlapPlayer = ExoPlayer.Builder(this)
+            .setAudioAttributes(audioAttributes, false)
+            .setHandleAudioBecomingNoisy(false)
+            .build()
+        overlapPlayer.setSkipSilenceEnabled(SilenceSkipStore(this).isEnabled())
+        crossfadeEngine = CrossfadeEngine(sessionPlayer = player, overlapPlayer = overlapPlayer, scope = serviceScope)
+        crossfadeEngine?.setEnabled(CrossfadeStore(this).isEnabled())
+
         // ExoPlayer assigns its own audio session ID lazily (once the AudioTrack is created).
         // PlayerViewModel talks to playback only through a MediaController, which doesn't expose
         // this ExoPlayer-specific property — so we mirror it into a same-process singleton every
@@ -114,10 +132,34 @@ class PlaybackService : MediaLibraryService() {
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 pushWidgetUpdate(player)
+                // Batch 102 — sessionPlayer mencapai akhir track sendiri secara alami (bukan
+                // seek/skip manual): ini titik "silent handback" milik CrossfadeEngine, lihat
+                // dokumentasi kelasnya langkah 3.
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                    crossfadeEngine?.onSessionAutoTransition()
+                }
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                // Batch 102 — skip/seek manual (tombol UI, notifikasi, headset, lock screen,
+                // Bluetooth) apa pun bentuknya wajib membatalkan crossfade yang sedang
+                // berlangsung, supaya overlapPlayer tidak pernah kebablasan main sendiri di
+                // atas lagu yang baru dituju user. Seek internal milik CrossfadeEngine sendiri
+                // (langkah handback) SENGAJA tidak ikut kena — lihat internalSeekInFlight di
+                // CrossfadeEngine.kt.
+                crossfadeEngine?.onSessionManualDiscontinuity(reason)
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 pushWidgetUpdate(player)
+                // Batch 102 — pause/resume mid-crossfade harus ikut membekukan/melanjutkan
+                // overlapPlayer, kalau tidak lagu berikutnya tetap terdengar sendiri walau user
+                // sudah menekan jeda.
+                crossfadeEngine?.onSessionPlayWhenReadyChanged(isPlaying)
                 if (isPlaying && ShakeSettingsStore(this@PlaybackService).isEnabled()) {
                     shakeDetector?.start()
                 } else {
@@ -141,6 +183,18 @@ class PlaybackService : MediaLibraryService() {
                 }
             }
         })
+
+        // Batch 102 — polling ringan (250ms) memeriksa apakah sessionPlayer sudah masuk jendela
+        // crossfade; no-op murah lewat guard `enabled`/`isPlaying` di CrossfadeEngine kalau
+        // fitur mati atau lagi tidak main. Pola sama seperti PlayerViewModel.startPositionLoop,
+        // tapi wajib hidup di sisi Service ini karena overlapPlayer (ExoPlayer mentah) tidak
+        // pernah diekspos ke ViewModel — ViewModel cuma pegang MediaController.
+        serviceScope.launch {
+            while (isActive) {
+                crossfadeEngine?.maybeStartCrossfade()
+                delay(250)
+            }
+        }
 
         shakeDetector = ShakeDetector(this) { mediaSession?.player?.seekToNextMediaItem() }
 
@@ -382,6 +436,7 @@ class PlaybackService : MediaLibraryService() {
             // MediaController secara umum.
             val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
                 .add(SessionCommand(ACTION_SET_SKIP_SILENCE, Bundle.EMPTY))
+                .add(SessionCommand(ACTION_SET_CROSSFADE_ENABLED, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailablePlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS)
@@ -398,6 +453,15 @@ class PlaybackService : MediaLibraryService() {
             if (customCommand.customAction == ACTION_SET_SKIP_SILENCE) {
                 val enabled = args.getBoolean(EXTRA_SKIP_SILENCE_ENABLED, false)
                 (mediaSession?.player as? ExoPlayer)?.setSkipSilenceEnabled(enabled)
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            if (customCommand.customAction == ACTION_SET_CROSSFADE_ENABLED) {
+                // Batch 102 — sama pola dengan ACTION_SET_SKIP_SILENCE: CrossfadeEngine hidup
+                // di ExoPlayer mentah milik Service ini, MediaController tidak bisa
+                // menjangkaunya langsung. setEnabled(false) di sini juga otomatis membatalkan
+                // crossfade yang sedang berlangsung (lihat CrossfadeEngine.abort()).
+                val enabled = args.getBoolean(EXTRA_CROSSFADE_ENABLED, false)
+                crossfadeEngine?.setEnabled(enabled)
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
             return super.onCustomCommand(session, controller, customCommand, args)
@@ -446,6 +510,10 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onDestroy() {
         shakeDetector?.stop()
+        // Batch 102 — overlapPlayer bukan bagian dari mediaSession, jadi tidak ikut dilepas
+        // oleh `player.release()` di bawah kalau tidak dilepas eksplisit di sini dulu.
+        crossfadeEngine?.release()
+        crossfadeEngine = null
         serviceScope.cancel()
         mediaSession?.run {
             player.release()
@@ -468,6 +536,10 @@ class PlaybackService : MediaLibraryService() {
         // dipakai bareng PlayerViewModel.setSilenceSkipEnabled() lewat MediaController.
         const val ACTION_SET_SKIP_SILENCE = "com.rudi.audioplayer.ACTION_SET_SKIP_SILENCE"
         const val EXTRA_SKIP_SILENCE_ENABLED = "skip_silence_enabled"
+
+        // Batch 102, Gap List #1 (True Crossfade) — lihat CrossfadeEngine.kt.
+        const val ACTION_SET_CROSSFADE_ENABLED = "com.rudi.audioplayer.ACTION_SET_CROSSFADE_ENABLED"
+        const val EXTRA_CROSSFADE_ENABLED = "crossfade_enabled"
     }
 }
 
