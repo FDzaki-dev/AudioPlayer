@@ -6,6 +6,33 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 112 (Fix baris tombol transport Now Playing ke-clip/hilang — root cause TERPISAH dari
+Batch 110/111, 1 file diedit)** — User lapor (screenshot): baris tombol shuffle/prev/play/next/
+repeat di Now Playing masih "deformasi" SETELAH Batch 111. Ternyata bukan kasus yang sama:
+`NowPlayingScreen` render DI DALAM `Scaffold`/`AppNavHost` (bukan di luar seperti 3 screen Batch
+111), jadi sudah dapat `contentWindowInsets` via `padding` di `AppNavHost` — insets BUKAN
+masalahnya di sini. Root cause asli: root `Column` layar ini `fillMaxSize()` TANPA scroll, isinya
+fixed-height (hero art 300dp + hint banner ~150dp saat tampil + title/rating/waveform/time/tombol)
+— total tinggi konten gampang melebihi viewport asli terutama saat 3-button nav (Android 15 ke
+bawah, makan tinggi layar riil) dibanding gesture-nav (Android 16 test device, overlay tipis) —
+match observasi "normal di 16, kacau di 15 ke bawah" yang sama persis, TAPI mekanisme beda dari
+Batch 110/111. Konten overflow sebelumnya di-clip diam-diam di tepi layar, baris tombol (paling
+bawah urutan Column) paling sering jadi korban — persis yang di screenshot.
+Fix: `NowPlayingScreen.kt` (edit parsial) — root `Column` dapat `.verticalScroll(rememberScrollState())`
+(2 import baru: `androidx.compose.foundation.rememberScrollState`, `.verticalScroll`). Kalau konten
+muat (layar tinggi/gesture-nav), scroll offset tetap 0, nol perubahan visual dari sebelumnya; kalau
+tidak muat, sekarang bisa digeser bukan ke-clip hilang. Gesture drag vertikal untuk
+brightness/volume (2 `Box` swipe-zone di dalam hero art 300dp) TETAP aman — masing-masing sudah
+pakai `change.consume()` di `detectVerticalDragGestures`-nya sejak sebelum batch ini, pola standar
+yang mencegah `verticalScroll` ancestor ikut menangkap drag yang sama; swipe next/prev (horizontal,
+`AlbumArtHero`) juga tidak terpengaruh (beda axis). Title marquee (`basicMarquee()`) SEKALI LAGI
+tidak disentuh sama sekali — dikonfirmasi ulang bukan bug. Brace/paren dicek seimbang (199/199,
+673/673). **Belum diverifikasi compile/runtime Gradle sungguhan** — prioritas berikutnya kalau
+user push: buka Now Playing di device Android 15 3-button-nav dengan hint banner masih tampil
+(kondisi termudah memicu overflow), pastikan baris tombol transport tetap terjangkau (via scroll
+kalau perlu) dan swipe brightness/volume/next/prev masih responsif seperti biasa. Detail lengkap:
+`CHANGELOG.md` Batch 112.
+
 **Batch 111 (Fix deformasi layout UI Android 15 ke bawah — eksekusi scope Batch 110, 3 file
 diedit)** — Root cause & diagnosis lengkap: lihat Batch 110 di bawah (tidak diulang di sini).
 Fix: tambah `.windowInsetsPadding(WindowInsets.safeDrawing)` (sebelum `.padding(32.dp)` fixed

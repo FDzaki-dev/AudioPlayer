@@ -22,6 +22,8 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -286,6 +288,21 @@ fun NowPlayingScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                // Batch 112 — root cause TERPISAH dari Batch 111 (yang soal insets di luar
+                // Scaffold): layar ini SUDAH di dalam Scaffold/NavHost, jadi sudah dapat
+                // contentWindowInsets via `padding` di AppNavHost. Bug sebenarnya: Column ini
+                // fillMaxSize() TANPA scroll, isinya fixed-height (hero art 300dp + hint banner
+                // ~150dp kalau tampil + title/rating/waveform/tombol) — total gampang > tinggi
+                // viewport asli setelah dipotong status/nav bar, apalagi 3-button nav (umum di
+                // Android 15 ke bawah) yang makan tinggi layar riil vs gesture-nav (overlay
+                // tipis, Android 16 test device) yang nyaris tidak makan ruang — match persis
+                // observasi user "normal di 16, kacau di 15 ke bawah". Sebelumnya konten yang
+                // overflow BUKAN discroll, tapi ke-clip diam-diam di tepi layar — baris tombol
+                // transport (shuffle/prev/play/next/repeat), paling bawah dalam urutan Column,
+                // paling sering jadi korban. `verticalScroll` di sini murni jaring pengaman:
+                // kalau konten muat (layar tinggi/gesture-nav), scroll offset tetap 0, nol
+                // perubahan visual; kalau tidak muat, sekarang bisa digeser bukan hilang.
+                .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

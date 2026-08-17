@@ -1,5 +1,51 @@
 # Changelog
 
+## Batch 112 — Fix baris tombol transport Now Playing ke-clip/hilang (root cause terpisah dari Batch 110/111)
+User lapor via screenshot: baris tombol shuffle/prev/play/next/repeat di Now Playing masih hilang
+dari layar SETELAH Batch 111. Investigasi ulang menemukan ini BUKAN kasus insets yang sama.
+
+**Kenapa bukan kasus Batch 110/111**: `NowPlayingScreen` dipanggil dari `composable("now_playing")`
+di dalam `NavHost`, yang ada di dalam `Scaffold` (`AppNavHost`, `MainActivity.kt`). Scaffold's
+`padding` (dari `contentWindowInsets` bawaan) SUDAH diterapkan ke `Row` pembungkus `NavHost` — jadi
+layar ini, tidak seperti `WelcomeScreen`/`PermissionRationale`/`LockScreen` di Batch 111, sudah
+punya proteksi insets sejak awal.
+
+**Root cause asli**: root `Column` di `NowPlayingScreen.kt` — `Modifier.fillMaxSize()` TANPA
+`verticalScroll` — isinya kombinasi elemen fixed-height yang cukup besar: `Box` hero album art
+300dp, `FeatureHintBanner` (~150dp) kalau belum di-dismiss user, title/artist/star-rating, waveform
++ slider 48dp, baris waktu, baru terakhir baris tombol transport. Total tinggi konten ini gampang
+melebihi tinggi viewport SESUNGGUHNYA yang tersisa setelah dipotong status bar + nav bar —
+khususnya 3-button nav (masih umum di device Android 15 ke bawah/budget, makan tinggi layar
+nyata) dibanding gesture-nav (device Android 16 test, cuma overlay tipis). Karena `Column` tidak
+scrollable, konten yang overflow SEBELUMNYA bukan digeser tapi ke-clip diam-diam di tepi layar —
+dan karena baris tombol ada PALING BAWAH urutan Column, dia yang paling sering habis duluan.
+
+**Fix — `NowPlayingScreen.kt` (edit parsial, 1 file)**:
+- Import baru: `androidx.compose.foundation.rememberScrollState`, `androidx.compose.foundation.verticalScroll`.
+- Root `Column` (pembungkus header, hint banner, hero art, title/rating, waveform, tombol
+  transport) dapat `.verticalScroll(rememberScrollState())`, disisipkan sebelum `.padding(20.dp)`
+  yang sudah ada.
+
+**Kenapa aman untuk gesture drag yang sudah ada**: hero art 300dp punya 2 swipe-zone (`Box`)
+untuk brightness (kiri) & volume (kanan) pakai `detectVerticalDragGestures` + `change.consume()`
+eksplisit di tiap `onVerticalDrag` — pola ini SUDAH ada sebelum batch ini, dan `change.consume()`
+adalah cara standar Compose mencegah `verticalScroll` di ancestor ikut menangkap drag yang sama.
+Swipe next/prev (horizontal, di `AlbumArtHero`) beda axis, tidak tersentuh sama sekali.
+
+**Yang TIDAK disentuh**: title lagu yang scroll sendiri (`basicMarquee()`, Now Playing) — user
+menegaskan ulang eksplisit itu BUKAN bug, jadi nol perubahan terkait itu. `AlbumArtHero` internal,
+`WaveformSeekBar`, ukuran hero art 300dp — tidak diubah (bukan akar masalah, cukup dibuat bisa
+discroll saat overflow).
+
+**Verifikasi statis**: brace/paren `NowPlayingScreen.kt` seimbang (199 `{` / 199 `}`, 673 `(` /
+673 `)`) setelah edit; import baru dicek tidak duplikat. **Belum diverifikasi compile/runtime
+Gradle sungguhan** — tidak ada JDK/Android SDK di sandbox kerja. Verifikasi berikutnya (butuh push
++ build sungguhan + device fisik Android 15 3-button-nav): buka Now Playing dengan hint banner
+masih tampil (kondisi termudah memicu overflow, paling gampang direproduksi), pastikan baris
+tombol transport tetap terjangkau (scroll kalau perlu, tidak lagi hilang total dari layar), dan
+pastikan swipe brightness (kiri)/volume (kanan)/next-prev (di piringan) masih responsif seperti
+sebelum batch ini — tidak ada regresi gesture akibat `verticalScroll` baru di ancestor.
+
 ## Batch 111 — Fix deformasi layout UI Android 15 ke bawah (eksekusi scope Batch 110)
 Lanjutan langsung Batch 110 (audit). Root cause tidak diulang di sini — lihat entry Batch 110 di
 bawah. Fix diterapkan:
