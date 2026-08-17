@@ -26,10 +26,22 @@ ke off tiap kali app dibuka ulang meski user terakhir aktifkan keduanya.
 murni level fade internal untuk true crossfade (Batch 102), nilainya balik ke `1f` di luar
 window fade. Mempersistnya lintas sesi tidak berarti apa-apa untuk pengalaman user.
 
-Belum diverifikasi compile/runtime Gradle sungguhan (tidak ada JDK/Android SDK/kotlinc di
-sandbox kerja). Prioritas verifikasi berikutnya: build APK asli, matikan app total dengan
-shuffle ON + repeat-one aktif, buka lagi, pastikan keduanya genuinely kepulihkan di UI dan
-`MediaController` — bukan cuma diverifikasi lewat baca kode.
+**Push pertama gagal (CI run 161, build, log `log_fail_161.zip`)** — `compileReleaseKotlin`/
+`compileDebugKotlin` gagal: `PlaybackStateStore.kt:46:56` & `:48:28`, "Returns are not allowed
+for functions with expression body. Use block body in '{...}'". Root cause: `load()` ditulis
+`fun load(): SavedPlaybackState? = try { ... } catch { ... }` (expression body via `=`), tapi
+isinya pakai 2 early-return (`?: return null`, `if (ids.isEmpty()) return null`) — early-return
+cuma sah kalau function-nya block body (`{ ... }`), bukan expression body, terlepas dari apa pun
+yang ada di dalam try/catch. Fix: ubah ke `fun load(): SavedPlaybackState? { return try { ...
+} catch (e: Exception) { ... null } }` — block body eksplisit, isi try/catch persis sama tidak
+diubah. **Pelajaran: gaya ringkas `fun x(): T = ...` menggoda dipakai untuk function pendek
+apa pun, tapi begitu isinya butuh early-return di tengah jalan, wajib block body — cek pola ini
+saat menulis, jangan nunggu ketahuan dari CI log.**
+
+Belum diverifikasi compile/runtime Gradle sungguhan setelah fix ini (tidak ada JDK/Android
+SDK/kotlinc di sandbox kerja). Prioritas verifikasi berikutnya: build APK asli, matikan app
+total dengan shuffle ON + repeat-one aktif, buka lagi, pastikan keduanya genuinely kepulihkan
+di UI dan `MediaController` — bukan cuma diverifikasi lewat baca kode.
 
 ## Batch 107 — Bersihkan tag & judul GitHub Release
 2 file (1 protected). Permintaan langsung user dari screenshot halaman Releases repo: (1) tag

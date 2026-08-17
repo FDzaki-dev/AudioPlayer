@@ -20,10 +20,17 @@ corrupt/incompatible jatuh ke `null` (dianggap tidak ada state, mulai kosong), b
 resume — SharedPreferences typed getters sendiri sudah aman ClassCastException, ini jaring
 pengaman tambahan untuk kasus masa depan. Volume (`userTargetVolume`) SENGAJA tidak dipersist —
 diaudit, itu murni level fade internal crossfade (Batch 102), bukan preferensi user yang berarti
-disimpan lintas sesi. Brace/paren 2 file dicek otomatis & seimbang. **Belum diverifikasi
-compile/runtime Gradle sungguhan** — prioritas berikutnya kalau user push: matikan app dengan
-shuffle/repeat-one aktif, buka lagi, pastikan keduanya genuinely kepulihkan (bukan cuma baca
-kode). Detail lengkap: `CHANGELOG.md` Batch 108.
+disimpan lintas sesi. Brace/paren 2 file dicek otomatis & seimbang. **Push pertama gagal (CI run 161, build)**: `e: Returns are not allowed for functions with
+expression body` di `PlaybackStateStore.kt:46/48` — `load()` ditulis gaya `fun load(): T? =
+try { ... }` (expression body) tapi isinya pakai early-return (`?: return null`), yang cuma sah
+di block body. Diperbaiki: `fun load(): T? { return try { ... } catch { ... } }` — block body
+eksplisit, `return` di dalam try/catch sah. **Pelajaran: `return` awal (early-return) di dalam
+body tidak boleh dicampur dengan gaya singkat `fun x() = ...` (expression body) sependek apa
+pun, meski tanpa early-return sah-sah saja — cek pola ini SEBELUM push tiap kali menulis
+function baru bergaya ringkas.** Belum diverifikasi CI run berikutnya (belum ada akses GitHub
+Actions di sandbox ini) — prioritas berikutnya kalau user push ulang: pastikan compile hijau,
+lalu matikan app dengan shuffle/repeat-one aktif, buka lagi, pastikan keduanya genuinely
+kepulihkan (bukan cuma baca kode). Detail lengkap: `CHANGELOG.md` Batch 108.
 
 **Batch 107 (Permintaan user langsung dari screenshot GitHub Releases — bersihkan tag & judul
 rilis, 2 file, 1 protected)** — 2 hal: (1) hapus `-release` dari tag/nama file APK (sudah punya

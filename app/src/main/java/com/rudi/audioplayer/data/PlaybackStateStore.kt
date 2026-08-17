@@ -42,22 +42,32 @@ class PlaybackStateStore(context: Context) {
             .apply()
     }
 
-    fun load(): SavedPlaybackState? = try {
-        val idsRaw = prefs.getString(KEY_IDS, null) ?: return null
-        val ids = idsRaw.split(",").mapNotNull { it.toLongOrNull() }
-        if (ids.isEmpty()) return null
-        val index = prefs.getInt(KEY_INDEX, 0).coerceIn(0, ids.size - 1)
-        val position = prefs.getLong(KEY_POSITION, 0L).coerceAtLeast(0L)
-        // KEY_REPEAT_MODE/KEY_SHUFFLE ditambah di SCHEMA_VERSION 2 — belum ada di state lama
-        // (versi 1), getInt/getBoolean default aman ke off tanpa versi checking eksplisit.
-        val repeatMode = prefs.getInt(KEY_REPEAT_MODE, 0)
-        val shuffleEnabled = prefs.getBoolean(KEY_SHUFFLE, false)
-        SavedPlaybackState(ids, index, position, repeatMode, shuffleEnabled)
-    } catch (e: Exception) {
-        // Corrupt/incompatible state tidak boleh menjegal resume seluruh app — anggap saja
-        // tidak ada state tersimpan, mulai dari kosong seperti install baru.
-        Log.w(TAG, "Gagal load playback state tersimpan, dianggap tidak ada", e)
-        null
+    fun load(): SavedPlaybackState? {
+        // Batch 108 push pertama (CI run 161) gagal compile: `return null`/`return null` di
+        // dalam expression-body function (`fun load(): T? = try { ... }`) tidak diizinkan
+        // Kotlin ("Returns are not allowed for functions with expression body"). Diperbaiki
+        // jadi block body eksplisit ({ return try { ... } }) — `return` di dalam try/catch
+        // sah selama function-nya sendiri block body, bukan expression body. Pelajaran: early-
+        // return (`?: return null`) di dalam body TIDAK bisa dicampur dengan gaya
+        // `fun x() = ...` sesingkat apa pun bodinya, walau tanpa early-return dia sah-sah saja.
+        return try {
+            val idsRaw = prefs.getString(KEY_IDS, null) ?: return null
+            val ids = idsRaw.split(",").mapNotNull { it.toLongOrNull() }
+            if (ids.isEmpty()) return null
+            val index = prefs.getInt(KEY_INDEX, 0).coerceIn(0, ids.size - 1)
+            val position = prefs.getLong(KEY_POSITION, 0L).coerceAtLeast(0L)
+            // KEY_REPEAT_MODE/KEY_SHUFFLE ditambah di SCHEMA_VERSION 2 — belum ada di state
+            // lama (versi 1), getInt/getBoolean default aman ke off tanpa versi checking
+            // eksplisit.
+            val repeatMode = prefs.getInt(KEY_REPEAT_MODE, 0)
+            val shuffleEnabled = prefs.getBoolean(KEY_SHUFFLE, false)
+            SavedPlaybackState(ids, index, position, repeatMode, shuffleEnabled)
+        } catch (e: Exception) {
+            // Corrupt/incompatible state tidak boleh menjegal resume seluruh app — anggap saja
+            // tidak ada state tersimpan, mulai dari kosong seperti install baru.
+            Log.w(TAG, "Gagal load playback state tersimpan, dianggap tidak ada", e)
+            null
+        }
     }
 
     companion object {
