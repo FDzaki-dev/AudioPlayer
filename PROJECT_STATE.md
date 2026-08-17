@@ -6,6 +6,43 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 116 (Gap List #11 — Genre metadata first-class, 8 file kode + 1 dokumentasi)** — Item
+kedua daftar "Sangat disarankan" (lanjut Batch 115). Genre di-skip sejak Batch 89 dengan alasan
+"N+1 query per lagu" — dicek ulang, alasan itu cuma berlaku untuk pendekatan naif (query per
+lagu); dibalik jadi 1 map id→nama dibangun SEKALI per scan dari sisi `MediaStore.Audio.Genres`
+(dibatasi jumlah genre di device, bukan jumlah lagu) menghilangkan biayanya sama sekali.
+`MusicRepository.kt`'s `buildGenreMap()` baru (query `Genres` lalu `Genres.Members` per genre,
+bukan per lagu) dipanggil sekali di awal `querySongs()`, lookup O(1) per baris cursor.
+`CustomFolderScanner.kt` baca `METADATA_KEY_GENRE` dari retriever yang sudah terbuka (zero I/O
+tambahan, pola sama albumArtist/composer Batch 105). `Song.kt` dapat field `genre: String?`
+(default null, posisi terakhir — 0 call site lama berubah). **Dicek dulu ke referensi resmi
+sebelum nulis kode** (bukan ditebak dari ingatan) — tidak ada kolom genre polos di baris utama
+`MediaStore.Audio.Media` lintas API yang ditarget app ini (beda dari track/disc/album-artist
+yang semuanya kolom langsung), genre HANYA ada lewat tabel relasi `Genres`/`Genres.Members` —
+pelajaran Batch 14/32/33/44 (jangan tebak API Android) diterapkan lagi di sini sebelum menulis
+`buildGenreMap()`.
+
+`LibrarySearchIndex.kt` — genre masuk `searchableText` (blob null-separated sama seperti title/
+artist) — sisi "gunakan genre pada filtering/search" gap list. `SmartPlaylist.kt`/
+`SmartPlaylistEngine.kt` — kriteria baru `genre: String?`, EXACT match case-insensitive (BUKAN
+substring seperti `keyword` — semantiknya beda, nilai genre datang dari picker chip nilai asli
+library, bukan teks bebas), lagu tanpa genre tidak pernah cocok rule genre-bounded (pola sama
+`year == 0`). `SmartPlaylistScreen.kt`/`LibraryScreen.kt` — param `availableGenres` (persis
+presenden `availableFolderNames`) → baris `FilterChip` tap-to-clear di builder sheet, tepat di
+bawah chip folder. `README.md` — deskripsi Smart Playlist & catatan "belum selesai" genre lama
+dihapus/diperbarui.
+
+Brace/paren 8 file kode dicek otomatis & seimbang. 0 file baru (murni edit 8 file existing), 0
+protected asset tersentuh, 0 file manifest berubah (tidak ada file baru → `FILE_MANIFEST.txt`
+tidak perlu diedit). **Belum diverifikasi compile/runtime Gradle sungguhan** — prioritas
+berikutnya kalau user push: `./gradlew testDebugUnitTest` (pastikan `SmartPlaylistEngineTest.kt`
+existing tetap hijau dengan field baru default null), build APK asli + cek device (1) genre
+genuinely terisi untuk lagu yang filenya punya tag genre (banyak file musik nyata TIDAK punya
+tag genre sama sekali — kosong belum tentu bug, cek dulu file test-nya sendiri bertag atau
+tidak), (2) `buildGenreMap()` tidak menambah lag terasa saat refresh library, (3) chip genre di
+Playlist Otomatis builder exact-match benar (lagu genre lain tidak ikut lolos). Detail lengkap:
+`CHANGELOG.md` Batch 116.
+
 **Batch 115 (Gap List #10 — Backup/restore data lokal, 3 file — 2 baru + 1 diedit)** — Item
 pertama dari daftar "Sangat disarankan" setelah 10 item "Wajib" P0/P1 (crossfade sampai database
 consistency) tuntas di Batch 102-114. `BackupManager.kt` (baru, `data/`) — export 17 prefs

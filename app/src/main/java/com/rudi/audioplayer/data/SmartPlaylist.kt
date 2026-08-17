@@ -23,11 +23,17 @@ data class SmartPlaylist(
     val minYear: Int? = null,
     val maxYear: Int? = null,
     /** Case-insensitive substring match against title, artist, or album. Blank = no filter. */
-    val keyword: String = ""
+    val keyword: String = "",
+    /** Gap List #11 — case-insensitive EXACT match against [Song.genre] (not substring, unlike
+     *  [keyword]: genre values come from a fixed picker of the library's actual tags, not free
+     *  text, so exact match is the correct semantic — same reasoning [folderNames] already
+     *  uses a picker + exact match rather than a text field). Null/blank = no filter. */
+    val genre: String? = null
 ) {
     /** True if every criterion is at its "don't filter" default — used to warn the user before
      *  saving a rule that would just match the entire library. */
     fun isEmpty(): Boolean =
         folderNames.isEmpty() && minDurationMs == null && maxDurationMs == null &&
-            minRating == 0 && minYear == null && maxYear == null && keyword.isBlank()
+            minRating == 0 && minYear == null && maxYear == null && keyword.isBlank() &&
+            genre.isNullOrBlank()
 }

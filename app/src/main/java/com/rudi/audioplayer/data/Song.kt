@@ -39,5 +39,12 @@ data class Song(
     /** MIME type as reported by MediaStore/DocumentFile, e.g. "audio/mpeg", "audio/flac" —
      *  used for the container/format field; not a verified codec (that needs a decoder-level
      *  probe, out of scope here, same reasoning as bitrate/sampleRate above). */
-    val mimeType: String? = null
+    val mimeType: String? = null,
+    /** Gap List #11 (Genre metadata first-class). Null = no genre tag on this file/device
+     *  index. MediaStore only exposes genre through the separate Genres/Genres.Members
+     *  tables (no plain column on the main Media row across the API range this app
+     *  targets), so this is filled from a small id->name map built once per scan
+     *  ([MusicRepository.buildGenreMap]) — bounded by genre count, not song count, so it
+     *  is NOT the per-song N+1 cost that was the reason genre was skipped back in Batch 89. */
+    val genre: String? = null
 )

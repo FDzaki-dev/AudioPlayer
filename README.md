@@ -47,7 +47,8 @@ memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 - **Antrean putar (Queue)**: lihat antrean, naik/turunkan urutan, hapus dari antrean, lompat langsung ke lagu manapun, plus aksi "Putar Berikutnya" / "Tambah ke Antrean" via tekan-lama pada lagu di Perpustakaan
 - **Beranda pintar**: bagian "Baru Diputar" dan "Paling Sering Diputar" otomatis terisi dari riwayat dengar, tanpa perlu aksi manual dari user
 - **Playlist manual**: buat playlist sendiri lintas folder/album/artis, isi lewat "Tambah ke Playlist" (tekan-lama lagu), atur urutan, hapus lagu, ganti nama, atau hapus playlist — tersedia di tab Playlist pada Perpustakaan
-- **Playlist Otomatis (Smart Playlist)**: berbeda dari playlist manual — atur aturan sekali (folder, rentang durasi, rating minimum, rentang tahun rilis, kata kunci judul/artis/album), lagu yang cocok (termasuk lagu baru yang ditambahkan belakangan) otomatis ikut masuk tanpa perlu diisi manual. Tersedia di tab "Otomatis" pada Perpustakaan (dropdown "Lainnya"). Kriteria genre belum didukung (lihat "Belum selesai / dalam pengerjaan")
+- **Playlist Otomatis (Smart Playlist)**: berbeda dari playlist manual — atur aturan sekali (folder, genre, rentang durasi, rating minimum, rentang tahun rilis, kata kunci judul/artis/album), lagu yang cocok (termasuk lagu baru yang ditambahkan belakangan) otomatis ikut masuk tanpa perlu diisi manual. Tersedia di tab "Otomatis" pada Perpustakaan (dropdown "Lainnya")
+- **Genre metadata**: dibaca dari tabel `Genres`/`Genres.Members` MediaStore (satu map id→nama dibangun sekali per scan, bukan query per-lagu) untuk lagu MediaStore, dan dari tag file langsung untuk lagu folder tambahan (SAF). Ikut dalam pencarian Perpustakaan & tersedia sebagai kriteria exact-match Playlist Otomatis
 - **Statistik Dengar**: dashboard di Pengaturan → "Statistik Dengar" — total lagu diputar, estimasi waktu dengar (durasi × jumlah putar), grafik tren 7 hari terakhir, jam favorit dengar musik (dari 24 jam-dalam-hari, seluruh riwayat), dan artis paling sering. Semua dihitung langsung dari data yang sudah dikumpulkan (`PlayStatsStore`/`ListeningHistoryStore`), plus 1 pencatat baru (`HourlyListenStore`) khusus untuk jam favorit
 - **Repeat A-B & Bookmark Posisi**: dari Now Playing → Kontrol Lanjutan → "Repeat A-B & Bookmark". Tandai Titik A & B untuk mengulang satu bagian lagu terus-menerus (latihan musik/bahasa, podcast/audiobook) — direset otomatis tiap ganti lagu. Bookmark Posisi menandai beberapa titik favorit per-lagu (intro/reff/solo dll, diberi nama sendiri) untuk lompat cepat kapan pun, tersimpan permanen per lagu
 - **Lirik**: tambahkan lirik sendiri per lagu (tempel teks biasa, atau format LRC `[mm:ss.xx]` untuk lirik yang otomatis mengikuti posisi putar dan auto-scroll)
@@ -172,9 +173,6 @@ tulis, ubah supaya menerima field mentah (`folderPath`, `id`) saja, bukan `Song`
 tanpa peduli isinya.
 
 ## Belum selesai / dalam pengerjaan
-- Kriteria genre di Playlist Otomatis belum didukung (Batch 89) — MediaStore taruh genre di
-  tabel `Genres` terpisah (query per-lagu / N+1), beda dari YEAR yang satu kolom langsung;
-  risiko/kompleksitas dianggap lebih tinggi dari sisa kriteria yang sudah ada
 - Shared-element transition sungguhan (mini player → Now Playing sebagai satu elemen visual) belum ada — versi sekarang pakai animasi scale-in sebagai pendekatan yang lebih aman (lihat catatan di riwayat commit); butuh bump Compose BOM dari 2024.05.00
 - Pull-to-refresh gesture di Library belum ada (cuma tombol manual + auto-refresh saat resume/ContentObserver) — API pull-to-refresh Material3 yang simpel baru stabil di versi Compose BOM lebih baru; naikkan BOM berisiko ke komponen lain yang sudah jalan
 - Ekstraksi penuh string hardcode ke `strings.xml` (untuk i18n) belum dikerjakan — 339 string literal tersebar di banyak file (Batch 54 audit), refactor mekanis sebesar itu belum aman dikerjakan tanpa akses compiler untuk verifikasi

@@ -1,5 +1,62 @@
 # Changelog
 
+## Batch 116 — Gap List #11: Genre metadata first-class
+Item "Sangat disarankan" kedua (lanjut Batch 115). Genre sebelumnya sengaja di-skip sejak
+Batch 89 (SmartPlaylist) dengan alasan "query per-lagu / N+1" — dicek ulang batch ini: alasan
+itu benar untuk pendekatan naif (query `Genres.Members` per lagu), tapi TIDAK berlaku kalau
+dibalik jadi 1 map id→nama dibangun sekali per scan dari sisi `Genres` (query dibatasi jumlah
+genre di device, bukan jumlah lagu).
+
+**`MusicRepository.kt`** — `buildGenreMap()` baru: query `MediaStore.Audio.Genres` (semua
+genre), lalu tiap genre query `Genres.Members.getContentUri(...)` (daftar `audio_id` anggotanya)
+— hasilnya `Map<Long, String>` id lagu → nama genre, dibangun 1x di awal `querySongs()` lalu
+dipakai lookup O(1) per baris cursor. Lagu yang (jarang) masuk >1 genre bucket dapat genre
+terakhir yang ditemukan loop — disederhanakan jadi 1 field string, bukan list (gap list sendiri
+menandai multi-genre sebagai "bila format memungkinkan", bukan wajib). **Kenapa bukan kolom
+langsung di tabel Media** (pola track/disc/album-artist yang sudah ada): tidak ada kolom genre
+polos di baris utama `MediaStore.Audio.Media` lintas API yang ditarget app ini — genre cuma ada
+lewat tabel relasi terpisah, beda dari track/disc (API 30+ punya kolom string langsung) atau
+album-artist/composer (kolom langsung sejak lama). Tidak ditebak dari ingatan — dicek dulu
+sebelum tulis kode (pelajaran Batch 14/32/33/44 soal jangan menebak API Android tanpa
+verifikasi).
+
+**`CustomFolderScanner.kt`** — `METADATA_KEY_GENRE` dibaca dari `MediaMetadataRetriever` yang
+sudah terbuka untuk title/artist/album/dst. (zero I/O tambahan, pola sama seperti albumArtist/
+composer Batch 105).
+
+**`Song.kt`** — field baru `genre: String? = null`, posisi terakhir constructor (tidak
+mengubah 1 pun call site lama termasuk fixture test).
+
+**`LibrarySearchIndex.kt`** — genre ditambahkan ke `searchableText` (blob null-separated yang
+sama dengan title/artist) — "gunakan genre pada filtering/search" dari gap list, sisi
+Perpustakaan. String kosong untuk lagu tanpa genre (bukan null-check di query time).
+
+**`SmartPlaylist.kt`/`SmartPlaylistEngine.kt`** — kriteria baru `genre: String?`, EXACT match
+case-insensitive (bukan substring seperti `keyword`) — semantik yang benar untuk nilai dari
+picker chip (nilai genre asli di library), bukan teks bebas yang rawan typo. Lagu tanpa genre
+(null) tidak pernah cocok dengan rule genre-bounded, sama seperti pola `year == 0` yang sudah
+ada. `isEmpty()` diperluas ikut cek field baru.
+
+**`SmartPlaylistScreen.kt`/`LibraryScreen.kt`** — param baru `availableGenres` (dihitung sekali
+dari `rawSongs.mapNotNull { it.genre }.distinct().sorted()`, presenden persis sama dengan
+`availableFolderNames` yang sudah ada) diteruskan ke builder sheet, dirender sebagai baris
+`FilterChip` (tap-to-clear di chip yang sama, pola sama tombol rating bintang) tepat di bawah
+chip folder. "Integrasikan genre dengan smart playlist" dari gap list — tuntas.
+
+**README.md** — deskripsi Smart Playlist & catatan "belum selesai" genre diperbarui/dihapus.
+
+8 file kode + 1 dokumentasi. Brace/paren dicek otomatis di semua file kode & seimbang. 0 file
+baru (murni edit), 0 protected asset tersentuh. **Belum diverifikasi compile/runtime Gradle
+sungguhan** (tidak ada JDK/Android SDK/kotlinc di sandbox ini) — prioritas berikutnya kalau
+user push: `./gradlew testDebugUnitTest` (pastikan `SmartPlaylistEngineTest.kt` existing tetap
+hijau dengan field baru), lalu build APK asli + cek di device (1) genre genuinely muncul untuk
+lagu yang device-nya punya tag genre (banyak library musik nyata TIDAK diberi tag genre oleh
+media scanner kalau file source-nya sendiri tidak punya frame genre ID3/Vorbis — jangan buru-
+buru anggap bug kalau kosong, cek dulu file test punya tag genre atau tidak), (2) `buildGenreMap()`
+tidak menambah lag terasa saat refresh library di device dengan genre count wajar, (3) chip
+genre di Playlist Otomatis builder muncul & filter benar-benar exact-match (lagu genre lain
+tidak ikut lolos).
+
 ## Batch 115 — Gap List #10: Backup/restore data lokal
 Item "Sangat disarankan" pertama setelah 10 item "Wajib" P0/P1 (1-9) tuntas. Sebelum batch ini
 tidak ada mekanisme apa pun untuk mengeluarkan data app (playlist, favorit, rating, dst.) ke

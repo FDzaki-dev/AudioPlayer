@@ -39,6 +39,12 @@ object SmartPlaylistEngine {
             if (!hit) return false
         }
 
+        // Gap List #11 — a song with no genre tag (null) can never satisfy a genre rule,
+        // same "unknown can't match a set filter" reasoning as the year block above.
+        playlist.genre?.takeIf { it.isNotBlank() }?.let { wanted ->
+            if (!song.genre.equals(wanted, ignoreCase = true)) return false
+        }
+
         return true
     }
 

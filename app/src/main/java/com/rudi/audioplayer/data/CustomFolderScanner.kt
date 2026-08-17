@@ -85,6 +85,11 @@ class CustomFolderScanner(private val context: Context) {
             )
             val mimeType = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
                 ?.takeIf { it.isNotBlank() }
+            // Gap List #11 — same open retriever pass as everything else above, zero extra
+            // I/O. Long-standing constant (METADATA_KEY_GENRE, API 1), unlike MediaStore's
+            // genre which needs the separate Genres/Members tables (see MusicRepository).
+            val genre = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE)
+                ?.takeIf { it.isNotBlank() }
             // DocumentFile.length() is metadata already cached by the provider (not a
             // read-the-whole-file operation) — safe to call per song during scan.
             val fileSize = doc.length()
@@ -115,7 +120,8 @@ class CustomFolderScanner(private val context: Context) {
                 trackNumber = trackNumber,
                 discNumber = discNumber,
                 fileSize = fileSize,
-                mimeType = mimeType
+                mimeType = mimeType,
+                genre = genre
             )
         } catch (e: Exception) {
             // File ini sudah lolos filter ekstensi audio tapi metadatanya tidak terbaca (file

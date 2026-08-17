@@ -16,6 +16,46 @@ class MusicRepository(private val context: Context) {
 
     fun getAllSongs(): List<Song> = querySongs(selection = BASE_SELECTION, selectionArgs = null)
 
+    /**
+     * Gap List #11 — genre has no plain column on the main Media row (unlike track/disc/
+     * album-artist above), it only exists via the separate Genres/Genres.Members tables.
+     * Building one id->name map here costs one query per GENRE THE DEVICE HAS (typically a
+     * handful to a few dozen), not one per song — deliberately avoiding the N+1-per-song
+     * cost that was the stated reason genre was skipped back in Batch 89's SmartPlaylist work.
+     */
+    private fun buildGenreMap(): Map<Long, String> {
+        val map = mutableMapOf<Long, String>()
+        context.contentResolver.query(
+            MediaStore.Audio.Genres.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.Audio.Genres._ID, MediaStore.Audio.Genres.NAME),
+            null, null, null
+        )?.use { genresCursor ->
+            val genreIdCol = genresCursor.getColumnIndexOrThrow(MediaStore.Audio.Genres._ID)
+            val nameCol = genresCursor.getColumnIndexOrThrow(MediaStore.Audio.Genres.NAME)
+            while (genresCursor.moveToNext()) {
+                val genreName = genresCursor.getString(nameCol)?.takeIf { it.isNotBlank() } ?: continue
+                val genreId = genresCursor.getLong(genreIdCol)
+                val membersUri = MediaStore.Audio.Genres.Members.getContentUri("external", genreId)
+                context.contentResolver.query(
+                    membersUri,
+                    arrayOf(MediaStore.Audio.Genres.Members.AUDIO_ID),
+                    null, null, null
+                )?.use { membersCursor ->
+                    val audioIdCol = membersCursor.getColumnIndexOrThrow(MediaStore.Audio.Genres.Members.AUDIO_ID)
+                    while (membersCursor.moveToNext()) {
+                        // A song that's (unusually) tagged into more than one genre bucket
+                        // keeps whichever genre this loop visits last — acceptable for a
+                        // single display field, same simplification the gap list's own
+                        // "multiple genre bila format memungkinkan" phrasing treats as
+                        // optional, not mandatory.
+                        map[membersCursor.getLong(audioIdCol)] = genreName
+                    }
+                }
+            }
+        }
+        return map
+    }
+
     /** Targeted lookup for just a few IDs — used to restore a saved queue without a full library scan. */
     fun getSongsByIds(ids: List<Long>): List<Song> {
         if (ids.isEmpty()) return emptyList()
@@ -28,6 +68,7 @@ class MusicRepository(private val context: Context) {
     private fun querySongs(selection: String, selectionArgs: Array<String>?): List<Song> {
         val songs = mutableListOf<Song>()
         val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        val genreMap = buildGenreMap()
 
         val folderColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             MediaStore.Audio.Media.RELATIVE_PATH
@@ -119,7 +160,8 @@ class MusicRepository(private val context: Context) {
                         trackNumber = trackNumber,
                         discNumber = discNumber,
                         fileSize = fileSize,
-                        mimeType = mimeType
+                        mimeType = mimeType,
+                        genre = genreMap[id]
                     )
                 )
             }

@@ -165,6 +165,12 @@ fun LibraryScreen(
         rawSongs.map { it.folderName }.distinct().sorted()
     }
 
+    // Gap List #11 — same precedent as availableFolderNames right above, for the Smart
+    // Playlist builder's genre chip picker. mapNotNull drops songs with no genre tag.
+    val availableGenreNames = remember(rawSongs) {
+        rawSongs.mapNotNull { it.genre }.distinct().sorted()
+    }
+
     // Normalize searchable fields once per visible-library change. This avoids repeating
     // case-insensitive string normalization for every song on every search keystroke.
     val searchIndex = remember(songs) { LibrarySearchIndex(songs) }
@@ -316,6 +322,7 @@ fun LibraryScreen(
                 // concern, not applied to either playlist kind.
                 allSongs = rawSongs,
                 availableFolders = availableFolderNames,
+                availableGenres = availableGenreNames,
                 smartPlaylists = smartPlaylists,
                 ratingOf = { id -> ratingStore.getRating(id) },
                 onSongClick = onSongClick,

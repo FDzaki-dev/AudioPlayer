@@ -37,6 +37,9 @@ import com.rudi.audioplayer.data.Song
 fun SmartPlaylistTabView(
     allSongs: List<Song>,
     availableFolders: List<String>,
+    // Gap List #11 — same "distinct values seen in the current library" precedent as
+    // availableFolders right above (computed once by the caller from song.genre).
+    availableGenres: List<String>,
     smartPlaylists: List<SmartPlaylist>,
     ratingOf: (Long) -> Int,
     onSongClick: (List<Song>, Int) -> Unit,
@@ -159,6 +162,7 @@ fun SmartPlaylistTabView(
         SmartPlaylistBuilderSheet(
             initial = editingPlaylist,
             availableFolders = availableFolders,
+            availableGenres = availableGenres,
             onDismiss = { showBuilder = false },
             onSave = { draft ->
                 if (editingPlaylist == null) {
@@ -191,6 +195,7 @@ private fun activeCriteriaCount(playlist: SmartPlaylist): Int {
     if (playlist.minRating > 0) count++
     if (playlist.minYear != null || playlist.maxYear != null) count++
     if (playlist.keyword.isNotBlank()) count++
+    if (!playlist.genre.isNullOrBlank()) count++
     return count
 }
 
@@ -199,6 +204,7 @@ private fun activeCriteriaCount(playlist: SmartPlaylist): Int {
 private fun SmartPlaylistBuilderSheet(
     initial: SmartPlaylist?,
     availableFolders: List<String>,
+    availableGenres: List<String>,
     onDismiss: () -> Unit,
     onSave: (SmartPlaylist) -> Unit
 ) {
@@ -213,6 +219,7 @@ private fun SmartPlaylistBuilderSheet(
     var minYear by remember { mutableStateOf(initial?.minYear?.toString() ?: "") }
     var maxYear by remember { mutableStateOf(initial?.maxYear?.toString() ?: "") }
     var keyword by remember { mutableStateOf(initial?.keyword ?: "") }
+    var selectedGenre by remember { mutableStateOf(initial?.genre) }
 
     fun buildDraft(): SmartPlaylist = SmartPlaylist(
         id = initial?.id ?: "",
@@ -223,10 +230,11 @@ private fun SmartPlaylistBuilderSheet(
         minRating = minRating,
         minYear = minYear.trim().toIntOrNull(),
         maxYear = maxYear.trim().toIntOrNull(),
-        keyword = keyword.trim()
+        keyword = keyword.trim(),
+        genre = selectedGenre
     )
 
-    val draftPreview = remember(name, selectedFolders, minMinutes, maxMinutes, minRating, minYear, maxYear, keyword) {
+    val draftPreview = remember(name, selectedFolders, minMinutes, maxMinutes, minRating, minYear, maxYear, keyword, selectedGenre) {
         buildDraft()
     }
 
@@ -270,6 +278,33 @@ private fun SmartPlaylistBuilderSheet(
                                     else selectedFolders + folder
                             },
                             label = { Text(folder) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            if (availableGenres.isNotEmpty()) {
+                // Gap List #11 — exact-match picker (not a text field), consistent with the
+                // folder chips right above: values come from tags actually seen in the
+                // library, not free text the user could mistype against what's stored.
+                Text("Genre", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    "Kosongkan untuk semua genre",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(availableGenres) { genreOption ->
+                        FilterChip(
+                            selected = genreOption == selectedGenre,
+                            onClick = {
+                                // Tap-to-clear on the already-selected chip, same convention
+                                // as the rating stars below.
+                                selectedGenre = if (genreOption == selectedGenre) null else genreOption
+                            },
+                            label = { Text(genreOption) }
                         )
                     }
                 }
