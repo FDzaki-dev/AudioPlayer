@@ -1,5 +1,39 @@
 # Changelog
 
+## Batch 137 — Scanline ke 3 sheet tersisa (LyricsSheet+ABRepeatBookmarkSheet+QueueSheet, 3 file diedit)
+Lanjutan langsung item "sengaja belum" Batch 135 — kandidat eksplisit sudah dicatat waktu itu:
+`LyricsSheet`, `ABRepeatBookmarkSheet`, `QueueSheet`. Ditutup di batch ini, pola identik persis
+`EqualizerSheet.kt`/`VisualizerSheet.kt`.
+
+**Containment dulu, bukan asumsi aman** (pola sama Batch 135) — `frostedGlass()`'s
+`background(tint, shape)` sudah shaped untuk cat latar, tapi TIDAK meng-`clip()` children/draw
+sesudahnya. Tanpa `clip()` eksplisit, overlay scanline `calmScanlines()` (draw rect penuh lewat
+`drawWithContent`) berisiko bocor melewati sudut membulat panel. Fix di ketiga file:
+`.clip(MaterialTheme.shapes.large)` dipasang SEBELUM `.calmScanlines()`, `isCalmRetro` di-hoist
+di titik yang sama seperti sheet lain (`isCalmRetroTheme()`, sebelum `ModalBottomSheet {}`).
+
+- `LyricsSheet.kt` — 3 import baru (`clip`, `isCalmRetroTheme`, `calmScanlines`), Column modifier
+  chain (`fillMaxWidth().frostedGlass().padding(...)`) disisipi `.then(...)` di antara
+  `frostedGlass()` dan `padding()`.
+- `ABRepeatBookmarkSheet.kt` — pola identik.
+- `QueueSheet.kt` — beda kecil: Column modifier chain aslinya cuma
+  `fillMaxWidth().frostedGlass()` tanpa `.padding()` level-Column (padding dikelola per-child di
+  file ini), jadi `.then(...)` ditaruh langsung setelah `frostedGlass()`, urutan lain tidak
+  disentuh.
+
+`frostedGlass()` sendiri TIDAK diubah — perbaikan lokal ke 3 pemanggil baru ini saja, konsisten
+dengan keputusan Batch 135 untuk tidak meng-clip semua pemanggil secara general (risiko efek
+samping ke shadow/bevel Tactile/Skeu yang sudah lama stabil).
+
+**Cakupan calmScanlines() app-wide sekarang selesai penuh** di semua sheet/panel kontrol:
+`AlbumArtHero`, `SongRow` (Batch 134), `EqualizerSheet`, `VisualizerSheet` (Batch 135),
+`LyricsSheet`, `ABRepeatBookmarkSheet`, `QueueSheet` (batch ini). 3 file diedit, 0 file baru, 0
+protected asset. Brace/paren dicek otomatis & seimbang (LyricsSheet 63/63 brace, 162/162 paren;
+ABRepeatBookmarkSheet 54/54 brace, 139/139 paren; QueueSheet 40/40 brace, 124/124 paren). 0
+duplikat import ditemukan. **Belum diverifikasi visual/build sungguhan** (0 JDK/SDK di sandbox
+ini) — prioritas berikutnya kalau user push: buka Lirik/A-B Repeat & Bookmark/Antrean Putar di
+tema Calm Retro, pastikan scanline genuinely muncul dan tidak bocor keluar sudut panel.
+
 ## Batch 136 — Release Downloader Spec: cek update manual dari GitHub Release (9 file)
 **Membalik keputusan sadar Batch 8** ("app ini tidak punya izin INTERNET sama sekali, itu
 bagian dari klaim privasinya") — atas permintaan eksplisit user, dengan syarat tidak mengganggu

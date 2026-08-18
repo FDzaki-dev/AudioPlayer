@@ -24,7 +24,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clip
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
+import com.rudi.audioplayer.ui.theme.calmScanlines
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
@@ -73,13 +76,22 @@ fun QueueSheet(
     var draggingSlotId by remember { mutableStateOf<Long?>(null) }
     var dragOffsetPx by remember { mutableStateOf(0f) }
     var rowHeightPx by remember { mutableStateOf(0f) }
+    // Batch 137 — lanjutan spread Pilar A (calmScanlines) Batch 135, pola identik EqualizerSheet.
+    val isCalmRetro = isCalmRetroTheme()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = Color.Transparent
     ) {
-        Column(modifier = Modifier.fillMaxWidth().frostedGlass()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .frostedGlass()
+                .then(
+                    if (isCalmRetro) Modifier.clip(MaterialTheme.shapes.large).calmScanlines() else Modifier
+                )
+        ) {
             Text(
                 text = "Antrean Putar (${queue.size} lagu)",
                 style = MaterialTheme.typography.titleMedium,

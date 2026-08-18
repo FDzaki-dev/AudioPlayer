@@ -19,7 +19,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
+import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.data.LrcSyncEditor
 import com.rudi.audioplayer.data.LyricsParser
 import com.rudi.audioplayer.data.SyncSession
@@ -53,12 +56,20 @@ fun LyricsSheet(
     // selagi sheet terbuka membatalkan sesi sync yang sedang jalan (masuk akal, timestamp yang
     // sedang direkam memang scoped ke lagu yang sedang diputar saat itu).
     var syncSession by remember(rawLyrics) { mutableStateOf<SyncSession?>(null) }
+    // Batch 137 — lanjutan spread Pilar A (calmScanlines) Batch 135, "sengaja belum" di
+    // LyricsSheet/ABRepeatBookmarkSheet/QueueSheet ditutup di sini. Pola identik EqualizerSheet/
+    // VisualizerSheet: .clip(MaterialTheme.shapes.large) WAJIB sebelum .calmScanlines() —
+    // frostedGlass()'s background() sudah shaped tapi tidak meng-clip children/draw sesudahnya.
+    val isCalmRetro = isCalmRetroTheme()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .frostedGlass()
+                .then(
+                    if (isCalmRetro) Modifier.clip(MaterialTheme.shapes.large).calmScanlines() else Modifier
+                )
                 .padding(horizontal = 20.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

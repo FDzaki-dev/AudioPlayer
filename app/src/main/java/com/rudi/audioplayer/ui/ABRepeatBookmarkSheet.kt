@@ -21,8 +21,11 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.clip
 import com.rudi.audioplayer.data.Bookmark as BookmarkModel
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
+import com.rudi.audioplayer.ui.theme.calmScanlines
 
 /**
  * Roadmap #4 (`ROADMAP_15_FITUR_OFFLINE.md`), Batch 91 — combines two related "mark a moment
@@ -51,12 +54,17 @@ fun ABRepeatBookmarkSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val haptic = LocalHapticFeedback.current
     var showAddBookmarkDialog by remember { mutableStateOf(false) }
+    // Batch 137 — lanjutan spread Pilar A (calmScanlines) Batch 135, pola identik EqualizerSheet.
+    val isCalmRetro = isCalmRetroTheme()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .frostedGlass()
+                .then(
+                    if (isCalmRetro) Modifier.clip(MaterialTheme.shapes.large).calmScanlines() else Modifier
+                )
                 .padding(horizontal = 20.dp)
         ) {
             Text(

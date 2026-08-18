@@ -6,6 +6,26 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 137 (Calm Retro v3 — scanline ke 3 sheet tersisa: LyricsSheet+ABRepeatBookmarkSheet+
+QueueSheet, 3 file diedit)** — Menutup "sengaja belum" Batch 135 (waktu itu ditunda demi batch
+kecil, kandidat eksplisit: `LyricsSheet`, `ABRepeatBookmarkSheet`, `QueueSheet`). Pola identik
+persis `EqualizerSheet.kt`/`VisualizerSheet.kt` Batch 135: `.clip(MaterialTheme.shapes.large)`
+DULU sebelum `.calmScanlines()` (containment wajib — `frostedGlass()`'s `background()` sudah
+shaped tapi tidak meng-`clip()` children/draw sesudahnya, kelas bug sama "Ambient Light gak
+bocor" Batch 81), `isCalmRetro` di-hoist di titik yang sama seperti sheet lain. 3 import baru
+per file (`androidx.compose.ui.draw.clip`, `isCalmRetroTheme`, `calmScanlines`) — 0 file file
+sebelumnya sudah punya `clip` import (dicek grep dulu). `QueueSheet.kt` beda kecil dari 2 file
+lain: Column modifier chain aslinya cuma `fillMaxWidth().frostedGlass()` tanpa `.padding()`
+(padding dikelola per-child), jadi `.then(...)` ditaruh langsung setelah `frostedGlass()` tanpa
+menyentuh urutan lain. `frostedGlass()` sendiri TIDAK diubah (perbaikan lokal ke 3 pemanggil
+baru, bukan general clip semua pemanggil — pola sama presedan Batch 135). 0 file baru, 0
+protected asset. **Cakupan calmScanlines() app-wide sekarang selesai penuh di semua sheet/panel
+kontrol** (`AlbumArtHero`, `SongRow`, `EqualizerSheet`, `VisualizerSheet`, `LyricsSheet`,
+`ABRepeatBookmarkSheet`, `QueueSheet`) — kalau ada sheet baru ke depannya, tinggal copy pola
+yang sama, bukan gap yang perlu diaudit ulang. **PENTING kalau lanjut sesi baru**: fix ini baru
+diverifikasi LOGIS dari kode (0 JDK/SDK di sandbox) — belum ada konfirmasi visual/build dari
+user untuk ketiga sheet ini. Detail: `CHANGELOG.md` Batch 137.
+
 **Batch 136 (Release Downloader Spec — cek update manual dari GitHub Release, 9 file)** —
 Membalik keputusan Batch 8 (dulu sengaja 0 INTERNET permission demi klaim privasi), atas
 persetujuan eksplisit user. `INTERNET`+`REQUEST_INSTALL_PACKAGES`+`<provider>` FileProvider baru

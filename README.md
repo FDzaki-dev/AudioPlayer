@@ -8,7 +8,7 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 133:** Calm Retro v3 — CRT scanlines, grain overlay, durasi monospace.
+> 🆕 **Update terbaru — Batch 137:** Calm Retro v3 — scanline kini di semua sheet (Lirik, A-B Repeat & Bookmark, Antrean Putar).
 > Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
 > sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
 > Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
