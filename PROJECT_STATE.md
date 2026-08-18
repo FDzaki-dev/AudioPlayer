@@ -6,6 +6,16 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 122 (Fix Build — Ringtone Cutter, 1 file diedit)** — CI (`log_fail_176.zip`) melaporkan
+`compileDebugKotlin`/`compileReleaseKotlin` gagal: `RingtoneEncoder.kt:142` panggil
+`AppLogger.i(...)` yang tidak ada (`AppLogger` cuma punya `e()`/`w()`). Fix 1 baris → `AppLogger.w`.
+0 sisa pemanggilan `.i(` lain dicek via grep. **Masih belum diverifikasi compile Gradle
+sungguhan** (sandbox tidak ada JDK/SDK) — ini fix pertama berdasar log CI ASLI (bukan
+tebakan), jadi keyakinan lebih tinggi dari batch-batch sebelumnya, tapi tetap perlu 1 run CI
+lagi untuk konfirmasi final (mungkin ada error lain yang baru kelihatan setelah error pertama
+ini teratasi — Kotlin compiler kadang berhenti di error pertama per-file). Detail: `CHANGELOG.md`
+Batch 122.
+
 **Batch 121 (Roadmap #5 — Ringtone Cutter, 7 file — 4 baru + 3 diedit)** — Item berikutnya dari
 tabel prioritas effort/risiko (Sedang/Sedang, terendah tersisa), dipilih karena reuse pola
 scope-narrowing `TagEditor` (Batch 118) dan pola simpan-MediaStore `BackupManager`/`AppLogger`,

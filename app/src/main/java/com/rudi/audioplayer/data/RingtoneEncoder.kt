@@ -139,7 +139,7 @@ class RingtoneEncoder(private val context: Context) {
             val savedUri = saveToMediaStore(tempFile, displayName, destination)
                 ?: return CutResult.Failure("Gagal menyimpan hasil potongan ke penyimpanan.")
 
-            AppLogger.i("RingtoneEncoder", "Potongan tersimpan: $displayName -> $savedUri")
+            AppLogger.w("RingtoneEncoder", "Potongan tersimpan: $displayName -> $savedUri")
             return CutResult.Success(displayName, destination)
         } catch (e: Exception) {
             AppLogger.e("RingtoneEncoder", "Gagal memotong '${song.title}'", e)

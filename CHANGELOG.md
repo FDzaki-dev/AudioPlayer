@@ -1,5 +1,15 @@
 # Changelog
 
+## Batch 122 — Fix Build: Ringtone Cutter
+CI GitHub Actions (`log_fail_176.zip`) melaporkan `compileDebugKotlin`/`compileReleaseKotlin`
+gagal: `RingtoneEncoder.kt:142` — `AppLogger.i(...)` dipanggil padahal `AppLogger` (Batch 121,
+cek ulang di batch ini) cuma punya `e()`/`w()`, tidak ada method `i()`. Perbaikan: 1 baris,
+`AppLogger.i` → `AppLogger.w` (level info-like terdekat yang memang ada). Dicek `grep` — 0 sisa
+pemanggilan `AppLogger.i(` di seluruh codebase. 0 file lain tersentuh, 0 protected asset.
+**Belum diverifikasi compile Gradle sungguhan ulang** (tetap tidak ada JDK/SDK di sandbox) —
+prioritas berikutnya kalau user push: `./gradlew assembleDebug`/`compileReleaseKotlin` harus
+hijau kali ini.
+
 ## Batch 121 — Roadmap #5: Ringtone Cutter
 Item roadmap berikutnya berdasar tabel prioritas effort/risiko (Sedang/Sedang, terendah yang
 masih tersisa setelah #1/#15/#13). 0 protected asset selain `MainActivity.kt` (edit parsial).
