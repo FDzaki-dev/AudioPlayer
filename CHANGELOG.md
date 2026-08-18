@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 124 — Micro UI/UX: samakan bounce-press ke 4 sheet fitur terbaru
+Audit `bouncyPress` (util tekan-mengecil-spring-balik, `Utils.kt`) di seluruh `ui/`: cuma
+dipakai di `MiniPlayerBar.kt`/`NowPlayingScreen.kt`/`LockScreen.kt` (kontrol lama). 4 sheet
+fitur terbaru (Batch 118-121) — dibangun cepat sebagai MVP fungsional — masih pakai `Button`
+polos Material3 tanpa micro-feedback ini. Scope batch ini: **cuma CTA utama tiap sheet**
+(bukan sapuan semua tombol, supaya tetap kecil & fokus):
+- `SongInfoEditSheet.kt` — "Simpan"
+- `RingtoneCutterSheet.kt` — "Potong & Simpan"
+- `VaultSheet.kt` — "Aktifkan Vault" + "Buka" (unlock PIN)
+- `LyricsSheet.kt` — "Tandai Sekarang" (tombol tap-to-sync, paling sering ditekan berulang saat
+  lagu diputar — prioritas tertinggi untuk feedback taktil)
+
+4 file kode diedit, 0 file baru, 0 protected asset, 0 perubahan logika/behavior — murni
+`interactionSource` + `Modifier.bouncyPress(...)` ditambahkan ke `Button` yang sudah ada,
+pola identik yang sudah dipakai di kontrol lama. Sisa tombol sekunder (TextButton batal/undo/
+skip, IconButton hapus) sengaja **tidak** disentuh batch ini — bukan CTA utama, giliran
+berikutnya kalau diminta lagi. **Belum diverifikasi compile Gradle sungguhan** (tidak ada
+JDK/SDK di sandbox) — brace/paren tiap file dicek otomatis & seimbang.
+
 ## Batch 123 — Dokumentasi: sinkronkan callout "Update terbaru" (0 file kode, 1 file dokumentasi diedit)
 Audit rutin urutan dokumentasi (pola sama Batch 94): `CHANGELOG.md` & `PROJECT_STATE.md` dicek
 ulang urut newest-first — **0 anomali**, keduanya sudah benar. Sumber laporan user ternyata

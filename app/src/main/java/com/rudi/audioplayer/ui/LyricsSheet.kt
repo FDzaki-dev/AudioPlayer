@@ -1,5 +1,6 @@
 package com.rudi.audioplayer.ui
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -111,6 +112,7 @@ fun LyricsSheet(
                         Text(formatDuration(positionMs), style = MaterialTheme.typography.bodyMedium)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
+                    val markInteraction = remember { MutableInteractionSource() }
                     Button(
                         onClick = {
                             val next = LrcSyncEditor.mark(session, positionMs)
@@ -122,7 +124,8 @@ fun LyricsSheet(
                             }
                         },
                         enabled = !session.isComplete,
-                        modifier = Modifier.fillMaxWidth()
+                        interactionSource = markInteraction,
+                        modifier = Modifier.fillMaxWidth().bouncyPress(markInteraction)
                     ) { Text("Tandai Sekarang") }
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth()) {

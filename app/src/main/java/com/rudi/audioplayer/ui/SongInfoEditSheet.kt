@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.ui
 
 import android.provider.MediaStore
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -161,6 +162,7 @@ fun SongInfoEditSheet(
             ) {
                 TextButton(onClick = onDismiss) { Text("Batal") }
                 Spacer(modifier = Modifier.width(8.dp))
+                val saveInteraction = remember { MutableInteractionSource() }
                 Button(
                     onClick = {
                         onSave(
@@ -175,7 +177,9 @@ fun SongInfoEditSheet(
                                 discNumber = discNumber.toIntOrNull()
                             )
                         )
-                    }
+                    },
+                    interactionSource = saveInteraction,
+                    modifier = Modifier.bouncyPress(saveInteraction)
                 ) { Text("Simpan") }
             }
             Spacer(modifier = Modifier.height(8.dp))

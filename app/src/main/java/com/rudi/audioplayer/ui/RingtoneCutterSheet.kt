@@ -1,5 +1,6 @@
 package com.rudi.audioplayer.ui
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
@@ -132,13 +133,15 @@ fun RingtoneCutterSheet(
             )
 
             Spacer(Modifier.height(16.dp))
+            val cutInteraction = remember { MutableInteractionSource() }
             Button(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onCut(song, range, destination, song.title)
                 },
                 enabled = RingtoneCutter.isValid(range, duration),
-                modifier = Modifier.fillMaxWidth()
+                interactionSource = cutInteraction,
+                modifier = Modifier.fillMaxWidth().bouncyPress(cutInteraction)
             ) {
                 Icon(Icons.Default.ContentCut, contentDescription = null)
                 Spacer(Modifier.width(8.dp))

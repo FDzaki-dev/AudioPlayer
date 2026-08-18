@@ -6,6 +6,18 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 124 (Micro UI/UX — bounce-press ke 4 sheet fitur terbaru, 4 file diedit)** — Audit
+`bouncyPress` (`Utils.kt`) ternyata cuma dipakai di kontrol lama (`MiniPlayerBar`/
+`NowPlayingScreen`/`LockScreen`); 4 sheet MVP Batch 118-121 (`SongInfoEditSheet`,
+`RingtoneCutterSheet`, `VaultSheet`, `LyricsSheet`) masih `Button` polos. Fix: tambah
+`interactionSource` + `.bouncyPress(...)` ke CTA utama tiap sheet saja (Simpan/Potong & Simpan/
+Aktifkan Vault+Buka/Tandai Sekarang) — sengaja **tidak** sapu tombol sekunder (batal/undo/skip/
+hapus), supaya batch tetap kecil sesuai arahan user "dilarang greedy". 0 logika berubah, 0
+protected asset. **Kandidat batch berikutnya kalau diminta lanjut**: tombol sekunder di 4 sheet
+ini, plus sheet lain yang belum diaudit (`BackupRestoreSheet`, `DuplicateFinderSheet`,
+`ABRepeatBookmarkSheet`, `SignatureMatcherSheet`, `EqualizerSheet` — 0 tombol Button ditemukan
+di grep awal, cek ulang kalau perlu). Detail: `CHANGELOG.md` Batch 124.
+
 **Batch 123 (Dokumentasi — sinkronkan callout "Update terbaru", 1 file dokumentasi diedit)** —
 User lapor sebagian entri dokumentasi terasa basi/harus scroll dulu baru kelihatan perubahan.
 Audit ulang urutan `CHANGELOG.md` + `PROJECT_STATE.md` (pola sama Batch 94): **0 anomali**,

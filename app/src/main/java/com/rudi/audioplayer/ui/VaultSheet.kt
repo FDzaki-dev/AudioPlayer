@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -175,6 +176,7 @@ private fun VaultSetupSection(onPinSet: (String) -> Unit) {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
         Spacer(modifier = Modifier.height(12.dp))
+        val activateInteraction = remember { MutableInteractionSource() }
         Button(
             onClick = {
                 when {
@@ -183,7 +185,8 @@ private fun VaultSetupSection(onPinSet: (String) -> Unit) {
                     else -> onPinSet(pin)
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            interactionSource = activateInteraction,
+            modifier = Modifier.fillMaxWidth().bouncyPress(activateInteraction)
         ) { Text("Aktifkan Vault") }
     }
 }
@@ -235,6 +238,7 @@ private fun VaultUnlockSection(vaultStore: VaultStore, onUnlocked: () -> Unit) {
             }
         }
         Spacer(modifier = Modifier.height(12.dp))
+        val unlockInteraction = remember { MutableInteractionSource() }
         Button(
             onClick = {
                 when (val result = vaultStore.verifyPin(pin)) {
@@ -244,7 +248,8 @@ private fun VaultUnlockSection(vaultStore: VaultStore, onUnlocked: () -> Unit) {
                 }
             },
             enabled = lockedUntil == null && pin.length == 6,
-            modifier = Modifier.fillMaxWidth()
+            interactionSource = unlockInteraction,
+            modifier = Modifier.fillMaxWidth().bouncyPress(unlockInteraction)
         ) { Text("Buka") }
     }
 }
