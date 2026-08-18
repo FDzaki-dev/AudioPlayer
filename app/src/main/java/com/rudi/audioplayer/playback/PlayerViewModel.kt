@@ -419,6 +419,31 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         }
     }
 
+    // --- Roadmap #5 — Ringtone Cutter ---
+    private val ringtoneEncoder by lazy { com.rudi.audioplayer.data.RingtoneEncoder(appContext) }
+
+    /** Fire-and-forget, sama pola [requestSaveTags]: hasil muncul lewat [infoMessage]/
+     *  [actionErrorMessage], bukan callback result langsung. Selalu bikin file BARU (tidak
+     *  pernah menulis balik ke [song]) jadi tidak butuh alur consent apa pun, beda dari
+     *  [requestSaveTags]. */
+    fun requestCutRingtone(
+        song: Song,
+        range: com.rudi.audioplayer.data.RingtoneCutter.TrimRange,
+        destination: com.rudi.audioplayer.data.RingtoneEncoder.Destination,
+        label: String
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            when (val result = ringtoneEncoder.cut(song, range, destination, label)) {
+                is com.rudi.audioplayer.data.RingtoneEncoder.CutResult.Success ->
+                    showInfoMessage("Tersimpan sebagai ${result.destination.label}: ${result.displayName}")
+                is com.rudi.audioplayer.data.RingtoneEncoder.CutResult.Unsupported ->
+                    _actionErrorMessage.value = result.reason
+                is com.rudi.audioplayer.data.RingtoneEncoder.CutResult.Failure ->
+                    _actionErrorMessage.value = "Gagal memotong: ${result.reason}"
+            }
+        }
+    }
+
     /** Carries both the Snackbar message and the exact action that reverses it — the Snackbar
      * itself doesn't need to know *what* was removed, only how to undo it. */
     data class UndoableAction(val message: String, val undo: () -> Unit)

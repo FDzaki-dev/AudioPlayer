@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.BrightnessHigh
 import androidx.compose.material.icons.filled.BrightnessLow
@@ -169,6 +170,13 @@ fun NowPlayingScreen(
     // di atas: hasil sukses/gagal muncul lewat Snackbar infoMessage/actionErrorMessage yang
     // sudah ada di MainActivity, bukan callback result langsung ke sini.
     onSaveSongTags: (com.rudi.audioplayer.data.Song, com.rudi.audioplayer.data.Id3TagWriter.EditableTags) -> Unit,
+    // Roadmap #5 (Ringtone Cutter) — fire-and-forget sama pola onSaveSongTags di atas.
+    onCutRingtone: (
+        com.rudi.audioplayer.data.Song,
+        com.rudi.audioplayer.data.RingtoneCutter.TrimRange,
+        com.rudi.audioplayer.data.RingtoneEncoder.Destination,
+        String
+    ) -> Unit,
     onBack: () -> Unit
 ) {
     val song = uiState.currentSong
@@ -192,6 +200,7 @@ fun NowPlayingScreen(
     var showAdvancedSheet by remember { mutableStateOf(false) }
     var showAbRepeatBookmarkSheet by remember { mutableStateOf(false) }
     var showSongInfoEditSheet by remember { mutableStateOf(false) }
+    var showRingtoneCutterSheet by remember { mutableStateOf(false) }
 
     // --- Swipe gesture: brightness (left of album art) & audio volume (right of album art) ---
     val gestureScope = rememberCoroutineScope()
@@ -797,6 +806,10 @@ fun NowPlayingScreen(
             onOpenSongInfoEdit = {
                 showAdvancedSheet = false
                 showSongInfoEditSheet = true
+            },
+            onOpenRingtoneCutter = {
+                showAdvancedSheet = false
+                showRingtoneCutterSheet = true
             }
         )
     }
@@ -808,6 +821,17 @@ fun NowPlayingScreen(
             onSave = { tags ->
                 onSaveSongTags(song, tags)
                 showSongInfoEditSheet = false
+            }
+        )
+    }
+
+    if (showRingtoneCutterSheet && song != null) {
+        RingtoneCutterSheet(
+            song = song,
+            onDismiss = { showRingtoneCutterSheet = false },
+            onCut = { s, range, destination, label ->
+                onCutRingtone(s, range, destination, label)
+                showRingtoneCutterSheet = false
             }
         )
     }
@@ -831,7 +855,8 @@ private fun AdvancedControlsSheet(
     onOpenEqualizer: () -> Unit,
     onOpenAbRepeatBookmark: () -> Unit,
     onOpenVisualizer: () -> Unit,
-    onOpenSongInfoEdit: () -> Unit
+    onOpenSongInfoEdit: () -> Unit,
+    onOpenRingtoneCutter: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val haptic = LocalHapticFeedback.current
@@ -895,6 +920,12 @@ private fun AdvancedControlsSheet(
                 label = "Edit Info Lagu",
                 value = null,
                 onClick = onOpenSongInfoEdit
+            )
+            AdvancedControlRow(
+                icon = Icons.Default.ContentCut,
+                label = "Potong Nada Dering",
+                value = null,
+                onClick = onOpenRingtoneCutter
             )
 
             HorizontalDivider(

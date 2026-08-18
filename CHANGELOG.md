@@ -1,5 +1,60 @@
 # Changelog
 
+## Batch 121 — Roadmap #5: Ringtone Cutter
+Item roadmap berikutnya berdasar tabel prioritas effort/risiko (Sedang/Sedang, terendah yang
+masih tersisa setelah #1/#15/#13). 0 protected asset selain `MainActivity.kt` (edit parsial).
+
+**`RingtoneCutter.kt`** (baru, `data/`) — logika murni (0 Context, pola sama `AbRepeatLogic`):
+`TrimRange` data class + `clampRange()` (jepit start/end ke batas lagu, durasi min 1 detik/maks
+60 detik — end diprioritaskan digeser dulu sebelum start supaya titik masuk yang user pilih
+tetap dihormati) + `isValid()` + `formatTimestamp()` (`mm:ss`). `RingtoneCutterTest.kt` — 10 test
+murni termasuk edge case lagu lebih pendek dari durasi minimum.
+
+**`RingtoneEncoder.kt`** (baru, `data/`) — orkestrasi Context-based, pola scope-narrowing sama
+`TagEditor`: (1) lagu MediaStore saja (bukan folder tambahan/SAF), (2) sumber MP3/AAC-M4A saja
+(2 format yang aman di-`MediaMuxer`-copy tanpa re-encode di `minSdk` 23 app ini — FLAC/OGG/WAV
+ditolak dengan pesan jujur), (3) simpan API 29+ saja. Potong pakai `MediaExtractor` (seek ke
+titik mulai, baca sample sampai titik akhir) + `MediaMuxer` (`MUXER_OUTPUT_MPEG_4`, stream-copy
+tanpa decode/encode ulang — kualitas audio identik sumber, presentationTimeUs direbase ke 0).
+Hasil disimpan sebagai file BARU ke `Ringtones|Notifications|Alarms/AudioPlayer` via MediaStore
+`RELATIVE_PATH` (pola sama `BackupManager`/`AppLogger`) dengan flag
+`IS_RINGTONE`/`IS_NOTIFICATION`/`IS_ALARM` — **tidak pernah menulis balik ke file asli**, jadi
+0 alur consent (`createWriteRequest`/`RecoverableSecurityException`) dibutuhkan sama sekali,
+beda dari `TagEditor`. `WRITE_SETTINGS`/`setActualDefaultRingtoneUri` SENGAJA tidak dikerjakan
+(izin sensitif) — fallback "tersimpan, pilih manual di Pengaturan > Suara" (flag MediaStore di
+atas membuat file otomatis muncul di pemilih nada dering bawaan Android, jadi fallback ini tetap
+mulus, bukan jalan buntu).
+
+**`RingtoneCutterSheet.kt`** (baru, `ui/`) — 2 `Slider` terpisah (awal/akhir, bukan
+`RangeSlider` — tidak ada precedent komponen itu di codebase) + 3 `FilterChip` tujuan simpan +
+tombol "Potong & Simpan" (disabled kalau rentang tidak valid). **MVP disengaja**: 0 preview audio
+langsung dari sheet ini (butuh player kedua di luar sesi putar utama) — user dengar hasil dari
+file yang sudah tersimpan lewat player lain, kelas keterbatasan sama seperti MVP `VaultSheet`
+(Batch 119).
+
+**`NowPlayingScreen.kt`** (diedit) — 1 menu baru "Potong Nada Dering" di `AdvancedControlsSheet`
+(pola sama "Edit Info Lagu"), state `showRingtoneCutterSheet` di-key ke `song.id` implisit lewat
+guard `song != null`. **`PlayerViewModel.kt`** (diedit) — `requestCutRingtone()` fire-and-forget,
+pakai kanal `infoMessage`/`actionErrorMessage` yang sudah ada, 0 kanal baru. **`MainActivity.kt`**
+(diedit, **protected asset — edit parsial**) — 1 param baru (`onCutRingtone`) di pemanggilan
+`NowPlayingScreen(...)` yang sudah ada.
+
+7 file (4 baru + 3 diedit), 0 protected asset lain selain `MainActivity.kt` (edit parsial).
+Brace/paren semua file dicek otomatis & seimbang. `FILE_MANIFEST.txt` 162→166 +
+`ROADMAP_15_FITUR_OFFLINE.md` (#5 ditandai selesai) + `README.md` sebelum repack.
+
+**Belum diverifikasi compile/runtime Gradle sungguhan** (tidak ada JDK/Android SDK di sandbox
+ini) — prioritas berikutnya kalau user push: (1) `./gradlew assembleDebug` build bersih —
+`MediaMuxer`/`MediaExtractor` API paling berisiko salah ketik manual tanpa cek compiler, (2) di
+device: potong 1 lagu MP3 & 1 lagu M4A, pastikan file baru muncul di Pengaturan > Suara > Nada
+Dering (bukan cuma di file manager), (3) putar hasil potongan di app lain untuk pastikan tidak
+korup/silent (stream-copy tanpa re-encode BISA gagal kalau track pertama yang ditemukan
+`MediaExtractor` bukan trek audio yang diharapkan pada file eksotis), (4) coba lagu FLAC/WAV,
+pastikan pesan "belum didukung" muncul jelas bukan macet/crash, (5) coba di Android 9 ke bawah,
+pastikan pesan "butuh Android 10 ke atas" muncul (bukan crash `IllegalArgumentException` dari
+`RELATIVE_PATH` yang tidak dikenal API lama). Detail lengkap: `CHANGELOG.md` Batch 121 (entri
+ini sendiri).
+
 ## Batch 120 — Roadmap #3: Editor Lirik LRC Tap-to-Sync
 Item roadmap berikutnya setelah #14 (Batch 119) — dipilih karena reuse infrastruktur lirik yang
 sudah ada penuh (`LyricsStore`/`LyricsParser`/highlight-scroll di `LyricsSheet.kt`), 0 dependency

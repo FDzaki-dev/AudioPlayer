@@ -825,6 +825,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             onToggleVisualizerEnabled = { playerViewModel.setVisualizerEnabled(it) },
             onRequestVisualizerPermission = { visualizerPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
             onSaveSongTags = { song, tags -> playerViewModel.requestSaveTags(song, tags) },
+            onCutRingtone = { song, range, destination, label ->
+                playerViewModel.requestCutRingtone(song, range, destination, label)
+            },
             onBack = onBackAction
         )
     }

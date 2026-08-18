@@ -6,6 +6,45 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 121 (Roadmap #5 — Ringtone Cutter, 7 file — 4 baru + 3 diedit)** — Item berikutnya dari
+tabel prioritas effort/risiko (Sedang/Sedang, terendah tersisa), dipilih karena reuse pola
+scope-narrowing `TagEditor` (Batch 118) dan pola simpan-MediaStore `BackupManager`/`AppLogger`,
+0 dependency Gradle baru.
+
+`RingtoneCutter.kt` (baru, `data/`) — `TrimRange`+`clampRange()` (jepit ke batas lagu, durasi
+1-60 detik)+`isValid()`+`formatTimestamp()`, pure/testable pola `AbRepeatLogic`.
+`RingtoneEncoder.kt` (baru, `data/`) — potong via `MediaExtractor`+`MediaMuxer` stream-copy
+(tanpa re-encode, `MUXER_OUTPUT_MPEG_4`), scope dipersempit ke lagu MediaStore + format MP3/AAC
+saja (pola sama `TagEditor`), simpan sebagai file BARU ke `Ringtones|Notifications|
+Alarms/AudioPlayer` (flag `IS_RINGTONE` dst, API 29+) — **karena selalu file baru (tidak pernah
+menulis balik ke file asli), 0 alur consent dibutuhkan**, beda dari `TagEditor`.
+`WRITE_SETTINGS`/set-as-default-otomatis SENGAJA tidak dikerjakan — fallback "simpan, pilih
+manual di Pengaturan > Suara" (tetap mulus karena flag MediaStore bikin file auto-muncul di
+pemilih nada dering sistem). `RingtoneCutterSheet.kt` (baru, `ui/`) — 2 `Slider` (bukan
+`RangeSlider`, 0 precedent komponen itu) + 3 `FilterChip` tujuan. **MVP disengaja**: 0 preview
+audio dari sheet ini. `RingtoneCutterTest.kt` (baru, `test/`) — 10 test pure logic.
+
+`NowPlayingScreen.kt`/`PlayerViewModel.kt` (diedit) — 1 menu "Potong Nada Dering" +
+`requestCutRingtone()` fire-and-forget lewat kanal `infoMessage`/`actionErrorMessage` yang
+sudah ada. `MainActivity.kt` (diedit, **protected asset — edit parsial**) — 1 param baru di
+call site `NowPlayingScreen(...)` yang sudah ada.
+
+**Batasan jujur**: hasil potongan TIDAK otomatis jadi nada dering aktif sistem (butuh
+`WRITE_SETTINGS`, izin sensitif yang sengaja dilewati) — user pilih manual dari Pengaturan >
+Suara setelah tersimpan. Stream-copy tanpa re-encode BISA gagal diam-diam kalau `MediaExtractor`
+salah pilih trek pada file berformat eksotis (belum diverifikasi di device sungguhan).
+
+7 file (4 baru + 3 diedit), 0 protected asset lain selain `MainActivity.kt` (edit parsial).
+Brace/paren dicek otomatis & seimbang. `FILE_MANIFEST.txt` 162→166 + `README.md` (1 baris fitur
++ banner) + `ROADMAP_15_FITUR_OFFLINE.md` (#5 selesai) sebelum repack. **Belum diverifikasi
+compile/runtime Gradle sungguhan** (tidak ada JDK/Android SDK di sandbox ini) — prioritas
+berikutnya kalau user push: (1) `./gradlew assembleDebug` build bersih (`MediaMuxer`/
+`MediaExtractor` API paling berisiko salah ketik manual), (2) di device: potong 1 lagu MP3 & 1
+M4A, pastikan hasil muncul di Pengaturan > Suara > Nada Dering, (3) putar hasil di app LAIN
+(bukan app ini sendiri) pastikan tidak korup/silent, (4) coba lagu FLAC/WAV pastikan pesan
+"belum didukung" muncul jelas, (5) coba di Android 9 ke bawah pastikan pesan "butuh Android 10+"
+muncul (bukan crash). Detail lengkap: `CHANGELOG.md` Batch 121.
+
 **Batch 120 (Roadmap #3 — Editor Lirik LRC Tap-to-Sync, 4 file — 2 baru + 2 diedit)** — Item
 roadmap berikutnya setelah #14 (Batch 119), dipilih karena 100% reuse infrastruktur lirik yang
 sudah ada (`LyricsStore`/`LyricsParser`/highlight-scroll `LyricsSheet.kt`), 0 dependency baru,

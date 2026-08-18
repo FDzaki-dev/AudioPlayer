@@ -55,7 +55,7 @@ favorit dalam satu file (intro/reff/part solo) untuk lompat cepat.
   Bookmark disimpan per-lagu via `BookmarkStore.kt` (JSON, pola sama `SmartPlaylistStore`).
   Detail lengkap: `CHANGELOG.md` Batch 91.
 
-## 5. Pemangkas & Pembuat Nada Dering (Ringtone Cutter)
+## 5. Pemangkas & Pembuat Nada Dering (Ringtone Cutter) ✅ SELESAI (Batch 121)
 Potong bagian lagu (drag range di waveform/seekbar) lalu set langsung sebagai nada dering,
 notifikasi, atau alarm sistem Android.
 - **Kenapa**: fitur klasik yang sering dicari user audio player, dan Android sudah punya API
@@ -65,6 +65,18 @@ notifikasi, atau alarm sistem Android.
   untuk set sebagai default.
 - **Risiko**: izin `WRITE_SETTINGS` mungkin diperlukan untuk set-as-default langsung (API level
   tertentu) — perlu dicek dan disediakan fallback "simpan lalu pilih manual" kalau ditolak.
+- **Catatan implementasi**: `WRITE_SETTINGS`/`setActualDefaultRingtoneUri` SENGAJA tidak
+  dikerjakan (izin sensitif, butuh flow approval terpisah) — turun ke fallback "simpan lalu
+  pilih manual" yang sudah disebut sebagai opsi risiko di atas, bukan penyempitan dadakan. File
+  hasil potong disimpan ke `Ringtones|Notifications|Alarms/AudioPlayer` via MediaStore
+  (`RELATIVE_PATH`, API 29+ saja, pola sama `BackupManager`/`AppLogger`) dengan flag
+  `IS_RINGTONE`/`IS_NOTIFICATION`/`IS_ALARM` sehingga otomatis muncul di pemilih nada dering
+  bawaan Android — tidak butuh `WRITE_SETTINGS` untuk itu. Potong pakai `MediaExtractor`+
+  `MediaMuxer` stream-copy (tanpa re-encode) ke wadah MPEG_4, scope sumber dipersempit ke
+  MP3/AAC-M4A saja (2 format yang aman di-mux tanpa re-encode di `minSdk` app ini) — pola
+  sama `TagEditor` mempersempit ke MP3 saja. 0 protected asset selain `MainActivity.kt` (edit
+  parsial — 1 param baru di call site `NowPlayingScreen(...)` yang sudah ada). Detail lengkap:
+  `CHANGELOG.md` Batch 121.
 
 ## 6. Pencari & Pembersih File Duplikat ✅ SELESAI (Batch 117)
 Deteksi file audio duplikat (berdasarkan durasi+ukuran, atau audio fingerprint sederhana) dan
@@ -249,7 +261,7 @@ saran titik mulai kalau user mau eksekusi bertahap:
 | 14 | Vault Lagu Privat ✅ | Sedang | Rendah |
 | 3 | Editor Lirik LRC Tap-to-Sync | Sedang | Rendah |
 | 7 | Cadangan & Pulihkan Data | Sedang | Sedang |
-| 5 | Ringtone Cutter | Sedang | Sedang |
+| 5 | Ringtone Cutter ✅ | Sedang | Sedang |
 | 9 | Visualizer Audio | Sedang | Sedang |
 | 1 | Editor Tag Metadata | Sedang-Tinggi | Sedang |
 | 6 | Pencari Duplikat | Sedang-Tinggi | Sedang |
