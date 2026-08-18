@@ -6,6 +6,20 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 132 (FIX — Calm Retro tenggelam di lagu beraksen kuat, 2 file diedit)** — User lapor
+pakai screenshot: CTA play tampak flat merah polos, aberrasi tak kelihatan sama sekali. Root
+cause: `animatedAccent` (CTA+wash+rating) selalu ikut `accentColor` dinamis dari ekstraksi
+album art per-lagu (`accentColor ?: fallback`), fallback ke warna tema HANYA kalau ekstraksi
+null — utk album art didominasi warna kuat, Muted Sage & aberrasi 0.35f-alpha ketimpa total.
+Fitur tint-dari-album-art ini disengaja & lama (berlaku semua identitas), tapi bertabrakan
+dgn filosofi "Calm Retro terkunci total" (Batch 128 dark-lock) — lock-nya sekarang meluas ke
+accent. Fix 1 baris/file di `NowPlayingScreen.kt`+`MiniPlayerBar.kt`: `if (isCalmRetro)
+fallback else (accentColor ?: fallback)` — identitas lain 0 perubahan perilaku (`isCalmRetro`
+sudah di-hoist sejak Batch 129, 0 hoist baru). **PENTING kalau lanjut sesi baru**: fix ini
+baru diverifikasi LOGIS dari kode (0 JDK/SDK di sandbox) — user BELUM konfirmasi visual hasil
+build ulang, jangan anggap selesai sebelum ada konfirmasi/screenshot baru dari user. Detail:
+`CHANGELOG.md` Batch 132.
+
 **Batch 131 (Calm Retro — live-showcase preview picker Settings, 1 file diedit)** — Menutup
 gap terakhir dari audit cakupan (Batch 130): Tactile/Skeu sudah live-showcase di baris preview
 `ThemeOptionCard`, Calm Retro belum. `SettingsScreen.kt` — `calmAberration()` (fungsi Batch 129,

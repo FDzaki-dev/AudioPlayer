@@ -274,8 +274,14 @@ fun NowPlayingScreen(
     }
 
     val fallback = MaterialTheme.colorScheme.primary
+    // Batch 132 — fix laporan user (screenshot): CTA/wash Calm Retro ikut warna dominan album
+    // art per-lagu (accentColor), Muted Sage & aberrasi jadi tenggelam/tak kebaca di lagu
+    // beraksen kuat (merah dst). Identitas ini sudah terkunci gelap total (Batch 128) — locknya
+    // sekarang meluas ke accent juga: SELALU CalmRetroAccent literal, tidak pernah ikut album
+    // art, konsisten dgn filosofi "tidak ikut-ikutan" identitas ini. Ini SATU titik kontrol
+    // (animatedAccent dipakai jadi seluruh CTA/wash/rating di bawah), jadi cukup 1 baris.
     val animatedAccent by animateColorAsState(
-        targetValue = accentColor ?: fallback,
+        targetValue = if (isCalmRetro) fallback else (accentColor ?: fallback),
         animationSpec = tween(700),
         label = "accentColor"
     )

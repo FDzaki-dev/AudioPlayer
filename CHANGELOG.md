@@ -1,5 +1,29 @@
 # Changelog
 
+## Batch 132 — FIX: Calm Retro tenggelam di lagu beraksen kuat (2 file)
+User lapor pakai screenshot: tombol play tampak flat merah polos (bukan Muted Sage), aberrasi
+Dusty Rose/Denim tak kelihatan sama sekali. Root cause: `animatedAccent` (dipakai jadi warna
+CTA + wash latar + rating) selama ini SELALU ikut `accentColor` dinamis hasil ekstraksi warna
+dominan album art per-lagu (`accentColor ?: fallback`) — fallback ke warna tema HANYA kalau
+ekstraksi gagal/null. Untuk lagu dengan album art didominasi warna kuat (merah di screenshot),
+Muted Sage & aberrasi 0.35f-alpha jadi tak mungkin kebaca sama sekali, ketimpa merah + wash
+gradient ikut merah juga. Ini bukan bug baru — fitur "tint dari album art" ini disengaja &
+lama (Color.kt: "modern music player can tint itself from the artwork"), berlaku sama untuk
+SEMUA identitas — tapi khusus Calm Retro, ini bertabrakan langsung dengan filosofi
+"identitas terkunci total, tidak ikut-ikutan" yang sudah ditetapkan sejak Batch 128 (dark
+terkunci) — locknya sekarang meluas ke accent juga.
+
+`NowPlayingScreen.kt` + `MiniPlayerBar.kt` — 1 baris `targetValue` di masing-masing
+`animateColorAsState` (`animatedAccent`): `if (isCalmRetro) fallback else (accentColor ?:
+fallback)` — Calm Retro SELALU `CalmRetroAccent` literal, identitas lain 0 perubahan perilaku
+(masih dinamis seperti sebelumnya). 1 titik kontrol per file (semua CTA/wash/rating turunan
+dari `animatedAccent` yang sama), jadi cukup 2 baris total untuk fix penuh — `isCalmRetro`
+sendiri sudah di-hoist sejak Batch 129, 0 hoist baru dibutuhkan.
+
+0 protected asset, 0 file baru, 2 file diedit. **Belum diverifikasi compile Gradle sungguhan**
+(tidak ada JDK/SDK di sandbox) — secara logis root cause & fix sudah dikonfirmasi dari kode,
+tapi verifikasi visual sungguhan (screenshot ulang setelah build) masih perlu user.
+
 ## Batch 131 — Calm Retro: live-showcase preview di picker Settings (1 file)
 Menutup gap terakhir dari audit cakupan (dilaporkan ke user setelah Batch 130): Tactile/Skeu
 sudah live-showcase di baris preview `ThemeOptionCard`, Calm Retro belum.

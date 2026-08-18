@@ -61,7 +61,10 @@ fun MiniPlayerBar(
     // konsisten muncul di mini bar juga, bukan cuma NowPlayingScreen.
     val isCalmRetro = isCalmRetroTheme()
     val animatedAccent by animateColorAsState(
-        targetValue = accentColor ?: MaterialTheme.colorScheme.primary,
+        // Batch 132 — sama fix/alasan persis NowPlayingScreen.kt: Calm Retro terkunci ke
+        // CalmRetroAccent literal (MaterialTheme.colorScheme.primary), tidak ikut accentColor
+        // dinamis per-lagu.
+        targetValue = if (isCalmRetro) MaterialTheme.colorScheme.primary else (accentColor ?: MaterialTheme.colorScheme.primary),
         animationSpec = tween(700),
         label = "miniAccentColor"
     )
