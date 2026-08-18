@@ -80,6 +80,7 @@ fun SettingsScreen(
     var showDuplicateFinder by remember { mutableStateOf(false) }
     var showVault by remember { mutableStateOf(false) }
     var showAdvancedSettings by remember { mutableStateOf(false) }
+    var showUpdateCheck by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -464,7 +465,25 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            // Release Downloader Spec — satu-satunya tempat app ini pernah menyentuh jaringan,
+            // dan hanya kalau baris ini ditekan manual (tidak pernah otomatis di background).
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showUpdateCheck = true }
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.SettingsBackupRestore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("Cek Update", style = MaterialTheme.typography.bodyMedium)
+            }
+            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 
@@ -476,6 +495,9 @@ fun SettingsScreen(
     }
     if (showBackupRestore) {
         BackupRestoreSheet(onDismiss = { showBackupRestore = false }, onInfoMessage = onInfoMessage)
+    }
+    if (showUpdateCheck) {
+        UpdateCheckSheet(onDismiss = { showUpdateCheck = false })
     }
 
     if (showDuplicateFinder) {

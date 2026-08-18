@@ -6,6 +6,20 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 136 (Release Downloader Spec — cek update manual dari GitHub Release, 9 file)** —
+Membalik keputusan Batch 8 (dulu sengaja 0 INTERNET permission demi klaim privasi), atas
+persetujuan eksplisit user. `INTERNET`+`REQUEST_INSTALL_PACKAGES`+`<provider>` FileProvider baru
+di `AndroidManifest.xml`, dipakai HANYA oleh tombol manual "Cek Update" baru (Settings → Lanjutan
+→ Tentang Aplikasi) — tidak ada auto-check background. Downloader (`update/UpdateDownloader.kt`)
+streaming chunk 8KB ke disk via Okio, TIDAK PERNAH buffer biner APK penuh di RAM; timeout
+15s/20s, follow-redirect (CDN GitHub), header Accept+Authorization Bearer sesuai spec.
+`update/GitHubReleaseChecker.kt` baca `releases/latest`, `update/UpdateManager.kt` orkestrasi
+state (singleton terisolasi, 0 sentuh PlaybackService/PlayerViewModel). **PENTING kalau lanjut
+sesi baru**: `gradle.properties` punya `UPDATE_REPO_OWNER=ganti-username-github` — masih
+placeholder, WAJIB diganti ke username GitHub asli sebelum fitur ini berfungsi (lihat juga
+"Owner/repo" di bawah). Belum ada verifikasi build (0 JDK/SDK di sandbox) — cek compile pertama
+kali di Termux/CI. Detail: `CHANGELOG.md` Batch 136.
+
 **Batch 135 (Calm Retro v3 — scanline ke panel kontrol Equalizer+Visualizer, 2 file diedit)** —
 Lanjutan item "sengaja belum" Batch 134: `calmScanlines()` disebar ke `EqualizerSheet.kt` +
 `VisualizerSheet.kt` (shell identik sejak Batch 92). Ditemukan risiko containment SEBELUM

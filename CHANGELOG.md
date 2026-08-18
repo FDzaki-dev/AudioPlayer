@@ -1,5 +1,39 @@
 # Changelog
 
+## Batch 136 — Release Downloader Spec: cek update manual dari GitHub Release (9 file)
+**Membalik keputusan sadar Batch 8** ("app ini tidak punya izin INTERNET sama sekali, itu
+bagian dari klaim privasinya") — atas permintaan eksplisit user, dengan syarat tidak mengganggu
+logic app yang sudah ada. `INTERNET` + `REQUEST_INSTALL_PACKAGES` ditambah ke
+`AndroidManifest.xml`, tapi keduanya HANYA dipakai satu jalur: tombol manual "Cek Update" baru
+di Settings → Lanjutan → Tentang Aplikasi. Tidak ada auto-check di background/app start, tidak
+ada analytics/ads/telemetry lain yang menumpang izin ini.
+
+- `update/UpdateDownloader.kt` (baru) — unduh biner APK rilis, streaming chunk 8KB langsung ke
+  `Buffer`→disk (Okio, transitive dari OkHttp), TIDAK PERNAH `ResponseBody.bytes()`/`.string()`
+  untuk biner (itu akan menampung seluruh APK di RAM). Timeout eksplisit connect 15s/read 20s,
+  `followRedirects(true)` (aset GitHub Release di-redirect 302 ke CDN), header
+  `Accept: application/octet-stream` + opsional `Authorization: Bearer <token>`.
+- `update/GitHubReleaseChecker.kt` (baru) — `GET /repos/{owner}/{repo}/releases/latest`, cari
+  asset `.apk`. Metadata JSON-nya kecil jadi `.string()` di sini wajar (aturan "jangan buffer di
+  RAM" khusus biner APK, bukan payload JSON kecil).
+- `update/UpdateManager.kt` (baru) — orkestrasi Checking→Available→Downloading→ReadyToInstall,
+  `MutableStateFlow` diamati UI. Singleton terpisah, sengaja tidak menyentuh
+  `PlayerViewModel`/`PlaybackService` sama sekali.
+- `ui/UpdateCheckSheet.kt` (baru) — bottom sheet, pola sama persis `SignatureMatcherSheet.kt`.
+- `ui/SettingsScreen.kt` (diedit, 2 titik) — 1 baris state (`showUpdateCheck`) + 1 row baru di
+  bawah "Tentang Aplikasi", murni tambahan, 0 baris existing diubah/dihapus.
+- `AndroidManifest.xml` (protected, diedit) — 2 permission + 1 `<provider>` FileProvider baru
+  (authorities `${applicationId}.updateprovider`, scoped ke `cacheDir` via `file_paths.xml` baru,
+  `exported="false"`).
+- `app/build.gradle.kts` (protected, diedit) — 1 dependency baru (`okhttp:4.12.0`) + 2
+  `buildConfigField` (`UPDATE_REPO_OWNER`/`UPDATE_REPO_NAME`) dibaca dari `gradle.properties`.
+- `gradle.properties` (diedit) — **WAJIB diisi manual**: `UPDATE_REPO_OWNER=ganti-username-github`
+  masih placeholder, ganti ke username GitHub asli sebelum "Cek Update" bisa nemu rilis.
+
+**Sengaja belum**: auto-check berkala/di background (spec eksplisit hanya minta jalur manual);
+verifikasi signature APK hasil unduhan sebelum install (`SignatureMatcherSheet.kt` sudah ada
+sebagai alat manual terpisah, belum diotomatisasi masuk ke alur ini). 0 file dihapus.
+
 ## Batch 135 — Scanline disebar ke panel kontrol (Equalizer + Visualizer, 2 file diedit)
 Lanjutan langsung item "sengaja belum" Batch 134: Pilar A (`calmScanlines()`) sekarang juga di
 `EqualizerSheet.kt` + `VisualizerSheet.kt` — 2 panel kontrol paling literal di app ini (slider

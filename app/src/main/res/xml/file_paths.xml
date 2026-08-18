@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release Downloader Spec — hanya expose cacheDir root (tempat UpdateManager menaruh
+     update_*.apk sementara), bukan seluruh penyimpanan app. Sengaja sesempit mungkin: kalau
+     nanti ada path lain butuh dibagikan lewat provider lain, jangan diperluas di sini. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="update_apk" path="." />
+</paths>

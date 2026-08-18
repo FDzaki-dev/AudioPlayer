@@ -34,6 +34,15 @@
          ON, tanpa user harus buka app dulu. Lihat BubbleBootReceiver.kt. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Release Downloader Spec — satu-satunya alasan INTERNET ada di app ini: cek & unduh APK
+         rilis terbaru dari GitHub Releases (Settings → Lanjutan → Cek Update). Tidak dipakai
+         untuk apa pun lain (tidak ada analytics/telemetry/ads) — lihat komentar AppLogger.kt
+         soal kenapa app ini sebelumnya sengaja tanpa INTERNET. REQUEST_INSTALL_PACKAGES wajib
+         supaya intent ACTION_VIEW ke APK hasil unduhan boleh memicu installer sistem
+         (Android 8+ memblokir ini tanpa izin eksplisit). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:name=".AudioPlayerApplication"
         android:allowBackup="true"
@@ -133,6 +142,20 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_player_info" />
         </receiver>
+
+        <!-- Release Downloader Spec — Android N+ tidak izinkan intent installer menerima
+             file:// URI langsung; FileProvider membungkus file APK di cacheDir jadi content://
+             sementara & scoped (grantUriPermissions), exported="false" karena hanya app ini
+             sendiri yang pernah butuh membaca file itu. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updateprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 </manifest>

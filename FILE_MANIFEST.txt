@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 167 file
+# Total: 172 file
 
 .github/workflows/build.yml
 .gitignore
@@ -99,6 +99,7 @@ app/src/main/java/com/rudi/audioplayer/ui/SignatureMatcherSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SmartPlaylistScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/SongInfoEditSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/StatsDashboardScreen.kt
+app/src/main/java/com/rudi/audioplayer/ui/UpdateCheckSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/Utils.kt
 app/src/main/java/com/rudi/audioplayer/ui/VaultSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/VisualizerSheet.kt
@@ -109,6 +110,9 @@ app/src/main/java/com/rudi/audioplayer/ui/theme/Spacing.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/TactileDepth.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Theme.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Type.kt
+app/src/main/java/com/rudi/audioplayer/update/GitHubReleaseChecker.kt
+app/src/main/java/com/rudi/audioplayer/update/UpdateDownloader.kt
+app/src/main/java/com/rudi/audioplayer/update/UpdateManager.kt
 app/src/main/java/com/rudi/audioplayer/util/ApkSignatureChecker.kt
 app/src/main/java/com/rudi/audioplayer/util/AppLogger.kt
 app/src/main/java/com/rudi/audioplayer/util/AudioArtFetcher.kt
@@ -150,6 +154,7 @@ app/src/main/res/values/strings.xml
 app/src/main/res/values/themes.xml
 app/src/main/res/xml/backup_rules.xml
 app/src/main/res/xml/data_extraction_rules.xml
+app/src/main/res/xml/file_paths.xml
 app/src/main/res/xml/shortcuts.xml
 app/src/main/res/xml/widget_player_info.xml
 app/src/test/java/com/rudi/audioplayer/data/CustomFolderScannerStableIdTest.kt

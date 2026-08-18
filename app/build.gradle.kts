@@ -94,6 +94,18 @@ android {
         // .github/workflows/build.yml. Tidak berlaku sama sekali utk build release biasa —
         // murni metadata utk target test task, nol dampak ke APK yang di-Release.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Release Downloader Spec — owner/repo GitHub yang dicek UpdateManager untuk rilis
+        // terbaru. Sengaja dibaca dari gradle.properties (bukan hardcoded di Kotlin) supaya
+        // ganti target repo cukup edit 1 baris properties, nol sentuh source/logic app.
+        buildConfigField(
+            "String", "UPDATE_REPO_OWNER",
+            "\"${project.findProperty("UPDATE_REPO_OWNER") ?: "ganti-username-github"}\""
+        )
+        buildConfigField(
+            "String", "UPDATE_REPO_NAME",
+            "\"${project.findProperty("UPDATE_REPO_NAME") ?: rootProject.name}\""
+        )
     }
 
     signingConfigs {
@@ -184,6 +196,11 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
+    // Release Downloader Spec — satu-satunya dependency jaringan di proyek ini, dipakai
+    // UpdateDownloader/GitHubReleaseChecker (Settings → Lanjutan → Cek Update). Okio (streaming
+    // sink chunk-by-chunk) sudah ikut sebagai transitive dependency OkHttp, tidak perlu baris
+    // terpisah.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.activity:activity-compose:1.9.0")
