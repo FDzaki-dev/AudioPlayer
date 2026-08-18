@@ -6,6 +6,21 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 134 (Calm Retro v3 — tuntaskan 2 item tunda Batch 133, 2 file diedit)** — Lanjutan
+langsung 2 catatan "sengaja belum digarap" Batch 133: (1) `calmScanlines()` (Pilar A) disebar
+dari `AlbumArtHero` ke `SongRow` (`LibraryScreen.kt`) — 1 composable dipakai ulang di tab Lagu/
+`GroupedListView`/`SearchResultsView` (3 call site), jadi 1 edit (`isCalmRetro` hoist + scanline
+di thumbnail AlbumArt 48dp SETELAH `.clip()`) otomatis menjangkau ketiganya. (2) Audit "blur
+album-art 80dp/15% backdrop" — ternyata BUKAN gap fungsional (backdrop generik sudah ada semua
+identitas sejak Batch 67), cuma beda angka dari literal spec; Calm Retro sekarang dapat
+intensitasnya sendiri (`NowPlayingScreen.kt`, backdrop 80dp/alpha 0.15f digate `isCalmRetro`,
+identitas lain tetap 60dp/0.5f seperti sebelumnya). 0 file baru, 0 protected asset. **Sengaja
+belum**: scanline ke panel kontrol/sheet lain (Equalizer/Visualizer dst.) — di luar cakupan
+"daftar lagu" yang diminta, kandidat lanjutan terpisah. **PENTING kalau lanjut sesi baru**: fix
+ini baru diverifikasi LOGIS dari kode (0 JDK/SDK di sandbox) — belum ada konfirmasi visual/build
+dari user, terutama kontras 15% vs 50% alpha backdrop yang paling berisiko meleset dari niat
+"jauh"/subtle spec tanpa device. Detail: `CHANGELOG.md` Batch 134.
+
 **Batch 133 (Calm Retro v3 upgrade — Pilar A/C/D dari spec baru, 3 file diedit)** — User upload
 `palet_warna_calm_retro_v3.md`, penerus v2 (Batch 128-132). 7 HEX §1 identik v2 (0 warna
 berubah). 3 pilar identitas yang belum pernah digarap ditutup: (A) `calmScanlines()` baru

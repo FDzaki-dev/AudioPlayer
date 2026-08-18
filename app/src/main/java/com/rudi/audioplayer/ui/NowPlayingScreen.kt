@@ -289,14 +289,25 @@ fun NowPlayingScreen(
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
+        // v3 upgrade — audit item "Do's" spec palet_warna_calm_retro_v3.md yang Batch 133
+        // sengaja tunda ("blur album-art 80dp/15% sebagai backdrop jauh Now Playing"): backdrop
+        // generik ini (semua identitas, sejak Batch 67) sudah ADA tapi angkanya beda (60dp/50%
+        // alpha) — bukan gap fungsional (Calm Retro sudah dapat backdrop blur sejak awal, sama
+        // seperti identitas lain), murni beda intensitas. Karena ini bagian "Do's" (saran, bukan
+        // salah satu 4 Pilar wajib) dan angka literal spec eksplisit beda dari nilai generik
+        // project, Calm Retro dapat angkanya sendiri di sini (mengaburkan 80dp, opacity 15% —
+        // jauh lebih halus dari 50% generik, sesuai nada "jauh"/subtle spec) — identitas lain
+        // TIDAK disentuh, tetap 60dp/50% seperti sebelumnya.
+        val backdropBlurRadius = if (isCalmRetro) 80.dp else 60.dp
+        val backdropAlpha = if (isCalmRetro) 0.15f else 0.5f
         AlbumArt(
             artworkUri = song?.uri,
             contentScale = ContentScale.Crop,
             showIcon = false,
             modifier = Modifier
                 .fillMaxSize()
-                .blur(60.dp)
-                .alpha(0.5f)
+                .blur(backdropBlurRadius)
+                .alpha(backdropAlpha)
         )
 
         Box(

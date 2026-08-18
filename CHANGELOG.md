@@ -1,5 +1,43 @@
 # Changelog
 
+## Batch 134 — Calm Retro v3: tuntaskan 2 item yang sengaja ditunda Batch 133 (2 file diedit)
+Lanjutan langsung Batch 133 ("gak usah greedy" — sengaja ditunda ke batch terpisah, bukan
+terlewat). 2 item dari catatan "Sengaja BELUM digarap" batch itu, dikerjakan bersama karena
+sama-sama scope kecil & terkait Pilar A yang sama:
+
+**1. Scanline disebar ke Card list lagu** (`LibraryScreen.kt`) — Pilar A (`calmScanlines()`,
+Batch 133) sebelumnya cuma di `AlbumArtHero` (Now Playing). Spec markdown eksplisit sebut
+"daftar lagu, panel kontrol" sebagai target lain, ditunda demi batch kecil. `SongRow` — 1
+composable yang dipakai ulang di SEMUA tampilan daftar lagu (tab Lagu/`GroupedListView`/
+`SearchResultsView`, 3 call site, grep-confirmed) — `isCalmRetro` di-hoist (pola sama
+`isTactile`/`isSkeu` di `NowPlayingScreen.kt`), `calmScanlines()` dipasang di thumbnail
+`AlbumArt` 48dp SETELAH `.clip()` (pola sama AlbumArtHero — scanline terkurung rapi di dalam
+shape bulat-persegi, tidak meluber ke row di sekitarnya). 1 edit di `SongRow` otomatis
+menjangkau ketiga tampilan sekaligus, tidak perlu disentuh satu-satu. **Sengaja belum**: panel
+kontrol lain (Equalizer/Visualizer sheet dst.) — di luar cakupan "list lagu" yang diminta
+eksplisit, kandidat lanjutan terpisah kalau diminta.
+
+**2. Audit blur backdrop album-art 80dp/15%** (`NowPlayingScreen.kt`) — item "Do's" spec yang
+Batch 133 tandai "belum diaudit". Hasil audit: backdrop blur generik (`AlbumArt` full-screen di
+belakang seluruh layar Now Playing) sudah ADA sejak lama (Batch 67, berlaku SEMUA identitas)
+— jadi ini bukan gap fungsional (Calm Retro sudah dapat backdrop, sama seperti tema lain),
+murni beda ANGKA dari literal spec (spec minta blur 80dp/opacity 15%, kode existing generik
+60dp/alpha 50%). Karena "Do's" cuma saran (bukan salah satu 4 Pilar wajib) dan angkanya eksplisit
+beda, Calm Retro sekarang dapat intensitasnya sendiri di titik ini — `backdropBlurRadius`/
+`backdropAlpha` di-gate `isCalmRetro` (80.dp/0.15f vs 60.dp/0.5f default), reuse `isCalmRetro`
+yang sudah di-hoist sejak Batch 129, 0 hoist baru. Identitas lain 0 perubahan perilaku (tetap
+60dp/50% seperti sebelum batch ini).
+
+2 file diedit, 0 file baru, 0 token warna baru, 0 protected asset. Brace/paren dicek otomatis &
+seimbang di kedua file (`LibraryScreen.kt` 330/330 `{}`, 701/701 `()`; `NowPlayingScreen.kt`
+209/209 `{}`, 719/719 `()`). **Belum diverifikasi compile/visual sungguhan** (0 JDK/Android SDK
+di sandbox ini, konsisten sama seperti setiap batch tema sebelumnya) — prioritas berikutnya
+kalau user push: `./gradlew assembleDebug` build bersih, lalu di device cek (1) scanline di
+thumbnail 48dp daftar lagu genuinely kebaca tapi tidak bikin row kelihatan kotor/berdebu, (2)
+backdrop Now Playing Calm Retro genuinely lebih halus/samar dari identitas lain (15% vs 50%
+alpha — perbedaan besar, paling berisiko meleset dari niat "jauh"/subtle spec tanpa device
+untuk verifikasi visual langsung).
+
 ## Batch 133 — Calm Retro v3 upgrade: 2 pilar identitas baru dari spec (3 file diedit)
 User upload `palet_warna_calm_retro_v3.md` ("Calm Cyber-Analog"), penerus
 `palet_warna_calm_retro_v2.md` yang jadi basis Batch 128-132. Diaudit dulu: 7 token HEX §1 di

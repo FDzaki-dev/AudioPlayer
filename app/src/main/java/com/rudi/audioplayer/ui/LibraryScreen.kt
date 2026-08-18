@@ -60,6 +60,8 @@ import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
+import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
+import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.ui.theme.Radius
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -1095,6 +1097,13 @@ private fun SongRow(
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    // v3 upgrade lanjutan — spread Pilar A (CRT scanlines, Batch 133) dari AlbumArtHero (Now
+    // Playing) ke sini: kandidat "Card list lagu" yang spec sebut eksplisit tapi sengaja
+    // ditunda batch itu ("gak usah greedy", pola sama presedan aberrasi CTA Batch 129->130-131).
+    // SongRow ini 1 titik dipakai ulang di semua tampilan daftar lagu (tab Lagu/GroupedListView/
+    // SearchResultsView — 3 call site, grep-confirmed), jadi 1 edit di sini otomatis menjangkau
+    // ketiganya, tidak perlu disentuh 1-1.
+    val isCalmRetro = isCalmRetroTheme()
 
     Box(modifier = modifier) {
         Row(
@@ -1126,6 +1135,7 @@ private fun SongRow(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(Radius.xxl))
+                    .then(if (isCalmRetro) Modifier.calmScanlines() else Modifier)
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
