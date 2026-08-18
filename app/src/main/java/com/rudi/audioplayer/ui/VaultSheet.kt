@@ -298,7 +298,12 @@ private fun VaultContentSection(
                                 maxLines = 1
                             )
                         }
-                        IconButton(onClick = { onRemove(song.id) }) {
+                        val removeInteraction = remember { MutableInteractionSource() }
+                        IconButton(
+                            onClick = { onRemove(song.id) },
+                            interactionSource = removeInteraction,
+                            modifier = Modifier.bouncyPress(removeInteraction, pressedScale = 0.8f)
+                        ) {
                             Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Keluarkan dari vault")
                         }
                     }

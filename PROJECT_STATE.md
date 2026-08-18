@@ -6,6 +6,19 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 127 (Micro UI/UX — bounce-press tombol sekunder frekuensi-tinggi, 3 file kode diedit)**
+— Lanjutan kategori #4: tombol **sekunder** yang ditekan berulang (bukan CTA sekali-tekan) —
+`LyricsSheet` (Mundur/Lewati Baris di flow tap-to-sync), `VaultSheet` (icon keluarkan-dari-vault
+per baris), `ABRepeatBookmarkSheet` (icon hapus bookmark per baris). Sengaja **tidak** disentuh:
+tombol keluar/batal sekali-pakai (bukan repetitive-tap, prioritas rendah), sheet lain yang belum
+diaudit sekunder-nya (`BackupRestoreSheet`/`DuplicateFinderSheet`/`SignatureMatcherSheet`/
+`SongInfoEditSheet`/`RingtoneCutterSheet`/`EqualizerSheet`). **Kandidat batch berikutnya**: (a)
+tuntaskan sisa tombol sekunder di 6 sheet itu (tapi turunkan prioritas: kebanyakan sekali-tekan,
+dampak micro-feedback lebih kecil dari yang sudah dikerjakan), (b) hit-target size audit formal
+kategori #4 (IconButton semua sudah Material default 48dp secara implisit, tinggal verifikasi
+eksplisit + cek ripple tidak terpotong container), atau (c) mulai kategori #1 String & Wording
+Consistency (scope sempit, tanpa migrasi `strings.xml`). Detail: `CHANGELOG.md` Batch 127.
+
 **Batch 126 (Micro UI/UX — bounce-press FilterChip Equalizer+Ringtone Cutter, 2 file kode
 diedit)** — Lanjutan kategori #4 `MICRO_UIUX_AUDIT.md`, giliran `FilterChip` (beda pola dari
 `Button`): `EqualizerSheet` (2 baris preset chip) + `RingtoneCutterSheet` (`DestinationChip`

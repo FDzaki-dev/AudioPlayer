@@ -1,5 +1,23 @@
 # Changelog
 
+## Batch 127 — Micro UI/UX: bounce-press ke tombol sekunder frekuensi-tinggi (3 file)
+Lanjutan kategori #4 — kali ini tombol **sekunder** (bukan CTA utama) yang paling sering
+ditekan berulang dalam 1 sesi, prioritas sama seperti alasan "Tandai Sekarang" Batch 124:
+
+- `LyricsSheet.kt` — "Mundur" & "Lewati Baris" (2 `TextButton` di flow tap-to-sync, ditekan
+  bergantian dengan "Tandai Sekarang" tiap baris lirik — sengaja **tidak** termasuk "Batal,
+  Kembali ke Teks" karena itu aksi keluar sekali pakai, bukan repetitive-tap).
+- `VaultSheet.kt` — `IconButton` "Keluarkan dari vault" per baris lagu (ditekan berulang saat
+  kosongkan vault berisi banyak lagu).
+- `ABRepeatBookmarkSheet.kt` — `IconButton` hapus bookmark per baris (ditekan berulang saat
+  bersih-bersih daftar bookmark).
+
+3 file kode diedit, 0 file baru, 0 protected asset, 0 perubahan logika/behavior. `pressedScale`
+disesuaikan per ukuran kontrol (0.9 untuk TextButton, 0.8 untuk IconButton kecil — makin kecil
+kontrolnya, makin terasa efeknya di scale sama, jadi dikecilkan sedikit). Brace/paren tiap file
+dicek otomatis & seimbang. **Belum diverifikasi compile Gradle sungguhan** (tidak ada JDK/SDK
+di sandbox).
+
 ## Batch 126 — Micro UI/UX: tuntaskan bounce-press ke FilterChip (Equalizer + Ringtone Cutter)
 Lanjutan kategori #4, giliran `FilterChip` (bukan `Button`/`OutlinedButton` seperti Batch
 124-125) — pola sama (`interactionSource` + `Modifier.bouncyPress(...)`, `pressedScale = 0.92f`

@@ -129,11 +129,15 @@ fun LyricsSheet(
                     ) { Text("Tandai Sekarang") }
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth()) {
+                        val undoInteraction = remember { MutableInteractionSource() }
                         TextButton(
                             onClick = { syncSession = LrcSyncEditor.undo(session) },
-                            enabled = session.currentIndex > 0
+                            enabled = session.currentIndex > 0,
+                            interactionSource = undoInteraction,
+                            modifier = Modifier.bouncyPress(undoInteraction, pressedScale = 0.9f)
                         ) { Text("Mundur") }
                         Spacer(modifier = Modifier.weight(1f))
+                        val skipInteraction = remember { MutableInteractionSource() }
                         TextButton(
                             onClick = {
                                 val next = LrcSyncEditor.skip(session)
@@ -144,7 +148,9 @@ fun LyricsSheet(
                                     syncSession = next
                                 }
                             },
-                            enabled = !session.isComplete
+                            enabled = !session.isComplete,
+                            interactionSource = skipInteraction,
+                            modifier = Modifier.bouncyPress(skipInteraction, pressedScale = 0.9f)
                         ) { Text("Lewati Baris") }
                     }
                     TextButton(

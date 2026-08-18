@@ -13,7 +13,7 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
 
 | # | Kategori | Status |
 |---|----------|--------|
-| 4 | Touch Target & Micro Interaction | ✅ **CTA & chip utama selesai** (Batch 124-126: 9 sheet — Button + FilterChip). Belum: tombol sekunder (TextButton/IconButton) semua sheet, hit-target size audit, ripple-terpotong-container audit — cukup jauh dari "selesai penuh", ditandai ✅ hanya untuk sub-bagian bounce-press CTA/chip. |
+| 4 | Touch Target & Micro Interaction | 🟡 **CTA/chip ✅ (Batch 124-126) + sebagian tombol sekunder ✅ (Batch 127: Mundur/Lewati Baris LyricsSheet, remove-icon VaultSheet, delete-icon ABRepeatBookmarkSheet)**. Belum: sisa TextButton/IconButton di sheet lain (BackupRestoreSheet/DuplicateFinderSheet/SignatureMatcherSheet/SongInfoEditSheet/RingtoneCutterSheet/EqualizerSheet — batal/undo/tutup dst.), hit-target size audit formal (semua IconButton sudah Material default 48dp, belum diverifikasi eksplisit), ripple-terpotong-container audit. |
 | 1 | Strings & Wording Consistency | ⬜ Belum mulai |
 | 2 | Spacing & Sizing Consistency | ⬜ Belum mulai |
 | 3 | Typography Hierarchy | ⬜ Belum mulai |

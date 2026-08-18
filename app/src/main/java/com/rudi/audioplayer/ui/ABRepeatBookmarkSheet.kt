@@ -212,7 +212,12 @@ private fun BookmarkRow(bookmark: BookmarkModel, onJump: () -> Unit, onDelete: (
                 color = MaterialTheme.colorScheme.secondary
             )
         }
-        IconButton(onClick = onDelete) {
+        val deleteInteraction = remember { MutableInteractionSource() }
+        IconButton(
+            onClick = onDelete,
+            interactionSource = deleteInteraction,
+            modifier = Modifier.bouncyPress(deleteInteraction, pressedScale = 0.8f)
+        ) {
             Icon(Icons.Default.DeleteOutline, contentDescription = "Hapus bookmark \"${bookmark.label}\"")
         }
     }
