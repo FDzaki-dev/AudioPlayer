@@ -1,5 +1,22 @@
 # Changelog
 
+## Batch 126 — Micro UI/UX: tuntaskan bounce-press ke FilterChip (Equalizer + Ringtone Cutter)
+Lanjutan kategori #4, giliran `FilterChip` (bukan `Button`/`OutlinedButton` seperti Batch
+124-125) — pola sama (`interactionSource` + `Modifier.bouncyPress(...)`, `pressedScale = 0.92f`
+sedikit lebih halus dari default 0.88f karena chip lebih kecil dari button penuh).
+
+`EqualizerSheet.kt` — 2 `LazyRow` chip (Preset Kuat 4 chip + Preset Bawaan Perangkat N chip,
+paling sering ditekan berulang saat eksplor equalizer). `RingtoneCutterSheet.kt` —
+`DestinationChip` (composable bersama, 1 edit → berlaku ke 3 chip tujuan Nada
+Dering/Notifikasi/Alarm sekaligus, pola sama `AbPointButton`/`ApkPickerRow` Batch 125).
+
+2 file kode diedit, 0 file baru, 0 protected asset, 0 perubahan logika/behavior. Dengan ini,
+**sub-bagian bounce-press untuk CTA & chip utama** di kategori #4 selesai (9 sheet total sejak
+Batch 124) — tombol sekunder & hit-target size audit masih belum, `MICRO_UIUX_AUDIT.md`
+diupdate mencerminkan ini (bukan ✅ penuh kategori #4, cuma sub-bagian). Brace/paren tiap file
+dicek otomatis & seimbang. **Belum diverifikasi compile Gradle sungguhan** (tidak ada JDK/SDK
+di sandbox).
+
 ## Batch 125 — Micro UI/UX: adopsi MICRO_UIUX_AUDIT.md + lanjut bounce-press ke 4 sheet lagi
 User upload `MICRO_UIUX_AUDIT.md` — checklist 14 kategori polish presentation-only (strings,
 spacing, typography, touch target, interactive states, dst.), scope eksplisit **dilarang**

@@ -13,7 +13,7 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
 
 | # | Kategori | Status |
 |---|----------|--------|
-| 4 | Touch Target & Micro Interaction | 🟡 **Sebagian** — bounce-press CTA utama: 4 sheet Batch 124 (Simpan/Potong & Simpan/Aktifkan Vault+Buka/Tandai Sekarang) + 4 sheet Batch 125 (Backup+Restore/Hapus Terpilih/A-B Point/Pilih APK). Belum: `EqualizerSheet` FilterChip, tombol sekunder (TextButton/IconButton) semua sheet, hit-target size audit. |
+| 4 | Touch Target & Micro Interaction | ✅ **CTA & chip utama selesai** (Batch 124-126: 9 sheet — Button + FilterChip). Belum: tombol sekunder (TextButton/IconButton) semua sheet, hit-target size audit, ripple-terpotong-container audit — cukup jauh dari "selesai penuh", ditandai ✅ hanya untuk sub-bagian bounce-press CTA/chip. |
 | 1 | Strings & Wording Consistency | ⬜ Belum mulai |
 | 2 | Spacing & Sizing Consistency | ⬜ Belum mulai |
 | 3 | Typography Hierarchy | ⬜ Belum mulai |

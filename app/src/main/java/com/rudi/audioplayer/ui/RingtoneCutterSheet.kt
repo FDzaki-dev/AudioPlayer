@@ -160,11 +160,13 @@ private fun DestinationChip(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val chipInteraction = remember { MutableInteractionSource() }
     FilterChip(
         selected = selected,
         onClick = onClick,
         label = { Text(label, maxLines = 1) },
         leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
-        modifier = modifier
+        interactionSource = chipInteraction,
+        modifier = modifier.bouncyPress(chipInteraction, pressedScale = 0.92f)
     )
 }

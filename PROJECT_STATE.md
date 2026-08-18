@@ -6,6 +6,17 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 126 (Micro UI/UX — bounce-press FilterChip Equalizer+Ringtone Cutter, 2 file kode
+diedit)** — Lanjutan kategori #4 `MICRO_UIUX_AUDIT.md`, giliran `FilterChip` (beda pola dari
+`Button`): `EqualizerSheet` (2 baris preset chip) + `RingtoneCutterSheet` (`DestinationChip`
+composable bersama, 1 edit → 3 chip). Dengan ini sub-bagian "bounce-press CTA & chip utama"
+kategori #4 selesai di 9 sheet (Batch 124-126) — **belum** tombol sekunder & hit-target size
+audit, jangan tandai kategori #4 ✅ penuh. **Kandidat batch berikutnya**: (a) tuntaskan sisa
+kategori #4 (tombol sekunder TextButton/IconButton semua sheet + audit ukuran hit-target), atau
+(b) mulai kategori #1 String & Wording Consistency (scope sempit: wording konsisten murni,
+**tanpa** migrasi ke `strings.xml` — sudah ditandai berisiko di README soal 339 string literal
+tanpa compiler). Detail: `CHANGELOG.md` Batch 126.
+
 **Batch 125 (Micro UI/UX — adopsi MICRO_UIUX_AUDIT.md + bounce-press 4 sheet lagi, 4 file kode +
 1 dokumentasi baru)** — User upload checklist 14-kategori polish presentation-only, disimpan
 sebagai `MICRO_UIUX_AUDIT.md` (tracking persisten, status per kategori di paling atas file —

@@ -1,10 +1,12 @@
 package com.rudi.audioplayer.ui
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -88,12 +90,15 @@ fun EqualizerSheet(
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(boldPresetOptions.size, key = { index -> boldPresetOptions[index].first.name }) { index ->
                         val (preset, label) = boldPresetOptions[index]
+                        val chipInteraction = remember { MutableInteractionSource() }
                         FilterChip(
                             selected = state.boldPreset == preset.name,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onBoldPresetSelect(preset)
                             },
+                            interactionSource = chipInteraction,
+                            modifier = Modifier.bouncyPress(chipInteraction, pressedScale = 0.92f),
                             label = { Text(label) }
                         )
                     }
@@ -109,6 +114,7 @@ fun EqualizerSheet(
                     Spacer(modifier = Modifier.height(6.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(state.presets.size, key = { index -> state.presets[index] }) { index ->
+                            val chipInteraction = remember { MutableInteractionSource() }
                             FilterChip(
                                 selected = state.selectedPreset == index,
                                 onClick = {
@@ -116,6 +122,8 @@ fun EqualizerSheet(
                                     onPresetSelect(index)
                                 },
                                 enabled = state.enabled,
+                                interactionSource = chipInteraction,
+                                modifier = Modifier.bouncyPress(chipInteraction, pressedScale = 0.92f),
                                 label = { Text(state.presets[index]) }
                             )
                         }
