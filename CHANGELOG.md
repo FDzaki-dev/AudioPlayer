@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 123 — Dokumentasi: sinkronkan callout "Update terbaru" (0 file kode, 1 file dokumentasi diedit)
+Audit rutin urutan dokumentasi (pola sama Batch 94): `CHANGELOG.md` & `PROJECT_STATE.md` dicek
+ulang urut newest-first — **0 anomali**, keduanya sudah benar. Sumber laporan user ternyata
+callout "🆕 Update terbaru" di `README.md`, yang **wajib disinkronkan manual** tiap batch (lihat
+Batch 94) — masih menunjuk Batch 121 padahal Batch 122 (fix build) sudah selesai, terlewat
+karena Batch 122 murni fix build (0 file dokumentasi disentuh di batch itu). Fix: banner
+diperbarui menunjuk Batch 122, tetap kredit fitur Ringtone Cutter dari Batch 121. 0 protected
+asset, 0 file kode disentuh.
+
 ## Batch 122 — Fix Build: Ringtone Cutter
 CI GitHub Actions (`log_fail_176.zip`) melaporkan `compileDebugKotlin`/`compileReleaseKotlin`
 gagal: `RingtoneEncoder.kt:142` — `AppLogger.i(...)` dipanggil padahal `AppLogger` (Batch 121,

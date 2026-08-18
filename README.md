@@ -8,8 +8,9 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 121:** Ringtone Cutter — potong bagian lagu (MP3/M4A) jadi file
-> baru, simpan sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
+> 🆕 **Update terbaru — Batch 122:** Fix build Ringtone Cutter (`AppLogger.i`→`AppLogger.w`).
+> Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
+> sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
 > Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
 
 > **Mulai dari sini kalau ini sesi/percakapan baru:** baca `PROJECT_STATE.md` (status +

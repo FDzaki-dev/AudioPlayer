@@ -6,6 +6,17 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 123 (Dokumentasi — sinkronkan callout "Update terbaru", 1 file dokumentasi diedit)** —
+User lapor sebagian entri dokumentasi terasa basi/harus scroll dulu baru kelihatan perubahan.
+Audit ulang urutan `CHANGELOG.md` + `PROJECT_STATE.md` (pola sama Batch 94): **0 anomali**,
+keduanya sudah newest-first dengan benar. Sumber sebenarnya: callout "🆕 Update terbaru" di
+`README.md` (wajib disinkronkan manual tiap batch, lihat Batch 94) masih menunjuk Batch 121,
+terlewat sync karena Batch 122 murni fix build (0 file dokumentasi disentuh di batch itu). Fix:
+banner diperbarui ke Batch 122, tetap kredit fitur Batch 121. **Pelajaran**: callout manual-sync
+di README rawan telat tiap kali ada batch fix-only (tanpa sentuh dokumentasi) yang menyusul
+batch fitur — cek banner ini juga, bukan cuma urutan CHANGELOG/PROJECT_STATE, tiap ada laporan
+dokumentasi "ketinggalan". Detail: `CHANGELOG.md` Batch 123.
+
 **Batch 122 (Fix Build — Ringtone Cutter, 1 file diedit)** — CI (`log_fail_176.zip`) melaporkan
 `compileDebugKotlin`/`compileReleaseKotlin` gagal: `RingtoneEncoder.kt:142` panggil
 `AppLogger.i(...)` yang tidak ada (`AppLogger` cuma punya `e()`/`w()`). Fix 1 baris → `AppLogger.w`.
