@@ -1,5 +1,62 @@
 # Changelog
 
+## Batch 133 — Calm Retro v3 upgrade: 2 pilar identitas baru dari spec (3 file diedit)
+User upload `palet_warna_calm_retro_v3.md` ("Calm Cyber-Analog"), penerus
+`palet_warna_calm_retro_v2.md` yang jadi basis Batch 128-132. Diaudit dulu: 7 token HEX §1 di
+v3 identik persis dengan yang sudah ada di `Color.kt` (0 perubahan warna dibutuhkan). 4 Pilar
+Identitas §2 diaudit satu-satu vs kode existing: Pilar B (aberrasi CTA) sudah ada sejak Batch
+129 — 0 sentuhan. Pilar A (CRT scanlines), C (tipografi monospace), D (grain organik) BELUM
+pernah digarap — batch ini menutup 2 dari 3 gap itu (A & D, primitive baru) + C (murni per-Text,
+tanpa primitive baru), sesuai instruksi eksplisit user "dilarang keras overthinking" — scope
+dijaga sempit ke titik paling representatif per pilar (bukan disebar ke semua Card/Sheet
+sekaligus, pola "gak usah greedy" yang sama seperti histori Calm Retro Batch 129-131).
+
+**Pilar A — Soft CRT Scanlines** (`TactileDepth.kt`, fungsi baru `calmScanlines()`) — garis
+horizontal berulang 4px (setengah transparan/setengah gelap tipis) via `Brush.verticalGradient`
++ `TileMode.Repeated` (GPU-side, murah dipanggil tiap frame, 0 loop draw manual) — literal
+terjemahan CSS `linear-gradient(...50%, rgba(0,0,0,0.3) 50%)` di spec, alpha 0.03f = literal
+spec "opacity: 0.03". Dipasang di `NowPlayingScreen.kt`'s `AlbumArtHero` (permukaan terbesar,
+paling representatif untuk "Card/Album Art" yang diminta spec) — SETELAH `.clip(heroShape)`
+(beda dari teknik shadow Tactile/Skeu yang sengaja bocor SEBELUM clip di titik yang sama),
+supaya garis scanline terkurung rapi di dalam bentuk album art, tidak meluber ke luar.
+
+**Pilar D — Organic Grain Overlay** (`TactileDepth.kt`, fungsi baru `calmGrain()`) — spec minta
+noise monokrom di seluruh kanvas app, opacity maks 4%. Compose tidak punya raster-noise
+generator bawaan tanpa RenderEffect (API 31+, di luar `minSdk 23` project ini) — didekati lewat
+speckle field seeded (bukan bitmap — pola sama "hand-drawn" seperti `calmAberration()`/
+`skeuEmboss()`), posisi & alpha tiap speck dihitung SEKALI per ukuran layar via `drawWithCache`
+(bukan re-roll tiap frame, biaya render tetap murah), rentang alpha 0.015f-0.04f (di bawah
+plafon 4% spec), warna putih polos. Dipasang di `MainActivity.kt` (protected, edit parsial) —
+slot arsitektur SAMA PERSIS dengan `identityRootBrush` (root ambient wash Tactile/Skeu), 1 titik
+cakupan seluruh app, HANYA aktif saat `appThemeIdentity == ThemeIdentity.CALM_RETRO`.
+
+**Pilar C — Muted Monospace** (`NowPlayingScreen.kt`, tanpa primitive baru) — `FontFamily.Monospace`
+diterapkan HANYA ke 2 `Text` durasi/waktu berjalan (elapsed & total/-mm:ss) di baris waktu Now
+Playing, gated `isCalmRetro` yang sudah di-hoist sejak Batch 129. **Sengaja TIDAK diterapkan ke
+judul lagu atau lirik** — larangan eksplisit spec §4 ("JANGAN memberikan efek distorsi warna
+atau font berbeda pada teks lirik/judul lagu utama... harus tetap bersih"). Typography global
+(`AppleTypography`, reuse sejak Batch 130) TIDAK disentuh — keputusan itu tetap benar, monospace
+di sini murni override lokal 2 Text, bukan ganti Typography seluruh identitas.
+
+**Sengaja BELUM digarap** (dicatat, bukan terlewat, jaga batch tetap kecil): scanlines belum
+disebar ke Card list lagu/panel kontrol lain (spec sebut "daftar lagu, panel kontrol" juga —
+kandidat batch lanjutan kalau diminta, sama presedan aberrasi CTA yang mulai dari 1 titik lalu
+meluas Batch 130-131); blur album-art 80dp/15% sebagai backdrop jauh Now Playing (bagian
+"Do's" §4, bukan salah satu dari 4 Pilar inti) belum diaudit ada/tidaknya mekanisme serupa di
+kode existing untuk Calm Retro secara spesifik; monospace belum diperluas ke tag kualitas audio
+(`FLAC 24-bit` dst.) — app ini belum punya UI yang menampilkan bitrate/format eksplisit di
+Now Playing, jadi tidak ada titik pemasangan yang valid saat ini.
+
+3 file diedit (`TactileDepth.kt`, `NowPlayingScreen.kt`, `MainActivity.kt` protected/parsial), 0
+file baru, 0 token warna baru (semua HEX v3 = v2). Brace/paren dicek otomatis & seimbang di
+ketiga file. **Belum diverifikasi compile/visual sungguhan** (0 JDK/Android SDK di sandbox ini,
+konsisten sama seperti setiap batch tema sebelumnya) — prioritas berikutnya kalau user push:
+`./gradlew assembleDebug` build bersih (`TileMode.Repeated`/`drawWithCache` API yang paling
+berisiko salah pakai tanpa compiler), lalu di device cek (1) scanline genuinely kebaca tapi
+tidak mengganggu keterbacaan album art, (2) grain terasa "berbutir hangat" bukan malah kelihatan
+kotor/berdebu berlebihan, (3) angka durasi Now Playing genuinely pakai font monospace tanpa
+mengubah tampilan judul/lirik sama sekali.
+
 ## Batch 132 — FIX: Calm Retro tenggelam di lagu beraksen kuat (2 file)
 User lapor pakai screenshot: tombol play tampak flat merah polos (bukan Muted Sage), aberrasi
 Dusty Rose/Denim tak kelihatan sama sekali. Root cause: `animatedAccent` (dipakai jadi warna

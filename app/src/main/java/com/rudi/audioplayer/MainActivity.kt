@@ -128,6 +128,7 @@ import com.rudi.audioplayer.ui.theme.SkeuAmbientAlphaDark
 import com.rudi.audioplayer.ui.theme.SkeuAmbientAlphaLight
 import com.rudi.audioplayer.ui.theme.SkeuEmerald
 import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
+import com.rudi.audioplayer.ui.theme.calmGrain
 
 class MainActivity : FragmentActivity() {
 
@@ -376,6 +377,14 @@ class MainActivity : FragmentActivity() {
                         .fillMaxSize()
                         .then(
                             if (identityRootBrush != null) Modifier.background(identityRootBrush) else Modifier
+                        )
+                        // v3 upgrade (palet_warna_calm_retro_v3.md, Pilar D — Organic Grain
+                        // Overlay) — "lapisi seluruh kanvas aplikasi" secara literal berarti
+                        // titik root ini (satu-satunya Surface yang dibungkus semua layar),
+                        // sama slot arsitektur dengan identityRootBrush di atas untuk identitas
+                        // lain, HANYA aktif untuk Calm Retro.
+                        .then(
+                            if (appThemeIdentity == ThemeIdentity.CALM_RETRO) Modifier.calmGrain() else Modifier
                         ),
                     color = if (identityRootBrush != null) Color.Transparent else MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground

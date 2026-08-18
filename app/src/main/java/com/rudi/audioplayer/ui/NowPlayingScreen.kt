@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import android.content.Context
 import android.media.AudioManager
 import android.view.WindowManager
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.media3.common.Player
 import com.rudi.audioplayer.data.OnboardingHintStore
@@ -95,6 +96,7 @@ import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
+import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.TactileHighlight
 import com.rudi.audioplayer.ui.theme.TactileShadow
@@ -516,10 +518,16 @@ fun NowPlayingScreen(
             )
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            // Batch v3 upgrade — Pilar C spec palet_warna_calm_retro_v3.md ("Muted Monospace"):
+            // font ketikan-mesin HANYA di data fungsional pendek (durasi waktu), sesuai literal
+            // contoh spec `01:42 / 03:55` — bukan judul/lirik (larangan eksplisit §4 "JANGAN").
+            // `isCalmRetro` sudah di-hoist di atas (baris 198, dipakai bareng CTA aberration).
+            val timeFontFamily = if (isCalmRetro) FontFamily.Monospace else FontFamily.Default
             Text(
                 formatDuration(uiState.position),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary
+                color = MaterialTheme.colorScheme.secondary,
+                fontFamily = timeFontFamily
             )
             Text(
                 // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — "menit tersisa" alih-alih
@@ -532,7 +540,8 @@ fun NowPlayingScreen(
                     formatDuration(uiState.duration)
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary
+                color = MaterialTheme.colorScheme.secondary,
+                fontFamily = timeFontFamily
             )
         }
 
@@ -1149,6 +1158,11 @@ private fun AlbumArtHero(
         // fell into the generic Apple shadow-only branch below with no bevel of its own at all.
         val isSkeu = isSkeuTheme()
         val isPanelTheme = isTactile || isSkeu
+        // v3 upgrade — Pilar A spec palet_warna_calm_retro_v3.md (CRT scanlines), dipasang di
+        // bawah lewat .calmScanlines() SETELAH .clip(heroShape) (bukan sebelum, beda dari
+        // teknik shadow Tactile/Skeu di atas yang sengaja bocor sebelum clip) — scanline harus
+        // terkurung rapi di dalam bentuk album art, tidak boleh meluber ke luar shape.
+        val isCalmRetroHero = isCalmRetroTheme()
         // Batch 74 — fix: this manual draw (unlike skeuEmboss()/tactileEmboss(), which both
         // already branch on LocalIsDarkTheme) hardcoded dark-only tokens (TactileHighlight/
         // TactileShadow, SkeuHighlight/SkeuShadow/SkeuAmbientOcclusion/SkeuSpecular/
@@ -1310,6 +1324,7 @@ private fun AlbumArtHero(
                     }
                 )
                 .clip(heroShape)
+                .then(if (isCalmRetroHero) Modifier.calmScanlines() else Modifier)
         )
     }
 }

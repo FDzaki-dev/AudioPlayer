@@ -6,6 +6,25 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 133 (Calm Retro v3 upgrade — Pilar A/C/D dari spec baru, 3 file diedit)** — User upload
+`palet_warna_calm_retro_v3.md`, penerus v2 (Batch 128-132). 7 HEX §1 identik v2 (0 warna
+berubah). 3 pilar identitas yang belum pernah digarap ditutup: (A) `calmScanlines()` baru
+(`TactileDepth.kt`) — garis CRT 4px via `Brush.verticalGradient`+`TileMode.Repeated`, dipasang
+di `AlbumArtHero` (`NowPlayingScreen.kt`) SETELAH `.clip()` supaya tidak meluber. (D)
+`calmGrain()` baru (`TactileDepth.kt`) — speckle field seeded via `drawWithCache` (bukan
+bitmap/RenderEffect, minSdk 23 tidak dukung itu), dipasang di root Surface `MainActivity.kt`
+(protected, parsial) slot sama dgn `identityRootBrush` identitas lain, alpha 0.015-0.04f. (C)
+`FontFamily.Monospace` HANYA di 2 `Text` durasi/waktu Now Playing (gated `isCalmRetro`), SENGAJA
+tidak disentuh ke judul/lirik (larangan eksplisit spec §4). Pilar B (aberrasi CTA) sudah ada
+sejak Batch 129, 0 sentuhan batch ini. **Sengaja belum digarap**: scanlines belum disebar ke
+Card list lagu/panel kontrol lain (spec sebut itu juga, kandidat lanjutan kalau diminta — pola
+sama presedan aberrasi CTA yang mulai 1 titik lalu meluas Batch 130-131); blur album-art
+80dp/15% backdrop (bagian "Do's" spec, bukan salah satu 4 Pilar inti) belum diaudit; monospace
+belum ke tag kualitas audio (app belum punya UI bitrate/format eksplisit). **PENTING kalau
+lanjut sesi baru**: fix ini baru diverifikasi LOGIS dari kode (0 JDK/SDK di sandbox) — belum ada
+konfirmasi visual/build dari user, jangan anggap selesai sebelum ada screenshot/build hijau baru.
+Detail: `CHANGELOG.md` Batch 133.
+
 **Batch 132 (FIX — Calm Retro tenggelam di lagu beraksen kuat, 2 file diedit)** — User lapor
 pakai screenshot: CTA play tampak flat merah polos, aberrasi tak kelihatan sama sekali. Root
 cause: `animatedAccent` (CTA+wash+rating) selalu ikut `accentColor` dinamis dari ekstraksi

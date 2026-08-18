@@ -11,17 +11,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.random.Random
 
 /**
  * Batch 53 — repainted again for the user-supplied compose-amoled-hybrid-glass-final.md spec,
@@ -347,5 +352,75 @@ fun Modifier.calmAberration(bias: Dp = 3.dp): Modifier {
             radius = radius,
             center = center + Offset(off, off)
         )
+    }
+}
+
+// ============================================================================
+// CALM RETRO v3 upgrade (palet_warna_calm_retro_v3.md) — 2 pilar baru dari 4 pilar identitas
+// yang belum pernah digarap sebelumnya (v2 cuma pilar B/aberrasi, sudah ada di atas sejak
+// Batch 129). Pilar A & D ditambahkan di sini; pilar C (tipografi monospace) murni per-Text
+// di NowPlayingScreen.kt (tidak butuh primitive baru), diterapkan HANYA ke durasi/waktu sesuai
+// larangan eksplisit spec §4 ("JANGAN" pakai efek/font berbeda di judul/lirik).
+
+// PILAR A — Soft CRT Scanlines. Garis horizontal berulang 4px (setengah transparan/setengah
+// gelap tipis, meniru CSS `linear-gradient(...50%, rgba(0,0,0,0.3) 50%)` literal spec), teknik
+// `TileMode.Repeated` (GPU-side brush, bukan loop draw manual — murah dipanggil tiap frame).
+// Dipasang di atas Album Art (permukaan terbesar/paling sering dilihat), BUKAN di teks lirik/
+// judul (larangan eksplisit spec). alpha 0.03f = literal "opacity: 0.03" spec.
+@Composable
+fun Modifier.calmScanlines(): Modifier {
+    return this.drawWithContent {
+        drawContent()
+        val lineHeight = 4.dp.toPx()
+        drawRect(
+            brush = Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0.00f to Color.Transparent,
+                    0.50f to Color.Transparent,
+                    0.50f to Color.Black,
+                    1.00f to Color.Black
+                ),
+                startY = 0f,
+                endY = lineHeight,
+                tileMode = TileMode.Repeated
+            ),
+            alpha = 0.03f
+        )
+    }
+}
+
+// PILAR D — Organic Grain Overlay. Spec minta "monochromatic noise" bertekstur pasir/debu di
+// SELURUH kanvas app dengan opacity maksimal 4%. Compose tidak punya raster-noise generator
+// bawaan tanpa RenderEffect (API 31+, di luar minSdk 23 project ini) — didekati dengan speckle
+// field seeded (bukan bitmap, pola sama "hand-drawn" seperti calmAberration()/skeuEmboss()):
+// posisi & alpha tiap speck dihitung SEKALI per ukuran layar lewat drawWithCache (bukan re-roll
+// tiap frame — biaya render tetap murah), rentang alpha 0.015f-0.04f (di bawah plafon 4% spec),
+// warna putih polos (monokrom). Dipasang di root Surface (MainActivity.kt) HANYA saat identitas
+// Calm Retro aktif — 1 titik cakupan seluruh app, sama seperti root ambient wash identitas lain.
+@Composable
+fun Modifier.calmGrain(): Modifier {
+    val density = LocalDensity.current
+    return this.drawWithCache {
+        val cellPx = with(density) { 32.dp.toPx() }.coerceAtLeast(1f)
+        val cols = (size.width / cellPx).toInt().coerceAtLeast(1)
+        val rows = (size.height / cellPx).toInt().coerceAtLeast(1)
+        val rnd = Random(42)
+        val specks = buildList {
+            for (cx in 0 until cols) {
+                for (cy in 0 until rows) {
+                    val x = cx * cellPx + rnd.nextFloat() * cellPx
+                    val y = cy * cellPx + rnd.nextFloat() * cellPx
+                    val alpha = 0.015f + rnd.nextFloat() * 0.025f
+                    val r = 0.6f + rnd.nextFloat() * 0.8f
+                    add(Triple(Offset(x, y), alpha, r))
+                }
+            }
+        }
+        onDrawWithContent {
+            drawContent()
+            specks.forEach { (offset, alpha, r) ->
+                drawCircle(color = Color.White.copy(alpha = alpha), radius = r, center = offset)
+            }
+        }
     }
 }
