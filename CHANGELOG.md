@@ -1,5 +1,76 @@
 # Changelog
 
+## Batch 120 — Roadmap #3: Editor Lirik LRC Tap-to-Sync
+Item roadmap berikutnya setelah #14 (Batch 119) — dipilih karena reuse infrastruktur lirik yang
+sudah ada penuh (`LyricsStore`/`LyricsParser`/highlight-scroll di `LyricsSheet.kt`), 0 dependency
+baru, 0 protected asset, cocok untuk sandbox tanpa compiler.
+
+**`LrcSyncEditor.kt`** (baru, `data/`) — logika murni (0 Context/Android, pola sama
+`AbRepeatLogic`/`SmartPlaylistEngine`): `SyncSession` data class immutable (`lines`,
+`timestamps: List<Long?>`, `currentIndex`), transisi lewat `mark()`/`skip()`/`undo()` yang
+masing-masing return instance baru (bukan mutasi in-place — UI cukup `var session by remember`
++ reassign). `mark()` stempel baris saat ini dengan posisi playback lalu maju; `skip()` maju
+tanpa stempel (baris tetap disimpan sbg plain text di hasil akhir, bukan dihapus/dipaksa dapat
+timestamp — pilihan disengaja, bukan gap); `undo()` mundur 1 baris & hapus stempelnya kalau ada
+(undo mark ATAU undo skip, efeknya sama — tidak perlu 2 fungsi terpisah). `formatTimestamp()`
+`[mm:ss.xx]` (centisecond 2-digit, konsisten dengan format yang sudah dibaca `LyricsParser`
+sejak lama). `buildLrcText()` gabung `lines`+`timestamps` jadi 1 teks siap simpan — baris yang
+di-skip tetap plain (tanpa prefix `[...]`), baris yang ditandai dapat prefix — hasilnya **boleh
+campur** (sebagian synced sebagian tidak), `LyricsParser.isSynced()` otomatis `false` untuk itu
+(disengaja: skip berarti user memang tidak mau baris itu ikut auto-scroll-highlight, bukan bug).
+
+**`LyricsSheet.kt`** (diedit) — 2 parameter baru dengan default aman (`isPlaying: Boolean =
+false`, `onPlayPause: () -> Unit = {}` — 0 call site lama selain `NowPlayingScreen.kt` yang
+perlu diubah, sudah dicek `grep`). Mode edit teks lama (`OutlinedTextField`) TIDAK diganti,
+cuma ditambah 1 tombol "Mode Tap-to-Sync (LRC)" (muncul kalau draft punya minimal 1 baris
+non-blank) yang membuka `SyncSession` baru dari `LrcSyncEditor.startSession(draft)`. Flow sync:
+1 baris besar ditampilkan per giliran + tombol play/pause inline (`onPlayPause`, reuse
+controller yang sama dgn transport utama — sengaja BUKAN tombol play terpisah/palsu) + posisi
+berjalan (`formatDuration(positionMs)`, reuse util yang sudah ada di `Utils.kt`, sama package
+`ui` jadi 0 import baru) + tombol besar "Tandai Sekarang" (`LrcSyncEditor.mark`) + baris
+"Mundur"/"Lewati Baris" + "Batal, Kembali ke Teks" (`syncSession = null`, draft lama tidak
+hilang). Begitu `session.isComplete`, `draft` langsung diisi `buildLrcText()` dan sesi ditutup
+otomatis — balik ke tampilan `OutlinedTextField` biasa untuk REVIEW manual sebelum tap "Simpan"
+(bukan auto-save — user tetap tahan kendali penuh, konsisten pola "jangan overwrite destruktif
+tanpa konfirmasi" proyek ini, lihat `BackupManager.readAndValidate()`/`applyBackup()` Batch 115).
+`syncSession` di-key ke `rawLyrics` sama seperti `editing`/`draft` (Batch 82) — ganti lagu
+selagi sheet terbuka membatalkan sesi sync yang sedang berjalan, bukan bug (timestamp yang
+sedang direkam scoped ke lagu yang diputar saat itu, tidak masuk akal dilanjut ke lagu lain).
+
+**`NowPlayingScreen.kt`** (diedit) — 1 titik panggil `LyricsSheet(...)` yang sudah ada dapat 2
+baris baru (`isPlaying = uiState.isPlaying`, `onPlayPause = onPlayPause`) — keduanya reuse
+state/callback yang sudah ada di scope composable ini sejak lama (dipakai transport button Now
+Playing), 0 parameter baru ke `NowPlayingScreen` itu sendiri, jadi **0 baris `MainActivity.kt`
+disentuh batch ini** (bukan protected asset yang perlu diedit sama sekali).
+
+**`LrcSyncEditorTest.kt`** (baru, `test/`) — 10 test pure-logic: split baris blank/trim,
+mark/skip/undo termasuk kasus tepi (index 0, sesi sudah complete), format timestamp (termasuk
+clamp negatif & menit 2-digit di atas 9), dan 1 test round-trip penuh (`buildLrcText` output
+di-parse ulang lewat `LyricsParser.parse()` yang sudah ada, verifikasi baris campur
+synced+skip dibaca benar dan `isSynced()` mengembalikan `false` seperti yang diharapkan).
+
+**Batasan jujur, disengaja**: kalau draft yang dijadikan sesi sync sudah punya sebagian baris
+ber-`[mm:ss.xx]` (bukan murni plain), `startSession()` tetap memperlakukan seluruh baris teks
+apa adanya (prefix lama ikut jadi bagian teks baris, bukan di-strip) — MVP ini ditargetkan untuk
+lirik plain-text yang belum pernah disinkronkan sama sekali, bukan re-sync sebagian lirik yang
+sudah campur. Kalau user butuh itu, alur saat ini: edit manual dulu di text field untuk buang
+prefix lama, baru masuk Mode Tap-to-Sync. 2 file kode baru + 2 diedit, 0 protected asset, brace/
+paren `LyricsSheet.kt` (60/60, 146/146) & `NowPlayingScreen.kt` (204/204, 681/681) dicek otomatis
+& seimbang. `FILE_MANIFEST.txt` 160→162 + `README.md` (1 baris fitur + banner) +
+`ROADMAP_15_FITUR_OFFLINE.md` (#3 ditandai selesai; sekalian #6 & #7 yang sudah lama selesai
+lewat Gap List Batch 117/115 tapi belum pernah ditandai di file roadmap ini — kelalaian
+housekeeping lama, dibetulkan sekalian karena ditemukan saat audit item berikutnya, bukan kerja
+tambahan yang disengaja dicari-cari). **Belum diverifikasi compile/runtime Gradle sungguhan**
+(tidak ada JDK/Android SDK di sandbox ini) — prioritas berikutnya kalau user push: (1)
+`./gradlew testDebugUnitTest` (10 test baru hijau), (2) di device: tempel lirik plain 3-4 baris,
+masuk Mode Tap-to-Sync, putar lagu, tekan Tandai Sekarang per baris sambil lagu jalan, pastikan
+timestamp yang tersimpan genuinely dekat dengan posisi saat tombol ditekan (bukan telat/gesekan
+render), (3) tekan Lewati di 1 baris, pastikan baris itu tetap muncul plain (tanpa timestamp) di
+hasil akhir dan tidak mengacaukan highlight baris lain, (4) Mundur setelah Tandai, pastikan
+kembali ke baris sebelumnya dan stempelnya genuinely terhapus (coba Tandai ulang, timestamp baru
+bukan yang lama), (5) tutup sheet di tengah sesi sync lalu buka lagi — pastikan mulai dari teks
+draft lama (bukan crash/nyangkut di state sync). Detail lengkap: lihat file ini.
+
 ## Batch 119 — Roadmap #14: Vault Lagu Privat (PIN-gated song vault)
 Item "Sangat disarankan" berikutnya dari `ROADMAP_15_FITUR_OFFLINE.md` — Sedang/Rendah risiko,
 infrastruktur PIN (`AppLockStore`/`PinLockoutPolicy`) dan pola filter-tampilan

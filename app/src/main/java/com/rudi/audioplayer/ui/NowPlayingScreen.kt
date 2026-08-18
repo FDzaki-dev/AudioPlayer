@@ -686,6 +686,8 @@ fun NowPlayingScreen(
         LyricsSheet(
             rawLyrics = lyricsText,
             positionMs = uiState.position,
+            isPlaying = uiState.isPlaying,
+            onPlayPause = onPlayPause,
             onDismiss = { showLyricsSheet = false },
             onSave = { text ->
                 onSaveLyrics(song.id, text)

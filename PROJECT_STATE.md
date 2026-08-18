@@ -6,6 +6,39 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 120 (Roadmap #3 — Editor Lirik LRC Tap-to-Sync, 4 file — 2 baru + 2 diedit)** — Item
+roadmap berikutnya setelah #14 (Batch 119), dipilih karena 100% reuse infrastruktur lirik yang
+sudah ada (`LyricsStore`/`LyricsParser`/highlight-scroll `LyricsSheet.kt`), 0 dependency baru,
+0 protected asset.
+
+`LrcSyncEditor.kt` (baru, `data/`) — logika murni `SyncSession` (immutable) +
+`mark()`/`skip()`/`undo()`/`formatTimestamp()`/`buildLrcText()`, pola sama `AbRepeatLogic`. Baris
+yang di-skip tetap plain di hasil akhir (bukan dipaksa dapat timestamp) — `buildLrcText()` boleh
+hasilkan campuran synced+plain, disengaja. `LyricsSheet.kt` (diedit) — 2 param baru default aman
+(`isPlaying`/`onPlayPause`), tombol "Mode Tap-to-Sync (LRC)" baru di mode edit teks yang sudah
+ada, flow sync 1-baris-per-giliran (Tandai/Mundur/Lewati/Batal) yang begitu selesai auto-isi
+`draft` lalu balik ke text field untuk REVIEW manual sebelum "Simpan" (bukan auto-save).
+`NowPlayingScreen.kt` (diedit) — 2 baris baru di call site `LyricsSheet(...)` yang sudah ada
+(`uiState.isPlaying`/`onPlayPause` yang sudah ada di scope) — **0 baris `MainActivity.kt`
+disentuh** (bukan protected asset). `LrcSyncEditorTest.kt` (baru, `test/`) — 10 test murni.
+
+**Batasan jujur**: kalau draft sudah campur sebagian ber-`[mm:ss.xx]`, Mode Tap-to-Sync
+memperlakukan prefix lama itu apa adanya sebagai bagian teks baris (tidak di-strip) — MVP ini
+untuk lirik plain-text murni, bukan re-sync sebagian. Sekalian dibetulkan: `ROADMAP_15_FITUR_
+OFFLINE.md` item #6 & #7 (sudah selesai lewat Gap List Batch 117/115) baru ditandai selesai di
+file roadmap ini sekarang — housekeeping lama yang kelewat, ditemukan pas audit roadmap batch
+ini, bukan kerja tambahan yang dicari-cari.
+
+4 file (2 baru + 2 diedit), 0 protected asset. Brace/paren dicek otomatis & seimbang.
+`FILE_MANIFEST.txt` 160→162 + `README.md` (1 baris fitur + banner) + `ROADMAP_15_FITUR_
+OFFLINE.md` (#3 selesai + #6/#7 dibetulkan) sebelum repack. **Belum diverifikasi compile/
+runtime Gradle sungguhan** (tidak ada JDK/Android SDK di sandbox ini) — prioritas berikutnya
+kalau user push: (1) `./gradlew assembleDebug` build bersih, (2) di device: tempel lirik plain,
+masuk Mode Tap-to-Sync, tandai tiap baris sambil lagu diputar, pastikan timestamp akurat & baris
+Lewati tetap plain di hasil akhir, (3) Mundur mengembalikan ke baris sebelumnya dgn stempel
+genuinely terhapus, (4) tutup+buka lagi sheet di tengah sesi sync tidak nyangkut/crash. Detail
+lengkap: `CHANGELOG.md` Batch 120.
+
 **Batch 119 (Roadmap #14 — Vault Lagu Privat, PIN-gated song vault, 6 file — 2 baru + 4
 diedit)** — Item "Sangat disarankan" berikutnya (Sedang/Rendah risiko) dari
 `ROADMAP_15_FITUR_OFFLINE.md`, dipilih karena sudah eksplisit dicatat "banyak infrastruktur

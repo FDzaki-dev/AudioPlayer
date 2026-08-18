@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 160 file
+# Total: 162 file
 
 .github/workflows/build.yml
 .gitignore
@@ -40,6 +40,7 @@ app/src/main/java/com/rudi/audioplayer/data/Id3TagWriter.kt
 app/src/main/java/com/rudi/audioplayer/data/LibraryFilterStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ListeningHistoryStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ListeningStatsEngine.kt
+app/src/main/java/com/rudi/audioplayer/data/LrcSyncEditor.kt
 app/src/main/java/com/rudi/audioplayer/data/LyricsParser.kt
 app/src/main/java/com/rudi/audioplayer/data/LyricsStore.kt
 app/src/main/java/com/rudi/audioplayer/data/MusicRepository.kt
@@ -151,6 +152,7 @@ app/src/test/java/com/rudi/audioplayer/data/CustomFolderScannerStableIdTest.kt
 app/src/test/java/com/rudi/audioplayer/data/Id3TagWriterTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LibraryFilterStoreTest.kt
 app/src/test/java/com/rudi/audioplayer/data/ListeningStatsEngineTest.kt
+app/src/test/java/com/rudi/audioplayer/data/LrcSyncEditorTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LyricsParserTest.kt
 app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryFolderNameTest.kt
 app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryTrackDiscTest.kt

@@ -7,6 +7,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,13 +19,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.data.LrcSyncEditor
 import com.rudi.audioplayer.data.LyricsParser
+import com.rudi.audioplayer.data.SyncSession
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LyricsSheet(
     rawLyrics: String?,
     positionMs: Long,
+    isPlaying: Boolean = false,
+    onPlayPause: () -> Unit = {},
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
     onDelete: () -> Unit
@@ -40,6 +47,11 @@ fun LyricsSheet(
     // than mis-attributing it to the wrong song.
     var editing by remember(rawLyrics) { mutableStateOf(rawLyrics.isNullOrBlank()) }
     var draft by remember(rawLyrics) { mutableStateOf(rawLyrics.orEmpty()) }
+    // Roadmap #3 — Tap-to-Sync: null = mode edit teks biasa, non-null = sedang di flow sync
+    // baris-per-baris. Sama alasan `editing`/`draft` di atas, dikey ke `rawLyrics` — ganti lagu
+    // selagi sheet terbuka membatalkan sesi sync yang sedang jalan (masuk akal, timestamp yang
+    // sedang direkam memang scoped ke lagu yang sedang diputar saat itu).
+    var syncSession by remember(rawLyrics) { mutableStateOf<SyncSession?>(null) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         Column(
@@ -70,6 +82,74 @@ fun LyricsSheet(
             Spacer(modifier = Modifier.height(8.dp))
 
             when {
+                editing && syncSession != null -> {
+                    val session = syncSession!!
+                    Text(
+                        "Sinkronisasi Lirik \u2014 baris ${(session.currentIndex + 1).coerceAtMost(session.lines.size)}/${session.lines.size}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        session.currentLine ?: "\u2713 Semua baris sudah diproses",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                        textAlign = TextAlign.Center
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        IconButton(onClick = onPlayPause) {
+                            Icon(
+                                if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Jeda" else "Putar"
+                            )
+                        }
+                        Text(formatDuration(positionMs), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            val next = LrcSyncEditor.mark(session, positionMs)
+                            if (next.isComplete) {
+                                draft = LrcSyncEditor.buildLrcText(next)
+                                syncSession = null
+                            } else {
+                                syncSession = next
+                            }
+                        },
+                        enabled = !session.isComplete,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Tandai Sekarang") }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        TextButton(
+                            onClick = { syncSession = LrcSyncEditor.undo(session) },
+                            enabled = session.currentIndex > 0
+                        ) { Text("Mundur") }
+                        Spacer(modifier = Modifier.weight(1f))
+                        TextButton(
+                            onClick = {
+                                val next = LrcSyncEditor.skip(session)
+                                if (next.isComplete) {
+                                    draft = LrcSyncEditor.buildLrcText(next)
+                                    syncSession = null
+                                } else {
+                                    syncSession = next
+                                }
+                            },
+                            enabled = !session.isComplete
+                        ) { Text("Lewati Baris") }
+                    }
+                    TextButton(
+                        onClick = { syncSession = null },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Batal, Kembali ke Teks") }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
                 editing -> {
                     OutlinedTextField(
                         value = draft,
@@ -81,7 +161,17 @@ fun LyricsSheet(
                             Text("Tempel lirik di sini. Untuk lirik sinkron, awali tiap baris dengan [mm:ss.xx]")
                         }
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (LrcSyncEditor.splitPlainLines(draft).isNotEmpty()) {
+                        TextButton(
+                            onClick = { syncSession = LrcSyncEditor.startSession(draft) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
+                            Text("Mode Tap-to-Sync (LRC)")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
                     Row(modifier = Modifier.fillMaxWidth()) {
                         TextButton(onClick = {
                             if (rawLyrics.isNullOrBlank()) onDismiss() else editing = false

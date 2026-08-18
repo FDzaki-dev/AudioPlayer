@@ -34,7 +34,7 @@ bintang, folder) — bukan playlist manual isi-tangan seperti fitur Playlist yan
   terpisah (query per-lagu / N+1), beda dari YEAR yang satu kolom `MediaStore.Audio.Media.YEAR`
   langsung. Detail lengkap: `CHANGELOG.md` Batch 89.
 
-## 3. Editor Lirik LRC Tap-to-Sync
+## 3. Editor Lirik LRC Tap-to-Sync ✅ SELESAI (Batch 120)
 Buat file LRC baru dari nol dengan menekan tombol "tandai baris ini" sambil lagu diputar —
 pelengkap fitur Lirik yang sudah ada (saat ini cuma bisa tempel LRC yang sudah jadi).
 - **Kenapa**: banyak lagu lokal/indie tidak punya LRC siap pakai di internet; user yang mau
@@ -66,7 +66,7 @@ notifikasi, atau alarm sistem Android.
 - **Risiko**: izin `WRITE_SETTINGS` mungkin diperlukan untuk set-as-default langsung (API level
   tertentu) — perlu dicek dan disediakan fallback "simpan lalu pilih manual" kalau ditolak.
 
-## 6. Pencari & Pembersih File Duplikat
+## 6. Pencari & Pembersih File Duplikat ✅ SELESAI (Batch 117)
 Deteksi file audio duplikat (berdasarkan durasi+ukuran, atau audio fingerprint sederhana) dan
 tampilkan daftar untuk dihapus/pilih mana yang disimpan.
 - **Kenapa**: koleksi musik lokal yang lama biasa punya duplikat dari berbagai sumber
@@ -78,7 +78,7 @@ tampilkan daftar untuk dihapus/pilih mana yang disimpan.
   yang sudah ada di app tapi hapus file fisik tidak bisa di-undo asli (sama kelasnya dengan
   keputusan Batch 26 soal folder tambahan).
 
-## 7. Cadangan & Pulihkan Data Lokal (Backup/Restore)
+## 7. Cadangan & Pulihkan Data Lokal (Backup/Restore) ✅ SELESAI (Batch 115)
 Ekspor seluruh data app (playlist, favorit, riwayat dengar, rating, pengaturan tema, dst.) ke
 satu file `.json`/`.zip` yang bisa disimpan sendiri atau dipindah ke HP lain — sepenuhnya lewat
 file lokal (share/copy manual), tanpa cloud/akun.

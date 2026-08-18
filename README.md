@@ -8,9 +8,9 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 119:** Vault Lagu Privat baru — sembunyikan lagu total dari
-> Beranda/Library di balik PIN 6 digit sendiri (Roadmap #14). Riwayat lengkap ada di
-> `CHANGELOG.md` (selalu terbaru di paling atas).
+> 🆕 **Update terbaru — Batch 120:** Mode Tap-to-Sync untuk lirik — tandai timestamp tiap baris
+> lirik langsung sambil lagu diputar, hasilnya otomatis jadi format LRC tersinkron (Roadmap #3).
+> Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
 
 > **Mulai dari sini kalau ini sesi/percakapan baru:** baca `PROJECT_STATE.md` (status +
 > riwayat insiden ringkas), `CHANGELOG.md` (histori tiap batch), dan bagian "Keputusan
@@ -51,7 +51,7 @@ memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 - **Vault Lagu Privat**: Pengaturan → "Vault Lagu Privat" — sembunyikan lagu tertentu TOTAL dari Beranda/Library (beda dari "sembunyikan lagu" biasa yang murni toggle tampilan), dilindungi PIN 6 digit sendiri (independen dari PIN Kunci Aplikasi, hash+salt+lockout escalating sama seperti itu). Tambah/keluarkan lagu dari sheet Vault sendiri; nonaktifkan vault otomatis mengembalikan semua lagu ke tampilan normal (file fisik tidak pernah disentuh). **Cakupan MVP**: murni manajemen keanggotaan, belum ada tombol putar langsung dari sheet Vault (keluarkan dulu dari vault untuk memutar)
 - **Statistik Dengar**: dashboard di Pengaturan → "Statistik Dengar" — total lagu diputar, estimasi waktu dengar (durasi × jumlah putar), grafik tren 7 hari terakhir, jam favorit dengar musik (dari 24 jam-dalam-hari, seluruh riwayat), dan artis paling sering. Semua dihitung langsung dari data yang sudah dikumpulkan (`PlayStatsStore`/`ListeningHistoryStore`), plus 1 pencatat baru (`HourlyListenStore`) khusus untuk jam favorit
 - **Repeat A-B & Bookmark Posisi**: dari Now Playing → Kontrol Lanjutan → "Repeat A-B & Bookmark". Tandai Titik A & B untuk mengulang satu bagian lagu terus-menerus (latihan musik/bahasa, podcast/audiobook) — direset otomatis tiap ganti lagu. Bookmark Posisi menandai beberapa titik favorit per-lagu (intro/reff/solo dll, diberi nama sendiri) untuk lompat cepat kapan pun, tersimpan permanen per lagu
-- **Lirik**: tambahkan lirik sendiri per lagu (tempel teks biasa, atau format LRC `[mm:ss.xx]` untuk lirik yang otomatis mengikuti posisi putar dan auto-scroll)
+- **Lirik**: tambahkan lirik sendiri per lagu (tempel teks biasa, atau format LRC `[mm:ss.xx]` untuk lirik yang otomatis mengikuti posisi putar dan auto-scroll) — atau pakai **Mode Tap-to-Sync**: tempel lirik polos, lalu tekan "Tandai Sekarang" per baris sambil lagu diputar untuk membuat versi tersinkron tanpa mengetik timestamp manual
 - **Tema dinamis**: warna aksen di Now Playing & mini player otomatis diambil dari sampul album lagu yang sedang diputar
 - **Kontrol volume** langsung dari Now Playing (slider attenuasi internal app, terpisah dari volume sistem)
 - **Kelola folder**: pilih folder mana saja yang mau disertakan/dikecualikan dari pemindaian musik otomatis, **plus tambahkan folder tambahan lewat izin sistem** (Storage Access Framework) untuk memindai audio yang belum terdeteksi MediaStore — bekerja penuh offline/lokal, tidak ada koneksi internet yang terlibat
