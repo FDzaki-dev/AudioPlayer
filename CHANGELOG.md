@@ -1,5 +1,25 @@
 # Changelog
 
+## Batch 138 — Isi UPDATE_REPO_OWNER dengan username GitHub asli (1 file diedit)
+User kirim URL repo asli: `https://github.com/FDzaki-dev/AudioPlayer`. Menutup item "WAJIB
+diisi manual" yang tercatat sejak Batch 136 (Release Downloader Spec).
+
+`gradle.properties` — `UPDATE_REPO_OWNER=ganti-username-github` (placeholder) diganti
+`UPDATE_REPO_OWNER=FDzaki-dev`. `UPDATE_REPO_NAME=AudioPlayer` tidak diubah (sudah cocok nama
+repo sejak Batch 136). Wiring diverifikasi baca-ulang (bukan diedit) di
+`app/build.gradle.kts:102-107` — `buildConfigField("String", "UPDATE_REPO_OWNER",
+"\"${project.findProperty("UPDATE_REPO_OWNER") ?: "ganti-username-github"}\"")`, dibaca
+`UpdateManager.kt`/`GitHubReleaseChecker.kt` saat runtime untuk `GET
+/repos/{owner}/{repo}/releases/latest`.
+
+1 file diedit, 0 file baru, 0 protected asset tersentuh (`gradle.properties` sendiri bukan
+protected asset — cuma isinya yang sebelumnya sengaja placeholder aman). **Belum diverifikasi
+runtime** (tidak ada akses network/GitHub API di sandbox ini) — prioritas berikutnya: rebuild,
+buka Settings → Lanjutan → Tentang Aplikasi → "Cek Update", pastikan genuinely nemu release dari
+`FDzaki-dev/AudioPlayer`. Kalau gagal, cek dulu apakah repo itu SUDAH punya minimal 1 GitHub
+Release dengan asset `.apk` terlampir — tanpa itu endpoint `releases/latest` akan 404 terlepas
+dari config ini benar atau salah.
+
 ## Batch 137 — Scanline ke 3 sheet tersisa (LyricsSheet+ABRepeatBookmarkSheet+QueueSheet, 3 file diedit)
 Lanjutan langsung item "sengaja belum" Batch 135 — kandidat eksplisit sudah dicatat waktu itu:
 `LyricsSheet`, `ABRepeatBookmarkSheet`, `QueueSheet`. Ditutup di batch ini, pola identik persis

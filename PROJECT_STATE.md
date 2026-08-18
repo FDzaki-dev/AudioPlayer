@@ -6,6 +6,22 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 138 (Konfigurasi — isi UPDATE_REPO_OWNER, 1 file diedit)** — User kirim URL repo asli
+(`https://github.com/FDzaki-dev/AudioPlayer`), menutup item "WAJIB diisi manual" yang tercatat
+sejak Batch 136. `gradle.properties`: `UPDATE_REPO_OWNER=ganti-username-github` (placeholder) →
+`UPDATE_REPO_OWNER=FDzaki-dev`. `UPDATE_REPO_NAME=AudioPlayer` sudah benar sejak awal (nama repo
+cocok), tidak disentuh. Dicek ulang wiring-nya di `app/build.gradle.kts` (protected, TIDAK
+diedit batch ini — cuma dibaca utk verifikasi): `buildConfigField` baca
+`project.findProperty("UPDATE_REPO_OWNER")` persis dari key ini, jadi fitur "Cek Update" di
+Settings → Lanjutan → Tentang Aplikasi sekarang genuinely bisa nemu rilis dari repo yang benar
+begitu di-build ulang. 1 file diedit (bukan protected asset — `gradle.properties` sendiri bukan
+di daftar protected, cuma nilai di dalamnya yang sebelumnya sengaja placeholder), 0 file baru, 0
+protected asset tersentuh. **Belum diverifikasi runtime** (tidak ada network/GitHub API access
+di sandbox ini) — prioritas berikutnya kalau user push: rebuild, buka "Cek Update", pastikan
+app genuinely menemukan release terbaru dari `FDzaki-dev/AudioPlayer` (bukan 404 — cek juga
+minimal ada 1 GitHub Release dgn asset `.apk` di repo tsb, kalau belum pernah rilis apa pun
+"Cek Update" akan gagal bukan karena config salah). Detail: `CHANGELOG.md` Batch 138.
+
 **Batch 137 (Calm Retro v3 — scanline ke 3 sheet tersisa: LyricsSheet+ABRepeatBookmarkSheet+
 QueueSheet, 3 file diedit)** — Menutup "sengaja belum" Batch 135 (waktu itu ditunda demi batch
 kecil, kandidat eksplisit: `LyricsSheet`, `ABRepeatBookmarkSheet`, `QueueSheet`). Pola identik
