@@ -6,6 +6,22 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 130 (Calm Retro — pemisahan & pemurnian visual dari identitas lain, 1 file diedit)** —
+Lanjutan Batch 128-129, fase "pemurnian": hapus semua token yang masih dipinjam identitas lain
+supaya Calm Retro otonom penuh (prinsip sama dgn Tactile/Skeu sejak Batch 61). `Theme.kt`
+satu-satunya file: `tertiary`/`error` dulu reuse `SkeuDarkSuccess`/`SkeuDarkError`, sekarang
+reuse token milik Calm Retro sendiri (`CalmRetroAccent`/`CalmRetroAberrationLeft` — 0 warna
+baru ditambah, "gak usah greedy"). `CalmRetroShapes` (BARU) — dulu jatuh ke `else` branch
+(warisan `AppleShapes`), sekarang shape sendiri paling mepet dari 4 identitas (`Radius.xs/sm/
+md`), dipakai di Card/Sheet/NavigationBar M3. **Sengaja tidak diubah**: shape play/pause tetap
+`CircleShape` (branch `else` tetap benar — sesuai literal spec `.calm-play-button {border-
+radius:50%}`), typografi tetap reuse `AppleTypography` (spec tidak beri spesifikasi tipografi,
+pola sama seperti Skeu Batch 57 — bukan kebocoran identitas, beda kasus dari tertiary/error/
+shape). **Kandidat batch berikutnya kalau diminta lanjut**: preview live-showcase Calm Retro
+di `ThemeOptionCard` (`SettingsScreen.kt`, sengaja belum disentuh Batch 128-130, pola sama
+`isTactilePreview`/`isSkeuPreview`), atau lanjutkan `FINAL EXECUTION ORDER` di
+`MICRO_UIUX_AUDIT.md` (lihat Batch 127-128). Detail: `CHANGELOG.md` Batch 130.
+
 **Batch 129 (Calm Retro — efek aberrasi CTA play/pause, 5 file diedit)** — Lanjutan Batch 128,
 item kandidat (a), user minta lanjut dengan instruksi eksplisit "gak usah overthinking &
 greedy" — discoped ke 1 titik CTA (tombol play/pause) saja, bukan disebar semua tombol app.

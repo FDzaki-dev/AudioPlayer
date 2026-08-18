@@ -195,7 +195,10 @@ private val CalmRetroColors = darkColorScheme(
     onPrimary = Color.Black,
     secondary = CalmRetroSecondaryText,
     onSecondary = CalmRetroBackground,
-    tertiary = SkeuDarkSuccess, // spec tidak beri token sukses sendiri — reuse hijau muted yg senada
+    // Batch 130 — pemurnian: dulu reuse SkeuDarkSuccess (token identitas LAIN, mengaburkan
+    // batas visual antar-identitas). Sekarang 100% derivasi dari palet Calm Retro sendiri —
+    // reuse CalmRetroAccent (Muted Sage sudah cukup "hijau positif" tanpa perlu warna asing).
+    tertiary = CalmRetroAccent,
     onTertiary = Color.Black,
     background = CalmRetroBackground,
     onBackground = CalmRetroText,
@@ -205,7 +208,10 @@ private val CalmRetroColors = darkColorScheme(
     onSurfaceVariant = CalmRetroSecondaryText,
     outline = CalmRetroBorder,
     surfaceTint = CalmRetroAccent,
-    error = SkeuDarkError // spec tidak beri token error sendiri — reuse existing
+    // Batch 130 — pemurnian: dulu reuse SkeuDarkError. Sekarang CalmRetroAberrationLeft
+    // (Dusty Rose) — token milik Calm Retro sendiri (sudah dipakai di calmAberration()),
+    // dipakai ulang di peran semantik error, bukan warna asing dari identitas lain.
+    error = CalmRetroAberrationLeft
 )
 
 // A single, consistent "continuous curve" language across the whole app — Compose's Shapes
@@ -235,6 +241,17 @@ val SkeuDarkShapes = Shapes(
     small = RoundedCornerShape(Radius.md),
     medium = RoundedCornerShape(Radius.lg),
     large = RoundedCornerShape(Radius.xxl)
+)
+
+// Batch 130 — pemurnian visual: dulu Calm Retro jatuh ke branch `else` di AudioPlayerTheme()
+// (warisan AppleShapes, generous superellipse-like curve). Sekarang shape sendiri, sudut PALING
+// mepet dari 4 identitas (Apple generous > Skeu > Tactile > Calm Retro di sini) — selaras bacaan
+// "Lo-Fi Sci-Fi teduh"/minimalis spec (garis lebih tenang/tegas, bukan bounce lembut ala Apple),
+// juga jadi pembeda visual paling langsung yang mudah dikenali di picker Settings.
+val CalmRetroShapes = Shapes(
+    small = RoundedCornerShape(Radius.xs),
+    medium = RoundedCornerShape(Radius.sm),
+    large = RoundedCornerShape(Radius.md)
 )
 
 // Batch 61 — mode resolution is now completely identity-agnostic (used to take an AppTheme and
@@ -289,6 +306,7 @@ fun AudioPlayerTheme(
             shapes = when (identity) {
                 ThemeIdentity.TACTILE -> TactileShapes
                 ThemeIdentity.SKEU_DARK_LITE -> SkeuDarkShapes
+                ThemeIdentity.CALM_RETRO -> CalmRetroShapes
                 else -> AppleShapes
             },
             content = content

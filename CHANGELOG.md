@@ -1,5 +1,39 @@
 # Changelog
 
+## Batch 130 — Calm Retro: pemisahan & pemurnian visual dari identitas lain (1 file)
+Lanjutan Batch 128-129 — fase "pemurnian": hilangkan SEMUA token/warisan visual yang masih
+dipinjam dari identitas lain, supaya Calm Retro 100% otonom (prinsip yang sama yang sudah
+berlaku utk Tactile/Skeu sejak Batch 61, lihat komentar "Dirancang OTONOM total, tidak
+menumpang baseline Tactile" di `Color.kt`).
+
+`Theme.kt` (satu-satunya file diedit):
+- `tertiary`/`onTertiary` — dulu reuse `SkeuDarkSuccess` (token identitas Neumorphism).
+  Sekarang reuse `CalmRetroAccent` sendiri (Muted Sage sudah cukup "hijau positif", 0 warna
+  asing ditambah — sesuai instruksi "gak usah greedy").
+- `error` — dulu reuse `SkeuDarkError`. Sekarang `CalmRetroAberrationLeft` (Dusty Rose) —
+  token milik Calm Retro sendiri (sudah dipakai di `calmAberration()` Batch 129), dipakai
+  ulang di peran semantik error alih-alih warna asing.
+- **Shape language baru** — `CalmRetroShapes` (BARU): dulu jatuh ke branch `else` di
+  `AudioPlayerTheme()` → warisan `AppleShapes` (generous superellipse-like curve, `Radius.ml/
+  xxl/hero`). Sekarang sudut sendiri, PALING mepet dari 4 identitas (`Radius.xs/sm/md`) —
+  selaras bacaan "Lo-Fi Sci-Fi teduh"/minimalis spec markdown (bukan literal dari tabel HEX,
+  ekstrapolasi desain yg didokumentasikan sebagai keputusan, bukan tebakan diam-diam). Dipakai
+  di seluruh Card/Sheet/NavigationBar M3 lewat role `shapes` MaterialTheme — 1 titik ganti,
+  blast radius terkendali (persis pola TactileShapes/SkeuDarkShapes yang sudah ada).
+- Tombol play/pause (`NowPlayingScreen.kt`/`MiniPlayerBar.kt`) **SENGAJA tidak diubah** —
+  `playPauseShape` sudah `CircleShape` utk identitas ini (branch `else`, sama seperti Apple),
+  dan itu justru BENAR sesuai spec markdown eksplisit (`.calm-play-button { border-radius:
+  50%; }`) — shape sendiri yang baru cuma berlaku ke Card/Sheet/dst, bukan CTA sirkular ini.
+- Typografi **SENGAJA tidak diubah** — masih reuse `AppleTypography` (branch `else`), pola
+  sama seperti Skeu (Batch 57: "no separate type-scale spec supplied ... identity here is
+  carried by color/shape/bevel, not custom type") — spec markdown user juga tidak memberi
+  spesifikasi tipografi, jadi reuse di sini BUKAN kebocoran identitas, beda kasus dari
+  tertiary/error/shape di atas yang memang py sumber sendiri di palet.
+
+0 protected asset, 0 file baru, 1 file diedit (scope sengaja sekecil mungkin — cuma
+`Theme.kt`, tidak ada perubahan di `Color.kt` karena token yang dipakai sudah ada dari Batch
+128-129). **Belum diverifikasi compile Gradle sungguhan** (tidak ada JDK/SDK di sandbox).
+
 ## Batch 129 — Calm Retro: efek aberrasi CTA play/pause (5 file)
 Lanjutan Batch 128 — item kandidat (a) "efek aberration CSS", diminta lanjut user dengan
 instruksi eksplisit "gak usah overthinking & greedy" (jadi discoped ke 1 titik CTA saja, bukan
