@@ -35,6 +35,8 @@ import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
+import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
+import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.Radius
 
 @Composable
@@ -55,6 +57,9 @@ fun MiniPlayerBar(
     // into the Apple-else default: plain shadow + a now-fully-opaque frostedGlass() fill, which
     // read closer to a flat card than Skeu's own bevelled identity).
     val isSkeu = isSkeuTheme()
+    // Batch 129 — sama alasan komentar Batch 55 di atas miniPlayPauseShape: identitas baru wajib
+    // konsisten muncul di mini bar juga, bukan cuma NowPlayingScreen.
+    val isCalmRetro = isCalmRetroTheme()
     val animatedAccent by animateColorAsState(
         targetValue = accentColor ?: MaterialTheme.colorScheme.primary,
         animationSpec = tween(700),
@@ -151,6 +156,7 @@ fun MiniPlayerBar(
                         when {
                             isTactile -> Modifier.tactileEmboss(shape = miniPlayPauseShape, elevation = 6.dp)
                             isSkeu -> Modifier.skeuEmboss(shape = miniPlayPauseShape, elevation = 6.dp)
+                            isCalmRetro -> Modifier.calmAberration(bias = 2.dp)
                             else -> Modifier
                         }
                     )

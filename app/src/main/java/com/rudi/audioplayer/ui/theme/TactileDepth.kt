@@ -312,3 +312,40 @@ fun Modifier.skeuEmboss(
             )
         }
 }
+
+// ============================================================================
+// CALM RETRO — bias aberrasi CTA (Batch 129). Terjemahan Compose dari CSS box-shadow ganda di
+// spec (`.calm-play-button`) — Compose tidak punya colored box-shadow native, jadi didekati
+// lewat 2 lingkaran radial-gradient tipis diposisikan offset kiri-atas (Dusty Rose)/kanan-bawah
+// (Dusty Denim), fade ke transparent (meniru blur lembut spec tanpa RenderEffect API 31+, pola
+// sama "hand-drawn, bukan bitmap" seperti tactileEmboss()/skeuEmboss()). HANYA dipakai identitas
+// Calm Retro (isCalmRetroTheme()), tidak menyentuh mekanisme embossSurface() identitas lain.
+// Alpha 0.35f — dalam rentang 30%-40% yang diminta eksplisit spec §"Panduan Desain Penting" #1
+// ("opacity rendah ... agar tidak berubah menjadi neon yang tajam").
+@Composable
+fun Modifier.calmAberration(bias: Dp = 3.dp): Modifier {
+    val biasPx = bias
+    return this.drawBehind {
+        val off = biasPx.toPx()
+        val radius = size.minDimension / 2f + off * 2f
+        val center = Offset(size.width / 2f, size.height / 2f)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(CalmRetroAberrationLeft.copy(alpha = 0.35f), Color.Transparent),
+                center = center - Offset(off, off),
+                radius = radius
+            ),
+            radius = radius,
+            center = center - Offset(off, off)
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(CalmRetroAberrationRight.copy(alpha = 0.35f), Color.Transparent),
+                center = center + Offset(off, off),
+                radius = radius
+            ),
+            radius = radius,
+            center = center + Offset(off, off)
+        )
+    }
+}

@@ -1,5 +1,37 @@
 # Changelog
 
+## Batch 129 — Calm Retro: efek aberrasi CTA play/pause (5 file)
+Lanjutan Batch 128 — item kandidat (a) "efek aberration CSS", diminta lanjut user dengan
+instruksi eksplisit "gak usah overthinking & greedy" (jadi discoped ke 1 titik CTA saja, bukan
+disebar ke semua tombol app).
+
+`Color.kt` — 2 token baru: `CalmRetroAberrationLeft` (#A87C8F Dusty Rose),
+`CalmRetroAberrationRight` (#7C96A8 Dusty Denim), literal dari tabel HEX spec.
+
+`Theme.kt` — `isCalmRetroTheme()`, pola sama persis `isTactileTheme()`/`isSkeuTheme()`
+(bandingkan `colorScheme.primary`).
+
+`TactileDepth.kt` — `calmAberration()` (fungsi BARU, akhir file, 0 fungsi lain disentuh):
+terjemahan Compose dari CSS `box-shadow` ganda spec (`.calm-play-button`) — Compose tidak
+punya colored box-shadow native, didekati 2 radial-gradient lingkaran offset kiri-atas
+(Rose)/kanan-bawah (Denim) fade ke transparent, alpha 0.35f (dalam rentang 30%-40% yang
+diminta eksplisit spec §"Panduan Desain Penting"). Pola "hand-drawn bukan bitmap" sama
+seperti `tactileEmboss()`/`skeuEmboss()` yang sudah ada.
+
+`NowPlayingScreen.kt`/`MiniPlayerBar.kt` (diedit) — `isCalmRetro` di-hoist sejajar
+`isTactile`/`isSkeu` yang sudah ada, ditambahkan sebagai branch baru di `.then(when {...})`
+tombol play/pause utama KEDUA tempat (full player + mini bar) — konsisten dengan pola Batch
+55/58 yang selalu sinkronkan kedua lokasi ini tiap identitas baru dapat treatment CTA
+(pelajaran Batch 58: identitas yang cuma dapat treatment di 1 lokasi dianggap bug/gap, bukan
+fitur selesai). `bias` diperkecil di mini bar (2.dp vs 3.dp default) mengikuti ukuran tombol
+yang lebih kecil.
+
+**Sengaja tidak dikerjakan** (tetap discoped sesuai instruksi): tombol lain di luar CTA
+play/pause utama (chip, IconButton sekunder, dst — di luar cakupan ".calm-play-button" spec),
+varian pressed-state khusus (spec CSS `:hover` tidak relevan di touch/Compose, ditinggalkan).
+0 protected asset, 0 file baru selain penambahan fungsi di file yang sudah ada, 5 file diedit.
+**Belum diverifikasi compile Gradle sungguhan** (tidak ada JDK/SDK di sandbox).
+
 ## Batch 128 — Tema baru: Calm Retro (terkunci gelap, 2 file diedit)
 Identitas tema ke-4, dari `palet_warna_calm_retro_v2.md` (user upload). **Terkunci gelap
 permanen atas instruksi eksplisit user** ("gak bisa geser mode seenaknya") — beda dari

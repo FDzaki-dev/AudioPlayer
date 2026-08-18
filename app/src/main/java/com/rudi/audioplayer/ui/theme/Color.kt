@@ -292,3 +292,8 @@ val CalmRetroBorder = Color(0xFF232635) // border .song-card di spec — dipakai
 val CalmRetroText = Color(0xFFE2E4E9) // Silk White
 val CalmRetroSecondaryText = Color(0xFF6A6F82) // Slate Mist
 val CalmRetroAccent = Color(0xFF7FA99B) // Muted Sage
+// Bias aberrasi CTA utama (spec §"Contoh Kode CSS" .calm-play-button box-shadow) — alpha
+// diterapkan saat dipakai (bukan di sini) supaya konsisten dgn pola Highlight/Edge/Shadow lain
+// di file ini; guideline markdown eksplisit minta alpha 30%-40% ("Panduan Desain Penting" §1).
+val CalmRetroAberrationLeft = Color(0xFFA87C8F) // Dusty Rose — bias kiri/atas
+val CalmRetroAberrationRight = Color(0xFF7C96A8) // Dusty Denim — bias kanan/bawah

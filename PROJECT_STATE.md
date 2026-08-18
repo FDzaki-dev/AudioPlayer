@@ -6,6 +6,19 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 129 (Calm Retro — efek aberrasi CTA play/pause, 5 file diedit)** — Lanjutan Batch 128,
+item kandidat (a), user minta lanjut dengan instruksi eksplisit "gak usah overthinking &
+greedy" — discoped ke 1 titik CTA (tombol play/pause) saja, bukan disebar semua tombol app.
+`calmAberration()` (fungsi baru di `TactileDepth.kt`, akhir file) — terjemahan Compose dari CSS
+`box-shadow` ganda spec markdown (`.calm-play-button`): 2 radial-gradient offset kiri-atas
+(Dusty Rose)/kanan-bawah (Dusty Denim) fade transparent, alpha 0.35f (sesuai guideline spec
+"30%-40%"). `isCalmRetroTheme()` (`Theme.kt`) pola sama `isTactileTheme()`/`isSkeuTheme()`.
+Diwire ke KEDUA lokasi tombol play/pause utama (`NowPlayingScreen.kt` + `MiniPlayerBar.kt`) —
+ikut pola Batch 55/58 yang selalu sinkronkan dua lokasi ini (identitas yang cuma dapat
+treatment di 1 lokasi = bug, bukan selesai, lihat pelajaran Batch 58). **Kandidat batch
+berikutnya kalau diminta lanjut**: (b) lanjutkan `FINAL EXECUTION ORDER` di
+`MICRO_UIUX_AUDIT.md` (lihat Batch 127/128). Detail: `CHANGELOG.md` Batch 129.
+
 **Batch 128 (Tema baru — Calm Retro, terkunci gelap, 2 file diedit)** — Identitas ke-4 dari
 `palet_warna_calm_retro_v2.md` user, TERKUNCI GELAP PERMANEN atas instruksi eksplisit user
 (beda dari Tactile/Skeu Batch 61 yang otonom di kedua mode) — `colorsFor()` mengabaikan param

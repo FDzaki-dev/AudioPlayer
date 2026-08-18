@@ -258,6 +258,9 @@ fun isTactileTheme(): Boolean = MaterialTheme.colorScheme.primary == TactileAcce
 @Composable
 fun isSkeuTheme(): Boolean = MaterialTheme.colorScheme.primary == SkeuAccent
 
+@Composable
+fun isCalmRetroTheme(): Boolean = MaterialTheme.colorScheme.primary == CalmRetroAccent
+
 fun colorsFor(identity: ThemeIdentity, isDark: Boolean) = when (identity) {
     ThemeIdentity.TACTILE -> if (isDark) TactileDarkColors else TactileLightColors
     ThemeIdentity.SKEU_DARK_LITE -> if (isDark) SkeuDarkColors else SkeuLightColors

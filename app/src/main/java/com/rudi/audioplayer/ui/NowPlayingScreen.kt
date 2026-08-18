@@ -94,6 +94,8 @@ import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
+import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
+import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.TactileHighlight
 import com.rudi.audioplayer.ui.theme.TactileShadow
 import com.rudi.audioplayer.ui.theme.TactileLightHighlight
@@ -191,6 +193,9 @@ fun NowPlayingScreen(
     // translucent 0.9f-alpha Surface) despite Skeu having had its own skeuEmboss() primitive
     // ready since Batch 57 — the exact gap Batch 57's own PROJECT_STATE entry flagged.
     val isSkeu = isSkeuTheme()
+    // Batch 129 — hoist sama alasan isTactile/isSkeu di atas: tombol play/pause ini persis
+    // "tombol utama"/`.calm-play-button` yang ditarget spec markdown user.
+    val isCalmRetro = isCalmRetroTheme()
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
     var showQueueSheet by remember { mutableStateOf(false) }
@@ -580,6 +585,7 @@ fun NowPlayingScreen(
                         when {
                             isTactile -> Modifier.tactileEmboss(shape = playPauseShape, elevation = 10.dp)
                             isSkeu -> Modifier.skeuEmboss(shape = playPauseShape, elevation = 10.dp)
+                            isCalmRetro -> Modifier.calmAberration()
                             else -> Modifier
                         }
                     )
