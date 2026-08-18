@@ -42,6 +42,7 @@ import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.colorsFor
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
+import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.resolveIsDark
 import com.rudi.audioplayer.ui.theme.Radius
 
@@ -576,6 +577,12 @@ private fun ThemeOptionCard(identity: ThemeIdentity, isDark: Boolean, selected: 
     val isTactilePreview = identity == ThemeIdentity.TACTILE
     val isSkeuPreview = identity == ThemeIdentity.SKEU_DARK_LITE
     val isEmbossPreview = isTactilePreview || isSkeuPreview
+    // Batch 131 — gap terakhir dari audit cakupan Calm Retro: Tactile/Skeu sudah live-showcase
+    // di baris preview masing-masing (emboss di seluruh Surface), tapi identitas Calm Retro
+    // sengaja TIDAK ikut pola itu (Surface-nya tetap flat/opaque, sesuai identitas — lihat Batch
+    // 130). Showcase-nya sendiri diterapkan lebih presisi: sama seperti CTA play/pause asli
+    // (Batch 129), aberrasi cuma di lingkaran aksen 30dp, bukan seluruh kartu.
+    val isCalmRetroPreview = identity == ThemeIdentity.CALM_RETRO
 
     Surface(
         modifier = Modifier
@@ -616,6 +623,7 @@ private fun ThemeOptionCard(identity: ThemeIdentity, isDark: Boolean, selected: 
                 Box(
                     modifier = Modifier
                         .size(30.dp)
+                        .then(if (isCalmRetroPreview) Modifier.calmAberration(bias = 2.dp) else Modifier)
                         .clip(CircleShape)
                         .background(previewColors.primary),
                     contentAlignment = Alignment.Center

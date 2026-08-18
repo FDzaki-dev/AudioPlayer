@@ -1,5 +1,20 @@
 # Changelog
 
+## Batch 131 — Calm Retro: live-showcase preview di picker Settings (1 file)
+Menutup gap terakhir dari audit cakupan (dilaporkan ke user setelah Batch 130): Tactile/Skeu
+sudah live-showcase di baris preview `ThemeOptionCard`, Calm Retro belum.
+
+`SettingsScreen.kt` (satu-satunya file diedit) — `isCalmRetroPreview` flag baru, `calmAberration
+(bias = 2.dp)` (fungsi Batch 129, 0 fungsi baru) diterapkan ke lingkaran aksen 30dp preview
+(BUKAN ke seluruh `Surface` kartu seperti `isEmbossPreview` Tactile/Skeu) — sengaja lebih
+presisi, meniru scope asli CTA play/pause (Batch 129: aberrasi cuma di tombol bulat, bukan
+panel). Konsisten dengan keputusan Batch 130 bahwa Card Calm Retro tetap flat/opaque (identitas
+"calm", bukan physical-panel seperti Tactile/Skeu) — cuma titik showcase-nya (lingkaran aksen)
+yang dapat efek, sama presisi dengan aplikasi aslinya di app.
+
+0 protected asset, 0 file baru, 0 fungsi baru (reuse `calmAberration()` yang sudah ada), 1 file
+diedit. **Belum diverifikasi compile Gradle sungguhan** (tidak ada JDK/SDK di sandbox).
+
 ## Batch 130 — Calm Retro: pemisahan & pemurnian visual dari identitas lain (1 file)
 Lanjutan Batch 128-129 — fase "pemurnian": hilangkan SEMUA token/warisan visual yang masih
 dipinjam dari identitas lain, supaya Calm Retro 100% otonom (prinsip yang sama yang sudah

@@ -6,6 +6,19 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 131 (Calm Retro — live-showcase preview picker Settings, 1 file diedit)** — Menutup
+gap terakhir dari audit cakupan (Batch 130): Tactile/Skeu sudah live-showcase di baris preview
+`ThemeOptionCard`, Calm Retro belum. `SettingsScreen.kt` — `calmAberration()` (fungsi Batch 129,
+reuse) diterapkan ke lingkaran aksen 30dp preview saja (bukan seluruh Surface kartu seperti
+Tactile/Skeu — Card Calm Retro tetap flat/opaque sesuai keputusan Batch 130), meniru scope asli
+CTA play/pause. 0 fungsi baru, 0 protected asset, 1 file diedit. **Audit cakupan Calm Retro app-
+wide sekarang selesai penuh**: warna/shape otomatis ke seluruh app lewat MaterialTheme, CTA
+utama (2 lokasi) + preview picker sudah dapat efek aberrasi khas; bevel/glass/ambient-wash
+Tactile/Skeu sengaja tidak direplikasi (bukan gap, identitas Calm Retro memang flat/opaque per
+spec). **Kandidat batch berikutnya kalau diminta lanjut**: lanjutkan `FINAL EXECUTION ORDER` di
+`MICRO_UIUX_AUDIT.md` (lihat Batch 127-128) — di luar itu, identitas Calm Retro dianggap
+selesai kecuali ada instruksi baru dari user. Detail: `CHANGELOG.md` Batch 131.
+
 **Batch 130 (Calm Retro — pemisahan & pemurnian visual dari identitas lain, 1 file diedit)** —
 Lanjutan Batch 128-129, fase "pemurnian": hapus semua token yang masih dipinjam identitas lain
 supaya Calm Retro otonom penuh (prinsip sama dgn Tactile/Skeu sejak Batch 61). `Theme.kt`
