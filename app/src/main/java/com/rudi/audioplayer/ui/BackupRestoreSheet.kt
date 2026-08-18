@@ -3,6 +3,7 @@ package com.rudi.audioplayer.ui
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -83,6 +84,7 @@ fun BackupRestoreSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
             )
             Spacer(modifier = Modifier.height(16.dp))
 
+            val backupInteraction = remember { MutableInteractionSource() }
             OutlinedButton(
                 onClick = {
                     val fileName = BackupManager.exportToDocuments(context)
@@ -99,7 +101,8 @@ fun BackupRestoreSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                         else "Gagal membuat backup"
                     )
                 },
-                modifier = Modifier.fillMaxWidth()
+                interactionSource = backupInteraction,
+                modifier = Modifier.fillMaxWidth().bouncyPress(backupInteraction)
             ) {
                 Icon(Icons.Default.FileDownload, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -108,9 +111,11 @@ fun BackupRestoreSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            val restoreInteraction = remember { MutableInteractionSource() }
             OutlinedButton(
                 onClick = { importLauncher.launch(arrayOf("application/json")) },
-                modifier = Modifier.fillMaxWidth()
+                interactionSource = restoreInteraction,
+                modifier = Modifier.fillMaxWidth().bouncyPress(restoreInteraction)
             ) {
                 Icon(Icons.Default.FileUpload, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))

@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -110,10 +111,12 @@ fun DuplicateFinderSheet(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
+                val deleteInteraction = remember { MutableInteractionSource() }
                 Button(
                     onClick = { if (selectedIds.isNotEmpty()) showConfirm = true },
                     enabled = selectedIds.isNotEmpty(),
-                    modifier = Modifier.fillMaxWidth()
+                    interactionSource = deleteInteraction,
+                    modifier = Modifier.fillMaxWidth().bouncyPress(deleteInteraction)
                 ) {
                     Icon(Icons.Default.DeleteSweep, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))

@@ -1,13 +1,14 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 166 file
+# Total: 167 file
 
 .github/workflows/build.yml
 .gitignore
 CHANGELOG.md
 FILE_MANIFEST.txt
 MANUAL_QA_CHECKLIST.md
+MICRO_UIUX_AUDIT.md
 PROJECT_STATE.md
 README.md
 ROADMAP_15_FITUR_OFFLINE.md

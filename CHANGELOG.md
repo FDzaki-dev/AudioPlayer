@@ -1,5 +1,30 @@
 # Changelog
 
+## Batch 125 — Micro UI/UX: adopsi MICRO_UIUX_AUDIT.md + lanjut bounce-press ke 4 sheet lagi
+User upload `MICRO_UIUX_AUDIT.md` — checklist 14 kategori polish presentation-only (strings,
+spacing, typography, touch target, interactive states, dst.), scope eksplisit **dilarang**
+sentuh logic/playback/queue/SAF/database/navigasi. Disimpan sebagai dokumen tracking persisten
+(pola sama `ROADMAP_15_FITUR_OFFLINE.md`), status per kategori dicatat di bagian atas file
+supaya tidak perlu scroll untuk lihat progres terbaru (pelajaran dari Batch 123).
+
+Eksekusi kategori #4 (Touch Target & Micro Interaction) — lanjutan Batch 124, kali ini 4 sheet
+yang sebelumnya belum diaudit (item "kandidat batch berikutnya" di `PROJECT_STATE.md` Batch 124):
+- `BackupRestoreSheet.kt` — "Buat Backup Sekarang" + "Pulihkan dari File"
+- `DuplicateFinderSheet.kt` — "Hapus N Terpilih" (destructive action)
+- `ABRepeatBookmarkSheet.kt` — `AbPointButton` composable bersama (1 edit → berlaku ke tombol
+  Titik A & Titik B sekaligus)
+- `SignatureMatcherSheet.kt` — `ApkPickerRow` composable bersama (1 edit → berlaku ke picker
+  APK 1 & APK 2 sekaligus)
+
+4 file kode diedit (2 lewat composable bersama = 4 tombol efektif tersentuh), 1 file dokumentasi
+baru (`MICRO_UIUX_AUDIT.md`), 0 protected asset, 0 perubahan logika/behavior — pola identik
+Batch 124 (`interactionSource` + `Modifier.bouncyPress(...)` ke `Button`/`OutlinedButton` yang
+sudah ada). **Sengaja tidak** disentuh batch ini: `EqualizerSheet` (FilterChip, bukan Button —
+pola beda, giliran berikutnya), tombol sekunder (TextButton/IconButton) di semua sheet — tetap
+disiplin "1 slice kecil per batch" sesuai arahan user. `FILE_MANIFEST.txt` 166→167. Brace/paren
+tiap file dicek otomatis & seimbang. **Belum diverifikasi compile Gradle sungguhan** (tidak ada
+JDK/SDK di sandbox).
+
 ## Batch 124 — Micro UI/UX: samakan bounce-press ke 4 sheet fitur terbaru
 Audit `bouncyPress` (util tekan-mengecil-spring-balik, `Utils.kt`) di seluruh `ui/`: cuma
 dipakai di `MiniPlayerBar.kt`/`NowPlayingScreen.kt`/`LockScreen.kt` (kontrol lama). 4 sheet

@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -179,7 +180,8 @@ fun ABRepeatBookmarkSheet(
 
 @Composable
 private fun AbPointButton(label: String, value: Long?, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, modifier = modifier) {
+    val interaction = remember { MutableInteractionSource() }
+    OutlinedButton(onClick = onClick, interactionSource = interaction, modifier = modifier.bouncyPress(interaction)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(label, style = MaterialTheme.typography.labelSmall)
             Text(

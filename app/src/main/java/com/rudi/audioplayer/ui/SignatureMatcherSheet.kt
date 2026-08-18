@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -131,7 +132,12 @@ private fun ApkPickerRow(label: String, result: ApkSignatureResult?, onPick: () 
     Column {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
         Spacer(modifier = Modifier.height(6.dp))
-        OutlinedButton(onClick = onPick, modifier = Modifier.fillMaxWidth()) {
+        val pickInteraction = remember { MutableInteractionSource() }
+        OutlinedButton(
+            onClick = onPick,
+            interactionSource = pickInteraction,
+            modifier = Modifier.fillMaxWidth().bouncyPress(pickInteraction)
+        ) {
             Icon(Icons.Default.FileOpen, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
             Text(result?.fileName ?: "Pilih File APK")

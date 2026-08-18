@@ -6,6 +6,20 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 125 (Micro UI/UX — adopsi MICRO_UIUX_AUDIT.md + bounce-press 4 sheet lagi, 4 file kode +
+1 dokumentasi baru)** — User upload checklist 14-kategori polish presentation-only, disimpan
+sebagai `MICRO_UIUX_AUDIT.md` (tracking persisten, status per kategori di paling atas file —
+lihat pelajaran Batch 123 soal banner yang telat sync). Lanjutan kategori #4 (Touch Target &
+Micro Interaction) dari Batch 124: `BackupRestoreSheet`/`DuplicateFinderSheet`/
+`ABRepeatBookmarkSheet` (via `AbPointButton`)/`SignatureMatcherSheet` (via `ApkPickerRow`) kini
+pakai `bouncyPress`. **Sengaja kecil**: `EqualizerSheet` (FilterChip) + semua tombol sekunder
+ditunda ke batch berikutnya, sesuai arahan user "jangan greedy". **Kandidat batch berikutnya**:
+lanjut `FINAL EXECUTION ORDER` di `MICRO_UIUX_AUDIT.md` — abis touch-target selesai (giliran
+`EqualizerSheet` + tombol sekunder), lanjut ke kategori #1 (String & Wording Consistency, tapi
+**tanpa** bagian "centralize ke resources" — itu tumpang tindih dengan item "Belum selesai" di
+README soal 339 string literal yang sudah ditandai berisiko tanpa compiler; scope ke wording
+konsisten murni, bukan refactor ke `strings.xml`). Detail: `CHANGELOG.md` Batch 125.
+
 **Batch 124 (Micro UI/UX — bounce-press ke 4 sheet fitur terbaru, 4 file diedit)** — Audit
 `bouncyPress` (`Utils.kt`) ternyata cuma dipakai di kontrol lama (`MiniPlayerBar`/
 `NowPlayingScreen`/`LockScreen`); 4 sheet MVP Batch 118-121 (`SongInfoEditSheet`,
