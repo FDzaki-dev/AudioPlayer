@@ -1,5 +1,33 @@
 # Changelog
 
+## Batch 128 — Tema baru: Calm Retro (terkunci gelap, 2 file diedit)
+Identitas tema ke-4, dari `palet_warna_calm_retro_v2.md` (user upload). **Terkunci gelap
+permanen atas instruksi eksplisit user** ("gak bisa geser mode seenaknya") — beda dari
+Tactile/Skeu (Batch 61, otonom di kedua mode): Calm Retro cuma 1 colorScheme, `colorsFor()`
+mengabaikan param `isDark` untuk identity ini. Toggle Mode Terang/Gelap tetap ada di
+Settings tapi tidak berefek visual saat Calm Retro aktif (behavior sama seperti Tactile/Skeu
+versi PRA-Batch-61).
+
+`Color.kt` — 6 token literal dari tabel HEX spec: `CalmRetroBackground` (#0F1015 Midnight
+Dust), `CalmRetroSurface` (#161822 Obsidian Gray), `CalmRetroBorder` (#232635, dari border
+`.song-card` CSS spec — dipakai `outline`/`surfaceVariant`), `CalmRetroText` (#E2E4E9 Silk
+White), `CalmRetroSecondaryText` (#6A6F82 Slate Mist), `CalmRetroAccent` (#7FA99B Muted
+Sage). Spec tidak beri token sukses/error sendiri — reuse `SkeuDarkSuccess`/`SkeuDarkError`
+yang sudah ada, sesuai instruksi "gak usah greedy" (tanpa nambah token baru yang tak perlu).
+
+`Theme.kt` — `ThemeIdentity.CALM_RETRO` (storageKey `"calm_retro"`) masuk daftar
+`ThemeIdentity.entries` (picker Settings otomatis menampilkannya, 0 edit di
+`SettingsScreen.kt`). `CalmRetroColors` (`darkColorScheme` tunggal) + case baru di
+`colorsFor()`. Shape & typografi reuse `AppleShapes`/`AppleTypography` (branch `else` yang
+sudah ada, 0 edit tambahan) — spec tidak menuntut bentuk/huruf custom.
+
+**Sengaja tidak dikerjakan** (instruksi "gak usah overthinking"): efek chromatic-aberration
+dual-shadow dari CSS contoh spec (`.calm-play-button`) — itu contoh implementasi CSS
+opsional, bukan bagian konfigurasi warna inti; tidak dibuatkan primitive Compose baru
+(beda dari `tactileEmboss()`/`skeuEmboss()`), tidak ada varian LIGHT (identity ini memang
+1 warna saja by design). 0 protected asset disentuh, 0 file baru, 2 file kode diedit.
+**Belum diverifikasi compile Gradle sungguhan** (tidak ada JDK/SDK di sandbox).
+
 ## Batch 127 — Micro UI/UX: bounce-press ke tombol sekunder frekuensi-tinggi (3 file)
 Lanjutan kategori #4 — kali ini tombol **sekunder** (bukan CTA utama) yang paling sering
 ditekan berulang dalam 1 sesi, prioritas sama seperti alasan "Tandai Sekarang" Batch 124:

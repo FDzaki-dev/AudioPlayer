@@ -6,6 +6,21 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 128 (Tema baru — Calm Retro, terkunci gelap, 2 file diedit)** — Identitas ke-4 dari
+`palet_warna_calm_retro_v2.md` user, TERKUNCI GELAP PERMANEN atas instruksi eksplisit user
+(beda dari Tactile/Skeu Batch 61 yang otonom di kedua mode) — `colorsFor()` mengabaikan param
+`isDark` untuk `ThemeIdentity.CALM_RETRO`, cuma 1 `CalmRetroColors` (`darkColorScheme`). 6
+token warna literal dari tabel HEX spec ditambah ke `Color.kt`; sukses/error reuse token Skeu
+yang sudah ada (instruksi "gak usah greedy" — tanpa token baru tak perlu). Shape/typografi
+reuse `AppleShapes`/`AppleTypography` (branch `else` sudah ada). **Sengaja tidak dikerjakan**:
+efek chromatic-aberration CSS dari spec (`.calm-play-button`) — cuma contoh implementasi
+opsional di markdown, bukan bagian konfigurasi warna inti; tidak dibuat primitive Compose
+baru. Picker Settings otomatis menampilkan tema baru ini (loop `ThemeIdentity.entries`), 0
+edit `SettingsScreen.kt`. **Kandidat batch berikutnya kalau diminta lanjut**: (a) efek
+aberration CSS di atas kalau user memang mau, (b) lanjutkan `FINAL EXECUTION ORDER` di
+`MICRO_UIUX_AUDIT.md` (sisa tombol sekunder + hit-target audit, lihat Batch 127). Detail:
+`CHANGELOG.md` Batch 128.
+
 **Batch 127 (Micro UI/UX — bounce-press tombol sekunder frekuensi-tinggi, 3 file kode diedit)**
 — Lanjutan kategori #4: tombol **sekunder** yang ditekan berulang (bukan CTA sekali-tekan) —
 `LyricsSheet` (Mundur/Lewati Baris di flow tap-to-sync), `VaultSheet` (icon keluarkan-dari-vault

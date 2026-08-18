@@ -32,7 +32,8 @@ import androidx.compose.ui.unit.dp
 enum class ThemeIdentity(val storageKey: String, val displayName: String, val description: String) {
     APPLE("apple", "Apple", "Tampilan bersih khas iOS, mengikuti mode terang/gelap yang dipilih"),
     TACTILE("tactile_lite", "Tactile", "Kaca premium dengan sentuhan Midnight Blue tipis dan kontrol taktil — kini otonom di mode terang maupun gelap"),
-    SKEU_DARK_LITE("skeu_dark_lite", "Neumorphism", "Panel lembut menyatu dgn kanvas, dual soft-shadow ultra realistic, aksen Titanium dominan dgn sentuhan Zamrud — otonom di mode terang maupun gelap");
+    SKEU_DARK_LITE("skeu_dark_lite", "Neumorphism", "Panel lembut menyatu dgn kanvas, dual soft-shadow ultra realistic, aksen Titanium dominan dgn sentuhan Zamrud — otonom di mode terang maupun gelap"),
+    CALM_RETRO("calm_retro", "Calm Retro", "Lo-Fi Sci-Fi teduh, aksen Muted Sage — selalu gelap, tidak mengikuti toggle Mode");
 
     companion object {
         fun fromStorageKey(key: String?): ThemeIdentity = entries.find { it.storageKey == key } ?: APPLE
@@ -185,6 +186,28 @@ private val SkeuLightColors = lightColorScheme(
     error = SkeuDarkError
 )
 
+// Calm Retro — 1 colorScheme saja (bukan pasangan Dark/Light seperti Tactile/Skeu), karena
+// identitas ini sengaja terkunci gelap permanen (lihat colorsFor() — param isDark diabaikan
+// untuk identity ini). onPrimary Color.Black: luma CalmRetroAccent (#7FA99B) ≈0.61, di atas
+// ambang 0.55 yang sudah dipakai identitas lain di file ini.
+private val CalmRetroColors = darkColorScheme(
+    primary = CalmRetroAccent,
+    onPrimary = Color.Black,
+    secondary = CalmRetroSecondaryText,
+    onSecondary = CalmRetroBackground,
+    tertiary = SkeuDarkSuccess, // spec tidak beri token sukses sendiri — reuse hijau muted yg senada
+    onTertiary = Color.Black,
+    background = CalmRetroBackground,
+    onBackground = CalmRetroText,
+    surface = CalmRetroSurface,
+    onSurface = CalmRetroText,
+    surfaceVariant = CalmRetroBorder,
+    onSurfaceVariant = CalmRetroSecondaryText,
+    outline = CalmRetroBorder,
+    surfaceTint = CalmRetroAccent,
+    error = SkeuDarkError // spec tidak beri token error sendiri — reuse existing
+)
+
 // A single, consistent "continuous curve" language across the whole app — Compose's Shapes
 // API only supports true rounded rectangles (Apple's real squircle/superellipse corners
 // aren't natively expressible), so generous rounding is the closest honest approximation.
@@ -239,6 +262,9 @@ fun colorsFor(identity: ThemeIdentity, isDark: Boolean) = when (identity) {
     ThemeIdentity.TACTILE -> if (isDark) TactileDarkColors else TactileLightColors
     ThemeIdentity.SKEU_DARK_LITE -> if (isDark) SkeuDarkColors else SkeuLightColors
     ThemeIdentity.APPLE -> if (isDark) AppleDarkColors else AppleLightColors
+    // isDark sengaja diabaikan — Calm Retro terkunci gelap permanen (instruksi eksplisit user),
+    // beda dari Tactile/Skeu yang otonom di kedua mode.
+    ThemeIdentity.CALM_RETRO -> CalmRetroColors
 }
 
 @Composable

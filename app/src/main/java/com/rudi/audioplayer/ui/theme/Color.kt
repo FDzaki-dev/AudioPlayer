@@ -278,3 +278,17 @@ val SkeuLightShadow = Color(0xFF23262B).copy(alpha = 0.38f)
 val SkeuLightSpecular = Color.White
 val SkeuLightAmbientOcclusion = Color(0xFF23262B).copy(alpha = 0.22f)
 val SkeuLightSpecularPressed = Color.White.copy(alpha = 0.25f)
+
+// ============================================================================
+// CALM RETRO — "Calm Retro-Futurism / Lo-Fi Sci-Fi" — dari palet_warna_calm_retro_v2.md
+// user. Identitas ke-3, TERKUNCI GELAP PERMANEN (instruksi eksplisit user) — beda dari
+// Tactile/Skeu (Batch 61, otonom di kedua mode), theme ini sengaja HANYA punya 1 set warna,
+// dipakai apa pun ThemeMode yang aktif. Nilai HEX di bawah literal dari tabel spesifikasi
+// markdown, 0 turunan/tebakan.
+// ============================================================================
+val CalmRetroBackground = Color(0xFF0F1015) // Midnight Dust
+val CalmRetroSurface = Color(0xFF161822) // Obsidian Gray
+val CalmRetroBorder = Color(0xFF232635) // border .song-card di spec — dipakai outline/surfaceVariant
+val CalmRetroText = Color(0xFFE2E4E9) // Silk White
+val CalmRetroSecondaryText = Color(0xFF6A6F82) // Slate Mist
+val CalmRetroAccent = Color(0xFF7FA99B) // Muted Sage
