@@ -1,5 +1,35 @@
 # Changelog
 
+## Batch 135 — Scanline disebar ke panel kontrol (Equalizer + Visualizer, 2 file diedit)
+Lanjutan langsung item "sengaja belum" Batch 134: Pilar A (`calmScanlines()`) sekarang juga di
+`EqualizerSheet.kt` + `VisualizerSheet.kt` — 2 panel kontrol paling literal di app ini (slider
+band/preset & spectrum bar), keduanya berbagi shell identik sejak Batch 92 (`ModalBottomSheet` +
+`Column.frostedGlass()`).
+
+**Containment dulu, bukan asumsi aman** — dicek dulu ke `frostedGlass()` (`BlurUtils.kt`):
+`background(tint, shape)` di dalamnya SUDAH shaped untuk cat latar, tapi TIDAK meng-`clip()`
+children/draw sesudahnya (pelajaran sama persis dengan insiden "Ambient Light gak bocor" Batch
+81 untuk shadow). Tanpa `clip()` eksplisit, overlay scanline `calmScanlines()` (draw rect penuh
+lewat `drawWithContent`) akan menggambar persegi penuh sampai ke bounds Column — bisa bocor
+melewati sudut membulat panel. Fix: `.clip(MaterialTheme.shapes.large)` dipasang SEBELUM
+`.calmScanlines()` di kedua file (pola sama AlbumArtHero/SongRow — scanline SETELAH clip),
+`isCalmRetro` di-hoist di titik yang sama seperti sheet lain.
+
+**Sengaja belum**: sheet lain (`LyricsSheet`, `ABRepeatBookmarkSheet`, `QueueSheet`, dst.) —
+kandidat "panel kontrol" juga tapi ditunda demi batch kecil (pola sama presedan aberrasi CTA
+yang meluas bertahap Batch 129->130->131, bukan sekaligus semua). `frostedGlass()` sendiri
+TIDAK disentuh (perbaikan clip di sini murni lokal ke 2 pemanggil, tidak general — kalau nanti
+lebih banyak sheet dapat scanline, pola `.clip(MaterialTheme.shapes.large).calmScanlines()` ini
+tinggal disalin, bukan alasan untuk mengubah `frostedGlass()` sendiri jadi meng-`clip()` semua
+pemanggilnya, yang berisiko ke perilaku shadow/bevel Tactile/Skeu yang sudah lama stabil).
+
+2 file diedit, 0 file baru, 0 protected asset. Brace/paren dicek otomatis & seimbang
+(`EqualizerSheet.kt` 27/27 `{}` 96/96 `()`; `VisualizerSheet.kt` 10/10 `{}` 68/68 `()`). **Belum
+diverifikasi compile/visual sungguhan** — prioritas berikutnya kalau user push: `./gradlew
+assembleDebug` build bersih, lalu di device buka Equalizer & Visualizer di tema Calm Retro,
+pastikan scanline genuinely terkurung rapi di dalam sudut panel (tidak bocor ke tepi sheet) dan
+tidak mengganggu keterbacaan slider/label preset.
+
 ## Batch 134 — Calm Retro v3: tuntaskan 2 item yang sengaja ditunda Batch 133 (2 file diedit)
 Lanjutan langsung Batch 133 ("gak usah greedy" — sengaja ditunda ke batch terpisah, bukan
 terlewat). 2 item dari catatan "Sengaja BELUM digarap" batch itu, dikerjakan bersama karena

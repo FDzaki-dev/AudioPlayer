@@ -14,7 +14,10 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
+import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
 import java.util.Locale
@@ -39,12 +42,23 @@ fun EqualizerSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val haptic = LocalHapticFeedback.current
+    // v3 upgrade lanjutan (Batch 134 -> 135) — spread Pilar A (CRT scanlines) dari
+    // AlbumArtHero/SongRow ke "panel kontrol" yang spec sebut eksplisit sebagai target lain.
+    // Equalizer = panel kontrol paling literal di app ini (slider band + preset), jadi kandidat
+    // pertama giliran ini. .clip(MaterialTheme.shapes.large) dulu SEBELUM .calmScanlines() —
+    // frostedGlass()'s background() sendiri sudah "shaped" tapi TIDAK meng-clip children/draw
+    // sesudahnya (pelajaran sama seperti "Ambient Light gak bocor" Batch 81), jadi scanline
+    // overlay wajib dikurung eksplisit di sini supaya tidak bocor melewati sudut membulat panel.
+    val isCalmRetro = isCalmRetroTheme()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .frostedGlass()
+                .then(
+                    if (isCalmRetro) Modifier.clip(MaterialTheme.shapes.large).calmScanlines() else Modifier
+                )
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp)
         ) {

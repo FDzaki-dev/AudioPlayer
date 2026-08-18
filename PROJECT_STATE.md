@@ -6,6 +6,21 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 135 (Calm Retro v3 — scanline ke panel kontrol Equalizer+Visualizer, 2 file diedit)** —
+Lanjutan item "sengaja belum" Batch 134: `calmScanlines()` disebar ke `EqualizerSheet.kt` +
+`VisualizerSheet.kt` (shell identik sejak Batch 92). Ditemukan risiko containment SEBELUM
+dipasang (cross-check `frostedGlass()`): `background(tint,shape)` di situ tidak `clip()`
+children/draw sesudahnya (kelas bug sama dgn "Ambient Light gak bocor" Batch 81) — fix:
+`.clip(MaterialTheme.shapes.large)` dipasang SEBELUM `.calmScanlines()` di kedua file, `isCalmRetro`
+di-hoist pola sama sheet lain. `frostedGlass()` sendiri TIDAK diubah (perbaikan lokal ke 2
+pemanggil, bukan general clip semua pemanggil — hindari efek samping ke shadow/bevel Tactile/
+Skeu). 0 file baru, 0 protected asset. **Sengaja belum**: sheet lain (`LyricsSheet`,
+`ABRepeatBookmarkSheet`, `QueueSheet`, dst.) — kandidat sama tapi ditunda, pola sama presedan
+aberrasi CTA yang meluas bertahap. **PENTING kalau lanjut sesi baru**: fix ini baru diverifikasi
+LOGIS dari kode (0 JDK/SDK di sandbox) — belum ada konfirmasi visual/build dari user, terutama
+apakah clip baru ini menyebabkan efek visual tak diinginkan lain di panel Equalizer/Visualizer
+Calm Retro (belum pernah dirender). Detail: `CHANGELOG.md` Batch 135.
+
 **Batch 134 (Calm Retro v3 — tuntaskan 2 item tunda Batch 133, 2 file diedit)** — Lanjutan
 langsung 2 catatan "sengaja belum digarap" Batch 133: (1) `calmScanlines()` (Pilar A) disebar
 dari `AlbumArtHero` ke `SongRow` (`LibraryScreen.kt`) — 1 composable dipakai ulang di tab Lagu/

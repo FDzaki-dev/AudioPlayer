@@ -6,6 +6,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -13,6 +14,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
+import com.rudi.audioplayer.ui.theme.calmScanlines
 
 /** Roadmap #9 (Visualizer Audio, ROADMAP_15_FITUR_OFFLINE.md), Batch 92. Same shell pattern as
  * EqualizerSheet.kt (header row + Switch, frostedGlass sheet), plus explicit permission education
@@ -32,12 +35,20 @@ fun VisualizerSheet(
     onRequestPermission: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // v3 upgrade lanjutan (Batch 134 -> 135) — panel kontrol kedua yang dapat Pilar A, pola
+    // identik EqualizerSheet.kt (shell sama sejak Batch 92): clip(shapes.large) dulu SEBELUM
+    // calmScanlines() supaya overlay terkurung di dalam sudut membulat panel, bukan bocor ke
+    // luar (frostedGlass()'s background() tidak meng-clip children/draw sesudahnya).
+    val isCalmRetro = isCalmRetroTheme()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .frostedGlass()
+                .then(
+                    if (isCalmRetro) Modifier.clip(MaterialTheme.shapes.large).calmScanlines() else Modifier
+                )
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp)
         ) {
