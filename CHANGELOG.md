@@ -1,5 +1,34 @@
 # Changelog
 
+## Batch 145 — Micro UI/UX kategori #1 TUNTAS: audit formal "Hapus" (22 titik) + sinkron status table (3 dokumentasi, 0 kode)
+Lanjutan Pending Queue Batch 144, item terakhir kategori #1: tulis formal hasil audit `"Hapus"`.
+
+**Metode**: grep ulang (bukan andalkan taksiran sekilas Batch 142) — persis 22 titik di 15 file
+`ui/*.kt`, dibaca konteks satu-satu. **Hasil: 0 bug, 4 kelompok beda fungsi, genuinely bukan
+kandidat unifikasi**:
+1. **Label tombol konfirmasi generik** (`DiagnosticLogSheet.kt:123`, `DuplicateFinderSheet.kt:142`,
+   `FolderManagerSheet.kt:228`, `LibraryScreen.kt:459,797`) — `"Hapus"` polos SENGAJA generik,
+   konteks objeknya sudah jelas dari `title` dialog yang sama (pola tombol konfirmasi standar,
+   bukan lupa dikasih detail).
+2. **Label tombol dgn jumlah dinamis** (`DuplicateFinderSheet.kt:123` `"Hapus N Terpilih"`) —
+   1 titik, unik, tidak ada padanan lain yang perlu disamakan.
+3. **Title dialog "Hapus X?"** (`DuplicateFinderSheet.kt:134`, `FolderManagerSheet.kt:215`,
+   `LibraryScreen.kt:444`) — sudah diaudit formal Batch 144 (pola "?" konsisten), tidak diulang.
+4. **`contentDescription` aksesibilitas** (13 titik: bookmark/folder/perangkat/favorit/lirik/
+   playlist/antrean/playlist-otomatis) — SENGAJA selalu full-context (`"Hapus dari favorit"`,
+   `"Hapus dari antrean"`, dst.), BUKAN dipendekkan ke `"Hapus"` polos seperti kelompok 1 — screen
+   reader butuh objek eksplisit karena tidak ada `title` dialog visual yang melengkapinya (beda
+   kelas UI dari tombol dalam dialog). Menyamakan gaya ke sini justru akan MERUSAK aksesibilitas,
+   bukan konsistensi.
+
+**Kesimpulan kategori #1**: 3 audit wording (Batch 142 undo-label, 143 Batal/Tutup, 144 title
+dialog + Aksi/Tindakan, 145 ini) tuntas 0 sisa pending. `MICRO_UIUX_AUDIT.md` status table
+disinkronkan ke ✅ SELESAI (Batch 142-145).
+
+3 file dokumentasi (`CHANGELOG.md`/`PROJECT_STATE.md`/`MICRO_UIUX_AUDIT.md`), 0 kode, 0 protected
+asset. Kandidat batch berikutnya: kategori #2 Spacing & Sizing Consistency (13 kategori lain
+masih ⬜ belum mulai, urutan `FINAL EXECUTION ORDER` di `MICRO_UIUX_AUDIT.md`).
+
 ## Batch 144 — Micro UI/UX kategori #1 lanjutan: audit judul dialog + samakan "Aksi"/"Tindakan" (1 file kode + 2 dokumentasi)
 Lanjutan Pending Queue Batch 143, item pertama: kapitalisasi & tanda baca title dialog
 konfirmasi.

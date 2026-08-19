@@ -6,6 +6,20 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 145 (Micro UI/UX kategori #1 TUNTAS — audit formal 22 titik "Hapus" + sinkron status
+table, 3 dokumentasi, 0 kode)** — Lanjutan & penutup Pending Queue kategori #1. Grep ulang
+(bukan andalkan taksiran Batch 142) konfirmasi persis 22 titik `"Hapus"` di 15 file `ui/*.kt`,
+dibaca konteks 1-per-1. **0 bug, 4 kelompok fungsi beda, genuinely bukan kandidat unifikasi**:
+(1) label tombol konfirmasi generik (5 titik, `"Hapus"` polos — konteks sudah jelas dari title
+dialog), (2) label dgn jumlah dinamis (1 titik, unik), (3) title dialog "Hapus X?" (3 titik,
+sudah diaudit formal Batch 144), (4) `contentDescription` aksesibilitas (13 titik, SENGAJA
+full-context spt `"Hapus dari favorit"` — screen reader butuh objek eksplisit, menyamakan ke
+gaya kelompok 1 justru MERUSAK aksesibilitas). **Kategori #1 (String & Wording Consistency)
+sekarang ✅ SELESAI PENUH** (Batch 142-145: undo-label, Batal/Tutup, title dialog+Aksi/Tindakan,
+Hapus) — `MICRO_UIUX_AUDIT.md` status table disinkronkan. 0 protected asset. Kandidat batch
+berikutnya: kategori #2 Spacing & Sizing Consistency (13 kategori lain masih ⬜, urutan
+`FINAL EXECUTION ORDER` di `MICRO_UIUX_AUDIT.md`). Detail: `CHANGELOG.md` Batch 145.
+
 **Batch 144 (Micro UI/UX kategori #1 lanjutan — audit judul dialog + samakan "Aksi"/"Tindakan",
 1 file kode + 2 dokumentasi)** — Audit 14 title `AlertDialog`: 2 kelompok (konfirmasi destruktif
 selalu diakhiri "?", form/info tidak) sudah konsisten. `"Hapus dari Perangkat?"` Title Case
