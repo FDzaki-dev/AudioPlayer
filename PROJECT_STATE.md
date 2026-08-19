@@ -6,6 +6,20 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 149 (Micro UI/UX kategori #3 dimulai — samakan gaya title bottom sheet
+FolderManagerSheet, 1 file kode + 2 dokumentasi)** — Item pertama Typography Hierarchy: grep
+semua header `ModalBottomSheet` (13 sheet). **12 sudah konsisten** `titleMedium` + `Font-
+Weight.Bold`, **1 gap nyata**: `FolderManagerSheet.kt` pakai `titleLarge` tanpa `fontWeight`
+eksplisit — beda ukuran DAN berat huruf dari 12 sheet lain, pecah hierarki visual paling
+mencolok kategori #3 sejauh ini. Fix: disamakan ke `titleMedium`+Bold + 1 import baru
+(`FontWeight`, file ini belum pernah pakainya). Brace/paren `FolderManagerSheet.kt` seimbang
+(42/42, 105/105). 0 protected asset. `MICRO_UIUX_AUDIT.md` status table SENGAJA belum disentuh
+(cap 3 file) — disinkronkan batch berikutnya (jangan tunda lebih dari 1 batch, pelajaran Batch
+148: dokumen tracking manual rawan telat kalau ditunda berturut-turut). **Belum diverifikasi
+visual**. **Sisa kategori #3**: audit body/label/caption, line-height, cakupan penuh truncation/
+ellipsis (sebagian sudah Batch 37, belum formal untuk kategori #3 spesifik). Detail:
+`CHANGELOG.md` Batch 149.
+
 **Batch 148 (Dokumentasi — sinkronkan status table kategori #2 di MICRO_UIUX_AUDIT.md, 3
 dokumentasi, 0 kode)** — Item pending prioritas tinggi Batch 147 (tertunda 2 batch demi cap 3
 file). Baris kategori #2 diperbarui `⬜ Belum mulai` → `🟡 Berlanjut (Batch 146-147)` + ringkasan

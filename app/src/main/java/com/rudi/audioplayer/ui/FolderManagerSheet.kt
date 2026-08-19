@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.rudi.audioplayer.ui.theme.frostedGlass
@@ -62,7 +63,8 @@ fun FolderManagerSheet(
         Column(modifier = Modifier.fillMaxWidth().frostedGlass().padding(bottom = 24.dp)) {
             Text(
                 "Kelola Perpustakaan",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
             Spacer(modifier = Modifier.height(4.dp))

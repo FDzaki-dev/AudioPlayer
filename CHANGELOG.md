@@ -1,5 +1,29 @@
 # Changelog
 
+## Batch 149 — Micro UI/UX kategori #3 dimulai: samakan gaya title bottom sheet FolderManagerSheet (1 file kode + 2 dokumentasi)
+Item pertama kategori #3 (Typography Hierarchy, urutan `FINAL EXECUTION ORDER`) — "Audit title/
+subtitle/body/label/caption" + "Konsistenkan font weight". Scope sengaja 1 pola dulu (title
+bottom sheet), bukan audit semua level tipografi sekaligus.
+
+**Metode**: grep semua `Text(...)` yang jadi HEADER `ModalBottomSheet` (baris pertama tiap sheet).
+**12 dari 13 sheet sudah konsisten**: `style = MaterialTheme.typography.titleMedium, fontWeight
+= FontWeight.Bold` (`BackupRestoreSheet`, `DuplicateFinderSheet`, `SignatureMatcherSheet`,
+`VaultSheet`, `DiagnosticLogSheet`, `ABRepeatBookmarkSheet`, `EqualizerSheet`, `LyricsSheet`,
+`QueueSheet`, `RingtoneCutterSheet`, `SongInfoEditSheet`, `VisualizerSheet`). **1 gap nyata**:
+`FolderManagerSheet.kt` — title `"Kelola Perpustakaan"` pakai `titleLarge` TANPA `fontWeight`
+eksplisit (default M3 titleLarge = Normal/400), beda ukuran DAN beda berat huruf dari 12 sheet
+lain sekaligus — pecah hierarki visual paling mencolok yang ditemukan sejauh ini di kategori #3.
+Fix: disamakan ke `titleMedium` + `FontWeight.Bold` (pola mayoritas), + 1 import baru
+`androidx.compose.ui.text.font.FontWeight` (file ini belum pernah pakai `FontWeight` sebelumnya).
+
+Brace/paren `FolderManagerSheet.kt` seimbang (42/42, 105/105). 1 file kode + 2 dokumentasi. 0
+protected asset. `MICRO_UIUX_AUDIT.md` status table SENGAJA belum disentuh batch ini (cap 3
+file, pola sama presedan Batch 146/147→148) — disinkronkan batch berikutnya. **Belum
+diverifikasi visual** — perubahan kecil (ukuran+berat font 1 baris teks), risiko rendah. **Sisa
+kategori #3**: audit body/label/caption text-style konsistensi (di luar scope title sheet),
+line-height, truncation/ellipsis (sebagian sudah dibereskan Batch 37 — cek ulang cakupan penuh
+belum pernah dilakukan formal untuk kategori #3 ini secara spesifik).
+
 ## Batch 148 — Dokumentasi: sinkronkan status table kategori #2 di MICRO_UIUX_AUDIT.md (3 dokumentasi, 0 kode)
 Item pending prioritas tinggi dari Batch 147 (tertunda 2 batch berturut-turut, 146+147, demi
 jaga cap 3 file/batch) — status table kategori #2 masih tertulis `⬜ Belum mulai` padahal 2 batch
