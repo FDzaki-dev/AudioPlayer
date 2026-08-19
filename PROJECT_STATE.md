@@ -6,6 +6,19 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 144 (Micro UI/UX kategori #1 lanjutan — audit judul dialog + samakan "Aksi"/"Tindakan",
+1 file kode + 2 dokumentasi)** — Audit 14 title `AlertDialog`: 2 kelompok (konfirmasi destruktif
+selalu diakhiri "?", form/info tidak) sudah konsisten. `"Hapus dari Perangkat?"` Title Case
+dikonfirmasi SENGAJA (echo label menu/ikon yang sama persis, bukan bug). **Bug nyata**: warning
+"tidak bisa dibatalkan" pakai `"Aksi"` (2 file) vs `"Tindakan"` (`LibraryScreen.kt`, 2 titik) —
+disamakan ke `"Aksi"` (pola mayoritas). Brace/paren `LibraryScreen.kt` seimbang. **Cap 3 file
+dijaga ketat**: 1 kode + 2 dokumentasi, `MICRO_UIUX_AUDIT.md` sengaja TIDAK disentuh batch ini
+(status table-nya menyusul batch berikutnya kalau ada slot — tidak mau ulang pelanggaran cap
+Batch 142). **Sisa Pending Queue kategori #1**: tulis formal hasil cek `"Hapus"` (22 titik,
+sudah dicek sekilas — semua konteks beda, bukan kandidat unifikasi) + sinkronkan status table
+`MICRO_UIUX_AUDIT.md` (masih tertulis "Batch 142-143" di sana, belum sebut Batch 144). Detail:
+`CHANGELOG.md` Batch 144.
+
 **Batch 143 (Micro UI/UX kategori #1 lanjutan — audit "Batal" vs "Tutup", 0 bug, 3 file
 dokumentasi, 0 kode)** — Lanjutan Pending Queue Batch 142. Baca konteks 17 titik `"Batal"`/
 `"Tutup"` (bukan cuma grep nama tombol): **pola sudah konsisten by-design** — `"Batal"` selalu

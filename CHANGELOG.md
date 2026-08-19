@@ -1,5 +1,30 @@
 # Changelog
 
+## Batch 144 — Micro UI/UX kategori #1 lanjutan: audit judul dialog + samakan "Aksi"/"Tindakan" (1 file kode + 2 dokumentasi)
+Lanjutan Pending Queue Batch 143, item pertama: kapitalisasi & tanda baca title dialog
+konfirmasi.
+
+**Audit 14 title `AlertDialog`** — 2 kelompok, keduanya sudah konsisten: (1) dialog konfirmasi
+destruktif/dengan aksi tertunda, semua diakhiri "?" (`"Hapus ${'$'}{toDelete.size} file?"`,
+`"Hapus folder tambahan?"`, `"Nonaktifkan Vault?"`, `"Timpa data saat ini?"`, `"Hapus dari
+Perangkat?"`); (2) dialog form/info tanpa pertanyaan, tanpa "?" (`"Atur PIN"`, `"Sleep Timer"`,
+`"Laporan Lengkap"`, dst.). `"Hapus dari Perangkat?"` sengaja Title Case (bukan bug) — dicek
+silang: frasa yang SAMA PERSIS dipakai di ikon/menu-item aksi yang sama (`LibraryScreen.kt:630`
+`contentDescription`, `:1207` teks menu) SEBELUM dialog ini muncul, jadi title dialog sengaja
+mengulang label persis yang baru saja user tap (echo pattern, bukan inkonsistensi kapitalisasi).
+
+**Bug nyata ditemukan** (bukan di title, di body `text`): peringatan "tidak bisa dibatalkan"
+untuk aksi hapus permanen pakai kata beda untuk semantik identik — `"Aksi ini tidak bisa
+dibatalkan."` (`DuplicateFinderSheet.kt`, `BackupRestoreSheet.kt`) vs `"Tindakan ini tidak bisa
+dibatalkan."` (`LibraryScreen.kt`, 2 titik: hapus 1 lagu & hapus banyak lagu). Fix:
+`LibraryScreen.kt` disamakan ke `"Aksi"` (pola mayoritas, 2 vs 2 sebelum fix → 4 vs 0 sesudah).
+
+Brace/paren `LibraryScreen.kt` seimbang (330/330, 701/701). 1 file kode + 2 dokumentasi = 3 file
+total (cap patuh, tidak sentuh `MICRO_UIUX_AUDIT.md` batch ini — status table disinkronkan batch
+berikutnya kalau ada slot). **Sisa Pending Queue kategori #1**: tulis formal hasil cek `"Hapus"`
+(22 titik, sudah dicek sekilas Batch 142 — semua konteks beda: hapus dari device/playlist/
+favorit/vault/folder/log, bukan kandidat unifikasi).
+
 ## Batch 143 — Micro UI/UX kategori #1 lanjutan: audit "Batal" vs "Tutup" — 0 bug, pola dikonfirmasi konsisten (3 file dokumentasi, 0 kode)
 Lanjutan Pending Queue Batch 142, item pertama: verifikasi 1-per-1 apakah wording `"Batal"`
 (12 titik) vs `"Tutup"` (5 titik, total 17 — sebelumnya ditaksir ~20 dari grep kasar yang ikut

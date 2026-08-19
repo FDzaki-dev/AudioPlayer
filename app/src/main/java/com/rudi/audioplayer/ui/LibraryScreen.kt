@@ -445,9 +445,9 @@ fun LibraryScreen(
             text = {
                 Text(
                     if (songsPendingDelete.size == 1)
-                        "\"${songsPendingDelete.first().title}\" akan dihapus permanen dari penyimpanan HP. Tindakan ini tidak bisa dibatalkan."
+                        "\"${songsPendingDelete.first().title}\" akan dihapus permanen dari penyimpanan HP. Aksi ini tidak bisa dibatalkan."
                     else
-                        "${songsPendingDelete.size} lagu akan dihapus permanen dari penyimpanan HP. Tindakan ini tidak bisa dibatalkan."
+                        "${songsPendingDelete.size} lagu akan dihapus permanen dari penyimpanan HP. Aksi ini tidak bisa dibatalkan."
                 )
             },
             confirmButton = {
