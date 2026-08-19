@@ -189,7 +189,7 @@ fun LockScreen(
                     isSkeu = isSkeu,
                     onClick = onRequestBiometric
                 ) {
-                    Icon(Icons.Default.Fingerprint, contentDescription = "Buka dengan sidik jari", modifier = Modifier.size(28.dp))
+                    Icon(Icons.Default.Fingerprint, contentDescription = "Buka dengan sidik jari", modifier = Modifier.size(24.dp))
                 }
             } else {
                 Spacer(modifier = Modifier.size(64.dp))
@@ -205,7 +205,7 @@ fun LockScreen(
                     if (entered.isNotEmpty()) entered = entered.dropLast(1)
                 }
             ) {
-                Icon(Icons.Default.Backspace, contentDescription = "Hapus", modifier = Modifier.size(22.dp))
+                Icon(Icons.Default.Backspace, contentDescription = "Hapus", modifier = Modifier.size(24.dp))
             }
         }
     }

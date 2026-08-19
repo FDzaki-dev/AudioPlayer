@@ -6,6 +6,22 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 147 (Micro UI/UX kategori #2 lanjutan — samakan ukuran ikon fingerprint/backspace
+LockScreen, 1 file kode + 2 dokumentasi)** — Item "ukuran control setara": audit 9 titik
+`Icon().size()` eksplisit di `ui/*.kt` (sisanya default Material 24dp). 1 gap nyata:
+`LockScreen.kt` Fingerprint (28dp) vs Backspace (22dp) — keduanya render via `RoundGlyphButton`
+yang sama (komentar kode sendiri menyatakan "same round tactile/skeu treatment"), duduk simetris
+flanking tombol "0", tapi beda 6dp visual. Fix: disamakan ke 24dp (default Material). 7 titik
+lain diaudit & TIDAK disentuh — beda konteks genuinely (tidak ada pasangan sejenis yang perlu
+diseragamkan; `NowPlayingScreen.kt` SkipPrevious/SkipNext 36dp+36dp SUDAH konsisten). Brace/paren
+`LockScreen.kt` seimbang (48/48, 128/128). 0 protected asset. `MICRO_UIUX_AUDIT.md` status table
+masih SENGAJA belum disentuh (cap 3 file, 3 batch berturut-turut sekarang — 146+147 — jadi
+prioritas TINGGI disinkronkan batch berikutnya, jangan ditunda lagi lebih lama). **Belum
+diverifikasi visual**. **Sisa kategori #2**: vertical spacing antar section, gap icon↔text
+(diaudit sekilas — sebaran Spacer 4-16dp terlalu kontekstual buat sweep mekanis, butuh
+pengelompokan per-konteks batch terpisah), sisa literal `.dp` lain. Detail: `CHANGELOG.md`
+Batch 147.
+
 **Batch 146 (Micro UI/UX kategori #2 dimulai — audit horizontal screen padding tab Library, 1
 file kode + 2 dokumentasi)** — Item pertama kategori #2 (Spacing & Sizing Consistency), scope
 sengaja 1 layar dulu (bukan sapuan ~340 literal `.dp` sekaligus, sudah ditandai berisiko sejak

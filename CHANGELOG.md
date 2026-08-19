@@ -1,5 +1,33 @@
 # Changelog
 
+## Batch 147 — Micro UI/UX kategori #2 lanjutan: samakan ukuran ikon fingerprint/backspace LockScreen (1 file kode + 2 dokumentasi)
+Item berikutnya kategori #2 — "Samakan ukuran control yang setara". Audit `Icon(...).size(N.dp)`
+eksplisit di seluruh `ui/*.kt`: cuma 9 titik total (sisanya pakai default Material 24dp), jadi
+diperiksa satu-satu (bukan sweep mekanis).
+
+**Temuan**: `LockScreen.kt`'s keypad — tombol Fingerprint (28dp) & Backspace (22dp), keduanya
+render lewat `RoundGlyphButton` yang SAMA (komentar kode sendiri: `"Fingerprint/backspace: same
+round tactile/skeu treatment as PinKey, smaller glyph instead of a digit"`), duduk simetris
+flanking tombol "0" di baris terbawah keypad — tapi beda 6dp secara visual, melanggar niat
+"treatment yang sama" yang sudah dinyatakan eksplisit di komentar. **Fix**: keduanya disamakan
+ke 24dp (default Material, bukan berat sebelah ke salah satu angka lama).
+
+**7 titik `Icon().size()` lain diaudit, TIDAK disentuh** (beda konteks genuinely, bukan
+pasangan/kelompok yang perlu seragam): `ABRepeatBookmarkSheet.kt` 3 titik (18dp icon-dalam-Button
+x2 + 16dp close x1, masing-masing 1 kemunculan tanpa pasangan sejenis di file yang sama),
+`FeatureHintBanner.kt` 16dp close (sudah match ukuran visual `bouncyPress` dismiss lain, Batch
+141), `NowPlayingScreen.kt` SkipPrevious/SkipNext 36dp+36dp (SUDAH konsisten satu sama lain,
+sengaja lebih besar — transport control primer), `RingtoneCutterSheet.kt` 18dp leadingIcon (1
+kemunculan, tidak ada pasangan).
+
+Brace/paren `LockScreen.kt` seimbang (48/48, 128/128). 1 file kode + 2 dokumentasi. 0 protected
+asset. `MICRO_UIUX_AUDIT.md` status table masih SENGAJA belum disentuh (cap 3 file) — akan
+disinkronkan sekali di batch mendatang begitu ada slot longgar. **Belum diverifikasi visual** —
+perubahan kecil (28→24, 22→24), risiko rendah. **Sisa kategori #2**: vertical spacing antar
+section, gap icon↔text (diaudit sekilas — sebaran nilai Spacer 4-16dp terlalu kontekstual buat
+disamakan mekanis, butuh pengelompokan per-konteks dulu di batch terpisah), sisa literal `.dp`
+lain.
+
 ## Batch 146 — Micro UI/UX kategori #2 dimulai: audit horizontal screen padding tab Library (1 file kode + 2 dokumentasi)
 Item pertama kategori #2 (Spacing & Sizing Consistency, urutan `FINAL EXECUTION ORDER`) —
 "Samakan horizontal screen padding", scope sengaja dipersempit ke 1 layar dulu (bukan sapuan
