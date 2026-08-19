@@ -6,6 +6,19 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 143 (Micro UI/UX kategori #1 lanjutan — audit "Batal" vs "Tutup", 0 bug, 3 file
+dokumentasi, 0 kode)** — Lanjutan Pending Queue Batch 142. Baca konteks 17 titik `"Batal"`/
+`"Tutup"` (bukan cuma grep nama tombol): **pola sudah konsisten by-design** — `"Batal"` selalu
+di dialog yang punya `confirmButton` beraksi (ada yang bisa dibatalkan), `"Tutup"` selalu di
+dialog info-only/tanpa aksi tertunda (viewer laporan, penjelasan, atau state confirmButton
+sudah berubah makna). 0 bug, 0 file kode diedit. **Catatan kepatuhan batch-limit**: batch ini
+sengaja HANYA 3 file dokumentasi (CHANGELOG/PROJECT_STATE/MICRO_UIUX_AUDIT), 0 kode — kalau ada
+temuan bug yang perlu fix kode di audit lanjutan, dokumentasi WAJIB dipangkas jadi ≤2 file supaya
+total tetap ≤3 (pelajaran dari pelanggaran cap di Batch 142, ditandai user). **Sisa Pending
+Queue kategori #1**: (1) kapitalisasi & tanda baca title dialog konfirmasi, (2) tulis formal
+hasil cek `"Hapus"` (22 titik, sudah dicek sekilas — beda konteks, bukan kandidat unifikasi).
+Detail: `CHANGELOG.md` Batch 143.
+
 **Batch 142 (Micro UI/UX kategori #1 dimulai — wording undo-hide disamakan, 1 file diedit)** —
 Kategori #4 (Touch Target) ✅ selesai penuh sejak Batch 141, lanjut kategori #1 (String & Wording
 Consistency) per `FINAL EXECUTION ORDER` di `MICRO_UIUX_AUDIT.md`. Scope tetap sengaja sempit

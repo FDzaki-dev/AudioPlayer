@@ -1,5 +1,32 @@
 # Changelog
 
+## Batch 143 — Micro UI/UX kategori #1 lanjutan: audit "Batal" vs "Tutup" — 0 bug, pola dikonfirmasi konsisten (3 file dokumentasi, 0 kode)
+Lanjutan Pending Queue Batch 142, item pertama: verifikasi 1-per-1 apakah wording `"Batal"`
+(12 titik) vs `"Tutup"` (5 titik, total 17 — sebelumnya ditaksir ~20 dari grep kasar yang ikut
+menghitung match non-UI) di `TextButton`/`AlertDialog` seluruh `ui/*.kt` genuinely konsisten.
+
+**Metode**: baca konteks `confirmButton`/`dismissButton` di sekitar tiap 17 titik (bukan cuma
+grep nama tombol). **Hasil: pola SUDAH konsisten by-design, 0 bug ditemukan** —
+- `"Batal"` selalu dipasang saat dialog punya `confirmButton` yang MELAKUKAN sesuatu (simpan PIN
+  `SettingsScreen.kt`, buat playlist `PlaylistScreen.kt`, hapus lagu `LibraryScreen.kt`, nonaktif
+  vault `VaultSheet.kt`, dst.) — menutup dialog ini genuinely membatalkan aksi yang tertunda.
+- `"Tutup"` selalu dipasang saat dialog TIDAK punya aksi tertunda buat dibatalkan — cuma info/\nviewer (laporan signature `SignatureMatcherSheet.kt`, penjelasan mode transisi
+  `NowPlayingScreen.kt`) atau state di mana confirmButton-nya sendiri sudah berubah makna jadi
+  "tutup" (Timer dialog tanpa timer aktif, picker playlist tanpa form create aktif
+  `PlaylistScreen.kt:324`) — pilihan lain di dialog itu (kalau ada) dieksekusi langsung dari list
+  item, bukan lewat confirmButton, jadi tidak ada "batal" yang berarti di situ.
+
+**Kesimpulan**: item checklist "Samakan capitalization dan punctuation konsisten" bagian
+Batal/Tutup di `MICRO_UIUX_AUDIT.md` § kategori #1 **selesai tanpa perlu 1 baris kode pun
+diubah** — audit murni konfirmasi, bukan berarti pekerjaan "gratis"/dilewati. 0 file kode
+disentuh batch ini (sesuai cap 3 file — kalau ada kode + 3 dokumen sekaligus, itu 4 file,
+melanggar cap, jadi audit-only ini pas mengisi slot 3 dokumen tanpa kode).
+
+**Sisa Pending Queue kategori #1** (belum digarap): (1) audit kapitalisasi & tanda baca title
+dialog konfirmasi (apakah semua diakhiri "?" konsisten), (2) tulis formal hasil cek `"Hapus"`
+(22 titik, sudah dicek sekilas Batch 142 — semua konteks beda, bukan kandidat unifikasi, belum
+didokumentasikan resmi).
+
 ## Batch 142 — Micro UI/UX kategori #1 dimulai: wording undo-hide disamakan ke label kanonik (1 file diedit)
 Kategori #4 (Touch Target) sudah ✅ selesai penuh sejak Batch 141 — lanjut ke kategori #1
 (String & Wording Consistency) sesuai `FINAL EXECUTION ORDER` di `MICRO_UIUX_AUDIT.md`. Scope
