@@ -5,13 +5,13 @@
 
 .github/workflows/build.yml
 .gitignore
+ARCHIVED_ROADMAP_15_FITUR_OFFLINE.md
 CHANGELOG.md
 FILE_MANIFEST.txt
 MANUAL_QA_CHECKLIST.md
 MICRO_UIUX_AUDIT.md
 PROJECT_STATE.md
 README.md
-ROADMAP_15_FITUR_OFFLINE.md
 app/build.gradle.kts
 app/compose_stability_config.conf
 app/proguard-rules.pro

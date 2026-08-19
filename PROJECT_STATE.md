@@ -6,6 +6,47 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 140 (Dokumentasi — arsipkan ROADMAP_15_FITUR_OFFLINE.md, 1 file di-rename + 2 dokumentasi
+diedit)** — Keputusan eksplisit user: dokumen roadmap dihentikan karena 2 item tersisa (#13
+Konverter Format Audio Lokal, #15 Alarm Musik) dinilai user tidak akan dipakai. **Diarsipkan,
+BUKAN dihapus** — 13 dari 15 fitur di dalamnya sudah ✅ selesai dan riwayat itu tetap berguna
+sebagai referensi, tiap entri ✅ menunjuk nomor Batch yang bisa dicari di `CHANGELOG.md`. File
+di-rename `ROADMAP_15_FITUR_OFFLINE.md` → `ARCHIVED_ROADMAP_15_FITUR_OFFLINE.md` + banner
+"📦 ARSIP — DIHENTIKAN" ditambah di paling atas (isi 15 item di bawahnya TIDAK diubah sama
+sekali). `FILE_MANIFEST.txt` diperbarui (nama file + posisi alfabetis dikoreksi — sempat salah
+taruh sebelum `app/*` padahal harusnya sebelum `CHANGELOG.md`, huruf besar disortir duluan di
+`git ls-files`). Dicek dulu referensi lain sebelum rename (bukan asumsi aman): cuma
+`FILE_MANIFEST.txt` yang menunjuk nama file ini secara langsung; file kode lain (`VisualizerSheet.kt`
+dkk.) yang menyebut "roadmap item #X" di komentar cuma referensi tekstual historis, bukan
+import/path — aman tidak ikut disentuh. 0 kode disentuh. **Kalau user berubah pikiran soal
+#13/#15 nanti, tinggal buka file arsip ini lagi — tidak perlu dibuat ulang dari nol.** Detail:
+`CHANGELOG.md` Batch 140.
+
+**Batch 139 (Dokumentasi — sinkronkan status Editor Tag Metadata di ROADMAP_15_FITUR_OFFLINE.md,
+1 file dokumentasi diedit)** — User tanya "roadmap apa yang pending", audit ditemukan item #1
+(Editor Tag Metadata) di roadmap ini masih tercatat belum dikerjakan padahal SUDAH selesai sejak
+Batch 118 — dikerjakan lewat jalur dokumen Gap List terpisah (`AudioPlayer_Coding_Gap_Updated.md`,
+bukan dari daftar 15 fitur roadmap ini), jadi status di file ini tidak pernah ikut ter-update.
+Dikonfirmasi langsung ke codebase sebelum ditandai (bukan asumsi): `Id3TagWriter.kt`/
+`TagEditor.kt`/`SongInfoEditSheet.kt` semua ada + README § Fitur baris "Edit Info Lagu (Tag
+Editor)" sudah ada. Fix: item #1 ditandai ✅ SELESAI (Batch 118) + catatan sinkronisasi + tabel
+prioritas diperbarui. 0 kode disentuh, murni housekeeping dokumentasi (pola sama Batch 123).
+
+**Sisa roadmap yang genuinely PENDING setelah audit ini** (2 dari 15 item, keduanya sengaja
+belum dieksekusi — bukan terlewat):
+- **#13 Konverter Format Audio Lokal** (Effort Tinggi/Risiko Tinggi) — butuh encoder codec
+  tambahan (FLAC/MP3 encoder tidak semua built-in `MediaCodec`), isu ukuran APK & lisensi encoder
+  belum diaudit.
+- **#15 Alarm Musik (Wake-Up Alarm)** (Effort Sedang-Tinggi/Risiko Sedang-Tinggi) — butuh
+  `AlarmManager.setExactAndAllowWhileIdle` + `SCHEDULE_EXACT_ALARM` (API 31+) + `BOOT_COMPLETED`
+  receiver baru (pola mirip `BubbleBootReceiver` Batch 98, tapi domain beda total).
+
+**Selain roadmap 15-fitur ini, ada 1 dokumen tracking terpisah yang juga pending**:
+`MICRO_UIUX_AUDIT.md` (14 kategori polish presentation-only) — baru kategori #4 (Touch Target)
+yang disentuh (🟡 sebagian, Batch 124-127), 13 kategori lain (#1 String Consistency, #2 Spacing,
+#3 Typography, #5 Interactive States, #6-14 Now Playing s/d Component Consistency) masih ⬜
+belum mulai sama sekali. Detail: `CHANGELOG.md` Batch 139.
+
 **Batch 138 (Konfigurasi — isi UPDATE_REPO_OWNER, 1 file diedit)** — User kirim URL repo asli
 (`https://github.com/FDzaki-dev/AudioPlayer`), menutup item "WAJIB diisi manual" yang tercatat
 sejak Batch 136. `gradle.properties`: `UPDATE_REPO_OWNER=ganti-username-github` (placeholder) →

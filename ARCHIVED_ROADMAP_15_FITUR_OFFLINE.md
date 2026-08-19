@@ -1,5 +1,15 @@
 # Roadmap: 15 Fitur Generik 100% Offline (Belum Tersedia)
 
+> ## 📦 ARSIP — DIHENTIKAN (Batch 140)
+> Dokumen ini **tidak lagi aktif diikuti**. Dihentikan atas keputusan eksplisit user: 13 dari 15
+> item sudah selesai (lihat tanda ✅ per item di bawah), dan 2 item tersisa (#13 Konverter Format
+> Audio Lokal, #15 Alarm Musik/Wake-Up Alarm) dinilai user tidak akan dipakai — bukan ditunda,
+> tapi genuinely tidak akan dieksekusi. File di-rename dari `ROADMAP_15_FITUR_OFFLINE.md` →
+> `ARCHIVED_ROADMAP_15_FITUR_OFFLINE.md` (bukan dihapus — riwayat 13 fitur yang sudah selesai
+> tetap berguna sebagai referensi/dokumentasi historis, dan setiap entri ✅ menunjuk ke nomor
+> Batch yang bisa dicari di `CHANGELOG.md`). Kalau ke depannya user berubah pikiran soal #13/#15,
+> tinggal buka file ini lagi — isinya tidak diubah sama sekali selain banner ini.
+
 Dibuat Batch 77. Daftar ini murni dokumen perencanaan — belum ada implementasi kode apa pun
 di batch ini. Semua fitur dipilih dengan syarat: (1) generik/berguna untuk audio player pada
 umumnya (bukan niche), (2) bisa berjalan 100% lokal di perangkat tanpa izin INTERNET (konsisten
@@ -12,15 +22,17 @@ langsung mulai tanpa riset ulang dari nol.
 
 ---
 
-## 1. Editor Tag Metadata (ID3/Vorbis Comment)
+## 1. Editor Tag Metadata (ID3/Vorbis Comment) ✅ SELESAI (Batch 118, via Gap List "Wajib" terpisah)
 Edit judul, artis, album, genre, tahun, nomor track, dan artwork tertanam langsung dari app,
 ditulis balik ke file audio asli.
-- **Kenapa**: banyak file hasil rip/unduhan lama punya tag berantakan/kosong — saat ini app
-  cuma bisa membaca tag, tidak bisa memperbaikinya.
-- **Kompleksitas**: Sedang-Tinggi. Perlu library penulis tag (mis. `mp3agic`/JAudioTagger, atau
-  implementasi manual ID3v2 writer) — tidak ada di dependency saat ini, perlu ditambah.
-- **Risiko**: menulis file audio user berisiko korupsi kalau ada bug; wajib ada backup/dry-run
-  sebelum overwrite, dan uji ekstensif per format (MP3/FLAC/M4A tag scheme beda-beda).
+- **Catatan sinkronisasi (Batch 139)**: item ini SUDAH selesai sejak Batch 118, tapi dikerjakan
+  lewat jalur `AudioPlayer_Coding_Gap_Updated.md` (dokumen Gap List terpisah dari roadmap ini),
+  bukan dari daftar 15 fitur ini — dicek langsung ke codebase (`Id3TagWriter.kt`, `TagEditor.kt`,
+  `SongInfoEditSheet.kt` semua ada) + README § Fitur baris "Edit Info Lagu (Tag Editor)", checklist
+  di atas baru diberi tanda ✅ sekarang, badge status telat sync 1 batch penuh (kelas masalah sama
+  seperti "Update terbaru" README, Batch 123). **Cakupan MVP**: MP3/ID3v2.3 SAJA, lagu MediaStore
+  SAJA (bukan folder tambahan/SAF) — 2 batasan ditampilkan apa adanya ke user di sheet edit, bukan
+  disembunyikan. Detail lengkap: `CHANGELOG.md` Batch 118.
 
 ## 2. Smart Playlist Otomatis ✅ SELESAI (Batch 89)
 Playlist yang isinya otomatis mengikuti kriteria (~~genre~~, tahun rilis, rentang durasi, rating
@@ -263,7 +275,7 @@ saran titik mulai kalau user mau eksekusi bertahap:
 | 7 | Cadangan & Pulihkan Data | Sedang | Sedang |
 | 5 | Ringtone Cutter ✅ | Sedang | Sedang |
 | 9 | Visualizer Audio | Sedang | Sedang |
-| 1 | Editor Tag Metadata | Sedang-Tinggi | Sedang |
+| 1 | Editor Tag Metadata ✅ | Sedang-Tinggi | Sedang |
 | 6 | Pencari Duplikat | Sedang-Tinggi | Sedang |
 | 8 | Trim Keheningan Otomatis | Sedang-Tinggi | Sedang |
 | 15 | Alarm Musik | Sedang-Tinggi | Sedang-Tinggi |
