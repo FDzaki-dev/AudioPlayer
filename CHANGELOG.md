@@ -1,5 +1,38 @@
 # Changelog
 
+## Batch 141 — Micro UI/UX kategori #4: hit-target audit + ripple-clip audit (2 file diedit)
+Menutup 2 item terakhir kategori #4 (Touch Target & Micro Interaction) di `MICRO_UIUX_AUDIT.md`
+— sekarang kategori ini ✅ selesai penuh.
+
+**Dicek ulang dulu, bukan diasumsikan**: kandidat TextButton "Batal"/"Tutup" di 4 `AlertDialog`
+(BackupRestoreSheet/DuplicateFinderSheet/SignatureMatcherSheet/SongInfoEditSheet) — dikonfirmasi
+tetap keputusan sadar sejak Batch 124/127 (sekali-tekan, bukan repetitive-tap, dampak
+micro-feedback lebih kecil), TIDAK disentuh batch ini.
+
+**Hit-target size audit** — grep 40 titik `IconButton(`/`FilledIconButton(` + 46 titik
+`.clickable()` di `ui/*.kt`, cari `Modifier.size()` eksplisit di bawah 48dp (minimum Material).
+2 gap ditemukan:
+- `FeatureHintBanner.kt` — tombol dismiss 40dp (pernah dinaikkan dari 28dp di Batch 31, belum
+  sampai 48dp) → 48dp. Icon `Close` (16dp) tidak disentuh.
+- `HomeScreen.kt` — `ContinueListeningCard`'s tombol play 44dp → 48dp. Icon `PlayArrow`
+  (default 24dp) tidak disentuh.
+
+Icon visual DI DALAM tombol sengaja tidak ikut diperbesar — hit-target (area sentuh transparan)
+dan ukuran visual icon adalah 2 hal berbeda, menaikkan `Modifier.size()` IconButton tidak bikin
+komponennya kelihatan "penuh". 38 IconButton lain dikonfirmasi sudah default Material 48dp tanpa
+override (grep, bukan asumsi).
+
+**Ripple-terpotong-container audit** — grep pola `.clip()` yang dipasang langsung di
+container/ancestor `IconButton`/`.clickable()` (arah kebalikan dari kelas bug "Ambient Light gak
+bocor" Batch 81/scanline containment Batch 135/137 — di sini clip TERLALU ketat yang jadi
+concern, bukan bocor). **0 kasus ditemukan.**
+
+2 file diedit, 0 file baru, 0 protected asset. Brace/paren dicek otomatis & seimbang. **Belum
+diverifikasi visual/build sungguhan** — prioritas berikutnya: cek Beranda + banner hint apa pun
+di device, pastikan area sentuh lebih nyaman tanpa perubahan visual icon yang aneh.
+
+`MICRO_UIUX_AUDIT.md` — status tracking kategori #4 diperbarui jadi ✅ SELESAI PENUH.
+
 ## Batch 140 — Arsipkan ROADMAP_15_FITUR_OFFLINE.md (1 file di-rename + 2 dokumentasi diedit)
 Keputusan eksplisit user: dokumen roadmap 15-fitur dihentikan — 2 item tersisa (#13 Konverter
 Format Audio Lokal, #15 Alarm Musik/Wake-Up Alarm) dinilai user tidak akan dipakai, bukan

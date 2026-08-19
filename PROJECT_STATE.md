@@ -6,6 +6,42 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 141 (Micro UI/UX kategori #4 — hit-target audit formal + ripple-clip audit, tuntaskan
+kategori #4 penuh, 2 file diedit)** — Lanjutan `MICRO_UIUX_AUDIT.md`, 2 item terakhir yang
+tercatat "belum" di kategori #4: hit-target size audit formal + ripple-terpotong-container audit.
+Kandidat tombol sekunder di 4 sheet (BackupRestoreSheet/DuplicateFinderSheet/SignatureMatcherSheet/
+SongInfoEditSheet — TextButton "Batal"/"Tutup" dalam `AlertDialog`) DICEK ULANG dulu, dikonfirmasi
+tetap keputusan sadar sejak Batch 124/127 (sekali-tekan, bukan repetitive-tap) — TIDAK disentuh,
+supaya tidak mengulang kerja yang sudah pernah ditolak dengan alasan jelas.
+
+**Hit-target size audit** — grep seluruh `IconButton(`/`FilledIconButton(` (40 titik total) +
+custom `.clickable()` (46 titik) di `ui/*.kt`, cari `Modifier.size()` eksplisit di bawah 48dp
+(minimum Material). 2 gap nyata ditemukan (bukan tebakan): `FeatureHintBanner.kt` dismiss button
+40dp (sudah pernah dinaikkan dari 28dp di Batch 31, tapi belum sampai 48dp) dan
+`HomeScreen.kt`'s `ContinueListeningCard` play button 44dp. Fix: keduanya dinaikkan ke 48dp —
+**icon visual DI DALAM tombol TIDAK ikut diperbesar** (16dp close icon, 24dp default PlayArrow),
+karena hit-target vs ukuran visual adalah 2 hal berbeda: IconButton 48dp cuma memperluas area
+sentuh transparan di sekeliling icon kecil yang sama, bukan bikin komponennya kelihatan lebih
+"penuh" secara visual. Semua 38 IconButton lain sudah default Material 48dp tanpa override
+eksplisit (dikonfirmasi grep, bukan diasumsikan).
+
+**Ripple-terpotong-container audit** — grep pola `.clip()` yang dipasang langsung di
+container/ancestor `IconButton`/`.clickable()` (kelas bug yang sama dengan "Ambient Light gak
+bocor" Batch 81 & scanline containment Batch 135/137, tapi arah sebaliknya — clip yang terlalu
+ketat bisa memotong ripple, bukan cuma bocor). **0 kasus ditemukan** — tidak ada `IconButton`
+yang di-clip ancestor-nya secara langsung di seluruh codebase.
+
+**Kategori #4 (Touch Target & Micro Interaction) sekarang ✅ SELESAI PENUH** — checklist ini
+ditutup total (Batch 124-127 + 141), giliran berikutnya kalau lanjut MICRO_UIUX: kategori #1
+(String & Wording Consistency) sesuai urutan `FINAL EXECUTION ORDER` di `MICRO_UIUX_AUDIT.md`
+(kategori #4 sebenarnya dikerjakan duluan atas permintaan eksplisit user waktu itu, bukan urutan
+dokumen — 13 kategori lain masih ⬜ belum mulai). 2 file diedit, 0 file baru, 0 protected asset.
+Brace/paren dicek otomatis & seimbang (FeatureHintBanner 4/4 brace 22/22 paren, HomeScreen
+67/67 brace 199/199 paren). **Belum diverifikasi visual/build sungguhan** — prioritas
+berikutnya kalau user push: buka Beranda (kartu "Lanjutkan Mendengarkan") & banner hint apa pun,
+pastikan area sentuh terasa lebih nyaman tanpa icon-nya kelihatan membesar aneh. Detail:
+`CHANGELOG.md` Batch 141.
+
 **Batch 140 (Dokumentasi — arsipkan ROADMAP_15_FITUR_OFFLINE.md, 1 file di-rename + 2 dokumentasi
 diedit)** — Keputusan eksplisit user: dokumen roadmap dihentikan karena 2 item tersisa (#13
 Konverter Format Audio Lokal, #15 Alarm Musik) dinilai user tidak akan dipakai. **Diarsipkan,

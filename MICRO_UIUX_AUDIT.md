@@ -13,7 +13,7 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
 
 | # | Kategori | Status |
 |---|----------|--------|
-| 4 | Touch Target & Micro Interaction | 🟡 **CTA/chip ✅ (Batch 124-126) + sebagian tombol sekunder ✅ (Batch 127: Mundur/Lewati Baris LyricsSheet, remove-icon VaultSheet, delete-icon ABRepeatBookmarkSheet)**. Belum: sisa TextButton/IconButton di sheet lain (BackupRestoreSheet/DuplicateFinderSheet/SignatureMatcherSheet/SongInfoEditSheet/RingtoneCutterSheet/EqualizerSheet — batal/undo/tutup dst.), hit-target size audit formal (semua IconButton sudah Material default 48dp, belum diverifikasi eksplisit), ripple-terpotong-container audit. |
+| 4 | Touch Target & Micro Interaction | ✅ **SELESAI (Batch 124-127, 141)**. CTA/chip (124-126) + tombol sekunder frekuensi-tinggi (127) + hit-target size audit formal (141: 2 gap ditemukan & diperbaiki — `FeatureHintBanner` dismiss 40dp→48dp, `ContinueListeningCard` play 44dp→48dp; sisanya semua sudah Material default 48dp, dikonfirmasi grep bukan tebakan) + ripple-terpotong-container audit (141: 0 kasus ditemukan). **Sengaja tetap tidak disentuh**: TextButton "Batal"/"Tutup" di dalam `AlertDialog` (BackupRestoreSheet/DuplicateFinderSheet/SignatureMatcherSheet/SongInfoEditSheet) — dikonfirmasi ulang Batch 141, ini keputusan SADAR sejak Batch 124/127 (\"sekali-tekan, dampak micro-feedback lebih kecil dari yang sudah dikerjakan\"), bukan gap yang terlewat. |
 | 1 | Strings & Wording Consistency | ⬜ Belum mulai |
 | 2 | Spacing & Sizing Consistency | ⬜ Belum mulai |
 | 3 | Typography Hierarchy | ⬜ Belum mulai |

@@ -48,7 +48,11 @@ fun FeatureHintBanner(text: String, onDismiss: () -> Unit, modifier: Modifier = 
                 modifier = Modifier.weight(1f, fill = true)
             )
             Spacer(modifier = Modifier.width(8.dp))
-            IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
+            // Batch 141 — audit hit-target formal kategori #4 MICRO_UIUX_AUDIT.md: 40dp di bawah
+            // minimum sentuh Material 48dp. Icon visual (16dp) TIDAK ikut diperbesar — hit-target
+            // vs ukuran visual adalah 2 hal berbeda, IconButton 48dp cuma memperluas area sentuh
+            // di sekeliling icon kecil yang sama, bukan bikin banner kelihatan lebih "penuh".
+            IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Tutup", modifier = Modifier.size(16.dp))
             }
         }
