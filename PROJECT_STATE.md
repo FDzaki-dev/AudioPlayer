@@ -6,6 +6,20 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 142 (Micro UI/UX kategori #1 dimulai — wording undo-hide disamakan, 1 file diedit)** —
+Kategori #4 (Touch Target) ✅ selesai penuh sejak Batch 141, lanjut kategori #1 (String & Wording
+Consistency) per `FINAL EXECUTION ORDER` di `MICRO_UIUX_AUDIT.md`. Scope tetap sengaja sempit
+sejak Batch 125 — wording murni, **tanpa** migrasi ke `strings.xml`. Temuan pertama: label undo
+di banner custom `LibraryScreen.kt` (undo sembunyikan-lagu, Batch 66) pakai `"Batalkan"`, beda
+dari label kanonik `"Urungkan"` yang dipakai semua `UndoableAction` lain via Snackbar
+(`MainActivity.kt:767`) — disamakan. 0 logic berubah. **Pending Queue kategori #1** (belum
+digarap, bukan terlewat — micro-batching): (1) verifikasi 1-per-1 20 titik `"Batal"`/`"Tutup"`
+apakah polanya genuinely konsisten (baru dicek sekilas, tampak benar tapi belum formal), (2)
+audit kapitalisasi & tanda baca title dialog konfirmasi, (3) tulis formal hasil audit `"Hapus"`
+(22 titik, sudah dicek sekilas semua beda konteks — bukan kandidat unifikasi). Brace/paren
+`LibraryScreen.kt` seimbang (330/330, 701/701). Kategori #1 status: 🟡 dimulai. Detail:
+`CHANGELOG.md` Batch 142.
+
 **Batch 141 (Micro UI/UX kategori #4 — hit-target audit formal + ripple-clip audit, tuntaskan
 kategori #4 penuh, 2 file diedit)** — Lanjutan `MICRO_UIUX_AUDIT.md`, 2 item terakhir yang
 tercatat "belum" di kategori #4: hit-target size audit formal + ripple-terpotong-container audit.

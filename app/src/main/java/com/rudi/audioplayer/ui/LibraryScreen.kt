@@ -506,7 +506,7 @@ fun LibraryScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f)
                     )
-                    TextButton(onClick = undoHide) { Text("Batalkan") }
+                    TextButton(onClick = undoHide) { Text("Urungkan") }
                 }
             }
         }

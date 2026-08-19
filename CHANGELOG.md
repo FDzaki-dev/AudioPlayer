@@ -1,5 +1,38 @@
 # Changelog
 
+## Batch 142 — Micro UI/UX kategori #1 dimulai: wording undo-hide disamakan ke label kanonik (1 file diedit)
+Kategori #4 (Touch Target) sudah ✅ selesai penuh sejak Batch 141 — lanjut ke kategori #1
+(String & Wording Consistency) sesuai `FINAL EXECUTION ORDER` di `MICRO_UIUX_AUDIT.md`. Scope
+kategori ini **sengaja dipersempit** sejak Batch 125: wording konsisten murni, **tanpa** migrasi
+ke `strings.xml` (339 string literal sudah ditandai berisiko di README tanpa compiler untuk
+verifikasi refactor sebesar itu).
+
+**Temuan pertama** — audit label tombol Undo lintas `ui/*.kt`: pola kanonik untuk aksi "batalkan
+aksi yang baru dilakukan" (undo hapus playlist/queue/dst., `UndoableAction` via Snackbar) sudah
+konsisten pakai `"Urungkan"` (`MainActivity.kt:767`, satu-satunya titik `actionLabel` untuk
+seluruh alur `UndoableAction`). Tapi 1 titik custom (bukan lewat Snackbar sistem, banner lokal
+`LibraryScreen.kt` untuk undo "sembunyikan lagu" — dibuat custom sejak Batch 66 karena Snackbar
+sistem ketutup `ModalBottomSheet`) masih pakai `"Batalkan"` — wording beda untuk semantik aksi
+yang identik (undo), ditemukan lewat grep silang ke `actionLabel`/`onClick = undo*` bukan
+tebakan. Fix: `LibraryScreen.kt:509` `"Batalkan"` → `"Urungkan"`. 0 logic/behavior berubah,
+tombol tetap sama (`onClick = undoHide`).
+
+**Sengaja BELUM digarap batch ini** (dicatat sebagai Pending Queue kategori #1, bukan terlewat):
+- Audit `"Batal"` (13 titik) vs `"Tutup"` (7 titik) — dicek sekilas, pola tampaknya sudah
+  benar by-convention (`"Batal"` = batalkan dialog sebelum aksi terjadi, `"Tutup"` = tutup
+  panel/info read-only tanpa aksi pending) tapi BELUM diverifikasi 1-per-1 ke tiap 20 titik —
+  perlu batch terpisah supaya tidak melebihi batas micro-batching.
+- Audit konsistensi kapitalisasi & tanda baca (title dialog konfirmasi: apakah semua diakhiri
+  "?" secara konsisten, apakah title-case/sentence-case konsisten) — belum diaudit sama sekali.
+- Audit istilah berulang lain (mis. "Hapus" 22 titik, sudah dicek sekilas semua konteksnya
+  legitimate beda — hapus dari device/playlist/favorit/vault dst — bukan 1 aksi yang sama,
+  jadi BUKAN kandidat unifikasi, tapi belum ditulis formal di sini).
+
+Brace/paren `LibraryScreen.kt` dicek otomatis & seimbang (330/330 brace, 701/701 paren). 0 file
+baru, 0 protected asset. **Kategori #1 status: 🟡 dimulai** (1 temuan ditutup, checklist resmi
+kategori ini di `MICRO_UIUX_AUDIT.md` masih panjang — lanjut batch berikutnya kalau user minta
+teruskan).
+
 ## Batch 141 — Micro UI/UX kategori #4: hit-target audit + ripple-clip audit (2 file diedit)
 Menutup 2 item terakhir kategori #4 (Touch Target & Micro Interaction) di `MICRO_UIUX_AUDIT.md`
 — sekarang kategori ini ✅ selesai penuh.
