@@ -6,6 +6,18 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 148 (Dokumentasi — sinkronkan status table kategori #2 di MICRO_UIUX_AUDIT.md, 3
+dokumentasi, 0 kode)** — Item pending prioritas tinggi Batch 147 (tertunda 2 batch demi cap 3
+file). Baris kategori #2 diperbarui `⬜ Belum mulai` → `🟡 Berlanjut (Batch 146-147)` + ringkasan
+2 temuan/fix (horizontal screen padding tab Library, ukuran ikon LockScreen) + 3 item pending
+(vertical spacing antar section, gap icon↔text — butuh pengelompokan per-konteks dulu sebelum
+aman dieksekusi, sisa literal `.dp` lain). **Pelajaran dicatat** (pola sama presedan Batch 123
+soal README telat sync): dokumen tracking manual rawan telat kalau beberapa batch berturut
+sengaja skip demi cap file — cek status table ini juga kalau ada laporan dokumentasi
+ketinggalan ke depan. 0 kode, 0 protected asset. Kandidat batch berikutnya: lanjut kategori #2
+(vertical spacing/icon-text gap per-konteks) atau mulai kategori #3 Typography Hierarchy. Detail:
+`CHANGELOG.md` Batch 148.
+
 **Batch 147 (Micro UI/UX kategori #2 lanjutan — samakan ukuran ikon fingerprint/backspace
 LockScreen, 1 file kode + 2 dokumentasi)** — Item "ukuran control setara": audit 9 titik
 `Icon().size()` eksplisit di `ui/*.kt` (sisanya default Material 24dp). 1 gap nyata:
