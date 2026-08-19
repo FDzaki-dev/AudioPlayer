@@ -6,6 +6,21 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 146 (Micro UI/UX kategori #2 dimulai — audit horizontal screen padding tab Library, 1
+file kode + 2 dokumentasi)** — Item pertama kategori #2 (Spacing & Sizing Consistency), scope
+sengaja 1 layar dulu (bukan sapuan ~340 literal `.dp` sekaligus, sudah ditandai berisiko sejak
+Batch 54). Semua screen utama lain sudah 20dp horizontal (dikonfirmasi grep) — 2 gap nyata di
+`LibraryScreen.kt`: (1) `AlbumGridView` `contentPadding` 16dp all-sides → `horizontal=20dp,
+vertical=16dp`; (2) 4 titik `ListItem(...).padding(horizontal=4dp)` (tab Artis/Folder +
+hasil-pencarian + riwayat-pencarian, konsisten satu sama lain tapi menyimpang jauh dari
+konvensi 20dp app) → disamakan ke 20dp. Brace/paren seimbang (330/330, 701/701). 1 file kode,
+0 protected asset. `MICRO_UIUX_AUDIT.md` status table SENGAJA belum disentuh (cap 3 file, pola
+sama Batch 144→145) — kategori #2 masih 🟡 (baru 1 dari banyak sub-item: horizontal screen
+padding), belum ✅. **Belum diverifikasi visual** — prioritas device: tab Album/Artis/Folder/
+hasil-pencarian/riwayat-pencarian sekarang sejajar tepi kiri-kanan dengan tab Lagu. **Sisa
+kategori #2**: vertical spacing antar section, gap icon↔text, ukuran control setara, audit
+literal `.dp` lain. Detail: `CHANGELOG.md` Batch 146.
+
 **Batch 145 (Micro UI/UX kategori #1 TUNTAS — audit formal 22 titik "Hapus" + sinkron status
 table, 3 dokumentasi, 0 kode)** — Lanjutan & penutup Pending Queue kategori #1. Grep ulang
 (bukan andalkan taksiran Batch 142) konfirmasi persis 22 titik `"Hapus"` di 15 file `ui/*.kt`,

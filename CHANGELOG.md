@@ -1,5 +1,35 @@
 # Changelog
 
+## Batch 146 — Micro UI/UX kategori #2 dimulai: audit horizontal screen padding tab Library (1 file kode + 2 dokumentasi)
+Item pertama kategori #2 (Spacing & Sizing Consistency, urutan `FINAL EXECUTION ORDER`) —
+"Samakan horizontal screen padding", scope sengaja dipersempit ke 1 layar dulu (bukan sapuan
+semua `.dp` sekaligus, ~340 literal non-radius sudah ditandai berisiko sejak Batch 54).
+
+**Metode**: bandingkan `contentPadding`/row-padding level-teratas semua tab & screen utama
+(`HomeScreen`/`SettingsScreen`/`NowPlayingScreen`/`PlaylistScreen`/`SmartPlaylistScreen`/
+`StatsDashboardScreen` — semua sudah konsisten 20dp horizontal, dikonfirmasi grep) vs 5 tab
+`LibraryScreen.kt`. **4 dari 5 tab sudah 20dp** (`SongListView` via `SongRow`'s
+`.padding(horizontal = 20.dp, ...)`) — **2 gap nyata ditemukan**:
+1. **`AlbumGridView`** (tab Album) — `contentPadding = PaddingValues(16.dp)` (all-sides 16dp,
+   beda dari konvensi 20dp horizontal app-wide). Fix: `PaddingValues(horizontal = 20.dp,
+   vertical = 16.dp)` — vertical 16dp dipertahankan (tidak ada acuan literal buat angka itu),
+   cuma horizontal disamakan.
+2. **`GroupedListView`** (tab Artis/Folder) + **`SearchResultsView`** (grup Artis/Album di hasil
+   pencarian) + **`SearchHistoryView`** (riwayat pencarian) — 4 titik `ListItem(...).padding(
+   horizontal = 4.dp)`, JAUH lebih sempit dari 20dp konvensi (beda 16dp, paling jarak visual
+   dari semua gap kategori #2 yang mungkin ditemukan). Ke-4 titik ini konsisten SATU SAMA LAIN
+   (sub-pola yang sengaja seragam, kemungkinan besar pola lama sebelum konvensi 20dp mapan) tapi
+   menyimpang dari konvensi dominan app. Fix: 4dp → 20dp di keempat titik, `LibraryScreen.kt`.
+
+Brace/paren `LibraryScreen.kt` seimbang (330/330, 701/701). 1 file kode + 2 dokumentasi.
+`MICRO_UIUX_AUDIT.md` status table SENGAJA belum disentuh batch ini (cap 3 file, pola sama
+Batch 144) — disinkronkan batch berikutnya. **Belum diverifikasi visual** — perubahan padding
+murni, risiko rendah (angka makin dekat ke konvensi mayoritas app, bukan makin menyimpang), tapi
+tetap prioritas cek device: tab Album/Artis/Folder/hasil-pencarian/riwayat-pencarian sekarang
+harus terasa sejajar tepi kiri-kanan dengan tab Lagu & layar lain. **Sisa kategori #2** (belum
+digarap, scope besar): vertical spacing antar section, gap icon↔text, ukuran control setara,
+audit ~340 literal `.dp` non-radius lain di luar horizontal screen padding.
+
 ## Batch 145 — Micro UI/UX kategori #1 TUNTAS: audit formal "Hapus" (22 titik) + sinkron status table (3 dokumentasi, 0 kode)
 Lanjutan Pending Queue Batch 144, item terakhir kategori #1: tulis formal hasil audit `"Hapus"`.
 

@@ -546,7 +546,7 @@ private fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> U
     if (selectedAlbum == null) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -805,7 +805,7 @@ private fun SearchHistoryView(
                     modifier = Modifier
                         .animateItemPlacement()
                         .clickable { onSelect(query) }
-                        .padding(horizontal = 4.dp)
+                        .padding(horizontal = 20.dp)
                 )
             }
         }
@@ -870,7 +870,7 @@ private fun SearchResultsView(
                     modifier = Modifier
                         .animateItemPlacement()
                         .clickable { onGroupSelect(artist) }
-                        .padding(horizontal = 4.dp)
+                        .padding(horizontal = 20.dp)
                 )
             }
         }
@@ -884,7 +884,7 @@ private fun SearchResultsView(
                     modifier = Modifier
                         .animateItemPlacement()
                         .clickable { onGroupSelect(album) }
-                        .padding(horizontal = 4.dp)
+                        .padding(horizontal = 20.dp)
                 )
             }
         }
@@ -1049,7 +1049,7 @@ private fun GroupedListView(
                     modifier = Modifier
                         .animateItemPlacement()
                         .clickable { selectedGroup = group }
-                        .padding(horizontal = 4.dp)
+                        .padding(horizontal = 20.dp)
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             }
