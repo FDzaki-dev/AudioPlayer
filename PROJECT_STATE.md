@@ -6,6 +6,19 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 155 (Dokumentasi — tambah aturan sesi: transparansi versi & pesan commit, 2
+dokumentasi, 0 kode)** — Permintaan langsung user (2 rule baru untuk SEMUA sesi berikutnya),
+ditulis formal di § "Aturan sesi: transparansi versi & pesan commit" (bawah file ini). **Rule 1
+diadaptasi**, bukan diikuti mentah-mentah: literal "bump manual" akan MEMBALIK keputusan
+arsitektur `versionCode`/`versionName` auto-derive dari commit count (sengaja dibuat sejak Batch
+30/86 justru untuk menghilangkan risiko lupa bump manual — lihat § "Konvensi penamaan ZIP &
+versi" tepat di atas). Diganti jadi kewajiban TRANSPARANSI: tiap kirim ZIP wajib sebut nomor
+batch + ingatkan versionName asli baru pasti setelah `git push`. **Rule 2 diikuti persis**: box
+code pesan commit sekarang WAJIB tampil di atas heading "Update Harian:" tiap respons, isinya
+WAJIB ambil penjelasan fitur langsung dari `CHANGELOG.md`, dilarang cuma angka versi. 0 kode, 0
+protected asset (build.gradle.kts TIDAK disentuh — sengaja, lihat alasan Rule 1 di atas).
+Diterapkan mulai respons INI juga. Detail: `CHANGELOG.md` Batch 155.
+
 **Batch 154 (Micro UI/UX kategori #3 lanjutan — samakan gaya song-row FolderManagerSheet, 1
 file kode + 2 dokumentasi)** — Item "audit body/label/caption" (pending sejak Batch 149). Grep
 `song.title` berpasangan style tetangga di semua sheet. Kelompok "song row ringkas dalam sheet"
@@ -3055,3 +3068,21 @@ com.rudi.audioplayer/
 `versionCode` dan `versionName` (sejak Batch 30) sama-sama otomatis dari jumlah commit git —
 tidak ada lagi bump manual untuk keduanya. Detail lengkap di README.md § "Standar Penomoran
 Versi".
+
+## Aturan sesi: transparansi versi & pesan commit (Batch 155, permintaan user)
+Berlaku untuk SEMUA sesi AI berikutnya yang mengirim artifact ZIP dari repo ini:
+1. **Transparansi versi, BUKAN bump manual di kode.** Setiap sesi WAJIB menyatakan status versi
+   di chat sebelum/saat mengirim ZIP — TAPI dilarang mengedit `versionCode`/`versionName` secara
+   manual di `app/build.gradle.kts`. Angka itu sengaja auto-derive dari jumlah commit git sejak
+   Batch 30 (arsitektur, § "Keputusan arsitektur utama" atas) justru untuk MENGHILANGKAN risiko
+   lupa bump manual — mengedit manual balik ke pola lama akan mengembalikan bug class yang
+   sengaja dihindari. Yang WAJIB ditampilkan tiap kirim ZIP: nomor batch ZIP saat ini, dan
+   pengingat bahwa versionName asli baru pasti setelah `git push` (auto dari commit count, bukan
+   dari nomor batch chat).
+2. **Box code pesan commit, DI ATAS heading "Update Harian:".** Tiap respons yang menyertakan
+   skrip "Update Harian:" WAJIB diawali 1 code-box terpisah berisi draft pesan commit (persis
+   yang dipakai di `git commit -m "..."` pada skrip di bawahnya), diletakkan sebelum heading
+   "Update Harian:". **DILARANG** isinya cuma angka versi/perbandingan versi belaka (mis. "bump
+   v1.1.43 -> v1.1.44") — WAJIB memuat penjelasan fitur/perbaikan singkat yang diambil LANGSUNG
+   dari isi entri `CHANGELOG.md` batch tersebut, bukan digeneralisasi ulang jadi generik.
+

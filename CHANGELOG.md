@@ -1,5 +1,25 @@
 # Changelog
 
+## Batch 155 — Dokumentasi: tambah aturan sesi transparansi versi & pesan commit (2 dokumentasi, 0 kode)
+Permintaan langsung user, screenshot layar "Cek Update" app (versi terpasang 1.1.43 vs update
+tersedia v1.1.44-run206) sebagai konteks — 2 rule baru wajib buat semua sesi AI berikutnya:
+
+1. **Transparansi versi tiap kirim ZIP** — diadaptasi dari permintaan "bump manual" literal,
+   karena `versionCode`/`versionName` SUDAH sengaja auto-derive dari jumlah commit git sejak
+   Batch 30 (dipertegas lagi Batch 86/87) justru untuk MENGHAPUS kebutuhan bump manual dan
+   risiko lupa yang menyertainya. Mengedit manual balik ke pola lama = regresi arsitektur.
+   Sebagai gantinya: tiap sesi wajib sebut nomor batch ZIP + ingatkan versionName final baru
+   pasti setelah `git push` (bukan sinkron 1:1 dengan nomor batch chat).
+2. **Box code pesan commit di atas heading "Update Harian:"** — diikuti persis sesuai permintaan.
+   Mulai batch ini, tiap respons yang punya skrip "Update Harian:" wajib diawali code-box pesan
+   commit terpisah, isinya wajib penjelasan fitur singkat dari `CHANGELOG.md` batch tsb (bukan
+   cuma angka versi/perbandingan version polos).
+
+Ditulis formal di `PROJECT_STATE.md` § "Aturan sesi: transparansi versi & pesan commit". 2
+dokumentasi (`CHANGELOG.md`/`PROJECT_STATE.md`), 0 kode, 0 protected asset —
+`app/build.gradle.kts` TIDAK disentuh (sengaja, lihat alasan Rule 1). Diterapkan mulai respons
+chat ini juga.
+
 ## Batch 154 — Micro UI/UX kategori #3 lanjutan: samakan gaya song-row FolderManagerSheet (1 file kode + 2 dokumentasi)
 Item "audit body/label/caption" kategori #3 (pending sejak Batch 149). Scope: bandingkan style
 `song.title` di SEMUA "song row ringkas di dalam bottom sheet" (bukan `SongRow` utama layar
