@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
@@ -68,6 +69,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -109,7 +111,13 @@ fun LibraryScreen(
     onAddCustomFolder: (Uri) -> Unit,
     onRemoveCustomFolder: (String) -> Unit,
     onDeleteSongs: (List<Song>) -> Unit,
-    onInfoMessage: (String) -> Unit
+    onInfoMessage: (String) -> Unit,
+    // Pending item dari audit Batch 163: SongRow di sini sebelumnya 0 indikator "sedang
+    // diputar" sama sekali (beda dari QueueSheet yang sudah punya sejak lama). Default null
+    // (bukan lupa ditambahkan di call site) supaya kalau ada fixture/preview lain yang masih
+    // memanggil LibraryScreen(...) tanpa parameter ini, tetap compile — perilakunya jatuh ke
+    // "tidak ada lagu yang di-highlight", sama seperti sebelum batch ini, bukan crash.
+    currentSongId: Long? = null
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -291,7 +299,8 @@ fun LibraryScreen(
                     onPlayNext = playNext,
                     onAddToQueue = addToQueue,
                     onAddToPlaylist = addToPlaylist,
-                    onHideSong = hideSong
+                    onHideSong = hideSong,
+                    currentSongId = currentSongId
                 )
             }
         } else {
@@ -311,7 +320,7 @@ fun LibraryScreen(
                         subtitle = "Ketuk ikon hati pada lagu untuk menambahkannya ke sini."
                     )
                 } else {
-                    SongListView(favoriteSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue, addToPlaylist, hideSong)
+                    SongListView(favoriteSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue, addToPlaylist, hideSong, currentSongId = currentSongId)
                 }
             }
             selectedTab == 5 -> PlaylistTabView(
@@ -356,7 +365,8 @@ fun LibraryScreen(
                 selectedIds = selectedIds,
                 onToggleSelect = { id -> toggleSelect(id) },
                 onEnterSelectionMode = { id -> selectionMode = true; selectedIds = persistentSetOf(id) },
-                onSweepSelectRange = { ids -> selectionMode = true; selectedIds = ids.toPersistentSet() }
+                onSweepSelectRange = { ids -> selectionMode = true; selectedIds = ids.toPersistentSet() },
+                currentSongId = currentSongId
             )
             selectedTab == 1 -> AlbumGridView(
                 songs = filteredSongs,
@@ -371,7 +381,8 @@ fun LibraryScreen(
                 onPlayNext = playNext,
                 onAddToQueue = addToQueue,
                 onAddToPlaylist = addToPlaylist,
-                onHideSong = hideSong
+                onHideSong = hideSong,
+                currentSongId = currentSongId
             )
             else -> GroupedListView(
                 songs = filteredSongs,
@@ -382,7 +393,8 @@ fun LibraryScreen(
                 onPlayNext = playNext,
                 onAddToQueue = addToQueue,
                 onAddToPlaylist = addToPlaylist,
-                onHideSong = hideSong
+                onHideSong = hideSong,
+                currentSongId = currentSongId
             )
         }
         }
@@ -834,7 +846,8 @@ private fun SearchResultsView(
     onPlayNext: (Song) -> Unit,
     onAddToQueue: (Song) -> Unit,
     onAddToPlaylist: (Song) -> Unit,
-    onHideSong: (Song) -> Unit
+    onHideSong: (Song) -> Unit,
+    currentSongId: Long? = null
 ) {
     val matchedSongs = remember(songs, query) {
         songs.filter {
@@ -899,7 +912,8 @@ private fun SearchResultsView(
                     onPlayNext = { onPlayNext(song) },
                     onAddToQueue = { onAddToQueue(song) },
                     onAddToPlaylist = { onAddToPlaylist(song) },
-                    onHideSong = { onHideSong(song) }
+                    onHideSong = { onHideSong(song) },
+                    isPlaying = song.id == currentSongId
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             }
@@ -922,7 +936,8 @@ private fun SongListView(
     selectedIds: ImmutableSet<Long> = persistentSetOf(),
     onToggleSelect: (Long) -> Unit = {},
     onEnterSelectionMode: (Long) -> Unit = {},
-    onSweepSelectRange: (ImmutableSet<Long>) -> Unit = {}
+    onSweepSelectRange: (ImmutableSet<Long>) -> Unit = {},
+    currentSongId: Long? = null
 ) {
     val haptic = LocalHapticFeedback.current
     // Batch 70 — root-coordinate bounds of every currently-composed row, refreshed as
@@ -1016,7 +1031,8 @@ private fun SongListView(
                 selectionMode = selectionMode,
                 isSelected = selectedIds.contains(song.id),
                 onToggleSelect = { onToggleSelect(song.id) },
-                onEnterSelectionMode = { onEnterSelectionMode(song.id) }
+                onEnterSelectionMode = { onEnterSelectionMode(song.id) },
+                isPlaying = song.id == currentSongId
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
         }
@@ -1033,7 +1049,8 @@ private fun GroupedListView(
     onPlayNext: (Song) -> Unit,
     onAddToQueue: (Song) -> Unit,
     onAddToPlaylist: (Song) -> Unit,
-    onHideSong: (Song) -> Unit
+    onHideSong: (Song) -> Unit,
+    currentSongId: Long? = null
 ) {
     var selectedGroup by remember(songs) { mutableStateOf<String?>(null) }
     val grouped = remember(songs) { songs.groupBy(groupOf) }
@@ -1068,7 +1085,8 @@ private fun GroupedListView(
                         onPlayNext = { onPlayNext(song) },
                         onAddToQueue = { onAddToQueue(song) },
                         onAddToPlaylist = { onAddToPlaylist(song) },
-                        onHideSong = { onHideSong(song) }
+                        onHideSong = { onHideSong(song) },
+                        isPlaying = song.id == currentSongId
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
@@ -1093,6 +1111,11 @@ private fun SongRow(
     isSelected: Boolean = false,
     onToggleSelect: () -> Unit = {},
     onEnterSelectionMode: () -> Unit = {},
+    // Pending item Batch 163: sebelumnya SongRow 0 indikator "sedang diputar" sama sekali,
+    // beda dari QueueRow yang sudah punya (primary 12% alpha bg + bold title). Default false —
+    // 0 caller lama di luar 3 titik yang sudah diupdate (SongListView/GroupedListView/
+    // SearchResultsView) yang perlu berubah.
+    isPlaying: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -1109,6 +1132,11 @@ private fun SongRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                // Batch 163 pending-item fix: samakan pola highlight "sedang diputar" dengan
+                // `QueueRow` (primary 12% alpha bg) — background dipasang SEBELUM clickable,
+                // urutan modifier sama persis QueueRow, supaya ripple clickable tetap kelihatan
+                // di atas warna latar ini, bukan ketutup.
+                .background(if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent)
                 // Batch 72: this used to also carry onLongClick -> onEnterSelectionMode()
                 // (Batch 66) — a second, INDEPENDENT long-press recognizer on the exact same
                 // touch as SongListView's new sweep-select detectDragGesturesAfterLongPress
@@ -1139,12 +1167,25 @@ private fun SongRow(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    song.title,
-                    maxLines = 1,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.basicMarquee()
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isPlaying) {
+                        Icon(
+                            Icons.Default.GraphicEq,
+                            contentDescription = "Sedang diputar",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Text(
+                        song.title,
+                        maxLines = 1,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false).basicMarquee()
+                    )
+                }
                 Text(
                     song.artist,
                     maxLines = 1,

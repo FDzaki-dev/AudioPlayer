@@ -18,6 +18,33 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 164 (Eksekusi pending item Batch 163 — indikator "sedang diputar" di SongRow Library, 2
+file, 1 protected edit parsial)** — Item tertunda #2 Batch 163, dieksekusi setelah user
+konfirmasi lanjut. `SongRow` (LibraryScreen.kt, 3 call site: tab Lagu/GroupedListView/
+SearchResultsView) sebelumnya 0 indikator lagu sedang diputar, beda dari `QueueRow` yang sudah
+lama punya (primary 12% alpha bg + title bold+primary).
+
+`LibraryScreen.kt` (diedit) — param baru `currentSongId: Long? = null` di level top, diteruskan
+lewat 5 titik pemanggilan internal (`SongListView` x2 pakai, `GroupedListView` x2, `SearchResultsView`)
+sampai ke `SongRow(isPlaying = song.id == currentSongId)`. `SongRow` sendiri: param baru
+`isPlaying: Boolean = false`, render disamakan PERSIS pola `QueueRow` (bg primary 12% alpha
+sebelum `.clickable()`, title bold+primary, ikon `GraphicEq` 16dp di depan judul dalam `Row`
+baru yang membungkus `Text` — `Text` dapat `Modifier.weight(1f, fill=false)` supaya
+`basicMarquee()` tetap jalan).
+
+`MainActivity.kt` (diedit, **protected — edit parsial, 1 titik**) — pemanggilan
+`LibraryScreen(...)` dapat 1 baris: `currentSongId = uiState.currentSong?.id` — reuse
+`uiState.currentSong` yang sudah ada di scope composable route `"library"` (dipakai
+`onPlayNext`/`onAddToQueue` di atasnya), 0 state baru.
+
+0 file baru (FILE_MANIFEST tidak berubah, 173/173 match). Brace/paren `LibraryScreen.kt`
+(332/332, 719/719) & `MainActivity.kt` (251/251, 583/583) seimbang. **Belum diverifikasi
+compile/runtime Gradle sungguhan** — prioritas berikutnya kalau user push: (1) `./gradlew
+assembleDebug` build bersih, (2) putar lagu, cek highlight muncul benar di SEMUA tab yang
+menampilkan lagu itu (Lagu/Favorit/Artis/Folder/Pencarian), (3) ganti lagu selagi Library
+terbuka, pastikan highlight pindah live tanpa navigasi ulang, (4) cek tidak bentrok visual
+dengan `selectionMode`/`Checkbox`. Detail lengkap: `CHANGELOG.md` Batch 164.
+
 **Batch 163 (Micro UI/UX kategori #5 lanjutan — audit selected/active state, 1 bug fix + 2
 observasi tertunda, 1 file kode + 3 dokumentasi)** — Sub-item ke-4/8 kategori #5. Taksonomi 3
 pola "selected" ditemukan di app ini, semua defensible by-design: Card preview (ThemeOptionCard)

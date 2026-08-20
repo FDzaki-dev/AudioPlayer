@@ -1076,7 +1076,14 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     onAddCustomFolder = { uri -> playerViewModel.addCustomFolder(uri) },
                     onRemoveCustomFolder = { uri -> playerViewModel.removeCustomFolder(uri) },
                     onDeleteSongs = { songs -> deleteSongsFromDevice(songs) },
-                    onInfoMessage = { message -> playerViewModel.showInfoMessage(message) }
+                    onInfoMessage = { message -> playerViewModel.showInfoMessage(message) },
+                    // Pending item Batch 163: SongRow tidak pernah tahu lagu mana yang sedang
+                    // diputar — `uiState.currentSong` sudah lama ada di scope composable ini
+                    // (dipakai `onPlayNext`/`onAddToQueue` di atas), cuma belum pernah
+                    // diteruskan ke LibraryScreen. `?.id` — null wajar saat belum ada lagu
+                    // diputar sama sekali (cold start), LibraryScreen sudah handle null lewat
+                    // default parameter yang sama.
+                    currentSongId = uiState.currentSong?.id
                 )
             }
             composable("settings") {

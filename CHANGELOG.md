@@ -1,5 +1,61 @@
 # Changelog
 
+## Batch 164 — Eksekusi pending item Batch 163: indikator "sedang diputar" di SongRow Library (2 file, 1 protected edit parsial)
+Item tertunda #2 dari 2 observasi Batch 163 (kategori #5 selected/active state) — user
+konfirmasi lanjut eksekusi. `SongRow` (LibraryScreen.kt, 3 call site: tab Lagu/GroupedListView/
+SearchResultsView) sebelumnya 0 indikator lagu mana yang sedang diputar, padahal `QueueSheet`'s
+`QueueRow` sudah punya sejak lama (primary 12% alpha background + title bold+primary). Gap
+cross-context: user browsing Library sambil lagu main tidak pernah lihat baris mana yang aktif.
+
+**`LibraryScreen.kt`** (diedit, non-protected) — 1 parameter baru di level top `LibraryScreen`:
+`currentSongId: Long? = null` (default aman — fixture/preview lain yang mungkin masih memanggil
+tanpa parameter ini tetap compile, jatuh ke "tidak ada highlight" seperti sebelum batch ini,
+bukan crash). Diteruskan lewat 5 titik pemanggilan internal: `SongListView` (tab Lagu + tab
+Favorit, keduanya reuse fungsi yang sama), `GroupedListView` x2 (grouping Artis & Folder),
+`SearchResultsView` — masing-masing fungsi private ini juga dapat parameter `currentSongId:
+Long? = null` sendiri, diteruskan lagi ke `SongRow(isPlaying = song.id == currentSongId)` di
+titik pemanggilan `SongRow` masing-masing (pola perbandingan identik `QueueSheet`'s `isPlaying
+= index == currentIndex`, cuma dibandingkan lewat song ID bukan index karena `SongRow` tidak
+punya konsep index queue).
+
+`SongRow` sendiri dapat parameter baru `isPlaying: Boolean = false` + render disamakan PERSIS
+pola `QueueRow` (bukan didesain ulang dari nol): background `primary.copy(alpha=0.12f)` di
+seluruh Row (dipasang SEBELUM `.clickable()` di modifier chain, urutan sama persis QueueRow,
+supaya ripple clickable tetap kelihatan di atas warna latar ini bukan ketutup), judul lagu
+`fontWeight = Bold` + `color = primary` saat aktif, dan ikon `Icons.Default.GraphicEq` 16dp
+(sama ikon yang dipakai `QueueRow`) muncul di depan judul dalam 1 `Row` baru yang membungkus
+teks judul (sebelumnya `Text` polos langsung anak `Column`) — `Text` judul dapat
+`Modifier.weight(1f, fill=false)` di dalam Row baru itu supaya `basicMarquee()`+truncation tetap
+berfungsi sama seperti sebelumnya, cuma sekarang berbagi baris dengan ikon. Artis tidak diubah
+(QueueRow juga tidak mem-bold artis, cuma judul).
+
+**`MainActivity.kt`** (diedit, **protected asset — edit parsial**, 1 titik) — pemanggilan
+`LibraryScreen(...)` yang sudah ada dapat 1 baris baru: `currentSongId = uiState.currentSong?.id`
+— `uiState.currentSong` sudah lama ada di scope composable route `"library"` ini (dipakai
+`onPlayNext`/`onAddToQueue` beberapa baris di atasnya untuk cek "belum ada lagu diputar sama
+sekali"), jadi 0 state/StateFlow baru diperlukan, murni reuse. `?.id` — null wajar saat cold
+start sebelum lagu pertama diputar, `LibraryScreen` sudah menangani lewat default parameter yang
+sama, bukan kasus yang perlu di-guard eksplisit di sini.
+
+**Kenapa aman digabung ke 1 batch (beda dari alasan Batch 163 menunda)**: satu-satunya alasan
+Batch 163 menunda item ini adalah "perlu parameter baru + wiring state lintas `MainActivity`/
+`NavGraph`, di luar cap 3 file/1 task kecil kalau digabung diam-diam ke batch audit" — begitu
+jadi task tersendiri (bukan menumpang batch audit lain), cakupannya genuinely cuma 2 file (1
+non-protected + 1 protected edit-parsial-1-baris), sudah pas di dalam cap batch normal.
+
+0 file baru → `FILE_MANIFEST.txt` tidak berubah (173/173 tetap match, diverifikasi diff eksplisit
+terhadap isi disk). Brace/paren `LibraryScreen.kt` (332/332, 719/719) & `MainActivity.kt`
+(251/251, 583/583) dicek otomatis & seimbang. **Belum diverifikasi compile/runtime Gradle
+sungguhan** (tidak ada JDK/Android SDK di sandbox ini) — prioritas berikutnya kalau user push:
+(1) `./gradlew assembleDebug` build bersih, (2) di device: putar 1 lagu dari tab Lagu, buka tab
+Favorit/Artis/Folder/hasil pencarian yang juga memuat lagu yang sama, pastikan baris itu
+genuinely ter-highlight (bg + bold + ikon) di SEMUA konteks tersebut, bukan cuma di tab asal,
+(3) ganti lagu (skip/next dari mini player atau notifikasi) selagi Library masih terbuka,
+pastikan highlight pindah ke baris yang benar tanpa perlu navigasi ulang ke tab Library (uiState
+Compose State harusnya sudah live-recompose, tapi belum pernah dilihat langsung di device), (4)
+mode `selectionMode` aktif (checkbox tampil) — pastikan `isPlaying` tetap benar dan tidak
+bentrok visual dengan `Checkbox`/warna seleksi.
+
 ## Batch 163 — Micro UI/UX kategori #5 lanjutan: audit selected/active state — 1 bug fix, 2 observasi tertunda (1 file kode + 3 dokumentasi)
 Sub-item ke-4/8 kategori 5 "Interactive States" (`MICRO_UIUX_AUDIT.md`), lanjutan Batch 162.
 Scope: cari SEMUA titik `selected =` / `isSelected` app-wide, kelompokkan per pola visual,
