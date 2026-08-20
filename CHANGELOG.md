@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 154 — Micro UI/UX kategori #3 lanjutan: samakan gaya song-row FolderManagerSheet (1 file kode + 2 dokumentasi)
+Item "audit body/label/caption" kategori #3 (pending sejak Batch 149). Scope: bandingkan style
+`song.title` di SEMUA "song row ringkas di dalam bottom sheet" (bukan `SongRow` utama layar
+Lagu yang memang lebih besar/beda konteks — 48dp album art + durasi, dipakai 3 tempat, `title-
+Medium`+`bodySmall`, sudah baseline tersendiri yang wajar).
+
+**Metode**: grep `song.title` berpasangan dengan style tetangganya di semua sheet. **Kelompok
+"song row ringkas dalam sheet" (5 titik/3 file) sudah 100% konsisten**: `DuplicateFinderSheet`,
+`PlaylistScreen`, `VaultSheet` x2 — title=`bodyMedium`, subtitle(artist)=`bodySmall`+secondary.
+**1 gap nyata**: `FolderManagerSheet.kt` baris song "Lagu Disembunyikan" — title pakai
+`titleMedium` (ukuran level `SongRow` utama) tapi subtitle tetap `bodySmall`+secondary (level
+kelompok sheet-ringkas) — kombinasi CAMPUR dari 2 baseline berbeda, padahal secara fungsi baris
+ini identik dengan 5 titik kelompok sheet-ringkas (list lagu terbatas di dalam modal, bukan
+layar penuh). Fix: title disamakan ke `bodyMedium`.
+
+Brace/paren `FolderManagerSheet.kt` seimbang (42/42, 105/105). 1 file kode + 2 dokumentasi. 0
+protected asset. `MICRO_UIUX_AUDIT.md` status table SENGAJA belum disentuh batch ini (cap 3
+file) — disinkronkan batch berikutnya, jangan ditunda >1 batch (pelajaran Batch 148). **Belum
+diverifikasi visual** — perubahan kecil (1 baris ukuran font), risiko rendah. **Sisa kategori
+#3**: label/caption text-style audit belum dimulai, line-height, cakupan penuh truncation/
+ellipsis (sebagian Batch 37, belum formal kategori #3).
+
 ## Batch 153 — Dokumentasi: sinkronkan status table kategori #2 di MICRO_UIUX_AUDIT.md (1 dokumentasi, 0 kode)
 Item pending PRIORITAS TINGGI Batch 152 (tertunda 2 batch berturut — 151+152 — pelajaran Batch
 148 diterapkan, tidak ditunda lebih lama). Baris kategori #2 disinkronkan dengan progres Batch

@@ -6,6 +6,19 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 154 (Micro UI/UX kategori #3 lanjutan — samakan gaya song-row FolderManagerSheet, 1
+file kode + 2 dokumentasi)** — Item "audit body/label/caption" (pending sejak Batch 149). Grep
+`song.title` berpasangan style tetangga di semua sheet. Kelompok "song row ringkas dalam sheet"
+(5 titik/3 file: `DuplicateFinderSheet`/`PlaylistScreen`/`VaultSheet`x2) sudah 100% konsisten
+(title=`bodyMedium`, subtitle=`bodySmall`+secondary). **1 gap nyata**: `FolderManagerSheet.kt`
+baris "Lagu Disembunyikan" — title pakai `titleMedium` (level `SongRow` utama layar penuh) tapi
+subtitle tetap `bodySmall` (level sheet-ringkas) — kombinasi CAMPUR 2 baseline padahal secara
+fungsi identik kelompok sheet-ringkas. Fix: title disamakan ke `bodyMedium`. Brace/paren
+seimbang (42/42, 105/105). 0 protected asset. `MICRO_UIUX_AUDIT.md` status table SENGAJA belum
+disentuh (cap 3 file) — disinkronkan batch berikutnya, jangan ditunda >1 batch (pelajaran Batch
+148). **Belum diverifikasi visual**. **Sisa kategori #3**: label/caption text-style belum
+dimulai, line-height, cakupan penuh truncation/ellipsis. Detail: `CHANGELOG.md` Batch 154.
+
 **Batch 153 (Dokumentasi — sinkronkan status table kategori #2 di MICRO_UIUX_AUDIT.md, 1
 dokumentasi, 0 kode)** — Item pending PRIORITAS TINGGI Batch 152 (tertunda 2 batch berturut,
 tidak ditunda lebih lama sesuai pelajaran Batch 148). Baris kategori #2 disinkronkan: audit
