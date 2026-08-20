@@ -1,5 +1,22 @@
 # Changelog
 
+## Batch 152 — Micro UI/UX kategori #2 lanjutan: samakan gap icon↔text tombol "Tambah" VaultSheet (1 file kode + 1 dokumentasi)
+Menutup Pending Queue Batch 151 — bug PERSIS sama, ditemukan di audit yang sama tapi ditunda demi
+cap 3 file. `VaultSheet.kt`'s `VaultContentSection` tombol "Tambah" (`TextButton`+
+`Icons.Default.Add` default-size, tanpa custom `Modifier.size()`) pakai gap 4dp — sama persis
+pola `PlaylistScreen.kt` "Buat Playlist Baru" yang sudah dibenarkan Batch 151. Fix: 4dp→8dp,
+menyamakan ke konvensi mayoritas app-wide (14 titik lain sudah 8dp untuk kombinasi icon
+default-size + label di button manapun). Brace/paren `VaultSheet.kt` seimbang (101/101,
+210/210). 0 protected asset.
+
+**Kategori #2 sub-item "gap icon↔text" sekarang ✅ SELESAI PENUH** (audit formal 29 titik Batch
+151 + fix 2 titik Batch 151-152, sisanya sudah konsisten by-design). **Sisa kategori #2**: sisa
+literal `.dp` lain (padding/size/offset di luar radius/icon-gap/screen-padding yang sudah
+disentuh Batch 146-147/151-152) — scope masih terlalu luas untuk 1 batch, kandidat audit
+per-konteks terpisah kalau diminta lanjut. Sinkron `MICRO_UIUX_AUDIT.md` status table masih
+tertunda (2 batch berturut sekarang — 151+152 — prioritas TINGGI batch berikutnya, jangan
+ditunda lebih lama, pola sama pelajaran Batch 148).
+
 ## Batch 151 — Micro UI/UX kategori #2 lanjutan: samakan gap icon↔text tombol "Buat Playlist Baru" (1 file kode + 1 dokumentasi)
 Item pertama kategori #2 (Spacing & Sizing Consistency) sub-item "gap icon↔text" (pending sejak
 Batch 147, ditandai "terlalu kontekstual buat sweep mekanis, butuh pengelompokan per-konteks

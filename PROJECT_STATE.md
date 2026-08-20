@@ -6,6 +6,20 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 152 (Micro UI/UX kategori #2 lanjutan — samakan gap icon↔text tombol "Tambah"
+VaultSheet, 1 file kode + 1 dokumentasi)** — Menutup Pending Queue Batch 151: bug PERSIS sama
+(`TextButton`+`Icons.Default.Add` default-size, gap 4dp) di `VaultSheet.kt`'s
+`VaultContentSection` tombol "Tambah" — disamakan ke 8dp, pola sama fix `PlaylistScreen.kt`
+Batch 151. Brace/paren seimbang (101/101, 210/210). 0 protected asset. **Kategori #2 sub-item
+"gap icon↔text" sekarang ✅ SELESAI PENUH** (29 titik diaudit formal Batch 151, 2 gap ditemukan
+& diperbaiki Batch 151-152, sisanya sudah konsisten by-design — default-size icon+label 8dp/14
+titik, TextButton icon custom-size proporsional 6dp/4dp disengaja, menu-row Icon+Column 12dp/5
+titik). **Sisa kategori #2**: sisa literal `.dp` lain (di luar radius/icon-gap/screen-padding
+yang sudah disentuh Batch 146-147/151-152) — scope luas, kandidat batch terpisah. **PRIORITAS
+TINGGI batch berikutnya**: sinkron `MICRO_UIUX_AUDIT.md` status table — tertunda 2 batch
+berturut (151+152), jangan ditunda lebih lama (pelajaran Batch 148). Detail: `CHANGELOG.md`
+Batch 152.
+
 **Batch 151 (Micro UI/UX kategori #2 lanjutan — samakan gap icon↔text tombol "Buat Playlist
 Baru", 1 file kode + 1 dokumentasi)** — Item "gap icon↔text" (pending sejak Batch 147): 29 titik
 `Icon()`→`Spacer(width)`→`Text()` di `ui/*.kt` dikelompokkan per konteks dulu (bukan sweep

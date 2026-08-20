@@ -268,7 +268,7 @@ private fun VaultContentSection(
             Text("${vaultedSongs.size} lagu di vault", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             TextButton(onClick = onAddClick) {
                 Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text("Tambah")
             }
         }
