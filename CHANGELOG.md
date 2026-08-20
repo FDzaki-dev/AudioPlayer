@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 153 — Dokumentasi: sinkronkan status table kategori #2 di MICRO_UIUX_AUDIT.md (1 dokumentasi, 0 kode)
+Item pending PRIORITAS TINGGI Batch 152 (tertunda 2 batch berturut — 151+152 — pelajaran Batch
+148 diterapkan, tidak ditunda lebih lama). Baris kategori #2 disinkronkan dengan progres Batch
+151 (audit vertical spacing antar section `SettingsScreen.kt` — 0 bug) dan Batch 151-152 (gap
+icon↔text ✅ SELESAI PENUH — 2 gap ditemukan & diperbaiki dari 29 titik diaudit). Sisa pending
+dicatat: literal `.dp` lain di luar radius/icon-gap/screen-padding yang sudah disentuh. 0 kode,
+0 protected asset. Kandidat batch berikutnya: lanjut kategori #2 (sisa literal `.dp`) atau
+kategori #3 Typography Hierarchy (body/label/caption, pending sejak Batch 149).
+
 ## Batch 152 — Micro UI/UX kategori #2 lanjutan: samakan gap icon↔text tombol "Tambah" VaultSheet (1 file kode + 1 dokumentasi)
 Menutup Pending Queue Batch 151 — bug PERSIS sama, ditemukan di audit yang sama tapi ditunda demi
 cap 3 file. `VaultSheet.kt`'s `VaultContentSection` tombol "Tambah" (`TextButton`+

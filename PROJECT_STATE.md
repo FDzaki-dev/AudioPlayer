@@ -6,6 +6,17 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 153 (Dokumentasi — sinkronkan status table kategori #2 di MICRO_UIUX_AUDIT.md, 1
+dokumentasi, 0 kode)** — Item pending PRIORITAS TINGGI Batch 152 (tertunda 2 batch berturut,
+tidak ditunda lebih lama sesuai pelajaran Batch 148). Baris kategori #2 disinkronkan: audit
+vertical spacing antar section (Batch 151, `SettingsScreen.kt` 7 titik — 0 bug) + gap icon↔text
+✅ SELESAI PENUH (Batch 151-152, 2 gap ditemukan & diperbaiki dari 29 titik diaudit —
+`PlaylistScreen.kt`/`VaultSheet.kt` tombol Add 4dp→8dp). Sisa pending: literal `.dp` lain di
+luar radius/icon-gap/screen-padding yang sudah disentuh. 0 kode, 0 protected asset. Kandidat
+batch berikutnya: lanjut kategori #2 (sisa literal `.dp`, scope masih luas) atau kategori #3
+Typography Hierarchy (body/label/caption font size/weight audit, pending sejak Batch 149).
+Detail: `CHANGELOG.md` Batch 153.
+
 **Batch 152 (Micro UI/UX kategori #2 lanjutan — samakan gap icon↔text tombol "Tambah"
 VaultSheet, 1 file kode + 1 dokumentasi)** — Menutup Pending Queue Batch 151: bug PERSIS sama
 (`TextButton`+`Icons.Default.Add` default-size, gap 4dp) di `VaultSheet.kt`'s
