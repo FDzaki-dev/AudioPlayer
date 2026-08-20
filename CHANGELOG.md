@@ -1,5 +1,33 @@
 # Changelog
 
+## Batch 160 — Micro UI/UX kategori #3 lanjutan: audit badge/kicker/value-readout — 0 bug, pola dikonfirmasi konsisten (3 dokumentasi, 0 kode)
+Item "badge/axis-label/nav-text (belum diaudit formal)" kategori #3 (pending sejak Batch 159).
+13 titik `typography.label*` sisa (di luar 2 kelompok yang sudah diaudit Batch 149/154/159)
+dikelompokkan & diperiksa:
+
+**Kelompok "setting-item/dialog caption" (7 titik, 1 file `NowPlayingScreen.kt` + `EqualizerSheet.kt`
++ `StatsDashboardScreen.kt`)** — "Peredam Dalam Aplikasi", "Preset Kuat", "Preset Bawaan
+Perangkat", "Kecepatan", "Transisi Antar Lagu", `label` param generik, day-of-week chart caption
+— **100% konsisten**, semua `labelSmall`+secondary.
+
+**Kelompok "screen-title eyebrow/kicker" (5 titik, 4 file)** — "BERANDA"/"LIBRARY"/"PENGATURAN"
+(3x `labelSmall`+secondary, baseline screen biasa) vs "LANJUTKAN MENDENGARKAN"
+(`labelSmall`+**primary**, kartu highlight) vs "SEDANG DIPUTAR" (`labelSmall`+**animatedAccent**,
+warna dinamis ikut sampul album). Ukuran (`labelSmall`) **konsisten di ke-5 titik** — variasi
+warna genuinely disengaja (kartu/section yang ingin ditonjolkan pakai warna aksen, bukan lupa
+disamakan), bukan bug.
+
+**"Value readout" `NowPlayingScreen.kt` baris 1115** (`labelMedium`+onSurface, angka persen di
+bawah ikon slider) dibandingkan `UpdateCheckSheet.kt` "Mengunduh… X%" (`bodyMedium`, teks inline
+1 kalimat) — beda fungsi (readout numerik mandiri vs teks kalimat), bukan pasangan yang wajar
+disamakan.
+
+**Hasil: 0 bug**, ke-13 titik sisa genuinely konsisten atau berbeda konteks secara sengaja. 0
+file kode diedit, 0 protected asset. Kategori #3 kelompok `typography.label*` (24 titik total)
+sekarang **tuntas diaudit 100%** (Batch 149 title/149 gap-fix + 154 body/label song-row + 159
+field-label + 160 badge/kicker/readout). **Sisa kategori #3**: line-height (belum diaudit sama
+sekali), cakupan penuh truncation/ellipsis (sebagian Batch 37, belum formal kategori #3).
+
 ## Batch 159 — Micro UI/UX kategori #3 lanjutan: samakan label field ApkPickerRow SignatureMatcherSheet (1 file kode + 2 dokumentasi)
 Item "label/caption text-style audit belum dimulai" kategori #3 (pending sejak Batch 154).
 Scope: bandingkan style Text "caption/label di atas control" (field-label pattern) di seluruh

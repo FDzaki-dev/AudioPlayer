@@ -18,6 +18,18 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 160 (Micro UI/UX kategori #3 lanjutan — audit badge/kicker/value-readout, 0 kode + 3
+dokumentasi)** — 13 titik sisa `typography.label*` (di luar yang sudah diaudit 149/154/159)
+diperiksa: kelompok "setting-item/dialog caption" (7 titik) 100% konsisten `labelSmall`+
+secondary; kelompok "screen-title eyebrow" (5 titik: BERANDA/LIBRARY/PENGATURAN/LANJUTKAN
+MENDENGARKAN/SEDANG DIPUTAR) ukuran konsisten `labelSmall`, variasi warna (secondary/primary/
+animatedAccent) genuinely disengaja untuk highlight, bukan bug; "value readout" persen beda
+fungsi dari "Mengunduh…%" `UpdateCheckSheet`, bukan pasangan wajar. **Hasil: 0 bug** — pola
+sama presisi Batch 143/145 (audit formal, hasil genuinely konsisten, bukan dipaksa cari bug).
+Dengan ini, seluruh 24 titik `typography.label*` app-wide **tuntas diaudit**. **Sisa kategori
+#3**: line-height (belum diaudit sama sekali), cakupan penuh truncation/ellipsis (sebagian
+Batch 37, belum formal). Detail: `CHANGELOG.md` Batch 160.
+
 **Batch 159 (Micro UI/UX kategori #3 lanjutan — samakan label field `ApkPickerRow`
 `SignatureMatcherSheet`, 1 file kode + 2 dokumentasi)** — Item "label/caption text-style audit"
 kategori #3 (pending sejak Batch 154). Grep 24 titik `typography.label*` di 26 file `ui/`,
