@@ -18,6 +18,17 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 162 (Micro UI/UX kategori #5 dimulai — audit disabled/pressed/loading, 0 kode + 3
+dokumentasi)** — 3 dari 8 sub-item Interactive States diperiksa: disabled icon-button tint (5
+titik `PlaylistScreen`/`QueueSheet`, 100% identik), pressed/ripple integrity (`indication =
+null` grep = 0 hasil app-wide, aman), loading (`ShimmerBrush` shared composable 2 titik,
+`CircularProgressIndicator` cuma 1 titik). **Hasil: 0 bug**. **Observasi dicatat (bukan
+dieksekusi)**: `EmptyState` composable hardcode ikon `MusicNote` utk semua 9 konteks pemanggil
+termasuk yang tidak relevan (folder/antrean/statistik) — perlu keputusan eksplisit user dulu
+sebelum tambah parameter `icon` custom (nyentuh 9 file, di luar cap batch kecil). **Sisa
+kategori #5**: selected/active state, empty state (icon-mismatch di atas), error state, success/
+confirmation feedback, konsistensi lintas-aksi-sama. Detail: `CHANGELOG.md` Batch 162.
+
 **Batch 161 (Micro UI/UX kategori #3 — audit line-height, 5 gap sistemik ditemukan &
 diperbaiki, 1 file kode + 2 dokumentasi)** — `grep lineHeight` seluruh `ui/`: 0 hasil di semua
 composable. Akar: `theme/Type.kt`'s 5 style ter-override (`titleLarge`/`titleMedium`/

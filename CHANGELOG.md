@@ -1,5 +1,44 @@
 # Changelog
 
+## Batch 162 — Micro UI/UX kategori #5 dimulai: audit disabled/pressed/loading — 0 bug, ditemukan pola shared-composable yang sudah aman by construction (3 dokumentasi, 0 kode)
+Kategori #5 Interactive States (belum mulai sejak checklist diadopsi Batch 125). 3 dari 8
+sub-item diperiksa:
+
+**Disabled state (icon-button tint)**: 5 titik `IconButton(enabled = ...)` app-wide
+(`PlaylistScreen`/`QueueSheet` — tombol naikkan/turunkan/hapus urutan) — **100% identik**,
+`tint = if (canX) secondary else secondary.copy(alpha = 0.3f)`. Dibandingkan dengan disabled
+state `LockScreen.kt` (`.alpha(if (enabled) 1f else 0.4f)`, 2 titik keypad/glyph button) — beda
+mekanisme (alpha komposit vs tint-kondisional) & beda konteks (dim seluruh tombol vs dim ikon
+saja) secara wajar, bukan gap: keypad butuh dim total (nomor tidak relevan sama sekali saat PIN
+penuh), reorder-icon cuma butuh dim tint (baris lagu tetap harus kebaca). `Button`/
+`OutlinedButton` disabled: grep `disabledContentColor`/`disabledContainerColor` app-wide = 0
+hasil — semua andalkan default Material3, otomatis konsisten.
+
+**Pressed state (ripple/indication integrity)**: grep `indication = null` app-wide = 0 hasil —
+tidak ada ripple yang sengaja/tidak sengaja dimatikan di mana pun.
+
+**Loading state**: `ShimmerBrush()` (skeleton loading `HomeScreen`+`LibraryScreen`) — 1
+composable bersama, 2 titik pakai, otomatis identik by construction. `CircularProgressIndicator`
+cuma 1 titik app-wide (`UpdateCheckSheet`) — terlalu sedikit untuk dibandingkan, bukan berarti
+gap, cuma belum ada kandidat pembanding.
+
+**Hasil: 0 bug** — pola sama Batch 143/145/160 (audit formal, genuinely konsisten atau
+belum-cukup-kandidat, bukan dipaksa cari bug). 0 file kode diedit, 0 protected asset.
+
+**Catatan untuk sesi berikutnya (BUKAN bug, tapi observasi)**: `EmptyState` (`LibraryScreen.kt`,
+1 composable dipakai 9 titik) hardcode `Icons.Default.MusicNote` utk SEMUA konteks — termasuk
+"Belum ada folder terdeteksi"/"Antrean kosong"/"Belum ada data dengar" yang secara semantik
+bukan soal musik. Title/subtitle/spacing 100% konsisten (dijamin shared composable), tapi ikon
+generik utk semua konteks berpotensi kurang match. **SENGAJA tidak dieksekusi batch ini** —
+menambah parameter `icon` custom berarti ubah signature composable + sentuh 9 file pemanggil
+sekaligus, jauh di atas cap batch kecil, dan condong ke wilayah "tambah opsi baru" bukan murni
+"perbaiki yang sudah ada" — perlu keputusan eksplisit user dulu sebelum dieksekusi.
+
+**Sisa kategori #5 (5 dari 8 sub-item belum disentuh)**: selected/active state (baru 2 kandidat
+ditemukan, `NowPlayingScreen` lyrics-highlight vs `QueueSheet` now-playing-row — beda konteks,
+belum cukup data), empty state (icon-mismatch di atas, keputusan tertunda), error state, success/
+confirmation feedback, konsistensi feedback lintas-aksi-yang-sama.
+
 ## Batch 161 — Micro UI/UX kategori #3 TUNTAS: audit line-height — 5 gap sistemik ditemukan & diperbaiki (1 file kode + 2 dokumentasi)
 Item "line-height (belum diaudit sama sekali)" kategori #3 (pending sejak Batch 149/160,
 terakhir sub-item kategori #3). Cek `grep -rn "lineHeight"` seluruh `ui/`: **0 hasil di semua
