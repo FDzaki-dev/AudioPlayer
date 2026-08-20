@@ -1,5 +1,55 @@
 # Changelog
 
+## Batch 165 — Micro UI/UX kategori #5 lanjutan: audit error state & success/confirmation feedback (0 kode, 3 dokumentasi)
+Sub-item ke-5&6/8 kategori #5 (2 digabung — ternyata 1 komponen visual yang sama dipakai untuk
+keduanya, lihat temuan di bawah). Grep `colorScheme.error`/`Icons.Default.Error`/
+`Icons.Default.Warning`/`isError` di seluruh `ui/*.kt` → 9 file. Dikelompokkan per fungsi
+sebenarnya (bukan cuma lokasi grep-match), 2 kelompok ditemukan:
+
+**Kelompok A — teks error validasi inline** (4 titik: `LockScreen.kt` "PIN salah"/lockout
+countdown, `SettingsScreen.kt` `SetPinDialog`, `VaultSheet.kt` setup+unlock section) — pola
+identik di keempatnya: `Text` polos, `colorScheme.error`, `typography.bodySmall`, `Spacer(4.dp)`
+di atasnya, TANPA ikon/background. **Hasil: 0 bug**, genuinely konsisten (`VaultSheet.kt` yang
+ditulis belakangan — Batch 119 — sudah otomatis mengikuti pola `LockScreen`/`SettingsScreen`
+yang lebih tua, bukan kebetulan).
+
+**Kelompok B — banner hasil operasi/status** (4 titik across 3 file) — **3-arah TIDAK
+konsisten, genuinely gap, DICATAT bukan langsung dieksekusi**:
+1. `BackupRestoreSheet.kt` + `DiagnosticLogSheet.kt` (identik satu sama lain): solid
+   `primaryContainer`/`errorContainer` bg + `RoundedCornerShape(8.dp)` + padding 12h/10v +
+   gap ikon-teks 8dp + `bodySmall` + warna teks/ikon `onPrimaryContainer`/`onErrorContainer`.
+   Konteks: hasil SEKALI TAMPIL setelah 1 aksi user (import/export selesai).
+2. `SignatureMatcherSheet.kt`: bg `bannerColor.copy(alpha=0.15f)` (tint transparan dari warna
+   semantik itu sendiri, BUKAN container role M3) + `shapes.medium` + padding 14dp semua sisi +
+   gap 10dp + `bodyMedium` + warna teks = `bannerColor` langsung (bukan `onXContainer`).
+   Konteks: state perbandingan yang tetap terlihat sambil user lanjut baca tombol "Lihat
+   Laporan Lengkap" di bawahnya.
+3. `UpdateCheckSheet.kt`'s `StatusBanner` (composable privat sendiri): TANPA background sama
+   sekali — cuma `Icon`+`Spacer(8dp)`+`Text`, `bodyMedium`, warna = parameter `color` langsung.
+   Konteks: 1 state di antara beberapa state stepper (Checking→Available→Downloading→
+   ReadyToInstall→Error), sengaja minim biar tidak bersaing visual dengan progress
+   bar/tombol di sekitarnya.
+
+Checklist audit sendiri eksplisit menyebut "Hindari feedback visual yang berbeda untuk action
+yang sama" — 3 treatment berbeda untuk satu konsep semantik (ikon+warna+teks status) persis
+kelas gap itu. **Kenapa TIDAK langsung disamakan batch ini** (beda dari fix `SpeedDialog`
+Batch 163 yang langsung dieksekusi): 3 konteks di atas punya alasan bobot-visual yang bisa jadi
+disengaja (hasil-sekali-tampil vs state-perbandingan-persisten vs status-dalam-stepper) — bukan
+2 kontrol identik bersebelahan dalam 1 dialog seperti kasus `SpeedDialog`. Unifikasi berarti
+menyentuh 3 file sekaligus untuk keputusan desain (container-solid vs tint-alpha vs
+tanpa-background — yang mana jadi standar?) yang belum eksplisit dikonfirmasi user, pola sama
+persis Batch 162 (`EmptyState` icon hardcode) & Batch 163 (`LibraryFilterChips` solid-fill) —
+observasi dicatat, tunggu keputusan user sebelum eksekusi.
+
+**Kalau user pilih lanjut eksekusi (kandidat batch berikutnya)**: opsi paling minim-risiko
+adalah ekstrak 1 composable shared `ResultBanner(color, icon, text, style: Solid|Tinted|Bare)`
+dipakai ulang di 3 file, ATAU pilih 1 treatment jadi standar tunggal untuk ketiganya — perlu
+keputusan eksplisit dulu, bukan diasumsikan.
+
+Sisa kategori #5 (setelah ini, 5/8 diperiksa — 2 diperiksa+0bug, 1 diperiksa+1bug-fixed, 1
+diperiksa+1observasi-tertunda-lama, 1 diperiksa+1observasi-baru-di-atas): konsistensi
+lintas-aksi-sama (item terakhir). Detail lengkap: `MICRO_UIUX_AUDIT.md` status table baris #5.
+
 ## Batch 164 — Eksekusi pending item Batch 163: indikator "sedang diputar" di SongRow Library (2 file, 1 protected edit parsial)
 Item tertunda #2 dari 2 observasi Batch 163 (kategori #5 selected/active state) — user
 konfirmasi lanjut eksekusi. `SongRow` (LibraryScreen.kt, 3 call site: tab Lagu/GroupedListView/

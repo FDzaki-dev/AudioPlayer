@@ -18,6 +18,24 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 165 (Micro UI/UX kategori #5 lanjutan — audit error state & success/confirmation
+feedback, 0 kode, 3 dokumentasi)** — Sub-item 5&6/8 kategori #5, digabung karena ternyata 1
+komponen visual yang sama. Grep 9 file `ui/*.kt` pakai error color/icon, dikelompokkan 2:
+**Kelompok A (teks validasi inline, 4 titik: `LockScreen`/`SettingsScreen` SetPinDialog/
+`VaultSheet` x2)** — 100% konsisten (Text polos + colorScheme.error + bodySmall, tanpa ikon/bg).
+**Hasil: 0 bug**. **Kelompok B (banner hasil operasi, 4 titik/3 file)** — **3-arah TIDAK
+konsisten, genuinely gap**: `BackupRestoreSheet`+`DiagnosticLogSheet` (identik, container-solid
+primaryContainer/errorContainer+RoundedCornerShape8dp) vs `SignatureMatcherSheet` (tint-alpha
+0.15f dari warna semantik sendiri+shapes.medium) vs `UpdateCheckSheet`'s `StatusBanner`
+(TANPA background sama sekali). **TIDAK dieksekusi batch ini** — 3 konteks beda bisa jadi
+disengaja beda bobot visual (hasil-sekali-tampil vs state-persisten vs status-dalam-stepper),
+beda dari kasus `SpeedDialog` Batch 163 yang jelas 2 kontrol identik bersebelahan. Dicatat
+sebagai observasi tertunda keputusan user, pola sama Batch 162/163. **Kandidat eksekusi kalau
+user pilih lanjut**: ekstrak composable shared `ResultBanner` dgn parameter style, atau pilih 1
+treatment jadi standar — belum diasumsikan mana yang benar. Sisa kategori #5: konsistensi
+lintas-aksi-sama (item terakhir, belum diperiksa). Detail: `CHANGELOG.md` Batch 165,
+`MICRO_UIUX_AUDIT.md` status table baris #5.
+
 **Batch 164 (Eksekusi pending item Batch 163 — indikator "sedang diputar" di SongRow Library, 2
 file, 1 protected edit parsial)** — Item tertunda #2 Batch 163, dieksekusi setelah user
 konfirmasi lanjut. `SongRow` (LibraryScreen.kt, 3 call site: tab Lagu/GroupedListView/
