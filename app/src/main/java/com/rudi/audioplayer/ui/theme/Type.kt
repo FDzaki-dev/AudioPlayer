@@ -15,29 +15,34 @@ val AppleTypography = Typography(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Bold,
         fontSize = 28.sp,
+        lineHeight = 35.6.sp,
         letterSpacing = (-0.4).sp
     ),
     titleMedium = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.SemiBold,
         fontSize = 17.sp,
+        lineHeight = 25.5.sp,
         letterSpacing = (-0.2).sp
     ),
     bodyMedium = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
         fontSize = 15.sp,
+        lineHeight = 21.4.sp,
         letterSpacing = (-0.1).sp
     ),
     bodySmall = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
-        fontSize = 13.sp
+        fontSize = 13.sp,
+        lineHeight = 17.3.sp
     ),
     labelSmall = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.SemiBold,
         fontSize = 11.sp,
+        lineHeight = 16.sp,
         letterSpacing = 0.6.sp
     )
 )
@@ -52,29 +57,34 @@ val TactileTypography = Typography(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 28.sp,
+        lineHeight = 35.6.sp,
         letterSpacing = 0.sp
     ),
     titleMedium = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Bold,
         fontSize = 17.sp,
+        lineHeight = 25.5.sp,
         letterSpacing = 0.sp
     ),
     bodyMedium = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
         fontSize = 15.sp,
+        lineHeight = 21.4.sp,
         letterSpacing = (-0.1).sp
     ),
     bodySmall = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
-        fontSize = 13.sp
+        fontSize = 13.sp,
+        lineHeight = 17.3.sp
     ),
     labelSmall = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.SemiBold,
         fontSize = 11.sp,
+        lineHeight = 16.sp,
         letterSpacing = 0.6.sp
     )
 )

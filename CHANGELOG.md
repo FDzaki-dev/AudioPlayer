@@ -1,5 +1,44 @@
 # Changelog
 
+## Batch 161 — Micro UI/UX kategori #3 TUNTAS: audit line-height — 5 gap sistemik ditemukan & diperbaiki (1 file kode + 2 dokumentasi)
+Item "line-height (belum diaudit sama sekali)" kategori #3 (pending sejak Batch 149/160,
+terakhir sub-item kategori #3). Cek `grep -rn "lineHeight"` seluruh `ui/`: **0 hasil di semua
+composable file** — hanya var lokal tak-terkait di `TactileDepth.kt` (canvas drawing, bukan
+typography). Ditelusuri ke akar: `theme/Type.kt`'s `AppleTypography`/`TactileTypography` (2
+`Typography` custom yang override 5 dari 15 style Material3 — `titleLarge`/`titleMedium`/
+`bodyMedium`/`bodySmall`/`labelSmall`) dibuat via `TextStyle(...)` manual **tanpa parameter
+`lineHeight`** — default Compose untuk itu adalah `TextUnit.Unspecified` (rapat, bukan leading
+proporsional M3), SEMENTARA 10 style lain yang TIDAK di-override (`labelLarge`, `bodyLarge`,
+`titleSmall`, dst — dipakai luas, termasuk 9 titik "field label" Batch 159 & sisi lain) otomatis
+warisi `lineHeight` default M3 yang benar. **Gap sistemik nyata**: teks multi-baris yang pakai
+salah satu dari 5 style ini (title bottom sheet Batch 149, body/label song-row Batch 154, badge/
+kicker Batch 160 — SEMUA kena) tampil lebih rapat dari yang seharusnya, tidak konsisten dengan
+10 style lain di app yang sama.
+
+**Fix**: `lineHeight` ditambahkan ke ke-5 style, di KEDUA `Typography` (simetris) — nilai
+dihitung proporsional dari rasio default M3 utk slot style yang sama (bukan angka tebakan):
+`titleLarge` 22sp→28sp M3 asli (rasio lineHeight/fontSize 28/22=1.2727) diterapkan ke fontSize
+custom 28sp → **35.6sp**; `titleMedium` rasio 24/16=1.5 → fontSize 17sp → **25.5sp**;
+`bodyMedium` rasio 20/14=1.4286 → fontSize 15sp → **21.4sp**; `bodySmall` rasio 16/12=1.3333 →
+fontSize 13sp → **17.3sp**; `labelSmall` — fontSize custom (11sp) KEBETULAN identik fontSize
+default M3 (11sp), jadi lineHeight dipakai persis **16sp** M3 tanpa perlu skala.
+
+1 file kode diedit (`Type.kt`, 10 titik — 5 style × 2 objek Typography), 0 file baru, 0
+protected asset. Brace/paren seimbang (0/0 kurung kurawal karena data class builder, 21/21
+kurung biasa). **Blast radius LEBIH LUAS dari batch-batch sebelumnya** — `Type.kt` dipakai
+`MaterialTheme` app-wide, jadi ini memengaruhi SEMUA teks yang pakai 5 style ini di SELURUH
+layar, bukan 1-2 file terisolasi. **Belum diverifikasi visual sama sekali** — prioritas TINGGI
+cek manual setelah build: teks judul bottom sheet (`titleMedium`), body song-row (`bodyMedium`),
+label/badge (`labelSmall`) di beberapa layar berbeda, pastikan line-height terlihat lebih lega
+tapi TIDAK merusak layout yang mepet (card compact, row sempit) — kalau ada yang kepotong/
+overflow gara-gara baris jadi lebih tinggi, laporkan baliknya, rollback per-style gampang (baris
+`lineHeight` tinggal dihapus).
+
+Dengan ini, **kategori #3 Typography Hierarchy dinyatakan TUNTAS** (Batch 149 title + 154 body/
+label + 159 field-label + 160 badge/kicker + 161 line-height) — sisa 1 sub-item "cakupan penuh
+truncation/ellipsis" (sebagian sudah Batch 37) SENGAJA tidak diklaim tuntas, beda sub-kategori,
+kandidat audit terpisah kalau diminta eksplisit.
+
 ## Batch 160 — Micro UI/UX kategori #3 lanjutan: audit badge/kicker/value-readout — 0 bug, pola dikonfirmasi konsisten (3 dokumentasi, 0 kode)
 Item "badge/axis-label/nav-text (belum diaudit formal)" kategori #3 (pending sejak Batch 159).
 13 titik `typography.label*` sisa (di luar 2 kelompok yang sudah diaudit Batch 149/154/159)

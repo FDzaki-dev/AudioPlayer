@@ -18,6 +18,24 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 161 (Micro UI/UX kategori #3 — audit line-height, 5 gap sistemik ditemukan &
+diperbaiki, 1 file kode + 2 dokumentasi)** — `grep lineHeight` seluruh `ui/`: 0 hasil di semua
+composable. Akar: `theme/Type.kt`'s 5 style ter-override (`titleLarge`/`titleMedium`/
+`bodyMedium`/`bodySmall`/`labelSmall`, di KEDUA `AppleTypography`+`TactileTypography`) dibuat
+tanpa `lineHeight` → default `Unspecified` (rapat), BEDA dari 10 style lain yang warisi default
+M3 proporsional. Fix: `lineHeight` ditambahkan, dihitung proporsional dari rasio M3 asli per
+slot style (`titleLarge` 35.6sp, `titleMedium` 25.5sp, `bodyMedium` 21.4sp, `bodySmall` 17.3sp,
+`labelSmall` 16sp — detail rasio di `CHANGELOG.md` Batch 161). **⚠️ Blast radius app-wide** —
+`Type.kt` dipakai `MaterialTheme` di SEMUA layar, beda dari batch-batch sebelumnya yang
+terisolasi 1-2 file. **Belum diverifikasi visual sama sekali** — prioritas TINGGI: cek beberapa
+layar (bottom sheet title, song-row body, badge label) pastikan line-height lebih lega tapi
+tidak bikin overflow di card/row sempit. Rollback gampang kalau ada masalah (hapus baris
+`lineHeight` per style). Dengan ini **kategori #3 Typography Hierarchy TUNTAS** (149/154/159/
+160/161) — sisa sub-item "truncation/ellipsis cakupan penuh" beda sub-kategori, tidak diklaim
+tuntas. **Kandidat batch berikutnya**: kategori #2 sisa literal `.dp` (pending sejak Batch 152),
+kategori #5 Interactive States (belum mulai), atau verifikasi visual line-height batch ini kalau
+user sudah build & lapor hasilnya. Detail: `CHANGELOG.md` Batch 161.
+
 **Batch 160 (Micro UI/UX kategori #3 lanjutan — audit badge/kicker/value-readout, 0 kode + 3
 dokumentasi)** — 13 titik sisa `typography.label*` (di luar yang sudah diaudit 149/154/159)
 diperiksa: kelompok "setting-item/dialog caption" (7 titik) 100% konsisten `labelSmall`+
