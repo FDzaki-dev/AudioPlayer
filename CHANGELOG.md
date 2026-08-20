@@ -1,5 +1,40 @@
 # Changelog
 
+## Batch 156 — Fitur: catatan rilis (pesan commit) tampil langsung di layar "Cek Update" app (3 file kode + 2 dokumentasi)
+Permintaan langsung user, jawab pertanyaan "apakah pesan update langsung dari aplikasi juga ikut
+berubah?" — jawaban sebelumnya: TIDAK, app cuma nampilin `tagName` (angka versi doang), field
+`body` GitHub Release tidak pernah di-fetch maupun ditampilkan. User minta dieksekusi utuh.
+
+**3 file kode, rantai lengkap API GitHub → app**:
+1. **`.github/workflows/build.yml`** (protected asset, edit parsial) — step baru "Capture commit
+   message for release notes": `git log -1 --pretty=%B > release_notes.txt` (file, bukan
+   `$GITHUB_OUTPUT`, supaya aman dari delimiter heredoc kalau pesan commit multi-baris). Step
+   "Create GitHub Release" ditambah `body_path: release_notes.txt` — mengisi field `body` GitHub
+   Release dengan pesan commit HEAD (yang sejak Rule Batch 155 wajib berisi penjelasan fitur
+   singkat, bukan cuma angka versi).
+2. **`GitHubReleaseChecker.kt`** — `ReleaseInfo` dapat field baru `releaseNotes: String`, di-
+   parse dari `json.optString("body", "")` (API `GET /releases/latest`). Fallback `""` untuk
+   rilis lama pra-Batch 156 yang belum punya body.
+3. **`UpdateCheckSheet.kt`** — state `Available` sekarang render `s.release.releaseNotes` (kalau
+   `isNotBlank()`) di bawah baris `"Update tersedia: ..."`, style `bodySmall`+secondary (selaras
+   subtitle pattern app-wide, bukan style baru). Blank-check WAJIB — rilis lama tanpa body tidak
+   menampilkan kotak kosong.
+
+Brace/paren `GitHubReleaseChecker.kt` (12/12, 53/53) & `UpdateCheckSheet.kt` (25/25, 62/62)
+seimbang. YAML `build.yml` divalidasi parse (`python3 -c "import yaml..."`) + urutan step
+dikonfirmasi benar (Capture commit message SEBELUM Create GitHub Release). 0 asset lain
+terpengaruh (`AndroidManifest.xml`/`build.gradle.kts`/dll tidak disentuh).
+
+**Efek end-to-end mulai push berikutnya**: pesan `git commit -m "..."` yang dikirim lewat skrip
+"Update Harian:" (sudah wajib deskriptif sejak Batch 155) otomatis jadi teks yang user lihat di
+app-nya sendiri saat "Cek Update" — bukan cuma di chat/CHANGELOG lagi. **Belum diverifikasi di
+device/CI run sungguhan** (workflow YAML tervalidasi sintaksnya, tapi belum pernah benar-benar
+jalan di GitHub Actions dengan step baru ini) — prioritas cek: push batch ini, pastikan release
+GitHub berikutnya field "body"-nya terisi pesan commit, lalu buka "Cek Update" di app buat
+konfirmasi teksnya muncul. Cap 3-file/batch SENGAJA dilewati batch ini atas instruksi eksplisit
+user ("eksekusi utuh dan sampai tuntas") — 1 fitur kohesif, bukan gabungan beberapa task
+independen.
+
 ## Batch 155 — Dokumentasi: tambah aturan sesi transparansi versi & pesan commit (2 dokumentasi, 0 kode)
 Permintaan langsung user, screenshot layar "Cek Update" app (versi terpasang 1.1.43 vs update
 tersedia v1.1.44-run206) sebagai konteks — 2 rule baru wajib buat semua sesi AI berikutnya:

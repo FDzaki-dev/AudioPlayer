@@ -6,6 +6,20 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 156 (Fitur — catatan rilis/pesan commit tampil di layar "Cek Update" app, 3 file kode +
+2 dokumentasi, cap file DILEWATI atas instruksi eksplisit user "eksekusi utuh dan sampai
+tuntas")** — Jawab pertanyaan user: app SEBELUMNYA tidak pernah nampilin pesan commit/release
+notes, cuma `tagName` (angka versi). Rantai lengkap 3 file: (1) `build.yml` (protected, edit
+parsial) — step baru tulis `git log -1 --pretty=%B` ke file, `body_path:` di step release
+GitHub; (2) `GitHubReleaseChecker.kt` — `ReleaseInfo.releaseNotes` baru, parse `body` dari API;
+(3) `UpdateCheckSheet.kt` — render releaseNotes (blank-checked) di state `Available`. Brace/
+paren kedua file Kotlin seimbang, YAML tervalidasi parse + urutan step benar. **Efek**: pesan
+commit yang sejak Batch 155 wajib deskriptif (bukan cuma angka versi) sekarang otomatis jadi
+teks yang muncul di app user sendiri saat "Cek Update", bukan cuma di chat. **Belum
+diverifikasi device/CI sungguhan** — prioritas cek: push, pastikan body release GitHub
+berikutnya terisi, buka "Cek Update" di app konfirmasi teks muncul. 0 protected asset lain
+tersentuh. Detail: `CHANGELOG.md` Batch 156.
+
 **Batch 155 (Dokumentasi — tambah aturan sesi: transparansi versi & pesan commit, 2
 dokumentasi, 0 kode)** — Permintaan langsung user (2 rule baru untuk SEMUA sesi berikutnya),
 ditulis formal di § "Aturan sesi: transparansi versi & pesan commit" (bawah file ini). **Rule 1

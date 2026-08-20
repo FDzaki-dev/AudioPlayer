@@ -144,6 +144,16 @@ jobs:
           mkdir -p renamed
           cp app/build/outputs/apk/release/app-release.apk "renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk"
 
+      - name: Capture commit message for release notes
+        # Batch 156 — user minta pesan commit (sejak Batch 155 wajib berisi penjelasan fitur
+        # singkat, bukan cuma angka versi — lihat PROJECT_STATE.md § "Aturan sesi") juga muncul
+        # di app sendiri lewat layar "Cek Update" (UpdateCheckSheet.kt), bukan cuma di chat/
+        # CHANGELOG. Ditulis ke FILE (bukan $GITHUB_OUTPUT) karena pesan commit multi-baris —
+        # GITHUB_OUTPUT butuh delimiter heredoc yang rawan kalau isi pesan kebetulan memuat
+        # baris sama persis dengan delimiter itu; body_path (step release di bawah) baca file
+        # apa adanya, tidak kena masalah itu sama sekali.
+        run: git log -1 --pretty=%B > release_notes.txt
+
       - name: Create GitHub Release with signed APK
         # softprops/action-gh-release menempel file APK langsung sebagai release asset —
         # BUKAN CI artifact. Release asset di-serve GitHub apa adanya (tidak dibungkus .zip
@@ -154,10 +164,14 @@ jobs:
         # "Determine version name" di atas), name pakai `release_name` (minimalis, cuma
         # nomor versi) — sengaja BEDA field, supaya daftar Releases di halaman repo tampil
         # rapi ("v1.0.47") sementara git tag di baliknya tetap unik ("v1.0.47-run159").
+        # body_path (Batch 156) — isi release_notes.txt (pesan commit HEAD, step di atas) jadi
+        # field "body" GitHub Release, dibaca app lewat GitHubReleaseChecker.kt/
+        # UpdateCheckSheet.kt di layar "Cek Update".
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.release_name }}
+          body_path: release_notes.txt
           files: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk
 
       - name: Upload failure log artifact

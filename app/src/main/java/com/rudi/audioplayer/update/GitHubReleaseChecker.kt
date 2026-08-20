@@ -19,7 +19,13 @@ object GitHubReleaseChecker {
         val tagName: String,
         val htmlUrl: String,
         val apkDownloadUrl: String,
-        val apkAssetName: String
+        val apkAssetName: String,
+        // Batch 156 — isi field "body" GitHub Release (pesan commit git HEAD saat rilis dibuat,
+        // lihat step "Determine version name"/"Create GitHub Release" di build.yml). Kosong
+        // ("") kalau CI belum sempat mengisi body (rilis lama sebelum Batch 156) atau API
+        // benar-benar tidak mengembalikannya — UpdateCheckSheet.kt WAJIB cek blank sebelum
+        // menampilkan section catatan rilis, jangan asumsikan selalu terisi.
+        val releaseNotes: String
     )
 
     sealed class CheckResult {
@@ -53,6 +59,11 @@ object GitHubReleaseChecker {
                 val json = JSONObject(response.body?.string().orEmpty())
                 val tagName = json.optString("tag_name", "")
                 val htmlUrl = json.optString("html_url", "")
+                // Batch 156 — "body" GitHub Release API = teks yang softprops/action-gh-release
+                // kirim lewat parameter `body:` di step "Create GitHub Release" (build.yml),
+                // isinya pesan commit git HEAD. optString fallback "" kalau field tidak ada
+                // sama sekali di response (rilis lama pra-Batch 156 tidak punya body).
+                val releaseNotes = json.optString("body", "")
                 val assets: JSONArray = json.optJSONArray("assets") ?: JSONArray()
                 for (i in 0 until assets.length()) {
                     val asset = assets.getJSONObject(i)
@@ -63,7 +74,8 @@ object GitHubReleaseChecker {
                                 tagName = tagName,
                                 htmlUrl = htmlUrl,
                                 apkDownloadUrl = asset.optString("browser_download_url", ""),
-                                apkAssetName = name
+                                apkAssetName = name,
+                                releaseNotes = releaseNotes
                             )
                         )
                     }

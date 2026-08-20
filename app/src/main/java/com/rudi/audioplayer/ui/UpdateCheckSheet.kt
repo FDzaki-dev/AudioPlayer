@@ -66,6 +66,18 @@ fun UpdateCheckSheet(onDismiss: () -> Unit) {
                 }
                 is UpdateManager.UpdateState.Available -> {
                     Text("Update tersedia: ${s.release.tagName}", style = MaterialTheme.typography.bodyMedium)
+                    // Batch 156 — catatan rilis (pesan commit git HEAD, lihat GitHubReleaseChecker.kt
+                    // & build.yml "Create GitHub Release"). Blank check WAJIB: rilis lama pra-Batch
+                    // 156 tidak punya body sama sekali, section ini harus hilang total (bukan
+                    // nampilin kotak kosong) daripada terlihat rusak/setengah-jadi.
+                    if (s.release.releaseNotes.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            s.release.releaseNotes,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(onClick = { UpdateManager.downloadAndPrepareInstall(context, s.release) }) {
                         Icon(Icons.Default.SystemUpdate, contentDescription = null)
