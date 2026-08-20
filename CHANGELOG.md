@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 150 — Dokumentasi: sinkronkan status table kategori #3 di MICRO_UIUX_AUDIT.md (1 dokumentasi, 0 kode)
+Item pending prioritas tinggi Batch 149 ("jangan tunda lebih dari 1 batch"). Baris kategori #3
+diperbarui `⬜ Belum mulai` → `🟡 Berlanjut (Batch 149)` + ringkasan temuan/fix (title
+`FolderManagerSheet.kt` disamakan `titleMedium`+Bold) + sisa pending (audit body/label/caption,
+line-height, cakupan penuh truncation/ellipsis). 0 kode, 0 protected asset. Kandidat batch
+berikutnya: lanjut kategori #3 (body/label/caption typography) atau kategori #2 (vertical
+spacing/icon-text gap per-konteks, masih pending sejak Batch 147).
+
 ## Batch 149 — Micro UI/UX kategori #3 dimulai: samakan gaya title bottom sheet FolderManagerSheet (1 file kode + 2 dokumentasi)
 Item pertama kategori #3 (Typography Hierarchy, urutan `FINAL EXECUTION ORDER`) — "Audit title/
 subtitle/body/label/caption" + "Konsistenkan font weight". Scope sengaja 1 pola dulu (title

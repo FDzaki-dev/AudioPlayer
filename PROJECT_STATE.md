@@ -6,6 +6,16 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 150 (Dokumentasi — sinkronkan status table kategori #3 di MICRO_UIUX_AUDIT.md, 1
+dokumentasi, 0 kode)** — Item pending prioritas tinggi Batch 149 (tertunda 0 batch, langsung
+disinkronkan sesuai pelajaran Batch 148 soal dokumen tracking manual rawan telat). Baris
+kategori #3 diperbarui `⬜ Belum mulai` → `🟡 Berlanjut (Batch 149)` + ringkasan temuan/fix
+(title `FolderManagerSheet.kt` disamakan `titleMedium`+Bold) + pending (body/label/caption,
+line-height, cakupan penuh truncation/ellipsis). 0 kode, 0 protected asset. Kandidat batch
+berikutnya: lanjut kategori #3 Typography Hierarchy (body/label/caption font size/weight audit)
+atau kategori #2 (vertical spacing antar section, gap icon↔text — masih pending sejak Batch 147).
+Detail: `CHANGELOG.md` Batch 150.
+
 **Batch 149 (Micro UI/UX kategori #3 dimulai — samakan gaya title bottom sheet
 FolderManagerSheet, 1 file kode + 2 dokumentasi)** — Item pertama Typography Hierarchy: grep
 semua header `ModalBottomSheet` (13 sheet). **12 sudah konsisten** `titleMedium` + `Font-
