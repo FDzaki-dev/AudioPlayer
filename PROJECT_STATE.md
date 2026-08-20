@@ -18,6 +18,39 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 163 (Micro UI/UX kategori #5 lanjutan — audit selected/active state, 1 bug fix + 2
+observasi tertunda, 1 file kode + 3 dokumentasi)** — Sub-item ke-4/8 kategori #5. Taksonomi 3
+pola "selected" ditemukan di app ini, semua defensible by-design: Card preview (ThemeOptionCard)
+→ border+elevation; List/dialog single-choice → `RadioButton`; Tag/filter chip → Material3
+`FilterChip` (secondaryContainer fill). **1 bug nyata ditemukan & diperbaiki**: `SpeedDialog`
+(NowPlayingScreen.kt) — daftar kecepatan pakai `TextButton`+teks "✓"/warna teks berubah,
+padahal `TransitionModeOption` (Gapless/Fade Halus) di dialog **SAMA PERSIS**, cuma dipisah 1
+`HorizontalDivider`, sudah pakai `RadioButton` sungguhan sejak Batch 102. Disamakan ke pola
+`RadioButton` (Row+clip+clickable identik `TransitionModeOption`, nol import baru). FilterChip
+(7 titik: EqualizerSheet 2x, SmartPlaylistScreen 2x, RingtoneCutterSheet 3x lewat
+`DestinationChip`) dicek satu-satu — 0 custom color override, genuinely konsisten, 0 bug.
+
+**2 observasi TERTUNDA keputusan eksplisit user** (pola sama Batch 162 EmptyState — bukan
+diam-diam dieksekusi):
+1. `LibraryFilterChips` (tab Lagu/Album/Artis + chip "Lainnya", LibraryScreen.kt) — custom
+`Box`+`background()` primary SOLID fill saat selected, BEDA dari `FilterChip` secondaryContainer
+yang jadi pola di semua tempat lain. Bisa jadi disengaja (navigasi PRIMER pantas lebih tegas
+dari filter/tag sekunder — beda hierarki fungsi, bukan inkonsistensi), bisa juga genuinely
+gap. **Tidak disentuh** — ini kontrol navigasi paling sering dilihat di seluruh app, mengubahnya
+tanpa konfirmasi eksplisit terlalu berisiko utk 1 batch kecil.
+2. `SongRow` (LibraryScreen.kt, 3 call site: tab Lagu/GroupedListView/SearchResultsView) TIDAK
+PUNYA indikator "sedang diputar" sama sekali, sedangkan `QueueSheet`'s row SUDAH (primary
+12% alpha bg + bold, `isPlaying = index == currentIndex`). User yang browsing Library sambil
+lagu main tidak pernah lihat baris mana yang aktif — gap cross-context nyata. **Tidak dieksekusi
+batch ini**: `LibraryScreen` composable sama sekali tidak menerima currentSong/currentSongId
+sebagai parameter (dicek: signature lengkap, 0 field terkait) — perbaikannya perlu parameter
+baru + wiring state lewat `MainActivity`/`NavGraph` (**protected**, lintas-file), jelas di luar
+cap "3 file/1 task kecil" kalau digabung diam-diam ke batch audit ini.
+
+Sisa kategori #5 (setelah ini, 4/8): empty state (icon-mismatch Batch 162, masih tertunda),
+error state, success/confirmation feedback, konsistensi lintas-aksi lain. Detail:
+`CHANGELOG.md` Batch 163.
+
 **Batch 162 (Micro UI/UX kategori #5 dimulai — audit disabled/pressed/loading, 0 kode + 3
 dokumentasi)** — 3 dari 8 sub-item Interactive States diperiksa: disabled icon-button tint (5
 titik `PlaylistScreen`/`QueueSheet`, 100% identik), pressed/ripple integrity (`indication =

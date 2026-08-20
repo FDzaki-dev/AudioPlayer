@@ -1,5 +1,80 @@
 # Changelog
 
+## Batch 163 — Micro UI/UX kategori #5 lanjutan: audit selected/active state — 1 bug fix, 2 observasi tertunda (1 file kode + 3 dokumentasi)
+Sub-item ke-4/8 kategori 5 "Interactive States" (`MICRO_UIUX_AUDIT.md`), lanjutan Batch 162.
+Scope: cari SEMUA titik `selected =` / `isSelected` app-wide, kelompokkan per pola visual,
+tentukan mana genuinely konsisten vs genuinely gap vs "kelihatan beda tapi defensible by-design"
+— disiplin sama persis Batch 159/160/161 (audit formal, bukan cari-cari bug dipaksakan).
+
+**Metode**: `grep -rn "selected = \|isSelected" app/src/main/java/com/rudi/audioplayer/ui/*.kt`
+→ 13 titik ditemukan di 7 file (`LibraryScreen.kt` x3, `NowPlayingScreen.kt` x5,
+`EqualizerSheet.kt` x2, `RingtoneCutterSheet.kt` x4 termasuk definisi `DestinationChip`,
+`SettingsScreen.kt` x1, `SmartPlaylistScreen.kt` x2; `QueueSheet.kt` pola beda, `isPlaying`,
+dicek terpisah). Tiap titik ditelusuri manual ke implementasi visualnya (bukan cuma dihitung
+dari nama parameter), dikelompokkan jadi 3 taksonomi:
+
+**Taksonomi #1 — Card preview selection (border + elevation)**: `ThemeOptionCard`
+(SettingsScreen.kt) — kartu preview tema penuh-lebar, `selected` -> `BorderStroke(2.dp, primary)`
++ `shadowElevation` naik. 1 titik, cocok utk konteksnya (kartu preview visual besar, beda level
+dari list-option/tag kecil) — bukan dibandingkan ke taksonomi lain, komponennya sendiri memang
+beda kelas.
+
+**Taksonomi #2 — List/dialog single-choice (RadioButton)**: `TransitionModeOption`
+(NowPlayingScreen.kt, dipakai 2x utk Gapless/Fade Halus — sudah ada sejak Batch 102) memakai
+`RadioButton` sungguhan. **Ditemukan 1 bug nyata**: `SpeedDialog`'s daftar kecepatan (0.5x-2x,
+di dialog "Pengaturan Putar" — DIALOG YANG SAMA PERSIS dengan `TransitionModeOption`, cuma
+dipisah 1 `HorizontalDivider` + 1 `Switch` Mode Audiobook di antaranya) sebelumnya pakai
+`TextButton` polos + suffix teks "  ✓" dan warna teks berubah primary/onSurface — bahasa
+visual SAMA SEKALI BEDA utk konsep identik (pilih 1 dari beberapa opsi), padahal user scroll
+1 layar yang sama utk lihat keduanya berdampingan. Fix: blok `options.forEach` diganti jadi
+`Row` + `RadioButton` + `Text`, struktur (`clip(RoundedCornerShape(Radius.md))` + `clickable` +
+`padding(vertical=8.dp, horizontal=4.dp)` + `Spacer(width=4.dp)`) disalin persis dari
+`TransitionModeOption` yang sudah ada di file yang sama — **0 import baru** (`RadioButton`,
+`Radius.md`, `clip`, `clickable` semua sudah dipakai di file ini sebelumnya, dicek `grep -c`
+sebelum ditulis). Efek samping baik yang tidak disengaja: whole-row sekarang clickable (dulu
+cuma area teks `TextButton`), row jadi lebih besar/nyaman disentuh — konsisten arah Batch 141
+hit-target audit walau bukan itu tujuan utama edit ini.
+
+**Taksonomi #3 — Tag/filter chip selection (Material3 FilterChip)**: diperiksa 7 titik —
+`EqualizerSheet.kt` (preset kuat x1, preset device x1), `SmartPlaylistScreen.kt` (folder chip
+x1, genre chip x1), `RingtoneCutterSheet.kt` (3x lewat `DestinationChip`, wrapper custom yang
+internally tetap panggil `FilterChip` polos tanpa override warna). **0 custom `colors =`
+override ditemukan di titik manapun** — semua pakai selected-state bawaan Material3
+(`secondaryContainer` bg). Genuinely konsisten, 0 bug.
+
+**2 observasi TERTUNDA keputusan eksplisit user** (BUKAN dieksekusi diam-diam — pola persis
+Batch 162's EmptyState-icon finding: temuan nyata, tapi berisiko/di luar cap kalau langsung
+dieksekusi tanpa konfirmasi):
+
+1. **`LibraryFilterChips` (LibraryScreen.kt) tidak masuk taksonomi #3 walau secara visual
+FUNGSINYA tag/filter row** (`LazyRow` pilihan tab Lagu/Album/Artis + chip "Lainnya" dropdown) —
+custom `Box().background(if (selected) primary else surface)` SOLID fill, bukan `FilterChip`.
+Beda dari 7 titik taksonomi #3 lainnya yang semua `secondaryContainer` (lebih lembut). Dua
+bacaan yang sama-sama masuk akal: (a) SENGAJA — ini kontrol navigasi PRIMER (menentukan seluruh
+isi layar), pantas lebih tegas/bold dari filter genre/folder yang sifatnya opsional/sekunder,
+beda hierarki fungsi bukan bug; (b) genuinely inkonsistensi styling yang tidak disengaja. Ini
+kontrol paling sering dilihat siapa pun yang buka app (selalu di atas tab Library) — mengubah
+tanpa konfirmasi eksplisit user dulu terlalu berisiko utk batch audit kecil. Dicatat di
+`MICRO_UIUX_AUDIT.md` tabel status, menunggu keputusan.
+
+2. **`SongRow` (LibraryScreen.kt, dipakai 3 call site: tab Lagu, `GroupedListView`,
+`SearchResultsView` — grep-confirmed via komentar yang sudah ada di file) tidak punya konsep
+"lagu ini sedang diputar" SAMA SEKALI** — dibandingkan `QueueSheet`'s row yang SUDAH punya
+(`background = if (isPlaying) primary.copy(alpha=0.12f) else Transparent` + `fontWeight =
+if (isPlaying) Bold else Normal`, `isPlaying = index == currentIndex`). User yang buka tab
+Library sambil lagu lain sedang main tidak pernah dapat sinyal visual lagu mana yang aktif — gap
+cross-context yang nyata dan bisa dibilang termasuk "selected/active state" kategori ini.
+**Sengaja tidak dieksekusi**: dicek dulu — signature lengkap `fun LibraryScreen(...)` (24
+parameter) TIDAK ADA satu pun yang bawa info current-song/currentSongId. Perbaikannya berarti:
+(a) parameter baru di `LibraryScreen` + `SongRow` (3 call site internal), (b) wiring data lagu
+aktif dari mana pun state itu hidup sekarang (kemungkinan `MainActivity`/`NavGraph`, keduanya
+**protected asset**) turun ke `LibraryScreen`. Itu jelas bukan lagi "audit kecil 1 file", di
+luar cap batch — butuh keputusan eksplisit user dulu, sama seperti EmptyState-icon Batch 162.
+
+**Sisa kategori #5** (setelah batch ini, 4/8 sub-item selesai): empty state (icon-mismatch
+Batch 162, masih tertunda keputusan), error state, success/confirmation feedback, konsistensi
+feedback visual lintas-aksi-yang-sama lainnya (di luar 2 yang sudah ditemukan+fix di batch ini).
+
 ## Batch 162 — Micro UI/UX kategori #5 dimulai: audit disabled/pressed/loading — 0 bug, ditemukan pola shared-composable yang sudah aman by construction (3 dokumentasi, 0 kode)
 Kategori #5 Interactive States (belum mulai sejak checklist diadopsi Batch 125). 3 dari 8
 sub-item diperiksa:

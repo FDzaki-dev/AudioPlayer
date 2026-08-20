@@ -1407,16 +1407,26 @@ private fun SpeedDialog(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.secondary
                 )
+                // Batch 163 (Micro UI/UX kategori #5, Interactive States — selected/active
+                // consistency) — dulu di sini TextButton polos + teks "✓" (dan warna teks
+                // berubah) buat menandai speed yang aktif, PADAHAL daftar pilihan-tunggal LAIN
+                // di dialog yang SAMA persis ini (Transisi Antar Lagu, langsung di bawah lewat
+                // TransitionModeOption) sudah pakai widget RadioButton sungguhan. Dua bahasa
+                // visual beda utk konsep yang identik (pilih 1 dari beberapa opsi), padahal
+                // cuma dipisah 1 Divider — disamakan ke pola RadioButton yang sama.
                 options.forEach { speed ->
                     val isSelected = speed == currentSpeed
-                    TextButton(
-                        onClick = { onSelect(speed) },
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Radius.md))
+                            .clickable(onClick = { onSelect(speed) })
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            if (isSelected) "${speed}x  ✓" else "${speed}x",
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                        )
+                        RadioButton(selected = isSelected, onClick = { onSelect(speed) })
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("${speed}x", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
 
