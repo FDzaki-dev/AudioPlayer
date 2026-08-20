@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 158 — Dokumentasi: arsipkan detail Batch 1-57 ke PROJECT_STATE_ARCHIVE.md (1 file baru + 3 dokumentasi, 0 kode)
+Eksekusi langsung "catatan jujur" di respons Batch 157: `PROJECT_STATE.md` sudah 3102 baris dan
+terus tumbuh tiap batch (Chronological Document Rule — entri baru selalu di baris teratas),
+bikin section "wajib dibaca" makin jauh dari mayoritas isi lama yang jarang dibutuhkan lagi.
+
+**Perubahan**: Batch 57 ke bawah (737 baris, rentang Batch 57-1) dipotong utuh dari
+`PROJECT_STATE.md`, dipindah — bukan ditulis ulang/diringkas, isi & urutan descending PERSIS
+sama — ke file baru `PROJECT_STATE_ARCHIVE.md`, dengan header penjelasan singkat kenapa file ini
+ada. 1 baris pointer ditinggal di `PROJECT_STATE.md` di titik potong, mengarah ke arsip.
+`PROJECT_STATE.md`: 3102 → 2388 baris, sekarang cuma menyimpan 100 batch paling baru (Batch
+58-157). `FILE_MANIFEST.txt` diperbarui (172→173 file). Intro `PROJECT_STATE.md` disebut ulang
+soal arsip ini.
+
+**Sengaja TIDAK disentuh**: section "Riwayat insiden kronologis (jangan dihapus)", "Keputusan
+arsitektur utama", "Struktur package", "Konvensi penamaan ZIP & versi", "Aturan sesi" — semua
+itu daftar kurasi/referensi umum (bukan dump mentah per-batch), beberapa eksplisit ditandai
+"jangan dihapus". `CHANGELOG.md` TIDAK ikut dipotong — tetap sumber detail penuh untuk SEMUA
+batch (1-157+), arsip ini murni soal `PROJECT_STATE.md`.
+
+0 kode, 0 protected asset. **Ambang arsip berikutnya**: kalau batch aktif tumbuh lagi ke ~100
+(sekitar Batch 258), ulangi pola sama — geser cutoff 100 batch dari batch terakhir saat itu.
+
 ## Batch 157 — Dokumentasi: pindahkan ringkasan aturan sesi ke posisi tetap paling atas PROJECT_STATE.md (2 dokumentasi, 0 kode)
 Pertanyaan langsung user: "yakin rule tadi gak bakal tenggelam oleh informasi baru?" Jawaban
 jujur: risikonya NYATA. Rule Batch 155 ("Aturan sesi: transparansi versi & pesan commit")
