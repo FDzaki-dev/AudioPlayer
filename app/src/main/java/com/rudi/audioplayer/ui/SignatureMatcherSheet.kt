@@ -130,7 +130,7 @@ private enum class MatchState { MATCH, MISMATCH, ERROR }
 @Composable
 private fun ApkPickerRow(label: String, result: ApkSignatureResult?, onPick: () -> Unit) {
     Column {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+        Text(label, style = MaterialTheme.typography.labelLarge)
         Spacer(modifier = Modifier.height(6.dp))
         val pickInteraction = remember { MutableInteractionSource() }
         OutlinedButton(

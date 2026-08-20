@@ -1,5 +1,31 @@
 # Changelog
 
+## Batch 159 — Micro UI/UX kategori #3 lanjutan: samakan label field ApkPickerRow SignatureMatcherSheet (1 file kode + 2 dokumentasi)
+Item "label/caption text-style audit belum dimulai" kategori #3 (pending sejak Batch 154).
+Scope: bandingkan style Text "caption/label di atas control" (field-label pattern) di seluruh
+`ui/*.kt`. **Metode**: grep semua `typography.label{Small,Medium,Large}` (24 titik, 26 file),
+kelompokkan per konteks fungsi.
+
+**Kelompok "field label di atas control" (9 titik/2 file) 89% konsisten**: `SmartPlaylistScreen`
+(5x: "Folder"/"Genre"/"Rentang durasi"/"Rentang tahun rilis"/"Rating minimum") +
+`RingtoneCutterSheet` (3x: "Awal:"/"Akhir:"/"Simpan sebagai") — semua `labelLarge`, warna default
+(bukan secondary). **1 gap nyata**: `SignatureMatcherSheet.kt`'s `ApkPickerRow` (dipakai 2x label
+"APK Lama"/"APK Baru" — fungsi identik: caption statis di atas tombol picker) pakai
+`labelMedium`+`color = secondary`, beda dari 8 titik lain. Fix: disamakan ke `labelLarge`, warna
+default.
+
+**Konteks lain SENGAJA tidak disentuh** (beda fungsi, bukan kandidat unifikasi): `AbPointButton`
+(`ABRepeatBookmarkSheet`) caption kecil DI DALAM tombol berpasangan dengan value bold — beda
+layout dari field-label-di-luar-control; `LyricsSheet` progress status "Sinkronisasi Lirik —
+baris N/M" — caption dinamis bukan field label statis; `NowPlayingScreen`/`HomeScreen`/
+`EqualizerSheet`/`StatsDashboardScreen`/`LibraryScreen`/`SettingsScreen` — badge/axis/nav-text,
+beda konteks, belum diaudit formal (kandidat kelompok terpisah kalau lanjut).
+
+Brace/paren `SignatureMatcherSheet.kt` seimbang (53/53, 133/133). 1 file kode + 2 dokumentasi. 0
+protected asset. **Sisa kategori #3**: badge/axis-label/nav-text (kelompok belum diaudit di
+atas), line-height, cakupan penuh truncation/ellipsis (sebagian Batch 37, belum formal kategori
+#3). **Belum diverifikasi visual** — perubahan kecil (1 baris style), risiko rendah.
+
 ## Batch 158 — Dokumentasi: arsipkan detail Batch 1-57 ke PROJECT_STATE_ARCHIVE.md (1 file baru + 3 dokumentasi, 0 kode)
 Eksekusi langsung "catatan jujur" di respons Batch 157: `PROJECT_STATE.md` sudah 3102 baris dan
 terus tumbuh tiap batch (Chronological Document Rule — entri baru selalu di baris teratas),

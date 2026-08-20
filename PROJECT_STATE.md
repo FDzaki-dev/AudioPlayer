@@ -18,6 +18,18 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 159 (Micro UI/UX kategori #3 lanjutan — samakan label field `ApkPickerRow`
+`SignatureMatcherSheet`, 1 file kode + 2 dokumentasi)** — Item "label/caption text-style audit"
+kategori #3 (pending sejak Batch 154). Grep 24 titik `typography.label*` di 26 file `ui/`,
+kelompokkan per fungsi: kelompok "field label di atas control" (9 titik, `SmartPlaylistScreen`
+5x + `RingtoneCutterSheet` 3x) 89% konsisten `labelLarge`+warna default — 1 gap:
+`SignatureMatcherSheet`'s `ApkPickerRow` (label "APK Lama"/"APK Baru") pakai
+`labelMedium`+secondary, disamakan ke `labelLarge`+default. Konteks lain (`AbPointButton`,
+progress status `LyricsSheet`, badge/axis/nav-text sheet lain) SENGAJA belum diaudit — beda
+fungsi atau kelompok terpisah kandidat batch berikutnya. 0 protected asset. **Sisa kategori
+#3**: badge/axis-label/nav-text (belum diaudit), line-height, cakupan penuh truncation/ellipsis.
+Detail: `CHANGELOG.md` Batch 159.
+
 **Batch 158 (Dokumentasi — arsipkan detail Batch 1-57 ke PROJECT_STATE_ARCHIVE.md, 1 file baru +
 3 dokumentasi diedit, 0 kode)** — Eksekusi langsung saran "catatan jujur" Batch 157: file sudah
 3102 baris & terus tumbuh, section aktif makin jauh dari batch-batch tua. Batch 57 ke bawah
