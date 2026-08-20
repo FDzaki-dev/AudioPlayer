@@ -308,7 +308,7 @@ fun AddToPlaylistDialog(
                 } else {
                     TextButton(onClick = { showCreateField = true }) {
                         Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text("Buat Playlist Baru")
                     }
                 }

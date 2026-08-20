@@ -6,6 +6,22 @@ lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang suda
 kejadian, bukan pengganti keduanya.
 
 ## Batch terakhir yang selesai
+**Batch 151 (Micro UI/UX kategori #2 lanjutan — samakan gap icon↔text tombol "Buat Playlist
+Baru", 1 file kode + 1 dokumentasi)** — Item "gap icon↔text" (pending sejak Batch 147): 29 titik
+`Icon()`→`Spacer(width)`→`Text()` di `ui/*.kt` dikelompokkan per konteks dulu (bukan sweep
+mekanis buta). 3 grup SUDAH konsisten (default-size icon+label 8dp, 14 titik/9 file; TextButton
+icon custom-size 16-18dp proporsional 6dp/4dp, disengaja bukan bug; menu-row Icon+Column
+judul+deskripsi 12dp, 5 titik/2 file). **1 gap nyata**: `PlaylistScreen.kt` "Buat Playlist Baru"
+(`TextButton`+`Icons.Default.Add` default-size) gap 4dp → disamakan ke 8dp. Brace/paren
+seimbang (96/96, 152/152). 0 protected asset. **Pending Queue kategori #2**: (1) `VaultSheet.kt`
+~baris 270 — bug PERSIS sama (`TextButton`+`Icons.Default.Add` default-size, gap 4dp) ditemukan
+di audit yang sama, ditunda demi cap 3 file — jangan ditunda >1 batch. (2) `SettingsScreen.kt`
+vertical spacing antar section diaudit ulang batch ini — 7 titik pola `Spacer(12dp)→Divider→
+Spacer(20dp)` SUDAH 100% konsisten, 0 bug, kategori ini bisa dianggap selesai kalau tidak ada
+screen lain yang perlu dicek. (3) sisa literal `.dp` lain. (4) sinkron `MICRO_UIUX_AUDIT.md`
+status table (tertunda 1 batch demi cap file — pelajaran Batch 148: jangan ditunda >1 batch
+berturut-turut). Detail: `CHANGELOG.md` Batch 151.
+
 **Batch 150 (Dokumentasi — sinkronkan status table kategori #3 di MICRO_UIUX_AUDIT.md, 1
 dokumentasi, 0 kode)** — Item pending prioritas tinggi Batch 149 (tertunda 0 batch, langsung
 disinkronkan sesuai pelajaran Batch 148 soal dokumen tracking manual rawan telat). Baris

@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 151 — Micro UI/UX kategori #2 lanjutan: samakan gap icon↔text tombol "Buat Playlist Baru" (1 file kode + 1 dokumentasi)
+Item pertama kategori #2 (Spacing & Sizing Consistency) sub-item "gap icon↔text" (pending sejak
+Batch 147, ditandai "terlalu kontekstual buat sweep mekanis, butuh pengelompokan per-konteks
+dulu"). Pengelompokan dilakukan: grep semua pasangan `Icon()` → `Spacer(width)` → `Text()` di
+`ui/*.kt` (29 titik), dikelompokkan per konteks (Button/OutlinedButton default-size icon,
+TextButton icon 16-18dp custom-size proporsional, menu-row Icon+Column judul+deskripsi, section
+header Icon+Text). Hasil: 3 grup pertama SUDAH konsisten (default-size icon+label mayoritas 8dp
+di 14 titik lintas 9 file; TextButton icon 16-18dp custom-size sengaja pakai gap lebih kecil
+6dp/4dp proporsional ke ukuran icon-nya — bukan gap, `ABRepeatBookmarkSheet.kt` 2 titik dicek TIDAK
+disentuh; menu-row Icon+Column 12dp konsisten 5 titik di 2 file). **1 gap nyata**: `PlaylistScreen.kt`
+tombol "Buat Playlist Baru" (`TextButton` + `Icons.Default.Add` default-size, TANPA custom
+`Modifier.size()`) pakai gap 4dp — menyimpang dari konvensi mayoritas 8dp utk kombinasi icon
+default-size di button manapun. Fix: 4dp→8dp. Brace/paren `PlaylistScreen.kt` seimbang (96/96,
+152/152). 0 protected asset.
+
+**Pending Queue kategori #2** (ditemukan di audit yang sama, ditunda demi cap 3 file — SAMA
+bug persis, `VaultSheet.kt` baris ~270, `TextButton`+`Icons.Default.Add` default-size, gap 4dp
+juga): fix `VaultSheet.kt` di batch berikutnya. Sisa: vertical spacing antar section
+(`SettingsScreen.kt` diaudit ulang batch ini — 7 titik pola `Spacer(12dp)→Divider→Spacer(20dp)`
+SUDAH 100% konsisten, 0 bug), sisa literal `.dp` lain, sinkron `MICRO_UIUX_AUDIT.md` status
+table (tertunda 1 batch demi cap file, jangan ditunda lebih lama).
+
 ## Batch 150 — Dokumentasi: sinkronkan status table kategori #3 di MICRO_UIUX_AUDIT.md (1 dokumentasi, 0 kode)
 Item pending prioritas tinggi Batch 149 ("jangan tunda lebih dari 1 batch"). Baris kategori #3
 diperbarui `⬜ Belum mulai` → `🟡 Berlanjut (Batch 149)` + ringkasan temuan/fix (title
