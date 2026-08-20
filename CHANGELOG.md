@@ -1,5 +1,22 @@
 # Changelog
 
+## Batch 157 — Dokumentasi: pindahkan ringkasan aturan sesi ke posisi tetap paling atas PROJECT_STATE.md (2 dokumentasi, 0 kode)
+Pertanyaan langsung user: "yakin rule tadi gak bakal tenggelam oleh informasi baru?" Jawaban
+jujur: risikonya NYATA. Rule Batch 155 ("Aturan sesi: transparansi versi & pesan commit")
+ditaruh di section paling BAWAH `PROJECT_STATE.md` (~baris 3057 dari 3102 total) — sementara
+section paling sering dibaca sesi manapun ada di paling ATAS ("Batch terakhir yang selesai"),
+yang terus memanjang tiap batch baru (Chronological Document Rule: entri baru selalu disisipkan
+di baris teratas). Kalau ada sesi yang cuma sempat baca sebagian file, atau context ter-
+truncate, rule di bawah bisa genuinely terlewat.
+
+**Fix**: ringkasan 2 rule (dari Batch 155) ditambahkan di section BARU "⚠️ ATURAN SESI AKTIF —
+WAJIB DIBACA", diletakkan tepat setelah paragraf pembuka file — posisi ini TETAP, tidak pernah
+ikut tergeser walau "Batch terakhir yang selesai" terus tumbuh ke bawah. Isi lengkap tetap ada
+di § "Aturan sesi: transparansi versi & pesan commit" (tidak dihapus/dipindah, cuma diringkas
+ulang di 2 tempat — di atas untuk visibilitas, di bawah untuk detail penuh).
+
+2 dokumentasi (`CHANGELOG.md`/`PROJECT_STATE.md`), 0 kode, 0 protected asset.
+
 ## Batch 156 — Fitur: catatan rilis (pesan commit) tampil langsung di layar "Cek Update" app (3 file kode + 2 dokumentasi)
 Permintaan langsung user, jawab pertanyaan "apakah pesan update langsung dari aplikasi juga ikut
 berubah?" — jawaban sebelumnya: TIDAK, app cuma nampilin `tagName` (angka versi doang), field

@@ -5,7 +5,28 @@ menyentuh kode apa pun. Detail lengkap tiap batch ada di `CHANGELOG.md`; ringkas
 lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang sudah pernah
 kejadian, bukan pengganti keduanya.
 
+## ⚠️ ATURAN SESI AKTIF — WAJIB DIBACA (posisi tetap, tidak ikut tergeser batch baru)
+Detail lengkap ada di § "Aturan sesi: transparansi versi & pesan commit" di BAWAH file ini
+(sengaja diringkas ulang di sini juga, supaya tidak tenggelam kalau sesi cuma sempat baca bagian
+atas file yang terus memanjang):
+1. **Dilarang edit manual `versionCode`/`versionName`** di `app/build.gradle.kts` — auto dari
+   commit git sejak Batch 30. Tiap kirim ZIP wajib sebut nomor batch + ingatkan versionName asli
+   baru pasti setelah `git push`.
+2. **Box code pesan commit WAJIB tampil di atas heading "Update Harian:"** tiap respons chat,
+   isinya wajib penjelasan fitur singkat dari `CHANGELOG.md` batch itu — dilarang cuma angka
+   versi polos.
+
 ## Batch terakhir yang selesai
+**Batch 157 (Dokumentasi — pindahkan ringkasan aturan sesi ke posisi tetap paling atas file, 2
+dokumentasi, 0 kode)** — User bertanya langsung: "yakin rule tadi gak bakal tenggelam?" Jawaban
+jujur: TIDAK yakin — rule Batch 155 ditaruh di § paling BAWAH file (3102 baris total saat itu),
+sementara bagian paling sering dibaca sesi manapun ada di paling ATAS ("Batch terakhir yang
+selesai"). Fix: ringkasan 2 rule ditambahkan di § baru "⚠️ ATURAN SESI AKTIF — WAJIB DIBACA"
+tepat setelah intro pembuka file (posisi TETAP — tidak ikut tergeser walau "Batch terakhir yang
+selesai" terus memanjang ke bawah tiap batch baru), sambil isi lengkap tetap di § "Aturan sesi"
+bawah (tidak dihapus, cuma diringkas ulang di 2 tempat). 0 kode, 0 protected asset. Detail:
+`CHANGELOG.md` Batch 157.
+
 **Batch 156 (Fitur — catatan rilis/pesan commit tampil di layar "Cek Update" app, 3 file kode +
 2 dokumentasi, cap file DILEWATI atas instruksi eksplisit user "eksekusi utuh dan sampai
 tuntas")** — Jawab pertanyaan user: app SEBELUMNYA tidak pernah nampilin pesan commit/release
