@@ -18,6 +18,19 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 167 (Hotfix — import `dp` hilang di `Utils.kt`, 1 file, 1 baris)** — User upload log CI
+gagal (`compileReleaseKotlin`+`compileDebugKotlin` FAILED, 7x "Unresolved reference: dp").
+Akar: composable `ResultBanner` baru (Batch 166) pakai 8 literal `.dp` tapi
+`import androidx.compose.ui.unit.dp` tidak pernah ditambahkan — `Utils.kt` sebelumnya genuinely
+0 pemakaian `.dp` (2 composable lain di file itu tidak butuh), jadi belum pernah perlu import
+ini. Fix: 1 baris import ditambahkan. Dicek ulang 4 file lain Batch 166 — semua sudah punya
+import `dp` dari sebelumnya, tidak ada yang ikut kehilangan. 0 perubahan logic/visual lain.
+`FILE_MANIFEST.txt` tidak berubah (173/173). **Masih belum diverifikasi compile Gradle ulang
+setelah fix** — prioritas TERTINGGI batch berikutnya: `./gradlew assembleDebug` bersih.
+**Pelajaran**: composable baru di file shared wajib dicek importnya sendiri dari nol, bukan
+diasumsikan lengkap karena bersebelahan kode lain yang sudah lengkap. Detail: `CHANGELOG.md`
+Batch 167.
+
 **Batch 166 (Eksekusi pending item Batch 165 — unifikasi ResultBanner, Atomic Change 5 file)**
 — User konfirmasi lanjut. Kelompok B Batch 165 (banner hasil-operasi 3-arah tidak konsisten)
 disatukan jadi 1 composable shared `ResultBanner` (`Utils.kt`, + `enum ResultBannerStyle

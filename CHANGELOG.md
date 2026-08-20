@@ -1,5 +1,30 @@
 # Changelog
 
+## Batch 167 — Hotfix: import `dp` hilang di Utils.kt (dari log CI Batch 166, 1 file)
+User upload log CI gagal (`log_fail_220.zip`, GitHub Actions `compileReleaseKotlin`+
+`compileDebugKotlin` FAILED, 7x "Unresolved reference: dp" di `Utils.kt` baris 171-191) — ini
+tepat verifikasi compile Gradle yang dicatat "belum dilakukan" di `PROJECT_STATE.md` Batch 166,
+dan langsung menangkap bug nyata: composable `ResultBanner` baru (Batch 166) pakai 8 literal
+`.dp` (`RoundedCornerShape(8.dp)`, `.padding(12.dp, 10.dp)`, `.padding(14.dp)`,
+`Modifier.width(8.dp)`/`width(10.dp)`, dst) tapi `import androidx.compose.ui.unit.dp` tidak
+pernah ditambahkan — sebelum Batch 166, `Utils.kt` genuinely 0 pemakaian `.dp` sama sekali
+(`AlbumArt`/`bouncyPress`, 2 composable lain di file itu, tidak pakai dp literal), jadi import
+ini belum pernah dibutuhkan sebelumnya di file ini.
+
+**`Utils.kt`** (diedit, 1 baris) — `import androidx.compose.ui.unit.dp` ditambahkan. Dicek
+ulang 4 file lain yang ikut disentuh Batch 166 (`BackupRestoreSheet`/`DiagnosticLogSheet`/
+`SignatureMatcherSheet`/`UpdateCheckSheet`) — SEMUA sudah punya import `dp` dari sebelumnya
+(dipakai di tempat lain di file yang sama, bukan cuma di blok `ResultBanner` yang diedit), jadi
+Batch 166 tidak menghapus import yang masih dibutuhkan di file manapun — murni 1 baris hilang
+di 1 file. 0 perubahan logic/visual lain.
+
+1 file, 1 baris. Brace/paren `Utils.kt` seimbang (17/17, 64/64). `FILE_MANIFEST.txt` tidak
+berubah (173/173). **Masih belum diverifikasi compile Gradle ulang setelah fix ini** — prioritas
+TERTINGGI batch berikutnya kalau user push: `./gradlew assembleDebug` bersih, konfirmasi 0 error
+serupa lolos lagi. Pelajaran dicatat: composable baru yang dipindah ke file shared (`Utils.kt`)
+wajib dicek importnya SENDIRI dari nol, bukan diasumsikan ikut lengkap cuma karena ditulis
+bersebelahan kode lain yang sudah punya semua importnya. Detail: log asli `log_fail_220.zip`.
+
 ## Batch 166 — Eksekusi pending item Batch 165: unifikasi ResultBanner (Atomic Change, 5 file)
 User konfirmasi lanjut. Kelompok B Batch 165 (banner hasil-operasi, 3-arah tidak konsisten)
 disatukan jadi 1 composable shared, BUKAN dipaksa 1 tampilan tunggal — 3 gaya visual yang sudah
