@@ -11,17 +11,26 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.SubcomposeAsyncImage
 import java.util.Locale
@@ -120,4 +129,67 @@ fun Modifier.bouncyPress(
         label = "bouncyPress"
     )
     this.scale(scale)
+}
+
+/**
+ * Visual weight for [ResultBanner] — kept as 3 distinct looks on purpose, not collapsed into
+ * one. Batch 165 audit found these had each been hand-duplicated slightly differently across
+ * 3 files; the fix here is giving them ONE shared implementation (so future drift is
+ * impossible), not forcing them to look identical — each already carried a different semantic
+ * weight that's reasonable to keep: [Solid] for a result that's shown once and won't change
+ * again, [Tinted] for a state that stays visible while the user reviews/acts further, [Bare]
+ * for one status among several in a multi-step flow where a full banner would compete with
+ * the progress indicator/button around it.
+ */
+enum class ResultBannerStyle { Solid, Tinted, Bare }
+
+/**
+ * Shared icon+color+text result/status banner. 0 visual change from this refactor by design —
+ * [Solid] reproduces exactly what `BackupRestoreSheet.kt`/`DiagnosticLogSheet.kt` already had
+ * (container-role background, `RoundedCornerShape(8.dp)`, 12dp/10dp padding, 8dp icon-gap,
+ * `bodySmall`), [Tinted] reproduces `SignatureMatcherSheet.kt` (15%-alpha tint of the semantic
+ * color itself, `shapes.medium`, 14dp padding, 10dp gap, `bodyMedium`), [Bare] reproduces
+ * `UpdateCheckSheet.kt`'s old private `StatusBanner` (no background at all, 8dp gap,
+ * `bodyMedium`). For [Solid], pass the M3 container role color (e.g. `primaryContainer`) as
+ * [containerColor] and its `onXContainer` pair as [contentColor]; for [Tinted] and [Bare],
+ * pass the same base semantic color (e.g. `colorScheme.error`) as both.
+ */
+@Composable
+fun ResultBanner(
+    style: ResultBannerStyle,
+    icon: ImageVector,
+    text: String,
+    containerColor: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    when (style) {
+        ResultBannerStyle.Solid -> Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = modifier
+                .fillMaxWidth()
+                .background(color = containerColor, shape = RoundedCornerShape(8.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = contentColor)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text, style = MaterialTheme.typography.bodySmall, color = contentColor)
+        }
+        ResultBannerStyle.Tinted -> Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .background(containerColor.copy(alpha = 0.15f), shape = MaterialTheme.shapes.medium)
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = null, tint = contentColor)
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(text, style = MaterialTheme.typography.bodyMedium, color = contentColor)
+        }
+        ResultBannerStyle.Bare -> Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
+            Icon(icon, contentDescription = null, tint = contentColor)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text, color = contentColor, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
 }

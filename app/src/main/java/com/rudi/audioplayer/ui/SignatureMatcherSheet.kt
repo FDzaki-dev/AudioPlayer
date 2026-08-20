@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,7 +14,6 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -97,17 +95,13 @@ fun SignatureMatcherSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit
                     MatchState.MISMATCH -> Triple(MaterialTheme.colorScheme.error, Icons.Default.Error, "Signature TIDAK COCOK — instalasi akan minta uninstall dulu")
                     MatchState.ERROR -> Triple(MaterialTheme.colorScheme.error, Icons.Default.Error, "Ada masalah membaca salah satu file")
                 }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(bannerColor.copy(alpha = 0.15f), shape = MaterialTheme.shapes.medium)
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(bannerIcon, contentDescription = null, tint = bannerColor)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(bannerText, style = MaterialTheme.typography.bodyMedium, color = bannerColor)
-                }
+                ResultBanner(
+                    style = ResultBannerStyle.Tinted,
+                    icon = bannerIcon,
+                    text = bannerText,
+                    containerColor = bannerColor,
+                    contentColor = bannerColor
+                )
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(
                     onClick = { showLogDialog = true },

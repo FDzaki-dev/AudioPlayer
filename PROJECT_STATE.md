@@ -18,6 +18,29 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 166 (Eksekusi pending item Batch 165 — unifikasi ResultBanner, Atomic Change 5 file)**
+— User konfirmasi lanjut. Kelompok B Batch 165 (banner hasil-operasi 3-arah tidak konsisten)
+disatukan jadi 1 composable shared `ResultBanner` (`Utils.kt`, + `enum ResultBannerStyle
+{Solid, Tinted, Bare}`) — BUKAN dipaksa 1 tampilan tunggal, 3 gaya visual lama dipertahankan
+lewat parameter `style` (masing-masing mereproduksi PERSIS byte-demi-byte implementasi lama:
+warna/shape/padding/gap/text-style, **0 perubahan visual disengaja**). Akar masalah yang
+diperbaiki: 3 implementasi manual gampang saling melenceng ke depan, bukan tampilannya sendiri
+(yang memang beda sengaja per konteks — hasil-sekali-tampil vs state-persisten vs
+status-dalam-stepper).
+
+`BackupRestoreSheet.kt`/`DiagnosticLogSheet.kt` (diedit) → `ResultBanner(style=Solid,...)`.
+`SignatureMatcherSheet.kt` (diedit) → `ResultBanner(style=Tinted,...)`, `ApkPickerRow` di file
+yang sama TIDAK disentuh. `UpdateCheckSheet.kt` (diedit) — private `StatusBanner` badan
+fungsinya delegasi ke `ResultBanner(style=Bare,...)`, KEDUA call site pemanggil TIDAK disentuh
+(paling minim-risiko). Import `background`/`RoundedCornerShape`/`Alignment` yang jadi tak
+terpakai di 3 file dihapus (dicek grep per simbol dulu, bukan tebakan).
+
+5 file, `Atomic Change` (1 task tidak bisa dipecah lebih kecil, pola sama Batch 91/95/119). 0
+file baru, `FILE_MANIFEST.txt` tidak berubah (173/173). Brace/paren ke-5 file seimbang.
+**Belum diverifikasi compile Gradle/visual device** — prioritas berikutnya: (1) `./gradlew
+assembleDebug`, (2-5) cek visual tiap 1 dari 3 style di device (Backup/Diagnostic/Signature/
+Update), pastikan PERSIS sama seperti sebelum batch ini. Detail: `CHANGELOG.md` Batch 166.
+
 **Batch 165 (Micro UI/UX kategori #5 lanjutan — audit error state & success/confirmation
 feedback, 0 kode, 3 dokumentasi)** — Sub-item 5&6/8 kategori #5, digabung karena ternyata 1
 komponen visual yang sama. Grep 9 file `ui/*.kt` pakai error color/icon, dikelompokkan 2:

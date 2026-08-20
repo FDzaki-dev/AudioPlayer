@@ -1,5 +1,49 @@
 # Changelog
 
+## Batch 166 — Eksekusi pending item Batch 165: unifikasi ResultBanner (Atomic Change, 5 file)
+User konfirmasi lanjut. Kelompok B Batch 165 (banner hasil-operasi, 3-arah tidak konsisten)
+disatukan jadi 1 composable shared, BUKAN dipaksa 1 tampilan tunggal — 3 gaya visual yang sudah
+ada (masing-masing punya alasan bobot semantik berbeda, lihat Batch 165) dipertahankan lewat
+parameter `style`, supaya akar masalahnya (implementasi diketik ulang 3x, gampang saling
+melenceng) hilang tanpa memaksa keputusan desain yang belum eksplisit dikonfirmasi user.
+
+**`Utils.kt`** (diedit) — `enum class ResultBannerStyle { Solid, Tinted, Bare }` +
+`@Composable fun ResultBanner(style, icon, text, containerColor, contentColor, modifier)` baru,
+ditaruh di file yang sama tempat `AlbumArt`/`bouncyPress` (shared composable lain) sudah hidup.
+3 cabang `when(style)` mereproduksi PERSIS 3 implementasi lama byte-demi-byte (warna, shape,
+padding, gap, text style) — **0 perubahan visual disengaja** dari refactor ini sendiri.
+`Solid`: bg container-role + `RoundedCornerShape(8.dp)` + padding 12h/10v + gap 8dp +
+`bodySmall`. `Tinted`: bg `containerColor.copy(alpha=0.15f)` + `shapes.medium` + padding 14dp +
+gap 10dp + `bodyMedium`. `Bare`: tanpa background sama sekali + gap 8dp + `bodyMedium`.
+
+**`BackupRestoreSheet.kt`/`DiagnosticLogSheet.kt`** (diedit) — blok `Row`+`background`+`Icon`+
+`Text` manual diganti `ResultBanner(style = Solid, ...)`. Import `background`/
+`RoundedCornerShape`/`Alignment` yang jadi tidak terpakai lagi di kedua file dihapus (dicek
+`grep` per simbol dulu sebelum dihapus, bukan tebakan).
+
+**`SignatureMatcherSheet.kt`** (diedit) — blok banner match/mismatch/error diganti
+`ResultBanner(style = Tinted, ...)`. `ApkPickerRow` (composable lain di file yang sama, TIDAK
+disentuh) masih pakai `Icon`/`Text` sendiri jadi import itu tetap ada — cuma `background` +
+`Alignment` yang jadi tak terpakai (dicek sama, dihapus).
+
+**`UpdateCheckSheet.kt`** (diedit) — private `fun StatusBanner(...)` (dipanggil di 2 titik,
+KEDUA call site TIDAK disentuh sama sekali) badan fungsinya diganti jadi delegasi 1 baris ke
+`ResultBanner(style = Bare, ...)` — cara paling minim-risiko untuk file ini, 0 titik pemanggilan
+perlu diubah.
+
+5 file (`Atomic Change` — 1 task "unifikasi ResultBanner", scope memang tidak bisa dipecah lebih
+kecil tanpa meninggalkan setengah-selesai; sama presisi kelas pengecualian Batch 91/95/119). 0
+file baru, `FILE_MANIFEST.txt` TIDAK berubah (173/173 tetap match — cek diff ulang sebelum
+repack). Brace/paren ke-5 file dicek otomatis & seimbang. **Belum diverifikasi compile Gradle
+sungguhan maupun visual di device** — prioritas berikutnya kalau user push: (1) `./gradlew
+assembleDebug` build bersih (nama fungsi/parameter baru rawan typo Kotlin yang cuma ketahuan
+compile-time), (2) buka Settings → Backup/Restore, import 1 file valid & 1 file rusak,
+konfirmasi banner sukses/gagal tampil PERSIS sama seperti sebelum batch ini, (3) sama untuk
+Diagnostic Log export, (4) Signature Matcher: bandingkan 2 APK sama & 2 APK beda, konfirmasi
+warna tertiary(match)/error(mismatch) + tint 15% masih benar, (5) Update Check: picu state Error
+(mis. matikan koneksi kalau ada cara simulasi), konfirmasi tampilan bare-banner tidak berubah.
+Detail lengkap perbandingan byte-demi-byte tiap style: lihat KDoc `ResultBanner` di `Utils.kt`.
+
 ## Batch 165 — Micro UI/UX kategori #5 lanjutan: audit error state & success/confirmation feedback (0 kode, 3 dokumentasi)
 Sub-item ke-5&6/8 kategori #5 (2 digabung — ternyata 1 komponen visual yang sama dipakai untuk
 keduanya, lihat temuan di bawah). Grep `colorScheme.error`/`Icons.Default.Error`/

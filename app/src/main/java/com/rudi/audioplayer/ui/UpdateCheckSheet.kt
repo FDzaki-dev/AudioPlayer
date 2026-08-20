@@ -118,9 +118,17 @@ fun UpdateCheckSheet(onDismiss: () -> Unit) {
 
 @Composable
 private fun StatusBanner(color: Color, icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = color)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text, color = color, style = MaterialTheme.typography.bodyMedium)
-    }
+    // Batch 165 — delegates to the shared ResultBanner (Bare style) so this and the 2 other
+    // hand-duplicated result-banner implementations (BackupRestoreSheet/DiagnosticLogSheet,
+    // SignatureMatcherSheet) can't silently drift apart again. Same look as before: no
+    // background, just icon+gap+text, kept minimal on purpose since this sits inside a
+    // multi-step stepper (Checking→Available→Downloading→ReadyToInstall→Error) next to a
+    // progress bar/button — a full banner would compete with those visually.
+    ResultBanner(
+        style = ResultBannerStyle.Bare,
+        icon = icon,
+        text = text,
+        containerColor = color,
+        contentColor = color
+    )
 }
