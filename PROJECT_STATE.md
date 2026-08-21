@@ -18,6 +18,16 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 192 (Playlist/Queue item 2/8 — drag handle touch target 40dp→48dp, 1 file, 1 bug fix)**
+— `QueueRow` (`QueueSheet.kt`) drag handle `Box` (gesture nyata via
+`detectDragGesturesAfterLongPress`) 40dp, di bawah standar 48dp yang dipakai 3 `IconButton` lain
+di baris sama. Disamakan ke 48dp, ikon/contentDescription/gesture logic tidak diubah. Dicek juga:
+`PlaylistScreen.kt` tidak punya drag handle sama sekali (cuma tombol naik/turun) — BUKAN gap,
+checklist-nya "jika tersedia" dan di situ memang tidak tersedia; menambah drag baru = ubah
+behavior, di luar scope. 1 file, 0 protected asset. Item berikutnya (3/8): audit selected/current
+item state. **Belum diverifikasi visual di device** — cek drag handle lebih mudah digenggam,
+tidak dorong elemen lain. Detail: `CHANGELOG.md` Batch 192.
+
 **Batch 191 (Playlist/Queue item 1/8 — konsistenkan row height dan spacing, 1 file, 1 bug fix)**
 — Kategori baru dimulai setelah Library/Song List tuntas. `QueueRow` horizontal padding 12dp,
 outlier dari konvensi 20dp yang dipakai konsisten di seluruh app (`PlaylistSongRow`/`SongRow`/

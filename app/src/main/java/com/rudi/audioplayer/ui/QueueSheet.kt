@@ -241,7 +241,7 @@ private fun QueueRow(
     ) {
         Box(
             modifier = dragHandleModifier
-                .size(40.dp),
+                .size(48.dp),
             contentAlignment = Alignment.Center
         ) {
             Icon(

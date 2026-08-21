@@ -107,7 +107,10 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
 ## 🟠 PLAYLIST / QUEUE
 
 - [x] Konsistenkan row height dan spacing. **✅ 1 bug fix (Batch 191)** — `QueueRow` (`QueueSheet.kt`) horizontal padding 12dp, outlier dari konvensi 20dp yang dipakai konsisten di SELURUH app (`PlaylistSongRow`, `SongRow`, `ShimmerRow`, dst.). Disamakan ke 20dp. Vertical padding (8dp) & tinggi efektif row sudah konsisten dari awal, tidak diubah.
-- [ ] Pastikan drag/reorder affordance jelas jika tersedia.
+- [ ] Pastikan drag/reorder affordance jelas jika tersedia. **✅ 1 bug fix (Batch 192)** —
+  `QueueRow` drag handle 40dp→48dp (standar Material touch target, samakan dgn 3 `IconButton`
+  lain di baris sama). `PlaylistScreen` tidak punya drag handle sama sekali — bukan gap
+  (checklist "jika tersedia", di situ memang tidak tersedia; nambah = ubah behavior).
 - [ ] Audit selected/current item state.
 - [ ] Audit remove/delete affordance.
 - [ ] Pastikan destructive action memiliki visual hierarchy yang tepat.

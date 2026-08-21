@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 192 — Playlist/Queue item 2/8: drag handle touch target 40dp→48dp (1 file, 1 bug fix)
+`QueueRow` (`QueueSheet.kt`) drag handle — `Box` pembungkus ikon `DragHandle` + gesture nyata
+(`pointerInputDragHandle`, `detectDragGesturesAfterLongPress`) — ukuran 40dp, di bawah standar
+touch target Material 48dp yang dipakai konsisten di 3 `IconButton` lain di baris yang sama
+(naik/turun/hapus, default Material 48dp). Disamakan ke 48dp — handle jadi lebih mudah digenggam
+tanpa geser layout lain (elemen pertama, `Column` berikutnya pakai `weight(1f)` jadi otomatis
+menyerap selisih 8dp). Ikon `DragHandle` sendiri, `contentDescription` ("Tahan lalu geser untuk
+mengurutkan ulang"), dan gesture logic tidak diubah — murni ukuran touch target.
+
+**Dicek juga (bukan bug)**: `PlaylistScreen.kt` tidak punya drag handle sama sekali, cuma tombol
+naik/turun — bukan gap, karena playlist itu memang belum punya mekanisme drag (`dragHandleModifier`
+tidak ada di signature-nya). Item checklist "jika tersedia" — untuk `PlaylistScreen` tidak
+tersedia, jadi tidak ada yang diaudit di sana. Menambah drag-and-drop baru ke `PlaylistScreen`
+akan jadi perubahan behavior baru, di luar scope "perbaiki yang ada" & melanggar item checklist
+terakhir kategori ini ("Jangan mengubah queue behavior").
+
+Brace/paren `QueueSheet.kt` seimbang (40/40, 125/125). 1 file, 0 protected asset.
+`FILE_MANIFEST.txt` tidak berubah (173/173). **Belum diverifikasi visual di device.**
+
 ## Batch 191 — Playlist/Queue item 1/8: konsistenkan row height dan spacing (1 file, 1 bug fix)
 Kategori baru setelah Library/Song List tuntas 11/11 (Batch 190). Item 1/8: dibandingkan
 `QueueRow` (`QueueSheet.kt`) vs `PlaylistSongRow` (`PlaylistScreen.kt`) — dua row paling mirip
