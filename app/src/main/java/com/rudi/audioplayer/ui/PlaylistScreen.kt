@@ -1,5 +1,6 @@
 package com.rudi.audioplayer.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,8 +17,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.Playlist
@@ -33,7 +36,8 @@ fun PlaylistTabView(
     onDeletePlaylist: (String) -> Unit,
     onRenamePlaylist: (String, String) -> Unit,
     onRemoveSongFromPlaylist: (String, Long) -> Unit,
-    onMoveSongInPlaylist: (String, Int, Int) -> Unit
+    onMoveSongInPlaylist: (String, Int, Int) -> Unit,
+    currentSongId: Long? = null
 ) {
     var selectedPlaylistId by remember { mutableStateOf<String?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -119,6 +123,7 @@ fun PlaylistTabView(
                             PlaylistSongRow(
                                 modifier = Modifier.animateItemPlacement(),
                                 song = song,
+                                isPlaying = song.id == currentSongId,
                                 canMoveUp = index > 0,
                                 canMoveDown = index < playlistSongs.lastIndex,
                                 onClick = { onSongClick(playlistSongs, index) },
@@ -200,6 +205,7 @@ fun PlaylistTabView(
 @Composable
 private fun PlaylistSongRow(
     song: Song,
+    isPlaying: Boolean = false,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     onClick: () -> Unit,
@@ -208,15 +214,24 @@ private fun PlaylistSongRow(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val background = if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .background(background)
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(song.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                song.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
+                color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Text(
                 song.artist,
                 style = MaterialTheme.typography.bodySmall,

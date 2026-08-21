@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 198 — PlaylistScreen highlight lagu-sedang-diputar (2 file, 1 fitur diperluas)
+Eksekusi observasi Batch 193 (disetujui user). `currentSongId` dialirkan: `LibraryScreen.kt`
+(`PlaylistTabView` call site) → `PlaylistTabView` (param baru, default `null` — 0 risiko
+pemanggil lain kalau ada) → `PlaylistSongRow` (param baru `isPlaying`, dihitung dari `song.id ==
+currentSongId`). Styling **disalin persis dari `QueueRow`** (`QueueSheet.kt`, sudah ada sejak
+awal) — background `primary.copy(alpha=0.12f)`, judul lagu bold+warna primary saat diputar.
+Bukan desain baru, murni terapkan pola yang sudah established di komponen sejenis.
+
+2 file kode diedit (`LibraryScreen.kt` — 1 baris param baru di call site; `PlaylistScreen.kt` —
+signature `PlaylistTabView`+`PlaylistSongRow`, 3 import baru `background`/`Color`/`FontWeight`).
+0 file baru, 0 protected asset, `FILE_MANIFEST.txt` tidak berubah (173/173). Brace/paren
+seimbang (`LibraryScreen.kt` 336/336 724/724, `PlaylistScreen.kt` 108/108 166/166).
+
+Dengan ini, 3 dari 3 titik "song list" yang teridentifikasi Batch 193 (`QueueSheet`,
+`PlaylistScreen`) kini konsisten highlight lagu-sedang-diputar — `SmartPlaylistTabView` (tab 6)
+BELUM dicek, kandidat audit terpisah kalau diminta (beda composable lagi, belum ditelusuri).
+**Belum diverifikasi visual** — cek: putar lagu yang ada di playlist, buka tab Playlist, pastikan
+baris lagu itu ter-highlight & tetap sinkron kalau ganti lagu tanpa keluar-masuk playlist.
+
 ## Batch 197 — Sweep-select tab Artist + Folder (1 file, 1 fitur diperluas — lanjutan Batch 196)
 Lanjutan permintaan user: `GroupedListView` (dipakai tab "Artist"/`selectedTab==2` DAN tab
 "Folder"/branch `else`) dulu render lagu-dalam-grup lewat `LazyColumn { itemsIndexed { SongRow }

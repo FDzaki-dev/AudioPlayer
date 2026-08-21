@@ -18,6 +18,15 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 198 (PlaylistScreen highlight lagu-sedang-diputar, 2 file, 1 fitur diperluas — DI LUAR
+`MICRO_UIUX_AUDIT.md`, eksekusi observasi Batch 193 yang disetujui user)** — `currentSongId`
+dialirkan `LibraryScreen.kt` → `PlaylistTabView` (param baru, default `null`) →
+`PlaylistSongRow` (param `isPlaying`). Styling disalin persis dari `QueueRow` (background
+primary tint + teks bold primary) — bukan desain baru. 2 file, 0 protected asset. Dengan ini
+`QueueSheet` + `PlaylistScreen` konsisten highlight now-playing; `SmartPlaylistTabView` (tab 6)
+belum dicek — beda composable lagi, kandidat terpisah. **Belum diverifikasi visual**. Detail:
+`CHANGELOG.md` Batch 198.
+
 **Batch 197 (Sweep-select tab Artist + Folder, 1 file, 1 fitur diperluas — lanjutan Batch 196,
 DI LUAR `MICRO_UIUX_AUDIT.md`)** — `GroupedListView` (tab Artist `selectedTab==2` + tab Folder
 `else`) dulu render lagu lewat `LazyColumn` manual, 0 `SongListView`, 0 selection sama sekali.
