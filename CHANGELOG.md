@@ -1,5 +1,19 @@
 # Changelog
 
+## Batch 171 — Now Playing item 3/11: audit slider height/touch area (0 kode)
+Item 3: "Audit slider height/touch area." Progress slider `NowPlayingScreen.kt` (~baris 508):
+input sentuh sesungguhnya adalah `Slider` Material3 standar (thumb+track dibuat transparan via
+`SliderDefaults.colors`), ditumpuk DI ATAS `WaveformSeekBar` custom yang murni visual (bukan
+penerima sentuhan) — dibungkus `Box(height = 48.dp)`, pas Material minimum touch target 48dp.
+`Slider` Material3 sendiri sudah punya touch-target accessible bawaan (area sentuh selalu
+memadai secara default terlepas dari tipisnya track visual, ini fitur aksesibilitas resmi M3,
+bukan sesuatu yang perlu diatur manual). **Hasil: 0 bug** — tinggi & area sentuh sudah memadai
+tanpa perlu perubahan.
+
+0 kode, 3 dokumentasi. `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (4/11):
+progress/current time/remaining time mudah dibaca. Detail: `MICRO_UIUX_AUDIT.md` bagian NOW
+PLAYING.
+
 ## Batch 170 — Now Playing item 2/11: spacing antar playback controls (1 file, 1 bug fix)
 Item 2: "Audit spacing antar playback controls." `Row` 5 tombol (Acak/Sebelumnya/Play-Pause/
 Berikutnya/Ulangi) di `NowPlayingScreen.kt` ternyata TANPA `fillMaxWidth()` maupun

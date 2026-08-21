@@ -18,6 +18,13 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 171 (Now Playing item 3/11 — audit slider height/touch area, 0 kode)** — Progress
+slider: input sentuh sesungguhnya `Slider` Material3 standar (transparan, ditumpuk atas
+`WaveformSeekBar` visual-only), dibungkus `Box(height=48dp)` = pas minimum touch target M3.
+`Slider` sendiri sudah accessible-by-default terlepas tipisnya track. **Hasil: 0 bug.**
+`FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (5/11): progress/waktu mudah
+dibaca. Detail: `CHANGELOG.md` Batch 171.
+
 **Batch 170 (Now Playing item 2/11 — spacing antar playback controls, 1 file, 1 bug fix)** —
 `Row` 5 tombol playback ternyata TANPA `fillMaxWidth()`/`horizontalArrangement` sama sekali
 (cluster rapat, bukan spread merata seperti player pada umumnya) — 0 komentar penjelas, beda
