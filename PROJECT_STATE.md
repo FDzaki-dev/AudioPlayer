@@ -18,6 +18,36 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 197 (Sweep-select tab Artist + Folder, 1 file, 1 fitur diperluas — lanjutan Batch 196,
+DI LUAR `MICRO_UIUX_AUDIT.md`)** — `GroupedListView` (tab Artist `selectedTab==2` + tab Folder
+`else`) dulu render lagu lewat `LazyColumn` manual, 0 `SongListView`, 0 selection sama sekali.
+Fix: blok manual diganti panggil `SongListView(songs = groupSongs, ...)` (`onSongClick`
+behavior identik), 6 param baru ditambah + diteruskan, 2 call site disamakan wiring dgn tab
+Lagu/Favorit. Selection state top-level, otomatis persisten lintas grup/tab. Sweep-select
+sekarang jalan di 4/7 tab (Lagu/Artist/Folder/Favorit). 1 file, 0 protected asset. **Sisa 3
+belum bisa**: Album (grid, paradigma beda), Playlist & SmartPlaylist (row type sendiri, butuh
+kerja lebih dalam). **Belum diverifikasi visual**.
+
+**⏭️ ANTRIAN LANGSUNG (diminta user bareng batch ini, DITUNDA ke batch berikutnya sesuai cap
+batch)**: kerjakan **PlaylistScreen highlight lagu-sedang-diputar** — observasi Batch 193 yang
+tadinya nunggu keputusan user, SEKARANG SUDAH DISETUJUI (user bilang "kerjakan...juga"). Scope:
+alirkan `currentSongId` dari `LibraryScreen.kt` (`onSongClick`/`PlaylistTabView` call site,
+sekitar baris 326-335) turun ke `PlaylistTabView` → `PlaylistSongRow`, lalu terapkan highlight
+gaya sama seperti `QueueRow` (background `primary.copy(alpha=0.12f)` + teks bold primary). 2
+file (`LibraryScreen.kt` + `PlaylistScreen.kt`). Detail: `CHANGELOG.md` Batch 197.
+
+**Batch 196 (Sweep-select tab Favorit, 1 file, 1 fitur diperluas — DI LUAR
+`MICRO_UIUX_AUDIT.md`, permintaan langsung user)** — Sweep-select (`LibraryScreen.kt`, sejak
+Batch 70/73) cuma jalan di tab Lagu; tab Favorit pakai `SongListView` YANG SAMA tapi manggil
+positional-pendek jadi param selection-mode jatuh ke default (mati total). Fix: panggilan
+disamakan persis dgn tab Lagu — `selectionMode`/`selectedIds` sudah top-level state (bukan
+per-tab) jadi otomatis persisten lintas-tab. `SelectionActionBar` dicek 100% generik (filter
+`rawSongs` pakai `selectedIds`, 0 referensi `selectedTab`), aman dipakai lintas tab. 1 file, 0
+protected asset. **Sisa 4 tab (Album/Grouped/Playlist/SmartPlaylist) BELUM BISA** — semuanya
+composable terpisah tanpa `SongListView`/selection-mode built-in, butuh kerja lebih besar (bukan
+wiring param doang), kandidat batch terpisah kalau user minta lanjut. **Belum diverifikasi
+visual**. Detail: `CHANGELOG.md` Batch 196.
+
 **Batch 195 (Playlist/Queue item 5/8 — konfirmasi hapus playlist + warna error, 1 file, 1 bug
 fix nyata)** — "Hapus playlist" (`PlaylistScreen.kt`) dulu langsung eksekusi 1 sentuhan, 0
 konfirmasi, ikon tanpa warna error — beda dari pola destructive-confirm established

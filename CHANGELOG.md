@@ -1,5 +1,57 @@
 # Changelog
 
+## Batch 197 — Sweep-select tab Artist + Folder (1 file, 1 fitur diperluas — lanjutan Batch 196)
+Lanjutan permintaan user: `GroupedListView` (dipakai tab "Artist"/`selectedTab==2` DAN tab
+"Folder"/branch `else`) dulu render lagu-dalam-grup lewat `LazyColumn { itemsIndexed { SongRow }
+}` manual — TIDAK lewat `SongListView`, jadi 0 kapabilitas selection sama sekali (beda akar
+masalah dari Favorit/Batch 196 yang cuma param jatuh ke default; di sini komponennya memang
+belum pernah dipasangi).
+
+**Fix**: blok manual itu diganti manggil `SongListView(songs = groupSongs, ...)` — behavior
+`onSongClick` **identik** (`SongListView` internal manggil `onSongClick(songs, index)`, dengan
+`songs` = `groupSongs` yang dioper, sama persis dengan yang dulu manual `onSongClick(groupSongs,
+index)`). 6 parameter baru ditambah ke signature `GroupedListView` (`onDeleteSong`/
+`selectionMode`/`selectedIds`/`onToggleSelect`/`onEnterSelectionMode`/`onSweepSelectRange`,
+semua ada default aman) lalu diteruskan ke `SongListView`. 2 titik pemanggil (`selectedTab==2`
+Artist, `else` Folder) disamakan wiring-nya dengan tab Lagu/Favorit.
+
+Selection state tetap top-level `LibraryScreen`, jadi otomatis persisten kalau user pilih lagu
+di 1 grup lalu "< Kembali" ke daftar grup lalu masuk grup lain — sama seperti lintas-tab (Batch
+196), bukan behavior baru yang perlu dipikirkan ulang.
+
+Dengan ini sweep-select jalan di 4 dari 7 "tab": Lagu, Artist, Folder, Favorit. 1 file, 0 file
+baru, 0 protected asset, `FILE_MANIFEST.txt` tidak berubah (173/173). Brace/paren seimbang
+(336/336, 724/724). **Sisa 3 belum bisa**: Album (grid, paradigma beda — pilih album ≠ pilih
+lagu individual, butuh desain UX baru bukan cuma wiring), Playlist & SmartPlaylist (composable
++ row type sendiri, `PlaylistSongRow` bukan `SongRow`, butuh kerja lebih dalam). **Belum
+diverifikasi visual** — cek tab Artist & Folder: masuk grup, sweep beberapa lagu, keluar-masuk
+grup lain, pastikan selection tidak berantakan/salah index.
+
+## Batch 196 — Sweep-select tab Favorit (1 file, 1 fitur diperluas — bukan micro-UIUX audit)
+**Di luar `MICRO_UIUX_AUDIT.md`** — permintaan user langsung: sweep-select (tekan-lama lalu
+seret utk pilih banyak lagu sekaligus, `LibraryScreen.kt` sejak Batch 70/73) cuma jalan di tab
+"Lagu" (`selectedTab == 0`). Tab "Favorit" (`selectedTab == 4`) pakai `SongListView` YANG SAMA
+persis, tapi manggil dengan argumen positional pendek — `selectionMode`/`selectedIds`/
+`onToggleSelect`/`onEnterSelectionMode`/`onSweepSelectRange`/`onDeleteSong` semua jatuh ke
+default composable (`false`/`{}`), jadi selection mode terkunci mati total di tab itu meski
+komponennya identik.
+
+**Fix**: panggilan `SongListView` di tab Favorit disamakan persis dengan tab Lagu — semua
+parameter selection-mode diisi (state `selectionMode`/`selectedIds` di level `LibraryScreen`
+sudah top-level, BUKAN per-tab, jadi otomatis persisten kalau user pilih beberapa lagu lalu
+pindah tab). Dicek juga `SelectionActionBar` (bulk add-to-playlist/hide/delete) — sudah generik
+dari awal, filter `rawSongs` pakai `selectedIds` doang, 0 referensi `selectedTab` — jadi 100%
+aman dipakai lintas tab tanpa sentuh logic bulk-action sama sekali.
+
+1 file, 0 file baru, 0 protected asset, `FILE_MANIFEST.txt` tidak berubah (173/173). Brace/paren
+seimbang (335/335, 722/722). **Sisa 4 tab lain BELUM bisa** (dicek, bukan diabaikan):
+`AlbumGridView` (tab 1) & `GroupedListView` (tab 2) TIDAK PAKAI `SongListView` sama sekali —
+implementasi grid/grouped terpisah, 0 selection mode built-in — butuh kerja lebih besar
+(bangun selection UI baru), bukan sekadar wiring param. `PlaylistTabView`/`SmartPlaylistTabView`
+(tab 5/6) juga composable terpisah dgn row-nya sendiri. **Belum diverifikasi visual** — cek tap
+& sweep di tab Favorit beneran masuk selection mode, lalu pindah ke tab Lagu, pastikan selection
+tetap ada (bukan cuma teori dari baca kode).
+
 ## Batch 195 — Playlist/Queue item 5/8: konfirmasi hapus playlist + warna error (1 file, 1 bug fix nyata)
 `PlaylistScreen.kt` — tombol "Hapus playlist" (di header detail playlist) **langsung eksekusi
 tanpa konfirmasi apa pun** saat disentuh, beda dari "Ganti nama" yang benar buka dialog dulu.

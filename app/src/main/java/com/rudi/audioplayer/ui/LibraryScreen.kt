@@ -320,7 +320,23 @@ fun LibraryScreen(
                         subtitle = "Ketuk ikon hati pada lagu untuk menambahkannya ke sini."
                     )
                 } else {
-                    SongListView(favoriteSongs, favoriteIds, onToggleFavorite, onSongClick, playNext, addToQueue, addToPlaylist, hideSong, currentSongId = currentSongId)
+                    SongListView(
+                        songs = favoriteSongs,
+                        favoriteIds = favoriteIds,
+                        onFavoriteToggle = onToggleFavorite,
+                        onSongClick = onSongClick,
+                        onPlayNext = playNext,
+                        onAddToQueue = addToQueue,
+                        onAddToPlaylist = addToPlaylist,
+                        onHideSong = hideSong,
+                        onDeleteSong = deleteSong,
+                        selectionMode = selectionMode,
+                        selectedIds = selectedIds,
+                        onToggleSelect = { id -> toggleSelect(id) },
+                        onEnterSelectionMode = { id -> selectionMode = true; selectedIds = persistentSetOf(id) },
+                        onSweepSelectRange = { ids -> selectionMode = true; selectedIds = ids.toPersistentSet() },
+                        currentSongId = currentSongId
+                    )
                 }
             }
             selectedTab == 5 -> PlaylistTabView(
@@ -382,6 +398,12 @@ fun LibraryScreen(
                 onAddToQueue = addToQueue,
                 onAddToPlaylist = addToPlaylist,
                 onHideSong = hideSong,
+                onDeleteSong = deleteSong,
+                selectionMode = selectionMode,
+                selectedIds = selectedIds,
+                onToggleSelect = { id -> toggleSelect(id) },
+                onEnterSelectionMode = { id -> selectionMode = true; selectedIds = persistentSetOf(id) },
+                onSweepSelectRange = { ids -> selectionMode = true; selectedIds = ids.toPersistentSet() },
                 currentSongId = currentSongId
             )
             else -> GroupedListView(
@@ -394,6 +416,12 @@ fun LibraryScreen(
                 onAddToQueue = addToQueue,
                 onAddToPlaylist = addToPlaylist,
                 onHideSong = hideSong,
+                onDeleteSong = deleteSong,
+                selectionMode = selectionMode,
+                selectedIds = selectedIds,
+                onToggleSelect = { id -> toggleSelect(id) },
+                onEnterSelectionMode = { id -> selectionMode = true; selectedIds = persistentSetOf(id) },
+                onSweepSelectRange = { ids -> selectionMode = true; selectedIds = ids.toPersistentSet() },
                 currentSongId = currentSongId
             )
         }
@@ -1050,6 +1078,12 @@ private fun GroupedListView(
     onAddToQueue: (Song) -> Unit,
     onAddToPlaylist: (Song) -> Unit,
     onHideSong: (Song) -> Unit,
+    onDeleteSong: (Song) -> Unit = {},
+    selectionMode: Boolean = false,
+    selectedIds: ImmutableSet<Long> = persistentSetOf(),
+    onToggleSelect: (Long) -> Unit = {},
+    onEnterSelectionMode: (Long) -> Unit = {},
+    onSweepSelectRange: (ImmutableSet<Long>) -> Unit = {},
     currentSongId: Long? = null
 ) {
     var selectedGroup by remember(songs) { mutableStateOf<String?>(null) }
@@ -1075,22 +1109,23 @@ private fun GroupedListView(
         val groupSongs = grouped[selectedGroup].orEmpty()
         Column {
             TextButton(onClick = { selectedGroup = null }) { Text("< Kembali") }
-            LazyColumn {
-                itemsIndexed(groupSongs, key = { _, song -> song.id }) { index, song ->
-                    SongRow(
-                        song = song,
-                        isFavorite = favoriteIds.contains(song.id),
-                        onFavoriteToggle = { onFavoriteToggle(song.id) },
-                        onClick = { onSongClick(groupSongs, index) },
-                        onPlayNext = { onPlayNext(song) },
-                        onAddToQueue = { onAddToQueue(song) },
-                        onAddToPlaylist = { onAddToPlaylist(song) },
-                        onHideSong = { onHideSong(song) },
-                        isPlaying = song.id == currentSongId
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-                }
-            }
+            SongListView(
+                songs = groupSongs,
+                favoriteIds = favoriteIds,
+                onFavoriteToggle = onFavoriteToggle,
+                onSongClick = onSongClick,
+                onPlayNext = onPlayNext,
+                onAddToQueue = onAddToQueue,
+                onAddToPlaylist = onAddToPlaylist,
+                onHideSong = onHideSong,
+                onDeleteSong = onDeleteSong,
+                selectionMode = selectionMode,
+                selectedIds = selectedIds,
+                onToggleSelect = onToggleSelect,
+                onEnterSelectionMode = onEnterSelectionMode,
+                onSweepSelectRange = onSweepSelectRange,
+                currentSongId = currentSongId
+            )
         }
     }
 }
