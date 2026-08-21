@@ -1156,10 +1156,24 @@ private fun AlbumArtHero(
 ) {
     val haptic = LocalHapticFeedback.current
     var totalDrag by remember { mutableStateOf(0f) }
+    // Batch 178 — Now Playing item 10/11 fix: swipe-to-skip di sini sebelumnya 0 feedback
+    // visual selama drag berlangsung (cuma haptic SEKALI di dragEnd kalau lolos threshold
+    // 120px) — beda dari gesture brightness/volume di Box induk (GestureIndicatorBadge
+    // muncul LIVE mengikuti drag). User tidak tahu sudah "cukup jauh" menggeser sampai
+    // jarinya dilepas. `dragOffset` bikin art ikut bergeser mengikuti jari (clamp ±48dp,
+    // damped 0.5x — bukan 1:1, supaya tidak terkesan bisa diseret jauh tak terbatas) lalu
+    // spring balik ke tengah begitu jari dilepas/gesture dibatalkan. Threshold/logic
+    // swipe-next/prev itu sendiri (totalDrag, 120px) SAMA SEKALI TIDAK DIUBAH — murni layer
+    // visual tambahan di atasnya, bukan perubahan playback/navigation logic.
+    val dragOffset = remember { Animatable(0f) }
+    val dragScope = rememberCoroutineScope()
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.pointerInput(Unit) {
+        modifier = Modifier
+            .graphicsLayer { translationX = dragOffset.value }
+            .pointerInput(Unit) {
+            val maxOffsetPx = 48.dp.toPx()
             detectHorizontalDragGestures(
                 onDragStart = { totalDrag = 0f },
                 onDragEnd = {
@@ -1170,10 +1184,15 @@ private fun AlbumArtHero(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onSwipePrevious()
                     }
+                    dragScope.launch { dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
+                },
+                onDragCancel = {
+                    dragScope.launch { dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
                 },
                 onHorizontalDrag = { change, dragAmount ->
                     totalDrag += dragAmount
                     change.consume()
+                    dragScope.launch { dragOffset.snapTo((totalDrag * 0.5f).coerceIn(-maxOffsetPx, maxOffsetPx)) }
                 }
             )
         }

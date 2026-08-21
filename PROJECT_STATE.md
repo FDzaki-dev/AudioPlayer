@@ -18,6 +18,46 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 178 (Now Playing item 10/11 — audit semua controls feedback visual, 1 file, 1 bug fix)**
+— Gap ditemukan: swipe album art (next/prev) 0 feedback visual selama drag (cuma haptic di
+dragEnd), beda dari gesture brightness/volume di sekitarnya yang sudah live badge. Fix:
+`AlbumArtHero` dapat `Animatable dragOffset` — art ikut bergeser mengikuti jari (damped 0.5x,
+clamp ±48dp) via `graphicsLayer { translationX = ... }`, spring balik ke tengah saat
+dilepas/dibatalkan. **Logic swipe (totalDrag, threshold 120px, kapan skip terpicu) SAMA SEKALI
+TIDAK diubah** — murni layer visual tambahan. 1 file, 0 protected asset. Brace/paren
+`NowPlayingScreen.kt` (215/215, 750/750) seimbang. `FILE_MANIFEST.txt` tidak berubah (173/173).
+**Belum diverifikasi visual di device** — cek art ikut jari saat drag, spring-back mulus saat
+dilepas, threshold skip tetap sama persis. Item berikutnya (11/11, verifikasi retrospektif):
+pastikan tidak ada perubahan playback logic. Detail: `CHANGELOG.md` Batch 178.
+
+**Batch 177 (Now Playing item 9/11 — audit artwork loading/error/empty state, 0 kode)** —
+`AlbumArt` (`Utils.kt`) 1 komponen shared dipakai 7 titik app-wide, konsisten by-construction.
+Error & artwork-null render `AlbumArtFallbackIcon` yang sama; loading blank (bukan shimmer)
+wajar utk app offline (URI lokal, dekode nyaris instan). **Hasil: 0 bug.** `FILE_MANIFEST.txt`
+tidak berubah (173/173). Item berikutnya (10/11): semua controls punya feedback visual. Detail:
+`CHANGELOG.md` Batch 177.
+
+**Batch 176 (Now Playing item 8/11 — audit long title/artist layout shift, 0 kode)** — Judul
+(`basicMarquee()`) & artist (`Ellipsis`) sudah `maxLines=1` keduanya, tinggi baris konstan;
+parent `Column` lebar tetap (`fillMaxSize().padding(20.dp)`). **Hasil: 0 bug** — anti-layout-
+shift by construction. `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (9/11):
+artwork loading/error/empty state. Detail: `CHANGELOG.md` Batch 176.
+
+**Batch 175 (Now Playing item 7/11 — audit selected/repeat/shuffle states, 0 kode)** — Tombol
+Acak/Ulangi pakai tint-toggle (`animatedAccent`/`secondary`), identik pola favorite-icon
+(`LibraryScreen.kt`) & rating-star (`SmartPlaylistScreen.kt`). Repeat dapat pembeda tambahan
+icon glyph `Repeat`→`RepeatOne`. **Hasil: 0 bug.** `FILE_MANIFEST.txt` tidak berubah (173/173).
+Item berikutnya (8/11): long title/artist tidak menyebabkan layout shift. Detail: `CHANGELOG.md`
+Batch 175.
+
+**Batch 174 (Now Playing item 6/11 — audit bottom sheet/modal transition, 0 kode)** — 1
+`ModalBottomSheet` (Kontrol Lanjutan) + 2 `AlertDialog` di `NowPlayingScreen.kt`, + 4 sheet lain
+dibuka via callback (`EqualizerSheet`/`VisualizerSheet`/`SongInfoEditSheet`/
+`RingtoneCutterSheet`, file terpisah). **Hasil: 0 bug** — semua 5 `ModalBottomSheet` pakai
+`rememberModalBottomSheetState(skipPartiallyExpanded=true)` + `containerColor=Transparent`
+identik, tidak ada custom transition menyimpang. `FILE_MANIFEST.txt` tidak berubah (173/173).
+Item berikutnya (8/11): selected/repeat/shuffle states. Detail: `CHANGELOG.md` Batch 174.
+
 **Batch 173 (Now Playing item 5/11 — audit volume/secondary controls, 0 kode)** — Slider
 "Peredam Dalam Aplikasi" + 2 zona gesture brightness/volume-sistem-HP diperiksa. 1 asimetri
 ditemukan (badge volume punya label "Volume HP", badge brightness tidak) TAPI sudah disengaja &

@@ -1,5 +1,101 @@
 # Changelog
 
+## Batch 178 — Now Playing item 10/11: audit semua controls feedback visual — 1 bug fix (1 file)
+Audit semua control interaktif Now Playing: transport buttons (`bouncyPress` + ripple, sudah
+ada), shuffle/repeat (tint-toggle, Batch 175), star rating (icon swap+tint+haptic), gesture
+brightness/volume (`GestureIndicatorBadge` live, sudah ada) — **1 gap ditemukan**: swipe album
+art (next/prev, `AlbumArtHero`) 0 feedback visual SELAMA drag berlangsung, cuma haptic sekali di
+`onDragEnd` kalau lolos threshold 120px. User tidak tahu sudah "cukup jauh" menggeser sampai
+jarinya dilepas — asimetri nyata dibanding gesture brightness/volume tepat di sekitarnya yang
+sudah live.
+
+**`NowPlayingScreen.kt`** (diedit, 1 titik, `AlbumArtHero`) — `dragOffset: Animatable<Float>` +
+`dragScope: CoroutineScope` baru. `onHorizontalDrag`: `dragOffset.snapTo((totalDrag *
+0.5f).coerceIn(-48dp, 48dp))` — damped 0.5x (bukan 1:1) supaya tidak terkesan bisa diseret jauh
+tak terbatas, clamp ±48dp jaga art tidak keluar terlalu jauh dari posisi visual wajar.
+`onDragEnd`/`onDragCancel`: `dragOffset.animateTo(0f, spring(dampingRatio =
+DampingRatioMediumBouncy))` — spring balik ke tengah, bukan snap instan, konsisten "tactile"
+dgn animasi lain di file ini (`entranceScale`/`entranceAlpha` pola sama persis, `Animatable` +
+`graphicsLayer`). Diterapkan lewat `.graphicsLayer { translationX = dragOffset.value }` di outer
+`Box` yang sama (membungkus glow blur + art, keduanya ikut bergeser sebagai satu unit).
+
+**PENTING — logic swipe TIDAK diubah**: `totalDrag` (dipakai buat threshold 120px &
+`onSwipeNext()`/`onSwipePrevious()`) sama sekali tidak disentuh, cuma dibaca (bukan direplace)
+utk turunkan `dragOffset`. `dragOffset` murni layer visual tambahan di atas logic yang sudah
+ada — 0 perubahan kapan/kenapa skip terpicu, cuma menambah "apakah user BISA MELIHAT progress
+gesture-nya", sesuai batas STRICT SCOPE audit ini (presentation/UI/UX polish only).
+
+1 file, 0 protected asset. Brace/paren `NowPlayingScreen.kt` (215/215, 750/750) seimbang.
+`FILE_MANIFEST.txt` tidak berubah (173/173, diverifikasi diff eksplisit). **Belum diverifikasi
+visual di device** — cek: (1) swipe album art pelan-pelan, pastikan art genuinely ikut
+bergeser mengikuti jari sebelum threshold, bukan diam sampai tiba-tiba skip, (2) lepas jari
+sebelum threshold, pastikan spring balik ke tengah mulus (bukan snap kasar/nyangkut di posisi
+offset), (3) swipe cepat lewat threshold, pastikan skip tetap terjadi PERSIS seperti sebelumnya
+(behavior threshold benar-benar tidak berubah), (4) clamp ±48dp tidak bikin art terlihat
+"nabrak" batas secara janggal di jari yang menggeser sangat jauh. Item terakhir (11/11): jangan
+mengubah playback logic (verifikasi retrospektif, bukan gap baru).
+
+## Batch 177 — Now Playing item 9/11: audit artwork loading/error/empty state (0 kode)
+`AlbumArtHero` (Now Playing) pakai `AlbumArt` (`Utils.kt`) — komponen shared yang SAMA persis
+dipakai 7 titik app-wide (`HomeScreen.kt` x2, `LibraryScreen.kt` x2, `MiniPlayerBar.kt`,
+`NowPlayingScreen.kt` x2 termasuk hero art & mini-progress). Konsisten by-construction: 1 sumber
+kode, bukan reimplementasi per-layar yang kebetulan mirip.
+
+3 state: `loading = {}` (blank, cuma `background(surfaceVariant)` polos dari Box pembungkus),
+`error = { AlbumArtFallbackIcon() }`, dan artwork `null` juga render `AlbumArtFallbackIcon()`
+yang SAMA (ikon `MusicNote` 40% ukuran, `onSurfaceVariant` alpha 0.5f) — error & empty state
+sengaja disamakan (keduanya secara semantik = "tidak ada visual art untuk ditampilkan").
+
+Loading blank (bukan shimmer) dinilai wajar, bukan gap: app ini 100% offline (README) — artwork
+selalu dari URI lokal (embedded ID3/MediaStore), dekode nyaris instan, beda karakteristik dari
+network image loading yang butuh shimmer utk state yang genuinely terlihat lama. Shimmer di
+sini kemungkinan cuma flicker sub-frame, bukan memperbaiki persepsi.
+
+**Hasil: 0 bug.** `FILE_MANIFEST.txt` tidak berubah (173/173, diverifikasi diff eksplisit). Item
+berikutnya (10/11): semua controls punya feedback visual.
+
+## Batch 176 — Now Playing item 8/11: audit long title/artist layout shift (0 kode)
+`song?.title` (`titleLarge`, `basicMarquee()`) & `song?.artist` (`bodyMedium`,
+`TextOverflow.Ellipsis`) di `NowPlayingScreen.kt` — keduanya sudah `maxLines = 1`. Tinggi 1
+baris teks Compose ditentukan line-height style, KONSTAN terlepas panjang konten; `basicMarquee()`
+scroll horizontal di dalam box tetap (tidak wrap/growing), `Ellipsis` clip bukan reflow. Parent
+`Column` root sudah `fillMaxSize().padding(20.dp)` (lebar tetap, bukan `wrapContentWidth`), jadi
+Text tidak bisa memaksa parent melebar. Sibling elemen (`Spacer` 6dp/24dp dst) semua fixed-dp,
+tidak reaktif terhadap panjang teks.
+
+**Hasil: 0 bug.** Struktur sudah anti-layout-shift by construction, bukan kandidat perubahan.
+`FILE_MANIFEST.txt` tidak berubah (173/173, diverifikasi diff eksplisit). Item berikutnya
+(9/11): artwork loading/error/empty state konsisten.
+
+## Batch 175 — Now Playing item 7/11: audit selected/repeat/shuffle states (0 kode)
+Tombol Acak (`Shuffle`) & Ulangi (`Repeat`/`RepeatOne`) di `NowPlayingScreen.kt` diperiksa:
+keduanya pakai `tint = if (aktif) animatedAccent else colorScheme.secondary` — pola tint-toggle
+identik dgn favorite-icon (`LibraryScreen.kt` line 1214: `primary`/`secondary`) & rating-star
+(`SmartPlaylistScreen.kt` line 376: `primary`/`secondary`) di tempat lain app. `animatedAccent`
+= aksen dinamis per-lagu, berperan setara `primary` di layar ini (bukan warna acak lepas).
+Repeat dapat pembeda tambahan: icon glyph ganti `Repeat`→`RepeatOne` saat mode "ulangi 1 lagu",
+di atas tint-toggle yang sama.
+
+**Hasil: 0 bug.** Pola sudah konsisten app-wide, bukan kandidat perubahan. `FILE_MANIFEST.txt`
+tidak berubah (173/173, diverifikasi diff eksplisit). Item berikutnya (8/11): long title/artist
+tidak menyebabkan layout shift.
+
+## Batch 174 — Now Playing item 6/11: audit bottom sheet/modal transition (0 kode)
+Item 6. Sheet/dialog dari Now Playing: 1 `ModalBottomSheet` langsung di `NowPlayingScreen.kt`
+("Kontrol Lanjutan") + 2 `AlertDialog` (`SleepTimerDialog`, `SpeedDialog` — sudah diaudit
+konsistensi opsi-pilihnya sendiri di Batch 163). Ditelusuri juga 4 sheet lain yang dibuka lewat
+callback dari Kontrol Lanjutan (dirender di level `MainActivity.kt`, file terpisah):
+`EqualizerSheet`, `VisualizerSheet`, `SongInfoEditSheet`, `RingtoneCutterSheet`.
+
+**Hasil: 0 bug** — SEMUA 5 `ModalBottomSheet` (Kontrol Lanjutan + 4 sheet lain) pakai
+`rememberModalBottomSheetState(skipPartiallyExpanded = true)` + `containerColor =
+Color.Transparent` identik persis, tidak ada 1 pun yang custom animationSpec/transition sendiri
+— transisi buka/tutup 100% konsisten framework-default di semua titik yang bisa dijangkau dari
+Now Playing.
+
+0 kode, 3 dokumentasi. `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (7/11):
+selected/repeat/shuffle states mudah dibedakan.
+
 ## Batch 173 — Now Playing item 5/11: audit volume/secondary controls (0 kode)
 Item 5. 2 kontrol diperiksa: (a) `Slider` "Peredam Dalam Aplikasi" (volume internal, bottom
 sheet Kontrol Lanjutan) — Material3 `Slider` standar, icon 3-tingkat (VolumeOff/Down/Up)
