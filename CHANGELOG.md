@@ -1,5 +1,25 @@
 # Changelog
 
+## Batch 169 — Kategori baru "Now Playing — Final Micro-Polish", item 1/11: audit alignment artwork/title/artist/controls (0 kode)
+Kategori #5 (Interactive States) tuntas 8/8 di Batch 168 — pindah ke kategori berikutnya sesuai
+urutan `MICRO_UIUX_AUDIT.md` (🟠 NOW PLAYING — FINAL MICRO-POLISH, 11 checklist item, belum
+disentuh sama sekali). Item 1: "Audit alignment artwork, title, artist, dan controls."
+
+Struktur `NowPlayingScreen.kt`: 1 `Column` root dengan `horizontalAlignment =
+Alignment.CenterHorizontally` membungkus SEMUA elemen vertikal (hero `AlbumArt` 280dp, label
+"SEDANG DIPUTAR", title, artist, `StarRatingRow`, slider, baris tombol transport) — jadi
+alignment center konsisten by-construction, bukan disetel manual per elemen (genuinely 0 celah
+untuk elemen "kelewatan" beda alignment sendiri-sendiri). Title pakai `basicMarquee()` (scroll
+otomatis kalau kepanjangan, `maxLines=1`), artist pakai `TextOverflow.Ellipsis` (potong diam,
+`maxLines=1`) — beda treatment, TAPI genuinely pola umum player (judul = info utama layak
+di-scroll penuh, artis = sekunder cukup dipotong) bukan inkonsistensi kebetulan. Baris tombol
+transport (`Row(verticalAlignment = Alignment.CenterVertically)`) konsisten dgn pola row lain
+di file yang sama.
+
+**Hasil: 0 bug.** Item 1/11 kategori Now Playing selesai diaudit. 0 kode, 3 dokumentasi.
+`FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya: "Audit spacing antar playback
+controls." Detail: `MICRO_UIUX_AUDIT.md` bagian NOW PLAYING.
+
 ## Batch 168 — Micro UI/UX kategori #5 penutup: audit konsistensi lintas-aksi (item terakhir, 8/8, 0 kode)
 Item terakhir kategori #5 (checklist: "Hindari feedback visual yang berbeda untuk action yang
 sama"). Cari aksi yang muncul di >1 lokasi UI dengan fungsi identik — kandidat paling jelas:

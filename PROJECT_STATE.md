@@ -18,6 +18,15 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 169 (Kategori baru "Now Playing — Final Micro-Polish", item 1/11 — audit alignment
+artwork/title/artist/controls, 0 kode)** — Kategori #5 tuntas di Batch 168, pindah ke kategori
+berikutnya. `NowPlayingScreen.kt`: 1 `Column` root `CenterHorizontally` membungkus semua elemen
+(hero art, title, artist, rating, slider, tombol transport) — alignment konsisten
+by-construction. Title `basicMarquee()` vs artist `TextOverflow.Ellipsis` beda treatment tapi
+pola umum player (judul discroll, artis dipotong), bukan inkonsistensi kebetulan. **Hasil: 0
+bug.** `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (2/11): spacing antar
+playback controls. Detail: `CHANGELOG.md` Batch 169.
+
 **Batch 168 (Micro UI/UX kategori #5 penutup — audit konsistensi lintas-aksi, 0 kode)** — Item
 terakhir checklist kategori #5. Audit toggle Favorit (`LibraryScreen.kt` SongRow vs
 `NowPlayingScreen.kt`, aksi identik 2 lokasi): icon/tint/haptic/contentDescription sudah
