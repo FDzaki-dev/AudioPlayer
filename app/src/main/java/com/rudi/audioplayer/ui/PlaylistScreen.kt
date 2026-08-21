@@ -38,6 +38,7 @@ fun PlaylistTabView(
     var selectedPlaylistId by remember { mutableStateOf<String?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     val selectedPlaylist = playlists.find { it.id == selectedPlaylistId }
@@ -93,11 +94,12 @@ fun PlaylistTabView(
                     IconButton(onClick = { showRenameDialog = true }) {
                         Icon(Icons.Default.Edit, contentDescription = "Ganti nama playlist")
                     }
-                    IconButton(onClick = {
-                        onDeletePlaylist(selectedPlaylist.id)
-                        selectedPlaylistId = null
-                    }) {
-                        Icon(Icons.Default.DeleteOutline, contentDescription = "Hapus playlist")
+                    IconButton(onClick = { showDeleteConfirm = true }) {
+                        Icon(
+                            Icons.Default.DeleteOutline,
+                            contentDescription = "Hapus playlist",
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
                 Text(
@@ -148,6 +150,32 @@ fun PlaylistTabView(
                     onConfirm = { newName ->
                         onRenamePlaylist(selectedPlaylist.id, newName)
                         showRenameDialog = false
+                    }
+                )
+            }
+
+            if (showDeleteConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteConfirm = false },
+                    title = { Text("Hapus Playlist?") },
+                    text = {
+                        Text(
+                            "\"${selectedPlaylist.name}\" akan dihapus. Lagu di dalamnya tidak " +
+                                "terhapus dari perangkat, cuma playlist ini yang hilang. Aksi ini " +
+                                "tidak bisa dibatalkan."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            onDeletePlaylist(selectedPlaylist.id)
+                            showDeleteConfirm = false
+                            selectedPlaylistId = null
+                        }) {
+                            Text("Hapus", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal") }
                     }
                 )
             }

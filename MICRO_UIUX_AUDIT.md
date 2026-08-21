@@ -111,9 +111,19 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
   `QueueRow` drag handle 40dp→48dp (standar Material touch target, samakan dgn 3 `IconButton`
   lain di baris sama). `PlaylistScreen` tidak punya drag handle sama sekali — bukan gap
   (checklist "jika tersedia", di situ memang tidak tersedia; nambah = ubah behavior).
-- [ ] Audit selected/current item state.
-- [ ] Audit remove/delete affordance.
-- [ ] Pastikan destructive action memiliki visual hierarchy yang tepat.
+- [ ] Audit selected/current item state. **🟡 1 observasi (Batch 193), belum dieksekusi** —
+  `QueueSheet` sudah highlight (background+bold primary). `PlaylistScreen` 0 highlight sama
+  sekali — butuh state baru lintas-file (`LibraryScreen`→`PlaylistTabView`→row), bukan pure
+  styling, perlu keputusan eksplisit user dulu (mirip kasus `EmptyState` tapi lebih dalam).
+- [ ] Audit remove/delete affordance. **✅ 0 bug (Batch 194)** — ikon/deskripsi/touch-target
+  konsisten `QueueSheet`+`PlaylistScreen`. Warna `secondary` (bukan error) sudah BENAR sesuai
+  konvensi app (error = permanen/hapus dari perangkat; hapus dari antrean/playlist = reversibel).
+  `canRemove` beda logic keduanya juga BENAR (queue tidak boleh kosong saat ada lagu diputar,
+  playlist boleh kosong total).
+- [ ] Pastikan destructive action memiliki visual hierarchy yang tepat. **✅ 1 bug fix (Batch
+  195)** — "Hapus playlist" dulu langsung eksekusi 0 konfirmasi + ikon tanpa warna error. Fix:
+  `AlertDialog` konfirmasi ditambah (tiru pola `LibraryScreen` "Hapus dari Perangkat?"), ikon
+  `tint = error`. Belum diverifikasi visual.
 - [ ] Audit empty queue/playlist state.
 - [ ] Pastikan queue controls tidak terlalu padat.
 - [ ] Jangan mengubah queue behavior.

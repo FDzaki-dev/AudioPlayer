@@ -1,5 +1,64 @@
 # Changelog
 
+## Batch 195 — Playlist/Queue item 5/8: konfirmasi hapus playlist + warna error (1 file, 1 bug fix nyata)
+`PlaylistScreen.kt` — tombol "Hapus playlist" (di header detail playlist) **langsung eksekusi
+tanpa konfirmasi apa pun** saat disentuh, beda dari "Ganti nama" yang benar buka dialog dulu.
+Dibandingkan dgn pola destructive-confirm yang SUDAH established di `LibraryScreen.kt` ("Hapus
+dari Perangkat?" — `AlertDialog` + tombol "Hapus" warna error + "Batal") — playlist tidak
+mengikuti pola itu sama sekali. Menghapus playlist itu ireversibel dari sisi urutan/kurasi
+(walau lagu-lagunya tetap ada di library), jadi harusnya setara level "destructive" dengan hapus
+lagu, bukan langsung tereksekusi 1 sentuhan.
+
+**Fix**: `showDeleteConfirm` state ditambah, ikon `DeleteOutline` diberi `tint = error` (dulu
+default/tidak diberi warna — beda dari konvensi error-color-utk-permanen yang dikonfirmasi
+Batch 194), `onClick` cuma buka dialog. `AlertDialog` baru ditambah, isi & struktur MENIRU
+persis pola `LibraryScreen.kt` (judul tanya, teks jelaskan konsekuensi + tegaskan lagu TIDAK
+ikut terhapus dari perangkat, tombol "Hapus" error + "Batal" netral).
+
+1 file, 0 file baru, 0 protected asset, `FILE_MANIFEST.txt` tidak berubah (173/173). Brace/paren
+seimbang (108/108, 161/161). **Belum diverifikasi visual** — dialog baru, cek tampilan +
+alur tap "Hapus" di dialog beneran memanggil `onDeletePlaylist` & balik ke daftar playlist.
+
+## Batch 194 — Playlist/Queue item 4/8: audit remove/delete affordance — 0 bug (3 dokumentasi, 0 kode)
+`QueueSheet.kt` & `PlaylistScreen.kt` row remove button diperiksa dari 4 sisi:
+
+- **Ikon & content description**: `Icons.Default.Close` + deskripsi jelas ("Hapus dari
+  antrean"/"Hapus dari playlist") — konsisten di keduanya.
+- **Warna**: keduanya `secondary` (netral), BUKAN `colorScheme.error`. Dibandingkan dengan
+  aksi hapus permanen app-wide (`LibraryScreen.kt` "Hapus dari Perangkat" `DeleteForever`+error,
+  `FolderManagerSheet.kt` dialog hapus+error) — app punya konvensi jelas: `error` khusus aksi
+  **permanen/tidak bisa dibalik** (hapus file dari perangkat). Hapus dari antrean/playlist itu
+  reversibel (lagu tetap ada di library, tinggal ditambah lagi) — warna netral disini justru
+  **benar sesuai konvensi**, bukan gap.
+- **Touch target**: `IconButton` default 48dp di keduanya. ✅
+- **Enabled/disabled logic**: `QueueSheet` `canRemove = queue.size > 1` (cegah antrean kosong
+  saat sedang ada lagu diputar — batasan logic pemutaran yang valid, didimkan jelas 0.3f alpha
+  saat nonaktif). `PlaylistScreen` tidak ada batasan begini — **benar, bukan gap**, playlist
+  boleh dikosongkan total (tidak terikat status "sedang diputar" seperti antrean aktif).
+
+**Hasil: 0 bug** — pola sama Batch 145/160/162/190 (audit formal, genuinely konsisten & sesuai
+konvensi yang sudah ada). 0 file kode diedit, 0 protected asset. `FILE_MANIFEST.txt` tidak
+berubah (173/173).
+
+## Batch 193 — Playlist/Queue item 3/8: audit selected/current item state — 1 observasi (bukan bug), butuh keputusan user (2 dokumentasi, 0 kode)
+`QueueSheet.kt`'s `QueueRow` sudah highlight lagu sedang diputar (background
+`primary.copy(alpha=0.12f)` + teks bold warna primary) — checklist item ini terpenuhi di situ.
+
+**Ditemukan**: `PlaylistScreen.kt`'s `PlaylistTabView`/`PlaylistSongRow` **TIDAK PUNYA highlight
+lagu-sedang-diputar sama sekali** — 0 referensi `isPlaying`/`isCurrent`/`currentSong` di file
+ini. Beda dari `EmptyState` icon (Batch 163, murni default parameter, 0 risiko) — ini **bukan**
+styling yang tinggal dipasang: `PlaylistTabView` memang tidak menerima parameter ID lagu yang
+sedang diputar sama sekali, jadi memperbaikinya butuh mengalirkan state baru dari pemanggil
+(`LibraryScreen.kt`) turun ke `PlaylistTabView` → `PlaylistSongRow`, nyentuh minimal 2 file +
+nambah parameter baru ke beberapa lapis composable. Itu **plumbing data baru**, bukan pure
+presentation fix, dan condong ke wilayah "tambah kapabilitas" — mirip kasus `EmptyState` icon
+tapi levelnya lebih dalam (state lintas-file, bukan cuma default param 1 file). **SENGAJA tidak
+dieksekusi** — checklist kategori ini eksplisit "Jangan mengubah queue behavior", dan
+`MICRO_UIUX_AUDIT.md` scope guard melarang sentuh behavior/state plumbing baru tanpa keputusan
+eksplisit user dulu.
+
+0 file kode diedit, 0 protected asset. `FILE_MANIFEST.txt` tidak berubah (173/173).
+
 ## Batch 192 — Playlist/Queue item 2/8: drag handle touch target 40dp→48dp (1 file, 1 bug fix)
 `QueueRow` (`QueueSheet.kt`) drag handle — `Box` pembungkus ikon `DragHandle` + gesture nyata
 (`pointerInputDragHandle`, `detectDragGesturesAfterLongPress`) — ukuran 40dp, di bawah standar

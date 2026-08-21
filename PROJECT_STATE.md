@@ -18,6 +18,34 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 195 (Playlist/Queue item 5/8 — konfirmasi hapus playlist + warna error, 1 file, 1 bug
+fix nyata)** — "Hapus playlist" (`PlaylistScreen.kt`) dulu langsung eksekusi 1 sentuhan, 0
+konfirmasi, ikon tanpa warna error — beda dari pola destructive-confirm established
+`LibraryScreen.kt` ("Hapus dari Perangkat?"). Fix: `AlertDialog` konfirmasi ditambah (tiru
+persis pola `LibraryScreen`), ikon diberi `tint = error`. 1 file, 0 protected asset. **Belum
+diverifikasi visual** — dialog baru, prioritas cek alur tap "Hapus" beneran jalan. Item
+berikutnya (6/8): audit empty queue/playlist state. Item PlaylistScreen highlight (Batch 193)
+masih pending keputusan user. Detail: `CHANGELOG.md` Batch 195.
+
+**Batch 194 (Playlist/Queue item 4/8 — audit remove/delete affordance, 0 kode + 3 dokumentasi)**
+— `QueueSheet`/`PlaylistScreen` remove button diperiksa: ikon+deskripsi konsisten, warna
+`secondary` (netral) BENAR sesuai konvensi app (`error` khusus aksi permanen — hapus dari
+perangkat — beda dari hapus-dari-antrean/playlist yang reversibel), touch target 48dp keduanya,
+`canRemove` `QueueSheet` (cegah antrean kosong) vs `PlaylistScreen` tanpa batasan — keduanya
+BENAR sesuai konteks masing-masing. **Hasil: 0 bug**. Item berikutnya (5/8): destructive action
+visual hierarchy (kemungkinan tumpang-tindih hasil audit warna batch ini — sudah dikonfirmasi
+konvensi error-color benar, jadi mungkin juga 0 bug/audit-only). Item PlaylistScreen highlight
+(Batch 193) masih pending keputusan user. Detail: `CHANGELOG.md` Batch 194.
+
+**Batch 193 (Playlist/Queue item 3/8 — audit selected/current item state, 0 kode + 2
+dokumentasi)** — `QueueSheet` sudah highlight lagu-sedang-diputar (background primary tint +
+teks bold). **Observasi (bukan bug, butuh keputusan user)**: `PlaylistScreen.kt` 0 referensi
+`isPlaying`/`currentSong` sama sekali — beda dari `EmptyState` icon (Batch 163, default param 1
+file, 0 risiko), ini butuh plumbing state BARU lintas-file (`LibraryScreen` → `PlaylistTabView`
+→ row), levelnya di atas "high-value low-risk". SENGAJA tidak dieksekusi — checklist eksplisit
+larang ubah queue behavior. **Tanya user dulu** sebelum lanjut kalau mau dikerjakan. 0 protected
+asset. Item berikutnya (4/8): audit remove/delete affordance. Detail: `CHANGELOG.md` Batch 193.
+
 **Batch 192 (Playlist/Queue item 2/8 — drag handle touch target 40dp→48dp, 1 file, 1 bug fix)**
 — `QueueRow` (`QueueSheet.kt`) drag handle `Box` (gesture nyata via
 `detectDragGesturesAfterLongPress`) 40dp, di bawah standar 48dp yang dipakai 3 `IconButton` lain
