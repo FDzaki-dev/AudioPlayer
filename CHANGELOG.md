@@ -1,5 +1,70 @@
 # Changelog
 
+## Batch 187 — Library/Song List item 8/11: audit loading state (1 file, 1 bug fix)
+Item 8/11 § Library/Song List. `ShimmerRow`/`ShimmerList` (skeleton saat `loading=true`,
+`LibraryScreen.kt`) diperiksa terhadap `SongRow` sungguhan yang digantikannya begitu data siap.
+
+**Gap ditemukan**: art skeleton 48dp sudah match `SongRow` asli, TAPI `padding(vertical =
+10.dp)` shimmer vs `padding(vertical = 8.dp)` `SongRow` asli — beda 2dp per baris. `ShimmerList`
+render 8 baris (`repeat(8)`), jadi total tinggi skeleton 16dp lebih tinggi dari 8 baris
+`SongRow` sungguhan yang menggantikannya — begitu loading selesai, list asli "melompat" naik
+16dp dibanding posisi shimmer terakhir sebelum konten nyata muncul.
+
+**Fix**: `vertical` padding `ShimmerRow` disamakan ke `8.dp`, match persis `SongRow`.
+
+1 file diedit, 0 file baru, 0 protected asset. Brace/paren `LibraryScreen.kt` seimbang (332/332
+`{}`, 719/719 `()`). `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (9/11): audit
+search result state. **Belum diverifikasi visual di device** — cek transisi loading→loaded tab
+Lagu genuinely tanpa jump/shift lagi.
+
+## Batch 186 — Library/Song List item 7/11: audit empty library state (0 kode)
+Item 7/11 § Library/Song List. Diperiksa semua skenario "0 lagu" di `LibraryScreen.kt`.
+
+**Hasil: 0 bug.** 1 composable shared `EmptyState` (icon `MusicNote` + title + subtitle + CTA
+opsional) dipakai ulang di 4 titik: (1) `songs.isEmpty()` — perpustakaan kosong total, satu-
+satunya yang dapat CTA "Pindai Ulang" (genuinely actionable, panggil `onRescan`), (2) tab
+Favorit kosong — hint "Ketuk ikon hati ... untuk menambahkannya", tanpa CTA (tidak ada aksi
+langsung yang masuk akal selain nge-tap hati di lagu lain), (3) `filteredSongs.isEmpty()` — hasil
+filter tab Album/Artis/Folder kosong (jarang terjadi tapi dijaga), (4) hasil Pencarian kosong —
+"Tidak ditemukan"/"Coba kata kunci lain", keduanya tanpa CTA (sama alasan). Perbedaan CTA
+antar skenario disengaja by-design, bukan inkonsistensi — komponen shared yang sama, cuma
+parameter beda sesuai konteks.
+
+0 file diedit. `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (8/11): audit
+loading state.
+
+## Batch 185 — Library/Song List item 6/11: verifikasi retrospektif indikator sedang-diputar (0 kode)
+Item 6/11 § Library/Song List — sesuai peringatan Batch 179, item ini SUDAH dikerjakan lebih
+dulu (Batch 163/164, sebelum kategori Library/Song List resmi dimulai Batch 180), jadi batch ini
+murni verifikasi ulang, bukan implementasi baru.
+
+**Dikonfirmasi grep + baca kode langsung**: `SongRow` (`LibraryScreen.kt`) & `QueueRow`
+(`QueueSheet.kt`) sama-sama 3 lapis identik — `.background(primary alpha 12%)` dipasang SEBELUM
+`.clickable` (komentar Batch 163 eksplisit menyebut "samakan pola highlight ... dengan
+QueueRow"), ikon `GraphicEq`, title bold+warna primary. `ContinueListeningCard` (Home) & `MiniPlayerBar`
+sengaja TANPA lapisan tambahan — beda semantik: card itu nunjuk lagu TERAKHIR diputar (bukan
+status live "sedang" diputar sekarang), mini bar itu SENDIRI sudah = indikator "sedang diputar"
+(kalau nongol di layar berarti sedang aktif), jadi highlight duplikat di situ justru berlebihan.
+
+0 file diedit. `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (7/11): audit empty
+library state.
+
+## Batch 184 — Library/Song List item 5/11: audit hit target icon (0 kode)
+Item 5/11 § Library/Song List. Diperiksa semua `IconButton`/`FilledIconButton` di 4 komponen
+yang sama (favorit `SongRow`, moveUp/moveDown/remove `QueueRow`, play-pause `MiniPlayerBar` —
+`ContinueListeningCard` 0 icon button, cuma card-tap biasa).
+
+**Hasil: 0 bug.** Yang pakai ukuran default (`SongRow`/`QueueRow`, tanpa `.size()` eksplisit)
+otomatis 48dp — memenuhi minimum Material3. Yang eksplisit lebih kecil (`MiniPlayerBar`
+play-pause, `.size(40.dp)`, sengaja sejak Batch 55 untuk footprint mini bar) TETAP aman: Material3
+`IconButton`/`FilledIconButton` menegakkan touch target minimum 48dp lewat
+`minimumInteractiveComponentSize()` internal — visual mengecil, area sentuh tidak. Dikonfirmasi
+grep: 0 pemakaian `LocalMinimumInteractiveComponentEnforcement`/override apa pun di 4 file
+terkait yang bisa mematikan proteksi otomatis itu.
+
+0 file diedit. `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (6/11): audit
+selected/current-playing indicator.
+
 ## Batch 183 — Library/Song List item 4/11: audit title/artist truncation (1 file, 1 bug fix)
 Item berikutnya dari `MICRO_UIUX_AUDIT.md` § Library/Song List. Diperiksa 4 komponen yang sama
 seperti item 1-3 sebelumnya (`SongRow`, `QueueRow`, `ContinueListeningCard`, `MiniPlayerBar`).

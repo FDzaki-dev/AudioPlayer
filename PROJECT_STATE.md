@@ -18,6 +18,36 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 187 (Library/Song List item 8/11 — audit loading state, 1 file, 1 bug fix)** —
+`ShimmerRow` skeleton (`LibraryScreen.kt`) padding vertical 10dp vs `SongRow` asli 8dp — beda
+2dp × 8 baris = shift 16dp saat transisi loading→loaded. Disamakan ke 8dp. 1 file, 0 protected
+asset. `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (9/11): audit search result
+state. **Belum diverifikasi visual di device.** Detail: `CHANGELOG.md` Batch 187.
+
+**Batch 186 (Library/Song List item 7/11 — audit empty library state, 0 kode)** — 1 composable
+shared `EmptyState` dipakai ulang di 4 skenario kosong `LibraryScreen.kt` (perpustakaan kosong
+total + CTA rescan, favorit kosong, filter tab kosong, pencarian kosong — 3 terakhir tanpa CTA
+disengaja). **Hasil: 0 bug.** `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya
+(8/11): audit loading state. Detail: `CHANGELOG.md` Batch 186.
+
+**Batch 185 (Library/Song List item 6/11 — verifikasi retrospektif indikator sedang-diputar, 0
+kode)** — Sesuai peringatan Batch 179: item ini sudah dikerjakan Batch 163/164 sebelum kategori
+resmi dimulai. **Hasil: 0 bug, dikonfirmasi ulang.** `SongRow`/`QueueRow` 3 lapis identik (bg
+primary 12% + ikon GraphicEq + title bold-primary). `ContinueListeningCard`/`MiniPlayerBar`
+sengaja tanpa lapisan tambahan (beda semantik: last-played vs live-status vs bar itu sendiri =
+indikator). `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (7/11): audit empty
+library state. Detail: `CHANGELOG.md` Batch 185.
+
+**Batch 184 (Library/Song List item 5/11 — audit hit target icon, 0 kode)** — 4 komponen
+diperiksa (favorit `SongRow`, moveUp/moveDown/remove `QueueRow`, play-pause `MiniPlayerBar`,
+`ContinueListeningCard` 0 icon). **Hasil: 0 bug.** Default 48dp aman; `MiniPlayerBar` play-pause
+`.size(40.dp)` (sengaja sejak Batch 55) tetap aman krn Material3 `minimumInteractiveComponentSize()`
+otomatis menegakkan touch target ≥48dp terlepas dari ukuran visual — dikonfirmasi 0 override
+`LocalMinimumInteractiveComponentEnforcement` di file terkait. `FILE_MANIFEST.txt` tidak berubah
+(173/173). Item berikutnya (6/11): audit selected/current-playing indicator — ⚠️ ingat catatan
+Batch 179: indikator ini SUDAH dikerjakan (Batch 164, `SongRow` currentSongId), verifikasi
+retrospektif saja, jangan salah tandai sebagai gap baru. Detail: `CHANGELOG.md` Batch 184.
+
 **Batch 183 (Library/Song List item 4/11 — audit title/artist truncation, 1 file, 1 bug fix)**
 — 3/4 komponen (`SongRow`/`ContinueListeningCard`/`MiniPlayerBar`) title-nya sudah
 `basicMarquee()`, cuma `QueueRow` (`QueueSheet.kt`) ketinggalan pakai `TextOverflow.Ellipsis`
