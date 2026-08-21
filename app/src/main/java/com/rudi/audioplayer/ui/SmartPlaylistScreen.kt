@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.input.KeyboardType
@@ -45,7 +46,8 @@ fun SmartPlaylistTabView(
     onSongClick: (List<Song>, Int) -> Unit,
     onCreate: (SmartPlaylist) -> SmartPlaylist,
     onUpdate: (SmartPlaylist) -> Unit,
-    onDelete: (String) -> Unit
+    onDelete: (String) -> Unit,
+    currentSongId: Long? = null
 ) {
     var selectedId by remember { mutableStateOf<String?>(null) }
     var showBuilder by remember { mutableStateOf(false) }
@@ -135,9 +137,17 @@ fun SmartPlaylistTabView(
                 } else {
                     LazyColumn {
                         itemsIndexed(matchedSongs, key = { _, song -> song.id }) { index, song ->
+                            val isPlaying = song.id == currentSongId
+                            val background = if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
                             ListItem(
                                 headlineContent = {
-                                    Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(
+                                        song.title,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
                                 },
                                 supportingContent = {
                                     Text(
@@ -147,7 +157,7 @@ fun SmartPlaylistTabView(
                                         color = MaterialTheme.colorScheme.secondary
                                     )
                                 },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                colors = ListItemDefaults.colors(containerColor = background),
                                 modifier = Modifier.clickable { onSongClick(matchedSongs, index) }
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)

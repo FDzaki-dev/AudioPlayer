@@ -18,6 +18,12 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 199 (SmartPlaylistTabView highlight lagu-sedang-diputar, 2 file — tuntaskan pending
+Batch 198)** — `currentSongId` diteruskan ke `SmartPlaylistTabView` (tab 6), styling disalin
+persis `PlaylistSongRow`/`QueueRow`. Brace/paren seimbang, 0 protected asset. **SEMUA
+composable song-list sekarang konsisten** (Queue/Playlist/SmartPlaylist). Belum diverifikasi
+visual. Detail: `CHANGELOG.md` Batch 199.
+
 **Batch 198 (PlaylistScreen highlight lagu-sedang-diputar, 2 file, 1 fitur diperluas — DI LUAR
 `MICRO_UIUX_AUDIT.md`, eksekusi observasi Batch 193 yang disetujui user)** — `currentSongId`
 dialirkan `LibraryScreen.kt` → `PlaylistTabView` (param baru, default `null`) →

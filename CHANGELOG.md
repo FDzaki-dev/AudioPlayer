@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 199 — SmartPlaylistTabView highlight lagu-sedang-diputar (2 file, tuntaskan pending Batch 198)
+`SmartPlaylistTabView` (tab 6) — satu-satunya composable song-list yang belum ikut highlight
+now-playing (`QueueSheet`/`PlaylistScreen`/tab 5 sudah). Fix: param baru `currentSongId: Long? =
+null` diteruskan `LibraryScreen.kt` → `SmartPlaylistTabView`; `isPlaying`/`background` dihitung
+inline per-item (styling disalin persis dari `PlaylistSongRow`/`QueueRow` — background primary
+alpha 0.12f + teks bold primary), + 1 import `FontWeight` baru. Brace/paren kedua file seimbang.
+2 file, 0 protected asset. Dengan ini SEMUA composable song-list (Queue/Playlist/SmartPlaylist)
+konsisten highlight now-playing. **Belum diverifikasi visual**.
+
 ## Batch 198 — PlaylistScreen highlight lagu-sedang-diputar (2 file, 1 fitur diperluas)
 Eksekusi observasi Batch 193 (disetujui user). `currentSongId` dialirkan: `LibraryScreen.kt`
 (`PlaylistTabView` call site) → `PlaylistTabView` (param baru, default `null` — 0 risiko

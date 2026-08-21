@@ -362,7 +362,8 @@ fun LibraryScreen(
                 onSongClick = onSongClick,
                 onCreate = onCreateSmartPlaylist,
                 onUpdate = onUpdateSmartPlaylist,
-                onDelete = onDeleteSmartPlaylist
+                onDelete = onDeleteSmartPlaylist,
+                currentSongId = currentSongId
             )
             filteredSongs.isEmpty() -> EmptyState(
                 title = "Tidak ditemukan",
