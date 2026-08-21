@@ -18,6 +18,12 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 172 (Now Playing item 4/11 — progress/current/remaining time mudah dibaca, 0 kode)** —
+Baris waktu: `Row SpaceBetween`, `bodySmall` + `colorScheme.secondary` kedua sisi, treatment
+umum player (timestamp di-de-emphasize dari warna teks utama). Mode Audiobook (Batch 93) sudah
+konsisten style-nya. **Hasil: 0 bug.** `FILE_MANIFEST.txt` tidak berubah (173/173). Item
+berikutnya (6/11): volume/secondary controls. Detail: `CHANGELOG.md` Batch 172.
+
 **Batch 171 (Now Playing item 3/11 — audit slider height/touch area, 0 kode)** — Progress
 slider: input sentuh sesungguhnya `Slider` Material3 standar (transparan, ditumpuk atas
 `WaveformSeekBar` visual-only), dibungkus `Box(height=48dp)` = pas minimum touch target M3.

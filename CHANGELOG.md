@@ -1,5 +1,16 @@
 # Changelog
 
+## Batch 172 — Now Playing item 4/11: progress/current/remaining time mudah dibaca (0 kode)
+Item 4. Baris waktu (`formatDuration(position)` kiri, total/sisa kanan) di `NowPlayingScreen.kt`
+~baris 531: `Row` `SpaceBetween`, kedua `Text` `bodySmall` + `colorScheme.secondary` —
+treatment umum player (timestamp memang selalu di-de-emphasize, bukan warna teks utama) dan
+ukuran `bodySmall` standar untuk label pendek semacam ini. Mode Audiobook (Roadmap #12, Batch
+93) sudah punya varian "-mm:ss" tersendiri yang konsisten style-nya (font/warna sama, cuma
+teksnya beda format). **Hasil: 0 bug** — kontras & ukuran sudah wajar, tidak ada perubahan.
+
+0 kode, 3 dokumentasi. `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (5/11):
+audit volume/secondary controls.
+
 ## Batch 171 — Now Playing item 3/11: audit slider height/touch area (0 kode)
 Item 3: "Audit slider height/touch area." Progress slider `NowPlayingScreen.kt` (~baris 508):
 input sentuh sesungguhnya adalah `Slider` Material3 standar (thumb+track dibuat transparan via
