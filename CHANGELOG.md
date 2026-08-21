@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 173 — Now Playing item 5/11: audit volume/secondary controls (0 kode)
+Item 5. 2 kontrol diperiksa: (a) `Slider` "Peredam Dalam Aplikasi" (volume internal, bottom
+sheet Kontrol Lanjutan) — Material3 `Slider` standar, icon 3-tingkat (VolumeOff/Down/Up)
+sesuai level, warna `secondary` untuk thumb/track aktif; (b) 2 zona gesture swipe brightness
+(kiri)/volume sistem HP (kanan) di area artwork, masing-masing 50% lebar x 300dp tinggi
+(touch target generous, sudah dikomentari sengaja sejak awal) + `GestureIndicatorBadge` yang
+muncul saat drag.
+
+**1 asimetri ditemukan, TAPI sudah disengaja & terdokumentasi**: badge volume-sistem-HP punya
+teks label "Volume HP" tambahan, badge brightness tidak — ternyata ini FIX yang sudah pernah
+dibuat di batch lampau (komentar eksplisit di kode: label ditambahkan khusus di badge volume
+untuk membedakan gesture-volume-sistem ini dari slider "Peredam Dalam Aplikasi" yang terpisah,
+brightness tidak butuh disambiguasi serupa karena tidak ada slider-brightness lain di layar
+yang sama). **Hasil: 0 bug baru** — icon 3-tingkat konsisten antara slider peredam & badge
+volume sistem, asimetri label sudah tepat by-design.
+
+0 kode, 3 dokumentasi. `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (6/11):
+audit bottom sheet/modal transition.
+
 ## Batch 172 — Now Playing item 4/11: progress/current/remaining time mudah dibaca (0 kode)
 Item 4. Baris waktu (`formatDuration(position)` kiri, total/sisa kanan) di `NowPlayingScreen.kt`
 ~baris 531: `Row` `SpaceBetween`, kedua `Text` `bodySmall` + `colorScheme.secondary` —

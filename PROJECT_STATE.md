@@ -18,6 +18,13 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 173 (Now Playing item 5/11 — audit volume/secondary controls, 0 kode)** — Slider
+"Peredam Dalam Aplikasi" + 2 zona gesture brightness/volume-sistem-HP diperiksa. 1 asimetri
+ditemukan (badge volume punya label "Volume HP", badge brightness tidak) TAPI sudah disengaja &
+terdokumentasi di kode dari batch lampau (disambiguasi dari slider peredam terpisah, brightness
+tidak butuh). **Hasil: 0 bug baru.** `FILE_MANIFEST.txt` tidak berubah (173/173). Item
+berikutnya (6/11): bottom sheet/modal transition. Detail: `CHANGELOG.md` Batch 173.
+
 **Batch 172 (Now Playing item 4/11 — progress/current/remaining time mudah dibaca, 0 kode)** —
 Baris waktu: `Row SpaceBetween`, `bodySmall` + `colorScheme.secondary` kedua sisi, treatment
 umum player (timestamp di-de-emphasize dari warna teks utama). Mode Audiobook (Batch 93) sudah
