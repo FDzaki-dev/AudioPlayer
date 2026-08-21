@@ -1,5 +1,25 @@
 # Changelog
 
+## Batch 170 — Now Playing item 2/11: spacing antar playback controls (1 file, 1 bug fix)
+Item 2: "Audit spacing antar playback controls." `Row` 5 tombol (Acak/Sebelumnya/Play-Pause/
+Berikutnya/Ulangi) di `NowPlayingScreen.kt` ternyata TANPA `fillMaxWidth()` maupun
+`horizontalArrangement` sama sekali — cuma `verticalAlignment`. Beda dari konvensi player pada
+umumnya (Spotify/Apple Music/YouTube Music selalu spread kontrol playback merata sepanjang
+lebar layar) dan beda dari kebiasaan file ini sendiri yang SELALU mengomentari keputusan layout
+sengaja (glow/shape/shadow di tombol play/pause tepat di baris yang sama komentarnya panjang) —
+Row ini 0 komentar sama sekali, ciri oversight bukan keputusan sadar.
+
+**`NowPlayingScreen.kt`** (diedit) — `.fillMaxWidth()` + `horizontalArrangement =
+Arrangement.SpaceEvenly` ditambahkan. `SpaceEvenly` dipilih (bukan `SpaceBetween`) supaya
+tombol Acak/Ulangi di kedua ujung tetap punya jarak dari tepi Column (bukan menempel rapat ke
+padding 20dp), konsisten "bernapas" dengan elemen lain di layar yang sama.
+
+1 file, 1 bug fix. Brace/paren `NowPlayingScreen.kt` seimbang (209/209, 736/736).
+`FILE_MANIFEST.txt` tidak berubah (173/173). **Belum diverifikasi visual di device** — cek
+prioritas: buka Now Playing, pastikan 5 tombol sekarang menyebar merata (bukan cluster rapat di
+tengah) tanpa mengubah ukuran/fungsi masing-masing tombol. Item berikutnya (3/11): audit slider
+height/touch area.
+
 ## Batch 169 — Kategori baru "Now Playing — Final Micro-Polish", item 1/11: audit alignment artwork/title/artist/controls (0 kode)
 Kategori #5 (Interactive States) tuntas 8/8 di Batch 168 — pindah ke kategori berikutnya sesuai
 urutan `MICRO_UIUX_AUDIT.md` (🟠 NOW PLAYING — FINAL MICRO-POLISH, 11 checklist item, belum

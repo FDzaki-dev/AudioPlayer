@@ -558,7 +558,22 @@ fun NowPlayingScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            // Batch 170 — sebelumnya Row ini TANPA fillMaxWidth()/horizontalArrangement sama
+            // sekali (cuma verticalAlignment), beda dari konvensi player pada umumnya (Spotify/
+            // Apple Music/YouTube Music selalu spread 5 kontrol playback merata sepanjang
+            // lebar layar, bukan cluster rapat di tengah) — dan beda dari kebiasaan file ini
+            // sendiri yang SELALU mengomentari keputusan layout sengaja (glow, shape, shadow,
+            // dst — cek komentar Batch di sekitar tombol play/pause tepat di bawah), Row ini
+            // 0 komentar sama sekali, ciri khas oversight bukan keputusan sadar.
+            // SpaceEvenly dipilih (bukan SpaceBetween) supaya jarak kiri tombol Acak ke tepi
+            // Column dan kanan tombol Ulangi ke tepi Column TIDAK menempel rapat ke padding
+            // 20dp Column — tetap ada ruang, konsisten "bernapas" dengan elemen lain di layar
+            // yang sama (title/artist/slider semua punya margin dari tepi).
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             val shuffleInteraction = remember { MutableInteractionSource() }
             IconButton(
                 onClick = onShuffle,

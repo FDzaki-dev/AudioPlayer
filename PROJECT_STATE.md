@@ -18,6 +18,15 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 170 (Now Playing item 2/11 — spacing antar playback controls, 1 file, 1 bug fix)** —
+`Row` 5 tombol playback ternyata TANPA `fillMaxWidth()`/`horizontalArrangement` sama sekali
+(cluster rapat, bukan spread merata seperti player pada umumnya) — 0 komentar penjelas, beda
+dari kebiasaan file ini yang selalu mendokumentasikan keputusan layout sengaja. Fix:
+`.fillMaxWidth()` + `Arrangement.SpaceEvenly`. Brace/paren seimbang. `FILE_MANIFEST.txt` tidak
+berubah (173/173). **Belum diverifikasi visual di device** — cek 5 tombol menyebar merata,
+ukuran/fungsi tidak berubah. Item berikutnya (3/11): slider height/touch area. Detail:
+`CHANGELOG.md` Batch 170.
+
 **Batch 169 (Kategori baru "Now Playing — Final Micro-Polish", item 1/11 — audit alignment
 artwork/title/artist/controls, 0 kode)** — Kategori #5 tuntas di Batch 168, pindah ke kategori
 berikutnya. `NowPlayingScreen.kt`: 1 `Column` root `CenterHorizontally` membungkus semua elemen
