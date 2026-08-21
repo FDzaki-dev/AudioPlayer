@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
@@ -270,7 +271,7 @@ private fun QueueRow(
                 fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
                 color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                modifier = Modifier.basicMarquee()
             )
             Text(
                 text = song.artist,

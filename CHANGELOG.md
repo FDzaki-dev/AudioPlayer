@@ -1,5 +1,101 @@
 # Changelog
 
+## Batch 183 — Library/Song List item 4/11: audit title/artist truncation (1 file, 1 bug fix)
+Item berikutnya dari `MICRO_UIUX_AUDIT.md` § Library/Song List. Diperiksa 4 komponen yang sama
+seperti item 1-3 sebelumnya (`SongRow`, `QueueRow`, `ContinueListeningCard`, `MiniPlayerBar`).
+
+**Gap ditemukan**: 3/4 komponen (`SongRow`, `ContinueListeningCard`, `MiniPlayerBar`) title-nya
+pakai `Modifier.basicMarquee()` (scroll penuh kalau kepanjangan) — cuma `QueueRow`
+(`QueueSheet.kt`) yang masih `overflow = TextOverflow.Ellipsis` diam. Artist di keempat
+komponen konsisten sama-sama `TextOverflow.Ellipsis` (tidak diubah — memang bukan fokus
+perhatian utama, cukup dipotong).
+
+**Fix**: title `QueueRow` disamakan ke `Modifier.basicMarquee()`, `overflow = Ellipsis` dilepas
+dari Text itu (redundan — marquee menggantikan truncation, pola sama persis 3 komponen lain).
+1 import baru (`androidx.compose.foundation.basicMarquee`).
+
+1 file diedit, 0 file baru, 0 protected asset. Brace/paren `QueueSheet.kt` seimbang (40/40 `{}`,
+125/125 `()`). `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (5/11): hit target
+favorite/overflow/action icon. **Belum diverifikasi visual di device** — cek title lagu panjang
+di Queue sheet sekarang genuinely scroll marquee, bukan tetap terpotong.
+
+## Batch 182 — Library/Song List item 3/11: audit spacing antar metadata (0 kode)
+4 komponen song-metadata (`SongRow`, `QueueRow`, `ContinueListeningCard`, `MiniPlayerBar`)
+diperiksa: pola 3-segmen spacing IDENTIK di semua — art↔text `Spacer(width=12dp)`, title↔artist
+`0dp` eksplisit (0 `Spacer` di antara 2 `Text` dalam `Column`, mengandalkan line-height Text
+bawaan, sama di ke-4 komponen — disengaja bukan lupa), text↔trailing-action `Spacer(width=8dp)`
+(sebelum duration+favorite di `SongRow`, sebelum tombol play di `ContinueListeningCard`).
+
+**Hasil: 0 bug.** `FILE_MANIFEST.txt` tidak berubah (173/173, diverifikasi diff eksplisit). Item
+berikutnya (4/11): audit title/artist truncation.
+
+## Batch 181 — Library/Song List item 2/11: audit thumbnail/artwork size (0 kode)
+5 file pemakai `AlbumArt` (`Utils.kt`) diperiksa: `HomeScreen.kt` (2 titik), `LibraryScreen.kt`
+(2 titik), `MiniPlayerBar.kt`, `NowPlayingScreen.kt` (2 titik, sudah diaudit Batch 177 dari sisi
+loading/error). Ukuran mengelompok jadi 4 kategori peran UI, masing-masing konsisten internal:
+
+- **List-row scrollable**: `SongRow` 48dp — 1 komponen shared 5 titik pemanggilan (Batch 180).
+- **Persistent compact bar**: `MiniPlayerBar` 44dp — konteks tunggal (1 titik), budget tinggi
+  bar terbatas (`Row padding 10dp` + art 44dp = tinggi total ~64dp, konvensi umum mini-player).
+- **Featured single-card**: `ContinueListeningCard` (`HomeScreen.kt`) 56dp — `Surface` elevated
+  dgn padding 14dp sendiri, konteks tunggal, BUKAN list-row biasa (beda `Modifier` chain total:
+  tonalElevation/embossed shape/clickable card, bukan `Row` polos kayak `SongRow`).
+- **Carousel/grid fill-container**: `HomeSongCard` (`HomeScreen.kt`) `.width(120.dp)` tetap +
+  art `.size(120.dp)` (art = lebar card persis), `AlbumGridView` (`LibraryScreen.kt`)
+  `fillMaxWidth()+aspectRatio(1f)` (art = lebar kolom grid persis) — PRINSIP sama ("art
+  mengisi penuh lebar container-nya"), angka absolut beda krn lebar carousel-item (120dp
+  tetap) vs lebar kolom grid (responsif jumlah kolom/lebar layar) memang 2 hal berbeda by
+  design, bukan dibandingkan apple-to-apple.
+
+Perbedaan ukuran LINTAS kategori (48 vs 44 vs 56 vs 120) = peran UI genuinely berbeda
+(list-row vs compact-bar vs featured-card vs carousel-item), bukan inkonsistensi DI DALAM
+kategori yang sama — tiap kategori sendiri sudah 1 komponen shared atau 1 konteks tunggal,
+tidak ada duplikasi/fragmentasi angka utk peran yang sama.
+
+**Hasil: 0 bug.** `FILE_MANIFEST.txt` tidak berubah (173/173, diverifikasi diff eksplisit). Item
+berikutnya (3/11): samakan spacing antar metadata (title/artist/duration dst).
+
+## Batch 180 — Library/Song List item 1/11: audit tinggi row (0 kode)
+Kategori baru setelah Now Playing tuntas (Batch 179). Item 1: `SongRow` (`LibraryScreen.kt`) —
+art `.size(48.dp)` + `Row` padding `vertical = 8.dp` = tinggi baris konstan. 1 fungsi private
+ini dipakai identik di 5 titik pemanggilan (tab Lagu, tab Favorit, drill-down grup Artis,
+drill-down grup Folder, hasil Pencarian — semua lewat `SongListView`/`GroupedListView`/
+`SearchResultsView` yang meneruskan ke `SongRow` yang sama, grep-confirmed sejak Batch 164),
+jadi tinggi row konsisten by-construction, bukan kebetulan disamakan manual di 5 tempat.
+
+2 elemen list LAIN sengaja diperiksa juga supaya tidak salah tandai sebagai gap: group-header
+row (`ListItem` di `GroupedListView` sebelum drill-down) beda semantik — itu navigasi kategori
+("Rock — 12 lagu"), bukan representasi 1 lagu, wajar beda tinggi/style dari `SongRow`. `Album
+GridView` beda paradigma total (grid card, bukan row list) — juga bukan kandidat perbandingan
+row-height, sudah dicek terpisah nanti di item "thumbnail/artwork size".
+
+**Hasil: 0 bug.** `FILE_MANIFEST.txt` tidak berubah (173/173, diverifikasi diff eksplisit). Item
+berikutnya (2/11): samakan thumbnail/artwork size.
+
+## Batch 179 — Now Playing item 11/11: verifikasi retrospektif "jangan ubah playback logic" — kategori TUNTAS (0 kode)
+Item terakhir kategori "Now Playing — Final Micro-Polish" (11/11) — bukan target audit baru,
+melainkan verifikasi retrospektif atas seluruh Batch 169-178: apakah audit micro-polish 10 item
+sebelumnya (alignment, spacing, slider, progress-readability, volume, bottom-sheet, selected-
+state, layout-shift, artwork-state, feedback-visual) genuinely tidak menyentuh playback logic
+sepanjang jalan, sesuai batas STRICT SCOPE yang tertulis di header `MICRO_UIUX_AUDIT.md`.
+
+Dikonfirmasi lewat grep: `PlayerViewModel.kt` (dan seluruh package `playback/`) **0 baris
+disentuh** sepanjang Batch 169-178. Satu-satunya perubahan kode nyata di kategori ini (Batch
+178, `AlbumArtHero` swipe-feedback) diverifikasi ulang: `onSwipeNext()`/`onSwipePrevious()` di
+dalam `detectHorizontalDragGestures` tetap memanggil `onNext`/`onPrevious` yang sama persis
+seperti sebelum Batch 178 (call site `NowPlayingScreen(onSwipeNext = onNext, onSwipePrevious =
+onPrevious)` tidak berubah), threshold 120px tidak diubah — `dragOffset`/`Animatable` yang
+ditambahkan murni membaca `totalDrag` untuk visual, tidak pernah menulis balik ke logic apa pun.
+
+**Hasil: terverifikasi bersih, 0 pelanggaran scope.** Kategori **"Now Playing — Final Micro-
+Polish" resmi TUNTAS 11/11** — 2 bug fix (spacing controls Batch 170, swipe feedback visual
+Batch 178), 9 audit hasil bersih. `FILE_MANIFEST.txt` tidak berubah (173/173, diverifikasi diff
+eksplisit). Kategori berikutnya (`MICRO_UIUX_AUDIT.md` § "🟠 LIBRARY / SONG LIST"): samakan
+tinggi row, thumbnail/artwork size, spacing metadata, truncation, hit-target
+favorite/overflow/action, indikator lagu-sedang-diputar (⚠️ **sudah dikerjakan** — cek
+`CHANGELOG.md` Batch 164 sebelum audit ulang, supaya tidak salah tandai sebagai gap baru), empty/
+loading/search-result state, separator/divider, visual-jump saat artwork selesai loading.
+
 ## Batch 178 — Now Playing item 10/11: audit semua controls feedback visual — 1 bug fix (1 file)
 Audit semua control interaktif Now Playing: transport buttons (`bouncyPress` + ripple, sudah
 ada), shuffle/repeat (tint-toggle, Batch 175), star rating (icon swap+tint+haptic), gesture

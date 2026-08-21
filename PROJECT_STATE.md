@@ -18,6 +18,45 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 183 (Library/Song List item 4/11 — audit title/artist truncation, 1 file, 1 bug fix)**
+— 3/4 komponen (`SongRow`/`ContinueListeningCard`/`MiniPlayerBar`) title-nya sudah
+`basicMarquee()`, cuma `QueueRow` (`QueueSheet.kt`) ketinggalan pakai `TextOverflow.Ellipsis`
+diam. Disamakan ke `basicMarquee()`, `overflow=Ellipsis` yang redundan dilepas dari Text itu.
+Artist di 4 komponen tetap ellipsis semua (tidak diubah, memang bukan fokus). 1 file, 0 protected
+asset. `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (5/11): hit target favorite/
+overflow/action icon. **Belum diverifikasi visual di device.** Detail: `CHANGELOG.md` Batch 183.
+
+**Batch 182 (Library/Song List item 3/11 — audit spacing antar metadata, 0 kode)** — 4 komponen
+song-metadata (`SongRow`/`QueueRow`/`ContinueListeningCard`/`MiniPlayerBar`) diperiksa, pola
+3-segmen IDENTIK di semua: art↔text 12dp, title↔artist 0dp (line-height, disengaja), text↔
+trailing-action 8dp. **Hasil: 0 bug.** `FILE_MANIFEST.txt` tidak berubah (173/173). Item
+berikutnya (4/11): audit title/artist truncation. Detail: `CHANGELOG.md` Batch 182.
+
+**Batch 181 (Library/Song List item 2/11 — audit thumbnail/artwork size, 0 kode)** — 5 file
+pemakai `AlbumArt` diperiksa, ukuran mengelompok 4 kategori peran UI (list-row `SongRow` 48dp,
+compact-bar `MiniPlayerBar` 44dp, featured-card `ContinueListeningCard` 56dp, carousel/grid
+fill-container `HomeSongCard`/`AlbumGridView`), masing-masing konsisten internal. Beda lintas-
+kategori = peran UI berbeda disengaja. **Hasil: 0 bug.** `FILE_MANIFEST.txt` tidak berubah
+(173/173). Item berikutnya (3/11): spacing antar metadata. Detail: `CHANGELOG.md` Batch 181.
+
+**Batch 180 (Library/Song List item 1/11 — audit tinggi row, 0 kode)** — Kategori baru setelah
+Now Playing tuntas. `SongRow` (art 48dp + padding vertical 8dp) 1 komponen shared dipakai
+identik di 5 titik (tab Lagu/Favorit/drill-down Artis/drill-down Folder/Pencarian), tinggi
+konsisten by-construction. Group-header `ListItem` & `AlbumGridView` sengaja beda paradigma,
+bukan gap. **Hasil: 0 bug.** `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya
+(2/11): samakan thumbnail/artwork size. Detail: `CHANGELOG.md` Batch 180.
+
+**Batch 179 (Now Playing item 11/11 — verifikasi retrospektif "jangan ubah playback logic",
+kategori TUNTAS 11/11, 0 kode)** — Dikonfirmasi grep: `PlayerViewModel.kt`/package `playback/`
+0 disentuh sepanjang Batch 169-178. Satu-satunya perubahan kode kategori ini (Batch 178, swipe
+feedback) diverifikasi ulang tetap panggil `onNext`/`onPrevious` yang sama, threshold 120px
+tidak berubah. **Kategori "Now Playing — Final Micro-Polish" resmi TUNTAS**: 2 bug fix
+(spacing controls Batch 170, swipe feedback visual Batch 178), 9 audit hasil bersih.
+`FILE_MANIFEST.txt` tidak berubah (173/173). **Kategori berikutnya: Library/Song List**
+(`MICRO_UIUX_AUDIT.md` § "🟠 LIBRARY / SONG LIST") — ⚠️ item "indikator lagu-sedang-diputar" di
+daftar itu SUDAH dikerjakan (Batch 164, `SongRow` currentSongId), jangan salah tandai sebagai
+gap baru saat audit dimulai. Detail: `CHANGELOG.md` Batch 179.
+
 **Batch 178 (Now Playing item 10/11 — audit semua controls feedback visual, 1 file, 1 bug fix)**
 — Gap ditemukan: swipe album art (next/prev) 0 feedback visual selama drag (cuma haptic di
 dragEnd), beda dari gesture brightness/volume di sekitarnya yang sudah live badge. Fix:
