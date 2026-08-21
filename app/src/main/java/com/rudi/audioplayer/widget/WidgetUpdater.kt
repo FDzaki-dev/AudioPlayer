@@ -30,6 +30,11 @@ object WidgetUpdater {
     private const val KEY_ARTWORK_URI = "artwork_uri"
     private const val KEY_IS_PLAYING = "is_playing"
     private const val COMPACT_WIDTH_THRESHOLD_DP = 180
+    // Batch 201 — full layout's real minimum: 52dp art + 14dp top/bottom padding = 80dp.
+    // Threshold set slightly above that (90dp) so compact kicks in BEFORE the hard-clip point,
+    // not exactly at it (matches the same margin-of-safety pattern as WIDTH_THRESHOLD 180dp
+    // vs full layout's real min width, which is well under 180dp too).
+    private const val COMPACT_HEIGHT_THRESHOLD_DP = 90
 
     // Batch 68: fix "widget nggak pernah sinkron pas ganti tema" — widget_player(.compact).xml
     // used to hardcode the dark palette permanently (no light counterpart, and nothing ever
@@ -81,9 +86,18 @@ object WidgetUpdater {
             // Widgets can be resized independently by the user, so each one gets its own
             // layout choice — a widget shrunk down to just an icon shouldn't try to cram in
             // a title, artist, and three buttons that no longer fit.
+            //
+            // Batch 201 — was width-only (`OPTION_APPWIDGET_MIN_WIDTH`). A widget squeezed
+            // SHORT but kept WIDE (user drags only the bottom resize handle) used to stay on
+            // the full layout, which needs ~80dp height (52dp art + 14dp*2 padding) to NOT
+            // hard-clip — RemoteViews/AppWidgetHost clip overflow content, they never reflow
+            // it. Reported by user via screenshot: title/artist/buttons visibly cut off at the
+            // widget's own bottom edge. Height now checked too — either dimension below
+            // threshold falls back to compact (which only needs ~52dp: 36dp art + 8dp*2).
             val options = manager.getAppWidgetOptions(id)
             val minWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
-            val isCompact = minWidthDp < COMPACT_WIDTH_THRESHOLD_DP
+            val minHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 250)
+            val isCompact = minWidthDp < COMPACT_WIDTH_THRESHOLD_DP || minHeightDp < COMPACT_HEIGHT_THRESHOLD_DP
 
             val views = RemoteViews(context.packageName, if (isCompact) R.layout.widget_player_compact else R.layout.widget_player)
 
@@ -108,6 +122,13 @@ object WidgetUpdater {
                 views.setTextViewText(R.id.widget_artist, artist ?: "Buka AudioPlayer")
                 views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
                 views.setTextColor(R.id.widget_artist, if (isDark) ARTIST_COLOR_DARK else ARTIST_COLOR_LIGHT)
+                // Batch 201 — `ellipsize="marquee"` in XML alone does NOT animate inside a
+                // widget: real TextView marquee normally needs the view to hold Android focus
+                // to scroll, and widget host views are never focusable. `setSelected(true)` is
+                // the documented workaround — marquee also runs whenever `isSelected` is true,
+                // regardless of focus. Static ellipsis ("...") stays as the fallback look on
+                // launchers/OS versions where this trick doesn't take (matches XML default).
+                views.setBoolean(R.id.widget_title, "setSelected", true)
                 views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
                 views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))
             }

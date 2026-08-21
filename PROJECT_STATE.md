@@ -18,6 +18,21 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 201 (Fix widget — truncated saat height-only shrink + marquee judul lagu, 2 file
+kode)** — User lapor via screenshot. (1) `isCompact` dulu cuma cek lebar, widget yang di-shrink
+cuma secara TINGGI tetap pakai layout penuh → clip di tepi (RemoteViews tidak reflow). Fix: cek
+`OPTION_APPWIDGET_MIN_HEIGHT` juga. (2) Judul lagu statis `ellipsize="end"`. Fix: `ellipsize=
+"marquee"` XML + WAJIB `views.setBoolean(id, "setSelected", true)` di Kotlin (marquee widget
+butuh trik ini — focus-based marquee normal tidak jalan di widget, host view tidak focusable).
+Brace/paren `WidgetUpdater.kt` seimbang (20/20, 122/122), 0 protected asset. **Belum
+diverifikasi device** — marquee riwayat tidak konsisten antar-launcher, prioritas cek resize
+height-only + judul panjang beneran scroll. Detail: `CHANGELOG.md` Batch 201.
+
+**Batch 200 (Playlist/Queue item 6/8 — audit empty queue/playlist state, 0 bug, 2
+dokumentasi)** — 3 titik `EmptyState` (`QueueSheet`/`PlaylistScreen` list & detail) diperiksa,
+semua konsisten + subtitle actionable, 1 punya CTA button. 0 kode. Item berikutnya (7/8): audit
+search-result state atau state serupa. Detail: `CHANGELOG.md` Batch 200.
+
 **Batch 199 (SmartPlaylistTabView highlight lagu-sedang-diputar, 2 file — tuntaskan pending
 Batch 198)** — `currentSongId` diteruskan ke `SmartPlaylistTabView` (tab 6), styling disalin
 persis `PlaylistSongRow`/`QueueRow`. Brace/paren seimbang, 0 protected asset. **SEMUA

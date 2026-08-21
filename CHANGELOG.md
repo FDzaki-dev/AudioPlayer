@@ -1,5 +1,39 @@
 # Changelog
 
+## Batch 201 — Fix widget: truncated saat diperkecil paksa (height-only shrink) + marquee judul lagu (2 file kode)
+2 bug dilaporkan user via screenshot resize widget home-screen:
+
+1. **Truncated saat layout dipaksa minimize** — root cause: `isCompact` (`WidgetUpdater.kt`)
+   cuma cek `OPTION_APPWIDGET_MIN_WIDTH`, TIDAK PERNAH cek tinggi. Widget yang di-shrink cuma
+   secara TINGGI (lebar tetap ≥180dp) tetap pakai `widget_player.xml` (butuh ~80dp: art 52dp +
+   padding 14dp×2) — RemoteViews/AppWidgetHost clip overflow, tidak reflow, hasil PERSIS sesuai
+   screenshot (title/artist/tombol terpotong di tepi bawah). Fix: tambah cek
+   `OPTION_APPWIDGET_MIN_HEIGHT` juga, `isCompact` sekarang true kalau SALAH SATU dimensi di
+   bawah threshold (`COMPACT_HEIGHT_THRESHOLD_DP = 90`, compact cuma butuh ~52dp).
+2. **Judul lagu tidak auto-scroll** — `widget_title` (`widget_player.xml`) cuma `ellipsize=
+   "end"` statis. Diganti `ellipsize="marquee"` + `marqueeRepeatLimit="marquee_forever"` +
+   `singleLine="true"`. **Catatan teknis penting**: marquee XML doang TIDAK cukup di widget —
+   TextView marquee normal butuh Android focus buat jalan, widget host view TIDAK PERNAH
+   focusable. Fix aslinya di `WidgetUpdater.kt`: `views.setBoolean(R.id.widget_title,
+   "setSelected", true)` — trik terdokumentasi, marquee juga jalan kalau `isSelected=true`,
+   lepas dari focus. Fallback: kalau ada launcher/OS version yang tetap tidak menjalankan trik
+   ini, tampilan jatuh balik ke ellipsis statis (bukan crash/rusak).
+
+2 file kode (`widget_player.xml` + `WidgetUpdater.kt`), 0 protected asset. Brace/paren
+`WidgetUpdater.kt` seimbang (20/20, 122/122). **Belum diverifikasi device sungguhan** — marquee
+widget punya riwayat tidak konsisten antar-launcher (Samsung One UI/Pixel Launcher/dst bisa
+beda perilaku) — prioritas cek: (a) resize widget cuma secara tinggi, pastikan compact muncul
+sebelum konten kepotong; (b) judul lagu panjang, pastikan benar-benar scroll bukan diam.
+
+## Batch 200 — Playlist/Queue item 6/8: audit empty queue/playlist state — 0 bug (2 dokumentasi, 0 kode)
+3 titik empty-state diperiksa: `QueueSheet` (antrean kosong), `PlaylistScreen` (belum ada
+playlist — dengan CTA `actionLabel`/`onAction` "Buat Playlist", & playlist kosong tanpa lagu).
+**Hasil: 0 bug** — ketiganya sudah pakai komponen `EmptyState` yang sama, subtitle actionable
+(kasih tahu cara isi, bukan cuma "kosong"), 1 di antaranya malah punya CTA button langsung.
+Konsisten dengan pola app-wide (sama seperti temuan Library/Song List item 6/11, Batch 185-an).
+0 file diedit. Item berikutnya (7/8): audit search-result state (kalau ada pencarian dalam
+Playlist/Queue) atau state serupa — dicek batch depan.
+
 ## Batch 199 — SmartPlaylistTabView highlight lagu-sedang-diputar (2 file, tuntaskan pending Batch 198)
 `SmartPlaylistTabView` (tab 6) — satu-satunya composable song-list yang belum ikut highlight
 now-playing (`QueueSheet`/`PlaylistScreen`/tab 5 sudah). Fix: param baru `currentSongId: Long? =
