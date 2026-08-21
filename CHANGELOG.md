@@ -1,5 +1,36 @@
 # Changelog
 
+## Batch 168 — Micro UI/UX kategori #5 penutup: audit konsistensi lintas-aksi (item terakhir, 8/8, 0 kode)
+Item terakhir kategori #5 (checklist: "Hindari feedback visual yang berbeda untuk action yang
+sama"). Cari aksi yang muncul di >1 lokasi UI dengan fungsi identik — kandidat paling jelas:
+toggle Favorit (dipakai persis sama di `LibraryScreen.kt` SongRow dan `NowPlayingScreen.kt`).
+
+**Icon/tint/haptic/contentDescription**: identik di kedua lokasi (ikon Favorite/FavoriteBorder,
+tint primary/secondary, `HapticFeedbackType.TextHandleMove`, deskripsi "Tambah/Hapus dari
+favorit") — komentar di `LibraryScreen.kt` sendiri malah mencatat haptic ini SUDAH disamakan di
+batch lampau ("Was the only place this toggle fired with zero haptic").
+
+**1 beda ditemukan**: `NowPlayingScreen.kt` pakai `Modifier.bouncyPress(pressedScale = 0.75f)`
+di tombol favoritnya, `LibraryScreen.kt` TIDAK — grep `bouncyPress` di seluruh `ui/*.kt`
+konfirmasi `LibraryScreen.kt` genuinely 0 pemakaian `bouncyPress` di file itu sama sekali
+(favorit maupun 7 `IconButton` lain di row yang sama: close/addToPlaylist/hide/delete/dst),
+sementara `VaultSheet.kt` (list singkat) DAN `NowPlayingScreen.kt` (hero screen) sama-sama
+pakai `bouncyPress` di tombol list-row/aksi utama mereka masing-masing. Jadi bukan pola bersih
+"list row = tanpa bounce, non-list = bounce" (`VaultSheet` list row punya bounce) — genuinely
+ambigu: bisa jadi disengaja (list Library berisi ratusan lagu, animasi scale di tiap tap bisa
+terasa berat/berulang di list sepadat itu, beda dari `VaultSheet` yang listnya pendek) atau
+genuinely kelewatan.
+
+**TIDAK dieksekusi batch ini** — pola sama Batch 162/163/165 (EmptyState icon, LibraryFilterChips
+fill, banner 3-arah sebelum Batch 166): dicatat sebagai observasi ke-3 yang tertunda keputusan
+user, bukan diasumsikan mana yang benar sebelum dikonfirmasi.
+
+**Kategori #5 kini 8/8 sub-item teraudit** (pressed, disabled, loading, selected, empty, error,
+success, lintas-aksi) — status naik ke ✅ audit selesai. **3 observasi masih tertunda eksekusi**:
+(1) `EmptyState` icon hardcode (Batch 162), (2) `LibraryFilterChips` custom-fill vs FilterChip
+(Batch 163), (3) Favorit `bouncyPress` di atas. Kategori berikutnya (belum mulai sama sekali):
+6-14 "Now Playing s/d Component Consistency". Detail: `MICRO_UIUX_AUDIT.md` status table baris #5.
+
 ## Batch 167 — Hotfix: import `dp` hilang di Utils.kt (dari log CI Batch 166, 1 file)
 User upload log CI gagal (`log_fail_220.zip`, GitHub Actions `compileReleaseKotlin`+
 `compileDebugKotlin` FAILED, 7x "Unresolved reference: dp" di `Utils.kt` baris 171-191) — ini

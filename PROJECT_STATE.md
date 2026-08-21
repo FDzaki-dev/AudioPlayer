@@ -18,6 +18,19 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 168 (Micro UI/UX kategori #5 penutup — audit konsistensi lintas-aksi, 0 kode)** — Item
+terakhir checklist kategori #5. Audit toggle Favorit (`LibraryScreen.kt` SongRow vs
+`NowPlayingScreen.kt`, aksi identik 2 lokasi): icon/tint/haptic/contentDescription sudah
+identik (haptic malah sudah pernah disamakan di batch lampau, dikonfirmasi komentar kode
+sendiri). **1 beda ditemukan**: `NowPlayingScreen` pakai `bouncyPress(0.75f)` di tombol
+favoritnya, `LibraryScreen` tidak sama sekali (0 `bouncyPress` di seluruh file itu) — genuinely
+ambigu (list Library ratusan lagu vs `VaultSheet` list pendek yang JUSTRU pakai bouncyPress di
+row-nya, jadi bukan pola bersih "list=tanpa-bounce"). **TIDAK dieksekusi**, dicatat observasi
+ke-3 tertunda keputusan user (pola sama Batch 162/163/165). Kategori #5 sekarang 8/8 sub-item
+teraudit → status ✅ audit selesai, 3 observasi masih tertunda eksekusi total. Kategori
+berikutnya (6-14, belum mulai sama sekali): Now Playing s/d Component Consistency. Detail:
+`CHANGELOG.md` Batch 168.
+
 **Batch 167 (Hotfix — import `dp` hilang di `Utils.kt`, 1 file, 1 baris)** — User upload log CI
 gagal (`compileReleaseKotlin`+`compileDebugKotlin` FAILED, 7x "Unresolved reference: dp").
 Akar: composable `ResultBanner` baru (Batch 166) pakai 8 literal `.dp` tapi
