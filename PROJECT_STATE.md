@@ -18,6 +18,44 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 191 (Playlist/Queue item 1/8 — konsistenkan row height dan spacing, 1 file, 1 bug fix)**
+— Kategori baru dimulai setelah Library/Song List tuntas. `QueueRow` horizontal padding 12dp,
+outlier dari konvensi 20dp yang dipakai konsisten di seluruh app (`PlaylistSongRow`/`SongRow`/
+dst.). Disamakan ke 20dp. Vertical padding & tinggi row sudah konsisten, tidak diubah. 1 file, 0
+protected asset. `FILE_MANIFEST.txt` tidak berubah (173/173). Item berikutnya (2/8): pastikan
+drag/reorder affordance jelas. **Belum diverifikasi visual di device** — cek drag handle masih
+mudah digenggam dari tepi. Detail: `CHANGELOG.md` Batch 191.
+
+**Batch 190 (Library/Song List item 11/11 TERAKHIR — visual jumping artwork, kategori TUNTAS
+11/11, 0 kode)** — `AlbumArt` (`Utils.kt`) sudah anti-jump by-design sejak awal: Box ukuran
+fixed dari `modifier` caller (bukan derive dari gambar), `background(surfaceVariant)` placeholder
+instan, `matchParentSize()` + `loading={}` kosong disengaja. Layout tidak pernah berubah ukuran
+sebelum→sesudah decode — jump tidak mungkin terjadi. **Hasil: 0 bug.**
+
+**🏁 KATEGORI "LIBRARY / SONG LIST" RESMI TUNTAS 11/11** (Batch 180-190): 2 bug fix (title
+marquee `QueueRow` Batch 183, padding `ShimmerRow` Batch 187), 9 audit bersih. 1 catatan untuk
+kategori berikutnya (bukan bug kategori ini): `QueueRow` 0 divider. **Kategori berikutnya:
+PLAYLIST / QUEUE** (`MICRO_UIUX_AUDIT.md` § "🟠 PLAYLIST / QUEUE", 8 item, mulai dari
+"Konsistenkan row height dan spacing") — ⚠️ item pertama kategori itu kemungkinan langsung
+ketemu catatan divider `QueueRow` di atas, bukan temuan baru. `FILE_MANIFEST.txt` tidak berubah
+(173/173). Detail: `CHANGELOG.md` Batch 190.
+
+**Batch 189 (Library/Song List item 10/11 — audit list separator/divider, 0 kode)** — 5 titik
+`HorizontalDivider` di `LibraryScreen.kt` (SongListView/GroupedListView×2/SearchResultsView/
+drill-down Album) semua identik (warna surfaceVariant, posisi setelah setiap item). **Hasil: 0
+bug.** Dicatat (bukan bug, di luar cakupan): `QueueRow` 0 divider — kandidat § Playlist/Queue
+nanti, kategori terpisah. `FILE_MANIFEST.txt` tidak berubah (173/173). **Item berikutnya
+(11/11, TERAKHIR kategori ini)**: hindari visual jumping artwork selesai loading — setelah ini
+kategori Library/Song List TUNTAS 11/11, lanjut ke § Playlist/Queue. Detail: `CHANGELOG.md`
+Batch 189.
+
+**Batch 188 (Library/Song List item 9/11 — audit search result state, 0 kode)** —
+`SearchResultsView` diperiksa: hasil kosong reuse `EmptyState` (sudah konsisten, item 7), hasil
+ada dikelompokkan Artis/Album/Lagu dengan `SearchSectionLabel` seragam, pencarian sinkron
+in-memory jadi 0 state loading terpisah diperlukan. **Hasil: 0 bug.** `FILE_MANIFEST.txt` tidak
+berubah (173/173). Item berikutnya (10/11): audit list separator/divider. Detail:
+`CHANGELOG.md` Batch 188.
+
 **Batch 187 (Library/Song List item 8/11 — audit loading state, 1 file, 1 bug fix)** —
 `ShimmerRow` skeleton (`LibraryScreen.kt`) padding vertical 10dp vs `SongRow` asli 8dp — beda
 2dp × 8 baris = shift 16dp saat transisi loading→loaded. Disamakan ke 8dp. 1 file, 0 protected

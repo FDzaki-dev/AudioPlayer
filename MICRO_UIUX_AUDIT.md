@@ -88,7 +88,7 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
 
 ---
 
-## 🟠 LIBRARY / SONG LIST
+## 🟠 LIBRARY / SONG LIST — ✅ TUNTAS 11/11 (Batch 180-190)
 
 - [x] Samakan tinggi row. **✅ 0 bug (Batch 180)** — `SongRow` (art 48dp + padding vertical 8dp = tinggi tetap) 1 komponen shared dipakai identik di 5 titik (tab Lagu, Favorit, drill-down Artis, drill-down Folder, hasil Pencarian), konsisten by-construction. Group-header row (`ListItem` navigasi kategori) & `AlbumGridView` (grid) sengaja beda paradigma UI dari song-row, bukan gap.
 - [x] Samakan thumbnail/artwork size. **✅ 0 bug (Batch 181)** — 5 file pemakai `AlbumArt` diperiksa, size mengelompok jadi 4 kategori peran UI, masing-masing konsisten internal: list-row scrollable (`SongRow` 48dp, 1 komponen shared 5 titik, Batch 180), persistent compact bar (`MiniPlayerBar` 44dp, konteks tunggal, budget tinggi bar terbatas), featured single-card (`ContinueListeningCard` 56dp, konteks tunggal, Card elevated bukan list-row biasa), carousel/grid fill-container (`HomeSongCard` 120dp width-tetap & `AlbumGridView` `fillMaxWidth+aspectRatio(1f)` — keduanya prinsip sama "art = lebar card", angka beda krn lebar carousel-item vs kolom-grid memang beda). Perbedaan LINTAS kategori = peran UI berbeda disengaja, bukan inkonsistensi DALAM kategori yang sama.
@@ -98,15 +98,15 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
 - [x] Audit selected/current-playing indicator. **✅ 0 bug — verifikasi retrospektif (Batch 185)** — sudah dikerjakan Batch 163/164 sebelum kategori ini resmi dimulai (dicatat sbg peringatan di Batch 179). `SongRow` & `QueueRow` sama-sama 3 lapis identik (bg primary 12% alpha + ikon `GraphicEq` + title bold/primary), `ContinueListeningCard` (lagu TERAKHIR diputar, bukan status live) & `MiniPlayerBar` (bar itu sendiri = indikator "sedang diputar") sengaja tanpa lapisan tambahan — beda semantik, bukan gap.
 - [x] Audit empty library state. **✅ 0 bug (Batch 186)** — 1 composable `EmptyState` (icon+title+subtitle+CTA opsional) dipakai ulang untuk semua 4 skenario kosong di `LibraryScreen.kt`: perpustakaan kosong total (dengan CTA "Pindai Ulang"), favorit kosong (tanpa CTA, hint tap-hati), hasil filter tab kosong & hasil pencarian kosong (tanpa CTA, "Coba kata kunci lain"/"Tidak ditemukan"). CTA cuma muncul di skenario yang genuinely actionable (rescan), sengaja tidak ada di skenario lain — bukan lupa, konsisten disengaja.
 - [x] Audit loading state. **✅ 1 bug fix (Batch 187)** — `ShimmerRow` (skeleton loading `LibraryScreen.kt`) dibuat meniru dimensi `SongRow` asli (art 48dp ✓ match), tapi `vertical padding`-nya 10dp vs `SongRow` sungguhan 8dp — beda 2dp/baris × 8 baris shimmer = shift 16dp pas transisi loading→loaded. Disamakan ke 8dp.
-- [ ] Audit search result state.
-- [ ] Audit list separator/divider bila digunakan.
-- [ ] Hindari visual jumping ketika artwork selesai loading.
+- [x] Audit search result state. **✅ 0 bug (Batch 188)** — `SearchResultsView` (`LibraryScreen.kt`) 1 komponen menangani ketiganya: hasil kosong reuse `EmptyState` yang sama (sudah diaudit item 7), hasil ada dikelompokkan Artis/Album/Lagu dengan `SearchSectionLabel` konsisten (typography+padding sama di ketiga grup), pencarian murni filter sinkron in-memory (`remember(songs, query)`) jadi tidak ada state loading terpisah yang perlu ditangani.
+- [x] Audit list separator/divider bila digunakan. **✅ 0 bug (Batch 189)** — 5 titik divider di `LibraryScreen.kt` (`SongListView`, `GroupedListView` 2x — daftar grup & daftar lagu dalam grup, `SearchResultsView`, drill-down Album) semua `HorizontalDivider(color = surfaceVariant)` identik, dipasang setelah SETIAP item termasuk yang terakhir — konsisten. Catatan (bukan bug, di luar cakupan kategori ini): `QueueRow` (§ Playlist/Queue, belum diaudit) 0 divider sama sekali — kandidat utk kategori itu nanti, bukan kategori Library/Song List.
+- [x] Hindari visual jumping ketika artwork selesai loading. **✅ 0 bug (Batch 190)** — `AlbumArt` (`Utils.kt`, 1 komponen shared dipakai di semua tempat art muncul) sudah didesain anti-jump sejak awal: `Box` ukurannya SELALU ditentukan `modifier` milik caller (fixed dp/aspectRatio, bukan derive dari ukuran gambar), diisi `background(surfaceVariant)` sebelum gambar sempat tiba, `SubcomposeAsyncImage` pakai `matchParentSize()` (tidak pernah mengubah bounds Box) + `loading = {}` (kosong disengaja, dikonfirmasi komentar KDoc existing — supaya lagu yang PUNYA art tidak sempat kelip ikon fallback dulu). Layout box tidak pernah berubah ukuran dari sebelum→sesudah gambar decode, jadi tidak ada jump yang mungkin terjadi by-construction.
 
 ---
 
 ## 🟠 PLAYLIST / QUEUE
 
-- [ ] Konsistenkan row height dan spacing.
+- [x] Konsistenkan row height dan spacing. **✅ 1 bug fix (Batch 191)** — `QueueRow` (`QueueSheet.kt`) horizontal padding 12dp, outlier dari konvensi 20dp yang dipakai konsisten di SELURUH app (`PlaylistSongRow`, `SongRow`, `ShimmerRow`, dst.). Disamakan ke 20dp. Vertical padding (8dp) & tinggi efektif row sudah konsisten dari awal, tidak diubah.
 - [ ] Pastikan drag/reorder affordance jelas jika tersedia.
 - [ ] Audit selected/current item state.
 - [ ] Audit remove/delete affordance.
