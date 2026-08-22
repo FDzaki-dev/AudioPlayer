@@ -183,6 +183,7 @@ fun QueueSheet(
                             }
                         )
                     )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
             }
 

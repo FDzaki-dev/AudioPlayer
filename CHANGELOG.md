@@ -1,5 +1,56 @@
 # Changelog
 
+## Batch 213 — Tambah drag-reorder ke PlaylistScreen (1 file kode + 1 dokumentasi)
+Item terbuka Batch 211/212 dieksekusi atas permintaan eksplisit user. Porting logic drag
+`QueueSheet.kt` ke `PlaylistScreen.kt` (detail playlist), 1:1 pola sama: drag-handle icon
+(`Icons.Default.DragHandle`, 48dp touch target) di kiri tiap `PlaylistSongRow`, tahan-lama lalu
+geser (`detectDragGesturesAfterLongPress`) reorder lagu; `graphicsLayer` translationY+
+shadowElevation(10f)+zIndex saat row lagi di-drag; `rememberUpdatedState` cegah closure basi
+(pola sama alasan komentar `QueueSheet.kt`); haptic feedback identik (LongPress saat mulai
+drag/hapus, TextHandleMove tiap geser 1 slot). Beda teknis dari `QueueSheet.kt`: pakai `song.id`
+langsung sbg identitas drag (bukan `slotIds` terpisah — playlist tidak reuse id sama 2x dalam 1
+playlist, `itemsIndexed key` sudah pakai `song.id` juga), fungsi helper gesture dibuat DUPLIKAT
+sendiri `pointerInputPlaylistDragHandle` (bukan diekstrak shared) karena masing-masing sudah
+`private` ke file composable-nya sejak awal, konsisten pola existing. Tombol naik/turun TETAP
+ada (bukan diganti) — fallback aksesibilitas persis alasan komentar `QueueSheet.kt`. Brace/paren
+`PlaylistScreen.kt` seimbang (127/127, 206/206). 0 protected asset. **Belum diverifikasi
+visual** — prioritas cek: drag antar-lagu playlist beneran reorder benar, divider (Batch 212)
+tidak tumpang-tindih row yang di-drag.
+
+## Batch 212 — Playlist/Queue item 8/8 (TERAKHIR): tambah divider antar baris QueueSheet (1 file kode + 1 dokumentasi)
+Menutup checklist § Playlist/Queue. Item ini flagged sejak Batch 189 ("`QueueRow` 0 divider —
+kandidat § Playlist/Queue nanti, kategori terpisah"). Konfirmasi: `QueueSheet.kt` (`itemsIndexed`
+baris antrean) 0 `HorizontalDivider` sama sekali, sedangkan `PlaylistScreen.kt` (baris
+lagu-dalam-playlist DAN daftar-playlist) sudah pakai `HorizontalDivider(color =
+MaterialTheme.colorScheme.surfaceVariant)` setelah tiap item. Fix: divider identik ditambah
+setelah tiap `QueueRow`, pola persis disalin dari `PlaylistScreen.kt` (warna surfaceVariant,
+posisi unconditional setelah tiap item termasuk terakhir — sama seperti Library/Song List Batch
+189). Brace/paren `QueueSheet.kt` seimbang (40/40, 126/126), `HorizontalDivider` sudah ter-cover
+wildcard import `androidx.compose.material3.*` (0 import baru). 0 protected asset. **Belum
+diverifikasi visual** — prioritas cek divider tidak tumpang-tindih row saat drag aktif
+(`shadowElevation`/`translationY` row yang di-drag).
+
+**§ Playlist/Queue checklist SEKARANG TUNTAS 8/8** (row height/touch-target/selected-state/
+remove-affordance/destructive-confirm/empty-state/search-state(N/A,gap-reorder-dicatat)/divider).
+**Item terbuka dari audit ini** (bukan bagian checklist, ditunda eksplisit): `PlaylistScreen.kt`
+reorder cuma tombol naik/turun, 0 drag gesture (beda `QueueSheet.kt` yang sudah drag+tombol) —
+kandidat batch terpisah kalau user eksplisit minta.
+
+## Batch 211 — Playlist/Queue item 7/8: audit search-result state atau serupa (0 kode, 2 dokumentasi)
+`PlaylistScreen.kt` + `QueueSheet.kt` dicek eksplisit: 0 fitur search/filter sama sekali di
+kedua file (grep "search"/"Search" nihil) — beda dari § Library/Song List yang punya
+`SearchResultsView` (sudah diaudit Batch 188, 0 bug). Jadi item literal "search-result state"
+TIDAK APLIKATIF di § Playlist/Queue. Dicari "state serupa" sesuai catatan Batch 200: ditemukan
+gap interaksi nyata — reorder lagu. `QueueSheet.kt` reorder pakai drag-handle (gesture,
+`shadowElevation=10f`+`translationY`+`zIndex` saat drag) DAN tombol naik/turun (fallback
+aksesibilitas). `PlaylistScreen.kt` (detail playlist) reorder HANYA tombol naik/turun
+(`onMoveUp`/`onMoveDown`) — 0 drag gesture/handle sama sekali. **Bukan bug tersembunyi, gap
+fitur nyata** tapi porting logic drag `QueueSheet` (~80 baris: offset state, pointerInput
+custom, index math) ke `PlaylistScreen` levelnya "kerja lebih dalam", BUKAN micro-fix 1
+file kecil — konsisten pola Batch 193/197 (item struktural besar ditunda, bukan dipaksa masuk 1
+batch kecil, demi hindari half-baked/truncation risk). **Tidak dieksekusi batch ini.** 0 kode, 0
+protected asset.
+
 ## Batch 210 — Widget compact: tambah prev/next (2 file kode)
 Lanjutan Batch 209. `widget_player_compact.xml`: tambah `widget_prev`/`widget_next`
 (28dp, lebih kecil dari full 34dp biar muat), diapit di kiri-kanan tombol play, margin 4dp.

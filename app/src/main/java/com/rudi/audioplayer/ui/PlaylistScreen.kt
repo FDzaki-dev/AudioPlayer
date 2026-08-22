@@ -2,6 +2,7 @@ package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -9,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -18,11 +20,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.Song
 
@@ -86,6 +92,16 @@ fun PlaylistTabView(
                 selectedPlaylist.songIds.mapNotNull { songMap[it] }
             }
 
+            // Pola persis QueueSheet.kt: gesture drag berjalan lintas banyak frame di coroutine
+            // sendiri, rememberUpdatedState mencegah callback baca closure basi kalau
+            // playlistSongs/onMoveSongInPlaylist berganti identity di tengah drag.
+            val currentPlaylistSongs by rememberUpdatedState(playlistSongs)
+            val currentOnMoveSongInPlaylist by rememberUpdatedState(onMoveSongInPlaylist)
+            val currentPlaylistId by rememberUpdatedState(selectedPlaylist.id)
+            var draggingSongId by remember { mutableStateOf<Long?>(null) }
+            var dragOffsetPx by remember { mutableStateOf(0f) }
+            var rowHeightPx by remember { mutableStateOf(0f) }
+
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier
@@ -120,8 +136,18 @@ fun PlaylistTabView(
                 } else {
                     LazyColumn {
                         itemsIndexed(playlistSongs, key = { _, song -> song.id }) { index, song ->
+                            val isDragging = song.id == draggingSongId
                             PlaylistSongRow(
-                                modifier = Modifier.animateItemPlacement(),
+                                modifier = Modifier
+                                    .animateItemPlacement()
+                                    .onGloballyPositioned { coordinates ->
+                                        if (rowHeightPx == 0f) rowHeightPx = coordinates.size.height.toFloat()
+                                    }
+                                    .graphicsLayer {
+                                        translationY = if (isDragging) dragOffsetPx else 0f
+                                        shadowElevation = if (isDragging) 10f else 0f
+                                    }
+                                    .zIndex(if (isDragging) 1f else 0f),
                                 song = song,
                                 isPlaying = song.id == currentSongId,
                                 canMoveUp = index > 0,
@@ -138,7 +164,37 @@ fun PlaylistTabView(
                                 onRemove = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     onRemoveSongFromPlaylist(selectedPlaylist.id, song.id)
-                                }
+                                },
+                                dragHandleModifier = Modifier.pointerInputPlaylistDragHandle(
+                                    songId = song.id,
+                                    onDragStart = {
+                                        draggingSongId = song.id
+                                        dragOffsetPx = 0f
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    },
+                                    onDragEnd = {
+                                        draggingSongId = null
+                                        dragOffsetPx = 0f
+                                    },
+                                    onDragDelta = { deltaY ->
+                                        val h = rowHeightPx
+                                        if (h > 0f) {
+                                            dragOffsetPx += deltaY
+                                            val fromIndex = currentPlaylistSongs.indexOfFirst { it.id == song.id }
+                                            if (fromIndex >= 0) {
+                                                if (dragOffsetPx > h / 2 && fromIndex < currentPlaylistSongs.lastIndex) {
+                                                    currentOnMoveSongInPlaylist(currentPlaylistId, fromIndex, fromIndex + 1)
+                                                    dragOffsetPx -= h
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                } else if (dragOffsetPx < -h / 2 && fromIndex > 0) {
+                                                    currentOnMoveSongInPlaylist(currentPlaylistId, fromIndex, fromIndex - 1)
+                                                    dragOffsetPx += h
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                         }
@@ -202,6 +258,30 @@ fun PlaylistTabView(
     }
 }
 
+/**
+ * Tahan-lalu-drag di handle khusus, persis pola `QueueSheet.kt`'s `pointerInputDragHandle` —
+ * duplikat sengaja (bukan diekstrak shared) karena masing-masing private ke file composable-nya,
+ * konsisten cara file ini sudah berdiri sendiri dari QueueSheet.
+ */
+private fun Modifier.pointerInputPlaylistDragHandle(
+    songId: Long,
+    onDragStart: () -> Unit,
+    onDragEnd: () -> Unit,
+    onDragDelta: (deltaY: Float) -> Unit
+): Modifier = this.then(
+    Modifier.pointerInput(songId) {
+        detectDragGesturesAfterLongPress(
+            onDragStart = { onDragStart() },
+            onDragEnd = { onDragEnd() },
+            onDragCancel = { onDragEnd() },
+            onDrag = { change, dragAmount ->
+                change.consume()
+                onDragDelta(dragAmount.y)
+            }
+        )
+    }
+)
+
 @Composable
 private fun PlaylistSongRow(
     song: Song,
@@ -212,6 +292,7 @@ private fun PlaylistSongRow(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onRemove: () -> Unit,
+    dragHandleModifier: Modifier = Modifier,
     modifier: Modifier = Modifier
 ) {
     val background = if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
@@ -223,6 +304,17 @@ private fun PlaylistSongRow(
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Box(
+            modifier = dragHandleModifier.size(48.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.DragHandle,
+                contentDescription = "Tahan lalu geser untuk mengurutkan ulang",
+                tint = MaterialTheme.colorScheme.secondary
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 song.title,

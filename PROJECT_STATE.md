@@ -23,6 +23,40 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 213 (Tambah drag-reorder ke PlaylistScreen, 1 file kode + 1 dokumentasi)** — Item
+terbuka Batch 211/212, dieksekusi atas permintaan eksplisit user. Porting logic drag
+`QueueSheet.kt` ke `PlaylistScreen.kt` 1:1: drag-handle 48dp + `detectDragGesturesAfterLongPress`
++ `graphicsLayer`(translationY/shadowElevation/zIndex) + `rememberUpdatedState` + haptic
+identik. Beda teknis: pakai `song.id` langsung (bukan slotIds terpisah), helper gesture
+duplikat sendiri `pointerInputPlaylistDragHandle` (masing-masing file private, bukan
+shared-extract). Tombol naik/turun TETAP ada sbg fallback aksesibilitas. Brace/paren seimbang
+(127/127, 206/206). 0 protected asset. **Belum diverifikasi visual** — prioritas cek reorder
+drag beneran jalan + divider (Batch 212) tidak tumpang-tindih row yang di-drag. Dengan ini
+**Playlist & Queue sekarang paritas penuh** (drag+tombol keduanya). Detail: `CHANGELOG.md`
+Batch 213.
+
+**Batch 212 (Playlist/Queue item 8/8 TERAKHIR — tambah divider antar baris QueueSheet, 1 file
+kode + 1 dokumentasi)** — Item flagged sejak Batch 189. `QueueSheet.kt` 0 `HorizontalDivider`
+antar baris antrean, beda `PlaylistScreen.kt` yang sudah pakai. Fix: divider identik
+(surfaceVariant, tiap item) ditambah, pola disalin persis `PlaylistScreen.kt`. Brace/paren
+seimbang (40/40, 126/126), 0 import baru (sudah tercover wildcard `material3.*`). 0 protected
+asset. **Belum diverifikasi visual** — cek divider vs row yang lagi di-drag (shadowElevation/
+translationY). **§ Playlist/Queue checklist TUNTAS 8/8.** Item terbuka (di luar checklist,
+ditunda): `PlaylistScreen.kt` reorder 0 drag gesture (cuma tombol) — kandidat kalau user minta.
+Detail: `CHANGELOG.md` Batch 212.
+
+**Batch 211 (Playlist/Queue item 7/8 — audit search-result state atau serupa, 0 kode, 2
+dokumentasi)** — `PlaylistScreen.kt`+`QueueSheet.kt` 0 fitur search sama sekali (beda §
+Library/Song List yang sudah punya `SearchResultsView`, Batch 188). Item literal tidak
+aplikatif. "State serupa" ditemukan: gap reorder — `QueueSheet.kt` drag-handle (gesture +
+shadowElevation/translationY/zIndex) + tombol naik/turun; `PlaylistScreen.kt` HANYA tombol
+naik/turun, 0 drag gesture. Gap fitur nyata tapi porting drag logic (~80 baris) levelnya
+"kerja lebih dalam" bukan micro-fix — **ditunda**, pola sama Batch 193/197. **Kandidat batch
+terpisah kalau user eksplisit minta tambah drag-reorder ke PlaylistScreen**. Item berikutnya
+(8/8, TERAKHIR checklist § Playlist/Queue): kandidat kemungkinan loading state atau list
+separator/divider (pola template § Library/Song List item 8-10). Detail: `CHANGELOG.md` Batch
+211.
+
 **Batch 210 (Widget compact — tambah prev/next, 2 file kode)** — Lanjutan Batch 209.
 `widget_player_compact.xml`: tambah `widget_prev`/`widget_next` (28dp, lebih kecil dari full
 34dp), diapit kiri-kanan tombol play. `WidgetUpdater.kt`: binding prev/next jalan di kedua
