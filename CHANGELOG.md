@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 214 — Fix drag reorder buggy (patah-patah/lompat/susah mulai/nyentak) — 2 file kode + 1 dokumentasi
+User laporan drag reorder buggy di ke-4 aspek sekaligus (stutter, reorder meleset, susah mulai,
+gak smooth pas selesai) — pola gejala klasik 1 root cause, bukan 4 bug terpisah. **Root cause**:
+`Modifier.animateItemPlacement()` (auto-spring reposisi bawaan Compose tiap key LazyColumn
+pindah slot) tetap aktif di row yang SEDANG di-drag, PADAHAL row itu udah dikontrol manual lewat
+`graphicsLayer { translationY = dragOffsetPx }`. Dua-duanya rebutan kendali posisi Y row yang
+sama tiap kali `onMove` terpanggil (posisi list beneran berubah → key geser slot → Compose mulai
+animasi spring KE posisi manual yang lagi di-drag) — hasilnya: row keliatan patah-patah (2
+animasi tarik-menarik), threshold reorder jadi gampang meleset (base offset row bergeser tanpa
+sepengetahuan drag-delta), kesan "susah mulai" (glitch visual pas frame pertama), dan nyentak
+pas dilepas (animasi spring baru sempat aktif nyusul). Fix (`QueueSheet.kt` +
+`PlaylistScreen.kt`, logic identik): `animateItemPlacement()` di-skip KHUSUS utk row yang lagi
+`isDragging` (`Modifier.then(if (isDragging) Modifier else Modifier.animateItemPlacement())`) —
+row lain (yang didorong geser slot karena drag) TETAP dapat animasi masuk-slot-baru yang mulus
+(itu efek "buka jalan" yang diinginkan, mirip iOS), cuma row yang tangannya lagi dipegang user
+yang murni manual. Brace/paren kedua file seimbang (`QueueSheet.kt` 40/40,128/128;
+`PlaylistScreen.kt` 127/127,208/208). 0 protected asset. **Belum diverifikasi device** —
+prioritas cek smoothness di HP user (Infinix XOS) & apakah ke-4 gejala hilang; kalau masih ada
+sisa gejala spesifik, kandidat lanjut: kalibrasi ulang threshold `h/2` atau delay
+long-press-gesture.
+
 ## Batch 213 — Tambah drag-reorder ke PlaylistScreen (1 file kode + 1 dokumentasi)
 Item terbuka Batch 211/212 dieksekusi atas permintaan eksplisit user. Porting logic drag
 `QueueSheet.kt` ke `PlaylistScreen.kt` (detail playlist), 1:1 pola sama: drag-handle icon

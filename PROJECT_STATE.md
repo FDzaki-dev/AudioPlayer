@@ -23,6 +23,15 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 214 (Fix drag reorder buggy — 2 file kode + 1 dokumentasi)** — User laporan ke-4 gejala
+sekaligus (stutter/lompat/susah mulai/nyentak) — 1 root cause: `animateItemPlacement()` tetap
+aktif di row yang lagi di-drag, rebutan kontrol posisi Y sama `graphicsLayer translationY`
+manual, tiap kali `onMove` geser slot list. Fix `QueueSheet.kt`+`PlaylistScreen.kt`: skip
+`animateItemPlacement()` khusus row `isDragging` (row lain yang kegeser slot tetap dapat
+animasi mulus). Brace/paren kedua file seimbang. 0 protected asset. **Belum diverifikasi
+device** — prioritas cek smoothness + apakah ke-4 gejala hilang. Detail: `CHANGELOG.md` Batch
+214.
+
 **Batch 213 (Tambah drag-reorder ke PlaylistScreen, 1 file kode + 1 dokumentasi)** — Item
 terbuka Batch 211/212, dieksekusi atas permintaan eksplisit user. Porting logic drag
 `QueueSheet.kt` ke `PlaylistScreen.kt` 1:1: drag-handle 48dp + `detectDragGesturesAfterLongPress`

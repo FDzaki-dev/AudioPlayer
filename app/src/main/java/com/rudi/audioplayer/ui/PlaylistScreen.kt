@@ -139,7 +139,7 @@ fun PlaylistTabView(
                             val isDragging = song.id == draggingSongId
                             PlaylistSongRow(
                                 modifier = Modifier
-                                    .animateItemPlacement()
+                                    .then(if (isDragging) Modifier else Modifier.animateItemPlacement())
                                     .onGloballyPositioned { coordinates ->
                                         if (rowHeightPx == 0f) rowHeightPx = coordinates.size.height.toFloat()
                                     }
