@@ -1,5 +1,31 @@
 # Changelog
 
+## Batch 203 — Widget tahan-banting struktural: responsive RemoteViews API 31+ (1 file kode)
+Permintaan user: widget WAJIB tahan banting di-stretch/minimize ekstrem tanpa distorsi visual —
+bukan cuma "threshold yang lebih pas lagi" (sudah 2x salah tebak: Batch 201 kurang lebar cakupan,
+Batch 202 threshold ketinggian). Root masalah sebenarnya: `OPTION_APPWIDGET_MIN_WIDTH/HEIGHT`
+cuma snapshot OPSI TERAKHIR yang di-report sistem, bukan ukuran live selama drag — pendekatan
+threshold manapun SELALU bisa salah tebak untuk kombinasi ukuran yang belum kepikiran.
+
+**Fix struktural** (bukan tebak angka lagi): `RemoteViews(Map<SizeF, RemoteViews>)`, API resmi
+Android 12+ (SDK 31) yang didesain persis buat kasus ini — OS sendiri yang pilih layout paling
+pas berdasar ukuran NYATA widget saat itu, terus-menerus selama resize, dan DIJAMIN oleh
+kontrak API-nya sendiri tidak akan pernah render RemoteViews yang butuh ruang lebih besar dari
+yang tersedia. Hard-clip/distorsi jadi TIDAK MUNGKIN terjadi lagi di jalur ini secara struktural,
+bukan cuma diperkecil kemungkinannya.
+
+**Kode**: logic pembuatan `RemoteViews` (background, teks, warna, listener, dst) diekstrak ke
+`buildViewsFor(...)` supaya identik dipakai di 2 entry map (`SizeF(110f,52f)` compact,
+`SizeF(180f,80f)` full — angka SAMA dengan threshold Batch 202, biar titik breakpoint konsisten
+antar-jalur). Android <12 (minSdk 23) TETAP pakai threshold Batch 202 sebagai fallback — API
+`SizeF` map tidak tersedia di bawah API 31, itu batas platform yang tidak bisa dihindari.
+
+1 file (`WidgetUpdater.kt`), 0 protected asset. Brace/paren seimbang (23/23, 139/139). **Jujur:
+Android <12 masih pakai threshold (bukan jaminan 100%)** — tapi mayoritas device aktif per Agu
+2026 sudah API 31+, jadi cakupan realnya besar. **Belum diverifikasi device** — prioritas cek:
+resize widget ekstrem (lebar & tinggi, kombinasi apapun) di device Android 12+, pastikan tidak
+ada lagi clipping/distorsi di titik manapun selama drag, bukan cuma di titik lepas jari.
+
 ## Batch 202 — HOTFIX regresi Batch 201: threshold compact-height ketinggian, kena widget default (1 file kode)
 User lapor "makin parah" via screenshot — widget ukuran NORMAL (bukan di-resize paksa) mendadak
 cuma nampilin art+play doang. Root cause: `COMPACT_HEIGHT_THRESHOLD_DP = 90` (Batch 201) LEBIH

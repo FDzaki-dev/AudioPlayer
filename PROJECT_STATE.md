@@ -18,6 +18,17 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 203 (Widget tahan-banting struktural — responsive RemoteViews API 31+, 1 file kode)** —
+User minta tahan banting SUNGGUHAN, bukan tebak threshold lagi (sudah 2x salah: 201/202). Fix:
+`RemoteViews(Map<SizeF, RemoteViews>)` (Android 12+/API 31) — OS pilih layout sendiri berdasar
+ukuran live, dijamin API-nya tidak pernah render lebih besar dari ruang tersedia → hard-clip
+TIDAK MUNGKIN lagi secara struktural di jalur ini. Logic build diekstrak ke `buildViewsFor(...)`
+dipakai 2 entry map (compact `SizeF(110,52)`, full `SizeF(180,80)`, angka sama persis threshold
+Batch 202). Android <12 (minSdk 23) tetap fallback threshold — batas platform, bukan bug. 1
+file, 0 protected asset, brace/paren seimbang (23/23, 139/139). **Belum diverifikasi device** —
+prioritas cek resize ekstrem di Android 12+, pastikan 0 clipping di titik manapun. Detail:
+`CHANGELOG.md` Batch 203.
+
 **Batch 202 (HOTFIX regresi Batch 201 — threshold compact-height ketinggian, 1 file kode)** —
 `COMPACT_HEIGHT_THRESHOLD_DP=90` (Batch 201) lebih tinggi dari `minHeight="80dp"` deklarasi app
 sendiri → widget ukuran DEFAULT (bukan di-resize) ikut kena compact, dampak nyaris universal.
