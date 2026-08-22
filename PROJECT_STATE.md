@@ -21,8 +21,47 @@ atas file yang terus memanjang):
    komponen, dan dependency WAJIB pakai versi paling mutakhir yang tersedia; JANGAN habiskan
    effort bikin/pertahankan fallback kompatibilitas legacy yang rumit kalau ada opsi modern yang
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
+4. **`POLISH_AUDIT.md` (ditanam Batch 253) adalah backlog aktif micro-polish** — kalau tidak ada
+   instruksi/log_fail baru dari user, sesi WAJIB cek file ini utk task berikutnya (checkbox
+   teratas yang masih `[ ]`, urutan Motion→Responsive→Surface/Color→Component→Typography). 1
+   checkbox = 1 batch, tetap tunduk Strict Micro-Batching. Kalau audit 1 area 0 nemu bug → centang
+   `[x]` + "0 bug, STOP", JANGAN ciptakan kerjaan baru demi 100%.
 
 ## Batch terakhir yang selesai
+**Batch 256 (POLISH_AUDIT #3 — fix konsistensi spring swipe-snap `NowPlayingScreen.kt`, 1 file
+patch)** — Audit menyeluruh animasi di `ui/*.kt` (cakupan nyata cuma 4 file, bukan 26). Temuan
+konkret: spring snap-back swipe-next/previous artwork (~baris 1228/1231) beda stiffness dari
+`bouncyPress()` (`Utils.kt`) & entrance spring (~410) yg sama-sama `StiffnessLow` eksplisit. Fix:
+tambah `stiffness=Spring.StiffnessLow` ke 2 spring itu — 3 animasi bouncy sekarang 1 sistem.
+`dampingRatio` tidak diubah. Brace/paren balance OK (217/217+780/780). Detail: `CHANGELOG.md`
+Batch 256.
+
+**Batch 255 (POLISH_AUDIT #2 — verifikasi `MiniPlayerBar.kt:68` + `NowPlayingScreen.kt:301`
+tween(700), 0 code diubah)** — Kedua `tween(700)` adalah `animateColorAsState` accent-color
+cross-fade saat lagu berganti (bukan respons tap/klik) — sudah konsisten satu sama lain (sama
+700ms, sama tujuan), 700ms wajar utk ambient color wash non-interaktif. Trigger cuma pas song
+berganti, 0 risiko numpuk di repeated interaction. **0 bug ditemukan, durasi tidak diubah.**
+Detail: `CHANGELOG.md` Batch 255.
+
+**Batch 254 (POLISH_AUDIT #1 — verifikasi `LibraryScreen.kt:1345` tween(1100), 0 code diubah)** —
+Cek checkbox teratas `POLISH_AUDIT.md` § Motion. Ternyata `tween(1100)` itu `ShimmerBrush()`
+(animasi loading-skeleton `infiniteRepeatable`), BUKAN micro-feedback interaktif spt dugaan audit
+asli. 1100ms wajar utk siklus shimmer (standar umum 1000-1500ms). **0 bug ditemukan, durasi tidak
+diubah** — dicentang `[x]` sesuai aturan "0 bug → STOP". Detail: `CHANGELOG.md` Batch 254.
+
+**Batch 253 (Tanam `POLISH_AUDIT.md` — backlog micro-polish permanen, 1 file baru, 0 code
+diubah)** — Permintaan user: tanam audit final micro-polish (5 area: Motion, Responsive,
+Surface/Color, Repeated Components, Typography) permanen ke repo + adaptasi ke referensi konkret
+project (bukan cuma tempel mentah). Dibuat `POLISH_AUDIT.md` di root — checklist hidup
+(descending per-seksi, dicentang progresif tiap batch berikutnya kerja 1 sub-item). Referensi
+konkret hasil grep: `LibraryScreen.kt:1345` (`tween(1100)`), `MiniPlayerBar.kt:68` +
+`NowPlayingScreen.kt:301` (`tween(700)` accent, 2 titik pola sama). Dicatat eksplisit: project TIDAK
+punya shared component library file (`Button.kt`/`Chip.kt`/dst tidak eksis, semua inline di 26
+file `ui/*.kt`) — jadi seksi "Repeated Components" audit ini murni visual comparison manual, BUKAN
+alasan ekstraksi ke shared composable (itu refactor, dilarang eksplisit di dokumen sumbernya).
+`PROJECT_STATE.md`: tambah aturan sesi #4 — `POLISH_AUDIT.md` jadi rujukan default Pending Queue
+kalau tidak ada instruksi/log_fail baru. **0 code/logic disentuh** — batch ini murni dokumentasi.
+
 **Batch 252 (Fix build FAILED lanjutan 4/4 — bump Room 2.6.1→2.8.4, 1 file patch)** — Root cause
 `log_fail_258.zip`: `[ksp] unexpected jvm signature V` — BUG KSP2 YANG SUDAH DIKENAL (dicek
 `web_search`, google/ksp#2957/#2177), muncul krn Room DAO suspend-Unit function diproses KSP2

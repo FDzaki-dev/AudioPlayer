@@ -1215,6 +1215,11 @@ private fun AlbumArtHero(
             .graphicsLayer { translationX = dragOffset.value }
             .pointerInput(Unit) {
             val maxOffsetPx = 48.dp.toPx()
+            // Batch 256 — POLISH_AUDIT §Motion: stiffness = Spring.StiffnessLow ditambah ke 2
+            // spring snap-back di bawah (onDragEnd + onDragCancel), dulu default (Medium),
+            // beda dari bouncyPress (Utils.kt) & entrance spring (baris ~410) yg sama-sama pakai
+            // StiffnessLow eksplisit — biar swipe-snap terasa 1 sistem sama animasi bouncy lain
+            // di screen ini, bukan 2 "rasa" beda. dampingRatio (MediumBouncy) tidak diubah.
             detectHorizontalDragGestures(
                 onDragStart = { totalDrag = 0f },
                 onDragEnd = {
@@ -1225,10 +1230,10 @@ private fun AlbumArtHero(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onSwipePrevious()
                     }
-                    dragScope.launch { dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
+                    dragScope.launch { dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) }
                 },
                 onDragCancel = {
-                    dragScope.launch { dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
+                    dragScope.launch { dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) }
                 },
                 onHorizontalDrag = { change, dragAmount ->
                     totalDrag += dragAmount

@@ -1,5 +1,61 @@
 # Changelog
 
+## Batch 256 — POLISH_AUDIT #3: fix konsistensi spring swipe-snap NowPlayingScreen (1 file patch)
+Kerjakan checkbox "audit semua duration/easing lain" `POLISH_AUDIT.md` § Motion. `grep` animasi
+(`tween/animateFloatAsState/animateColorAsState/spring`) di seluruh `ui/*.kt` — cakupan nyata cuma
+4 file (`LibraryScreen.kt`, `MiniPlayerBar.kt`, `NowPlayingScreen.kt`, `Utils.kt`); 22 file lain 0
+animasi custom. Temuan konkret: `bouncyPress()` (`Utils.kt`, shared modifier dipakai semua
+tappable control sesuai komentar aslinya "premium music apps put on every tappable control") dan
+entrance spring `NowPlayingScreen.kt` (~baris 410) sama-sama eksplisit
+`spring(dampingRatio=Spring.DampingRatioMediumBouncy, stiffness=Spring.StiffnessLow)` — tapi 2
+spring snap-back drag artwork swipe-next/previous (~baris 1228 `onDragEnd`, ~1231 `onDragCancel`)
+cuma set `dampingRatio` tanpa `stiffness` eksplisit (default Compose = `Spring.StiffnessMedium`,
+lebih kaku/cepat drpd StiffnessLow yg dipakai 2 animasi bouncy lain — inkonsistensi "rasa" nyata,
+bukan dugaan). Fix: tambah `stiffness = Spring.StiffnessLow` ke kedua spring tsb (`sed` in-place,
+2 baris identik). `dampingRatio` TIDAK diubah — cuma nyamain stiffness biar 1 sistem. Item lain yg
+dicek 0 masalah: `fadeIn(tween(150))`/`fadeOut(tween(300))` (2 titik, identik dgn dirinya sendiri,
+sudah konsisten), `tween(280)` entrance-alpha (dipakai tunggal, tidak ada pembanding). Brace/paren
+balance OK (217/217+780/780). 0 logic/behavior berubah — swipe-next/previous tetap trigger sama
+persis, cuma "rasa" animasi snap-back-nya yang kini seragam dgn animasi bouncy lain di screen ini.
+
+## Batch 255 — POLISH_AUDIT #2: verifikasi tween(700) MiniPlayerBar + NowPlayingScreen — 0 code diubah
+Kerjakan 2 checkbox berikutnya `POLISH_AUDIT.md` § Motion (digabung — dicatat di dokumen sebagai
+"audit bareng" krn pola identik). `MiniPlayerBar.kt:68` dan `NowPlayingScreen.kt:301` sama-sama
+`animateColorAsState(tween(700))` utk cross-fade warna aksen dominan album-art (dipakai CTA/wash/
+rating) saat lagu berganti — BUKAN animasi respons tap/klik, jadi standar "micro-feedback harus
+cepat" di audit sumber tidak langsung berlaku di sini; yang relevan justru konsistensi ambient
+color wash. Hasil: keduanya SUDAH konsisten satu sama lain (700ms identik, tujuan identik). 700ms
+sendiri wajar utk color cross-fade non-interaktif (rentang umum 300-800ms) — lebih cepat malah
+terasa "kedut" tiap pergantian lagu. Trigger hanya saat song berganti (bukan per-frame/rapid
+interaction), jadi 0 risiko numpuk. **Kesimpulan: 0 bug, durasi TIDAK diubah**, sesuai aturan
+"0 bug → STOP". `POLISH_AUDIT.md` 2 checkbox dicentang `[x]` dgn catatan verifikasi ini. 0 file
+kode disentuh.
+
+## Batch 254 — POLISH_AUDIT #1: verifikasi LibraryScreen.kt:1345 tween(1100) — 0 code diubah
+Kerjakan checkbox teratas `POLISH_AUDIT.md` § Motion & Transition. Ternyata `tween(1100, easing=
+LinearEasing)` di `LibraryScreen.kt:1345` adalah bagian `ShimmerBrush()` — animasi loading-skeleton
+`infiniteRepeatable` (efek shimmer saat list masih loading dari MediaStore/DB), BUKAN animasi
+respons interaksi tap/klik (micro-feedback) seperti dugaan di audit sumber. 1100ms per siklus
+shimmer masih dalam rentang wajar (pattern shimmer umum di Android/Material biasanya 1000-1500ms
+per siklus, terlalu cepat malah bikin shimmer terasa "berkedip" tidak natural). **Kesimpulan: 0
+bug, durasi TIDAK diubah** — sesuai aturan eksplisit `POLISH_AUDIT.md` ("kalau 0 bug ditemukan,
+STOP, jangan ciptakan kerjaan baru demi 100%"). `POLISH_AUDIT.md` checkbox dicentang `[x]` dgn
+catatan verifikasi ini. 0 file kode disentuh.
+
+## Batch 253 — Tanam POLISH_AUDIT.md (backlog micro-polish permanen, 1 file baru, 0 code diubah)
+Permintaan user: tanam audit final micro-polish permanen ke repo, adaptasi ke referensi konkret
+(bukan tempel mentah). File baru `POLISH_AUDIT.md` (root) — 5 area (Motion & Transition,
+Responsive/Adaptive, Surface/Color Consistency, Repeated Components, Typography Final Check),
+tiap area jadi checklist `[ ]`/`[x]` descending, cara-pakai eksplisit utk sesi berikutnya (1
+checkbox = 1 batch, tetap Strict Micro-Batching). Referensi konkret ditambahkan via grep repo
+sendiri: `LibraryScreen.kt:1345` `tween(1100, easing=LinearEasing)`, `MiniPlayerBar.kt:68` +
+`NowPlayingScreen.kt:301` sama-sama `tween(700)` accent transition. Catatan penting yg
+ditambahkan: project TIDAK punya shared component library (`ui/*.kt` 26 file, semua inline) — jadi
+seksi "Repeated Components" WAJIB visual-comparison manual, bukan alasan ekstraksi shared
+composable (refactor besar, dilarang eksplisit oleh sumber audit maupun aturan sesi umum project).
+`PROJECT_STATE.md` aturan sesi #4 ditambah: `POLISH_AUDIT.md` jadi sumber Pending Queue default.
+**0 file kode disentuh, 0 build risk** — batch murni dokumentasi/perencanaan.
+
 ## Batch 252 — Fix build FAILED lanjutan 4/4: bump Room 2.6.1→2.8.4 (1 file patch)
 Root cause dari `log_fail_258.zip` (build FAILED lagi setelah Batch 251 fix DSL syntax):
 `kspDebugKotlin`/`kspReleaseKotlin` FAILED — `[ksp] java.lang.IllegalStateException: unexpected
