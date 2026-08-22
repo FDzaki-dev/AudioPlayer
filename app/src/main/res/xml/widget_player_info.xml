@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Batch 207 — minResizeWidth/minResizeHeight ditambahkan eksplisit. Tanpa ini, sebagian
+     launcher (termasuk yang dipakai user, screenshot menunjukkan resize sampai jauh di bawah
+     minWidth/minHeight) TIDAK otomatis membatasi resize-handle ke ukuran minimum — declarative
+     floor ini pembatas resmi Android, murni metadata, 0 risiko crash (beda total dari pendekatan
+     Batch 201-204 yang direvert karena bikin exception runtime). -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="110dp"
     android:minHeight="80dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="80dp"
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/widget_player"
     android:resizeMode="horizontal|vertical"

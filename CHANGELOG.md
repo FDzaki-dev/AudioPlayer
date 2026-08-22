@@ -1,5 +1,31 @@
 # Changelog
 
+## Batch 207 — Widget: minResizeWidth/Height + border visual (3 file, XML-only, 0 logic runtime)
+Permintaan user setelah revert total Batch 206: tambah insets & pembatas/border visual biar
+tidak truncated lagi saat di-minimize/di-stretch — TANPA logic runtime baru (yang sebelumnya
+bikin crash "Ketuk untuk memulihkan", sudah direvert Batch 206).
+
+**2 fix, murni metadata/drawable XML, 0 risiko crash**:
+1. **`widget_player_info.xml`** — `minResizeWidth`/`minResizeHeight` ditambahkan eksplisit
+   (110dp/80dp, sama dengan `minWidth`/`minHeight`). Tanpa ini, screenshot user menunjukkan
+   launcher yang dipakai TIDAK otomatis membatasi resize-handle ke ukuran minimum declared —
+   floor resmi ini pembatas level-launcher, mencegah shrink-berlebih dari SUMBERNYA (di
+   compliant launcher), bukan reaksi setelah kejadian.
+2. **`widget_background.xml` + `widget_background_light.xml`** — border/stroke 1dp ditambah
+   sebagai layer terakhir (putih 20% alpha di dark, hitam 15% di light) — batas visual widget
+   selalu jelas, murni kosmetik (tidak pengaruh layout/insets internal).
+
+**Insets internal** (padding 14dp full / 8dp compact, `widget_player.xml`/`widget_player_
+compact.xml`) dicek ulang — SUDAH memadai sejak sebelumnya, TIDAK diubah (menghindari
+scope-creep, fokus 2 fix di atas yang eksplisit diminta).
+
+3 file (`widget_player_info.xml`/`widget_background.xml`/`widget_background_light.xml`), 0
+protected asset, 0 file Kotlin disentuh (tidak ada risiko regresi crash Batch 201-206 lagi).
+XML tervalidasi parse. **Batasan jujur**: `minResizeWidth/Height` HANYA efektif di launcher yang
+patuh kontrak Android — kalau launcher user tetap mengizinkan resize di bawah itu (beberapa OEM
+launcher longgar), truncation masih mungkin terjadi; ini pembatas terkuat yang tersedia lewat
+XML murni tanpa balik ke logic runtime yang baru saja terbukti crash.
+
 ## Batch 206 — REVERT PENUH Batch 201-204 (widget "tahan banting") — fallback total ke widget normal (2 file kode)
 User laporan via screenshot bertimestamp: widget render BENAR sesaat (12:39:57), lalu ~15 detik
 kemudian (12:40:12) jatuh ke placeholder Android "Ketuk untuk memulihkan" — pola khas widget

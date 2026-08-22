@@ -23,6 +23,16 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 207 (Widget — minResizeWidth/Height + border visual, 3 file XML, 0 logic runtime)** —
+Setelah revert total Batch 206, user minta insets & border visual biar tidak truncated lagi,
+TANPA logic baru. Fix murni metadata/drawable: (1) `widget_player_info.xml` — `minResizeWidth`/
+`minResizeHeight` eksplisit (110dp/80dp) — launcher user terbukti (screenshot) tidak otomatis
+membatasi resize ke minimum declared, floor ini pembatas resmi level-launcher; (2) border/stroke
+1dp ditambah di `widget_background.xml`+`_light.xml` — batas visual selalu jelas. Insets
+internal (padding) dicek, sudah memadai, tidak diubah. 0 Kotlin disentuh (0 risiko crash lagi).
+XML valid. **Batasan jujur**: minResizeWidth/Height cuma efektif di launcher patuh kontrak,
+bukan jaminan mutlak di semua OEM. Detail: `CHANGELOG.md` Batch 207.
+
 **Batch 206 (REVERT PENUH Batch 201-204 — fallback total widget normal, 2 file kode)** — User
 laporan screenshot bertimestamp: widget benar sesaat lalu ~15 detik kemudian jatuh "Ketuk untuk
 memulihkan" (pola khas widget provider exception, BUKAN cuma distorsi visual). 4 iterasi
