@@ -18,6 +18,15 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 204 (Fix widget — root full layout wajib center horizontal saat stretch, 1 file
+kode)** — User: OS<12 sudah selesai (Batch 203), fokus SEMUA ukuran wajib center + 0 distorsi.
+1 gap: root `widget_player.xml` cuma `gravity="center_vertical"` (compact sudah `center` sejak
+awal) — widget di-stretch lebar bisa nempel kiri kalau kolom weight=1 tidak menyerap semua sisa
+ruang. Fix: ke `gravity="center"`. Distorsi scaleType dicek ulang — TIDAK ada bug (centerCrop/
+fitCenter sudah benar, semua ukuran FIXED dp). Live-refresh saat drag juga dicek — sudah benar
+sejak Batch 35. 1 file, 0 protected asset, XML valid. **Belum diverifikasi device.** Detail:
+`CHANGELOG.md` Batch 204.
+
 **Batch 203 (Widget tahan-banting struktural — responsive RemoteViews API 31+, 1 file kode)** —
 User minta tahan banting SUNGGUHAN, bukan tebak threshold lagi (sudah 2x salah: 201/202). Fix:
 `RemoteViews(Map<SizeF, RemoteViews>)` (Android 12+/API 31) — OS pilih layout sendiri berdasar

@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 204 — Fix widget: root full layout wajib center horizontal saat stretch (1 file kode)
+User: tidak peduli OS<12 (Batch 203 sudah selesaikan itu, jangan diutak-atik lagi), fokus SEMUA
+ukuran widget wajib center + 0 distorsi. Audit ulang `widget_player.xml` vs `widget_player_
+compact.xml`: **1 gap nyata** — root `widget_player.xml` cuma `gravity="center_vertical"`
+(compact sudah benar `gravity="center"` sejak awal). Kalau widget di-stretch LEBAR dan kolom
+judul/artist (`layout_weight="1"`) tidak menyerap semua sisa ruang (mis. teks pendek + minWidth
+row terpenuhi), baris konten nempel ke kiri, bukan center. Fix: `center_vertical` → `center`.
+
+**Distorsi visual (scaleType)**: dicek ulang, TIDAK ada bug — album art sudah `centerCrop`
+(crop, bukan stretch, aspect ratio selalu terjaga), tombol `fitCenter` (letterbox, bukan
+stretch). Semua ukuran art/tombol FIXED dp (52dp/36dp dst, tidak relatif ke ukuran widget) jadi
+tidak pernah gepeng di ukuran manapun.
+
+**Live-refresh saat drag**: dicek ulang juga, sudah benar sejak Batch 35 —
+`onAppWidgetOptionsChanged` (`PlayerWidgetProvider.kt`) sudah panggil `updateAllAsync` on setiap
+event resize live, bukan cuma pas lepas jari — tidak ada "stale render" yang perlu di-snap-balik.
+
+1 file (`widget_player.xml`), 0 protected asset, XML tervalidasi parse. **Belum diverifikasi
+device** — prioritas cek: stretch widget lebar-pendek/sempit-tinggi kombinasi apapun, pastikan
+konten selalu center, 0 nempel ke salah satu sisi.
+
 ## Batch 203 — Widget tahan-banting struktural: responsive RemoteViews API 31+ (1 file kode)
 Permintaan user: widget WAJIB tahan banting di-stretch/minimize ekstrem tanpa distorsi visual —
 bukan cuma "threshold yang lebih pas lagi" (sudah 2x salah tebak: Batch 201 kurang lebar cakupan,
