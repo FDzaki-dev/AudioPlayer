@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -156,17 +158,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs += listOf(
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
-            // Batch 20: see app/compose_stability_config.conf for why this exists.
-            "-P",
-            "plugin:androidx.compose.compiler.plugins.kotlin:stabilityConfigurationPath=" +
-                "${project.projectDir}/compose_stability_config.conf"
-        )
-    }
+    // Batch 251 — blok `kotlinOptions{}` lama DIPINDAH ke `kotlin{compilerOptions{}}`
+    // top-level di bawah (lihat setelah `android{}` ditutup) — trigger `log_fail_257.zip`:
+    // `jvmTarget: String` & `freeCompilerArgs: List<String>` jadi HARD ERROR di Kotlin 2.4.10
+    // (Batch 250), bukan cuma deprecated warning lagi. WAJIB migrasi DSL, bukan opsional.
 
     buildFeatures {
         compose = true
@@ -198,6 +193,24 @@ android {
     // would otherwise throw "not mocked" instead of just returning a harmless default.
     testOptions {
         unitTests.isReturnDefaultValues = true
+    }
+}
+
+// Batch 251 — pengganti `android{kotlinOptions{}}` lama (Kotlin 2.x compilerOptions DSL,
+// `jvmTarget`/`freeCompilerArgs` string lama jadi hard error di Kotlin 2.4.10). Isi/opt-in
+// PERSIS sama, cuma pindah lokasi + syntax: `jvmTarget` string → `JvmTarget` enum,
+// `freeCompilerArgs +=` → `.addAll(...)`.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        freeCompilerArgs.addAll(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            // Batch 20: see app/compose_stability_config.conf for why this exists.
+            "-P",
+            "plugin:androidx.compose.compiler.plugins.kotlin:stabilityConfigurationPath=" +
+                "${project.projectDir}/compose_stability_config.conf"
+        )
     }
 }
 

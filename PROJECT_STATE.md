@@ -23,6 +23,21 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 251 (Fix build FAILED lanjutan 3/3 — migrasi kotlinOptions→compilerOptions DSL, 1 file
+patch)** — Root cause `log_fail_257.zip`: `android{kotlinOptions{jvmTarget="17"; freeCompilerArgs
++=...}}` jadi HARD ERROR di Kotlin 2.4.10 (Batch 250 kemarin), bukan warning lagi. Fix `app/
+build.gradle.kts`: pindah ke top-level `kotlin{compilerOptions{jvmTarget.set(JvmTarget.JVM_17);
+freeCompilerArgs.addAll(...)}}`, isi opt-in flags PERSIS sama (0 logic berubah, murni syntax).
+Brace/paren balance OK (35/35+150/150).
+
+**⚠️ 3× GAGAL BUILD BERTURUT** (Batch 249→log_fail_256→Batch 250→log_fail_257→Batch 251 ini) —
+tiap fix buka error lapisan berikutnya (compileSdk/AGP → versi Kotlin → syntax DSL), semua 1 akar:
+lompatan versi besar 1.9.24→2.4.10 sekaligus (banyak breaking change nempel bareng). **SESI
+BERIKUTNYA WAJIB**: kalau ada `log_fail_258` lagi, JANGAN auto-asumsikan "pasti 1 layer lagi
+doang" — cek MENYELURUH semua breaking change Kotlin 2.0-2.4 yang mungkin masih nyangkut di file
+lain (mis. KSP-generated code, Room schema export, dsb), bukan cuma tambal 1 baris error teratas.
+Belum ada konfirmasi BUILD SUCCESS dari user sampai sekarang. Detail: `CHANGELOG.md` Batch 251.
+
 **Batch 250 (Fix build FAILED lanjutan — Kotlin 2.4.10 + Compose compiler plugin, 2 file patch)**
 — Root cause `log_fail_256.zip`: `kspReleaseKotlin`/`kspDebugKotlin` FAILED, `work-runtime-2.11.2`
 metadata Kotlin 2.1.0 vs project 1.9.24 (binary incompatible). Fix: `build.gradle.kts` Kotlin

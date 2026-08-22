@@ -1,5 +1,21 @@
 # Changelog
 
+## Batch 251 — Fix build FAILED lanjutan 3/3: migrasi kotlinOptions→compilerOptions DSL (1 file patch)
+Root cause dari `log_fail_257.zip` (build FAILED lagi setelah Batch 250 fix Kotlin/KSP/Compose
+plugin): `android{kotlinOptions{jvmTarget="17"; freeCompilerArgs+=...}}` — syntax string lama ini
+jadi HARD ERROR (bukan cuma deprecated warning) di Kotlin 2.4.10 (Batch 250). Fix `app/
+build.gradle.kts`: hapus blok `kotlinOptions{}` dari dalam `android{}`, ganti top-level
+`kotlin{compilerOptions{}}` (letak setelah `android{}` ditutup) — `jvmTarget` string →
+`JvmTarget.JVM_17` enum (`import org.jetbrains.kotlin.gradle.dsl.JvmTarget` ditambah di top file),
+`freeCompilerArgs +=` → `freeCompilerArgs.addAll(...)`. Isi opt-in flags & stabilityConfigurationPath
+(Batch 20) PERSIS sama, 0 logic/behavior berubah — murni migrasi syntax DSL. Brace/paren balance OK
+(35/35+150/150). Protected asset (`app/build.gradle.kts`) disentuh SEBAGIAN sesuai izin
+edit-parsial. **3× gagal build berturut** (Batch 249→log_fail_256→Batch 250→log_fail_257→batch
+ini) — tiap fix membuka error lapisan berikutnya (compileSdk→Kotlin version→DSL syntax), semua
+akar sama: lompatan versi besar 1.9.24→2.4.10 sekaligus. **WAJIB di-build ulang di CI**, jangan
+kirim ZIP lagi ke user sampai ada konfirmasi BUILD SUCCESS — kalau gagal lagi, kemungkinan ada
+error keempat yang belum ketauan krn build kemarin selalu berhenti di error pertama yang ketemu.
+
 ## Batch 250 — Fix build FAILED lanjutan: bump Kotlin 2.4.10 + Compose compiler plugin (2 file patch)
 Root cause dari `log_fail_256.zip` (build FAILED lagi setelah Batch 249 fix AGP/compileSdk):
 `kspReleaseKotlin`/`kspDebugKotlin` FAILED — `work-runtime-2.11.2` dikompilasi metadata Kotlin
