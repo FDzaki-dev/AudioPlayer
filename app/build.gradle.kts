@@ -1,6 +1,9 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    // Batch 250 — plugin baru, lihat root build.gradle.kts utk alasan (Compose compiler
+    // decoupled dari Kotlin plugin sejak Kotlin 2.0+).
+    id("org.jetbrains.kotlin.plugin.compose")
     // Batch 243 — Room (Lyrics cache). Lihat root build.gradle.kts utk versi.
     id("com.google.devtools.ksp")
 }
@@ -169,9 +172,11 @@ android {
         compose = true
         buildConfig = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
+    // Batch 250 — kotlinCompilerExtensionVersion (composeOptions) DIHAPUS: obsolete sejak
+    // Kotlin 2.0+, compose compiler version sekarang auto-mengikuti versi Kotlin lewat plugin
+    // `org.jetbrains.kotlin.plugin.compose` (lihat blok plugins di atas + root build.gradle.kts).
+    // Set manual "1.5.14" yg lama sudah tidak match Kotlin 2.4.10 sama sekali — kalau
+    // dibiarkan bakal jadi error baru, bukan cuma warning.
     packaging {
         resources.excludes.add("/META-INF/{AL2.0,LGPL2.1}")
     }

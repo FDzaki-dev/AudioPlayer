@@ -23,6 +23,18 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 250 (Fix build FAILED lanjutan — Kotlin 2.4.10 + Compose compiler plugin, 2 file patch)**
+— Root cause `log_fail_256.zip`: `kspReleaseKotlin`/`kspDebugKotlin` FAILED, `work-runtime-2.11.2`
+metadata Kotlin 2.1.0 vs project 1.9.24 (binary incompatible). Fix: `build.gradle.kts` Kotlin
+→`2.4.10` (latest stable, 2.4.20 masih RC), KSP →`2.3.10` (decoupled versioning, pairing resmi
+kotlinlang.org docs), plugin BARU `org.jetbrains.kotlin.plugin.compose` `2.4.10` (wajib sejak
+Kotlin 2.0+). `app/build.gradle.kts`: tambah plugin id tsb + HAPUS `composeOptions.
+kotlinCompilerExtensionVersion="1.5.14"` (obsolete total, auto-follow Kotlin sekarang). Brace
+balance OK (1/1, 28/28). **2× gagal build berturut** (Batch 249 fix compileSdk/AGP ternyata belum
+cukup, root cause kedua ini baru ketauan dari log_fail_256) — confidence diturunkan, **WAJIB
+di-build ulang** sebelum dianggap tuntas, jangan asumsikan otomatis fix. Detail: `CHANGELOG.md`
+Batch 250.
+
 **Batch 249 (Fix build FAILED — bump AGP/compileSdk/Gradle, 3 file patch, 0 file baru)** — Root
 cause dari `log_fail_255.zip`: `work-runtime-ktx:2.11.2` (Batch 246) butuh compileSdk 35+ & AGP
 8.6.0+, project masih 34/8.4.1 → `:app:checkDebugAarMetadata` FAILED. Fix: `build.gradle.kts` AGP

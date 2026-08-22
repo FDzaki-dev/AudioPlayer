@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 250 — Fix build FAILED lanjutan: bump Kotlin 2.4.10 + Compose compiler plugin (2 file patch)
+Root cause dari `log_fail_256.zip` (build FAILED lagi setelah Batch 249 fix AGP/compileSdk):
+`kspReleaseKotlin`/`kspDebugKotlin` FAILED — `work-runtime-2.11.2` dikompilasi metadata Kotlin
+2.1.0, project masih pakai Kotlin 1.9.24 (binary incompatible, "expected version is 1.9.0").
+Fix: `build.gradle.kts` Kotlin (`org.jetbrains.kotlin.android`) `1.9.24`→`2.4.10` (latest STABLE
+per kotlinlang.org, dicek `web_search` Agustus 2026 — 2.4.20 masih RC, sengaja tidak dipilih). KSP
+`1.9.24-1.0.20`→`2.3.10` (BUKAN `2.4.10-x`, versioning KSP decoupled dari Kotlin sejak KSP 2.3.0 —
+pairing ini persis contoh resmi quickstart docs kotlinlang.org, dicek `web_search`). Plugin BARU
+`org.jetbrains.kotlin.plugin.compose` version `2.4.10` — WAJIB sejak Kotlin 2.0+, Compose compiler
+sudah tidak dibundel otomatis di kotlin-android plugin lagi. `app/build.gradle.kts`: tambah
+`id("org.jetbrains.kotlin.plugin.compose")` ke plugins block + HAPUS `composeOptions {
+kotlinCompilerExtensionVersion = "1.5.14" }` (obsolete, versi compose compiler sekarang auto ikut
+Kotlin via plugin baru — kalau dibiarkan, "1.5.14" incompatible total sama Kotlin 2.4.10, jadi
+error baru bukan cuma warning). Brace balance OK 2 file (1/1, 28/28 — turun dari 29/29 krn 1 blok
+composeOptions dihapus utuh). Protected assets (build.gradle.kts root+app) disentuh SEBAGIAN sesuai
+izin edit-parsial. **Belum diverifikasi ulang di CI** — 2 kali gagal build berturut (Batch
+249→log_fail_256, sekarang batch ini) jadi confidence diturunkan drpd batch fix biasa, WAJIB
+di-build ulang sebelum dianggap tuntas.
+
 ## Batch 249 — Fix build FAILED: bump AGP/compileSdk/Gradle (3 file patch, 0 file baru)
 Root cause dari `log_fail_255.zip`: `androidx.work:work-runtime-ktx:2.11.2` (ditambahkan Batch 246
 buat `LyricsPrefetchWorker`) butuh compileSdk 35+ & AGP 8.6.0+ — project masih compileSdk 34 & AGP
