@@ -121,10 +121,10 @@ object WidgetUpdater {
                 if (isDark) R.drawable.widget_play_button_bg else R.drawable.widget_play_button_bg_light
             )
 
+            views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
+            views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
             if (!isCompact) {
-                views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
                 views.setTextViewText(R.id.widget_artist, artist ?: "Buka AudioPlayer")
-                views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
                 views.setTextColor(R.id.widget_artist, if (isDark) ARTIST_COLOR_DARK else ARTIST_COLOR_LIGHT)
                 views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
                 views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))
@@ -149,7 +149,7 @@ object WidgetUpdater {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             views.setOnClickPendingIntent(R.id.widget_album_art, openAppPending)
-            if (!isCompact) views.setOnClickPendingIntent(R.id.widget_title, openAppPending)
+            views.setOnClickPendingIntent(R.id.widget_title, openAppPending)
 
             manager.updateAppWidget(id, views)
         }

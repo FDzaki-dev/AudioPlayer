@@ -23,6 +23,15 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 209 (Widget — compact mode hilangkan judul total, bukan cuma truncate, 2 file kode)** —
+User laporan screenshot: widget compact (dipaksa sempit) render album art + tombol play doang,
+center-paksa, TANPA teks judul sama sekali. Root cause: `widget_player_compact.xml` dari awal
+memang tidak punya `TextView` judul; `WidgetUpdater.kt` skip binding judul saat `isCompact`. Fix:
+tambah `TextView` `@id/widget_title` (1 baris, ellipsize) di compact XML antara art & tombol
+play, `gravity="center"`→`"center_vertical"`; `WidgetUpdater.kt` binding judul+click-to-open jalan
+di kedua layout (artist+prev/next tetap eksklusif full). XML valid, brace/paren seimbang. 0
+protected asset. Detail: `CHANGELOG.md` Batch 209.
+
 **Batch 208 (Widget — kembalikan height-check compact-mode, BUKAN SizeF, 1 file kode)** — User
 laporan: masih truncated 1-baris (Batch 207 XML metadata tidak cukup, tidak retroaktif). Analisis
 ulang: height-check ITU SENDIRI (Batch 201/202) TIDAK PERNAH crash — cuma salah kalibrasi angka

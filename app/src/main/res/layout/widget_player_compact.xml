@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="horizontal"
-    android:gravity="center"
+    android:gravity="center_vertical"
     android:padding="8dp">
 
     <ImageView
@@ -13,6 +13,19 @@
         android:layout_width="36dp"
         android:layout_height="36dp"
         android:scaleType="centerCrop" />
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="8dp"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="Tidak ada lagu" />
 
     <ImageButton
         android:id="@+id/widget_play_pause"

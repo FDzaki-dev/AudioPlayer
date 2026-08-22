@@ -1,5 +1,17 @@
 # Changelog
 
+## Batch 209 — Widget: compact mode hilangkan judul total, bukan cuma truncate (2 file kode)
+User laporan screenshot (widget dipaksa pendek/sempit): compact layout (`widget_player_compact.xml`)
+memang dari awal SAMA SEKALI tanpa `TextView` judul — cuma album art + tombol play, gravity
+`center`. `WidgetUpdater.kt` juga sengaja skip `setTextViewText(widget_title, ...)` saat
+`isCompact`. Root cause: bukan bug truncation, tapi compact layout tidak pernah punya slot judul.
+Fix: tambah `TextView` `@id/widget_title` (1 baris, `ellipsize="end"`, `layout_weight=1`) di
+antara art & tombol play pada `widget_player_compact.xml`, ganti `gravity="center"` →
+`"center_vertical"` biar title bisa isi ruang sisa alih-alih dipaksa ke tengah. `WidgetUpdater.kt`:
+binding `widget_title` + click-to-open dipindah keluar dari blok `if (!isCompact)` (jalan di kedua
+layout); artist + prev/next tetap eksklusif full layout (compact sengaja tanpa itu). XML valid,
+brace/paren `WidgetUpdater.kt` seimbang (20/20, 118/118). 0 protected asset.
+
 ## Batch 208 — Widget: kembalikan height-check compact-mode (BUKAN SizeF), tetap truncated 1-baris (1 file kode)
 User laporan screenshot: widget diperkecil jadi 1-baris, judul "Music M..." + artis "Forever Y"
 kepotong vertikal. Batch 207 (minResizeWidth/Height + border, XML metadata) tidak cukup —
