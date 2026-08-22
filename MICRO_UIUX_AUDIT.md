@@ -18,7 +18,7 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
 | 2 | Spacing & Sizing Consistency | 🟡 **Berlanjut (Batch 146-147, 151-152)**. 146: audit horizontal screen padding — 4 tab utama Home/Settings/NowPlaying/Playlist/SmartPlaylist/StatsDashboard sudah 20dp; 2 gap di `LibraryScreen.kt` diperbaiki (`AlbumGridView` 16dp→20dp horizontal, 4 titik `ListItem` Artis/Folder/hasil-pencarian/riwayat 4dp→20dp). 147: audit ukuran control setara — `LockScreen.kt` ikon Fingerprint(28dp)/Backspace(22dp) disamakan ke 24dp. 151: audit vertical spacing antar section (`SettingsScreen.kt`, 7 titik pola `Spacer(12dp)→Divider→Spacer(20dp)`) — 0 bug, sudah konsisten. 151-152: **gap icon↔text ✅ SELESAI** — audit formal 29 titik `Icon()→Spacer(width)→Text()` di `ui/*.kt`, dikelompokkan per-konteks (default-size icon+label/TextButton icon custom-size/menu-row Icon+Column/section header) — 2 gap nyata ditemukan & diperbaiki (`PlaylistScreen.kt` "Buat Playlist Baru" & `VaultSheet.kt` "Tambah", keduanya `TextButton`+`Icons.Default.Add` default-size 4dp→8dp), sisanya sudah konsisten by-design. Pending: sisa literal `.dp` lain (padding/size/offset di luar radius/icon-gap/screen-padding yang sudah disentuh). |
 | 3 | Typography Hierarchy | ✅ **TUNTAS (Batch 149, 154, 159, 160, 161)**. 149: title bottom sheet (1 gap fix). 154: body/label song-row (1 gap fix). 159: field-label caption (1 gap fix). 160: badge/kicker/value-readout (0 bug). 161: line-height — **5 gap sistemik** (`theme/Type.kt` 5 style ter-override tanpa `lineHeight`, app-wide blast radius) diperbaiki, dihitung proporsional dari rasio M3 asli. **Belum diverifikasi visual** Batch 161 — cek prioritas tinggi. Sisa (SENGAJA tidak diklaim tuntas): cakupan penuh truncation/ellipsis (beda sub-kategori, sebagian sudah Batch 37). |
 | 5 | Interactive States (disabled/selected/loading/error) | ✅ **Audit selesai 8/8 sub-item (Batch 162-168)**. disabled icon-button tint (5 titik, konsisten), pressed/ripple integrity (0 `indication=null` ditemukan, aman), loading (`ShimmerBrush` shared, konsisten), **selected/active state (Batch 163-164)** — taksonomi 3 pola selected by-design (Card preview→border+elevation; List/dialog option→RadioButton; Tag/filter→FilterChip fill), 2 konsisten, **1 bug ditemukan & diperbaiki (Batch 163)**: `SpeedDialog` TextButton+"✓" disamakan ke RadioButton (samakan `TransitionModeOption` di dialog sama). **1 dari 3 observasi tertunda DIEKSEKUSI (Batch 164)**: `SongRow` (LibraryScreen) sekarang menandai lagu sedang diputar, disamakan pola `QueueRow`. **error state & success/confirmation feedback (Batch 165-166)** — teks validasi inline 100% konsisten (0 bug); banner hasil-operasi (4 titik/3 file) 3-arah tidak konsisten → **DISATUKAN (Batch 166)**: composable shared `ResultBanner` (`Utils.kt`) + `enum ResultBannerStyle {Solid,Tinted,Bare}`, 3 gaya lama dipertahankan lewat parameter, 0 perubahan visual disengaja. **konsistensi lintas-aksi (Batch 168)** — toggle Favorit (LibraryScreen vs NowPlaying): icon/tint/haptic identik, TAPI `bouncyPress` cuma ada di NowPlaying — genuinely ambigu (list padat vs hero screen), dicatat bukan dieksekusi. **3 observasi masih tertunda keputusan user**: (a) `EmptyState` icon hardcode (Batch 162), (b) `LibraryFilterChips` custom-fill vs FilterChip (Batch 163), (c) Favorit `bouncyPress` di atas (Batch 168). |
-| 6-14 | Now Playing s/d Component Consistency | 🟡 **Now Playing ✅ TUNTAS (Batch 169-179)**. **Library/Song List ✅ TUNTAS 11/11 (Batch 180-190)**. **Playlist/Queue ✅ TUNTAS 8/8 (Batch 191-214)**, termasuk fix drag-reorder buggy (214). **Settings dimulai (Batch 215)**: item 1/9 grouping antar section — 1 bug fix. Kategori 11-14 belum mulai. |
+| 6-14 | Now Playing s/d Component Consistency | 🟡 **Now Playing ✅ TUNTAS (Batch 169-179)**. **Library/Song List ✅ TUNTAS 11/11 (Batch 180-190)**. **Playlist/Queue ✅ TUNTAS 8/8 (Batch 191-214)**. **Settings berlanjut (Batch 215-217)**: item 1/9 grouping (215), item 2/9 title/subtitle row (216), item 3/9 spacing — 0 bug (217). Kategori 11-14 belum mulai. |
 
 ---
 
@@ -138,11 +138,43 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
   beda dari pola section lain di file ini (mis. "Perilaku Pemutaran") yang selalu 1 title
   menaungi beberapa item terkait. Disatukan 1 title "Alat & Utilitas" menaungi ke-4-nya, 3
   divider antar-item dibuang (diganti `Spacer(4.dp)`). 0 logic/navigasi/aksi berubah.
-- [ ] Konsistenkan title/subtitle row.
-- [ ] Samakan spacing antar setting.
-- [ ] Audit switch/toggle alignment.
-- [ ] Audit navigation affordance.
-- [ ] Pastikan destructive setting terlihat berbeda.
+- [x] Konsistenkan title/subtitle row. **✅ 1 bug fix (Batch 216)** — 7 baris navigasi
+  icon+title (4 "Alat & Utilitas" + "Cek Signature APK"/"Log Diagnostik"/"Cek Update") diaudit:
+  4 punya title+subtitle sendiri, 2 (Signature/Diagnostik) title-only tapi dinaungi 1 deskripsi
+  section bersama "Alat Developer" (konteks tetap ada, bukan gap), 1 ("Cek Update") title-only
+  TANPA konteks apa pun di dekatnya — genuinely berdiri sendiri. Subtitle ditambah ke "Cek
+  Update" saja, 2 baris developer tool sengaja tidak disentuh (pola section-level description
+  sudah valid & konsisten dengan "Tema"/"Perilaku Pemutaran").
+- [x] Samakan spacing antar setting. **✅ 0 bug (Batch 217)** — audit menyeluruh pasca
+  restrukturisasi Batch 215-216. **Transisi antar-section** (4 titik: Perilaku Pemutaran/Alat &
+  Utilitas/Lanjutan/Tentang Aplikasi): `Spacer(12dp)→Divider→Spacer(20dp)` identik di semua 4,
+  konsisten. **Title→konten pertama dalam section**: `Spacer(8dp)` identik di 3 titik (Perilaku
+  Pemutaran, Alat & Utilitas, Tentang Aplikasi). **Antar-item DALAM 1 section** — 2 pola beda
+  angka TAPI beda alasan fungsional, bukan inkonsistensi: switch-row (Perilaku Pemutaran)
+  `Spacer(12dp)` statis, row sendiri 0 padding vertikal (target sentuh = `Switch`-nya saja, bukan
+  seluruh row); nav-row (Alat & Utilitas, Alat Developer) `Spacer(4dp)` + `padding(vertical=8dp)`
+  bawaan row = ~20dp gap efektif (row SELURUHNYA `.clickable{}`, padding vertikal itu bagian dari
+  target sentuh, bukan estetika murni) — 2 spesies row beda afinitas interaksi, pola sama
+  precedent Batch 181 (ukuran beda krn peran UI beda, bukan gap).
+- [x] Audit switch/toggle alignment. **✅ 0 bug (Batch 218)** — 8 titik `Switch(` di
+  `SettingsScreen.kt` dicek: semua pakai pola identik `Row(verticalAlignment =
+  Alignment.CenterVertically)` + `Column(weight(1f))` title di kiri + `Switch` polos (0
+  modifier ukuran/offset custom) di kanan. 0 titik pakai `Alignment.Top/Bottom` atau padding/
+  size manual yang bisa geser switch dari center. Beda `padding` pembungkus luar antar titik
+  murni struktural (langsung di Row vs diwarisi Column orang tua), tidak berpengaruh ke
+  alignment vertikal internal.
+- [x] Audit navigation affordance. **✅ 0 bug (Batch 219)** — 7 baris navigasi (Statistik/
+  Backup/Duplikat/Vault/Signature/Diagnostik/Cek Update) 0 punya chevron trailing, TAPI di-grep
+  seluruh `ui/` folder: `ChevronRight`/`Arrow...Forward`/`NavigateNext` 0 hasil di mana pun —
+  app-wide 0% pernah pakai pola chevron. Affordance klik konsisten pakai ripple `.clickable{}`
+  full-row + icon prefix, bukan chevron. Row "Lanjutan" (`ExpandMore`/`Less`) bukan pembanding
+  valid — itu representasi STATE expand/collapse, bukan affordance navigasi.
+- [x] Pastikan destructive setting terlihat berbeda. **✅ 1 bug fix (Batch 220)** — toggle OFF
+  "Kunci Aplikasi (PIN)" ternyata memicu `AppLockStore.disableLock()` yang **hapus permanen** PIN
+  hash+salt dari `SharedPreferences` (harus dibuat ulang dari nol kalau diaktifkan lagi), tapi
+  dulu dieksekusi langsung dari toggle 0 konfirmasi 0 warna error — pola sama bug Batch 195. Fix:
+  `AlertDialog` konfirmasi ditambah + tombol "Nonaktifkan" & ikon `LockOpen` di-tint
+  `colorScheme.error`. Switch tetap terikat state asli parent (0 flicker saat Batal).
 - [ ] Pastikan disabled setting terlihat jelas.
 - [ ] Kurangi visual density tanpa menghilangkan informasi.
 - [ ] Jangan mengubah fungsi setting.

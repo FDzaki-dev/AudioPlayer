@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.SettingsBackupRestore
@@ -488,7 +489,21 @@ fun SettingsScreen(
                     tint = MaterialTheme.colorScheme.secondary
                 )
                 Spacer(modifier = Modifier.width(12.dp))
-                Text("Cek Update", style = MaterialTheme.typography.bodyMedium)
+                Column {
+                    Text("Cek Update", style = MaterialTheme.typography.bodyMedium)
+                    // Batch 216 — Settings polish 2/9 (title/subtitle row). Baris ini dulu
+                    // title-only, beda dari 4 baris "Alat & Utilitas" (Statistik/Backup/
+                    // Duplikat/Vault) yang semua title+subtitle. Beda dari "Cek Signature APK"/
+                    // "Log Diagnostik" (juga title-only) yang dinaungi 1 deskripsi section
+                    // bersama ("Alat Developer"), baris ini BERDIRI SENDIRI tanpa konteks apa
+                    // pun di dekatnya — subtitle ditambah, bukan dibuang lagi.
+                    Text(
+                        "Cek versi APK terbaru dari GitHub Release — satu-satunya koneksi " +
+                            "internet di app ini",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(20.dp))
         }
@@ -700,6 +715,7 @@ private fun AppLockSection(
     onToggleBiometric: (Boolean) -> Unit
 ) {
     var showSetPinDialog by remember { mutableStateOf(false) }
+    var showDisableLockConfirm by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     Column(modifier = Modifier.padding(horizontal = 20.dp)) {
@@ -716,7 +732,7 @@ private fun AppLockSection(
                 checked = lockEnabled,
                 onCheckedChange = { enabled ->
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    if (enabled) showSetPinDialog = true else onDisableLock()
+                    if (enabled) showSetPinDialog = true else showDisableLockConfirm = true
                 }
             )
         }
@@ -746,6 +762,30 @@ private fun AppLockSection(
         SetPinDialog(
             onConfirm = { pin -> onSetPin(pin); showSetPinDialog = false },
             onDismiss = { showSetPinDialog = false }
+        )
+    }
+
+    if (showDisableLockConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDisableLockConfirm = false },
+            icon = { Icon(Icons.Default.LockOpen, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Nonaktifkan Kunci Aplikasi?") },
+            text = {
+                Text(
+                    "PIN yang tersimpan akan dihapus permanen. Kalau diaktifkan lagi nanti, PIN " +
+                        "baru harus dibuat dari awal.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDisableLock()
+                    showDisableLockConfirm = false
+                }) { Text("Nonaktifkan", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisableLockConfirm = false }) { Text("Batal") }
+            }
         )
     }
 }

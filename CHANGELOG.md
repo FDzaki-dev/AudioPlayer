@@ -1,5 +1,134 @@
 # Changelog
 
+## Batch 220 — Settings polish item 6/9: fix destructive setting (nonaktifkan kunci PIN, 1 file kode + 2 dokumentasi)
+Lanjutan Batch 215-219, item 6/9 § Settings `MICRO_UIUX_AUDIT.md`: "Pastikan destructive setting
+terlihat berbeda". Ditelusuri sampai layer data: `AppLockStore.disableLock()` **menghapus
+permanen** `KEY_PIN_HASH`+`KEY_SALT` dari `SharedPreferences` — kalau lock diaktifkan lagi nanti,
+PIN harus dibuat ulang dari nol, 0 cara mengembalikan PIN lama. Tapi di UI, aksi ini dipicu
+langsung dari 1 gerakan jari (toggle `Switch` OFF) — **0 konfirmasi, 0 pembeda visual warna
+error**, padahal efeknya permanen. Persis pola bug yang sudah dikonfirmasi & diperbaiki Batch 195
+di kategori Playlist/Queue ("Hapus playlist" dulu 0 konfirmasi).
+
+**Fix** `SettingsScreen.kt`: `onCheckedChange` saat toggle OFF tidak lagi panggil
+`onDisableLock()` langsung, tapi buka `AlertDialog` konfirmasi baru ("Nonaktifkan Kunci
+Aplikasi?" + penjelasan PIN akan dihapus permanen + wajib dibuat ulang dari awal kalau
+diaktifkan lagi). Tombol konfirmasi "Nonaktifkan" pakai `color = MaterialTheme.colorScheme.error`,
+ikon dialog `Icons.Default.LockOpen` di-tint error juga. Tombol "Batal" netral. `Switch` sendiri
+tetap `checked = lockEnabled` terikat state asli dari parent (bukan state toggle lokal) — kalau
+user tekan "Batal", switch otomatis balik ke posisi semula tanpa flicker/state-jump, karena
+`disableLock()` beneran belum pernah dipanggil.
+
+1 import baru (`Icons.Default.LockOpen`, eksplisit — file ini tidak pakai wildcard icons). Brace/
+paren `SettingsScreen.kt` seimbang (136/136, 436/436). 0 protected asset. **Belum diverifikasi
+visual** — prioritas cek dialog konfirmasi muncul benar saat toggle OFF, switch tidak
+kejump/flicker saat "Batal" ditekan, dan aktivasi ulang lock (`showSetPinDialog`) tetap jalan
+seperti sebelumnya (jalur ini tidak disentuh). `MICRO_UIUX_AUDIT.md` diperbarui (checklist item
+6/9). Item berikutnya (7/9): pastikan disabled setting terlihat jelas.
+
+## Batch 219 — Settings polish item 5/9: audit navigation affordance (audit, 0 bug)
+Lanjutan Batch 215-218, item 5/9 § Settings `MICRO_UIUX_AUDIT.md`: "Audit navigation
+affordance". 7 baris navigasi (buka sheet/dialog lain) di `SettingsScreen.kt` — Statistik
+Dengar/Cadangkan & Pulihkan/Deteksi File Duplikat/Vault Lagu Privat/Cek Signature APK/Log
+Diagnostik/Cek Update — dicek: **tidak satu pun** punya ikon chevron/panah trailing yang
+menandakan "baris ini navigasi ke tempat lain". Awalnya dicurigai gap, tapi di-grep seluruh
+`ui/` folder untuk pola `ChevronRight`/`KeyboardArrowRight`/`Arrow...Forward`/`NavigateNext` —
+**0 hasil di mana pun**, termasuk di file lain (`PlaylistScreen.kt`, `QueueSheet.kt`, dst).
+
+**Kesimpulan**: bukan gap, tapi pola desain app-wide yang konsisten — affordance klik ditandai
+lewat kombinasi ripple bawaan `.clickable{}` full-width row + icon prefix + title/subtitle,
+BUKAN chevron trailing (app ini 0% pernah pakai pola chevron di mana pun, jadi menambah chevron
+justru akan jadi elemen baru yang tidak konsisten dengan sisa app). Beda kasus dengan baris
+"Lanjutan" (expand/collapse) yang MEMANG punya ikon `ExpandMore`/`ExpandLess` trailing — tapi itu
+bukan pembanding valid, krn perannya beda (toggle show/hide state di tempat, bukan navigasi ke
+layar lain — ikon expand/collapse WAJIB ada krn merepresentasikan STATE, bukan sekadar affordance
+klik).
+
+**Hasil: 0 bug, 0 kode disentuh.** `MICRO_UIUX_AUDIT.md` diperbarui (checklist item 5/9). Item
+berikutnya (6/9): pastikan destructive setting terlihat berbeda.
+
+## Batch 218 — Settings polish item 4/9: audit switch/toggle alignment (audit, 0 bug)
+Lanjutan Batch 215-217, item 4/9 § Settings `MICRO_UIUX_AUDIT.md`: "Audit switch/toggle
+alignment". Grep semua `Switch(` di `SettingsScreen.kt` — 8 titik total: 4 di "Perilaku
+Pemutaran" (Goyang untuk Lagu Berikutnya/Lanjutkan Otomatis/Mini Player Mengambang/Lewati
+Keheningan), 2 di tema (Ikuti Sistem/Mode Gelap), 2 di kunci app (Kunci Aplikasi PIN/Buka dengan
+Sidik Jari).
+
+**Semua 8 dicek satu-satu**: pola identik tanpa kecuali — `Row(verticalAlignment =
+Alignment.CenterVertically)` membungkus `Column(modifier = Modifier.weight(1f))` berisi
+title(+subtitle) di kiri, lalu `Switch(...)` polos (0 modifier ukuran/offset custom) di kanan.
+Tidak ada satu pun titik yang pakai `Alignment.Top`/`Alignment.Bottom` atau `Switch` dengan
+padding/size manual yang bisa bikin switch kegeser dari center row-nya. Perbedaan `padding`
+pembungkus luar (`Modifier.padding(horizontal = 20.dp)` langsung di beberapa Row vs sudah
+diwarisi dari `Column` orang tua di titik lain) tidak berpengaruh ke alignment vertikal internal
+Row itu sendiri — struktural per konteks pemanggil, bukan inkonsistensi alignment.
+
+**Hasil: 0 bug, 0 kode disentuh.** `MICRO_UIUX_AUDIT.md` diperbarui (checklist item 4/9). Item
+berikutnya (5/9): audit navigation affordance.
+
+## Batch 217 — Settings polish item 3/9: spacing antar setting (audit, 0 bug)
+Lanjutan Batch 215-216, item 3/9 § Settings `MICRO_UIUX_AUDIT.md`: "Samakan spacing antar
+setting". Audit menyeluruh `SettingsScreen.kt` pasca restrukturisasi Batch 215-216 (khawatir
+perubahan struktur "Alat & Utilitas" bisa saja meninggalkan spacing yang tidak sinkron lagi
+dengan bagian lain file).
+
+**3 sub-pola dicek terpisah**:
+1. **Transisi antar-section** (4 titik: masuk ke Perilaku Pemutaran/Alat & Utilitas/Lanjutan/
+   Tentang Aplikasi) — `Spacer(12dp)→HorizontalDivider→Spacer(20dp)` identik di ke-4-nya.
+2. **Title section → konten pertama** (3 titik: Perilaku Pemutaran/Alat & Utilitas/Tentang
+   Aplikasi) — `Spacer(8dp)` identik. ("Tema" beda krn punya deskripsi section tambahan sebelum
+   konten, "Lanjutan" beda krn struktur collapsible dgn sub-title bersarang — keduanya kasus
+   struktural beda, bukan pembanding apple-to-apple utk gap ini.)
+3. **Antar-item DALAM 1 section** — di sinilah ditemukan 2 angka berbeda: switch-row (4 toggle
+   "Perilaku Pemutaran") pakai `Spacer(12dp)` statis antar-row, row itu sendiri 0 padding
+   vertikal tambahan; nav-row (4 "Alat & Utilitas" + 2 "Alat Developer") pakai `Spacer(4dp)` +
+   `padding(vertical=8dp)` bawaan tiap row → gap visual efektif ~20dp, LEBIH LEBAR dari
+   switch-row.
+
+**Dicek apakah ini bug atau disengaja** (bukan langsung disamakan angkanya): switch-row target
+sentuhnya cuma komponen `Switch` di kanan (Material sudah menegakkan touch-target minimum
+sendiri di situ), jadi `Row` pembungkus tidak perlu padding vertikal ekstra — `Spacer(12dp)`
+murni jarak visual antar-baris. Nav-row SELURUH `Row` adalah `.clickable{}` (baris demi baris
+navigasi ke sheet lain) — `padding(vertical=8dp)` di situ BUKAN estetika, itu bagian dari target
+sentuh fungsional row (lebih lebar dari cuma tinggi teks 2 baris). Dua "spesies" row dengan
+afinitas interaksi berbeda secara sah punya angka spacing berbeda — persis pola yang sudah
+dikonfirmasi Batch 181 di kategori Library/Song List ("ukuran art beda krn peran UI beda, bukan
+inkonsistensi yang perlu disamakan").
+
+**Hasil: 0 bug, 0 kode disentuh.** `MICRO_UIUX_AUDIT.md` diperbarui (checklist item 3/9 dgn
+detail temuan + status tracking kategori 6-14). Item berikutnya (4/9): audit switch/toggle
+alignment.
+
+## Batch 216 — Settings polish item 2/9: title/subtitle row
+Lanjutan Batch 215. Audit `SettingsScreen.kt` § "Konsistenkan title/subtitle row" (item 2/9 §
+Settings, `MICRO_UIUX_AUDIT.md`): 7 baris navigasi berpola `Icon + Spacer(12dp) + title` dikenali
+di seluruh file — 4 di antaranya ("Alat & Utilitas": Statistik Dengar/Cadangkan & Pulihkan/
+Deteksi File Duplikat/Vault Lagu Privat, hasil Batch 215) sudah title+subtitle per-item; 3 sisanya
+title-only ("Cek Signature APK", "Log Diagnostik", "Cek Update").
+
+**Dicek satu-satu, bukan disamakan semua secara buta**: "Cek Signature APK" & "Log Diagnostik"
+dinaungi 1 `Text` deskripsi section bersama "Alat Developer" ("Bukan untuk penggunaan sehari-hari
+— dipakai untuk mengecek APK sebelum instal update manual.") tepat sebelum keduanya — pola ini
+identik dengan section "Tema"/"Perilaku Pemutaran" di file yang sama, yang juga pakai 1 deskripsi
+section untuk menaungi beberapa item sekaligus (bukan subtitle per-item). Menambah subtitle
+duplikat ke 2 baris ini justru mengulang info yang sudah ada, bukan konsistensi. "Cek Update"
+BEDA — title-only TANPA satu pun kalimat penjelas di dekatnya (section "Tentang Aplikasi" cuma
+punya deskripsi soal app secara umum, bukan soal aksi cek-update itu sendiri) — genuinely satu-
+satunya baris yang berdiri sendiri tanpa konteks.
+
+**Fix**: subtitle ditambah ke "Cek Update" saja — "Cek versi APK terbaru dari GitHub Release —
+satu-satunya koneksi internet di app ini" (dikonfirmasi akurat ke `UpdateCheckSheet.kt`, yang
+memang cuma dipicu manual lewat baris ini, tidak pernah otomatis — komentar KDoc file itu sendiri
+sudah menyebut ini "satu-satunya tempat app ini pernah menyentuh jaringan"). Struktur baris
+diubah dari `Icon+Spacer+Text` jadi `Icon+Spacer+Column{Text+Text}` (pola identik 4 baris "Alat &
+Utilitas"), 0 logic/`onClick`/navigasi berubah.
+
+0 protected asset. Brace/paren `SettingsScreen.kt` seimbang (124/124, 426/426). **Belum
+diverifikasi visual**. `MICRO_UIUX_AUDIT.md` diperbarui (status tracking + checklist item 2/9).
+Item berikutnya (3/9): "Samakan spacing antar setting" — kandidat cross-check dengan audit Batch
+151 (kategori Spacing) yang sudah pernah memeriksa pola spacing section serupa dan menemukan 0
+bug; batch berikutnya perlu verifikasi ulang apakah kesimpulan itu masih berlaku setelah struktur
+section berubah di Batch 215-216, atau genuinely tuntas tanpa kerja tambahan.
+
 ## Batch 215 — Settings polish item 1/9: grouping antar section
 Next pending sesuai `MICRO_UIUX_AUDIT.md` § FINAL EXECUTION ORDER — kategori 9 (Playlist/Queue)
 tuntas 8/8 (Batch 191-214, termasuk fix drag-reorder Batch 214), lanjut kategori 10 (Settings
