@@ -1,6 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    // Batch 243 — Room (Lyrics cache). Lihat root build.gradle.kts utk versi.
+    id("com.google.devtools.ksp")
 }
 
 // A hardcoded versionCode has to be remembered and manually bumped on every single
@@ -267,4 +269,16 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.1")
     androidTestImplementation("androidx.test:core:1.6.1")
+
+    // Batch 243 — Lyrics offline-first (cache Room). room-ktx bawa Flow/suspend DAO support.
+    // Ver 2.6.1 = stabil terbaru per KSP 1.9.24 pairing di atas.
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+
+    // Batch 244 — Lyrics offline-first 2/4. Retrofit2 + converter-gson buat LRCLIB API.
+    // okhttp3 sudah ada (UpdateDownloader/GitHubReleaseChecker) — Retrofit numpang instance
+    // client yg sama pattern (timeout eksplisit), bukan dependency baru buat http-nya sendiri.
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
 }

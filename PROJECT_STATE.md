@@ -23,6 +23,119 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 245 (Lyrics offline-first 3/4 — Repository+ViewModel+View, 3 file kode + 2
+dokumentasi)** — Lanjutan Batch 244. `LyricsRepository.kt` (`sealed class LyricsResult
+{Found/NotFound}`, logic offline-first PERSIS spec: `dao.get()`→null?`api.getLyrics()`→map→
+`dao.upsert()`→return; hit→return cache 0 network; `ensureCached()` khusus dipanggil
+PrefetchWorker batch 4/4 — cache-check dulu tanpa expose hasil; `IOException`/exception apa pun
+→ `NotFound`, tidak crash) → `LyricsViewModel.kt` (`StateFlow<LyricsUiState>` 4 state
+Idle/Loading/Found/NotFound; **debounce 5 detik + skip-lagu-sama diimplementasi DI SINI**,
+bukan di PlaybackService pemanggil batch 4/4 — 1 sumber kebenaran, PlaybackService cukup
+panggil `loadLyrics()` polos) → `LyricsView.kt` (`parseLRC()` regex `[mm:ss.xx]text`, xx=
+centisecond ×10 bukan ×1 spt millisecond; `activeLyricIndex()` cari baris terakhir
+timeMs≤posisi; `LazyColumn`+`animateScrollToItem` autoscroll; baris aktif bold+ukuran beda
+BUKAN cuma warna, konsisten aturan Batch 241; fallback plain→pesan "Lirik tidak ditemukan";
+`LyricsStateView` wrapper terima `LyricsUiState` langsung). **Belum di-wire ke NowPlayingScreen**
+(integrasi UI di luar 10 file yg diminta spec — sengaja, scope batch 4/4 cuma trigger+worker+
+Settings menu). Brace/paren balance OK 3 file (1 titik `)` di komentar `LyricsView.kt`
+notasi interval matematika `[start,end)` — false-positive checker karakter, bukan kode, sudah
+diverifikasi manual). 0 protected asset disentuh.
+
+**Pending Queue — Lyrics offline-first 4/4 (batch terakhir kategori ini)**:
+`worker/LyricsPrefetchWorker.kt` (WorkManager `Constraints.NetworkType.UNMETERED`, 10 lagu
+depan queue ExoPlayer, `repository.ensureCached()` per lagu — skip yg sudah ke-cache otomatis
+via cek internal) + gradle `work-runtime-ktx` + patch `PlaybackService.kt` (dengarkan
+`MediaSessionCompat.Callback.onMetadataChanged()`, panggil `lyricsViewModel.loadLyrics()`) + 2
+menu baru `SettingsScreen.kt` ("Hapus Cache Lirik" → `repository.clearCache()`, "Prefetch Saat
+WiFi" toggle) + `WorkManager.enqueueUniqueWork("prefetch_lyrics", ...)`. Detail: `CHANGELOG.md`
+Batch 245.
+
+**Batch 244 (Lyrics offline-first 2/4 — Retrofit API layer LRCLIB, 2 file kode + gradle
+protected-parsial + 2 dokumentasi)** — Lanjutan Batch 243. `LyricsDto.kt` (bentuk respons 1:1
+LRCLIB `/api/get`, 0 logic, mapping ke `LyricsEntity` didelegasikan ke Repository batch
+berikutnya) + `LyricsApi.kt` (Retrofit interface, endpoint `GET api/get?artist_name=&
+track_name=` — persis spec, bukan `/api/search` yg ambiguous multi-hasil). Timeout 10s
+(connect+read, spec) — SENGAJA beda dari `GitHubReleaseChecker` (15s/20s) krn ini dipanggil di
+jalur pemutaran lagu (`onMetadataChanged`), gagal cepat > nunggu lama. Header
+`User-Agent: MusicApp/1.3 Hybrid` via `Interceptor` (persis spec). Gradle (protected-parsial):
+`app/build.gradle.kts` +retrofit2/converter-gson 2.11.0 (okhttp3 sudah ada dari
+UpdateDownloader/GitHubReleaseChecker, numpang instance-pattern yg sama, bukan http client
+baru). Brace/paren balance (`LyricsApi.kt` 3/3+26/26, `LyricsDto.kt` 0/0+7/7). 0 protected asset
+app disentuh (cuma gradle).
+
+**Pending Queue — Lyrics offline-first (batch berikutnya)**:
+3. `data/lyrics/LyricsRepository.kt` (offline-first: `dao.get()` → null? `api.getLyrics()` →
+   map DTO→Entity → `dao.upsert()` → return; hit? return cache, 0 network; API gagal & cache
+   kosong → emit "Lirik tidak ditemukan") + `ui/lyrics/LyricsViewModel.kt`
+   (`StateFlow<LyricsUiState>`, debounce 5 detik, skip kalau lagu sama) + `ui/lyrics/
+   LyricsView.kt` (`parseLRC()`/`updateTime()`/autoScroll Composable, fallback plain text).
+4. `worker/LyricsPrefetchWorker.kt` (WorkManager Unmetered, 10 lagu depan queue ExoPlayer, skip
+   yg sudah ke-cache) + gradle work-runtime-ktx + patch `PlaybackService.kt` (trigger
+   `onMetadataChanged`, debounce 5s) + 2 menu `SettingsScreen.kt` ("Hapus Cache Lirik",
+   "Prefetch Saat WiFi") + `WorkManager.enqueueUniqueWork`. Detail: `CHANGELOG.md` Batch 244.
+
+**Batch 243 (FITUR BARU — Lyrics offline-first 1/4: Room cache layer, 3 file kode + gradle
+protected-parsial + 2 dokumentasi) → 🆕 LYRICS OFFLINE-FIRST dimulai (menyela antrean Motion &
+Transition, ditunda user — urgent)** — Spec user: cache lirik LRCLIB (LRC synced+plain),
+offline-first (cache dulu baru API), prefetch WiFi, trigger dari playback service. **Adaptasi
+arsitektur (izin eksplisit user "boleh diadaptasi")**: spec minta Hilt DI, TAPI codebase ini
+0% pakai DI framework (semua `data/*Store.kt` manual-construct dari Context, `PlayerViewModel`
+manual Factory) — nambah Hilt cuma demi 1 fitur berarti nyentuh Application/MainActivity/
+PlaybackService (3 protected asset) demi framework baru. Diganti singleton manual
+(`LyricsDatabase.getInstance()`), pola sama persis konvensi existing, 0 protected asset app
+disentuh (cuma gradle). Nama file/class disesuaikan realita project: **`PlaybackService.kt`**
+(bukan `PlayerService.kt` — nama itu tidak ada di project ini).
+
+File batch ini (3, HARD CAP): `data/lyrics/db/LyricsEntity.kt` (table `lyrics_cache`, index
+UNIQUE(artist,title), kolom persis spec), `LyricsDao.kt` (get suspend + observe Flow + upsert
+REPLACE + clearAll + count), `LyricsDatabase.kt` (singleton, DB name `lyrics_database.db`,
+exportSchema=false — Room pertama kali di project ini, 0 folder schema/ existing yg kebentur).
+Gradle (protected-parsial): root `build.gradle.kts` +KSP plugin 1.9.24-1.0.20 (KSP dipilih atas
+kapt — modern, sesuai aturan sesi #3), `app/build.gradle.kts` +room-runtime/room-ktx/
+room-compiler(ksp) 2.6.1. Brace/paren balance semua 3 file OK (lihat CHANGELOG).
+
+**Pending Queue — Lyrics offline-first (batch berikutnya, urutan sesuai dependency)**:
+2. `data/lyrics/api/LyricsDto.kt` + `LyricsApi.kt` (Retrofit interface LRCLIB, timeout 10s,
+   User-Agent "MusicApp/1.3 Hybrid") + gradle retrofit/okhttp-logging (okhttp sudah ada).
+3. `data/lyrics/LyricsRepository.kt` (offline-first logic: dao.get() → null? fetch API →
+   dao.upsert() → return; cache hit → return langsung) + `ui/lyrics/LyricsViewModel.kt`
+   (StateFlow<LyricsUiState>, debounce 5s, skip kalau lagu sama) + `ui/lyrics/LyricsView.kt`
+   (parseLRC/updateTime/autoScroll Composable, fallback plain text, pesan "Lirik tidak
+   ditemukan" kalau API gagal & cache kosong).
+4. `worker/LyricsPrefetchWorker.kt` (WorkManager, constraint Unmetered, 10 lagu depan dari
+   ExoPlayer queue, skip yg sudah ke-cache) + gradle work-runtime-ktx + patch
+   `PlaybackService.kt` (trigger onMetadataChanged, debounce 5s) + 2 menu Settings ("Hapus
+   Cache Lirik", "Prefetch Saat WiFi") + panggilan `WorkManager.enqueueUniqueWork`.
+
+**⚠️ CATATAN SESI BARU**: mulai batch ini, fitur "Lyrics" pakai konvensi nama `PlaybackService`
+(bukan `PlayerService`) — kalau user sebut "PlayerService" di prompt lanjutan, itu maksudnya
+`playback/PlaybackService.kt`. Detail: `CHANGELOG.md` Batch 243.
+
+**Batch 242 (Accessibility Micro-Polish 9/9 — verifikasi retrospektif no-behavior-change, 0 bug,
+0 kode + 2 dokumentasi) → 🟠 ACCESSIBILITY MICRO-POLISH TUNTAS 9/9 (Batch 234-242)** — Item
+terakhir bersifat guard-rail, audit retrospektif 6 fix kode Batch 234-241: 234/236 (handler
+pindah ke parent `.selectable`, `onClick` child jadi `null` — semantics-only, `onClick` logic
+sama persis cuma naik level)/237 (nambah navigasi fokus imeAction, 0 logic baru)/238 (ukuran
+touch target, 0 logic)/241 (nambah icon visual, 0 onClick baru). **Hasil: 0 pelanggaran**, 0
+kode disentuh. `MICRO_UIUX_AUDIT.md` diupdate (checklist 9/9 + `STATUS TRACKING`). **Rekap
+kategori Accessibility Micro-Polish**: TalkBack semantics(234)/content desc(235)/semantic
+role(236)/focus order(237)/touch target(238)/text scaling(239, 0 bug)/contrast(240, 0
+bug)/color-only info(241)/no-behavior-change(242, 0 bug). Kategori berikutnya (belum mulai):
+🟡 MOTION & TRANSITION. Detail: `CHANGELOG.md` Batch 242.
+
+
+**Batch 241 (Accessibility Micro-Polish 8/9 — informasi tidak boleh cuma dibedakan lewat warna,
+1 bug fix, 1 file kode + 2 dokumentasi)** — `PlaylistSongRow` (`PlaylistScreen.kt`) beda pola
+dari 2 saudaranya: status "sedang diputar" di `QueueRow` (`QueueSheet.kt`) & `SongRow`
+(`LibraryScreen.kt`) sama-sama pakai badge icon `GraphicEq` + teks bold + warna primary, TAPI
+`PlaylistSongRow` cuma pakai background tint 12% alpha + bold + warna primary — 0 icon/teks,
+murni warna (masalah klasik utk low-vision/color-blind user, background tint 12% alpha apalagi
+sangat subtle). Fix: tambah `Icon(Icons.Default.GraphicEq, tint = secondary, 16dp)` +
+`contentDescription = "Sedang diputar"` persis pola 2 file lain, dibungkus `Row` horizontal di
+atas title. Brace/paren balance (129/129, 218/218). `MICRO_UIUX_AUDIT.md` diupdate. Item
+berikutnya (9/9, penutup kategori Accessibility Micro-Polish): audit dynamic type / RTL layout
+mirroring. Detail: `CHANGELOG.md` Batch 241.
+
 **Batch 240 (Accessibility Micro-Polish 7/9 — audit contrast, 0 bug, 0 kode + 2 dokumentasi)** —
 Cek app-wide: (1) `ResultBanner` (3 varian: Solid/Tinted/Bare) — Solid pasang container-role +
 `onXContainer` pair (kontras terjamin M3), Tinted & Bare sengaja pass warna semantik sama ke
