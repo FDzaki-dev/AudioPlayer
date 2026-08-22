@@ -36,7 +36,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: 8.7
+          gradle-version: 8.14.3
           # Batch 62 — cache Gradle User Home (dependency jar, wrapper dist, dan build
           # cache dari org.gradle.caching=true di gradle.properties) otomatis tersimpan
           # antar-run lewat actions/cache di balik layar action ini. Tidak perlu setup
@@ -217,7 +217,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: 8.7
+          gradle-version: 8.14.3
 
       - name: Enable KVM (emulator hardware acceleration)
         # Tanpa ini emulator jalan lewat software rendering murni — jauh lebih lambat, kadang

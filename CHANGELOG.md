@@ -1,5 +1,23 @@
 # Changelog
 
+## Batch 249 — Fix build FAILED: bump AGP/compileSdk/Gradle (3 file patch, 0 file baru)
+Root cause dari `log_fail_255.zip`: `androidx.work:work-runtime-ktx:2.11.2` (ditambahkan Batch 246
+buat `LyricsPrefetchWorker`) butuh compileSdk 35+ & AGP 8.6.0+ — project masih compileSdk 34 & AGP
+8.4.1, task `:app:checkDebugAarMetadata` FAILED (4 issues, semua sama akar). Fix: `build.gradle.kts`
+AGP `8.4.1`→`8.13.0` (versi 8.x stabil terakhir sebelum AGP 9.x — 9.x classic-DSL-breaking, di luar
+scope 1-task fix ini, sengaja TIDAK dipilih meski lebih baru, lihat catatan risiko di bawah).
+`app/build.gradle.kts` `compileSdk` 34→36 (bukan pas 35 — 36 adalah max API yg didukung AGP 8.13,
+dicek `web_search` Agustus 2026, biar tidak nagih bump lagi kalau ada dependency lain minta 35).
+`targetSdk` SENGAJA TIDAK ikut dinaikkan (tetap 34) — di luar scope fix compile error ini, murni
+task perbaikan build, bukan task modernisasi target runtime. `.github/workflows/build.yml`
+`gradle-version: 8.7`→`8.14.3` (2 titik, job debug+release) — AGP 8.13 butuh Gradle lebih baru dari
+8.7 (dicek `web_search`, pasangan umum AGP 8.13↔Gradle 8.13-8.14). Kotlin `1.9.24`/KSP
+`1.9.24-1.0.20` SENGAJA TIDAK disentuh — tidak ada indikasi jadi penyebab FAILED ini, ganti versi
+Kotlin di luar 1-task scope (Strict Micro-Batching). Brace balance OK 3 file (1/1, 29/29, 38/38).
+Protected assets (build.gradle.kts root+app, workflow) disentuh SEBAGIAN sesuai izin edit-parsial.
+**Belum diverifikasi ulang di CI** — perbaikan berdasar analisa log_fail_255.zip + web_search
+compatibility matrix, bukan hasil re-run build sukses.
+
 ## Batch 248 — Wire Lyrics offline-first ke NowPlayingScreen (2 file patch, 0 file baru)
 Menutup gap yang dicatat eksplisit di Batch 245/247 ("Belum di-wire ke NowPlayingScreen").
 `NowPlayingScreen.kt` (patch): hoist `LyricsViewModel` via `viewModel(factory = LyricsViewModel.factory(context))`

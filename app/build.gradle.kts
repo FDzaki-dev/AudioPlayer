@@ -72,7 +72,11 @@ val appVersionName = "$versionMajor.${appVersionCode / commitsPerMinor}.${appVer
 
 android {
     namespace = "com.rudi.audioplayer"
-    compileSdk = 34
+    // Batch 249 — bump 34→36. Trigger: build gagal (`log_fail_255.zip`), `androidx.work:
+    // work-runtime-ktx:2.11.2` (Batch 246) butuh compileSdk 35+ & AGP 8.6.0+, project masih 34/8.4.1.
+    // Pilih 36 (bukan pas 35) — max API yg didukung AGP 8.13 (dicek web_search Agustus 2026) skalian,
+    // biar tidak perlu bump lagi kalau ada dependency lain nagih 35 nanti.
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.rudi.audioplayer"

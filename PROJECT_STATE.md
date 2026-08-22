@@ -23,6 +23,15 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 249 (Fix build FAILED — bump AGP/compileSdk/Gradle, 3 file patch, 0 file baru)** — Root
+cause dari `log_fail_255.zip`: `work-runtime-ktx:2.11.2` (Batch 246) butuh compileSdk 35+ & AGP
+8.6.0+, project masih 34/8.4.1 → `:app:checkDebugAarMetadata` FAILED. Fix: `build.gradle.kts` AGP
+→`8.13.0` (bukan lompat ke AGP 9.x — breaking DSL, di luar scope 1-task fix), `app/build.gradle.kts`
+`compileSdk` 34→36 (max yg didukung AGP 8.13), `.github/workflows/build.yml` `gradle-version`
+8.7→8.14.3 (2 titik). `targetSdk` & Kotlin/KSP version SENGAJA tidak disentuh (di luar scope,
+bukan penyebab FAILED). Brace balance OK 3 file. **Belum diverifikasi ulang di CI** — fix berdasar
+analisa log + web_search compatibility, bukan hasil re-run sukses. Detail: `CHANGELOG.md` Batch 249.
+
 **Batch 248 (Wire Lyrics offline-first ke NowPlayingScreen, 2 file patch, 0 file baru)** —
 Menutup gap "Belum di-wire" yang dicatat eksplisit Batch 245/247. `NowPlayingScreen.kt`: hoist
 `LyricsViewModel` (factory pattern, konsisten `EqualizerController` dkk) + `LaunchedEffect(song?.id)`

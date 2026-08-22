@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.application") version "8.4.1" apply false
+    id("com.android.application") version "8.13.0" apply false
     id("org.jetbrains.kotlin.android") version "1.9.24" apply false
     // Batch 243 — Lyrics offline-first feature (Room). KSP dipilih ATAS kapt (kapt legacy,
     // lebih lambat) — konsisten "prioritas mutakhir" (aturan sesi #3). Versi disamakan Kotlin
