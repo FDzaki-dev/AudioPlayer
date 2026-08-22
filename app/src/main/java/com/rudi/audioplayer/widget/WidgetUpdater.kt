@@ -39,6 +39,14 @@ object WidgetUpdater {
     private const val KEY_ARTWORK_URI = "artwork_uri"
     private const val KEY_IS_PLAYING = "is_playing"
     private const val COMPACT_WIDTH_THRESHOLD_DP = 180
+    // Batch 208 — dikembalikan (bukan Batch 203's SizeF/setSelected marquee — itu yang
+    // dicurigai jadi penyebab crash "Ketuk untuk memulihkan", TETAP di-revert). Height-check
+    // sendiri (Batch 201/202, sebelum SizeF masuk di Batch 203) TIDAK PERNAH bikin crash —
+    // cuma nilainya yang salah kalibrasi awalnya (90dp > minHeight 80dp declared, sudah
+    // dikoreksi 70dp di Batch 202). User laporan screenshot: widget full layout 1-baris
+    // (dipaksa pendek) bikin judul+artis kepotong vertikal — persis kasus yang height-check
+    // ini tangani, tanpa API baru/reflection apapun yang berisiko.
+    private const val COMPACT_HEIGHT_THRESHOLD_DP = 70
 
     // Batch 68: fix "widget nggak pernah sinkron pas ganti tema" — widget_player(.compact).xml
     // used to hardcode the dark palette permanently (no light counterpart, and nothing ever
@@ -92,7 +100,8 @@ object WidgetUpdater {
             // a title, artist, and three buttons that no longer fit.
             val options = manager.getAppWidgetOptions(id)
             val minWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
-            val isCompact = minWidthDp < COMPACT_WIDTH_THRESHOLD_DP
+            val minHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 250)
+            val isCompact = minWidthDp < COMPACT_WIDTH_THRESHOLD_DP || minHeightDp < COMPACT_HEIGHT_THRESHOLD_DP
 
             val views = RemoteViews(context.packageName, if (isCompact) R.layout.widget_player_compact else R.layout.widget_player)
 

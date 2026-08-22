@@ -23,6 +23,18 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 208 (Widget — kembalikan height-check compact-mode, BUKAN SizeF, 1 file kode)** — User
+laporan: masih truncated 1-baris (Batch 207 XML metadata tidak cukup, tidak retroaktif). Analisis
+ulang: height-check ITU SENDIRI (Batch 201/202) TIDAK PERNAH crash — cuma salah kalibrasi angka
+(sudah dikoreksi 70dp). Crash baru muncul SETELAH `SizeF` map + `setBoolean setSelected` (Batch
+203) — 2 hal itu paling dicurigai, BUKAN height-check. Fix: `COMPACT_HEIGHT_THRESHOLD_DP=70` +
+`isCompact = width<180 || height<70` dikembalikan (versi Batch 202 terkoreksi), TANPA `SizeF`
+map/`setSelected` (tetap non-aktif). 1 file, 0 protected asset, brace/paren seimbang (20/20,
+119/119). **Belum diverifikasi device** — kalau crash muncul lagi = height-check-lah penyebabnya,
+revert lagi + logcat. Kalau truncation masih tapi tanpa crash = kemungkinan launcher tidak
+update `OPTION_APPWIDGET_MIN_HEIGHT` akurat, butuh info merk launcher/HP. Detail: `CHANGELOG.md`
+Batch 208.
+
 **Batch 207 (Widget — minResizeWidth/Height + border visual, 3 file XML, 0 logic runtime)** —
 Setelah revert total Batch 206, user minta insets & border visual biar tidak truncated lagi,
 TANPA logic baru. Fix murni metadata/drawable: (1) `widget_player_info.xml` — `minResizeWidth`/

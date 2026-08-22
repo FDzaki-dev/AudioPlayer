@@ -1,5 +1,31 @@
 # Changelog
 
+## Batch 208 — Widget: kembalikan height-check compact-mode (BUKAN SizeF), tetap truncated 1-baris (1 file kode)
+User laporan screenshot: widget diperkecil jadi 1-baris, judul "Music M..." + artis "Forever Y"
+kepotong vertikal. Batch 207 (minResizeWidth/Height + border, XML metadata) tidak cukup —
+metadata provider tidak berlaku retroaktif ke widget yang sudah terpasang, dan sebagian launcher
+tetap longgar soal itu.
+
+**Analisis ulang penyebab crash Batch 201-204** (supaya tidak asal takut ulangi semuanya):
+height-check ITU SENDIRI (Batch 201, dikoreksi Batch 202) TIDAK PERNAH menyebabkan crash — cuma
+salah kalibrasi angka (90dp > minHeight 80dp declared). Crash "Ketuk untuk memulihkan" baru
+muncul SETELAH Batch 203 menambah `RemoteViews(Map<SizeF,...>)` (API 31+) + `setBoolean(...,
+"setSelected", true)` — 2 hal itulah yang paling dicurigai (API kompleks/reflection, berpotensi
+tidak stabil di sebagian launcher), BUKAN height-check biasa.
+
+**Fix**: `COMPACT_HEIGHT_THRESHOLD_DP=70` + `isCompact = width<180 || height<70` dikembalikan
+persis seperti Batch 202 (versi TERKOREKSI, bukan Batch 201's 90dp yang salah) — mekanisme
+paling sederhana (baca 1 Int dari options, bandingkan, pilih 1 dari 2 `RemoteViews` statis).
+TIDAK mengembalikan `SizeF` map ataupun `setBoolean setSelected` — keduanya tetap non-aktif
+sesuai revert Batch 206.
+
+1 file (`WidgetUpdater.kt`), 0 protected asset. Brace/paren seimbang (20/20, 119/119). **Belum
+diverifikasi device** — kalau "Ketuk untuk memulihkan" muncul LAGI setelah batch ini, itu bukti
+kuat height-check-lah penyebabnya (bukan SizeF/setSelected seperti dugaan), dan perlu direvert
+lagi + minta logcat. Kalau TIDAK muncul tapi truncation MASIH terjadi, kemungkinan launcher user
+tidak meng-update `OPTION_APPWIDGET_MIN_HEIGHT` secara akurat/live — butuh info lebih (merk
+launcher/HP) buat diagnosis lanjut.
+
 ## Batch 207 — Widget: minResizeWidth/Height + border visual (3 file, XML-only, 0 logic runtime)
 Permintaan user setelah revert total Batch 206: tambah insets & pembatas/border visual biar
 tidak truncated lagi saat di-minimize/di-stretch — TANPA logic runtime baru (yang sebelumnya
