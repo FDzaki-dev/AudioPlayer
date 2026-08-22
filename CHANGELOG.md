@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 210 — Widget compact: tambah prev/next (2 file kode)
+Lanjutan Batch 209. `widget_player_compact.xml`: tambah `widget_prev`/`widget_next`
+(28dp, lebih kecil dari full 34dp biar muat), diapit di kiri-kanan tombol play, margin 4dp.
+`WidgetUpdater.kt`: binding prev/next dipindah keluar dari blok `if (!isCompact)` (jalan di
+kedua layout); artist tetap eksklusif full (compact masih tanpa baris artis, cuma judul).
+XML valid, brace/paren `WidgetUpdater.kt` seimbang (20/20, 118/118). 0 protected asset.
+
 ## Batch 209 — Widget: compact mode hilangkan judul total, bukan cuma truncate (2 file kode)
 User laporan screenshot (widget dipaksa pendek/sempit): compact layout (`widget_player_compact.xml`)
 memang dari awal SAMA SEKALI tanpa `TextView` judul — cuma album art + tombol play, gravity

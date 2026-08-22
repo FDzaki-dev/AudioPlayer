@@ -123,11 +123,11 @@ object WidgetUpdater {
 
             views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
             views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
+            views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
+            views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))
             if (!isCompact) {
                 views.setTextViewText(R.id.widget_artist, artist ?: "Buka AudioPlayer")
                 views.setTextColor(R.id.widget_artist, if (isDark) ARTIST_COLOR_DARK else ARTIST_COLOR_LIGHT)
-                views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
-                views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))
             }
 
             views.setImageViewResource(

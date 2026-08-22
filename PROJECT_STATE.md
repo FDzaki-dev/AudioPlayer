@@ -23,6 +23,12 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 210 (Widget compact — tambah prev/next, 2 file kode)** — Lanjutan Batch 209.
+`widget_player_compact.xml`: tambah `widget_prev`/`widget_next` (28dp, lebih kecil dari full
+34dp), diapit kiri-kanan tombol play. `WidgetUpdater.kt`: binding prev/next jalan di kedua
+layout; artist tetap eksklusif full. XML valid, brace/paren seimbang. 0 protected asset.
+Detail: `CHANGELOG.md` Batch 210.
+
 **Batch 209 (Widget — compact mode hilangkan judul total, bukan cuma truncate, 2 file kode)** —
 User laporan screenshot: widget compact (dipaksa sempit) render album art + tombol play doang,
 center-paksa, TANPA teks judul sama sekali. Root cause: `widget_player_compact.xml` dari awal
