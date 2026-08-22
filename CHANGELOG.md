@@ -1,5 +1,23 @@
 # Changelog
 
+## Batch 202 — HOTFIX regresi Batch 201: threshold compact-height ketinggian, kena widget default (1 file kode)
+User lapor "makin parah" via screenshot — widget ukuran NORMAL (bukan di-resize paksa) mendadak
+cuma nampilin art+play doang. Root cause: `COMPACT_HEIGHT_THRESHOLD_DP = 90` (Batch 201) LEBIH
+TINGGI dari `minHeight="80dp"` yang app sendiri deklarasikan di `widget_player_info.xml` — jadi
+widget baru dipasang / ukuran default (tinggi umum 1-baris ~80-110dp) OTOMATIS memenuhi kondisi
+compact, bukan cuma yang benar-benar di-shrink paksa. Dampak nyaris universal, bukan edge case.
+
+Fix: turunkan ke `COMPACT_HEIGHT_THRESHOLD_DP = 70` — di bawah `minHeight` 80dp (placement
+default balik ke full layout), tetap di atas kebutuhan riil compact (~52dp) supaya kasus ASLI
+Batch 201 (widget di-shrink sungguhan <70dp) tetap tertangkap.
+
+1 file (`WidgetUpdater.kt`), 0 protected asset. Brace/paren seimbang (20/20, 126/126). Marquee
+judul (fix lain Batch 201) TIDAK disentuh — tidak ada laporan/bukti itu bermasalah, cuma
+threshold height yang salah hitung. **Belum diverifikasi device.** Kalau "Ketuk untuk
+memulihkan" (screenshot user) masih muncul setelah fix ini, itu kemungkinan bukan lagi soal
+compact-mode — kemungkinan besar itu prompt generik launcher/OS ("tap to restore widget stack")
+yang butuh logcat buat didiagnosis lebih lanjut, bukan tebakan dari kode saja.
+
 ## Batch 201 — Fix widget: truncated saat diperkecil paksa (height-only shrink) + marquee judul lagu (2 file kode)
 2 bug dilaporkan user via screenshot resize widget home-screen:
 

@@ -30,11 +30,15 @@ object WidgetUpdater {
     private const val KEY_ARTWORK_URI = "artwork_uri"
     private const val KEY_IS_PLAYING = "is_playing"
     private const val COMPACT_WIDTH_THRESHOLD_DP = 180
-    // Batch 201 — full layout's real minimum: 52dp art + 14dp top/bottom padding = 80dp.
-    // Threshold set slightly above that (90dp) so compact kicks in BEFORE the hard-clip point,
-    // not exactly at it (matches the same margin-of-safety pattern as WIDTH_THRESHOLD 180dp
-    // vs full layout's real min width, which is well under 180dp too).
-    private const val COMPACT_HEIGHT_THRESHOLD_DP = 90
+    // Batch 202 — HOTFIX regresi Batch 201. 90dp lebih TINGGI dari `minHeight="80dp"` yang
+    // dideklarasikan sendiri di widget_player_info.xml, jadi widget ukuran DEFAULT (baru
+    // dipasang, belum di-resize sama sekali) otomatis kena compact — bukan cuma yang di-shrink
+    // paksa. Dampaknya nyaris universal: hampir semua widget 1-baris (tinggi umum ~80-110dp)
+    // jatuh ke compact (cuma art+play), padahal sebelumnya tampil penuh. Diturunkan ke 70dp —
+    // di bawah minHeight 80dp (placement default TETAP full layout), tapi masih di atas
+    // kebutuhan riil compact (~52dp), jadi masih menangkap kasus asli Batch 201 (widget
+    // di-shrink SUNGGUHAN sampai <70dp).
+    private const val COMPACT_HEIGHT_THRESHOLD_DP = 70
 
     // Batch 68: fix "widget nggak pernah sinkron pas ganti tema" — widget_player(.compact).xml
     // used to hardcode the dark palette permanently (no light counterpart, and nothing ever

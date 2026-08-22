@@ -18,6 +18,14 @@ atas file yang terus memanjang):
    versi polos.
 
 ## Batch terakhir yang selesai
+**Batch 202 (HOTFIX regresi Batch 201 — threshold compact-height ketinggian, 1 file kode)** —
+`COMPACT_HEIGHT_THRESHOLD_DP=90` (Batch 201) lebih tinggi dari `minHeight="80dp"` deklarasi app
+sendiri → widget ukuran DEFAULT (bukan di-resize) ikut kena compact, dampak nyaris universal.
+Diturunkan ke 70dp (di bawah minHeight, di atas kebutuhan compact ~52dp). 1 file, 0 protected
+asset, brace/paren seimbang. Marquee (fix lain Batch 201) tidak disentuh, tidak ada bukti
+bermasalah. **Belum diverifikasi device.** Kalau "Ketuk untuk memulihkan" masih muncul, itu
+kemungkinan prompt generik launcher, butuh logcat. Detail: `CHANGELOG.md` Batch 202.
+
 **Batch 201 (Fix widget — truncated saat height-only shrink + marquee judul lagu, 2 file
 kode)** — User lapor via screenshot. (1) `isCompact` dulu cuma cek lebar, widget yang di-shrink
 cuma secara TINGGI tetap pakai layout penuh → clip di tepi (RemoteViews tidak reflow). Fix: cek
