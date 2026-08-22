@@ -1,5 +1,37 @@
 # Changelog
 
+## Batch 215 — Settings polish item 1/9: grouping antar section
+Next pending sesuai `MICRO_UIUX_AUDIT.md` § FINAL EXECUTION ORDER — kategori 9 (Playlist/Queue)
+tuntas 8/8 (Batch 191-214, termasuk fix drag-reorder Batch 214), lanjut kategori 10 (Settings
+polish), item 1/9: "Konsistenkan grouping antar section".
+
+**Audit `SettingsScreen.kt`**: pola section di file ini konsisten SELALU 1 title (`titleMedium`)
+menaungi 1+ item terkait di bawahnya, dipisah `HorizontalDivider` dari section berikutnya — mis.
+"Tema" (1 deskripsi + grid kartu tema), "Perilaku Pemutaran" (4 switch tanpa title per-switch),
+"Lanjutan" (2 sub-section "Keamanan"+"Alat Developer"), "Tentang Aplikasi" (versi + tombol Cek
+Update). **1 gap ditemukan**: 4 baris tool berurutan — Statistik Dengar, Cadangkan & Pulihkan,
+Deteksi File Duplikat, Vault Lagu Privat — masing-masing dibungkus `HorizontalDivider` SENDIRI
+tanpa title section sama sekali, tampak visual seperti 4 section kosong-nama berturut-turut,
+bukan 1 kelompok "alat/utilitas" yang koheren.
+
+**Fix**: 1 title baru "Alat & Utilitas" ditambah sebelum baris Statistik Dengar (title pertama
+dari kelompok), 3 `HorizontalDivider` yang tadinya memisahkan Cadangkan/Duplikat/Vault dari
+tetangganya dibuang, diganti `Spacer(height=4.dp)` — antar-item dalam 1 section yang sama tidak
+butuh divider (konsisten dengan pola "Perilaku Pemutaran" yang juga cuma pakai `Spacer(12.dp)`
+antar switch, bukan divider). Divider transisi MASUK (dari section "Identitas Tema"/kartu tema)
+dan KELUAR (ke section "Lanjutan") sengaja TIDAK disentuh — itu batas section yang genuinely
+berbeda, cuma 3 batas INTERNAL antar 4 item yang dihapus.
+
+0 logic/state/navigasi/aksi berubah — murni `Text`/`Spacer`/`HorizontalDivider` restrukturisasi
+visual, `onClick`/`onOpenStats`/dst. semua identik. 0 protected asset. Brace/paren `SettingsScreen.kt`
+seimbang (123/123, 421/421). **Belum diverifikasi visual** — prioritas cek section baru tidak
+terasa terlalu padat (kandidat silang-cek dengan item 8/9 "kurangi visual density" nanti) dan
+transisi in/out section masih terasa jelas tanpa divider internal.
+
+`MICRO_UIUX_AUDIT.md` diperbarui: status tracking kategori 6-14 (Playlist/Queue ditandai tuntas
+8/8, Settings dimulai) + checklist Settings item 1/9 dicentang dengan detail. Item berikutnya
+(2/9): konsistenkan title/subtitle row.
+
 ## Batch 214 — Fix drag reorder buggy (patah-patah/lompat/susah mulai/nyentak) — 2 file kode + 1 dokumentasi
 User laporan drag reorder buggy di ke-4 aspek sekaligus (stutter, reorder meleset, susah mulai,
 gak smooth pas selesai) — pola gejala klasik 1 root cause, bukan 4 bug terpisah. **Root cause**:

@@ -23,6 +23,22 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 215 (Settings polish item 1/9 — grouping antar section, 1 file kode + 1 dokumentasi)** —
+Next pending sesuai `MICRO_UIUX_AUDIT.md` § FINAL EXECUTION ORDER: kategori 9 (Playlist/Queue)
+tuntas 8/8 di Batch 212-214 (termasuk fix drag-reorder Batch 214), lanjut kategori 10 (Settings
+polish), item 1/9. Audit `SettingsScreen.kt`: 4 baris tool (Statistik Dengar/Cadangkan &
+Pulihkan/Deteksi File Duplikat/Vault Lagu Privat) masing-masing dibungkus `HorizontalDivider`
+sendiri TANPA title section — beda dari pola section lain di file yang SELALU 1 title menaungi
+beberapa item terkait (mis. "Perilaku Pemutaran" menaungi 4 switch). Fix: disatukan 1 title baru
+"Alat & Utilitas" menaungi ke-4-nya, 3 `HorizontalDivider` antar-item dibuang (diganti
+`Spacer(4.dp)` kecil antar-row dalam section yang sama). Divider transisi masuk (dari section
+Tema) & keluar (ke section "Lanjutan") TIDAK disentuh — cuma batas internal antar 4 item yang
+dihapus. 0 logic/navigasi/aksi berubah (murni `Text`/`Spacer`/`HorizontalDivider` restrukturisasi),
+0 protected asset. Brace/paren seimbang (123/123, 421/421). **Belum diverifikasi visual** —
+prioritas cek section baru tidak terasa terlalu padat (checklist item 8/9 "kurangi visual
+density" nanti). `MICRO_UIUX_AUDIT.md` diupdate (status tracking + checklist item 1/9 Settings).
+Item berikutnya (2/9): konsistenkan title/subtitle row. Detail: `CHANGELOG.md` Batch 215.
+
 **Batch 214 (Fix drag reorder buggy — 2 file kode + 1 dokumentasi)** — User laporan ke-4 gejala
 sekaligus (stutter/lompat/susah mulai/nyentak) — 1 root cause: `animateItemPlacement()` tetap
 aktif di row yang lagi di-drag, rebutan kontrol posisi Y sama `graphicsLayer translationY`

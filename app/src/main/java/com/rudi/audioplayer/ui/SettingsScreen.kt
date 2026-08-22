@@ -249,9 +249,22 @@ fun SettingsScreen(
         }
 
         item {
+            // Batch 215 — Settings polish 1/9 (grouping antar section, MICRO_UIUX_AUDIT.md §
+            // Settings). 4 baris ini (Statistik/Backup/Duplikat/Vault) SEBELUMNYA masing-masing
+            // dibungkus divider+Spacer sendiri TANPA title — tampak seperti 4 "section" kosong
+            // nama, beda dari pola section lain di file ini (mis. "Perilaku Pemutaran") yang
+            // selalu 1 title menaungi beberapa item terkait. Disatukan 1 title "Alat &
+            // Utilitas" menaungi ke-4-nya — 0 logic/navigasi/aksi berubah, murni restrukturisasi
+            // visual (title baru + divider antar-item dibuang, ganti Spacer kecil).
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                "Alat & Utilitas",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -273,9 +286,7 @@ fun SettingsScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -297,9 +308,7 @@ fun SettingsScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -321,9 +330,7 @@ fun SettingsScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
