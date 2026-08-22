@@ -294,9 +294,17 @@ dependencies {
 
     // Batch 243 — Lyrics offline-first (cache Room). room-ktx bawa Flow/suspend DAO support.
     // Ver 2.6.1 = stabil terbaru per KSP 1.9.24 pairing di atas.
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    // Batch 252 — bump 2.6.1→2.8.4. Trigger: build FAILED (`log_fail_258.zip`), `[ksp]
+    // java.lang.IllegalStateException: unexpected jvm signature V` — bug KSP2 kompatibilitas
+    // KNOWN (dicek `web_search`, google/ksp#2957 & #2177) saat KSP2 (Kotlin 2.0+, aktif sejak
+    // Batch 250) proses Room DAO suspend function return Unit dgn Room versi lama (2.6.1). Fix
+    // resmi: bump Room ke versi yg sudah patch kompatibilitas KSP2 ini (2.7.0+) — pilih 2.8.4
+    // (latest stable Room 2.x per Agustus 2026, line 2.x sekarang maintenance-mode setelah Room
+    // 3.0 rilis alpha Maret 2026; Room 3.0 SENGAJA TIDAK dipilih — breaking rewrite total,
+    // artifact/API beda semua, jauh di luar scope 1-task bug fix ini).
+    implementation("androidx.room:room-runtime:2.8.4")
+    implementation("androidx.room:room-ktx:2.8.4")
+    ksp("androidx.room:room-compiler:2.8.4")
 
     // Batch 244 — Lyrics offline-first 2/4. Retrofit2 + converter-gson buat LRCLIB API.
     // okhttp3 sudah ada (UpdateDownloader/GitHubReleaseChecker) — Retrofit numpang instance

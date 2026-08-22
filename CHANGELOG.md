@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 252 — Fix build FAILED lanjutan 4/4: bump Room 2.6.1→2.8.4 (1 file patch)
+Root cause dari `log_fail_258.zip` (build FAILED lagi setelah Batch 251 fix DSL syntax):
+`kspDebugKotlin`/`kspReleaseKotlin` FAILED — `[ksp] java.lang.IllegalStateException: unexpected
+jvm signature V`. Dicek `web_search`: BUG KSP2 YANG SUDAH DIKENAL (google/ksp issue #2957, #2177)
+— muncul saat KSP2 (aktif sejak Kotlin 2.0+/Batch 250) memproses Room DAO suspend function ber-
+return Unit, dgn Room versi lama. Root cause BUKAN kode project (`LyricsDao.kt` dkk 0 disentuh) —
+murni versi Room (2.6.1) belum kompatibel KSP2. Fix `app/build.gradle.kts`: `room-runtime`/
+`room-ktx`/`room-compiler` 2.6.1→2.8.4 (latest stable Room 2.x per Agustus 2026 — line 2.x sekarang
+maintenance-mode setelah Room 3.0 alpha rilis Maret 2026, TAPI Room 3.0 SENGAJA TIDAK dipilih:
+breaking rewrite total/artifact beda semua `androidx.room3:*`, jauh di luar scope 1-task fix ini).
+Dicek juga: 0 KSP-processor lain di project selain Room (`grep ksp(` cuma 1 match) — jadi Room ini
+satu-satunya sumber KSP2 incompatibility yang mungkin, 0 lurking issue lain tersisa dari sisi KSP.
+Brace/paren balance OK (35/35+156/156). Protected asset (`app/build.gradle.kts`) disentuh SEBAGIAN.
+
+**⚠️ 4× GAGAL BUILD BERTURUT** (Batch 249→250→251→252, akar berbeda-beda: compileSdk/AGP → versi
+Kotlin → syntax DSL → versi Room/KSP2 bug). Semua akar SAMA-SAMA konsekuensi lompatan besar Kotlin
+1.9.24→2.4.10 sekaligus (Batch 250) — tiap dependency yang belum sempat diaudit compatibility-nya
+munculin error baru satu per satu. **Belum ada konfirmasi BUILD SUCCESS dari user sampai sekarang.**
+
 ## Batch 251 — Fix build FAILED lanjutan 3/3: migrasi kotlinOptions→compilerOptions DSL (1 file patch)
 Root cause dari `log_fail_257.zip` (build FAILED lagi setelah Batch 250 fix Kotlin/KSP/Compose
 plugin): `android{kotlinOptions{jvmTarget="17"; freeCompilerArgs+=...}}` — syntax string lama ini

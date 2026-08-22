@@ -23,20 +23,28 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 252 (Fix build FAILED lanjutan 4/4 — bump Room 2.6.1→2.8.4, 1 file patch)** — Root cause
+`log_fail_258.zip`: `[ksp] unexpected jvm signature V` — BUG KSP2 YANG SUDAH DIKENAL (dicek
+`web_search`, google/ksp#2957/#2177), muncul krn Room DAO suspend-Unit function diproses KSP2
+(aktif sejak Batch 250) pakai Room versi lama. Root cause BUKAN kode project — murni versi
+dependency. Fix `app/build.gradle.kts`: Room 2.6.1→2.8.4 (latest stable 2.x, BUKAN Room 3.0 —
+breaking rewrite total, di luar scope). Dicek juga 0 KSP-processor lain di project selain Room
+(`grep ksp(` 1 match) — 0 lurking issue KSP lain tersisa. Brace/paren balance OK (35/35+156/156).
+
+**⚠️ 4× GAGAL BUILD BERTURUT** (Batch 249→250→251→252: compileSdk/AGP → versi Kotlin → syntax DSL
+→ versi Room/KSP2 bug) — semua konsekuensi lompatan besar Kotlin 1.9.24→2.4.10 sekaligus (Batch
+250), satu per satu ketauan pas dependency yang belum diaudit kena. **Belum ada konfirmasi BUILD
+SUCCESS dari user.** Kalau `log_fail_259` masih muncul: sesi berikutnya WAJIB full-audit SEMUA
+dependency lain yang mungkin masih pakai versi lama pra-Kotlin-2.0 (bukan cuma Room), bukan tambal
+1-per-1 lagi — cek `grep -n "implementation\|ksp(" app/build.gradle.kts` menyeluruh sekali jalan.
+Detail: `CHANGELOG.md` Batch 252.
+
 **Batch 251 (Fix build FAILED lanjutan 3/3 — migrasi kotlinOptions→compilerOptions DSL, 1 file
 patch)** — Root cause `log_fail_257.zip`: `android{kotlinOptions{jvmTarget="17"; freeCompilerArgs
 +=...}}` jadi HARD ERROR di Kotlin 2.4.10 (Batch 250 kemarin), bukan warning lagi. Fix `app/
 build.gradle.kts`: pindah ke top-level `kotlin{compilerOptions{jvmTarget.set(JvmTarget.JVM_17);
 freeCompilerArgs.addAll(...)}}`, isi opt-in flags PERSIS sama (0 logic berubah, murni syntax).
 Brace/paren balance OK (35/35+150/150).
-
-**⚠️ 3× GAGAL BUILD BERTURUT** (Batch 249→log_fail_256→Batch 250→log_fail_257→Batch 251 ini) —
-tiap fix buka error lapisan berikutnya (compileSdk/AGP → versi Kotlin → syntax DSL), semua 1 akar:
-lompatan versi besar 1.9.24→2.4.10 sekaligus (banyak breaking change nempel bareng). **SESI
-BERIKUTNYA WAJIB**: kalau ada `log_fail_258` lagi, JANGAN auto-asumsikan "pasti 1 layer lagi
-doang" — cek MENYELURUH semua breaking change Kotlin 2.0-2.4 yang mungkin masih nyangkut di file
-lain (mis. KSP-generated code, Room schema export, dsb), bukan cuma tambal 1 baris error teratas.
-Belum ada konfirmasi BUILD SUCCESS dari user sampai sekarang. Detail: `CHANGELOG.md` Batch 251.
 
 **Batch 250 (Fix build FAILED lanjutan — Kotlin 2.4.10 + Compose compiler plugin, 2 file patch)**
 — Root cause `log_fail_256.zip`: `kspReleaseKotlin`/`kspDebugKotlin` FAILED, `work-runtime-2.11.2`
