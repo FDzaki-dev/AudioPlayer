@@ -16,8 +16,36 @@ atas file yang terus memanjang):
 2. **Box code pesan commit WAJIB tampil di atas heading "Update Harian:"** tiap respons chat,
    isinya wajib penjelasan fitur singkat dari `CHANGELOG.md` batch itu — dilarang cuma angka
    versi polos.
+3. **Prioritas mutakhir, bukan kompatibilitas OS/dependency lama** (Batch 205, permintaan user
+   eksplisit) — user TIDAK PEDULI dukungan OS/API lama (mis. Android <12/API 31). Struktur,
+   komponen, dan dependency WAJIB pakai versi paling mutakhir yang tersedia; JANGAN habiskan
+   effort bikin/pertahankan fallback kompatibilitas legacy yang rumit kalau ada opsi modern yang
+   lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 206 (REVERT PENUH Batch 201-204 — fallback total widget normal, 2 file kode)** — User
+laporan screenshot bertimestamp: widget benar sesaat lalu ~15 detik kemudian jatuh "Ketuk untuk
+memulihkan" (pola khas widget provider exception, BUKAN cuma distorsi visual). 4 iterasi
+(201/202/203/204) tidak menyelesaikan, makin parah. `WidgetUpdater.kt` ditulis ulang PERSIS
+logic pra-201 (width-only threshold, 1 RemoteViews, tanpa setSelected marquee); `widget_
+player.xml` gravity balik `center_vertical`, title balik `ellipsize="end"` statis. Brace/paren
+seimbang (20/20, 114/114), XML valid. 0 protected asset. **Kalau masih muncul setelah ini** =
+bukti kuat penyebabnya BUKAN kode widget Batch 201-204 (sudah tidak ada lagi) — WAJIB logcat
+sebelum coba apapun lagi, jangan tebak ulang. Detail: `CHANGELOG.md` Batch 206.
+
+**Batch 205 (Dokumentasi — abadikan kebijakan "prioritas mutakhir, bukan kompat OS lama", 2
+dokumentasi, 0 kode)** — Permintaan langsung user, permanen. Ditulis di 2 tempat (pola sama
+Batch 157 — pinned summary + detail penuh): item 3 di § "⚠️ ATURAN SESI AKTIF" (atas file) +
+§ baru "Kebijakan: prioritas mutakhir, bukan kompatibilitas OS/dependency lama" (bawah, dekat §
+"Aturan sesi" Batch 155). Inti: sesi berikutnya WAJIB tawarkan/utamakan API/dependency modern
+meski butuh `minSdk` lebih baru, JANGAN habiskan effort fallback compat OS lama yang rumit kalau
+ada opsi modern lebih bersih. **`minSdk` sendiri TIDAK diubah** oleh kebijakan ini — itu
+keputusan terpisah (device existing di bawah minSdk baru = tidak bisa install sama sekali, beda
+kelas risiko dari "fallback visual kurang optimal") — sesi berikutnya boleh SARANKAN naik
+`minSdk`, tapi tetap wajib konfirmasi eksplisit dulu, bukan diam-diam. 0 kode, 0 protected
+asset (`build.gradle.kts` tidak disentuh, sesuai poin 3 kebijakan itu sendiri). Detail:
+`CHANGELOG.md` Batch 205.
+
 **Batch 204 (Fix widget — root full layout wajib center horizontal saat stretch, 1 file
 kode)** — User: OS<12 sudah selesai (Batch 203), fokus SEMUA ukuran wajib center + 0 distorsi.
 1 gap: root `widget_player.xml` cuma `gravity="center_vertical"` (compact sudah `center` sejak
@@ -2892,4 +2920,27 @@ Berlaku untuk SEMUA sesi AI berikutnya yang mengirim artifact ZIP dari repo ini:
    "Update Harian:". **DILARANG** isinya cuma angka versi/perbandingan versi belaka (mis. "bump
    v1.1.43 -> v1.1.44") — WAJIB memuat penjelasan fitur/perbaikan singkat yang diambil LANGSUNG
    dari isi entri `CHANGELOG.md` batch tersebut, bukan digeneralisasi ulang jadi generik.
+
+## Kebijakan: prioritas mutakhir, bukan kompatibilitas OS/dependency lama (Batch 205, permintaan user)
+Berlaku untuk SEMUA sesi AI berikutnya, permanen sampai user bilang sebaliknya:
+
+**User TIDAK PEDULI dukungan OS/API/dependency lama.** Konteks asal: widget "tahan banting"
+(Batch 201-204) — sempat dibikinkan fallback threshold buat Android <12/API 31 (device tanpa
+`RemoteViews(Map<SizeF,...>)`), padahal user cuma mau solusi PALING BENAR/modern, bukan solusi
+yang juga jalan di device lama.
+
+**Implikasi konkret buat sesi berikutnya**:
+1. Kalau ada API/library/pendekatan MODERN yang lebih bersih/robust secara struktural
+   (bukan sekadar preferensi gaya) tapi butuh `minSdk`/versi dependency lebih baru — WAJIB
+   diutamakan/ditawarkan, JANGAN otomatis dihindari cuma karena "nanti device lama gak kebagian".
+2. JANGAN habiskan effort ekstra bikin/pertahankan fallback compat kompleks buat OS/API lama
+   kalau ada opsi modern yang jauh lebih sederhana & robust — cukup catat keterbatasannya (device
+   mana yang tidak kebagian), tidak perlu direkayasa workaround rumit.
+3. **`minSdk` (`app/build.gradle.kts`, protected asset) TIDAK diubah otomatis** oleh kebijakan
+   ini sendiri — itu keputusan terpisah dengan konsekuensi instalasi nyata (device existing di
+   bawah `minSdk` baru tidak bisa install app sama sekali, beda dari "cuma fallback visual
+   kurang optimal"). Sesi berikutnya boleh MENYARANKAN naikkan `minSdk` kalau relevan, tapi tetap
+   minta konfirmasi eksplisit dulu sebelum mengeksekusi — bukan diam-diam dinaikkan.
+4. Dependency (`build.gradle.kts` versions, library versi) — prioritaskan versi stabil TERBARU
+   yang tersedia saat sesi berjalan, bukan versi lama yang "aman/teruji" tanpa alasan konkret.
 

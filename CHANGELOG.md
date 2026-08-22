@@ -1,5 +1,49 @@
 # Changelog
 
+## Batch 206 — REVERT PENUH Batch 201-204 (widget "tahan banting") — fallback total ke widget normal (2 file kode)
+User laporan via screenshot bertimestamp: widget render BENAR sesaat (12:39:57), lalu ~15 detik
+kemudian (12:40:12) jatuh ke placeholder Android "Ketuk untuk memulihkan" — pola khas widget
+provider MELEMPAR EXCEPTION/gagal update, bukan cuma soal layout/distorsi visual seperti diduga
+sebelumnya. Sudah 4 iterasi coba (201 fitur baru → 202 hotfix threshold → 203 rewrite struktural
+SizeF API → 204 fix gravity) dan situasinya "gak kunjung hilang", makin parah menurut user.
+
+**Keputusan**: STOP coba-tebak lebih lanjut tanpa logcat. User minta eksplisit fallback total ke
+kondisi SEBELUM Batch 201, tanpa kosmetik apapun. Dieksekusi persis begitu:
+
+1. **`WidgetUpdater.kt`** — ditulis ulang PERSIS logic pra-Batch-201: `isCompact` balik width-
+   only (`COMPACT_WIDTH_THRESHOLD_DP=180`, tidak ada height check), 1 `RemoteViews` per update
+   (bukan `Map<SizeF,...>` API 31+), tidak ada `setBoolean(..., "setSelected", true)`.
+2. **`widget_player.xml`** — root `gravity` balik `center_vertical` (bukan `center`), `widget_
+   title` balik `ellipsize="end"` statis (bukan `marquee`+`singleLine`+`marqueeRepeatLimit`).
+
+Brace/paren `WidgetUpdater.kt` seimbang (20/20, 114/114), XML tervalidasi parse. 2 file kode, 0
+protected asset. **Kalau "Ketuk untuk memulihkan" MASIH muncul setelah revert ini** — itu bukti
+kuat penyebabnya BUKAN dari perubahan widget Batch 201-204 sama sekali (karena baris kode
+penyebabnya sudah tidak ada), kemungkinan ada di tempat lain (mis. `PlaybackService`/album-art
+loading/launcher itu sendiri) — WAJIB minta logcat sebelum coba fix apapun lagi, bukan
+menebak ulang.
+
+## Batch 205 — Dokumentasi: abadikan kebijakan "prioritas mutakhir, bukan kompat OS lama" (2 dokumentasi, 0 kode)
+Permintaan langsung user (permanen, berlaku semua sesi berikutnya) — konteks asal: widget "tahan
+banting" (Batch 201-204), fallback threshold buat Android <12 sempat dibuat padahal user cuma
+mau solusi PALING BENAR/modern.
+
+Ditulis di 2 tempat `PROJECT_STATE.md` (pola sama Batch 157 — pinned summary supaya tidak
+tenggelam + detail penuh): item 3 § "⚠️ ATURAN SESI AKTIF" (atas file, posisi tetap) + § baru
+"Kebijakan: prioritas mutakhir, bukan kompatibilitas OS/dependency lama" (bawah).
+
+**Inti kebijakan**: (1) API/dependency modern yang lebih bersih/robust struktural WAJIB
+diutamakan meski butuh `minSdk`/versi lebih baru, jangan otomatis dihindari cuma karena device
+lama; (2) jangan habiskan effort fallback compat OS lama yang rumit kalau ada opsi modern lebih
+sederhana — cukup catat keterbatasannya; (3) `minSdk` sendiri (protected asset) TIDAK ikut
+diubah oleh kebijakan ini — beda kelas risiko dari sekadar "fallback visual kurang optimal"
+(device di bawah minSdk baru = tidak bisa install sama sekali) — sesi berikutnya boleh sarankan
+naik `minSdk`, tapi wajib minta konfirmasi eksplisit dulu, bukan dieksekusi diam-diam; (4)
+dependency versi `build.gradle.kts` prioritaskan stabil TERBARU, bukan versi lama tanpa alasan
+konkret.
+
+2 dokumentasi (`CHANGELOG.md`/`PROJECT_STATE.md`), 0 kode, 0 protected asset.
+
 ## Batch 204 — Fix widget: root full layout wajib center horizontal saat stretch (1 file kode)
 User: tidak peduli OS<12 (Batch 203 sudah selesaikan itu, jangan diutak-atik lagi), fokus SEMUA
 ukuran widget wajib center + 0 distorsi. Audit ulang `widget_player.xml` vs `widget_player_
