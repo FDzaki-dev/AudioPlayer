@@ -23,6 +23,16 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 233 (HOTFIX — import Icons.Error hilang, regresi Batch 228, 2 file kode + 2
+dokumentasi)** — CI build gagal (`compileReleaseKotlin`/`compileDebugKotlin`, dari
+`log_fail_251.zip` user): `Unresolved reference: Error` di `BackupRestoreSheet.kt`/
+`DiagnosticLogSheet.kt`. Root cause: Batch 228 ganti kode `ErrorOutline`→`Error` tapi lupa
+update import (codebase pakai explicit per-icon import, bukan wildcard). Fix: import
+`ErrorOutline`→`Error` di kedua file. Brace/paren balance (33/33+89/89, 16/16+68/68). Safety
+net: scan app-wide seluruh `Icons.Default.X` vs import — 0 gap lain. **⚠️ CATATAN SESI**: mulai
+batch ini, WAJIB cross-check import statement setiap kali ganti nama icon (`Icons.Default.X`→
+`Y`), bukan cuma ganti di body kode. Detail: `CHANGELOG.md` Batch 233.
+
 **Batch 232 (Iconography 7/7 penutup — verifikasi retrospektif no-cosmetic-affordance-change,
 0 bug, 0 kode + 2 dokumentasi) → 🟠 ICONOGRAPHY TUNTAS 7/7 (Batch 224-232)** — Item terakhir
 bersifat guard-rail, dieksekusi sbg audit retrospektif 4 fix kode Batch 224-231: ukuran(224)/

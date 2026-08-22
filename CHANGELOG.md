@@ -1,5 +1,25 @@
 # Changelog
 
+## Batch 233 — HOTFIX: import Icons.Error hilang (regresi Batch 228), 2 file kode + 2 dokumentasi
+User laporkan CI build gagal (`log_fail_251.zip`, GitHub Actions `compileReleaseKotlin`/
+`compileDebugKotlin`): `Unresolved reference: Error` di `BackupRestoreSheet.kt:131` &
+`DiagnosticLogSheet.kt:130`.
+
+**Root cause**: Batch 228 ganti `Icons.Default.ErrorOutline`→`Icons.Default.Error` di kode,
+TAPI codebase ini pakai explicit per-icon import (bukan wildcard) — import statement lupa
+diupdate, masih `import ...filled.ErrorOutline` sementara kode sudah pakai `Error`. Referensi
+2 titik lain (`UpdateCheckSheet.kt`/`SignatureMatcherSheet.kt`) yg jadi acuan Batch 228 tidak
+kena krn sudah punya import `Error` dari awal.
+
+**Fix**: `import androidx.compose.material.icons.filled.ErrorOutline` → `.filled.Error` di
+kedua file (urutan alfabetis tetap terjaga: CheckCircle→Error→FileDownload/Upload,
+Archive→CheckCircle→DeleteOutline→Error). Brace/paren balance (33/33+89/89, 16/16+68/68).
+
+**Safety net**: scan app-wide seluruh `Icons.Default.X` vs import statement — 0 gap lain
+ditemukan (Batch 226/227/229/231 aman, tidak sentuh import).
+
+---
+
 ## Batch 232 — Iconography 7/7 penutup: verifikasi retrospektif no-cosmetic-affordance-change (0 bug, 0 kode + 2 dokumentasi) → 🟠 ICONOGRAPHY TUNTAS 7/7 (Batch 224-232)
 Item terakhir kategori Iconography bersifat guard-rail (bukan proaktif ganti icon), jadi
 dieksekusi sbg verifikasi retrospektif: ditelusuri ulang 4 fix kode sepanjang Batch 224-231,
