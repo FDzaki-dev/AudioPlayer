@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.BuildConfig
 import com.rudi.audioplayer.data.Song
@@ -639,7 +641,7 @@ private fun ThemeOptionCard(identity: ThemeIdentity, isDark: Boolean, selected: 
                     else -> Modifier.clip(RoundedCornerShape(Radius.xl))
                 }
             )
-            .clickable(onClick = onClick),
+            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
         color = if (isEmbossPreview) Color.Transparent else previewColors.surface,
         // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent-color
         // fallback chain (that's exactly what caused the invisible-text LockScreen bug).

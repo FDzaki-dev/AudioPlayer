@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.ui
 
 import android.provider.MediaStore
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,8 +12,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.Id3TagWriter
@@ -37,6 +41,7 @@ fun SongInfoEditSheet(
     onSave: (Id3TagWriter.EditableTags) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val focusManager = LocalFocusManager.current
 
     // Key di song.id — sama alasan LyricsSheet: kalau lagu ganti sementara sheet ini entah
     // bagaimana masih terbuka, draft basi tidak boleh ketimpa ke lagu yang salah.
@@ -99,6 +104,8 @@ fun SongInfoEditSheet(
                 onValueChange = { title = it },
                 label = { Text("Judul") },
                 singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             )
             OutlinedTextField(
@@ -106,6 +113,8 @@ fun SongInfoEditSheet(
                 onValueChange = { artist = it },
                 label = { Text("Artis") },
                 singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             )
             OutlinedTextField(
@@ -113,6 +122,8 @@ fun SongInfoEditSheet(
                 onValueChange = { album = it },
                 label = { Text("Album") },
                 singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             )
             OutlinedTextField(
@@ -120,6 +131,8 @@ fun SongInfoEditSheet(
                 onValueChange = { albumArtist = it },
                 label = { Text("Artis Album") },
                 singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             )
             OutlinedTextField(
@@ -127,6 +140,8 @@ fun SongInfoEditSheet(
                 onValueChange = { genre = it },
                 label = { Text("Genre") },
                 singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             )
             OutlinedTextField(
@@ -134,6 +149,8 @@ fun SongInfoEditSheet(
                 onValueChange = { composer = it },
                 label = { Text("Komposer") },
                 singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             )
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -142,7 +159,8 @@ fun SongInfoEditSheet(
                     onValueChange = { new -> trackNumber = new.filter { it.isDigit() } },
                     label = { Text("No. Track") },
                     singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Right) }),
                     modifier = Modifier.weight(1f).padding(vertical = 4.dp, horizontal = 2.dp)
                 )
                 OutlinedTextField(
@@ -150,7 +168,8 @@ fun SongInfoEditSheet(
                     onValueChange = { new -> discNumber = new.filter { it.isDigit() } },
                     label = { Text("No. Disc") },
                     singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                     modifier = Modifier.weight(1f).padding(vertical = 4.dp, horizontal = 2.dp)
                 )
             }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -79,6 +80,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import android.content.Context
 import android.media.AudioManager
@@ -1022,7 +1024,7 @@ private fun AdvancedControlsSheet(
                     volume < 0.5f -> Icons.Default.VolumeDown
                     else -> Icons.Default.VolumeUp
                 }
-                Icon(volumeIcon, contentDescription = "Peredam dalam aplikasi", tint = MaterialTheme.colorScheme.secondary)
+                Icon(volumeIcon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
                 Spacer(modifier = Modifier.width(8.dp))
                 Slider(
                     value = volume,
@@ -1111,8 +1113,7 @@ private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit, accentColor: Color
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onRate(if (rating == star) 0 else star)
-                },
-                modifier = Modifier.size(32.dp)
+                }
             ) {
                 Icon(
                     if (star <= rating) Icons.Default.Star else Icons.Default.StarBorder,
@@ -1481,11 +1482,15 @@ private fun SpeedDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(Radius.md))
-                            .clickable(onClick = { onSelect(speed) })
+                            .selectable(
+                                selected = isSelected,
+                                onClick = { onSelect(speed) },
+                                role = Role.RadioButton
+                            )
                             .padding(vertical = 8.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        RadioButton(selected = isSelected, onClick = { onSelect(speed) })
+                        RadioButton(selected = isSelected, onClick = null)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("${speed}x", style = MaterialTheme.typography.bodyMedium)
                     }
@@ -1566,11 +1571,15 @@ private fun TransitionModeOption(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(Radius.md))
-            .clickable(onClick = onClick)
+            .selectable(
+                selected = selected,
+                onClick = onClick,
+                role = Role.RadioButton
+            )
             .padding(vertical = 8.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        RadioButton(selected = selected, onClick = onClick)
+        RadioButton(selected = selected, onClick = null)
         Spacer(modifier = Modifier.width(4.dp))
         Column {
             Text(title, style = MaterialTheme.typography.bodyMedium)

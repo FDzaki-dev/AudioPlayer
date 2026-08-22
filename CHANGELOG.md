@@ -1,5 +1,163 @@
 # Changelog
 
+## Batch 240 — Accessibility Micro-Polish 7/9: audit contrast, 0 bug, 0 kode + 2 dokumentasi
+Item 7/9: audit contrast.
+
+Cakupan audit app-wide:
+1. `ResultBanner` (shared composable, 3 gaya: Solid/Tinted/Bare, dipakai 4 titik call site) —
+   Solid pasang M3 container-role color + `onXContainer` pair (kontras dijamin sistem tema).
+   Tinted & Bare terlihat mencurigakan sekilas (parameter `containerColor` dan `contentColor`
+   diisi variabel warna yang SAMA) — tapi setelah baca implementasi: Bare tidak pernah memakai
+   `containerColor` sama sekali (`Row` tanpa `.background()`), dan Tinted memakai
+   `containerColor.copy(alpha = 0.15f)` sbg tint latar sementara `contentColor` teks solid
+   penuh di atasnya — pola standar "tinted alert banner", bukan bug tabrakan warna.
+2. Seluruh `onPrimary`/`onTertiary` per varian tema (`Theme.kt`) sudah disertai komentar
+   perhitungan luminance manual (mis. "luma CalmRetroAccent ≈0.61, di atas threshold") — bukan
+   nilai hardcode sembarangan.
+3. `.alpha(0.4f)` utk disabled state (`LockScreen.kt` PinKey/RoundGlyphButton) — sesuai WCAG,
+   kontrol dalam status disabled DIKECUALIKAN dari syarat rasio kontras teks/UI biasa.
+4. Grep app-wide: 0 titik `Color.Gray`/`Color.LightGray`/hex hardcoded dipakai sbg warna teks
+   (yang bisa memotong jalur jaminan kontras tema M3). 0 titik role `outline`/`outlineVariant`
+   (dirancang low-contrast khusus border) disalahgunakan sbg warna teks — semua titik
+   `surfaceVariant` yang match adalah `HorizontalDivider` (dekoratif) atau `Slider` inactive
+   track, bukan teks.
+
+**Hasil: 0 bug**, 0 kode disentuh.
+
+Item berikutnya (8/9): pastikan informasi penting tidak hanya dibedakan lewat warna.
+
+## Batch 239 — Accessibility Micro-Polish 6/9: audit text scaling, 0 bug, 0 kode + 2 dokumentasi
+Item 6/9: audit text scaling (teks harus ikut membesar sesuai pengaturan ukuran font sistem,
+tidak boleh terpotong/statis).
+
+Cakupan audit app-wide:
+1. Seluruh `fontSize`/`lineHeight` (di `Type.kt` maupun override lokal) — 100% pakai unit `.sp`,
+   0 titik pakai `.dp` (kesalahan umum yang membuat teks tidak scaling).
+2. Widget (`widget_player.xml`, `widget_player_compact.xml`) — `android:textSize` juga `sp`.
+3. `AndroidManifest.xml` — tidak ada `android:configChanges` yang meng-exclude font-scale;
+   default behavior (activity recreate saat font-scale berubah) tetap berlaku, state Compose
+   aman lewat `rememberSaveable`/ViewModel seperti biasa.
+4. Grep `TextOverflow.Clip` & `softWrap = false` app-wide — 0 titik ditemukan; yang ada hanya
+   `TextOverflow.Ellipsis` & `basicMarquee()`, keduanya graceful (tidak hard-crop) di ukuran
+   font besar.
+5. Grep seluruh `.height()`/`.width()` fixed berdekatan dengan `Text(` — semua match ternyata
+   `Spacer` (bukan pembungkus teks) atau container scrollable (`LazyColumn.heightIn(max=...)`,
+   aman karena discroll, bukan clip). 0 titik container non-scroll fixed-height yang membungkus
+   `Text` langsung ditemukan.
+
+**Hasil: 0 bug**, 0 kode disentuh — konsisten dgn temuan kategori Iconography sebelumnya (Batch
+230/232) yang juga sempat 0 bug di beberapa item verifikasi retrospektif.
+
+Item berikutnya (7/9): audit contrast.
+
+## Batch 238 — Accessibility Micro-Polish 5/9: minimum touch target StarRatingRow, 1 file kode + 2 dokumentasi
+Item 5/9: audit minimum touch target (rekomendasi Material: 48dp). Grep app-wide seluruh
+`IconButton(`/`FilledIconButton(` (40 titik) yang punya override `modifier = Modifier.size(...)`
+eksplisit — cek apakah ada yang jatuh di bawah 48dp.
+
+Ditemukan 1 titik: `StarRatingRow` (`NowPlayingScreen.kt`, 5 tombol rating bintang di Now
+Playing screen) — `IconButton` di-override `Modifier.size(32.dp)`, jauh di bawah 48dp. Glyph
+`Icon` di dalamnya sendiri sudah benar 20dp (itu ukuran visual, bukan area sentuh) — tapi area
+sentuh keseluruhan tombolnya yang kena pangkas ke 32dp, bikin 5 bintang berjejer jadi target
+sentuh sempit & rapat, riskan mis-tap terutama utk user dgn keterbatasan motorik.
+
+**Fix**: hapus override `modifier = Modifier.size(32.dp)` dari `IconButton`, biarkan default
+Material (48dp). `Icon` glyph di dalamnya TIDAK disentuh (tetap 20dp) — visual bintang persis
+sama, cuma area sentuhnya melebar ke standar. Cek layout: `StarRatingRow` dipanggil full-width
+di Now Playing screen (bukan dialog sempit), 5×48dp = 240dp — muat leluasa, tidak overflow.
+
+Brace/paren balance: 215/215, 767/767.
+
+Item berikutnya (6/9): audit text scaling.
+
+## Batch 237 — Accessibility Micro-Polish 4/9: focus order form multi-field, 1 file kode + 2 dokumentasi
+Item 4/9: audit focus order. Grep app-wide seluruh form multi-field (`OutlinedTextField`/
+`BasicTextField` berurutan) — cek apakah ada rantai `imeAction`/`KeyboardActions` yang
+menghubungkan fokus antar field, atau tiap field berdiri sendiri (default `ImeAction.Done`).
+
+Ditemukan: `SongInfoEditSheet.kt` — form edit metadata lagu, 8 field berurutan (Judul → Artis →
+Album → Artis Album → Genre → Komposer → No.Track/No.Disc bersebelahan dalam 1 `Row`) — SEMUA
+tanpa `imeAction` eksplisit, default jatuh ke `ImeAction.Done`. Dampak: tombol "selesai" di
+keyboard pada field pertama langsung MENUTUP keyboard, bukan lanjut ke field kedua — user
+(termasuk pengguna keyboard eksternal/switch-access) wajib tap manual satu-satu ke tiap field,
+padahal ini form linear yang jelas urutannya.
+
+**Fix**: tambah `LocalFocusManager`. Field 1-6 (Judul s/d Komposer, tersusun vertikal) →
+`KeyboardOptions(imeAction = ImeAction.Next)` + `KeyboardActions(onNext = {
+focusManager.moveFocus(FocusDirection.Down) })`. No.Track (kiri dalam `Row` horizontal) → `Next`
++ `FocusDirection.Right` (lompat ke No.Disc, bukan Down yang salah arah). No.Disc (field
+terakhir) → `ImeAction.Done` + `focusManager.clearFocus()` (baru boleh tutup keyboard di sini).
+0 perubahan validasi/logic simpan data — murni urutan fokus & IME action.
+
+Brace/paren balance: 49/49, 125/125.
+
+Item berikutnya (5/9): audit minimum touch target.
+
+## Batch 236 — Accessibility Micro-Polish 3/9: semantic role list pilihan tema, 1 file kode + 2 dokumentasi
+Item 3/9: audit semantic role. Grep app-wide seluruh `.clickable(` (13 titik) — cross-check mana
+yang sebetulnya representasi pola semantik lain (radio/tab/checkbox) tapi cuma pakai role
+default (`Role.Button` implisit dari `clickable`).
+
+Ditemukan: `ThemeOptionCard` (`SettingsScreen.kt`) — item dalam `LazyColumn` list pilihan
+identitas tema (`ThemeIdentity.entries`, single-choice, exactly 1 aktif lewat
+`currentThemeIdentity`), state terpilih ditandai visual lewat `border` 2dp `primary` — TAPI
+pakai `Surface.clickable(onClick)` biasa. TalkBack tidak tahu ini grup pilihan-tunggal atau item
+mana yang aktif; hanya baca "double tap to activate" generik.
+
+**Fix**: `.clickable(onClick = onClick)` → `.selectable(selected = selected, onClick = onClick,
+role = Role.RadioButton)`. Import baru: `androidx.compose.foundation.selection.selectable`,
+`androidx.compose.ui.semantics.Role`. Visual TIDAK berubah (border-based selection tetap sama,
+bukan diganti widget RadioButton — beda dgn pola speed-selector Batch 234 yang memang display
+radio literal). Fungsi pilih tema tidak berubah.
+
+Brace/paren balance: 136/136, 436/436.
+
+Item berikutnya (4/9): audit focus order.
+
+## Batch 235 — Accessibility Micro-Polish 2/9: decorative icon static contentDescription, 1 file kode + 2 dokumentasi
+Item 2/9: audit content descriptions. Scan app-wide: semua `Icon(...)` (124 titik) sudah punya
+parameter `contentDescription` eksplisit (0 gap param hilang). Audit lanjut ke kualitas isi
+string — cek duplikat, placeholder generik, dan kecocokan dgn state icon.
+
+Ditemukan 1 titik: icon peredam volume dalam-aplikasi (`NowPlayingScreen.kt`, di atas `Slider`
+volume) — non-interactive, sudah ada `Text` label sibling persis di atasnya ("Peredam Dalam
+Aplikasi (bukan volume HP)"). Icon-nya sendiri berubah glyph mengikuti level (mute/rendah/
+tinggi) TAPI `contentDescription` di-hardcode string statis "Peredam dalam aplikasi" — TalkBack
+mengumumkan stop tambahan yang tidak menambah info (sudah kebaca dari Text) dan tidak
+merefleksikan level volume saat ini.
+
+**Fix**: `contentDescription = "Peredam dalam aplikasi"` → `null`. Konsisten dgn konvensi
+codebase (Batch 230): icon decorative + text label sibling → `null`, hindari TalkBack stop
+ganda. Behavior/fungsi slider volume TIDAK berubah.
+
+Brace/paren balance: 215/215, 768/768.
+
+Item berikutnya (3/9): audit semantic role.
+
+## Batch 234 — Accessibility Micro-Polish 1/9: TalkBack semantics RadioButton row, 1 file kode + 2 dokumentasi
+Kategori baru dimulai: 🟡 ACCESSIBILITY MICRO-POLISH (setelah Iconography tuntas 7/7 di Batch
+232-233). Item 1/9: audit TalkBack semantics pada interactive control.
+
+Ditemukan di `NowPlayingScreen.kt` — 2 titik (speed selector di dialog "Pengaturan Putar", dan
+`TransitionModeOption`): `Row` pakai `.clickable(onClick=...)` sebagai target sentuh utama, TAPI
+`RadioButton` di dalamnya juga punya `onClick` sendiri → 2 node semantics terpisah bertumpuk.
+Dampak: TalkBack fokus 2x per baris (swipe kanan pertama kena Row "double tap to activate" tanpa
+role, swipe kedua kena RadioButton child "radio button, tidak dicentang") — membingungkan &
+role/selected-state tidak terbaca di level baris yang benar.
+
+**Fix**: Row modifier `.clickable(...)` → `.selectable(selected = isSelected, onClick = {...},
+role = Role.RadioButton)`; `RadioButton(...)` onClick diset `null` (jadi visual-only, tidak
+menyerap sentuhan/semantics sendiri — parent Row yang menyerap & mendeklarasikan role+state).
+Hasil: 1 fokus TalkBack per baris, terbaca "radio button, dicentang/tidak dicentang, [label]".
+
+Import ditambah: `androidx.compose.foundation.selection.selectable`,
+`androidx.compose.ui.semantics.Role`. Behavior visual & fungsi pilih kecepatan/transisi TIDAK
+berubah — murni perbaikan semantics aksesibilitas.
+
+Brace/paren balance: 215/215, 768/768 (NowPlayingScreen.kt utuh).
+
+Item berikutnya (2/9): audit content descriptions.
+
 ## Batch 233 — HOTFIX: import Icons.Error hilang (regresi Batch 228), 2 file kode + 2 dokumentasi
 User laporkan CI build gagal (`log_fail_251.zip`, GitHub Actions `compileReleaseKotlin`/
 `compileDebugKotlin`): `Unresolved reference: Error` di `BackupRestoreSheet.kt:131` &

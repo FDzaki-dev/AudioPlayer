@@ -23,6 +23,90 @@ atas file yang terus memanjang):
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
 
 ## Batch terakhir yang selesai
+**Batch 240 (Accessibility Micro-Polish 7/9 — audit contrast, 0 bug, 0 kode + 2 dokumentasi)** —
+Cek app-wide: (1) `ResultBanner` (3 varian: Solid/Tinted/Bare) — Solid pasang container-role +
+`onXContainer` pair (kontras terjamin M3), Tinted & Bare sengaja pass warna semantik sama ke
+`containerColor`+`contentColor` TAPI itu BY DESIGN (Bare: containerColor tidak dipakai sama
+sekali, 0 background; Tinted: containerColor cuma jadi tint 15% alpha, contentColor teks solid
+di atasnya — pola standar "tinted alert banner"), bukan bug. (2) Seluruh `onPrimary`/`onTertiary`
+di `Theme.kt` per varian tema sudah py komentar luminance-check manual (mis. luma≈0.49/0.61
+dibandingkan threshold) — bukan tebakan. (3) `.alpha(0.4f)` disabled-state di `LockScreen.kt`
+(PinKey/RoundGlyphButton) — WCAG mengecualikan kontrol disabled dari syarat rasio kontras, bukan
+pelanggaran. (4) 0 titik `Color.Gray`/hardcoded hex dipakai sbg warna teks (bypass jaminan
+kontras tema), 0 titik role `outline`/`outlineVariant` (didesain low-contrast utk border) disalah
+gunakan sbg warna teks — seluruh titik `surfaceVariant` yang ditemukan adalah `HorizontalDivider`
+(dekoratif, bukan teks) atau `Slider` track. **Hasil: 0 bug**, 0 kode disentuh.
+`MICRO_UIUX_AUDIT.md` diupdate. Item berikutnya (8/9): pastikan informasi penting tidak hanya
+dibedakan lewat warna. Detail: `CHANGELOG.md` Batch 240.
+
+**Batch 239 (Accessibility Micro-Polish 6/9 — audit text scaling, 0 bug, 0 kode + 2
+dokumentasi)** — Cek app-wide: (1) semua `fontSize`/`lineHeight` di `Type.kt` & seluruh
+composable pakai unit `.sp` (0 titik pakai `.dp` buat ukuran teks — bug klasik yang bikin teks
+tidak ikut scaling sistem), (2) widget `widget_player.xml`/`widget_player_compact.xml` juga
+`sp`, (3) `AndroidManifest.xml` tidak override `configChanges` yang skip font-scale (activity
+recreate default, state Compose aman), (4) 0 titik `TextOverflow.Clip`/`softWrap = false` (yang
+ada cuma `Ellipsis`/`basicMarquee`, keduanya graceful di font besar), (5) grep seluruh
+`.height()`/`.width()` fixed dgn `Text` bersebelahan — semua ternyata `Spacer` atau container
+scrollable (`LazyColumn.heightIn`) yang aman, 0 fixed-height non-scroll pembungkus teks yang
+bisa clip. **Hasil: 0 bug**, 0 kode disentuh. `MICRO_UIUX_AUDIT.md` diupdate. Item berikutnya
+(7/9): audit contrast. Detail: `CHANGELOG.md` Batch 239.
+
+**Batch 238 (Accessibility Micro-Polish 5/9 — minimum touch target StarRatingRow, 1 bug fix, 1
+file kode + 2 dokumentasi)** — `StarRatingRow` (`NowPlayingScreen.kt`, 5 `IconButton` rating
+bintang) override eksplisit `modifier = Modifier.size(32.dp)` pada `IconButton` — DI BAWAH
+minimum touch target 48dp (default Material `IconButton` kalau tidak di-override). Glyph
+bintang sendiri cuma 20dp (oke, cuma ukuran visual), tapi area sentuh keseluruhan yang dipangkas
+ke 32dp — target kecil utk jari, apalagi 5 star berjejer rapat. Fix: hapus override
+`.size(32.dp)`, biarkan `IconButton` pakai default 48dp (glyph `Icon` 20dp di dalamnya tidak
+disentuh, tetap sama). Row full-width di Now Playing screen (bukan dialog sempit) — 5×48dp=
+240dp muat leluasa, tidak overflow. Brace/paren balance (215/215, 767/767).
+`MICRO_UIUX_AUDIT.md` diupdate. Item berikutnya (6/9): audit text scaling. Detail:
+`CHANGELOG.md` Batch 238.
+
+**Batch 237 (Accessibility Micro-Polish 4/9 — focus order form multi-field, 1 bug fix, 1 file
+kode + 2 dokumentasi)** — `SongInfoEditSheet.kt` (form edit metadata, 8 `OutlinedTextField`:
+Judul/Artis/Album/Artis Album/Genre/Komposer/No.Track/No.Disc) tidak punya `imeAction`/
+`KeyboardActions` sama sekali — tiap field default `ImeAction.Done`, tiap kali user tekan tombol
+next di keyboard, keyboard malah TERTUTUP alih-alih pindah ke field berikutnya. User harus tap
+manual tiap field satu-satu, TalkBack/keyboard-only user makin terhambat. Fix: field 1-6
+(vertikal) → `ImeAction.Next` + `focusManager.moveFocus(FocusDirection.Down)`; No.Track (dalam
+`Row` horizontal) → `Next` + `FocusDirection.Right` ke No.Disc; No.Disc (field terakhir) →
+`ImeAction.Done` + `focusManager.clearFocus()`. Brace/paren balance (49/49, 125/125).
+`MICRO_UIUX_AUDIT.md` diupdate. Item berikutnya (5/9): audit minimum touch target. Detail:
+`CHANGELOG.md` Batch 237.
+
+**Batch 236 (Accessibility Micro-Polish 3/9 — semantic role list pilihan tema, 1 bug fix, 1
+file kode + 2 dokumentasi)** — `ThemeOptionCard` (`SettingsScreen.kt`, list "Identitas Tema" —
+single-choice pilih 1 dari beberapa identitas tema) pakai `Surface.clickable()` polos: TalkBack
+cuma baca "double tap to activate", tidak ada indikasi ini bagian dari grup pilihan-tunggal
+ataupun status terpilih/tidak (padahal visual border 2dp `primary` menandakan `selected`).
+Fix: `.clickable(onClick)` → `.selectable(selected, onClick, role = Role.RadioButton)` — role +
+selected state sekarang terbaca TalkBack ("radio button, dicentang/tidak, [nama tema]"), tanpa
+mengubah visual (masih border-based, bukan literal RadioButton widget — identitas tema
+divisualkan lewat card preview, bukan icon). Brace/paren balance (136/136, 436/436).
+`MICRO_UIUX_AUDIT.md` diupdate. Item berikutnya (4/9): audit focus order. Detail:
+`CHANGELOG.md` Batch 236.
+
+**Batch 235 (Accessibility Micro-Polish 2/9 — decorative icon static contentDescription, 1 bug
+fix, 1 file kode + 2 dokumentasi)** — Icon peredam volume dalam aplikasi (`NowPlayingScreen.kt`,
+di atas `Slider`) genuinely decorative (non-clickable, sudah ada Text label sibling "Peredam
+Dalam Aplikasi (bukan volume HP)" di atasnya), TAPI pakai `contentDescription` string statis
+("Peredam dalam aplikasi") padahal glyph-nya berubah (mute/rendah/tinggi) — TalkBack baca stop
+tambahan yang redundan & tidak merefleksikan state. Fix: → `null`, konsisten dgn konvensi
+decorative-icon+text-sibling (Batch 230). Brace/paren balance (215/215, 768/768).
+`MICRO_UIUX_AUDIT.md` diupdate. Item berikutnya (3/9): audit semantic role. Detail:
+`CHANGELOG.md` Batch 235.
+
+**Batch 234 (Accessibility Micro-Polish 1/9 — TalkBack semantics RadioButton row, 1 bug fix, 1
+file kode + 2 dokumentasi) → 🟡 ACCESSIBILITY MICRO-POLISH dimulai** — 2 titik di
+`NowPlayingScreen.kt` (speed selector dialog & transition-mode option) pakai pola `Row.clickable`
++ `RadioButton(onClick=...)` nested — TalkBack berhenti 2x per baris (Row lalu child
+RadioButton), role tidak terbaca sebagai radio button di level Row. Fix: Row → `Modifier
+.selectable(selected, onClick, role = Role.RadioButton)`, `RadioButton` jadi `onClick = null`
+(visual-only, semantics diambil alih parent) — 1 fokus TalkBack per baris, role+selected state
+terbaca benar. Brace/paren balance (215/215, 768/768). `MICRO_UIUX_AUDIT.md` diupdate. Item
+berikutnya (2/9): audit content descriptions. Detail: `CHANGELOG.md` Batch 234.
+
 **Batch 233 (HOTFIX — import Icons.Error hilang, regresi Batch 228, 2 file kode + 2
 dokumentasi)** — CI build gagal (`compileReleaseKotlin`/`compileDebugKotlin`, dari
 `log_fail_251.zip` user): `Unresolved reference: Error` di `BackupRestoreSheet.kt`/
