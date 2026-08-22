@@ -1,5 +1,132 @@
 # Changelog
 
+## Batch 248 — Wire Lyrics offline-first ke NowPlayingScreen (2 file patch, 0 file baru)
+Menutup gap yang dicatat eksplisit di Batch 245/247 ("Belum di-wire ke NowPlayingScreen").
+`NowPlayingScreen.kt` (patch): hoist `LyricsViewModel` via `viewModel(factory = LyricsViewModel.factory(context))`
+di level composable (bukan di dalam blok `showLyricsSheet`) + `LaunchedEffect(song?.id)` panggil
+`loadLyrics(artist, title, album)` tiap ganti lagu — fetch mulai duluan sebelum user buka sheet,
+debounce 5 detik dari ViewModel (Batch 245) tetap satu-satunya guard anti-spam. State
+`lyricsAutoState` (collectAsState) diteruskan ke `LyricsSheet` sebagai param baru `autoUiState`.
+`LyricsSheet.kt` (patch): param baru `autoUiState: LyricsUiState? = null` (default null =
+source-compatible, 0 call-site lain kena breaking change). Default `editing` diubah dari
+`rawLyrics.isNullOrBlank()` → `false` (dulu lompat langsung ke textbox edit kalau lirik manual
+kosong krn 0 alternatif; sekarang kalau auto-fetch ketemu, tampilkan itu dulu). Branch baru:
+manual kosong + `autoUiState` Found/Loading → render `LyricsStateView` (dari `ui/lyrics/LyricsView.kt`,
+Batch 245) di dalam sheet; manual kosong + auto NotFound/Idle/null → fallback pesan "Belum ada
+lirik" + tombol "Tambah Lirik" spt sebelumnya (0 regresi). Lirik manual (`onSaveLyrics`/DB) SELALU
+menang atas auto kalau ada — 2 sumber data tetap terpisah, auto cuma fallback tampilan, bukan
+auto-save ke penyimpanan manual. Tombol Edit di header (`if (!editing)`) sekarang jadi satu-satunya
+jalur override manual dari tampilan auto. Brace/paren balance OK (`LyricsSheet.kt` 65/65+183/183,
+`NowPlayingScreen.kt` 217/217+775/775). 0 protected asset disentuh. **Belum diverifikasi
+compile/device** seperti biasa.
+
+## Batch 247 — Lyrics offline-first 4/4b: Store toggle + 2 menu Settings (TERAKHIR kategori ini)
+Lanjutan Batch 246 (Pending Queue 4/4b). Batch penutup kategori Lyrics offline-first (Batch
+243-247).
+
+**`data/lyrics/LyricsPrefetchStore.kt` (baru)**: boilerplate identik `SilenceSkipStore.kt` —
+`SharedPreferences` boolean tunggal, `isEnabled()`/`setEnabled()`. **Default ON**, beda dari
+semua toggle playback-behavior lain di app ini (`ShakeSettingsStore`/`FloatingBubbleStore`/
+`SilenceSkipStore`, semua default OFF) — alasan dijelaskan di KDoc file: fitur ini WiFi-only
+(`NetworkType.UNMETERED`), 0 dampak ke pemutaran atau kuota data seluler kalau user tidak pernah
+nyambung WiFi, sedangkan toggle lain mengubah perilaku pemutaran yang user rasakan langsung
+(makanya wajib opt-in eksplisit). Konsekuensi ON diam-diam jauh lebih ringan di sini.
+
+**`playback/PlaybackService.kt` (patch)**: `onMediaItemTransition` sekarang
+`if (LyricsPrefetchStore(this).isEnabled()) LyricsPrefetchWorker.enqueue(this)` — store dibaca
+ULANG tiap transition (bukan di-cache ke field Service saat `onCreate`), supaya toggle yang baru
+saja diubah user di Settings langsung berlaku transisi lagu berikutnya tanpa perlu restart
+Service/proses.
+
+**`ui/SettingsScreen.kt` (patch)**: 2 item baru.
+1. **"Prefetch Lirik Saat WiFi"** — switch ke-5 di grup "Perilaku Pemutaran" (title+subtitle+
+   `Switch`, `Spacer(12dp)`, haptic `TextHandleMove` — pola identik 4 switch lain di situ).
+   SENGAJA ditaruh di sini, BUKAN di "Alat & Utilitas" tempat 4 item lyrics-adjacent lain
+   (Statistik/Backup/Duplikat/Vault/Hapus-Cache) berada — karena secara visual ini SWITCH,
+   bukan nav-row, dan Batch 217-218 sudah mengaudit+mengkonfirmasi 2 row-species itu punya
+   spacing/padding berbeda secara SAH (afinitas interaksi beda). Mencampur toggle ke grup
+   nav-row akan mengulang inkonsistensi yang sudah susah payah diperbaiki 2 batch lalu.
+2. **"Hapus Cache Lirik"** — nav-row ke-5 di "Alat & Utilitas" (icon `DeleteSweep`+title+
+   subtitle, `Spacer(4dp)`, pola identik 4 row lain di situ) + `AlertDialog` konfirmasi (pola
+   identik `showDisableLockConfirm` milik `AppLockSection` — icon warna error, `TextButton`
+   "Hapus" warna error di confirmButton, "Batal" di dismissButton). Confirm →
+   `scope.launch { LyricsRepository(context).clearCache(); onInfoMessage("Cache lirik dihapus") }`.
+
+State (`lyricsPrefetchEnabled`, `context`, `scope`) dibaca/ditulis LANGSUNG via `LocalContext.
+current`/`rememberCoroutineScope()` di dalam `SettingsScreen.kt` sendiri — pola sama seperti
+Vault/Duplicate/Backup (fitur "utilitas" mandiri di file ini semua begini), BUKAN di-hoist ke
+`MainActivity.kt` seperti toggle playback-behavior lama (`shakeToSkipEnabled` dst.) — jadi 0
+protected asset disentuh, cukup 3 file kode (cap terpenuhi persis).
+
+Brace/paren 3 file seimbang (`LyricsPrefetchStore.kt` 3/3+12/12, `PlaybackService.kt`
+78/78+361/361, `SettingsScreen.kt` 157/157+481/481). `FILE_MANIFEST.txt` 182→183 (1 file baru,
+diselipkan alfabetis).
+
+**🎉 Kategori Lyrics offline-first TUNTAS 4/4, 5 batch (243-247)**: Room cache layer → Retrofit
+LRCLIB API → Repository+ViewModel+View offline-first (debounce+skip-lagu-sama) → Worker prefetch
+WiFi-only (10 lagu depan queue) → Store toggle + 2 menu Settings. **Item terbuka TERPISAH dari
+scope 5 batch ini** (eksplisit dicatat sejak Batch 245): `LyricsView`/`LyricsViewModel` belum
+di-wire ke layar Now Playing manapun — lirik sudah bisa di-cache/prefetch/dihapus lewat Settings,
+tapi belum ada UI yang benar-benar MENAMPILKANNYA saat lagu diputar. Kandidat kategori kerja
+terpisah kalau user minta. Belum diverifikasi compile/device seperti biasa.
+
+## Batch 246 — Lyrics offline-first 4/4a: Worker prefetch, 2 file kode + 1 file baru + gradle protected-parsial + 2 dokumentasi
+Lanjutan Batch 245. Pending Queue lama ("batch 4/4") membundel Worker + Store toggle + 2 menu
+Settings jadi 1 batch — itu 4 file kode sekaligus, lewat batas Maks 3 File / batch. **Dipecah
+jadi 4/4a (batch ini) dan 4/4b (Pending Queue baru)**, prioritas mekanisme inti jalan dulu
+sebelum kontrol user-facing-nya.
+
+**`worker/LyricsPrefetchWorker.kt` (baru)**: `CoroutineWorker`, `doWork()` baca
+`PlaybackStateStore(applicationContext).load()` — infrastruktur SUDAH ADA sejak Batch 108
+(playback resumption), dipilih SENGAJA ketimbang pegang ExoPlayer/MediaController langsung
+karena Worker bisa dieksekusi WorkManager kapan pun termasuk saat proses app sudah mati total.
+Ambil `songIds.drop(index+1).take(10)`, resolve ke `Song` (artist/title/album) via
+`MusicRepository.getSongsByIds()` (fungsi sudah ada, dipakai jalur playback-resumption juga),
+loop `repository.ensureCached()` per lagu — cek `isStopped` tiap iterasi (WorkManager bisa minta
+stop kapan saja, mis. WiFi putus di tengah). 1 lagu gagal fetch tidak menjegal sisanya
+(`ensureCached()` sendiri sudah swallow exception, lihat `LyricsRepository.kt` Batch 245).
+`enqueue()` companion: `Constraints.NetworkType.UNMETERED` (spec: WiFi saja) +
+`enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, request)` — aman dipanggil berulang,
+request lama yang belum jalan otomatis dibuang gantikan window terbaru.
+
+**`playback/PlaybackService.kt` (patch)**: `LyricsPrefetchWorker.enqueue(this)` dipanggil dari
+`Player.Listener.onMediaItemTransition` — BUKAN `MediaSessionCompat.Callback.onMetadataChanged()`
+seperti draft Pending Queue lama (itu API Media**Compat** lawas; project ini pakai Media3
+`androidx.media3.common.Player.Listener`, sudah ada 1 listener yang sama dipakai buat
+widget-update sejak Batch 34, tinggal ditambah 1 baris di situ — bukan listener baru).
+
+**Catatan akurasi jujur, bukan diklaim sempurna**: window "10 lagu depan" akurat SEJAUH
+`PlaybackStateStore` terakhir di-save — dan itu checkpoint PERIODIK ~5 detik oleh
+`PlayerViewModel.persistPlaybackState()` (Batch 108), BUKAN synchronous tepat di titik
+`onMediaItemTransition` ini. Kalau Worker kebetulan langsung dieksekusi WorkManager (mis. sudah
+di WiFi, 0 delay) di celah beberapa detik sebelum checkpoint berikutnya, window yang dibaca bisa
+1 index ketinggalan (prefetch lagu N alih-alih N+1 dst). Konsekuensinya ringan — geser 1 lagu,
+bukan salah total atau crash — sengaja TIDAK dikejar presisi sinkron sempurna di batch ini
+(butuh sentuh `PlayerViewModel.kt` jadi 4 file, lewat cap), dicatat eksplisit sebagai
+known-limitation di `PROJECT_STATE.md`, bukan disembunyikan.
+
+**Gradle (protected-parsial)**: `androidx.work:work-runtime-ktx:2.11.2` — `web_search`
+dijalankan dulu ke developer.android.com/kotlin/ktx (halaman resmi, "last updated 2026-08-14")
+buat pastikan versi terbaru, bukan angka dari training data yang bisa basi (WorkManager pernah
+ubah bentuk API antar rilis). 0 protected asset app (Manifest/MainActivity/dst.) disentuh.
+
+**Bonus temuan (low-risk high-value, di luar scope diminta)**: sebelum edit apa pun batch ini,
+`FILE_MANIFEST.txt` dicek dulu vs disk (rutin tiap batch) — ketahuan SUDAH DRIFT dari 3 batch
+sebelumnya: 8 file kategori Lyrics (Batch 243-245) tidak pernah tercatat — `LyricsRepository.kt`,
+`LyricsApi.kt`, `LyricsDto.kt`, `LyricsDao.kt`, `LyricsDatabase.kt`, `LyricsEntity.kt`,
+`LyricsView.kt`, `LyricsViewModel.kt`. Diperbaiki sekaligus bareng 1 file baru batch ini
+(173→182), diselipkan alfabetis per folder. 182/182 match disk terverifikasi ulang setelah semua
+edit selesai.
+
+**Pending Queue — Lyrics offline-first 4/4b (batch terakhir kategori ini)**: `data/lyrics/
+LyricsPrefetchStore.kt` (baru — boilerplate identik `SilenceSkipStore.kt`, boolean "Prefetch
+Saat WiFi", default ON) + patch `SettingsScreen.kt` (2 menu baru di grup "Alat & Utilitas": "Hapus
+Cache Lirik" → `LyricsRepository.clearCache()` + dialog konfirmasi, "Prefetch Saat WiFi" → toggle
+baca/tulis store). Kalau toggle OFF, `PlaybackService.kt` KEMUNGKINAN kena sentuh sekali lagi —
+guard `if (LyricsPrefetchStore(this).isEnabled())` sebelum `LyricsPrefetchWorker.enqueue()`
+(kalau begitu jadinya, hitung ulang cap: `LyricsPrefetchStore.kt` baru + `SettingsScreen.kt` +
+`PlaybackService.kt` = pas 3 file, masih dalam batas).
+
 ## Batch 245 — Lyrics offline-first 3/4: Repository+ViewModel+View, 3 file kode + 2 dokumentasi
 Lanjutan Batch 244 (API layer). Pending Queue item 3.
 

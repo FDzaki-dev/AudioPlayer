@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
@@ -25,7 +26,9 @@ import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +43,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.BuildConfig
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.data.lyrics.LyricsPrefetchStore
+import com.rudi.audioplayer.data.lyrics.LyricsRepository
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.colorsFor
@@ -48,6 +53,7 @@ import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.resolveIsDark
 import com.rudi.audioplayer.ui.theme.Radius
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -85,6 +91,14 @@ fun SettingsScreen(
     var showAdvancedSettings by remember { mutableStateOf(false) }
     var showUpdateCheck by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    // Batch 247 — Lyrics offline-first 4/4b. Pola sama Vault/Duplicate/Backup di file ini:
+    // Store dibaca/ditulis LANGSUNG dari sini pakai LocalContext, bukan di-hoist ke
+    // MainActivity — fitur "utilitas" mandiri di file ini semuanya begini, beda dari toggle
+    // playback-behavior lama (shakeToSkipEnabled dst.) yang state-nya di-hoist dari luar.
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var lyricsPrefetchEnabled by remember { mutableStateOf(LyricsPrefetchStore(context).isEnabled()) }
+    var showClearLyricsCacheConfirm by remember { mutableStateOf(false) }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
@@ -249,6 +263,34 @@ fun SettingsScreen(
                     }
                 )
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    // Batch 247 — Lyrics offline-first 4/4b. Switch ke-5 section ini, pola
+                    // identik 4 lainnya (title+subtitle+Switch, Spacer 12dp) — beda dari 5
+                    // baris "Alat & Utilitas" yg icon+nav-row, konsisten pembagian row-species
+                    // yg sudah diaudit Batch 217/218 (switch vs nav-row beda afinitas
+                    // interaksi, bukan hal yang perlu disamakan).
+                    Text("Prefetch Lirik Saat WiFi", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Unduh lirik 10 lagu berikutnya di antrean otomatis saat tersambung " +
+                            "WiFi, supaya sudah tersedia offline duluan",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                Switch(
+                    checked = lyricsPrefetchEnabled,
+                    onCheckedChange = { enabled ->
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        lyricsPrefetchEnabled = enabled
+                        LyricsPrefetchStore(context).setEnabled(enabled)
+                    }
+                )
+            }
         }
 
         item {
@@ -347,6 +389,31 @@ fun SettingsScreen(
                     Text("Vault Lagu Privat", style = MaterialTheme.typography.bodyMedium)
                     Text(
                         "Sembunyikan lagu tertentu total dari Beranda/Library, dilindungi PIN sendiri",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+        }
+
+        item {
+            // Batch 247 — Lyrics offline-first 4/4b. Item ke-5 grup "Alat & Utilitas", pola
+            // identik 4 lainnya (Spacer 4dp, icon+title+subtitle, row seluruhnya .clickable).
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showClearLyricsCacheConfirm = true }
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text("Hapus Cache Lirik", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Bersihkan semua lirik tersimpan offline — akan diunduh ulang saat lagu " +
+                            "diputar lagi",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary
                     )
@@ -536,6 +603,35 @@ fun SettingsScreen(
         VaultSheet(
             songs = songs,
             onDismiss = { showVault = false }
+        )
+    }
+
+    if (showClearLyricsCacheConfirm) {
+        // Batch 247 — pola identik showDisableLockConfirm di bawah (AppLockSection): AlertDialog
+        // konfirmasi buat aksi destruktif, TextButton warna error di confirmButton.
+        AlertDialog(
+            onDismissRequest = { showClearLyricsCacheConfirm = false },
+            icon = { Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Hapus Cache Lirik?") },
+            text = {
+                Text(
+                    "Semua lirik tersimpan offline akan dihapus. Lirik akan diunduh ulang " +
+                        "otomatis saat lagu terkait diputar lagi (butuh koneksi internet).",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        LyricsRepository(context).clearCache()
+                        onInfoMessage("Cache lirik dihapus")
+                    }
+                    showClearLyricsCacheConfirm = false
+                }) { Text("Hapus", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearLyricsCacheConfirm = false }) { Text("Batal") }
+            }
         )
     }
 }

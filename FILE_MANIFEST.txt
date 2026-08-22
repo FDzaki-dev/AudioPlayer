@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 173 file
+# Total: 183 file
 
 .github/workflows/build.yml
 .gitignore
@@ -45,6 +45,13 @@ app/src/main/java/com/rudi/audioplayer/data/ListeningStatsEngine.kt
 app/src/main/java/com/rudi/audioplayer/data/LrcSyncEditor.kt
 app/src/main/java/com/rudi/audioplayer/data/LyricsParser.kt
 app/src/main/java/com/rudi/audioplayer/data/LyricsStore.kt
+app/src/main/java/com/rudi/audioplayer/data/lyrics/LyricsPrefetchStore.kt
+app/src/main/java/com/rudi/audioplayer/data/lyrics/LyricsRepository.kt
+app/src/main/java/com/rudi/audioplayer/data/lyrics/api/LyricsApi.kt
+app/src/main/java/com/rudi/audioplayer/data/lyrics/api/LyricsDto.kt
+app/src/main/java/com/rudi/audioplayer/data/lyrics/db/LyricsDao.kt
+app/src/main/java/com/rudi/audioplayer/data/lyrics/db/LyricsDatabase.kt
+app/src/main/java/com/rudi/audioplayer/data/lyrics/db/LyricsEntity.kt
 app/src/main/java/com/rudi/audioplayer/data/MusicRepository.kt
 app/src/main/java/com/rudi/audioplayer/data/OnboardingHintStore.kt
 app/src/main/java/com/rudi/audioplayer/data/PinLockoutPolicy.kt
@@ -90,6 +97,8 @@ app/src/main/java/com/rudi/audioplayer/ui/LibraryScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/LibrarySearchIndex.kt
 app/src/main/java/com/rudi/audioplayer/ui/LockScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/LyricsSheet.kt
+app/src/main/java/com/rudi/audioplayer/ui/lyrics/LyricsView.kt
+app/src/main/java/com/rudi/audioplayer/ui/lyrics/LyricsViewModel.kt
 app/src/main/java/com/rudi/audioplayer/ui/MiniPlayerBar.kt
 app/src/main/java/com/rudi/audioplayer/ui/NowPlayingScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/PlaylistScreen.kt
@@ -119,6 +128,7 @@ app/src/main/java/com/rudi/audioplayer/util/AppLogger.kt
 app/src/main/java/com/rudi/audioplayer/util/AudioArtFetcher.kt
 app/src/main/java/com/rudi/audioplayer/widget/PlayerWidgetProvider.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetUpdater.kt
+app/src/main/java/com/rudi/audioplayer/worker/LyricsPrefetchWorker.kt
 app/src/main/res/drawable/ic_bubble_minimize.xml
 app/src/main/res/drawable/ic_bubble_tile.xml
 app/src/main/res/drawable/ic_widget_next.png

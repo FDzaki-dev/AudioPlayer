@@ -78,6 +78,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
@@ -89,6 +90,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.media3.common.Player
 import com.rudi.audioplayer.data.OnboardingHintStore
+import com.rudi.audioplayer.ui.lyrics.LyricsViewModel
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
 import com.rudi.audioplayer.playback.PlaybackUiState
@@ -214,6 +216,16 @@ fun NowPlayingScreen(
     // --- Swipe gesture: brightness (left of album art) & audio volume (right of album art) ---
     val gestureScope = rememberCoroutineScope()
     val context = LocalContext.current
+    // Batch 248 — wire Lyrics offline-first (Batch 243-247) ke NowPlayingScreen. ViewModel
+    // di-hoist di sini (bukan di dalam blok `showLyricsSheet` di bawah) supaya request auto-fetch
+    // jalan begitu lagu berganti (debounce 5 detik di ViewModel sendiri yg jamin tidak nembak
+    // API tiap transisi cepat), bukan baru mulai fetch pas user buka sheet — lirik sudah siap
+    // duluan saat sheet dibuka.
+    val lyricsViewModel: LyricsViewModel = viewModel(factory = LyricsViewModel.factory(context))
+    val lyricsAutoState by lyricsViewModel.uiState.collectAsState()
+    LaunchedEffect(song?.id) {
+        song?.let { lyricsViewModel.loadLyrics(it.artist, it.title, it.album) }
+    }
     val hintStore = remember(context) { OnboardingHintStore(context) }
     var showNowPlayingHint by remember { mutableStateOf(!hintStore.hasSeenNowPlayingHint()) }
     val activity = remember(context) { context.findActivity() }
@@ -770,6 +782,7 @@ fun NowPlayingScreen(
         var lyricsText by remember(song.id) { mutableStateOf(onGetLyrics(song.id)) }
         LyricsSheet(
             rawLyrics = lyricsText,
+            autoUiState = lyricsAutoState,
             positionMs = uiState.position,
             isPlaying = uiState.isPlaying,
             onPlayPause = onPlayPause,

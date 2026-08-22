@@ -34,8 +34,10 @@ import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.ShakeSettingsStore
 import com.rudi.audioplayer.data.SilenceSkipStore
+import com.rudi.audioplayer.data.lyrics.LyricsPrefetchStore
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.widget.WidgetUpdater
+import com.rudi.audioplayer.worker.LyricsPrefetchWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -136,6 +138,25 @@ class PlaybackService : MediaLibraryService() {
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 pushWidgetUpdate(player)
+                // Batch 246 — Lyrics offline-first 4/4a. Tiap pindah lagu, jendela "10 lagu
+                // depan" ikut geser satu — enqueue ulang, bukan panggil sekali di onCreate
+                // saja. REPLACE policy di dalam enqueue() bikin ini aman dipanggil sesering
+                // apa pun (skip-spam sekalipun). CATATAN AKURASI (bukan diklaim sempurna):
+                // Worker baca index dari PlaybackStateStore, yang di-`save()` PlayerViewModel
+                // secara PERIODIK (~5 detik saat playing, lihat persistPlaybackState()), BUKAN
+                // sinkron persis di titik transition ini — kalau Worker kebetulan jalan
+                // instan (sudah WiFi, 0 delay) di celah beberapa detik itu, window 10-lagu
+                // yang dibaca bisa 1 index ketinggalan. Konsekuensinya ringan (prefetch geser
+                // 1 lagu, bukan salah total atau crash) — sengaja tidak dikejar presisi
+                // sempurna di batch ini, cukup dicatat sebagai known-limitation.
+                // Batch 247 — guard toggle "Prefetch Saat WiFi" (default ON, lihat
+                // LyricsPrefetchStore.kt). Store dibaca ULANG tiap transition (bukan
+                // di-cache sekali di field Service) — instance SharedPreferences murah dibuat,
+                // dan ini menjamin toggle yang baru saja diubah user di Settings langsung
+                // berlaku transisi lagu BERIKUTNYA, tanpa perlu restart Service.
+                if (LyricsPrefetchStore(this@PlaybackService).isEnabled()) {
+                    LyricsPrefetchWorker.enqueue(this@PlaybackService)
+                }
                 // Batch 102 — sessionPlayer mencapai akhir track sendiri secara alami (bukan
                 // seek/skip manual): ini titik "silent handback" milik CrossfadeEngine, lihat
                 // dokumentasi kelasnya langkah 3.

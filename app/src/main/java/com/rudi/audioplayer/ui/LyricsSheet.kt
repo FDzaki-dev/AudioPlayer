@@ -26,11 +26,18 @@ import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.data.LrcSyncEditor
 import com.rudi.audioplayer.data.LyricsParser
 import com.rudi.audioplayer.data.SyncSession
+import com.rudi.audioplayer.ui.lyrics.LyricsUiState
+import com.rudi.audioplayer.ui.lyrics.LyricsStateView
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LyricsSheet(
     rawLyrics: String?,
+    // Batch 248 — hasil auto-fetch offline-first (LRCLIB, Batch 243-247). Null = caller belum
+    // wire (source-compatible, default null bukan breaking change). Cuma dipakai kalau
+    // [rawLyrics] manual kosong — lirik manual user SELALU menang, auto cuma fallback tampilan
+    // sebelum user isi manual (bukan auto-save ke DB manual, tetap 2 sumber data terpisah).
+    autoUiState: LyricsUiState? = null,
     positionMs: Long,
     isPlaying: Boolean = false,
     onPlayPause: () -> Unit = {},
@@ -49,7 +56,11 @@ fun LyricsSheet(
     // both re-derive fresh every time the sheet is showing a different song's lyrics, discarding
     // any unsaved draft along with it — losing an un-saved edit on track change is much safer
     // than mis-attributing it to the wrong song.
-    var editing by remember(rawLyrics) { mutableStateOf(rawLyrics.isNullOrBlank()) }
+    // Batch 248 — dulu default `rawLyrics.isNullOrBlank()` (lompat langsung ke edit kalau lirik
+    // manual kosong, krn dulu 0 alternatif tampilan). Sekarang default false: kalau manual kosong
+    // tapi auto-fetch (LRCLIB) ketemu, user harus lihat itu dulu, bukan dipaksa ke textbox edit.
+    // Tombol Edit di header tetap selalu ada (lihat blok `if (!editing)` di bawah) buat override manual.
+    var editing by remember(rawLyrics) { mutableStateOf(false) }
     var draft by remember(rawLyrics) { mutableStateOf(rawLyrics.orEmpty()) }
     // Roadmap #3 — Tap-to-Sync: null = mode edit teks biasa, non-null = sedang di flow sync
     // baris-per-baris. Sama alasan `editing`/`draft` di atas, dikey ke `rawLyrics` — ganti lagu
@@ -206,6 +217,15 @@ fun LyricsSheet(
                         ) { Text("Simpan") }
                     }
                     Spacer(modifier = Modifier.height(20.dp))
+                }
+                // Batch 248 — manual kosong TAPI auto-fetch offline-first (Found/Loading) ada:
+                // tampilkan itu dulu drpd langsung pesan "Belum ada lirik". NotFound/Idle/null
+                // turun ke branch di bawah (pesan + tombol "Tambah Lirik" spt sebelumnya).
+                rawLyrics.isNullOrBlank() && (autoUiState is LyricsUiState.Found || autoUiState is LyricsUiState.Loading) -> {
+                    Box(modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 420.dp)) {
+                        LyricsStateView(autoUiState, positionMs, modifier = Modifier.fillMaxSize())
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
                 rawLyrics.isNullOrBlank() -> {
                     Column(
