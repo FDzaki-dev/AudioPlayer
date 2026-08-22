@@ -1,5 +1,101 @@
 # Changelog
 
+## Batch 224 — Iconography item 1/7: audit ukuran icon (1 bug fix — Play/Pause NowPlaying 34dp→40dp)
+Kategori baru dimulai (Settings TUNTAS 9/9 di Batch 223). Item 1/7 § Iconography
+`MICRO_UIUX_AUDIT.md`: "Audit ukuran icon". Grep semua `Icon(` app-wide (113 titik total di
+`ui/*.kt`): **104 default 24dp** (baseline mayoritas konsisten), 9 pakai `.size()` custom eksplisit
+tersebar di 4 file — semua dicek konteksnya satu-satu.
+
+**8 dari 9 justified** (peran UI beda, bukan gap): 2× 18dp (`ABRepeatBookmarkSheet` — icon di
+dalam `TextButton` disandingkan teks, disamakan tinggi baris teks bukan standalone-icon-button;
+pola sama precedent Batch 151-152), 1× 18dp `RingtoneCutterSheet` (leading icon `FilterChip`,
+konvensi M3 chip beda dari standalone icon), 2× 16dp Close (1 di dalam `TextButton`+teks sama
+alasan di atas; 1 di `FeatureHintBanner` sudah didokumentasikan sadar sejak Batch 141 — hit-target
+48dp vs ukuran visual 2 hal beda, dikonfirmasi ulang bukan oversight), 2× 24dp `LockScreen`
+(redundant eksplisit tapi SENGAJA disamakan ke default sejak Batch 147, bukan gap baru).
+
+**1 dari 9 genuinely bug**: Icon Play/Pause `NowPlayingScreen.kt` (tombol hero, kontainer PALING
+BESAR di row kontrol — 68dp vs default ~48dp `IconButton`) glyph-nya cuma **34dp — LEBIH KECIL**
+dari icon `SkipPrevious`/`SkipNext` yang mengapitnya (36dp eksplisit). Row kontrol lengkap
+seharusnya 3-tingkat hierarki bobot visual: Shuffle/Repeat (24dp default, aksi sekunder) < Skip
+(36dp, aksi navigasi) < Play/Pause (aksi utama, harus PALING besar) — tapi 34 < 36 membalik
+tingkat teratas. 0 komentar histori menjelaskan angka 34dp secara spesifik (beda dari kontainernya
+sendiri yang punya banyak komentar shape/warna/emboss per-batch), ciri oversight bukan keputusan
+sadar.
+
+**Fix**: `34.dp` → `40.dp`. Hierarki dipulihkan (24 < 36 < 40), padding internal circle tetap
+proporsional (68−40=28dp total ruang, lebih lega dari margin skip-icon 48−36=12dp, jadi tetap
+"bernapas" bukan penuh sesak). 1 file (`NowPlayingScreen.kt`), 1 baris kode. Brace/paren
+seimbang (215/215, 756/756). **Belum diverifikasi visual** — prioritas cek proporsi icon dalam
+lingkaran accent tidak terlihat kebesaran/kepenuhan di device asli. `MICRO_UIUX_AUDIT.md`
+diperbarui (checklist item 1/7). Item berikutnya (2/7): audit optical alignment.
+
+## Batch 223 — Settings polish item 9/9: verifikasi fungsi setting tidak berubah (audit, 0 bug) — SETTINGS 9/9 TUNTAS
+Item terakhir § Settings `MICRO_UIUX_AUDIT.md`: "Jangan mengubah fungsi setting" — verifikasi
+akhir bahwa Batch 215-222 (8 item sebelumnya di kategori ini) 0 mengubah behavior fungsional.
+
+Ditelusuri titik wiring `MainActivity.kt` → `SettingsScreen(...)`: seluruh 9 callback
+(`onSelectThemeIdentity`/`onSelectThemeMode`/`onSetPin`/`onDisableLock`/`onToggleBiometric`/
+`onToggleShakeToSkip`/`onToggleRadioAutoContinue`/`onToggleFloatingBubble`/
+`onToggleSilenceSkip`) tetap terpasang ke fungsi `PlayerViewModel` yang sama persis seperti
+sebelum Batch 215 — **0 baris di `MainActivity.kt` pernah tersentuh** sepanjang seluruh siklus
+9 batch ini. Cuma `SettingsScreen.kt` yang pernah diedit (Batch 216: subtitle ditambah; Batch
+220: state var + `AlertDialog` konfirmasi ditambah). Batch 220 satu-satunya yang menyentuh alur
+eksekusi — tapi `onDisableLock()` masih dipanggil dengan efek 100% identik saat user menekan
+"Nonaktifkan"; yang berubah cuma perlu 1 tap konfirmasi ekstra sebelum trigger, bukan efek
+`disableLock()` itu sendiri (`AppLockStore.kt`/`PlayerViewModel.kt` juga 0 tersentuh). Bukan
+perubahan fungsi setting — murni safety-gate di depan fungsi yang sama.
+
+**Hasil: 0 bug, 0 kode disentuh.** `MICRO_UIUX_AUDIT.md` diperbarui (checklist item 9/9 — kategori
+🟠 SETTINGS **TUNTAS 9/9**, Batch 215-223). `STATUS TRACKING` (baris 20 tabel kategori 6-14)
+diupdate reflect penutupan. Kategori berikutnya (belum mulai): 🟡 ICONOGRAPHY.
+
+## Batch 222 — Settings polish item 8/9: audit visual density (audit, 0 bug)
+Lanjutan Batch 215-221, item 8/9 § Settings `MICRO_UIUX_AUDIT.md`: "Kurangi visual density tanpa
+menghilangkan informasi". Ditelusuri seluruh 848 baris `SettingsScreen.kt` — pola spacing pakai
+skala Material konsisten (`4dp` title→deskripsi, `8dp` title→konten pertama, `12dp` antar-item
+switch, `20dp` antar-section, sudah diverifikasi struktural di Batch 217).
+
+Titik paling "berat" secara tekstual: 4 switch di "Perilaku Pemutaran" — subtitle terpanjang
+("Mini Player Mengambang" 3 baris, "Lewati Keheningan Otomatis" 4 baris) berisi info fungsional
+non-basa-basi: syarat izin sistem, batasan teknis (belum ada slider sensitivitas), efek samping
+potensial (bisa motong intro/outro), saran mitigasi (coba dulu, matikan kalau ganggu). **Semua
+kalimat itu WAJIB tetap ada** — instruksi item ini sendiri eksplisit "tanpa menghilangkan
+informasi", jadi memangkas kalimat penjelasan izin sistem/batasan teknis demi baris lebih pendek
+justru melanggar syarat item ini sendiri, bukan memenuhinya.
+
+**0 titik ditemukan** dengan elemen bertumpuk, spacing di bawah `4dp` (minimum readable gap), atau
+Row berisi >3 elemen visual sekaligus yang bisa dianggap "padat" secara objektif. Kepadatan yang
+ada murni konsekuensi dari jumlah informasi yang memang perlu disampaikan (bukan tata letak boros
+atau redundan) — konsisten dengan kesimpulan spacing Batch 217.
+
+**Hasil: 0 bug, 0 kode disentuh.** `MICRO_UIUX_AUDIT.md` diperbarui (checklist item 8/9). Item
+terakhir kategori Settings (9/9): jangan mengubah fungsi setting — verifikasi akhir bahwa 8
+perbaikan/audit Batch 215-222 di kategori ini 0 mengubah behavior fungsional apa pun.
+
+## Batch 221 — Settings polish item 7/9: audit disabled setting visibility (audit, 0 bug)
+Lanjutan Batch 215-220, item 7/9 § Settings `MICRO_UIUX_AUDIT.md`: "Pastikan disabled setting
+terlihat jelas". Grep `enabled = ` di seluruh `SettingsScreen.kt` — cuma **1 titik** di seluruh
+file: `Switch` "Mode Gelap" di-`enabled = !followSystem` (nonaktif otomatis saat "Ikuti Sistem"
+ON, krn logikanya jadi tidak relevan).
+
+**Dicek 2 lapis**: (1) `Switch` ini 0 pakai `colors = SwitchDefaults.colors(...)` custom — murni
+default Material3, yang otomatis render dgn `disabledCheckedThumbColor`/
+`disabledUncheckedTrackColor` (alpha diturunkan bawaan) saat `enabled = false`, jadi switch-nya
+sendiri sudah visually muted tanpa perlu sentuhan tambahan. (2) Subtitle di bawah judul "Mode
+Gelap" SUDAH eksplisit ganti teks jadi "Nonaktif — mengikuti pengaturan sistem" tiap kali
+`followSystem = true` — bukan sekadar warna redup, tapi kalimat penjelasan langsung kenapa
+switch itu tidak bisa disentuh. Kombinasi switch teredup (M3 default) + subtitle penjelasan
+eksplisit sudah lebih jelas dari sekadar dim visual generik.
+
+Sempat dipertimbangkan menambah `alpha` manual pada Text judul "Mode Gelap" biar match tone
+redup switch, tapi di-grep app-wide (`alpha = 0.38`/`LocalContentColor`/`ContentAlpha`) — **0
+precedent** pola dim-title-saat-disabled di mana pun di codebase ini. Menambah alpha sepihak di
+1 titik ini justru jadi elemen baru yang tidak konsisten dgn sisa app, bukan perbaikan.
+
+**Hasil: 0 bug, 0 kode disentuh.** `MICRO_UIUX_AUDIT.md` diperbarui (checklist item 7/9). Item
+berikutnya (8/9): kurangi visual density tanpa menghilangkan informasi.
+
 ## Batch 220 — Settings polish item 6/9: fix destructive setting (nonaktifkan kunci PIN, 1 file kode + 2 dokumentasi)
 Lanjutan Batch 215-219, item 6/9 § Settings `MICRO_UIUX_AUDIT.md`: "Pastikan destructive setting
 terlihat berbeda". Ditelusuri sampai layer data: `AppLockStore.disableLock()` **menghapus

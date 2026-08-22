@@ -18,7 +18,7 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
 | 2 | Spacing & Sizing Consistency | 🟡 **Berlanjut (Batch 146-147, 151-152)**. 146: audit horizontal screen padding — 4 tab utama Home/Settings/NowPlaying/Playlist/SmartPlaylist/StatsDashboard sudah 20dp; 2 gap di `LibraryScreen.kt` diperbaiki (`AlbumGridView` 16dp→20dp horizontal, 4 titik `ListItem` Artis/Folder/hasil-pencarian/riwayat 4dp→20dp). 147: audit ukuran control setara — `LockScreen.kt` ikon Fingerprint(28dp)/Backspace(22dp) disamakan ke 24dp. 151: audit vertical spacing antar section (`SettingsScreen.kt`, 7 titik pola `Spacer(12dp)→Divider→Spacer(20dp)`) — 0 bug, sudah konsisten. 151-152: **gap icon↔text ✅ SELESAI** — audit formal 29 titik `Icon()→Spacer(width)→Text()` di `ui/*.kt`, dikelompokkan per-konteks (default-size icon+label/TextButton icon custom-size/menu-row Icon+Column/section header) — 2 gap nyata ditemukan & diperbaiki (`PlaylistScreen.kt` "Buat Playlist Baru" & `VaultSheet.kt` "Tambah", keduanya `TextButton`+`Icons.Default.Add` default-size 4dp→8dp), sisanya sudah konsisten by-design. Pending: sisa literal `.dp` lain (padding/size/offset di luar radius/icon-gap/screen-padding yang sudah disentuh). |
 | 3 | Typography Hierarchy | ✅ **TUNTAS (Batch 149, 154, 159, 160, 161)**. 149: title bottom sheet (1 gap fix). 154: body/label song-row (1 gap fix). 159: field-label caption (1 gap fix). 160: badge/kicker/value-readout (0 bug). 161: line-height — **5 gap sistemik** (`theme/Type.kt` 5 style ter-override tanpa `lineHeight`, app-wide blast radius) diperbaiki, dihitung proporsional dari rasio M3 asli. **Belum diverifikasi visual** Batch 161 — cek prioritas tinggi. Sisa (SENGAJA tidak diklaim tuntas): cakupan penuh truncation/ellipsis (beda sub-kategori, sebagian sudah Batch 37). |
 | 5 | Interactive States (disabled/selected/loading/error) | ✅ **Audit selesai 8/8 sub-item (Batch 162-168)**. disabled icon-button tint (5 titik, konsisten), pressed/ripple integrity (0 `indication=null` ditemukan, aman), loading (`ShimmerBrush` shared, konsisten), **selected/active state (Batch 163-164)** — taksonomi 3 pola selected by-design (Card preview→border+elevation; List/dialog option→RadioButton; Tag/filter→FilterChip fill), 2 konsisten, **1 bug ditemukan & diperbaiki (Batch 163)**: `SpeedDialog` TextButton+"✓" disamakan ke RadioButton (samakan `TransitionModeOption` di dialog sama). **1 dari 3 observasi tertunda DIEKSEKUSI (Batch 164)**: `SongRow` (LibraryScreen) sekarang menandai lagu sedang diputar, disamakan pola `QueueRow`. **error state & success/confirmation feedback (Batch 165-166)** — teks validasi inline 100% konsisten (0 bug); banner hasil-operasi (4 titik/3 file) 3-arah tidak konsisten → **DISATUKAN (Batch 166)**: composable shared `ResultBanner` (`Utils.kt`) + `enum ResultBannerStyle {Solid,Tinted,Bare}`, 3 gaya lama dipertahankan lewat parameter, 0 perubahan visual disengaja. **konsistensi lintas-aksi (Batch 168)** — toggle Favorit (LibraryScreen vs NowPlaying): icon/tint/haptic identik, TAPI `bouncyPress` cuma ada di NowPlaying — genuinely ambigu (list padat vs hero screen), dicatat bukan dieksekusi. **3 observasi masih tertunda keputusan user**: (a) `EmptyState` icon hardcode (Batch 162), (b) `LibraryFilterChips` custom-fill vs FilterChip (Batch 163), (c) Favorit `bouncyPress` di atas (Batch 168). |
-| 6-14 | Now Playing s/d Component Consistency | 🟡 **Now Playing ✅ TUNTAS (Batch 169-179)**. **Library/Song List ✅ TUNTAS 11/11 (Batch 180-190)**. **Playlist/Queue ✅ TUNTAS 8/8 (Batch 191-214)**. **Settings berlanjut (Batch 215-217)**: item 1/9 grouping (215), item 2/9 title/subtitle row (216), item 3/9 spacing — 0 bug (217). Kategori 11-14 belum mulai. |
+| 6-14 | Now Playing s/d Component Consistency | 🟡 **Now Playing ✅ TUNTAS (Batch 169-179)**. **Library/Song List ✅ TUNTAS 11/11 (Batch 180-190)**. **Playlist/Queue ✅ TUNTAS 8/8 (Batch 191-214)**. **Settings ✅ TUNTAS 9/9 (Batch 215-223)**: grouping(215)/title-subtitle(216)/spacing(217, 0 bug)/switch alignment(218, 0 bug)/nav affordance(219, 0 bug)/destructive setting(220, 1 fix — konfirmasi nonaktifkan PIN)/disabled visibility(221, 0 bug)/visual density(222, 0 bug)/fungsi tidak berubah(223, verifikasi 0 bug). **Iconography berlanjut (Batch 224)**: item 1/7 ukuran icon — 1 fix (Play/Pause `NowPlayingScreen` 34dp→40dp, hierarki visual dgn Skip 36dp dipulihkan). Kategori 12-14 belum mulai. |
 
 ---
 
@@ -175,15 +175,36 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
   dulu dieksekusi langsung dari toggle 0 konfirmasi 0 warna error — pola sama bug Batch 195. Fix:
   `AlertDialog` konfirmasi ditambah + tombol "Nonaktifkan" & ikon `LockOpen` di-tint
   `colorScheme.error`. Switch tetap terikat state asli parent (0 flicker saat Batal).
-- [ ] Pastikan disabled setting terlihat jelas.
-- [ ] Kurangi visual density tanpa menghilangkan informasi.
-- [ ] Jangan mengubah fungsi setting.
+- [x] Pastikan disabled setting terlihat jelas. **✅ 0 bug (Batch 221)** — cuma 1 titik
+  `enabled = ` di seluruh file: `Switch` "Mode Gelap" (`enabled = !followSystem`). 0 custom
+  `SwitchDefaults.colors`, murni default M3 yg otomatis dim saat disabled + subtitle SUDAH
+  eksplisit ganti teks jadi "Nonaktif — mengikuti pengaturan sistem". Dipertimbangkan tambah
+  alpha manual ke title, tapi di-grep app-wide: 0 precedent pola dim-title — batal, hindari
+  elemen baru yg tidak konsisten dgn sisa app.
+- [x] Kurangi visual density tanpa menghilangkan informasi. **✅ 0 bug (Batch 222)** — spacing
+  pakai skala Material konsisten (4/8/12/20dp, diverifikasi struktural Batch 217). Subtitle
+  terpanjang (Mini Player Mengambang/Lewati Keheningan) berisi info fungsional wajib (syarat
+  izin, batasan teknis, efek samping) — memangkas demi baris lebih pendek justru melanggar
+  syarat item ini sendiri ("tanpa menghilangkan informasi"). 0 elemen bertumpuk/Row padat
+  ditemukan; kepadatan murni konsekuensi jumlah info yang memang perlu, bukan tata letak boros.
+- [x] Jangan mengubah fungsi setting. **✅ 0 bug — verifikasi akhir (Batch 223)** — semua 9
+  callback `SettingsScreen(...)` di `MainActivity.kt` tetap terpasang ke fungsi `PlayerViewModel`
+  yang sama persis, 0 baris `MainActivity.kt` tersentuh sepanjang Batch 215-222. Batch 220
+  (satu-satunya yg sentuh alur eksekusi) cuma tambah safety-gate `AlertDialog` di depan
+  `onDisableLock()` — fungsi & efeknya identik, bukan perubahan behavior. **🟠 SETTINGS TUNTAS
+  9/9 (Batch 215-223).**
 
 ---
 
 ## 🟡 ICONOGRAPHY
 
-- [ ] Audit ukuran icon.
+- [x] Audit ukuran icon. **✅ 1 bug fix (Batch 224)** — 113 titik `Icon(` app-wide dicek: 104
+  default 24dp (baseline), 9 custom size. 8/9 justified (TextButton/FilterChip icon disandingkan
+  teks = beda konvensi, `LockScreen` disamakan sadar sejak Batch 147, `FeatureHintBanner`
+  hit-target vs visual size didokumentasikan sejak Batch 141). **1 bug nyata**: Play/Pause
+  `NowPlayingScreen.kt` (kontainer terbesar 68dp) glyph cuma 34dp — LEBIH KECIL dari Skip
+  Prev/Next yang mengapitnya (36dp), membalik hierarki bobot visual (Shuffle/Repeat 24 < Skip 36
+  < harusnya Play/Pause terbesar). Fix: 34dp→40dp, hierarki 24<36<40 dipulihkan.
 - [ ] Audit optical alignment.
 - [ ] Samakan visual weight icon sejenis.
 - [ ] Pastikan action icon dapat dibedakan dari decorative icon.

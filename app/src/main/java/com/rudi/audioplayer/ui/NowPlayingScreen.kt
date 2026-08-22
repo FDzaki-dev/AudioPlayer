@@ -636,7 +636,14 @@ fun NowPlayingScreen(
                     Icon(
                         if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (playing) "Jeda" else "Putar",
-                        modifier = Modifier.size(34.dp)
+                        // Batch 224 — Iconography 1/7 (audit ukuran icon). Sebelumnya 34dp: LEBIH
+                        // KECIL dari icon SkipPrevious/SkipNext yang mengapitnya (36dp), padahal
+                        // tombol ini kontainer PALING BESAR di row (68dp vs default ~48dp
+                        // IconButton) — hierarki visual kebalik (aksi utama harusnya glyph
+                        // TERBESAR, bukan terkecil). Baris Shuffle/Repeat (default 24dp, tanpa
+                        // override) < Skip (36dp) < Play/Pause sekarang 40dp — urutan bobot
+                        // visual 3-tingkat yang benar utuh dipulihkan.
+                        modifier = Modifier.size(40.dp)
                     )
                 }
             }
