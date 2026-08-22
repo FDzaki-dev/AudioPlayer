@@ -168,7 +168,10 @@ fun MiniPlayerBar(
                 AnimatedContent(targetState = uiState.isPlaying, label = "miniPlayPause") { playing ->
                     Icon(
                         if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playing) "Jeda" else "Putar"
+                        contentDescription = if (playing) "Jeda" else "Putar",
+                        // Batch 226 — Iconography 2/7 (audit optical alignment), konsisten
+                        // dengan fix NowPlayingScreen.kt: kompensasi bias visual kiri PlayArrow.
+                        modifier = if (!playing) Modifier.offset(x = 1.dp) else Modifier
                     )
                 }
             }

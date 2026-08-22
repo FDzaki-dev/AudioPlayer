@@ -1,5 +1,146 @@
 # Changelog
 
+## Batch 232 — Iconography 7/7 penutup: verifikasi retrospektif no-cosmetic-affordance-change (0 bug, 0 kode + 2 dokumentasi) → 🟠 ICONOGRAPHY TUNTAS 7/7 (Batch 224-232)
+Item terakhir kategori Iconography bersifat guard-rail (bukan proaktif ganti icon), jadi
+dieksekusi sbg verifikasi retrospektif: ditelusuri ulang 4 fix kode sepanjang Batch 224-231,
+pastikan tidak ada yg murni kosmetik & mengaburkan affordance.
+
+- Batch 224 (34dp→40dp): ukuran saja, glyph/makna tetap.
+- Batch 226-227 (offset +1dp): posisi mikro, bukan ganti glyph.
+- Batch 228 (`ErrorOutline`→`Error`): ganti glyph, TAPI berdasar penyamaan bobot dgn pasangan
+  `CheckCircle` solid yg sudah eksis di 2 titik lain — konsistensi makna status, bukan estetika.
+- Batch 229 (tint `primary`→`secondary`): warna saja; affordance malah DIPERJELAS (pisahkan
+  decorative dari actionable), bukan dikaburkan.
+- Batch 231 (contentDescription teks): 0 icon visual berubah sama sekali.
+
+**Hasil: 0 pelanggaran**, 0 kode disentuh. `MICRO_UIUX_AUDIT.md` diupdate — checklist 7/7 +
+`STATUS TRACKING` baris 6-14 ditandai Iconography TUNTAS.
+
+**Rekap kategori Iconography**: ukuran(224, 1 fix)/optical alignment(226-227, 1 fix, 4 titik)/
+visual weight(228, 1 fix)/action-vs-decorative(229, 1 fix)/contentDescription null(230, 0 bug)/
+semantic label(231, 1 fix)/no-cosmetic-affordance-change(232, verifikasi 0 bug). Kategori
+berikutnya (belum mulai): 🟡 ACCESSIBILITY MICRO-POLISH.
+
+---
+
+## Batch 231 — Iconography 6/7: semantic label actionable icon (1 bug fix, 1 file kode + 2 dokumentasi)
+Audit label content description tombol toggle playback mode di `NowPlayingScreen.kt`.
+
+**Bug**: tombol Shuffle & Repeat (3-state OFF→ALL→ONE via `cycleRepeatMode()`) pakai label
+statis (`"Acak"`/`"Ulangi"`) — status ON/OFF/mode aktif cuma dibedakan lewat `tint`
+(`animatedAccent` vs `colorScheme.secondary`), TalkBack tidak baca warna. Repeat lebih parah:
+glyph `Icons.Default.Repeat` identik utk state OFF & ALL (cuma `RepeatOne` beda glyph) —
+screen-reader user 100% tidak bisa bedakan OFF vs ALL aktif.
+
+**Fix**: label ikut state — Shuffle: `"Acak: aktif"`/`"Acak: nonaktif"`. Repeat: `"Ulangi:
+mati"`/`"Ulangi: semua lagu"`/`"Ulangi: satu lagu"`. Brace/paren `NowPlayingScreen.kt` balance
+(216/216, 769/769).
+
+`MICRO_UIUX_AUDIT.md` diupdate (checklist item 6/7). Item berikutnya (7/7, penutup kategori):
+jangan mengganti icon hanya demi estetika jika mengubah affordance. Belum diverifikasi TalkBack
+di device asli.
+
+---
+
+## Batch 230 — Iconography 5/7: contentDescription null hanya utk decorative (0 bug, 0 kode + 2 dokumentasi)
+Grep 69 titik `contentDescription = null` app-wide, dicek satu-satu: semua genuinely decorative
+— icon+Text sibling dlm `Button`/`TextButton`/`NavigationBarItem` (label Text terpisah)/
+`AlertDialog` (icon dialog standar)/`ListItem leadingContent`/menu `leadingIcon`, atau badge
+status murni tanpa onClick (`GraphicEq` "Sedang diputar", `Lock`/`LockOpen` status vault).
+
+Cross-check terpisah: scan window ±12 baris tiap `IconButton(`/`FilledIconButton(` app-wide
+mencari kombinasi icon-only actionable + `contentDescription = null` (pola bug aksesibilitas
+klasik — icon-only button tanpa label teks butuh deskripsi eksplisit utk TalkBack). **0 titik
+ditemukan** — semua `IconButton` icon-only app ini sudah konsisten pakai deskripsi string
+(`"Putar"`, `"Jeda"`, `"Hapus lirik"`, dst, lihat Batch 226-228 utk contoh).
+
+**Hasil: 0 bug**, 0 kode disentuh. `MICRO_UIUX_AUDIT.md` diupdate (checklist item 5/7). Item
+berikutnya (6/7): semua actionable icon harus memiliki semantic/content label yang sesuai.
+
+---
+
+## Batch 229 — Iconography 4/7: action vs decorative icon (1 bug fix, 2 file kode + 2 dokumentasi)
+Audit tint icon decorative (badge status, 0 onClick) app-wide. Konvensi codebase: icon
+decorative pakai `colorScheme.secondary` (contoh: `MusicNote` fallback album art di
+`LibraryScreen.kt`/`Utils.kt`/`MainActivity.kt`, drag-handle `QueueSheet.kt`), sementara
+`primary` reserved utk icon actionable/tombol (mis. `animatedAccent` play/pause).
+
+**Bug**: badge "Sedang diputar" (`Icons.Default.GraphicEq`, murni indikator status — tidak
+ada onClick sama sekali) di `QueueSheet.kt` & `LibraryScreen.kt` pakai tint `primary` —
+menyamai warna icon actionable, bikin ambigu seolah badge ini bisa di-tap padahal cuma status.
+
+**Fix**: `primary` → `secondary` di kedua titik, samakan dgn baris drag-handle persis di
+atasnya (`QueueSheet.kt`) yang sudah pakai `secondary` dgn benar. Brace/paren kedua file
+balance (40/40+131/131, 336/336+725/725).
+
+`MICRO_UIUX_AUDIT.md` diupdate (checklist item 4/7). Item berikutnya (5/7):
+`contentDescription = null` hanya untuk icon yang benar-benar decorative. Belum diverifikasi
+visual di device asli.
+
+---
+
+## Batch 228 — Iconography 3/7: samakan visual weight icon sejenis (1 bug fix, 2 file kode + 2 dokumentasi)
+Grep semua call site `ResultBanner(...)` (pola sukses/gagal): 4 titik — `SignatureMatcherSheet.kt`,
+`UpdateCheckSheet.kt`, `BackupRestoreSheet.kt`, `DiagnosticLogSheet.kt`.
+
+**Bug**: 2/4 titik (`BackupRestoreSheet.kt`, `DiagnosticLogSheet.kt`) pasangkan `CheckCircle`
+(solid, bobot tebal) dengan `ErrorOutline` (garis tipis, bobot ringan) untuk pasangan
+sukses/gagal yang sama persis secara semantik — tidak konsisten dengan 2 titik lain
+(`SignatureMatcherSheet.kt`, `UpdateCheckSheet.kt`) yang sama-sama pakai bobot solid
+(`CheckCircle` + `Error`).
+
+**Fix**: ganti `Icons.Default.ErrorOutline` → `Icons.Default.Error` di kedua file, samakan
+dengan pola referensi `SignatureMatcherSheet.kt`. Brace/paren kedua file balance
+(33/33+89/89, 16/16+68/68).
+
+`MICRO_UIUX_AUDIT.md` diupdate (checklist item 3/7). Item berikutnya (4/7): pastikan action
+icon dapat dibedakan dari decorative icon. Belum diverifikasi visual di device asli.
+
+---
+
+## Batch 227 — Iconography 2/7 penutup: fix HomeScreen.kt (1 bug fix, 1 file kode + 2 dokumentasi)
+Menutup Pending Queue Batch 226. `HomeScreen.kt` tombol "Lanjutkan" (continue-listening, 48dp)
+pakai `Icons.Default.PlayArrow` selalu (bukan toggle Play/Pause seperti 3 titik lain) — jadi
+offset +1dp diterapkan tetap/tidak kondisional, konsisten dgn fix Batch 226. Brace/paren
+`HomeScreen.kt` balance (67/67, 202/202).
+
+**Iconography item "audit optical alignment" TUNTAS 4/4 titik** (Batch 226-227).
+`MICRO_UIUX_AUDIT.md` diupdate. Item berikutnya (3/7): samakan visual weight icon sejenis.
+Belum diverifikasi visual di device asli.
+
+---
+
+## Batch 226 — Iconography 2/7: audit optical alignment (1 bug fix, 3 file kode + 2 dokumentasi)
+Grep app-wide `Icons.Default.PlayArrow`: 4 titik ditemukan (`NowPlayingScreen.kt` tombol utama
+68dp, `MiniPlayerBar.kt` tombol mini 40dp, `LyricsSheet.kt` tombol sync lirik, `HomeScreen.kt`
+tombol "Lanjutkan" continue-listening 48dp).
+
+**Bug**: glyph segitiga PlayArrow secara optik condong ke kiri dalam bounding box 24dp-nya
+(vector Material bawaan tidak simetris kiri-kanan seperti Pause). Di 4 titik ini, Play↔Pause
+di-swap di posisi/ukuran yang sama persis lewat `AnimatedContent` — akibatnya PlayArrow
+berpotensi kelihatan "kegeser kiri" dari titik pusat tombol, padahal Pause pas center.
+
+**Fix**: tambah `Modifier.offset(x = 1.dp)` kondisional — HANYA aktif saat state PlayArrow
+(`!playing`/`!isPlaying`), Pause tidak disentuh. Diterapkan ke 3/4 titik: `NowPlayingScreen.kt`,
+`MiniPlayerBar.kt`, `LyricsSheet.kt`. Brace/paren ketiga file balance (215/215+762/762,
+12/12+96/96, 63/63+165/165).
+
+**Pending Queue (micro-batching cap 3 file/batch)**: `HomeScreen.kt` tombol "Lanjutkan" — fix
+sama (offset +1dp saat PlayArrow), belum dikerjakan batch ini.
+
+`MICRO_UIUX_AUDIT.md` diupdate (checklist item 2/7 + `STATUS TRACKING`). Item berikutnya (3/7):
+samakan visual weight icon sejenis. Belum diverifikasi visual di device asli.
+
+---
+
+## Batch 225 — Verifikasi visual Batch 224 (Play/Pause icon fix, 0 kode + 2 dokumentasi)
+Screenshot user (tema Tactile/Skeu, squircle shape) mengonfirmasi fix Batch 224: icon Play/Pause
+(40dp) sekarang tampak jelas lebih besar dari icon Skip Previous/Next di sisi kirinya —
+hierarki visual 3-tingkat (Shuffle/Repeat terkecil < Skip < Play/Pause terbesar) sudah benar
+secara visual, tidak ada lagi kesan tombol besar tapi glyph kecil. 0 distorsi/kepenuhan dalam
+lingkaran/squircle accent. `MICRO_UIUX_AUDIT.md` & `CHANGELOG.md` Batch 224 diupdate status
+"belum diverifikasi visual" → "terverifikasi visual (Batch 225)".
+
 ## Batch 224 — Iconography item 1/7: audit ukuran icon (1 bug fix — Play/Pause NowPlaying 34dp→40dp)
 Kategori baru dimulai (Settings TUNTAS 9/9 di Batch 223). Item 1/7 § Iconography
 `MICRO_UIUX_AUDIT.md`: "Audit ukuran icon". Grep semua `Icon(` app-wide (113 titik total di
@@ -26,8 +167,8 @@ sadar.
 **Fix**: `34.dp` → `40.dp`. Hierarki dipulihkan (24 < 36 < 40), padding internal circle tetap
 proporsional (68−40=28dp total ruang, lebih lega dari margin skip-icon 48−36=12dp, jadi tetap
 "bernapas" bukan penuh sesak). 1 file (`NowPlayingScreen.kt`), 1 baris kode. Brace/paren
-seimbang (215/215, 756/756). **Belum diverifikasi visual** — prioritas cek proporsi icon dalam
-lingkaran accent tidak terlihat kebesaran/kepenuhan di device asli. `MICRO_UIUX_AUDIT.md`
+seimbang (215/215, 756/756). **✅ Terverifikasi visual (Batch 225, screenshot user)** — hierarki
+3-tingkat sudah kelihatan benar, 0 distorsi/kepenuhan dalam squircle accent. `MICRO_UIUX_AUDIT.md`
 diperbarui (checklist item 1/7). Item berikutnya (2/7): audit optical alignment.
 
 ## Batch 223 — Settings polish item 9/9: verifikasi fungsi setting tidak berubah (audit, 0 bug) — SETTINGS 9/9 TUNTAS

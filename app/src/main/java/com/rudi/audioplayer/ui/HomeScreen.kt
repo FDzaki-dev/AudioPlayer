@@ -303,7 +303,14 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
             // Batch 141 — audit hit-target formal kategori #4: 44dp di bawah minimum sentuh
             // Material 48dp. Icon PlayArrow (default 24dp) tidak disentuh.
             FilledIconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "Lanjutkan")
+                // Batch 227 — Iconography 2/7 (audit optical alignment), penutup Pending Queue
+                // Batch 226. Tombol ini selalu PlayArrow (bukan toggle Play/Pause), jadi offset
+                // +1dp diterapkan tetap/tidak kondisional — konsisten dgn 3 titik lain.
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = "Lanjutkan",
+                    modifier = Modifier.offset(x = 1.dp)
+                )
             }
         }
     }

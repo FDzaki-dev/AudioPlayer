@@ -117,7 +117,10 @@ fun LyricsSheet(
                         IconButton(onClick = onPlayPause) {
                             Icon(
                                 if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "Jeda" else "Putar"
+                                contentDescription = if (isPlaying) "Jeda" else "Putar",
+                                // Batch 226 — Iconography 2/7 (audit optical alignment),
+                                // konsisten dgn NowPlayingScreen.kt/MiniPlayerBar.kt.
+                                modifier = if (!isPlaying) Modifier.offset(x = 1.dp) else Modifier
                             )
                         }
                         Text(formatDuration(positionMs), style = MaterialTheme.typography.bodyMedium)

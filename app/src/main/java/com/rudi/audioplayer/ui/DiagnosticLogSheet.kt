@@ -125,7 +125,9 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                 Spacer(modifier = Modifier.height(12.dp))
                 ResultBanner(
                     style = ResultBannerStyle.Solid,
-                    icon = if (ok) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                    // Batch 228 — Iconography 3/7 (samakan visual weight icon sejenis),
+                    // konsisten dgn fix BackupRestoreSheet.kt & referensi SignatureMatcherSheet.kt.
+                    icon = if (ok) Icons.Default.CheckCircle else Icons.Default.Error,
                     text = if (ok) "Tersimpan di Documents/AudioPlayer/logs" else "Gagal menyimpan (perlu Android 10 ke atas)",
                     containerColor = if (ok) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
                     contentColor = if (ok) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer

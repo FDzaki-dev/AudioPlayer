@@ -582,7 +582,11 @@ fun NowPlayingScreen(
             ) {
                 Icon(
                     Icons.Default.Shuffle,
-                    contentDescription = "Acak",
+                    // Batch 231 — Iconography 6/7 (semantic label actionable icon). Sebelumnya
+                    // "Acak" statis — TalkBack user tidak tahu status ON/OFF saat ini (beda
+                    // dari user awas yang lihat lewat tint animatedAccent vs secondary).
+                    // Fix: label ikut state, konsisten pola dgn Repeat di bawah.
+                    contentDescription = if (uiState.shuffleEnabled) "Acak: aktif" else "Acak: nonaktif",
                     tint = if (uiState.shuffleEnabled) animatedAccent else MaterialTheme.colorScheme.secondary
                 )
             }
@@ -643,7 +647,15 @@ fun NowPlayingScreen(
                         // TERBESAR, bukan terkecil). Baris Shuffle/Repeat (default 24dp, tanpa
                         // override) < Skip (36dp) < Play/Pause sekarang 40dp — urutan bobot
                         // visual 3-tingkat yang benar utuh dipulihkan.
-                        modifier = Modifier.size(40.dp)
+                        // Batch 226 — Iconography 2/7 (audit optical alignment). Glyph segitiga
+                        // PlayArrow punya bobot visual condong ke kiri dalam bounding box-nya
+                        // (beda dari Pause yang simetris) — kalau ukuran sama & posisi sama
+                        // persis pas AnimatedContent switch, mata lihat PlayArrow "kegeser kiri"
+                        // dari titik pusat lingkaran tombol. Fix: offset +1dp ke kanan HANYA
+                        // saat PlayArrow (bukan Pause) buat kompensasi bias optik tsb.
+                        modifier = Modifier
+                            .size(40.dp)
+                            .then(if (!playing) Modifier.offset(x = 1.dp) else Modifier)
                     )
                 }
             }
@@ -664,7 +676,15 @@ fun NowPlayingScreen(
                 val icon = if (uiState.repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
                 Icon(
                     icon,
-                    contentDescription = "Ulangi",
+                    // Batch 231 — Iconography 6/7 (semantic label actionable icon). Sebelumnya
+                    // "Ulangi" statis utk toggle 3-state (OFF→ALL→ONE) — TalkBack user tidak
+                    // bisa bedakan OFF vs ALL sama sekali (icon glyph identik, cuma tint beda,
+                    // dan tint tidak terbaca screen reader). Fix: label sebut mode aktif.
+                    contentDescription = when (uiState.repeatMode) {
+                        Player.REPEAT_MODE_ONE -> "Ulangi: satu lagu"
+                        Player.REPEAT_MODE_ALL -> "Ulangi: semua lagu"
+                        else -> "Ulangi: mati"
+                    },
                     tint = if (uiState.repeatMode != Player.REPEAT_MODE_OFF) animatedAccent else MaterialTheme.colorScheme.secondary
                 )
             }

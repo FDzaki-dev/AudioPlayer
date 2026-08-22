@@ -257,7 +257,11 @@ private fun QueueRow(
                 Icon(
                     Icons.Default.GraphicEq,
                     contentDescription = "Sedang diputar",
-                    tint = MaterialTheme.colorScheme.primary,
+                    // Batch 229 — Iconography 4/7 (action vs decorative icon). Badge murni
+                    // status, 0 onClick — pakai `primary` (warna reserved utk icon actionable/
+                    // tombol app ini) bikin ambigu seolah bisa di-tap. Baris drag-handle
+                    // persis di atasnya (juga decorative) pakai `secondary` — samakan.
+                    tint = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.size(20.dp)
                 )
             }

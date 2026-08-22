@@ -1209,7 +1209,9 @@ private fun SongRow(
                         Icon(
                             Icons.Default.GraphicEq,
                             contentDescription = "Sedang diputar",
-                            tint = MaterialTheme.colorScheme.primary,
+                            // Batch 229 — Iconography 4/7 (action vs decorative icon), konsisten
+                            // dgn fix QueueSheet.kt: badge status murni, bukan `primary`.
+                            tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))

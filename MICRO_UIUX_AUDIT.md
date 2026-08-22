@@ -18,7 +18,7 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
 | 2 | Spacing & Sizing Consistency | 🟡 **Berlanjut (Batch 146-147, 151-152)**. 146: audit horizontal screen padding — 4 tab utama Home/Settings/NowPlaying/Playlist/SmartPlaylist/StatsDashboard sudah 20dp; 2 gap di `LibraryScreen.kt` diperbaiki (`AlbumGridView` 16dp→20dp horizontal, 4 titik `ListItem` Artis/Folder/hasil-pencarian/riwayat 4dp→20dp). 147: audit ukuran control setara — `LockScreen.kt` ikon Fingerprint(28dp)/Backspace(22dp) disamakan ke 24dp. 151: audit vertical spacing antar section (`SettingsScreen.kt`, 7 titik pola `Spacer(12dp)→Divider→Spacer(20dp)`) — 0 bug, sudah konsisten. 151-152: **gap icon↔text ✅ SELESAI** — audit formal 29 titik `Icon()→Spacer(width)→Text()` di `ui/*.kt`, dikelompokkan per-konteks (default-size icon+label/TextButton icon custom-size/menu-row Icon+Column/section header) — 2 gap nyata ditemukan & diperbaiki (`PlaylistScreen.kt` "Buat Playlist Baru" & `VaultSheet.kt` "Tambah", keduanya `TextButton`+`Icons.Default.Add` default-size 4dp→8dp), sisanya sudah konsisten by-design. Pending: sisa literal `.dp` lain (padding/size/offset di luar radius/icon-gap/screen-padding yang sudah disentuh). |
 | 3 | Typography Hierarchy | ✅ **TUNTAS (Batch 149, 154, 159, 160, 161)**. 149: title bottom sheet (1 gap fix). 154: body/label song-row (1 gap fix). 159: field-label caption (1 gap fix). 160: badge/kicker/value-readout (0 bug). 161: line-height — **5 gap sistemik** (`theme/Type.kt` 5 style ter-override tanpa `lineHeight`, app-wide blast radius) diperbaiki, dihitung proporsional dari rasio M3 asli. **Belum diverifikasi visual** Batch 161 — cek prioritas tinggi. Sisa (SENGAJA tidak diklaim tuntas): cakupan penuh truncation/ellipsis (beda sub-kategori, sebagian sudah Batch 37). |
 | 5 | Interactive States (disabled/selected/loading/error) | ✅ **Audit selesai 8/8 sub-item (Batch 162-168)**. disabled icon-button tint (5 titik, konsisten), pressed/ripple integrity (0 `indication=null` ditemukan, aman), loading (`ShimmerBrush` shared, konsisten), **selected/active state (Batch 163-164)** — taksonomi 3 pola selected by-design (Card preview→border+elevation; List/dialog option→RadioButton; Tag/filter→FilterChip fill), 2 konsisten, **1 bug ditemukan & diperbaiki (Batch 163)**: `SpeedDialog` TextButton+"✓" disamakan ke RadioButton (samakan `TransitionModeOption` di dialog sama). **1 dari 3 observasi tertunda DIEKSEKUSI (Batch 164)**: `SongRow` (LibraryScreen) sekarang menandai lagu sedang diputar, disamakan pola `QueueRow`. **error state & success/confirmation feedback (Batch 165-166)** — teks validasi inline 100% konsisten (0 bug); banner hasil-operasi (4 titik/3 file) 3-arah tidak konsisten → **DISATUKAN (Batch 166)**: composable shared `ResultBanner` (`Utils.kt`) + `enum ResultBannerStyle {Solid,Tinted,Bare}`, 3 gaya lama dipertahankan lewat parameter, 0 perubahan visual disengaja. **konsistensi lintas-aksi (Batch 168)** — toggle Favorit (LibraryScreen vs NowPlaying): icon/tint/haptic identik, TAPI `bouncyPress` cuma ada di NowPlaying — genuinely ambigu (list padat vs hero screen), dicatat bukan dieksekusi. **3 observasi masih tertunda keputusan user**: (a) `EmptyState` icon hardcode (Batch 162), (b) `LibraryFilterChips` custom-fill vs FilterChip (Batch 163), (c) Favorit `bouncyPress` di atas (Batch 168). |
-| 6-14 | Now Playing s/d Component Consistency | 🟡 **Now Playing ✅ TUNTAS (Batch 169-179)**. **Library/Song List ✅ TUNTAS 11/11 (Batch 180-190)**. **Playlist/Queue ✅ TUNTAS 8/8 (Batch 191-214)**. **Settings ✅ TUNTAS 9/9 (Batch 215-223)**: grouping(215)/title-subtitle(216)/spacing(217, 0 bug)/switch alignment(218, 0 bug)/nav affordance(219, 0 bug)/destructive setting(220, 1 fix — konfirmasi nonaktifkan PIN)/disabled visibility(221, 0 bug)/visual density(222, 0 bug)/fungsi tidak berubah(223, verifikasi 0 bug). **Iconography berlanjut (Batch 224)**: item 1/7 ukuran icon — 1 fix (Play/Pause `NowPlayingScreen` 34dp→40dp, hierarki visual dgn Skip 36dp dipulihkan). Kategori 12-14 belum mulai. |
+| 6-14 | Now Playing s/d Component Consistency | 🟡 **Now Playing ✅ TUNTAS (Batch 169-179)**. **Library/Song List ✅ TUNTAS 11/11 (Batch 180-190)**. **Playlist/Queue ✅ TUNTAS 8/8 (Batch 191-214)**. **Settings ✅ TUNTAS 9/9 (Batch 215-223)**: grouping(215)/title-subtitle(216)/spacing(217, 0 bug)/switch alignment(218, 0 bug)/nav affordance(219, 0 bug)/destructive setting(220, 1 fix — konfirmasi nonaktifkan PIN)/disabled visibility(221, 0 bug)/visual density(222, 0 bug)/fungsi tidak berubah(223, verifikasi 0 bug). **Iconography ✅ TUNTAS 7/7 (Batch 224-232)**: ukuran(224, 1 fix Play/Pause 34dp→40dp)/optical alignment(226-227, 1 fix 4 titik PlayArrow offset+1dp)/visual weight(228, 1 fix ErrorOutline→Error di `ResultBanner`)/action-vs-decorative(229, 1 fix tint badge GraphicEq primary→secondary)/contentDescription null(230, 0 bug)/semantic label(231, 1 fix Shuffle+Repeat state-aware)/no-cosmetic-affordance-change(232, verifikasi retrospektif 0 pelanggaran). Kategori 12-14 belum mulai — Accessibility Micro-Polish berikutnya. |
 
 ---
 
@@ -204,13 +204,58 @@ kategori dicatat di sini; detail teknis tiap batch ada di `CHANGELOG.md`.
   hit-target vs visual size didokumentasikan sejak Batch 141). **1 bug nyata**: Play/Pause
   `NowPlayingScreen.kt` (kontainer terbesar 68dp) glyph cuma 34dp — LEBIH KECIL dari Skip
   Prev/Next yang mengapitnya (36dp), membalik hierarki bobot visual (Shuffle/Repeat 24 < Skip 36
-  < harusnya Play/Pause terbesar). Fix: 34dp→40dp, hierarki 24<36<40 dipulihkan.
-- [ ] Audit optical alignment.
-- [ ] Samakan visual weight icon sejenis.
-- [ ] Pastikan action icon dapat dibedakan dari decorative icon.
-- [ ] `contentDescription = null` hanya untuk icon yang benar-benar decorative.
-- [ ] Semua actionable icon harus memiliki semantic/content label yang sesuai.
-- [ ] Jangan mengganti icon hanya demi estetika jika mengubah affordance.
+  < harusnya Play/Pause terbesar). Fix: 34dp→40dp, hierarki 24<36<40 dipulihkan. **✅
+  Terverifikasi visual (Batch 225, screenshot user)**.
+- [x] Audit optical alignment. **✅ 1 bug fix (Batch 226-227), TUNTAS 4/4 titik** — grep semua
+  `Icons.Default.PlayArrow` app-wide: 4 titik (`NowPlayingScreen.kt`, `MiniPlayerBar.kt`,
+  `LyricsSheet.kt`, `HomeScreen.kt` "Lanjutkan"). Glyph segitiga PlayArrow punya bobot visual
+  condong kiri dalam bounding box (beda dari Pause yang simetris kiri-kanan) — pas
+  `AnimatedContent` switch Play↔Pause di posisi identik, PlayArrow kelihatan "kegeser kiri" dari
+  titik pusat tombol. **Fix**: offset +1dp kanan. Batch 226: 3 titik toggle Play/Pause
+  (`NowPlayingScreen.kt`/`MiniPlayerBar.kt`/`LyricsSheet.kt`), kondisional HANYA saat PlayArrow.
+  Batch 227 (penutup): `HomeScreen.kt` — tombol ini selalu PlayArrow (bukan toggle), offset
+  diterapkan tetap. Belum diverifikasi visual di device asli.
+- [x] Samakan visual weight icon sejenis. **✅ 1 bug fix (Batch 228)** — grep pasangan
+  ikon sukses/gagal `ResultBanner(...)` (4 call site app-wide): `SignatureMatcherSheet.kt` &
+  `UpdateCheckSheet.kt` pakai `CheckCircle` (solid) vs `Error` (solid) — bobot konsisten.
+  **Bug**: `BackupRestoreSheet.kt` & `DiagnosticLogSheet.kt` pakai `CheckCircle` (solid) vs
+  `ErrorOutline` (garis tipis) — 1 pasangan sukses/gagal yg sama tapi bobot visual beda dgn
+  2 site lain. Fix: `ErrorOutline` → `Error` di kedua file, samakan dgn pola referensi
+  `SignatureMatcherSheet.kt`. Belum diverifikasi visual di device asli.
+- [x] Pastikan action icon dapat dibedakan dari decorative icon. **✅ 1 bug fix (Batch 229)** —
+  audit tint icon decorative (badge status, tanpa onClick) app-wide. Konvensi codebase: icon
+  decorative pakai `colorScheme.secondary` (mis. `MusicNote` fallback album art, drag-handle
+  `QueueSheet.kt`), `primary` reserved utk icon actionable/tombol. **Bug**: badge "Sedang
+  diputar" (`GraphicEq`, murni status 0 onClick) di `QueueSheet.kt` & `LibraryScreen.kt` pakai
+  `primary` — ambigu seolah bisa di-tap, padahal cuma indikator. Fix: `primary` → `secondary`
+  di kedua titik, samakan dgn baris drag-handle persis di atasnya (`QueueSheet.kt`) yang sudah
+  benar. Belum diverifikasi visual di device asli.
+- [x] `contentDescription = null` hanya untuk icon yang benar-benar decorative. **✅ 0 bug
+  (Batch 230)** — grep 69 titik `contentDescription = null` app-wide. Semua genuinely
+  decorative: (a) icon+Text sibling dlm `Button`/`TextButton`/`NavigationBarItem`/`AlertDialog`/
+  `ListItem leadingContent`/`leadingIcon` (TalkBack baca label teksnya, null menghindari
+  duplikasi announcement — pola benar), atau (b) badge status murni tanpa onClick. 0 titik
+  `IconButton`/`clickable` icon-only (tanpa Text pendamping) ditemukan pakai null — dicek
+  window ±12 baris tiap `IconButton(` app-wide, semua actionable icon-only sudah punya
+  `contentDescription` deskriptif.
+- [x] Semua actionable icon harus memiliki semantic/content label yang sesuai. **✅ 1 bug fix
+  (Batch 231)** — audit label toggle playback mode di `NowPlayingScreen.kt`. **Bug**: tombol
+  Shuffle & Repeat (3-state OFF→ALL→ONE) pakai label statis ("Acak"/"Ulangi") — status ON/OFF/
+  mode aktif cuma dibedakan lewat `tint` (animatedAccent vs secondary), tidak terbaca TalkBack.
+  Repeat lebih parah: glyph icon OFF vs ALL identik (`Icons.Default.Repeat`), jadi user
+  screen-reader sama sekali tidak bisa tahu status OFF vs ALL aktif. Fix: label ikut state
+  ("Acak: aktif/nonaktif", "Ulangi: mati/semua lagu/satu lagu"). Belum diverifikasi TalkBack
+  di device asli.
+- [x] Jangan mengganti icon hanya demi estetika jika mengubah affordance. **✅ Verifikasi
+  retrospektif (Batch 232), TUNTAS 7/7 kategori ICONOGRAPHY** — ditelusuri ulang 4 fix kode
+  Batch 224-231, tidak ada satupun murni kosmetik yg mengubah/mengaburkan affordance: (1)
+  Batch 224 ukuran 34dp→40dp = size saja, glyph & makna tetap. (2) Batch 226-227 offset +1dp =
+  posisi mikro, bukan ganti glyph. (3) Batch 228 `ErrorOutline`→`Error` = ganti glyph TAPI
+  dasarnya menyamakan bobot dgn pasangan `CheckCircle` solid yg sudah ada (konsistensi makna
+  status gagal, bukan estetika semata). (4) Batch 229 tint `primary`→`secondary` = warna saja,
+  affordance malah DIPERJELAS (bedakan decorative dari actionable, bukan dikaburkan). (5) Batch
+  231 contentDescription = teks saja, 0 icon visual berubah. **Hasil: 0 pelanggaran**, 0 kode
+  disentuh batch ini.
 
 ---
 
