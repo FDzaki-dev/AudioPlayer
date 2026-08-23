@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlaylistAdd
@@ -1001,6 +1002,17 @@ private fun SongListView(
         modifier = Modifier
             .onGloballyPositioned { containerCoordinates = it }
             .pointerInput(songs) {
+                // Batch 1 (v263 session) — Pending Queue item 2: user reported sweep-select in
+                // tab Lagu as over-sensitive vs iOS's standard feel. Root cause: `indexAt()`
+                // flips `sweepLastIndex` the INSTANT the Y coordinate crosses a row's exact
+                // pixel boundary — completely normal finger tremor while holding roughly still
+                // near a boundary line reads as several rapid crossings, so selection flickered
+                // in/out on rows the user never meant to touch. Fix: hysteresisPx — once a row
+                // is committed, the touch must travel that much PAST the previous row's boundary
+                // (not just 1px past it) before the next row is allowed to commit. Doesn't
+                // change fast/deliberate swipes at all (those clear the margin trivially), only
+                // damps the tiny-jitter-near-a-boundary case.
+                val hysteresisPx = 6.dp.toPx()
                 detectDragGesturesAfterLongPress(
                     onDragStart = { offset ->
                         val root = containerCoordinates?.localToRoot(offset) ?: return@detectDragGesturesAfterLongPress
@@ -1015,8 +1027,15 @@ private fun SongListView(
                         val anchor = sweepAnchorIndex ?: return@detectDragGesturesAfterLongPress
                         change.consume()
                         val root = containerCoordinates?.localToRoot(change.position) ?: return@detectDragGesturesAfterLongPress
+                        val lastIdx = sweepLastIndex ?: return@detectDragGesturesAfterLongPress
                         val idx = indexAt(root.y) ?: return@detectDragGesturesAfterLongPress
-                        if (idx == sweepLastIndex) return@detectDragGesturesAfterLongPress
+                        if (idx == lastIdx) return@detectDragGesturesAfterLongPress
+                        val lastBounds = rowBoundsInRoot[lastIdx]
+                        if (lastBounds != null) {
+                            val committed = if (idx > lastIdx) root.y > lastBounds.endInclusive + hysteresisPx
+                            else root.y < lastBounds.start - hysteresisPx
+                            if (!committed) return@detectDragGesturesAfterLongPress
+                        }
                         sweepLastIndex = idx
                         val range = minOf(anchor, idx)..maxOf(anchor, idx)
                         val sweptIds = range.map { songs[it].id }
@@ -1251,6 +1270,22 @@ private fun SongRow(
                         if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = if (isFavorite) "Hapus dari favorit" else "Tambah ke favorit",
                         tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    )
+                }
+                // Batch 265 (v263 session Batch2) — user lapor "gak bisa pilih lagu langsung dari
+                // tab favorit/playlist". Root cause SUNGGUHAN, bukan gap per-tab: `showMenu`
+                // (DropdownMenu di bawah, isinya termasuk "Pilih" -> onEnterSelectionMode()) TIDAK
+                // PERNAH di-set true di MANA PUN di file ini — grep `showMenu` cuma nongol di
+                // deklarasi + di dalam DropdownMenu itu sendiri, 0 trigger. Menu ini sepenuhnya
+                // unreachable, di SEMUA tab yang lewat SongRow (Lagu/Favorit/Artis/Folder/Search
+                // — 1 composable dipakai ulang, grep-confirmed komentar Batch 133 di atas), bukan
+                // cuma Favorit/Playlist seperti dugaan awal (Batch 262/264). Playlist tab sendiri
+                // TETAP belum tersentuh — itu `PlaylistTabView`, composable lain total, tidak
+                // lewat SongRow sama sekali, root cause ini tidak menjangkaunya.
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "Opsi lagu lainnya"
                     )
                 }
             }

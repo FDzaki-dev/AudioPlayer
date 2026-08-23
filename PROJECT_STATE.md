@@ -28,6 +28,37 @@ atas file yang terus memanjang):
    `[x]` + "0 bug, STOP", JANGAN ciptakan kerjaan baru demi 100%.
 
 ## Batch terakhir yang selesai
+**Batch 265 (Fix SUNGGUHAN "gak bisa pilih lagu" — koreksi user atas Batch 264, 1 file)** — Root
+cause ASLI: `showMenu` (state `DropdownMenu` di `SongRow`, isinya termasuk "Pilih" ->
+`onEnterSelectionMode()`) TIDAK PERNAH di-set `true` di mana pun — menu 100% unreachable, di
+SEMUA tab lewat `SongRow` (Lagu/Favorit/Artis/Folder/Search), bukan gap per-tab seperti dugaan
+Batch 262/264. Fix: tambah `IconButton` "..." (`Icons.Default.MoreVert`, import baru) yang
+men-trigger `showMenu = true`. **Playlist tab TETAP belum tersentuh** (composable lain total,
+`PlaylistTabView`, tidak lewat `SongRow`) — masih butuh keputusan desain terpisah, sama seperti
+dicatat Batch 264. Brace/paren seimbang (339/339, 740/740). `FILE_MANIFEST.txt` tidak berubah. 0
+protected asset. **Belum diverifikasi visual di device** — prioritas kalau user push: tap "..."
+di sebuah lagu (tab manapun), pastikan menu muncul + "Pilih" masuk mode seleksi. Detail:
+`CHANGELOG.md` Batch 265.
+
+**Pending Queue (1 item, sama seperti Batch 264, belum berubah)**: sweep-select/multi-select di
+tab Playlist (`selectedTab == 5`, `PlaylistTabView`) — perlu keputusan desain: pilih banyak
+PLAYLIST sekaligus, atau di dalam tampilan lagu-per-playlist (drill-down)? Tanya user dulu
+sebelum eksekusi.
+
+**Batch 264 (Pending Queue item 2 — fix sweep-select over-sensitif tab Lagu, 1 file)** —
+Lanjutan sesi baru (`AudioPlayer_v263_Batch1.zip`, hard reset). `detectDragGesturesAfterLongPress`
+di `SongListView`/`LibraryScreen.kt` (satu-satunya implementasi, dipakai bareng tab Lagu(0)+
+Favorit(4)) dulu pindah row PERSIS saat Y lewat batas 1px — tremor jari dekat garis batas =
+flicker seleksi. Fix: `hysteresisPx` (6dp), row baru commit kalau touch lewat SEJAUH itu dari
+batas row sebelumnya. Swipe cepat tidak berubah. **Koreksi Pending Queue item 1 (sendirinya
+terkoreksi ulang oleh Batch 265 di atas — sweep-select bukan masalahnya, dropdown "Pilih" yang
+unreachable)** — diverifikasi ulang ke kode sungguhan dulu (bukan asumsi): tab Favorit TERNYATA
+SUDAH punya sweep-select (basi/salah di catatan Batch 262), sisa PR sebenarnya cuma tab Playlist
+(composable beda total, `PlaylistTabView`, bukan sekadar sambung parameter). Brace/paren
+seimbang (337/337, 733/733). `FILE_MANIFEST.txt` tidak berubah. 0 protected asset. **Belum
+diverifikasi visual di device** — gesture sensitif susah dinilai dari kode doang. Detail:
+`CHANGELOG.md` Batch 264.
+
 **Batch 263 (Follow-up fix — scroll "bouncy" di sheet Buat Playlist Otomatis, 1 file)** — User
 konfirmasi Batch 262 berhasil, lapor scroll terasa bouncy: overscroll stretch-glow bawaan
 Android 12+ bertumpuk dgn gesture drag `ModalBottomSheet`. Fix: `Column` dibungkus

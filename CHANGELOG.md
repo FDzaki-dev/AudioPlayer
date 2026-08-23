@@ -1,5 +1,65 @@
 # Changelog
 
+## Batch 265 — Fix SUNGGUHAN "gak bisa pilih lagu": `showMenu` dropdown SongRow unreachable
+User koreksi Batch 264: "gak bisa pilih lagu langsung dari tab favorit, begitu pula tab
+playlist!!". Root cause ASLI ditemukan — BUKAN gap per-tab seperti dugaan Batch 262/264: `var
+showMenu by remember { mutableStateOf(false) }` di `SongRow` (`LibraryScreen.kt`) TIDAK PERNAH
+di-set `true` di MANA PUN — grep `showMenu` di seluruh file cuma nongol di deklarasi + di dalam
+`DropdownMenu` itu sendiri (0 trigger). `DropdownMenu` ini isinya "Putar Berikutnya", "Tambah ke
+Antrean", "Tambah ke Playlist", "Sembunyikan", **"Pilih"** (= `onEnterSelectionMode()`, ini yang
+user cari), "Hapus dari Perangkat" — SEMUANYA unreachable, bukan cuma "Pilih". Konsekuensi:
+`SongRow` dipakai ulang di SEMUA tab (Lagu/Favorit/Artis/Folder/Search — 1 composable, komentar
+Batch 133 sudah confirm ini), jadi bug ini genuinely lintas-tab, cuma user kebetulan
+mengalami/melaporkannya lewat Favorit & Playlist duluan.
+
+Fix (`LibraryScreen.kt`, 1 file): tambah `IconButton(onClick = { showMenu = true })` ber-ikon
+`Icons.Default.MoreVert` (import baru), ditaruh setelah tombol favorit-heart, di dalam blok
+`if (!selectionMode)` yang sama (konsisten — opsi overflow memang tidak relevan begitu sudah
+dalam mode seleksi). Sekarang "Pilih" beneran bisa di-tap dari mana pun `SongRow` muncul.
+
+**Playlist tab TETAP belum tersentuh** — itu `PlaylistTabView`, composable lain total, sama
+sekali tidak lewat `SongRow`, jadi fix ini TIDAK menjangkaunya. Masih butuh keputusan desain
+terpisah (dicatat Batch 264): sweep-select buat pilih banyak PLAYLIST sekaligus, atau di dalam
+tampilan lagu-per-playlist (drill-down)?
+
+Brace/paren `LibraryScreen.kt` seimbang (339/339, 740/740). 1 import baru (`MoreVert`), 0 file
+baru/hapus, `FILE_MANIFEST.txt` tidak berubah. 0 protected asset. **Belum diverifikasi visual di
+device** — prioritas kalau user push: buka tab Lagu (paling gampang ada isinya), tap "..." di
+sebuah lagu, pastikan menu muncul dan "Pilih" beneran masuk mode seleksi (checkbox nongol).
+
+## Batch 264 — Pending Queue item 2: fix sweep-select over-sensitif tab Lagu (standar iOS)
+Lanjutan sesi baru (`AudioPlayer_v263_Batch1.zip` sbg source-of-truth, hard reset konteks per
+protokol). User: "lanjutkan progress pending urgent". Pending Queue tersisa 2 item dari Batch
+262 — dieksekusi item PALING krusial dulu sesuai Strict Micro-Batching (bug aktif mengganggu
+fitur yang SUDAH ada > gap fitur di tab yang belum tentu perlu sweep-select sama sekali):
+
+**Item 2 (dikerjakan) — sweep-select tab Lagu over-sensitif**: `SongListView`'s
+`detectDragGesturesAfterLongPress` (`LibraryScreen.kt`) memindah `sweepLastIndex` PERSIS saat Y
+melewati garis batas 1px row berikutnya — tremor jari normal saat nahan posisi dekat garis batas
+terbaca sebagai berkali-kali "melewati batas", jadi seleksi flicker in/out di row yang user tidak
+pernah maksud sentuh. Fix: `hysteresisPx` (6dp) — begitu 1 row committed, touch harus lewat
+SEJAUH ITU dari batas row sebelumnya (bukan cuma 1px) sebelum row berikutnya boleh commit. Swipe
+cepat/sengaja tidak berubah sama sekali (jarak hysteresis kelewat trivial), cuma meredam kasus
+jitter-kecil-dekat-batas. 1 file (`LibraryScreen.kt`), gesture ini SATU-SATUNYA implementasi
+`detectDragGesturesAfterLongPress` di file ini — dipakai bareng oleh tab Lagu (0) DAN tab
+Favorit (4), keduanya lewat `SongListView` yang sama, jadi ke-fix otomatis di keduanya tanpa
+edit terpisah.
+
+**Item 1 (koreksi catatan, TIDAK butuh kerjaan)** — dicek ulang kode sungguhan sebelum eksekusi:
+klaim "sweep-select belum ada di tab Favorit" di Pending Queue Batch 262 sudah **BASI/salah** —
+tab Favorit (`selectedTab == 4`) sudah pakai `SongListView` yang sama dgn `onSweepSelectRange`
+terpasang penuh (baris ~337), diverifikasi lewat `primaryLabels`/`moreLabels` di baris 748-749.
+Sisa PR sebenarnya CUMA tab Playlist (`selectedTab == 5`, `PlaylistTabView` — composable beda
+total, daftar PLAYLIST bukan daftar lagu flat, jadi "sweep-select" di sana bukan sekadar
+nyambungin parameter yang sudah ada, perlu desain terpisah) — dicatat ulang sebagai Pending Queue
+yang benar di bawah, bukan diasumsikan sama kayak Favorit.
+
+Brace/paren `LibraryScreen.kt` seimbang (337/337, 733/733). `FILE_MANIFEST.txt` tidak berubah (0
+file baru/hapus). 0 protected asset disentuh. **Belum diverifikasi visual di device** — gesture
+sensitif sulit dinilai lewat baca kode doang, prioritas paling atas kalau user push: coba sweep
+pelan-pelan dekat garis batas row (skenario yang tadinya flicker), pastikan sekarang halus tapi
+swipe cepat tetap responsif normal (bukan malah jadi lag/nge-lag).
+
 ## Batch 263 — Follow-up fix: scroll "bouncy" di sheet Buat Playlist Otomatis (1 file)
 User konfirmasi fix Batch 262 berhasil (tombol Batal/Simpan sekarang terjangkau), TAPI lapor
 scroll terasa "agak bouncy". Root cause: `verticalScroll` yang baru ditambahkan otomatis ikut
