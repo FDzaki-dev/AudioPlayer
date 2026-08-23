@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 263 — Follow-up fix: scroll "bouncy" di sheet Buat Playlist Otomatis (1 file)
+User konfirmasi fix Batch 262 berhasil (tombol Batal/Simpan sekarang terjangkau), TAPI lapor
+scroll terasa "agak bouncy". Root cause: `verticalScroll` yang baru ditambahkan otomatis ikut
+overscroll stretch-glow bawaan Android 12+/Compose Foundation — di dalam `ModalBottomSheet` yang
+JUGA punya gesture drag-to-dismiss sendiri, stretch effect itu terasa berlebihan/ganda (2 sistem
+gesture bertumpuk).
+
+**`SmartPlaylistScreen.kt`** (diedit) — `Column` dibungkus `CompositionLocalProvider
+(LocalOverscrollConfiguration provides null)`, scope CUMA di Column ini (bukan seluruh app,
+bukan seluruh sheet — tombol Batal/Simpan di luar Column pun tidak ikut terkena). Compose BOM
+project ini 2024.05.00 — `LocalOverscrollConfiguration` masih API terkini utk versi ini (bukan
+workaround usang; parameter `overscrollEffect` langsung di `verticalScroll()` baru ada di BOM
+lebih baru yang belum dipakai project ini). Scroll drag/fling sendiri TIDAK diubah, cuma efek
+visual stretch-glow-nya yang dimatikan.
+
+1 file. Brace/paren seimbang (103/103, 252/252). `FILE_MANIFEST.txt` tidak berubah. **Belum
+diverifikasi visual di device** — cek: scroll sheet ini sampai mentok atas/bawah, pastikan 0
+lagi efek stretch/bounce, scroll tetap responsif normal.
+
 ## Batch 262 — Bug fix urgent: sheet "Buat Playlist Otomatis" truncated & 0 scrollable (1 file)
 User lapor + screenshot: sheet `SmartPlaylistScreen.kt` (bikin playlist otomatis) kepotong di
 tengah field "Rating minimum", tombol Batal/Simpan di paling bawah sama sekali tidak terjangkau,

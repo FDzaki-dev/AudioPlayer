@@ -1,5 +1,6 @@
 package com.rudi.audioplayer.ui
 
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -251,6 +252,15 @@ private fun SmartPlaylistBuilderSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        // Batch 263 — user feedback langsung setelah Batch 262 (verticalScroll fix): scroll
+        // terasa "bouncy". Root cause: verticalScroll baru otomatis ikut overscroll
+        // stretch-glow bawaan Android 12+/Compose Foundation — di dalam ModalBottomSheet yang
+        // JUGA punya gesture drag sendiri, stretch itu terasa berlebihan/ganda. Compose BOM di
+        // project ini (2024.05.00) API terkininya masih `LocalOverscrollConfiguration provides
+        // null` (bukan workaround usang — versi Foundation yang lebih baru dgn parameter
+        // `overscrollEffect` di `verticalScroll()` belum ada di BOM ini). Discope cuma di
+        // Column ini (bukan seluruh app), scroll drag/fling-nya sendiri TIDAK diubah.
+        CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -433,6 +443,7 @@ private fun SmartPlaylistBuilderSheet(
                     Text(if (initial == null) "Buat" else "Simpan")
                 }
             }
+        }
         }
     }
 }

@@ -28,6 +28,13 @@ atas file yang terus memanjang):
    `[x]` + "0 bug, STOP", JANGAN ciptakan kerjaan baru demi 100%.
 
 ## Batch terakhir yang selesai
+**Batch 263 (Follow-up fix — scroll "bouncy" di sheet Buat Playlist Otomatis, 1 file)** — User
+konfirmasi Batch 262 berhasil, lapor scroll terasa bouncy: overscroll stretch-glow bawaan
+Android 12+ bertumpuk dgn gesture drag `ModalBottomSheet`. Fix: `Column` dibungkus
+`CompositionLocalProvider(LocalOverscrollConfiguration provides null)`, scope cuma Column ini.
+API masih terkini utk Compose BOM 2024.05.00 project ini. Brace/paren seimbang. `FILE_MANIFEST.txt`
+tidak berubah. **Belum diverifikasi visual di device.** Detail: `CHANGELOG.md` Batch 263.
+
 **Batch 262 (Bug fix urgent — sheet "Buat Playlist Otomatis" truncated & 0 scrollable, 1
 file)** — User lapor + screenshot: `Column` dialog `SmartPlaylistScreen.kt` 0
 `verticalScroll`, konten (rating+tombol Simpan) ke-clip diam-diam. Root cause & fix persis sama
