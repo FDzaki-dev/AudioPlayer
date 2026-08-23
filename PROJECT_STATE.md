@@ -28,6 +28,18 @@ atas file yang terus memanjang):
    `[x]` + "0 bug, STOP", JANGAN ciptakan kerjaan baru demi 100%.
 
 ## Batch terakhir yang selesai
+**Batch 262 (Bug fix urgent — sheet "Buat Playlist Otomatis" truncated & 0 scrollable, 1
+file)** — User lapor + screenshot: `Column` dialog `SmartPlaylistScreen.kt` 0
+`verticalScroll`, konten (rating+tombol Simpan) ke-clip diam-diam. Root cause & fix persis sama
+Batch 112 (`NowPlayingScreen.kt`). Fix: `.verticalScroll(rememberScrollState())`. `LazyRow`
+nested di dalamnya dicek dulu (horizontal, 0 konflik axis). Brace/paren seimbang.
+`FILE_MANIFEST.txt` tidak berubah. **Belum diverifikasi visual di device.**
+
+**Pending Queue (2 item, ditunda sesuai Strict Micro-Batching)**: (1) sweep-select belum ada di
+tab Favorit & Playlist (baru ada di tab Lagu). (2) sensitivitas sweep-select tab Lagu perlu
+dikonfigurasi ke standar iOS (user bilang saat ini over-sensitif). Detail: `CHANGELOG.md`
+Batch 262.
+
 **Batch 261 (POLISH_AUDIT #8 § Surface/Color item 2 — samakan treatment border/divider lintas
 screen, 2 file, 3 bug fix)** — 24 `HorizontalDivider` di 10 file, 20 eksplisit `surfaceVariant`,
 3 titik (`DuplicateFinderSheet.kt` x2, `VaultSheet.kt` x1) tanpa color (default M3

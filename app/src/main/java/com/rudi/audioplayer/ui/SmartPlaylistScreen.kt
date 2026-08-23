@@ -6,7 +6,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -252,6 +254,15 @@ private fun SmartPlaylistBuilderSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Bug report user: "Buat Playlist Otomatis" TRUNCATED, 0 bisa discroll —
+                // Column ini isinya banyak (nama+folder chips+genre chips+durasi+tahun+rating+
+                // tombol Batal/Simpan di paling bawah) TANPA verticalScroll sama sekali,
+                // konten yang > tinggi sheet ke-clip diam-diam, tombol Simpan pun ikut tidak
+                // terjangkau. Root cause & fix sama persis Batch 112 (`NowPlayingScreen.kt`):
+                // verticalScroll murni jaring pengaman — kalau konten muat, scroll offset
+                // tetap 0 (0 perubahan visual), kalau tidak muat, sekarang bisa digeser bukan
+                // ke-clip/hilang.
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 24.dp)
         ) {

@@ -1,5 +1,29 @@
 # Changelog
 
+## Batch 262 — Bug fix urgent: sheet "Buat Playlist Otomatis" truncated & 0 scrollable (1 file)
+User lapor + screenshot: sheet `SmartPlaylistScreen.kt` (bikin playlist otomatis) kepotong di
+tengah field "Rating minimum", tombol Batal/Simpan di paling bawah sama sekali tidak terjangkau,
+0 bisa discroll. Root cause: `Column` pembungkus SEMUA field (nama+folder chips+genre chips+
+durasi+tahun+rating+tombol) TIDAK punya `verticalScroll` sama sekali — konten yang lebih tinggi
+dari sheet ke-clip diam-diam. **Root cause & fix persis sama Batch 112**
+(`NowPlayingScreen.kt`, kasus sheet overflow silent-clip yang sama).
+
+**`SmartPlaylistScreen.kt`** (diedit) — `.verticalScroll(rememberScrollState())` ditambahkan ke
+`Column` dialog (+2 import). `LazyRow` folder-chips/genre-chips di dalamnya TIDAK konflik
+(scroll horizontal, beda axis dari Column vertical) — dicek eksplisit sebelum edit, bukan
+tebakan (nested `LazyColumn` VERTICAL di dalam `verticalScroll` Column akan crash "infinity
+height", makanya perlu dicek dulu).
+
+1 file. Brace/paren seimbang (102/102, 246/246). `FILE_MANIFEST.txt` tidak berubah. **Belum
+diverifikasi visual di device** — cek prioritas: buka Playlist → Otomatis → Buat Baru, pastikan
+sekarang bisa discroll sampai tombol Simpan, konten tidak kepotong lagi.
+
+**Pending Queue (2 item dari laporan user, ditunda ke batch berikutnya sesuai Strict
+Micro-Batching)**:
+1. Sweep-select belum ada di tab Favorit & Playlist (saat ini cuma di tab Lagu, `LibraryScreen.kt`).
+2. Sensitivitas sweep-select (yang sudah ada di tab Lagu) perlu dikonfigurasi ulang ke standar
+   iOS — user bilang saat ini "over sensitivitas".
+
 ## Batch 261 — POLISH_AUDIT #8 § Surface/Color item 2: samakan treatment border/divider lintas screen (2 file, 3 bug fix)
 Item kedua § Surface/Color Consistency. Survey `HorizontalDivider(...)` di seluruh `ui/*.kt`: 24
 titik/10 file. **20 dari 24 eksplisit `color = MaterialTheme.colorScheme.surfaceVariant`** —
