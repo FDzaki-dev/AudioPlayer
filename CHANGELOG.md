@@ -1,5 +1,104 @@
 # Changelog
 
+## Batch 261 — POLISH_AUDIT #8 § Surface/Color item 2: samakan treatment border/divider lintas screen (2 file, 3 bug fix)
+Item kedua § Surface/Color Consistency. Survey `HorizontalDivider(...)` di seluruh `ui/*.kt`: 24
+titik/10 file. **20 dari 24 eksplisit `color = MaterialTheme.colorScheme.surfaceVariant`** —
+mayoritas jelas & konsisten. **3 titik (2 file) TIDAK set `color` sama sekali**
+(`DuplicateFinderSheet.kt` x2, `VaultSheet.kt` x1) — otomatis jatuh ke default M3
+`DividerDefaults.color` (`colorScheme.outlineVariant`, TOKEN BEDA dari `surfaceVariant`, meski
+di banyak tema keduanya kebetulan mirip nilainya, keduanya bukan token yang sama secara
+semantik). Beda dari temuan Batch 260 (5 file, blast radius besar, genuinely ambigu) — ini
+**mayoritas 20:3 jelas, blast radius kecil (2 file), 0 risiko perilaku** (murni parameter warna
+sebuah divider statis) — **langsung dieksekusi**, bukan dicatat sebagai observasi.
+
+**`DuplicateFinderSheet.kt`** (diedit, 2 baris) — `color = MaterialTheme.colorScheme.
+surfaceVariant` ditambahkan ke 2 `HorizontalDivider` (pemisah antar grup duplikat).
+**`VaultSheet.kt`** (diedit, 1 baris) — sama, 1 `HorizontalDivider` (pemisah antar lagu vaulted).
+
+2 file, 3 bug fix. Brace/paren kedua file seimbang. `FILE_MANIFEST.txt` tidak berubah
+(184/184). **Belum diverifikasi visual di device** — cek prioritas: buka Duplicate Finder &
+Vault, pastikan divider sekarang match warna divider di layar lain (mis. Library/Settings),
+bukan lebih tipis-kontras dari sebelumnya (kalau tema device kebetulan bikin outlineVariant≈
+surfaceVariant, perubahan visual mungkin nyaris tak kentara — itu tetap benar, cuma jadi tidak
+dramatis). Item berikutnya § Surface/Color: audit disabled/selected state lintas screen.
+
+## Batch 260 — POLISH_AUDIT #7 § Surface/Color, item 1: audit background→surface→elevated surface (0 code, observasi baru)
+Item pertama § Surface/Color Consistency. Survey `colorScheme.background`/`.surface`/
+`.surfaceVariant` di seluruh `ui/*.kt` (26 file): `background` cuma dipakai 3x (semua di
+`NowPlayingScreen.kt`), `surface` polos 6 titik tersebar 1 file masing-masing, `surfaceVariant`
+lebih luas (11 file). `surfaceContainer*` (token M3 lebih baru khusus elevated-surface) **0
+pemakaian sama sekali** — project ini genuinely tidak pakai token itu, elevasi ditangani lewat
+`Surface(tonalElevation=...)` manual, bukan lewat role warna terpisah.
+
+**5 titik `Surface` "kartu pembungkus konten"** ditemukan (Home/Library/NowPlaying/
+StatsDashboard/Settings) — SEMUA pola identik: `color = colorScheme.surface` (Transparent utk
+tema Panel), `contentColor = onSurface` eksplisit (pelajaran Batch 48/49, sudah konsisten).
+**TAPI nilai `tonalElevation` beda tanpa penjelasan semantik**: StatsDashboard 2dp, Home &
+Settings 4dp, Library & NowPlaying 6dp — 0 komentar di kode manapun yg menjustifikasi kenapa
+beda (beda dari "Batch 48/49 lesson" yg didokumentasikan utk bagian contentColor-nya). Kelima
+Surface ini secara struktural fungsinya sama (bungkus 1 blok konten jadi kartu), bukan
+hierarki visual yg jelas beda tingkat.
+
+**TIDAK dieksekusi batch ini** — pola sama Batch 162/163/165 (EmptyState icon, LibraryFilterChips
+fill, banner 3-arah sebelum disatukan): blast radius 5 file, genuinely bisa jadi disengaja
+(StatsDashboard mungkin memang dimaksud lebih "flat"/sekunder dari Library/NowPlaying yang jadi
+fokus utama), dicatat sebagai observasi tertunda keputusan user, bukan diasumsikan.
+
+0 file kode, 1 dokumentasi (`POLISH_AUDIT.md`). `FILE_MANIFEST.txt` tidak berubah (184/184).
+Item berikutnya § Surface/Color: samakan treatment border/divider lintas screen.
+
+## Batch 259 — POLISH_AUDIT #6 § Responsive/Adaptive: audit statis small/large/landscape/font-scale (0 bug baru, 0 code)
+Checkbox pertama § Responsive/Adaptive. **Batasan jujur dicatat di depan**: sandbox ini 0
+kemampuan render/emulator, jadi audit ini STATIS (grep menyeluruh) bukan visual device betulan
+— tidak diklaim setara verifikasi visual.
+
+4 aspek diperiksa: (a) fixed-width besar berisiko clip — 0 ditemukan di 12 file kandidat
+(NowPlaying/LibraryScreen/10 `*Sheet.kt`), cuma `Spacer` kecil harmless; (b) long title/artist
+song row — sudah `weight(1f)`+`maxLines=1`+marquee/ellipsis, pola flexible standar; (c)
+landscape/viewport pendek Now Playing — SUDAH ADA `verticalScroll` safety net dari Batch 112
+(komentar detail persis soal skenario 3-button-nav vs gesture-nav); (d) font-scale besar — 0
+`fontSize` hardcoded ditemukan di seluruh `ui/*.kt`, semua pakai token typography (otomatis
+ikut scale sistem).
+
+**Kesimpulan: 0 bug baru** — pola/safety-net relevan sudah ada dari batch lampau. **TIDAK
+diklaim "selesai 100%"** — dicatat sebagai kandidat `MANUAL_QA_CHECKLIST.md` untuk verifikasi
+visual manual di device fisik oleh user, bukan dipaksa tuntas cuma krn grep bersih.
+
+0 file kode, 1 dokumentasi (`POLISH_AUDIT.md`). `FILE_MANIFEST.txt` tidak berubah (184/184).
+Item berikutnya § Responsive: "Jangan ubah layout architecture" (aturan, bukan checkbox kerja)
+— checkbox kerja berikutnya sebenarnya sudah habis di seksi ini (cuma 2 baris, 1 sudah selesai,
+1 aturan batas). Lanjut ke § Surface/Color Consistency.
+
+## Batch 258 — POLISH_AUDIT #5: reduced-motion infra check (N/A) — § Motion & Transition TUNTAS (0 code)
+Checkbox terakhir § Motion & Transition. `grep -rn "reduced.motion\|ReducedMotion\|
+animatorDurationScale\|isReduceMotionEnabled"` di seluruh `app/src/main/java/` → 0 match, project
+ini genuinely 0 infrastruktur reduced-motion. Sesuai instruksi eksplisit dokumen sumber: TIDAK
+dibuat baru (di luar scope "audit visual", masuk kategori bikin fitur baru). **N/A, STOP.**
+
+**§ Motion & Transition sekarang 6/6 checkbox tuntas** (Batch 254-258). Kategori berikutnya
+sesuai urutan dokumen: § Responsive/Adaptive (small/large phone, landscape, font-scale besar —
+titik rawan dugaan: `NowPlayingScreen.kt`, `LibraryScreen.kt` song row, 13 `*Sheet.kt`, WAJIB
+dicek visual dulu sebelum diedit, bukan tebakan dari nama file).
+
+0 file kode, 1 dokumentasi (`POLISH_AUDIT.md`). `FILE_MANIFEST.txt` tidak berubah (184/184).
+
+## Batch 257 — POLISH_AUDIT #4: animasi vs repeated interaction/scroll cepat, 0 bug + fix manifest gap (0 code, 2 file)
+Checkbox berikutnya § Motion & Transition. Kandidat diperiksa: `animateItemPlacement()` (4
+titik, `LibraryScreen.kt`) — fire cuma pas list MUTASI (reorder/insert/remove), BUKAN karena
+scroll-offset berubah, jadi scroll cepat murni 0 memicu; `basicMarquee()` (3 titik:
+`LibraryScreen.kt`/`MiniPlayerBar.kt`/`NowPlayingScreen.kt`) — self-gating bawaan Compose (cuma
+jalan kalau teks overflow), independen dari kecepatan scroll. **0 bug ditemukan, STOP** — tidak
+ada animasi yang genuinely terikat scroll-offset event.
+
+**Ditemukan sekalian saat cek integritas sebelum repack**: `POLISH_AUDIT.md` (ditanam Batch 253)
+ternyata belum pernah masuk `FILE_MANIFEST.txt` — gap lama, bukan dari batch ini. Ditambahkan
+(183→184 file), bukan task terpisah (prasyarat wajib sebelum repack manapun, bukan pekerjaan
+baru).
+
+0 file kode, 2 dokumentasi (`POLISH_AUDIT.md`, `FILE_MANIFEST.txt`). Item berikutnya §
+Motion: "Hormati reduced-motion kalau sudah ada infrastruktur lokalnya" (cek dulu ada/tidaknya
+infra sebelum bikin apa pun — kalau belum ada, JANGAN bikin baru).
+
 ## Batch 256 — POLISH_AUDIT #3: fix konsistensi spring swipe-snap NowPlayingScreen (1 file patch)
 Kerjakan checkbox "audit semua duration/easing lain" `POLISH_AUDIT.md` § Motion. `grep` animasi
 (`tween/animateFloatAsState/animateColorAsState/spring`) di seluruh `ui/*.kt` — cakupan nyata cuma

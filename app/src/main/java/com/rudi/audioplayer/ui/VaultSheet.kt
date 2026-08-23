@@ -307,7 +307,7 @@ private fun VaultContentSection(
                             Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Keluarkan dari vault")
                         }
                     }
-                    HorizontalDivider()
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
             }
         }

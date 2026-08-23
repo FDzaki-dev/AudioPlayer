@@ -28,6 +28,46 @@ atas file yang terus memanjang):
    `[x]` + "0 bug, STOP", JANGAN ciptakan kerjaan baru demi 100%.
 
 ## Batch terakhir yang selesai
+**Batch 261 (POLISH_AUDIT #8 § Surface/Color item 2 — samakan treatment border/divider lintas
+screen, 2 file, 3 bug fix)** — 24 `HorizontalDivider` di 10 file, 20 eksplisit `surfaceVariant`,
+3 titik (`DuplicateFinderSheet.kt` x2, `VaultSheet.kt` x1) tanpa color (default M3
+`outlineVariant`, token beda) — disamakan. Mayoritas 20:3 jelas + blast radius kecil (2 file) +
+0 risiko perilaku → langsung dieksekusi (beda dari observasi Batch 260). Brace/paren seimbang.
+`FILE_MANIFEST.txt` tidak berubah (184/184). **Belum diverifikasi visual di device**. Item
+berikutnya: audit disabled/selected state lintas screen. Detail: `CHANGELOG.md` Batch 261.
+
+**Batch 260 (POLISH_AUDIT #7 § Surface/Color item 1 — audit background→surface→elevated
+surface, 0 code, observasi baru)** — `surfaceContainer*` (M3 elevated token) 0 dipakai, elevasi
+manual via `Surface(tonalElevation=...)`. 5 titik "kartu pembungkus" (Home/Library/NowPlaying/
+StatsDashboard/Settings) pola identik TAPI `tonalElevation` beda tanpa penjelasan: 2/4/4/6/6dp.
+**TIDAK dieksekusi** — observasi tertunda keputusan user (pola sama Batch 162/163/165), blast
+radius 5 file, bisa jadi disengaja. `FILE_MANIFEST.txt` tidak berubah (184/184). Item
+berikutnya: samakan treatment border/divider lintas screen. Detail: `CHANGELOG.md` Batch 260.
+
+**Batch 259 (POLISH_AUDIT #6 § Responsive/Adaptive — audit statis small/large/landscape/
+font-scale, 0 bug baru, 0 code)** — **Batasan jujur**: audit STATIS (grep), sandbox 0 kemampuan
+render/emulator, bukan verifikasi visual device. 4 aspek: fixed-width clip-risk (0 ditemukan di
+12 file kandidat), long title/artist song row (sudah flexible+marquee/ellipsis), landscape Now
+Playing (SUDAH ADA `verticalScroll` safety net Batch 112), font-scale (0 `fontSize` hardcoded,
+semua pakai token typography). **0 bug baru**, TIDAK diklaim selesai 100% — kandidat
+`MANUAL_QA_CHECKLIST.md` untuk verifikasi visual manual user. `FILE_MANIFEST.txt` tidak berubah
+(184/184). Sisa § Responsive cuma guardrail ("jangan ubah layout architecture", bukan task),
+lanjut § Surface/Color Consistency batch berikutnya. Detail: `CHANGELOG.md` Batch 259.
+
+**Batch 258 (POLISH_AUDIT #5 — reduced-motion infra check, N/A, § Motion TUNTAS, 0 code)** —
+0 infrastruktur reduced-motion ditemukan (`grep` menyeluruh), sesuai instruksi dokumen sumber
+TIDAK dibuat baru. **N/A, STOP.** § Motion & Transition sekarang 6/6 tuntas (Batch 254-258).
+Kategori berikutnya: § Responsive/Adaptive (small/large phone, landscape, font-scale besar —
+WAJIB dicek visual dulu, bukan tebakan). `FILE_MANIFEST.txt` tidak berubah (184/184). Detail:
+`CHANGELOG.md` Batch 258.
+
+**Batch 257 (POLISH_AUDIT #4 — animasi vs repeated interaction/scroll cepat, 0 bug + fix
+manifest gap, 0 code)** — `animateItemPlacement()` (4 titik) fire cuma pas mutasi list, bukan
+scroll-offset; `basicMarquee()` (3 titik) self-gating, independen kecepatan scroll. **0 bug,
+STOP.** Ditemukan sekalian: `POLISH_AUDIT.md` belum ada di `FILE_MANIFEST.txt` sejak Batch 253
+— ditambahkan (183→184). Item berikutnya § Motion: reduced-motion (cek infra dulu, jangan bikin
+baru kalau belum ada). Detail: `CHANGELOG.md` Batch 257.
+
 **Batch 256 (POLISH_AUDIT #3 — fix konsistensi spring swipe-snap `NowPlayingScreen.kt`, 1 file
 patch)** — Audit menyeluruh animasi di `ui/*.kt` (cakupan nyata cuma 4 file, bukan 26). Temuan
 konkret: spring snap-back swipe-next/previous artwork (~baris 1228/1231) beda stiffness dari

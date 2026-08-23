@@ -90,7 +90,7 @@ fun DuplicateFinderSheet(
                             items(group.songs, key = { "lib_${it.id}" }) { song ->
                                 DuplicateSongRow(song = song, checked = song.id in selectedIds, onToggle = { toggle(song.id) })
                             }
-                            item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp)) }
+                            item { HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(vertical = 8.dp)) }
                         }
                     }
                     if (physicalGroups.isNotEmpty()) {
@@ -105,7 +105,7 @@ fun DuplicateFinderSheet(
                             items(group.songs, key = { "phys_${it.id}" }) { song ->
                                 DuplicateSongRow(song = song, checked = song.id in selectedIds, onToggle = { toggle(song.id) })
                             }
-                            item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp)) }
+                            item { HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(vertical = 8.dp)) }
                         }
                     }
                 }
