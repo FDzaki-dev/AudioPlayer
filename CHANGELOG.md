@@ -1,5 +1,23 @@
 # Changelog
 
+## Batch 266 — FAB shortcut "Tambah ke Favorit" + SongPickerSheet reusable (2 file kode + 1 dokumentasi)
+User laporan screenshot (tab Favorit & Playlist kosong): satu-satunya cara nambah lagu
+sebelumnya WAJIB muter ke tab Lagu dulu, cari manual, tekan-lama, baru pilih "Tambah ke
+Favorit/Playlist" — nggak ada shortcut langsung dari tab tujuan. **File baru**
+`SongPickerSheet.kt`: bottom sheet generik reusable — cari + checklist banyak lagu sekaligus,
+`alreadyAddedIds` otomatis nyaring yang udah ada (gak checklist ulang), `onConfirm` dipanggil
+SEKALI dengan list id terpilih (bukan per-toggle terpisah). **`LibraryScreen.kt`**: tab Favorit
+(`selectedTab==4`) dibungkus `Box` + `FloatingActionButton` (ikon hati, BottomEnd, disembunyikan
+saat `selectionMode` aktif biar gak tabrakan sama `SelectionActionBar`) yang buka
+`SongPickerSheet` — `onConfirm` loop `onToggleFavorite` tiap id + toast jumlah. FAB tetap
+muncul walau daftar udah terisi (bukan cuma solusi pas kosong doang, biar nambah lanjutan juga
+gampang). Brace/paren kedua file seimbang (`LibraryScreen.kt` 349/349,755/755;
+`SongPickerSheet.kt` 24/24,69/69). 0 protected asset. **Belum diverifikasi visual.**
+
+**Pending Queue**: FAB serupa buat tab Playlist (di dalam detail playlist) — belum dikerjakan
+batch ini demi cap 3 file (butuh sentuh `PlaylistScreen.kt` juga, `onAddSongToPlaylist` belum
+diteruskan ke `PlaylistTabView`). Kandidat batch berikutnya.
+
 ## Batch 265 — Fix SUNGGUHAN "gak bisa pilih lagu": `showMenu` dropdown SongRow unreachable
 User koreksi Batch 264: "gak bisa pilih lagu langsung dari tab favorit, begitu pula tab
 playlist!!". Root cause ASLI ditemukan — BUKAN gap per-tab seperti dugaan Batch 262/264: `var

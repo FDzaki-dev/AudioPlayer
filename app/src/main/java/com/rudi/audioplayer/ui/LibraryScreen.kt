@@ -139,6 +139,9 @@ fun LibraryScreen(
     var selectedIds by remember { mutableStateOf(persistentSetOf<Long>()) }
     var songForBulkPlaylistDialog by remember { mutableStateOf(false) }
     var songsPendingDelete by remember { mutableStateOf<List<Song>>(emptyList()) }
+    // Shortcut FAB Batch 266 — laporan user (screenshot tab Favorit kosong): satu-satunya cara
+    // sebelumnya WAJIB muter ke tab Lagu dulu buat nambah favorit manual.
+    var showFavoritePicker by remember { mutableStateOf(false) }
 
     fun exitSelectionMode() {
         selectionMode = false
@@ -315,29 +318,41 @@ fun LibraryScreen(
             )
             selectedTab == 4 -> {
                 val favoriteSongs = filteredSongs.filter { favoriteIds.contains(it.id) }
-                if (favoriteSongs.isEmpty()) {
-                    EmptyState(
-                        title = "Belum ada favorit",
-                        subtitle = "Ketuk ikon hati pada lagu untuk menambahkannya ke sini."
-                    )
-                } else {
-                    SongListView(
-                        songs = favoriteSongs,
-                        favoriteIds = favoriteIds,
-                        onFavoriteToggle = onToggleFavorite,
-                        onSongClick = onSongClick,
-                        onPlayNext = playNext,
-                        onAddToQueue = addToQueue,
-                        onAddToPlaylist = addToPlaylist,
-                        onHideSong = hideSong,
-                        onDeleteSong = deleteSong,
-                        selectionMode = selectionMode,
-                        selectedIds = selectedIds,
-                        onToggleSelect = { id -> toggleSelect(id) },
-                        onEnterSelectionMode = { id -> selectionMode = true; selectedIds = persistentSetOf(id) },
-                        onSweepSelectRange = { ids -> selectionMode = true; selectedIds = ids.toPersistentSet() },
-                        currentSongId = currentSongId
-                    )
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (favoriteSongs.isEmpty()) {
+                        EmptyState(
+                            title = "Belum ada favorit",
+                            subtitle = "Ketuk ikon hati pada lagu untuk menambahkannya ke sini."
+                        )
+                    } else {
+                        SongListView(
+                            songs = favoriteSongs,
+                            favoriteIds = favoriteIds,
+                            onFavoriteToggle = onToggleFavorite,
+                            onSongClick = onSongClick,
+                            onPlayNext = playNext,
+                            onAddToQueue = addToQueue,
+                            onAddToPlaylist = addToPlaylist,
+                            onHideSong = hideSong,
+                            onDeleteSong = deleteSong,
+                            selectionMode = selectionMode,
+                            selectedIds = selectedIds,
+                            onToggleSelect = { id -> toggleSelect(id) },
+                            onEnterSelectionMode = { id -> selectionMode = true; selectedIds = persistentSetOf(id) },
+                            onSweepSelectRange = { ids -> selectionMode = true; selectedIds = ids.toPersistentSet() },
+                            currentSongId = currentSongId
+                        )
+                    }
+                    if (!selectionMode) {
+                        FloatingActionButton(
+                            onClick = { showFavoritePicker = true },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(20.dp)
+                        ) {
+                            Icon(Icons.Default.Favorite, contentDescription = "Tambah lagu ke favorit")
+                        }
+                    }
                 }
             }
             selectedTab == 5 -> PlaylistTabView(
@@ -432,6 +447,19 @@ fun LibraryScreen(
     }
 
     val pendingSong = songForPlaylistDialog
+    if (showFavoritePicker) {
+        SongPickerSheet(
+            title = "Tambah ke Favorit",
+            allSongs = rawSongs,
+            alreadyAddedIds = favoriteIds,
+            onConfirm = { ids ->
+                ids.forEach { onToggleFavorite(it) }
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onInfoMessage(if (ids.size == 1) "1 lagu ditambahkan ke favorit" else "${ids.size} lagu ditambahkan ke favorit")
+            },
+            onDismiss = { showFavoritePicker = false }
+        )
+    }
     if (pendingSong != null) {
         AddToPlaylistDialog(
             song = pendingSong,

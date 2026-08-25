@@ -26,8 +26,25 @@ atas file yang terus memanjang):
    teratas yang masih `[ ]`, urutan Motion→Responsive→Surface/Color→Component→Typography). 1
    checkbox = 1 batch, tetap tunduk Strict Micro-Batching. Kalau audit 1 area 0 nemu bug → centang
    `[x]` + "0 bug, STOP", JANGAN ciptakan kerjaan baru demi 100%.
+5. **Nama folder Termux proyek ini WAJIB `AudioPlayer` (kapital persis), BUKAN `audioplayer`
+   lowercase** — override eksplisit dari user terhadap default preferensi lowercase kebab-case.
+   Alasan: repo GitHub asli sudah `FDzaki-dev/AudioPlayer` (kapital, dikonfirmasi Batch 138 lewat
+   URL repo asli user), folder lokal Termux WAJIB sama persis biar tidak desync sama nama repo.
+   Semua skrip Termux (`~/projects/AudioPlayer`, bukan `~/projects/audioplayer`) di respons
+   berikutnya WAJIB pakai casing ini.
 
 ## Batch terakhir yang selesai
+**Batch 266 (FAB shortcut "Tambah ke Favorit" + SongPickerSheet reusable, 2 file kode + 1
+dokumentasi)** — User laporan screenshot: tab Favorit & Playlist kosong, satu-satunya cara nambah
+lagu WAJIB muter ke tab Lagu dulu. File baru `SongPickerSheet.kt` — sheet cari+checklist banyak
+lagu, `alreadyAddedIds` nyaring otomatis, `onConfirm` sekali dgn list id. `LibraryScreen.kt`: tab
+Favorit dibungkus `Box`+`FloatingActionButton` (ikon hati, BottomEnd, sembunyi saat
+selectionMode) buka `SongPickerSheet`, loop `onToggleFavorite`. FAB tetap muncul walau daftar
+udah terisi. Brace/paren kedua file seimbang. 0 protected asset. **Belum diverifikasi visual.**
+**Pending Queue**: FAB serupa buat tab Playlist (detail playlist) — ditunda demi cap 3 file,
+butuh sentuh `PlaylistScreen.kt` (`onAddSongToPlaylist` belum diteruskan ke `PlaylistTabView`).
+Detail: `CHANGELOG.md` Batch 266.
+
 **Batch 265 (Fix SUNGGUHAN "gak bisa pilih lagu" — koreksi user atas Batch 264, 1 file)** — Root
 cause ASLI: `showMenu` (state `DropdownMenu` di `SongRow`, isinya termasuk "Pilih" ->
 `onEnterSelectionMode()`) TIDAK PERNAH di-set `true` di mana pun — menu 100% unreachable, di
