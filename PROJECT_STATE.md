@@ -35,6 +35,15 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 268 (SongPickerSheet: layar lebih luas + sweep-select, 1 file kode)** — User laporan
+sheet (FAB Favorit/Playlist Batch 266-267) kecil & 0 sweep-select. Fix `SongPickerSheet.kt`: (1)
+`fillMaxHeight(0.92f)` + `LazyColumn weight(1f)` (dulu capped 420dp); (2) sweep-select di-port
+1:1 dari `SongListView` (`LibraryScreen.kt`) — tekan-lama+geser centang banyak lagu, termasuk
+hysteresis 6dp & `DisposableEffect` cleanup. Beda: checkbox SELALU tampil (gak perlu
+`selectionMode` terpisah), sweep langsung nambah ke `selected`. Brace/paren seimbang. 0
+protected asset. **Belum diverifikasi visual** — cek sweep tetap akurat pas list difilter
+pencarian. Detail: `CHANGELOG.md` Batch 268.
+
 **Batch 267 (FAB shortcut "Tambah lagu" di detail Playlist, 2 file kode)** — Menutup Pending
 Queue Batch 266. `PlaylistScreen.kt` (`PlaylistTabView`): param baru `onAddSongToPlaylist`+
 `onInfoMessage` diteruskan dari `LibraryScreen.kt` (1 call site). Detail playlist (kosong/isi)

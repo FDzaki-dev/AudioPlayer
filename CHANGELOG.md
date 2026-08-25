@@ -1,5 +1,19 @@
 # Changelog
 
+## Batch 268 — SongPickerSheet: layar lebih luas + sweep-select (1 file kode)
+User laporan (dipakai lewat FAB Favorit & Playlist, Batch 266-267): sheet kecil (capped 420dp)
+& 0 sweep-select — checklist manual 1-per-1 gak praktis buat banyak lagu sekaligus. Fix
+`SongPickerSheet.kt`: (1) sheet diperbesar `fillMaxHeight(0.92f)` (hampir setinggi layar,
+sebelumnya cuma wrap-content+capped), `LazyColumn` pakai `weight(1f)` ngisi ruang sisa; (2)
+sweep-select di-port 1:1 dari `SongListView` (`LibraryScreen.kt`) — tekan-lama 1 row lalu geser
+buat centang banyak lagu sekaligus, TERMASUK hysteresis 6dp anti-jitter & `DisposableEffect`
+cleanup bounds (row yang di-recycle LazyColumn gak nyisain bounds basi) yang udah battle-tested
+di situ. Beda dari `SongListView`: di sini gak perlu param `selectionMode` terpisah (checkbox
+SELALU tampil tiap row, jadi sweep langsung nambah ke `selected`, bukan toggle mode dulu).
+Brace/paren seimbang (41/41, 105/105). 0 protected asset. **Belum diverifikasi visual** —
+prioritas cek sweep tetap akurat pas list difilter query pencarian (rowBoundsInRoot di-reset
+tiap `filtered` berubah identity).
+
 ## Batch 267 — FAB shortcut "Tambah lagu" di detail Playlist (2 file kode)
 Menutup Pending Queue Batch 266. `PlaylistScreen.kt` (`PlaylistTabView`): param baru
 `onAddSongToPlaylist: (String, Long) -> Boolean` + `onInfoMessage: (String) -> Unit` (dua-duanya
