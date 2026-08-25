@@ -47,7 +47,17 @@ fun SongPickerSheet(
     onConfirm: (List<Long>) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Batch 269 — user laporan: sweep-select di sheet ini kelewat sensitif, kadang ke-cancel
+    // sendiri sebelum sempat kepakai (beda dari tab Lagu yang "normal"). Root cause: sheet ini
+    // (`ModalBottomSheet`) punya gesture swipe-to-dismiss BAWAAN aktif di seluruh permukaan
+    // sheet — bersaing langsung dgn long-press+drag sweep-select buat event pointer vertikal
+    // yang sama. `SongListView` (`LibraryScreen.kt`) di layar biasa TIDAK punya pesaing gesture
+    // sejenis ini sama sekali, makanya cuma di sini yang kena. Fix: `isSweeping` diset true
+    // begitu long-press sweep berhasil (blok `onDragStart`), `confirmValueChange` sheet nolak
+    // SEMUA perubahan state (termasuk dismiss akibat swipe) selama itu true — begitu sweep
+    // selesai (`onDragEnd`/`onDragCancel`), dibuka lagi.
+    var isSweeping by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !isSweeping })
     val haptic = LocalHapticFeedback.current
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf(setOf<Long>()) }
@@ -129,6 +139,7 @@ fun SongPickerSheet(
                                 onDragStart = { offset ->
                                     val root = containerCoordinates?.localToRoot(offset) ?: return@detectDragGesturesAfterLongPress
                                     val idx = indexAt(root.y) ?: return@detectDragGesturesAfterLongPress
+                                    isSweeping = true
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     sweepAnchorIndex = idx
                                     sweepLastIndex = idx
@@ -153,8 +164,8 @@ fun SongPickerSheet(
                                     val sweptIds = range.map { filtered[it].id }
                                     selected = sweepBaseSelection + sweptIds
                                 },
-                                onDragEnd = { sweepAnchorIndex = null; sweepLastIndex = null },
-                                onDragCancel = { sweepAnchorIndex = null; sweepLastIndex = null }
+                                onDragEnd = { isSweeping = false; sweepAnchorIndex = null; sweepLastIndex = null },
+                                onDragCancel = { isSweeping = false; sweepAnchorIndex = null; sweepLastIndex = null }
                             )
                         }
                 ) {

@@ -35,6 +35,16 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 269 (Fix sweep-select oversensitif di SongPickerSheet, 1 file kode)** — User: sebagian
+sweep-select normal, sebagian mem-batalkan diri sendiri. Root cause: `SongPickerSheet.kt`
+dibungkus `ModalBottomSheet` yang punya swipe-to-dismiss bawaan bersaing dengan long-press-drag
+sweep-select buat gesture vertikal yang sama — `SongListView` di layar biasa (tab Lagu) tidak
+punya pesaing gesture ini, itu bedanya. Fix: state `isSweeping` blok `confirmValueChange` sheet
+selama sweep aktif (`onDragStart`→true, `onDragEnd`/`onDragCancel`→false), sheet tidak bisa
+dismiss di tengah drag. 1 file, 0 protected asset, brace/paren seimbang (43/43, 112/112). Murni
+Kotlin state, tidak perlu naikkan Material3. **Belum diverifikasi visual.** Detail:
+`CHANGELOG.md` Batch 269.
+
 **Batch 268 (SongPickerSheet: layar lebih luas + sweep-select, 1 file kode)** — User laporan
 sheet (FAB Favorit/Playlist Batch 266-267) kecil & 0 sweep-select. Fix `SongPickerSheet.kt`: (1)
 `fillMaxHeight(0.92f)` + `LazyColumn weight(1f)` (dulu capped 420dp); (2) sweep-select di-port

@@ -1,5 +1,25 @@
 # Changelog
 
+## Batch 269 — Fix sweep-select oversensitif di SongPickerSheet (bukan di tab Lagu) (1 file kode)
+User laporan: sebagian sweep-select normal, sebagian lagi kelewat sensitif — sampai membatalkan
+diri sendiri sebelum sempat kepakai. Dikonfirmasi: `SongListView` (`LibraryScreen.kt`, tab Lagu)
+= normal, `SongPickerSheet.kt` (Batch 266-268, dipakai FAB Favorit/Playlist) = oversensitif.
+
+**Root cause**: `SongPickerSheet` dibungkus `ModalBottomSheet`, yang punya gesture
+swipe-to-dismiss BAWAAN aktif di seluruh permukaan sheet — bersaing langsung dengan long-press+
+drag sweep-select buat event pointer vertikal yang sama. `SongListView` di layar biasa (bukan
+sheet) TIDAK punya pesaing gesture sejenis sama sekali — itu bedanya kenapa cuma satu yang kena.
+
+**Fix**: `isSweeping` (state baru) diset `true` begitu long-press sweep berhasil (`onDragStart`),
+`false` lagi begitu selesai (`onDragEnd`/`onDragCancel`). `sheetState` dapat `confirmValueChange
+= { !isSweeping }` — sheet MENOLAK semua perubahan state (termasuk dismiss akibat swipe) selama
+sweep aktif. Murni state Kotlin, tidak butuh naikkan versi Material3 (BOM 2024.05.00/~1.2.1
+tetap, `confirmValueChange` sudah tersedia di versi ini).
+
+1 file (`SongPickerSheet.kt`), 0 protected asset. Brace/paren seimbang (43/43, 112/112).
+**Belum diverifikasi visual** — prioritas cek: sweep-select di sheet Favorit/Playlist sekarang
+seharusnya sama mulusnya dengan tab Lagu, sheet tidak lagi ketutup sendiri di tengah drag.
+
 ## Batch 268 — SongPickerSheet: layar lebih luas + sweep-select (1 file kode)
 User laporan (dipakai lewat FAB Favorit & Playlist, Batch 266-267): sheet kecil (capped 420dp)
 & 0 sweep-select — checklist manual 1-per-1 gak praktis buat banyak lagu sekaligus. Fix
