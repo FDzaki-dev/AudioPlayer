@@ -35,6 +35,25 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 271 (Fix ROOT CAUSE sweep-select "auto-cancel diri sendiri" saat long-press TANPA gerak,
+1 file kode + 2 dokumentasi)** — User kasih root cause: long-press tanpa sweep sama sekali
+terkesan auto-cancel. Akar: `onDragStart` (`SongListView`, `LibraryScreen.kt`) pilih baris +
+`selectionMode=true`, TAPI tidak pernah `.consume()` (cuma terima `Offset`) — kalau jari lepas
+tanpa gerak, `onDrag` (satu-satunya yg consume) tidak pernah jalan, jadi sentuhan asli tidak
+pernah dikonsumsi. `SongRow`'s `clickable` polos (0 `onLongClick` sejak Batch 72) masih
+mengintip pasangan sentuh yang sama, nyusul jadi "klik" — karena `selectionMode` sudah `true`,
+klik itu rute ke `onToggleSelect()` yang MEMBALIK baris yang baru saja terpilih. Select →
+instant self-deselect. Fix: latch `suppressClickForId`, diisi persis di `onDragStart`, ditelan
+sekali di `onClick`/`onToggleSelect` `SongRow` kalau id cocok, dibersihkan di `onDrag` (gerak
+asli) & `onDragCancel` (jaring pengaman) — SENGAJA TIDAK di `onDragEnd` (ordering vs klik-hantu
+tidak terjamin, bisa balikin bug). 1 titik fix, 4 tab kebagian (Lagu/Favorit/Artist/Folder,
+arsitektur delegasi sejak Batch 197). 1 file, 0 protected asset. **Bonus**: `FILE_MANIFEST.txt`
+basi sejak Batch 266 (`SongPickerSheet.kt` tidak pernah ditambah) — dibetulkan 184→185, ketauan
+pas cek integritas awal batch. **⚠️ PALING PRIORITAS diverifikasi visual dari semua batch
+belakangan** — ini gesture inti 4 tab: tes long-press-tanpa-gerak, sweep-normal (jangan
+regresi hysteresis Batch 1/v263), dan tap baris lain saat ada row lain kepilih. Detail:
+`CHANGELOG.md` Batch 271.
+
 **Batch 270 (Fix sweep-select SongPickerSheet TAKE 2 — NestedScrollConnection, 1 file kode)** —
 User konfirmasi Batch 269 (`confirmValueChange`) tidak cukup. Diriset ulang: `ModalBottomSheet`'s
 `anchoredDraggable` MEMPROSES delta drag visual duluan setiap `LazyColumn` kehabisan sisa scroll

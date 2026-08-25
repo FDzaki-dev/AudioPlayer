@@ -1,7 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 184 file
+# Total: 185 file
 
 .github/workflows/build.yml
 .gitignore
@@ -109,6 +109,7 @@ app/src/main/java/com/rudi/audioplayer/ui/SettingsScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/SignatureMatcherSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SmartPlaylistScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/SongInfoEditSheet.kt
+app/src/main/java/com/rudi/audioplayer/ui/SongPickerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/StatsDashboardScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/UpdateCheckSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/Utils.kt

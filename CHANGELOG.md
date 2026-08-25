@@ -1,5 +1,55 @@
 # Changelog
 
+## Batch 271 — Fix ROOT CAUSE sweep-select "auto-cancel diri sendiri" saat long-press TANPA gerak (1 file kode + 2 dokumentasi)
+User kasih root cause presisi: long-press yang TIDAK dilanjut sweep sama sekali (tekan-tahan-
+lepas, 0 gerakan) terkesan auto-cancel/oversensitif — beda dari bug Batch 268-270 (yang soal
+`ModalBottomSheet` ganggu SAAT drag aktif). Ini soal kasus TANPA drag sama sekali, di
+`SongListView` (`LibraryScreen.kt`, dipakai tab Lagu/Favorit + `GroupedListView` Artist/Folder
+via delegasi — 1 titik fix, 4 tab kebagian).
+
+**Diriset & dikonfirmasi via pembacaan kode + pengetahuan `detectDragGesturesAfterLongPress`
+Compose**: `onDragStart` MEMANG sudah benar (Batch 72) — begitu long-press dikenali, langsung
+`onSweepSelectRange(...)` pilih baris itu + `selectionMode=true`. Tapi `onDragStart` cuma terima
+`Offset`, BUKAN `PointerInputChange` — TIDAK PERNAH manggil `.consume()`. Kalau jari lepas tanpa
+gerak sama sekali, `onDrag` (satu-satunya tempat yang `consume()`) TIDAK PERNAH jalan — jadi
+sentuhan turun-lalu-naik ITU SENDIRI tidak pernah dikonsumsi siapa pun. `SongRow`'s `clickable`
+polos (`onClick` doang, `onLongClick` sudah dihapus Batch 72) MASIH mengintip pasangan
+turun-naik yang sama itu — `clickable` tanpa `onLongClick` tidak punya timing durasi sendiri,
+tekan-lama-lalu-lepas-tanpa-gerak tetap sah sebagai "klik". Klik itu nyusul SEPERSEKIAN DETIK
+setelah `onDragStart`, dan karena `selectionMode` SUDAH `true` (baru saja di-set), baris
+`if (selectionMode) onToggleSelect() else onClick()` di `SongRow` malah rute ke
+`onToggleSelect()` — **membalik baris yang BARU SAJA terpilih itu balik ke tidak-terpilih**.
+Select → instant self-deselect = kelihatan kayak 0 kejadian.
+
+**Fix**: latch `suppressClickForId` (state baru `SongListView`) — diisi `songs[idx].id` persis
+di `onDragStart` (baris yang sama yg baru dipilih). Di titik panggil `SongRow`, `onClick` DAN
+`onToggleSelect` sama-sama dibungkus: kalau `suppressClickForId == song.id` → telan sekali
+(`= null`) TANPA jalanin apa pun; kalau tidak cocok → jalan normal seperti biasa. Latch
+dibersihkan di `onDrag` (begitu ADA gerakan asli — brarti bukan kasus stasioner, klik hantu
+child tidak akan pernah nyampe krn `clickable` batal sendiri kena touch-slop) dan di
+`onDragCancel` (jaring pengaman kalau gesture dibatalkan ancestor sebelum salah satu jalur di
+atas sempat jalan). SENGAJA TIDAK dibersihkan di `onDragEnd` — urutan klik-hantu vs `onDragEnd`
+antar 2 coroutine gesture terpisah tidak terjamin, membersihkan di situ berisiko menghapus latch
+SEBELUM klik sempat mengeceknya, yang justru menghidupkan lagi bug yang sama.
+
+1 file kode (+13 baris net: 1 state, 1 assignment, 1 clear di `onDrag`, 1 clear di
+`onDragCancel`, 2 lambda dibungkus di call site — semua di dalam `SongListView`, 0 sentuh
+`SongRow`/`GroupedListView`/`SearchResultsView` langsung karena arsitektur sudah delegasi sejak
+Batch 197). 0 file baru, 0 protected asset. Brace/paren `LibraryScreen.kt` seimbang (350/350,
+771/771).
+
+**Bonus housekeeping ketemu pas cek integritas**: `FILE_MANIFEST.txt` ternyata sudah basi sejak
+Batch 266 — `SongPickerSheet.kt` (file baru batch itu) tidak pernah ditambahkan ke daftar,
+184→185 dibetulkan sekalian (bukan disengajakan skip, ketauan pas `find` vs manifest count
+mismatch di awal batch ini).
+
+**Belum diverifikasi visual — PALING PRIORITAS dari semua batch belakangan**: ini fix gesture
+inti yang dipakai 4 tab sekaligus, tolong tes: (1) long-press TANPA gerak sama sekali → baris
+harus TETAP terpilih (bukan balik kosong), (2) long-press LALU sweep beberapa baris → tetap
+akurat seperti biasa (Batch 1 v263 hysteresis tidak boleh regresi), (3) tap biasa (bukan
+long-press) di baris LAIN saat sudah ada row lain kepilih dari sweep sebelumnya → toggle normal,
+tidak ikut ketelan.
+
 ## Batch 270 — Fix sweep-select oversensitif SongPickerSheet, TAKE 2: NestedScrollConnection (bukan confirmValueChange) (1 file kode)
 User konfirmasi: fix Batch 269 (`confirmValueChange`) TIDAK cukup, "masih kejadian". Diriset
 ulang (bukan tebak lagi) — pola dikenal luas di Material3 `ModalBottomSheet`+`LazyColumn`

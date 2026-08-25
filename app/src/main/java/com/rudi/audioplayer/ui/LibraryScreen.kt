@@ -1025,6 +1025,22 @@ private fun SongListView(
     // dragging back-and-forth within one continuous gesture still behaves like a plain range
     // select (shrinking the range removes rows again) rather than only ever growing.
     var sweepBaseSelection by remember { mutableStateOf(persistentSetOf<Long>()) }
+    // Root cause (user report): a stationary long-press (held, then released with ZERO
+    // movement) looked like it did nothing — worse, felt like it actively CANCELLED itself.
+    // Sequence: onDragStart below fires normally (Batch 72 already fixed the earlier "long
+    // press does nothing AT ALL" bug by removing SongRow's competing onLongClick), selects the
+    // row, sets selectionMode=true. But `onDrag` never runs (no movement = no
+    // PointerInputChange to consume), so the ORIGINATING down/up touch itself is never
+    // consumed by this detector — SongRow's own plain `clickable` (still listening to that same
+    // down/up pair for its own click, since `clickable` has no long-press timing of its own,
+    // just a press-then-release) sees a perfectly normal, unconsumed tap and fires `onClick`
+    // a beat later. Because `selectionMode` is now (correctly) true, SongRow's own
+    // `if (selectionMode) onToggleSelect() else onClick()` routes that phantom tap to
+    // `onToggleSelect` — which immediately toggles the row BACK OFF. Net visible result: select
+    // → instant self-deselect, i.e. nothing. Fix: latch which row id the sweep gesture just
+    // touched; the very next click/toggle for THAT id is swallowed once (self-clearing), every
+    // other row and every later, genuine tap behaves exactly as before.
+    var suppressClickForId by remember { mutableStateOf<Long?>(null) }
 
     fun indexAt(rootY: Float): Int? = rowBoundsInRoot.entries.firstOrNull { rootY in it.value }?.key
 
@@ -1051,11 +1067,18 @@ private fun SongListView(
                         sweepAnchorIndex = idx
                         sweepLastIndex = idx
                         sweepBaseSelection = currentSelectedIds.toPersistentSet()
+                        suppressClickForId = songs[idx].id
                         onSweepSelectRange(sweepBaseSelection.add(songs[idx].id))
                     },
                     onDrag = { change, _ ->
                         val anchor = sweepAnchorIndex ?: return@detectDragGesturesAfterLongPress
                         change.consume()
+                        // Real movement confirmed — this is an actual sweep, not a stationary
+                        // press, so the anchor row's own click will never fire (SongRow's
+                        // `clickable` self-cancels once touch slop is exceeded). Clear the latch
+                        // now instead of leaving it set until some unrelated future tap on this
+                        // same row, which would otherwise get silently swallowed by mistake.
+                        suppressClickForId = null
                         val root = containerCoordinates?.localToRoot(change.position) ?: return@detectDragGesturesAfterLongPress
                         val lastIdx = sweepLastIndex ?: return@detectDragGesturesAfterLongPress
                         val idx = indexAt(root.y) ?: return@detectDragGesturesAfterLongPress
@@ -1072,7 +1095,13 @@ private fun SongListView(
                         onSweepSelectRange(sweepBaseSelection.addAll(sweptIds))
                     },
                     onDragEnd = { sweepAnchorIndex = null; sweepLastIndex = null },
-                    onDragCancel = { sweepAnchorIndex = null; sweepLastIndex = null }
+                    // Defensive cleanup only — the stationary-press case is expected to clear
+                    // `suppressClickForId` itself via the swallowed click (see wiring below), and
+                    // the real-drag case already clears it in `onDrag` above. This just prevents
+                    // a leak into some unrelated future tap on the same row in any edge case
+                    // where neither of those paths runs (e.g. gesture cancelled by an ancestor
+                    // before either fires).
+                    onDragCancel = { sweepAnchorIndex = null; sweepLastIndex = null; suppressClickForId = null }
                 )
             }
     ) {
@@ -1101,7 +1130,10 @@ private fun SongListView(
                 song = song,
                 isFavorite = favoriteIds.contains(song.id),
                 onFavoriteToggle = { onFavoriteToggle(song.id) },
-                onClick = { onSongClick(songs, index) },
+                onClick = {
+                    if (suppressClickForId == song.id) suppressClickForId = null
+                    else onSongClick(songs, index)
+                },
                 onPlayNext = { onPlayNext(song) },
                 onAddToQueue = { onAddToQueue(song) },
                 onAddToPlaylist = { onAddToPlaylist(song) },
@@ -1109,7 +1141,10 @@ private fun SongListView(
                 onDeleteSong = { onDeleteSong(song) },
                 selectionMode = selectionMode,
                 isSelected = selectedIds.contains(song.id),
-                onToggleSelect = { onToggleSelect(song.id) },
+                onToggleSelect = {
+                    if (suppressClickForId == song.id) suppressClickForId = null
+                    else onToggleSelect(song.id)
+                },
                 onEnterSelectionMode = { onEnterSelectionMode(song.id) },
                 isPlaying = song.id == currentSongId
             )
