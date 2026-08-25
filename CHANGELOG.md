@@ -1,5 +1,39 @@
 # Changelog
 
+## Batch 272 — Fitur: selectionMode WAJIB persist meski selectedIds kosong, keluar cuma lewat tombol Close manual (1 file kode)
+Permintaan user eksplisit: kalau user long-press (masuk selectionMode) lalu diam, atau bahkan
+iseng deselect lagu pertama yang di-long-press (selectedIds balik ke 0), tab TIDAK BOLEH auto-
+kembali ke tampilan normal — satu-satunya jalan keluar WAJIB lewat tombol Close manual di
+`SelectionActionBar`. Berlaku ke SEMUA logic terkait, bukan setengah-setengah.
+
+**Audit dulu, baru fix** (`grep "selectionMode"` di seluruh `ui/`): cuma `LibraryScreen.kt` yang
+punya konsep selectionMode toggleable (`SongPickerSheet.kt` checkbox SELALU tampil sejak Batch
+268, tidak ada "mode" yang bisa keluar-masuk, jadi tidak relevan/tidak disentuh). Di dalam
+`LibraryScreen.kt`, cuma SATU titik yang auto-exit: `toggleSelect()` punya baris
+`if (selectedIds.isEmpty()) selectionMode = false` — dipakai SEMUA 4 tab (Lagu/Favorit/Artist/
+Folder) via arsitektur delegasi 1 fungsi (Batch 197/271), jadi 1 fix ini otomatis berlaku ke
+ke-4 nya sekaligus (dikonfirmasi: baris `onToggleSelect = { id -> toggleSelect(id) }` identik
+di 4 call site).
+
+**2 perubahan**:
+1. `toggleSelect()` — baris auto-exit DIHAPUS. `exitSelectionMode()` (dipanggil `onClose`
+   `SelectionActionBar`) sekarang SATU-SATUNYA tempat yang men-set `selectionMode = false`
+   (dikonfirmasi lewat grep ulang setelah edit).
+2. **Hardening supaya tidak setengah-setengah**: `SelectionActionBar` — count SEKARANG BISA 0
+   (state baru yang sebelumnya mustahil). 3 tombol aksi massal (Tambah ke Playlist/Sembunyikan/
+   Hapus) di-disable saat `count==0` — bukan kosmetik, mencegah `bulkHide()`/`bulkDelete()`
+   beneran jalan atas 0 lagu (potensi dialog konfirmasi "hapus 0 lagu" yang janggal). Tombol
+   Close TETAP selalu aktif — itu satu-satunya jalan keluar sah sekarang.
+
+**Sengaja TIDAK disentuh**: `bulkHide()`'s `exitSelectionMode()` di akhir — itu keluar akibat
+AKSI SELESAI (deliberate, ditekan tombol), bukan "auto-cancel karena kosong" yang dikeluhkan
+user, beda kasus, tetap benar dipertahankan.
+
+1 file (`LibraryScreen.kt`), 0 protected asset. Brace/paren seimbang (350/350, 781/781). **Belum
+diverifikasi visual** — prioritas cek: long-press 1 lagu lalu deselect lagu itu sendiri, pastikan
+SelectionActionBar TETAP tampil (count: 0 dipilih, 3 tombol aksi abu-abu/disabled), baru hilang
+setelah tombol Close ditekan.
+
 ## Batch 271 — Fix ROOT CAUSE sweep-select "auto-cancel diri sendiri" saat long-press TANPA gerak (1 file kode + 2 dokumentasi)
 User kasih root cause presisi: long-press yang TIDAK dilanjut sweep sama sekali (tekan-tahan-
 lepas, 0 gerakan) terkesan auto-cancel/oversensitif — beda dari bug Batch 268-270 (yang soal

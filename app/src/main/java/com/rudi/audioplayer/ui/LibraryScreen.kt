@@ -149,8 +149,13 @@ fun LibraryScreen(
     }
 
     fun toggleSelect(id: Long) {
+        // Batch 272 — user minta eksplisit: selectionMode TIDAK BOLEH auto-exit lagi cuma
+        // gara-gara selectedIds balik ke 0 (mis. user long-press 1 lagu lalu iseng
+        // deselect lagu itu sendiri tanpa gerak sweep apapun). SATU-SATUNYA jalan keluar dari
+        // selectionMode sekarang WAJIB lewat tombol Close eksplisit di SelectionActionBar
+        // (`exitSelectionMode()`, `onClose`) — baris `if (selectedIds.isEmpty()) selectionMode
+        // = false` yang lama SENGAJA DIHAPUS, bukan lupa.
         selectedIds = if (selectedIds.contains(id)) selectedIds.remove(id) else selectedIds.add(id)
-        if (selectedIds.isEmpty()) selectionMode = false
     }
 
     // Roadmap #14 — vaulted songs excluded here the same way as hidden ones; the Vault itself
@@ -679,6 +684,13 @@ private fun SelectionActionBar(
     onHide: () -> Unit,
     onDelete: () -> Unit
 ) {
+    // Batch 272 — count BISA 0 sekarang (selectionMode tidak lagi auto-exit saat kosong,
+    // lihat toggleSelect()). Aksi massal (Playlist/Hide/Hapus) DISABLE saat count==0 — bukan
+    // cuma kosmetik, mencegah bulkHide()/bulkDelete() beneran jalan atas 0 lagu (mis.
+    // songsPendingDelete jadi list kosong, berpotensi munculkan dialog konfirmasi "hapus 0
+    // lagu" yang aneh). Tombol Close (`onClose`) TETAP SELALU aktif — itu satu-satunya jalan
+    // keluar yang sah sekarang, harus tetap bisa dipakai kapan saja.
+    val hasSelection = count > 0
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -693,13 +705,13 @@ private fun SelectionActionBar(
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.weight(1f)
         )
-        IconButton(onClick = onAddToPlaylist) {
+        IconButton(onClick = onAddToPlaylist, enabled = hasSelection) {
             Icon(Icons.Default.QueueMusic, contentDescription = "Tambah ke Playlist")
         }
-        IconButton(onClick = onHide) {
+        IconButton(onClick = onHide, enabled = hasSelection) {
             Icon(Icons.Default.VisibilityOff, contentDescription = "Sembunyikan")
         }
-        IconButton(onClick = onDelete) {
+        IconButton(onClick = onDelete, enabled = hasSelection) {
             Icon(Icons.Default.DeleteForever, contentDescription = "Hapus dari Perangkat", tint = MaterialTheme.colorScheme.error)
         }
     }

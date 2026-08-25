@@ -35,6 +35,20 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 272 (Fitur — selectionMode WAJIB persist meski selectedIds kosong, 1 file kode)** — User:
+long-press lalu diam/iseng deselect lagu pertama TIDAK BOLEH auto-kembali normal, keluar cuma
+lewat tombol Close manual, berlaku semua logic terkait. Audit `grep selectionMode` seluruh `ui/`
+— cuma `LibraryScreen.kt` yang relevan (`SongPickerSheet.kt` checkbox selalu tampil, tidak ada
+"mode"). 1 titik auto-exit ditemukan: `toggleSelect()`'s `if (selectedIds.isEmpty())
+selectionMode=false` — dipakai 4 tab via delegasi 1 fungsi, jadi 1 fix cover semua. Dihapus;
+`exitSelectionMode()` (tombol Close) sekarang satu-satunya exit (dikonfirmasi grep ulang).
+Hardening: `SelectionActionBar` 3 tombol aksi massal di-disable saat count==0 (cegah bulk-action
+jalan atas 0 lagu), tombol Close tetap selalu aktif. `bulkHide()`'s exit-setelah-aksi SENGAJA
+tidak disentuh (beda kasus, itu deliberate bukan auto-cancel). 1 file, 0 protected asset,
+brace/paren seimbang (350/350, 781/781). **Belum diverifikasi visual** — prioritas cek:
+deselect lagu tunggal pas selectionMode aktif, ActionBar harus tetap ada (count:0, tombol aksi
+abu-abu) sampai Close ditekan. Detail: `CHANGELOG.md` Batch 272.
+
 **Batch 271 (Fix ROOT CAUSE sweep-select "auto-cancel diri sendiri" saat long-press TANPA gerak,
 1 file kode + 2 dokumentasi)** — User kasih root cause: long-press tanpa sweep sama sekali
 terkesan auto-cancel. Akar: `onDragStart` (`SongListView`, `LibraryScreen.kt`) pilih baris +
