@@ -26,12 +26,13 @@ atas file yang terus memanjang):
    teratas yang masih `[ ]`, urutan Motion→Responsive→Surface/Color→Component→Typography). 1
    checkbox = 1 batch, tetap tunduk Strict Micro-Batching. Kalau audit 1 area 0 nemu bug → centang
    `[x]` + "0 bug, STOP", JANGAN ciptakan kerjaan baru demi 100%.
-5. **Nama folder Termux proyek ini WAJIB `AudioPlayer` (kapital persis), BUKAN `audioplayer`
-   lowercase** — override eksplisit dari user terhadap default preferensi lowercase kebab-case.
-   Alasan: repo GitHub asli sudah `FDzaki-dev/AudioPlayer` (kapital, dikonfirmasi Batch 138 lewat
-   URL repo asli user), folder lokal Termux WAJIB sama persis biar tidak desync sama nama repo.
-   Semua skrip Termux (`~/projects/AudioPlayer`, bukan `~/projects/audioplayer`) di respons
-   berikutnya WAJIB pakai casing ini.
+5. **Nama folder Termux proyek ini `audioplayer` (lowercase, default kebab-case) — SUDAH FINAL,
+   JANGAN diubah lagi.** Sempat direvisi ke `AudioPlayer` (kapital) tapi DIBATALKAN user: local
+   folder Termux TIDAK terikat ke `rootProject.name` (sudah di-hardcode `"AudioPlayer"` di
+   `settings.gradle.kts`, tidak baca nama folder) maupun ke `git remote` (cuma URL, bukan
+   casing folder) — jadi lowercase aman dan konsisten sama default preferensi. Migrasi 1x
+   (rename/hapus folder lama kapital) sudah diarahkan ke user Batch 266. Semua skrip Termux
+   berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
 **Batch 266 (FAB shortcut "Tambah ke Favorit" + SongPickerSheet reusable, 2 file kode + 1
