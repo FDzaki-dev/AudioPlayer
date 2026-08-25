@@ -1,5 +1,29 @@
 # Changelog
 
+## Batch 273 — Fix "select→instant self-deselect" di SongPickerSheet (Favorit/Playlist add), PORT dari Batch 271 (1 file kode)
+User laporan (screenshot 2 sheet: "Tambah ke Favorit" & "Tambah ke Playlist"): masih kena
+instant-cancel pas long-press diam. **Dikonfirmasi lewat baca kode langsung** (bukan tebak):
+`SongPickerSheet.kt` masih punya bug PERSIS sama yang baru dibetulkan Batch 271 di `SongListView`
+(`LibraryScreen.kt`) — TAPI fix itu TIDAK PERNAH DI-PORT ke sini, karena `SongPickerSheet.kt`
+punya gesture DUPLIKAT sendiri sejak Batch 268 (bukan didelegasikan/reuse dari LibraryScreen).
+
+**Root cause identik**: `onDragStart` di sini tidak pernah `.consume()` — tekan-lama diam (tanpa
+gerak) bikin `onDrag` (satu-satunya yang consume) tidak pernah jalan, sentuhan asli lolos ke
+`.clickable` Row, yang langsung membalik toggle yang baru saja di-set `onDragStart`. Select →
+instant self-deselect, persis kasus Batch 271.
+
+**Fix**: pola `suppressClickForId` di-port PERSIS (bukan reimplementasi beda gaya) — diisi di
+`onDragStart`, ditelan sekali di `.clickable` Row kalau id cocok, dibersihkan di `onDrag` (gerak
+asli terkonfirmasi) & `onDragCancel` (jaring pengaman) — SENGAJA TIDAK di `onDragEnd`, alasan
+sama Batch 271 (ordering vs klik-hantu tidak terjamin).
+
+1 file (`SongPickerSheet.kt`), 0 protected asset. Brace/paren seimbang (47/47, 130/130). Fix
+NestedScrollConnection (Batch 270) + confirmValueChange (Batch 269) TIDAK disentuh — masih
+relevan (beda kelas masalah: itu sheet-vs-scroll, ini within-row click-vs-longpress). **⚠️
+Prioritas verifikasi**: tes PERSIS skenario screenshot — buka "Tambah ke Favorit"/"Tambah ke
+Playlist", long-press 1 lagu TANPA gerak sama sekali, pastikan checkbox TETAP tercentang (bukan
+balik kosong).
+
 ## Batch 272 — Fitur: selectionMode WAJIB persist meski selectedIds kosong, keluar cuma lewat tombol Close manual (1 file kode)
 Permintaan user eksplisit: kalau user long-press (masuk selectionMode) lalu diam, atau bahkan
 iseng deselect lagu pertama yang di-long-press (selectedIds balik ke 0), tab TIDAK BOLEH auto-

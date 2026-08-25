@@ -103,6 +103,15 @@ fun SongPickerSheet(
     var sweepLastIndex by remember { mutableStateOf<Int?>(null) }
     val currentSelected by rememberUpdatedState(selected)
     var sweepBaseSelection by remember { mutableStateOf(setOf<Long>()) }
+    // Batch 273 — user laporan: sheet ini ("Tambah ke Favorit"/"Tambah ke Playlist") MASIH
+    // kena "select → instant self-deselect" pas long-press diam tanpa gerak — bug PERSIS yang
+    // sama yang baru dibetulkan Batch 271 di `SongListView` (`LibraryScreen.kt`), tapi FIX
+    // ITU TIDAK PERNAH DI-PORT KE SINI (file terpisah, gesture-nya duplikat sejak Batch 268,
+    // bukan didelegasikan). Root cause identik: `onDragStart` di bawah tidak pernah
+    // `.consume()`, jadi kalau jari lepas tanpa gerak, `onDrag` (satu-satunya yang consume)
+    // tidak pernah jalan — sentuhan asli lolos ke `.clickable` Row, yang langsung membalik
+    // toggle yang baru saja di-set `onDragStart`. Fix: latch sama persis (`suppressClickForId`).
+    var suppressClickForId by remember { mutableStateOf<Long?>(null) }
 
     fun indexAt(rootY: Float): Int? = rowBoundsInRoot.entries.firstOrNull { rootY in it.value }?.key
 
@@ -166,11 +175,18 @@ fun SongPickerSheet(
                                     sweepAnchorIndex = idx
                                     sweepLastIndex = idx
                                     sweepBaseSelection = currentSelected
+                                    suppressClickForId = filtered[idx].id
                                     selected = sweepBaseSelection + filtered[idx].id
                                 },
                                 onDrag = { change, _ ->
                                     val anchor = sweepAnchorIndex ?: return@detectDragGesturesAfterLongPress
                                     change.consume()
+                                    // Gerakan asli terkonfirmasi — ini sweep beneran, bukan tekan
+                                    // diam, jadi klik baris anchor gak akan pernah nyala (clickable
+                                    // Row self-cancel begitu touch-slop kelewat). Latch dibersihkan
+                                    // sekarang, bukan dibiarkan nyangkut sampai tap lain di baris
+                                    // yang sama ketelan gak sengaja.
+                                    suppressClickForId = null
                                     val root = containerCoordinates?.localToRoot(change.position) ?: return@detectDragGesturesAfterLongPress
                                     val lastIdx = sweepLastIndex ?: return@detectDragGesturesAfterLongPress
                                     val idx = indexAt(root.y) ?: return@detectDragGesturesAfterLongPress
@@ -187,7 +203,12 @@ fun SongPickerSheet(
                                     selected = sweepBaseSelection + sweptIds
                                 },
                                 onDragEnd = { isSweeping = false; sweepAnchorIndex = null; sweepLastIndex = null },
-                                onDragCancel = { isSweeping = false; sweepAnchorIndex = null; sweepLastIndex = null }
+                                // Defensive cleanup saja — kasus tekan-diam SEHARUSNYA sudah
+                                // membersihkan `suppressClickForId` sendiri lewat klik yang
+                                // ketelan (lihat wiring di bawah), kasus sweep beneran sudah
+                                // dibersihkan di `onDrag` atas. Ini cuma jaga-jaga edge case
+                                // (gesture dibatalkan ancestor sebelum keduanya sempat jalan).
+                                onDragCancel = { isSweeping = false; sweepAnchorIndex = null; sweepLastIndex = null; suppressClickForId = null }
                             )
                         }
                 ) {
@@ -204,7 +225,8 @@ fun SongPickerSheet(
                                     rowBoundsInRoot[index] = top..(top + coords.size.height)
                                 }
                                 .clickable {
-                                    selected = if (isSelected) selected - song.id else selected + song.id
+                                    if (suppressClickForId == song.id) suppressClickForId = null
+                                    else selected = if (isSelected) selected - song.id else selected + song.id
                                 }
                                 .padding(horizontal = 20.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically

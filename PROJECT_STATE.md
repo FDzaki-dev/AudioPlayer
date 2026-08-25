@@ -35,6 +35,18 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 273 (Fix "select→instant self-deselect" di SongPickerSheet, PORT dari Batch 271, 1
+file kode)** — User: screenshot 2 sheet (Favorit/Playlist) masih instant-cancel. Dikonfirmasi
+baca kode: `SongPickerSheet.kt` punya gesture DUPLIKAT sendiri (Batch 268, bukan delegasi dari
+`LibraryScreen.kt`) — jadi fix Batch 271 (`.consume()` bug, `onDragStart` gak consume →
+tekan-diam bocor ke `.clickable` → toggle balik) TIDAK PERNAH ikut ter-port ke sini. Fix: pola
+`suppressClickForId` di-port PERSIS dari `SongListView` — isi di `onDragStart`, telan sekali di
+`.clickable` Row, bersih di `onDrag`/`onDragCancel` (bukan `onDragEnd`, sama alasan Batch 271).
+1 file, 0 protected asset, brace/paren seimbang (47/47, 130/130). Fix Batch 269/270 (sheet-vs-
+scroll) TIDAK disentuh, beda kelas masalah, masih relevan. **⚠️ PRIORITAS verifikasi**: long-
+press 1 lagu TANPA gerak di sheet Favorit/Playlist, checkbox harus TETAP tercentang. Detail:
+`CHANGELOG.md` Batch 273.
+
 **Batch 272 (Fitur — selectionMode WAJIB persist meski selectedIds kosong, 1 file kode)** — User:
 long-press lalu diam/iseng deselect lagu pertama TIDAK BOLEH auto-kembali normal, keluar cuma
 lewat tombol Close manual, berlaku semua logic terkait. Audit `grep selectionMode` seluruh `ui/`
