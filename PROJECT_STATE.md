@@ -35,6 +35,17 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 270 (Fix sweep-select SongPickerSheet TAKE 2 — NestedScrollConnection, 1 file kode)** —
+User konfirmasi Batch 269 (`confirmValueChange`) tidak cukup. Diriset ulang: `ModalBottomSheet`'s
+`anchoredDraggable` MEMPROSES delta drag visual duluan setiap `LazyColumn` kehabisan sisa scroll
+(termasuk gerakan kecil pas fase tunggu long-press) — `confirmValueChange` cuma tolak state
+akhir, gerakan yang ganggu long-press sudah kejadian duluan. Fix resmi/dikenal luas: custom
+`NestedScrollConnection` di content wrapper, `onPostScroll` habiskan semua sisa delta vertikal
+— sheet TIDAK PERNAH kebagian delta buat mulai drag. `isSweeping` guard (Batch 269) tetap
+dipertahankan sebagai lapisan tambahan. 1 file, +3 import, 0 protected asset, brace/paren
+seimbang (46/46, 119/119). **Belum diverifikasi visual** — kalau masih terjadi, butuh
+video/rekaman gesture buat diagnosis lanjut. Detail: `CHANGELOG.md` Batch 270.
+
 **Batch 269 (Fix sweep-select oversensitif di SongPickerSheet, 1 file kode)** — User: sebagian
 sweep-select normal, sebagian mem-batalkan diri sendiri. Root cause: `SongPickerSheet.kt`
 dibungkus `ModalBottomSheet` yang punya swipe-to-dismiss bawaan bersaing dengan long-press-drag

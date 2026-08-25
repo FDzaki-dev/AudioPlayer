@@ -1,5 +1,28 @@
 # Changelog
 
+## Batch 270 — Fix sweep-select oversensitif SongPickerSheet, TAKE 2: NestedScrollConnection (bukan confirmValueChange) (1 file kode)
+User konfirmasi: fix Batch 269 (`confirmValueChange`) TIDAK cukup, "masih kejadian". Diriset
+ulang (bukan tebak lagi) — pola dikenal luas di Material3 `ModalBottomSheet`+`LazyColumn`
+bersarang: sheet pakai `anchoredDraggable`, yang MEMPROSES delta drag secara VISUAL duluan
+setiap kali `LazyColumn` kehabisan sisa scroll buat dikonsumsi (bukan cuma pas user coba
+dismiss — bereaksi ke SETIAP delta "sisa" yang lolos, termasuk gerakan super kecil pas fase
+tunggu long-press). `confirmValueChange` cuma menolak STATE AKHIRNYA — gerakan visual yang
+mengganggu gesture long-press kita tetap sudah kejadian duluan, itu sebabnya Batch 269 gagal.
+
+**Fix yang benar** (dikonfirmasi lewat riset — bukan spekulasi): `NestedScrollConnection` custom
+dipasang di content wrapper (`Column`) via `.nestedScroll(sheetScrollConnection)`,
+`onPostScroll` mengembalikan SEMUA sisa delta vertikal (`available.copy(x=0f)`) — sheet jadi
+TIDAK PERNAH kebagian delta apapun buat mulai drag-nya sendiri, bukan direaksi-lalu-ditolak
+belakangan seperti `confirmValueChange`. `isSweeping`+`confirmValueChange` (Batch 269) TETAP
+dipertahankan sebagai lapisan pengaman tambahan (tidak mengganggu, tinggal jaga-jaga).
+
+1 file (`SongPickerSheet.kt`), 0 protected asset, +3 import baru (`NestedScrollConnection`/
+`NestedScrollSource`/`nestedScroll`). Brace/paren seimbang (46/46, 119/119). Murni Kotlin/
+Compose stdlib, tidak butuh naikkan Material3. **Belum diverifikasi visual** — kalau MASIH
+kejadian setelah ini, kemungkinan besar penyebabnya bukan lagi soal sheet-vs-scroll (sudah
+ditangani via mekanisme resmi Compose), butuh video/rekaman gesture persis buat diagnosis lebih
+lanjut, bukan tebak konsep lagi.
+
 ## Batch 269 — Fix sweep-select oversensitif di SongPickerSheet (bukan di tab Lagu) (1 file kode)
 User laporan: sebagian sweep-select normal, sebagian lagi kelewat sensitif — sampai membatalkan
 diri sendiri sebelum sempat kepakai. Dikonfirmasi: `SongListView` (`LibraryScreen.kt`, tab Lagu)

@@ -13,6 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -58,6 +61,24 @@ fun SongPickerSheet(
     // selesai (`onDragEnd`/`onDragCancel`), dibuka lagi.
     var isSweeping by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !isSweeping })
+    // Batch 270 — Batch 269's `confirmValueChange` alone TERBUKTI tidak cukup ("masih
+    // kejadian" — user konfirmasi). Root cause SEBENARNYA (dikonfirmasi riset, pola dikenal
+    // luas di Material3 `ModalBottomSheet`): sheet pakai `anchoredDraggable` yang MEMPROSES
+    // delta drag secara visual DULU begitu `LazyColumn` tidak lagi punya sisa scroll buat
+    // dikonsumsi (bukan cuma pas mau dismiss — anchoredDraggable bereaksi ke SETIAP delta
+    // "sisa" yang lolos dari LazyColumn, termasuk gerakan super kecil pas fase tunggu
+    // long-press) — `confirmValueChange` cuma menolak STATE AKHIRNYA, gerakan visualnya
+    // (yang ganggu gesture long-press kita) tetap kejadian duluan. Fix yang benar:
+    // `NestedScrollConnection` di content wrapper yang "menghabiskan" semua sisa delta
+    // vertikal di `onPostScroll` — sheet jadi TIDAK PERNAH kebagian delta apapun buat
+    // di-drag, bukan direaksi lalu ditolak belakangan.
+    val sheetScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: androidx.compose.ui.geometry.Offset, available: androidx.compose.ui.geometry.Offset, source: NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                return available.copy(x = 0f)
+            }
+        }
+    }
     val haptic = LocalHapticFeedback.current
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf(setOf<Long>()) }
@@ -90,6 +111,7 @@ fun SongPickerSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.92f)
+                .nestedScroll(sheetScrollConnection)
                 .frostedGlass()
         ) {
             Text(
