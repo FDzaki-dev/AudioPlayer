@@ -35,6 +35,14 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 267 (FAB shortcut "Tambah lagu" di detail Playlist, 2 file kode)** — Menutup Pending
+Queue Batch 266. `PlaylistScreen.kt` (`PlaylistTabView`): param baru `onAddSongToPlaylist`+
+`onInfoMessage` diteruskan dari `LibraryScreen.kt` (1 call site). Detail playlist (kosong/isi)
+dibungkus `Box`+`FAB` (`+`, BottomEnd) buka `SongPickerSheet` (reuse Batch 266),
+`alreadyAddedIds` nyaring lagu yg udah ada, `onConfirm` loop+hitung `addedCount`+toast. FAB
+"Buat playlist baru" di LIST playlist (beda konteks) TIDAK disentuh. Brace/paren kedua file
+seimbang. 0 protected asset. **Belum diverifikasi visual.** Detail: `CHANGELOG.md` Batch 267.
+
 **Batch 266 (FAB shortcut "Tambah ke Favorit" + SongPickerSheet reusable, 2 file kode + 1
 dokumentasi)** — User laporan screenshot: tab Favorit & Playlist kosong, satu-satunya cara nambah
 lagu WAJIB muter ke tab Lagu dulu. File baru `SongPickerSheet.kt` — sheet cari+checklist banyak

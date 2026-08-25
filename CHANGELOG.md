@@ -1,5 +1,18 @@
 # Changelog
 
+## Batch 267 — FAB shortcut "Tambah lagu" di detail Playlist (2 file kode)
+Menutup Pending Queue Batch 266. `PlaylistScreen.kt` (`PlaylistTabView`): param baru
+`onAddSongToPlaylist: (String, Long) -> Boolean` + `onInfoMessage: (String) -> Unit` (dua-duanya
+udah tersedia di scope `LibraryScreen.kt`, tinggal diteruskan — 1 call site doang, dicek via
+grep). Detail playlist (baik kosong maupun udah terisi) dibungkus `Box` + `FloatingActionButton`
+(ikon `+`, BottomEnd) yang buka `SongPickerSheet` (reuse komponen Batch 266) —
+`alreadyAddedIds = selectedPlaylist.songIds.toSet()` nyaring lagu yang udah ada,
+`onConfirm` loop `onAddSongToPlaylist` per id + hitung `addedCount` (bisa < jumlah dipilih kalau
+race duplikat) + toast. FAB "Buat playlist baru" (`+`) di LIST playlist (bukan detail) TIDAK
+disentuh — beda konteks/tujuan, tetap seperti sebelumnya. Brace/paren kedua file seimbang
+(`PlaylistScreen.kt` 141/141,241/241; `LibraryScreen.kt` 349/349,755/755). 0 protected asset.
+**Belum diverifikasi visual.**
+
 ## Batch 266 — FAB shortcut "Tambah ke Favorit" + SongPickerSheet reusable (2 file kode + 1 dokumentasi)
 User laporan screenshot (tab Favorit & Playlist kosong): satu-satunya cara nambah lagu
 sebelumnya WAJIB muter ke tab Lagu dulu, cari manual, tekan-lama, baru pilih "Tambah ke

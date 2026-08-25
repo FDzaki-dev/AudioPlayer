@@ -364,6 +364,8 @@ fun LibraryScreen(
                 onRenamePlaylist = onRenamePlaylist,
                 onRemoveSongFromPlaylist = onRemoveSongFromPlaylist,
                 onMoveSongInPlaylist = onMoveSongInPlaylist,
+                onAddSongToPlaylist = onAddSongToPlaylist,
+                onInfoMessage = onInfoMessage,
                 currentSongId = currentSongId
             )
             selectedTab == 6 -> SmartPlaylistTabView(

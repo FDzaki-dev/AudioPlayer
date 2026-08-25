@@ -44,12 +44,15 @@ fun PlaylistTabView(
     onRenamePlaylist: (String, String) -> Unit,
     onRemoveSongFromPlaylist: (String, Long) -> Unit,
     onMoveSongInPlaylist: (String, Int, Int) -> Unit,
+    onAddSongToPlaylist: (String, Long) -> Boolean,
+    onInfoMessage: (String) -> Unit,
     currentSongId: Long? = null
 ) {
     var selectedPlaylistId by remember { mutableStateOf<String?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showAddSongsPicker by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     val selectedPlaylist = playlists.find { it.id == selectedPlaylistId }
@@ -130,11 +133,22 @@ fun PlaylistTabView(
                 )
 
                 if (playlistSongs.isEmpty()) {
-                    EmptyState(
-                        title = "Playlist kosong",
-                        subtitle = "Tekan-lama lagu di tab Lagu, lalu pilih \"Tambah ke Playlist\"."
-                    )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        EmptyState(
+                            title = "Playlist kosong",
+                            subtitle = "Tekan-lama lagu di tab Lagu, lalu pilih \"Tambah ke Playlist\"."
+                        )
+                        FloatingActionButton(
+                            onClick = { showAddSongsPicker = true },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(20.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Tambah lagu ke playlist")
+                        }
+                    }
                 } else {
+                    Box(modifier = Modifier.fillMaxSize()) {
                     LazyColumn {
                         itemsIndexed(playlistSongs, key = { _, song -> song.id }) { index, song ->
                             val isDragging = song.id == draggingSongId
@@ -200,7 +214,31 @@ fun PlaylistTabView(
                             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                         }
                     }
+                    FloatingActionButton(
+                        onClick = { showAddSongsPicker = true },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(20.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Tambah lagu ke playlist")
+                    }
+                    }
                 }
+            }
+
+            if (showAddSongsPicker) {
+                SongPickerSheet(
+                    title = "Tambah ke \"${selectedPlaylist.name}\"",
+                    allSongs = allSongs,
+                    alreadyAddedIds = selectedPlaylist.songIds.toSet(),
+                    onConfirm = { ids ->
+                        var addedCount = 0
+                        ids.forEach { id -> if (onAddSongToPlaylist(selectedPlaylist.id, id)) addedCount++ }
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onInfoMessage(if (addedCount == 1) "1 lagu ditambahkan" else "$addedCount lagu ditambahkan")
+                    },
+                    onDismiss = { showAddSongsPicker = false }
+                )
             }
 
             if (showRenameDialog) {
