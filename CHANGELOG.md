@@ -1,5 +1,34 @@
 # Changelog
 
+## Batch 276 — Rapikan .github/workflows/build.yml: section header + Build Summary informatif (1 file, edit-parsial protected asset)
+Permintaan user: workflow berantakan & tidak informatif. **Scope dijaga ketat sesuai status
+protected asset** (Edit Parsial Only) — TIDAK ada logic/command/urutan yang diubah, cuma
+ditambah:
+
+1. **5 section-header comment** (`SETUP`/`VERSIONING`/`BUILD & TEST`/`PACKAGE & RELEASE`/
+   `DIAGNOSTICS & SUMMARY` di job `build`; `SETUP`/`EMULATOR & TEST` di job `instrumentation-
+   tests`) — murni visual wayfinding, 0 pengaruh eksekusi.
+2. **Step baru "Publish build summary"** — sebelum ini, halaman ringkasan run GitHub Actions
+   (yang muncul otomatis begitu run selesai, SEBELUM klik ke step manapun) SELALU KOSONG TOTAL
+   — satu-satunya cara tahu versi/commit yang di-build adalah buka log mentah step "Determine
+   version name" satu-satu. Step baru ini nulis tabel Markdown ke `$GITHUB_STEP_SUMMARY` (fitur
+   native GitHub Actions): versi/tag, commit SHA, trigger+aktor, baris pertama pesan commit,
+   link langsung ke halaman Release. **100% aditif** — tidak menyentuh build/signing/release
+   apa pun, `if: always()` supaya tetap tampil bahkan kalau step lain gagal (dengan pesan
+   "APK tidak sampai dibuat" alih-alih kosong).
+
+**Insiden kecil selama edit** (dicatat jujur, bukan disembunyikan): 1 percobaan awal (menambah
+section-header di step "Report signing status") sempat TIDAK SENGAJA menghapus baris `run: |`
+saat replace — LANGSUNG terdeteksi lewat validasi `python3 -c "import yaml..."` yang dijalankan
+setelah SETIAP edit tunggal (bukan cuma di akhir), dan langsung diperbaiki sebelum lanjut ke
+edit berikutnya. File final divalidasi ulang penuh: parse YAML sukses, urutan & nama SEMUA 18
+step (12 job `build` + 6 job `instrumentation-tests`) dikonfirmasi identik dengan sebelum edit.
+
+1 file (`.github/workflows/build.yml`, protected asset — edit parsial, TIDAK dirombak total).
+0 file lain. **Belum diverifikasi run CI sungguhan** — prioritas cek: push batch ini, buka tab
+Actions run yang baru, pastikan section "Summary" (bukan cuma daftar step) menampilkan tabel
+versi/commit/release seperti dijelaskan di atas.
+
 ## Batch 275 — POLISH_AUDIT.md kategori 4: audit Button lintas screen, 4 gap nyata (3 diperbaiki, 1 pending) (3 file kode + 3 dokumentasi, cap DILEWATI 1x — 1 task kohesif)
 Sub-item pertama kategori "Repeated Components": bandingkan SEMUA `Button(` (bukan Icon/Text/
 Outlined) di 26 file `ui/*.kt` — bukan visual/screenshot (belum bisa), tapi mekanis & terbukti

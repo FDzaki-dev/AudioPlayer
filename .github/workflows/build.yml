@@ -13,6 +13,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      # ═══════════════════════ 1. SETUP ═══════════════════════
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -70,6 +71,7 @@ jobs:
             echo "⚠️ No keystore decoded (SIGNING_KEYSTORE_BASE64 secret missing/empty) — falling back to debug signing."
           fi
 
+      # ═══════════════════════ 2. VERSIONING ═══════════════════════
       - name: Determine version name
         id: version
         run: |
@@ -112,6 +114,7 @@ jobs:
           echo "release_name=v$VERSION_NAME" >> "$GITHUB_OUTPUT"
           echo "Resolved version: $VERSION_NAME (commit $SHORT_SHA, run ${{ github.run_number }})"
 
+      # ═══════════════════════ 3. BUILD & TEST ═══════════════════════
       - name: Test + Build Release APK
         # Batch 62 — dulu 2 invocation Gradle terpisah (testDebugUnitTest, lalu
         # assembleRelease di step lain) = 2x fase configuration project penuh (parsing
@@ -139,6 +142,7 @@ jobs:
           set -o pipefail
           gradle testDebugUnitTest assembleRelease --no-daemon --build-cache --configuration-cache 2>&1 | tee build-output.log
 
+      # ═══════════════════════ 4. PACKAGE & RELEASE ═══════════════════════
       - name: Rename APK to match version
         run: |
           mkdir -p renamed
@@ -174,6 +178,34 @@ jobs:
           body_path: release_notes.txt
           files: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk
 
+      # ═══════════════════════ 5. DIAGNOSTICS & SUMMARY ═══════════════════════
+      - name: Publish build summary
+        # Batch 276 — user minta workflow lebih informatif. Sebelum ini, satu-satunya cara
+        # tahu versi/commit yang barusan di-build adalah buka log mentah step "Determine
+        # version name" satu-satu — halaman ringkasan run GitHub Actions (yang muncul begitu
+        # run selesai, sebelum klik ke step manapun) SELALU KOSONG total. Step ini nulis ke
+        # $GITHUB_STEP_SUMMARY (fitur native Actions, dirender sebagai Markdown di halaman
+        # ringkasan run) — 100% aditif, tidak mengubah build/signing/release APAPUN di atas.
+        if: always()
+        run: |
+          {
+            echo "## 🎵 AudioPlayer — Build ${{ steps.version.outputs.tag || 'N/A' }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| **Versi** | \`${{ steps.version.outputs.tag || 'gagal ditentukan' }}\` |"
+            echo "| **Commit** | \`$(git rev-parse --short HEAD)\` |"
+            echo "| **Trigger** | ${{ github.event_name }} oleh @${{ github.actor }} |"
+            if [ -f release_notes.txt ]; then
+              echo "| **Pesan commit** | $(head -1 release_notes.txt) |"
+            fi
+            if [ -f "renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk" ]; then
+              echo "| **Release** | [Lihat di GitHub Releases](${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}) |"
+            else
+              echo "| **Release** | ⚠️ APK tidak sampai dibuat — cek log step \"Test + Build Release APK\" |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload failure log artifact
         # Batch 62 — dulu 2 log file terpisah (test-output.log, build-output.log) karena
         # 2 step Gradle terpisah; sekarang cuma 1 (build-output.log, dari step gabungan di
@@ -202,6 +234,7 @@ jobs:
   instrumentation-tests:
     runs-on: ubuntu-latest
     steps:
+      # ═══════════════════════ 1. SETUP ═══════════════════════
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -219,6 +252,7 @@ jobs:
         with:
           gradle-version: 8.14.3
 
+      # ═══════════════════════ 2. EMULATOR & TEST ═══════════════════════
       - name: Enable KVM (emulator hardware acceleration)
         # Tanpa ini emulator jalan lewat software rendering murni — jauh lebih lambat, kadang
         # timeout duluan sebelum sempat boot. GitHub-hosted ubuntu-latest runner sudah mendukung

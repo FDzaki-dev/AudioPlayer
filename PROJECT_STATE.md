@@ -35,6 +35,18 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 276 (Rapikan `.github/workflows/build.yml` — section header + Build Summary informatif,
+1 file, protected asset edit-parsial)** — User: workflow berantakan & tidak informatif. Scope
+ketat: 0 logic/command/urutan diubah, cuma ditambah: 5 section-header comment (wayfinding
+visual) + step baru "Publish build summary" yang nulis tabel Markdown ke `$GITHUB_STEP_SUMMARY`
+(versi/tag, commit, trigger+aktor, pesan commit, link Release) — sebelumnya halaman ringkasan
+run GitHub Actions SELALU KOSONG TOTAL, cuma daftar step. 100% aditif, `if: always()`. **Insiden
+kecil dicatat jujur**: 1 edit sempat tidak sengaja hapus baris `run: |`, LANGSUNG terdeteksi via
+validasi YAML setelah SETIAP edit tunggal (bukan cuma di akhir), langsung diperbaiki. File final
+divalidasi penuh: 18 step (12+6) dikonfirmasi identik posisi/nama dgn sebelum edit. 1 file, 0
+file lain. **Belum diverifikasi run CI sungguhan** — prioritas cek: push, buka tab Actions run
+baru, pastikan section Summary muncul. Detail: `CHANGELOG.md` Batch 276.
+
 **Batch 275 (POLISH_AUDIT.md kategori 4 — audit Button lintas screen, 4 gap (3 fix, 1 pending),
 3 file kode + 3 dokumentasi, cap dilewati 1x)** — Sub-item "Button": grep semua `Button(` di
 26 file `ui/`, cek kehadiran `bouncyPress` (standar app-wide sejak Batch 256). 10 titik, 2
