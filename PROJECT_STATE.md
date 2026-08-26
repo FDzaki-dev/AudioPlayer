@@ -35,6 +35,17 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 275 (POLISH_AUDIT.md kategori 4 — audit Button lintas screen, 4 gap (3 fix, 1 pending),
+3 file kode + 3 dokumentasi, cap dilewati 1x)** — Sub-item "Button": grep semua `Button(` di
+26 file `ui/`, cek kehadiran `bouncyPress` (standar app-wide sejak Batch 256). 10 titik, 2
+awalnya dikira gap tapi FALSE POSITIVE (dicek ulang lebih teliti), 4 gap NYATA. 3 diperbaiki
+(`LibraryScreen.kt` EmptyState CTA — dampak PALING LUAS krn dipakai banyak screen,
+`SongPickerSheet.kt` tombol konfirmasi, `SmartPlaylistScreen.kt` tombol simpan) pakai pola
+identik referensi `VaultSheet.kt`. 1 PENDING (`LyricsSheet.kt:214`, di luar cap). Brace/paren
+3 file seimbang. Cap dilewati (alasan sama Batch 156: 1 task kohesif, dokumentasi tetap wajib).
+**Belum diverifikasi visual**, risiko rendah (pola sudah terbukti di 6 titik lain). Detail:
+`CHANGELOG.md` Batch 275.
+
 **Batch 274 (POLISH_AUDIT.md — audit disabled/selected state lintas screen, 0 bug, 2
 dokumentasi)** — Item teratas kategori Surface/Color. 4 kategori state diperiksa: disabled
 (5/5 konsisten), isPlaying (4/4 konsisten, dikonfirmasi ulang), isSelected (0 warna di 3

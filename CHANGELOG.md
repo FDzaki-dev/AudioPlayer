@@ -1,5 +1,34 @@
 # Changelog
 
+## Batch 275 — POLISH_AUDIT.md kategori 4: audit Button lintas screen, 4 gap nyata (3 diperbaiki, 1 pending) (3 file kode + 3 dokumentasi, cap DILEWATI 1x — 1 task kohesif)
+Sub-item pertama kategori "Repeated Components": bandingkan SEMUA `Button(` (bukan Icon/Text/
+Outlined) di 26 file `ui/*.kt` — bukan visual/screenshot (belum bisa), tapi mekanis & terbukti
+lewat grep: kehadiran `bouncyPress` (tap-feedback standar app-wide sejak Motion/Batch 256).
+
+**10 titik ditemukan**. **2 awalnya dikira gap TAPI FALSE POSITIVE** (`LyricsSheet.kt` tombol
+"Mark"/`SongInfoEditSheet.kt` tombol "Simpan" — modifier `bouncyPress`-nya ada, cuma di baris
+lebih jauh dari window awal pengecekan; dicek ulang lebih lebar sebelum disimpulkan, bukan
+asumsi). **4 gap NYATA**: `LibraryScreen.kt` `EmptyState` CTA, `SongPickerSheet.kt` tombol
+konfirmasi, `SmartPlaylistScreen.kt` tombol simpan, `LyricsSheet.kt:214` tombol "Simpan" edit
+manual lirik.
+
+**3 diperbaiki batch ini** (cap 3 file kode): pola identik persis existing (`VaultSheet.kt`
+dijadikan referensi) — `val xInteraction = remember { MutableInteractionSource() }` +
+`interactionSource = xInteraction` + `modifier = Modifier.bouncyPress(xInteraction)`, + import
+`MutableInteractionSource` di 2 file yang belum punya (`LibraryScreen.kt`/`SmartPlaylistScreen.
+kt`; `SongPickerSheet.kt` juga ditambah). `LibraryScreen.kt`'s `EmptyState` fix berdampak PALING
+LUAS (composable dipakai banyak screen dengan CTA — 1 fix nyebar otomatis). **1 PENDING**
+(`LyricsSheet.kt:214`) — di luar cap, batch berikutnya.
+
+Brace/paren ketiga file kode seimbang: `LibraryScreen.kt` (351/351, 786/786), `SongPickerSheet.kt`
+(48/48, 133/133), `SmartPlaylistScreen.kt` (104/104, 254/254). 0 protected asset. **Cap 3-file/
+batch DILEWATI 1x** (total 6 file: 3 kode + `CHANGELOG.md`/`PROJECT_STATE.md`/`POLISH_AUDIT.md`)
+— alasan sama presedan Batch 156: 1 task kohesif (audit+fix 1 sub-kategori), bukan gabungan
+task independen, dan dokumentasi WAJIB tiap batch (aturan tetap, tidak boleh di-skip demi cap).
+
+**Belum diverifikasi visual** — perubahan micro-interaction kecil (scale-on-press), risiko
+rendah, pola sudah terbukti jalan di 6 titik lain yang sudah ada.
+
 ## Batch 274 — POLISH_AUDIT.md: audit disabled/selected state lintas screen — 0 bug (2 dokumentasi, 0 kode)
 Item teratas kategori Surface/Color yang masih `[ ]` (Motion & Responsive sudah tuntas). 4
 kategori state diperiksa via grep menyeluruh `ui/*.kt`:

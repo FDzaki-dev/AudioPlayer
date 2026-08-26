@@ -2,6 +2,7 @@ package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -261,13 +262,19 @@ fun SongPickerSheet(
             ) {
                 TextButton(onClick = onDismiss) { Text("Batal") }
                 Spacer(modifier = Modifier.weight(1f))
+                // Batch 275 — sama alasan LibraryScreen.kt: tombol konfirmasi paling sering
+                // ditekan di sheet ini (dipanggil dari FAB Favorit/Playlist), tapi belum kena
+                // bouncyPress standar app-wide.
+                val confirmInteraction = remember { MutableInteractionSource() }
                 Button(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onConfirm(selected.toList())
                         onDismiss()
                     },
-                    enabled = selected.isNotEmpty()
+                    enabled = selected.isNotEmpty(),
+                    interactionSource = confirmInteraction,
+                    modifier = Modifier.bouncyPress(confirmInteraction)
                 ) {
                     Text("Tambah (${selected.size})")
                 }

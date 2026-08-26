@@ -117,6 +117,16 @@ inline per-screen di 26 file `ui/*.kt`. Jadi audit ini murni **visual comparison
 ekstraksi ke shared composable (itu refactor, dilarang eksplisit).
 - [ ] Button, IconButton, ListRow/song-row, Card, Chip, Dialog, BottomSheet (13 `*Sheet.kt`),
   Snackbar, Search, Slider, Switch — bandingkan visual antar screen.
+  **Sub-item "Button" ✅ Batch 275** (mekanis, bukan dugaan — grep semua `Button(` non-Icon/Text/
+  Outlined di `ui/*.kt`, 10 titik, cek kehadiran `bouncyPress` yang sudah jadi standar app-wide
+  sejak Motion/Batch 256). **6/10 sudah benar** (`DuplicateFinderSheet`/`RingtoneCutterSheet`/
+  `VaultSheet`x2/`LyricsSheet`(mark)/`SongInfoEditSheet` — 2 di antaranya awalnya dikira gap tapi
+  ternyata FALSE POSITIVE, modifier-nya ada di baris lebih jauh dari window pengecekan awal,
+  dicek ulang lebih teliti sebelum disimpulkan). **4 gap NYATA ditemukan, 3 diperbaiki batch
+  ini** (`LibraryScreen.kt` `EmptyState` CTA — dampaknya nyebar ke SEMUA pemanggil dgn action
+  button; `SongPickerSheet.kt` tombol konfirmasi; `SmartPlaylistScreen.kt` tombol simpan), **1
+  PENDING** (`LyricsSheet.kt:214` tombol "Simpan" edit manual lirik — di luar cap 3 file/batch,
+  batch berikutnya). IconButton/ListRow/dst BELUM diaudit — sub-item terpisah.
 - [ ] Perbaiki HANYA ketidakkonsistenan yang terbukti visual (screenshot/side-by-side), bukan dugaan.
 
 ### 5. Typography — Final Visual Check

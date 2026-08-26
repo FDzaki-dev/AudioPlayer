@@ -2,6 +2,7 @@ package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -439,7 +440,14 @@ private fun SmartPlaylistBuilderSheet(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDismiss) { Text("Batal") }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = { onSave(buildDraft()) }) {
+                // Batch 275 — sama alasan file lain di batch ini: tombol simpan playlist
+                // pintar belum kena bouncyPress standar app-wide.
+                val saveInteraction = remember { MutableInteractionSource() }
+                Button(
+                    onClick = { onSave(buildDraft()) },
+                    interactionSource = saveInteraction,
+                    modifier = Modifier.bouncyPress(saveInteraction)
+                ) {
                     Text(if (initial == null) "Buat" else "Simpan")
                 }
             }

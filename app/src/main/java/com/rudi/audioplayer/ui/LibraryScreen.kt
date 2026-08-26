@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -1442,7 +1443,16 @@ fun EmptyState(
         )
         if (actionLabel != null && onAction != null) {
             Spacer(modifier = Modifier.height(20.dp))
-            Button(onClick = onAction) { Text(actionLabel) }
+            // Batch 275 — kategori "Repeated Components" (POLISH_AUDIT.md): audit Button
+            // lintas screen nemu `EmptyState` (dipakai BANYAK tempat) tidak ikut kena
+            // `bouncyPress` tap-feedback yang sudah jadi standar app-wide (Motion, Batch 256)
+            // — 1 fix di sini otomatis nyebar ke SEMUA pemanggil `EmptyState` dengan CTA.
+            val actionInteraction = remember { MutableInteractionSource() }
+            Button(
+                onClick = onAction,
+                interactionSource = actionInteraction,
+                modifier = Modifier.bouncyPress(actionInteraction)
+            ) { Text(actionLabel) }
         }
     }
 }
