@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 274 — POLISH_AUDIT.md: audit disabled/selected state lintas screen — 0 bug (2 dokumentasi, 0 kode)
+Item teratas kategori Surface/Color yang masih `[ ]` (Motion & Responsive sudah tuntas). 4
+kategori state diperiksa via grep menyeluruh `ui/*.kt`:
+1. **Disabled** (tombol reorder/remove non-aktif) — `secondary.copy(alpha=0.3f)`, konsisten 5/5
+   titik (`PlaylistScreen.kt`+`QueueSheet.kt`), sengaja override auto-dim `IconButton` bawaan M3.
+2. **isPlaying** (badge sedang diputar) — `primary.copy(alpha=0.12f)` bg + teks bold `primary`,
+   konsisten 4/4 file (sudah diverifikasi Batch 198-199 sebelumnya, dikonfirmasi ulang di sini).
+3. **isSelected** (checkbox multi-pilih) — 0 warna di SEMUA 3 implementasi independen
+   (`LibraryScreen.kt`/`SongPickerSheet.kt`/`DuplicateFinderSheet.kt`), checkbox-glyph-only —
+   TIDAK tabrakan dgn kategori 2 meski 1 baris bisa kena keduanya sekaligus (playing+selected),
+   karena kategori ini tidak pakai warna apapun buat direbut.
+4. **Tab-chip selected** — solid `primary` bg + `onPrimary`, SENGAJA beda dari kategori 2 (chip
+   kecil butuh kontras penuh, row-highlight butuh wash halus) — beda peran UI, bukan tabrakan.
+
+**Kesimpulan: 0 bug** — tiap kategori konsisten penuh di dalam dirinya sendiri, tidak ada 1
+warna dipakai utk 2 makna berbeda. Checkbox `[x]` di `POLISH_AUDIT.md`, TIDAK menciptakan
+kerjaan baru demi "menemukan sesuatu" (sesuai instruksi eksplisit dokumen itu sendiri).
+
+2 dokumentasi (`CHANGELOG.md`/`POLISH_AUDIT.md`), 0 kode. Item berikutnya kategori Surface/Color:
+"Jangan redesign theme" (guardrail, bukan task) — kategori Surface/Color sekarang TUNTAS,
+lanjut kategori 4 (Repeated Components) batch berikutnya.
+
 ## Batch 273 — Fix "select→instant self-deselect" di SongPickerSheet (Favorit/Playlist add), PORT dari Batch 271 (1 file kode)
 User laporan (screenshot 2 sheet: "Tambah ke Favorit" & "Tambah ke Playlist"): masih kena
 instant-cancel pas long-press diam. **Dikonfirmasi lewat baca kode langsung** (bukan tebak):

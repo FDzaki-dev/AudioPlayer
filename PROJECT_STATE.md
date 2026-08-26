@@ -35,6 +35,15 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 274 (POLISH_AUDIT.md — audit disabled/selected state lintas screen, 0 bug, 2
+dokumentasi)** — Item teratas kategori Surface/Color. 4 kategori state diperiksa: disabled
+(5/5 konsisten), isPlaying (4/4 konsisten, dikonfirmasi ulang), isSelected (0 warna di 3
+implementasi independen — checkbox-glyph-only, tidak tabrakan dgn isPlaying meski bisa kena
+bareng), tab-chip-selected (beda treatment SENGAJA, beda peran UI). **0 bug ditemukan** — tidak
+menciptakan kerjaan baru. 0 kode. Kategori Surface/Color sekarang TUNTAS (guardrail "jangan
+redesign theme" bukan task nyata). Item berikutnya: kategori 4 Repeated Components. Detail:
+`CHANGELOG.md` Batch 274.
+
 **Batch 273 (Fix "select→instant self-deselect" di SongPickerSheet, PORT dari Batch 271, 1
 file kode)** — User: screenshot 2 sheet (Favorit/Playlist) masih instant-cancel. Dikonfirmasi
 baca kode: `SongPickerSheet.kt` punya gesture DUPLIKAT sendiri (Batch 268, bukan delegasi dari

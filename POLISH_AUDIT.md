@@ -92,7 +92,22 @@ untuk batch-batch berikutnya — bukan sekali kerja, tapi checklist yang diisi/d
   (default M3 `outlineVariant`, token beda)** — `DuplicateFinderSheet.kt` (2) + `VaultSheet.kt`
   (1) disamakan ke `surfaceVariant`, mayoritas 20:3 jelas & blast radius kecil, langsung
   dieksekusi (beda dari item 1 yg diobservasi saja). Detail: `CHANGELOG.md` Batch 261.
-- [ ] Audit disabled/selected state lintas screen (warna sama = makna sama, cari yg dobel makna).
+- [x] Audit disabled/selected state lintas screen (warna sama = makna sama, cari yg dobel makna).
+  **Diaudit Batch 274: 0 bug ditemukan, STOP.** 4 kategori state diperiksa: (a) **disabled**
+  (tombol reorder/remove non-aktif) — `secondary.copy(alpha=0.3f)`, 5 titik identik di
+  `PlaylistScreen.kt`+`QueueSheet.kt`, sengaja override `IconButton`'s auto-dim M3 (explicit
+  `tint` menang atas `LocalContentColor`), konsisten 5/5; (b) **isPlaying** (badge lagu sedang
+  diputar) — `primary.copy(alpha=0.12f)` bg + teks bold `primary`, konsisten 4/4 file
+  (`LibraryScreen`/`PlaylistScreen`/`QueueSheet`/`SmartPlaylistScreen`, sudah diverifikasi Batch
+  198-199); (c) **isSelected** (checkbox multi-pilih) — 0 warna sama sekali di SEMUA 3
+  implementasi independen (`LibraryScreen.kt` selectionMode, `SongPickerSheet.kt`,
+  `DuplicateFinderSheet.kt`) — checkbox-glyph-only secara konsisten, TIDAK numpuk warna dgn (b)
+  sekalipun 1 baris bisa `isPlaying` DAN `isSelected` bersamaan (0 tabrakan makna krn (c) tidak
+  pakai warna apapun); (d) **tab-chip selected** (`LibraryScreen.kt` baris 803) — solid
+  `primary` bg + `onPrimary` teks, SENGAJA beda treatment dari (b) (chip kecil butuh kontras
+  penuh, row-highlight butuh wash halus) — beda peran UI, bukan tabrakan makna. **Kesimpulan:
+  4 kategori state, masing-masing konsisten penuh di dalam dirinya sendiri, dan tidak ada 1
+  warna yang dipakai utk 2 makna berbeda.**
 - [ ] **Jangan redesign theme** — ini audit konsistensi pemakaian token yang sudah ada, bukan bikin
   token baru.
 
