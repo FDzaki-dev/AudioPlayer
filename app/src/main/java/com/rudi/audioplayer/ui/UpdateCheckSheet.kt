@@ -72,8 +72,16 @@ fun UpdateCheckSheet(onDismiss: () -> Unit) {
                     // nampilin kotak kosong) daripada terlihat rusak/setengah-jadi.
                     if (s.release.releaseNotes.isNotBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
+                        // Batch 277 — release_notes.txt (build.yml) sekarang diawali baris
+                        // "v1.3.14-run276 (e4ea7ca)" + baris kosong SEBELUM pesan commit
+                        // (biar halaman web GitHub Release lebih informatif, bukan cuma pesan
+                        // commit polos). Prefix itu REDUNDAN di sini — "Update tersedia:
+                        // ${tagName}" di atas SUDAH menampilkan info versi yang sama persis.
+                        // `substringAfter("\n\n", releaseNotes)` buang prefix itu SEBELUM
+                        // baris kosong pertama; fallback ke `releaseNotes` utuh kalau tidak
+                        // ketemu separator (rilis lama pra-Batch-277 belum punya format ini).
                         Text(
-                            s.release.releaseNotes,
+                            s.release.releaseNotes.substringAfter("\n\n", s.release.releaseNotes),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.secondary
                         )

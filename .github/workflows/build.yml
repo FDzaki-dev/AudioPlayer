@@ -156,7 +156,22 @@ jobs:
         # GITHUB_OUTPUT butuh delimiter heredoc yang rawan kalau isi pesan kebetulan memuat
         # baris sama persis dengan delimiter itu; body_path (step release di bawah) baca file
         # apa adanya, tidak kena masalah itu sama sekali.
-        run: git log -1 --pretty=%B > release_notes.txt
+        #
+        # Batch 277 — user bandingkan halaman Release (screenshot) vs Build Summary baru
+        # (Batch 276) yang jauh lebih informatif, minta disamakan standarnya. FILE INI PUNYA
+        # 2 KONSUMEN SEKALIGUS: (1) halaman web GitHub Release, RENDER Markdown penuh; (2)
+        # `UpdateCheckSheet.kt` di app, `Text()` POLOS — TIDAK render Markdown, sintaks `##`/
+        # tabel/`**` bakal tampil MENTAH sebagai karakter literal, bikin rusak di app. Jadi
+        # baris tambahan di bawah SENGAJA plain text aja (bukan header/tabel Markdown spt
+        # Build Summary yang cuma dibaca CI), aman di KEDUA konsumen — tetap nambah info versi
+        # + commit SHA singkat yang sebelumnya cuma ada di elemen UI terpisah GitHub (tidak
+        # ikut ke body), tanpa risiko syntax mentah muncul di UI app.
+        run: |
+          {
+            echo "${{ steps.version.outputs.tag }} ($(git rev-parse --short HEAD))"
+            echo ""
+            git log -1 --pretty=%B
+          } > release_notes.txt
 
       - name: Create GitHub Release with signed APK
         # softprops/action-gh-release menempel file APK langsung sebagai release asset —

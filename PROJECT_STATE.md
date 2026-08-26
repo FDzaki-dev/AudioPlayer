@@ -35,6 +35,16 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 277 (Samakan standar informatif GitHub Release body dgn Build Summary, 1 protected
+asset + 1 file kode)** — User bandingkan screenshot: Summary sudah rapi, Release body masih
+polos. Kendala dijaga: `release_notes.txt` dibaca 2 konsumen (web GitHub Markdown-render vs app
+`Text()` polos) — enrichment SENGAJA plain text, bukan Markdown spt Summary. Fix: `build.yml`
+tulis `${tag} (${sha})` + baris kosong sebelum pesan commit (YAML divalidasi segera, bukan di
+akhir); `UpdateCheckSheet.kt` buang prefix redundan itu (`substringAfter("\n\n", ...)`, fallback
+aman ke rilis lama). Brace/paren seimbang (25/25, 67/67), YAML valid 13 step. **Belum
+diverifikasi visual** — cek: halaman Release baru ada versi+SHA di body, app "Cek Update" TIDAK
+duplikasi versi. Detail: `CHANGELOG.md` Batch 277.
+
 **Batch 276 (Rapikan `.github/workflows/build.yml` — section header + Build Summary informatif,
 1 file, protected asset edit-parsial)** — User: workflow berantakan & tidak informatif. Scope
 ketat: 0 logic/command/urutan diubah, cuma ditambah: 5 section-header comment (wayfinding

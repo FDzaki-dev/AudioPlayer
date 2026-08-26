@@ -1,5 +1,32 @@
 # Changelog
 
+## Batch 277 — Samakan standar informatif GitHub Release body dgn Build Summary Batch 276 (1 protected asset + 1 file kode)
+User bandingkan screenshot: Build Summary (Batch 276) sudah rapi & informatif, tapi halaman
+Release (Image 2) — yang juga dibaca app via `UpdateCheckSheet.kt` — masih polos cuma pesan
+commit doang. Diminta disamakan standarnya.
+
+**Kendala penting yang dijaga**: `release_notes.txt` punya 2 KONSUMEN sekaligus — (1) halaman
+web GitHub Release, render Markdown penuh; (2) `UpdateCheckSheet.kt` di app, `Text()` POLOS,
+TIDAK render Markdown — sintaks `##`/tabel/`**` bakal tampil MENTAH sebagai karakter literal di
+app kalau dipakai. Jadi enrichment SENGAJA plain text, bukan copy gaya Build Summary yang cuma
+dibaca CI (Markdown aman di sana).
+
+**2 file**:
+1. **`.github/workflows/build.yml`** (protected, edit parsial) — "Capture commit message for
+   release notes" sekarang tulis `${tag} (${short_sha})` + baris kosong SEBELUM pesan commit,
+   plain text aman di kedua konsumen. YAML divalidasi parse SEGERA setelah edit (pelajaran
+   Batch 276 diterapkan — bukan cuma di akhir).
+2. **`UpdateCheckSheet.kt`** — prefix versi baru itu REDUNDAN di app (`"Update tersedia:
+   ${tagName}"` sudah tampil di atasnya, versi sama persis). Fix: `releaseNotes.substringAfter(
+   "\n\n", releaseNotes)` buang prefix sebelum baris kosong pertama, fallback ke teks utuh kalau
+   separator tidak ketemu (rilis lama pra-Batch-277 tetap aman, tidak berubah tampilannya).
+
+Brace/paren `UpdateCheckSheet.kt` seimbang (25/25, 67/67). YAML `build.yml` valid, 13 step
+`build` job dikonfirmasi identik posisi/nama. **Belum diverifikasi visual** — prioritas cek:
+push batch ini, buka halaman Release baru, pastikan body-nya sekarang ada baris versi+SHA di
+atas pesan commit; buka app "Cek Update", pastikan TIDAK ada duplikasi versi (cuma pesan commit
+polos, sama seperti sebelumnya).
+
 ## Batch 276 — Rapikan .github/workflows/build.yml: section header + Build Summary informatif (1 file, edit-parsial protected asset)
 Permintaan user: workflow berantakan & tidak informatif. **Scope dijaga ketat sesuai status
 protected asset** (Edit Parsial Only) — TIDAK ada logic/command/urutan yang diubah, cuma
