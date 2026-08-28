@@ -1,5 +1,51 @@
 # Changelog
 
+## Batch 285 — Rebranding kosmetik: "Audio Player" → "SONIX" (permintaan user, 8 file kode + 1 dokumentasi, cap DILEWATI — 1 task kohesif)
+Permintaan user eksplisit: nama app terasa placeholder generik, minta rebrand ke nama keren
+terinspirasi 'CONVX'. **Nama dipilih: SONIX** (sound + gaya akhiran-X ala CONVX, pendek & pas
+buat audio player). **Scope dijaga ketat sesuai instruksi user sendiri**: "only kosmetik, user
+facing. zero touch bagian vital dan sudah lama stabil".
+
+**Metode**: grep menyeluruh `"AudioPlayer"`/`"Audio Player"` di `app/src/main/java/` +
+`app/src/main/res/`, tiap titik diperiksa satu-satu, dikategorikan user-facing (ganti) vs
+vital/internal (JANGAN sentuh) SEBELUM eksekusi — bukan sapuan mekanis buta.
+
+**9 titik user-facing diganti**: `strings.xml` `app_name` (label launcher — paling penting),
+`MainActivity.kt` (judul prompt biometrik + teks splash "SELAMAT DATANG" — momen branding
+paling menonjol), `PlaybackService.kt` (judul notifikasi cold-start), `WidgetUpdater.kt` +
+`widget_player.xml` (teks fallback widget), `SettingsScreen.kt` ("SONIX versi..."),
+`BackupRestoreSheet.kt` (pesan error, HANYA teks tampilan — logic validasi JSON internal
+SENGAJA tidak disentuh, lihat di bawah), `FloatingBubbleService.kt` (teks notifikasi bubble),
+`README.md` (judul H1).
+
+**SENGAJA TIDAK disentuh (vital/stable, sesuai instruksi user)**:
+- `applicationId`/`namespace` = `com.rudi.audioplayer` — mengubah ini = app dianggap APLIKASI
+  BEDA oleh Android (install existing user JADI HILANG datanya, bukan update).
+- Nama class/composable internal (`AudioPlayerApplication`, `AudioPlayerTheme`,
+  `Theme.AudioPlayer` style resource) — identifier kode, tidak pernah dilihat user, refactor
+  lintas-file berisiko tinggi buat perubahan "kosmetik".
+- **Path filesystem asli device** (`Documents/AudioPlayer/backups`, `Documents/AudioPlayer/
+  logs`, path ringtone MediaStore) — kalau diganti, backup/log yang SUDAH ADA di device user
+  jadi orphan (app cari di folder baru, file lama tetap di folder lama, tidak ketemu lagi).
+  Teks yang MENAMPILKAN path ini ke user (`BackupRestoreSheet.kt`/`DiagnosticLogSheet.kt`)
+  ikut TIDAK diubah — supaya tetap akurat menunjuk lokasi asli, bukan salah info.
+- **`BackupManager.kt`'s `root.put("app", "AudioPlayer")`** — marker internal di file JSON
+  backup, dipakai validasi restore. Tidak diubah → backup lama DAN baru tetap 100% kompatibel
+  direstore (cuma pesan tampilan yang diperbarui, bukan pemeriksaan data).
+- Komentar kode yang menyebut "AudioPlayer" — dokumentasi developer, bukan user-facing.
+
+Brace/paren 6 file Kotlin seimbang (`MainActivity.kt` 251/251+583/583, `PlaybackService.kt`
+78/78+361/361, `WidgetUpdater.kt` 20/20+118/118, `SettingsScreen.kt` 157/157+481/481,
+`BackupRestoreSheet.kt` 33/33+89/89, `FloatingBubbleService.kt` 78/78+276/276). XML
+(`widget_player.xml`/`strings.xml`) tervalidasi parse. Grep ulang pasca-edit konfirmasi: SEMUA
+sisa occurrence "AudioPlayer" cuma yang sengaja dipertahankan (class/style/path/JSON/komentar),
+0 yang kelewat.
+
+**Cap 3-file/batch DILEWATI** (9 file total) — 1 task kohesif (rebranding SATU nama, bukan
+gabungan task independen), alasan sama presedan Batch 156/275. **Belum diverifikasi visual** —
+prioritas cek: launcher icon label, splash screen, notifikasi, widget, Settings, semua tampil
+"SONIX" konsisten; backup/restore lama-baru tetap saling kompatibel.
+
 ## Batch 284 — Liquid Glass fase 3 langkah 4: audit Sheets/Dialog (0 kode)
 Lanjutan §5 langkah 3, urutan "Sheets/Dialog" setelah LibraryScreen (Batch 283, 0 gap). Grep
 `.frostedGlass()` app-wide: **9 sheet** memakainya (`ABRepeatBookmarkSheet`, `EqualizerSheet`,

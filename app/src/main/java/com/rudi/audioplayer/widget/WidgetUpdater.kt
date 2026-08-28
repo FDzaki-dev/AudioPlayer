@@ -126,7 +126,7 @@ object WidgetUpdater {
             views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
             views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))
             if (!isCompact) {
-                views.setTextViewText(R.id.widget_artist, artist ?: "Buka AudioPlayer")
+                views.setTextViewText(R.id.widget_artist, artist ?: "Buka SONIX")
                 views.setTextColor(R.id.widget_artist, if (isDark) ARTIST_COLOR_DARK else ARTIST_COLOR_LIGHT)
             }
 

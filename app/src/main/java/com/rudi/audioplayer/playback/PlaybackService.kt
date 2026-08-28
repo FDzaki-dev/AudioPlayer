@@ -390,7 +390,7 @@ class PlaybackService : MediaLibraryService() {
         }
 
         return NotificationCompat.Builder(this, COLD_START_CHANNEL_ID)
-            .setContentTitle("AudioPlayer")
+            .setContentTitle("SONIX")
             .setContentText("Memuat lagu…")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_LOW)

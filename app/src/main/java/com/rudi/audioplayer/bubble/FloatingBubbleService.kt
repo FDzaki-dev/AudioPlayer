@@ -231,7 +231,7 @@ class FloatingBubbleService : Service() {
 
         val notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Mini Player Mengambang aktif")
-            .setContentText("Ketuk untuk buka AudioPlayer. Matikan lewat Settings kalau tidak dibutuhkan.")
+            .setContentText("Ketuk untuk buka SONIX. Matikan lewat Settings kalau tidak dibutuhkan.")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)

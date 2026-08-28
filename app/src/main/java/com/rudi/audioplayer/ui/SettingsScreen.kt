@@ -531,7 +531,7 @@ fun SettingsScreen(
                 // strictly increasing (basis git commit count, lihat app/build.gradle.kts),
                 // jadi "(build N)" tidak menambah info baru bagi pengguna. Skema penomoran
                 // versi (auto dari commit count) TIDAK diubah — cuma ringkas tampilannya.
-                "AudioPlayer versi ${BuildConfig.VERSION_NAME}",
+                "SONIX versi ${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )

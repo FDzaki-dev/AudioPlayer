@@ -36,6 +36,17 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 285 (Rebranding kosmetik "Audio Player" → "SONIX", 8 file kode + 1 dokumentasi, cap
+dilewati — 1 task kohesif)** — Permintaan user eksplisit, nama terinspirasi CONVX. 9 titik
+user-facing diganti (`strings.xml` app_name, splash screen, notifikasi, widget, Settings,
+biometric prompt, backup error msg, README). **SENGAJA TIDAK disentuh** (vital/stable, sesuai
+instruksi user): `applicationId`/`namespace` (ganti = app dianggap beda oleh Android, data user
+hilang), nama class/style internal, **path filesystem device asli** (Documents/AudioPlayer/
+backups+logs — ganti = file lama user jadi orphan), marker JSON internal backup (kompatibilitas
+restore lama↔baru tetap terjaga), komentar kode. Brace/paren 6 file Kotlin seimbang, XML valid,
+grep ulang konfirmasi 0 titik user-facing kelewat. Cap dilewati (9 file, 1 task kohesif, presedan
+Batch 156/275). **Belum diverifikasi visual**. Detail: `CHANGELOG.md` Batch 285.
+
 **Batch 284 (Liquid Glass fase 3 langkah 4 — audit Sheets/Dialog, 0 kode)** — 9 sheet pemakai
 `.frostedGlass()` (`ABRepeatBookmarkSheet`/`EqualizerSheet`/`FolderManagerSheet`/`LyricsSheet`/
 `QueueSheet`/`RingtoneCutterSheet`/`SongInfoEditSheet`/`SongPickerSheet`/`VisualizerSheet`)

@@ -1,4 +1,4 @@
-# Audio Player
+# SONIX
 
 Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer. 100% offline, tanpa izin
 INTERNET sama sekali.

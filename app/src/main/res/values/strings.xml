@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Audio Player</string>
+    <string name="app_name">SONIX</string>
     <string name="shortcut_shuffle_short">Acak Semua</string>
     <string name="shortcut_shuffle_long">Acak Semua Musik</string>
     <string name="shortcut_continue_short">Lanjutkan</string>

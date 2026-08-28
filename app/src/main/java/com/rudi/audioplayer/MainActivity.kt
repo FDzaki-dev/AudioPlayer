@@ -175,7 +175,7 @@ class MainActivity : FragmentActivity() {
             }
         )
         val info = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Buka AudioPlayer")
+            .setTitle("Buka SONIX")
             .setNegativeButtonText("Pakai PIN")
             .build()
         prompt.authenticate(info)
@@ -463,7 +463,7 @@ private fun WelcomeScreen(onContinue: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            "Audio Player",
+            "SONIX",
             style = MaterialTheme.typography.titleLarge,
             textAlign = TextAlign.Center
         )

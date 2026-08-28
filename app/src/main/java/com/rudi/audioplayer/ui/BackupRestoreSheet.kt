@@ -57,7 +57,7 @@ fun BackupRestoreSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
             if (payload != null) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
         )
         if (payload == null) {
-            resultBanner = false to "File bukan backup AudioPlayer yang valid, atau formatnya sudah tidak dikenali versi ini"
+            resultBanner = false to "File bukan backup SONIX yang valid, atau formatnya sudah tidak dikenali versi ini"
         } else {
             // Validasi lolos, TAPI belum langsung diterapkan — konfirmasi eksplisit dari user
             // (dialog di bawah) adalah pagar terakhir sebelum data saat ini benar-benar ditimpa.

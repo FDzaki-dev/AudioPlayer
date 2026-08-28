@@ -42,7 +42,7 @@
             android:textSize="12sp"
             android:maxLines="1"
             android:ellipsize="end"
-            android:text="Buka AudioPlayer" />
+            android:text="Buka SONIX" />
     </LinearLayout>
 
     <ImageButton
