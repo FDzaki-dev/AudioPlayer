@@ -64,6 +64,7 @@ import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
+import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.ui.theme.Radius
 import androidx.compose.ui.platform.LocalContext
@@ -794,6 +795,15 @@ private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
     var showMoreMenu by remember { mutableStateOf(false) }
     val moreSelected = selectedTab in 3..6
     val moreChipLabel = if (moreSelected) moreLabels[selectedTab - 3] else "Lainnya"
+    // Batch 287 — Liquid Glass fase 3 sisa langkah: audit pill/chip lebar. Chip filter tab ini
+    // (lebar≠tinggi, teks pendek dgn padding, BUKAN tombol persegi/lingkaran) genuinely pill
+    // secara visual tapi radius-nya `Radius.xxl` (20dp FIXED) — cuma KEBETULAN terlihat pill
+    // di ukuran teks pendek ini, bukan stadium sungguhan yg auto-adaptif ke tinggi berapa pun
+    // (`Radius.liquidPill`=999dp dijamin selalu stadium PENUH apa pun metrik font/padding live
+    // di device, `xxl` fixed bisa saja tidak pas kalau line-height berbeda). SENGAJA opt-in
+    // per-identitas (`isLiquidGlassTheme()`, pola sama seluruh redesign ini) — tema lain TETAP
+    // `Radius.xxl` seperti sebelumnya, 0 perubahan visual buat mereka.
+    val chipRadius = if (isLiquidGlassTheme()) Radius.liquidPill else Radius.xxl
 
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
@@ -804,7 +814,7 @@ private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
             val selected = selectedTab == index
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(Radius.xxl))
+                    .clip(RoundedCornerShape(chipRadius))
                     .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
                     .clickable { onSelect(index) }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -820,7 +830,7 @@ private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
             Box {
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(Radius.xxl))
+                        .clip(RoundedCornerShape(chipRadius))
                         .background(if (moreSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
                         .clickable { showMoreMenu = true }
                         .padding(horizontal = 16.dp, vertical = 8.dp),

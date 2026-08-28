@@ -2,6 +2,7 @@ package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.ContentCut
@@ -19,7 +20,9 @@ import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.RingtoneCutter
 import com.rudi.audioplayer.data.RingtoneEncoder
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.ui.theme.Radius
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
 
 /**
  * Roadmap #5 — Ringtone Cutter. MVP disengaja: 2 [Slider] terpisah (awal/akhir) alih-alih 1
@@ -161,12 +164,15 @@ private fun DestinationChip(
     onClick: () -> Unit
 ) {
     val chipInteraction = remember { MutableInteractionSource() }
+    // Batch 288 — kandidat FilterChip Batch 287, pola sama EqualizerSheet.kt/SmartPlaylistScreen.kt.
+    val chipLiquidShape = if (isLiquidGlassTheme()) RoundedCornerShape(Radius.liquidPill) else FilterChipDefaults.shape
     FilterChip(
         selected = selected,
         onClick = onClick,
         label = { Text(label, maxLines = 1) },
         leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
         interactionSource = chipInteraction,
+        shape = chipLiquidShape,
         modifier = modifier.bouncyPress(chipInteraction, pressedScale = 0.92f)
     )
 }

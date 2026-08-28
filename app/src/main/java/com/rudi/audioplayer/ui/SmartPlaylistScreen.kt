@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.SmartPlaylist
 import com.rudi.audioplayer.data.SmartPlaylistEngine
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.ui.theme.Radius
+import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
 
 /**
  * Smart Playlist tab content: list of rule-based playlists (with live match count), or the
@@ -234,6 +237,8 @@ private fun SmartPlaylistBuilderSheet(
     var maxYear by remember { mutableStateOf(initial?.maxYear?.toString() ?: "") }
     var keyword by remember { mutableStateOf(initial?.keyword ?: "") }
     var selectedGenre by remember { mutableStateOf(initial?.genre) }
+    // Batch 288 — kandidat FilterChip Batch 287, pola sama EqualizerSheet.kt.
+    val chipLiquidShape = if (isLiquidGlassTheme()) RoundedCornerShape(Radius.liquidPill) else FilterChipDefaults.shape
 
     fun buildDraft(): SmartPlaylist = SmartPlaylist(
         id = initial?.id ?: "",
@@ -309,6 +314,7 @@ private fun SmartPlaylistBuilderSheet(
                                     if (folder in selectedFolders) selectedFolders - folder
                                     else selectedFolders + folder
                             },
+                            shape = chipLiquidShape,
                             label = { Text(folder) }
                         )
                     }
@@ -336,6 +342,7 @@ private fun SmartPlaylistBuilderSheet(
                                 // as the rating stars below.
                                 selectedGenre = if (genreOption == selectedGenre) null else genreOption
                             },
+                            shape = chipLiquidShape,
                             label = { Text(genreOption) }
                         )
                     }

@@ -15,8 +15,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.rudi.audioplayer.ui.theme.Radius
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
+import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
@@ -50,6 +53,10 @@ fun EqualizerSheet(
     // sesudahnya (pelajaran sama seperti "Ambient Light gak bocor" Batch 81), jadi scanline
     // overlay wajib dikurung eksplisit di sini supaya tidak bocor melewati sudut membulat panel.
     val isCalmRetro = isCalmRetroTheme()
+    // Batch 288 — Liquid Glass fase 3 sisa langkah: kandidat FilterChip Batch 287 (Material3
+    // bawaan, shape default ~8dp kotak-bulat, BUKAN custom shape kayak LibraryFilterChips).
+    // Sama opt-in per-identitas: tema lain tetap FilterChipDefaults.shape, 0 perubahan visual.
+    val chipLiquidShape = if (isLiquidGlassTheme()) RoundedCornerShape(Radius.liquidPill) else FilterChipDefaults.shape
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         Column(
@@ -113,6 +120,7 @@ fun EqualizerSheet(
                             },
                             interactionSource = chipInteraction,
                             modifier = Modifier.bouncyPress(chipInteraction, pressedScale = 0.92f),
+                            shape = chipLiquidShape,
                             label = { Text(label) }
                         )
                     }
@@ -138,6 +146,7 @@ fun EqualizerSheet(
                                 enabled = state.enabled,
                                 interactionSource = chipInteraction,
                                 modifier = Modifier.bouncyPress(chipInteraction, pressedScale = 0.92f),
+                                shape = chipLiquidShape,
                                 label = { Text(state.presets[index]) }
                             )
                         }

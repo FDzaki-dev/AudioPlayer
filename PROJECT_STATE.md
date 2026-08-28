@@ -36,6 +36,35 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 288 (Liquid Glass fase 3 — sisa 5 titik Material3 FilterChip bawaan, 3 file kode + 1
+dokumentasi)** — Menutup Pending Queue Batch 287. `EqualizerSheet.kt` (2 titik: preset
+kuat+bawaan perangkat), `SmartPlaylistScreen.kt`'s `SmartPlaylistBuilderSheet` (2 titik: folder+
+genre), `RingtoneCutterSheet.kt`'s `DestinationChip` (1 titik) — semua dikasih `shape =
+if (isLiquidGlassTheme()) RoundedCornerShape(Radius.liquidPill) else FilterChipDefaults.shape`,
+pola persis Batch 287. **Kandidat pill/chip fase 3 SEKARANG SELESAI PENUH — 0 sisa.** Brace/
+paren ketiga file seimbang, 0 import duplikat. 0 protected asset. **Belum diverifikasi visual.**
+Detail: `CHANGELOG.md` Batch 288.
+
+**Batch 287 (Liquid Glass fase 3 sisa langkah — pill/chip lebar, LibraryFilterChips →
+Radius.liquidPill, 1 file kode + 1 dokumentasi)** — Kandidat pertama & paling menonjol:
+`LibraryFilterChips` (tab Library, dilihat tiap kunjungan). Radius dulu `Radius.xxl` (20dp
+FIXED, cuma kebetulan terlihat pill di ukuran teks sekarang). Fix: `chipRadius = if
+(isLiquidGlassTheme()) Radius.liquidPill else Radius.xxl` (reuse helper Batch 280), diterapkan
+2 chip row. Opt-in per-identitas, tema lain 0 perubahan. Brace/paren seimbang (351/351,
+793/793). **⏳ Kandidat lain BELUM diaudit** (Material3 `FilterChip` bawaan di 3 file lain,
+shape default beda dari custom shape ini) — batch berikutnya. **Belum diverifikasi visual.**
+Detail: `CHANGELOG.md` Batch 287.
+
+**Batch 286 (Liquid Glass fase 3 langkah 5 — audit Settings, 0 gap, sub-langkah 3 SELESAI
+PENUH, 2 dokumentasi)** — Grep menyeluruh `SettingsScreen.kt`: cuma 1 cluster branch identitas
+di seluruh file (`ThemeOptionCard` preview tema, 3 cek ke identitas spesifik LAIN — Liquid
+Glass otomatis flat/minimalis lewat absensi kecocokan, bukan branch eksplisit, hasil SAMA
+dengan file lain). 0 `frostedGlass()` di file ini — Settings = list polos, sisa 100% generik.
+**Sub-langkah 3 (MiniPlayerBar→NowPlayingScreen→LibraryScreen→Sheets/Dialog→Settings) SEKARANG
+TUNTAS PENUH, 0 gap di 5/5 area.** 0 kode. Item berikutnya: audit pill/chip lebar layak
+`Radius.liquidPill` (belum ada kandidat, perlu grep terarah baru). Detail: `CHANGELOG.md`
+Batch 286.
+
 **Batch 285 (Rebranding kosmetik "Audio Player" → "SONIX", 8 file kode + 1 dokumentasi, cap
 dilewati — 1 task kohesif)** — Permintaan user eksplisit, nama terinspirasi CONVX. 9 titik
 user-facing diganti (`strings.xml` app_name, splash screen, notifikasi, widget, Settings,

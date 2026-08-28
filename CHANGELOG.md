@@ -1,5 +1,73 @@
 # Changelog
 
+## Batch 288 — Liquid Glass fase 3: sisa 5 titik Material3 FilterChip bawaan → Radius.liquidPill (3 file kode + 1 dokumentasi)
+Menutup Pending Queue Batch 287 (kandidat kedua): Material3 `FilterChip` bawaan (shape default
+~8dp kotak-bulat, BEDA dari `LibraryFilterChips` yang custom shape). Titik ditemukan lewat grep
+`FilterChip(` di 3 file — semuanya dikasih param `shape =` baru, pola opt-in per-identitas
+PERSIS Batch 287 (`if (isLiquidGlassTheme()) RoundedCornerShape(Radius.liquidPill) else
+FilterChipDefaults.shape` — else eksplisit ke default M3 asli, BUKAN dibiarkan kosong, biar tema
+lain 0 perubahan visual persis kayak sebelumnya):
+- `EqualizerSheet.kt`: 2 titik (chip preset kuat + chip preset bawaan perangkat)
+- `SmartPlaylistScreen.kt` (`SmartPlaylistBuilderSheet`): 2 titik (chip folder + chip genre)
+- `RingtoneCutterSheet.kt` (`DestinationChip`, composable privat sendiri): 1 titik
+
+Total 5 titik, 1 val `chipLiquidShape` per file (dihitung sekali per composable, dipakai ulang
+di semua `FilterChip` dalam scope yang sama — bukan re-evaluate `isLiquidGlassTheme()` tiap
+chip). **Dengan ini, seluruh kandidat pill/chip Batch 287 SELESAI — 0 kandidat lain tersisa**,
+sisa fase 3 Liquid Glass kembali ke item roadmap berikutnya (di luar chip/pill).
+
+Brace/paren ketiga file seimbang (`EqualizerSheet.kt` 27/27,100/100; `SmartPlaylistScreen.kt`
+104/104,257/257; `RingtoneCutterSheet.kt` 24/24,86/86). 0 import duplikat (dicek per file). 0
+protected asset. **Belum diverifikasi visual.**
+
+## Batch 287 — Liquid Glass fase 3 sisa langkah: pill/chip lebar — LibraryFilterChips → Radius.liquidPill (1 file kode + 1 dokumentasi)
+Item pending dari Batch 286: audit pill/chip lebar (lebar≠tinggi, BUKAN tombol persegi/
+lingkaran) yang genuinely layak `Radius.liquidPill` eksplisit.
+
+**Kandidat pertama & paling menonjol**: `LibraryFilterChips` (`LibraryScreen.kt`) — tab
+Lagu/Album/Artis/Folder/Favorit/Playlist/Otomatis, dilihat setiap kunjungan Library. Radius
+sebelumnya `Radius.xxl` (20dp FIXED) — cuma KEBETULAN terlihat pill di ukuran teks pendek yang
+dipakai sekarang, BUKAN stadium sungguhan yang auto-adaptif ke tinggi render berapa pun (beda
+line-height font di device lain bisa saja tidak pas). Fix: `chipRadius = if
+(isLiquidGlassTheme()) Radius.liquidPill else Radius.xxl` (helper `isLiquidGlassTheme()` sudah
+ada sejak Batch 280, tinggal reuse) — diterapkan ke KEDUA chip row (3 chip utama + 1 chip
+"Lainnya"). Opt-in per-identitas, pola sama seluruh redesign — tema lain (Apple/Tactile/Skeu/
+CalmRetro) 0 perubahan visual.
+
+Brace/paren `LibraryScreen.kt` seimbang (351/351, 793/793). 1 file kode + 1 dokumentasi
+(`ROADMAP_LIQUID_GLASS_REDESIGN.md`, § rencana eksekusi diperbarui). **⏳ Kandidat LAIN
+ditemukan tapi BELUM diaudit** (di luar cap): Material3 `FilterChip` bawaan
+(`EqualizerSheet.kt`/`SmartPlaylistScreen.kt`/`RingtoneCutterSheet.kt`'s `DestinationChip`) —
+pakai shape default M3 (~8dp kotak-bulat, bukan custom shape kayak `LibraryFilterChips`), perlu
+`shape=` param eksplisit kalau mau ikut treatment pill — batch berikutnya.
+
+**Belum diverifikasi visual** — prioritas cek: ganti tema ke Liquid Glass, buka tab Library,
+pastikan chip filter (termasuk label panjang seperti "Playlist"/"Otomatis") tampil stadium
+penuh, bukan rounded-rect biasa.
+
+## Batch 286 — Liquid Glass fase 3 langkah 5: audit Settings — 0 gap, sub-langkah 3 SELESAI PENUH (2 dokumentasi, 0 kode)
+Item berikutnya roadmap Liquid Glass: audit `SettingsScreen.kt`. Grep menyeluruh untuk semua
+pola percabangan identitas yang sudah jadi standar audit (`frostedGlass`/`tactileEmboss`/
+`skeuEmboss`/`calmAberration`/`calmScanlines`/`identity ==`).
+
+**Hasil: 0 gap.** Cuma 1 cluster branch di SELURUH file: `ThemeOptionCard` (preview live tiap
+kartu opsi tema di picker Settings) — 3 pengecekan (`isTactilePreview`/`isSkeuPreview`/
+`isCalmRetroPreview`), semuanya `==` ke identitas SPESIFIK LAIN (bukan `LIQUID_GLASS`) — Liquid
+Glass otomatis dapat 0 emboss + 0 calmAberration lewat ABSENSI kecocokan (bukan lewat branch
+eksplisit `else` seperti file2 lain), efeknya SAMA: preview tampil flat/minimalis, persis sesuai
+definisi Liquid Glass yang sudah dikonfirmasi Batch 282. **0 `frostedGlass()` dipakai di file
+ini sama sekali** — Settings itu list polos (bukan panel mengambang kayak Sheet/MiniPlayerBar),
+jadi sisa file 100% generik `MaterialTheme.colorScheme`, otomatis konsisten tanpa perlu disentuh.
+
+**Sub-langkah 3 (terapkan ke komponen inti) SEKARANG SELESAI PENUH** — 5/5 area diaudit
+(MiniPlayerBar+NowPlayingScreen Batch 282, LibraryScreen Batch 283, Sheets/Dialog Batch 284,
+Settings Batch 286), 0 gap ditemukan di SEMUA area. `ROADMAP_LIQUID_GLASS_REDESIGN.md` §5
+diperbarui.
+
+0 kode, 2 dokumentasi (`CHANGELOG.md`/`ROADMAP_LIQUID_GLASS_REDESIGN.md`). Item berikutnya
+(sisa fase 3): audit pill/chip lebar (lebar≠tinggi, bukan tombol persegi/lingkaran) yang layak
+`Radius.liquidPill` eksplisit — belum ada kandidat ditemukan sejauh ini, perlu grep terarah baru.
+
 ## Batch 285 — Rebranding kosmetik: "Audio Player" → "SONIX" (permintaan user, 8 file kode + 1 dokumentasi, cap DILEWATI — 1 task kohesif)
 Permintaan user eksplisit: nama app terasa placeholder generik, minta rebrand ke nama keren
 terinspirasi 'CONVX'. **Nama dipilih: SONIX** (sound + gaya akhiran-X ala CONVX, pendek & pas

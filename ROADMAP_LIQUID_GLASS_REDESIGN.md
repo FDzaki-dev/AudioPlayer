@@ -181,15 +181,37 @@ karena pola itu sudah terbukti jalan 25+ batch tanpa masalah, bukan re-invent pr
    semua otomatis kebagian fix Batch 281 (5 py branch tambahan `calmScanlines`-only, Liquid
    Glass benar jatuh `else`; 4 sisanya 0 branch sama sekali). `AlertDialog` Material3 standar 0
    hardcoded warna, otomatis token fase 2.
-   **⏳ Sisa sub-langkah 3 yang BELUM dikerjakan**: (a) audit Settings (`SettingsScreen.kt`) —
-   **← ITEM BERIKUTNYA**; (b) audit pill/chip lebar (lebar≠tinggi, BUKAN tombol persegi/
-   lingkaran) yang genuinely layak `Radius.liquidPill` eksplisit — belum ada kandidat ditemukan
-   di semua file yang sudah dibaca sejauh ini.
+   **✅ Settings diaudit TUNTAS Batch 286, hasil 0 gap** — cuma 1 cluster branch identitas di
+   SELURUH file: `ThemeOptionCard` (preview live tiap opsi tema di picker), 3 pengecekan
+   (`isTactilePreview`/`isSkeuPreview`/`isCalmRetroPreview`), SEMUA `==` cek identitas SPESIFIK
+   lain (bukan LIQUID_GLASS) — Liquid Glass otomatis dapat 0 emboss + 0 calmAberration lewat
+   ABSENSI kecocokan (bukan branch eksplisit) — persis benar sesuai definisi "flat/minimalis"
+   yang sudah dikonfirmasi Batch 282. 0 `frostedGlass()` dipakai di file ini sama sekali
+   (Settings = list polos, bukan panel mengambang) — SISA file 100% generik `MaterialTheme.
+   colorScheme`, otomatis konsisten tanpa perlu sentuh apa pun. **Sub-langkah 3 SELESAI PENUH**
+   (MiniPlayerBar→NowPlayingScreen→LibraryScreen→Sheets/Dialog→Settings, 0 gap ditemukan di
+   SEMUA 5 area).
+   **⏳ Sisa fase 3**: audit pill/chip lebar (lebar≠tinggi, BUKAN tombol persegi/lingkaran) yang
+   genuinely layak `Radius.liquidPill` eksplisit — **← ITEM BERIKUTNYA**, belum ada kandidat
+   ditemukan di semua file yang sudah dibaca sejauh ini, perlu grep terarah batch depan.
 4. **Keputusan final §3a** — **sudah final: TAMBAH, bukan ganti** (lihat §3 di atas), jadi
    langkah ini SUDAH TIDAK PERLU dieksekusi terpisah (dulu didraft "putuskan setelah fase 3
    kelihatan hasilnya" — sekarang sudah diputuskan duluan oleh user, bukan ditunda).
 5. **(Opsional, fase terpisah jauh setelahnya)** Opsi A §3b — blur asli, kalau user konfirmasi
    mau invest + bump minSdk.
+
+**Audit pill/chip lebar (sisa fase 3) — dimulai Batch 287**: `LibraryFilterChips`
+(`LibraryScreen.kt`, tab Lagu/Album/Artis/dst) — chip lebar (lebar≠tinggi, teks pendek+padding,
+BUKAN tombol persegi/lingkaran), **kandidat PERTAMA & paling menonjol ditemukan** (dilihat
+setiap kunjungan Library). Radius sebelumnya `Radius.xxl` (20dp FIXED) — cuma KEBETULAN
+terlihat pill di ukuran teks pendek ini, bukan stadium sungguhan yang auto-adaptif ke tinggi
+render berapa pun. **✅ SELESAI Batch 287**: `chipRadius = if (isLiquidGlassTheme())
+Radius.liquidPill else Radius.xxl` — opt-in per-identitas (pola sama seluruh redesign), tema
+lain 0 perubahan. **⏳ Kandidat LAIN belum diaudit** (di luar cap batch 287): Material3
+`FilterChip` bawaan (`EqualizerSheet.kt`/`SmartPlaylistScreen.kt`/`RingtoneCutterSheet.kt`'s
+`DestinationChip`) — pakai shape default M3 (~8dp), BUKAN custom shape kayak
+`LibraryFilterChips`, perlu override `shape=` param eksplisit kalau mau ikut pill — batch
+berikutnya.
 
 ---
 
