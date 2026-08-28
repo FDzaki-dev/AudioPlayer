@@ -167,14 +167,24 @@ karena pola itu sudah terbukti jalan 25+ batch tanpa masalah, bukan re-invent pr
    SEMUA panel glass (MiniPlayerBar/NowPlayingScreen/tiap Sheet/card Home-Library), urutan
    "MiniPlayerBar dulu baru NowPlayingScreen dst" untuk bagian glass-edge spesifiknya jadi
    otomatis serentak, bukan perlu diulang per file. **Belum diverifikasi visual di device.**
-   **⏳ Sisa sub-langkah 3 yang BELUM dikerjakan** (bukan glass-edge, hal lain): (a) audit apakah
-   ada elemen pill/chip lebar (lebar≠tinggi) di komponen-komponen itu yang layak dipasangi
-   `Radius.liquidPill` eksplisit di call site — belum ada kandidat ditemukan sejauh file yang
-   sudah dibaca; (b) cek apakah ada styling HARDCODED per-identitas lain (bukan lewat
-   MaterialTheme dispatch) di MiniPlayerBar/NowPlayingScreen/LibraryScreen row/Sheets/Settings
-   yang butuh cabang Liquid Glass eksplisit — baru diperiksa utk `frostedGlass()`'s edgeBrush,
-   BELUM diperiksa menyeluruh utk cabang lain (mis. `tactileEmboss`/`skeuEmboss`-style flourish
-   custom per komponen di luar helper shared ini).
+   **✅ MiniPlayerBar + NowPlayingScreen diaudit TUNTAS Batch 282, hasil 0 gap** — seluruh
+   branch `isTactile`/`isSkeu`/`isCalmRetro`/`else` di kedua file dibaca detail; Liquid Glass
+   (jatuh ke `else` bareng Apple) sudah benar di semua titik: shape stadium (CircleShape utk
+   elemen persegi = liquidPill secara visual), flat/tanpa-emboss (sesuai definisi "minimalis"),
+   accentColor dinamis per-lagu (bukan locked). `GestureIndicatorBadge` py surface terpisah dari
+   `frostedGlass()` tapi konsisten by-design (cuma bedakan panel-fisik vs sisanya).
+   **✅ LibraryScreen.kt diaudit TUNTAS Batch 283, hasil 0 gap** — cuma 2 titik branch identitas
+   di seluruh file (snackbar undo-hide, `SongRow`'s `calmScanlines`), keduanya Liquid Glass
+   jatuh `else` dgn benar (snackbar otomatis violet-cool via `colorScheme.surface`, scanline CRT
+   memang cuma relevan CalmRetro). `AlbumGridView` 0 branch sama sekali, otomatis konsisten.
+   **✅ Sheets/Dialog diaudit TUNTAS Batch 284, hasil 0 gap** — 9 sheet pemakai `frostedGlass()`
+   semua otomatis kebagian fix Batch 281 (5 py branch tambahan `calmScanlines`-only, Liquid
+   Glass benar jatuh `else`; 4 sisanya 0 branch sama sekali). `AlertDialog` Material3 standar 0
+   hardcoded warna, otomatis token fase 2.
+   **⏳ Sisa sub-langkah 3 yang BELUM dikerjakan**: (a) audit Settings (`SettingsScreen.kt`) —
+   **← ITEM BERIKUTNYA**; (b) audit pill/chip lebar (lebar≠tinggi, BUKAN tombol persegi/
+   lingkaran) yang genuinely layak `Radius.liquidPill` eksplisit — belum ada kandidat ditemukan
+   di semua file yang sudah dibaca sejauh ini.
 4. **Keputusan final §3a** — **sudah final: TAMBAH, bukan ganti** (lihat §3 di atas), jadi
    langkah ini SUDAH TIDAK PERLU dieksekusi terpisah (dulu didraft "putuskan setelah fase 3
    kelihatan hasilnya" — sekarang sudah diputuskan duluan oleh user, bukan ditunda).

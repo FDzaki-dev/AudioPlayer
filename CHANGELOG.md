@@ -1,5 +1,89 @@
 # Changelog
 
+## Batch 284 — Liquid Glass fase 3 langkah 4: audit Sheets/Dialog (0 kode)
+Lanjutan §5 langkah 3, urutan "Sheets/Dialog" setelah LibraryScreen (Batch 283, 0 gap). Grep
+`.frostedGlass()` app-wide: **9 sheet** memakainya (`ABRepeatBookmarkSheet`, `EqualizerSheet`,
+`FolderManagerSheet`, `LyricsSheet`, `QueueSheet`, `RingtoneCutterSheet`, `SongInfoEditSheet`,
+`SongPickerSheet`, `VisualizerSheet`) — SEMUA otomatis kebagian fix edge violet-glass Batch 281
+tanpa disentuh satu-satu, sama pola MiniPlayerBar/NowPlayingScreen (Batch 282).
+
+5 dari 9 sheet (`ABRepeatBookmarkSheet`/`EqualizerSheet`/`LyricsSheet`/`QueueSheet`/
+`VisualizerSheet`) py 1 branch tambahan identik: `if (isCalmRetro) calmScanlines() else
+Modifier` di panel utamanya — Liquid Glass jatuh `else` (polos), BENAR sama alasan `SongRow`
+Batch 283 (scanline CRT cuma relevan CalmRetro). 4 sheet lain (`FolderManagerSheet`,
+`RingtoneCutterSheet`, `SongInfoEditSheet`, `SongPickerSheet`) malah **0 branch identitas sama
+sekali** — murni `frostedGlass()` + `MaterialTheme` polos, otomatis konsisten tanpa perlu
+diperiksa lebih lanjut.
+
+Dialog non-sheet (`AlertDialog` Material3 standar — `SpeedDialog` dkk, Batch 163) tidak
+diperiksa ulang di sini krn 0 hardcoded warna/shape (semua `MaterialTheme.colorScheme` polos
+lewat `AlertDialog` bawaan Compose), otomatis ikut token fase 2, sama kategori "grid card"
+Batch 283.
+
+**Hasil: 0 gap.** `FILE_MANIFEST.txt` tidak berubah (186/186, diverifikasi diff eksplisit). Item
+berikutnya (§5 langkah 3, urutan roadmap): audit Settings (`SettingsScreen.kt`, termasuk
+`ThemeOptionCard` picker itu sendiri — sudah dikonfirmasi generik Batch 280, tapi ada elemen
+Settings LAIN yang belum diperiksa detail).
+
+## Batch 283 — Liquid Glass fase 3 langkah 3: audit LibraryScreen.kt (0 kode)
+Lanjutan §5 langkah 3, urutan "LibraryScreen row" setelah MiniPlayerBar+NowPlayingScreen (Batch
+282, 0 gap). Grep menyeluruh `LibraryScreen.kt` utk SEMUA titik `isTactile`/`isSkeu`/
+`isCalmRetro` — cuma 2 titik ditemukan di seluruh file (bukan cuma `SongRow`, ikut cek
+`AlbumGridView`/undo-hide snackbar juga supaya tidak salah anggap "row" doang):
+
+1. **Snackbar undo-hide** (`isPanelTheme` = Tactile/Skeu dapat emboss+opaque, `else` dapat
+   `Surface` solid `colorScheme.surface` + tonal/shadow elevation Material3 default) — Liquid
+   Glass jatuh `else` bareng Apple/CalmRetro, warnanya OTOMATIS benar (violet-cool) krn
+   `colorScheme.surface` sudah di-dispatch lewat `colorsFor()` (fase 2, Batch 280) — bukan
+   `frostedGlass()` jadi bukan glass-tint, tapi memang panel ini BUKAN glass surface (solid
+   snackbar), jadi wajar tidak ikut treatment kaca sama sekali, di identitas manapun.
+2. **`SongRow`'s `AlbumArt`** — `.calmScanlines()` HANYA utk CalmRetro (efek CRT scanline,
+   identitas visual spesifik dia), Liquid Glass jatuh `else` (polos) — SUDAH BENAR, scanline CRT
+   retro sama sekali tidak relevan utk identitas "violet-glass minimalis", bukan celah.
+
+**Hasil: 0 gap.** `AlbumGridView` (grid card tab Album) 0 branch identitas sama sekali — grid
+card sudah otomatis konsisten Liquid Glass lewat `MaterialTheme.shapes`/`colorScheme` polos,
+tidak butuh cabang tambahan. `FILE_MANIFEST.txt` tidak berubah (186/186, diverifikasi diff
+eksplisit). Item berikutnya (§5 langkah 3, urutan roadmap): audit Sheets/Dialog (banyak
+`ModalBottomSheet` — cek titik non-`frostedGlass()` yang mungkin sama pola "surface terpisah"
+kayak `GestureIndicatorBadge`/snackbar di atas).
+
+## Batch 282 — Liquid Glass fase 3 langkah 2: audit MiniPlayerBar + NowPlayingScreen (0 kode)
+Lanjutan §5 langkah 3 roadmap, urutan dikonfirmasi user (Liquid Glass duluan). Setelah Batch 281
+(edgeBrush terpusat di `frostedGlass()`), sisa pertanyaan: apakah 2 komponen pertama di urutan
+(`MiniPlayerBar`, `NowPlayingScreen`) masih punya branch per-identitas LAIN (di luar
+`frostedGlass()`) yang butuh cabang `isLiquidGlass` eksplisit? Dibaca menyeluruh, tiap titik
+`when { isTactile -> ...; isSkeu -> ...; isCalmRetro -> ...; else -> ... }` di kedua file.
+
+**`MiniPlayerBar.kt`**: `miniPlayPauseShape` (Tactile/Skeu→`shapes.medium`, else→`CircleShape`)
+— Liquid Glass jatuh ke `else`, TAPI utk tombol 40dp persegi, `CircleShape` SUDAH stadium penuh
+(pill dgn lebar=tinggi = lingkaran, tidak ada beda visual dgn `Radius.liquidPill` di elemen
+persegi). Modifier emboss tombol (Tactile/Skeu/CalmRetro dapat efek, else→`Modifier` polos) —
+Liquid Glass "flat, tanpa emboss" ini SESUAI definisinya sendiri (`ThemeIdentity.LIQUID_GLASS`:
+"minimalis"), bukan kelalaian — berbagi treatment kosong dgn Apple disengaja, sama alasan
+"flat shadow shared dgn Apple" yang sudah didokumentasikan Batch 281.
+
+**`NowPlayingScreen.kt`**: pola identik di `playPauseShape` + modifier tombol transport (baris
+~621/644). `backdropBlurRadius`/`backdropAlpha` (baris 315-316, cuma CalmRetro dapat nilai
+beda) — Liquid Glass ikut default 60dp/0.5f bareng Apple/Tactile/Skeu, wajar (bukan
+identity-lock spesifik kayak CalmRetro). `AlbumArtHero`'s `when` besar (border+glow
+Tactile/Skeu bespoke) — `else` (Apple+LiquidGlass) dapat `shadow(28dp, spotColor=accentColor)`
+polos; `accentColor` di sini tetap DINAMIS per-lagu (bukan dikunci warna identitas kayak
+CalmRetro) — sudah sesuai catatan Batch 280 "Liquid Glass otonom pola sama Apple/Tactile/Skeu",
+bukan CalmRetro yang locked. `GestureIndicatorBadge` (badge brightness/volume) py `isPanelTheme`
+sendiri (Tactile/Skeu dapat emboss+opaque, else dapat `Surface` translucent 0.9f) — INI TIDAK
+lewat `frostedGlass()` (surface glass terpisah, dikonfirmasi baca kode), jadi TIDAK otomatis
+kebagian fix Batch 281. TAPI dianalisis: blok ini sengaja cuma membedakan "identitas panel
+fisik" (Tactile/Skeu) vs "sisanya", bukan tiap identitas dapat rimnya sendiri — Liquid Glass
+(bukan panel fisik) pas masuk kategori "sisanya" bareng Apple/CalmRetro, konsisten by-design.
+
+**Hasil: 0 gap di kedua file.** Semua titik yang relevan sudah benar lewat MaterialTheme dispatch
+(fase 2, Batch 280) atau `frostedGlass()` (Batch 281); sisanya adalah treatment KOSONG yang
+disengaja utk identitas "flat/minimalis", bukan celah yang lupa dikerjakan. `FILE_MANIFEST.txt`
+tidak berubah (186/186, diverifikasi diff eksplisit). Item berikutnya (§5 langkah 3, urutan
+roadmap): audit `LibraryScreen.kt` (`SongRow` dkk sudah py `isTactile`/`isSkeu`/`isCalmRetro`
+sendiri, grep-confirmed, belum diperiksa detail per-titik).
+
 ## Batch 281 — Liquid Glass fase 3 langkah 1: edgeBrush khusus di frostedGlass() (2 file)
 `ROADMAP_LIQUID_GLASS_REDESIGN.md` §5 langkah 3 — "Terapkan ke komponen inti, urutan MiniPlayerBar
 duluan". `frostedGlass()` (`BlurUtils.kt`) adalah SATU shared helper yang dilalui SEMUA panel

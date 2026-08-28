@@ -36,6 +36,33 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 284 (Liquid Glass fase 3 langkah 4 — audit Sheets/Dialog, 0 kode)** — 9 sheet pemakai
+`.frostedGlass()` (`ABRepeatBookmarkSheet`/`EqualizerSheet`/`FolderManagerSheet`/`LyricsSheet`/
+`QueueSheet`/`RingtoneCutterSheet`/`SongInfoEditSheet`/`SongPickerSheet`/`VisualizerSheet`)
+SEMUA otomatis kebagian fix edge Batch 281. 5 di antaranya py branch `isCalmRetro→calmScanlines`
+tambahan, Liquid Glass jatuh `else` dgn benar. 4 sisanya 0 branch identitas sama sekali. Dialog
+non-sheet (`AlertDialog` Material3 standar) 0 hardcoded warna, otomatis token fase 2. **Hasil: 0
+gap.** `FILE_MANIFEST.txt` tidak berubah (186/186). Item berikutnya: audit Settings. Detail:
+`CHANGELOG.md` Batch 284.
+
+**Batch 283 (Liquid Glass fase 3 langkah 3 — audit LibraryScreen.kt, 0 kode)** — 2 titik
+`isTactile`/`isSkeu`/`isCalmRetro` ditemukan di seluruh file (snackbar undo-hide, `SongRow`'s
+`calmScanlines`), keduanya diperiksa: Liquid Glass jatuh `else` di kedua titik, SUDAH BENAR
+(snackbar solid otomatis dapat warna violet-cool lewat `colorScheme.surface`; scanline CRT
+memang cuma relevan CalmRetro). `AlbumGridView` 0 branch identitas sama sekali — otomatis
+konsisten. **Hasil: 0 gap.** `FILE_MANIFEST.txt` tidak berubah (186/186). Item berikutnya: audit
+Sheets/Dialog. Detail: `CHANGELOG.md` Batch 283.
+
+**Batch 282 (Liquid Glass fase 3 langkah 2 — audit MiniPlayerBar + NowPlayingScreen, 0 kode)** —
+Semua titik `when { isTactile/isSkeu/isCalmRetro/else }` di 2 file diperiksa: `else` (Liquid
+Glass jatuh ke sini bareng Apple) SEMUA sudah benar — shape stadium (CircleShape = liquidPill
+utk elemen persegi), flat/tanpa-emboss SESUAI definisi "minimalis" identitas ini, accentColor
+tetap dinamis per-lagu (bukan locked kayak CalmRetro, sesuai catatan Batch 280).
+`GestureIndicatorBadge` py surface terpisah (bukan lewat `frostedGlass()`) tapi konsisten
+by-design: cuma bedakan "panel fisik" (Tactile/Skeu) vs "sisanya". **Hasil: 0 gap.**
+`FILE_MANIFEST.txt` tidak berubah (186/186). Item berikutnya: audit `LibraryScreen.kt`
+(`SongRow` dkk). Detail: `CHANGELOG.md` Batch 282.
+
 **Batch 281 (Liquid Glass fase 3 langkah 1 — edgeBrush khusus di `frostedGlass()`, 2 file)** —
 `frostedGlass()` (`BlurUtils.kt`) = 1 shared helper dilalui SEMUA panel glass app-wide (mini
 player, tiap bottom sheet, card Home/Library). `Theme.kt` +`isLiquidGlassTheme()` (pola identik
