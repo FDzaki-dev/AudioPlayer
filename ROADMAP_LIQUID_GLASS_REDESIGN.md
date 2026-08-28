@@ -63,9 +63,19 @@ rencana di bawah.
 
 ## 3. Keputusan besar yang HARUS dikonfirmasi user dulu sebelum batch eksekusi pertama
 
-Ini BUKAN hal yang aman ditebak sendiri — salah pilih di sini bisa berarti puluhan batch
-eksekusi ke arah yang salah. Ditulis sebagai rekomendasi + alasan, tapi tetap perlu "ya" dari
-user, bukan diasumsikan diam-diam.
+**✅ DIKONFIRMASI USER (Batch 279)** — semua 3 keputusan berikut FINAL, bukan lagi rekomendasi:
+- **§3a → TAMBAH sebagai tema ke-5** (BUKAN rekomendasi dokumen ini yang "ganti/konsolidasi" —
+  user eksplisit override: 4 tema lama TETAP ada, `LIQUID_GLASS` jadi opsi baru di sampingnya).
+- **§3b → Opsi B dulu** ("Liquid Glass LOOK" shape+typography murni, TANPA blur asli/minSdk
+  bump), dieksekusi BERTAHAP per fase §5. Opsi A (blur asli) TETAP fase terpisah jauh
+  setelahnya, belum dikonfirmasi kapan/apakah dieksekusi.
+- **§3c → 4 identitas lama TIDAK di-retire, tetap dipertahankan penuh** — konsekuensi langsung
+  dari §3a "tambah" (bukan "ganti"), premis asli §3c ("kalau opsi 3a = ganti") jadi tidak
+  berlaku, dicatat di sini biar jelas kenapa bagian rekomendasi di bawah TIDAK dieksekusi.
+
+Sisa bagian di bawah (rekomendasi awal sebelum konfirmasi) dipertahankan apa adanya sebagai
+jejak keputusan — jangan dihapus, biar sesi berikutnya bisa lihat apa yang direkomendasikan vs
+apa yang akhirnya dipilih user.
 
 ### 3a. Ganti 4 tema jadi 1, atau tambah sebagai tema ke-5?
 **Rekomendasi: ganti/konsolidasi**, bukan tambah opsi ke-5. Alasan: instruksi user bilang "ganti
@@ -115,7 +125,9 @@ dibongkar sekaligus, sejalan prinsip Strict Micro-Batching yang sudah jadi stand
 
 ---
 
-## 5. Rencana eksekusi bertahap (draft urutan, TUNGGU konfirmasi §3 dulu)
+## 5. Rencana eksekusi bertahap
+
+**Status: §3 terkonfirmasi Batch 279, eksekusi dimulai.**
 
 Tiap fase = beberapa batch terpisah (1 sub-item/batch, standar project). Urutan diusulkan
 mengikuti pola `POLISH_AUDIT.md` lama (Motion→Responsive→Surface/Color→Component→Typography)
@@ -124,13 +136,27 @@ karena pola itu sudah terbukti jalan 25+ batch tanpa masalah, bukan re-invent pr
 1. **Fondasi token baru** — definisikan skala radius baru (lebih besar/pill, minimalis) +
    skala tipografi baru (font-weight lebih ringan, letter-spacing, line-height) di file token
    yang SUDAH ADA (`Spacing.kt`/`Type.kt`) sebagai identitas terpisah dulu (belum jadi default).
+   **✅ SELESAI Batch 279**: `Radius.liquidLg` (34dp) + `Radius.liquidPill` (999dp, stadium
+   shape) ditambahkan `Spacing.kt`; `LiquidGlassTypography` (weight 1 tingkat lebih ringan tiap
+   judul + letterSpacing lebih terbuka dari `AppleTypography`, size/lineHeight dipertahankan
+   sama sengaja) ditambahkan `Type.kt`. Purely additif, 0 dipakai di manapun (dikonfirmasi grep
+   0 hasil di luar 2 file definisi) — belum ada visual berubah sama sekali sampai fase 2.
 2. **1 identitas baru utuh** (`Theme.kt`) — reuse pola `ThemeIdentity` enum yang sudah ada,
    named misalnya `LIQUID_GLASS`, warna+shape+typography lengkap, TAPI belum jadi default/belum
    retire yang lama (opsional dulu, biar bisa dibandingkan side-by-side sebelum commit §3a).
+   **← ITEM BERIKUTNYA.** Perlu: `LiquidGlassLightColors`/`LiquidGlassDarkColors` (warna baru,
+   belum diriset — kandidat: netral+1 aksen extract-dari-artwork ala Material You disebut §1,
+   TAPI ekstraksi-dari-artwork itu MEKANISME baru [beda dari sekadar palet statis], kemungkinan
+   perlu batch terpisah sendiri kalau mau match riset persis; utk fase 2 boleh mulai palet
+   statis dulu, upgrade ke ekstraksi nanti), `LiquidGlassShapes` (kombinasi `Radius.liquidLg`/
+   `Radius.liquidPill` + token lama yg relevan), lalu daftar di `ThemeIdentity` enum +
+   `colorsFor()`/`when(identity)` dispatch (3 titik di `Theme.kt`) + entry baru di UI pemilih
+   tema Settings.
 3. **Terapkan ke komponen inti** (urutan dampak-terbesar-dulu, sama pola `POLISH_AUDIT.md`):
    MiniPlayerBar → NowPlayingScreen → LibraryScreen row → Sheets/Dialog → Settings.
-4. **Keputusan final §3a** dieksekusi (jadikan default / retire yang lama) SETELAH fase 3
-   kelihatan hasilnya, bukan diputuskan buta di awal.
+4. **Keputusan final §3a** — **sudah final: TAMBAH, bukan ganti** (lihat §3 di atas), jadi
+   langkah ini SUDAH TIDAK PERLU dieksekusi terpisah (dulu didraft "putuskan setelah fase 3
+   kelihatan hasilnya" — sekarang sudah diputuskan duluan oleh user, bukan ditunda).
 5. **(Opsional, fase terpisah jauh setelahnya)** Opsi A §3b — blur asli, kalau user konfirmasi
    mau invest + bump minSdk.
 

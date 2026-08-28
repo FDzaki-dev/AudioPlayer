@@ -33,4 +33,17 @@ object Radius {
     val xxl = 20.dp  // cards (spec §19: "Cards 16-20dp")
     val xxxl = 24.dp // large surfaces (spec §19: "Large surfaces 20-24dp")
     val hero = 28.dp // Apple theme's own large-shape token (AppleShapes.large)
+
+    // Batch 279 — ROADMAP_LIQUID_GLASS_REDESIGN.md §5 fase 1 ("fondasi token baru... sebagai
+    // identitas terpisah dulu, belum jadi default"). CONVX-terinspirasi: "radius lebih besar/
+    // pill, minimalis" (§3b Opsi B, shape+typography TANPA blur asli). Purely ADDITIF — 0 nilai
+    // di atas diubah, 0 theme lama kebagian efek (belum dipakai di manapun sampai
+    // `LiquidGlassShapes` didefinisikan di Theme.kt, fase 2 roadmap yang sama).
+    val liquidLg = 34.dp  // 1 langkah lebih besar dari `hero` — panel/card besar ala CONVX
+    val liquidPill = 999.dp // stadium/pill penuh — tombol & chip liquid glass, dp sengaja jauh
+                             // melebihi tinggi elemen manapun di app ini supaya Compose selalu
+                             // clamp ke radius maksimum yg mungkin (setengah tinggi elemen),
+                             // menjamin ujung selalu bulat sempurna apa pun tinggi kontrolnya —
+                             // ini pola RESMI utk stadium shape di Compose (lihat dokumentasi
+                             // RoundedCornerShape), bukan angka sembarang.
 }

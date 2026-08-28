@@ -36,6 +36,19 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 279 (Liquid Glass §3 dikonfirmasi user + fase 1 eksekusi — fondasi token
+radius+typography, 2 file, additif)** — User jawab §3 `ROADMAP_LIQUID_GLASS_REDESIGN.md`:
+**3a→tambah tema ke-5** (bukan ganti/konsolidasi seperti rekomendasi dokumen — 4 tema lama
+tetap ada), **3b→Opsi B dulu** (shape+typography murni, tanpa blur asli, bertahap per fase),
+**3c→4 identitas lama TIDAK di-retire**. Roadmap diupdate mencatat keputusan final SEBELUM
+eksekusi kode. Fase 1 dieksekusi: `Spacing.kt` +2 token radius (`liquidLg` 34dp, `liquidPill`
+999dp stadium), `Type.kt` +`LiquidGlassTypography` (weight 1 tingkat lebih ringan dari Apple,
+letterSpacing lebih terbuka, size/lineHeight dipertahankan sama). **Purely additif, 0
+pemakaian di luar 2 file definisi (dikonfirmasi grep)** — 0 perubahan visual sampai fase 2.
+Brace/paren seimbang. `FILE_MANIFEST.txt` tidak berubah. Item berikutnya (fase 2):
+`ThemeIdentity.LIQUID_GLASS` lengkap di `Theme.kt` (warna+shape+dispatch+picker Settings).
+Detail: `CHANGELOG.md` Batch 279, `ROADMAP_LIQUID_GLASS_REDESIGN.md` §5.
+
 **Batch 278 (Arahan user — arsipkan dokumentasi stale + arahkan goals ke redesign "Liquid
 Glass" terinspirasi CONVX, PERENCANAAN SAJA, 0 kode)** — 2 bagian instruksi:
 1. **Arsip**: `MICRO_UIUX_AUDIT.md`→`ARCHIVED_MICRO_UIUX_AUDIT.md`,

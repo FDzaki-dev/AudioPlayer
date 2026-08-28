@@ -88,3 +88,51 @@ val TactileTypography = Typography(
         letterSpacing = 0.6.sp
     )
 )
+
+// Batch 279 — ROADMAP_LIQUID_GLASS_REDESIGN.md §5 fase 1, §3b Opsi B ("Liquid Glass LOOK":
+// shape+typography murni, TANPA blur asli/minSdk bump). CONVX-terinspirasi "tipografi lebih
+// ringan" — dikontraskan sengaja terhadap AppleTypography di atas: weight 1 tingkat lebih
+// RINGAN di tiap slot judul (Bold->SemiBold, SemiBold->Medium) sesuai riset roadmap (README
+// CONVX: "clean+minimalis", motion & permukaan yang jadi ciri khas, bukan huruf tebal), dan
+// letterSpacing dibuka positif/mendekati 0 (bukan negatif rapat ala Apple) untuk kesan lapang.
+// fontSize/lineHeight SENGAJA dipertahankan sama seperti AppleTypography — perubahan hierarki
+// ukuran teks itu risiko layout terpisah (reflow/wrap beda), di luar scope fase 1 ("token
+// murni, belum diterapkan ke komponen mana pun"). Purely ADDITIF — belum dipakai di Theme.kt
+// manapun sampai `LiquidGlassShapes`+dispatch identitas baru ditambahkan (fase 2).
+val LiquidGlassTypography = Typography(
+    titleLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 28.sp,
+        lineHeight = 35.6.sp,
+        letterSpacing = 0.sp
+    ),
+    titleMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 17.sp,
+        lineHeight = 25.5.sp,
+        letterSpacing = 0.sp
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 15.sp,
+        lineHeight = 21.4.sp,
+        letterSpacing = 0.1.sp
+    ),
+    bodySmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 13.sp,
+        lineHeight = 17.3.sp,
+        letterSpacing = 0.1.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.6.sp
+    )
+)

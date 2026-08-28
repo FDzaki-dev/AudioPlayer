@@ -1,5 +1,40 @@
 # Changelog
 
+## Batch 279 — Liquid Glass §3 dikonfirmasi user + fase 1 eksekusi: fondasi token radius+typography (2 file, additif)
+User jawab 3 keputusan besar `ROADMAP_LIQUID_GLASS_REDESIGN.md` §3: **3a→tambah tema ke-5**
+(BUKAN rekomendasi dokumen "ganti/konsolidasi" — 4 tema lama tetap ada), **3b→Opsi B dulu**
+("Liquid Glass LOOK" shape+typography murni, TANPA blur asli, bertahap per fase), **3c→4
+identitas lama TIDAK di-retire** (konsekuensi langsung 3a=tambah, bukan ganti). Semua final,
+dicatat di roadmap sebelum eksekusi kode mulai (dokumen diupdate duluan, bukan diasumsikan
+diam-diam).
+
+**Fase 1 §5 dieksekusi**: fondasi token, PURELY ADDITIF, 0 wiring ke tema manapun.
+
+**`Spacing.kt`** (diedit) — 2 token radius baru ditambahkan ke `Radius` object yang sudah ada
+(bukan object terpisah — object ini shared-pool dipakai semua identitas, pola sudah ada sejak
+Batch 54): `liquidLg` (34dp, 1 langkah di atas `hero` 28dp, panel/card besar) + `liquidPill`
+(999dp, stadium shape penuh — dp sengaja jauh melebihi tinggi elemen manapun supaya Compose
+selalu clamp ke radius maksimum yang mungkin, pola resmi utk stadium shape, bukan angka
+sembarang).
+
+**`Type.kt`** (diedit) — `LiquidGlassTypography` baru ditambahkan, struktur SAMA PERSIS
+`AppleTypography` (5 slot: titleLarge/titleMedium/bodyMedium/bodySmall/labelSmall) tapi weight
+1 tingkat lebih ringan tiap judul (Bold→SemiBold, SemiBold→Medium) + letterSpacing dibuka
+positif/mendekati 0 (bukan negatif rapat ala Apple), sesuai riset roadmap "tipografi lebih
+ringan". `fontSize`/`lineHeight` SENGAJA dipertahankan sama seperti Apple — ubah hierarki
+ukuran teks itu risiko reflow/wrap terpisah, di luar scope fase 1 ("token murni, belum
+diterapkan ke komponen").
+
+2 file. Brace/paren seimbang (Spacing.kt 1/1,20/20; Type.kt 0/0,34/34). **Dikonfirmasi grep: 0
+pemakaian token baru di luar 2 file definisi** — genuinely unwired, 0 perubahan visual apa pun
+di app sampai fase 2. `FILE_MANIFEST.txt` tidak berubah (0 file baru, cuma isi 2 file existing
+bertambah).
+
+**Item berikutnya (fase 2, roadmap §5)**: `ThemeIdentity.LIQUID_GLASS` di `Theme.kt` — warna
+(palet statis dulu, ekstraksi-dari-artwork Material You kemungkinan batch terpisah), `Shapes`
+baru pakai token fase 1, wiring ke `colorsFor()`/`when(identity)` dispatch (3 titik) + entry
+picker tema di Settings. Detail lengkap: `ROADMAP_LIQUID_GLASS_REDESIGN.md` §5.
+
 ## Batch 278 — Arsipkan dokumentasi stale + roadmap redesign "Liquid Glass" ala CONVX (PERENCANAAN SAJA, 0 kode)
 User: "arsipkan dokumentasi yang sudah stale/gak relevan sama sekali dengan pembaruan terkini.
 lalu ganti arah goals project menuju 100% tipografi/shape mirip musik player 'CONVX' yang
