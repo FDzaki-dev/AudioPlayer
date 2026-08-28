@@ -1,5 +1,21 @@
 # AudioPlayer — Final Micro-Polish Audit (living checklist)
 
+> ## 📦 ARSIP — DIHENTIKAN (Batch 278)
+> Dokumen ini **tidak lagi backlog aktif** (sebelumnya rule wajib § "ATURAN SESI AKTIF" di
+> `PROJECT_STATE.md` #4 — rule itu sudah diupdate, lihat versi baru di sana). Item 1-3 (Motion,
+> Responsive) TETAP valid sebagai catatan historis kerja nyata yang sudah selesai — TIDAK perlu
+> diulang. Item 4 (Repeated Components, sisa IconButton/ListRow/Card/dst) dan item 5 (Typography
+> Final Visual Check) DIHENTIKAN bukan karena selesai, tapi karena keduanya audit visual terhadap
+> SHAPE & TYPE SCALE LAMA yang akan diganti total mengikuti arah baru — lihat
+> `ROADMAP_LIQUID_GLASS_REDESIGN.md`. Melanjutkan audit "apakah baris ini konsisten dgn baris
+> lain" sesaat sebelum kedua baris itu didesain ulang total = kerja yang langsung terbuang.
+>
+> Boundary "🟡 Jangan disentuh" (playback/data/SAF/database FREEZE) di bawah **TETAP BERLAKU**
+> untuk redesign yang akan datang juga — itu bukan spesifik ke polish-pass ini, itu batas
+> permanen proyek: redesign visual TIDAK BOLEH menyentuh logic behavior apa pun.
+
+---
+
 Ditanam Batch 253 (permintaan user, adaptasi ke referensi konkret repo). Dokumen ini backlog aktif
 untuk batch-batch berikutnya — bukan sekali kerja, tapi checklist yang diisi/dicoret per batch
 (descending: temuan/perbaikan terbaru di atas tiap seksi, bukan urutan seksi 1-5 di bawah).

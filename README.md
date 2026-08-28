@@ -199,5 +199,9 @@ Untuk **MP3/AAC** (lossy), gapless yang benar-benar sample-accurate juga bergant
 Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai **GitHub Release** bertag `v<versi>-release` (bukan CI artifact — release asset di-serve GitHub apa adanya, tanpa dibungkus `.zip`, dan bisa diunduh publik tanpa login). Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
 
 ## Rencana v2 (belum dibuat)
+- **Redesign identitas visual terinspirasi CONVX ("Liquid Glass")** — arah baru Batch 278, lihat
+  `ROADMAP_LIQUID_GLASS_REDESIGN.md` untuk rencana lengkap. Masih tahap perencanaan, 0 kode
+  berubah; keputusan besar (ganti vs tambah tema, blur sungguhan vs simulasi) masih menunggu
+  konfirmasi user sebelum batch eksekusi pertama.
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)

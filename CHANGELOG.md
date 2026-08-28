@@ -1,5 +1,47 @@
 # Changelog
 
+## Batch 278 — Arsipkan dokumentasi stale + roadmap redesign "Liquid Glass" ala CONVX (PERENCANAAN SAJA, 0 kode)
+User: "arsipkan dokumentasi yang sudah stale/gak relevan sama sekali dengan pembaruan terkini.
+lalu ganti arah goals project menuju 100% tipografi/shape mirip musik player 'CONVX' yang
+clean+minimalis atau bahkan bisa lebih baik lagi!! (documentation planning only first)". Dieksekusi
+persis sesuai batasan eksplisit terakhir — 0 file `.kt`/`.xml` disentuh, murni dokumentasi.
+
+**Bagian 1 — Arsip** (pola persis `ARCHIVED_ROADMAP_15_FITUR_OFFLINE.md`, isi dipertahankan
+penuh + banner arsip di atas, TIDAK dihapus):
+- `MICRO_UIUX_AUDIT.md` → `ARCHIVED_MICRO_UIUX_AUDIT.md` — 12/14 kategori TUNTAS (kerja nyata,
+  bukan diklaim), tapi mengukur konsistensi terhadap sistem visual LAMA yang akan diganti.
+  Ditandai bagian mana yang TETAP reusable (wording, accessibility — identitas-agnostic).
+- `POLISH_AUDIT.md` → `ARCHIVED_POLISH_AUDIT.md` — item 1-3 (Motion/Responsive) tetap valid
+  sbg catatan historis; item 4-5 sisa (Repeated Components, Typography Final Check) dihentikan
+  krn keduanya audit visual thd shape/type-scale yang segera diganti total.
+
+**Bagian 2 — Roadmap arah baru**: `ROADMAP_LIQUID_GLASS_REDESIGN.md` (file baru). Riset CONVX
+(`cosmictaserdev-creator/Convx`, GitHub, via web search — bukan asumsi) diringkas: identitas
+"Liquid Glass" = real backdrop blur+refraction (dibangun di atas library terpisah
+`Kyant0/backdrop`), motion bouncy iOS-style, Material You dari artwork album, 0 widget Material
+stock. Dikontraskan ke kondisi project SEKARANG (dicek dari kode, bukan ingatan): 4 identitas
+visual ada (`ThemeIdentity` enum — Apple/Tactile/Neumorphism/Calm Retro, `Theme.kt`); temuan
+PALING PENTING — `frostedGlass()` (`BlurUtils.kt`) TERNYATA glass PALSU, bukan blur sungguhan
+(`Modifier.blur()` Compose blur foreground composable itu sendiri, bukan piksel di belakangnya —
+sudah didokumentasikan jujur di komentar kode sejak Batch 53, bukan bug baru); `minSdk=23`
+(`app/build.gradle.kts`) jadi kendala nyata krn blur asli (`RenderEffect`) butuh API 31+.
+
+3 keputusan besar diidentifikasi & DISENGAJA TIDAK ditebak sendiri (ditulis sbg rekomendasi +
+alasan, tapi tetap minta konfirmasi eksplisit user sebelum sesi mana pun eksekusi kode): (a)
+ganti total 4 tema jadi 1 vs tambah sbg tema ke-5, (b) blur sungguhan [perlu bump minSdk 23→31]
+vs "Liquid Glass look" tanpa sampling asli, (c) nasib 4 identitas lama kalau (a) = ganti.
+Rencana eksekusi 5 fase didraft (reuse pola urutan `POLISH_AUDIT.md` lama: fondasi token →
+1 identitas baru utuh → terapkan ke komponen inti urutan dampak-terbesar → keputusan final →
+blur asli opsional). `PROJECT_STATE.md` § ATURAN SESI AKTIF rule #4 diupdate (dulu nunjuk
+`POLISH_AUDIT.md`, sekarang nunjuk roadmap baru + catatan "jangan eksekusi tanpa konfirmasi
+user"). `README.md` § "Rencana v2" ditambah 1 pointer singkat (bukan duplikasi seluruh roadmap).
+`FILE_MANIFEST.txt` diperbarui (2 rename, 1 file baru, total +1).
+
+0 kode disentuh sama sekali (instruksi eksplisit user). **Prioritas sesi berikutnya: JANGAN
+eksekusi §5 roadmap langsung** — 3 keputusan §3 (a/b/c) WAJIB dikonfirmasi user dulu di chat,
+baru mulai fase 1. Detail lengkap ada di `ROADMAP_LIQUID_GLASS_REDESIGN.md` itu sendiri (tidak
+diduplikasi penuh di sini, biar 1 sumber kebenaran).
+
 ## Batch 277 — Samakan standar informatif GitHub Release body dgn Build Summary Batch 276 (1 protected asset + 1 file kode)
 User bandingkan screenshot: Build Summary (Batch 276) sudah rapi & informatif, tapi halaman
 Release (Image 2) — yang juga dibaca app via `UpdateCheckSheet.kt` — masih polos cuma pesan

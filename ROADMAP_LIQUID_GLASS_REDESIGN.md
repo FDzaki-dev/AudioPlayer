@@ -1,0 +1,154 @@
+# ROADMAP: Redesign arah "Liquid Glass" terinspirasi CONVX
+
+Ditanam Batch 278 (instruksi eksplisit user: "ganti arah goals project menuju 100% tipografi/
+shape mirip musik player 'CONVX' yang clean+minimalis atau bahkan bisa lebih baik lagi").
+
+**Status batch ini: PERENCANAAN SAJA, sesuai instruksi eksplisit user ("documentation planning
+only first"). 0 kode disentuh — 0 file `.kt`/`.xml` diedit, 0 shape/warna/tipografi diubah.**
+Dokumen ini adalah peta buat sesi-sesi berikutnya, bukan laporan kerja yang sudah selesai.
+
+---
+
+## 1. Apa itu CONVX (riset, bukan asumsi)
+
+CONVX (`cosmictaserdev-creator/Convx` di GitHub, fork dari `vivi-music`) adalah music player
+Android open-source dengan identitas visual **"Liquid Glass"** — terinspirasi bahasa desain iOS
+terbaru Apple sendiri, bernama sama. Fakta konkret dari README resminya (bukan tebakan gaya):
+
+- **Real backdrop blur & refraction** — permukaan (nav bar, floating button, sheet) benar-benar
+  mengambil sampel piksel DI BELAKANGNYA lalu di-blur+refract secara real-time, bukan warna
+  translusen statis. Dibangun di atas library terpisah, `Kyant0/backdrop` (di-vendor, bukan
+  dependency biasa) — CONVX sendiri menyebutnya "foundational project", bukan hal remeh.
+- **Motion ala iOS**: bouncy rubber-band overscroll, transisi halaman blur, "nav puck" (indikator
+  tab aktif) yang springy.
+- **Material You**: warna aksen diekstrak otomatis dari artwork album yang sedang main.
+- **Sengaja menghindari widget Material stock** — semua permukaan custom-drawn glass.
+- Arsitektur teknis: Compose + MVVM (mirip project ini), `Modifier.liquidGlass(...)` sebagai 1
+  titik pemakaian terpusat (mirip pola `frostedGlass()` project ini — lihat §3).
+
+Sumber: README resmi repo (`github.com/cosmictaserdev-creator/Convx`), diakses via web search
+Batch 278. Tidak ada screenshot resmi yang berhasil ditemukan lewat image search — deskripsi di
+atas murni dari teks README+artikel pihak ketiga, BUKAN dari melihat langsung UI-nya. Kalau user
+punya screenshot/video CONVX yang lebih spesifik (warna aksen, radius sudut persis, ukuran font),
+itu akan jauh lebih akurat daripada riset tekstual ini — lampirkan kalau ada, bakal mempertajam
+rencana di bawah.
+
+---
+
+## 2. Kondisi project SEKARANG (basis perbandingan, dicek dari kode sungguhan)
+
+- **4 identitas visual selectable** (`ThemeIdentity` enum, `Theme.kt`): `Apple` ("Tampilan bersih
+  khas iOS"), `Tactile` (kaca premium Midnight Blue), `Neumorphism`/Skeu (panel lembut,
+  dual-shadow, Titanium+Zamrud), `Calm Retro` (Lo-Fi Sci-Fi, selalu gelap). Semua toggle-able user
+  di Settings, bukan 1 skin tunggal.
+- **`frostedGlass()` (`BlurUtils.kt`) BUKAN blur sungguhan** — ini temuan PALING PENTING buat
+  roadmap ini. Komentar di kode sendiri jujur menjelaskan kenapa: `Modifier.blur()` di Compose
+  nge-blur ISI composable itu sendiri, bukan piksel di belakangnya — kalau dipakai ke container,
+  teks/ikon di dalamnya ikut buram, kebalikan dari "kaca buram yang bisa dibaca". Solusi yang
+  dipakai sekarang: permukaan tinted opacity tinggi (0.92-0.96 alpha) + tepi tipis — glass
+  PALSU/simulasi, bukan sampling real-time seperti CONVX. Ini bukan bug — ini keputusan sadar
+  Batch 53, didokumentasikan jujur di komentar kode.
+- **Shape system**: token radius tunggal (`Radius.xs/sm/md/lg/xl/xxl/hero`, `Spacing.kt`,
+  4dp-28dp) dikombinasikan beda-beda per identitas jadi `Shapes(small/medium/large)`
+  (`AppleShapes`/`TactileShapes`/`SkeuDarkShapes`/`CalmRetroShapes`, `Theme.kt`) — sudah ada
+  sistem token, bukan hardcode tersebar, jadi infrastruktur-nya SIAP dipakai ulang buat radius
+  baru, bukan mulai dari nol.
+- **`minSdk = 23`** (`app/build.gradle.kts`) — lihat §4, ini kendala teknis nyata buat blur
+  sungguhan.
+- **Aturan permanen yang TETAP berlaku, redesign visual tidak mengubah ini**: FREEZE playback
+  engine/data/SAF/database (sama seperti boundary `POLISH_AUDIT.md` lama, lihat
+  `ARCHIVED_POLISH_AUDIT.md`) — ini murni pekerjaan presentation layer.
+
+---
+
+## 3. Keputusan besar yang HARUS dikonfirmasi user dulu sebelum batch eksekusi pertama
+
+Ini BUKAN hal yang aman ditebak sendiri — salah pilih di sini bisa berarti puluhan batch
+eksekusi ke arah yang salah. Ditulis sebagai rekomendasi + alasan, tapi tetap perlu "ya" dari
+user, bukan diasumsikan diam-diam.
+
+### 3a. Ganti 4 tema jadi 1, atau tambah sebagai tema ke-5?
+**Rekomendasi: ganti/konsolidasi**, bukan tambah opsi ke-5. Alasan: instruksi user bilang "ganti
+arah **goals project**" (arah keseluruhan), bukan "tambah pilihan baru" — kalau cuma nambah
+opsi, users lama tetap bisa pakai 3 tema lama dan kerja redesign ini jadi opsional/tersembunyi,
+bukan "arah baru". Tapi ini keputusan besar (4 tema itu representasi ratusan batch kerja
+sebelumnya) — **perlu konfirmasi eksplisit**, bukan dieksekusi diam-diam di batch pertama nanti.
+
+### 3b. Blur sungguhan (real backdrop sampling) vs "glass look" tanpa blur asli?
+Dua opsi valid, trade-off beda jauh:
+- **Opsi A — Blur asli**: pakai `RenderEffect`/`RenderNode` (API 31+, `android.graphics.RenderEffect`)
+  buat capture+blur konten di belakang composable, pola serupa `Kyant0/backdrop`/CONVX sendiri.
+  Hasil paling mendekati CONVX sungguhan. **Butuh bump `minSdk` 23→31** (lihat §4) — sejalan
+  dengan rule #3 `PROJECT_STATE.md` ("prioritas mutakhir, bukan kompatibilitas lama") jadi
+  KEMUNGKINAN BESAR selaras dgn preferensi user yang sudah ada, tapi tetap perubahan besar
+  (drop dukungan Android <12) yang harus disetujui eksplisit, bukan efek samping tak terduga.
+  Effort tinggi — infrastruktur blur real-time belum ada sama sekali di project ini.
+- **Opsi B — "Liquid Glass LOOK" tanpa sampling asli**: pertahankan pendekatan `frostedGlass()`
+  yang sudah ada (tinted-surface simulasi), tapi ganti SHAPE+TYPOGRAPHY-nya biar terasa minimalis
+  ala CONVX (radius lebih besar/pill, kontras lebih lembut, tipografi lebih ringan) — **tidak
+  butuh bump minSdk**, effort jauh lebih kecil, tapi tidak akan pernah benar-benar seperti CONVX
+  (yang justru blur SUNGGUHAN itu ciri khas utamanya).
+
+**Rekomendasi: mulai dari Opsi B dulu** (shape+typography murni, sesuai instruksi user sendiri
+"100% tipografi/shape" — TIDAK secara eksplisit minta blur-engine baru), blur asli (Opsi A) jadi
+fase terpisah SETELAH shape/typography beres DAN user konfirmasi mau invest effort tinggi + bump
+minSdk. Ini juga alasan kenapa dokumen ini dipisah dari implementasi — biar keputusan besar ini
+kelihatan dulu sebelum ada kode yang harus "dibongkar lagi" kalau ternyata pilihannya beda.
+
+### 3c. Nasib 4 identitas lama kalau opsi 3a = "ganti"
+Retire total (hapus `Tactile`/`Neumorphism`/`Calm Retro`, `Apple` dievolusikan jadi basis Liquid
+Glass baru), atau tetap disimpan sebagai kode tapi tidak lagi jadi arah utama? Rekomendasi:
+**`Apple` dievolusikan** (paling dekat secara filosofi — sama-sama "iOS-inspired, clean"), 3
+lainnya di-retire bertahap per-batch (bukan sekali hapus besar — resiko regresi tinggi kalau
+dibongkar sekaligus, sejalan prinsip Strict Micro-Batching yang sudah jadi standar project ini).
+
+---
+
+## 4. Kendala teknis konkret (bukan pendapat, dicek dari kode+dokumentasi resmi)
+
+| Kendala | Fakta | Implikasi |
+|---|---|---|
+| `minSdk = 23` | `app/build.gradle.kts` baris 88 | `RenderEffect`/blur asli perlu API 31+. Opsi A §3b TIDAK JALAN tanpa bump minSdk. |
+| `Modifier.blur()` blur foreground, bukan background | Komentar `BlurUtils.kt`, dikonfirmasi perilaku resmi Compose | Alasan `frostedGlass()` sekarang glass palsu — bukan bug yang "gampang" diperbaiki, perlu infrastruktur baru total kalau mau blur asli. |
+| 4 shape-set sudah ada, per-identitas | `Theme.kt` baris 220-254 | Infrastruktur token radius (`Radius.*`, `Spacing.kt`) SIAP dipakai ulang — redesign shape tidak mulai dari nol. |
+| 0 shared component library | Catatan `ARCHIVED_POLISH_AUDIT.md` §4 ("26 file `ui/*.kt`, semua inline") | Redesign shape/tipografi akan MENYENTUH BANYAK FILE satu per satu (bukan 1 titik pusat) — perlu direncanakan per-komponen (Button/Card/Sheet/dst), bukan 1 batch raksasa. Selaras Strict Micro-Batching yang sudah standar. |
+
+---
+
+## 5. Rencana eksekusi bertahap (draft urutan, TUNGGU konfirmasi §3 dulu)
+
+Tiap fase = beberapa batch terpisah (1 sub-item/batch, standar project). Urutan diusulkan
+mengikuti pola `POLISH_AUDIT.md` lama (Motion→Responsive→Surface/Color→Component→Typography)
+karena pola itu sudah terbukti jalan 25+ batch tanpa masalah, bukan re-invent proses:
+
+1. **Fondasi token baru** — definisikan skala radius baru (lebih besar/pill, minimalis) +
+   skala tipografi baru (font-weight lebih ringan, letter-spacing, line-height) di file token
+   yang SUDAH ADA (`Spacing.kt`/`Type.kt`) sebagai identitas terpisah dulu (belum jadi default).
+2. **1 identitas baru utuh** (`Theme.kt`) — reuse pola `ThemeIdentity` enum yang sudah ada,
+   named misalnya `LIQUID_GLASS`, warna+shape+typography lengkap, TAPI belum jadi default/belum
+   retire yang lama (opsional dulu, biar bisa dibandingkan side-by-side sebelum commit §3a).
+3. **Terapkan ke komponen inti** (urutan dampak-terbesar-dulu, sama pola `POLISH_AUDIT.md`):
+   MiniPlayerBar → NowPlayingScreen → LibraryScreen row → Sheets/Dialog → Settings.
+4. **Keputusan final §3a** dieksekusi (jadikan default / retire yang lama) SETELAH fase 3
+   kelihatan hasilnya, bukan diputuskan buta di awal.
+5. **(Opsional, fase terpisah jauh setelahnya)** Opsi A §3b — blur asli, kalau user konfirmasi
+   mau invest + bump minSdk.
+
+---
+
+## 6. Yang TIDAK berubah (boundary permanen, bukan spesifik dokumen ini)
+
+Playback engine, Queue/shuffle/repeat, MediaStore/SAF, Database, Repository, Persistence,
+MediaSession, Audio focus, Background playback, Navigation architecture, Feature behavior —
+sama persis boundary `ARCHIVED_POLISH_AUDIT.md`, berlaku permanen untuk redesign visual apa pun.
+
+---
+
+## Cara pakai dokumen ini (sesi berikutnya)
+
+1. **Jangan langsung eksekusi §5** — konfirmasi §3a/3b/3c ke user dulu (lewat chat, bukan
+   diasumsikan dari dokumen ini sendiri).
+2. Begitu terkonfirmasi, mulai §5 fase 1, 1 batch = 1 sub-item, Strict Micro-Batching tetap
+   berlaku (tidak ada pengecualian utk dokumen ini).
+3. Update dokumen ini per fase selesai (descending, temuan terbaru di atas) — pola sama seperti
+   `PROJECT_STATE.md`/`CHANGELOG.md`.

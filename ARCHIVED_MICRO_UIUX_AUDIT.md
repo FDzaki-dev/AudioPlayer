@@ -1,6 +1,27 @@
 # AudioPlayer — Micro UI/UX Gap Audit
 ## Target: 100% Micro UI/UX Polish
 
+> ## 📦 ARSIP — DIHENTIKAN (Batch 278)
+> Dokumen ini **tidak lagi aktif diikuti**. Dihentikan bukan karena isinya salah — 12/14 kategori
+> genuinely TUNTAS (kerja nyata, bukan diklaim) — tapi karena arah goal project berubah total:
+> user instruksikan pivot ke identitas visual baru terinspirasi **CONVX** (Liquid Glass, iOS-
+> inspired, lihat `ROADMAP_LIQUID_GLASS_REDESIGN.md`). Dokumen ini mengukur konsistensi micro-detail
+> (spacing/wording/icon/typography-hierarchy/a11y) terhadap SISTEM VISUAL LAMA (Apple/Tactile/
+> Neumorphism/Calm Retro) — begitu shape+typography diganti total, sebagian besar checklist ini
+> otomatis tidak relevan lagi (mengaudit sesuatu yang segera diganti = kerja sia-sia).
+>
+> **Yang TETAP relevan/reusable** (tidak spesifik ke skin visual manapun, murni hygiene): kategori
+> 1 (Strings/Wording), sebagian kategori 5 (error/success state pattern, bukan warnanya), dan
+> kategori Accessibility (TalkBack semantics, focus order, touch target, text-scaling) — prinsip-
+> prinsipnya berlaku lintas skin visual apapun. Kalau sesi redesign butuh referensi "wording apa
+> yang sudah disepakati konsisten" atau "pola accessibility apa yang harus dipertahankan", cek
+> dulu di sini sebelum reinvent.
+>
+> **Kategori 13-14 (belum sempat mulai)** — dibatalkan, akan didesain ulang dari nol mengikuti
+> prinsip shape/typography baru, bukan dilanjutkan dari draft lama.
+
+---
+
 > **STRICT SCOPE:** Presentation/UI/UX polish only.
 > **DILARANG:** perubahan logic, playback engine, queue behavior, SAF, database, scanning, persistence, navigation architecture, atau feature behavior kecuali ada bug UI murni yang benar-benar urgent.
 

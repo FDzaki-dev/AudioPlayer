@@ -21,11 +21,12 @@ atas file yang terus memanjang):
    komponen, dan dependency WAJIB pakai versi paling mutakhir yang tersedia; JANGAN habiskan
    effort bikin/pertahankan fallback kompatibilitas legacy yang rumit kalau ada opsi modern yang
    lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
-4. **`POLISH_AUDIT.md` (ditanam Batch 253) adalah backlog aktif micro-polish** — kalau tidak ada
-   instruksi/log_fail baru dari user, sesi WAJIB cek file ini utk task berikutnya (checkbox
-   teratas yang masih `[ ]`, urutan Motion→Responsive→Surface/Color→Component→Typography). 1
-   checkbox = 1 batch, tetap tunduk Strict Micro-Batching. Kalau audit 1 area 0 nemu bug → centang
-   `[x]` + "0 bug, STOP", JANGAN ciptakan kerjaan baru demi 100%.
+4. **`POLISH_AUDIT.md`/`MICRO_UIUX_AUDIT.md` DIARSIPKAN Batch 278** (jadi
+   `ARCHIVED_POLISH_AUDIT.md`/`ARCHIVED_MICRO_UIUX_AUDIT.md`) — digantikan
+   `ROADMAP_LIQUID_GLASS_REDESIGN.md` sebagai sumber task default kalau tidak ada instruksi/
+   log_fail baru dari user. **TAPI**: roadmap itu butuh konfirmasi user dulu (§3 di dalamnya)
+   sebelum sesi mana pun mulai eksekusi kode — kalau belum ada konfirmasi, JANGAN eksekusi
+   apa pun dari situ, tanya user dulu.
 5. **Nama folder Termux proyek ini `audioplayer` (lowercase, default kebab-case) — SUDAH FINAL,
    JANGAN diubah lagi.** Sempat direvisi ke `AudioPlayer` (kapital) tapi DIBATALKAN user: local
    folder Termux TIDAK terikat ke `rootProject.name` (sudah di-hardcode `"AudioPlayer"` di
@@ -35,6 +36,30 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 278 (Arahan user — arsipkan dokumentasi stale + arahkan goals ke redesign "Liquid
+Glass" terinspirasi CONVX, PERENCANAAN SAJA, 0 kode)** — 2 bagian instruksi:
+1. **Arsip**: `MICRO_UIUX_AUDIT.md`→`ARCHIVED_MICRO_UIUX_AUDIT.md`,
+   `POLISH_AUDIT.md`→`ARCHIVED_POLISH_AUDIT.md` (isi dipertahankan penuh, cuma ditambah banner
+   arsip di atas, pola sama `ARCHIVED_ROADMAP_15_FITUR_OFFLINE.md`). Bukan karena isinya salah
+   (12/14 kategori genuinely TUNTAS) — karena keduanya mengaudit konsistensi SISTEM VISUAL LAMA
+   yang segera diganti total; melanjutkan sekarang = kerja terbuang.
+2. **Roadmap baru**: `ROADMAP_LIQUID_GLASS_REDESIGN.md` (file baru) — riset CONVX via web search
+   (real backdrop blur/refraction, motion iOS-style, Material You dari artwork, dibangun di atas
+   library `Kyant0/backdrop` terpisah) dikontraskan ke kondisi project sekarang (4 identitas
+   visual ada: Apple/Tactile/Neumorphism/Calm Retro; `frostedGlass()` di `BlurUtils.kt` TERNYATA
+   glass PALSU — `Modifier.blur()` Compose blur foreground bukan background, jadi sekarang cuma
+   tinted-surface simulasi, bukan sampling real-time; `minSdk=23` jadi kendala nyata utk blur
+   asli yang butuh API 31+). 3 keputusan besar diidentifikasi BUTUH konfirmasi user dulu sebelum
+   eksekusi kode dimulai (ganti vs tambah tema; blur sungguhan [bump minSdk] vs "look" tanpa
+   blur asli; nasib 4 identitas lama) — TIDAK ditebak sendiri, resiko puluhan batch salah arah.
+   Rencana eksekusi bertahap 5 fase didraft, urutan reuse pola `POLISH_AUDIT.md` lama.
+   `README.md` § "Rencana v2" ditambah pointer singkat ke roadmap ini.
+
+`FILE_MANIFEST.txt` diperbarui (2 rename, 1 file baru). 0 file kode (`.kt`/`.xml`) disentuh sama
+sekali — sesuai instruksi eksplisit user "documentation planning only first". **Prioritas
+sesi berikutnya: JANGAN langsung eksekusi roadmap** — konfirmasi §3a/3b/3c
+`ROADMAP_LIQUID_GLASS_REDESIGN.md` ke user dulu. Detail: `CHANGELOG.md` Batch 278.
+
 **Batch 277 (Samakan standar informatif GitHub Release body dgn Build Summary, 1 protected
 asset + 1 file kode)** — User bandingkan screenshot: Summary sudah rapi, Release body masih
 polos. Kendala dijaga: `release_notes.txt` dibaca 2 konsumen (web GitHub Markdown-render vs app
