@@ -202,8 +202,15 @@ karena pola itu sudah terbukti jalan 25+ batch tanpa masalah, bukan re-invent pr
 4. **Keputusan final §3a** — **sudah final: TAMBAH, bukan ganti** (lihat §3 di atas), jadi
    langkah ini SUDAH TIDAK PERLU dieksekusi terpisah (dulu didraft "putuskan setelah fase 3
    kelihatan hasilnya" — sekarang sudah diputuskan duluan oleh user, bukan ditunda).
-5. **(Opsional, fase terpisah jauh setelahnya)** Opsi A §3b — blur asli, kalau user konfirmasi
-   mau invest + bump minSdk.
+5. **Opsi A §3b — blur asli.** **✅ DIKONFIRMASI USER Batch 290** (user pilih lanjut setelah
+   trade-off minSdk dijelaskan eksplisit, sejalan rule #3 PROJECT_STATE.md). **← SEDANG
+   BERJALAN.** Sub-langkah:
+   - **✅ SELESAI Batch 290**: `minSdk` 23→31 (`app/build.gradle.kts`) — fondasi wajib
+     `RenderEffect`/`RenderNode`. Konsekuensi eksplisit: drop dukungan Android <12 total (bukan
+     cuma fitur blur, seluruh app tidak bisa diinstall di device API <31 lagi). 0 guard
+     `SDK_INT < 31` ditemukan di codebase (dicek grep) — 0 dead-code cleanup diperlukan.
+   - **⏳ Berikutnya**: infrastruktur `RenderEffect`/`RenderNode` capture+blur (belum ada sama
+     sekali di project ini, effort tinggi, perlu direncanakan per-komponen — lihat §4).
 
 **Audit pill/chip lebar (sisa fase 3) — dimulai Batch 287**: `LibraryFilterChips`
 (`LibraryScreen.kt`, tab Lagu/Album/Artis/dst) — chip lebar (lebar≠tinggi, teks pendek+padding,

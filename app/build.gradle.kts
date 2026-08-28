@@ -85,7 +85,13 @@ android {
 
     defaultConfig {
         applicationId = "com.rudi.audioplayer"
-        minSdk = 23
+        // Batch 290 — bump 23→31, fondasi wajib RenderEffect/RenderNode (blur asli Liquid
+        // Glass, roadmap §3b Opsi A, ROADMAP_LIQUID_GLASS_REDESIGN.md). Dikonfirmasi user
+        // eksplisit ("yes please" atas pertanyaan trade-off minSdk), sejalan rule #3
+        // PROJECT_STATE.md (prioritas mutakhir, bukan kompatibilitas OS lama). Konsekuensi:
+        // drop dukungan Android <12 (API <31) total — device lama TIDAK BISA install app ini
+        // lagi sejak versi ini, bukan cuma fitur blur yang hilang di device lama.
+        minSdk = 31
         targetSdk = 34
         versionCode = appVersionCode
         // versionCode and versionName both auto-derive from git commit count (see
@@ -245,7 +251,17 @@ dependencies {
     // unrelated recomposition (e.g. playback position ticking every second).
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.7")
 
-    implementation(platform("androidx.compose:compose-bom:2024.05.00"))
+    // Batch 291 — bump 2024.05.00 → 2026.04.01 (Compose 1.11). Alasan: butuh
+    // `androidx.compose.ui.graphics.layer.GraphicsLayer` (capture+`RenderEffect` blur asli,
+    // roadmap Liquid Glass §3b Opsi A) — API ini baru stabil sejak Compose 1.7 (BOM
+    // 2024.09.00+), 2024.05.00 belum punya. SENGAJA BUKAN BOM terbaru 2026.08.00 (Compose
+    // 1.12, dicek web_search Agustus 2026): versi itu memaksa compileSdk 37 + AGP minimum
+    // 9.1.1 — migrasi AGP 9.x itu BREAKING (hapus DSL lama BaseExtension/AppExtension total,
+    // wajib Gradle 9.1.0+, kompatibilitas plugin Kotlin beda) — resiko besar di luar scope
+    // (task ini cuma butuh 1 API baru, bukan alasan migrasi toolchain penuh). Rule #3
+    // "prioritas mutakhir" tetap dipatuhi (2026.04.01 masih rilis April 2026, jauh lebih baru
+    // dari 2024.05.00 lama) TANPA melanggar STABILITY > Speed yang levelnya di atasnya.
+    implementation(platform("androidx.compose:compose-bom:2026.04.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")

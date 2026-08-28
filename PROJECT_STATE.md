@@ -36,6 +36,30 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 291 (Liquid Glass langkah 5 lanjutan — bump Compose BOM 2024.05.00→2026.04.01, 1 file
+kode + 2 dokumentasi)** — Blocker teknis kedua (setelah minSdk Batch 290): `GraphicsLayer`
+capture API (wajib buat blur asli) baru stabil BOM 2024.09.00+, lama belum punya. **Keputusan
+SENGAJA bukan BOM paling baru** (2026.08.00/Compose 1.12) — itu maksa compileSdk 37+AGP
+9.1.1+migrasi breaking (DSL lama dihapus, Gradle 9.1.0+ wajib) — dipilih **2026.04.01** (Compose
+1.11) yg sudah py `GraphicsLayer` TAPI tetap kompatibel compileSdk 36/AGP 8.13.0 yg sudah ada,
+0 migrasi breaking. STABILITY > Speed menang di atas "prioritas mutakhir mutlak". Brace/paren
+seimbang. **⚠️ BELUM tervalidasi build sungguhan** (0 akses jaringan sesi ini) —
+`LocalOverscrollConfiguration` (`SmartPlaylistScreen.kt`) tersangka pertama kalau CI gagal
+(potensi API pindah ke `overscrollEffect` di rentang lompatan ini), BELUM diperbaiki preventif
+(hindari perubahan spekulatif). **WAJIB cek hasil CI build setelah push batch ini** sebelum
+lanjut ke sub-langkah GraphicsLayer/RenderEffect modifier sungguhan. Detail: `CHANGELOG.md`
+Batch 291.
+
+**Batch 290 (Liquid Glass langkah 5 DIKONFIRMASI, mulai eksekusi: bump minSdk 23→31, 1 file
+kode + 2 dokumentasi)** — User konfirmasi eksplisit lanjut Opsi A §3b (blur asli) setelah
+trade-off dijelaskan. Sub-langkah pertama: `app/build.gradle.kts` `minSdk` 23→31 (edit fokus 1
+baris+komentar). 0 guard `SDK_INT < 31` ditemukan (0 dead-code cleanup perlu). Brace/paren
+seimbang. `ROADMAP_LIQUID_GLASS_REDESIGN.md` §5 disinkron: langkah 5 "sedang berjalan".
+**⚠️ KONSEKUENSI PENTING**: APK dari sini TIDAK BISA diinstall device Android <12 (API <31) —
+kalau device testing utama user API-nya <31, WAJIB diinfokan/dicek sebelum lanjut sub-langkah
+berikutnya (infrastruktur `RenderEffect` capture+blur, belum ada sama sekali, effort tinggi).
+Detail: `CHANGELOG.md` Batch 290.
+
 **Batch 289 (Sync ROADMAP_LIQUID_GLASS_REDESIGN.md — fase 3 100% selesai, 2 dokumentasi, 0
 kode)** — §5 belum disinkron sejak Batch 288. Sisa fase 3 (chip/pill) ditandai ✅ SELESAI PENUH,
 Fase 3 keseluruhan 100% selesai (0 pending). Catatan ditambahkan: satu-satunya sisa roadmap

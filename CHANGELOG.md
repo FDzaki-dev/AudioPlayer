@@ -1,5 +1,46 @@
 # Changelog
 
+## Batch 291 — Liquid Glass langkah 5 lanjutan: bump Compose BOM 2024.05.00 → 2026.04.01 (1 file kode + 2 dokumentasi)
+Lanjutan Batch 290 (minSdk 23→31). Dicek: `GraphicsLayer` capture API (`androidx.compose.ui.
+graphics.layer.GraphicsLayer` — mekanisme wajib buat capture+`RenderEffect` blur asli, dipakai
+library referensi kayak `Kyant0/backdrop`) baru stabil sejak Compose UI 1.7 (BOM 2024.09.00+),
+BOM lama 2024.05.00 (Compose 1.6.x) belum punya sama sekali — blocker teknis kedua setelah
+minSdk.
+
+**Keputusan versi — BUKAN BOM terbaru mutlak**: web_search dicek, versi terbaru saat ini BOM
+2026.08.00 (Compose 1.12, rilis Agustus 2026) — TAPI itu WAJIB compileSdk 37 + AGP minimum
+9.1.1, dan migrasi AGP 9.x itu breaking-change besar (DSL lama `BaseExtension`/`AppExtension`
+dihapus total, wajib Gradle 9.1.0+, kompatibilitas plugin Kotlin berbeda) — jauh di luar scope
+"butuh 1 API baru buat blur". Dipilih **BOM 2026.04.01** (Compose 1.11, rilis April 2026)
+sebagai gantinya — sudah py `GraphicsLayer` stabil, TETAP kompatibel `compileSdk=36`/AGP
+8.13.0/Kotlin 2.4.10 yang sudah ada, 0 migrasi toolchain breaking. Rule #3 "prioritas mutakhir"
+tetap dipatuhi (lompatan besar dari 2024.05.00, bukan versi seadanya) TANPA melanggar STABILITY
+> Speed yang levelnya lebih tinggi di hierarki.
+
+Brace/paren `app/build.gradle.kts` seimbang (35/35, 167/167). **⚠️ Risiko diketahui, BELUM
+tervalidasi build sungguhan** (bash tool sesi ini 0 akses jaringan, gak bisa compile-check):
+`LocalOverscrollConfiguration` (dipakai `SmartPlaylistScreen.kt`) berpotensi deprecated/pindah
+API di rentang lompatan 1.6→1.11 (evolusi umum Compose Foundation ke `overscrollEffect`
+parameter) — KALAU build CI gagal spesifik di titik ini, itu tersangka pertama, BELUM
+diperbaiki preventif batch ini (menghindari perubahan spekulatif tanpa bukti nyata gagal).
+0 protected asset lain disentuh.
+
+## Batch 290 — Liquid Glass langkah 5 (blur asli) DIKONFIRMASI, mulai eksekusi: bump minSdk 23→31 (1 file kode + 2 dokumentasi)
+User dikonfirmasi eksplisit lanjut ke Opsi A §3b (blur asli, `RenderEffect`/`RenderNode`) setelah
+trade-off dijelaskan (drop dukungan Android <12, effort tinggi, infrastruktur belum ada sama
+sekali) — sejalan rule #3 `PROJECT_STATE.md` (prioritas mutakhir). **Sub-langkah pertama**:
+`app/build.gradle.kts` `minSdk` 23→31 (`Protect` file, edit fokus SATU baris + komentar, 0
+sentuh bagian lain). Fondasi wajib sebelum `RenderEffect` bisa dipakai — API 31+. Digrep codebase
+buat guard `SDK_INT < 31` yang bakal jadi dead code: **0 ditemukan**, 0 cleanup diperlukan batch
+ini. Brace/paren `app/build.gradle.kts` seimbang (35/35, 160/160).
+`ROADMAP_LIQUID_GLASS_REDESIGN.md` §5 diupdate: langkah 5 status "opsional/pending" →
+"dikonfirmasi, sedang berjalan", sub-langkah minSdk ditandai selesai, sub-langkah berikutnya
+(infrastruktur `RenderEffect` capture+blur) dicatat sbg item lanjutan. 0 protected asset lain.
+
+**PENTING — konsekuensi langsung**: build APK dari versi ini TIDAK BISA diinstall di device
+Android <12 (API <31). Kalau ada device testing lama di tangan user, sebaiknya dicek device
+utama testing sekarang API berapa sebelum lanjut sub-langkah berikutnya.
+
 ## Batch 289 — Sync ROADMAP_LIQUID_GLASS_REDESIGN.md: fase 3 tandai 100% selesai (2 dokumentasi, 0 kode)
 `ROADMAP_LIQUID_GLASS_REDESIGN.md` §5 belum disentuh sejak Batch 288 selesai (chip/pill fase 3)
 — masih nunjukin "⏳ item berikutnya" padahal udah tuntas. Disinkronkan: sisa fase 3 (chip/pill)
