@@ -36,6 +36,23 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 281 (Liquid Glass fase 3 langkah 1 — edgeBrush khusus di `frostedGlass()`, 2 file)** —
+`frostedGlass()` (`BlurUtils.kt`) = 1 shared helper dilalui SEMUA panel glass app-wide (mini
+player, tiap bottom sheet, card Home/Library). `Theme.kt` +`isLiquidGlassTheme()` (pola identik
+3 helper identitas lain). `BlurUtils.kt`'s `edgeBrush` dapat cabang `isLiquidGlass` sendiri
+(bukan jatuh ke `else` yang cuma benar deteksi "Apple light" — tanpa branch sendiri, Liquid
+Glass mode TERANG akan diam-diam pakai alpha edge yang dituning utk GELAP, laten bug ditemukan
+saat fix, bukan cuma kosmetik). Cabang baru: highlight rim `LiquidGlassAccent` ungu tipis
+(0.32→0.06 gelap, 0.22→0.05 terang), gradient statis (bukan blur asli, sesuai §3b Opsi B).
+
+**Cakupan otomatis**: MiniPlayerBar/NowPlayingScreen/semua Sheet/card Home-Library SEMUA ikut
+dapat edge violet-glass serentak — roadmap §5 langkah 3 bagian "glass-edge" per-komponen
+dianggap selesai lewat 1 fix terpusat ini (bukan pola per-file). 2 file, 0 protected asset.
+Brace/paren seimbang. `FILE_MANIFEST.txt` tidak berubah (186/186). **Belum diverifikasi visual
+di device** — cek rim ungu terlihat di kedua mode + 4 identitas lama TIDAK berubah (regresi
+urutan `when`). Item berikutnya: audit elemen pill/chip lebar yang layak `Radius.liquidPill`
+eksplisit (belum ketemu kandidat). Detail: `CHANGELOG.md` Batch 281.
+
 **Batch 280 (Liquid Glass fase 2 — ThemeIdentity.LIQUID_GLASS lengkap, 3 file, additif)** —
 Identitas ke-5 utuh (belum default, side-by-side 4 lama sesuai §3a). `Color.kt` +10 token
 palet statis (bg/surface/text × dark/light, accent violet-glass, success teal). `Theme.kt`

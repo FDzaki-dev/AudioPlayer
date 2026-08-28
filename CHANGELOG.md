@@ -1,5 +1,52 @@
 # Changelog
 
+## Batch 281 — Liquid Glass fase 3 langkah 1: edgeBrush khusus di frostedGlass() (2 file)
+`ROADMAP_LIQUID_GLASS_REDESIGN.md` §5 langkah 3 — "Terapkan ke komponen inti, urutan MiniPlayerBar
+duluan". `frostedGlass()` (`BlurUtils.kt`) adalah SATU shared helper yang dilalui SEMUA panel
+glass di app (mini player, tiap bottom sheet, card Home/Library — dikonfirmasi di komentar file
+itu sendiri sejak Batch 53/58), jadi memperbaikinya di titik pusat ini = seluruh titik termasuk
+MiniPlayerBar otomatis ikut ter-update, bukan disalin manual per-file — persis pola yang sudah
+dipakai identitas Tactile (Batch 53) & Skeu (Batch 58/61) dulu saat masing-masing pertama kali
+butuh treatment glass sendiri.
+
+**`Theme.kt`** — helper ke-4 `isLiquidGlassTheme()`, pola identik persis
+`isTactileTheme()`/`isSkeuTheme()`/`isCalmRetroTheme()` (`primary == LiquidGlassAccent`).
+
+**`BlurUtils.kt`** — `frostedGlass()`'s `edgeBrush` when-block dapat cabang `isLiquidGlass`
+sendiri (bukan jatuh ke `else`). **Alasan BUKAN kosmetik semata**: `else` branch cuma benar
+mendeteksi "Apple light" lewat `background == AppleLightBackground` literal — identitas lain
+otomatis dianggap "dark-tuned" (alpha 0.24f). Calm Retro aman krn terkunci gelap permanen
+(tidak pernah kena), TAPI Liquid Glass otonom di KEDUA mode (Batch 280) — tanpa branch sendiri,
+mode terangnya akan diam-diam pakai alpha edge yang dituning utk gelap. Ini laten bug yang
+ditemukan SAAT nulis fix, bukan cuma penambahan visual kosmetik. Cabang baru pakai
+`LiquidGlassAccent` (bukan flat neutral `onSurface` ala Apple) utk highlight rim ungu tipis —
+`0.32f→0.06f` alpha di gelap, `0.22f→0.05f` di terang — satu-satunya sentuhan warna pembeda
+identitas ini dari Apple di layer glass, tetap gradient statis (bukan sampling backdrop asli,
+sesuai §3b Opsi B yang dikonfirmasi user Batch 279).
+
+**Cakupan otomatis**: `MiniPlayerBar`, `NowPlayingScreen` (2 panel), semua `ModalBottomSheet`,
+card Home/Library — SEMUA ikut dapat edge violet-glass begitu user pilih identitas ini, TANPA
+perlu diedit satu-satu. Langkah 3 roadmap (MiniPlayerBar→NowPlayingScreen→LibraryScreen row→
+Sheets/Dialog→Settings) untuk bagian **glass-edge** boleh dianggap selesai serentak lewat fix
+ini — sisa pekerjaan per-komponen di langkah itu (kalau ada) adalah hal LAIN di luar glass-edge,
+misalnya cabang emboss/shadow spesifik non-glass (`isTactile`/`isSkeu` punya `tactileEmboss()`/
+`skeuEmboss()` sendiri di beberapa file, Liquid Glass SENGAJA tidak — flat shadow shared dgn
+Apple dinilai tepat krn identitas ini eksplisit "minimalis" per definisinya sendiri di
+`ThemeIdentity.LIQUID_GLASS`, bukan gap yang lupa dikerjakan) atau pemasangan `Radius.liquidPill`
+di call site pill spesifik (belum ada kandidat pill yang genuinely butuh diubah dari `CircleShape`
+yang sudah ada — circle SUDAH stadium penuh utk elemen persegi, `liquidPill` relevan utk elemen
+lebar≠tinggi macam chip/pill button lebar, belum ada di alur file yang disentuh batch ini).
+
+2 file, 0 protected asset. Brace/paren `Theme.kt` (13/13, 140/140) & `BlurUtils.kt` (5/5, 55/55)
+seimbang. `FILE_MANIFEST.txt` tidak berubah (186/186, diverifikasi diff eksplisit). **Belum
+diverifikasi visual di device** — prioritas cek: pilih Liquid Glass di Settings, buka mini
+player + Now Playing + 1 bottom sheet, pastikan rim ungu tipis genuinely terlihat (bukan
+ketutup krn alpha kegedean/kekecilan) di kedua mode terang/gelap, DAN pastikan 4 identitas lama
+(Apple/Tactile/Skeu/Calm Retro) visualnya SAMA SEKALI TIDAK berubah (regresi `else`-branch
+krn urutan `when` baru). Item berikutnya (masih §5 langkah 3): audit apakah ada elemen pill/chip
+lebar di MiniPlayerBar/NowPlayingScreen/Sheets yang layak dipasangi `Radius.liquidPill` secara
+eksplisit di call site-nya.
+
 ## Batch 280 — Liquid Glass fase 2: ThemeIdentity.LIQUID_GLASS lengkap (3 file, additif)
 Fase 2 §5 roadmap: identitas ke-5 utuh, MASIH BELUM default (side-by-side dgn 4 lama, sesuai
 §3a "tambah" yang sudah dikonfirmasi Batch 279).

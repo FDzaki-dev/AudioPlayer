@@ -44,6 +44,9 @@ fun Modifier.frostedGlass(
     // "Text remains readable... Glass must not become milky").
     val isTactile = isTactileTheme()
     val isSkeu = isSkeuTheme()
+    // Batch 281 — Liquid Glass fase 3: needed below so this identity gets its OWN edgeBrush
+    // branch instead of falling into the generic `else`.
+    val isLiquidGlass = isLiquidGlassTheme()
     val isDark = LocalIsDarkTheme.current
     // Shape now follows the active theme's own shape tokens instead of a hardcoded 24dp —
     // otherwise every sheet/mini-player using this modifier would keep Apple's soft rounding
@@ -69,6 +72,24 @@ fun Modifier.frostedGlass(
     val edgeBrush = when {
         isTactile -> Brush.linearGradient(
             colors = if (isDark) listOf(TactileHighlight, TactileEdge) else listOf(TactileLightHighlight, TactileLightEdge)
+        )
+        // Batch 281 — Liquid Glass fase 3, komponen inti pertama (MiniPlayerBar dkk semua
+        // route lewat sini — file header di atas). Own branch, BUKAN jatuh ke `else` di bawah:
+        // `else` cuma benar mendeteksi "Apple light" (`background == AppleLightBackground`
+        // literal), identitas lain (termasuk Liquid Glass yang otonom kedua mode sejak Batch
+        // 280 — beda dari Calm Retro yang terkunci gelap permanen jadi tidak pernah kena
+        // mismatch ini) akan salah kebagian alpha 0.24f "dark-tuned" bahkan di mode terangnya
+        // sendiri — laten bug, bukan disengaja, dihindari dgn branch eksplisit sendiri di sini
+        // (pola sama persis Tactile di atas). Pakai `LiquidGlassAccent` (bukan flat neutral
+        // onSurface ala Apple) utk highlight rim bernuansa ungu tipis — satu-satunya tempat
+        // identitas ini dapat "refraction hint" berwarna, selaras estetika kaca CONVX, TETAP di
+        // dalam batas §3b Opsi B (gradient statis, bukan sampling backdrop asli).
+        isLiquidGlass -> Brush.linearGradient(
+            colors = if (isDark) {
+                listOf(LiquidGlassAccent.copy(alpha = 0.32f), LiquidGlassAccent.copy(alpha = 0.06f))
+            } else {
+                listOf(LiquidGlassAccent.copy(alpha = 0.22f), LiquidGlassAccent.copy(alpha = 0.05f))
+            }
         )
         else -> {
             val flat = MaterialTheme.colorScheme.onSurface.copy(

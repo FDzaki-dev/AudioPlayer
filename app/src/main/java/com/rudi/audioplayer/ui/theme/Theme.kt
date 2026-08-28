@@ -337,6 +337,12 @@ fun isSkeuTheme(): Boolean = MaterialTheme.colorScheme.primary == SkeuAccent
 @Composable
 fun isCalmRetroTheme(): Boolean = MaterialTheme.colorScheme.primary == CalmRetroAccent
 
+// Batch 281 — Liquid Glass fase 3 dimulai: helper ke-4 pola identik 3 di atas, dibutuhkan
+// komponen (BlurUtils.kt duluan; call site UI lain menyusul) buat cabang khusus identitas ini,
+// sama seperti Tactile/Skeu/Calm Retro dulu.
+@Composable
+fun isLiquidGlassTheme(): Boolean = MaterialTheme.colorScheme.primary == LiquidGlassAccent
+
 fun colorsFor(identity: ThemeIdentity, isDark: Boolean) = when (identity) {
     ThemeIdentity.TACTILE -> if (isDark) TactileDarkColors else TactileLightColors
     ThemeIdentity.SKEU_DARK_LITE -> if (isDark) SkeuDarkColors else SkeuLightColors

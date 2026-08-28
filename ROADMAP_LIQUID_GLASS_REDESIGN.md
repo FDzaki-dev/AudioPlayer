@@ -157,10 +157,24 @@ karena pola itu sudah terbukti jalan 25+ batch tanpa masalah, bukan re-invent pr
    LIQUID_GLASS otomatis muncul begitu enum-nya ada, dikonfirmasi baca kode dulu sebelum
    diasumsikan.
 3. **Terapkan ke komponen inti** (urutan dampak-terbesar-dulu, sama pola `POLISH_AUDIT.md`):
-   MiniPlayerBar → NowPlayingScreen → LibraryScreen row → Sheets/Dialog → Settings. **← ITEM
-   BERIKUTNYA.** Ini juga titik yang tepat utk mulai pasang `Radius.liquidPill` (999dp, stadium
+   MiniPlayerBar → NowPlayingScreen → LibraryScreen row → Sheets/Dialog → Settings. **← SEDANG
+   BERJALAN.** Ini juga titik yang tepat utk mulai pasang `Radius.liquidPill` (999dp, stadium
    penuh) LANGSUNG di call site komponen yang genuinely pill (tombol besar/chip/FAB), bukan
    lewat `Shapes` generik (lihat catatan Batch 280 di §2 di atas).
+   **✅ Sub-langkah "glass-edge" SELESAI serentak Batch 281**: `frostedGlass()` (`BlurUtils.kt`)
+   dapat cabang `isLiquidGlass` sendiri di `edgeBrush` (highlight rim violet tipis + sekalian
+   perbaiki laten bug alpha-terbalik mode-terang). Karena helper ini 1 shared call site dilalui
+   SEMUA panel glass (MiniPlayerBar/NowPlayingScreen/tiap Sheet/card Home-Library), urutan
+   "MiniPlayerBar dulu baru NowPlayingScreen dst" untuk bagian glass-edge spesifiknya jadi
+   otomatis serentak, bukan perlu diulang per file. **Belum diverifikasi visual di device.**
+   **⏳ Sisa sub-langkah 3 yang BELUM dikerjakan** (bukan glass-edge, hal lain): (a) audit apakah
+   ada elemen pill/chip lebar (lebar≠tinggi) di komponen-komponen itu yang layak dipasangi
+   `Radius.liquidPill` eksplisit di call site — belum ada kandidat ditemukan sejauh file yang
+   sudah dibaca; (b) cek apakah ada styling HARDCODED per-identitas lain (bukan lewat
+   MaterialTheme dispatch) di MiniPlayerBar/NowPlayingScreen/LibraryScreen row/Sheets/Settings
+   yang butuh cabang Liquid Glass eksplisit — baru diperiksa utk `frostedGlass()`'s edgeBrush,
+   BELUM diperiksa menyeluruh utk cabang lain (mis. `tactileEmboss`/`skeuEmboss`-style flourish
+   custom per komponen di luar helper shared ini).
 4. **Keputusan final §3a** — **sudah final: TAMBAH, bukan ganti** (lihat §3 di atas), jadi
    langkah ini SUDAH TIDAK PERLU dieksekusi terpisah (dulu didraft "putuskan setelah fase 3
    kelihatan hasilnya" — sekarang sudah diputuskan duluan oleh user, bukan ditunda).
