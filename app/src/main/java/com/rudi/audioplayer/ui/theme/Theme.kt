@@ -33,7 +33,11 @@ enum class ThemeIdentity(val storageKey: String, val displayName: String, val de
     APPLE("apple", "Apple", "Tampilan bersih khas iOS, mengikuti mode terang/gelap yang dipilih"),
     TACTILE("tactile_lite", "Tactile", "Kaca premium dengan sentuhan Midnight Blue tipis dan kontrol taktil — kini otonom di mode terang maupun gelap"),
     SKEU_DARK_LITE("skeu_dark_lite", "Neumorphism", "Panel lembut menyatu dgn kanvas, dual soft-shadow ultra realistic, aksen Titanium dominan dgn sentuhan Zamrud — otonom di mode terang maupun gelap"),
-    CALM_RETRO("calm_retro", "Calm Retro", "Lo-Fi Sci-Fi teduh, aksen Muted Sage — selalu gelap, tidak mengikuti toggle Mode");
+    CALM_RETRO("calm_retro", "Calm Retro", "Lo-Fi Sci-Fi teduh, aksen Muted Sage — selalu gelap, tidak mengikuti toggle Mode"),
+    // Batch 279/280 — ROADMAP_LIQUID_GLASS_REDESIGN.md, §3 dikonfirmasi user: TAMBAH sebagai
+    // opsi ke-5 (bukan ganti/konsolidasi 4 di atas), Opsi B (shape+typography+palet statis,
+    // tanpa blur asli). Otonom di kedua mode seperti Apple/Tactile/Skeu.
+    LIQUID_GLASS("liquid_glass", "Liquid Glass", "Radius besar/pill minimalis ala CONVX, tipografi lebih ringan, palet violet-glass sejuk — otonom di mode terang maupun gelap");
 
     companion object {
         fun fromStorageKey(key: String?): ThemeIdentity = entries.find { it.storageKey == key } ?: APPLE
@@ -214,6 +218,47 @@ private val CalmRetroColors = darkColorScheme(
     error = CalmRetroAberrationLeft
 )
 
+// Batch 279/280 — Liquid Glass, otonom di kedua mode (pola sama Apple/Tactile/Skeu, bukan
+// terkunci gelap spt Calm Retro). error pakai token M3 iOS-merah standar (sama seperti Apple)
+// — belum ada token error khusus Liquid Glass sendiri, palet fase 2 fokus ke background/surface/
+// text/accent/success dulu sesuai scope roadmap ("shape+typography+palet", bukan semantic-error
+// baru yang tidak disebut riset CONVX sama sekali).
+private val LiquidGlassDarkColors = darkColorScheme(
+    primary = LiquidGlassAccent,
+    onPrimary = Color.White,
+    secondary = LiquidGlassDarkSecondaryText,
+    onSecondary = LiquidGlassDarkBackground,
+    tertiary = LiquidGlassDarkSuccess,
+    onTertiary = Color.Black,
+    background = LiquidGlassDarkBackground,
+    onBackground = LiquidGlassDarkText,
+    surface = LiquidGlassDarkSurface,
+    onSurface = LiquidGlassDarkText,
+    surfaceVariant = LiquidGlassDarkSurfaceVariant,
+    onSurfaceVariant = LiquidGlassDarkSecondaryText,
+    outline = LiquidGlassDarkSurfaceVariant,
+    surfaceTint = LiquidGlassAccent,
+    error = Color(0xFFFF453A)
+)
+
+private val LiquidGlassLightColors = lightColorScheme(
+    primary = LiquidGlassAccent,
+    onPrimary = Color.White,
+    secondary = LiquidGlassLightSecondaryText,
+    onSecondary = LiquidGlassLightBackground,
+    tertiary = LiquidGlassLightSuccess,
+    onTertiary = Color.White,
+    background = LiquidGlassLightBackground,
+    onBackground = LiquidGlassLightText,
+    surface = LiquidGlassLightSurface,
+    onSurface = LiquidGlassLightText,
+    surfaceVariant = LiquidGlassLightSurfaceVariant,
+    onSurfaceVariant = LiquidGlassLightSecondaryText,
+    outline = LiquidGlassLightSurfaceVariant,
+    surfaceTint = LiquidGlassAccent,
+    error = Color(0xFFFF3B30)
+)
+
 // A single, consistent "continuous curve" language across the whole app — Compose's Shapes
 // API only supports true rounded rectangles (Apple's real squircle/superellipse corners
 // aren't natively expressible), so generous rounding is the closest honest approximation.
@@ -254,6 +299,20 @@ val CalmRetroShapes = Shapes(
     large = RoundedCornerShape(Radius.md)
 )
 
+// Batch 279/280 — Liquid Glass shape language: paling generous dari SEMUA 5 identitas
+// (termasuk lebih besar dari Apple, yang sebelumnya paling generous) — pakai token `Radius.
+// liquidLg` fase 1 (Batch 279) di slot `large`. `Radius.liquidPill` (999dp, stadium PENUH)
+// SENGAJA TIDAK dipasang di sini — `Shapes.large` M3 dipakai generik di banyak komponen
+// (Card/Sheet/dialog besar berbagai tinggi/lebar), radius sebesar 999dp di situ akan clamp jadi
+// bentuk lensa/blob di surface tinggi, bukan "kartu bersudut besar" yang dimaksud. `liquidPill`
+// disimpan sebagai token, dipakai LANGSUNG di call site spesifik yang benar2 pill (tombol/chip)
+// di fase 3 nanti — bukan lewat `Shapes` generik ini.
+val LiquidGlassShapes = Shapes(
+    small = RoundedCornerShape(Radius.xl),
+    medium = RoundedCornerShape(Radius.xxxl),
+    large = RoundedCornerShape(Radius.liquidLg)
+)
+
 // Batch 61 — mode resolution is now completely identity-agnostic (used to take an AppTheme and
 // hardcode TACTILE/SKEU_DARK_LITE to always-true). Every identity honors SYSTEM/LIGHT/DARK the
 // same way; an identity's own light/dark visual DIFFERENCE lives entirely in colorsFor() below.
@@ -285,6 +344,8 @@ fun colorsFor(identity: ThemeIdentity, isDark: Boolean) = when (identity) {
     // isDark sengaja diabaikan — Calm Retro terkunci gelap permanen (instruksi eksplisit user),
     // beda dari Tactile/Skeu yang otonom di kedua mode.
     ThemeIdentity.CALM_RETRO -> CalmRetroColors
+    // Batch 279/280 — Liquid Glass otonom di kedua mode (pola sama Apple/Tactile/Skeu).
+    ThemeIdentity.LIQUID_GLASS -> if (isDark) LiquidGlassDarkColors else LiquidGlassLightColors
 }
 
 @Composable
@@ -302,11 +363,19 @@ fun AudioPlayerTheme(
             colorScheme = colorsFor(identity, isDark),
             // Batch 57 — Skeu reuses AppleTypography (no separate type-scale spec supplied for this
             // theme; skeuomorphic identity here is carried by color/shape/bevel, not custom type).
-            typography = if (identity == ThemeIdentity.TACTILE) TactileTypography else AppleTypography,
+            // Batch 279/280 — LIQUID_GLASS dapat typography sendiri (LiquidGlassTypography,
+            // fase 1), bukan reuse Apple — beda dari Skeu, tipografi justru salah satu dari 2
+            // pembeda utama identitas ini (§3b Opsi B: "shape+typography").
+            typography = when (identity) {
+                ThemeIdentity.TACTILE -> TactileTypography
+                ThemeIdentity.LIQUID_GLASS -> LiquidGlassTypography
+                else -> AppleTypography
+            },
             shapes = when (identity) {
                 ThemeIdentity.TACTILE -> TactileShapes
                 ThemeIdentity.SKEU_DARK_LITE -> SkeuDarkShapes
                 ThemeIdentity.CALM_RETRO -> CalmRetroShapes
+                ThemeIdentity.LIQUID_GLASS -> LiquidGlassShapes
                 else -> AppleShapes
             },
             content = content

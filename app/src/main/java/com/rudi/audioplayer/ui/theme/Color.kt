@@ -297,3 +297,38 @@ val CalmRetroAccent = Color(0xFF7FA99B) // Muted Sage
 // di file ini; guideline markdown eksplisit minta alpha 30%-40% ("Panduan Desain Penting" §1).
 val CalmRetroAberrationLeft = Color(0xFFA87C8F) // Dusty Rose — bias kiri/atas
 val CalmRetroAberrationRight = Color(0xFF7C96A8) // Dusty Denim — bias kanan/bawah
+
+// ============================================================================
+// LIQUID GLASS — Batch 279/280, ROADMAP_LIQUID_GLASS_REDESIGN.md §5 fase 2. §3b Opsi B
+// ("Liquid Glass LOOK": shape+typography+PALET WARNA STATIS, TANPA blur/sampling asli — lihat
+// `BlurUtils.kt` frostedGlass() KDoc utk kenapa blur asli belum memungkinkan di minSdk 23 app
+// ini saat ini). Palet statis dulu sesuai catatan roadmap ("boleh mulai palet statis, upgrade
+// ke ekstraksi-dari-artwork Material You nanti sebagai fase terpisah") — BUKAN dari screenshot
+// resmi CONVX (roadmap §1 sendiri jujur catat 0 screenshot resmi ditemukan), jadi ini
+// interpretasi "cool glassy tone" dari teks riset, bukan color-matching pixel-perfect.
+// Otonom di kedua mode (light & dark) — pola sama Apple/Tactile/Skeu, BUKAN terkunci gelap
+// permanen seperti Calm Retro.
+
+// Dark mode — netral sejuk (bukan true-black seperti Apple, sedikit lebih "berkabut/glassy")
+val LiquidGlassDarkBackground = Color(0xFF0D0F14)
+val LiquidGlassDarkSurface = Color(0xFF171A22)
+val LiquidGlassDarkSurfaceVariant = Color(0xFF242836)
+val LiquidGlassDarkText = Color(0xFFF3F4F8)
+val LiquidGlassDarkSecondaryText = Color(0xFFA6ACC0)
+
+// Light mode — netral sejuk terang, kontras lebih lembut dari Apple's pure white/black
+val LiquidGlassLightBackground = Color(0xFFF7F8FC)
+val LiquidGlassLightSurface = Color(0xFFFFFFFF)
+val LiquidGlassLightSurfaceVariant = Color(0xFFE9EBF4)
+val LiquidGlassLightText = Color(0xFF13151C)
+val LiquidGlassLightSecondaryText = Color(0xFF61667A)
+
+// Aksen — violet-glass sejuk, sengaja dipilih beda dari 4 aksen tema lain (Apple biru murni
+// 0x4F7CFF, Tactile biru-ungu 0x6670FF, Neumorphism Titanium+Zamrud, Calm Retro Muted Sage
+// hijau) supaya langsung kebeda di picker Settings, bukan varian-mirip.
+val LiquidGlassAccent = Color(0xFF8E7CFF)
+
+// Success — teal/mint sejuk (bukan hijau standar iOS Apple/Tactile), selaras nuansa "glass"
+// dingin, satu per mode biar tetap legible di kedua ekstrem.
+val LiquidGlassDarkSuccess = Color(0xFF5EEAD4)
+val LiquidGlassLightSuccess = Color(0xFF14B8A6)

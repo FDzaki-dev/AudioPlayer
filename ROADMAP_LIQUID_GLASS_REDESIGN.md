@@ -144,16 +144,23 @@ karena pola itu sudah terbukti jalan 25+ batch tanpa masalah, bukan re-invent pr
 2. **1 identitas baru utuh** (`Theme.kt`) — reuse pola `ThemeIdentity` enum yang sudah ada,
    named misalnya `LIQUID_GLASS`, warna+shape+typography lengkap, TAPI belum jadi default/belum
    retire yang lama (opsional dulu, biar bisa dibandingkan side-by-side sebelum commit §3a).
-   **← ITEM BERIKUTNYA.** Perlu: `LiquidGlassLightColors`/`LiquidGlassDarkColors` (warna baru,
-   belum diriset — kandidat: netral+1 aksen extract-dari-artwork ala Material You disebut §1,
-   TAPI ekstraksi-dari-artwork itu MEKANISME baru [beda dari sekadar palet statis], kemungkinan
-   perlu batch terpisah sendiri kalau mau match riset persis; utk fase 2 boleh mulai palet
-   statis dulu, upgrade ke ekstraksi nanti), `LiquidGlassShapes` (kombinasi `Radius.liquidLg`/
-   `Radius.liquidPill` + token lama yg relevan), lalu daftar di `ThemeIdentity` enum +
-   `colorsFor()`/`when(identity)` dispatch (3 titik di `Theme.kt`) + entry baru di UI pemilih
-   tema Settings.
+   **✅ SELESAI Batch 280**: `ThemeIdentity.LIQUID_GLASS` ditambahkan (otonom kedua mode, pola
+   Apple/Tactile/Skeu). `Color.kt` +10 token (Dark/Light Background/Surface/SurfaceVariant/
+   Text/SecondaryText + Accent violet-glass + Success teal/mint, palet STATIS — ekstraksi
+   artwork Material You masih fase terpisah). `Theme.kt` +`LiquidGlassDarkColors`/
+   `LightColors` + `LiquidGlassShapes` (`small=Radius.xl, medium=Radius.xxxl,
+   large=Radius.liquidLg` — `liquidPill` 999dp SENGAJA TIDAK dipasang di `Shapes` generik,
+   berisiko blob di surface besar, disimpan utk dipakai langsung di komponen pill spesifik fase
+   3). 3 titik dispatch diupdate: `colorsFor()`, `typography` when-block, `shapes` when-block —
+   semua dikonfirmasi exhaustive (5/5 identitas). **Picker Settings 0 disentuh** — sudah iterate
+   `ThemeIdentity.entries` generik + `ThemeOptionCard` derive warna via `colorsFor()` generik,
+   LIQUID_GLASS otomatis muncul begitu enum-nya ada, dikonfirmasi baca kode dulu sebelum
+   diasumsikan.
 3. **Terapkan ke komponen inti** (urutan dampak-terbesar-dulu, sama pola `POLISH_AUDIT.md`):
-   MiniPlayerBar → NowPlayingScreen → LibraryScreen row → Sheets/Dialog → Settings.
+   MiniPlayerBar → NowPlayingScreen → LibraryScreen row → Sheets/Dialog → Settings. **← ITEM
+   BERIKUTNYA.** Ini juga titik yang tepat utk mulai pasang `Radius.liquidPill` (999dp, stadium
+   penuh) LANGSUNG di call site komponen yang genuinely pill (tombol besar/chip/FAB), bukan
+   lewat `Shapes` generik (lihat catatan Batch 280 di §2 di atas).
 4. **Keputusan final §3a** — **sudah final: TAMBAH, bukan ganti** (lihat §3 di atas), jadi
    langkah ini SUDAH TIDAK PERLU dieksekusi terpisah (dulu didraft "putuskan setelah fase 3
    kelihatan hasilnya" — sekarang sudah diputuskan duluan oleh user, bukan ditunda).

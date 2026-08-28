@@ -1,5 +1,52 @@
 # Changelog
 
+## Batch 280 — Liquid Glass fase 2: ThemeIdentity.LIQUID_GLASS lengkap (3 file, additif)
+Fase 2 §5 roadmap: identitas ke-5 utuh, MASIH BELUM default (side-by-side dgn 4 lama, sesuai
+§3a "tambah" yang sudah dikonfirmasi Batch 279).
+
+**`Color.kt`** (diedit) — +10 token palet statis: Dark/Light × Background/Surface/
+SurfaceVariant/Text/SecondaryText, `LiquidGlassAccent` (violet-glass 0x8E7CFF, sengaja beda
+dari 4 aksen tema lain — biru Apple/biru-ungu Tactile/Titanium-Zamrud Neumorphism/sage Calm
+Retro), `LiquidGlassDarkSuccess`/`LightSuccess` (teal/mint, bukan hijau standar). Palet dari
+interpretasi teks riset roadmap (0 screenshot resmi CONVX ditemukan, dicatat jujur di §1) —
+ekstraksi-dari-artwork Material You masih fase terpisah, bukan bagian batch ini.
+
+**`Theme.kt`** (diedit) — `ThemeIdentity.LIQUID_GLASS` (otonom kedua mode, pola Apple/Tactile/
+Skeu). `LiquidGlassDarkColors`/`LightColors` (`darkColorScheme`/`lightColorScheme` standar).
+`LiquidGlassShapes` (`small=Radius.xl 18dp, medium=Radius.xxxl 24dp, large=Radius.liquidLg
+34dp`) — **`Radius.liquidPill` (999dp) SENGAJA TIDAK dipasang di `Shapes` generik**: token itu
+dipakai di M3 utk Card/Sheet/dialog besar berbagai ukuran, radius 999dp di situ akan clamp jadi
+bentuk lensa/blob di surface tinggi, bukan "kartu bersudut besar" yang dimaksud riset — dicek &
+dikoreksi sebelum commit (draf awal batch ini sempat salah pasang `liquidPill` di situ,
+langsung diperbaiki setelah dipikir ulang dampak ke Card/Sheet, bukan lolos ke ZIP). `liquidPill`
+disimpan sbg token, akan dipakai LANGSUNG di call site pill-shaped spesifik (tombol/chip) fase
+3. 3 titik dispatch diupdate — `colorsFor()`, `typography` when-block, `shapes` when-block —
+dikonfirmasi exhaustive 5/5 identitas (grep ulang setelah edit, bukan asumsi compiler bakal
+nangkep sendiri krn sandbox ini 0 Gradle).
+
+**Picker Settings — 0 file disentuh**: dicek dulu `SettingsScreen.kt` (`items(ThemeIdentity.
+entries...)` + `ThemeOptionCard`'s `previewColors = colorsFor(identity, isDark)`, keduanya
+generik) sebelum menyimpulkan — LIQUID_GLASS otomatis muncul di picker + live-preview warna
+begitu enum-nya ada, TIDAK perlu edit tambahan, dikonfirmasi baca kode bukan ditebak.
+
+3 file. Brace/paren seimbang (Color.kt 0/0,212/212; Spacing.kt 1/1,20/20 [tidak berubah batch
+ini]; Type.kt 0/0,34/34 [tidak berubah]; Theme.kt 13/13,138/138). `FILE_MANIFEST.txt` tidak
+berubah (0 file baru). **Belum diverifikasi visual di device** — cek prioritas: Settings → Tema
+→ pilih "Liquid Glass", pastikan muncul di picker dgn live-preview warna violet-glass, pilih →
+seluruh app pindah ke skema warna+shape+typography baru tanpa crash, 4 tema lama masih utuh
+selectable seperti biasa (regresi paling kritis kalau ada — dispatch salah bisa merusak tema
+lain, bukan cuma yang baru).
+
+**Item berikutnya (fase 3, roadmap §5)**: terapkan ke komponen inti, urutan dampak-terbesar-dulu
+(MiniPlayerBar→NowPlayingScreen→LibraryScreen row→Sheets/Dialog→Settings) — TAPI fase 2 ini
+SUDAH otomatis "diterapkan" di level MaterialTheme (semua komponen yang baca
+`MaterialTheme.colorScheme`/`.typography`/`.shapes` generik ikut berubah begitu identitas ini
+dipilih); fase 3 sebenarnya utk komponen yang TIDAK baca token generik (custom-drawn/hardcoded
+efek per-identitas seperti `tactileEmboss()`/`skeuEmboss()`/`calmAberration()` — Liquid Glass
+belum punya efek custom serupa, itu scope potensial fase 3 kalau mau tambah bevel/glow khas
+sendiri) + titik pill-shape spesifik (`Radius.liquidPill`, lihat catatan Theme.kt di atas).
+Detail lengkap: `ROADMAP_LIQUID_GLASS_REDESIGN.md` §5.
+
 ## Batch 279 — Liquid Glass §3 dikonfirmasi user + fase 1 eksekusi: fondasi token radius+typography (2 file, additif)
 User jawab 3 keputusan besar `ROADMAP_LIQUID_GLASS_REDESIGN.md` §3: **3a→tambah tema ke-5**
 (BUKAN rekomendasi dokumen "ganti/konsolidasi" — 4 tema lama tetap ada), **3b→Opsi B dulu**

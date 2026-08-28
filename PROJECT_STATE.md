@@ -36,6 +36,21 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 280 (Liquid Glass fase 2 — ThemeIdentity.LIQUID_GLASS lengkap, 3 file, additif)** —
+Identitas ke-5 utuh (belum default, side-by-side 4 lama sesuai §3a). `Color.kt` +10 token
+palet statis (bg/surface/text × dark/light, accent violet-glass, success teal). `Theme.kt`
++`ThemeIdentity.LIQUID_GLASS` + `LiquidGlassDarkColors`/`LightColors` +
+`LiquidGlassShapes` (small=18dp/medium=24dp/large=34dp — **`Radius.liquidPill` 999dp SENGAJA
+TIDAK dipasang di `Shapes` generik**, berisiko blob di Card/Sheet besar, disimpan utk call site
+pill spesifik fase 3; draf awal sempat salah pasang di situ, dikoreksi sebelum commit). 3 titik
+dispatch (`colorsFor()`+2 when-block) exhaustive 5/5, dikonfirmasi grep ulang. **Picker Settings
+0 disentuh** — sudah generik (`ThemeIdentity.entries` + `colorsFor()` di `ThemeOptionCard`),
+dikonfirmasi baca kode dulu, LIQUID_GLASS otomatis muncul. Brace/paren seimbang. `FILE_MANIFEST.
+txt` tidak berubah. **Belum diverifikasi visual di device** — prioritas cek: pilih Liquid Glass
+di Settings, app pindah tema tanpa crash, 4 tema lama masih utuh. Item berikutnya (fase 3):
+terapkan ke komponen custom-effect (belum ada punya Liquid Glass sendiri) + pasang `liquidPill`
+di call site pill spesifik. Detail: `CHANGELOG.md` Batch 280.
+
 **Batch 279 (Liquid Glass §3 dikonfirmasi user + fase 1 eksekusi — fondasi token
 radius+typography, 2 file, additif)** — User jawab §3 `ROADMAP_LIQUID_GLASS_REDESIGN.md`:
 **3a→tambah tema ke-5** (bukan ganti/konsolidasi seperti rekomendasi dokumen — 4 tema lama
