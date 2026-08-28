@@ -191,9 +191,14 @@ karena pola itu sudah terbukti jalan 25+ batch tanpa masalah, bukan re-invent pr
    colorScheme`, otomatis konsisten tanpa perlu sentuh apa pun. **Sub-langkah 3 SELESAI PENUH**
    (MiniPlayerBar→NowPlayingScreen→LibraryScreen→Sheets/Dialog→Settings, 0 gap ditemukan di
    SEMUA 5 area).
-   **⏳ Sisa fase 3**: audit pill/chip lebar (lebar≠tinggi, BUKAN tombol persegi/lingkaran) yang
-   genuinely layak `Radius.liquidPill` eksplisit — **← ITEM BERIKUTNYA**, belum ada kandidat
-   ditemukan di semua file yang sudah dibaca sejauh ini, perlu grep terarah batch depan.
+   **⏳ Sisa fase 3 (chip/pill lebar)**: **✅ SELESAI PENUH Batch 288** — 5 titik Material3
+   `FilterChip` bawaan (`EqualizerSheet.kt` 2 titik, `SmartPlaylistScreen.kt` 2 titik,
+   `RingtoneCutterSheet.kt`'s `DestinationChip` 1 titik) dikasih `shape =` eksplisit, pola opt-in
+   per-identitas sama `LibraryFilterChips`. **0 kandidat pill/chip tersisa di seluruh codebase**
+   (dicek grep `FilterChip(` menyeluruh, semua titik sudah tercakup Batch 287+288).
+   **→ FASE 3 (Terapkan ke komponen inti) SEKARANG SELESAI 100%** — Sub-langkah 3 (5/5 area:
+   MiniPlayerBar+NowPlayingScreen/LibraryScreen/Sheets-Dialog/Settings) + sisa chip/pill,
+   semuanya tuntas, 0 item pending tersisa di fase ini.
 4. **Keputusan final §3a** — **sudah final: TAMBAH, bukan ganti** (lihat §3 di atas), jadi
    langkah ini SUDAH TIDAK PERLU dieksekusi terpisah (dulu didraft "putuskan setelah fase 3
    kelihatan hasilnya" — sekarang sudah diputuskan duluan oleh user, bukan ditunda).
@@ -207,11 +212,16 @@ setiap kunjungan Library). Radius sebelumnya `Radius.xxl` (20dp FIXED) — cuma 
 terlihat pill di ukuran teks pendek ini, bukan stadium sungguhan yang auto-adaptif ke tinggi
 render berapa pun. **✅ SELESAI Batch 287**: `chipRadius = if (isLiquidGlassTheme())
 Radius.liquidPill else Radius.xxl` — opt-in per-identitas (pola sama seluruh redesign), tema
-lain 0 perubahan. **⏳ Kandidat LAIN belum diaudit** (di luar cap batch 287): Material3
-`FilterChip` bawaan (`EqualizerSheet.kt`/`SmartPlaylistScreen.kt`/`RingtoneCutterSheet.kt`'s
-`DestinationChip`) — pakai shape default M3 (~8dp), BUKAN custom shape kayak
-`LibraryFilterChips`, perlu override `shape=` param eksplisit kalau mau ikut pill — batch
-berikutnya.
+lain 0 perubahan. **✅ Kandidat LAIN SELESAI Batch 288**: Material3 `FilterChip` bawaan
+(`EqualizerSheet.kt`/`SmartPlaylistScreen.kt`/`RingtoneCutterSheet.kt`'s `DestinationChip`) — 5
+titik dikasih `shape = if (isLiquidGlassTheme()) RoundedCornerShape(Radius.liquidPill) else
+FilterChipDefaults.shape`. **Audit pill/chip lebar TUNTAS, fase 3 100% selesai.**
+
+**Item berikutnya**: TIDAK ADA lagi item fase 3 yang bisa dieksekusi otomatis. Sisa satu-satunya
+item roadmap adalah langkah 5 (blur asli §3b) — itu OPSIONAL dan eksplisit butuh konfirmasi user
+dulu (bump minSdk + investasi teknis), bukan sesuatu yang bisa jalan sendiri tanpa izin. Sesi
+berikutnya: kalau user tidak punya instruksi baru, TANYA dulu apa mau lanjut ke blur asli
+(dengan trade-off minSdk-nya dijelaskan), atau anggap redesign Liquid Glass selesai di titik ini.
 
 ---
 

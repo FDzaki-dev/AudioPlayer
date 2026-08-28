@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 289 — Sync ROADMAP_LIQUID_GLASS_REDESIGN.md: fase 3 tandai 100% selesai (2 dokumentasi, 0 kode)
+`ROADMAP_LIQUID_GLASS_REDESIGN.md` §5 belum disentuh sejak Batch 288 selesai (chip/pill fase 3)
+— masih nunjukin "⏳ item berikutnya" padahal udah tuntas. Disinkronkan: sisa fase 3 (chip/pill)
+ditandai ✅ SELESAI PENUH, Fase 3 (Terapkan ke komponen inti) keseluruhan ditandai 100% selesai
+(Sub-langkah 3: 5/5 area + sisa chip/pill, 0 pending tersisa). Ditambahkan catatan eksplisit:
+satu-satunya sisa item roadmap (langkah 5, blur asli §3b) OPSIONAL & butuh konfirmasi user dulu
+(bump minSdk) — BUKAN item yang bisa auto-eksekusi tanpa izin, beda dari fase 1-3 yang sudah
+terkonfirmasi §3 Batch 279. 0 kode, 0 protected asset.
+
 ## Batch 288 — Liquid Glass fase 3: sisa 5 titik Material3 FilterChip bawaan → Radius.liquidPill (3 file kode + 1 dokumentasi)
 Menutup Pending Queue Batch 287 (kandidat kedua): Material3 `FilterChip` bawaan (shape default
 ~8dp kotak-bulat, BEDA dari `LibraryFilterChips` yang custom shape). Titik ditemukan lewat grep

@@ -36,6 +36,14 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 289 (Sync ROADMAP_LIQUID_GLASS_REDESIGN.md — fase 3 100% selesai, 2 dokumentasi, 0
+kode)** — §5 belum disinkron sejak Batch 288. Sisa fase 3 (chip/pill) ditandai ✅ SELESAI PENUH,
+Fase 3 keseluruhan 100% selesai (0 pending). Catatan ditambahkan: satu-satunya sisa roadmap
+(langkah 5, blur asli §3b) OPSIONAL, butuh konfirmasi user dulu (bump minSdk) — TIDAK bisa
+auto-eksekusi. **Sesi berikutnya kalau user tidak punya instruksi baru: TANYA dulu mau lanjut
+blur asli atau anggap redesign Liquid Glass selesai — jangan eksekusi kode langsung dari
+roadmap ini lagi tanpa itu.** 0 kode, 0 protected asset. Detail: `CHANGELOG.md` Batch 289.
+
 **Batch 288 (Liquid Glass fase 3 — sisa 5 titik Material3 FilterChip bawaan, 3 file kode + 1
 dokumentasi)** — Menutup Pending Queue Batch 287. `EqualizerSheet.kt` (2 titik: preset
 kuat+bawaan perangkat), `SmartPlaylistScreen.kt`'s `SmartPlaylistBuilderSheet` (2 titik: folder+
