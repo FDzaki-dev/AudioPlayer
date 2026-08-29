@@ -8,7 +8,7 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 299:** Tema Liquid Glass — tint blur diturunkan lagi (0.55/0.65 → 0.38/0.48) setelah user melaporkan dari device API 33+ sungguhan bahwa efek blur masih kurang kelihatan; blur asli Haze di baliknya sudah jalan, cuma ketutup tint yang masih terlalu pekat.
+> 🆕 **Update terbaru — Batch 300:** 2 bug fix dari feedback device sungguhan — (1) card "Lanjutkan Mendengarkan" (Beranda) & kartu Statistik Dengar sekarang ikut kena efek Liquid Glass (sebelumnya flat, tidak routing lewat titik blur bersama seperti panel lain); (2) radius blur diturunkan 32dp → 24dp untuk meredakan sedikit stuttering saat scroll yang dilaporkan user.
 > Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
 > sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
 > Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
@@ -204,10 +204,12 @@ Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diu
   (fase 1-4), blur asli via Haze (`hazeSource`/`hazeEffect`, fase 5 langkah 1-4, Batch 295-297,
   diperkuat lagi Batch 298), dan tuning typography khusus (Batch 298). **Satu-satunya yang masih
   tersisa: langkah 5/5 fase blur — verifikasi visual+performa di device Android sungguhan**, kini
-  di **putaran tuning ke-2** (Batch 299): user sudah coba di device API 33+ sungguhan, blur masih
-  kurang kelihatan → tint (`liquidGlassAlpha`) diturunkan lagi, menunggu konfirmasi hasil putaran
-  ini + laporan performa (lag scroll atau tidak) yang belum pernah masuk. Lihat `PROJECT_STATE.md`
-  untuk detail yang perlu dicek. Rencana lengkap & histori keputusan di
-  `ROADMAP_LIQUID_GLASS_REDESIGN.md` dan `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md`.
+  di **putaran tuning ke-3** (Batch 300): 2 laporan device masuk sekaligus — card Home/Statistik
+  yang sebelumnya flat sekarang sudah ikut `.frostedGlass()`, dan radius blur diturunkan 32dp →
+  24dp meredam sedikit stutter scroll yang dilaporkan. Tint (`liquidGlassAlpha`, 0.38f/0.48f sejak
+  Batch 299) belum dapat konfirmasi ulang user — masih menunggu apakah 24dp sudah cukup meredakan
+  stutter, dan apakah tint saat ini sudah pas. Lihat `PROJECT_STATE.md` untuk detail yang perlu
+  dicek. Rencana lengkap & histori keputusan di `ROADMAP_LIQUID_GLASS_REDESIGN.md` dan
+  `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md`.
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)

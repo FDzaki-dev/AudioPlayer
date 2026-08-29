@@ -48,7 +48,19 @@ fun Modifier.frostedGlass(
     // Belum lebih tinggi lagi (mis. 40dp+) krn PROJECT_STATE sudah tandai API32 "berat" utk blur
     // asli — 32dp kompromi naik cukup terasa tanpa melompat ke rentang berisiko performa; WAJIB
     // ikut diverifikasi bareng alpha 0.55/0.65 pas langkah 5/5 roadmap (device sungguhan).
-    blurRadius: Dp = 32.dp
+    // Batch 300 — verifikasi device itu SUDAH datang: user laporkan sedikit stuttering pas
+    // scroll (tidak sampai freeze). Ini persis risiko yang param ini sendiri sudah tandai di
+    // atas ("dekat batas nyaman performa") — blur asli Haze resample tiap frame saat konten di
+    // belakang kaca berubah (mis. MiniPlayerBar yang selalu melayang di atas layar yg lagi
+    // di-scroll, per §5 langkah 5 LIQUID_GLASS_BLUR_ENGINE_DESIGN.md), jadi radius lebih besar =
+    // GPU cost per-frame lebih besar. Diturunkan balik 32dp → 24dp (nilai sebelum dinaikkan
+    // Batch 298, satu-satunya batch yang mengubah angka ini sejak diaktifkan Batch 296, dan 0
+    // laporan stutter pernah masuk selama radius masih di 24dp). Tint (`liquidGlassAlpha`,
+    // 0.38f/0.48f sejak Batch 299) TIDAK ikut disentuh — itu lever "blur ketutup/tidak", bukan
+    // lever performa, dan user kali ini tidak melaporkan masalah visibilitas. Kalau stutter
+    // masih terasa di 24dp, lever berikutnya yang harus dicoba adalah radius lebih rendah lagi
+    // atau meninjau frekuensi re-render MiniPlayerBar saat progress lagu jalan — BUKAN tint.
+    blurRadius: Dp = 24.dp
 ): Modifier {
     // Batch 296 — blurRadius was "kept for source compatibility, unused" since Batch 53; now
     // wired to real Haze blur (see `requestedBlurRadius` below) for Liquid Glass specifically.

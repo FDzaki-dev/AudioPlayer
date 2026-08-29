@@ -1,5 +1,55 @@
 # Changelog
 
+## Batch 300 — 2 bug fix dari feedback device sungguhan: card Liquid Glass flat + stutter scroll (3 file)
+User melaporkan 2 hal sekaligus dari device fisik: (1) efek Liquid Glass cuma kena sebagian card,
+sisanya flat total; (2) sedikit stuttering saat scroll aplikasi (tidak sampai freeze). Ini laporan
+performa pertama yang masuk sejak diminta di Batch 297/299.
+
+**Bug 1 — card flat (`HomeScreen.kt`, `StatsDashboardScreen.kt`)**: root cause bukan bug
+rendering Haze, melainkan gap arsitektur lama. `ContinueListeningCard` (Beranda) dan
+`StatSectionCard` (Statistik Dengar — komentar kodenya sendiri menyebut "pola sama persis
+ContinueListeningCard") masing-masing punya cabang khusus untuk identitas Tactile dan Skeu, tapi
+Liquid Glass dibiarkan jatuh ke cabang `else` generik: `Modifier.clip()` polos plus `Surface`
+warna solid opaque — sama sekali tidak melalui `.frostedGlass()`, titik pusat yang seharusnya
+dipakai semua permukaan kaca di app ini. Grep ulang mengonfirmasi ini adalah SATU-SATUNYA 2 titik
+di seluruh codebase yang lolos dari konvensi itu; 12 titik lain (MiniPlayerBar, NowPlayingScreen,
+8 bottom sheet) semua sudah benar sejak Batch 296-297. Diperbaiki dengan menambah cabang
+`isLiquidGlass` eksplisit di kedua file, memakai pola yang identik dengan cabang isTactile/isSkeu
+yang sudah ada (warna `Surface` diganti Transparent, modifier diganti `.frostedGlass()` yang
+menggambar tint+blur+edge miliknya sendiri).
+
+Dua kartu lain sengaja TIDAK disentuh karena berada di luar cakupan bug ini: `ThemeOptionCard`
+(SettingsScreen) adalah swatch preview untuk seluruh identitas tema sekaligus di layar pemilih
+tema, bukan tema yang sedang aktif — konteksnya beda, menyamakannya dengan tema aktif justru akan
+salah. `HomeSongCard` (LazyRow di Beranda) tidak punya `Surface`/panel sama sekali — cuma artwork
+dan teks polos di bawahnya — jadi tidak relevan dengan gap `.frostedGlass()` ini.
+
+**Bug 2 — stutter scroll (`BlurUtils.kt`, 1 titik)**: `blurRadius` yang dinaikkan ke 32dp di
+Batch 298 diturunkan balik ke **24dp**, nilai sebelum kenaikan itu. Komentar kode Batch 298/299
+sendiri sudah menandai 32dp "dekat batas nyaman performa" untuk device kelas API 32 — blur asli
+Haze mengambil sampel ulang tiap frame saat konten di belakang permukaan kaca berubah, dan
+`MiniPlayerBar` yang selalu melayang di atas layar manapun yang sedang di-scroll (lihat
+`LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5 langkah 5) adalah kandidat biaya GPU terbesar untuk ini.
+Radius 24dp sendiri sudah pernah berjalan tanpa 1 pun laporan stutter selama Batch 296-297,
+sehingga revert ke angka itu adalah langkah dengan risiko paling rendah. Tint
+(`liquidGlassAlpha`, 0.38f/0.48f sejak Batch 299) sengaja TIDAK ikut diubah — itu lever untuk
+keterlihatan blur, bukan performa, dan user tidak melaporkan masalah keterlihatan kali ini.
+
+Total 3 file kode, pas di batas Micro-Batch. 0 file lain disentuh, 0 dependency baru, 0 file baru
+— `FILE_MANIFEST.txt` tidak berubah (187/187). Import baru di 2 file (`isLiquidGlassTheme`,
+`frostedGlass`) berasal dari package `ui.theme` yang sudah ada, bukan dependency eksternal baru.
+Brace/paren ketiga file diverifikasi seimbang. Belum divalidasi compile Gradle sungguhan (tidak
+ada akses jaringan di sesi ini) — cek hasil CI setelah push; risiko tetap rendah karena hanya
+menambah 1 cabang `when` (memakai fungsi yang sudah dipakai luas di file lain) per file, plus 1
+literal `Dp`, tanpa API atau dependency baru.
+
+**Status Fase 5 langkah 5/5 setelah batch ini: masih belum selesai.** Kedua fix di atas menjawab
+sebagian dari verifikasi device yang diminta (cakupan card + performa), tapi belum ada konfirmasi
+ulang dari user apakah 24dp sudah cukup meredakan stutter (kalau masih terasa, lever berikutnya
+adalah turunkan radius lagi atau tinjau frekuensi re-render `MiniPlayerBar` saat progress lagu
+berjalan — bukan tint), dan tint 0.38f/0.48f dari Batch 299 juga masih menunggu konfirmasi
+terpisah sebagai titik akhir atau belum.
+
 ## Batch 299 — Fase 5 langkah 5/5: feedback device API 33+ sungguhan, tuning alpha blur iterasi 2 (1 file)
 User melaporkan langsung dari device fisik **API 33+** (tier "Runtime Shader" — paling cepat/
 ringan menurut `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §2, bukan tier lemah API 31/32) bahwa efek

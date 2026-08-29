@@ -28,6 +28,8 @@ import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
+import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.collections.immutable.ImmutableSet
 import java.util.Calendar
@@ -250,7 +252,15 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
     // hits on Home, same priority spot Tactile got here. Same pattern as Batch 58's
     // NowPlayingScreen/MiniPlayerBar rollout.
     val isSkeu = isSkeuTheme()
-    val isPanelTheme = isTactile || isSkeu
+    // Batch 300 — user melaporkan langsung dari device: efek Liquid Glass cuma kena sebagian
+    // card, sisanya flat total. Root cause: card ini punya cabang isTactile/isSkeu sendiri tapi
+    // Liquid Glass jatuh ke `else` generik (clip + Surface warna solid) alih-alih `.frostedGlass()`
+    // — satu-satunya titik panggil di seluruh app yang TIDAK routing lewat situ (grep ulang: semua
+    // 8 sheet + MiniPlayerBar + NowPlayingScreen sudah, cuma card Home/Stats yang lolos). Ditambah
+    // cabang isLiquidGlass sendiri, pola identik isTactile/isSkeu (opaque Surface color diganti
+    // Transparent, .frostedGlass() yang menggambar tint+blur+edge-nya sendiri).
+    val isLiquidGlass = isLiquidGlassTheme()
+    val isPanelTheme = isTactile || isSkeu || isLiquidGlass
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -259,6 +269,7 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
                 when {
                     isTactile -> Modifier.tactileEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
                     isSkeu -> Modifier.skeuEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
+                    isLiquidGlass -> Modifier.frostedGlass()
                     else -> Modifier.clip(RoundedCornerShape(Radius.xl))
                 }
             )

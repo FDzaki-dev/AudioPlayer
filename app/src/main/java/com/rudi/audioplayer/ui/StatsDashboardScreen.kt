@@ -25,6 +25,8 @@ import com.rudi.audioplayer.data.ListeningStatsEngine
 import com.rudi.audioplayer.ui.theme.Radius
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isTactileTheme
+import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import java.time.DayOfWeek
@@ -194,12 +196,17 @@ private fun SummaryStatCard(
 }
 
 /** Reusable panel used for every section on this screen — same conditional Tactile/Skeu emboss
- * vs. flat Surface pattern already used by HomeScreen's ContinueListeningCard (Batch 59). */
+ * vs. flat Surface pattern already used by HomeScreen's ContinueListeningCard (Batch 59).
+ * Batch 300 — that shared pattern was exactly the bug user reported (Liquid Glass hitting some
+ * cards, others staying flat): both this card and ContinueListeningCard had isTactile/isSkeu
+ * branches but let Liquid Glass fall into the generic opaque `else`, the one gap in an otherwise
+ * app-wide `.frostedGlass()` convention. Fixed here the same way as HomeScreen.kt this batch. */
 @Composable
 private fun StatSectionCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val isTactile = isTactileTheme()
     val isSkeu = isSkeuTheme()
-    val isPanelTheme = isTactile || isSkeu
+    val isLiquidGlass = isLiquidGlassTheme()
+    val isPanelTheme = isTactile || isSkeu || isLiquidGlass
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -207,6 +214,7 @@ private fun StatSectionCard(modifier: Modifier = Modifier, content: @Composable 
                 when {
                     isTactile -> Modifier.tactileEmboss(shape = MaterialTheme.shapes.medium, elevation = 6.dp)
                     isSkeu -> Modifier.skeuEmboss(shape = MaterialTheme.shapes.medium, elevation = 6.dp)
+                    isLiquidGlass -> Modifier.frostedGlass()
                     else -> Modifier.clip(RoundedCornerShape(Radius.xl))
                 }
             ),

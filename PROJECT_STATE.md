@@ -36,6 +36,50 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 300 (2 bug fix dari feedback device sungguhan: card Liquid Glass yang flat + stuttering
+scroll, 3 file kode)** — User laporkan 2 hal dari device fisik dalam 1 pesan: (1) efek Liquid
+Glass cuma kena sebagian card, sisanya flat total; (2) sedikit stuttering pas scroll (belum
+sampai freeze). Ini pertama kalinya info performa yang diminta sejak Batch 297/299 datang.
+
+**Bug 1 — card flat (`HomeScreen.kt`, `StatsDashboardScreen.kt`):** root cause BUKAN bug
+rendering Haze, tapi gap arsitektur lama: `ContinueListeningCard` (Home) dan `StatSectionCard`
+(Stats, komentarnya sendiri bilang "pola sama persis ContinueListeningCard") punya cabang
+isTactile/isSkeu sendiri tapi Liquid Glass jatuh ke `else` generik (`Modifier.clip()` +
+`Surface` warna solid opaque) — SATU-SATUNYA 2 titik di seluruh app yang tidak routing lewat
+`.frostedGlass()` (grep ulang: 12/12 call site lain — MiniPlayerBar, NowPlayingScreen, 8 sheet —
+sudah benar sejak Batch 296/297). Ditambah cabang `isLiquidGlass` eksplisit di kedua file, pola
+identik isTactile/isSkeu (`Surface` color → Transparent, modifier → `.frostedGlass()`).
+`ThemeOptionCard` (SettingsScreen, picker tema) SENGAJA tidak disentuh — itu preview swatch utk
+SEMUA identitas tema sekaligus (bukan tema aktif), konteks beda, bukan bagian dari bug ini.
+`HomeSongCard` (LazyRow Home) juga tidak disentuh — murni thumbnail+teks, tidak ada Surface/panel
+sama sekali, jadi tidak relevan dengan gap ini.
+
+**Bug 2 — stutter scroll (`BlurUtils.kt`, 1 titik):** `blurRadius` (32dp sejak Batch 298)
+diturunkan balik ke **24dp** — nilai sebelum Batch 298 menaikkannya, yang mana sudah ditandai
+eksplisit di komentar kode itu sendiri sebagai "dekat batas nyaman performa". Blur asli Haze
+resample tiap frame saat konten di belakang kaca berubah; MiniPlayerBar (selalu melayang di atas
+layar yang sedang di-scroll, per `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5 langkah 5) adalah
+kandidat GPU-cost terbesar. 0 laporan stutter pernah masuk selama radius masih 24dp (Batch
+296-297), jadi revert ke situ adalah langkah paling minim risiko. `liquidGlassAlpha`
+(0.38f/0.48f, Batch 299) TIDAK disentuh — itu lever tint/visibilitas, bukan lever performa, dan
+user tidak melaporkan masalah visibilitas kali ini.
+
+3 file kode (pas batas Micro-Batch): `HomeScreen.kt`, `StatsDashboardScreen.kt`, `BlurUtils.kt`.
+0 file lain disentuh, 0 import baru selain `isLiquidGlassTheme`/`frostedGlass` (sudah ada di
+`theme/` package, bukan dependency baru), 0 file baru — `FILE_MANIFEST.txt` tidak berubah
+(187/187). Brace/paren ketiga file diverifikasi seimbang. Belum divalidasi compile Gradle
+sungguhan (0 akses jaringan sesi ini, pola sama tiap batch) — **WAJIB cek CI setelah push**,
+risiko rendah (menambah 1 cabang `when` + 1 import per file existing function, 1 literal `Dp`,
+bukan API/dependency baru).
+
+**Status Fase 5 langkah 5/5 setelah batch ini: MASIH BELUM SELESAI** — kedua fix di atas
+menjawab BAGIAN dari verifikasi device yang diminta (cakupan card + performa), tapi belum ada
+konfirmasi ulang user apakah 24dp sudah cukup meredakan stutter (kalau MASIH stutter, turunkan
+radius lagi atau tinjau frekuensi re-render MiniPlayerBar saat progress lagu jalan — bukan
+tint), dan tint 0.38f/0.48f dari Batch 299 juga masih belum dikonfirmasi user sebagai titik akhir
+(bisa jadi butuh sesi terpisah kalau user belum sempat menilai keduanya sekaligus). Detail
+lengkap: `CHANGELOG.md` Batch 300.
+
 **Batch 299 (Fase 5 langkah 5/5 — feedback device API 33+ sungguhan: blur masih kurang, tuning
 alpha iterasi 2, 1 file kode)** — User laporkan langsung dari device fisik API 33+ (tier
 "Runtime Shader" tercepat/paling ringan per `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §2, BUKAN tier
