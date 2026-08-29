@@ -36,6 +36,49 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 301 (2 bug fix lanjutan dari feedback device: tab Library masih flat + stutter transisi
+tab, 2 file kode)** — User laporkan lagi dalam 1 pesan: (1) tab Beranda **dan** tab Library masih
+flat total; (2) stuttering pas **transisi antar tab** (beda dari "stutter scroll" Batch 300).
+
+**Bug 1 (`LibraryScreen.kt`):** grep `isPanelTheme` app-wide (metodologi sama Batch 300) nemuin
+LibraryScreen belum pernah diaudit — Batch 300 cuma HomeScreen/StatsDashboard. 1 gap identik
+ketemu: bar "Urungkan" (isTactile/isSkeu ada, Liquid Glass jatuh else generik) — ditambah cabang
+`isLiquidGlass -> Modifier.frostedGlass()`. Ini SATU-SATUNYA `Surface` di LibraryScreen — header/
+chip filter/`SongRow` murni `Box`/`Row` tanpa panel (chip dibandingkan ke `FilterChip` M3 di
+tempat lain, flat di SEMUA tema, bukan bug). 2 sisa titik `GestureIndicatorBadge`
+(NowPlayingScreen, badge gesture transient) SENGAJA tidak disentuh — di luar tab yang dilaporkan.
+**PENTING:** `ContinueListeningCard` (Home) dicek ulang, fix Batch 300 SUDAH benar di source ini.
+Kalau Beranda MASIH flat di APK batch ini (bukan build lama), kemungkinan besar BUKAN lagi bug
+kode — `LiquidGlassDarkBackground`/`LightBackground` (`Color.kt`) itu 1 warna solid FLAT di
+seluruh layar (0 wallpaper/gradient/blob ambient), jadi blur asli otomatis ikut flat walau
+kodenya benar. Ini butuh keputusan arsitektur baru (lapisan ambient), BUKAN tuning parameter lagi
+— per §4 aturan sesi aktif, TIDAK dieksekusi tanpa konfirmasi user dulu. **Tanya user: APK yang
+diuji itu hasil Batch 300/301 atau lebih lama, dan apakah ambient background mau dikejar.**
+
+**Bug 2 (`MainActivity.kt`, 6 titik):** root cause BUKAN blur — `popUpTo`/`navigate` di 6 titik
+(3 `NavigationBarItem` + 3 `NavigationRailItem`, Compact vs Medium/Expanded) 0 pernah pakai
+`saveState`/`restoreState`, jadi Nav Compose menghancurkan-total+membangun ulang layar tujuan
+tiap tap tab (state `LazyColumn`/scroll/ViewModel scope reset dari nol) — pola resmi Google
+sebagai penyebab jank tab switch, mekanisme beda total dari stutter-scroll (resample blur per-
+frame) yang sudah dijawab Batch 300. Fix: `popUpTo("home"){saveState=true}` +
+`launchSingleTop=true` + `restoreState=true` di keenamnya. `inclusive=true` yang tadinya khusus
+tombol Beranda ikut dilepas (0 alasan terdokumentasi ketemu lewat grep CHANGELOG/komentar) —
+disamakan 1 pola konsisten; efek samping: Beranda sekarang juga simpan scroll position sendiri.
+
+2 file kode (di bawah batas Micro-Batch): `LibraryScreen.kt`, `MainActivity.kt`. 0 file lain
+disentuh, 0 dependency baru, 0 file baru — `FILE_MANIFEST.txt` tidak berubah. Import baru
+(`frostedGlass` di `LibraryScreen.kt`) dari `ui.theme` yang sudah ada. Brace/paren kedua file
+diverifikasi seimbang. Belum divalidasi compile Gradle sungguhan (0 akses jaringan sesi ini) —
+**WAJIB cek CI setelah push**, risiko rendah (1 cabang `when` + opsi navigasi standar, 0 API/
+dependency baru). Detail lengkap: `CHANGELOG.md` Batch 301.
+
+**Status setelah batch ini:** Bug 2 kemungkinan besar tuntas (fix arsitektural langsung) tapi
+tetap wajib dikonfirmasi user di device nyata. Bug 1 tuntas untuk SEMUA gap routing kode yang
+terkonfirmasi lewat grep (0 sisa gap di luar 2 badge NowPlayingScreen yang di luar cakupan) —
+TAPI kalau Beranda/Library masih terasa flat setelah build ini, kemungkinan sudah keluar dari
+ranah "bug kode" (lihat catatan Bug 1 di atas), bukan sesuatu yang bisa dijawab tuning parameter
+lagi seperti Batch 296-300.
+
 **Batch 300 (2 bug fix dari feedback device sungguhan: card Liquid Glass yang flat + stuttering
 scroll, 3 file kode)** — User laporkan 2 hal dari device fisik dalam 1 pesan: (1) efek Liquid
 Glass cuma kena sebagian card, sisanya flat total; (2) sedikit stuttering pas scroll (belum

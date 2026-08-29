@@ -65,6 +65,7 @@ import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.ui.theme.Radius
 import androidx.compose.ui.platform.LocalContext
@@ -555,7 +556,15 @@ fun LibraryScreen(
             // Batch 59 — same Tactile-only gap pattern fixed elsewhere this batch: Skeu fell
             // into the Apple-else flat-Surface branch here.
             val isSkeu = isSkeuTheme()
-            val isPanelTheme = isTactile || isSkeu
+            // Batch 301 — user melaporkan tab Library masih flat total. Grep `isPanelTheme` di
+            // seluruh app nemuin ini SATU-SATUNYA titik yang belum ikut fix Batch 300 (di luar 2
+            // gesture badge NowPlayingScreen — transient overlay, di luar scope laporan tab):
+            // cabang isTactile/isSkeu sendiri tapi Liquid Glass jatuh ke else generik (Modifier
+            // polos + Surface warna solid opaque). Pola identik ContinueListeningCard/
+            // StatSectionCard Batch 300 — isLiquidGlass -> .frostedGlass(), Surface color jadi
+            // Transparent lewat isPanelTheme di bawah.
+            val isLiquidGlass = isLiquidGlassTheme()
+            val isPanelTheme = isTactile || isSkeu || isLiquidGlass
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -565,6 +574,7 @@ fun LibraryScreen(
                         when {
                             isTactile -> Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xxl), elevation = 10.dp)
                             isSkeu -> Modifier.skeuEmboss(shape = RoundedCornerShape(Radius.xxl), elevation = 10.dp)
+                            isLiquidGlass -> Modifier.frostedGlass()
                             else -> Modifier
                         }
                     ),

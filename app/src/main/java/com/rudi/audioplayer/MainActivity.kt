@@ -950,9 +950,22 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         NavigationBarItem(
                             selected = currentRoute == "home",
                             onClick = {
+                                // Batch 301 — user melaporkan stuttering pas transisi antar tab
+                                // (beda dari stutter SCROLL Batch 300 yang sudah dijawab lewat
+                                // blurRadius). Root cause: `popUpTo`/`navigate` di 6 titik ini
+                                // (3 NavigationBarItem + 3 NavigationRailItem, pola identik) 0
+                                // pernah pakai `saveState`/`restoreState` — tiap tap tab
+                                // MENGHANCURKAN TOTAL layar tujuan (LazyColumn state, scroll
+                                // position, ViewModel scope) lalu membangunnya dari nol, bukan
+                                // cuma pindah tampilan. Ini pola resmi Google utk bottom nav.
+                                // `inclusive = true` di sini (khusus Home) juga dilepas — grep
+                                // CHANGELOG/komentar lama 0 nemuin alasan terdokumentasi kenapa
+                                // Home beda sendiri dari Library/Settings di bawah, jadi ini
+                                // disamakan jadi 1 pola konsisten bertiga, bukan kasus khusus.
                                 navController.navigate("home") {
-                                    popUpTo("home") { inclusive = true }
+                                    popUpTo("home") { saveState = true }
                                     launchSingleTop = true
+                                    restoreState = true
                                 }
                             },
                             icon = { Icon(Icons.Default.Home, contentDescription = null) },
@@ -961,9 +974,11 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         NavigationBarItem(
                             selected = currentRoute == "library",
                             onClick = {
+                                // Batch 301 — sama seperti onClick "home" di atas.
                                 navController.navigate("library") {
-                                    popUpTo("home")
+                                    popUpTo("home") { saveState = true }
                                     launchSingleTop = true
+                                    restoreState = true
                                 }
                             },
                             icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
@@ -972,9 +987,11 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         NavigationBarItem(
                             selected = currentRoute == "settings",
                             onClick = {
+                                // Batch 301 — sama seperti onClick "home" di atas.
                                 navController.navigate("settings") {
-                                    popUpTo("home")
+                                    popUpTo("home") { saveState = true }
                                     launchSingleTop = true
+                                    restoreState = true
                                 }
                             },
                             icon = { Icon(Icons.Default.Settings, contentDescription = null) },
@@ -1000,9 +1017,12 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     NavigationRailItem(
                         selected = currentRoute == "home",
                         onClick = {
+                            // Batch 301 — mirror NavigationBarItem "home" fix di atas (layar
+                            // Medium/Expanded pakai Rail ini, bukan NavigationBar bawah).
                             navController.navigate("home") {
-                                popUpTo("home") { inclusive = true }
+                                popUpTo("home") { saveState = true }
                                 launchSingleTop = true
+                                restoreState = true
                             }
                         },
                         icon = { Icon(Icons.Default.Home, contentDescription = null) },
@@ -1011,9 +1031,11 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     NavigationRailItem(
                         selected = currentRoute == "library",
                         onClick = {
+                            // Batch 301 — sama seperti onClick "home" Rail di atas.
                             navController.navigate("library") {
-                                popUpTo("home")
+                                popUpTo("home") { saveState = true }
                                 launchSingleTop = true
+                                restoreState = true
                             }
                         },
                         icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
@@ -1022,9 +1044,11 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     NavigationRailItem(
                         selected = currentRoute == "settings",
                         onClick = {
+                            // Batch 301 — sama seperti onClick "home" Rail di atas.
                             navController.navigate("settings") {
-                                popUpTo("home")
+                                popUpTo("home") { saveState = true }
                                 launchSingleTop = true
+                                restoreState = true
                             }
                         },
                         icon = { Icon(Icons.Default.Settings, contentDescription = null) },

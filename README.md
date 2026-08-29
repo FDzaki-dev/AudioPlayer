@@ -8,7 +8,7 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 300:** 2 bug fix dari feedback device sungguhan — (1) card "Lanjutkan Mendengarkan" (Beranda) & kartu Statistik Dengar sekarang ikut kena efek Liquid Glass (sebelumnya flat, tidak routing lewat titik blur bersama seperti panel lain); (2) radius blur diturunkan 32dp → 24dp untuk meredakan sedikit stuttering saat scroll yang dilaporkan user.
+> 🆕 **Update terbaru — Batch 301:** 2 bug fix lanjutan dari feedback device — (1) bar "Urungkan" di tab Library sekarang ikut kena efek Liquid Glass (gap arsitektur terakhir yang tersisa, sama seperti fix card Beranda/Statistik di Batch 300); (2) navigasi antar tab (Beranda/Library/Pengaturan) sekarang menyimpan & memulihkan state layar alih-alih membangunnya ulang dari nol tiap kali pindah tab, untuk meredakan stuttering saat transisi yang dilaporkan user.
 > Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
 > sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
 > Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
