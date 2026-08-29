@@ -1,5 +1,50 @@
 # Changelog
 
+## Batch 309 — Tema ke-6 "Aurora", Fase 4/N: shape sendiri `AuroraShapes` (lanjutan langsung, 1 file)
+Lanjutan langsung dari Batch 308, permintaan user langsung: "lanjut sempurnakan shape murni
+nya!!". Menuntaskan item terakhir yang dicatat "belum diminta user" di entri Batch 308. Dengan
+batch ini ke-6 identitas app punya color+typography+shape murni sendiri — Aurora menyusul 5
+identitas lain yang sudah lengkap sebelumnya (color Batch 307, typography Batch 308).
+
+**Dampak nyata mulai batch ini** — setiap panel/card/sheet yang pakai `Shapes.small/medium/large`
+M3 saat Aurora aktif sekarang bersudut ASIMETRIS: 2 sudut diagonal (kiri-atas & kanan-bawah)
+lebih besar dari 2 sudut lainnya (kanan-atas & kiri-bawah), bukan rounded-rect seragam seperti 5
+identitas lain. Ini pola shape PERTAMA di seluruh project yang non-seragam per sudut.
+
+**`Theme.kt`** (2 titik, 1 file) —
+1. `AuroraShapes` ditambah setelah `LiquidGlassShapes`. Mekanisme: `RoundedCornerShape(topStart,
+   topEnd, bottomEnd, bottomStart)` 4-parameter (bukan 1-parameter seragam yang dipakai 5
+   `*Shapes` lain di file ini) — asimetri ditarik LANGSUNG dari arah diagonal default
+   `Brush.linearGradient()` di `auroraGlow()` (`TactileDepth.kt`): tanpa parameter `start`/`end`
+   eksplisit di situ, Compose menggambar gradient itu diagonal dari pojok kiri-atas ke
+   kanan-bawah (`topStart`→`bottomEnd`) — jadi sudut yang searah diagonal itu dapat radius lebih
+   besar (menekankan arah alirnya), sudut yang tegak lurus arah alir dapat radius lebih kecil.
+   0 token `Radius` baru ditambah ke `Spacing.kt` — nilai "besar" tiap tier (`Radius.xl`/`xxxl`/
+   `liquidLg`) SENGAJA disamakan persis dgn puncak radius seragam `LiquidGlassShapes` (bukan
+   melebihinya) — keunikan Aurora murni dari asimetrinya, bukan dari mengejar rekor angka radius
+   baru, konsisten dgn semangat "100% ide sendiri" yang sama dipakai `AuroraColors`/
+   `AuroraTypography` sebelumnya.
+2. `shapes = when (identity)` di `AudioPlayerTheme()` dapat cabang baru `ThemeIdentity.AURORA ->
+   AuroraShapes`. Comment di atas `typography`/`shapes` diperbarui: `else -> AppleShapes` sekarang
+   murni cabang APPLE saja — satu-satunya identitas tanpa cabang eksplisit di typography maupun
+   shapes.
+
+**Ringkasan file** — 1 file kode (`Theme.kt`), jauh di bawah batas Micro-Batch (maksimal 3). 0
+file baru, 0 dependency baru, 0 token `Radius` baru. `FILE_MANIFEST.txt` tidak berubah (187/187).
+Brace/paren `Theme.kt` diverifikasi seimbang utuh: 14/14 braces, 198/198 parens.
+
+**Belum divalidasi compile Gradle sungguhan** (WAJIB cek CI) — risiko sintaks rendah
+(`RoundedCornerShape` 4-parameter adalah konstruktor resmi Compose, type-compatible penuh dgn
+`CornerBasedShape`/`Shapes` M3, 0 call site di luar `Theme.kt` berubah). **Risiko VISUAL lebih
+tinggi dari batch shape sebelumnya** — ini genuinely mekanisme baru (asimetri per-sudut), bukan
+cuma tuning angka radius seragam yang sudah terbukti aman di 5 identitas lain — **belum
+diverifikasi di device sungguhan**: kalau dicoba sekarang, Card/Sheet/dialog saat Aurora aktif
+harus terlihat bersudut "condong" (2 sudut diagonal lebih membulat), bukan rounded rect simetris
+biasa. 5 identitas lain harus 0 berubah.
+
+**Item berikutnya (belum diminta user)** — rim-glow per-panel (status "ditunda" sejak Batch 306,
+bukan dibatalkan), satu-satunya sisa item Aurora dari cakupan awal yang dikonfirmasi user.
+
 ## Batch 308 — Tema ke-6 "Aurora", Fase 3/N: wiring `auroraGlow()` + typography sendiri (lanjutan langsung, 3 file)
 Lanjutan langsung dari Batch 307, permintaan user langsung: "lanjutkan fase 3/N, sempurnakan
 juga typography-nya". 2 hal dikerjakan sekaligus: (1) item yang sudah tercatat sejak Batch 307

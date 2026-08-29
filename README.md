@@ -8,7 +8,8 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 308 (Fase 3/N tema ke-6 "Aurora"):** Animasi gradien mengalirnya (`auroraGlow()`) **sekarang sudah terpasang** — pilih Aurora di Settings dan ambient background akan mengalir pelan (hijau→teal→ungu→magenta). Typography sendiri juga sudah menyusul (`AuroraTypography`) — bobot huruf paling ringan dari 6 tema, tracking paling lebar. Shape masih fallback Apple untuk saat ini.
+> 🆕 **Update terbaru — Batch 309 (Fase 4/N tema ke-6 "Aurora"):** Shape sendiri (`AuroraShapes`) sekarang terpasang — pola PERTAMA di project ini yang asimetris per sudut (2 sudut diagonal lebih membulat, mengikuti arah alir gradiennya), bukan rounded-rect seragam seperti 5 tema lain. Dengan ini Aurora sudah lengkap 3/3: color+typography+shape murni sendiri.
+> Batch 308: Animasi gradien mengalirnya (`auroraGlow()`) terpasang + typography sendiri (`AuroraTypography`) — bobot huruf paling ringan dari 6 tema.
 > Batch 307: Aurora **sudah bisa dipilih** di Settings — dark-lock permanen, aksen hijau vivid di atas latar near-black navy-teal (tampilan waktu itu masih flat, sebelum fase 3).
 > Batch 306: Fondasi tema baru 100% ide orisinal — mekanisme warna gradien ambient yang mengalir pelan + palet hijau-teal-ungu-magenta terinspirasi aurora borealis ditulis lebih dulu, belum terdaftar sebagai identitas saat itu.
 > Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
@@ -222,12 +223,13 @@ Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diu
   mengalir pelan (animated hue-shift antar hijau→teal→ungu→magenta, terinspirasi spektrum aurora
   borealis asli), berbeda total dari mekanisme 5 tema lain (bukan shadow/bevel, bukan blur, bukan
   artefak retro). Terkunci **gelap permanen** (pola sama Calm Retro), cakupan efek **ambient
-  background saja** untuk saat ini (rim-glow per-panel ditunda). **Fase 3/N selesai** (Batch 308)
-  — animasi `auroraGlow()` **sekarang benar-benar mengalir** di root background (sebelum batch
-  ini tampilannya flat statis walau sudah bisa dipilih), dan typography sendiri (`AuroraTypography`)
-  sudah menggantikan fallback Apple — bobot huruf paling ringan (Light/Normal, 0 slot Bold-tier)
-  dari 6 identitas, tracking `labelSmall` paling lebar. Shape **masih fallback `AppleShapes`**,
-  belum diminta user. Rim-glow per-panel masih berstatus ditunda (bukan dibatalkan).
-  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-308.
+  background saja** untuk saat ini (rim-glow per-panel ditunda). **Fase 4/N selesai** (Batch 309)
+  — `AuroraShapes` sekarang terpasang, mekanisme asimetris PERTAMA di project ini (2 sudut
+  diagonal lebih membulat mengikuti arah alir gradien `auroraGlow()`, bukan rounded-rect seragam
+  seperti 5 tema lain). Dengan ini Aurora **lengkap 3/3**: color (Batch 307) + typography (Batch
+  308, bobot Light/Normal paling ringan dari 6 identitas) + shape (batch ini) sudah 100% murni
+  sendiri, 0 lagi fallback ke identitas lain. Rim-glow per-panel masih berstatus ditunda (bukan
+  dibatalkan) — satu-satunya sisa item dari cakupan awal yang dikonfirmasi user Batch 306.
+  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-309.
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)

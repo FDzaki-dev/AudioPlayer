@@ -358,6 +358,50 @@ val LiquidGlassShapes = Shapes(
     large = RoundedCornerShape(Radius.liquidLg)
 )
 
+// Batch 309 — Aurora fase 4/N, permintaan user eksplisit "sempurnakan shape murni-nya" (lanjutan
+// langsung dari Batch 308's "belum diminta user" catatan soal shape). SATU-SATUNYA dari 6
+// identitas yang TIDAK pakai `RoundedCornerShape(Radius.x)` seragam (1 argumen, 4 sudut sama) —
+// mekanisme baru: `RoundedCornerShape(topStart, topEnd, bottomEnd, bottomStart)` ASIMETRIS per
+// sudut, ditarik LANGSUNG dari arah `Brush.linearGradient()` di `auroraGlow()` (TactileDepth.kt):
+// tanpa parameter `start`/`end` eksplisit, Compose menggambar linear gradient itu diagonal dari
+// pojok kiri-atas ke kanan-bawah kanvas (topStart -> bottomEnd) — jadi 2 sudut YANG SEARAH
+// diagonal itu (`topStart` & `bottomEnd`) dapat radius LEBIH BESAR (menekankan arah alirnya),
+// sementara 2 sudut yang TEGAK LURUS arah alir (`topEnd` & `bottomStart`) dapat radius LEBIH
+// KECIL — setiap panel/card/sheet berbentuk `Shapes` di app ini ikut "condong" ke arah yang sama
+// persis dengan ambient wash yang mengalir di baliknya, bukan sekadar rounded rect generik.
+// SENGAJA TIDAK ikut lomba jadi radius PALING besar dari 6 identitas (LiquidGlass di atas tetap
+// pemegang radius seragam terbesar, 34dp/`liquidLg`) — nilai "besar" Aurora di sudut diagonalnya
+// SAMA PERSIS dgn `liquidLg`/`xxxl`/`xl` LiquidGlass di tiap tier (0 token baru ditambah ke
+// `Radius` di `Spacing.kt`), keunikannya murni dari ASIMETRI-nya, bukan dari mengejar rekor angka
+// baru — konsisten dgn semangat Batch 306 ("100% ide sendiri, tanpa contek gaya apapun") yang
+// sama diterapkan ke `AuroraColors`/`AuroraTypography`, sekarang menuntaskan sisi shape.
+// CATATAN RISIKO: ini pola shape PERTAMA di seluruh project yang non-seragam per sudut — 5
+// identitas lain semuanya 4-sudut sama. Type-compatible penuh dgn M3 `Shapes`/`CornerBasedShape`
+// (0 API baru, 0 call site di luar `Theme.kt` perlu berubah, sama seperti giliran Aurora
+// sebelumnya), TAPI belum pernah diverifikasi visual di komponen nyata (Card/Sheet/dialog) — WAJIB
+// dicek device sungguhan lebih hati-hati dari batch shape sebelumnya, krn ini genuinely mekanisme
+// baru, bukan cuma tuning angka radius seragam yang sudah terbukti aman di 5 identitas lain.
+val AuroraShapes = Shapes(
+    small = RoundedCornerShape(
+        topStart = Radius.xl,      // 18dp — searah gradient masuk (kiri-atas)
+        topEnd = Radius.sm,        // 10dp — tegak lurus arah alir
+        bottomEnd = Radius.xl,     // 18dp — searah gradient keluar (kanan-bawah)
+        bottomStart = Radius.sm    // 10dp — tegak lurus arah alir
+    ),
+    medium = RoundedCornerShape(
+        topStart = Radius.xxxl,    // 24dp
+        topEnd = Radius.md,        // 12dp
+        bottomEnd = Radius.xxxl,   // 24dp
+        bottomStart = Radius.md    // 12dp
+    ),
+    large = RoundedCornerShape(
+        topStart = Radius.liquidLg, // 34dp — sama persis puncak radius LiquidGlass, TIDAK melebihi
+        topEnd = Radius.lg,         // 16dp
+        bottomEnd = Radius.liquidLg,// 34dp
+        bottomStart = Radius.lg     // 16dp
+    )
+)
+
 // Batch 61 — mode resolution is now completely identity-agnostic (used to take an AppTheme and
 // hardcode TACTILE/SKEU_DARK_LITE to always-true). Every identity honors SYSTEM/LIGHT/DARK the
 // same way; an identity's own light/dark visual DIFFERENCE lives entirely in colorsFor() below.
@@ -434,12 +478,10 @@ fun AudioPlayerTheme(
             // (SkeuTypography) atas instruksi eksplisit user ("sempurnakan typography Neumorphism
             // 100% murni, tuntas!!") — menutup reuse-Apple TERAKHIR dari 5 identitas saat itu;
             // sesudah batch itu ke-5 identitas semuanya punya Typography() murni sendiri.
-            // Batch 308 — AURORA (tema ke-6) menyusul dapat typography sendiri (AuroraTypography)
-            // atas instruksi eksplisit user ("sempurnakan juga typography-nya"), dikerjakan
-            // bersamaan dgn fase 3 (wiring `auroraGlow()` ke `MainActivity.kt`). Shape TETAP
-            // `else -> AppleShapes` untuk saat ini — user cuma minta typography batch ini, shape
-            // belum diminta (pola sama Batch 302/305: 1 identitas dituntaskan per permintaan
-            // eksplisit, bukan sekaligus semua identitas/semua aspek).
+            // Batch 309 — AURORA menyusul dapat shape sendiri (AuroraShapes) atas instruksi
+            // eksplisit user ("sempurnakan shape murni-nya") — menutup 3/3 pemurnian identitas
+            // ini (color Batch 307, typography Batch 308, shape batch ini). `else -> AppleShapes`
+            // di bawah sekarang murni APPLE saja (satu-satunya identitas tanpa cabang eksplisit).
             typography = when (identity) {
                 ThemeIdentity.TACTILE -> TactileTypography
                 ThemeIdentity.SKEU_DARK_LITE -> SkeuTypography
@@ -453,8 +495,7 @@ fun AudioPlayerTheme(
                 ThemeIdentity.SKEU_DARK_LITE -> SkeuDarkShapes
                 ThemeIdentity.CALM_RETRO -> CalmRetroShapes
                 ThemeIdentity.LIQUID_GLASS -> LiquidGlassShapes
-                // AURORA belum masuk sini — fase 3 (Batch 308) cuma cakup typography sesuai
-                // permintaan eksplisit user, shape masih fallback AppleShapes sampai diminta.
+                ThemeIdentity.AURORA -> AuroraShapes
                 else -> AppleShapes
             },
             content = content
