@@ -382,9 +382,14 @@ fun AudioPlayerTheme(
             // Batch 279/280 — LIQUID_GLASS dapat typography sendiri (LiquidGlassTypography,
             // fase 1), bukan reuse Apple — beda dari Skeu, tipografi justru salah satu dari 2
             // pembeda utama identitas ini (§3b Opsi B: "shape+typography").
+            // Batch 302 — CALM_RETRO menyusul dapat typography sendiri (CalmRetroTypography),
+            // membalik keputusan reuse-Apple Batch 130 atas instruksi eksplisit user
+            // ("perkuat typography khusus tema Calm Retro, murni 100%") — menuntaskan pemurnian
+            // identitas ini ke ranah typography (color/shape sudah murni sejak Batch 130).
             typography = when (identity) {
                 ThemeIdentity.TACTILE -> TactileTypography
                 ThemeIdentity.LIQUID_GLASS -> LiquidGlassTypography
+                ThemeIdentity.CALM_RETRO -> CalmRetroTypography
                 else -> AppleTypography
             },
             shapes = when (identity) {

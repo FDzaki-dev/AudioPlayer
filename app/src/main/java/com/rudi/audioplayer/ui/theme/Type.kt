@@ -188,3 +188,69 @@ val LiquidGlassTypography = Typography(
         letterSpacing = 0.6.sp
     )
 )
+
+// Batch 302 — permintaan user langsung "perkuat typography khusus tema Calm Retro, murni
+// 100%". Menutup celah yang SENGAJA dibiarkan terbuka di Batch 130 ("pemurnian" Calm Retro):
+// waktu itu tertiary/error/shape sudah dilepas dari token pinjaman identitas lain
+// (CalmRetroShapes dibuat sendiri), TAPI typography SENGAJA dibiarkan tetap reuse
+// AppleTypography ("spec tidak beri spesifikasi tipografi... bukan kebocoran identitas, beda
+// kasus dari tertiary/error/shape"). Keputusan itu sekarang dibalik atas instruksi eksplisit
+// user — giliran typography ikut murni jadi token milik sendiri, bukan pinjaman, menuntaskan
+// pemurnian Calm Retro 5/5 (color+tertiary+error+shape+typography).
+//
+// fontFamily tetap FontFamily.Default (sans) di 5 slot ini — larangan eksplisit spec §4 (Batch
+// 133: "FontFamily.Monospace HANYA di 2 Text durasi/waktu Now Playing... SENGAJA tidak disentuh
+// ke judul/lirik") masih berlaku dan TIDAK dilonggarkan batch ini. "Murni" di sini berarti
+// WEIGHT+LETTERSPACING+LINEHEIGHT jadi kurva sendiri, bukan migrasi seluruh scale ke monospace
+// (itu akan membalik keputusan sadar yang sudah didokumentasikan, bukan "penguatan").
+//
+// Pembeda dari 3 identitas lain (bukan angka acak):
+// - vs AppleTypography: letterSpacing dibalik dari NEGATIF/rapat ala iOS modern jadi POSITIF/
+//   terbuka (+0.15sp s/d +1.2sp tiap slot) — mengesankan jarak antar-huruf mesin ketik/label
+//   cetak vintage, sejalan visual CRT-scanline+chromatic-aberration identitas ini.
+// - vs TactileTypography (ExtraBold/Bold, "machined label" fisik/embossed): Calm Retro TIDAK
+//   ikut naik ke tier itu — identitas ini flat/opaque by design (Batch 130), bukan fisik, jadi
+//   weight ditahan di tier Bold/SemiBold yang sama seperti Apple; pembeda murni dari spacing +
+//   lineHeight, bukan dari menaikkan weight lebih jauh.
+// - labelSmall (dipakai luas sbg kicker/eyebrow app-wide — "BERANDA"/"SEDANG DIPUTAR" dkk) dapat
+//   lompatan tracking PALING besar (0.6sp->1.2sp, dua kali lipat) — kicker bertracking lebar
+//   adalah ciri khas label cetak/prangko vintage, titik paling terasa "retro" dari 5 slot ini.
+// - lineHeight tiap slot dilonggarkan sedikit dari padanan Apple (bukan dipadatkan) — "calm"
+//   secara harfiah berarti ruang napas antar-baris lebih lega, konsisten nama identitasnya.
+val CalmRetroTypography = Typography(
+    titleLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Bold,
+        fontSize = 28.sp,
+        lineHeight = 36.4.sp,
+        letterSpacing = 0.3.sp
+    ),
+    titleMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 17.sp,
+        lineHeight = 26.5.sp,
+        letterSpacing = 0.2.sp
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 15.sp,
+        lineHeight = 22.5.sp,
+        letterSpacing = 0.15.sp
+    ),
+    bodySmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 13.sp,
+        lineHeight = 18.3.sp,
+        letterSpacing = 0.1.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 11.sp,
+        lineHeight = 16.4.sp,
+        letterSpacing = 1.2.sp
+    )
+)

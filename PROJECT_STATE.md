@@ -36,6 +36,49 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 302 (Perkuat typography khusus tema Calm Retro, murni 100% — permintaan user langsung,
+2 file kode)** — Menutup celah yang SENGAJA dibiarkan terbuka di Batch 130: waktu itu Calm Retro
+"dipurifikasi" (tertiary/error/shape dilepas dari token pinjaman identitas lain, `CalmRetroShapes`
+dibuat sendiri) TAPI typography-nya SENGAJA dibiarkan tetap reuse `AppleTypography` ("spec tidak
+beri spesifikasi tipografi... bukan kebocoran identitas, beda kasus dari tertiary/error/shape").
+User sekarang minta eksplisit dibalik — typography ikut murni jadi milik sendiri.
+
+**`Type.kt`** (1 titik baru): `CalmRetroTypography` (5 slot, pola sama Apple/Tactile) ditambah di
+akhir file. **fontFamily TETAP `FontFamily.Default`** di kelima slot — larangan eksplisit spec §4
+(Batch 133: monospace HANYA boleh di 2 `Text` durasi/waktu Now Playing, dilarang ke judul/lirik)
+masih berlaku, TIDAK dilonggarkan batch ini ("murni" = kurva weight/letterSpacing/lineHeight
+sendiri, bukan migrasi ke monospace — itu akan membalik keputusan terdokumentasi, bukan
+penguatan). Pembeda dari 3 identitas lain: (1) vs Apple — letterSpacing dibalik dari negatif/rapat
+jadi positif/terbuka (+0.15sp s/d +1.2sp per slot), kesan mesin-ketik/label cetak vintage, sejalan
+CRT-scanline+chromatic-aberration identitas ini; (2) vs Tactile (ExtraBold/Bold "machined label"
+fisik) — Calm Retro TIDAK ikut naik ke tier itu, ditahan di Bold/SemiBold sama seperti Apple krn
+identitas ini flat/opaque by design (Batch 130), pembeda murni dari spacing bukan weight; (3)
+`labelSmall` (dipakai luas sbg kicker/eyebrow app-wide — "BERANDA"/"SEDANG DIPUTAR" dkk) dapat
+lompatan tracking terbesar (0.6sp→1.2sp, 2x lipat) — titik paling terasa "retro" dari 5 slot;
+(4) lineHeight tiap slot dilonggarkan sedikit dari padanan Apple (bukan dipadatkan) — "calm"
+secara harfiah berarti ruang napas antar-baris lebih lega.
+
+**`Theme.kt`** (1 titik): blok `when (identity)` dispatch `typography` — `ThemeIdentity.CALM_RETRO
+-> CalmRetroTypography` ditambah eksplisit (sebelumnya jatuh ke `else -> AppleTypography`).
+`SKEU_DARK_LITE`/`APPLE` TETAP jatuh ke `else -> AppleTypography` — TIDAK disentuh, di luar scope
+permintaan user (cuma Calm Retro yang diminta). Komentar di atas blok itu diperbarui menyebut
+Batch 302.
+
+2 file kode (di bawah batas Micro-Batch), 0 file baru, 0 dependency baru — `FILE_MANIFEST.txt`
+tidak berubah (187/187). 0 protected asset disentuh. Brace/paren kedua file diverifikasi seimbang.
+Cakupan otomatis app-wide lewat `MaterialTheme.typography` — setiap composable yang sudah pakai
+token M3 (`titleLarge`/`titleMedium`/`bodyMedium`/`bodySmall`/`labelSmall`) otomatis ikut
+`CalmRetroTypography` saat identitas ini aktif, 0 call site UI perlu diedit satu-satu. Live-preview
+swatch `ThemeOptionCard` (SettingsScreen) ikut otomatis (manggil `MaterialTheme.typography`
+langsung, tidak disentuh — pola sama Batch 128-131). **Belum divalidasi compile Gradle sungguhan**
+(0 akses jaringan sesi ini, pola sama tiap batch) — **WAJIB cek CI setelah push**, risiko rendah
+(1 `val Typography(...)` baru + 1 cabang `when` tambahan, bukan API/dependency baru). **Belum
+diverifikasi visual di device** — prioritas cek: pilih Calm Retro di Settings, judul/label/body di
+seluruh app (Home/Library/NowPlaying/Settings) terasa beda dari Apple (tracking lebih terbuka,
+kicker lebih lebar), teks waktu/durasi Now Playing TETAP monospace seperti sebelumnya (tidak
+kebawa berubah), 4 identitas lain (Apple/Tactile/Skeu/Liquid Glass) visualnya TIDAK berubah sama
+sekali (regresi urutan `when`). Detail lengkap: `CHANGELOG.md` Batch 302.
+
 **Batch 301 (2 bug fix lanjutan dari feedback device: tab Library masih flat + stutter transisi
 tab, 2 file kode)** — User laporkan lagi dalam 1 pesan: (1) tab Beranda **dan** tab Library masih
 flat total; (2) stuttering pas **transisi antar tab** (beda dari "stutter scroll" Batch 300).
