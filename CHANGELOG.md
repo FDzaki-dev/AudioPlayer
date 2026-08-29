@@ -1,5 +1,97 @@
 # Changelog
 
+## Batch 305 — Perkuat typography khusus tema Neumorphism, murni 100% (permintaan user langsung, 2 file)
+User minta eksplisit: "sempurnakan typography Neumorphism 100% murni, tuntas!!" — melanjutkan
+pola penguatan typography per-tema (Batch 298 melakukan ini untuk Liquid Glass, Batch 302 untuk
+Calm Retro), sekarang giliran Neumorphism (`SKEU_DARK_LITE`), dengan penekanan "murni" (bukan
+pinjaman dari identitas lain) dan "tuntas" (menutup gap terakhir yang tersisa).
+
+**Konteks historis yang relevan**: sejak Batch 57, Skeu (waktu itu masih bernama Skeuomorphism,
+di-upgrade jadi "Neumorphism" Batch 79) sengaja dibiarkan reuse `AppleTypography` — alasan
+eksplisit ketika itu: "no separate type-scale spec supplied for this theme; skeuomorphic identity
+here is carried by color/shape/bevel, not custom type". Batch 302 lalu memurnikan Calm Retro
+(typography sendiri, bukan pinjaman Apple lagi) tapi SENGAJA tidak menyentuh Skeu — user waktu
+itu cuma minta Calm Retro secara eksplisit. Jadi sampai batch ini, Skeu adalah SATU-SATUNYA dari
+5 identitas yang masih 100% reuse `AppleTypography` lewat cabang `else` di dispatcher `Theme.kt`.
+Permintaan user sekarang menutup gap terakhir itu — sesudah batch ini, ke-5 identitas
+(Apple/Tactile/Skeu/CalmRetro/LiquidGlass) semuanya punya `Typography()` murni sendiri, 0 yang
+tersisa jatuh ke `else` selain Apple sendiri.
+
+**`Type.kt`** (1 titik baru, additif) — `SkeuTypography` ditambah di akhir file, mengisi 5 slot
+yang sama seperti `AppleTypography`/`TactileTypography`/`CalmRetroTypography`
+(`titleLarge`/`titleMedium`/`bodyMedium`/`bodySmall`/`labelSmall`), bukan menambah slot M3 baru
+(pola sama Batch 302 — 5 slot itu SUDAH terdefinisi lewat reuse Apple, jadi ini murni mengganti
+isinya, bukan menambal celah seperti kasus Liquid Glass Batch 298).
+
+Nilai baru dipilih berdasar 3 prinsip pembeda yang ditarik LANGSUNG dari mekanisme `skeuEmboss()`
+(`TactileDepth.kt`) dan spec identitas ini sendiri (Batch 79 — dual soft-shadow multi-layer, 0
+border/0 grain, panel "dipahat dari material yang sama dengan kanvas", pressed=concave):
+1. **Weight satu tingkat lebih RINGAN dari Apple** di tiap slot berjenjang (`titleLarge`
+   Bold→SemiBold, `titleMedium` SemiBold→Medium, `labelSmall` SemiBold→Medium; `bodyMedium`/
+   `bodySmall` tetap Normal — sudah di tier paling ringan) — kebalikan Tactile yang justru naik
+   ke ExtraBold/Bold ("machined label" fisik ditempa keras). Filosofi `skeuEmboss()`: kedalaman
+   MURNI dari dual soft-shadow, 0 border/0 grain — bukan dari kontras tinta tebal. Huruf berat
+   akan terbaca seperti cetakan tinta DI ATAS permukaan (metafora Apple/Tactile/CalmRetro/
+   LiquidGlass, yang semuanya sama atau lebih berat dari baseline Apple), bertentangan dengan
+   "molded" (dipahat dari material yang sama), bukan "printed", yang jadi identitas visual Skeu.
+   Neumorphism jadi SATU-SATUNYA dari 5 identitas yang lebih ringan dari baseline Apple — sumbu
+   berat jadi eksklusif milik Skeu, tidak tumpang tindih Tactile di ujung berlawanan.
+2. **letterSpacing DATAR 0.sp di semua 5 slot** — tidak ada dorongan gaya tracking sama sekali,
+   beda dari 4 identitas lain yang semuanya punya arah tracking sendiri (Apple negatif/rapat ala
+   iOS, CalmRetro positif/lebar ala label cetak vintage, LiquidGlass positif/terbuka ala CONVX,
+   Tactile netral tapi dibedakan lewat weight bukan tracking). Ini perpanjangan LANGSUNG dari ciri
+   paling literal identitas ini: "0 border, 0 tekstur grain — kedalaman murni dari bayangan"
+   (README/Batch 79) — kalau permukaan sengaja dilucuti dari semua gaya selain bayangan, huruf
+   ikut dilucuti dari gaya tracking; definisi datang murni dari `skeuEmboss()` di sekitarnya
+   (swatch tema, kartu panel), bukan dari bentuk hurufnya sendiri.
+3. **lineHeight PALING LONGGAR dari 5 identitas** (lebih longgar dari Calm Retro yang sudah
+   dilonggarkan dari Apple) — mencerminkan panel Skeu yang lembut/empuk tanpa sudut/border tegas;
+   teks ikut "bernapas" di ruang lebih lega, selaras kesan dipahat dari bantalan material lunak,
+   bukan dicetak rapat di atas permukaan keras.
+
+**`fontFamily` TETAP `FontFamily.Default` (sans) di kelima slot — TIDAK diubah ke Monospace.**
+Larangan eksplisit Batch 133 §4 (`FontFamily.Monospace` HANYA ke 2 elemen `Text` durasi/waktu Now
+Playing, di luar sistem `Typography` M3) tetap berlaku sama seperti Batch 302 tidak melonggarkannya
+untuk Calm Retro — permintaan user kali ini tidak menyebut monospace maupun membatalkan
+pembatasan itu.
+
+**`Theme.kt`** (1 titik) — blok `when (identity)` dispatcher `typography` di dalam
+`AudioPlayerTheme()` dapat 1 cabang baru: `ThemeIdentity.SKEU_DARK_LITE -> SkeuTypography`,
+ditambahkan sebelum `else -> AppleTypography`. `APPLE` tetap satu-satunya identitas yang jatuh ke
+`else` (memang benar identitasnya sendiri, bukan gap). Komentar block di atas dispatcher
+diperbarui menyebut Batch 305 & histori keputusan Batch 57/279/302.
+
+**Cakupan otomatis app-wide** — karena dispatch terjadi 1 titik di `MaterialTheme(typography=...)`
+level root `AudioPlayerTheme()`, SETIAP composable yang sudah memanggil
+`MaterialTheme.typography.titleLarge`/`titleMedium`/`bodyMedium`/`bodySmall`/`labelSmall` di
+seluruh app (Home/Library/NowPlaying/Settings/semua sheet) otomatis ikut `SkeuTypography` begitu
+identitas Neumorphism aktif — 0 call site UI individual perlu diedit satu-satu, pola yang sama
+seperti `TactileTypography`/`LiquidGlassTypography`/`CalmRetroTypography` sejak awal. Live-preview
+swatch `ThemeOptionCard` (`SettingsScreen.kt`, picker identitas tema) ikut otomatis benar tanpa
+disentuh — composable itu memanggil `MaterialTheme.typography` langsung untuk preview tiap
+identitas, pola yang sudah terbukti benar sejak Batch 128-131/302.
+
+**Ringkasan file**: 2 file kode (`Type.kt` + `Theme.kt`), di bawah batas Micro-Batch (maks 3 file
+kode). 0 file baru, 0 dependency baru, 0 import baru (semua simbol yang dipakai — `Typography`,
+`TextStyle`, `FontFamily`, `FontWeight`, `sp` — sudah diimpor `Type.kt` sejak awal untuk definisi
+typography lain). `FILE_MANIFEST.txt` tidak berubah (187/187, tidak ada file baru). 0 protected
+asset disentuh. Brace/paren blok yang ditambahkan diverifikasi seimbang (`Type.kt`: 27/27 parens,
+0/0 braces krn murni deklarasi `val`+`TextStyle` tanpa blok kurung kurawal; `Theme.kt` utuh: 14/14
+braces, 152/152 parens).
+
+**Belum divalidasi compile Gradle sungguhan** (0 akses jaringan sesi ini, pola sama tiap batch) —
+**WAJIB cek CI setelah push**, walau risikonya rendah (1 `val Typography(...)` baru murni data
+class + 1 cabang `when` tambahan yang mengacu ke `val` itu, bukan API/dependency baru, pola persis
+sama seperti `CalmRetroTypography` Batch 302 yang sudah terbukti compile bersih).
+
+**Belum diverifikasi visual di device** — prioritas cek kalau user build ulang: (1) pilih
+Neumorphism di Settings, judul/label/body app terasa lebih ringan bobotnya dari Apple (SemiBold/
+Medium, bukan Bold/SemiBold) dan tracking netral rapat (bukan lebar ala Calm Retro atau rapat
+negatif ala Apple), (2) baris teks terasa lebih longgar/lega dibanding 4 identitas lain, (3) 4
+identitas lain (Apple/Tactile/CalmRetro/Liquid Glass) visualnya TIDAK berubah sama sekali dari
+sebelum batch ini (regresi urutan `when` — cabang baru ditambah tanpa mengubah urutan/isi cabang
+lain).
+
 ## Batch 304 — Fix laporan bug (screenshot): notifikasi cold-start teks statis + tombol Jeda kepatri (1 file)
 Laporan ad-hoc dari user berupa screenshot kartu notifikasi ongoing "SONIX" (gaya visual cocok
 skin OEM ala MIUI/HyperOS): teks isi selalu "Memuat lagu…" tidak pernah berubah, dan tombol aksi

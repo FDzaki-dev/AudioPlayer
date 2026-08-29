@@ -8,8 +8,8 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 304 (fix laporan bug):** Notifikasi "SONIX" yang muncul sesaat saat widget home-screen ditekan sebelum aplikasi hidup (cold start) sebelumnya menampilkan teks "Memuat lagu…" statis dan tombol "Jeda" yang tidak berganti label walau musik sedang diputar/dijeda (dilaporkan lewat screenshot, tampilan cocok skin OEM ala MIUI/HyperOS) — sekarang teks menampilkan judul lagu begitu tersedia, dan tombol diperbarui lewat mekanisme resmi Android (`startForeground()` ulang) alih-alih `notify()` polos.
-> Batch 303: Nama artis/album panjang di hasil pencarian Library, judul lagu di Ringtone Cutter, dan nama artis di ranking Statistik sekarang dipotong rapi dengan "…" alih-alih membungkus tak terbatas atau terpotong mentah.
+> 🆕 **Update terbaru — Batch 305 (typography Neumorphism, murni 100%):** Tema Neumorphism sekarang punya gaya tipografi sendiri (bukan pinjaman Apple lagi) — bobot huruf lebih ringan di tiap judul, 0 letterSpacing di semua slot (selaras identitas "0 border/0 grain"-nya), dan baris teks paling longgar dari seluruh tema, meniru kesan dipahat dari bantalan material lunak.
+> Batch 304: Notifikasi "SONIX" yang muncul sesaat saat widget home-screen ditekan sebelum aplikasi hidup (cold start) sebelumnya menampilkan teks "Memuat lagu…" statis dan tombol "Jeda" yang tidak berganti label walau musik sedang diputar/dijeda — sekarang teks menampilkan judul lagu begitu tersedia, dan tombol diperbarui lewat mekanisme resmi Android.
 > Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
 > sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
 > Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
@@ -84,7 +84,11 @@ permukaan kaca lainnya.
   bersaing dengan Titanium. Wajib gelap-mode-independen (punya ekspresi terang sendiri sejak
   Batch 61). Dipasang di mini player, tombol play/pause (mini & Now Playing), piringan album hero,
   kartu "Lanjutkan Mendengarkan", banner undo-sembunyikan-lagu, badge indikator gesture, dan baris
-  pemilih tema.
+  pemilih tema. **Typography sendiri** (Batch 305, murni 100% — bukan pinjaman Apple lagi):
+  bobot satu tingkat lebih ringan di tiap judul (kebalikan Tactile yang lebih tebal), 0
+  letterSpacing di semua slot (huruf ikut dilucuti dari gaya tracking, selaras "0 border/0 grain"
+  di atas — kedalaman murni dari bayangan, bukan dari gaya huruf), dan lineHeight paling longgar
+  dari seluruh identitas, meniru kesan dipahat dari bantalan material lunak.
 
   Dipilih lewat tab **Pengaturan** di navigasi bawah, tersimpan otomatis, diterapkan ulang tiap sesi
 - **Halaman Pengaturan**: tab baru di navigasi bawah — berisi pemilih tema dan info versi aplikasi (nomor versi + build)

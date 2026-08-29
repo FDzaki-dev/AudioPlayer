@@ -254,3 +254,84 @@ val CalmRetroTypography = Typography(
         letterSpacing = 1.2.sp
     )
 )
+
+// Batch 305 — permintaan user langsung "sempurnakan typography Neumorphism 100% murni,
+// tuntas!!". Menutup gap TERAKHIR yang tersisa dari pola "pemurnian typography per-identitas"
+// (Batch 298 Liquid Glass, Batch 302 Calm Retro): sejak Batch 57, SKEU_DARK_LITE ("Neumorphism"
+// sejak Batch 79) masih 100% reuse AppleTypography lewat cabang `else` di dispatcher Theme.kt —
+// alasan awalnya eksplisit "no separate type-scale spec supplied for this theme". Batch 302
+// sengaja TIDAK menyentuh Skeu krn user waktu itu cuma minta Calm Retro. Sekarang giliran Skeu:
+// dari 5 identitas, ini yang terakhir masih pinjam Apple — sesudah batch ini, ke-5 identitas
+// (Apple/Tactile/Skeu/CalmRetro/LiquidGlass) semuanya punya Typography() murni sendiri.
+//
+// Sama seperti Batch 302, ini murni 5 slot yang SUDAH terdefinisi lewat reuse Apple
+// (titleLarge/titleMedium/bodyMedium/bodySmall/labelSmall) — mengganti isinya, bukan menambal
+// lubang slot M3 baru (beda kasus dari Liquid Glass Batch 298).
+//
+// 3 sumbu pembeda, masing-masing ditarik LANGSUNG dari mekanisme skeuEmboss() (TactileDepth.kt)
+// dan spec identitas ini sendiri (Batch 79), bukan angka acak:
+// 1. WEIGHT satu tingkat lebih RINGAN dari Apple di tiap slot berjenjang (Bold->SemiBold,
+//    SemiBold->Medium) — kebalikan Tactile (naik ke ExtraBold/Bold, "machined label" fisik
+//    ditempa keras). Filosofi skeuEmboss(): panel "dipahat dari material yang sama dengan
+//    kanvas", 0 border/0 grain, kedalaman MURNI dari dual soft-shadow — bukan dari kontras
+//    tinta tebal. Huruf berat/tebal akan terbaca seperti cetakan tinta di ATAS permukaan
+//    (metafora Apple/Tactile/CalmRetro/LiquidGlass), bertentangan dengan "molded", bukan
+//    "printed", yang jadi identitas visual Skeu. Satu-satunya dari 5 identitas yang LEBIH
+//    RINGAN dari baseline Apple (4 lainnya β Bold/SemiBold sama seperti Apple, atau lebih berat
+//    khusus Tactile) — sumbu berat jadi milik eksklusif Skeu, tidak tumpang tindih Tactile.
+// 2. letterSpacing DATAR 0.sp di SEMUA 5 slot — TIDAK ada dorongan gaya tracking sama sekali,
+//    beda dari 4 identitas lain yang semua punya arah tracking (Apple negatif/rapat, Tactile
+//    0 tapi lewat weight, CalmRetro positif/lebar ala label cetak vintage, LiquidGlass
+//    positif/terbuka ala CONVX). ini perpanjangan LANGSUNG dari ciri khas paling literal
+//    identitas ini: "0 border, 0 tekstur grain — kedalaman murni dari bayangan" (README/Batch
+//    79) — kalau permukaan sengaja dilucuti dari SEMUA gaya selain bayangan, huruf ikut
+//    dilucuti dari gaya tracking; definisi datang murni dari skeuEmboss() di sekitarnya (mis.
+//    swatch tema, kartu panel), bukan dari bentuk hurufnya sendiri.
+// 3. lineHeight PALING LONGGAR dari 5 identitas (lebih dari CalmRetro yang sudah dilonggarkan
+//    dari Apple) — mencerminkan panel Skeu yang lembut/empuk, tanpa sudut/border tegas; teks
+//    ikut "bernapas" di ruang lebih lega, selaras kesan dipahat dari bantalan material lunak,
+//    bukan dicetak rapat di atas permukaan keras.
+//
+// fontFamily TETAP FontFamily.Default (sans) di kelima slot — TIDAK dialihkan ke Monospace,
+// larangan eksplisit Batch 133 §4 (Monospace HANYA 2 Text durasi/waktu Now Playing, di luar
+// sistem Typography M3) tetap berlaku sama seperti Batch 302 tidak melonggarkannya utk Calm
+// Retro. fontSize/fontFamily dipertahankan identik ke 4 identitas lain — perubahan ukuran teks
+// beresiko reflow/wrap layout terpisah, di luar scope permintaan "typography", sama seperti
+// batasan yang sudah dipatuhi Batch 279/298/302.
+val SkeuTypography = Typography(
+    titleLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 28.sp,
+        lineHeight = 37.2.sp,
+        letterSpacing = 0.sp
+    ),
+    titleMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 17.sp,
+        lineHeight = 27.2.sp,
+        letterSpacing = 0.sp
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 15.sp,
+        lineHeight = 23.2.sp,
+        letterSpacing = 0.sp
+    ),
+    bodySmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 13.sp,
+        lineHeight = 19.sp,
+        letterSpacing = 0.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 17.sp,
+        letterSpacing = 0.sp
+    )
+)

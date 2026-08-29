@@ -377,17 +377,23 @@ fun AudioPlayerTheme(
     CompositionLocalProvider(LocalIsDarkTheme provides isDark) {
         MaterialTheme(
             colorScheme = colorsFor(identity, isDark),
-            // Batch 57 — Skeu reuses AppleTypography (no separate type-scale spec supplied for this
-            // theme; skeuomorphic identity here is carried by color/shape/bevel, not custom type).
-            // Batch 279/280 — LIQUID_GLASS dapat typography sendiri (LiquidGlassTypography,
-            // fase 1), bukan reuse Apple — beda dari Skeu, tipografi justru salah satu dari 2
-            // pembeda utama identitas ini (§3b Opsi B: "shape+typography").
+            // Batch 57 — Skeu awalnya reuse AppleTypography (no separate type-scale spec supplied
+            // for this theme; skeuomorphic identity here is carried by color/shape/bevel, not
+            // custom type). Batch 279/280 — LIQUID_GLASS dapat typography sendiri
+            // (LiquidGlassTypography, fase 1), bukan reuse Apple — beda dari Skeu, tipografi
+            // justru salah satu dari 2 pembeda utama identitas ini (§3b Opsi B: "shape+typography").
             // Batch 302 — CALM_RETRO menyusul dapat typography sendiri (CalmRetroTypography),
             // membalik keputusan reuse-Apple Batch 130 atas instruksi eksplisit user
             // ("perkuat typography khusus tema Calm Retro, murni 100%") — menuntaskan pemurnian
-            // identitas ini ke ranah typography (color/shape sudah murni sejak Batch 130).
+            // identitas itu ke ranah typography (color/shape sudah murni sejak Batch 130).
+            // Batch 305 — SKEU_DARK_LITE menyusul terakhir dapat typography sendiri
+            // (SkeuTypography) atas instruksi eksplisit user ("sempurnakan typography Neumorphism
+            // 100% murni, tuntas!!") — menutup reuse-Apple TERAKHIR dari 5 identitas; sesudah
+            // batch ini ke-5 identitas semuanya punya Typography() murni sendiri, tidak ada lagi
+            // yang jatuh ke cabang `else`.
             typography = when (identity) {
                 ThemeIdentity.TACTILE -> TactileTypography
+                ThemeIdentity.SKEU_DARK_LITE -> SkeuTypography
                 ThemeIdentity.LIQUID_GLASS -> LiquidGlassTypography
                 ThemeIdentity.CALM_RETRO -> CalmRetroTypography
                 else -> AppleTypography
