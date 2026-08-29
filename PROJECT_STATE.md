@@ -36,6 +36,75 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 303 (Micro-Polish Terakhir 1/6 — overflow title/artist/album, 3 file kode + planning
+aksesibilitas 0 kode)** — User kirim daftar 6 item "MICRO-POLISH TERAKHIR" dalam 1 pesan (lihat
+"Sisa antrean" di bawah), item terakhir (Aksesibilitas) ditandai eksplisit "(planning first, zero
+code)" oleh user sendiri — 5 item lain TIDAK ditandai begitu, jadi dieksekusi kode sungguhan.
+**1 batch = 1 task** (aturan Micro-Batch) berarti 6 item ini TIDAK muat 1 batch — dipilih item
+#1 (overflow) sbg kode batch ini, sisa 5 masuk antrean eksplisit di bawah, BUKAN diabaikan.
+
+**Asumsi yang diambil (didokumentasikan, bukan ditanya balik — instruksi user "gak usah denial
+segala macem"):** item #4 user tulis "Dark/Light/**Matte Noir**" — "Matte Noir" bukan identitas
+yang ada sekarang (grep: 0 hit di `enum class ThemeIdentity` aktif; nama itu tema custom LAMA yg
+sudah dihapus total & diganti "Tactile" sejak Batch 49, riwayat lengkap ada di
+`PROJECT_STATE_ARCHIVE.md`). Diasumsikan maksud user: cek konsistensi warna/surface di mode
+Dark/Light SEMUA identitas aktif + fondasi AMOLED near-black Tactile (`#030508`, kandidat plesetan
+paling dekat ke "matte noir" di kode SEKARANG) — BUKAN membangkitkan lagi tema lama yang sudah
+sengaja dihapus. Kalau salah tangkap, koreksi user ditunggu sebelum item #4 dieksekusi (item itu
+sendiri belum masuk kode batch ini, jadi 0 risiko salah arah kepatri ke kode).
+
+**Item #1 — overflow title/artist/album (`TextOverflow`, 3 file):** metodologi: grep pola
+`Text(` yang render field title/artist/album app-wide (`app/src/main/java/com/rudi/audioplayer/
+ui/*.kt`), 1-per-1 titik yang lolos filter otomatis diperiksa manual (auto-filter sempat false-
+positive di beberapa: `AlertDialog` body message LibraryScreen.kt — wajar wrap multi-baris utk
+kalimat konfirmasi, BUKAN bug; label statis "SEDANG DIPUTAR"/"Potong Nada Dering" — string tetap,
+0 risiko overflow). 3 celah nyata ketemu & diperbaiki:
+- `LibraryScreen.kt` (2 titik, hasil pencarian tab "Lainnya"): `ListItem` baris "Artis" & "Album"
+  di daftar hasil cari — keduanya `Text(artist)`/`Text(album)` POLOS 0 `maxLines`/`overflow`,
+  nama panjang bisa wrap tak terbatas & bikin tinggi row ListItem tidak rata dgn baris lain.
+  Ditambah `maxLines = 1, overflow = TextOverflow.Ellipsis` (pola sama persis dgn `song.artist`
+  di `SongRow` bawahnya di file yang sama — bukan pola baru).
+- `RingtoneCutterSheet.kt` (1 titik + 1 import baru): `song.title` di header sheet SUDAH punya
+  `maxLines = 1` tapi 0 `overflow` — default Compose diam-diam jatuh ke `TextOverflow.Clip`
+  (kepotong mentah tanpa "…", bukan ellipsis rapi). Ditambah `overflow = TextOverflow.Ellipsis`.
+- `StatsDashboardScreen.kt` (1 titik + 1 import baru): baris ranking "Artis Paling Sering" —
+  `artistCount.artist` pakai `Modifier.weight(1f)` tapi 0 `maxLines`/`overflow`, nama artis
+  panjang bisa wrap 2+ baris & merusak alignment vertikal terhadap nomor rank & play-count di
+  kanan-kirinya (yang tetap 1 baris). Ditambah `maxLines = 1, overflow = TextOverflow.Ellipsis`.
+
+`NowPlayingScreen.kt` (title/artist hero) dicek juga — SUDAH benar sejak lama (`maxLines=1` +
+`basicMarquee()` utk title, `maxLines=1` + `Ellipsis` utk artist, pola identik `SongRow`), 0
+perubahan diperlukan di situ (auto-filter sempat flag baris label "SEDANG DIPUTAR" di atasnya,
+false positive, sudah diverifikasi manual).
+
+**Planning Aksesibilitas (0 kode, sesuai instruksi eksplisit user):** 2 pengecekan grep-heuristik
+dijalankan app-wide (`app/src/main/java/com/rudi/audioplayer/ui/*.kt`): (1) `IconButton`/
+`IconToggleButton` dgn `contentDescription = null` di dalamnya (icon aksi tanpa label TalkBack)
+— **0 ditemukan**; (2) touch-target di bawah 48dp yg menempel `.clickable`/`IconButton` — 4 hit
+awal, SEMUA false positive setelah diperiksa manual (itu ukuran GLYPH icon di dalam kontainer
+`IconButton` 48dp default, bukan ukuran area sentuhnya — pola yg sama persis sudah diaudit &
+didokumentasikan eksplisit Batch 141/224/226/229/231, seri "Iconography 1/7" s.d. "7/7" yang
+disebut berulang di komentar `NowPlayingScreen.kt`). Kesimpulan sementara: 2 kategori ini
+kemungkinan besar SUDAH beres dari seri audit lama, bukan celah baru — TAPI ini BARU 2 dari
+sekian sub-area aksesibilitas yang diminta ("disabled state" belum diperiksa sama sekali,
+`contentDescription` utk elemen non-`Icon` seperti `Image`/artwork juga belum). **Belum planning
+lengkap** — sisa sub-area masuk giliran item #6 di antrean bawah, BUKAN ditutup dini di batch ini.
+
+**Sisa antrean Micro-Polish Terakhir (permintaan user, urutan sesuai pesan asli):**
+2. Empty/error/loading state — konsisten di seluruh screen (belum diaudit sama sekali).
+3. Dialog/Sheet — perilaku back button, tap-di-luar, dan tap-berulang (belum diaudit).
+4. Dark/Light/"Matte Noir" — 0 inkonsistensi surface/warna (lihat asumsi di atas; belum diaudit).
+5. Animation — 0 transisi yang terasa lambat/berlebihan (belum diaudit).
+6. Aksesibilitas — lanjutan planning (baru 2/banyak sub-area tercek, lihat paragraf di atas),
+   TETAP zero-code sampai user konfirmasi hasil planning lengkap & minta lanjut ke eksekusi kode.
+
+3 file kode (pas batas Micro-Batch), 2 import baru (`TextOverflow` — package sudah ada di
+dependency, 0 dependency baru), 0 file baru — `FILE_MANIFEST.txt` tidak berubah (187/187). 0
+protected asset disentuh. Brace/paren ketiga file diverifikasi seimbang. **Belum divalidasi
+compile Gradle sungguhan** (0 akses jaringan sesi ini) — **WAJIB cek CI setelah push**, risiko
+rendah (parameter `Text()` + 1 import standar, bukan API/dependency baru). Detail lengkap:
+`CHANGELOG.md` Batch 303.
+
 **Batch 302 (Perkuat typography khusus tema Calm Retro, murni 100% — permintaan user langsung,
 2 file kode)** — Menutup celah yang SENGAJA dibiarkan terbuka di Batch 130: waktu itu Calm Retro
 "dipurifikasi" (tertiary/error/shape dilepas dari token pinjaman identitas lain, `CalmRetroShapes`

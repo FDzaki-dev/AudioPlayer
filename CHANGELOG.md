@@ -1,5 +1,57 @@
 # Changelog
 
+## Batch 303 — Micro-Polish Terakhir 1/6: overflow title/artist/album (3 file) + planning aksesibilitas (0 kode)
+User mengirim daftar 6 item "MICRO-POLISH TERAKHIR" dalam satu pesan, dengan item terakhir
+(aksesibilitas) ditandai eksplisit oleh user sebagai "planning first, zero code" — lima item
+lainnya tidak diberi penanda itu, sehingga dikerjakan sebagai perubahan kode sungguhan. Karena
+satu batch mengerjakan satu tugas, keenam item tidak mungkin selesai sekaligus di batch ini —
+item pertama (overflow teks) dipilih untuk dieksekusi, lima sisanya dicatat sebagai antrean
+eksplisit di `PROJECT_STATE.md`, bukan diabaikan.
+
+Satu asumsi diambil dan didokumentasikan alih-alih ditanyakan balik ke user (sesuai instruksi
+user sendiri untuk tidak ragu-ragu menjalankan daftar ini): item keempat menyebut tema
+"Matte Noir", yang bukan lagi identitas yang ada di kode saat ini — nama itu adalah tema custom
+lama yang sudah dihapus total dan digantikan "Tactile" sejak Batch 49 (riwayat lengkap ada di
+`PROJECT_STATE_ARCHIVE.md`). Item itu diasumsikan merujuk ke pengecekan konsistensi warna/surface
+di seluruh mode Dark/Light identitas yang aktif sekarang, termasuk fondasi AMOLED near-black milik
+Tactile — bukan permintaan untuk menghidupkan kembali tema yang sudah sengaja dihapus. Item ini
+sendiri belum dieksekusi sama sekali di batch ini, jadi asumsi ini belum terpatri ke kode apa pun;
+masih terbuka untuk dikoreksi user sebelum gilirannya tiba di antrean.
+
+**Overflow title/artist/album** — seluruh pemanggilan `Text()` yang menampilkan field title/
+artist/album di `app/src/main/java/com/rudi/audioplayer/ui/*.kt` digrep dan diperiksa satu per
+satu (beberapa hasil pencarian otomatis ternyata false positive setelah diperiksa manual: pesan
+konfirmasi `AlertDialog` yang secara wajar membungkus banyak baris, dan label statis seperti
+"SEDANG DIPUTAR" yang tidak pernah berisiko overflow). Tiga celah nyata ditemukan dan diperbaiki:
+baris "Artis" dan "Album" pada hasil pencarian di `LibraryScreen.kt` sebelumnya sama sekali tidak
+membatasi baris teks, sehingga nama panjang bisa membungkus tanpa batas dan merusak kerataan
+tinggi antar baris daftar — sekarang keduanya dibatasi satu baris dengan tanda pemotongan,
+mengikuti pola yang sudah dipakai `SongRow` di file yang sama. Judul lagu pada header
+`RingtoneCutterSheet.kt` sudah dibatasi satu baris sebelumnya tetapi tanpa tanda pemotongan resmi,
+sehingga teks yang kepanjangan terpotong mentah tanpa elipsis — sekarang diperbaiki. Baris
+peringkat "Artis Paling Sering" di `StatsDashboardScreen.kt` juga belum dibatasi sama sekali,
+padahal berbagi baris dengan nomor peringkat dan jumlah putar di kanan-kirinya — nama artis yang
+panjang bisa membungkus dan merusak kesejajaran elemen-elemen itu. Judul dan artis pada layar
+Now Playing sudah diperiksa ulang secara terpisah dan ternyata sudah benar sejak lama (mengikuti
+pola yang sama seperti `SongRow`), sehingga tidak ada perubahan yang diperlukan di sana.
+
+**Planning aksesibilitas** — dua pemeriksaan berbasis pencarian pola dijalankan ke seluruh layar:
+ikon aksi di dalam `IconButton`/`IconToggleButton` tanpa deskripsi konten (nol ditemukan), dan
+target sentuh di bawah 48dp yang menempel pada elemen yang bisa disentuh (empat kandidat awal,
+semuanya ternyata ukuran glyph ikon di dalam kontainer `IconButton` yang secara default tetap
+48dp — bukan ukuran area sentuh sesungguhnya, konsisten dengan seri audit ikonografi dan target
+sentuh yang sudah dilakukan pada batch-batch sebelumnya). Ini baru mencakup sebagian kecil dari
+seluruh cakupan aksesibilitas yang diminta — perilaku disabled-state dan deskripsi konten untuk
+elemen non-ikon seperti artwork belum diperiksa sama sekali, sehingga item ini tetap terbuka di
+antrean dan tidak ada kode yang ditulis untuknya, sesuai permintaan eksplisit user.
+
+Antrean tersisa dari lima item lain dicatat lengkap di `PROJECT_STATE.md`. Tiga file kode (pas di
+batas Micro-Batch), dua import baru (`TextOverflow`, dari package yang sudah menjadi dependency,
+bukan dependency baru), nol file baru — `FILE_MANIFEST.txt` tidak berubah (187/187). Belum
+divalidasi lewat compile Gradle sungguhan pada sesi ini — perlu dicek hasil CI setelah push,
+meski risikonya rendah karena hanya menambahkan parameter pada pemanggilan `Text()` yang sudah
+ada beserta satu import standar.
+
 ## Batch 302 — Perkuat typography khusus tema Calm Retro, murni 100% (permintaan user langsung, 2 file)
 User minta eksplisit: "lanjut perkuat typography khusus theme Calm Retro murni 100%!!" —
 melanjutkan pola penguatan typography per-tema (Batch 298 sudah melakukan ini untuk Liquid Glass),

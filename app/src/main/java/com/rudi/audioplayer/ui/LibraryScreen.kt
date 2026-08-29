@@ -971,7 +971,9 @@ private fun SearchResultsView(
             item { SearchSectionLabel("Artis") }
             items(matchedArtists, key = { it }) { artist ->
                 ListItem(
-                    headlineContent = { Text(artist) },
+                    headlineContent = {
+                        Text(artist, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
                     leadingContent = { Icon(Icons.Default.Person, contentDescription = null) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier
@@ -985,7 +987,9 @@ private fun SearchResultsView(
             item { SearchSectionLabel("Album") }
             items(matchedAlbums, key = { it }) { album ->
                 ListItem(
-                    headlineContent = { Text(album) },
+                    headlineContent = {
+                        Text(album, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
                     leadingContent = { Icon(Icons.Default.Album, contentDescription = null) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier

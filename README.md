@@ -8,8 +8,8 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 302:** Typography tema Calm Retro sekarang murni 100% milik sendiri (`CalmRetroTypography`) — sebelumnya sejak Batch 130 sengaja masih reuse gaya Apple. Judul/label/body sekarang punya tracking huruf lebih terbuka ala mesin ketik/label cetak vintage (beda dari Apple yang rapat), kicker/eyebrow label dapat tracking terlebar dari 5 slot. Font waktu/durasi Now Playing tetap monospace seperti sebelumnya (tidak ikut berubah).
-> Batch 301 (bug fix): bar "Urungkan" di tab Library sekarang ikut kena efek Liquid Glass; navigasi antar tab (Beranda/Library/Pengaturan) menyimpan & memulihkan state layar alih-alih membangunnya ulang dari nol tiap kali pindah tab.
+> 🆕 **Update terbaru — Batch 303 (Micro-Polish Terakhir 1/6):** Nama artis/album panjang di hasil pencarian Library, judul lagu di Ringtone Cutter, dan nama artis di ranking Statistik sekarang dipotong rapi dengan "…" alih-alih membungkus tak terbatas atau terpotong mentah. Bagian dari daftar polish terakhir 6 item — 5 sisanya (empty/error/loading state, perilaku dialog/sheet, konsistensi warna Dark/Light, kehalusan animasi, aksesibilitas) masih di antrean, lihat `PROJECT_STATE.md`.
+> Batch 302: Typography tema Calm Retro sekarang murni 100% milik sendiri (`CalmRetroTypography`), tracking huruf lebih terbuka ala mesin ketik/label cetak vintage.
 > Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
 > sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
 > Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
