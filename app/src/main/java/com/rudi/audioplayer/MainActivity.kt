@@ -129,6 +129,7 @@ import com.rudi.audioplayer.ui.theme.SkeuAmbientAlphaLight
 import com.rudi.audioplayer.ui.theme.SkeuEmerald
 import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
 import com.rudi.audioplayer.ui.theme.calmGrain
+import com.rudi.audioplayer.ui.theme.auroraGlow
 import com.rudi.audioplayer.ui.theme.LocalHazeState
 import dev.chrisbanes.haze.rememberHazeState
 import dev.chrisbanes.haze.hazeSource
@@ -388,6 +389,15 @@ class MainActivity : FragmentActivity() {
                         // lain, HANYA aktif untuk Calm Retro.
                         .then(
                             if (appThemeIdentity == ThemeIdentity.CALM_RETRO) Modifier.calmGrain() else Modifier
+                        )
+                        // Batch 308 — Aurora fase 3/N: wiring `auroraGlow()` (TactileDepth.kt,
+                        // Batch 306 — sudah ada dari fase 1, 0 call site sampai baris ini) ke root
+                        // Surface, pola arsitektur sama persis `calmGrain()` di atas (1 titik
+                        // cakupan seluruh app, aktif hanya saat identitas ini yang dipilih). Mulai
+                        // batch ini animasi gradien mengalirnya baru benar-benar terlihat di layar
+                        // — sebelumnya (Batch 306-307) fungsinya ada tapi tampilan tetap flat.
+                        .then(
+                            if (appThemeIdentity == ThemeIdentity.AURORA) Modifier.auroraGlow() else Modifier
                         ),
                     color = if (identityRootBrush != null) Color.Transparent else MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground

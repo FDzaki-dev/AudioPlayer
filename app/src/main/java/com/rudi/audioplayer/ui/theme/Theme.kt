@@ -388,6 +388,12 @@ fun isCalmRetroTheme(): Boolean = MaterialTheme.colorScheme.primary == CalmRetro
 @Composable
 fun isLiquidGlassTheme(): Boolean = MaterialTheme.colorScheme.primary == LiquidGlassAccent
 
+// Batch 308 — Aurora fase 3/N, helper ke-5 pola identik 4 di atas (Tactile/Skeu/CalmRetro/
+// LiquidGlass). Dipakai pertama kali di `MainActivity.kt` (wiring `auroraGlow()` ke root
+// Surface) — call site UI lain yang butuh cabang khusus identitas ini menyusul nanti kalau ada.
+@Composable
+fun isAuroraTheme(): Boolean = MaterialTheme.colorScheme.primary == AuroraAccent
+
 fun colorsFor(identity: ThemeIdentity, isDark: Boolean) = when (identity) {
     ThemeIdentity.TACTILE -> if (isDark) TactileDarkColors else TactileLightColors
     ThemeIdentity.SKEU_DARK_LITE -> if (isDark) SkeuDarkColors else SkeuLightColors
@@ -426,14 +432,20 @@ fun AudioPlayerTheme(
             // identitas itu ke ranah typography (color/shape sudah murni sejak Batch 130).
             // Batch 305 — SKEU_DARK_LITE menyusul terakhir dapat typography sendiri
             // (SkeuTypography) atas instruksi eksplisit user ("sempurnakan typography Neumorphism
-            // 100% murni, tuntas!!") — menutup reuse-Apple TERAKHIR dari 5 identitas; sesudah
-            // batch ini ke-5 identitas semuanya punya Typography() murni sendiri, tidak ada lagi
-            // yang jatuh ke cabang `else`.
+            // 100% murni, tuntas!!") — menutup reuse-Apple TERAKHIR dari 5 identitas saat itu;
+            // sesudah batch itu ke-5 identitas semuanya punya Typography() murni sendiri.
+            // Batch 308 — AURORA (tema ke-6) menyusul dapat typography sendiri (AuroraTypography)
+            // atas instruksi eksplisit user ("sempurnakan juga typography-nya"), dikerjakan
+            // bersamaan dgn fase 3 (wiring `auroraGlow()` ke `MainActivity.kt`). Shape TETAP
+            // `else -> AppleShapes` untuk saat ini — user cuma minta typography batch ini, shape
+            // belum diminta (pola sama Batch 302/305: 1 identitas dituntaskan per permintaan
+            // eksplisit, bukan sekaligus semua identitas/semua aspek).
             typography = when (identity) {
                 ThemeIdentity.TACTILE -> TactileTypography
                 ThemeIdentity.SKEU_DARK_LITE -> SkeuTypography
                 ThemeIdentity.LIQUID_GLASS -> LiquidGlassTypography
                 ThemeIdentity.CALM_RETRO -> CalmRetroTypography
+                ThemeIdentity.AURORA -> AuroraTypography
                 else -> AppleTypography
             },
             shapes = when (identity) {
@@ -441,6 +453,8 @@ fun AudioPlayerTheme(
                 ThemeIdentity.SKEU_DARK_LITE -> SkeuDarkShapes
                 ThemeIdentity.CALM_RETRO -> CalmRetroShapes
                 ThemeIdentity.LIQUID_GLASS -> LiquidGlassShapes
+                // AURORA belum masuk sini — fase 3 (Batch 308) cuma cakup typography sesuai
+                // permintaan eksplisit user, shape masih fallback AppleShapes sampai diminta.
                 else -> AppleShapes
             },
             content = content

@@ -335,3 +335,73 @@ val SkeuTypography = Typography(
         letterSpacing = 0.sp
     )
 )
+
+// Batch 308 — Aurora fase 3/N, permintaan user eksplisit ("sempurnakan juga typography-nya",
+// bersamaan dgn wiring auroraGlow() ke MainActivity.kt). Sebelum batch ini Aurora jatuh ke
+// `else -> AppleTypography` (bootstrap sementara, pola sama 5 identitas lain sebelum dimurnikan
+// masing-masing — LiquidGlass Batch 298, CalmRetro Batch 302, Skeu Batch 305 di atas).
+//
+// Aurora menempati sumbu WEIGHT paling ekstrem dari 6 identitas — bukan sekadar "1 tingkat lebih
+// ringan dari Apple" seperti SkeuTypography di atas (titleLarge masih SemiBold, tetap di tier
+// Bold-keluarga), tapi turun 1 tingkat LEBIH JAUH ke Light/Normal: titleLarge=Light,
+// titleMedium=Normal — 0 slot di seluruh scale ini menyentuh tier Bold/SemiBold/ExtraBold, satu-
+// satunya dari 6 identitas dengan sifat itu. 3 sumbu pembeda, ditarik LANGSUNG dari mekanisme
+// `auroraGlow()` (TactileDepth.kt, Batch 306) & spec identitas ini sendiri, bukan angka acak:
+// 1. WEIGHT — aurora borealis bukan material fisik yang "dicetak" (Apple/CalmRetro), "ditempa"
+//    (Tactile), atau "dipahat lembut dari bantalan" (Skeu) — dia gas terionisasi tanpa bentuk
+//    padat, jadi huruf dilucuti ke tier PALING ringan yang ada di scale ini. labelSmall tetap
+//    Medium (bukan ikut turun ke Normal) — kicker (mis. "BERANDA"/"SEDANG DIPUTAR") tetap butuh
+//    sedikit bobot supaya kebaca di atas AuroraSurfaceVariant gelap, tapi masih di bawah
+//    SemiBold yang dipakai 5 identitas lain di slot yang sama.
+// 2. LETTER SPACING — arah POSITIF/terbuka di semua 5 slot (arah sama dgn CalmRetro/LiquidGlass,
+//    ALASAN beda): bukan tracking label cetak vintage (CalmRetro) atau kelapangan ala CONVX
+//    (LiquidGlass), tapi meniru cahaya yang berdifusi/menyebar keluar dari sumbernya. labelSmall
+//    dapat lompatan PALING lebar dari 6 identitas (1.4sp, melewati rekor CalmRetro 1.2sp) —
+//    kicker adalah slot yang paling sering berdiri sendiri di atas ambient wash `auroraGlow()`,
+//    makin lebar diffusion-nya makin terasa "menyala", bukan cuma berlabel.
+// 3. LINE HEIGHT — dilonggarkan dari baseline Apple (arah sama CalmRetro/Skeu), ALASAN beda:
+//    bukan "ruang napas" (CalmRetro) atau "material lunak" (Skeu), tapi ruang vertikal supaya
+//    animasi `auroraGlow()` yang "mengalir pelan" (20 detik/arah, TactileDepth.kt) tidak terasa
+//    terpotong-potong oleh baris teks yang berdempetan.
+//
+// fontSize/fontFamily TETAP identik ke 5 identitas lain (28/17/15/13/11sp, FontFamily.Default) —
+// larangan Monospace-hanya-2-slot-durasi (Batch 133 §4) tetap berlaku, dan perubahan fontSize
+// beresiko reflow layout di luar scope permintaan "typography" (batasan sama yg dipatuhi Batch
+// 279/298/302/305 di atas).
+val AuroraTypography = Typography(
+    titleLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Light,
+        fontSize = 28.sp,
+        lineHeight = 37.6.sp,
+        letterSpacing = 0.8.sp
+    ),
+    titleMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 17.sp,
+        lineHeight = 27.sp,
+        letterSpacing = 0.6.sp
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 15.sp,
+        lineHeight = 22.8.sp,
+        letterSpacing = 0.4.sp
+    ),
+    bodySmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 13.sp,
+        lineHeight = 18.6.sp,
+        letterSpacing = 0.35.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 17.2.sp,
+        letterSpacing = 1.4.sp
+    )
+)

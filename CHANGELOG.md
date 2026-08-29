@@ -1,5 +1,74 @@
 # Changelog
 
+## Batch 308 — Tema ke-6 "Aurora", Fase 3/N: wiring `auroraGlow()` + typography sendiri (lanjutan langsung, 3 file)
+Lanjutan langsung dari Batch 307, permintaan user langsung: "lanjutkan fase 3/N, sempurnakan
+juga typography-nya". 2 hal dikerjakan sekaligus: (1) item yang sudah tercatat sejak Batch 307
+sebagai "Fase 3, BELUM dikerjakan" — wiring `auroraGlow()` ke root Surface; (2) item tambahan
+yang eksplisit diminta user batch ini — typography sendiri untuk Aurora, sebelumnya cuma dicatat
+"kalau diminta nanti".
+
+**Dampak nyata mulai batch ini** — pilih Aurora di Settings sekarang menampilkan animasi warna
+mengalir pelan (hijau→teal→ungu→magenta, siklus ~40 detik penuh, bolak-balik halus) di ambient
+background, bukan lagi flat statis seperti Batch 306-307. Judul & label juga sudah pakai
+`AuroraTypography` sendiri, bukan lagi fallback `AppleTypography` — bobot huruf paling ringan
+dari 6 identitas (Light/Normal, 0 slot Bold-tier sama sekali), letter-spacing paling terbuka
+(kicker `labelSmall` 1.4sp, rekor terlebar melewati Calm Retro 1.2sp), line-height paling
+longgar. Shape MASIH fallback `AppleShapes` — user cuma minta typography batch ini, bukan shape.
+
+**`MainActivity.kt`** (protected/parsial, 2 titik) —
+1. Import `com.rudi.audioplayer.ui.theme.auroraGlow` ditambah setelah import `calmGrain`.
+2. 1 `.then()` baru ditambahkan setelah blok `.then()` `calmGrain()` yang sudah ada di modifier
+   root `Surface` — pola arsitektur identik (aktif hanya saat `appThemeIdentity ==
+   ThemeIdentity.AURORA`, `Modifier` polos untuk identitas lain). `auroraGlow()` sendiri sudah
+   lengkap sejak Batch 306 (fase 1) — batch ini murni titik pemanggilannya, 0 logika baru di
+   fungsi itu sendiri (`TactileDepth.kt` 0 baris disentuh).
+
+**`Theme.kt`** (2 titik) —
+1. `isAuroraTheme(): Boolean = MaterialTheme.colorScheme.primary == AuroraAccent` ditambah
+   setelah `isLiquidGlassTheme()` — helper ke-5, pola identik 4 pendahulunya (Tactile/Skeu/
+   CalmRetro/LiquidGlass), belum ada call site selain persiapan untuk `MainActivity.kt`.
+2. `typography = when (identity)` di `AudioPlayerTheme()` dapat 1 cabang baru:
+   `ThemeIdentity.AURORA -> AuroraTypography`. `shapes = when (identity)` di bawahnya SENGAJA
+   TIDAK disentuh — comment ditambah menjelaskan ini keputusan sadar (scope permintaan user cuma
+   typography), bukan celah yang terlewat, supaya sesi berikutnya tidak salah asumsi.
+
+**`Type.kt`** (1 definisi baru, `AuroraTypography`) — 5 slot (titleLarge/titleMedium/bodyMedium/
+bodySmall/labelSmall), `fontSize`/`fontFamily` identik ke 5 identitas lain (28/17/15/13/11sp,
+`FontFamily.Default` — larangan Monospace Batch 133 §4 tetap berlaku, ukuran tidak diubah supaya
+0 resiko reflow layout, batasan sama yang dipatuhi Batch 279/298/302/305). 3 sumbu pembeda,
+ditarik langsung dari mekanisme `auroraGlow()` & spec identitas ini sendiri (rasional penuh di
+comment block `Type.kt`, bukan angka acak):
+1. **Weight** — `titleLarge`=`Light`, `titleMedium`=`Normal`: SATU-SATUNYA dari 6 identitas
+   dengan 0 slot menyentuh tier Bold/SemiBold/ExtraBold di seluruh scale-nya (SkeuTypography,
+   identitas paling ringan sebelumnya, masih `SemiBold` di `titleLarge`). `labelSmall` tetap
+   `Medium` — kicker tetap butuh sedikit bobot supaya kebaca di atas `AuroraSurfaceVariant` gelap.
+2. **Letter spacing** — positif/terbuka di semua 5 slot (arah sama CalmRetro/LiquidGlass, alasan
+   beda: meniru cahaya berdifusi, bukan tracking cetak vintage atau kelapangan CONVX).
+   `labelSmall` 1.4sp jadi rekor terlebar dari 6 identitas, melewati CalmRetro 1.2sp.
+3. **Line height** — dilonggarkan dari baseline Apple (arah sama CalmRetro/Skeu), alasan beda:
+   ruang vertikal supaya animasi `auroraGlow()` "mengalir pelan" tidak terasa terpotong baris teks.
+
+**Pemeriksaan sebelum eksekusi** — grep ulang seluruh app untuk `when (identity)`/
+`when (appThemeIdentity)`: `colorsFor()` (exhaustive, sudah lengkap sejak Batch 307, 0 disentuh
+batch ini) tetap satu-satunya yang WAJIB exhaustive. `typography`/`shapes` (`Theme.kt`),
+`identityRootBrush`/`navCatchLightColor` (`MainActivity.kt`), `ThemeOptionCard`
+(`SettingsScreen.kt`) semuanya `else`/`==` biasa — 0 risiko compile break dari cabang yang
+ditambahkan batch ini.
+
+**Ringkasan file** — 3 file kode (`MainActivity.kt`, `Theme.kt`, `Type.kt`), pas di batas
+Micro-Batch (maksimal 3). 0 file baru, 0 dependency baru, `FILE_MANIFEST.txt` tidak berubah
+(187/187). Brace/paren diverifikasi seimbang per-file: `Theme.kt` 179/179 parens + 14/14 braces,
+`MainActivity.kt` 617/617 parens + 256/256 braces, `Type.kt` 45/45 parens kode-saja (komentar
+prosa dikecualikan dari hitungan — wajar tidak simetris seperti file lain di project ini).
+
+**Belum divalidasi compile Gradle sungguhan** (WAJIB cek CI) dan **belum diverifikasi visual di
+device** — kalau dicoba sekarang, pilih Aurora di Settings harus menampilkan ambient background
+yang mengalir pelan (bukan flat lagi) dengan judul/label yang terasa lebih ringan/lapang
+dibanding 5 tema lain; 5 identitas lain harus 0 berubah.
+
+**Item berikutnya (belum diminta user)** — shape Aurora sendiri (masih fallback `AppleShapes`),
+rim-glow per-panel (status "ditunda" sejak Batch 306, bukan dibatalkan).
+
 ## Batch 307 — Tema ke-6 "Aurora", Fase 2/N: registrasi identitas + palet lengkap (lanjutan langsung, 2 file)
 Lanjutan langsung dari Batch 306 (instruksi "next"). Fase 2 sesuai rencana yang sudah dicatat di
 Batch 306: `ThemeIdentity.AURORA` resmi didaftarkan ke enum + `AuroraColors` (`darkColorScheme`)
