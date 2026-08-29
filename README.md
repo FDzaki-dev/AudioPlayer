@@ -8,8 +8,8 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 303 (Micro-Polish Terakhir 1/6):** Nama artis/album panjang di hasil pencarian Library, judul lagu di Ringtone Cutter, dan nama artis di ranking Statistik sekarang dipotong rapi dengan "…" alih-alih membungkus tak terbatas atau terpotong mentah. Bagian dari daftar polish terakhir 6 item — 5 sisanya (empty/error/loading state, perilaku dialog/sheet, konsistensi warna Dark/Light, kehalusan animasi, aksesibilitas) masih di antrean, lihat `PROJECT_STATE.md`.
-> Batch 302: Typography tema Calm Retro sekarang murni 100% milik sendiri (`CalmRetroTypography`), tracking huruf lebih terbuka ala mesin ketik/label cetak vintage.
+> 🆕 **Update terbaru — Batch 304 (fix laporan bug):** Notifikasi "SONIX" yang muncul sesaat saat widget home-screen ditekan sebelum aplikasi hidup (cold start) sebelumnya menampilkan teks "Memuat lagu…" statis dan tombol "Jeda" yang tidak berganti label walau musik sedang diputar/dijeda (dilaporkan lewat screenshot, tampilan cocok skin OEM ala MIUI/HyperOS) — sekarang teks menampilkan judul lagu begitu tersedia, dan tombol diperbarui lewat mekanisme resmi Android (`startForeground()` ulang) alih-alih `notify()` polos.
+> Batch 303: Nama artis/album panjang di hasil pencarian Library, judul lagu di Ringtone Cutter, dan nama artis di ranking Statistik sekarang dipotong rapi dengan "…" alih-alih membungkus tak terbatas atau terpotong mentah.
 > Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
 > sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
 > Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).

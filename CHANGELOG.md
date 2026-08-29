@@ -1,5 +1,46 @@
 # Changelog
 
+## Batch 304 — Fix laporan bug (screenshot): notifikasi cold-start teks statis + tombol Jeda kepatri (1 file)
+Laporan ad-hoc dari user berupa screenshot kartu notifikasi ongoing "SONIX" (gaya visual cocok
+skin OEM ala MIUI/HyperOS): teks isi selalu "Memuat lagu…" tidak pernah berubah, dan tombol aksi
+"Jeda" tidak pernah berganti label walau musik sedang diputar/dijeda. Ini laporan bug baru,
+bukan lanjutan antrean "Micro-Polish Terakhir" — item 2-6 dari daftar itu tetap menunggu di
+`PROJECT_STATE.md`, tidak tersentuh batch ini.
+
+String persis dari screenshot ditelusuri lewat grep dan ditemukan tepat satu titik sumber:
+`buildColdStartNotification()` di `PlaybackService.kt`. Fungsi ini membangun notifikasi
+placeholder yang tampil sangat singkat saat widget home-screen ditekan sebelum proses aplikasi
+hidup (cold start) — sebelum notifikasi asli Media3 (`MediaStyle`, auto-sync bawaan) mengambil
+alih. Dua masalah berbeda ditemukan di fungsi yang sama:
+
+Pertama, `contentText` di-hardcode "Memuat lagu…" tanpa syarat, tidak pernah membaca state atau
+metadata apa pun — bahkan setelah lagu confirmed sedang diputar dan metadata sudah tersedia, teks
+itu tetap sama. Kedua, mekanisme untuk memperbarui label tombol sebenarnya sudah ada dari batch
+sebelumnya (`onIsPlayingChanged` memanggil `updateColdStartNotification(isPlaying)` selama
+placeholder ini aktif), tetapi implementasinya hanya `NotificationManagerCompat.notify()` biasa
+ke ID notifikasi yang sama. Karena placeholder ini sengaja bukan `MediaStyle` (dicatat eksplisit
+di komentar lama sebagai alasan kenapa update manual diperlukan sama sekali), sejumlah skin OEM
+yang cocok dengan gaya visual di screenshot dikenal menahan cache tombol aksi untuk notifikasi
+foreground non-MediaStyle dan tidak selalu menggambar ulang hanya dari `notify()`.
+
+**Perbaikan:** `buildColdStartNotification()` mendapat parameter baru `nowPlayingTitle` (default
+null, sehingga pemanggilan lama yang memang belum punya media item di titik itu tidak perlu
+diubah). Isi teks sekarang menampilkan judul lagu begitu tersedia — judul polos saat sedang
+diputar, "judul — Dijeda" saat dijeda — dan hanya jatuh ke "Memuat lagu…" pada jendela cold-start
+murni sebelum media item pertama termuat. `updateColdStartNotification()` diganti dari
+`notify()` polos menjadi memanggil ulang `startForeground()` (mengikuti pola pemeriksaan versi
+SDK yang sama persis dengan fungsi pembuat notifikasi awal di bawahnya) — ini adalah cara resmi
+Android untuk memperbarui notifikasi milik service foreground sendiri, bersifat idempoten, tidak
+memicu flicker atau me-restart service, dan tetap menjadi perbaikan yang valid terlepas dari
+apakah dugaan penyebab cache OEM di atas tepat sasaran atau tidak.
+
+Satu file diubah, nol import baru (semua kelas yang dipakai sudah ada di file), nol file baru,
+nol dependency baru — `FILE_MANIFEST.txt` tidak berubah (187/187). Belum divalidasi lewat compile
+Gradle sungguhan pada sesi ini (perlu dicek hasil CI setelah push) maupun diverifikasi visual di
+perangkat asli — prioritas pengecekan berikutnya: dari kondisi aplikasi benar-benar mati, tekan
+tombol play di widget home-screen, dan pastikan teks notifikasi berganti jadi judul lagu serta
+tombol berganti label dengan benar saat ditekan berulang.
+
 ## Batch 303 — Micro-Polish Terakhir 1/6: overflow title/artist/album (3 file) + planning aksesibilitas (0 kode)
 User mengirim daftar 6 item "MICRO-POLISH TERAKHIR" dalam satu pesan, dengan item terakhir
 (aksesibilitas) ditandai eksplisit oleh user sebagai "planning first, zero code" — lima item

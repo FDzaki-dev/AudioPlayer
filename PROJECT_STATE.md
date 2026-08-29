@@ -36,6 +36,63 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 304 (Fix laporan bug lewat screenshot — cold-start notification: teks statis + tombol
+Jeda kepatri, 1 file kode)** — Laporan ad-hoc user (screenshot notifikasi "SONIX" ongoing), BUKAN
+lanjutan antrean "Sisa antrean Micro-Polish Terakhir" di bawah (item 2-6 itu TETAP menunggu,
+tidak tersentuh batch ini — laporan bug baru selalu interupsi, sesuai pola batch-batch
+sebelumnya). Screenshot menunjukkan kartu notifikasi ongoing "SONIX" dgn `contentText` "Memuat
+lagu…" dan action button "Jeda" — gaya visual kartu (header waktu terpisah dari body, bentuk
+pill button) cocok skin OEM ala MIUI/HyperOS.
+
+**Diagnosis:** grep string persis dari screenshot ("Memuat lagu") ketemu SATU titik:
+`buildColdStartNotification()` di `PlaybackService.kt` — notifikasi placeholder yang tampil
+SANGAT SINGKAT saat widget home-screen ditekan sebelum proses app ada (cold start), sebelum
+notifikasi Media3 asli (MediaStyle, auto-sync) mengambil alih. Dua akar masalah berbeda,
+sama-sama di fungsi builder yang sama:
+1. **Teks statis** — `.setContentText("Memuat lagu…")` HARDCODE, tidak pernah baca state/
+   metadata apa pun, bahkan setelah lagu confirmed playing (`isPlaying=true` & `currentMediaItem`
+   sudah terisi di titik itu). User selalu lihat teks yang sama walau lagu sudah jalan.
+2. **Tombol "Jeda" kepatri** — mekanisme update SEBENARNYA sudah ada (`onIsPlayingChanged` ->
+   `updateColdStartNotification(isPlaying)` kalau `coldStartNotificationActive`, ditambahkan
+   batch sebelumnya persis untuk kasus ini — lihat komentar existing di kode). TAPI
+   implementasinya cuma `NotificationManagerCompat.notify()` polos ke ID yang sama. Notifikasi
+   placeholder ini SENGAJA bukan `MediaStyle` (`Media3` tidak ikut sinkronkan otomatis — dicatat
+   eksplisit di komentar lama), dan sejumlah skin OEM (cocok gaya screenshot user) diketahui
+   menahan cache action-button utk notifikasi foreground non-MediaStyle, tidak selalu redraw dari
+   `notify()` ulang walau `Notification` baru sudah dikirim dgn label berbeda.
+
+**Fix (`PlaybackService.kt`, 1 file):**
+- `buildColdStartNotification()` — parameter baru `nowPlayingTitle: String? = null` (default null,
+  jadi call site lama di `startForegroundColdStartNotification()` — yang memang selalu belum
+  punya media item persis di titik itu — TIDAK perlu diubah, 0 risiko regresi di jalur itu).
+  `contentText` sekarang `when`: judul lagu kalau tersedia (`isPlaying` -> judul polos; `!isPlaying`
+  -> "{judul} — Dijeda"), fallback "Memuat lagu…" HANYA kalau benar-benar belum ada apa pun
+  diketahui (window cold-start murni, sebelum media item pertama termuat).
+- `updateColdStartNotification()` — ganti `NotificationManagerCompat.notify()` polos jadi
+  `startForeground()` ulang (pola SDK-check API 29+ `ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_
+  PLAYBACK` disalin persis dari `startForegroundColdStartNotification()` di bawahnya, supaya
+  konsisten). `startForeground()` ulang adalah cara resmi Android utk memperbarui notifikasi
+  service foreground miliknya sendiri — idempotent, tidak me-restart service/bikin flicker —
+  dan tidak bergantung pada asumsi soal cache OEM tertentu buat berhasil refresh, jadi perbaikan
+  ini valid terlepas dari root cause persis quirk OEM-nya benar dugaan di atas atau bukan. Juga
+  ambil `mediaSession?.player?.currentMediaItem?.mediaMetadata?.title?.toString()` di titik ini
+  (pola sama persis `pushWidgetUpdate()` di file yang sama) buat dioper ke `nowPlayingTitle`.
+
+0 import baru (`ServiceInfo`/`NotificationCompat`/`NotificationManagerCompat` semua sudah ada di
+file), 0 file baru, 0 dependency baru — `FILE_MANIFEST.txt` tidak berubah (187/187). 0 protected
+asset disentuh (di dalam `PlaybackService.kt`, protected utk EDIT PARSIAL — perubahan ini murni
+2 fungsi terisolasi, bukan sentuh lifecycle/session/manifest-nya). Brace/paren file diverifikasi
+seimbang (81/81 `{}`, 373/373 `()`). **Belum divalidasi compile Gradle sungguhan** (0 akses
+jaringan sesi ini, pola sama tiap batch) — **WAJIB cek CI setelah push**. **Belum diverifikasi
+visual di device asli** (terutama device OEM yang cocok screenshot user) — prioritas cek: matikan
+app total, tekan tombol play di widget home-screen, amati notifikasi "SONIX" muncul: (1)
+`contentText` berubah dari "Memuat lagu…" jadi judul lagu begitu lagu mulai jalan, (2) tombol
+berganti label "Jeda" (bukan lagi kepatri), (3) tekan tombol itu, konfirmasi label balik jadi
+"Lanjutkan" — kalau OEM tertentu masih tidak refresh walau sudah pakai `startForeground()` ulang,
+itu sinyal root cause bukan (cuma) cache action-button seperti dugaan, perlu investigasi lanjut
+sesi berikutnya (kemungkinan lain: migrasi placeholder ini ke `MediaStyle` sungguhan, TAPI itu
+scope lebih besar dari micro-fix ini — sengaja tidak dicoba di batch ini).
+
 **Batch 303 (Micro-Polish Terakhir 1/6 — overflow title/artist/album, 3 file kode + planning
 aksesibilitas 0 kode)** — User kirim daftar 6 item "MICRO-POLISH TERAKHIR" dalam 1 pesan (lihat
 "Sisa antrean" di bawah), item terakhir (Aksesibilitas) ditandai eksplisit "(planning first, zero

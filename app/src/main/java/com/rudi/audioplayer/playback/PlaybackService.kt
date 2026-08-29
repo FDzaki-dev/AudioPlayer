@@ -380,7 +380,15 @@ class PlaybackService : MediaLibraryService() {
         return super.onStartCommand(intent, flags, startId)
     }
 
-    private fun buildColdStartNotification(isPlaying: Boolean): android.app.Notification {
+    /** Batch 304 — `nowPlayingTitle` BARU (default null, jadi call site lama di
+     * [startForegroundColdStartNotification] yang memang selalu belum punya media item di titik
+     * itu tidak perlu diubah). Sebelumnya `contentText` HARDCODE "Memuat lagu…" terus, bahkan
+     * setelah lagu confirmed playing & metadata sudah ada — user lapor teks itu tak pernah
+     * berubah jadi apa pun yang lebih berguna. Begitu judul lagu tersedia (persis di titik
+     * `isPlaying` pertama kali berubah, lihat [updateColdStartNotification]), tampilkan itu;
+     * "Memuat lagu…" cuma dipakai selagi benar-benar belum ada apa pun diketahui (window murni
+     * cold-start, sebelum media item pertama termuat). */
+    private fun buildColdStartNotification(isPlaying: Boolean, nowPlayingTitle: String? = null): android.app.Notification {
         val toggleIntent = Intent(this, PlaybackService::class.java).setAction(WidgetUpdater.ACTION_TOGGLE_PLAY)
         val toggleFlags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         val togglePendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -389,9 +397,15 @@ class PlaybackService : MediaLibraryService() {
             PendingIntent.getService(this, 101, toggleIntent, toggleFlags)
         }
 
+        val contentText = when {
+            !nowPlayingTitle.isNullOrBlank() && isPlaying -> nowPlayingTitle
+            !nowPlayingTitle.isNullOrBlank() && !isPlaying -> "$nowPlayingTitle — Dijeda"
+            else -> "Memuat lagu…"
+        }
+
         return NotificationCompat.Builder(this, COLD_START_CHANNEL_ID)
             .setContentTitle("SONIX")
-            .setContentText("Memuat lagu…")
+            .setContentText(contentText)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
@@ -405,9 +419,24 @@ class PlaybackService : MediaLibraryService() {
 
     /** Re-posts the placeholder with an action label matching the player's actual current
      * state. Only meaningful while [coldStartNotificationActive] — never called after Media3's
-     * own notification has taken over. */
+     * own notification has taken over.
+     *
+     * Batch 304 — sebelumnya `NotificationManagerCompat.notify()` polos ke ID yang sama: user
+     * lapor tombol "Jeda" kepatri (tampilan notifikasi di laporan cocok gaya kartu media
+     * OEM ala MIUI/HyperOS, yang dikenal suka menahan cache action-button notifikasi foreground
+     * non-MediaStyle & tidak selalu redraw dari `notify()` ulang). `startForeground()` ulang
+     * adalah cara resmi Android utk memperbarui notifikasi service foreground miliknya sendiri —
+     * idempotent, tidak me-restart service atau bikin flicker — dipakai di sini gantinya, pola
+     * SDK-check sama persis dgn [startForegroundColdStartNotification] di bawah supaya perilaku
+     * API 29+ (foreground service type) konsisten. */
     private fun updateColdStartNotification(isPlaying: Boolean) {
-        NotificationManagerCompat.from(this).notify(COLD_START_NOTIFICATION_ID, buildColdStartNotification(isPlaying))
+        val nowPlayingTitle = mediaSession?.player?.currentMediaItem?.mediaMetadata?.title?.toString()
+        val notification = buildColdStartNotification(isPlaying, nowPlayingTitle)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        } else {
+            startForeground(COLD_START_NOTIFICATION_ID, notification)
+        }
     }
 
     /** Bare-minimum "waking up" notification so the OS treats this process as a legitimate
