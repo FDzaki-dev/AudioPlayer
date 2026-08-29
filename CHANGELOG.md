@@ -1,5 +1,35 @@
 # Changelog
 
+## Batch 293 — Hotfix CI: instrumentation-tests job FAILED "No compatible devices connected" (regresi tertinggal Batch 290, 1 protected asset)
+User upload screenshot GitHub Actions run #287 (`build` job HIJAU — konfirmasi fix Batch 292
+sukses — tapi job `instrumentation-tests` terpisah FAILED, 7m42s) + `instrumentation_test_report_287.zip`.
+Report HTML dibaca (`debug/index.html`, tab "Failed tests"): 1 test, 1 failure, pesan persis
+**"No compatible devices connected."** — BUKAN test assertion yang gagal (nama test/class-nya
+sendiri kosong di laporan), murni tidak ada device yang cocok utk dites sama sekali.
+
+**Akar masalah, dikonfirmasi silang ke `app/build.gradle.kts`, bukan tebakan**: `minSdk` di
+project sudah 31 (dinaikkan Batch 290, bagian eksekusi Liquid Glass blur asli), tapi job
+`instrumentation-tests` di `.github/workflows/build.yml` masih pakai `api-level: 30` — TIDAK
+ikut diperbarui saat Batch 290 bump minSdk. AGP/Gradle test-runner otomatis menyaring keluar
+device yang API levelnya DI BAWAH `minSdk` modul sebelum `connectedDebugAndroidTest` sungguhan
+jalan; 1 emulator API 30 yang di-boot job ini jadi 0 device valid dari sudut pandang module
+(minSdk 31 > device API 30) — persis kenapa pesannya "no compatible devices", bukan kegagalan
+boot emulator/KVM/dsb (emulatornya sendiri sukses boot, cuma ditolak sebelum test jalan).
+
+**Fix** (`.github/workflows/build.yml`, 1 protected asset, edit parsial 1 baris + komentar):
+`api-level: 30` → `31`. Nilai baru dipilih TEPAT di lantai `minSdk` baru, bukan asal naik ke
+targetSdk(34)/compileSdk(36) — konsisten dgn alasan pemilihan API level ASLI job ini (Batch 103:
+"cukup relevan, tidak melebihi apa yang app-nya sendiri sasar"), minSdk 31 sekarang JADI batas
+relevan terendah itu. Grep ulang seluruh `build.yml` mengonfirmasi `api-level: 30` cuma 1 titik
+konfigurasi (sisa kemunculan "30" lain di file cuma di komentar historis, bukan value aktif) —
+bukan asumsi "pasti cuma 1 tempat", benar-benar dicek.
+
+YAML divalidasi ulang (`yaml.safe_load`) sesudah edit. 0 file lain disentuh. **Belum ada CI run
+baru yang membuktikan job `instrumentation-tests` sungguhan hijau** — baru menghilangkan akar
+masalah yang terkonfirmasi dari report; test SENDIRI (yang sekarang akhirnya akan benar-benar
+tereksekusi di device yang valid) belum pernah lolos/gagal secara nyata sama sekali di batch mana
+pun sejauh ini karena dari awal tidak pernah dapat device yang jalan.
+
 ## Batch 292 — Hotfix CI FAILED: `animateItemPlacement` unresolved (akibat langsung bump BOM Batch 291)
 User upload `log_fail_286.zip` + instruksi "debugging sampai tuntas, gak usah denial segala
 macem". Build gagal total (`compileDebugKotlin` DAN `compileReleaseKotlin`, keduanya) dgn 7 error

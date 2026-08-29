@@ -36,6 +36,19 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 293 (Hotfix CI — user upload screenshot run #287 + `instrumentation_test_report_287.zip`,
+1 protected asset)** — `build` job Batch 292 HIJAU (konfirmasi), tapi job `instrumentation-tests`
+terpisah FAILED: "No compatible devices connected." Akar masalah dikonfirmasi silang ke
+`app/build.gradle.kts`: `minSdk` sudah 31 sejak Batch 290, tapi `api-level: 30` di job ini
+(`.github/workflows/build.yml`) TIDAK ikut diupdate saat itu — emulator API 30 otomatis
+ditolak AGP test-runner krn di bawah minSdk modul (30 < 31), makanya 0 device valid meski
+emulator sendiri boot sukses. Fix: `api-level: 30` → `31` (tepat di lantai minSdk baru, bukan
+asal naik ke targetSdk 34/compileSdk 36 — konsisten alasan asli job ini Batch 103). Grep ulang
+konfirmasi cuma 1 titik config aktif (bukan asumsi). YAML divalidasi ulang. ⚠️ **Belum ada CI run
+baru yang membuktikan job ini sungguhan hijau** — test itu sendiri belum PERNAH tereksekusi
+nyata di batch manapun (selalu gagal dapat device duluan sebelum test-nya sendiri sempat jalan).
+Detail: `CHANGELOG.md` Batch 293.
+
 **Batch 292 (Hotfix CI FAILED — user upload `log_fail_286.zip`, "debugging sampai tuntas, gak
 usah denial", 4 file kode)** — Konsekuensi LANGSUNG bump BOM Batch 291: `animateItemPlacement()`
 (dipakai 7x di 4 file — `FolderManagerSheet.kt`, `LibraryScreen.kt`x4, `PlaylistScreen.kt`,

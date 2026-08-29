@@ -278,18 +278,24 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Run instrumentation tests
-        # api-level 30 (Android 11) dipilih sbg titik tengah wajar: cukup baru utk relevan,
-        # cukup lama utk boot cepat & stabil di emulator CI. SENGAJA BUKAN api-level 35/36 utk
-        # menyasar "Android 15/16 behavior" di gap list item #2 — compileSdk/targetSdk proyek
-        # ini sendiri masih 34 (app/build.gradle.kts), jadi menyasar API di atasnya di sini tidak
-        # akan mengetes apa pun yang app-nya sendiri belum menyasar. Lihat MANUAL_QA_CHECKLIST.md
-        # bagian "Android 15/16-spesifik" utk kenapa itu sengaja jadi batch terpisah.
+        # Batch 293 hotfix — user upload screenshot GitHub Actions run #287: job ini FAILED,
+        # "No compatible devices connected." (dari `instrumentation_test_report_287.zip`, tab
+        # Failed tests). Akar masalah: `api-level: 30` di bawah ini sudah 2 batch ketinggalan —
+        # Batch 290 bump `minSdk` 23→31 (`app/build.gradle.kts`) tapi TIDAK mengecek job ini.
+        # AGP/Gradle test-runner menyaring device yang API-nya DI BAWAH minSdk modul sebelum
+        # `connectedDebugAndroidTest` jalan — 1 emulator API 30 yang ada jadi 0 device valid dari
+        # sudut pandang module ini (minSdk 31 > API device 30), makanya pesannya "no compatible
+        # devices" walau emulatornya sendiri boot sempurna (bukan gagal boot/KVM/dsb).
+        # api-level dinaikkan jadi 31 — TEPAT di lantai minSdk baru (bukan asal naik ke
+        # 34/targetSdk atau 36/compileSdk): comment asli job ini (Batch 103) sengaja memilih
+        # "cukup relevan, tidak melebihi apa yang app-nya sendiri sasar" — minSdk 31 sekarang
+        # JADI batas relevan terendah itu, konsisten dgn alasan awal, bukan angka baru sembarang.
         # `gradle` (bukan `./gradlew`) dipakai persis spt job `build` di atas — proyek ini belum
         # menyertakan Gradle Wrapper (gap list item #19, belum digarap), setup-gradle@v3 di atas
         # yang menyediakan binary `gradle` versi 8.7 di PATH utk job ini.
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 31
           arch: x86_64
           target: google_apis
           profile: pixel_5
