@@ -36,6 +36,33 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 299 (Fase 5 langkah 5/5 — feedback device API 33+ sungguhan: blur masih kurang, tuning
+alpha iterasi 2, 1 file kode)** — User laporkan langsung dari device fisik API 33+ (tier
+"Runtime Shader" tercepat/paling ringan per `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §2, BUKAN tier
+lemah API 31/32): efek blur Liquid Glass masih kurang kelihatan. Ini persis skenario yang sudah
+diantisipasi di komentar Batch 296/298 sendiri ("kalau nyaris tak kelihatan → alpha masih
+ketinggian, turunkan lagi") — didiagnosis sebagai parameter tint yang masih terlalu pekat
+menutupi blur asli, BUKAN bug rendering (device tier terbaik, API Haze `hazeSource`/`hazeEffect`
+sudah terkonfirmasi compile+jalan sejak CI Batch 296 hijau).
+
+**`BlurUtils.kt`** (1 titik, `liquidGlassAlpha`): diturunkan lagi 0.55f→0.38f (gelap) /
+0.65f→0.48f (terang) — langkah lebih besar dari turun Batch 296→298 krn feedback "masih kurang"
+datang SETELAH satu putaran tuning (titik awal 0.92/0.96 lawas), bukan feedback pertama. Gap
+dark/light (0.10) dipertahankan sama seperti iterasi-iterasi sebelumnya. `blurRadius` (32dp,
+Batch 298) SENGAJA TIDAK ikut dinaikkan — lever yang teridentifikasi utk masalah "blur ketutup"
+adalah tint, bukan radius, dan radius sudah didokumentasikan dekat batas nyaman performa (API 32
+"berat"). 0 file lain disentuh, 0 import baru, 0 dependency baru — `FILE_MANIFEST.txt` tidak
+berubah (187/187). Brace/paren file diverifikasi seimbang (8/8, 34/34 — komentar dikecualikan).
+
+**Status Fase 5 langkah 5/5 setelah batch ini: MASIH BELUM SELESAI**, sekarang di putaran ke-2.
+0.38f/0.48f TETAP "titik awal berikutnya", bukan angka final — WAJIB dikonfirmasi ulang user
+pas coba build hasil batch ini: kalau MASIH kurang → turunkan lagi; kalau JUSTRU jadi terlalu
+ramai/teks susah dibaca → naikkan sedikit dari 0.38/0.48 (jangan balik ke 0.55/0.65). Juga tetap
+kumpulkan info performa (ada lag scroll/tidak) yang belum pernah dilaporkan sejak langkah 5/5
+dibuka Batch 297. Belum divalidasi compile Gradle sungguhan (0 akses jaringan sesi ini, pola sama
+tiap batch) — **WAJIB cek CI setelah push**, meski risiko rendah (2 angka `Float` literal, bukan
+API/dependency baru). Detail lengkap: `CHANGELOG.md` Batch 299.
+
 **Batch 298 (Perkuat typography + efek blur Liquid Glass — permintaan user langsung, 2 file kode)**
 — User minta eksplisit "perkuat typography+efek blur pada theme liquid glass" di luar antrean
 roadmap (langkah 5/5 blur asli masih nunggu verifikasi device sungguhan sejak Batch 297 — batch

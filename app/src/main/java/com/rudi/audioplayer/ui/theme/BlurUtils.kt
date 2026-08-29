@@ -78,14 +78,26 @@ fun Modifier.frostedGlass(
     // sudah ada preseden). ALASAN, bukan kosmetik: alpha 0.92/0.96 default sengaja NEAR-OPAQUE
     // krn dulu (Batch 53-281) TIDAK ADA blur asli di belakangnya — tint pekat itu SATU-SATUNYA
     // cara jaga keterbacaan di atas backdrop yang tajam/kacau. Sekarang Liquid Glass dapat
-    // `hazeEffect` (blur asli, di bawah), backdrop-nya SUDAH disaring jadi halus — tint
-    // setinggi 0.92/0.96 di atas blur asli akan membuat blur itu nyaris tidak kelihatan (cuma
-    // nongol 4-8%), menghilangkan tujuan fase 5 ini sama sekali. 0.55f/0.65f = titik awal
-    // masuk akal (translucent, blur+variasi warna backdrop tetap kebaca, teks tetap kontras
-    // cukup di atas blur+tint gabungan) — BUKAN angka final, WAJIB dituning ulang pas
-    // verifikasi visual di device sungguhan (langkah 5/5 roadmap blur), disebut eksplisit di
-    // CHANGELOG supaya sesi berikutnya tidak kaget angka ini berubah.
-    val liquidGlassAlpha = if (isDark) 0.55f else 0.65f
+    // `hazeEffect` (blur asli, di bawah), backdrop-nya SUDAH disaring jadi halus — tint tinggi
+    // di atas blur asli akan membuat blur itu nyaris tidak kelihatan, menghilangkan tujuan
+    // fase 5 ini sama sekali.
+    // Batch 299 — langkah 5/5 iterasi kedua: user melaporkan LANGSUNG dari device API 33+
+    // sungguhan (bukan API 31/32 — justru tier "Runtime Shader" tercepat/paling ringan per
+    // LIQUID_GLASS_BLUR_ENGINE_DESIGN.md §2) bahwa blur masih kurang kelihatan dgn titik awal
+    // 0.55f/0.65f Batch 296. Ini persis skenario yang sudah diantisipasi komentar Batch
+    // 296/298 ("kalau nyaris tak kelihatan → alpha masih ketinggian, turunkan lagi") — BUKAN
+    // bug rendering (device sudah tier terbaik, `hazeSource`/`hazeEffect` sudah dikonfirmasi
+    // compile+jalan sejak CI Batch 296), murni parameter tint yang masih terlalu pekat
+    // menutupi blur asli di bawahnya. Diturunkan lagi 0.55f→0.38f (gelap) / 0.65f→0.48f
+    // (terang) — langkah lebih besar dari turun Batch 296→298 krn feedback "masih kurang"
+    // datang SETELAH satu putaran tuning, bukan dari titik awal 0.92/0.96 lawas. `blurRadius`
+    // (32dp, Batch 298) TIDAK ikut dinaikkan batch ini — lever yg diidentifikasi user & kode
+    // ini utk masalah "blur ketutup" adalah tint, bukan radius; radius sudah didokumentasikan
+    // dekat batas nyaman performa (§ komentar `blurRadius` param di atas). Gap dark/light
+    // (0.10) dipertahankan sama seperti semua iterasi sebelumnya (mode terang butuh tint
+    // sedikit lebih pekat drpd gelap utk kontras teks yg setara). TETAP "titik awal
+    // berikutnya", bukan final — WAJIB dikonfirmasi ulang oleh user pas coba build ini.
+    val liquidGlassAlpha = if (isDark) 0.38f else 0.48f
     val effectiveAlpha = if (isSkeu) 1f else if (isLiquidGlass) liquidGlassAlpha else alpha
     // Batch 53 — spec §8 "Glass edge / highlight" + §9 "Lighting model" (single simulated light,
     // top-left -> bottom-right): a flat single-color border reads as a printed outline, not
