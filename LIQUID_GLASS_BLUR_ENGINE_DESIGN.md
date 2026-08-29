@@ -128,8 +128,25 @@ Strict Micro-Batching tetap berlaku — TIDAK dieksekusi semua sekaligus:
    `.hazeSource()`/`.hazeEffect()` di manapun** — genuinely 0 visual berubah.
 2. **MiniPlayerBar** — hazeSource di `NavHost` content + hazeEffect di `frostedGlass()`'s cabang
    LiquidGlass. Kandidat VISUAL PERTAMA yang kelihatan.
+   **✅ SELESAI Batch 296.** API 1.7.2 dikonfirmasi ulang web_search sesi eksekusi (bukan asumsi
+   desain): `hazeSource(state)`/`hazeEffect(state, style, block)`, properti blur (`blurRadius`
+   dkk) diset LANGSUNG di lambda `block` (skema flat 1.x). `hazeSource` di `Box` pembungkus
+   `NavHost` (`MainActivity.kt`), HANYA saat `isLiquidGlassTheme()`. `hazeEffect` di
+   `frostedGlass()`'s cabang `isLiquidGlass`, dipasang SEBELUM `.background()` (urutan gambar:
+   blur→tint→edge). `effectiveAlpha` Liquid Glass DITURUNKAN 0.55f/0.65f (dari 0.92f/0.96f
+   default) — kalau tidak, tint sepekat default akan menutupi blur nyaris total; **titik awal,
+   wajib dituning ulang pas langkah 5 (device)**. Parameter `blurRadius` fungsi (24.dp default,
+   dummy sejak Batch 53) akhirnya benar-benar dipakai. **Cakupan otomatis LEBIH LUAS dari
+   sekadar MiniPlayerBar**: krn `frostedGlass()` shared, `NowPlayingScreen`'s panel + 8 sheet
+   lain ikut nyala jg (semua overlay di atas region `NavHost` yang di-tag) — TAPI langkah 3 di
+   bawah TETAP belum ditandai selesai, krn belum ada verifikasi/analisis KHUSUS apakah
+   NowPlayingScreen butuh treatment beda (cuma "kemungkinan sudah cukup" via cakupan otomatis,
+   belum dikonfirmasi). **Belum diverifikasi compile Gradle sungguhan — WAJIB cek CI SEBELUM
+   lanjut langkah 3**, risiko ganda (dependency Batch 295 + API Haze yang baru dipakai sekarang
+   sama-sama belum pernah dicompile).
 3. **NowPlayingScreen** — sumber konten beda (artwork/panel, bukan list scroll) — dicek dulu apa
    perlu treatment beda dari MiniPlayerBar sebelum asal disamakan.
+   **⏳ BELUM diperiksa detail** — lihat catatan "cakupan otomatis" di langkah 2 di atas.
 4. **LibraryScreen row/Sheets/Dialog/Settings** — reuse titik yang sudah teraudit lengkap di
    Batch 282-286 (semua sudah punya daftar pasti file/baris mana yang pakai `frostedGlass()`,
    tidak perlu re-audit dari nol).

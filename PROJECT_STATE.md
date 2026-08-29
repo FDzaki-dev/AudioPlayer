@@ -36,6 +36,26 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 296 (Blur asli fase 5 langkah 2/5 — hazeSource+hazeEffect nyala, 2 file)** — User minta
+lanjut langsung (bukan tunggu CI Batch 295 dulu). API Haze 1.7.2 dicek ulang web_search sesi
+ini: `hazeSource`/`hazeEffect` skema flat 1.x (properti blur langsung di lambda, bukan wrapper
+`blurEffect{}` 2.0). `MainActivity.kt` (protected, 1 titik): `Box` pembungkus `NavHost` dapat
+`.hazeSource(state=hazeState)` HANYA saat Liquid Glass aktif. `BlurUtils.kt`: `frostedGlass()`'s
+cabang `isLiquidGlass` dapat `hazeEffect` (dipasang PALING LUAR sebelum `.background()` —
+urutan gambar blur→tint→edge) + `effectiveAlpha` diturunkan 0.55f gelap/0.65f terang (BUKAN
+kosmetik — tint setinggi default 0.92/0.96 akan bikin blur nyaris tak kelihatan; TITIK AWAL,
+wajib dituning device). Bonus: parameter `blurRadius` yg dari Batch 53 cuma dummy, akhirnya
+dipakai sungguhan (capture ke `requestedBlurRadius` dulu, hindari name-shadowing lambda Haze).
+
+**Cakupan LEBIH LUAS dari sekadar MiniPlayerBar**: `frostedGlass()` 1 titik shared → otomatis
+nyala jg utk `NowPlayingScreen`'s panel + 8 sheet lain yang overlay di atas region ter-tag.
+Langkah 3/5 roadmap ("NowPlaying — cek treatment beda") BELUM diperiksa detail — klaim "selesai"
+ditahan sampai verifikasi visual (langkah 5). 2 file, 0 file baru. `FILE_MANIFEST.txt` tidak
+berubah (187/187). Brace/paren seimbang. **Belum diverifikasi compile Gradle** — risiko GANDA
+(dependency Batch 295 + API Haze yang baru dipakai sekarang, belum pernah dicompile). **WAJIB
+cek CI build setelah push, SEBELUM lanjut langkah 3/5** — kelas masalah sama Batch 291-293.
+Detail: `CHANGELOG.md` Batch 296, `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5.
+
 **Batch 295 (Blur asli fase 5 langkah 1/5 — fondasi plumbing Haze, 3 file, dependency baru)** —
 User minta lanjut eksekusi (bukan tunggu). Versi **`dev.chrisbanes.haze:haze:1.7.2`** dipilih
 (dicek ulang web_search persis di momen eksekusi) — tag "Latest" resmi GitHub, BUKAN linimasa

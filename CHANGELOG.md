@@ -1,5 +1,61 @@
 # Changelog
 
+## Batch 296 — Blur asli fase 5 langkah 2/5: hazeSource+hazeEffect nyala (2 file)
+User minta lanjut eksekusi langsung (bukan tunggu verifikasi CI Batch 295 dulu). API Haze 1.7.2
+dicek ulang via web search PERSIS sesi ini (bukan asumsi dari desain Batch 294): dikonfirmasi
+`Modifier.hazeSource(state)` + `Modifier.hazeEffect(state, style, block)` dgn properti blur
+(`blurRadius`, `tints`, `noiseFactor`) diset LANGSUNG di dalam lambda `block` (skema flat 1.x,
+BUKAN wrapper `blurEffect{}` yang baru wajib di linimasa 2.0-alpha) — cocok persis catatan
+Batch 295 kenapa 1.7.2 dipilih.
+
+**`MainActivity.kt`** (protected, 1 titik) — `Box(Modifier.weight(1f))` pembungkus `NavHost`
+dapat `.hazeSource(state = hazeState)`, **HANYA saat `appThemeIdentity == LIQUID_GLASS`**
+(0 biaya render tambahan utk 4 identitas lain — mereka tidak pernah panggil `hazeEffect` sama
+sekali, capture yang tidak pernah dikonsumsi = kerja sia-sia). `hazeState` dibaca dari variabel
+lokal `AppNavHost` sendiri (Batch 295's `rememberHazeState()`), bukan `LocalHazeState.current`
+— fungsi ini justru PROVIDER composition local itu, bukan consumer.
+
+**`BlurUtils.kt`** — `frostedGlass()`'s cabang `isLiquidGlass` dapat 2 perubahan terkoordinasi:
+1. **`hazeEffect`** dipasang PALING LUAR (`this.hazeEffect(...)` sebelum `.background()`) —
+   urutan modifier menentukan urutan gambar: blur dulu (belakang), baru tint semi-transparan
+   menimpa, baru border edge-glow (Batch 281) di atas itu — persis resep §3b desain (blur+tint
+   tipis+edge highlight, BUKAN blur polos tanpa warna, BUKAN edge tanpa blur di belakangnya).
+2. **`effectiveAlpha` Liquid Glass diturunkan** jadi 0.55f gelap/0.65f terang (dari default
+   0.92f/0.96f yang dipakai 4 identitas lain) — **BUKAN kosmetik, keharusan**: alpha setinggi
+   itu SENGAJA near-opaque krn dulu 0 blur asli di belakangnya (tint pekat = satu-satunya cara
+   jaga keterbacaan). Sekarang backdrop sudah disaring blur, tint sepekat itu akan membuat blur
+   nyaris tidak kelihatan (4-8% doang) — menghilangkan seluruh tujuan fase 5. Angka 0.55/0.65
+   TITIK AWAL masuk akal, BUKAN final, wajib dituning ulang pas verifikasi device (langkah 5/5).
+
+**Bonus**: parameter `blurRadius: Dp = 24.dp` fungsi ini sejak Batch 53 cuma "kept for source
+compatibility, 0 dipakai" (krn dulu 0 blur asli sama sekali) — SEKARANG akhirnya benar2 dipakai
+(ditangkap ke `requestedBlurRadius` SEBELUM masuk lambda `hazeEffect{}`, nama beda disengaja krn
+`blurRadius` polos DI DALAM lambda itu merujuk ke property `HazeEffectScope` sendiri —
+name-shadowing lambda-with-receiver Kotlin, bukan parameter fungsi ini; tanpa capture nama beda
+dulu, bisa jadi self-assign salah/no-op). 0 call site manapun (grep ulang, 9 sheet + MiniPlayerBar
++ NowPlayingScreen) yang override `blurRadius` eksplisit, jadi semua otomatis pakai 24dp.
+
+**Cakupan LEBIH LUAS dari sekadar "MiniPlayerBar"**: krn `frostedGlass()` 1 titik shared (bukan
+per-file), fix ini otomatis nyala jg utk `NowPlayingScreen`'s panel (baris 957) DAN sisa 8 sheet
+lain — SEMUA pemanggil `frostedGlass()` yang aktif DI DALAM region `NavHost` yang di-tag
+`hazeSource` (termasuk sheet modal yang tampil DI ATAS layar manapun yang lagi terbuka, sesuai
+desain §3a "sumbernya SAMA, apa pun yang lagi tampil"). **TAPI**: langkah 3/5 roadmap ("NowPlaying
+— cek dulu apa perlu treatment beda") secara eksplisit BELUM diperiksa detail batch ini — cakupan
+otomatis ini kemungkinan besar SUDAH cukup, tapi klaim "fase 3 selesai" ditahan dulu sampai
+verifikasi visual sungguhan (langkah 5), bukan diasumsikan benar dari baca kode doang.
+
+2 file, 0 file baru. `FILE_MANIFEST.txt` tidak berubah (187/187, diverifikasi diff eksplisit).
+Brace/paren `MainActivity.kt` (252/252, 604/604) & `BlurUtils.kt` (9/9, 75/75) seimbang. **Belum
+diverifikasi compile Gradle sungguhan** (0 akses jaringan sesi ini, sama batasan Batch 295) —
+risiko GANDA sekarang (dependency Batch 295 BELUM dikonfirmasi resolve + API `hazeEffect`/
+`hazeSource`/`HazeEffectScope.blurRadius` yang dipakai di sini belum pernah dicompile sama
+sekali). **WAJIB cek CI build setelah push, prioritas SEBELUM lanjut langkah 3/5** — kelas
+masalah sama Batch 291-293 (unresolved-reference cuma ketahuan compile-time). Kalau CI gagal:
+kandidat pertama dicurigai adalah signature exact `hazeEffect`/`HazeEffectScope` di 1.7.2 vs versi
+yang muncul di hasil pencarian (dokumentasi resmi kadang describe versi TERBARU meski artikelnya
+lama) — bandingkan pesan error compiler dgn asumsi di atas sebelum ubah pendekatan lain. Detail
+lengkap: `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5 langkah 2 (ditandai selesai di bawah).
+
 ## Batch 295 — Blur asli fase 5 langkah 1/5: fondasi plumbing Haze (3 file, dependency baru)
 User: "sempurnakan, repack, present" + eksplisit minta lanjut eksekusi (bukan tunggu lagi seperti
 dicatat Batch 294). Langkah 1 `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5 dieksekusi.

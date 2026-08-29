@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.hazeEffect
 
 /**
  * Readable glass surface for Compose.
@@ -38,10 +39,10 @@ fun Modifier.frostedGlass(
     alpha: Float = if (LocalIsDarkTheme.current) 0.92f else 0.96f,
     blurRadius: Dp = 24.dp
 ): Modifier {
-    // blurRadius is kept in the API for source compatibility with existing call sites.
-    // Real backdrop blur is not performed here because Modifier.blur() would blur foreground
-    // content. The surface tint is intentionally opaque enough to preserve contrast (spec §7:
-    // "Text remains readable... Glass must not become milky").
+    // Batch 296 — blurRadius was "kept for source compatibility, unused" since Batch 53; now
+    // wired to real Haze blur (see `requestedBlurRadius` below) for Liquid Glass specifically.
+    // Still a genuine no-op for the other 4 identities — Modifier.blur() would still blur
+    // foreground content, so their surface tint remains the readability strategy for them.
     val isTactile = isTactileTheme()
     val isSkeu = isSkeuTheme()
     // Batch 281 — Liquid Glass fase 3: needed below so this identity gets its OWN edgeBrush
@@ -61,7 +62,20 @@ fun Modifier.frostedGlass(
     // passes one explicitly (grepped), so this can't silently clobber an intentional override.
     // Batch 61 — still forced opaque in BOTH modes: "solid panel, not glass" is an identity trait
     // of Skeu, not something the light/dark toggle should be able to override.
-    val effectiveAlpha = if (isSkeu) 1f else alpha
+    // Batch 296 — Fase 5 langkah 2/5: alpha tint Liquid Glass diturunkan KHUSUS identitas ini
+    // (pola sama persis Skeu's `if (isSkeu) 1f else alpha` di bawah — override per-identitas
+    // sudah ada preseden). ALASAN, bukan kosmetik: alpha 0.92/0.96 default sengaja NEAR-OPAQUE
+    // krn dulu (Batch 53-281) TIDAK ADA blur asli di belakangnya — tint pekat itu SATU-SATUNYA
+    // cara jaga keterbacaan di atas backdrop yang tajam/kacau. Sekarang Liquid Glass dapat
+    // `hazeEffect` (blur asli, di bawah), backdrop-nya SUDAH disaring jadi halus — tint
+    // setinggi 0.92/0.96 di atas blur asli akan membuat blur itu nyaris tidak kelihatan (cuma
+    // nongol 4-8%), menghilangkan tujuan fase 5 ini sama sekali. 0.55f/0.65f = titik awal
+    // masuk akal (translucent, blur+variasi warna backdrop tetap kebaca, teks tetap kontras
+    // cukup di atas blur+tint gabungan) — BUKAN angka final, WAJIB dituning ulang pas
+    // verifikasi visual di device sungguhan (langkah 5/5 roadmap blur), disebut eksplisit di
+    // CHANGELOG supaya sesi berikutnya tidak kaget angka ini berubah.
+    val liquidGlassAlpha = if (isDark) 0.55f else 0.65f
+    val effectiveAlpha = if (isSkeu) 1f else if (isLiquidGlass) liquidGlassAlpha else alpha
     // Batch 53 — spec §8 "Glass edge / highlight" + §9 "Lighting model" (single simulated light,
     // top-left -> bottom-right): a flat single-color border reads as a printed outline, not
     // reflected light. A diagonal two-stop brush (Highlight fading to a second stop) is the
@@ -101,7 +115,30 @@ fun Modifier.frostedGlass(
     // Batch 58 — Skeu's now-stronger bevel border reads better a hair over the glass-theme
     // hairline (1.dp); Tactile/Apple unchanged.
     val edgeWidth = if (isSkeu) 1.5.dp else 1.dp
-    val base = this.background(tint.copy(alpha = effectiveAlpha), shape)
+    // Batch 296 — Fase 5 langkah 2/5: `hazeEffect` DITAMBAH, bukan menggantikan tint+edge yang
+    // sudah ada (§3b desain: blur based + tint warna tipis + edge highlight, bukan blur polos
+    // tanpa warna — pola sama CONVX/Apple Liquid Glass asli). Urutan modifier PENTING:
+    // `hazeEffect` dipasang PALING LUAR (di `this`, sebelum `.background()`) supaya draw-nya
+    // paling belakang — blur tergambar duluan, baru tint semi-transparan (`effectiveAlpha` yg
+    // sudah diturunkan di atas) menimpa di atasnya, baru border edge-glow di atas itu lagi.
+    // `hazeState` dari `LocalHazeState` (Batch 295's provider di AppNavHost) — 4 identitas lain
+    // 0 disentuh (tidak pernah masuk cabang ini sama sekali, `this` mereka tetap Modifier
+    // polos apa adanya seperti sebelum batch ini).
+    // Bonus kecil: parameter `blurRadius` fungsi ini (baris atas, default 24.dp) sejak dulu
+    // cuma "kept for source compatibility" — 0 dipakai sama sekali krn dulu 0 blur asli sama
+    // sekali. Sekarang AKHIRNYA benar2 dipakai (utk Liquid Glass), makanya ditangkap ke
+    // `requestedBlurRadius` DULU sebelum masuk lambda `hazeEffect{}` — nama beda sengaja,
+    // krn di DALAM lambda itu `blurRadius` polos akan merujuk ke property `HazeEffectScope`
+    // sendiri (name-shadowing lambda-with-receiver Kotlin), bukan parameter fungsi ini; tanpa
+    // capture ke nama lain duluan, `this.blurRadius = blurRadius` di dalam bisa jadi
+    // self-assign yang salah/no-op.
+    val requestedBlurRadius = blurRadius
+    val glassBase = if (isLiquidGlass) {
+        this.hazeEffect(state = LocalHazeState.current) { this.blurRadius = requestedBlurRadius }
+    } else {
+        this
+    }
+    val base = glassBase.background(tint.copy(alpha = effectiveAlpha), shape)
     // Batch 79 — NEUMORPHISM: Skeu no longer draws ANY edge/border here at all (was a
     // brushed-metal repeating-stripe rim, Batch 73's isSkeu branch above — deleted along with
     // every other border in this identity's redesign, see TactileDepth.kt's skeuEmboss()).
