@@ -36,6 +36,25 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 297 (Blur asli fase 5 langkah 3-4/5 — verifikasi ModalBottomSheet + CI Batch 296 hijau,
+0 kode)** — User kirim screenshot CI: **Batch 296 Success, 6m 23s** — dependency Haze + API
+`hazeSource`/`hazeEffect` TERKONFIRMASI compile bersih, 2 risiko yang ditandai Batch 296
+terjawab. 2 web search: (1) Haze py dukungan RESMI utk `ModalBottomSheet`/Dialog (official
+sample), bug historis cross-window sudah lama fix (1.6.7, project di 1.7.2); (2) syarat resmi
+"containerColor Transparent + tint manual (bukan Haze tints)" — grep ulang, **SEMUA 9 sheet app
+ini SUDAH match syarat itu sejak lama** (konvensi lama, kebetulan align). **Kesimpulan: 0 gap,
+0 kode tambahan.** Langkah 3 (NowPlayingScreen) & langkah 4 (LibraryScreen/Sheets/Settings)
+roadmap DITANDAI SELESAI — reuse penuh Batch 296 + arsitektur lama, sesuai rencana asli.
+
+**Fase 5 kini tersisa SATU item: langkah 5/5 — verifikasi visual+performa di DEVICE
+SUNGGUHAN.** Ini bukan tugas kode lagi (0 compiler/emulator di sandbox) — perlu USER coba
+langsung: pilih Liquid Glass, buka MiniPlayerBar+NowPlaying+1 sheet, cek blur genuinely
+kelihatan (kalau nyaris tak kelihatan → alpha `BlurUtils.kt` 0.55/0.65 masih ketinggian,
+turunkan lagi), cek API level device (§2 desain: API31=scrim/0 peningkatan, API32=berat,
+API33+=ringan), cek lag saat scroll. Laporkan hasil supaya tuning berikutnya presisi, bukan
+tebak-tebak. 0 file diedit. `FILE_MANIFEST.txt` tidak berubah (187/187). Detail: `CHANGELOG.md`
+Batch 297, `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5.
+
 **Batch 296 (Blur asli fase 5 langkah 2/5 — hazeSource+hazeEffect nyala, 2 file)** — User minta
 lanjut langsung (bukan tunggu CI Batch 295 dulu). API Haze 1.7.2 dicek ulang web_search sesi
 ini: `hazeSource`/`hazeEffect` skema flat 1.x (properti blur langsung di lambda, bukan wrapper

@@ -146,10 +146,19 @@ Strict Micro-Batching tetap berlaku — TIDAK dieksekusi semua sekaligus:
    sama-sama belum pernah dicompile).
 3. **NowPlayingScreen** — sumber konten beda (artwork/panel, bukan list scroll) — dicek dulu apa
    perlu treatment beda dari MiniPlayerBar sebelum asal disamakan.
-   **⏳ BELUM diperiksa detail** — lihat catatan "cakupan otomatis" di langkah 2 di atas.
+   **✅ SELESAI Batch 297, hasil: 0 gap, 0 kode tambahan.** Kekhawatiran awal: "Kontrol Lanjutan"
+   (`ModalBottomSheet`) render di window/layer terpisah, mungkin tidak bisa nyampling
+   `hazeSource` window utama. Dijawab 2 web search: Haze py dukungan RESMI utk Dialog/
+   ModalBottomSheet (official sample ada), syarat `containerColor = Color.Transparent` + tint
+   manual (bukan Haze `tints`) — **sudah dipenuhi sejak lama** (konvensi existing app ini,
+   kebetulan align). `AlbumArtHero` sendiri 0 butuh `hazeEffect` (dia SOURCE, bukan permukaan
+   kaca).
 4. **LibraryScreen row/Sheets/Dialog/Settings** — reuse titik yang sudah teraudit lengkap di
    Batch 282-286 (semua sudah punya daftar pasti file/baris mana yang pakai `frostedGlass()`,
    tidak perlu re-audit dari nol).
+   **✅ SELESAI Batch 297 (sekaligus dgn langkah 3)** — sama alasan: 9 sheet app-wide semua
+   sudah `containerColor` transparent, 0 kode tambahan diperlukan lewat titik-titik yang sudah
+   dipetakan Batch 282-286.
 5. **Verifikasi visual+performa di device sungguhan** — WAJIB, tidak bisa diverifikasi dari
    environment kerja sesi ini (tidak ada compiler/emulator). Termasuk cek performa (blur
    real-time genuinely berat GPU, terutama MiniPlayerBar yang sering re-render saat progress

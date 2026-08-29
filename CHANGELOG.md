@@ -1,5 +1,56 @@
 # Changelog
 
+## Batch 297 — Blur asli fase 5 langkah 3-4/5: verifikasi ModalBottomSheet + CI Batch 296 hijau (0 kode)
+User kirim screenshot CI GitHub Actions: **Batch 296 — Success, 6m 23s, 1 artifact.** Dependency
+Haze 1.7.2 + API `hazeSource`/`hazeEffect`/`HazeEffectScope.blurRadius` TERKONFIRMASI compile
+bersih — 2 risiko yang ditandai Batch 296 (dependency baru + API yang baru dipakai, sama-sama
+belum pernah dicompile) SELESAI terjawab. Gerbang "WAJIB cek CI sebelum lanjut" resmi dibuka.
+
+Lanjut langkah 3 ("NowPlayingScreen — cek treatment beda") + langkah 4 ("LibraryScreen row/
+Sheets/Dialog/Settings — reuse audit lama"). Kekhawatiran awal: `NowPlayingScreen`'s "Kontrol
+Lanjutan" (baris 957) DAN sisa 8 sheet lain semua `ModalBottomSheet` — apakah render-nya di
+window/layer TERPISAH dari main content bikin `hazeEffect` di dalamnya TIDAK BISA nyampling
+`hazeSource` yang ditempel di `NavHost` (beda window = beda surface capture)? 2 web search
+(bukan asumsi):
+
+1. **Haze punya dukungan resmi utk Dialog/ModalBottomSheet** — dokumentasi resminya eksplisit
+   py "DialogSample" + "Bottom Sheet sample... blurred bottom sheet using Haze dengan Material
+   3's ModalBottomSheet" sbg pola yang DIDUKUNG & didokumentasikan, bukan limitasi/gotcha. Bug
+   historis "Haze'd dialogs not blurring background content" sudah lama diperbaiki (rilis 1.6.7,
+   versi project ini 1.7.2 jauh di atasnya).
+2. **Syarat yang didokumentasikan**: "Always set the container color to transparent... when
+   using Haze with ModalBottomSheet" + "avoid Haze tint directly... use translucent background
+   color on the dialog surface instead". Grep ulang: **SEMUA 9 sheet app ini SUDAH
+   `containerColor = Color.Transparent`** (konvensi lama, jauh sebelum Haze dipertimbangkan —
+   awalnya demi konsisten dgn simulasi kaca `frostedGlass()`, TERNYATA kebetulan PERSIS syarat
+   yang Haze minta). Tint juga SUDAH lewat `.background()` kita sendiri (bukan `tints` param
+   Haze) — persis rekomendasi resmi kedua ("avoid Haze tint directly").
+
+**Kesimpulan: 0 gap, 0 kode tambahan dibutuhkan.** Arsitektur lama (containerColor transparent +
+tint manual via `frostedGlass()`) SUDAH match syarat Haze utk dialog/sheet sejak sebelum fase 5
+ini dimulai — kebetulan baik, bukan by design saat itu, tapi hasil akhirnya sama. `AlbumArtHero`
+(NowPlayingScreen) sendiri TIDAK butuh `hazeEffect` apa pun — dia SOURCE (bagian dari region yang
+di-`hazeSource`), bukan permukaan kaca, jadi 0 perubahan relevan di sana. Langkah 3 & 4 roadmap
+**ditandai SELESAI** (reuse penuh dari Batch 296 + arsitektur lama, sesuai rencana asli §5:
+"tidak perlu re-audit dari nol").
+
+**Sisa SATU-SATUNYA item fase 5: langkah 5/5 — verifikasi visual+performa di device sungguhan.**
+Ini BUKAN tugas kode yang bisa "next" lagi dari sandbox sesi ini (0 compiler/emulator/device di
+sini) — perlu user coba langsung: (1) pilih Liquid Glass di Settings, (2) buka MiniPlayerBar +
+Now Playing + minimal 1 sheet (mis. Equalizer/Queue), scroll konten di baliknya, pastikan blur
+GENUINELY kelihatan (bukan cuma tint pekat spt sebelum Batch 296) — kalau blur nyaris tak
+kelihatan, kandidat pertama: alpha 0.55/0.65 (BlurUtils.kt) masih ketinggian, turunkan lagi;
+kalau TERLALU transparan/teks susah dibaca, naikkan; (3) cek device API level (Settings > Tentang
+Ponsel) — sesuai §2 desain, API 31 tepat = fallback scrim (TIDAK ADA peningkatan visual sama
+sekali dari fase ini, itu ekspektasi Haze sendiri bukan bug), API 32 = blur tapi lebih berat,
+API 33+ = paling ringan; (4) scroll cepat sambil MiniPlayerBar/sheet terbuka, rasakan ada
+lag/stutter atau tidak (blur real-time genuinely berat GPU). Laporkan hasil (device+API level+
+kesan visual+performa) supaya batch berikutnya bisa tuning alpha/blurRadius yang tepat, bukan
+menebak lagi.
+
+0 file diedit batch ini (verifikasi doang). `FILE_MANIFEST.txt` tidak berubah (187/187). Detail:
+`LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5 langkah 3-4 (ditandai selesai di bawah).
+
 ## Batch 296 — Blur asli fase 5 langkah 2/5: hazeSource+hazeEffect nyala (2 file)
 User minta lanjut eksekusi langsung (bukan tunggu verifikasi CI Batch 295 dulu). API Haze 1.7.2
 dicek ulang via web search PERSIS sesi ini (bukan asumsi dari desain Batch 294): dikonfirmasi
