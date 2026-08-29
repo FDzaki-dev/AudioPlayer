@@ -129,6 +129,8 @@ import com.rudi.audioplayer.ui.theme.SkeuAmbientAlphaLight
 import com.rudi.audioplayer.ui.theme.SkeuEmerald
 import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
 import com.rudi.audioplayer.ui.theme.calmGrain
+import com.rudi.audioplayer.ui.theme.LocalHazeState
+import dev.chrisbanes.haze.rememberHazeState
 
 class MainActivity : FragmentActivity() {
 
@@ -515,6 +517,12 @@ private fun WelcomeHighlight(icon: androidx.compose.ui.graphics.vector.ImageVect
 @Composable
 private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boolean) {
     val navController = rememberNavController()
+    // Batch 295 — fase 5 langkah 1 ("fondasi plumbing"), lihat LIQUID_GLASS_BLUR_ENGINE_DESIGN.md
+    // §3a. 1 HazeState dipegang di sini (bukan per-layar), diteruskan ke seluruh NavHost/
+    // MiniPlayerBar via LocalHazeState (Theme.kt) supaya tidak perlu parameter baru di 20+
+    // file. 0 consumer sama sekali batch ini (belum ada .hazeSource()/.hazeEffect() dipasang
+    // di manapun) — murni plumbing, 0 perubahan visual.
+    val hazeState = rememberHazeState()
     val uiState by playerViewModel.uiState.collectAsStateWithLifecycle()
     val favoriteIds by playerViewModel.favoriteIds.collectAsStateWithLifecycle()
     val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsStateWithLifecycle()
@@ -841,6 +849,11 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         )
     }
 
+    // Batch 295 — bungkus Scaffold (bukan cuma pasang provider di root Compose tree lebih
+    // atas) supaya scope-nya jelas 1 titik, sama gaya CompositionLocalProvider yang SUDAH ADA
+    // di file ini (Batch 24, baris ~210) — badan blok TIDAK di-reindent (pola sama persis
+    // Batch 24: minim-diff, bukan reformat besar-besaran demi estetika indentasi).
+    CompositionLocalProvider(LocalHazeState provides hazeState) {
     Scaffold(
         snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
@@ -1163,7 +1176,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 }
             }
         } // tutup Row adaptif (Batch 101)
-    }
+    } // tutup Scaffold
+    } // tutup CompositionLocalProvider(LocalHazeState) (Batch 295)
 }
 
 @Composable

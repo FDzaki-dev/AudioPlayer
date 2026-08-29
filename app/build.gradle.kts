@@ -270,6 +270,21 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
+    // Batch 295 — LIQUID_GLASS_BLUR_ENGINE_DESIGN.md §1/§3a/§4, fase 5 langkah 1 ("fondasi
+    // plumbing"). 1.7.2 dipilih SENGAJA BUKAN versi 2.0.0-alphaXX yang lebih baru (dicek
+    // web_search Agustus 2026, alpha05 ada di Maven Central, rilis modul aktif s/d 21 Agu
+    // 2026) — 1.7.2 adalah tag "Latest" resmi (non-prerelease) di GitHub releases, API-nya
+    // flat/simpel (hazeSource+hazeEffect, properti blur langsung di lambda), SEDANGKAN linimasa
+    // 2.x masih alpha (5 rilis alpha dalam ~4 bulan, tiap rilis eksplisit "Breaking Changes" di
+    // changelog-nya sendiri, termasuk split modul wajib haze+haze-blur & API blur dibungkus
+    // blurEffect{} baru). Fase ini ("fondasi plumbing") jadi pijakan SEMUA sub-langkah blur
+    // berikutnya (2-5) — STABILITY > Speed (Core Protocol, di atas rule #3 "prioritas
+    // mutakhir") menang: pijakan awal pakai API yang breaking-change-nya sudah selesai
+    // (tag stabil), bukan API yang masih berpotensi berubah lagi sebelum sub-langkah 2 sempat
+    // jalan. haze-materials (prebuilt HazeStyle) TIDAK ditambahkan — desain fase 5 pakai tint
+    // LiquidGlassAccent yang SUDAH ADA di frostedGlass(), bukan style bawaan Haze.
+    implementation("dev.chrisbanes.haze:haze:1.7.2")
+
     implementation("androidx.media3:media3-exoplayer:1.3.1")
     implementation("androidx.media3:media3-session:1.3.1")
     implementation("androidx.media3:media3-common:1.3.1")

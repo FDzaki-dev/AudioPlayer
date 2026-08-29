@@ -1,5 +1,87 @@
 # Changelog
 
+## Batch 295 — Blur asli fase 5 langkah 1/5: fondasi plumbing Haze (3 file, dependency baru)
+User: "sempurnakan, repack, present" + eksplisit minta lanjut eksekusi (bukan tunggu lagi seperti
+dicatat Batch 294). Langkah 1 `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5 dieksekusi.
+
+**Keputusan versi Haze** (dicek ulang web_search Agustus 2026, persis di momen eksekusi sesuai
+§4 dokumen desain): **`dev.chrisbanes.haze:haze:1.7.2`**, BUKAN linimasa `2.0.0-alphaXX` yang
+lebih baru tapi masih pre-release aktif (5 alpha dalam ~4 bulan, modul `haze-blur`/
+`haze-utils` dapat rilis sesegar 21 Agustus 2026 — linimasa 2.x genuinely linimasa
+pengembangan utama saat ini, BUKAN cuma proyek sampingan basi). 1.7.2 dipilih karena itu tag
+"Latest" resmi GitHub (non-prerelease) — setiap rilis alpha 2.x eksplisit "Breaking Changes" di
+changelog-nya sendiri (split modul wajib, API blur dibungkus `blurEffect{}` baru, dst). Batch
+ini "fondasi plumbing" — pijakan SEMUA 4 sub-langkah blur berikutnya — STABILITY > Speed (Core
+Protocol, di atas rule #3 "prioritas mutakhir") menang: pijakan pakai API yang breaking-change-
+nya sudah selesai, bukan yang masih berpotensi berubah lagi sebelum sub-langkah 2 sempat jalan.
+
+**`app/build.gradle.kts`** (diedit, protected asset) — `implementation("dev.chrisbanes.haze:
+haze:1.7.2")` ditambahkan, 1 baris + komentar alasan versi. `haze-materials` (prebuilt style)
+TIDAK ditambahkan — desain fase 5 pakai tint `LiquidGlassAccent` yang SUDAH ADA di
+`frostedGlass()`, bukan style bawaan Haze.
+
+**`Theme.kt`** (diedit) — `LocalHazeState` baru (`staticCompositionLocalOf { HazeState() }`),
+persis di sebelah `LocalIsDarkTheme` yang sudah ada, pola identik (default cuma fallback
+preview/test, nilai sungguhan dari provider di `AppNavHost`).
+
+**`MainActivity.kt`** (diedit, protected asset) — `AppNavHost`: `val hazeState =
+rememberHazeState()` ditambahkan setelah `navController`. `Scaffold(...)` (baris ~844-1166,
+sudah dikonfirmasi jadi statement top-level terakhir fungsi via cek indentasi manual sebelum
+edit, bukan tebakan) dibungkus `CompositionLocalProvider(LocalHazeState provides hazeState) {
+... }` — badan blok Scaffold TIDAK di-reindent, pola minim-diff identik
+`CompositionLocalProvider` yang SUDAH ADA di file yang sama (Batch 24, baris ~210).
+
+3 file (2 protected asset — `app/build.gradle.kts` & `MainActivity.kt` — edit parsial fokus,
+sesuai Protocol §2). Brace/paren ketiganya seimbang (MainActivity.kt 252/252,596/596; Theme.kt
+14/14,146/146; app/build.gradle.kts 36/36,179/179). **Dikonfirmasi grep: 0 pemakaian
+`.hazeSource()`/`.hazeEffect()` di manapun** — genuinely 0 visual/behavior berubah, murni
+plumbing. `FILE_MANIFEST.txt` tidak berubah (0 file baru). **Belum diverifikasi compile Gradle
+sungguhan** (0 akses jaringan sesi ini, tidak bisa `./gradlew` fetch dependency baru) — **WAJIB
+cek CI build setelah push batch ini** sebelum lanjut sub-langkah 2 (MiniPlayerBar, kandidat
+visual pertama) — dependency baru + CompositionLocal baru adalah kombinasi paling rawan
+typo/unresolved-reference yang cuma ketahuan compile-time, persis kelas masalah Batch 291-293
+sebelumnya. Detail lengkap: `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5.
+
+## Batch 294 — Desain teknis blur asli Liquid Glass (Fase 5 lanjutan, PERENCANAAN SAJA, 0 kode)
+User pilih "desain teknis dulu (dokumen, 0 kode)" setelah ditanya mau mulai dari mana utk blur
+asli. Dokumen baru: `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md`.
+
+Riset (web search, bukan asumsi): dibandingkan 4 opsi implementasi (Haze/`dev.chrisbanes.haze`,
+`imla`, `Cloudy`, hand-roll `RenderEffect` sendiri). **Rekomendasi: adopsi Haze** — library
+Compose khusus backdrop-blur, v2.0 rilis 2026 (aktif dikembangkan), dibangun di atas
+`GraphicsLayer` Compose 1.7+. Hand-roll ditolak eksplisit dgn alasan: `RenderEffect`+
+`graphicsLayer` 1-baris cuma blur ISI composable itu sendiri — LIMITASI SAMA PERSIS yang sudah
+didokumentasikan jujur di `BlurUtils.kt` sekarang — blur backdrop SUNGGUHAN butuh koordinasi 2
+composable (1 "source" direkam, 1 "effect" sampling+blur ulang), problem solved yang tidak
+untung direinvent. Analogi disebutkan: CONVX sendiri juga vendor library terpisah
+(`Kyant0/backdrop`) utk alasan yang sama, bukan hand-roll.
+
+Ekspektasi realistis dicatat eksplisit (dari dokumentasi resmi Haze): fallback per-API — API 31
+(persis minSdk project sekarang) = "scrim", SAMA PERSIS visualnya dgn `frostedGlass()` yang
+sudah ada (0 peningkatan buat device di lantai minSdk baru); API 32 = multi-`GraphicsLayer`; API
+33+ = Runtime Shader (paling efisien). Peningkatan visual nyata baru kerasa di device API 32+.
+
+Arsitektur diperiksa terhadap kode SUNGGUHAN (bukan diagram abstrak): `frostedGlass()`
+(`BlurUtils.kt`) adalah 1 titik pusat, tapi blur asli TIDAK bisa cuma "edit 1 fungsi itu" — perlu
+`HazeState` dibagi antara konten "source" (apa yang di-blur) dan permukaan "effect" (kaca-nya).
+`MainActivity.kt` diperiksa: `AppNavHost` (~baris 516) punya `Scaffold` (~844) berisi
+`MiniPlayerBar` (~877) + `NavHost` (~1022) sbg 2 anak sejajar — direkomendasikan `HazeState`
+dipegang 1 titik di situ, diteruskan lewat `CompositionLocal` baru (`LocalHazeState`, pola sama
+`LocalIsDarkTheme` yg sudah ada), MiniPlayerBar jadi kandidat blur PERTAMA (satu-satunya
+permukaan yang 100% waktu melayang di atas konten yang scroll).
+
+5 sub-langkah eksekusi didraft (fondasi plumbing → MiniPlayerBar → NowPlayingScreen →
+LibraryScreen/Sheets/Dialog/Settings [reuse hasil audit Batch 282-286] → verifikasi
+visual+performa device). Dependency baru (`dev.chrisbanes.haze:haze`) diberitahukan dari sekarang
+akan menyentuh `app/build.gradle.kts` (protected asset) di batch eksekusi pertama — TIDAK
+ditambahkan sekarang, dan versi pasti SENGAJA tidak ditulis (arsitektur modular Haze 2.x baru,
+versi hari ini berisiko basi di batch eksekusi nanti — cek ulang dokumentasi resmi saat itu).
+
+`ROADMAP_LIQUID_GLASS_REDESIGN.md` §5 diupdate menunjuk dokumen baru ini (ringkasan singkat,
+bukan duplikasi penuh). `FILE_MANIFEST.txt` diperbarui (+1 file). 0 kode disentuh sama sekali
+(instruksi eksplisit user). **Prioritas sesi berikutnya**: TUNGGU user minta lanjut eksekusi —
+jangan mulai sub-langkah 1 tanpa instruksi, ini murni desain yang menunggu giliran.
+
 ## Batch 293 — Hotfix CI: instrumentation-tests job FAILED "No compatible devices connected" (regresi tertinggal Batch 290, 1 protected asset)
 User upload screenshot GitHub Actions run #287 (`build` job HIJAU — konfirmasi fix Batch 292
 sukses — tapi job `instrumentation-tests` terpisah FAILED, 7m42s) + `instrumentation_test_report_287.zip`.

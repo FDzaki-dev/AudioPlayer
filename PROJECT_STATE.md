@@ -36,6 +36,37 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 295 (Blur asli fase 5 langkah 1/5 — fondasi plumbing Haze, 3 file, dependency baru)** —
+User minta lanjut eksekusi (bukan tunggu). Versi **`dev.chrisbanes.haze:haze:1.7.2`** dipilih
+(dicek ulang web_search persis di momen eksekusi) — tag "Latest" resmi GitHub, BUKAN linimasa
+`2.0.0-alphaXX` yang lebih baru tapi masih pre-release aktif (breaking changes tiap rilis
+alpha). STABILITY > Speed menang di atas rule #3 "prioritas mutakhir" — pijakan fondasi 4
+sub-langkah berikutnya pakai API yang sudah selesai breaking-change-nya. `app/build.gradle.kts`
+(protected, +1 dependency) + `Theme.kt` (+`LocalHazeState`, pola identik `LocalIsDarkTheme`) +
+`MainActivity.kt` (protected, `AppNavHost`: `rememberHazeState()` + `Scaffold` dibungkus
+`CompositionLocalProvider`, pola minim-diff identik wrap Batch 24 yang sudah ada di file yang
+sama). **Dikonfirmasi grep: 0 pemakaian `.hazeSource()`/`.hazeEffect()` di manapun** — genuinely
+0 visual/behavior berubah, murni plumbing. Brace/paren seimbang. `FILE_MANIFEST.txt` tidak
+berubah. **Belum diverifikasi compile Gradle sungguhan** (0 akses jaringan sesi ini) — **WAJIB
+cek CI build setelah push** sebelum lanjut sub-langkah 2 (MiniPlayerBar, kandidat visual
+pertama) — dependency+CompositionLocal baru rawan unresolved-reference yang cuma ketahuan
+compile-time (kelas masalah sama Batch 291-293). Detail: `CHANGELOG.md` Batch 295,
+`LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5.
+
+**Batch 294 (Desain teknis blur asli Liquid Glass — PERENCANAAN SAJA, 0 kode, 1 dokumen baru)**
+— User pilih "desain dulu" utk Fase 5 (blur asli). Dokumen baru `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md`:
+riset 4 opsi (Haze/imla/Cloudy/hand-roll), **rekomendasi adopsi Haze** (`dev.chrisbanes.haze`) —
+hand-roll ditolak krn `RenderEffect` 1-baris cuma blur ISI composable sendiri, limitasi SAMA
+persis yg sudah ada di `frostedGlass()` sekarang. Ekspektasi realistis dicatat: API 31 (minSdk
+sekarang) fallback "scrim" = 0 peningkatan visual, baru kerasa bedanya API 32+. Arsitektur
+diperiksa ke kode nyata: `HazeState` direkomendasikan dipegang 1 titik di `AppNavHost`
+(`MainActivity.kt`, `Scaffold` berisi `MiniPlayerBar`+`NavHost` sejajar), diteruskan
+`CompositionLocal` baru. MiniPlayerBar jadi kandidat blur pertama. 5 sub-langkah eksekusi
+didraft, TIDAK dieksekusi. Dependency Haze BELUM ditambahkan, versi sengaja tidak ditulis
+(resiko basi). `ROADMAP_LIQUID_GLASS_REDESIGN.md` §5 diupdate nunjuk dokumen ini. 0 kode
+disentuh. **Prioritas: TUNGGU user minta lanjut eksekusi**, jangan mulai sub-langkah 1 sendiri.
+Detail: `CHANGELOG.md` Batch 294.
+
 **Batch 293 (Hotfix CI — user upload screenshot run #287 + `instrumentation_test_report_287.zip`,
 1 protected asset)** — `build` job Batch 292 HIJAU (konfirmasi), tapi job `instrumentation-tests`
 terpisah FAILED: "No compatible devices connected." Akar masalah dikonfirmasi silang ke

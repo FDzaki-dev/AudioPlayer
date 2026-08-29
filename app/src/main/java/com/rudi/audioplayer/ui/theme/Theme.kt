@@ -11,6 +11,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.HazeState
 
 // Batch 61 — REARSITEKTUR: identitas tema (Apple/Tactile/Skeuomorphism) dan mode
 // terang/gelap dulunya digabung jadi satu enum AppTheme (SYSTEM/LIGHT/DARK/TACTILE/
@@ -60,6 +61,15 @@ enum class ThemeMode(val storageKey: String, val displayName: String) {
 // seluruh app) — cukup 1 CompositionLocal yang di-provide sekali di root
 // AudioPlayerTheme(), persis pola LocalContentColor bawaan Compose sendiri.
 val LocalIsDarkTheme = staticCompositionLocalOf { true }
+
+// Batch 295 — LIQUID_GLASS_BLUR_ENGINE_DESIGN.md §3a, fase 5 langkah 1 ("fondasi plumbing").
+// Sama pola persis LocalIsDarkTheme di atas: 1 HazeState dipegang 1 titik (AppNavHost,
+// MainActivity.kt) via rememberHazeState(), diteruskan lewat CompositionLocal ini supaya
+// layar/sheet di dalam NavHost (20+ file) tidak perlu terima parameter baru satu-satu.
+// Default `HazeState()` di sini HANYA fallback preview/test — nilai sungguhan SELALU datang
+// dari provider di AppNavHost, sama seperti LocalIsDarkTheme's default `true` bukan nilai yang
+// benar2 dipakai runtime.
+val LocalHazeState = staticCompositionLocalOf { HazeState() }
 
 private val AppleDarkColors = darkColorScheme(
     primary = AppleAccent,

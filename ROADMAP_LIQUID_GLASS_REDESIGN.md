@@ -211,6 +211,15 @@ karena pola itu sudah terbukti jalan 25+ batch tanpa masalah, bukan re-invent pr
      `SDK_INT < 31` ditemukan di codebase (dicek grep) — 0 dead-code cleanup diperlukan.
    - **⏳ Berikutnya**: infrastruktur `RenderEffect`/`RenderNode` capture+blur (belum ada sama
      sekali di project ini, effort tinggi, perlu direncanakan per-komponen — lihat §4).
+     **✅ Desain teknis SELESAI Batch 294** — lihat `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` (dokumen
+     terpisah, khusus fase ini). Ringkasan keputusan: adopsi library **Haze**
+     (`dev.chrisbanes.haze`), BUKAN hand-roll `RenderEffect` dari nol — CONVX sendiri juga
+     vendor library terpisah (`Kyant0/backdrop`) utk alasan yang sama. `HazeState` dipegang 1
+     titik di `AppNavHost` (`MainActivity.kt`), diteruskan lewat `CompositionLocal` baru.
+     Ekspektasi realistis dicatat: device persis di minSdk 31 TIDAK dapat peningkatan visual
+     (Haze fallback ke "scrim" = sama seperti `frostedGlass()` sekarang), baru kelihatan bedanya
+     di API 32+. **BELUM dieksekusi — 0 kode, 0 dependency ditambahkan.** Rencana batch
+     eksekusi (5 sub-langkah) didraft di dokumen itu, tunggu user minta lanjut.
 
 **Audit pill/chip lebar (sisa fase 3) — dimulai Batch 287**: `LibraryFilterChips`
 (`LibraryScreen.kt`, tab Lagu/Album/Artis/dst) — chip lebar (lebar≠tinggi, teks pendek+padding,
@@ -224,11 +233,13 @@ lain 0 perubahan. **✅ Kandidat LAIN SELESAI Batch 288**: Material3 `FilterChip
 titik dikasih `shape = if (isLiquidGlassTheme()) RoundedCornerShape(Radius.liquidPill) else
 FilterChipDefaults.shape`. **Audit pill/chip lebar TUNTAS, fase 3 100% selesai.**
 
-**Item berikutnya**: TIDAK ADA lagi item fase 3 yang bisa dieksekusi otomatis. Sisa satu-satunya
-item roadmap adalah langkah 5 (blur asli §3b) — itu OPSIONAL dan eksplisit butuh konfirmasi user
-dulu (bump minSdk + investasi teknis), bukan sesuatu yang bisa jalan sendiri tanpa izin. Sesi
-berikutnya: kalau user tidak punya instruksi baru, TANYA dulu apa mau lanjut ke blur asli
-(dengan trade-off minSdk-nya dijelaskan), atau anggap redesign Liquid Glass selesai di titik ini.
+**Item berikutnya**: Fase 3 (pill/chip) 100% selesai sejak Batch 288. **Langkah 5 (blur asli
+§3b) DIKONFIRMASI user Batch 290, sedang berjalan** — minSdk 23→31 (290), BOM Compose bump
+(291), 2 hotfix CI (292/293), desain teknis blur di `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` (294),
+**sub-langkah 1/5 "fondasi plumbing" SELESAI (Batch 295)**: dependency Haze 1.7.2 + `LocalHazeState`
++ `HazeState` dipegang `AppNavHost`, 0 visual berubah (dikonfirmasi 0 consumer). Sisa sub-langkah
+2-5 ada di `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5 — TUNGGU user minta lanjut tiap sub-langkah,
+jangan eksekusi berturutan tanpa jeda (Strict Micro-Batching).
 
 ---
 
