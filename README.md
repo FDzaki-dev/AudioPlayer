@@ -8,7 +8,7 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 137:** Calm Retro v3 — scanline kini di semua sheet (Lirik, A-B Repeat & Bookmark, Antrean Putar).
+> 🆕 **Update terbaru — Batch 298:** Tema Liquid Glass — typography lebih tegas (bobot header naik + 5 slot skala teks yang tadinya kosong kini terisi) dan blur asli (Haze) diperkuat, dipasangkan sengaja: blur lebih kuat butuh kontras teks yang lebih tinggi di atasnya.
 > Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
 > sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
 > Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
@@ -199,9 +199,13 @@ Untuk **MP3/AAC** (lossy), gapless yang benar-benar sample-accurate juga bergant
 Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai **GitHub Release** bertag `v<versi>-release` (bukan CI artifact — release asset di-serve GitHub apa adanya, tanpa dibungkus `.zip`, dan bisa diunduh publik tanpa login). Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
 
 ## Rencana v2 (belum dibuat)
-- **Redesign identitas visual terinspirasi CONVX ("Liquid Glass")** — arah baru Batch 278, lihat
-  `ROADMAP_LIQUID_GLASS_REDESIGN.md` untuk rencana lengkap. Masih tahap perencanaan, 0 kode
-  berubah; keputusan besar (ganti vs tambah tema, blur sungguhan vs simulasi) masih menunggu
-  konfirmasi user sebelum batch eksekusi pertama.
+- **Redesign identitas visual terinspirasi CONVX ("Liquid Glass")** — arah baru sejak Batch 278,
+  kini tema ke-5 yang aktif (bukan lagi tahap perencanaan). Sudah punya shape/typography sendiri
+  (fase 1-4), blur asli via Haze (`hazeSource`/`hazeEffect`, fase 5 langkah 1-4, Batch 295-297,
+  diperkuat lagi Batch 298), dan tuning typography khusus (Batch 298). **Satu-satunya yang masih
+  tersisa: langkah 5/5 fase blur — verifikasi visual+performa di device Android sungguhan** (0
+  emulator/compiler di sandbox sesi manapun sejauh ini), lihat `PROJECT_STATE.md` untuk detail
+  yang perlu dicek. Rencana lengkap & histori keputusan di `ROADMAP_LIQUID_GLASS_REDESIGN.md` dan
+  `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md`.
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)

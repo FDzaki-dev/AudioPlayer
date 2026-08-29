@@ -36,6 +36,50 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 298 (Perkuat typography + efek blur Liquid Glass — permintaan user langsung, 2 file kode)**
+— User minta eksplisit "perkuat typography+efek blur pada theme liquid glass" di luar antrean
+roadmap (langkah 5/5 blur asli masih nunggu verifikasi device sungguhan sejak Batch 297 — batch
+INI TIDAK menyelesaikan itu, cuma menambah 2 hal baru yang ikut perlu diverifikasi bareng nanti).
+2 perubahan dipasangkan SATU rasionalisasi: blur lebih kuat bikin backdrop lebih "ramai", jadi
+teks header/label butuh kontras lebih tinggi biar tetap kebaca di atasnya — bukan 2 task lepas.
+
+**`BlurUtils.kt`** (1 titik): default parameter `blurRadius` fungsi `frostedGlass()` naik
+24dp → 32dp. Aman lewat default bersama (bukan cabang khusus baru) krn dikonfirmasi ulang: grep
+12/12 call site `.frostedGlass()` di app ini TANPA argumen (semua pakai default), dan parameter
+ini genuinely no-op utk 4 identitas lain (Apple/Tactile/Skeu/Calm Retro tidak pernah membacanya
+— cuma `isLiquidGlass` yang menangkapnya ke `requestedBlurRadius` lalu diteruskan ke
+`hazeEffect`). Jadi menaikkan default ini 100% cuma menguatkan blur asli Liquid Glass, 0 dampak
+identitas lain. Belum dinaikkan lebih jauh lagi (mis. 40dp+) krn PROJECT_STATE sudah menandai
+API32 "berat" utk blur asli (Batch 294 §2) — 32dp kompromi naik cukup terasa tanpa lompat ke
+rentang berisiko performa. `liquidGlassAlpha` (0.55f/0.65f) SENGAJA TIDAK disentuh — itu tint,
+bukan blur, dan sudah ditandai eksplisit di Batch 296 sebagai "titik awal, wajib dituning ulang
+pas verifikasi visual device" — biar 1 sumber kebenaran, bukan diubah dua kali di dua batch beda
+sebelum ada data device sungguhan.
+
+**`Type.kt`** (`LiquidGlassTypography`, 1 titik): 2 kelompok perubahan dari baseline Batch 279.
+(1) **Bobot naik 1 tingkat** di 3 slot lama yang sudah ada: `titleLarge` SemiBold→Bold,
+`titleMedium` Medium→SemiBold, `labelSmall` Medium→SemiBold — ukuran/lineHeight/letterSpacing
+TIDAK disentuh (tetap terbuka/0 ala identitas asli, bukan rapat ala Apple), murni bobot.
+(2) **5 slot M3 baru diisi**: `headlineSmall`/`titleSmall`/`bodyLarge`/`labelLarge`/`labelMedium`
+— digrep dulu (`MaterialTheme.typography.*` di seluruh `app/src/main/java`) sebelum nulis kode:
+kelima slot ini dipakai luas (StatsDashboardScreen angka besar, LibraryScreen+SettingsScreen
+judul seksi, LyricsView/LyricsSheet, SmartPlaylistScreen filter, RingtoneCutterSheet,
+NowPlayingScreen) tapi belum pernah didefinisikan di `LiquidGlassTypography` — diam-diam jatuh
+ke `Typography()` default Material3 (Roboto) tiap Liquid Glass aktif, SATU-SATUNYA dari 5
+identitas yang punya lubang ini (AppleTypography/TactileTypography juga cuma isi 5 slot yang
+sama, tapi TIDAK disentuh batch ini — di luar scope permintaan user, "liquid glass" doang).
+Nilai baru: ukuran ikut pola "app selalu sedikit di atas default M3" yang sudah ada di slot
+lama (bukan angka M3 mentah), bobot ikut tier yang sama dgn (1) — `headlineSmall`/`titleSmall`/
+`labelLarge` naik ke SemiBold/Bold (peran header/label), `bodyLarge` tetap Normal (peran teks
+baca, sejajar `bodyMedium`/`bodySmall` yang JUGA sengaja tidak disentuh) — kontras datang dari
+header vs body, bukan dari menebalkan semua teks sekaligus.
+
+Brace/paren kedua file diverifikasi seimbang (kode-only, komentar dikecualikan). 0 import baru,
+0 dependency baru, 0 file baru — `FILE_MANIFEST.txt` tidak berubah (187/187). **Belum
+divalidasi compile Gradle sungguhan** (0 akses jaringan sesi ini, pola sama tiap batch) —
+**WAJIB cek CI setelah push**, walau risikonya rendah (perubahan value + isi `TextStyle` baru,
+bukan API/dependency baru yang belum pernah dipakai). Detail lengkap: `CHANGELOG.md` Batch 298.
+
 **Batch 297 (Blur asli fase 5 langkah 3-4/5 — verifikasi ModalBottomSheet + CI Batch 296 hijau,
 0 kode)** — User kirim screenshot CI: **Batch 296 Success, 6m 23s** — dependency Haze + API
 `hazeSource`/`hazeEffect` TERKONFIRMASI compile bersih, 2 risiko yang ditandai Batch 296

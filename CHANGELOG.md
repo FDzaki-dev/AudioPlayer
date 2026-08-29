@@ -1,5 +1,54 @@
 # Changelog
 
+## Batch 298 — Perkuat typography + efek blur Liquid Glass (permintaan user langsung, 2 file)
+User minta eksplisit "perkuat typography+efek blur pada theme liquid glass", di luar antrean
+roadmap blur (langkah 5/5 — verifikasi visual di device sungguhan — masih tertunda sejak Batch
+297, TIDAK diselesaikan batch ini). 2 perubahan berikut sengaja dipasangkan satu alasan: blur
+yang lebih kuat membuat backdrop di belakang panel kaca lebih "ramai", jadi teks header/label di
+atasnya butuh kontras lebih tinggi supaya tetap terbaca — bukan dua perbaikan yang tidak
+berhubungan.
+
+**Blur (`BlurUtils.kt`)** — default `blurRadius` pada `frostedGlass()` naik dari 24dp ke 32dp.
+Grep ulang mengonfirmasi 12 dari 12 pemanggilan `.frostedGlass()` di seluruh app memakai default
+(tidak ada yang mengirim argumen sendiri), dan parameter ini terbukti tidak pernah dibaca oleh 4
+identitas lain (Apple/Tactile/Skeu/Calm Retro) — hanya cabang Liquid Glass yang menangkapnya
+untuk diteruskan ke `hazeEffect` milik Haze. Menaikkan angka default ini karena itu murni
+menguatkan blur asli Liquid Glass, tanpa efek samping ke tema lain. Angka tidak dinaikkan lebih
+jauh (mis. 40dp+) karena desain blur asli (Batch 294) sudah mencatat API 32 sebagai kelas
+perangkat yang "berat" untuk efek ini — 32dp dipilih sebagai kenaikan yang terasa tanpa masuk ke
+zona risiko performa. Tint (`liquidGlassAlpha`, 0.55f gelap / 0.65f terang) sengaja tidak ikut
+diubah batch ini — nilai itu sudah ditandai eksplisit di Batch 296 sebagai titik awal yang wajib
+dituning ulang berdasarkan hasil verifikasi di device sungguhan, jadi biar tetap satu sumber
+kebenaran sampai data device itu ada.
+
+**Typography (`Type.kt`, `LiquidGlassTypography`)** — dua kelompok perubahan:
+1. Bobot naik satu tingkat pada 3 slot yang sudah ada: `titleLarge` (SemiBold → Bold),
+   `titleMedium` (Medium → SemiBold), `labelSmall` (Medium → SemiBold). Ukuran, line height, dan
+   letter spacing tidak diubah sama sekali — identitas "tracking terbuka, bukan rapat ala Apple"
+   dari Batch 279 tetap dipertahankan, murni bobotnya yang naik.
+2. Lima slot skala tipografi Material3 yang sebelumnya kosong kini diisi: `headlineSmall`,
+   `titleSmall`, `bodyLarge`, `labelLarge`, `labelMedium`. Sebelum menulis kode, dilakukan grep
+   `MaterialTheme.typography.*` di seluruh `app/src/main/java` — kelima slot ini ternyata dipakai
+   luas (angka besar di `StatsDashboardScreen`, judul seksi di `LibraryScreen`/`SettingsScreen`,
+   teks lirik di `LyricsView`/`LyricsSheet`, label filter di `SmartPlaylistScreen`, tombol/label
+   di `RingtoneCutterSheet`, teks meta di `NowPlayingScreen`) tapi belum pernah didefinisikan di
+   `LiquidGlassTypography` — selama ini diam-diam jatuh ke `Typography()` default Material3
+   (Roboto) setiap kali tema Liquid Glass aktif. Liquid Glass adalah satu-satunya dari 5 identitas
+   tema yang punya lubang ini (AppleTypography/TactileTypography juga cuma mengisi 5 slot yang
+   sama, tapi keduanya di luar cakupan permintaan user kali ini — hanya "liquid glass" yang
+   diminta, jadi keduanya tidak disentuh). Ukuran slot baru mengikuti pola yang sudah ada di app
+   ini (sedikit di atas ukuran default Material3, bukan angka mentahnya), dan bobotnya mengikuti
+   aturan yang sama seperti poin 1: `headlineSmall`/`titleSmall`/`labelLarge` (peran header/label)
+   naik ke SemiBold/Bold, sementara `bodyLarge` tetap Normal — sejajar `bodyMedium`/`bodySmall`
+   yang juga sengaja tidak ikut ditebalkan, supaya kontras datang dari header versus isi, bukan
+   dari menebalkan seluruh teks sekaligus.
+
+Tidak ada import baru, dependency baru, atau file baru — `FILE_MANIFEST.txt` tidak berubah
+(187/187). Brace/paren kedua file diverifikasi seimbang (bagian kode, komentar dikecualikan
+dari perhitungan). Belum divalidasi compile Gradle sungguhan (tidak ada akses jaringan di sesi
+ini) — cek hasil CI setelah push, meski risikonya tergolong rendah karena hanya perubahan nilai
+dan pengisian `TextStyle` baru, bukan API atau dependency yang belum pernah dipakai sebelumnya.
+
 ## Batch 297 — Blur asli fase 5 langkah 3-4/5: verifikasi ModalBottomSheet + CI Batch 296 hijau (0 kode)
 User kirim screenshot CI GitHub Actions: **Batch 296 — Success, 6m 23s, 1 artifact.** Dependency
 Haze 1.7.2 + API `hazeSource`/`hazeEffect`/`HazeEffectScope.blurRadius` TERKONFIRMASI compile

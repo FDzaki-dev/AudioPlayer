@@ -37,7 +37,18 @@ fun Modifier.frostedGlass(
     // LocalIsDarkTheme is identity-agnostic by construction, so this now works correctly no
     // matter which of the 3 identities is active.
     alpha: Float = if (LocalIsDarkTheme.current) 0.92f else 0.96f,
-    blurRadius: Dp = 24.dp
+    // Batch 298 — perkuat efek blur (permintaan user eksplisit): 24dp -> 32dp. Aman dinaikkan
+    // lewat default bersama krn dikonfirmasi ulang di atas + grep 12/12 call site frostedGlass()
+    // di app ini TANPA argumen (semua pakai default) — 4 identitas lain genuinely tidak pernah
+    // membaca parameter ini (lihat komentar isTactile/isSkeu di bawah), jadi menaikkan angka ini
+    // 100% hanya mengubah `requestedBlurRadius` yang dikonsumsi `hazeEffect` di cabang
+    // isLiquidGlass, 0 dampak ke Apple/Tactile/Skeu/Calm Retro. TETAP "titik awal" seperti
+    // liquidGlassAlpha di bawah — dipasangkan sengaja SATU rasionalisasi sama: blur lebih kuat
+    // butuh typography lebih kuat juga di atasnya biar tetap kebaca (lihat Type.kt Batch 298).
+    // Belum lebih tinggi lagi (mis. 40dp+) krn PROJECT_STATE sudah tandai API32 "berat" utk blur
+    // asli — 32dp kompromi naik cukup terasa tanpa melompat ke rentang berisiko performa; WAJIB
+    // ikut diverifikasi bareng alpha 0.55/0.65 pas langkah 5/5 roadmap (device sungguhan).
+    blurRadius: Dp = 32.dp
 ): Modifier {
     // Batch 296 — blurRadius was "kept for source compatibility, unused" since Batch 53; now
     // wired to real Haze blur (see `requestedBlurRadius` below) for Liquid Glass specifically.
