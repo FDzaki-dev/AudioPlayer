@@ -92,7 +92,7 @@ fun FolderManagerSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 20.dp, vertical = 10.dp)
-                            .animateItemPlacement(),
+                            .animateItem(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {

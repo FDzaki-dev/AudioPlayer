@@ -36,6 +36,18 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 292 (Hotfix CI FAILED — user upload `log_fail_286.zip`, "debugging sampai tuntas, gak
+usah denial", 4 file kode)** — Konsekuensi LANGSUNG bump BOM Batch 291: `animateItemPlacement()`
+(dipakai 7x di 4 file — `FolderManagerSheet.kt`, `LibraryScreen.kt`x4, `PlaylistScreen.kt`,
+`QueueSheet.kt`) sudah 100% DIHAPUS dari BOM 2026.04.01 (bukan cuma deprecated-warning lagi),
+`Unresolved reference` di compileDebugKotlin DAN compileReleaseKotlin. Log dicek penuh dari awal
+— dikonfirmasi ini SATU-SATUNYA akar masalah, 0 error lain tersembunyi. Fix: `.animateItemPlacement()`
+→ `.animateItem()`, mekanis di ke-7 lokasi (semua tanpa `animationSpec` custom, jadi padanan
+langsung, bukan perkiraan). 0 import baru. Brace/paren ke-4 file diverifikasi seimbang. ⚠️
+**Belum ada CI run baru yang membuktikan hijau** — baru menghilangkan 1 jenis error yang
+terkonfirmasi dari log, prioritas kalau user push: pastikan run berikutnya BENAR-BENAR lolos,
+bukan cuma dianggap selesai dari sisi statis. Detail: `CHANGELOG.md` Batch 292.
+
 **Batch 291 (Liquid Glass langkah 5 lanjutan — bump Compose BOM 2024.05.00→2026.04.01, 1 file
 kode + 2 dokumentasi)** — Blocker teknis kedua (setelah minSdk Batch 290): `GraphicsLayer`
 capture API (wajib buat blur asli) baru stabil BOM 2024.09.00+, lama belum punya. **Keputusan

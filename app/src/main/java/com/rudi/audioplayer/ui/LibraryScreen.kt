@@ -899,7 +899,7 @@ private fun SearchHistoryView(
                     leadingContent = { Icon(Icons.Default.History, contentDescription = null) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier
-                        .animateItemPlacement()
+                        .animateItem()
                         .clickable { onSelect(query) }
                         .padding(horizontal = 20.dp)
                 )
@@ -965,7 +965,7 @@ private fun SearchResultsView(
                     leadingContent = { Icon(Icons.Default.Person, contentDescription = null) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier
-                        .animateItemPlacement()
+                        .animateItem()
                         .clickable { onGroupSelect(artist) }
                         .padding(horizontal = 20.dp)
                 )
@@ -979,7 +979,7 @@ private fun SearchResultsView(
                     leadingContent = { Icon(Icons.Default.Album, contentDescription = null) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier
-                        .animateItemPlacement()
+                        .animateItem()
                         .clickable { onGroupSelect(album) }
                         .padding(horizontal = 20.dp)
                 )
@@ -1207,7 +1207,7 @@ private fun GroupedListView(
                     supportingContent = { Text("${grouped[group]?.size ?: 0} lagu") },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier
-                        .animateItemPlacement()
+                        .animateItem()
                         .clickable { selectedGroup = group }
                         .padding(horizontal = 20.dp)
                 )

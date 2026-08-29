@@ -1,5 +1,34 @@
 # Changelog
 
+## Batch 292 — Hotfix CI FAILED: `animateItemPlacement` unresolved (akibat langsung bump BOM Batch 291)
+User upload `log_fail_286.zip` + instruksi "debugging sampai tuntas, gak usah denial segala
+macem". Build gagal total (`compileDebugKotlin` DAN `compileReleaseKotlin`, keduanya) dgn 7 error
+identik: `Unresolved reference 'animateItemPlacement'` di `FolderManagerSheet.kt:95`,
+`LibraryScreen.kt:902/968/982/1210`, `PlaylistScreen.kt:157`, `QueueSheet.kt:128`.
+
+**Akar masalah, apa adanya, tanpa berkelit**: ini konsekuensi LANGSUNG dari Batch 291 (bump
+Compose BOM `2024.05.00` → `2026.04.01`, demi `RenderEffect`/`GraphicsLayer` API buat Liquid
+Glass blur asli). `animateItemPlacement()` sudah lama berstatus deprecated di Compose Foundation
+(diganti `animateItem()`), tapi Batch 291 tidak mengecek 7 pemakaian lama ini sebelum push — di
+BOM sebaru itu API-nya BUKAN LAGI sekadar deprecated-dgn-warning, tapi sudah 100% dihapus dari
+classpath (`Unresolved reference`, bukan `warning: deprecated`). Log CI dicek penuh dari awal
+sampai akhir (bukan cuma potongan error) — dikonfirmasi INI SATU-SATUNYA akar masalah, 0 error
+lain tersembunyi (kspDebugKotlin/kspReleaseKotlin bersih, 2 warning lain — resourceConfigurations
+& versi Gradle deprecated — keduanya cuma warning, tidak menghentikan build).
+
+**Fix** (4 file, semua 7 call site, bukan cuma 1 contoh): `.animateItemPlacement()` →
+`.animateItem()` di ke-4 file di atas, mekanis 1:1 (semua 7 pemakaian TANPA argumen custom
+`animationSpec`, jadi `animateItem()` tanpa argumen adalah padanan langsung, bukan perkiraan —
+default `placementSpec`-nya sama-sama spring). 0 import baru dibutuhkan (keduanya member extension
+di `LazyItemScope`, resolve otomatis dari receiver, bukan top-level import). Brace/paren ke-4
+file dicek ulang, seimbang (replace mekanis `()`→`()`, jumlah kurung tidak mungkin berubah, tapi
+tetap diverifikasi, bukan diasumsikan).
+
+**Belum ada CI run baru yang membuktikan build ini sungguhan hijau** — baru menghilangkan SATU
+jenis error yang terkonfirmasi dari log asli; kalau ternyata ada lapisan error lain yang baru
+kelihatan setelah baris ini lolos compile, itu akan perlu log_fail baru buat dipastikan, bukan
+diasumsikan aman dari sini.
+
 ## Batch 291 — Liquid Glass langkah 5 lanjutan: bump Compose BOM 2024.05.00 → 2026.04.01 (1 file kode + 2 dokumentasi)
 Lanjutan Batch 290 (minSdk 23→31). Dicek: `GraphicsLayer` capture API (`androidx.compose.ui.
 graphics.layer.GraphicsLayer` — mekanisme wajib buat capture+`RenderEffect` blur asli, dipakai
