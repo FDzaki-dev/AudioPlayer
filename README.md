@@ -8,8 +8,8 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 305 (typography Neumorphism, murni 100%):** Tema Neumorphism sekarang punya gaya tipografi sendiri (bukan pinjaman Apple lagi) — bobot huruf lebih ringan di tiap judul, 0 letterSpacing di semua slot (selaras identitas "0 border/0 grain"-nya), dan baris teks paling longgar dari seluruh tema, meniru kesan dipahat dari bantalan material lunak.
-> Batch 304: Notifikasi "SONIX" yang muncul sesaat saat widget home-screen ditekan sebelum aplikasi hidup (cold start) sebelumnya menampilkan teks "Memuat lagu…" statis dan tombol "Jeda" yang tidak berganti label walau musik sedang diputar/dijeda — sekarang teks menampilkan judul lagu begitu tersedia, dan tombol diperbarui lewat mekanisme resmi Android.
+> 🆕 **Update terbaru — Batch 307 (Fase 2/N tema ke-6 "Aurora"):** Aurora sekarang **sudah bisa dipilih** di Settings — dark-lock permanen, aksen hijau vivid di atas latar near-black navy-teal. Animasi gradien mengalirnya (`auroraGlow()`, Batch 306) **belum terpasang** — tampilannya masih flat statis untuk saat ini, menyusul di fase berikutnya.
+> Batch 306: Fondasi tema baru 100% ide orisinal — mekanisme warna gradien ambient yang mengalir pelan + palet hijau-teal-ungu-magenta terinspirasi aurora borealis ditulis lebih dulu, belum terdaftar sebagai identitas saat itu.
 > Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
 > sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
 > Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
@@ -216,5 +216,16 @@ Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diu
   stutter, dan apakah tint saat ini sudah pas. Lihat `PROJECT_STATE.md` untuk detail yang perlu
   dicek. Rencana lengkap & histori keputusan di `ROADMAP_LIQUID_GLASS_REDESIGN.md` dan
   `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md`.
+- **Tema ke-6 "Aurora"** — arah baru sejak Batch 306, permintaan user eksplisit "100% ide sendiri,
+  tanpa contek gaya desain visual apapun manapun". Mekanisme orisinal: warna gradien ambient yang
+  mengalir pelan (animated hue-shift antar hijau→teal→ungu→magenta, terinspirasi spektrum aurora
+  borealis asli), berbeda total dari mekanisme 5 tema lain (bukan shadow/bevel, bukan blur, bukan
+  artefak retro). Terkunci **gelap permanen** (pola sama Calm Retro), cakupan efek **ambient
+  background saja** untuk saat ini (rim-glow per-panel ditunda). **Fase 2/N selesai** (Batch 307)
+  — **sudah bisa dipilih di Settings** dengan palet dark-lock sendiri (aksen hijau vivid + latar
+  near-black navy-teal), tapi animasi `auroraGlow()`-nya **belum terpasang di mana pun** — kalau
+  dicoba sekarang tampilannya masih flat statis, bukan mengalir. Fase 3 (wiring ke root
+  background `MainActivity.kt`) yang bikin animasinya benar-benar kelihatan belum dikerjakan.
+  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-307.
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)

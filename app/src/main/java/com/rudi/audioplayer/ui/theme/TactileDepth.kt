@@ -1,7 +1,13 @@
 package com.rudi.audioplayer.ui.theme
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +29,7 @@ import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -423,4 +430,66 @@ fun Modifier.calmGrain(): Modifier {
             }
         }
     }
+}
+
+// ============================================================================
+// AURORA — Batch 306, tema ke-6. Permintaan user eksplisit: "100% karya hasil ide sendiri tanpa
+// contek gaya desain visual apapun" — jadi mekanisme di bawah ini SENGAJA tidak meniru
+// tactileEmboss()/skeuEmboss() (shadow/bevel) di atas, calmScanlines()/calmGrain() (retro
+// artifact), atau hazeEffect() BlurUtils.kt (blur asli) — kedalaman/identitas di sini datang
+// dari WARNA YANG MENGALIR (animated hue-shift), sebuah mekanisme yang belum pernah dipakai di
+// app ini sama sekali sampai batch ini.
+//
+// FASE 1/N dari rollout tema baru (pola sama persis LiquidGlassTypography/LiquidGlassShapes
+// Batch 279 — "purely additif, 0 pemakaian di luar file definisi, 0 perubahan visual sampai
+// fase registrasi identitas"): fungsi ini BELUM dipanggil dari mana pun (0 call site), dan
+// ThemeIdentity.AURORA BELUM ditambahkan ke enum — sengaja dipisah krn `colorsFor()` di
+// Theme.kt pakai `when` EXHAUSTIVE (bukan `when` + `else` seperti dispatcher typography/shapes),
+// jadi begitu 1 entry enum baru ditambah, SEMUA cabang termasuk warna/typography/shapes WAJIB
+// terisi sekaligus di batch yang sama — pola sama kenapa Liquid Glass dulu juga menunda
+// registrasi enum ke fase terpisah (isLiquidGlassTheme() sendiri baru muncul Batch 281, fase 3).
+//
+// Konsep yang sudah dikonfirmasi user sebelum batch ini: (1) Aurora terkunci GELAP PERMANEN
+// (aurora borealis = fenomena malam — pola sama CalmRetroColors, bukan otonom 2 mode ala
+// Apple/Tactile/Skeu/LiquidGlass), (2) cakupan efek AMBIENT BACKGROUND SAJA dulu (bukan
+// rim-glow di tiap panel — itu eksplisit "dipertimbangkan lagi nanti" oleh user, BUKAN dibatalkan
+// permanen, BUKAN juga dikerjakan diam-diam duluan).
+//
+// Mekanisme: BUKAN posisi gradien yang bergeser (menggeser fraction stop berisiko 2 stop
+// bertabrakan di 0f/1f, red flag rendering) — sebagai gantinya 5 titik stop TETAP di
+// (0/0.22/0.48/0.74/1.0), dan WARNA di 3 stop tengah saling di-lerp() antar 2 hue aurora
+// bersebelahan seiring `phase` (0f<->1f, infinite, Reverse — bolak-balik halus, bukan
+// Restart yang lompat patah di ujung siklus). Stop pertama & terakhir tetap Color.Transparent
+// permanen supaya wash ini berbaur ke tepi kanvas, bukan kotak warna bertepi tegas.
+// `rememberInfiniteTransition`+`animateFloat` adalah pola yang SUDAH terbukti compile+jalan di
+// app ini (ShimmerBrush(), LibraryScreen.kt) — dipakai lagi di sini apa adanya, bukan API baru.
+// Durasi 20000ms (20 detik) SATU ARAH, direverse (~40 detik/siklus penuh) — sengaja lambat/tenang
+// krn ini elemen ambient di BELAKANG seluruh konten, bukan aksen yang butuh menarik perhatian;
+// titik awal, seperti semua tuning ambient lain di file/project ini, WAJIB dikonfirmasi ulang
+// begitu tampil di device sungguhan.
+//
+// BELUM dipasang ke root Surface (MainActivity.kt, protected/parsial) — itu fase berikutnya,
+// sesudah ThemeIdentity.AURORA + AuroraColors terdaftar (fase 2).
+@Composable
+fun Modifier.auroraGlow(): Modifier {
+    val transition = rememberInfiniteTransition(label = "auroraGlow")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 20000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "auroraPhase"
+    )
+    val brush = Brush.linearGradient(
+        colorStops = arrayOf(
+            0.00f to Color.Transparent,
+            0.22f to lerp(AuroraGreen, AuroraTeal, phase).copy(alpha = AuroraGlowAlpha),
+            0.48f to lerp(AuroraTeal, AuroraViolet, phase).copy(alpha = AuroraGlowAlpha * 0.85f),
+            0.74f to lerp(AuroraViolet, AuroraMagenta, phase).copy(alpha = AuroraGlowAlpha * 0.6f),
+            1.00f to Color.Transparent
+        )
+    )
+    return this.background(brush)
 }

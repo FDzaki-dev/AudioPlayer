@@ -332,3 +332,51 @@ val LiquidGlassAccent = Color(0xFF8E7CFF)
 // dingin, satu per mode biar tetap legible di kedua ekstrem.
 val LiquidGlassDarkSuccess = Color(0xFF5EEAD4)
 val LiquidGlassLightSuccess = Color(0xFF14B8A6)
+
+// ============================================================================
+// AURORA -- Batch 306, tema ke-6. Permintaan user eksplisit: "100% karya hasil ide sendiri
+// tanpa contek gaya desain visual apapun" -- bukan reuse mekanisme/nama identitas manapun di
+// atas. FASE 1/N: hanya token warna gradien ambient + mekanisme animasinya (auroraGlow(),
+// TactileDepth.kt). Belum didaftarkan ke ThemeIdentity/colorsFor() -- lihat komentar panjang di
+// atas auroraGlow() utk kenapa registrasi sengaja ditunda ke fase terpisah. 0 pemakaian di luar
+// definisi ini, 0 perubahan visual sampai fase registrasi identitas.
+//
+// Dikonfirmasi user sebelum batch ini: kunci GELAP PERMANEN (aurora borealis = fenomena malam,
+// pola sama CalmRetroColors di atas -- bukan otonom 2 mode ala Apple/Tactile/Skeu/LiquidGlass),
+// cakupan efek AMBIENT BACKGROUND SAJA dulu (rim-glow tiap panel eksplisit ditunda, bukan
+// dibatalkan).
+//
+// 4 hue mengikuti spektrum aurora borealis asli (hijau = warna aurora paling umum/dominan,
+// lalu teal, ungu, magenta-pink di aurora yang kuat) -- BUKAN reuse 5 aksen tema lain: hijau di
+// sini jauh lebih vivid/saturated drpd CalmRetroAccent (Muted Sage, sengaja pudar/lo-fi), ungu
+// di sini beda hue dari TactileAccent (biru-ungu 0x6670FF) maupun LiquidGlassAccent
+// (ungu-violet lebih dingin 0x8E7CFF) -- dipakai HANYA sbg ingredient gradien alpha-rendah,
+// jadi kemiripan hue longgar dgn 2 aksen itu tidak pernah tabrakan langsung di UI.
+val AuroraAccent = Color(0xFF3DE8A0) // hijau aurora vivid -- calon role `primary` fase
+                                      // registrasi nanti, & calon dasar isAuroraTheme()
+                                      // (pola sama TactileAccent/SkeuAccent/dst)
+val AuroraGreen = AuroraAccent
+val AuroraTeal = Color(0xFF2BC9C9)
+val AuroraViolet = Color(0xFF7C6FE0)
+val AuroraMagenta = Color(0xFFD46FC7)
+// Alpha puncak tiap stop gradien ambient (auroraGlow(), TactileDepth.kt) -- titik awal yang
+// SENGAJA belum final, WAJIB dituning ulang begitu tampil di device sungguhan, pola sama semua
+// tuning ambient/blur lain di file ini (MidnightBlueAmbientAlpha/SkeuAmbientAlphaDark/
+// liquidGlassAlpha semuanya juga "titik awal" pas pertama ditambah, lalu direvisi ulang
+// setelah feedback device -- lihat histori Batch 296/298/299/300 di CHANGELOG.md).
+val AuroraGlowAlpha = 0.34f
+
+// Batch 307 — Fase 2/N: token permukaan/teks yang dibutuhkan `AuroraColors` (Theme.kt) — hue
+// 4 di atas (AuroraGreen/Teal/Violet/Magenta) murni ingredient gradien ambient, BUKAN utk
+// role M3 background/surface/text (kontras gagal kalau dipaksa jadi warna solid latar/teks).
+// Base near-black navy-teal — hex sengaja beda dari AmoledSurface/CalmRetroBackground/
+// LiquidGlassDarkBackground (semua "near-black" itu memang wajar mirip secara alami; pembeda
+// asli identitas ini bukan di sini, tapi di overlay `auroraGlow()` animasi di atasnya).
+val AuroraBackground = Color(0xFF05080C)
+val AuroraSurface = Color(0xFF0B1015)
+val AuroraSurfaceVariant = Color(0xFF161D22)
+// Teks nyaris putih dgn sentuhan hijau-dingin sangat tipis — bukan putih murni ala LiquidGlass
+// (0xF3F4F8) atau abu-terang ala CalmRetro (0xE2E4E9), selaras nuansa hijau aurora tanpa
+// mengorbankan kontras baca.
+val AuroraText = Color(0xFFE7F3EC)
+val AuroraSecondaryText = Color(0xFF7E8C90)

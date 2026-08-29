@@ -38,7 +38,14 @@ enum class ThemeIdentity(val storageKey: String, val displayName: String, val de
     // Batch 279/280 — ROADMAP_LIQUID_GLASS_REDESIGN.md, §3 dikonfirmasi user: TAMBAH sebagai
     // opsi ke-5 (bukan ganti/konsolidasi 4 di atas), Opsi B (shape+typography+palet statis,
     // tanpa blur asli). Otonom di kedua mode seperti Apple/Tactile/Skeu.
-    LIQUID_GLASS("liquid_glass", "Liquid Glass", "Radius besar/pill minimalis ala CONVX, tipografi lebih ringan, palet violet-glass sejuk — otonom di mode terang maupun gelap");
+    LIQUID_GLASS("liquid_glass", "Liquid Glass", "Radius besar/pill minimalis ala CONVX, tipografi lebih ringan, palet violet-glass sejuk — otonom di mode terang maupun gelap"),
+    // Batch 306/307 — tema ke-6, 100% ide orisinal (bukan reuse mekanisme identitas manapun di
+    // atas maupun nama gerakan desain yang sudah ada), dikonfirmasi user via ask_user_input_v0
+    // sebelum eksekusi: terkunci gelap permanen (pola sama CALM_RETRO), cakupan efek ambient
+    // background saja utk saat ini (rim-glow per-panel ditunda). Mekanisme: `auroraGlow()`
+    // (TactileDepth.kt, Batch 306) — warna gradien mengalir pelan, bukan shadow/blur/artefak
+    // retro seperti 5 identitas lain.
+    AURORA("aurora", "Aurora", "Cahaya aurora borealis mengalir pelan di ambient, aksen hijau-teal-ungu-magenta — selalu gelap, tidak mengikuti toggle Mode");
 
     companion object {
         fun fromStorageKey(key: String?): ThemeIdentity = entries.find { it.storageKey == key } ?: APPLE
@@ -269,6 +276,34 @@ private val LiquidGlassLightColors = lightColorScheme(
     error = Color(0xFFFF3B30)
 )
 
+// Batch 307 — Fase 2/N tema Aurora. 1 colorScheme saja (bukan pasangan Dark/Light), sama alasan
+// CalmRetroColors di atas: identitas ini terkunci gelap permanen (lihat colorsFor() — param
+// isDark diabaikan utk identity ini, pola sama persis CALM_RETRO).
+// onPrimary Color.Black: luma AuroraAccent (#3DE8A0) ≈0.75, jauh di atas ambang 0.55 yang
+// dipakai identitas lain di file ini. tertiary/onTertiary sama: luma AuroraTeal (#2BC9C9) ≈0.66.
+// error = AuroraMagenta (BUKAN token asing/generik ala LiquidGlassDarkColors di atas) — pelajaran
+// Batch 130 eksplisit: "100% derivasi dari palet [identitas] sendiri" drpd reuse token identitas
+// lain atau warna generik tak-berhubungan; magenta-pink sudah masuk keluarga hue aurora sendiri
+// (Color.kt) dan cukup dekat semantik "perhatian/warning" spt CalmRetroAberrationLeft (Dusty
+// Rose) dipakai utk peran yang sama di sana.
+private val AuroraColors = darkColorScheme(
+    primary = AuroraAccent,
+    onPrimary = Color.Black,
+    secondary = AuroraSecondaryText,
+    onSecondary = AuroraBackground,
+    tertiary = AuroraTeal,
+    onTertiary = Color.Black,
+    background = AuroraBackground,
+    onBackground = AuroraText,
+    surface = AuroraSurface,
+    onSurface = AuroraText,
+    surfaceVariant = AuroraSurfaceVariant,
+    onSurfaceVariant = AuroraSecondaryText,
+    outline = AuroraSurfaceVariant,
+    surfaceTint = AuroraAccent,
+    error = AuroraMagenta
+)
+
 // A single, consistent "continuous curve" language across the whole app — Compose's Shapes
 // API only supports true rounded rectangles (Apple's real squircle/superellipse corners
 // aren't natively expressible), so generous rounding is the closest honest approximation.
@@ -362,6 +397,9 @@ fun colorsFor(identity: ThemeIdentity, isDark: Boolean) = when (identity) {
     ThemeIdentity.CALM_RETRO -> CalmRetroColors
     // Batch 279/280 — Liquid Glass otonom di kedua mode (pola sama Apple/Tactile/Skeu).
     ThemeIdentity.LIQUID_GLASS -> if (isDark) LiquidGlassDarkColors else LiquidGlassLightColors
+    // Batch 307 — isDark sengaja diabaikan, sama alasan CALM_RETRO di atas: Aurora terkunci
+    // gelap permanen (dikonfirmasi user sebelum Batch 306).
+    ThemeIdentity.AURORA -> AuroraColors
 }
 
 @Composable

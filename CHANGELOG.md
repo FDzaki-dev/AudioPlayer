@@ -1,5 +1,173 @@
 # Changelog
 
+## Batch 307 — Tema ke-6 "Aurora", Fase 2/N: registrasi identitas + palet lengkap (lanjutan langsung, 2 file)
+Lanjutan langsung dari Batch 306 (instruksi "next"). Fase 2 sesuai rencana yang sudah dicatat di
+Batch 306: `ThemeIdentity.AURORA` resmi didaftarkan ke enum + `AuroraColors` (`darkColorScheme`)
+lengkap dibangun + cabang baru di `colorsFor()`. Ketiganya WAJIB dikerjakan sekaligus dalam 1
+batch (bukan dicicil lebih jauh) karena `colorsFor()` di `Theme.kt` pakai `when` **exhaustive**
+tanpa `else` — Kotlin memaksa semua cabang enum terisi begitu 1 entry baru ditambahkan, atau
+build gagal compile total.
+
+**Dampak nyata mulai batch ini — Aurora SUDAH BISA DIPILIH** di picker tema (`SettingsScreen.kt`)
+— pemilih itu mengiterasi `ThemeIdentity.entries.toList()` secara generik, jadi 0 baris di file
+itu perlu disentuh supaya opsi baru otomatis muncul. Yang akan terlihat kalau dipilih sekarang:
+warna dark-lock milik sendiri (aksen hijau vivid di atas latar near-black night-navy), TAPI
+**animasi `auroraGlow()` (Batch 306) belum terpasang di mana pun** — layar akan tampak flat
+gelap + aksen hijau statis, bukan mengalir, sampai Fase 3 (wiring ke root Surface
+`MainActivity.kt`). Typography & shapes Aurora untuk saat ini jatuh ke `else -> AppleTypography`
+/`else -> AppleShapes` di dispatcher — pola bootstrap yang sama persis dijalani semua identitas
+lain sebelum dimurnikan (Skeu: Batch 57 → dimurnikan Batch 305; Calm Retro: Batch 130 →
+dimurnikan Batch 302) — bukan sesuatu yang lupa dikerjakan, memang urutan yang disengaja.
+
+**`Color.kt`** (5 token baru, ditambah setelah blok Aurora Batch 306) — `AuroraBackground`
+(`0xFF05080C`), `AuroraSurface` (`0xFF0B1015`), `AuroraSurfaceVariant` (`0xFF161D22`),
+`AuroraText` (`0xFFE7F3EC` — nyaris putih dengan sentuhan hijau-dingin sangat tipis, beda dari
+putih murni `LiquidGlassDarkText` `0xF3F4F8` maupun abu-terang `CalmRetroText` `0xE2E4E9`),
+`AuroraSecondaryText` (`0xFF7E8C90`). Hex base near-black sengaja beda dari `AmoledSurface`/
+`CalmRetroBackground`/`LiquidGlassDarkBackground` yang sudah ada — kemiripan wajar karena semua
+"near-black", pembeda identitas sesungguhnya tetap di overlay animasi `auroraGlow()` (Batch
+306), bukan di token statis ini.
+
+**`Theme.kt`** (3 titik dalam 1 file) —
+1. Entry enum baru `AURORA("aurora", "Aurora", "Cahaya aurora borealis mengalir pelan di
+   ambient, aksen hijau-teal-ungu-magenta — selalu gelap, tidak mengikuti toggle Mode")`
+   ditambahkan setelah `LIQUID_GLASS`, dengan comment block menjelaskan histori Batch 306/307.
+2. `private val AuroraColors = darkColorScheme(...)` ditambahkan setelah `LiquidGlassLightColors`
+   — 1 set warna saja (bukan pasangan Dark/Light seperti Tactile/Skeu/LiquidGlass), karena
+   dikonfirmasi user terkunci gelap permanen (pola identik `CalmRetroColors`). Setiap role
+   diturunkan dari token Aurora sendiri: `primary`=`AuroraAccent`, `tertiary`=`AuroraTeal`
+   (`onPrimary`/`onTertiary` = `Color.Black` — luma `AuroraAccent` (`#3DE8A0`) ≈0.75 dan
+   `AuroraTeal` (`#2BC9C9`) ≈0.66, keduanya jauh di atas ambang 0.55 yang sudah dipakai
+   identitas lain di file ini utk keputusan hitam-vs-putih). `error` = `AuroraMagenta` — SENGAJA
+   derivasi dari palet Aurora sendiri, BUKAN reuse token identitas lain maupun hardcode merah
+   generik seperti `LiquidGlassDarkColors` di atasnya — ini menerapkan pelajaran eksplisit Batch
+   130 ("100% derivasi dari palet [identitas] sendiri" ketimbang meminjam warna asing).
+3. `colorsFor()` dapat 1 cabang baru: `ThemeIdentity.AURORA -> AuroraColors`, dengan comment
+   menjelaskan `isDark` sengaja diabaikan (pola sama `CALM_RETRO` di atasnya).
+
+**Pemeriksaan exhaustiveness dilakukan eksplisit sebelum eksekusi, bukan diasumsikan aman** —
+grep seluruh app untuk setiap `when (identity)`/`when (appThemeIdentity)`: hasilnya cuma
+`colorsFor()` yang exhaustive tanpa `else` (satu-satunya yang WAJIB disentuh). Dispatcher
+`typography`/`shapes` (`Theme.kt`), `identityRootBrush`/`navCatchLightColor`
+(`MainActivity.kt`), dan `ThemeOptionCard` (`SettingsScreen.kt`) semuanya memakai `else`/`==`
+biasa (bukan exhaustive `when`) — 0 file itu disentuh batch ini, 0 risiko compile break, Aurora
+otomatis jatuh ke cabang fallback yang aman di semuanya (Apple typography/shapes, `null` root
+brush/nav catch-light, kartu preview flat generik).
+
+**Ringkasan file**: 2 file kode (`Color.kt` + `Theme.kt`), di bawah batas Micro-Batch (maks 3
+file kode). 0 file baru, 0 dependency Gradle baru. `FILE_MANIFEST.txt` tidak berubah (187/187).
+0 protected asset disentuh — `MainActivity.kt` dan `SettingsScreen.kt` BELUM disentuh sama
+sekali batch ini (keduanya "otomatis benar" lewat fallback generik di atas, bukan lewat edit).
+Brace/paren diverifikasi seimbang penuh per-file (`Color.kt`: 243/243 parens, 0/0 braces;
+`Theme.kt` utuh: 14/14 braces, 168/168 parens).
+
+**Belum divalidasi compile Gradle sungguhan** (0 akses jaringan sesi ini) — **WAJIB cek CI
+setelah push**, risiko sedikit lebih tinggi dari Batch 306: menambah entry ke `when` exhaustive
+adalah salah satu titik paling gampang salah di Kotlin (1 cabang lupa terisi = compile error
+TOTAL di seluruh modul, bukan cuma 1 fitur rusak) — sudah diperiksa manual lewat grep di atas,
+tapi tetap wajib dikonfirmasi CI, bukan diasumsikan aman hanya karena "kelihatan benar secara
+manual".
+
+**Belum diverifikasi visual di device** — kalau user coba pilih Aurora di Settings sekarang:
+swatch harus tampil bulatan hijau vivid (`AuroraAccent`) di atas lingkaran latar near-black
+navy-teal (`AuroraBackground`), **tanpa animasi apa pun** (statis, itu memang belum dipasang —
+bukan bug/regresi). 5 identitas lain (Apple/Tactile/Skeu/CalmRetro/LiquidGlass) harus 0 berubah
+sama sekali dari sebelum batch ini.
+
+**Item berikutnya (Fase 3, BELUM dikerjakan)**: helper `isAuroraTheme()` (pola sama
+`isLiquidGlassTheme()` dkk), wiring `auroraGlow()` ke root Surface `MainActivity.kt`
+(protected/parsial — target diagnostik 1 baris tambahan, pola sama `calmGrain()` yang sudah ada
+di sana), typography/shape sendiri kalau/ketika diminta (boleh tetap reuse Apple selama belum
+diminta, pola sama semua identitas lain dulu). Rim-glow per-panel: masih ditunda sesuai
+keputusan user di Batch 306.
+
+## Batch 306 — Tema ke-6 "Aurora", Fase 1/N: fondasi mekanisme + palet (permintaan user langsung, 2 file)
+User minta eksplisit: "bikin theme ke-6, tapi murni 100% karya hasil ide sendiri tanpa contek
+gaya desain visual apapun". Sebelum kode ditulis, 3+3 konsep orisinal dipitch (Ink Wash,
+Paper-fold, Circuit Trace, lalu setelah user minta "beda lagi/gabung": Woven, Contour, Aurora) —
+user pilih **Aurora**. 2 keputusan arsitektur dikonfirmasi lewat tool tap-pilih sebelum eksekusi:
+mode terkunci **gelap permanen**, dan cakupan efek **ambient background saja dulu** (rim-glow
+per-panel ditunda, dipertimbangkan lagi setelah fondasi ini terverifikasi).
+
+**Kenapa dipecah fase, bukan langsung sekali jadi**: nambah identitas baru itu sekelas Liquid
+Glass dulu (Batch 279 dst), bukan micro-task. `colorsFor()` di `Theme.kt` pakai `when`
+**exhaustive** — begitu 1 entry `ThemeIdentity` baru ditambah, semua cabang warna wajib terisi
+sekaligus. Jadi urutan aman (pola sama histori Liquid Glass: token dulu fase 1, `enum`+dispatch
+fase 2, helper `isXTheme()`+wiring UI fase 3+) adalah bangun mekanisme+token dulu secara
+terisolasi (0 pemakaian di luar file definisi, 0 perubahan visual), baru daftarkan identitasnya
+di fase berikutnya.
+
+**Mekanisme baru, genuinely orisinal** — bukan reuse `skeuEmboss()`/`tactileEmboss()` (dual
+shadow/bevel), `calmScanlines()`/`calmGrain()`/`calmAberration()` (artefak retro CRT), atau
+`hazeEffect()` (blur asli Haze): Aurora dapat kedalaman dari **warna yang mengalir** (animated
+hue-shift antar 4 warna aurora), mekanisme yang belum pernah dipakai di app ini sebelumnya.
+
+**`TactileDepth.kt`** (1 fungsi baru, `Modifier.auroraGlow()`, ditambah setelah `calmGrain()` di
+akhir file) — 5 titik stop gradien linear TETAP di posisi (0.00/0.22/0.48/0.74/1.00), sengaja
+BUKAN posisi yang digeser (menggeser fraction stop berisiko 2 stop bertabrakan tepat di
+ujung 0f/1f — red flag rendering gradient). 3 stop tengah warnanya di-`lerp()` (Compose
+`androidx.compose.ui.graphics.lerp`) antar 2 hue aurora yang bersebelahan (hijau→teal,
+teal→ungu, ungu→magenta) seiring sebuah `phase` float 0f↔1f dari `rememberInfiniteTransition` +
+`animateFloat` (`RepeatMode.Reverse`, `tween(20000ms, LinearEasing)` — bolak-balik halus ~40
+detik/siklus penuh, bukan `Restart` yang lompat patah di ujung siklus). Stop pertama & terakhir
+tetap `Color.Transparent` permanen supaya wash berbaur ke tepi kanvas, bukan kotak warna
+bertepi tegas. Pola animasi (`rememberInfiniteTransition`/`animateFloat`/`infiniteRepeatable`/
+`tween`) di-copy 1:1 dari `ShimmerBrush()` (`LibraryScreen.kt`) — sudah terbukti compile+jalan
+di app ini, BUKAN API baru yang belum pernah diuji di codebase ini. 0 call site memanggil fungsi
+ini sampai batch ini (murni definisi, sesuai fase 1). 8 import baru: `LinearEasing`,
+`RepeatMode`, `animateFloat`, `infiniteRepeatable`, `rememberInfiniteTransition`, `tween` (semua
+`androidx.compose.animation.core`) + `androidx.compose.ui.graphics.lerp`;
+`androidx.compose.foundation.background` sudah diimpor sebelumnya (dipakai `this.background(brush)`
+di baris terakhir fungsi).
+
+**`Color.kt`** (6 token baru, akhir file) — `AuroraAccent`/`AuroraGreen` (alias, hijau vivid
+`0xFF3DE8A0` — calon role `primary` & dasar `isAuroraTheme()` di fase registrasi nanti, pola
+sama `TactileAccent`/`SkeuAccent`/`CalmRetroAccent`/`LiquidGlassAccent`), `AuroraTeal`
+(`0xFF2BC9C9`), `AuroraViolet` (`0xFF7C6FE0`), `AuroraMagenta` (`0xFFD46FC7`),
+`AuroraGlowAlpha` (`0.34f`). 4 hue ditarik langsung dari spektrum aurora borealis asli (hijau =
+warna aurora paling umum/dominan → teal → ungu → magenta-pink di aurora kuat), sengaja dijaga
+beda dari 5 aksen tema lain yang sudah ada: hijau di sini jauh lebih vivid/saturated drpd
+`CalmRetroAccent` (Muted Sage, sengaja pudar/lo-fi by design), ungu di sini beda hue dari
+`TactileAccent` (biru-ungu `0x6670FF`) maupun `LiquidGlassAccent` (ungu-violet lebih dingin
+`0x8E7CFF`) — dipakai HANYA sbg ingredient gradien alpha-rendah (bukan warna solid dominan di
+UI manapun), jadi kemiripan hue longgar itu 0 resiko tabrakan visual langsung dgn 2 aksen
+tersebut. `AuroraGlowAlpha` (0.34f) eksplisit ditandai "titik awal" — akan perlu dituning ulang
+begitu tampil di device sungguhan, pola sama semua tuning ambient/blur lain di file ini
+(`MidnightBlueAmbientAlpha`/`SkeuAmbientAlphaDark`/`liquidGlassAlpha`, lihat histori Batch
+296/298/299/300 di atas — semuanya juga "titik awal" pas pertama ditambah, lalu direvisi
+berdasar feedback device sungguhan, bukan ditebak sekali jadi final).
+
+**Ringkasan file**: 2 file kode (`TactileDepth.kt` + `Color.kt`), di bawah batas Micro-Batch
+(maks 3 file kode). 0 file baru dibuat, 0 dependency Gradle baru (semua API yang dipakai —
+`rememberInfiniteTransition`, `animateFloat`, `lerp`, dst — sudah tersedia lewat Compose BOM yang
+sudah dipakai app ini, sama seperti `ShimmerBrush()` yang sudah lama compile bersih). 0 protected
+asset disentuh — `Theme.kt` dan `MainActivity.kt` BELUM disentuh SAMA SEKALI di batch ini (fase
+berikutnya). `FILE_MANIFEST.txt` tidak berubah (187/187, tidak ada file baru). Brace/paren
+diverifikasi seimbang penuh per-file (`Color.kt`: 231/231 parens, 0/0 braces — murni deklarasi
+`val`; `TactileDepth.kt` utuh: 33/33 braces, 275/275 parens).
+
+**Belum divalidasi compile Gradle sungguhan** (0 akses jaringan sesi ini, pola sama tiap batch)
+— **WAJIB cek CI setelah push**. Risiko sedikit lebih tinggi dari batch typography murni
+(Batch 302/305) krn ini fungsi BARU dgn state animasi (bukan cuma data `TextStyle`/`Typography`
+statis), tapi seluruh pola animasinya di-copy 1:1 dari `ShimmerBrush()` yang sudah terbukti
+compile+jalan di app ini sejak lama — risiko tetap rendah-menengah, bukan API yang benar-benar
+belum teruji di codebase ini.
+
+**Belum ada apa pun yang terlihat di device** — fungsi ini genuinely 0 dipanggil dari mana pun
+sampai batch ini (pola sengaja, bukan lupa). Tidak ada langkah verifikasi visual utk batch ini;
+verifikasi baru relevan mulai Fase 3 setelah `auroraGlow()` benar-benar dipasang ke root Surface.
+
+**Item berikutnya (Fase 2, BELUM dikerjakan)**: daftarkan `ThemeIdentity.AURORA` ke enum +
+token warna tambahan (`AuroraBackground`/`AuroraSurface`/`AuroraText` dkk) + `AuroraColors =
+darkColorScheme(...)` (`Theme.kt`) + wire cabang baru di `colorsFor()` — wajib sekaligus krn
+`when` exhaustive. **Fase 3+ (belum)**: helper `isAuroraTheme()`, wiring `auroraGlow()` ke root
+Surface `MainActivity.kt` (protected/parsial — target diagnostik: 1 baris tambahan pola
+`.then(if (appThemeIdentity == ThemeIdentity.AURORA) Modifier.auroraGlow() else Modifier)`,
+sama shape dgn `calmGrain()` yang sudah ada di sana), typography/shape (boleh mulai reuse Apple
+dulu seperti tema lain dulu, dimurnikan belakangan — pola sama Skeu/Calm Retro dulu), deskripsi
++ entry picker `SettingsScreen.kt`. Rim-glow per-panel: **ditunda**, dipertimbangkan lagi setelah
+fondasi ambient ini terverifikasi di device sungguhan.
+
 ## Batch 305 — Perkuat typography khusus tema Neumorphism, murni 100% (permintaan user langsung, 2 file)
 User minta eksplisit: "sempurnakan typography Neumorphism 100% murni, tuntas!!" — melanjutkan
 pola penguatan typography per-tema (Batch 298 melakukan ini untuk Liquid Glass, Batch 302 untuk
