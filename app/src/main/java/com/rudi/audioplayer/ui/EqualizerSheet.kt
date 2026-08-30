@@ -4,6 +4,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -59,6 +61,13 @@ fun EqualizerSheet(
     val chipLiquidShape = if (isLiquidGlassTheme()) RoundedCornerShape(Radius.liquidPill) else FilterChipDefaults.shape
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+        // Batch 315 — audit "pola tab serupa" dari Batch 314 (fix sheet "Kontrol Lanjutan"
+        // terpotong): sheet ini juga punya Column fixed tanpa verticalScroll/LazyColumn jaring
+        // pengaman — prioritas TERTINGGI di antara 5 sheet yang kena pola sama, karena jumlah
+        // band EQ variatif per device (makin banyak band, makin tinggi total konten) ditambah 2
+        // baris preset di atasnya. Pola fix PERSIS sama Batch 314: kalau konten muat, scroll
+        // offset tetap 0 (nol perubahan visual); kalau tidak muat (device banyak band/layar
+        // pendek), sekarang bisa digeser, bukan diam-diam ke-clip di band terakhir.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -66,6 +75,7 @@ fun EqualizerSheet(
                 .then(
                     if (isCalmRetro) Modifier.clip(MaterialTheme.shapes.large).calmScanlines() else Modifier
                 )
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp)
         ) {

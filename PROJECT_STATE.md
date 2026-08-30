@@ -36,6 +36,53 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 315 (Lanjutan audit Batch 314: terapkan `verticalScroll` ke 3 dari 5 sheet antrean —
+`EqualizerSheet.kt`, `RingtoneCutterSheet.kt`, `VisualizerSheet.kt`, 3 file, item antrean internal
+Batch 314, bukan laporan bug baru user)** — Eksekusi urutan prioritas yang sudah ditetapkan Batch
+314: dari 5 sheet yang kena pola sama (`Column` fixed dalam `ModalBottomSheet` tanpa
+`verticalScroll`/`LazyColumn` jaring pengaman), 3 prioritas TERTINGGI dikerjakan batch ini (limit
+Micro-Batch 3 file kode sudah penuh), 2 sisanya (`UpdateCheckSheet.kt`, `BackupRestoreSheet.kt` —
+konten pendek, risiko rendah) diantrekan Batch 316.
+
+**Root cause & pola fix** — PERSIS sama Batch 314 (yang sendiri PERSIS sama fix awal
+`NowPlayingScreen.kt`/`SongInfoEditSheet.kt`): kalau total tinggi konten `Column` melebihi tinggi
+sheet yang tersedia (layar pendek/gesture-nav/font sistem besar), baris paling bawah diam-diam
+ke-clip alih-alih bisa digeser. Bukan pola baru — murni menerapkan jaring-pengaman yang sudah
+terbukti dipakai di 3 tempat lain codebase yang sama.
+
+**`EqualizerSheet.kt`** (prioritas 1 — jumlah band EQ variatif per device, makin banyak band makin
+tinggi total konten, ditambah 2 baris preset chip di atasnya) — `.verticalScroll
+(rememberScrollState())` ditambah ke modifier chain `Column` utama, persis setelah blok
+`.then(...)` tema Calm Retro, sebelum `.padding(...)` — urutan sama seperti pola
+`SongInfoEditSheet.kt`/`AdvancedControlsSheet` Batch 314 (padding ikut discroll bersama konten).
+
+**`RingtoneCutterSheet.kt`** (prioritas 2 — judul+lagu, 2 slider awal/akhir, teks durasi, 3
+`DestinationChip` sejajar, catatan penyimpanan, tombol "Potong & Simpan") — `.verticalScroll
+(rememberScrollState())` ditambah ke `Column` utama, sebelum `.padding(horizontal = 20.dp,
+vertical = 12.dp)`.
+
+**`VisualizerSheet.kt`** (prioritas 3 — teks edukasi izin Mikrofon 4 baris saat
+`!permissionGranted` + `SpectrumBars` 120dp saat aktif) — `.verticalScroll
+(rememberScrollState())` ditambah persis setelah blok `.then(...)` tema Calm Retro (shell identik
+`EqualizerSheet.kt`, sama-sama warisan pola v3 Batch 134→135), sebelum `.padding(...)`.
+
+**Ringkasan file** — 3 file kode diubah, masing-masing +2 import (`rememberScrollState`,
+`verticalScroll`) + 1 blok komentar + 1 baris modifier. 0 file baru, 0 dependency baru, 0
+parameter/callback publik berubah, 0 komposable lain di ketiga file disentuh (`ZERO-REFACTOR`).
+`FILE_MANIFEST.txt` tidak berubah (187/187 — 3 file sudah ada sebelumnya). Brace/paren
+diverifikasi seimbang tiap file: `EqualizerSheet.kt` 27/27 brace, 106/106 paren;
+`RingtoneCutterSheet.kt` 24/24 brace, 91/91 paren; `VisualizerSheet.kt` 10/10 brace, 73/73 paren.
+
+**Belum divalidasi compile Gradle sungguhan** (tidak ada akses Android SDK/Gradle/jaringan di
+sandbox sesi ini — WAJIB cek CI run berikutnya). Risiko sintaks rendah: `verticalScroll`/
+`rememberScrollState` sudah dipakai identik di 3 file lain codebase yang sama
+(`NowPlayingScreen.kt`, `SongInfoEditSheet.kt`), import & posisi dalam modifier chain mengikuti
+pola yang sudah terbukti compile, bukan pola baru yang belum pernah diuji.
+
+**Antrean Batch 316** — terapkan `verticalScroll` (pola sama) ke `UpdateCheckSheet.kt` dan
+`BackupRestoreSheet.kt`, 2 sisa dari audit Batch 314 — konten pendek & risiko rendah, tidak
+dikerjakan batch ini karena limit Micro-Batch 3 file kode sudah penuh oleh 3 prioritas tertinggi.
+
 **Batch 314 (Fix sheet "Kontrol Lanjutan" terpotong + Equalizer tidak auto re-attach ke sesi audio
 baru, 3 file, 2 laporan user)** — 2 laporan terpisah dalam 1 pesan, masing-masing diminta plus
 audit pola serupa.

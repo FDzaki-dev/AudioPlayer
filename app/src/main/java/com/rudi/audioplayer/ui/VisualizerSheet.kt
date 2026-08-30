@@ -2,6 +2,8 @@ package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -42,6 +44,12 @@ fun VisualizerSheet(
     val isCalmRetro = isCalmRetroTheme()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+        // Batch 315 — audit "pola tab serupa" dari Batch 314 (fix sheet "Kontrol Lanjutan"
+        // terpotong), prioritas 3 dari 5 sheet yang kena pola sama: Column fixed tanpa
+        // verticalScroll/LazyColumn jaring pengaman. Teks edukasi izin Mikrofon di sheet ini
+        // cukup panjang (4 baris) + SpectrumBars 120dp saat aktif, berisiko ke-clip di layar
+        // pendek/font besar sama seperti kasus Batch 314. Pola fix sama: kalau muat, scroll
+        // offset 0 (nol perubahan visual); kalau tidak, sekarang bisa digeser.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -49,6 +57,7 @@ fun VisualizerSheet(
                 .then(
                     if (isCalmRetro) Modifier.clip(MaterialTheme.shapes.large).calmScanlines() else Modifier
                 )
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp)
         ) {
