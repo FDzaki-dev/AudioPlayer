@@ -36,6 +36,65 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 314 (Fix sheet "Kontrol Lanjutan" terpotong + Equalizer tidak auto re-attach ke sesi audio
+baru, 3 file, 2 laporan user)** — 2 laporan terpisah dalam 1 pesan, masing-masing diminta plus
+audit pola serupa.
+
+**Bug 1 — "Kontrol Lanjutan" terpotong.** `NowPlayingScreen.kt`: `Column` dalam
+`AdvancedControlsSheet` tidak pernah dibungkus `verticalScroll` — begitu total tinggi 3 seksi +
+2 divider + slider volume + section header melebihi tinggi sheet yang tersedia (layar pendek/
+gesture-nav/font besar), baris paling bawah ("Potong Nada Dering") diam-diam ke-clip, bukan bisa
+digeser. Root cause & fix PERSIS sama dengan yang sudah pernah diperbaiki di body utama
+`NowPlayingScreen` sendiri (lihat komentar `verticalScroll` di scaffold utama fungsi itu) — fix
+kali ini murni menerapkan pola jaring-pengaman yang SUDAH ADA di codebase yang sama (juga dipakai
+`SongInfoEditSheet.kt`), bukan pola baru. **Audit "pola tab serupa"** (semua `ModalBottomSheet` di
+`ui/`): dari 22 sheet, 5 LAINNYA juga punya `Column` fixed tanpa `verticalScroll` maupun
+`LazyColumn` sebagai jaring pengaman — `EqualizerSheet.kt` (prioritas tertinggi, jumlah band EQ
+variatif per device + 2 baris preset), `RingtoneCutterSheet.kt`, `VisualizerSheet.kt`,
+`UpdateCheckSheet.kt`, `BackupRestoreSheet.kt` (2 terakhir konten pendek, risiko rendah). Sengaja
+BELUM disentuh batch ini (lihat batas Micro-Batch 3 file kode di bawah) — **diantrekan Batch 315**,
+urutan sesuai prioritas di atas.
+
+**Bug 2 — Equalizer tidak persistent.** Root cause BUKAN di penyimpanan (`EqualizerController.kt`
+sudah benar simpan band/preset/enabled ke SharedPreferences sejak awal, dan `attach()` sudah benar
+baca+terapkan ulang) — root cause di PEMANGGILAN `attach()`: satu-satunya call site adalah
+`ensureEqualizerAttached()`, dan itu cuma dipanggil dari `onOpenEqualizer` (`MainActivity.kt`) —
+artinya efek `android.media.audiofx.Equalizer` NYATA cuma ter-reattach ke sesi audio kalau user
+BUKA sheet Equalizer secara manual. Sesi audio baru yang lebih dulu terjadi (cold-start app,
+Service restart, ExoPlayer bikin ulang AudioTrack di tengah pemutaran) TIDAK pernah otomatis
+ter-reattach — settingan tersimpan tetap ada di prefs (kelihatan benar kalau sheet dibuka), tapi
+suara yang benar-benar keluar flat/tanpa EQ sampai user buka sheet lagi. Ini kontradiksi langsung
+dengan doc-comment `ensureEqualizerAttached()` sendiri yang sudah menyatakan niatnya "must keep
+affecting real audio in the background regardless of whether its sheet is open" — wiring-nya saja
+yang belum pernah sesuai niat itu. **Fix**: `PlaybackAudioSession.kt` — tambah hook
+`onSessionIdChanged` (setter `sessionId` custom, invoke listener tiap kali ID baru non-zero masuk)
+supaya `PlaybackService.kt` (listener `onEvents`-nya) TIDAK perlu disentuh sama sekali.
+`PlayerViewModel.kt` — daftarkan listener itu di `init{}` (`equalizerController.attach(id)`), plus
+attach sekali langsung kalau sesi sudah ada saat ViewModel dibuat (mis. Service masih main di
+background). **Audit "pola yang sama"**: 1 controller `AudioEffect` lain di codebase ini
+(`AudioVisualizerController`) — TIDAK kena bug sejenis; lazy-attach-nya memang disengaja (baca
+doc-comment `ensureVisualizerAttached()`: trade-off baterai, bukan niat "selalu aktif" seperti
+Equalizer). `SilenceSkipStore`/`CrossfadeStore` dua-duanya sudah benar dibaca ulang di
+`PlaybackService.onCreate()` tiap kali Service baru, tidak kena pola bug ini.
+
+**Ringkasan file** — 3 file kode diubah (`PlaybackAudioSession.kt` +8 baris,
+`PlayerViewModel.kt` +14 baris di `init{}`, `NowPlayingScreen.kt` +8 baris + 1 modifier baru). 0
+file baru, 0 dependency baru, 0 perubahan struktur/urutan grup yang sudah ada. Brace/paren
+diverifikasi seimbang tiap file yang disentuh (`NowPlayingScreen.kt` 218/218 brace, 800/800 paren;
+`PlayerViewModel.kt` 220/220 brace, 772/772 paren; `PlaybackAudioSession.kt` 2/2 brace, 7/7 paren).
+
+**Belum divalidasi compile Gradle sungguhan** (tidak ada akses Android SDK/Gradle/jaringan di
+sandbox sesi ini — WAJIB cek CI run berikutnya, sama seperti pelajaran Batch 312→313). Sudah
+diverifikasi manual: nama fungsi/properti (`equalizerController.attach`, `PlaybackAudioSession.
+sessionId`, `rememberScrollState`/`verticalScroll`) dicek ada & sudah dipakai identik di tempat
+lain file yang sama; import `verticalScroll`/`rememberScrollState` sudah ada di
+`NowPlayingScreen.kt` (dipakai composable lain di file yang sama), tidak perlu import baru.
+
+**Antrean Batch 315** — terapkan `verticalScroll` (pola sama Batch 314) ke `EqualizerSheet.kt`
+(prioritas 1), `RingtoneCutterSheet.kt`, `VisualizerSheet.kt`, `UpdateCheckSheet.kt`,
+`BackupRestoreSheet.kt`, dari hasil audit di atas — belum dieksekusi batch ini karena limit
+Micro-Batch 3 file kode sudah penuh oleh 2 bug yang dilaporkan user langsung.
+
 **Batch 313 (Fix CI build gagal: `Modifier.padding()` overload tidak valid di Batch 312, 1 file,
 `log_fail_305.zip` dari user)** — User upload log build CI (`build-output.log`, Gradle 8.14.3):
 `:app:compileDebugKotlin` & `:app:compileReleaseKotlin` GAGAL, error tepat di

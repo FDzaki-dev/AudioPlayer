@@ -954,7 +954,19 @@ private fun AdvancedControlsSheet(
         sheetState = sheetState,
         containerColor = Color.Transparent
     ) {
-        Column(modifier = Modifier.fillMaxWidth().frostedGlass()) {
+        // Batch 314 — laporan user: sheet ini terpotong (baris terakhir, "Potong Nada Dering",
+        // tidak terjangkau di layar pendek/font besar). Sama persis root cause & pola jaring
+        // pengaman yang sudah dipakai body utama NowPlayingScreen (lihat komentar
+        // `verticalScroll` di scaffold utama fungsi ini): 3 seksi + divider + slider volume TIDAK
+        // pernah discroll, cuma diam-diam ke-clip di tepi layar begitu total tinggi > tinggi sheet
+        // yang tersedia. Kalau konten muat (layar tinggi/gesture-nav), scroll offset tetap 0, nol
+        // perubahan visual; kalau tidak muat, sekarang bisa digeser bukan hilang.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .frostedGlass()
+                .verticalScroll(rememberScrollState())
+        ) {
             Text(
                 "Kontrol Lanjutan",
                 style = MaterialTheme.typography.titleMedium,

@@ -292,6 +292,24 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 _sleepTimerRemaining.value = null
             }
         }
+
+        // Batch 314 — EqualizerController already persists bands/preset/enabled to
+        // SharedPreferences and re-applies them in attach(), but attach() itself was only ever
+        // called from ensureEqualizerAttached() (wired to MainActivity's onOpenEqualizer) — i.e.
+        // only when the user manually opened the Equalizer sheet. Any NEW audio session that
+        // started first — cold app start, Service restart, ExoPlayer recreating its AudioTrack
+        // mid-playback — left the saved settings sitting in prefs without ever touching the real
+        // android.media.audiofx.Equalizer, so playback stayed flat until the sheet was reopened.
+        // ensureEqualizerAttached()'s own doc-comment already says the equalizer "must keep
+        // affecting real audio in the background regardless of whether its sheet is open" — the
+        // wiring just never matched that intent. Fix: hook PlaybackAudioSession (see its Batch 314
+        // doc-comment) so every future session ID re-attaches automatically, plus attach once now
+        // in case a session already exists (e.g. Service kept playing in the background while this
+        // ViewModel was recreated).
+        PlaybackAudioSession.onSessionIdChanged = { id -> equalizerController.attach(id) }
+        if (PlaybackAudioSession.sessionId != 0) {
+            equalizerController.attach(PlaybackAudioSession.sessionId)
+        }
     }
 
 
