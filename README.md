@@ -8,7 +8,11 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 317 (Kecepatan Putar sekarang persistent):** Sebelumnya "Kecepatan
+> 🆕 **Update terbaru — Batch 318 (Fix teks "Fade Halus" ke-clip di dialog Pengaturan Putar):**
+> `SpeedDialog` (Now Playing → ⋮ → Kecepatan) sekarang bisa discroll (`verticalScroll`) — pola
+> `Column` fixed tanpa jaring pengaman yang sama seperti Batch 314-316, tapi di `AlertDialog`
+> yang luput dari audit ModalBottomSheet batch-batch itu.
+> Batch 317 (Kecepatan Putar sekarang persistent): Sebelumnya "Kecepatan
 > Putar" cuma hidup di memori — reset ke 1x tiap app dibuka ulang. Sekarang tersimpan otomatis dan
 > dipulihkan lintas sesi, berlaku ke lagu apa pun yang diputar (bukan cuma saat lanjut queue lama).
 > Mode Audiobook per-lagu tetap override-nya sendiri kalau diaktifkan untuk lagu itu.

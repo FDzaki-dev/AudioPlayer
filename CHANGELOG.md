@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 318 — Fix teks "Fade Halus" ke-clip di dialog Pengaturan Putar (laporan user, 1 file)
+User kirim screenshot: subtitle "Fade Halus" di seksi "Transisi Antar Lagu" (`SpeedDialog`, Now
+Playing → ⋮ → Kecepatan) terpotong di bawah.
+
+**Root cause** — Pola sama Batch 314-316 (`Column` fixed tanpa `verticalScroll`), tapi di lokasi
+yang luput dari audit itu: `SpeedDialog` adalah `AlertDialog`, bukan `ModalBottomSheet` (scope
+audit sebelumnya). Total tinggi konten (6 opsi Kecepatan + toggle Audiobook + 2 opsi Transisi
+dengan subtitle panjang) melebihi tinggi slot `text` Material3 `AlertDialog`.
+
+**Fix** — `.verticalScroll(rememberScrollState())` ditambah ke `Column` utama di
+`NowPlayingScreen.kt`. Import sudah ada di file, 0 import baru. Audit ulang: tidak ada
+`AlertDialog` lain di codebase dengan konten sepanjang ini.
+
+**Ringkasan file** — 1 file kode diubah, 0 file baru. `FILE_MANIFEST.txt` tidak berubah
+(187/187). Brace/paren seimbang: 218/218 brace, 807/807 paren.
+
+**Belum divalidasi compile Gradle sungguhan** (WAJIB cek CI run berikutnya) — risiko sintaks
+rendah, pola sudah dipakai identik di 5+ file lain codebase yang sama.
+
 ## Batch 317 — Kecepatan Putar sekarang persistent (laporan user, 2 file)
 User minta inspeksi tab Pengaturan/Kecepatan Putar: ketahuan `setPlaybackSpeed()` cuma
 `controller?.setPlaybackSpeed()` in-memory, tidak pernah ditulis/dibaca dari `PlaybackStateStore`

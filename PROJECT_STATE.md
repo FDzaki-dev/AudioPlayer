@@ -36,6 +36,33 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 318 (Laporan user, screenshot: teks "Fade Halus" ke-clip di dialog Pengaturan Putar — 1
+file)** — User kirim screenshot `SpeedDialog` (dibuka dari Now Playing → ⋮ → Kecepatan): opsi
+"Fade Halus" di seksi "Transisi Antar Lagu" (paling bawah) subtitle-nya terpotong.
+
+**Root cause** — PERSIS pola yang sama Batch 314-316 (`Column` fixed tanpa jaring pengaman
+scroll), tapi di lokasi yang LUPUT dari audit "pola tab serupa" batch-batch itu: audit itu
+scope-nya cuma 5 `ModalBottomSheet`, sedangkan `SpeedDialog` ini `AlertDialog` — kontainer beda,
+gejala identik. Total tinggi konten (6 opsi Kecepatan + toggle Mode Audiobook/Podcast + 2 opsi
+Transisi Antar Lagu dengan subtitle panjang) melebihi tinggi yang dialokasikan Material3
+`AlertDialog` ke slot `text`, baris paling bawah diam-diam ke-clip.
+
+**Fix** — `.verticalScroll(rememberScrollState())` ditambah ke `Column` utama di slot `text`
+milik `SpeedDialog` (`NowPlayingScreen.kt`). Import sudah ada di file ini sebelumnya (dipakai di
+tempat lain), 0 import baru.
+
+**Cek lokasi serupa lain** — Audit ulang cepat: `AlertDialog` LAIN di codebase ini (konfirmasi
+hapus, dsb.) kontennya pendek/statis (1-2 baris), tidak berisiko pola sama. `SpeedDialog` adalah
+satu-satunya `AlertDialog` dengan konten sepanjang ini.
+
+**Ringkasan file** — 1 file kode diubah (`NowPlayingScreen.kt`), 0 file baru, 0 dependency baru,
+0 komposable lain di file ini disentuh (`ZERO-REFACTOR`). `FILE_MANIFEST.txt` tidak berubah
+(187/187). Brace/paren diverifikasi seimbang: 218/218 brace, 807/807 paren, 1/1 bracket.
+
+**Belum divalidasi compile Gradle sungguhan** (tidak ada akses Android SDK/Gradle/jaringan di
+sandbox sesi ini — WAJIB cek CI run berikutnya). Risiko sintaks rendah: `verticalScroll`/
+`rememberScrollState` sudah dipakai identik di 5+ file lain codebase yang sama.
+
 **Batch 317 (Laporan user: Kecepatan Putar tidak persistent — 2 file)** — User minta inspeksi tab
 Pengaturan/Kecepatan Putar, ketahuan `setPlaybackSpeed()` di `PlayerViewModel` cuma
 `controller?.setPlaybackSpeed()` in-memory, tidak pernah ditulis/dibaca dari `PlaybackStateStore`

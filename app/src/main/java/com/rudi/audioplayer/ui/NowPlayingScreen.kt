@@ -1522,7 +1522,14 @@ private fun SpeedDialog(
         onDismissRequest = onDismiss,
         title = { Text("Pengaturan Putar") },
         text = {
-            Column {
+            // Batch 318 (laporan user, screenshot) — Column ini beda dari 5 sheet yang sudah
+            // diaudit Batch 314-316 (semua ModalBottomSheet): SpeedDialog ini AlertDialog, jadi
+            // luput dari audit "pola tab serupa" yang scope-nya cuma ModalBottomSheet. Simptom
+            // & root cause PERSIS sama: total tinggi konten (6 opsi Kecepatan + toggle Mode
+            // Audiobook + 2 opsi Transisi Antar Lagu dengan subtitle panjang) melebihi tinggi
+            // yang dialokasikan Material3 AlertDialog ke slot `text`, baris paling bawah
+            // ("Fade Halus" subtitle) diam-diam ke-clip alih-alih bisa digeser.
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     "Kecepatan",
                     style = MaterialTheme.typography.labelSmall,
