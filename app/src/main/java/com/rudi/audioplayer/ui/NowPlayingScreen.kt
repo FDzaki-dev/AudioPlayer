@@ -1081,7 +1081,7 @@ private fun AdvancedControlsSectionHeader(title: String) {
         style = MaterialTheme.typography.labelSmall,
         fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.secondary,
-        modifier = Modifier.padding(horizontal = 20.dp, top = 4.dp, bottom = 4.dp)
+        modifier = Modifier.padding(start = 20.dp, top = 4.dp, end = 20.dp, bottom = 4.dp)
     )
 }
 

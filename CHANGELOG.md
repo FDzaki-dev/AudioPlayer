@@ -1,5 +1,35 @@
 # Changelog
 
+## Batch 313 — Fix CI build gagal: `Modifier.padding()` overload tidak valid di Batch 312 (`log_fail_305.zip` dari user, 1 file)
+User upload log build CI (`build-output.log`, Gradle 8.14.3): `:app:compileDebugKotlin` &
+`:app:compileReleaseKotlin` GAGAL, error tepat di `NowPlayingScreen.kt:1084:29` — kode baru
+`AdvancedControlsSectionHeader` yang ditambah Batch 312. Root cause:
+`Modifier.padding(horizontal = 20.dp, top = 4.dp, bottom = 4.dp)` mencampur parameter
+`horizontal` (overload 2-parameter `padding(horizontal, vertical)`) dengan `top`/`bottom`
+(overload 4-parameter `padding(start, top, end, bottom)`) — 2 overload berbeda, Kotlin tidak bisa
+resolve kombinasi keduanya. Regresi murni dari sesi kemarin, tidak pernah lolos compile sungguhan
+sebelum dikirim (dicatat eksplisit di entri Batch 312: "Belum divalidasi compile Gradle
+sungguhan" — sekarang baru ketahuan lewat CI beneran).
+
+**`NowPlayingScreen.kt`** (1 file, 1 baris) — diganti ke overload 4-parameter yang valid:
+`Modifier.padding(start = 20.dp, top = 4.dp, end = 20.dp, bottom = 4.dp)` — hasil visual identik
+(20dp kiri/kanan, 4dp atas/bawah, sama persis yang dimaksud Batch 312), cuma nama parameter yang
+diperbaiki. Grep ulang seluruh file untuk pola campur `horizontal`+`top/bottom` yang sama: 0
+kecocokan lain — ini satu-satunya titik yang salah dari Batch 312.
+
+**Ringkasan file** — 1 file kode, 1 baris diubah. 0 file baru, 0 dependency baru, 0 perubahan
+struktur/urutan grup (pengelompokan Pemutaran/Audio/Lagu dari Batch 312 tidak disentuh — murni bug
+sintaks). `FILE_MANIFEST.txt` tidak berubah (187/187). Brace/paren `NowPlayingScreen.kt`
+diverifikasi seimbang utuh: 218/218 braces, 795/795 parens.
+
+**Masih belum divalidasi compile Gradle sungguhan** (WAJIB cek CI run berikutnya) — tapi akar
+masalah sudah dikonfirmasi persis dari pesan error compiler asli, bukan tebakan; overload
+`Modifier.padding(start, top, end, bottom)` sudah dipakai di tempat lain pada codebase yang sama.
+
+**Pelajaran untuk sesi berikutnya** — komposable baru yang pakai `Modifier.padding()` dengan lebih
+dari 2 parameter wajib pastikan kombinasi nama parameter itu benar ada di 1 overload yang sama,
+tidak bisa dicampur lintas overload.
+
 ## Batch 312 — Rapikan sheet "Kontrol Lanjutan": kelompokkan 9 baris jadi 3 seksi berdasar kegunaan (klarifikasi user, 1 file)
 Lanjutan langsung dari Batch 311. Batch 311 salah tafsir "berantakan/tidak-professional" sebagai
 bug transparansi tint (sudah benar diperbaiki, TIDAK di-revert batch ini); klarifikasi user kali

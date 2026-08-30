@@ -36,6 +36,40 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 313 (Fix CI build gagal: `Modifier.padding()` overload tidak valid di Batch 312, 1 file,
+`log_fail_305.zip` dari user)** — User upload log build CI (`build-output.log`, Gradle 8.14.3):
+`:app:compileDebugKotlin` & `:app:compileReleaseKotlin` GAGAL, error tepat di
+`NowPlayingScreen.kt:1084:29` — kode baru `AdvancedControlsSectionHeader` yang ditambah Batch 312
+kemarin. Root cause: `Modifier.padding(horizontal = 20.dp, top = 4.dp, bottom = 4.dp)` mencampur
+parameter `horizontal` (dari overload 2-parameter `padding(horizontal, vertical)`) dengan
+`top`/`bottom` (dari overload 4-parameter `padding(start, top, end, bottom)`) — 2 overload
+BERBEDA, Kotlin tidak bisa resolve kombinasi keduanya sekaligus, compile error "None of the
+following candidates is applicable". Regresi murni dari sesi kemarin, TIDAK pernah lolos compile
+sungguhan sebelum dikirim (dicatat eksplisit di entri Batch 312: "Belum divalidasi compile Gradle
+sungguhan (WAJIB cek CI)" — sekarang baru ketahuan lewat CI beneran, persis alasan catatan itu ada).
+
+**`NowPlayingScreen.kt`** (1 file, 1 baris) — diganti ke overload 4-parameter yang valid:
+`Modifier.padding(start = 20.dp, top = 4.dp, end = 20.dp, bottom = 4.dp)` — hasil visual IDENTIK
+(20dp kiri/kanan, 4dp atas/bawah, sama persis yang dimaksud Batch 312), cuma nama parameter yang
+diperbaiki jadi kombinasi yang benar-benar ada di API `Modifier.padding()`. 0 baris lain di file
+ini disentuh — grep ulang seluruh file utk pola `horizontal=...`+`top/bottom=...` campur yang
+sama: 0 kecocokan lain ditemukan, jadi ini SATU-SATUNYA titik yang salah dari Batch 312.
+
+**Ringkasan file** — 1 file kode, 1 baris diubah — jauh di bawah batas Micro-Batch. 0 file baru, 0
+dependency baru, 0 perubahan struktur/urutan grup (pengelompokan Pemutaran/Audio/Lagu dari Batch
+312 tidak disentuh sama sekali, murni bug sintaks). `FILE_MANIFEST.txt` tidak berubah (187/187).
+Brace/paren `NowPlayingScreen.kt` diverifikasi seimbang utuh: 218/218 braces, 795/795 parens.
+
+**Masih belum divalidasi compile Gradle sungguhan** (WAJIB cek CI run berikutnya) — TAPI kali ini
+akar masalahnya sudah dikonfirmasi persis dari pesan error compiler asli (bukan tebakan): overload
+`Modifier.padding(start, top, end, bottom)` adalah API resmi Compose foundation yang sudah dipakai
+di tempat lain pada codebase yang sama, risiko sisa sangat rendah.
+
+**Pelajaran utk sesi berikutnya** — komposable baru yang pakai `Modifier.padding()` dengan lebih
+dari 2 parameter WAJIB pastikan kombinasi nama parameter itu benar ada di 1 overload yang sama
+(`(horizontal, vertical)` ATAU `(start, top, end, bottom)` ATAU `(all)` ATAU `(PaddingValues)` —
+TIDAK BISA dicampur lintas overload), bukan cuma diasumsikan dari pola visual yang diinginkan.
+
 **Batch 312 (Rapikan sheet "Kontrol Lanjutan": kelompokkan 9 baris jadi 3 seksi berdasar
 kegunaan, 1 file, klarifikasi user langsung — "maksud saya rapikan menu utilitas yang tidak
 dipisahkan berdasarkan kegunaan umumnya")** — Lanjutan langsung dari Batch 311. Batch 311 salah
