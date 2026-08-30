@@ -36,6 +36,50 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 312 (Rapikan sheet "Kontrol Lanjutan": kelompokkan 9 baris jadi 3 seksi berdasar
+kegunaan, 1 file, klarifikasi user langsung — "maksud saya rapikan menu utilitas yang tidak
+dipisahkan berdasarkan kegunaan umumnya")** — Lanjutan langsung dari Batch 311. Batch 311 salah
+tafsir "berantakan/tidak-professional" sebagai bug transparansi tint (sudah benar diperbaiki,
+TIDAK di-revert batch ini); klarifikasi user kali ini soal hal LAIN: 9 baris menu (Antrean, Lirik,
+Sleep Timer, Kecepatan, Equalizer, Repeat A-B & Bookmark, Visualizer, Edit Info, Potong Nada
+Dering) sebelumnya flat berurutan tanpa pengelompokan sama sekali — dianggap tidak rapi/tidak
+professional secara struktur, terlepas dari isu tint kemarin.
+
+**`NowPlayingScreen.kt`** (1 file) — `AdvancedControlsSheet` composable direstrukturisasi jadi 3
+seksi ala grouped-list iOS (label kecil di atas tiap grup + `HorizontalDivider` di antaranya, gaya
+divider SAMA PERSIS yang sudah ada sebelumnya sebelum "Peredam Dalam Aplikasi", cuma sekarang
+dipakai konsisten di antara SEMUA seksi bukan cuma 1 titik):
+1. **"Pemutaran"** — Antrean Putar, Sleep Timer, Kecepatan Putar, Repeat A-B & Bookmark (kontrol
+   yang mengatur JALANNYA putar lagu saat ini/berikutnya).
+2. **"Audio"** — Equalizer, Visualizer Audio, + slider "Peredam Dalam Aplikasi" (pemrosesan/
+   tampilan sinyal audio, bukan soal urutan/waktu putar).
+3. **"Lagu"** — Lirik, Edit Info Lagu, Potong Nada Dering (konten/metadata per-lagu — hasil akhir
+   aksinya nempel ke lagu itu sendiri, bukan ke sesi putar yang sedang berjalan).
+
+Composable baru `AdvancedControlsSectionHeader(title: String)` ditambah tepat di sebelah
+`AdvancedControlRow` (private, cuma dipakai di sheet ini) — gaya teks SENGAJA disamakan persis
+dengan label "Peredam Dalam Aplikasi" yang sudah ada sebelumnya (`labelSmall` + `secondary`),
+supaya section header terasa 1 sistem konsisten dengan yang sudah dikenal user, bukan pola baru
+yang asing. 0 icon/label/callback yang diubah atau dihapus — 9 `AdvancedControlRow` + 1 baris
+slider volume SEMUA masih ada, cuma urutan & pengelompokan yang berubah; 9/9 parameter callback
+(`onOpenQueue`...`onOpenRingtoneCutter`) diverifikasi masih terpasang tepat 1x masing-masing.
+
+**Ringkasan file** — 1 file kode (`NowPlayingScreen.kt`), jauh di bawah batas Micro-Batch
+(maksimal 3). 0 file baru, 0 dependency baru, 0 parameter/callback publik yang berubah tanda
+tangan (`AdvancedControlsSheet` tetap private, dipanggil sama seperti sebelumnya). 0 komposable
+lain di file ini disentuh (`ZERO-REFACTOR`). `FILE_MANIFEST.txt` tidak berubah (187/187).
+Brace/paren `NowPlayingScreen.kt` diverifikasi seimbang utuh: 218/218 braces, 795/795 parens.
+
+**Belum divalidasi compile Gradle sungguhan** (WAJIB cek CI) — risiko sintaks rendah: murni
+reorder pemanggilan composable yang sudah ada + 1 composable baru sangat sederhana (`Text` +
+`Modifier.padding`, pola yang sudah dipakai berulang di file yang sama).
+
+**Belum diverifikasi visual di device** — kalau user buka lagi "Kontrol Lanjutan": harus terlihat
+3 grup terpisah label "Pemutaran"/"Audio"/"Lagu" dengan divider di antaranya (bukan lagi 9 baris
+flat tanpa jeda). Urutan baru: Antrean→Sleep Timer→Kecepatan→Repeat A-B (grup 1), Equalizer→
+Visualizer→slider volume (grup 2), Lirik→Edit Info→Potong Nada Dering (grup 3) — beda dari urutan
+lama, disengaja mengikuti pengelompokan, bukan regresi urutan.
+
 **Batch 311 (Fix bug: sheet "Kontrol Lanjutan" berantakan/tidak-professional, 1 file, laporan
 screenshot user langsung)** — User kirim screenshot `ModalBottomSheet` "Kontrol Lanjutan" (Now
 Playing) dengan teks latar (coachmark "Geser di kiri/kanan piringan buat atur kecerahan & volume

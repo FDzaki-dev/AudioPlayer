@@ -1,5 +1,34 @@
 # Changelog
 
+## Batch 312 — Rapikan sheet "Kontrol Lanjutan": kelompokkan 9 baris jadi 3 seksi berdasar kegunaan (klarifikasi user, 1 file)
+Lanjutan langsung dari Batch 311. Batch 311 salah tafsir "berantakan/tidak-professional" sebagai
+bug transparansi tint (sudah benar diperbaiki, TIDAK di-revert batch ini); klarifikasi user kali
+ini soal hal lain: "maksud saya rapikan menu utilitas yang tidak dipisahkan berdasarkan kegunaan
+umumnya" — 9 baris menu sebelumnya flat berurutan tanpa pengelompokan sama sekali.
+
+**`NowPlayingScreen.kt`** (1 file) — `AdvancedControlsSheet` direstrukturisasi jadi 3 seksi ala
+grouped-list iOS (label kecil di atas tiap grup + `HorizontalDivider` di antaranya, gaya divider
+sama persis yang sudah ada sebelumnya, sekarang dipakai konsisten di antara semua seksi):
+1. **Pemutaran** — Antrean Putar, Sleep Timer, Kecepatan Putar, Repeat A-B & Bookmark.
+2. **Audio** — Equalizer, Visualizer Audio, + slider "Peredam Dalam Aplikasi".
+3. **Lagu** — Lirik, Edit Info Lagu, Potong Nada Dering.
+
+Composable baru `AdvancedControlsSectionHeader(title: String)` ditambah di sebelah
+`AdvancedControlRow` — gaya teks disamakan persis dengan label "Peredam Dalam Aplikasi" yang
+sudah ada (`labelSmall` + `secondary`). 0 icon/label/callback diubah atau dihapus — 9
+`AdvancedControlRow` + 1 slider volume semua masih ada, cuma urutan & pengelompokan berubah; 9/9
+callback (`onOpenQueue`...`onOpenRingtoneCutter`) diverifikasi masih terpasang tepat 1x.
+
+**Ringkasan file** — 1 file kode, jauh di bawah batas Micro-Batch (maksimal 3). 0 file baru, 0
+dependency baru, 0 signature publik berubah. `FILE_MANIFEST.txt` tidak berubah (187/187).
+Brace/paren `NowPlayingScreen.kt` diverifikasi seimbang utuh: 218/218 braces, 795/795 parens.
+
+**Belum divalidasi compile Gradle sungguhan** (WAJIB cek CI) — risiko sintaks rendah: reorder
+composable yang sudah ada + 1 composable baru sangat sederhana.
+
+**Belum diverifikasi visual di device** — harus terlihat 3 grup dengan label "Pemutaran"/
+"Audio"/"Lagu" + divider di antaranya, urutan baru mengikuti pengelompokan (bukan regresi).
+
 ## Batch 311 — Fix bug: sheet "Kontrol Lanjutan" berantakan/tidak-professional (laporan screenshot user, 1 file)
 User kirim screenshot `ModalBottomSheet` "Kontrol Lanjutan" (Now Playing): teks latar (coachmark
 "Geser di kiri/kanan piringan buat atur kecerahan & volume HP... Ketuk ⋮ buat Sleep Timer,

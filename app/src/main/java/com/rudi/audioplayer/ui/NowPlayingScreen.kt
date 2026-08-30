@@ -962,17 +962,18 @@ private fun AdvancedControlsSheet(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
             )
 
+            // Batch 312 — sebelumnya 9 baris flat tanpa pengelompokan (permintaan user: "rapikan
+            // menu utilitas yang tidak dipisahkan berdasarkan kegunaan umumnya"). Dikelompokkan
+            // jadi 3 seksi ala grouped-list iOS (label kecil di atas tiap grup + divider di
+            // antaranya, pola sama seperti "Peredam Dalam Aplikasi" yang sudah ada sebelumnya):
+            // "Pemutaran" (kontrol JALANNYA putar lagu saat ini), "Audio" (pemrosesan/tampilan
+            // sinyal audio), "Lagu" (konten/metadata per-lagu, bukan soal pemutaran real-time).
+            AdvancedControlsSectionHeader("Pemutaran")
             AdvancedControlRow(
                 icon = Icons.Default.QueueMusic,
                 label = "Antrean Putar",
                 value = null,
                 onClick = onOpenQueue
-            )
-            AdvancedControlRow(
-                icon = Icons.Default.Article,
-                label = "Lirik",
-                value = null,
-                onClick = onOpenLyrics
             )
             AdvancedControlRow(
                 icon = Icons.Default.Timer,
@@ -987,34 +988,10 @@ private fun AdvancedControlsSheet(
                 onClick = onOpenSpeed
             )
             AdvancedControlRow(
-                icon = Icons.Default.Equalizer,
-                label = "Equalizer",
-                value = null,
-                onClick = onOpenEqualizer
-            )
-            AdvancedControlRow(
                 icon = Icons.Default.Repeat,
                 label = "Repeat A-B & Bookmark",
                 value = null,
                 onClick = onOpenAbRepeatBookmark
-            )
-            AdvancedControlRow(
-                icon = Icons.Default.GraphicEq,
-                label = "Visualizer Audio",
-                value = null,
-                onClick = onOpenVisualizer
-            )
-            AdvancedControlRow(
-                icon = Icons.Default.Edit,
-                label = "Edit Info Lagu",
-                value = null,
-                onClick = onOpenSongInfoEdit
-            )
-            AdvancedControlRow(
-                icon = Icons.Default.ContentCut,
-                label = "Potong Nada Dering",
-                value = null,
-                onClick = onOpenRingtoneCutter
             )
 
             HorizontalDivider(
@@ -1022,11 +999,24 @@ private fun AdvancedControlsSheet(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
             )
 
+            AdvancedControlsSectionHeader("Audio")
+            AdvancedControlRow(
+                icon = Icons.Default.Equalizer,
+                label = "Equalizer",
+                value = null,
+                onClick = onOpenEqualizer
+            )
+            AdvancedControlRow(
+                icon = Icons.Default.GraphicEq,
+                label = "Visualizer Audio",
+                value = null,
+                onClick = onOpenVisualizer
+            )
             Text(
                 "Peredam Dalam Aplikasi (bukan volume HP)",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(horizontal = 20.dp)
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
             )
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
@@ -1051,9 +1041,48 @@ private fun AdvancedControlsSheet(
                     )
                 )
             }
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+            )
+
+            AdvancedControlsSectionHeader("Lagu")
+            AdvancedControlRow(
+                icon = Icons.Default.Article,
+                label = "Lirik",
+                value = null,
+                onClick = onOpenLyrics
+            )
+            AdvancedControlRow(
+                icon = Icons.Default.Edit,
+                label = "Edit Info Lagu",
+                value = null,
+                onClick = onOpenSongInfoEdit
+            )
+            AdvancedControlRow(
+                icon = Icons.Default.ContentCut,
+                label = "Potong Nada Dering",
+                value = null,
+                onClick = onOpenRingtoneCutter
+            )
             Spacer(modifier = Modifier.height(20.dp))
         }
     }
+}
+
+/** Batch 312 — label kecil di atas tiap grup "Kontrol Lanjutan" (Pemutaran/Audio/Lagu), gaya
+ * sama persis "Peredam Dalam Aplikasi" yang sudah ada sebelumnya (labelSmall + secondary),
+ * supaya terasa 1 sistem konsisten, bukan pola baru yang asing di sheet ini. */
+@Composable
+private fun AdvancedControlsSectionHeader(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.secondary,
+        modifier = Modifier.padding(horizontal = 20.dp, top = 4.dp, bottom = 4.dp)
+    )
 }
 
 @Composable
