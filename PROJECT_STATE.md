@@ -36,6 +36,85 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 320 (Verifikasi integritas rilis — repack tanpa laporan bug baru, 0 kode, 3 dokumentasi)**
+— User minta "sempurnakan, repack, lalu present" tanpa laporan bug/log_fail spesifik. Sesuai
+Fast-Track (audit full project dilarang tanpa instruksi eksplisit), dibatasi ke verifikasi
+integritas: (1) `FILE_MANIFEST.txt` vs disk — `diff` 188/188, 0 drift; (2) brace/paren/bracket
+seluruh 126 file `.kt` (main+test+androidTest) — 3 file tampil "tidak seimbang" di hitungan
+karakter mentah, SEMUA dikonfirmasi false-positive manual (`LyricsView.kt` komentar notasi
+interval matematika, sudah didokumentasikan sejak Batch 245; `Type.kt` cuma prosa komentar
+panjang, kode-saja 45/45 paren terverifikasi; `LyricsParserTest.kt` 1 string uji sengaja tanpa
+`]` penutup, menguji penanganan bracket tak tertutup — bukan galat); (3) spot-check hasil Batch
+318/319 (`PlaybackService.kt`/`NowPlayingScreen.kt`/`ic_notification_play_pause.xml`) — angka
+brace/paren & validitas XML cocok persis catatan batch asalnya, 0 korupsi konten.
+
+**Hasil: 0 bug, 0 file kode diedit.** `ROADMAP_LIQUID_GLASS_REDESIGN.md` (blur asli §3b) TIDAK
+disentuh — masih menunggu instruksi eksplisit lanjut sub-langkah (aturan sesi #4), bukan
+dieksekusi diam-diam. ZIP direpack identik isi kode dengan Batch 319, 3 dokumentasi VIP
+disinkronkan. Versi APK tetap auto dari `GITHUB_RUN_NUMBER` (0 bump manual).
+
+**Catatan observasi (BUKAN dieksekusi, butuh konfirmasi user dulu)**: `PROJECT_STATE.md` ini
+sendiri sudah menyimpan batch 58→320 (262 batch aktif) — jauh melebihi pola "~100 batch lalu
+arsipkan" yang ditetapkan Batch 158 (rencana lanjutan waktu itu: re-arsip "sekitar Batch 258",
+belum pernah dieksekusi). File ini sekarang 5000+ baris. Kandidat batch terpisah kalau user minta:
+potong batch lama (mis. 58-219) ke `PROJECT_STATE_ARCHIVE.md`, sisakan ~100 batch terbaru aktif —
+TIDAK dieksekusi sesi ini karena bukan instruksi eksplisit dan berisiko kalau dipotong tergesa di
+file sebesar ini tanpa konfirmasi dulu.
+
+**Batch 319 (2 laporan user dalam 1 pesan — (1) efek persistent speed/repeat/shuffle tidak
+berlaku kalau app di-kill lalu diputar via widget/media player eksternal/notifikasi, (2)
+notifikasi cold-start "SONIX" dibuat statis/universal, 1 file kode + 1 drawable baru)** —
+
+**Bug 1 (root cause)** — `PlaybackStateStore` sudah menyimpan repeatMode/shuffleEnabled (Batch
+108) & speed (Batch 317), TAPI cuma pernah dipulihkan lewat `PlayerViewModel.connect()`/
+`resumeFromSaved()` — jalur UI yang HANYA jalan kalau app dibuka. `PlaybackService`'s
+`SavedQueueItems` (dipakai bareng `restoreLastQueue()` — widget cold-start — dan
+`onPlaybackResumption()` — resume dari lock screen/Android Auto/Bluetooth setelah proses mati
+total) cuma pernah meneruskan `items`/`startIndex`/`startPositionMs` ke player, 3 field lain
+diam-diam diabaikan sejak field itu ditambah ke store — persis laporan user.
+
+**Fix Bug 1 (`PlaybackService.kt`)** — `SavedQueueItems` +3 field (`repeatMode`,
+`shuffleEnabled`, `speed`), `loadSavedQueueItems()` mengisinya dari `PlaybackStateStore`.
+`restoreLastQueue()` set repeat/shuffle SEBELUM `setMediaItems()` (pola sama `resumeFromSaved()`
+Batch 108) + `setPlaybackSpeed()`. `onPlaybackResumption()` set ketiganya ke `mediaSession.player`
+(parameter callback, instance sama yang akan menerima item dari `completer.set()`) sebelum future
+di-complete.
+
+**Bug 2 (root cause)** — `buildColdStartNotification()` (`NotificationCompat` polos, BUKAN
+`MediaStyle` — Batch 304) cuma diperbarui dari `onIsPlayingChanged` DI PROSES YANG SAMA; begitu
+app di-kill lalu state berubah lewat widget/media player eksternal/notifikasi lain selagi
+placeholder ini masih tampil (jendela s/d `MAX_HANDOFF_WAIT_MS` 8 detik), judul & label tombol
+yang sudah terpasang tidak pernah ikut ter-refresh — sinkronisasi yang oleh desainnya sendiri
+tidak akan pernah 100%.
+
+**Fix Bug 2 (instruksi user eksplisit — statis tapi universal, bukan kejar sinkron)** —
+`contentText` jadi teks tetap "Ketuk untuk membuka kontrol pemutaran" (bukan lagi judul lagu
+dinamis). Tombol toggle jadi 1 ikon gabungan Putar/Jeda kustom baru (`ic_notification_play_pause.xml`,
+baru, gaya "⏯️", BUKAN daur ulang `ic_widget_play`/`ic_widget_pause` yang sebelumnya ditukar
+bergantian) + label tetap "Putar/Jeda" (bukan lagi "Jeda"/"Lanjutkan" bergantian).
+`buildColdStartNotification()` disederhanakan jadi 0 parameter (`isPlaying`/`nowPlayingTitle`
+dihapus, bukan dibiarkan jadi parameter mati) — 3 call site disesuaikan. `updateColdStartNotification()`
+SENGAJA TETAP DIPERTAHANKAN (kini cuma me-repost konten identik) — mencabut hook itu dari
+`onIsPlayingChanged` di luar scope 2 laporan ini (listener itu dipakai crossfade/shake
+detector/floating bubble juga, ZERO-REFACTOR).
+
+**Ringkasan file** — 1 file kode diubah (`PlaybackService.kt`), 1 drawable baru
+(`ic_notification_play_pause.xml`), 0 dependency baru, 0 protected asset disentuh.
+`FILE_MANIFEST.txt` 187→188. Brace/paren `PlaybackService.kt` seimbang utuh: 80/80 brace,
+388/388 paren, 14/14 bracket.
+
+**Belum divalidasi compile Gradle sungguhan** (0 akses SDK/Gradle/jaringan di sandbox sesi ini —
+WAJIB cek CI run berikutnya). Risiko rendah utk Bug 1 (field + assignment ke API `Player` yang
+sudah dipakai identik di `PlayerViewModel.kt`). Risiko sedang utk vector drawable baru (`pathData`
+belum pernah divalidasi parser Android sungguhan di sandbox ini — sintaks M/L/Z/H/V standar, gaya
+sama `ic_bubble_minimize.xml`/`ic_bubble_tile.xml` yang sudah terbukti compile).
+
+**Belum diverifikasi visual/device** — prioritas cek: (1) set speed≠1x + repeat/shuffle ON,
+force-stop app, tekan play di widget, konfirmasi ketiganya ikut ke lagu yang diputar; (2) ulangi
+lewat resume lock screen/Bluetooth kalau ada akses; (3) trigger notifikasi cold-start, pastikan
+ikon ⏯️ baru tampil benar (bukan kotak putih/pecah) dan teks/tombol tidak lagi berubah-ubah
+mengikuti lagu/status. Detail lengkap: `CHANGELOG.md` Batch 319.
+
 **Batch 318 (Laporan user, screenshot: teks "Fade Halus" ke-clip di dialog Pengaturan Putar — 1
 file)** — User kirim screenshot `SpeedDialog` (dibuka dari Now Playing → ⋮ → Kecepatan): opsi
 "Fade Halus" di seksi "Transisi Antar Lagu" (paling bawah) subtitle-nya terpotong.

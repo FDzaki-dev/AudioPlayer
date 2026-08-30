@@ -204,7 +204,7 @@ class PlaybackService : MediaLibraryService() {
                 // it was first built (always "Lanjutkan", since nothing was playing yet at
                 // that exact moment), even after playback actually started.
                 if (coldStartNotificationActive) {
-                    updateColdStartNotification(isPlaying)
+                    updateColdStartNotification()
                 }
             }
         })
@@ -380,15 +380,18 @@ class PlaybackService : MediaLibraryService() {
         return super.onStartCommand(intent, flags, startId)
     }
 
-    /** Batch 304 — `nowPlayingTitle` BARU (default null, jadi call site lama di
-     * [startForegroundColdStartNotification] yang memang selalu belum punya media item di titik
-     * itu tidak perlu diubah). Sebelumnya `contentText` HARDCODE "Memuat lagu…" terus, bahkan
-     * setelah lagu confirmed playing & metadata sudah ada — user lapor teks itu tak pernah
-     * berubah jadi apa pun yang lebih berguna. Begitu judul lagu tersedia (persis di titik
-     * `isPlaying` pertama kali berubah, lihat [updateColdStartNotification]), tampilkan itu;
-     * "Memuat lagu…" cuma dipakai selagi benar-benar belum ada apa pun diketahui (window murni
-     * cold-start, sebelum media item pertama termuat). */
-    private fun buildColdStartNotification(isPlaying: Boolean, nowPlayingTitle: String? = null): android.app.Notification {
+    /** Batch 319 (laporan user, screenshot kartu OEM "SONIX sekarang") — dibalik dari pendekatan
+     * dinamis Batch 304: judul lagu & label tombol yang ikut `nowPlayingTitle`/`isPlaying` PASTI
+     * sesekali stale, karena notifikasi ini `NotificationCompat` polos (bukan `MediaStyle` yang
+     * disinkronkan Media3 otomatis) — satu-satunya jalur pembaruannya adalah listener
+     * `onIsPlayingChanged` DI PROSES INI, jadi begitu app di-kill lalu lagu diganti/dikontrol
+     * lewat widget/media player eksternal/notifikasi lain SELAGI placeholder ini masih tampil,
+     * teks & tombol yang sudah terlanjur terpasang tidak pernah ikut diperbarui. Instruksi user
+     * eksplisit: berhenti mengejar sinkronisasi yang oleh desainnya sendiri tidak akan pernah
+     * 100% — ganti ke konten STATIS tapi UNIVERSAL (selalu benar apa pun state-nya), bukan
+     * "benar kalau sempat ke-refresh". `isPlaying`/`nowPlayingTitle` sudah tidak dibutuhkan sama
+     * sekali (dihapus dari signature, bukan dibiarkan jadi parameter mati). */
+    private fun buildColdStartNotification(): android.app.Notification {
         val toggleIntent = Intent(this, PlaybackService::class.java).setAction(WidgetUpdater.ACTION_TOGGLE_PLAY)
         val toggleFlags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         val togglePendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -397,29 +400,26 @@ class PlaybackService : MediaLibraryService() {
             PendingIntent.getService(this, 101, toggleIntent, toggleFlags)
         }
 
-        val contentText = when {
-            !nowPlayingTitle.isNullOrBlank() && isPlaying -> nowPlayingTitle
-            !nowPlayingTitle.isNullOrBlank() && !isPlaying -> "$nowPlayingTitle — Dijeda"
-            else -> "Memuat lagu…"
-        }
-
         return NotificationCompat.Builder(this, COLD_START_CHANNEL_ID)
             .setContentTitle("SONIX")
-            .setContentText(contentText)
+            .setContentText("Ketuk untuk membuka kontrol pemutaran")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .addAction(
-                if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play,
-                if (isPlaying) "Jeda" else "Lanjutkan",
+                // Ikon gabungan Putar/Jeda kustom (ic_notification_play_pause, gaya ⏯️) —
+                // SATU ikon tetap, tidak lagi ditukar ic_widget_play/ic_widget_pause mengikuti
+                // isPlaying. Label "Putar/Jeda" juga tetap, bukan "Jeda"/"Lanjutkan" bergantian —
+                // affordance toggle tunggal yang benar apa pun state playback yang sebenarnya.
+                R.drawable.ic_notification_play_pause,
+                "Putar/Jeda",
                 togglePendingIntent
             )
             .build()
     }
 
-    /** Re-posts the placeholder with an action label matching the player's actual current
-     * state. Only meaningful while [coldStartNotificationActive] — never called after Media3's
-     * own notification has taken over.
+    /** Re-posts the placeholder. Only meaningful while [coldStartNotificationActive] — never
+     * called after Media3's own notification has taken over.
      *
      * Batch 304 — sebelumnya `NotificationManagerCompat.notify()` polos ke ID yang sama: user
      * lapor tombol "Jeda" kepatri (tampilan notifikasi di laporan cocok gaya kartu media
@@ -428,10 +428,17 @@ class PlaybackService : MediaLibraryService() {
      * adalah cara resmi Android utk memperbarui notifikasi service foreground miliknya sendiri —
      * idempotent, tidak me-restart service atau bikin flicker — dipakai di sini gantinya, pola
      * SDK-check sama persis dgn [startForegroundColdStartNotification] di bawah supaya perilaku
-     * API 29+ (foreground service type) konsisten. */
-    private fun updateColdStartNotification(isPlaying: Boolean) {
-        val nowPlayingTitle = mediaSession?.player?.currentMediaItem?.mediaMetadata?.title?.toString()
-        val notification = buildColdStartNotification(isPlaying, nowPlayingTitle)
+     * API 29+ (foreground service type) konsisten.
+     *
+     * Batch 319 — sejak [buildColdStartNotification] jadi statis penuh (0 parameter), fungsi ini
+     * secara teknis cuma me-repost konten yang identik tiap dipanggil. SENGAJA TETAP
+     * DIPERTAHANKAN (bukan dihapus bareng pemanggilnya di `onIsPlayingChanged`) — idempotent &
+     * tidak berbahaya, dan mencabut hook itu sekalian adalah perubahan lifecycle yang lebih luas
+     * dari yang diminta user batch ini (`onIsPlayingChanged` dipakai banyak listener lain di
+     * fungsi yang sama — crossfade, shake detector, floating bubble — ZERO-REFACTOR di luar
+     * scope 2 laporan user). */
+    private fun updateColdStartNotification() {
+        val notification = buildColdStartNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         } else {
@@ -441,9 +448,9 @@ class PlaybackService : MediaLibraryService() {
 
     /** Bare-minimum "waking up" notification so the OS treats this process as a legitimate
      * foreground service from the very first instant of a widget-triggered cold start. Still
-     * carries a real Jeda/Lanjutkan action — even in this brief handoff window before Media3's
-     * own full notification takes over, the user has something to tap instead of a dead,
-     * control-less notification. */
+     * carries a real Putar/Jeda toggle action — even in this brief handoff window before
+     * Media3's own full notification takes over, the user has something to tap instead of a
+     * dead, control-less notification. */
     private fun startForegroundColdStartNotification() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(NotificationManager::class.java)
@@ -458,7 +465,7 @@ class PlaybackService : MediaLibraryService() {
             }
         }
 
-        val notification = buildColdStartNotification(isPlaying = mediaSession?.player?.isPlaying == true)
+        val notification = buildColdStartNotification()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
@@ -480,8 +487,24 @@ class PlaybackService : MediaLibraryService() {
      * MediaStore, since only song IDs are persisted), which one to start on, and where in it.
      * Shared by the widget cold-start path ([restoreLastQueue]) and playback resumption
      * ([PlaybackSessionCallback.onPlaybackResumption]) so both restore a saved queue exactly
-     * the same way — one no longer needs to be kept in sync with the other by hand. */
-    private data class SavedQueueItems(val items: List<MediaItem>, val startIndex: Int, val startPositionMs: Long)
+     * the same way — one no longer needs to be kept in sync with the other by hand.
+     *
+     * Batch 319 (laporan user) — `repeatMode`/`shuffleEnabled`/`speed` ditambah. Sebelumnya 2
+     * jalur ini cuma meneruskan `items`/`startIndex`/`startPositionMs` ke player, padahal
+     * [PlaybackStateStore] sudah menyimpan ketiga field itu sejak Batch 108/317 — jadi begitu
+     * proses di-kill lalu playback dipicu murni dari widget/notifikasi/kontrol eksternal (tanpa
+     * `PlayerViewModel.connect()`/`resumeFromSaved()` UI yang selama ini jadi SATU-SATUNYA
+     * jalur pemulihan ketiganya), ExoPlayer yang baru dibuat `onCreate()` selalu mulai dari
+     * default (1.0x, repeat off, shuffle off) — persis laporan user "efek persistent tidak
+     * berlaku kalau app di-kill lalu diputar via widget/media player eksternal/notifikasi". */
+    private data class SavedQueueItems(
+        val items: List<MediaItem>,
+        val startIndex: Int,
+        val startPositionMs: Long,
+        val repeatMode: Int,
+        val shuffleEnabled: Boolean,
+        val speed: Float
+    )
 
     private suspend fun loadSavedQueueItems(): SavedQueueItems? {
         val saved = PlaybackStateStore(this).load() ?: return null
@@ -516,13 +539,20 @@ class PlaybackService : MediaLibraryService() {
         }
 
         val index = saved.index.coerceIn(0, items.size - 1)
-        return SavedQueueItems(items, index, saved.positionMs)
+        return SavedQueueItems(items, index, saved.positionMs, saved.repeatMode, saved.shuffleEnabled, saved.speed)
     }
 
     private suspend fun restoreLastQueue() {
         val saved = loadSavedQueueItems() ?: return
         mediaSession?.player?.apply {
+            // Batch 319 — repeat/shuffle diset SEBELUM setMediaItems(), pola sama persis
+            // PlayerViewModel.resumeFromSaved() (Batch 108), supaya urutan shuffle (kalau ada)
+            // berlaku sejak media item pertama, bukan re-shuffle setelah queue sudah jalan.
+            // speed independen dari urutan queue, aman diset di titik mana pun.
+            repeatMode = saved.repeatMode
+            shuffleModeEnabled = saved.shuffleEnabled
             setMediaItems(saved.items, saved.startIndex, saved.startPositionMs)
+            setPlaybackSpeed(saved.speed)
             prepare()
         }
     }
@@ -596,6 +626,17 @@ class PlaybackService : MediaLibraryService() {
                 serviceScope.launch {
                     val saved = loadSavedQueueItems()
                     if (saved != null) {
+                        // Batch 319 — sebelumnya repeat/shuffle/speed tersimpan diabaikan total
+                        // di jalur ini: resumption yang dipicu murni dari lock screen/Android
+                        // Auto/Bluetooth (proses sudah mati, PlayerViewModel.connect() tidak
+                        // pernah jalan) selalu kembali ke default. Diset ke `mediaSession.player`
+                        // yang SAMA yang akan menerima `items` dari completer.set() di bawah —
+                        // repeatMode/shuffleModeEnabled/speed independen dari media item mana
+                        // pun yang sedang/akan dimuat, aman diset sebelum Media3 menerapkan hasil
+                        // future ini ke player.
+                        mediaSession.player.repeatMode = saved.repeatMode
+                        mediaSession.player.shuffleModeEnabled = saved.shuffleEnabled
+                        mediaSession.player.setPlaybackSpeed(saved.speed)
                         completer.set(
                             MediaSession.MediaItemsWithStartPosition(saved.items, saved.startIndex, saved.startPositionMs)
                         )

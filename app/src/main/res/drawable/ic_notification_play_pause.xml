@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Batch 319 (laporan user) — ikon toggle Putar/Jeda gabungan gaya "⏯️", dibuat khusus utk
+     tombol aksi notifikasi cold-start (lihat PlaybackService.buildColdStartNotification()),
+     BUKAN sekadar Unicode "⏯" mentah atau daur ulang ic_widget_play.png/ic_widget_pause.png
+     yang sebelumnya ditukar bergantian mengikuti isPlaying. SATU ikon tetap (segitiga Putar +
+     2 batang Jeda berdampingan) — affordance "ketuk utk toggle" yang tidak pernah butuh
+     disinkronkan ke state playback yang sebenarnya, jadi tidak pernah stale walau notifikasi
+     ini gagal ter-refresh (root cause laporan user: app di-kill lalu dikontrol lewat widget/
+     media player eksternal/notifikasi lain). Putih solid, konsisten dgn ic_widget_*.png &
+     ic_bubble_minimize.xml yang juga putih di atas latar gelap; sudut sengaja tetap tajam
+     (bukan rounded-corner) demi kesederhanaan path — vector ini belum diverifikasi visual di
+     device, rounding bisa ditambah kalau ukuran 24dp terasa terlalu tajam setelah dicoba. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Segitiga Putar (kiri) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3,4 L3,20 L12,12 Z" />
+    <!-- Batang Jeda pertama -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M14,4 H16.5 V20 H14 Z" />
+    <!-- Batang Jeda kedua -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M18.5,4 H21 V20 H18.5 Z" />
+</vector>

@@ -1,5 +1,106 @@
 # Changelog
 
+## Batch 320 — Verifikasi integritas rilis (repack tanpa laporan bug baru), 0 kode diubah
+User minta "sempurnakan, repack, lalu present" tanpa laporan bug/log_fail baru spesifik. Sesuai
+Fast-Track (task mikro dieksekusi langsung, audit full project dilarang tanpa instruksi), sesi ini
+dibatasi ke verifikasi integritas ZIP yang sudah ada — BUKAN audit UI/UX baru.
+
+**Cek 1 — `FILE_MANIFEST.txt` vs disk.** `diff` penuh 188 path di manifest vs 188 file fisik
+hasil `find`: 0 selisih kedua arah. Manifest 100% akurat, 0 drift.
+
+**Cek 2 — brace/paren/bracket balance seluruh `.kt` (126 file, main+test+androidTest).** 3 file
+tampil "tidak seimbang" di penghitungan karakter mentah, ketiganya diverifikasi manual sebagai
+false-positive, 0 bug nyata:
+- `LyricsView.kt` — 1 `[`/`)` ekstra dari komentar notasi interval matematika `[start,end)`
+  (sudah didokumentasikan sejak Batch 245, bukan temuan baru).
+- `Type.kt` — 2 `)` ekstra murni dari prosa komentar Indonesia panjang (parenthetical remarks
+  lintas-baris). Dikonfirmasi ulang: setelah baris `//` dibuang, kode-saja 45/45 paren, 0/0 brace
+  — file ini genuinely cuma deklarasi `val`, 0 risiko compile.
+- `LyricsParserTest.kt` — 2 `[` ekstra dari 1 string uji sengaja tanpa `]` penutup
+  (`"...tanpa kurung tutup"`, muncul 2x: input `parse()` + nilai harapan `assertEquals`) — inilah
+  test case yang MEMANG menguji penanganan bracket tak tertutup, bukan galat pengetikan.
+
+**Cek 3 — file hasil Batch 318/319 spot-check.** `PlaybackService.kt` (80/80 brace, 388/388
+paren, 14/14 bracket) & `NowPlayingScreen.kt` (218/218 brace, 807/807 paren, 1/1 bracket) — cocok
+persis angka yang tercatat di entri Batch 318/319, konfirmasi 0 korupsi konten sejak ZIP terakhir.
+`ic_notification_play_pause.xml` divalidasi ulang lewat `xmllint` — XML valid.
+
+**Item ROADMAP_LIQUID_GLASS_REDESIGN.md TIDAK disentuh** — blur asli §3b masih menunggu instruksi
+eksplisit lanjut sub-langkah berikutnya (aturan sesi #4 PROJECT_STATE.md), 0 eksekusi diam-diam.
+
+**Hasil: 0 bug ditemukan, 0 file kode diedit.** ZIP direpack identik isi kodenya dengan Batch 319
+(cuma dokumentasi VIP disinkronkan) — versi APK baru tetap otomatis dari `GITHUB_RUN_NUMBER`
+begitu di-push (Versioning Lock, 0 bump manual).
+
+## Batch 319 — Fix efek persistent tidak berlaku via kontrol eksternal setelah app di-kill + notifikasi cold-start jadi statis/universal (2 laporan user, 1 file kode + 1 drawable baru)
+User kirim 2 laporan dalam 1 pesan: (1) efek persistent (mis. Kecepatan Putar) tidak berlaku
+kalau app di-kill lalu musik diputar via widget/media player eksternal/notifikasi; (2) minta
+tombol "Jeda" di notifikasi cold-start diganti ⏯️ custom + judul lagu dibuat statis-tapi-universal,
+karena kontrol eksternal itu tidak akan pernah 100% sinkron kalau app sudah mati.
+
+**Bug 1 — persistent state tidak sampai ke player di jalur eksternal.** `PlaybackStateStore`
+sudah menyimpan repeatMode/shuffleEnabled (Batch 108) & speed (Batch 317), TAPI cuma dipulihkan
+lewat `PlayerViewModel.connect()`/`resumeFromSaved()` — jalur UI yang HANYA jalan kalau app
+dibuka. `PlaybackService`'s `SavedQueueItems` (dipakai bareng `restoreLastQueue()` — widget
+cold-start — dan `onPlaybackResumption()` — resume dari lock screen/Android Auto/Bluetooth
+setelah proses mati total) cuma pernah meneruskan `items`/`startIndex`/`startPositionMs`, 3
+field lainnya diam-diam diabaikan sejak field itu ditambah ke store.
+
+**Fix Bug 1** — `SavedQueueItems` dapat 3 field baru (`repeatMode`, `shuffleEnabled`, `speed`),
+`loadSavedQueueItems()` mengisinya dari `PlaybackStateStore`. `restoreLastQueue()` set
+repeat/shuffle SEBELUM `setMediaItems()` (pola sama `resumeFromSaved()` Batch 108, supaya
+shuffle order berlaku sejak item pertama) + `setPlaybackSpeed()`. `onPlaybackResumption()` set
+ketiganya ke `mediaSession.player` (parameter callback, instance sama yang akan menerima item
+dari `completer.set()`) sebelum future itu di-complete — aman karena repeat/shuffle/speed
+independen dari media item mana pun yang sedang/akan dimuat.
+
+**Bug 2 — notifikasi cold-start "SONIX" (tombol "Jeda" + judul lagu) rentan stale.**
+`buildColdStartNotification()` (`NotificationCompat` polos, BUKAN `MediaStyle` yang disinkron
+Media3 otomatis — sudah didokumentasikan sejak Batch 304) cuma diperbarui dari listener
+`onIsPlayingChanged` DI PROSES YANG SAMA — begitu app di-kill lalu state berubah lewat
+widget/media player eksternal/notifikasi lain SELAGI placeholder ini masih tampil (jendela s/d
+`MAX_HANDOFF_WAIT_MS` 8 detik), teks judul & label tombol yang sudah terlanjur terpasang tidak
+pernah ikut ter-refresh.
+
+**Fix Bug 2** (instruksi user eksplisit — berhenti mengejar sinkronisasi yang oleh desainnya
+sendiri tidak akan pernah 100%, ganti ke konten STATIS TAPI UNIVERSAL): `contentText` jadi teks
+tetap "Ketuk untuk membuka kontrol pemutaran" (bukan lagi judul lagu dinamis); tombol toggle jadi
+1 ikon gabungan Putar/Jeda kustom baru (`ic_notification_play_pause.xml`, gaya "⏯️", dibuat khusus
+utk app ini — bukan daur ulang `ic_widget_play`/`ic_widget_pause` yang sebelumnya ditukar
+bergantian) + label tetap "Putar/Jeda" (bukan lagi "Jeda"/"Lanjutkan" bergantian).
+`buildColdStartNotification()` disederhanakan jadi 0 parameter (`isPlaying`/`nowPlayingTitle`
+dihapus dari signature, bukan dibiarkan jadi parameter mati) — 3 call site
+(`startForegroundColdStartNotification()`, `updateColdStartNotification()`, listener
+`onIsPlayingChanged`) disesuaikan. `updateColdStartNotification()` sendiri SENGAJA TETAP
+DIPERTAHANKAN walau kini cuma me-repost konten identik — mencabut hook itu dari
+`onIsPlayingChanged` sekalian di luar scope 2 laporan ini (listener itu dipakai banyak logic
+lain: crossfade, shake detector, floating bubble).
+
+**`ic_notification_play_pause.xml`** (baru) — vector 24dp, segitiga Putar + 2 batang Jeda
+berdampingan, putih solid konsisten `ic_widget_*.png`/`ic_bubble_minimize.xml`. Sudut sengaja
+tajam (bukan rounded) demi path sederhana yang bisa diverifikasi manual tanpa akses SDK/render
+di sandbox ini — rounding bisa ditambah setelah user konfirmasi visual di device.
+
+**Ringkasan file** — 1 file kode diubah (`PlaybackService.kt`), 1 drawable baru
+(`ic_notification_play_pause.xml`), 0 dependency baru, 0 protected asset disentuh.
+`FILE_MANIFEST.txt` 187→188. Brace/paren `PlaybackService.kt` seimbang utuh: 80/80 brace,
+388/388 paren, 14/14 bracket.
+
+**Belum divalidasi compile Gradle sungguhan** (0 akses Android SDK/Gradle/jaringan di sandbox
+sesi ini — WAJIB cek CI run berikutnya). Risiko sintaks rendah utk Bug 1 (murni menambah field +
+baris assignment ke API `Player` yang sudah dipakai identik di `PlayerViewModel.kt`). Risiko
+sedang utk vector drawable baru (`pathData` belum pernah divalidasi parser Android sungguhan di
+sandbox ini — sintaks path M/L/Z/H/V standar, gaya sama `ic_bubble_minimize.xml`/
+`ic_bubble_tile.xml` yang sudah terbukti compile).
+
+**Belum diverifikasi visual/device** — prioritas cek kalau user push: (1) putar lagu, set
+speed≠1x + repeat/shuffle ON, force-stop app dari App Info (simulasi kill proses), tekan play di
+widget, konfirmasi speed/repeat/shuffle genuinely ikut ke lagu yang diputar (bukan reset ke
+default); (2) ulangi lewat resume dari lock screen/Bluetooth (bukan widget) kalau ada akses
+device Bluetooth; (3) trigger notifikasi cold-start "SONIX", pastikan ikon ⏯️ baru tampil benar
+(bukan kotak putih/pecah — tanda pathData salah) dan teks/tombol tidak lagi berubah-ubah
+mengikuti lagu/status.
+
 ## Batch 318 — Fix teks "Fade Halus" ke-clip di dialog Pengaturan Putar (laporan user, 1 file)
 User kirim screenshot: subtitle "Fade Halus" di seksi "Transisi Antar Lagu" (`SpeedDialog`, Now
 Playing → ⋮ → Kecepatan) terpotong di bawah.

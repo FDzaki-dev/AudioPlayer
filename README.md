@@ -8,7 +8,19 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 318 (Fix teks "Fade Halus" ke-clip di dialog Pengaturan Putar):**
+> 🆕 **Update terbaru — Batch 320 (Verifikasi integritas rilis, 0 bug, 0 kode diubah):** Sesi
+> tanpa laporan bug baru — repack ini murni diverifikasi ulang (manifest file, keseimbangan
+> kode seluruh file `.kt`, hasil Batch 318/319 dicek cocok) sebelum dikirim ulang. 0 fitur/
+> perilaku berubah dari Batch 319.
+> Batch 319 (Fix efek persistent hilang via kontrol eksternal setelah app
+> di-kill + notifikasi cold-start jadi statis/universal): Kecepatan Putar/Repeat/Shuffle
+> sekarang genuinely ikut ke lagu yang diputar walau app di-kill total lalu dikontrol lewat
+> widget/media player eksternal/notifikasi (sebelumnya cuma dipulihkan kalau app dibuka).
+> Notifikasi cold-start "SONIX" juga dibuat statis: tombol toggle jadi 1 ikon Putar/Jeda gabungan
+> kustom (bukan lagi ganti-ganti ikon+label "Jeda"/"Lanjutkan"), teks jadi kalimat tetap (bukan
+> lagi judul lagu yang bisa stale) — keduanya tidak lagi bergantung pada sinkronisasi yang oleh
+> desainnya sendiri tidak akan pernah 100% akurat.
+> Batch 318 (Fix teks "Fade Halus" ke-clip di dialog Pengaturan Putar):
 > `SpeedDialog` (Now Playing → ⋮ → Kecepatan) sekarang bisa discroll (`verticalScroll`) — pola
 > `Column` fixed tanpa jaring pengaman yang sama seperti Batch 314-316, tapi di `AlertDialog`
 > yang luput dari audit ModalBottomSheet batch-batch itu.
@@ -21,7 +33,6 @@ memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 > Batch 314: Fix sheet "Kontrol Lanjutan" terpotong (`AdvancedControlsSheet` sekarang bisa discroll, sebelumnya "Potong Nada Dering" ke-clip diam-diam) + Equalizer kini auto re-attach ke sesi audio BARU (cold-start/Service restart/lagu baru) lewat hook `PlaybackAudioSession.onSessionIdChanged` — sebelumnya cuma ter-reattach kalau sheet Equalizer dibuka manual.
 > Batch 313: Fix CI build gagal dari Batch 312 — `Modifier.padding(horizontal=..., top=..., bottom=...)` mencampur 2 overload berbeda yang tidak valid di `AdvancedControlsSectionHeader`. Diganti ke `Modifier.padding(start, top, end, bottom)` — hasil visual identik, cuma sintaks yang diperbaiki.
 > Batch 312: Sheet "Kontrol Lanjutan" dikelompokkan jadi 3 seksi — **Pemutaran** (Antrean/Sleep Timer/Kecepatan/Repeat A-B), **Audio** (Equalizer/Visualizer/Peredam Volume), **Lagu** (Lirik/Edit Info/Potong Nada Dering) — tiap seksi punya label kecil + divider pemisah.
-> Batch 311: Fix bug tampilan sheet "Kontrol Lanjutan" tembus/berantakan — root cause blur `ModalBottomSheet` gagal render lintas-window, tint Liquid Glass dinaikkan ke dekat-opaque (`frostedGlass()`) sebagai fallback aman.
 > Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
 > sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
 > Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
