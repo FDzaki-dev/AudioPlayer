@@ -71,6 +71,9 @@ fun Modifier.frostedGlass(
     // Batch 281 — Liquid Glass fase 3: needed below so this identity gets its OWN edgeBrush
     // branch instead of falling into the generic `else`.
     val isLiquidGlass = isLiquidGlassTheme()
+    // Batch 310 — Aurora rim-glow per-panel: needed below for the same reason as isLiquidGlass
+    // above, its own edgeBrush branch instead of the generic `else`.
+    val isAurora = isAuroraTheme()
     val isDark = LocalIsDarkTheme.current
     // Shape now follows the active theme's own shape tokens instead of a hardcoded 24dp —
     // otherwise every sheet/mini-player using this modifier would keep Apple's soft rounding
@@ -139,6 +142,45 @@ fun Modifier.frostedGlass(
             } else {
                 listOf(LiquidGlassAccent.copy(alpha = 0.22f), LiquidGlassAccent.copy(alpha = 0.05f))
             }
+        )
+        // Batch 310 — Aurora rim-glow per-panel, permintaan user langsung ("lanjut wiring
+        // rim-glow kesemua area") menutup item yang sejak Batch 306 dicatat eksplisit "ditunda,
+        // BUKAN dibatalkan". Own branch, bukan jatuh ke `else` di bawah — pola sama alasan
+        // isLiquidGlass di atas: `else` cuma benar mendeteksi "Apple light" (perbandingan literal
+        // ke AppleLightBackground), Aurora (dark-locked permanen sejak Batch 306, `colorsFor()`
+        // sengaja mengabaikan `isDark` — sama seperti CalmRetro) akan diam-diam kebagian rim flat
+        // netral `onSurface` alih-alih warna khas identitasnya sendiri kalau tidak dipisah.
+        //
+        // Sengaja TIDAK dibedakan `isDark` (beda dari isTactile/isLiquidGlass di atas) — identitas
+        // ini cuma punya 1 mode terkunci gelap, cabang isDark di sini justru berisiko salah pilih
+        // kalau toggle sistem user kebetulan "terang" walau skema warna yang dipakai tetap
+        // dipaksa gelap (alasan yang sama persis kenapa CalmRetro juga tidak dibedakan isDark).
+        //
+        // `frostedGlass()` adalah SATU titik shared yang dilalui SEMUA panel glass app-wide
+        // (MiniPlayerBar, tiap bottom sheet, card Home/Library, panel NowPlaying — grep 12+ call
+        // site, precedent Batch 281) — jadi 1 branch di sini otomatis "wiring rim-glow kesemua
+        // area" tanpa perlu menyentuh 1-per-1 file screen, pola arsitektur identik cara Liquid
+        // Glass dapat edge-glow terpusat Batch 281.
+        //
+        // Warna: 4-stop linear gradient lintas SELURUH spektrum Aurora sendiri (Green->Teal->
+        // Violet->Magenta, urutan hue sama persis `auroraGlow()`) — BUKAN 2-stop flat highlight
+        // ->fade ala Tactile/Liquid Glass, supaya rim ini kebaca sebagai "irisan aurora" bukan
+        // cuma glow generik bertopeng warna tema. Alpha menurun tiap stop (pola sama persis
+        // `auroraGlow()`'s multiplier 1.0x/0.85x/0.6x dari `AuroraGlowAlpha`) + 1 falloff
+        // tambahan 0.35x utk stop ke-4 — 0 token warna/alpha baru ditambah ke Color.kt, murni
+        // reuse AuroraGreen/Teal/Violet/Magenta + AuroraGlowAlpha yang sudah ada sejak Batch 306.
+        // SENGAJA statis (bukan animated ala `auroraGlow()`) — `frostedGlass()` dipanggil 12+
+        // call site sekaligus, 12+ `rememberInfiniteTransition` independen serentak adalah biaya
+        // performa baru yang belum pernah diverifikasi device (beda dari `auroraGlow()` yang cuma
+        // 1 instance di root Surface) — titik awal paling aman, kandidat animasi kalau user minta
+        // lanjut nanti setelah statis ini terverifikasi visual dulu.
+        isAurora -> Brush.linearGradient(
+            colors = listOf(
+                AuroraGreen.copy(alpha = AuroraGlowAlpha),
+                AuroraTeal.copy(alpha = AuroraGlowAlpha * 0.85f),
+                AuroraViolet.copy(alpha = AuroraGlowAlpha * 0.6f),
+                AuroraMagenta.copy(alpha = AuroraGlowAlpha * 0.35f)
+            )
         )
         else -> {
             val flat = MaterialTheme.colorScheme.onSurface.copy(

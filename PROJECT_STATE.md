@@ -36,6 +36,65 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 310 (Tema ke-6 "Aurora", Fase 5/N — rim-glow per-panel, wiring app-wide lewat
+`frostedGlass()`, 1 file, permintaan user langsung "lanjut wiring rim-glow kesemua area!!")** —
+Lanjutan langsung dari Batch 309. Menuntaskan SATU-SATUNYA item Aurora yang masih berstatus
+"ditunda" sejak Batch 306 ("rim-glow per-panel eksplisit ditunda utk dipertimbangkan lagi nanti,
+BUKAN dibatalkan") — sekarang diminta eksplisit oleh user. Dengan batch ini, cakupan efek Aurora
+yang dikonfirmasi user di awal (ambient background + rim-glow per-panel) SELESAI PENUH, di atas
+color+typography+shape murni yang sudah lengkap sejak Batch 307-309.
+
+**Dampak nyata mulai batch ini**: setiap panel/card/sheet yang route lewat `frostedGlass()`
+(MiniPlayerBar, panel NowPlaying, tiap bottom sheet, card Home/Library) saat Aurora aktif sekarang
+punya rim/border ber-gradasi 4 warna lintas spektrum Aurora (hijau→teal→ungu→magenta), bukan lagi
+rim flat netral generik seperti sebelumnya.
+
+**`BlurUtils.kt`** (2 titik, 1 file) —
+1. `val isAurora = isAuroraTheme()` ditambah setelah `isLiquidGlass`, pola identik.
+2. `edgeBrush`'s `when` dapat cabang baru `isAurora ->`: `Brush.linearGradient` 4-stop
+   (AuroraGreen/Teal/Violet/Magenta) dengan alpha menurun tiap stop (1.0x/0.85x/0.6x/0.35x dari
+   `AuroraGlowAlpha` — 3 multiplier pertama SAMA PERSIS `auroraGlow()`, 1 falloff tambahan utk
+   stop ke-4). 0 token warna/alpha baru — murni reuse token Aurora yang sudah ada sejak Batch 306.
+   Own branch, BUKAN jatuh ke `else` (pola sama alasan `isLiquidGlass`) — kalau dibiarkan `else`,
+   Aurora (dark-locked, `colorsFor()` abaikan `isDark`) akan kebagian rim flat netral `onSurface`,
+   bukan warna khas identitasnya.
+
+**Kenapa `frostedGlass()`, bukan sentuh tiap screen 1-per-1** — fungsi ini SATU titik shared yang
+dilalui SEMUA panel glass app-wide (grep 12+ call site, precedent Batch 281 Liquid Glass) — 1
+branch di sini otomatis mewujudkan permintaan user "kesemua area" tanpa perlu edit per-file
+screen, arsitektur identik cara Liquid Glass dapat edge-glow terpusat.
+
+**Keputusan disengaja: statis, BUKAN animated** — beda dari `auroraGlow()` (1 instance
+`rememberInfiniteTransition` di root Surface), rim ini dipasang di titik yang dipanggil 12+ kali
+sekaligus per komposisi — 12+ infinite transition independen serentak adalah biaya performa baru
+yang belum pernah diverifikasi device (project ini sudah pernah kena masalah stutter blur Liquid
+Glass, Batch 300). Statis dulu sebagai titik awal paling aman; animasi jadi kandidat lanjutan
+kalau user minta setelah versi statis ini terverifikasi visual.
+
+**Tidak dibedakan `isDark`** (beda dari `isTactile`/`isLiquidGlass` di branch yang sama) — Aurora
+cuma punya 1 mode terkunci gelap permanen, cabang `isDark` di sini berisiko salah pilih kalau
+toggle sistem user "terang" walau skema warna yang dipakai tetap dipaksa gelap — alasan sama
+persis kenapa CalmRetro juga tidak dibedakan `isDark` di titik yang sama.
+
+**Ringkasan file**: 1 file kode (`BlurUtils.kt`), jauh di bawah batas Micro-Batch (maksimal 3). 0
+file baru, 0 dependency baru, 0 token warna/alpha baru. `FILE_MANIFEST.txt` tidak berubah
+(187/187). Brace/paren `BlurUtils.kt` diverifikasi seimbang utuh: 9/9 braces, 117/117 parens.
+
+**Belum divalidasi compile Gradle sungguhan** — WAJIB cek CI. Risiko sintaks rendah
+(`Brush.linearGradient(colors = listOf(...))` konstruktor yang sudah dipakai berulang kali di
+file yang sama, `isAuroraTheme()` sudah ada sejak Batch 308, 0 API baru).
+
+**Belum diverifikasi visual di device** — kalau user coba pilih Aurora sekarang: MiniPlayerBar/
+panel NowPlaying/bottom sheet/card Home-Library harus terlihat punya rim tipis ber-gradasi
+hijau→teal→ungu→magenta di tepinya, BUKAN lagi garis flat netral. 5 identitas lain harus 0
+berubah.
+
+**🎉 Cakupan Aurora yang dikonfirmasi user di awal (Batch 306) SEKARANG SELESAI PENUH** — mode
+gelap terkunci (306), ambient background `auroraGlow()` (306, wired 308), color/typography/shape
+murni sendiri (307/308/309), rim-glow per-panel wired app-wide (batch ini). **Item berikutnya
+(belum diminta user, JANGAN dikerjakan diam-diam)**: animasi rim-glow (lihat "keputusan disengaja:
+statis" di atas), atau tuning alpha/warna rim setelah terverifikasi visual device.
+
 **Batch 309 (Tema ke-6 "Aurora", Fase 4/N — shape sendiri `AuroraShapes`, 1 file, permintaan
 user langsung "lanjut sempurnakan shape murni nya!!")** — Lanjutan langsung dari Batch 308.
 Menuntaskan item yang dicatat "belum diminta user" di entri Batch 308: shape Aurora, sekarang

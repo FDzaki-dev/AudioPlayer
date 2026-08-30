@@ -8,10 +8,10 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 309 (Fase 4/N tema ke-6 "Aurora"):** Shape sendiri (`AuroraShapes`) sekarang terpasang — pola PERTAMA di project ini yang asimetris per sudut (2 sudut diagonal lebih membulat, mengikuti arah alir gradiennya), bukan rounded-rect seragam seperti 5 tema lain. Dengan ini Aurora sudah lengkap 3/3: color+typography+shape murni sendiri.
+> 🆕 **Update terbaru — Batch 310 (Fase 5/N tema ke-6 "Aurora"):** Rim-glow per-panel akhirnya di-wiring app-wide — MiniPlayerBar, panel NowPlaying, tiap bottom sheet, dan card Home/Library sekarang punya rim ber-gradasi 4 warna (hijau→teal→ungu→magenta) di tepinya lewat 1 titik terpusat (`frostedGlass()`). Dengan ini, cakupan efek Aurora yang dikonfirmasi user sejak Batch 306 (ambient background + rim-glow per-panel) selesai penuh, di atas color+typography+shape murni yang sudah lengkap.
+> Batch 309: Shape sendiri (`AuroraShapes`) terpasang — pola PERTAMA di project ini yang asimetris per sudut (2 sudut diagonal lebih membulat, mengikuti arah alir gradiennya), bukan rounded-rect seragam seperti 5 tema lain.
 > Batch 308: Animasi gradien mengalirnya (`auroraGlow()`) terpasang + typography sendiri (`AuroraTypography`) — bobot huruf paling ringan dari 6 tema.
 > Batch 307: Aurora **sudah bisa dipilih** di Settings — dark-lock permanen, aksen hijau vivid di atas latar near-black navy-teal (tampilan waktu itu masih flat, sebelum fase 3).
-> Batch 306: Fondasi tema baru 100% ide orisinal — mekanisme warna gradien ambient yang mengalir pelan + palet hijau-teal-ungu-magenta terinspirasi aurora borealis ditulis lebih dulu, belum terdaftar sebagai identitas saat itu.
 > Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
 > sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
 > Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
@@ -222,14 +222,17 @@ Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diu
   tanpa contek gaya desain visual apapun manapun". Mekanisme orisinal: warna gradien ambient yang
   mengalir pelan (animated hue-shift antar hijau→teal→ungu→magenta, terinspirasi spektrum aurora
   borealis asli), berbeda total dari mekanisme 5 tema lain (bukan shadow/bevel, bukan blur, bukan
-  artefak retro). Terkunci **gelap permanen** (pola sama Calm Retro), cakupan efek **ambient
-  background saja** untuk saat ini (rim-glow per-panel ditunda). **Fase 4/N selesai** (Batch 309)
-  — `AuroraShapes` sekarang terpasang, mekanisme asimetris PERTAMA di project ini (2 sudut
-  diagonal lebih membulat mengikuti arah alir gradien `auroraGlow()`, bukan rounded-rect seragam
-  seperti 5 tema lain). Dengan ini Aurora **lengkap 3/3**: color (Batch 307) + typography (Batch
-  308, bobot Light/Normal paling ringan dari 6 identitas) + shape (batch ini) sudah 100% murni
-  sendiri, 0 lagi fallback ke identitas lain. Rim-glow per-panel masih berstatus ditunda (bukan
-  dibatalkan) — satu-satunya sisa item dari cakupan awal yang dikonfirmasi user Batch 306.
-  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-309.
+  artefak retro). Terkunci **gelap permanen** (pola sama Calm Retro). **Fase 4/N** (Batch 309) —
+  `AuroraShapes` terpasang, mekanisme asimetris PERTAMA di project ini (2 sudut diagonal lebih
+  membulat mengikuti arah alir gradien `auroraGlow()`, bukan rounded-rect seragam seperti 5 tema
+  lain) — dengan itu color (Batch 307) + typography (Batch 308, bobot Light/Normal paling ringan
+  dari 6 identitas) + shape (Batch 309) sudah 100% murni sendiri, 0 lagi fallback ke identitas
+  lain. **Fase 5/N selesai** (Batch 310) — rim-glow per-panel (sebelumnya ditunda sejak Batch 306)
+  akhirnya di-wiring app-wide lewat `frostedGlass()`: MiniPlayerBar, panel NowPlaying, tiap bottom
+  sheet, dan card Home/Library sekarang punya rim ber-gradasi 4 warna Aurora di tepinya, statis
+  (belum animated — pertimbangan performa, lihat catatan di `CHANGELOG.md` Batch 310). **Dengan
+  ini cakupan Aurora yang dikonfirmasi user Batch 306 (ambient background + rim-glow per-panel)
+  SELESAI PENUH**, di atas color+typography+shape yang sudah lengkap sejak Batch 309.
+  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-310.
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)
