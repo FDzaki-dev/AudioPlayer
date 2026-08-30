@@ -36,6 +36,49 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 316 (Tuntaskan antrean audit Batch 314: terapkan `verticalScroll` ke 2 sheet terakhir —
+`UpdateCheckSheet.kt`, `BackupRestoreSheet.kt`, 2 file, item antrean internal Batch 314/315, bukan
+laporan bug baru user)** — Melengkapi 2 sisa dari 5 sheet yang kena pola sama (`Column` fixed
+dalam `ModalBottomSheet` tanpa `verticalScroll`/`LazyColumn` jaring pengaman), yang sudah ditandai
+"konten pendek, risiko rendah" sejak audit Batch 314. Dengan ini, audit "pola tab serupa" Batch
+314 (5 sheet) SELESAI TOTAL — 0 sisa antrean pola ini.
+
+**Root cause & pola fix** — PERSIS sama Batch 314/315: kalau total tinggi konten `Column`
+melebihi tinggi sheet yang tersedia (layar pendek/gesture-nav/font sistem besar), baris paling
+bawah diam-diam ke-clip alih-alih bisa digeser.
+
+**`UpdateCheckSheet.kt`** (prioritas 4 — konten pendek di kebanyakan state
+Idle/Checking/UpToDate/Error, TAPI state `Available` bisa memanjang: judul + catatan rilis
+multi-baris + tombol) — `.verticalScroll(rememberScrollState())` ditambah ke modifier chain
+`Column` utama, sebelum `.padding(horizontal = 20.dp)`. Sheet ini TIDAK pakai `frostedGlass()`/
+tema Calm Retro (beda dari `EqualizerSheet.kt`/`VisualizerSheet.kt`), jadi tidak ada blok
+`.then(...)` yang perlu dilewati — scroll langsung setelah `.fillMaxWidth()`.
+
+**`BackupRestoreSheet.kt`** (prioritas 5, terakhir — judul, deskripsi, 2 `OutlinedButton`, banner
+hasil opsional) — `.verticalScroll(rememberScrollState())` ditambah dengan pola sama, langsung
+setelah `.fillMaxWidth()`, sebelum `.padding(horizontal = 20.dp)`. `AlertDialog` konfirmasi timpa
+data (composable terpisah, di luar `ModalBottomSheet` ini) TIDAK disentuh — sudah pakai `Column`
+pendek tanpa risiko serupa (cuma teks + daftar ringkas jumlah data).
+
+**Ringkasan file** — 2 file kode diubah, masing-masing +2 import (`rememberScrollState`,
+`verticalScroll`) + 1 blok komentar + 1 baris modifier. 0 file baru, 0 dependency baru, 0
+parameter/callback publik berubah, 0 komposable lain di kedua file disentuh (`ZERO-REFACTOR`).
+`FILE_MANIFEST.txt` tidak berubah (187/187 — 2 file sudah ada sebelumnya). Brace/paren
+diverifikasi seimbang tiap file: `UpdateCheckSheet.kt` 25/25 brace, 72/72 paren;
+`BackupRestoreSheet.kt` 33/33 brace, 94/94 paren. Jauh di bawah limit Micro-Batch (maks 3 file
+kode).
+
+**Belum divalidasi compile Gradle sungguhan** (tidak ada akses Android SDK/Gradle/jaringan di
+sandbox sesi ini — WAJIB cek CI run berikutnya). Risiko sintaks rendah: `verticalScroll`/
+`rememberScrollState` sudah dipakai identik di 5 file lain codebase yang sama
+(`NowPlayingScreen.kt`, `SongInfoEditSheet.kt`, `EqualizerSheet.kt`, `RingtoneCutterSheet.kt`,
+`VisualizerSheet.kt`), pola sudah terbukti compile, bukan hal baru.
+
+**Status audit "pola tab serupa" Batch 314** — TUNTAS. Ke-5 sheet yang teridentifikasi punya
+`Column` fixed tanpa jaring pengaman scroll (`EqualizerSheet.kt`/`RingtoneCutterSheet.kt`/
+`VisualizerSheet.kt` Batch 315, `UpdateCheckSheet.kt`/`BackupRestoreSheet.kt` batch ini) semua
+sudah dapat `verticalScroll`. Tidak ada antrean lanjutan dari topik ini untuk batch berikutnya.
+
 **Batch 315 (Lanjutan audit Batch 314: terapkan `verticalScroll` ke 3 dari 5 sheet antrean —
 `EqualizerSheet.kt`, `RingtoneCutterSheet.kt`, `VisualizerSheet.kt`, 3 file, item antrean internal
 Batch 314, bukan laporan bug baru user)** — Eksekusi urutan prioritas yang sudah ditetapkan Batch

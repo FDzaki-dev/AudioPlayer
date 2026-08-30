@@ -1,6 +1,8 @@
 package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
@@ -33,9 +35,14 @@ fun UpdateCheckSheet(onDismiss: () -> Unit) {
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        // Batch 316 — lanjutan audit Batch 314/315: prioritas 4 dari 5 sheet yang kena pola sama
+        // (Column fixed tanpa verticalScroll/LazyColumn jaring pengaman). Konten pendek di
+        // kebanyakan state (Idle/Checking/UpToDate/Error), TAPI state Available bisa memanjang
+        // (judul + catatan rilis multi-baris + tombol), risiko rendah tapi tetap sama pola.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp)
         ) {

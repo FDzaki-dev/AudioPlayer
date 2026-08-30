@@ -1,5 +1,35 @@
 # Changelog
 
+## Batch 316 — Tuntaskan antrean audit Batch 314: `verticalScroll` ke 2 sheet terakhir (item antrean internal, 2 file)
+Bukan laporan bug baru user — melengkapi 2 sisa dari 5 sheet yang kena pola sama (`Column` fixed
+dalam `ModalBottomSheet` tanpa `verticalScroll`/`LazyColumn` jaring pengaman), ditandai "konten
+pendek, risiko rendah" sejak audit Batch 314. Dengan batch ini, audit "pola tab serupa" Batch 314
+SELESAI TOTAL — 0 sisa antrean.
+
+**Root cause & pola fix** — PERSIS sama Batch 314/315: kalau total tinggi konten `Column`
+melebihi tinggi sheet yang tersedia (layar pendek/gesture-nav/font sistem besar), baris paling
+bawah diam-diam ke-clip alih-alih bisa digeser.
+
+**`UpdateCheckSheet.kt`** (prioritas 4 — konten pendek di kebanyakan state, tapi state
+`Available` bisa memanjang: judul + catatan rilis multi-baris + tombol) — scroll ditambah
+langsung setelah `.fillMaxWidth()` (sheet ini tidak pakai `frostedGlass()`/tema Calm Retro),
+sebelum `.padding(horizontal = 20.dp)`.
+
+**`BackupRestoreSheet.kt`** (prioritas 5, terakhir — judul, deskripsi, 2 `OutlinedButton`, banner
+hasil opsional) — scroll ditambah dengan pola sama. `AlertDialog` konfirmasi timpa data (di luar
+`ModalBottomSheet` ini) tidak disentuh — kontennya pendek, tidak berisiko pola sama.
+
+**Ringkasan file** — 2 file kode diubah, 0 file baru, 0 dependency baru, 0 parameter/callback
+publik berubah, 0 komposable lain disentuh. `FILE_MANIFEST.txt` tidak berubah (187/187).
+Brace/paren diverifikasi seimbang: `UpdateCheckSheet.kt` 25/25 brace, 72/72 paren;
+`BackupRestoreSheet.kt` 33/33 brace, 94/94 paren.
+
+**Belum divalidasi compile Gradle sungguhan** (WAJIB cek CI run berikutnya) — risiko sintaks
+rendah, pola sudah dipakai identik di 5 file lain codebase yang sama.
+
+**Status**: audit "pola tab serupa" Batch 314 (5 sheet total) TUNTAS. Tidak ada antrean lanjutan
+dari topik ini.
+
 ## Batch 315 — Lanjutan audit Batch 314: `verticalScroll` ke 3 dari 5 sheet antrean (item antrean internal, 3 file)
 Bukan laporan bug baru user — eksekusi antrean yang sudah ditetapkan Batch 314. Dari 5 sheet yang
 kena pola sama (`Column` fixed dalam `ModalBottomSheet` tanpa `verticalScroll`/`LazyColumn` jaring
