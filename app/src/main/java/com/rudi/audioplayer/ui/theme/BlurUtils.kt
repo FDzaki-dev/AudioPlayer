@@ -110,9 +110,28 @@ fun Modifier.frostedGlass(
     // ini utk masalah "blur ketutup" adalah tint, bukan radius; radius sudah didokumentasikan
     // dekat batas nyaman performa (§ komentar `blurRadius` param di atas). Gap dark/light
     // (0.10) dipertahankan sama seperti semua iterasi sebelumnya (mode terang butuh tint
-    // sedikit lebih pekat drpd gelap utk kontras teks yg setara). TETAP "titik awal
-    // berikutnya", bukan final — WAJIB dikonfirmasi ulang oleh user pas coba build ini.
-    val liquidGlassAlpha = if (isDark) 0.38f else 0.48f
+    // sedikit lebih pekat drpd gelap utk kontras teks yg setara).
+    // Batch 311 — DIBALIK ARAH, screenshot user "Kontrol Lanjutan" (ModalBottomSheet):
+    // background NowPlayingScreen (coachmark "Geser di kiri/kanan piringan buat atur
+    // kecerahan & volume HP...") tembus HAMPIR PENUH di belakang sheet, tumpang-tindih sama
+    // teks sheet sendiri — bukan "blur ketutup tint" (arah yang selalu diasumsikan tiap
+    // iterasi 296-299 di atas), tapi kebalikannya: 0 blur sama sekali yang kelihatan.
+    // Root cause: `ModalBottomSheet`/`Dialog` render di Android Window terpisah dari
+    // `hazeSource` (Box NavHost, `MainActivity.kt`) — capture RenderNode Haze tidak bisa
+    // sample lintas-window, jadi `hazeEffect` di titik ini diam-diam no-op utk SEMUA bottom
+    // sheet/dialog (12+ call site `frostedGlass()` yg lewat sini), sisa cuma tint
+    // 0.38f/0.48f itu sendiri tanpa blur di baliknya — jauh terlalu tipis buat berdiri
+    // sendiri, persis penyebab "berantakan/tidak professional" yg dilaporkan user.
+    // Fix: naikkan tint balik dekat opaque (0.85f/0.90f, BUKAN full 1f ala Skeu — masih
+    // sisakan sedikit karakter glass utk elemen DALAM window yg sama spt MiniPlayerBar/card
+    // Home-Library/panel NowPlaying, yg capture-nya kemungkinan tetap sah krn 1 window sama
+    // dgn `hazeSource`-nya). radius/edgeBrush/hazeEffect call TIDAK disentuh (bukan akar
+    // masalah, lihat root cause di atas) — murni 1 parameter tint yg jadi fallback aman
+    // terlepas blur cross-window itu jalan atau tidak. Investigasi wiring Haze lintas-window
+    // yang sesungguhnya (mis. pindah scrim/blur ke layer yg sama) BELUM dikerjakan (di luar
+    // scope 1-parameter fix ini, risiko lebih tinggi ke MainActivity.kt yg diproteksi) — jadi
+    // dicatat sebagai item lanjutan, bukan ditutup permanen di sini.
+    val liquidGlassAlpha = if (isDark) 0.85f else 0.90f
     val effectiveAlpha = if (isSkeu) 1f else if (isLiquidGlass) liquidGlassAlpha else alpha
     // Batch 53 — spec §8 "Glass edge / highlight" + §9 "Lighting model" (single simulated light,
     // top-left -> bottom-right): a flat single-color border reads as a printed outline, not

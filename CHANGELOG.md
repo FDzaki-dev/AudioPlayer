@@ -1,5 +1,51 @@
 # Changelog
 
+## Batch 311 — Fix bug: sheet "Kontrol Lanjutan" berantakan/tidak-professional (laporan screenshot user, 1 file)
+User kirim screenshot `ModalBottomSheet` "Kontrol Lanjutan" (Now Playing): teks latar (coachmark
+"Geser di kiri/kanan piringan buat atur kecerahan & volume HP... Ketuk ⋮ buat Sleep Timer,
+Kecepatan, dan Equalizer" dari `NowPlayingScreen.kt`) tembus hampir penuh di belakang sheet,
+tumpang-tindih dengan isi sheet sendiri — dilaporkan "berantakan" & "jauh dari kesan professional".
+
+**Root cause** — `frostedGlass()` (`BlurUtils.kt`) untuk identitas Liquid Glass sudah diturunkan
+bertahap ke tint sangat tipis (0.38f gelap/0.48f terang, Batch 296-299) dengan asumsi `hazeEffect`
+(blur asli via Haze) akan menutupi sisanya. Asumsi itu salah khusus untuk `ModalBottomSheet`/
+`Dialog`: keduanya render di Android Window terpisah dari `hazeSource` (`Box` pembungkus NavHost
+di `MainActivity.kt`), sehingga capture `RenderNode` Haze tidak bisa sample lintas-window — blur
+diam-diam tidak pernah menyala di SEMUA bottom sheet/dialog app-wide (12+ call site
+`frostedGlass()`), menyisakan tint 0.38/0.48 itu sendiri tanpa blur di baliknya. Setiap iterasi
+tuning Batch 296-299 sebelumnya mengasumsikan arah masalah "blur ketutup tint" (tint diturunkan
+tiap kali) — screenshot ini membuktikan arah sebaliknya: 0 blur yang kelihatan sama sekali.
+
+**`BlurUtils.kt`** (1 titik, 1 file) — `liquidGlassAlpha` dinaikkan `0.38f/0.48f` →
+**`0.85f/0.90f`** (dekat opaque, bukan full `1f` ala Skeu — sengaja masih menyisakan sedikit
+karakter glass untuk elemen yang render dalam window yang sama dengan `hazeSource`, mis.
+MiniPlayerBar/card Home-Library/panel NowPlaying, yang capture-nya kemungkinan tetap sah karena 1
+window sama). `blurRadius`/`edgeBrush`/pemanggilan `hazeEffect` tidak disentuh — bukan akar
+masalah. `MainActivity.kt` (lokasi `hazeSource`, ada di daftar Protect) tidak disentuh — perbaikan
+wiring Haze lintas-window sesungguhnya di luar scope fix 1-parameter minimal-risiko ini.
+
+**Kenapa cuma naikkan tint, bukan re-arsitektur Haze cross-window** — STABILITY > Speed +
+ZERO-REFACTOR: opsi lain menyentuh `MainActivity.kt`/`NavGraph` yang diproteksi & berisiko pecah
+di 12+ call site lain yang sudah benar (MiniPlayerBar dkk, dalam window yang sama). Menaikkan 1
+parameter tint adalah perubahan minimal yang pasti memperbaiki keterbacaan (monoton — makin
+opaque makin sedikit bleed-through) tanpa menyentuh apa pun yang berisiko ke fitur lain.
+
+**Ringkasan file** — 1 file kode (`BlurUtils.kt`), jauh di bawah batas Micro-Batch (maksimal 3). 0
+file baru, 0 dependency baru, 0 token warna baru. `FILE_MANIFEST.txt` tidak berubah (187/187).
+Brace/paren `BlurUtils.kt` diverifikasi seimbang utuh: 9/9 braces, 127/127 parens.
+
+**Belum divalidasi compile Gradle sungguhan** (WAJIB cek CI) — risiko sintaks sangat rendah: cuma
+ganti 2 literal `Float`, 0 struktur/API/branch baru.
+
+**Belum diverifikasi visual di device** — kalau user buka lagi "Kontrol Lanjutan" (atau bottom
+sheet apa pun) di identitas Liquid Glass: latar belakang seharusnya tidak lagi tembus terbaca,
+sheet terlihat solid/rapi seperti 4 identitas non-glass lainnya. 5 identitas lain 0 berubah.
+
+**Item berikutnya (belum diminta user, JANGAN dikerjakan diam-diam)**: kalau user mau blur ASLI
+(bukan cuma tint opaque fallback) tetap tampak di bottom sheet/dialog Liquid Glass, perlu
+investigasi wiring Haze lintas-window sesungguhnya — perubahan itu akan menyentuh
+`MainActivity.kt` yang diproteksi, jadi wajib dikonfirmasi user dulu sebelum eksekusi.
+
 ## Batch 310 — Tema ke-6 "Aurora", Fase 5/N: rim-glow per-panel, wiring app-wide (lanjutan langsung, 1 file)
 Lanjutan langsung dari Batch 309, permintaan user langsung: "lanjut wiring rim-glow kesemua
 area!!". Menuntaskan SATU-SATUNYA item Aurora yang masih berstatus "ditunda" sejak Batch 306 —

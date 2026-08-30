@@ -8,10 +8,10 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 310 (Fase 5/N tema ke-6 "Aurora"):** Rim-glow per-panel akhirnya di-wiring app-wide — MiniPlayerBar, panel NowPlaying, tiap bottom sheet, dan card Home/Library sekarang punya rim ber-gradasi 4 warna (hijau→teal→ungu→magenta) di tepinya lewat 1 titik terpusat (`frostedGlass()`). Dengan ini, cakupan efek Aurora yang dikonfirmasi user sejak Batch 306 (ambient background + rim-glow per-panel) selesai penuh, di atas color+typography+shape murni yang sudah lengkap.
+> 🆕 **Update terbaru — Batch 311 (Fix bug: sheet "Kontrol Lanjutan" berantakan):** Laporan screenshot user — latar Now Playing tembus hampir penuh di belakang sheet "Kontrol Lanjutan", tumpang-tindih tidak terbaca. Root cause: `ModalBottomSheet`/`Dialog` render di window terpisah dari sumber blur Haze, jadi blur asli diam-diam tidak pernah nyala di SEMUA bottom sheet/dialog — tint pun sudah diturunkan sangat tipis (Batch 296-299) dengan asumsi blur itu akan menutupi sisanya. Tint Liquid Glass dinaikkan balik ke dekat-opaque (`frostedGlass()`, `BlurUtils.kt`) sebagai fallback aman: sheet sekarang solid/rapi terlepas blur cross-window itu jalan atau tidak.
+> Batch 310: Rim-glow per-panel Aurora akhirnya di-wiring app-wide — MiniPlayerBar, panel NowPlaying, tiap bottom sheet, dan card Home/Library sekarang punya rim ber-gradasi 4 warna (hijau→teal→ungu→magenta) di tepinya lewat 1 titik terpusat (`frostedGlass()`). Dengan ini, cakupan efek Aurora yang dikonfirmasi user sejak Batch 306 selesai penuh.
 > Batch 309: Shape sendiri (`AuroraShapes`) terpasang — pola PERTAMA di project ini yang asimetris per sudut (2 sudut diagonal lebih membulat, mengikuti arah alir gradiennya), bukan rounded-rect seragam seperti 5 tema lain.
 > Batch 308: Animasi gradien mengalirnya (`auroraGlow()`) terpasang + typography sendiri (`AuroraTypography`) — bobot huruf paling ringan dari 6 tema.
-> Batch 307: Aurora **sudah bisa dipilih** di Settings — dark-lock permanen, aksen hijau vivid di atas latar near-black navy-teal (tampilan waktu itu masih flat, sebelum fase 3).
 > Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
 > sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
 > Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
