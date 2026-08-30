@@ -1,5 +1,35 @@
 # Changelog
 
+## Batch 317 — Kecepatan Putar sekarang persistent (laporan user, 2 file)
+User minta inspeksi tab Pengaturan/Kecepatan Putar: ketahuan `setPlaybackSpeed()` cuma
+`controller?.setPlaybackSpeed()` in-memory, tidak pernah ditulis/dibaca dari `PlaybackStateStore`
+— reset ke 1x tiap proses di-kill. Beda dari Mode Audiobook per-lagu (`AudiobookModeStore`,
+Batch 93) yang memang sudah persistent tapi cuma untuk lagu yang di-opt-in.
+
+**Root cause & pola fix** — Sama persis Gap List #6 Batch 108 (repeat/shuffle): field `speed`
+ditambah ke `PlaybackStateStore` (`SCHEMA_VERSION` 2→3, default 1.0x aman untuk state lama),
+ditulis tiap `persistPlaybackState()`, dipulihkan sekali di `connect()` (controller-connect) —
+bukan `resumeFromSaved()` — supaya berlaku ke lagu apa pun, bukan cuma saat lanjut queue lama.
+
+**`PlaybackStateStore.kt`** — `SavedPlaybackState.speed`, param `speed` di `save()`, `KEY_SPEED`.
+
+**`PlayerViewModel.kt`** — `restoreSavedSpeed()` baru (dipanggil di `connect()`).
+`persistPlaybackState()` dapat param opsional `speedOverride` (default null, 8 call site lama
+tidak berubah) supaya `setPlaybackSpeed()` simpan LANGSUNG nilai baru, bukan baca
+`_uiState.value.playbackSpeed` yang update-nya lewat listener async. `setPlaybackSpeed()`
+sekarang panggil persist tiap dipanggil (bukan nunggu tick ~5s) — speed yang diganti saat PAUSE
+tetap tersimpan.
+
+**Interaksi Mode Audiobook** — tidak bentrok: speed per-lagu (kalau opt-in) tetap override speed
+global begitu lagu itu mulai diputar (urutan sudah begitu sejak Batch 93).
+
+**Ringkasan file** — 2 file kode diubah, 0 file baru, 0 dependency baru. `FILE_MANIFEST.txt`
+tidak berubah (187/187). Brace/paren seimbang: `PlaybackStateStore.kt` 10/10 brace, 48/48 paren;
+`PlayerViewModel.kt` 221/221 brace, 786/786 paren.
+
+**Belum divalidasi compile Gradle sungguhan** (WAJIB cek CI run berikutnya) — risiko sintaks
+rendah, pola SharedPreferences + default-param persis dipakai di Gap List #6 (Batch 108).
+
 ## Batch 316 — Tuntaskan antrean audit Batch 314: `verticalScroll` ke 2 sheet terakhir (item antrean internal, 2 file)
 Bukan laporan bug baru user — melengkapi 2 sisa dari 5 sheet yang kena pola sama (`Column` fixed
 dalam `ModalBottomSheet` tanpa `verticalScroll`/`LazyColumn` jaring pengaman), ditandai "konten

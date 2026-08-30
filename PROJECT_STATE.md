@@ -36,6 +36,47 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 317 (Laporan user: Kecepatan Putar tidak persistent — 2 file)** — User minta inspeksi tab
+Pengaturan/Kecepatan Putar, ketahuan `setPlaybackSpeed()` di `PlayerViewModel` cuma
+`controller?.setPlaybackSpeed()` in-memory, tidak pernah ditulis/dibaca dari `PlaybackStateStore`
+— hilang tiap proses di-kill (beda dari Mode Audiobook per-lagu di `AudiobookModeStore`, yang
+memang sudah persistent tapi cuma untuk lagu yang di-opt-in, Batch 93).
+
+**Root cause & pola fix** — Sama persis Gap List #6 Batch 108 (repeat/shuffle): field baru
+ditambah ke `PlaybackStateStore` (`SCHEMA_VERSION` 2→3, `KEY_SPEED`, default 1.0x aman untuk
+state lama), ditulis di `persistPlaybackState()` (sudah baca `_uiState.value.playbackSpeed`
+sebelumnya, tinggal diteruskan ke `save()`), dipulihkan di titik BARU: `connect()`
+(controller-connect) — BUKAN `resumeFromSaved()` — supaya berlaku ke lagu apa pun yang diputar
+duluan, bukan cuma saat user lanjut queue lama (`playQueue()` sendiri tidak pernah reset speed
+eksplisit, jadi begitu di-set saat connect, otomatis nempel ke instance ExoPlayer yang sama untuk
+lagu berikutnya).
+
+**`PlaybackStateStore.kt`** — `SavedPlaybackState.speed`, param `speed` di `save()`, `KEY_SPEED` +
+`SCHEMA_VERSION` 3.
+
+**`PlayerViewModel.kt`** — `restoreSavedSpeed()` baru, dipanggil sekali di `connect()` setelah
+controller ready. `persistPlaybackState()` dapat param opsional `speedOverride` (default null —
+8 call site lama TIDAK berubah) supaya `setPlaybackSpeed()` bisa simpan LANGSUNG nilai yang baru
+di-set, bukan baca `_uiState.value.playbackSpeed` yang update-nya lewat listener
+`onPlaybackParametersChanged` (async, belum tentu sudah landing di call stack yang sama).
+`setPlaybackSpeed()` sekarang panggil `persistPlaybackState(speedOverride = speed)` tiap
+dipanggil (bukan nunggu tick periodik ~5s), supaya speed yang diganti saat PAUSE tetap tersimpan.
+
+**Interaksi dengan Mode Audiobook per-lagu** — TIDAK bentrok: begitu lagu ber-status opt-in
+Audiobook mulai transisi (`onMediaItemTransition`), speed per-lagu dari `AudiobookModeStore`
+tetap override speed global (urutan sudah begitu sejak Batch 93) — speed global cuma "default"
+untuk lagu yang TIDAK opt-in.
+
+**Ringkasan file** — 2 file kode diubah, 0 file baru, 0 dependency baru, 0 parameter/callback
+publik BERUBAH (cuma nambah 1 optional param `speedOverride` berdefault null — semua caller lama
+tetap valid tanpa ubah). `FILE_MANIFEST.txt` tidak berubah (187/187). Brace/paren diverifikasi
+seimbang: `PlaybackStateStore.kt` 10/10 brace, 48/48 paren, 1/1 bracket; `PlayerViewModel.kt`
+221/221 brace, 786/786 paren, 29/29 bracket.
+
+**Belum divalidasi compile Gradle sungguhan** (tidak ada akses Android SDK/Gradle/jaringan di
+sandbox sesi ini — WAJIB cek CI run berikutnya). Risiko sintaks rendah: pola SharedPreferences +
+default-param persis dipakai di Gap List #6 (Batch 108) yang sudah terbukti compile.
+
 **Batch 316 (Tuntaskan antrean audit Batch 314: terapkan `verticalScroll` ke 2 sheet terakhir —
 `UpdateCheckSheet.kt`, `BackupRestoreSheet.kt`, 2 file, item antrean internal Batch 314/315, bukan
 laporan bug baru user)** — Melengkapi 2 sisa dari 5 sheet yang kena pola sama (`Column` fixed

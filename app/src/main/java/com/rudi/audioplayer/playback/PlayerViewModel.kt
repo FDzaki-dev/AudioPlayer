@@ -652,10 +652,23 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         future.addListener({
             controller = future.get()
             controller?.addListener(playerListener)
+            restoreSavedSpeed()
             startPositionLoop()
         }, Executor { it.run() }) // same-thread executor — Guava's directExecutor() had no special behavior beyond this
         ensureLibraryLoaded()
         registerLibraryContentObserver()
+    }
+
+    /** Batch 317 (laporan user) — Kecepatan Putar sebelumnya cuma hidup di ExoPlayer in-memory,
+     * hilang tiap proses di-kill karena tidak pernah ditulis/dibaca dari [PlaybackStateStore].
+     * Dipulihkan di sini (controller-connect), BUKAN di [resumeFromSaved], supaya berlaku ke
+     * lagu APA PUN yang diputar duluan — bukan cuma saat user melanjutkan queue lama. Mode
+     * Audiobook per-lagu (jika opt-in) tetap menang lewat override-nya sendiri di
+     * `onMediaItemTransition` begitu lagu itu mulai diputar. `load()` balik null kalau belum
+     * pernah ada queue tersimpan sama sekali (install baru) — default 1.0x sudah benar, no-op. */
+    private fun restoreSavedSpeed() {
+        val savedSpeed = playbackStateStore.load()?.speed ?: return
+        controller?.setPlaybackSpeed(savedSpeed)
     }
 
     private var libraryContentObserver: ContentObserver? = null
@@ -896,7 +909,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         }
     }
 
-    private fun persistPlaybackState() {
+    /** [speedOverride] lets [setPlaybackSpeed] pass the just-set value directly instead of
+     * reading `_uiState.value.playbackSpeed` — that field only updates once the player's
+     * `onPlaybackParametersChanged` listener callback fires, which is not guaranteed to have
+     * landed yet in the same call stack as `controller.setPlaybackSpeed()` (Batch 317). */
+    private fun persistPlaybackState(speedOverride: Float? = null) {
         val c = controller ?: return
         val index = c.currentMediaItemIndex
         if (currentQueue.isEmpty() || index !in currentQueue.indices) return
@@ -907,7 +924,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val songIds = currentQueue.map { it.id }
         val positionMs = c.currentPosition.coerceAtLeast(0)
         val currentSongId = currentQueue.getOrNull(index)?.id
-        val speed = _uiState.value.playbackSpeed
+        val speed = speedOverride ?: _uiState.value.playbackSpeed
         // Batch 108 fix2 (crash log 20260817_111602) — `c.repeatMode`/`c.shuffleModeEnabled`
         // WAJIB dibaca di sini, di main thread, sebelum masuk `launch(Dispatchers.IO)`.
         // MediaController melempar IllegalStateException ("called from a wrong thread") kalau
@@ -924,7 +941,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 index = index,
                 positionMs = positionMs,
                 repeatMode = repeatMode,
-                shuffleEnabled = shuffleEnabled
+                shuffleEnabled = shuffleEnabled,
+                speed = speed
             )
             // Roadmap #12 (Batch 93) — no-ops internally if this song was never opted into
             // audiobook mode, so it's safe to call unconditionally at the same cadence as the
@@ -1386,6 +1404,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     fun setPlaybackSpeed(speed: Float) {
         controller?.setPlaybackSpeed(speed)
+        // Simpan langsung (bukan nunggu tick periodik ~5s/onIsPlayingChanged) — kalau di-pause
+        // saat user ganti speed, tick periodik itu tidak jalan sampai play lagi (Batch 317).
+        persistPlaybackState(speedOverride = speed)
     }
 
     fun setVolume(volume: Float) {

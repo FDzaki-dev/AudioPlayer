@@ -8,7 +8,11 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 316 (Tuntaskan audit Batch 314: `verticalScroll` ke 2 sheet terakhir):** `UpdateCheckSheet.kt` dan `BackupRestoreSheet.kt` sekarang bisa discroll (`verticalScroll`) — 2 sisa terakhir dari 5 sheet yang diaudit Batch 314. Dengan ini, audit "pola tab serupa" (`Column` tanpa jaring pengaman scroll) TUNTAS untuk semua 5 sheet yang teridentifikasi (`EqualizerSheet.kt`/`RingtoneCutterSheet.kt`/`VisualizerSheet.kt` Batch 315, 2 sheet ini Batch 316).
+> 🆕 **Update terbaru — Batch 317 (Kecepatan Putar sekarang persistent):** Sebelumnya "Kecepatan
+> Putar" cuma hidup di memori — reset ke 1x tiap app dibuka ulang. Sekarang tersimpan otomatis dan
+> dipulihkan lintas sesi, berlaku ke lagu apa pun yang diputar (bukan cuma saat lanjut queue lama).
+> Mode Audiobook per-lagu tetap override-nya sendiri kalau diaktifkan untuk lagu itu.
+> Batch 316 (Tuntaskan audit Batch 314: `verticalScroll` ke 2 sheet terakhir): `UpdateCheckSheet.kt` dan `BackupRestoreSheet.kt` sekarang bisa discroll (`verticalScroll`) — 2 sisa terakhir dari 5 sheet yang diaudit Batch 314. Dengan ini, audit "pola tab serupa" (`Column` tanpa jaring pengaman scroll) TUNTAS untuk semua 5 sheet yang teridentifikasi (`EqualizerSheet.kt`/`RingtoneCutterSheet.kt`/`VisualizerSheet.kt` Batch 315, 2 sheet ini Batch 316).
 > Batch 315: `verticalScroll` ke `EqualizerSheet.kt`, `RingtoneCutterSheet.kt`, `VisualizerSheet.kt` — 3 dari 5 sheet yang diaudit Batch 314 karena punya pola sama (`Column` tanpa jaring pengaman scroll, berisiko baris bawah ke-clip diam-diam di layar pendek/font besar).
 > Batch 314: Fix sheet "Kontrol Lanjutan" terpotong (`AdvancedControlsSheet` sekarang bisa discroll, sebelumnya "Potong Nada Dering" ke-clip diam-diam) + Equalizer kini auto re-attach ke sesi audio BARU (cold-start/Service restart/lagu baru) lewat hook `PlaybackAudioSession.onSessionIdChanged` — sebelumnya cuma ter-reattach kalau sheet Equalizer dibuka manual.
 > Batch 313: Fix CI build gagal dari Batch 312 — `Modifier.padding(horizontal=..., top=..., bottom=...)` mencampur 2 overload berbeda yang tidak valid di `AdvancedControlsSectionHeader`. Diganti ke `Modifier.padding(start, top, end, bottom)` — hasil visual identik, cuma sintaks yang diperbaiki.
@@ -45,7 +49,7 @@ memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 - Dark mode default
 - Pencarian (search) judul/artis di Perpustakaan
 - Sleep timer (10/15/30/45/60 menit)
-- Kecepatan putar (0.5x–2x)
+- Kecepatan putar (0.5x–2x), tersimpan otomatis lintas sesi (dipulihkan tiap app dibuka ulang)
 - Resume otomatis dari posisi terakhir setelah app ditutup
 - Favorit lagu
 - **Antrean putar (Queue)**: lihat antrean, naik/turunkan urutan, hapus dari antrean, lompat langsung ke lagu manapun, plus aksi "Putar Berikutnya" / "Tambah ke Antrean" via tekan-lama pada lagu di Perpustakaan

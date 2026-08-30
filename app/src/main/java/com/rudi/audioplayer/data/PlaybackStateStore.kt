@@ -8,7 +8,8 @@ data class SavedPlaybackState(
     val index: Int,
     val positionMs: Long,
     val repeatMode: Int,
-    val shuffleEnabled: Boolean
+    val shuffleEnabled: Boolean,
+    val speed: Float = 1.0f
 )
 
 /**
@@ -17,6 +18,11 @@ data class SavedPlaybackState(
  *
  * Gap List #6 (Batch 108) — sebelumnya cuma songIds/index/positionMs tersimpan, repeat/shuffle
  * selalu reset ke default tiap resume. Ditambah `SCHEMA_VERSION` + `load()` dibungkus try/catch:
+ *
+ * Batch 317 — pola sama diulang untuk `speed` (Kecepatan Putar): sebelumnya cuma hidup di
+ * ExoPlayer in-memory (hilang tiap proses di-kill, laporan user langsung), sekarang tersimpan +
+ * dipulihkan lewat field ini. Lihat [PlayerViewModel.connect] untuk titik pulih (controller-
+ * connect, bukan resumeFromSaved(), supaya berlaku ke lagu apa pun, bukan cuma lanjut queue lama).
  * SharedPreferences typed getters sendiri sudah aman dari ClassCastException lintas versi (beda
  * key kalau tipe berubah), tapi ini jaring pengaman eksplisit kalau versi data lampau pernah
  * menyimpan bentuk lain di masa depan — corrupt/incompatible state jatuh ke null (baris kosong),
@@ -30,7 +36,8 @@ class PlaybackStateStore(context: Context) {
         index: Int,
         positionMs: Long,
         repeatMode: Int,
-        shuffleEnabled: Boolean
+        shuffleEnabled: Boolean,
+        speed: Float
     ) {
         prefs.edit()
             .putInt(KEY_SCHEMA_VERSION, SCHEMA_VERSION)
@@ -39,6 +46,7 @@ class PlaybackStateStore(context: Context) {
             .putLong(KEY_POSITION, positionMs)
             .putInt(KEY_REPEAT_MODE, repeatMode)
             .putBoolean(KEY_SHUFFLE, shuffleEnabled)
+            .putFloat(KEY_SPEED, speed)
             .apply()
     }
 
@@ -61,7 +69,11 @@ class PlaybackStateStore(context: Context) {
             // eksplisit.
             val repeatMode = prefs.getInt(KEY_REPEAT_MODE, 0)
             val shuffleEnabled = prefs.getBoolean(KEY_SHUFFLE, false)
-            SavedPlaybackState(ids, index, position, repeatMode, shuffleEnabled)
+            // KEY_SPEED ditambah di SCHEMA_VERSION 3 — sama seperti repeat/shuffle dulu (versi
+            // 2), belum ada di state lama, getFloat default aman ke 1.0x tanpa version checking
+            // eksplisit.
+            val speed = prefs.getFloat(KEY_SPEED, 1.0f)
+            SavedPlaybackState(ids, index, position, repeatMode, shuffleEnabled, speed)
         } catch (e: Exception) {
             // Corrupt/incompatible state tidak boleh menjegal resume seluruh app — anggap saja
             // tidak ada state tersimpan, mulai dari kosong seperti install baru.
@@ -79,6 +91,7 @@ class PlaybackStateStore(context: Context) {
         private const val KEY_POSITION = "position"
         private const val KEY_REPEAT_MODE = "repeat_mode"
         private const val KEY_SHUFFLE = "shuffle_enabled"
-        private const val SCHEMA_VERSION = 2
+        private const val KEY_SPEED = "speed"
+        private const val SCHEMA_VERSION = 3
     }
 }
