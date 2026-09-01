@@ -1,5 +1,19 @@
 # Changelog
 
+## Batch 327 — Naikkan alpha rim-glow Aurora — token baru `AuroraRimGlowAlpha`, 2 file kode
+User (device sungguhan): "terlalu tipis, hampir tak kasat mata" — dikonfirmasi lewat
+`ask_user_input_v0` scope-nya rim-glow per-panel Batch 326, bukan ambient wash `auroraGlow()`
+(0 dikeluhkan, tidak disentuh).
+
+`AuroraRimGlowAlpha = 0.44f` (`Color.kt`) — token baru, terpisah dari `AuroraGlowAlpha` (0.34f)
+yang dipakai ambient wash, supaya menaikkan rim tidak ikut menaikkan wash yang sudah pas.
+Puncaknya disamakan ke level "accent-glow biasa ~0.42-0.45f" yang sudah didokumentasikan di
+tempat lain app ini (komentar emerald streak Skeu Batch 80) — bukan angka tebakan baru.
+
+Multiplier taper per-stop rim-glow (`BlurUtils.kt`) juga dinaikkan: 0.85x/0.6x/0.35x →
+0.85x/0.65x/0.46x. Floor (stop ke-4, titik paling redup) naik dari alpha efektif 0.119 → 0.202
+(~70% lebih terang), taper tetap dipertahankan (masih memudar antar stop, bukan flat solid).
+
 ## Batch 326 — Aurora rim-glow statis → animated via `LocalAuroraPhase`, 3 file kode
 User: "next: Aurora statis -> bergerak!!". Kandidat yang sudah dicatat eksplisit sejak komentar
 Batch 310 ("kandidat animasi kalau user minta lanjut nanti setelah statis ini terverifikasi

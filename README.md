@@ -8,7 +8,10 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 326 (Aurora rim-glow statis → animated, 3 file):** Fase 6/N Aurora
+> 🆕 **Update terbaru — Batch 327 (Naikkan alpha rim-glow Aurora, token baru
+> `AuroraRimGlowAlpha` 0.44f, 2 file):** User: "terlalu tipis, hampir tak kasat mata" — floor
+> stop ke-4 naik ~70% (alpha efektif 0.119→0.202), ambient wash `auroraGlow()` tidak disentuh.
+> Batch 326 (Aurora rim-glow statis → animated, 3 file): Fase 6/N Aurora
 > selesai — rim-glow 12+ panel sekarang bergerak lewat `LocalAuroraPhase` (1 phase dibagi
 > semua titik, 0 transition tambahan per panel — kekhawatiran performa Batch 310 tertangani).
 > Batch 325 (Blur Liquid Glass dikonfirmasi user di device sungguhan —
@@ -273,10 +276,12 @@ Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diu
   6/N selesai (Batch 326)** — rim-glow ini SEKARANG ANIMATED (statis sejak Batch 310, ditunda
   murni pertimbangan performa): 1 phase float dihitung sekali di `AppNavHost` lewat
   `LocalAuroraPhase`, dibagi ke semua 12+ titik rim-glow — 0 `rememberInfiniteTransition`
-  tambahan per panel. **Dengan
+  tambahan per panel. **Batch 327** — user device sungguhan: rim-glow "terlalu tipis, hampir tak
+  kasat mata"; alpha puncaknya dinaikkan ke token baru `AuroraRimGlowAlpha` (0.44f, terpisah dari
+  `AuroraGlowAlpha` 0.34f milik ambient wash yang tidak dikeluhkan/tidak disentuh). **Dengan
   ini cakupan Aurora yang dikonfirmasi user Batch 306 (ambient background + rim-glow per-panel,
   keduanya kini bergerak) SELESAI PENUH**, di atas color+typography+shape yang sudah lengkap
   sejak Batch 309.
-  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-310, 326.
+  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-310, 326-327.
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)

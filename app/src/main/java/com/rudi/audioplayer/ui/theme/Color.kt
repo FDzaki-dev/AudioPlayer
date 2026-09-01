@@ -366,6 +366,17 @@ val AuroraMagenta = Color(0xFFD46FC7)
 // setelah feedback device -- lihat histori Batch 296/298/299/300 di CHANGELOG.md).
 val AuroraGlowAlpha = 0.34f
 
+// Batch 327 — user (device sungguhan, setelah rim-glow animated Batch 326): "terlalu tipis,
+// hampir tak kasat mata" — TAPI scope dikonfirmasi user cuma rim-glow per-panel (`frostedGlass()`,
+// BlurUtils.kt), BUKAN ambient wash (`auroraGlow()`, TactileDepth.kt) yang 0 dikeluhkan. Token
+// TERPISAH (bukan naikkan `AuroraGlowAlpha` di atas) supaya wash root tidak ikut berubah tanpa
+// diminta — 2 use-case ini sekarang genuinely beda kebutuhan, bukan lagi "1 alpha cukup utk
+// keduanya" seperti asumsi Batch 306/310. Nilai puncak (stop pertama) 0.44f BUKAN tebakan acak —
+// disamakan ke level "accent-glow biasa" yang sudah didokumentasikan di tempat lain app ini
+// (~0.42-0.45f, lihat komentar emerald streak Skeu Batch 80, MainActivity.kt) — patokan yang
+// sudah ada, bukan angka baru dari nol.
+val AuroraRimGlowAlpha = 0.44f
+
 // Batch 307 — Fase 2/N: token permukaan/teks yang dibutuhkan `AuroraColors` (Theme.kt) — hue
 // 4 di atas (AuroraGreen/Teal/Violet/Magenta) murni ingredient gradien ambient, BUKAN utk
 // role M3 background/surface/text (kontras gagal kalau dipaksa jadi warna solid latar/teks).

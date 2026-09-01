@@ -36,6 +36,21 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 327 (Naikkan alpha rim-glow Aurora — token baru `AuroraRimGlowAlpha`, 2 file kode)** —
+User dikonfirmasi lewat `ask_user_input_v0`: keluhan "terlalu tipis, hampir tak kasat mata"
+scope-nya rim-glow per-panel Batch 326, BUKAN ambient wash `auroraGlow()` (0 dikeluhkan, TIDAK
+disentuh). `AuroraRimGlowAlpha = 0.44f` (`Color.kt`, token BARU terpisah dari `AuroraGlowAlpha`
+0.34f yang dipakai wash — supaya naikkan rim tidak ikut menaikkan wash) — puncaknya disamakan ke
+level "accent-glow biasa ~0.42-0.45f" yang sudah didokumentasikan (komentar emerald streak Skeu
+Batch 80, MainActivity.kt), bukan tebakan baru. Multiplier taper per-stop (`BlurUtils.kt`,
+Aurora branch `frostedGlass()`) juga dinaikkan 0.85x/0.6x/0.35x → 0.85x/0.65x/0.46x — floor stop
+ke-4 naik dari alpha efektif 0.119 → 0.202 (~70% lebih terang di titik paling redup), taper
+tetap dipertahankan (masih memudar, bukan flat). Brace/paren dicek seimbang (Color.kt 0/0 `{}`
+251/251 `()`; BlurUtils.kt 10/10 `{}` 157/157 `()`).
+
+**Ringkasan file** — 2 file kode (di bawah batas Micro-Batch). `FILE_MANIFEST.txt` tidak berubah
+(188/188). Docs disinkronkan.
+
 **Batch 326 (Aurora rim-glow statis → animated via `LocalAuroraPhase`, 3 file kode)** — User:
 "next: Aurora statis -> bergerak!!". Ini KANDIDAT yang sudah dicatat eksplisit sejak komentar
 Batch 310 (`frostedGlass()`, BlurUtils.kt): "SENGAJA statis ... kandidat animasi kalau user minta

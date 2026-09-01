@@ -215,14 +215,23 @@ fun Modifier.frostedGlass(
         // AuroraGreen (bukan diam di Magenta) supaya rim terasa "mengalir memutar" penuh, bukan
         // cuma 3 dari 4 stop yang bergerak. Resep durasi/easing/RepeatMode (20 detik/arah,
         // LinearEasing, Reverse) disalin persis dari `auroraGlow()` — bukan angka baru.
+        // Batch 327 — user (device sungguhan): "terlalu tipis, hampir tak kasat mata", scope
+        // dikonfirmasi cuma rim-glow ini (`auroraGlow()`'s wash 0 dikeluhkan, TIDAK disentuh).
+        // Base alpha pindah `AuroraGlowAlpha` (0.34f, dipakai bareng ambient wash) →
+        // `AuroraRimGlowAlpha` (0.44f, token BARU khusus rim — lihat rasionalisasi penuh di
+        // Color.kt) supaya menaikkan rim tidak ikut menaikkan wash yang sudah pas. Multiplier
+        // taper per-stop JUGA dinaikkan (0.85x/0.6x/0.35x → 0.85x/0.65x/0.46x) — floor stop ke-4
+        // naik dari alpha efektif 0.119 (0.34×0.35) ke 0.202 (0.44×0.46), ~70% lebih terang di
+        // titik paling redup, sementara taper (tiap stop tetap lebih redup dari sebelumnya) tetap
+        // dipertahankan supaya rim masih kebaca "memudar", bukan flat solid.
         isAurora -> {
             val rimPhase = LocalAuroraPhase.current
             Brush.linearGradient(
                 colors = listOf(
-                    lerp(AuroraGreen, AuroraTeal, rimPhase).copy(alpha = AuroraGlowAlpha),
-                    lerp(AuroraTeal, AuroraViolet, rimPhase).copy(alpha = AuroraGlowAlpha * 0.85f),
-                    lerp(AuroraViolet, AuroraMagenta, rimPhase).copy(alpha = AuroraGlowAlpha * 0.6f),
-                    lerp(AuroraMagenta, AuroraGreen, rimPhase).copy(alpha = AuroraGlowAlpha * 0.35f)
+                    lerp(AuroraGreen, AuroraTeal, rimPhase).copy(alpha = AuroraRimGlowAlpha),
+                    lerp(AuroraTeal, AuroraViolet, rimPhase).copy(alpha = AuroraRimGlowAlpha * 0.85f),
+                    lerp(AuroraViolet, AuroraMagenta, rimPhase).copy(alpha = AuroraRimGlowAlpha * 0.65f),
+                    lerp(AuroraMagenta, AuroraGreen, rimPhase).copy(alpha = AuroraRimGlowAlpha * 0.46f)
                 )
             )
         }
