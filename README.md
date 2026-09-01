@@ -8,7 +8,11 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 320 (Verifikasi integritas rilis, 0 bug, 0 kode diubah):** Sesi
+> 🆕 **Update terbaru — Batch 321 (Housekeeping dokumentasi: arsip `PROJECT_STATE.md` Batch
+> 58–219 → `PROJECT_STATE_ARCHIVE.md`, 0 kode diubah):** Murni beres-beres dokumentasi internal
+> proyek (file catatan sesi kerja terlalu panjang) — 0 fitur/perilaku app berubah sama sekali
+> dari Batch 320.
+> Batch 320 (Verifikasi integritas rilis, 0 bug, 0 kode diubah): Sesi
 > tanpa laporan bug baru — repack ini murni diverifikasi ulang (manifest file, keseimbangan
 > kode seluruh file `.kt`, hasil Batch 318/319 dicek cocok) sebelum dikirim ulang. 0 fitur/
 > perilaku berubah dari Batch 319.

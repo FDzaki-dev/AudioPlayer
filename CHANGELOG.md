@@ -1,5 +1,29 @@
 # Changelog
 
+## Batch 321 — Arsip `PROJECT_STATE.md`: pindahkan Batch 58–219 ke `PROJECT_STATE_ARCHIVE.md`, 0 kode diubah
+Kandidat yang dicatat (BUKAN dieksekusi) di Batch 320: `PROJECT_STATE.md` sudah menyimpan 262
+batch aktif (58→320), jauh melebihi target "~100 batch terbaru" sejak Batch 158. User memilih
+eksplisit lewat `ask_user_input_v0` sesi ini untuk mengeksekusi arsip ini dulu (docs only),
+sebelum memutuskan item kode berikutnya.
+
+**Aksi.** 162 entri batch (Batch 219 turun ke Batch 58, urutan descending) dipindah VERBATIM dari
+`PROJECT_STATE.md` ke `PROJECT_STATE_ARCHIVE.md`, disisipkan tepat setelah header arsip di ATAS
+entri Batch 57 yang sudah ada (descending tetap terjaga, 0 gap baru/duplikat — gap pre-existing
+"Batch 83", yang memang tidak pernah punya entri terpisah di histori asli, dipertahankan apa
+adanya sesuai ZERO-REFACTOR). `PROJECT_STATE.md` sekarang menyimpan 101 batch aktif (220→321).
+Catatan pointer arsip & referensi "Batch 58 ke atas" diperbarui ke "Batch 220 ke atas" di kedua
+file; header `PROJECT_STATE_ARCHIVE.md` disamakan (range + urutan descending).
+
+**Tidak disentuh.** Section "Riwayat insiden kronologis" (permanen, ditandai "jangan dihapus") dan
+seluruh section kebijakan/arsitektur permanen di `PROJECT_STATE.md` — 0 dipindah, 0 diedit. 0 file
+`.kt`/kode disentuh — murni potong-tempel dokumentasi, dicek verbatim (jumlah baris archived block
+sama persis sebelum/sesudah pindah, 0 teks hilang/terduplikasi). `FILE_MANIFEST.txt` tidak berubah
+(188/188 — kedua file dokumentasi sudah ada sejak Batch 158).
+
+**Item kode berikutnya masih menunggu pilihan user eksplisit**: fix blur Liquid Glass
+lintas-window (`MainActivity.kt`, protected, Batch 311), atau animasi rim-glow Aurora (Batch 310)
+— TIDAK dieksekusi diam-diam batch ini.
+
 ## Batch 320 — Verifikasi integritas rilis (repack tanpa laporan bug baru), 0 kode diubah
 User minta "sempurnakan, repack, lalu present" tanpa laporan bug/log_fail baru spesifik. Sesuai
 Fast-Track (task mikro dieksekusi langsung, audit full project dilarang tanpa instruksi), sesi ini
