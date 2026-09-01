@@ -34,7 +34,10 @@ fun UpdateCheckSheet(onDismiss: () -> Unit) {
         onDispose { UpdateManager.reset() }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    // Batch 323 — fix blur lintas-window, pola sama Batch 322 (rasionalisasi penuh di
+    // PROJECT_STATE.md Batch 321/322): tambah `containerColor = Color.Transparent` yang kelewat
+    // sejak sheet ini dibuat. `Color` sudah diimpor sebelumnya (dipakai fungsi lain file ini).
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         // Batch 316 — lanjutan audit Batch 314/315: prioritas 4 dari 5 sheet yang kena pola sama
         // (Column fixed tanpa verticalScroll/LazyColumn jaring pengaman). Konten pendek di
         // kebanyakan state (Idle/Checking/UpToDate/Error), TAPI state Available bisa memanjang

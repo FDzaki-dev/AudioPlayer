@@ -78,6 +78,21 @@ val LocalIsDarkTheme = staticCompositionLocalOf { true }
 // benar2 dipakai runtime.
 val LocalHazeState = staticCompositionLocalOf { HazeState() }
 
+// Batch 326 — Aurora rim-glow §langkah animasi (kandidat yang sudah dicatat sejak komentar
+// Batch 310 di `frostedGlass()`, BlurUtils.kt: "SENGAJA statis ... kandidat animasi kalau user
+// minta lanjut nanti setelah statis ini terverifikasi visual dulu" — precondition itu sudah
+// terpenuhi, blur+rim statis dikonfirmasi user Batch 325). Sama pola PERSIS LocalHazeState di
+// atas: masalah yang mau dihindari SAMA (Batch 310's kekhawatiran eksplisit) — `frostedGlass()`
+// dipanggil 12+ call site, 12+ `rememberInfiniteTransition` independen serentak adalah biaya
+// performa baru yang belum diverifikasi. Solusinya SAMA: 1 phase float dihitung 1 kali
+// (AppNavHost, MainActivity.kt) via `rememberInfiniteTransition`, diteruskan lewat 1
+// CompositionLocal ini ke semua call site `frostedGlass()` sekaligus — 0 transition tambahan
+// per panel, cukup 1 total (terpisah dari transition internal `auroraGlow()`'s ambient wash di
+// root Surface, TIDAK disatukan/disentuh batch ini — scope minimal, 0 risiko ke Surface root).
+// Default `0f` di sini HANYA fallback preview/test, sama seperti LocalHazeState's default di
+// atas — nilai sungguhan SELALU datang dari provider di AppNavHost.
+val LocalAuroraPhase = staticCompositionLocalOf { 0f }
+
 private val AppleDarkColors = darkColorScheme(
     primary = AppleAccent,
     onPrimary = Color.White,

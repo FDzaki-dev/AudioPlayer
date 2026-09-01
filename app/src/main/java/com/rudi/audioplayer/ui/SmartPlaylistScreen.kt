@@ -257,7 +257,10 @@ private fun SmartPlaylistBuilderSheet(
         buildDraft()
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    // Batch 323 — fix blur lintas-window, pola sama Batch 322 (rasionalisasi penuh di
+    // PROJECT_STATE.md Batch 321/322): tambah `containerColor = Color.Transparent` yang kelewat
+    // sejak sheet ini dibuat. `Color` sudah diimpor sebelumnya (dipakai fungsi lain file ini).
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         // Batch 263 — user feedback langsung setelah Batch 262 (verticalScroll fix): scroll
         // terasa "bouncy". Root cause: verticalScroll baru otomatis ikut overscroll
         // stretch-glow bawaan Android 12+/Compose Foundation — di dalam ModalBottomSheet yang

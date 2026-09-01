@@ -235,11 +235,15 @@ FilterChipDefaults.shape`. **Audit pill/chip lebar TUNTAS, fase 3 100% selesai.*
 
 **Item berikutnya**: Fase 3 (pill/chip) 100% selesai sejak Batch 288. **Langkah 5 (blur asli
 §3b) DIKONFIRMASI user Batch 290, sedang berjalan** — minSdk 23→31 (290), BOM Compose bump
-(291), 2 hotfix CI (292/293), desain teknis blur di `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` (294),
-**sub-langkah 1/5 "fondasi plumbing" SELESAI (Batch 295)**: dependency Haze 1.7.2 + `LocalHazeState`
-+ `HazeState` dipegang `AppNavHost`, 0 visual berubah (dikonfirmasi 0 consumer). Sisa sub-langkah
-2-5 ada di `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5 — TUNGGU user minta lanjut tiap sub-langkah,
-jangan eksekusi berturutan tanpa jeda (Strict Micro-Batching).
+(291), 2 hotfix CI (292/293), desain teknis blur di `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` (294).
+Sub-langkah 1-4/5 SELESAI (295-297, lihat dokumen itu). Sempat ada penyimpangan tak terduga:
+Batch 311 melaporkan blur 0% di sheet cross-window (`liquidGlassAlpha` dinaikkan darurat ke
+0.85f/0.90f sbg fallback aman); Batch 322 riset ulang & nemu root cause SEBENARNYA — 7 dari 17
+call site `ModalBottomSheet` tidak pasang `containerColor = Color.Transparent` — dituntaskan
+Batch 322-324 (17/17 konsisten). **Sub-langkah 5/5 — VISUAL dikonfirmasi user Batch 325**: blur
+kelihatan benar termasuk cross-window, `liquidGlassAlpha` diturunkan balik ke nilai tuning
+device terakhir yang sah (0.38f/0.48f, Batch 299). **⏳ Performa (GPU/lag) BELUM eksplisit
+dikonfirmasi** — sisa satu-satunya item terbuka di seluruh roadmap ini.
 
 ---
 

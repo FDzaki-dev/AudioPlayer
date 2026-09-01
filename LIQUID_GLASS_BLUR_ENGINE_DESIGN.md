@@ -163,6 +163,12 @@ Strict Micro-Batching tetap berlaku — TIDAK dieksekusi semua sekaligus:
    environment kerja sesi ini (tidak ada compiler/emulator). Termasuk cek performa (blur
    real-time genuinely berat GPU, terutama MiniPlayerBar yang sering re-render saat progress
    lagu jalan) — bukan cuma "kelihatan benar", tapi juga "tidak nge-lag".
+   **✅ VISUAL dikonfirmasi user Batch 325** (blur kelihatan benar di device sungguhan, termasuk
+   sheet/dialog cross-window yang dulu 0% — root cause Batch 311 kini genuinely tuntas via fix
+   `containerColor` Batch 322-324). `liquidGlassAlpha` diturunkan balik 0.85f/0.90f→0.38f/0.48f
+   (`BlurUtils.kt`, reuse nilai tuning Batch 299 yang sudah pernah lolos device dulu). **⏳ PERFORMA
+   (GPU/lag saat MiniPlayerBar re-render) BELUM eksplisit dikonfirmasi user** — sisa item terbuka
+   sub-langkah ini, jangan diasumsikan lolos cuma karena visual OK.
 
 ---
 

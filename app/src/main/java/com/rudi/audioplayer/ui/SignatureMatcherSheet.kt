@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -60,7 +61,10 @@ fun SignatureMatcherSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    // Batch 323 — fix blur lintas-window, pola sama 3 sheet Batch 322 (BackupRestoreSheet dkk —
+    // rasionalisasi penuh di PROJECT_STATE.md Batch 321/322): tambah `containerColor =
+    // Color.Transparent` yang kelewat sejak sheet ini dibuat.
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

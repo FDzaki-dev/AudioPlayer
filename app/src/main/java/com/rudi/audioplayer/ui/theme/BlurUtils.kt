@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.hazeEffect
@@ -131,7 +132,18 @@ fun Modifier.frostedGlass(
     // yang sesungguhnya (mis. pindah scrim/blur ke layer yg sama) BELUM dikerjakan (di luar
     // scope 1-parameter fix ini, risiko lebih tinggi ke MainActivity.kt yg diproteksi) — jadi
     // dicatat sebagai item lanjutan, bukan ditutup permanen di sini.
-    val liquidGlassAlpha = if (isDark) 0.85f else 0.90f
+    // Batch 325 — user KONFIRMASI LANGSUNG dari device sungguhan (setelah Batch 324 menutup
+    // ke-7 gap `containerColor`, 17/17 call site `ModalBottomSheet` app-wide): blur SUDAH
+    // kelihatan benar, termasuk sheet/dialog cross-window yang dulu 0% (root cause Batch 311).
+    // Fallback aman 0.85f/0.90f (Batch 311) sekarang TIDAK relevan lagi — itu murni jaring
+    // pengaman selagi root cause "0 blur sama sekali" belum ketemu, bukan nilai tuning yang
+    // pernah divalidasi device. Diturunkan BALIK ke nilai tuning device TERAKHIR yang sah
+    // (Batch 299, sebelum Batch 311 menaikkannya darurat karena bug tak-terkait):
+    // 0.85f→0.38f (gelap) / 0.90f→0.48f (terang). Bukan angka baru/tebakan — reuse murni nilai
+    // yang sudah pernah lolos 1 putaran tuning device dulu, kini blocker-nya sudah tuntas.
+    // `blurRadius` (32dp, Batch 298) & gap dark/light (0.10) TETAP tidak disentuh, sama alasan
+    // seperti sebelumnya (lever yang relevan cuma tint, bukan radius/kontras).
+    val liquidGlassAlpha = if (isDark) 0.38f else 0.48f
     val effectiveAlpha = if (isSkeu) 1f else if (isLiquidGlass) liquidGlassAlpha else alpha
     // Batch 53 — spec §8 "Glass edge / highlight" + §9 "Lighting model" (single simulated light,
     // top-left -> bottom-right): a flat single-color border reads as a printed outline, not
@@ -188,19 +200,32 @@ fun Modifier.frostedGlass(
         // `auroraGlow()`'s multiplier 1.0x/0.85x/0.6x dari `AuroraGlowAlpha`) + 1 falloff
         // tambahan 0.35x utk stop ke-4 — 0 token warna/alpha baru ditambah ke Color.kt, murni
         // reuse AuroraGreen/Teal/Violet/Magenta + AuroraGlowAlpha yang sudah ada sejak Batch 306.
-        // SENGAJA statis (bukan animated ala `auroraGlow()`) — `frostedGlass()` dipanggil 12+
-        // call site sekaligus, 12+ `rememberInfiniteTransition` independen serentak adalah biaya
-        // performa baru yang belum pernah diverifikasi device (beda dari `auroraGlow()` yang cuma
-        // 1 instance di root Surface) — titik awal paling aman, kandidat animasi kalau user minta
-        // lanjut nanti setelah statis ini terverifikasi visual dulu.
-        isAurora -> Brush.linearGradient(
-            colors = listOf(
-                AuroraGreen.copy(alpha = AuroraGlowAlpha),
-                AuroraTeal.copy(alpha = AuroraGlowAlpha * 0.85f),
-                AuroraViolet.copy(alpha = AuroraGlowAlpha * 0.6f),
-                AuroraMagenta.copy(alpha = AuroraGlowAlpha * 0.35f)
+        // Batch 310 — sengaja dibiarkan STATIS dulu (bukan animated ala `auroraGlow()`):
+        // `frostedGlass()` dipanggil 12+ call site sekaligus, 12+ `rememberInfiniteTransition`
+        // independen serentak adalah biaya performa baru yang belum pernah diverifikasi device —
+        // titik awal paling aman, dicatat eksplisit sebagai "kandidat animasi kalau user minta
+        // lanjut nanti setelah statis ini terverifikasi visual dulu".
+        // Batch 326 — user minta lanjut ("Aurora statis -> bergerak"), precondition Batch 310
+        // (statis terverifikasi visual device) TERPENUHI (Batch 325). Kekhawatiran performa di
+        // atas DITANGANI, bukan diabaikan: phase TIDAK dihitung di sini — dibaca dari
+        // `LocalAuroraPhase` (Theme.kt), 1 `rememberInfiniteTransition` dipegang 1 titik
+        // (AppNavHost, MainActivity.kt, pola identik `LocalHazeState`/`hazeState` Batch 295) lalu
+        // dibagi ke SEMUA call site rim-glow — 0 transition tambahan per panel, tetap 1 total.
+        // Mekanisme lerp() antar-hue identik `auroraGlow()`; stop ke-4 di-lerp balik ke
+        // AuroraGreen (bukan diam di Magenta) supaya rim terasa "mengalir memutar" penuh, bukan
+        // cuma 3 dari 4 stop yang bergerak. Resep durasi/easing/RepeatMode (20 detik/arah,
+        // LinearEasing, Reverse) disalin persis dari `auroraGlow()` — bukan angka baru.
+        isAurora -> {
+            val rimPhase = LocalAuroraPhase.current
+            Brush.linearGradient(
+                colors = listOf(
+                    lerp(AuroraGreen, AuroraTeal, rimPhase).copy(alpha = AuroraGlowAlpha),
+                    lerp(AuroraTeal, AuroraViolet, rimPhase).copy(alpha = AuroraGlowAlpha * 0.85f),
+                    lerp(AuroraViolet, AuroraMagenta, rimPhase).copy(alpha = AuroraGlowAlpha * 0.6f),
+                    lerp(AuroraMagenta, AuroraGreen, rimPhase).copy(alpha = AuroraGlowAlpha * 0.35f)
+                )
             )
-        )
+        }
         else -> {
             val flat = MaterialTheme.colorScheme.onSurface.copy(
                 alpha = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.14f else 0.24f

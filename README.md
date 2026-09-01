@@ -8,7 +8,22 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 321 (Housekeeping dokumentasi: arsip `PROJECT_STATE.md` Batch
+> 🆕 **Update terbaru — Batch 326 (Aurora rim-glow statis → animated, 3 file):** Fase 6/N Aurora
+> selesai — rim-glow 12+ panel sekarang bergerak lewat `LocalAuroraPhase` (1 phase dibagi
+> semua titik, 0 transition tambahan per panel — kekhawatiran performa Batch 310 tertangani).
+> Batch 325 (Blur Liquid Glass dikonfirmasi user di device sungguhan —
+> `liquidGlassAlpha` diturunkan balik 0.85f/0.90f→0.38f/0.48f, 1 file): Sub-langkah 5/5
+> (visual) roadmap blur asli selesai. Performa (GPU/lag) masih belum eksplisit dikonfirmasi.
+> Batch 324 (Tuntaskan antrean Batch 322/323: fix `containerColor` di
+> `VaultSheet.kt`, 1 file): Ke-7 gap `containerColor`/blur lintas-window yang ditemukan Batch
+> 322 TUNTAS semua — 17/17 call site `ModalBottomSheet` app-wide sudah konsisten.
+> Batch 323 (Lanjutan Batch 322: fix `containerColor` 3 dari 4 sheet
+> tersisa, 3 file): `SignatureMatcherSheet`/`SmartPlaylistScreen`/`UpdateCheckSheet` diperbaiki.
+> Batch 322 (Fix blur lintas-window Liquid Glass, 3 file — root cause Batch
+> 311 diriset ulang & ternyata keliru, `MainActivity.kt` diperiksa tapi 0 bug jadi TIDAK diubah):**
+> 7 sheet kelewat pasang `containerColor = Color.Transparent` (syarat resmi Haze) — 3 diperbaiki
+> batch ini, 4 diantre. Blur belum diturunkan tint-nya sampai user konfirmasi visual device.
+> Batch 321 (Housekeeping dokumentasi: arsip `PROJECT_STATE.md` Batch
 > 58–219 → `PROJECT_STATE_ARCHIVE.md`, 0 kode diubah):** Murni beres-beres dokumentasi internal
 > proyek (file catatan sesi kerja terlalu panjang) — 0 fitur/perilaku app berubah sama sekali
 > dari Batch 320.
@@ -254,10 +269,14 @@ Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diu
   dari 6 identitas) + shape (Batch 309) sudah 100% murni sendiri, 0 lagi fallback ke identitas
   lain. **Fase 5/N selesai** (Batch 310) — rim-glow per-panel (sebelumnya ditunda sejak Batch 306)
   akhirnya di-wiring app-wide lewat `frostedGlass()`: MiniPlayerBar, panel NowPlaying, tiap bottom
-  sheet, dan card Home/Library sekarang punya rim ber-gradasi 4 warna Aurora di tepinya, statis
-  (belum animated — pertimbangan performa, lihat catatan di `CHANGELOG.md` Batch 310). **Dengan
-  ini cakupan Aurora yang dikonfirmasi user Batch 306 (ambient background + rim-glow per-panel)
-  SELESAI PENUH**, di atas color+typography+shape yang sudah lengkap sejak Batch 309.
-  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-310.
+  sheet, dan card Home/Library sekarang punya rim ber-gradasi 4 warna Aurora di tepinya. **Fase
+  6/N selesai (Batch 326)** — rim-glow ini SEKARANG ANIMATED (statis sejak Batch 310, ditunda
+  murni pertimbangan performa): 1 phase float dihitung sekali di `AppNavHost` lewat
+  `LocalAuroraPhase`, dibagi ke semua 12+ titik rim-glow — 0 `rememberInfiniteTransition`
+  tambahan per panel. **Dengan
+  ini cakupan Aurora yang dikonfirmasi user Batch 306 (ambient background + rim-glow per-panel,
+  keduanya kini bergerak) SELESAI PENUH**, di atas color+typography+shape yang sudah lengkap
+  sejak Batch 309.
+  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-310, 326.
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)

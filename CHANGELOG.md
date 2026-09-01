@@ -1,5 +1,86 @@
 # Changelog
 
+## Batch 326 — Aurora rim-glow statis → animated via `LocalAuroraPhase`, 3 file kode
+User: "next: Aurora statis -> bergerak!!". Kandidat yang sudah dicatat eksplisit sejak komentar
+Batch 310 ("kandidat animasi kalau user minta lanjut nanti setelah statis ini terverifikasi
+visual dulu") — precondition itu terpenuhi (Batch 325).
+
+Kekhawatiran performa Batch 310 (12+ call site `frostedGlass()` × transition independen)
+ditangani via arsitektur: 1 phase float dihitung sekali di `AppNavHost` (pola identik
+`hazeState`/`LocalHazeState` Batch 295), dibagi ke semua panel lewat `LocalAuroraPhase`
+(CompositionLocal baru, `Theme.kt`) — 0 transition tambahan per panel. Resep animasi (20 detik/
+arah, LinearEasing, Reverse) dan mekanisme `lerp()` antar-hue disalin persis dari `auroraGlow()`
+(TactileDepth.kt) — bukan API/angka baru.
+
+3 file: `Theme.kt` (+`LocalAuroraPhase`), `MainActivity.kt` (Protected/edit parsial — phase
+computation + provider di `AppNavHost`, root Surface's `auroraGlow()` TIDAK disentuh),
+`BlurUtils.kt` (Aurora branch `frostedGlass()` kini animated). `TactileDepth.kt` (ambient wash
+root) sengaja tidak disentuh sama sekali — scope minimal, 0 risiko tambahan.
+
+## Batch 325 — Turunkan `liquidGlassAlpha` balik ke nilai tuning device terakhir yang sah, 1 file kode
+User konfirmasi lewat `ask_user_input_v0`: blur Liquid Glass sudah kelihatan benar di device
+sungguhan (termasuk sheet/dialog cross-window yang dulu 0% — root cause Batch 311, dituntaskan
+via fix `containerColor` Batch 322-324). Ini melengkapi sub-langkah 5/5 (visual) di
+`LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5.
+
+`liquidGlassAlpha` (`BlurUtils.kt`) diturunkan dari fallback aman darurat Batch 311
+(0.85f/0.90f) ke **0.38f/0.48f** — bukan angka baru/tebakan, murni reuse nilai tuning Batch 299
+yang sudah pernah lolos 1 putaran verifikasi device dulu, sebelum dinaikkan darurat karena bug
+tak-terkait (root cause aslinya `containerColor`, bukan tint terlalu tipis). `blurRadius` (32dp)
+dan gap kontras dark/light (0.10) tidak disentuh — bukan lever yang relevan untuk masalah ini.
+
+**Performa (GPU/lag saat MiniPlayerBar re-render) belum eksplisit dikonfirmasi user** — satu-
+satunya item terbuka tersisa di seluruh roadmap Liquid Glass; jangan diasumsikan lolos cuma
+karena visual sudah OK.
+
+## Batch 324 — Tuntaskan antrean Batch 322/323: fix `containerColor` di `VaultSheet.kt`, 1 file kode
+User: "next", melanjutkan antrean eksplisit Batch 322/323 (pola identik, pra-disetujui, tidak perlu
+tanya ulang). Fix `+containerColor = Color.Transparent` diterapkan ke `ModalBottomSheet` di
+`VaultSheet.kt` + import `androidx.compose.ui.graphics.Color` (belum ada sebelumnya). Brace/paren
+dicek seimbang (101/101 `{}`, 210/210 `()`).
+
+Dengan ini **ke-7 gap yang ditemukan grep Batch 322 tuntas semua** — diverifikasi ulang app-wide
+dengan grep multi-baris (bukan cuma single-line): **17/17 call site `ModalBottomSheet` sudah
+konsisten pasang `containerColor = Color.Transparent`**.
+
+Tint `liquidGlassAlpha` masih sengaja belum diturunkan, sama alasan Batch 322/323 (tunggu
+verifikasi visual device dulu sebelum ubah fallback 0.85f/0.90f).
+
+## Batch 323 — Lanjutan Batch 322: fix containerColor 3 dari 4 sheet tersisa, 3 file kode
+Melanjutkan antrean eksplisit Batch 322 (pola identik, sudah pra-disetujui). Fix
+`containerColor = Color.Transparent` diterapkan ke `SignatureMatcherSheet.kt`,
+`SmartPlaylistScreen.kt`, `UpdateCheckSheet.kt`. Sisa 1 file (`VaultSheet.kt`) diantre — setelah
+itu ke-7 gap yang ditemukan Batch 322 tuntas semua (17/17 call site `ModalBottomSheet` konsisten).
+Tint `liquidGlassAlpha` masih sengaja tidak diturunkan (tunggu verifikasi device, lihat Batch 322).
+
+## Batch 322 — Fix blur lintas-window Liquid Glass (root cause Batch 311 diriset ulang), 3 file kode
+User konfirmasi eksplisit: "Fix blur lintas-window (sentuh MainActivity.kt, protected)".
+
+**Riset ulang.** Klaim Batch 311 ("RenderNode Haze tidak bisa sample lintas-window sama sekali")
+diverifikasi ke dokumentasi resmi `chrisbanes/haze` (sample `BottomSheet.kt`/`DialogSample.kt`
+upstream) — TIDAK akurat. Sample resmi membuktikan `hazeEffect` di dalam `ModalBottomSheet`/`Dialog`
+sungguhan BISA sample dari `hazeSource` di window Activity berbeda, asal `containerColor =
+Color.Transparent` dipasang & `hazeState` yang sama dipakai kedua sisi.
+
+**`MainActivity.kt` diperiksa, TIDAK diubah.** Wiring `hazeSource`/`CompositionLocalProvider` di
+file ini dicek baris-per-baris terhadap pola resmi — sudah sesuai, 0 bug ditemukan. Termasuk
+verifikasi eksplisit bahwa sheet "Kontrol Lanjutan" (dilaporkan Batch 311) ada di dalam scope
+provider `LocalHazeState`, bukan di luar seperti sempat dicurigai.
+
+**Bug nyata: 7 dari 17 `ModalBottomSheet(` call site tidak pernah pasang `containerColor =
+Color.Transparent`** (syarat wajib pola resmi Haze) — termasuk `BackupRestoreSheet.kt`,
+`DiagnosticLogSheet.kt`, `DuplicateFinderSheet.kt`, `SignatureMatcherSheet.kt`,
+`SmartPlaylistScreen.kt`, `UpdateCheckSheet.kt`, `VaultSheet.kt`. Sheet "Kontrol Lanjutan" sendiri
+ternyata SUDAH benar sejak awal — gap ini bug nyata & terpisah, bukan penyebab tunggal laporan asli.
+3 diperbaiki batch ini (batas Micro-Batch): `BackupRestoreSheet.kt`, `DiagnosticLogSheet.kt`,
+`DuplicateFinderSheet.kt` (`+containerColor = Color.Transparent` + import `Color`). 4 sisanya
+diantre untuk batch berikutnya (pola identik, tidak perlu konfirmasi ulang).
+
+**Tint (`liquidGlassAlpha`, `BlurUtils.kt`) sengaja TIDAK diturunkan** — tetap di 0.85f/0.90f
+(fallback aman Batch 311) sampai user konfirmasi visual device bahwa blur sungguhan sudah tampil
+benar di sheet yang sudah diperbaiki. Menurunkan sebelum konfirmasi berisiko regresi ke bug
+"ghost text tembus" asli kalau fix ini ternyata belum menuntaskan seluruh gejala.
+
 ## Batch 321 — Arsip `PROJECT_STATE.md`: pindahkan Batch 58–219 ke `PROJECT_STATE_ARCHIVE.md`, 0 kode diubah
 Kandidat yang dicatat (BUKAN dieksekusi) di Batch 320: `PROJECT_STATE.md` sudah menyimpan 262
 batch aktif (58→320), jauh melebihi target "~100 batch terbaru" sejak Batch 158. User memilih

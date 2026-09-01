@@ -36,6 +36,149 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 326 (Aurora rim-glow statis → animated via `LocalAuroraPhase`, 3 file kode)** — User:
+"next: Aurora statis -> bergerak!!". Ini KANDIDAT yang sudah dicatat eksplisit sejak komentar
+Batch 310 (`frostedGlass()`, BlurUtils.kt): "SENGAJA statis ... kandidat animasi kalau user minta
+lanjut nanti setelah statis ini terverifikasi visual dulu" — precondition itu TERPENUHI (blur+rim
+statis dikonfirmasi user Batch 325).
+
+Kekhawatiran performa asli Batch 310 (12+ call site `frostedGlass()` × `rememberInfiniteTransition`
+independen = biaya baru belum diverifikasi) DITANGANI via arsitektur, bukan diabaikan: 1 phase
+float dihitung SEKALI di `AppNavHost` (`MainActivity.kt`, pola identik `hazeState`/`LocalHazeState`
+Batch 295) via `rememberInfiniteTransition`, dibagi ke semua panel lewat `LocalAuroraPhase`
+(`Theme.kt`, CompositionLocal baru) — 0 transition tambahan per panel, tetap 1 total (terpisah
+dari transition internal `auroraGlow()`'s ambient wash di root Surface — itu TIDAK disentuh batch
+ini, 0 risiko ke situ/`TactileDepth.kt`). Resep durasi/easing/RepeatMode (20 detik/arah,
+LinearEasing, Reverse) disalin persis dari `auroraGlow()`, bukan angka baru. Mekanisme warna:
+`lerp()` antar-hue identik `auroraGlow()`, stop ke-4 di-lerp balik ke `AuroraGreen` (bukan diam di
+Magenta) supaya rim terasa mengalir memutar penuh.
+
+**3 file**: `Theme.kt` (+`LocalAuroraPhase`), `MainActivity.kt` (**Protected, edit parsial** —
++phase computation di `AppNavHost` dekat `hazeState`, +provide di `CompositionLocalProvider` yang
+sudah ada; root Surface's `auroraGlow()` call site BARIS 400-an TIDAK disentuh), `BlurUtils.kt`
+(Aurora branch `frostedGlass()` baca `LocalAuroraPhase.current`, ganti brush statis → animated).
+Brace/paren dicek seimbang ketiganya (Theme.kt 15/15 `{}` 206/206 `()`; MainActivity.kt 256/256
+`{}` 632/632 `()`; BlurUtils.kt 10/10 `{}` 148/148 `()`).
+
+**Ringkasan file** — 3 file kode (pas batas Micro-Batch). `FILE_MANIFEST.txt` tidak berubah
+(188/188). Docs disinkronkan: README.md (banner + bullet fitur Aurora, "Fase 6/N selesai"),
+CHANGELOG.md.
+
+**Batch 325 (Turunkan `liquidGlassAlpha` balik ke nilai tuning device terakhir yang sah, 1 file
+kode)** — User dikonfirmasi lewat `ask_user_input_v0`: "Sudah dicoba, blur OK — lanjut turunkan
+tint alpha" (verifikasi visual device sub-langkah 5/5 `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §5,
+setelah ke-7 gap `containerColor` tuntas Batch 322-324). `liquidGlassAlpha` (`BlurUtils.kt`)
+diturunkan 0.85f/0.90f (fallback aman darurat Batch 311) → **0.38f/0.48f** — BUKAN angka baru,
+reuse murni nilai tuning Batch 299 yang sudah pernah lolos 1 putaran device dulu, sebelum
+dinaikkan darurat karena bug tak-terkait (blur 0% cross-window, akar masalahnya `containerColor`,
+bukan tint). `blurRadius` (32dp) & gap dark/light (0.10) TIDAK disentuh (bukan lever yang
+relevan). Brace/paren dicek seimbang (9/9 `{}`, 136/136 `()`).
+
+**⏳ PERFORMA (GPU/lag saat MiniPlayerBar re-render) BELUM eksplisit dikonfirmasi user** — satu-
+satunya item terbuka tersisa di seluruh `ROADMAP_LIQUID_GLASS_REDESIGN.md`/
+`LIQUID_GLASS_BLUR_ENGINE_DESIGN.md`. Jangan diasumsikan lolos cuma karena visual sudah OK.
+
+**Ringkasan file** — 1 file kode (di bawah batas Micro-Batch). `FILE_MANIFEST.txt` tidak berubah
+(188/188).
+
+**Batch 324 (Tuntaskan antrean Batch 322/323: fix `containerColor` di `VaultSheet.kt`, 1 file
+kode)** — User: "next", melanjutkan antrean eksplisit Batch 323 ("BOLEH dikerjakan tanpa tanya
+ulang — pola identik, bukan keputusan arsitektur baru"). Fix identik diterapkan ke
+`VaultSheet.kt`: `+containerColor = Color.Transparent` pada `ModalBottomSheet` + import
+`androidx.compose.ui.graphics.Color` (belum ada sebelumnya). Brace/paren dicek seimbang
+(101/101 `{}`, 210/210 `()`).
+
+**Ke-7 gap `containerColor` yang ditemukan grep Batch 322 TUNTAS semua** — diverifikasi ulang
+app-wide pakai grep multi-baris (single-line grep sempat salah nunjuk 13/17 karena beberapa
+call site nulis parameter di baris lanjutan): **17/17 call site `ModalBottomSheet` app-wide
+sudah konsisten pasang `containerColor = Color.Transparent`**.
+
+**`liquidGlassAlpha` masih SENGAJA tidak disentuh** (sama alasan Batch 322/323 — tunggu
+verifikasi visual device dulu, lihat PROJECT_STATE.md Batch 322 utk rasionalisasi penuh).
+
+**Ringkasan file** — 1 file kode (di bawah batas Micro-Batch). `FILE_MANIFEST.txt` tidak berubah
+(188/188).
+
+**Batch 323 (Lanjutan antrean Batch 322: fix `containerColor` 3 dari 4 sheet tersisa, 3 file
+kode)** — User: "next", melanjutkan antrean eksplisit Batch 322 ("BOLEH dikerjakan tanpa tanya
+ulang — pola identik, bukan keputusan arsitektur baru"). Fix identik Batch 322 (`+containerColor
+= Color.Transparent`) diterapkan ke:
+- `SignatureMatcherSheet.kt` — + import `Color` (belum ada sebelumnya).
+- `SmartPlaylistScreen.kt` — `Color` sudah diimpor, cuma tambah parameter.
+- `UpdateCheckSheet.kt` — `Color` sudah diimpor, cuma tambah parameter.
+Brace/paren dicek seimbang ketiganya (52/52+126/126, 104/104+259/259, 25/25+74/74).
+
+**Antrean tersisa (1 file, sama alasan boleh lanjut tanpa tanya)**: `VaultSheet.kt` — fix 1-baris
+identik + import `Color` (belum ada). Setelah ini, ke-7 gap `containerColor` yang ditemukan grep
+Batch 322 akan TUNTAS semua (17/17 call site `ModalBottomSheet` app-wide konsisten).
+
+**`liquidGlassAlpha` masih SENGAJA tidak disentuh** (sama alasan Batch 322 — tunggu verifikasi
+visual device dulu, lihat PROJECT_STATE.md Batch 322 utk rasionalisasi penuh).
+
+**Ringkasan file** — 3 file kode (batas Micro-Batch). `FILE_MANIFEST.txt` tidak berubah (188/188).
+
+**Batch 322 (Fix blur lintas-window Liquid Glass — investigasi ulang root cause Batch 311,
+3 file kode + `MainActivity.kt` DIPERIKSA tapi TIDAK diubah, dikonfirmasi eksplisit user)** —
+User pilih lewat `ask_user_input_v0`: "Fix blur lintas-window (sentuh MainActivity.kt, protected)".
+
+**Riset ulang root cause (WAJIB sebelum sentuh protected file)** — Batch 311 mengklaim "capture
+`RenderNode` Haze tidak bisa sample lintas-window sama sekali" sebagai akar masalah. Diverifikasi
+ulang batch ini lewat dokumentasi RESMI `chrisbanes/haze` (sample `BottomSheet.kt` & `DialogSample.kt`
+upstream, di-fetch langsung dari GitHub) — klaim itu TIDAK akurat: sample resmi library ini
+MEMBUKTIKAN `hazeEffect` di dalam `ModalBottomSheet`/`Dialog` sungguhan (window Android terpisah)
+BISA sample dari `hazeSource` yang berada di window Activity yang berbeda, asalkan
+`containerColor = Color.Transparent` (ModalBottomSheet) dipasang & `hazeState` yang sama dipakai
+di kedua sisi. Batch 311 benar soal GEJALA (blur 0% kelihatan di screenshot "Kontrol Lanjutan"),
+tapi teori PENYEBAB-nya keliru — sekadar tebakan dari 1 screenshot, bukan bukti Android/Compose
+langsung.
+
+**Audit `MainActivity.kt` (protected, diperiksa detail baris-per-baris)** — dibandingkan struktur
+wiring `hazeState`/`hazeSource`/`CompositionLocalProvider(LocalHazeState)` di file ini terhadap
+pola resmi Haze di atas: SESUAI. `hazeSource` benar terpasang di `Box` pembungkus `NavHost` (baris
+~1069-1082, Batch 296), `CompositionLocalProvider(LocalHazeState provides hazeState)` membungkus
+seluruh `Scaffold` termasuk `NavHost` (baris 867-1228, Batch 295) — dicek eksplisit bahwa KEDUA
+titik pemanggilan `nowPlayingContent { ... }` (baris 1205 & 1223, termasuk sheet "Kontrol Lanjutan"
+yang dilaporkan Batch 311) ADA di dalam scope provider ini, bukan di luar seperti sempat dicurigai.
+**Kesimpulan: 0 bug ditemukan di `MainActivity.kt` — TIDAK diubah batch ini.** Mengubah file
+protected ini tanpa bug yang terverifikasi akan melanggar ZERO-REFACTOR & berisiko ke 12+ call
+site `frostedGlass()` lain yang sudah benar (MiniPlayerBar, card Home/Library) — bukan menjalankan
+otorisasi user secara serampangan.
+
+**Bug nyata yang ditemukan & diperbaiki (3 file, batas Micro-Batch)** — grep ULANG seluruh 17 call
+site `ModalBottomSheet(` app ini: 7 file TIDAK pernah pasang `containerColor = Color.Transparent`
+(syarat WAJIB di sample resmi Haze), berbeda dari 10 file lain yang sudah benar sejak awal.
+Sheet "Kontrol Lanjutan" (`NowPlayingScreen.kt`, sheet yang dilaporkan Batch 311) TERNYATA SUDAH
+benar (`containerColor` sudah Transparent sejak dibuat) — jadi gap ini BUKAN penyebab tunggal bug
+yang dilaporkan, tapi tetap bug nyata & terpisah yang wajib diperbaiki di 7 file lain. Micro-Batch
+membatasi 3 file kode/batch (pola sama Batch 315/316 memecah antrean `verticalScroll` 5-file jadi
+2 batch) — 3 diperbaiki batch ini:
+- `BackupRestoreSheet.kt` — `+containerColor = Color.Transparent` + import `Color`.
+- `DiagnosticLogSheet.kt` — sama.
+- `DuplicateFinderSheet.kt` — sama.
+Brace/paren dicek seimbang ketiganya (33/33+101/101, 16/16+69/69, 56/56+104/104).
+
+**Antrean Batch berikutnya (sama, BOLEH dikerjakan tanpa tanya ulang — pola identik, bukan
+keputusan arsitektur baru)**: `SignatureMatcherSheet.kt`, `SmartPlaylistScreen.kt`,
+`UpdateCheckSheet.kt`, `VaultSheet.kt` — fix 1-baris identik (`+containerColor = Color.Transparent`
++ import `Color` kalau belum ada).
+
+**`liquidGlassAlpha` (`BlurUtils.kt`) SENGAJA TIDAK disentuh** — tetap 0.85f/0.90f (fallback aman
+Batch 311). Menurunkan balik ke 0.38f/0.48f sebelum user verifikasi visual device akan berisiko:
+kalau fix `containerColor` ini TERNYATA tidak menuntaskan seluruh gejala (mis. ada faktor lain yang
+tidak kelihatan dari static analysis — device sungguhan adalah bukti akhir, bukan grep), app akan
+regresi balik ke bug asli "ghost text tembus". Tint hanya boleh diturunkan lagi SETELAH user
+konfirmasi blur sungguhan sudah tampil benar di device pada sheet yang sudah diperbaiki.
+
+**Verifikasi visual device (WAJIB, tidak bisa disimulasikan di sandbox ini)** — minta user cek 3
+sheet ini (Backup/Restore, Diagnostic Log, Duplicate Finder) di identitas Liquid Glass: kalau blur
+SUDAH kelihatan → fix ini terbukti benar, lanjut ke 4 sheet antrean + evaluasi turunkan tint lagi.
+Kalau MASIH 0% blur di 3 sheet ini padahal `containerColor` sudah benar → bukti kuat penyebabnya
+lebih dalam dari sekadar parameter ini (mis. perbedaan tier RenderNode vs RuntimeShader API 33+
+yang disebut `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md` §2 — TIDAK bisa dipastikan tanpa device, sengaja
+tidak ditebak lebih jauh batch ini).
+
+**Ringkasan file** — 3 file kode (batas Micro-Batch). `FILE_MANIFEST.txt` tidak berubah (188/188).
+
 **Batch 321 (Arsip `PROJECT_STATE.md`: pindahkan Batch 58–219 ke `PROJECT_STATE_ARCHIVE.md`, sesuai
 kebijakan ~100 batch aktif Batch 158 — dikonfirmasi eksplisit user sesi ini, 0 kode, 2 dokumentasi)** —
 Kandidat yang dicatat (BUKAN dieksekusi) di Batch 320: file ini sudah menyimpan 262 batch aktif

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -67,7 +68,20 @@ fun BackupRestoreSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    // Batch 321 — fix blur lintas-window (root cause dikonfirmasi ulang via dokumentasi resmi
+    // Haze: sample BottomSheet.kt/DialogSample.kt upstream MEMANG mendukung hazeEffect di dalam
+    // ModalBottomSheet/Dialog yang sumbernya (`hazeSource`) berada di window Activity berbeda —
+    // klaim Batch 311 "RenderNode tidak bisa sample lintas-window sama sekali" TIDAK akurat,
+    // lihat catatan lengkap di PROJECT_STATE.md Batch 321). Syarat WAJIB dari sample resmi:
+    // `containerColor = Color.Transparent` di ModalBottomSheet — sheet ini 1 dari 7 di seluruh
+    // app yang kelewat sejak ditambahkan (17 total call site ModalBottomSheet, grep dikonfirmasi
+    // ulang batch ini), beda dari `frostedGlass()`-nya sendiri yang sudah benar sejak awal.
+    // Tanpa ini, containerColor DEFAULT Material3 (opak) berpotensi menimpa hazeEffect di
+    // dalamnya tepat di tepi/sudut sheet. TIDAK menaikkan/menurunkan `liquidGlassAlpha` di
+    // `BlurUtils.kt` batch ini — tetap di 0.85f/0.90f (fallback aman Batch 311) sampai user
+    // verifikasi visual device bahwa blur benar-benar tampil sekarang, BUKAN diturunkan
+    // spekulatif sebelum ada konfirmasi (lihat rasionalisasi penuh di PROJECT_STATE.md).
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         // Batch 316 — lanjutan audit Batch 314/315: prioritas 5 (terakhir) dari 5 sheet yang kena
         // pola sama (Column fixed tanpa verticalScroll/LazyColumn jaring pengaman). Konten pendek
         // & risiko rendah (judul, deskripsi, 2 tombol, banner hasil opsional), tapi tetap
