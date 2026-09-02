@@ -637,11 +637,24 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val toAdd = pool.shuffled().take(20)
         if (toAdd.isEmpty()) return
 
+        // Bug fix (laporan user, radio+shuffle mati total pas antrean benar-benar mentok) —
+        // sebelumnya pakai `c.seekToNextMediaItem()` tepat setelah `c.addMediaItems()`.
+        // MediaController men-cache lokal ("mask") hasil command supaya panggilan berantai
+        // berikutnya terasa sinkron, TAPI resolusi "next" itu bergantung ShuffleOrder yang baru
+        // saja disisipi — saat shuffle aktif & antrean lama sudah benar-benar habis (posisi
+        // sekarang = paling akhir di urutan shuffle lama), item baru bisa ke-mask jatuh SEBELUM
+        // posisi sekarang di urutan shuffle yang baru, jadi `seekToNextMediaItem()` diam-diam
+        // no-op: lagu baru KELIHATAN masuk ke antrean UI (state di-update di bawah) tapi player
+        // tidak pernah lanjut — kedengaran "radio/shuffle mati total". Fix: lompat LANGSUNG ke
+        // index linear pasti dari lagu baru pertama (`c.mediaItemCount` SEBELUM add == posisi
+        // sisip, selalu benar terlepas urutan shuffle) via `seekTo(index, 0)`, tidak lagi
+        // bergantung resolusi "next" ExoPlayer sama sekali.
+        val insertionIndex = c.mediaItemCount
         c.addMediaItems(toAdd.map { mediaItemFor(it) })
         currentQueue = currentQueue + toAdd
         currentQueueSlotIds = currentQueueSlotIds + newSlotIds(toAdd.size)
         _uiState.value = _uiState.value.copy(queue = currentQueue, queueSlotIds = currentQueueSlotIds)
-        c.seekToNextMediaItem()
+        c.seekTo(insertionIndex, 0)
         c.play()
     }
 

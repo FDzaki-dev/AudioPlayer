@@ -8,8 +8,14 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 327 (Naikkan alpha rim-glow Aurora, token baru
-> `AuroraRimGlowAlpha` 0.44f, 2 file):** User: "terlalu tipis, hampir tak kasat mata" — floor
+> 🆕 **Update terbaru — Batch 328 (Fix Radio Auto-Continue + Shuffle mati total saat antrean
+> benar-benar mentok, 1 file):** User: "Mode radio, shuffle gak berfungsi sama sekali saat
+> daftar playlist musik user benar-benar habis/mentok!!" — root cause: seek ke lagu baru
+> lewat `seekToNextMediaItem()` bergantung resolusi ShuffleOrder yang bisa ke-mask salah pas
+> shuffle aktif & antrean lama sudah mentok; sekarang lompat pasti via index (`seekTo`), tidak
+> lagi bergantung urutan shuffle sama sekali.
+> Batch 327 (Naikkan alpha rim-glow Aurora, token baru
+> `AuroraRimGlowAlpha` 0.44f, 2 file): User: "terlalu tipis, hampir tak kasat mata" — floor
 > stop ke-4 naik ~70% (alpha efektif 0.119→0.202), ambient wash `auroraGlow()` tidak disentuh.
 > Batch 326 (Aurora rim-glow statis → animated, 3 file): Fase 6/N Aurora
 > selesai — rim-glow 12+ panel sekarang bergerak lewat `LocalAuroraPhase` (1 phase dibagi

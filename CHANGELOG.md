@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 328 — Fix Radio Auto-Continue + Shuffle mati total saat antrean benar-benar mentok, 1 file kode
+User laporkan: "Mode radio, shuffle gak berfungsi sama sekali saat daftar playlist musik user
+benar-benar habis/mentok!!"
+
+Root cause: `continuePlaybackIfQueueEnded()` (`PlayerViewModel.kt`) sebelumnya memanggil
+`c.seekToNextMediaItem()` langsung setelah `c.addMediaItems()`. `MediaController` men-cache
+lokal ("mask") hasil command supaya panggilan berantai terasa sinkron, tapi resolusi "next" itu
+bergantung `ShuffleOrder` yang baru saja disisipi — saat shuffle aktif & antrean benar-benar
+habis (posisi sekarang = paling akhir di urutan shuffle lama), lagu baru bisa ke-mask jatuh
+SEBELUM posisi sekarang di urutan shuffle baru, jadi `seekToNextMediaItem()` diam-diam no-op:
+antrean di UI kelihatan bertambah (state sudah di-update) tapi player tidak pernah lanjut —
+persis gejala "mati total" yang dilaporkan.
+
+Fix: index linear pasti dari lagu baru pertama ditangkap SEBELUM `addMediaItems()`
+(`c.mediaItemCount`, selalu sama dengan posisi sisip, terlepas urutan shuffle), lalu lompat
+langsung via `c.seekTo(insertionIndex, 0)` — tidak lagi bergantung resolusi "next" ExoPlayer/
+shuffle sama sekali. Berlaku sama baik shuffle aktif maupun tidak (fix umum, bukan cabang
+kondisional per mode). Brace/paren dicek seimbang (221/221 `{}`, 795/795 `()`).
+
 ## Batch 327 — Naikkan alpha rim-glow Aurora — token baru `AuroraRimGlowAlpha`, 2 file kode
 User (device sungguhan): "terlalu tipis, hampir tak kasat mata" — dikonfirmasi lewat
 `ask_user_input_v0` scope-nya rim-glow per-panel Batch 326, bukan ambient wash `auroraGlow()`

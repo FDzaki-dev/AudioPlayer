@@ -36,6 +36,29 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 328 (Fix Radio Auto-Continue + Shuffle mati total saat antrean benar-benar mentok, 1
+file kode)** — User laporkan: "Mode radio, shuffle gak berfungsi sama sekali saat daftar
+playlist musik user benar-benar habis/mentok!!"
+
+**Root cause** — `continuePlaybackIfQueueEnded()` (`PlayerViewModel.kt`) sebelumnya panggil
+`c.seekToNextMediaItem()` tepat setelah `c.addMediaItems()`. `MediaController` men-cache lokal
+("mask") hasil command supaya panggilan berantai berikutnya terasa sinkron, TAPI resolusi
+"next" itu bergantung `ShuffleOrder` yang baru saja disisipi — saat shuffle aktif & antrean
+lama sudah BENAR-BENAR habis (posisi sekarang = paling akhir di urutan shuffle lama), lagu
+baru bisa ke-mask jatuh SEBELUM posisi sekarang di urutan shuffle yang baru, jadi
+`seekToNextMediaItem()` diam-diam no-op: antrean di UI kelihatan bertambah (state sudah
+di-update duluan) tapi player tidak pernah lanjut — persis gejala "mati total" yang dilaporkan.
+
+**Fix** — index linear pasti dari lagu baru pertama ditangkap SEBELUM `addMediaItems()`
+(`c.mediaItemCount`, selalu = posisi sisip, terlepas urutan shuffle), lalu lompat langsung via
+`c.seekTo(insertionIndex, 0)` — tidak lagi bergantung resolusi "next" ExoPlayer/shuffle sama
+sekali. Fix bersifat umum (bukan cabang kondisional per mode), berlaku sama baik shuffle aktif
+maupun tidak. Brace/paren dicek seimbang (221/221 `{}`, 795/795 `()`).
+
+**Ringkasan file** — 1 file kode (di bawah batas Micro-Batch). `FILE_MANIFEST.txt` tidak
+berubah (188/188 — diverifikasi ulang `find . -type f | wc -l`). Docs disinkronkan: README.md
+(banner "Update terbaru"), CHANGELOG.md.
+
 **Batch 327 (Naikkan alpha rim-glow Aurora — token baru `AuroraRimGlowAlpha`, 2 file kode)** —
 User dikonfirmasi lewat `ask_user_input_v0`: keluhan "terlalu tipis, hampir tak kasat mata"
 scope-nya rim-glow per-panel Batch 326, BUKAN ambient wash `auroraGlow()` (0 dikeluhkan, TIDAK
