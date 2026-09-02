@@ -8,8 +8,13 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 328 (Fix Radio Auto-Continue + Shuffle mati total saat antrean
-> benar-benar mentok, 1 file):** User: "Mode radio, shuffle gak berfungsi sama sekali saat
+> 🆕 **Update terbaru — Batch 329 (Redesign placeholder "no cover" AlbumArt, 1 file):** User:
+> "Redesign icon placeholder album musik yang kosong jadi lebih menarik!!" — latar flat 1 warna
+> jadi radial-gradient tint lembut ke `primary`, ikon note polos jadi `Icons.Rounded` di dalam
+> badge lingkaran ber-tint — berlaku app-wide (Home/Library/MiniPlayerBar/Now Playing) lewat 1
+> titik render, otomatis ikut semua tema × light/dark (0 literal warna baru).
+> Batch 328 (Fix Radio Auto-Continue + Shuffle mati total saat antrean
+> benar-benar mentok, 1 file): User: "Mode radio, shuffle gak berfungsi sama sekali saat
 > daftar playlist musik user benar-benar habis/mentok!!" — root cause: seek ke lagu baru
 > lewat `seekToNextMediaItem()` bergantung resolusi ShuffleOrder yang bisa ke-mask salah pas
 > shuffle aktif & antrean lama sudah mentok; sekarang lompat pasti via index (`seekTo`), tidak

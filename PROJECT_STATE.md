@@ -36,6 +36,26 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 329 (Redesign placeholder "no cover" AlbumArt jadi lebih menarik, 1 file kode)** —
+User: "Redesign icon placeholder album musik yang kosong jadi lebih menarik!!"
+
+`AlbumArt()`/`AlbumArtFallbackIcon()` (`Utils.kt`) — 1 titik render dipakai app-wide (8 call
+site: Home, Library ×2, MiniPlayerBar, Now Playing ×2 termasuk backdrop `showIcon=false`), jadi
+cukup 1 file untuk mengubah tampilan "no cover" di mana pun sekaligus. Latar flat 1 warna →
+`Brush.radialGradient` lembut (tint `primary` 12% di tengah, meluruh ke `surfaceVariant` polos
+di tepi — efek spotlight halus). Ikon `MusicNote` filled 50%-alpha polos → `Icons.Rounded.
+MusicNote` di dalam badge lingkaran ber-tint `primary` (14% latar, 85% alpha ikon).
+
+Keduanya murni token `MaterialTheme.colorScheme` (0 literal warna Aurora/Tactile/Skeu baru) —
+otomatis ikut tiap tema × light/dark persis seperti fill flat lama, 0 percabangan per-tema.
+`radialGradient` dipanggil tanpa center/radius eksplisit → otomatis ikut ukuran box asli, 1 code
+path sama dari thumbnail 44dp (MiniPlayerBar) sampai hero 280dp (Now Playing). Signature publik
+`AlbumArt()` tidak berubah — 0 file caller disentuh. Brace/paren dicek seimbang (19/19 `{}`,
+77/77 `()`).
+
+**Ringkasan file** — 1 file kode (di bawah batas Micro-Batch). `FILE_MANIFEST.txt` tidak
+berubah (188/188). Docs disinkronkan: README.md (banner "Update terbaru"), CHANGELOG.md.
+
 **Batch 328 (Fix Radio Auto-Continue + Shuffle mati total saat antrean benar-benar mentok, 1
 file kode)** — User laporkan: "Mode radio, shuffle gak berfungsi sama sekali saat daftar
 playlist musik user benar-benar habis/mentok!!"

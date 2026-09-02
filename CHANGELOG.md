@@ -1,5 +1,25 @@
 # Changelog
 
+## Batch 329 — Redesign placeholder "no cover" AlbumArt jadi lebih menarik, 1 file kode
+User: "Redesign icon placeholder album musik yang kosong jadi lebih menarik!!"
+
+`AlbumArt()`/`AlbumArtFallbackIcon()` (`Utils.kt`) — satu-satunya tempat "no cover" dirender,
+dipakai app-wide (Home/Library/MiniPlayerBar/Now Playing) lewat 8 call site, jadi 1 file ini
+cukup untuk mengubah tampilannya di mana pun. Latar flat 1 warna (`surfaceVariant` polos) diganti
+`Brush.radialGradient` lembut yang men-tint sedikit ke `primary` (12%) di tengah lalu meluruh
+balik ke `surfaceVariant` di tepi — efek "spotlight" halus, bukan lagi ubin abu mati. Ikon
+`Icons.Default.MusicNote` 50%-alpha polos diganti `Icons.Rounded.MusicNote` di dalam badge
+lingkaran ber-tint `primary` (14% latar badge, 85% alpha ikon) — lebih berwarna & terasa
+"didesain" alih-alih simbol pudar mengambang sendirian.
+
+Keduanya murni dibangun dari `MaterialTheme.colorScheme` (0 literal warna Aurora/Tactile/Skeu
+baru) — otomatis menyesuaikan tiap kombinasi tema × light/dark persis seperti fill flat lama,
+0 percabangan per-tema ditambahkan. `Brush.radialGradient` dipanggil tanpa center/radius eksplisit
+supaya otomatis mengikuti ukuran box sungguhan — 1 code path yang sama berlaku dari thumbnail
+44dp (MiniPlayerBar) sampai hero 280dp (Now Playing). Signature publik `AlbumArt()` tidak
+berubah sama sekali, jadi 0 file caller perlu disentuh. Brace/paren dicek seimbang (19/19 `{}`,
+77/77 `()`).
+
 ## Batch 328 — Fix Radio Auto-Continue + Shuffle mati total saat antrean benar-benar mentok, 1 file kode
 User laporkan: "Mode radio, shuffle gak berfungsi sama sekali saat daftar playlist musik user
 benar-benar habis/mentok!!"
