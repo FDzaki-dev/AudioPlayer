@@ -8,7 +8,17 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 328 (REVERT animasi rim-glow Aurora, 3 file):** User laporan device
+> 🆕 **Update terbaru — Batch 329 (Matikan blur asli Liquid Glass PERMANEN app-wide, 2 file):**
+> User pilih opsi paling aman dari 2 opsi yang ditawarkan, setelah root cause stutter/lag Batch
+> 328 ditelusuri lebih dalam: blur asli (`hazeEffect`) genuinely aktif di 17/17 `ModalBottomSheet`
+> sejak Batch 324 + `MiniPlayerBar` yang SELALU tervisible selama musik main adalah persis biaya
+> GPU resample-per-frame yang sudah diperingatkan sejak param `blurRadius` pertama ditambah.
+> `hazeEffect` (`BlurUtils.kt`) dihapus dari cabang Liquid Glass; `hazeSource` (`MainActivity.kt`,
+> Protected/edit parsial) juga dilepas — 0 consumer tersisa berarti 0 alasan tetap membayar
+> capture backdrop tiap frame. Tint (`liquidGlassAlpha`) balik ke fallback opaque 0.85f/0.90f —
+> nilai yang sama persis sudah pernah tervalidasi Batch 311-324, kini jadi status permanen.
+> Identitas Liquid Glass sekarang tint+edge-glow saja seperti 4 tema lain, TANPA blur asli.
+> Batch 328 (REVERT animasi rim-glow Aurora, 3 file): User laporan device
 > sungguhan: musik stuttering + lag/glitch swipe sheet "Kontrol Lanjutan". Root cause: berbagi 1
 > `rememberInfiniteTransition` (Batch 326) tetap memicu recomposition tiap frame di semua panel
 > — dikembalikan ke statis. Alpha Batch 327 (`AuroraRimGlowAlpha` 0.44f) TETAP dipertahankan,
@@ -249,16 +259,17 @@ Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diu
 
 ## Rencana v2 (belum dibuat)
 - **Redesign identitas visual terinspirasi CONVX ("Liquid Glass")** — arah baru sejak Batch 278,
-  kini tema ke-5 yang aktif (bukan lagi tahap perencanaan). Sudah punya shape/typography sendiri
-  (fase 1-4), blur asli via Haze (`hazeSource`/`hazeEffect`, fase 5 langkah 1-4, Batch 295-297,
-  diperkuat lagi Batch 298), dan tuning typography khusus (Batch 298). **Satu-satunya yang masih
-  tersisa: langkah 5/5 fase blur — verifikasi visual+performa di device Android sungguhan**, kini
-  di **putaran tuning ke-3** (Batch 300): 2 laporan device masuk sekaligus — card Home/Statistik
-  yang sebelumnya flat sekarang sudah ikut `.frostedGlass()`, dan radius blur diturunkan 32dp →
-  24dp meredam sedikit stutter scroll yang dilaporkan. Tint (`liquidGlassAlpha`, 0.38f/0.48f sejak
-  Batch 299) belum dapat konfirmasi ulang user — masih menunggu apakah 24dp sudah cukup meredakan
-  stutter, dan apakah tint saat ini sudah pas. Lihat `PROJECT_STATE.md` untuk detail yang perlu
-  dicek. Rencana lengkap & histori keputusan di `ROADMAP_LIQUID_GLASS_REDESIGN.md` dan
+  tema ke-5 aktif. Shape/typography sendiri (fase 1-4) final. **Blur asli via Haze
+  (`hazeSource`/`hazeEffect`) DIMATIKAN PERMANEN app-wide sejak Batch 329.** Setelah blur genuinely
+  aktif di 17/17 `ModalBottomSheet` (Batch 324) & dikonfirmasi visual user (Batch 325), device
+  sungguhan justru melaporkan musik stuttering + lag/glitch swipe sheet "Kontrol Lanjutan"; root
+  cause: resample GPU per-frame dari blur asli + `MiniPlayerBar` yang SELALU tervisible selama
+  musik main — persis risiko yang sudah diperingatkan sejak param `blurRadius` pertama ditambah
+  (Batch 296). Sesuai `STABILITY > Speed`, fase 5/5 blur DITUTUP dengan keputusan final: kembali
+  ke tint solid opaque (`liquidGlassAlpha` 0.85f gelap / 0.90f terang — fallback yang sama persis
+  sudah pernah tervalidasi Batch 311-324), bukan blur. Identitas Liquid Glass sekarang murni
+  tint+edge-glow seperti 4 tema lain, TANPA blur asli — final, bukan lagi kandidat tuning
+  lanjutan. Detail: `PROJECT_STATE.md` Batch 329, `ROADMAP_LIQUID_GLASS_REDESIGN.md`,
   `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md`.
 - **Tema ke-6 "Aurora"** — arah baru sejak Batch 306, permintaan user eksplisit "100% ide sendiri,
   tanpa contek gaya desain visual apapun manapun". Mekanisme orisinal: warna gradien ambient yang

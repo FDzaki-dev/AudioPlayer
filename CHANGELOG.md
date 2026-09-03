@@ -1,5 +1,39 @@
 # Changelog
 
+## Batch 329 — Matikan blur asli Liquid Glass PERMANEN app-wide, 2 file kode
+User pilih opsi paling aman dari 2 opsi yang ditawarkan, setelah root cause stutter/lag Batch 328
+ditelusuri lebih dalam: blur asli (`hazeEffect`) baru genuinely aktif di 17/17 `ModalBottomSheet`
+sejak Batch 324 — sheet "Kontrol Lanjutan" + `MiniPlayerBar` (SELALU tervisible & terus resample
+tiap frame selama musik main) adalah persis biaya GPU per-frame yang sudah diperingatkan sejak
+param `blurRadius` pertama ditambah (komentar Batch 298/300).
+
+**Root cause**: berbeda dari Batch 328 (yang cuma revert animasi Aurora di atas glass), batch ini
+mematikan MEKANISME blur asli itu sendiri — `hazeEffect` (Haze) resample backdrop tiap frame saat
+konten di belakang kaca berubah, dan `MiniPlayerBar` yang selalu tervisible selama playback
+bersaing langsung dengan thread audio/UI.
+
+**Keputusan (sesuai `STABILITY > Speed`)**: `hazeEffect` dihapus dari cabang Liquid Glass
+(`BlurUtils.kt`) — `glassBase` sekarang selalu `this` (identik ke-4 identitas lain, 0 blur asli).
+`hazeSource` (`MainActivity.kt`) juga dilepas — 0 consumer tersisa berarti capture backdrop tiap
+frame cuma buang biaya GPU tanpa manfaat visual apa pun kalau dibiarkan terpasang. Tint
+(`liquidGlassAlpha`) dinaikkan balik ke fallback opaque 0.85f (gelap) / 0.90f (terang) — BUKAN
+angka baru, reuse persis fallback "0 blur terlihat, tint sendiri wajib jaga keterbacaan" yang
+sudah pernah tervalidasi Batch 311-324, kini jadi status permanen (bukan darurat sementara).
+`hazeState`/`LocalHazeState`/`CompositionLocalProvider` (Theme.kt, MainActivity.kt) SENGAJA TIDAK
+dibongkar — direuse persis state Batch 295 (murni plumbing, 0 consumer, 0 perubahan visual),
+menghindari risiko membongkar `CompositionLocalProvider` yang membungkus ratusan baris Scaffold.
+Parameter `blurRadius` (fungsi `frostedGlass()`) balik ke status "kept for source compatibility,
+unused" persis pra-Batch-296 — signature publik tidak diubah.
+
+2 file: `BlurUtils.kt` (hapus import+call `hazeEffect`, `glassBase` selalu `this`,
+`liquidGlassAlpha` 0.38f/0.48f → 0.85f/0.90f), `MainActivity.kt` (Protected/edit parsial — hapus
+`.then(...)`/`Modifier.hazeSource(state = hazeState)` di Box NavHost, hapus import `hazeSource`
+tak terpakai). Brace/paren dicek seimbang keduanya (BlurUtils.kt 5/5 `{}` 159/159 `()`;
+MainActivity.kt 256/256 `{}` 620/620 `()`).
+
+**Ringkasan file** — 2 file kode (di bawah batas Micro-Batch). `FILE_MANIFEST.txt` tidak berubah
+(188/188). Docs disinkronkan: README.md (banner + § "Rencana v2" Liquid Glass), PROJECT_STATE.md.
+
 ## Batch 328 — REVERT Aurora rim-glow animation, regresi performa dikonfirmasi user, 3 file kode
 User: "lakukan perbaikan akhir sebelum masuk fase discontinued" → scope dikonfirmasi: "musik
 stuttering/mandek saat diputar, lagging & nge glitch saat swipe kontrol lanjutan".

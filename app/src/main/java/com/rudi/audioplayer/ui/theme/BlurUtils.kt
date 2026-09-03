@@ -9,7 +9,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.chrisbanes.haze.hazeEffect
 
 /**
  * Readable glass surface for Compose.
@@ -142,7 +141,16 @@ fun Modifier.frostedGlass(
     // yang sudah pernah lolos 1 putaran tuning device dulu, kini blocker-nya sudah tuntas.
     // `blurRadius` (32dp, Batch 298) & gap dark/light (0.10) TETAP tidak disentuh, sama alasan
     // seperti sebelumnya (lever yang relevan cuma tint, bukan radius/kontras).
-    val liquidGlassAlpha = if (isDark) 0.38f else 0.48f
+    // Batch 329 — `hazeEffect` DIMATIKAN PERMANEN app-wide (keputusan user: "matikan blur asli
+    // sepenuhnya, balik ke tint solid" — opsi paling aman, lihat rasionalisasi penuh di
+    // `glassBase` bawah). Nilai 0.38f/0.48f di atas SENGAJA diasumsikan blur asli ADA di
+    // baliknya (persis rasionalisasi Batch 296/299/325 di atas) — sekarang blur itu dimatikan,
+    // tint SENDIRIAN wajib menanggung penuh keterbacaan tanpa backdrop tersaring di belakangnya.
+    // BUKAN angka baru/tebakan: reuse persis fallback "0 blur terlihat, tint sendiri wajib jaga
+    // keterbacaan" yang sudah pernah shipped & valid Batch 311-324 (0.85f gelap / 0.90f terang)
+    // — skenario itu dulu darurat/sementara (bug cross-window blur belum ketemu), sekarang jadi
+    // status permanen dengan kebutuhan visual yang identik: tint tanpa blur di baliknya.
+    val liquidGlassAlpha = if (isDark) 0.85f else 0.90f
     val effectiveAlpha = if (isSkeu) 1f else if (isLiquidGlass) liquidGlassAlpha else alpha
     // Batch 53 — spec §8 "Glass edge / highlight" + §9 "Lighting model" (single simulated light,
     // top-left -> bottom-right): a flat single-color border reads as a printed outline, not
@@ -243,29 +251,32 @@ fun Modifier.frostedGlass(
     // Batch 58 — Skeu's now-stronger bevel border reads better a hair over the glass-theme
     // hairline (1.dp); Tactile/Apple unchanged.
     val edgeWidth = if (isSkeu) 1.5.dp else 1.dp
-    // Batch 296 — Fase 5 langkah 2/5: `hazeEffect` DITAMBAH, bukan menggantikan tint+edge yang
-    // sudah ada (§3b desain: blur based + tint warna tipis + edge highlight, bukan blur polos
-    // tanpa warna — pola sama CONVX/Apple Liquid Glass asli). Urutan modifier PENTING:
-    // `hazeEffect` dipasang PALING LUAR (di `this`, sebelum `.background()`) supaya draw-nya
-    // paling belakang — blur tergambar duluan, baru tint semi-transparan (`effectiveAlpha` yg
-    // sudah diturunkan di atas) menimpa di atasnya, baru border edge-glow di atas itu lagi.
-    // `hazeState` dari `LocalHazeState` (Batch 295's provider di AppNavHost) — 4 identitas lain
-    // 0 disentuh (tidak pernah masuk cabang ini sama sekali, `this` mereka tetap Modifier
-    // polos apa adanya seperti sebelum batch ini).
-    // Bonus kecil: parameter `blurRadius` fungsi ini (baris atas, default 24.dp) sejak dulu
-    // cuma "kept for source compatibility" — 0 dipakai sama sekali krn dulu 0 blur asli sama
-    // sekali. Sekarang AKHIRNYA benar2 dipakai (utk Liquid Glass), makanya ditangkap ke
-    // `requestedBlurRadius` DULU sebelum masuk lambda `hazeEffect{}` — nama beda sengaja,
-    // krn di DALAM lambda itu `blurRadius` polos akan merujuk ke property `HazeEffectScope`
-    // sendiri (name-shadowing lambda-with-receiver Kotlin), bukan parameter fungsi ini; tanpa
-    // capture ke nama lain duluan, `this.blurRadius = blurRadius` di dalam bisa jadi
-    // self-assign yang salah/no-op.
-    val requestedBlurRadius = blurRadius
-    val glassBase = if (isLiquidGlass) {
-        this.hazeEffect(state = LocalHazeState.current) { this.blurRadius = requestedBlurRadius }
-    } else {
-        this
-    }
+    // Batch 329 — `hazeEffect` DIMATIKAN PERMANEN app-wide (keputusan eksplisit user: "matikan
+    // blur asli sepenuhnya, balik ke tint solid" — opsi paling aman dari 2 opsi yang ditawarkan).
+    // Root cause yang mendasari keputusan ini: blur asli baru genuinely aktif di 17/17
+    // ModalBottomSheet sejak Batch 324 (sebelumnya no-op cross-window, root cause Batch 311) —
+    // sheet "Kontrol Lanjutan" + `MiniPlayerBar` (SELALU tervisible & terus resample tiap frame
+    // selama musik main, capture-nya lewat `hazeSource` di window yg sama) adalah persis biaya
+    // GPU per-frame yang sudah diperingatkan sejak param `blurRadius` ini pertama ditambah
+    // (komentar Batch 298/300 di atas: "blur asli Haze resample tiap frame"). Beda dari Batch
+    // 328 (yang cuma revert animasi Aurora) — batch ini mematikan MEKANISME blur asli itu
+    // sendiri, bukan cuma 1 dekorasi di atasnya.
+    // Companion change (`MainActivity.kt`, Protected/edit parsial): `.hazeSource(state =
+    // hazeState)` di Box NavHost DILEPAS juga — kalau cuma `hazeEffect` di sini yang dimatikan
+    // tapi `hazeSource` masih terpasang, capture backdrop tiap frame TETAP jalan tanpa 1
+    // consumer pun, jadi tetap bayar sebagian besar biaya GPU yang justru ingin dihilangkan
+    // batch ini. `hazeState`/`LocalHazeState`/`CompositionLocalProvider` (Theme.kt,
+    // MainActivity.kt) SENGAJA TIDAK dibongkar — dibiarkan reuse persis state Batch 295
+    // ("murni plumbing, 0 consumer, 0 perubahan visual", sebelum Batch 296 menyambungkannya ke
+    // hazeEffect/hazeSource) — precedent yang sudah pernah shipped, jadi 0 risiko baru drpd
+    // membongkar CompositionLocalProvider yang membungkus ratusan baris Scaffold (Batch 295's
+    // komentar sendiri: "badan blok TIDAK di-reindent, minim-diff").
+    // `glassBase` sekarang SELALU `this` (identik ke-4 identitas lain) — tidak ada lagi cabang
+    // isLiquidGlass di sini. Parameter `blurRadius` fungsi ini (default 24.dp) BALIK ke status
+    // "kept for source compatibility, unused" persis pra-Batch-296 — tidak dihapus dari
+    // signature (0 call site di app ini pernah pass eksplisit, grep masih 17/17 tanpa argumen),
+    // supaya tidak mengubah kontrak publik fungsi ini tanpa perlu.
+    val glassBase = this
     val base = glassBase.background(tint.copy(alpha = effectiveAlpha), shape)
     // Batch 79 — NEUMORPHISM: Skeu no longer draws ANY edge/border here at all (was a
     // brushed-metal repeating-stripe rim, Batch 73's isSkeu branch above — deleted along with

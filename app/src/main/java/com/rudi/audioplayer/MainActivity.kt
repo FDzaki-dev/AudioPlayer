@@ -132,7 +132,6 @@ import com.rudi.audioplayer.ui.theme.calmGrain
 import com.rudi.audioplayer.ui.theme.auroraGlow
 import com.rudi.audioplayer.ui.theme.LocalHazeState
 import dev.chrisbanes.haze.rememberHazeState
-import dev.chrisbanes.haze.hazeSource
 
 class MainActivity : FragmentActivity() {
 
@@ -1078,16 +1077,15 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         Box(
             modifier = Modifier
                 .weight(1f)
-                // Fase 5 langkah 2/5 (Batch 296) — hazeSource HANYA saat Liquid Glass aktif
-                // (0 biaya render tambahan utk 4 identitas lain yang tidak pernah consume
-                // capture ini — frostedGlass()'s cabang mereka tidak panggil hazeEffect sama
-                // sekali). `hazeState` = instance yang SAMA dipegang AppNavHost sendiri (Batch
-                // 295), jadi baca langsung variabel lokal, bukan LocalHazeState.current (fungsi
-                // ini justru PROVIDER-nya, bukan consumer).
-                .then(
-                    if (appThemeIdentity == ThemeIdentity.LIQUID_GLASS) Modifier.hazeSource(state = hazeState)
-                    else Modifier
-                )
+                // Batch 329 — `.hazeSource(state = hazeState)` (Batch 296) DILEPAS. Root cause:
+                // user matikan `hazeEffect` permanen app-wide (BlurUtils.kt) krn ini + MiniPlayerBar
+                // yang terus resample tiap frame selama musik main adalah biaya GPU yang sudah
+                // diperingatkan sejak awal. Kalau capture ini dibiarkan terpasang tanpa 1 consumer
+                // pun, tetap bayar sebagian besar biaya capture tsb demi 0 manfaat visual — jadi
+                // dilepas juga, bukan cuma dinonaktifkan di sisi consumer. `hazeState`/
+                // `CompositionLocalProvider(LocalHazeState)` di bawah SENGAJA TIDAK dibongkar —
+                // reuse persis state Batch 295 (murni plumbing, 0 consumer), lihat rasionalisasi
+                // penuh di BlurUtils.kt.
         ) {
         NavHost(
             navController = navController,
