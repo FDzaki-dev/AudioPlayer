@@ -36,6 +36,24 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 334 (BUG FIX — gesture brightness/volume bentrok dengan verticalScroll, 1 file kode)** —
+User laporan+screenshot: swipe kecerahan/volume "bentrokan langsung". Root cause: Column induk
+py `verticalScroll()` (Batch 112) membungkus Box gesture (`detectVerticalDragGestures`, drag
+vertikal) — 2 recognizer sumbu sama bersarang bentrok, `change.consume()` tidak cukup krn
+ancestor `scrollable()` bisa menang arbitrase drag-start duluan.
+
+**Fix struktural**: Column induk (header: tombol atas+hint+Box art/gesture) TIDAK LAGI
+scrollable — dipisah jadi Column baru (`weight(1f).verticalScroll(...)`) yang HANYA bungkus
+konten SETELAH art (judul s/d transport). Pola "fixed header + scrollable body" standar,
+dipilih drpd hack pointer-arbitration level-rendah (lebih riskan tanpa bisa dicompile-test).
+Jaring pengaman Batch 112 (transport row layar pendek) TETAP UTUH, cuma scope diperbaiki. 0
+logic gesture brightness/volume diubah.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). Brace/paren seimbang (223/223, 840/840).
+`FILE_MANIFEST.txt` tidak berubah (188/188). **Belum diverifikasi visual di device** — cek:
+swipe kecerahan/volume mulus, transport row masih reachable via scroll di layar pendek, 0
+scroll-bleed saat swipe piringan, header tetap diam. Detail: `CHANGELOG.md` Batch 334.
+
 **Batch 333 (Pending Queue item 2 — feedback tekan tombol yang belum `bouncyPress`, 1 file)** —
 Audit menyeluruh `IconButton`/`FilledIconButton` (`NowPlayingScreen.kt` 9 titik +
 `MiniPlayerBar.kt` 1 titik): transport row 100% SUDAH `bouncyPress` (dugaan Batch 332 benar).

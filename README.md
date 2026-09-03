@@ -8,7 +8,14 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 333 (Feedback tekan tombol yang belum bouncyPress, 1 file):**
+> 🆕 **Update terbaru — Batch 334 (Bug fix: gesture kecerahan/volume bentrok scroll, 1 file):**
+> Swipe kecerahan/volume di piringan Now Playing sebelumnya tersendat/salah kebaca sebagai
+> scroll layar — root cause: Column induk (jaring pengaman layar pendek, Batch 112) membungkus
+> Box gesture dengan drag vertikal di sumbu yang sama, keduanya berebut touch. Fix: dipisah jadi
+> "fixed header + scrollable body" — area art/gesture tidak lagi ikut ancestor scrollable, jaring
+> pengaman layar pendek tetap ada tapi scope-nya cuma bagian bawah (judul s/d tombol transport).
+> `NowPlayingScreen.kt` (non-protected).
+> Batch 333 (Feedback tekan tombol yang belum bouncyPress, 1 file):
 > Menutup Pending Queue Batch 330. Audit temukan 3 tombol di layar Now Playing (tutup, "⋮
 > Kontrol Lanjutan", 5 bintang rating) yang belum ikut efek scale-down saat ditekan — padahal
 > semua tetangganya (shuffle/prev/play-pause/next/repeat/favorit) sudah lama punya. Disamakan.

@@ -1,5 +1,41 @@
 # Changelog
 
+## Batch 334 — BUG FIX: gesture brightness/volume bentrok dengan verticalScroll (1 file kode)
+User laporan + screenshot: swipe kecerahan/volume di piringan (Now Playing) "bentrokan langsung"
+dengan sesuatu — dikonfirmasi via baca kode (bukan tebakan): root cause SAMA PERSIS pola bug
+klasik Compose nested-drag-gesture-conflict.
+
+**Root cause**: Column induk layar ini py `.verticalScroll(rememberScrollState())` (Batch 112,
+jaring pengaman biar transport row tidak kepotong di layar pendek). Box gesture brightness/
+volume (`detectVerticalDragGestures`, drag VERTIKAL) ada DI DALAM Column itu — 2 pointer-drag
+recognizer di SUMBU YANG SAMA (parent scrollable + child custom gesture) bersarang bikin
+keduanya berebut touch stream yang identik. Child SUDAH `change.consume()` di `onVerticalDrag`,
+TAPI ancestor `Modifier.scrollable()` (dasar `verticalScroll`) tetap bisa menang arbitrase
+drag-start/touch-slop LEBIH DULU sebelum child sempat consume — gejala: swipe kecerahan/volume
+jadi tersendat/salah kebaca sbg scroll, PERSIS sesuai laporan "bentrokan langsung".
+
+**Fix (struktural, bukan hack pointer-arbitration level-rendah)**: Column induk (header: tombol
+atas + hint banner + Box art/gesture) **TIDAK LAGI scrollable sama sekali** — dipisah jadi Column
+BARU khusus (`Modifier.weight(1f).verticalScroll(...)`) yang HANYA membungkus konten SETELAH
+Box art (judul, artist, rating, waveform+slider, posisi/durasi, tombol transport). Pola "fixed
+header + scrollable body" standar Compose, dipilih ketimbang solusi `NestedScrollConnection`/
+pointer-pass manual (lebih rumit, lebih riskan salah tanpa bisa dicompile-test di sandbox ini).
+
+**Jaring pengaman Batch 112 TETAP UTUH, cuma scope-nya diperbaiki**: transport row tetap bisa
+discroll kalau layar pendek (skenario asli Batch 112 fix) — bedanya sekarang scroll TIDAK LAGI
+ikut membungkus area gesture yang architecturally memang tidak boleh ikut ancestor scrollable.
+0 logic gesture brightness/volume itu sendiri diubah (`applyBrightness`/`applySystemVolume`/
+threshold/dll sama persis) — murni pemindahan posisi 1 `Column` dalam hierarki.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). Brace/paren dicek seimbang (223/223,
+840/840). `FILE_MANIFEST.txt` tidak berubah (188/188, diverifikasi diff eksplisit). **Belum
+diverifikasi visual di device** — prioritas cek: (1) swipe kecerahan/volume di piringan
+sekarang GENUINELY mulus tanpa tersendat/salah baca, (2) di layar pendek/3-button-nav, transport
+row masih bisa dijangkau via scroll (regresi Batch 112 tidak boleh kembali), (3) scroll TIDAK
+ikut ter-trigger tanpa sengaja saat swipe di piringan (harus 100% milik gesture brightness/
+volume sekarang, 0 scroll-bleed), (4) hint banner + tombol atas (tutup/favorit/⋮) tetap diam di
+posisi (bagian fixed, tidak ikut scroll body).
+
 ## Batch 333 — Pending Queue item 2: feedback tekan tombol yang belum punya `bouncyPress` (1 file)
 Lanjutan audit yang sengaja ditunda Batch 332 ("jangan asumsikan 'tombol kontrol pemutaran' =
 transport row yang sudah lama beres — audit dulu"). Hasil audit `grep` menyeluruh SEMUA

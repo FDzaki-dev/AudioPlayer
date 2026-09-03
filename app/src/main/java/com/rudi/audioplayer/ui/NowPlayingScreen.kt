@@ -344,21 +344,21 @@ fun NowPlayingScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                // Batch 112 — root cause TERPISAH dari Batch 111 (yang soal insets di luar
-                // Scaffold): layar ini SUDAH di dalam Scaffold/NavHost, jadi sudah dapat
-                // contentWindowInsets via `padding` di AppNavHost. Bug sebenarnya: Column ini
-                // fillMaxSize() TANPA scroll, isinya fixed-height (hero art 300dp + hint banner
-                // ~150dp kalau tampil + title/rating/waveform/tombol) — total gampang > tinggi
-                // viewport asli setelah dipotong status/nav bar, apalagi 3-button nav (umum di
-                // Android 15 ke bawah) yang makan tinggi layar riil vs gesture-nav (overlay
-                // tipis, Android 16 test device) yang nyaris tidak makan ruang — match persis
-                // observasi user "normal di 16, kacau di 15 ke bawah". Sebelumnya konten yang
-                // overflow BUKAN discroll, tapi ke-clip diam-diam di tepi layar — baris tombol
-                // transport (shuffle/prev/play/next/repeat), paling bawah dalam urutan Column,
-                // paling sering jadi korban. `verticalScroll` di sini murni jaring pengaman:
-                // kalau konten muat (layar tinggi/gesture-nav), scroll offset tetap 0, nol
-                // perubahan visual; kalau tidak muat, sekarang bisa digeser bukan hilang.
-                .verticalScroll(rememberScrollState())
+                // Batch 334 — FIX BUG NYATA (laporan user + screenshot): `verticalScroll()`
+                // (Batch 112, jaring pengaman layar pendek) SEBELUMNYA membungkus Box gesture
+                // brightness/volume (baris di bawah) — 2 pointer-drag-vertikal recognizer di
+                // SUMBU YANG SAMA bersarang (parent scrollable + child `detectVerticalDragGestures`)
+                // BENTROK memperebutkan touch stream yang sama, walau child sudah `change.consume()`
+                // (Compose's ancestor `scrollable()` tetap bisa menang arbitrase drag-start/slop
+                // duluan sebelum child sempat consume). GEJALA: swipe kecerahan/volume di piringan
+                // jadi tersendat/salah baca sebagai scroll, persis laporan user.
+                // FIX: Column ini TIDAK LAGI scrollable sendiri — cuma header (tombol atas+hint+
+                // Spacer+Box art/gesture) yang tetap di sini (fixed, 0 ancestor scrollable lagi utk
+                // gesture zone). Sisa konten (judul s/d tombol transport) dipindah ke Column BARU
+                // di bawah (`.weight(1f).verticalScroll(...)`) — jaring pengaman Batch 112 utk
+                // "transport row kepotong di layar pendek" TETAP ada, cuma scope-nya sekarang PAS
+                // ke bagian yang benar2 butuh (bukan ikut membungkus area gesture yang architecturally
+                // tidak boleh scroll).
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -503,6 +503,16 @@ fun NowPlayingScreen(
                 )
             }
         }
+
+        // Batch 334 — badan scrollable terpisah (lihat komentar Column induk di atas): jaring
+        // pengaman Batch 112 utk layar pendek dipindah SPESIFIK ke sini (judul s/d transport),
+        // TIDAK LAGI ikut membungkus Box gesture brightness/volume di atas.
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -730,6 +740,7 @@ fun NowPlayingScreen(
                 )
             }
         }
+        } // tutup Column scrollable baru (Batch 334)
         }
 
         AnimatedVisibility(
