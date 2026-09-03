@@ -36,6 +36,48 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 336 (BUG FIX — transport row TETAP TIDAK kejangkau via scroll di layar pendek, jaring
+pengaman Batch 112/334 regresi nyata, root cause beda level dari Batch 335, 1 file kode)** — User
+laporan device: dari 3 opsi klarifikasi (overscroll glow / transport kepotong-tidak kejangkau /
+scroll di layar lain), user pilih **"transport masih kepotong/tidak kejangkau di layar pendek"** —
+persis item yang Batch 335 tandai "Belum diverifikasi visual di device" (baris "jaring pengaman
+Batch 112/334, transport row harus TETAP reachable... behavior itu tidak boleh regresi"), dan
+ternyata REGRESI.
+
+**Root cause (BEDA dari Batch 335, ikut kebijakan Batch 24 — kalau fix resmi sudah diikuti tapi
+gejala identik/berlanjut, curigai level akar beda, jangan ulangi variasi kecil dari pendekatan
+sama)**: Batch 335 cuma matikan overscroll GLOW — 0 sentuh soal RUANG. Header hasil split Batch
+334 (Row tombol atas + hint banner opsional + Spacer 12dp + Box gesture art **fixed 300dp, tidak
+scrollable**) sebelum Batch 334 semuanya ikut 1 Column scroll tunggal (art bisa ke-scroll
+off-screen kalau perlu). Setelah split, art box DIKUNCI fixed (sengaja, supaya gesture
+brightness/volume-nya lolos dari nested-scroll conflict — lihat Batch 334) — konsekuensinya:
+`Column(weight(1f).verticalScroll(...))` di bawahnya cuma kebagian SISA tinggi layar setelah
+header+art (fixed, tidak bisa disusut oleh scroll apa pun). Di layar pendek (landscape/
+split-screen/foldable tertutup) total header+art (~300dp+) bisa nyaris menghabiskan seluruh
+tinggi layar, sisa ruang buat Column konten kepepet sampai nyaris 0dp — transport row jadi
+TIDAK kejangkau walau discroll, meski secara teknis Column-nya scrollable.
+
+**Fix**: `Box` gesture art — tinggi HARDCODE `.height(300.dp)` → `.height(albumArtBoxHeight)`,
+dihitung dari `LocalConfiguration.current.screenHeightDp.dp`: layar `>= 640.dp` (mayoritas HP
+potret normal) tinggi TETAP 300dp persis (0 perubahan visual, byte-identical ke sebelumnya);
+layar `< 640.dp` (pendek) disusutkan proporsional `screenHeightDp * 0.28f`, dibatasi
+`coerceIn(160.dp, 300.dp)` (lantai 160dp supaya art tidak jadi terlalu kecil buat dilihat,
+plafon 300dp). Struktur/gesture zone TIDAK diubah — Box gesture art TETAP di luar ancestor
+scrollable manapun (0 regresi ke fix nested-scroll-conflict Batch 334); `weight(1f).
+verticalScroll(..., overscrollEffect = null)` (Batch 335) juga TIDAK disentuh. Efeknya murni:
+susutkan porsi fixed → sisa ruang scroll bertambah proporsional → transport row balik kejangkau
+di layar pendek, tanpa mengubah tampilan sama sekali di layar normal/tinggi.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 1 import baru (`androidx.compose.ui.platform.
+LocalConfiguration` — `LocalContext`/`LocalDensity` dari package sama sudah dipakai file ini,
+jadi bukan dependency baru). Brace/paren seimbang (225/225, 865/865 — diverifikasi otomatis).
+**Belum diverifikasi compile Gradle sungguhan** (0 akses jaringan/SDK di sandbox sesi ini) —
+**WAJIB cek CI setelah push**. **Belum diverifikasi visual di device** — prioritas cek: (1) layar
+pendek asli (landscape, atau split-screen Termux+app) — buka Now Playing, scroll area
+judul-transport sampai habis, tombol play/pause/next/prev HARUS kejangkau penuh; (2) layar
+normal/potret biasa — pastikan ukuran album art TIDAK berubah sama sekali dibanding sebelumnya
+(regresi visual = bug baru). Detail: `CHANGELOG.md` Batch 336.
+
 **Batch 335 (BUG FIX — overscroll stretch-glow kepicu di Column judul-transport meski konten
 muat, regresi dari Batch 334, 1 file kode)** — User laporan device (format T/J): \"bagian bawah
 (judul-tombol transport) yang masih bisa discroll\" — \"Scroll-nya kepicu padahal konten harusnya

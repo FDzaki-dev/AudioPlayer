@@ -80,6 +80,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.platform.LocalDensity
@@ -238,6 +239,23 @@ fun NowPlayingScreen(
     // respond. This roughly doubles sensitivity for the same physical swipe distance.
     val density = LocalDensity.current
     val gestureRangePx = remember(density) { with(density) { 140.dp.toPx() } }
+    // Batch 336 — root cause beda level dari Batch 335 (bukan overscroll glow, tapi safety
+    // net Batch 112/334 sendiri regresi): header (Row + hint banner opsional + art box FIXED
+    // 300dp) tidak ikut discroll, jadi di layar pendek (landscape/split-screen) sisa ruang
+    // buat Column konten (weight+verticalScroll) bisa kepepet sampai nyaris 0dp — transport
+    // row jadi TIDAK kejangkau walau discroll. Sebelum Batch 334 semuanya 1 Column scroll jadi
+    // art ikut ke-scroll off-screen; sekarang art dikunci fixed supaya gesture brightness/
+    // volume-nya lolos dari nested-scroll conflict (Batch 334). Fix: susutkan TINGGI art box
+    // (bukan strukturnya — gesture zone TETAP di luar ancestor scrollable, tidak regresi
+    // Batch 334) secara proporsional saat layar pendek, supaya sisa ruang scroll cukup buat
+    // transport row selalu kejangkau. Layar normal/tinggi (>=640dp) 100% tidak berubah (tetap
+    // 300dp persis seperti sebelumnya).
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    val albumArtBoxHeight = if (screenHeightDp < 640.dp) {
+        (screenHeightDp * 0.28f).coerceIn(160.dp, 300.dp)
+    } else {
+        300.dp
+    }
     var brightnessLevel by remember {
         mutableStateOf(
             activity?.window?.attributes?.screenBrightness
@@ -429,7 +447,7 @@ fun NowPlayingScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(300.dp)
+                .height(albumArtBoxHeight)
         ) {
             // Left half of the whole row: swipe up/down to raise/lower screen brightness.
             // Sized to a true 50% of the available width — independent of however big the

@@ -8,15 +8,16 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 335 (Bug fix: overscroll kepicu di Column judul-transport meski
-> konten muat, 1 file):** Regresi dari Batch 334 — setelah area judul-transport dipisah jadi
-> Column tersendiri (`weight(1f).verticalScroll(...)`), di layar yang cukup tinggi kontennya
-> sebenarnya sudah muat penuh, TAPI efek overscroll stretch-glow bawaan Android tetap terpicu
-> visual tiap disentuh-drag walau posisi tidak benar-benar berpindah — kebaca user sebagai
-> "masih bisa discroll". Fix: overscroll dimatikan khusus di Column itu lewat parameter resmi
-> `verticalScroll(overscrollEffect = null)` (API modern, dicek ulang ke dokumentasi resmi Compose
-> Foundation — bukan pola `LocalOverscrollConfiguration` lama yang sudah deprecated). Jaring
-> pengaman scroll asli utk layar pendek (Batch 112/334) tidak berubah, tetap berfungsi penuh.
+> 🆕 **Update terbaru — Batch 336 (Bug fix: transport row tidak kejangkau via scroll di layar
+> pendek, 1 file):** Regresi nyata dari jaring pengaman Batch 112/334, akar beda dari fix
+> overscroll Batch 335 — header hasil split Batch 334 (tombol atas + hint + Box album art fixed
+> `300.dp`, sengaja tidak scrollable demi gesture brightness/volume) mengunci porsi tetap tinggi
+> layar; di layar pendek (landscape/split-screen/foldable tertutup) sisa ruang buat Column
+> konten scrollable bisa kepepet nyaris 0dp — transport row jadi tidak kejangkau walau discroll.
+> Fix: tinggi Box album art dihitung adaptif dari `LocalConfiguration.current.screenHeightDp`
+> — tetap persis `300.dp` di layar normal/tinggi (0 perubahan visual), disusutkan proporsional
+> (lantai `160.dp`) di layar pendek supaya ruang scroll cukup. Gesture zone tetap di luar
+> ancestor scrollable (0 regresi fix Batch 334); fix overscroll Batch 335 tidak disentuh.
 > `NowPlayingScreen.kt` (non-protected).
 > Batch 334 (Bug fix: gesture kecerahan/volume bentrok scroll, 1 file):
 > Swipe kecerahan/volume di piringan Now Playing sebelumnya tersendat/salah kebaca sebagai

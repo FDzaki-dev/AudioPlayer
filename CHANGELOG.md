@@ -1,5 +1,60 @@
 # Changelog
 
+## Batch 336 — BUG FIX: transport row TETAP tidak kejangkau via scroll di layar pendek, jaring pengaman Batch 112/334 regresi nyata (1 file kode)
+User laporan device: dikonfirmasi lewat 3 opsi klarifikasi (overscroll glow / transport
+kepotong-tidak kejangkau / scroll di layar lain) — user pilih **"transport masih
+kepotong/tidak kejangkau di layar pendek"**. Ini persis item yang catatan Batch 335 tandai
+"Belum diverifikasi visual di device" (poin (2): "di layar PENDEK yang genuinely butuh scroll,
+tombol transport harus TETAP reachable via scroll seperti sebelumnya — regresi ke arah itu TIDAK
+boleh terjadi") — dan ternyata memang REGRESI.
+
+**Root cause — BEDA level dari Batch 335** (kebijakan Batch 24: kalau fix resmi sudah diikuti
+tapi gejala serupa/berlanjut, curigai akar beda, jangan ulangi variasi kecil dari pendekatan
+sama). Batch 335 cuma mematikan efek visual overscroll glow — 0 mengubah soal ALOKASI RUANG.
+Header hasil split Batch 334 (Row tombol atas + hint banner opsional + Spacer 12dp + Box gesture
+album art **fixed `.height(300.dp)`, sengaja TIDAK scrollable** supaya gesture brightness/volume
+lolos dari nested-scroll conflict) sekarang mengunci porsi tetap dari tinggi layar yang TIDAK
+bisa disusut oleh scroll apa pun — beda dari sebelum Batch 334, saat semuanya (termasuk art)
+masih 1 Column scroll tunggal sehingga art bisa ikut ke-scroll off-screen kalau perlu ruang.
+Konsekuensinya: `Column(Modifier.weight(1f).verticalScroll(...))` di bawah header cuma kebagian
+SISA tinggi layar setelah header+art (fixed). Di layar pendek (landscape, split-screen, foldable
+tertutup) total header+art (~300dp+) bisa mendekati/melebihi tinggi layar itu sendiri — sisa
+ruang scroll kepepet sampai nyaris 0dp, transport row jadi TIDAK kejangkau walau Column-nya
+secara teknis tetap scrollable.
+
+**Fix**: `Box` gesture art — tinggi hardcode `.height(300.dp)` → `.height(albumArtBoxHeight)`,
+dihitung sekali dari `LocalConfiguration.current.screenHeightDp.dp`:
+- Layar `>= 640.dp` (mayoritas HP potret normal): tetap `300.dp` persis — **0 perubahan visual**
+  dibanding sebelumnya.
+- Layar `< 640.dp` (pendek): disusutkan proporsional `screenHeightDp * 0.28f`, dibatasi
+  `coerceIn(160.dp, 300.dp)` — lantai 160dp supaya art tidak jadi terlalu kecil untuk dilihat,
+  plafon 300dp supaya tidak pernah lebih besar dari sebelumnya.
+
+Struktur & gesture zone TIDAK diubah — Box gesture art TETAP di luar ancestor scrollable manapun
+(0 regresi ke fix nested-scroll-conflict Batch 334, swipe brightness/volume 0 terdampak);
+`Modifier.weight(1f).verticalScroll(state = ..., overscrollEffect = null)` (Batch 335) juga 0
+disentuh. Efeknya murni geometris: susutkan porsi fixed non-scrollable → sisa ruang scrollable
+bertambah proporsional → transport row balik kejangkau di layar pendek, tanpa mengubah tampilan
+apa pun di layar normal/tinggi.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 1 import baru:
+`androidx.compose.ui.platform.LocalConfiguration` (satu package dengan `LocalContext`/
+`LocalDensity` yang sudah dipakai file ini — bukan dependency baru buat project). Brace/paren
+dicek seimbang (225/225, 865/865). 0 import/dependency lain berubah.
+
+**Belum divalidasi compile Gradle sungguhan** (0 akses jaringan/SDK di sandbox sesi ini) —
+**WAJIB cek CI setelah push**. Risiko sintaks rendah: `LocalConfiguration`/`screenHeightDp` API
+stabil & lama (bukan API baru/eksperimental seperti `overscrollEffect` di Batch 335), pola
+umum dipakai luas di ekosistem Compose.
+
+**Belum diverifikasi visual di device** — prioritas cek: (1) layar pendek asli (landscape, atau
+split-screen Termux+app berdampingan) — buka Now Playing, scroll area judul-transport sampai
+habis, tombol play/pause/next/prev HARUS kejangkau penuh, tidak terpotong; (2) layar
+normal/potret biasa — ukuran album art HARUS identik dengan sebelum batch ini (regresi visual di
+layar normal = bug baru, tanda `albumArtBoxHeight` salah hitung); (3) swipe kecerahan/volume di
+piringan (fix Batch 334) & fix overscroll glow (Batch 335) — keduanya harus TETAP mulus, 0
+terdampak batch ini.
+
 ## Batch 335 — BUG FIX: overscroll stretch-glow kepicu di Column judul-transport meski konten muat, regresi dari Batch 334 (1 file kode)
 User laporan device (format T/J singkat): "bagian bawah (judul-tombol transport) yang masih bisa
 discroll — itu gimana?" / "Scroll-nya kepicu padahal konten harusnya muat (bug baru)".
