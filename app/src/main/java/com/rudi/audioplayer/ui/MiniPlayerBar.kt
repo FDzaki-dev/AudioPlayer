@@ -2,6 +2,11 @@ package com.rudi.audioplayer.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -165,7 +170,17 @@ fun MiniPlayerBar(
                     )
                     .bouncyPress(playPauseInteraction, pressedScale = 0.82f)
             ) {
-                AnimatedContent(targetState = uiState.isPlaying, label = "miniPlayPause") { playing ->
+                AnimatedContent(
+                    targetState = uiState.isPlaying,
+                    label = "miniPlayPause",
+                    // Batch 332 — konsisten persis dgn fix NowPlayingScreen.kt (Pending Queue
+                    // item 1, Batch 330): morph scale+fade, durasi asimetris 200ms masuk/150ms
+                    // keluar reuse dari NavHost tab transition (Batch 330).
+                    transitionSpec = {
+                        (scaleIn(initialScale = 0.6f, animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)))
+                            .togetherWith(scaleOut(targetScale = 0.6f, animationSpec = tween(150)) + fadeOut(animationSpec = tween(150)))
+                    }
+                ) { playing ->
                     Icon(
                         if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (playing) "Jeda" else "Putar",

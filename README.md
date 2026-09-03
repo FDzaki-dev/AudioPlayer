@@ -8,13 +8,13 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 331 (Transisi push horizontal untuk stats_dashboard, 1 file):**
-> Melanjutkan item #1 Pending Queue Batch 330. `stats_dashboard` (dibuka dari Pengaturan →
-> Statistik) sebelumnya ikut fade generik yang sama seperti tab lateral — sekarang slide dari
-> kanan + fade saat masuk, slide balik + fade saat di-pop (pola iOS-push), karena navigasinya
-> hierarkis (drill-down), beda sifat dari tab Beranda/Perpustakaan/Pengaturan. `tween(300)` reuse
-> dari rute "now_playing" yang sudah ada. `MainActivity.kt` (Protected, edit parsial).
-> Batch 330 (Default crossfade transisi tab navigasi bawah, 1 file):
+> 🆕 **Update terbaru — Batch 332 (Micro-interaction icon morph Play/Pause, 2 file):**
+> Melanjutkan item #1 Pending Queue Batch 331. Tombol Play/Pause di layar Now Playing & mini
+> player sebelumnya cuma crossfade polos (default Compose) saat ganti ikon — sekarang morph
+> scale+fade (ikon baru membesar dari 0.6x sambil fade in, ikon lama mengecil sambil fade out).
+> Durasi reuse persis pola asimetris 200ms masuk/150ms keluar dari transisi tab (Batch 330).
+> `NowPlayingScreen.kt` + `MiniPlayerBar.kt` (non-protected keduanya).
+> Batch 331 (Transisi push horizontal untuk stats_dashboard, 1 file):
 > Transisi antar tab Beranda/Perpustakaan/Pengaturan (+ buka Statistik dari Pengaturan)
 > sebelumnya cut instan — 0 `enter`/`exitTransition` di level `NavHost`. Sekarang pakai fade
 > ringan (`tween(200)` masuk / `tween(150)` keluar, angka reuse persis dari yang sudah ada di

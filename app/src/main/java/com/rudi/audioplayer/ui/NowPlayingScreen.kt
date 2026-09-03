@@ -12,6 +12,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -650,7 +653,21 @@ fun NowPlayingScreen(
                     )
                     .bouncyPress(playPauseInteraction, pressedScale = 0.85f)
             ) {
-                AnimatedContent(targetState = uiState.isPlaying, label = "playPause") { playing ->
+                AnimatedContent(
+                    targetState = uiState.isPlaying,
+                    label = "playPause",
+                    // Batch 332 — Pending Queue item 1 (dari Batch 330): upgrade default
+                    // `AnimatedContent` (fade polos bawaan Compose kalau `transitionSpec` tidak
+                    // diisi) jadi morph scale+fade — ikon baru masuk membesar dari 0.6x sambil
+                    // fade in, ikon lama keluar mengecil ke 0.6x sambil fade out. Durasi REUSE
+                    // persis pola asimetris "masuk lebih pelan, keluar lebih cepat" yang sudah
+                    // divalidasi Batch 330 (200ms/150ms, dipakai NavHost tab transition) — bukan
+                    // angka baru. `togetherWith` (bukan `with` yang sudah deprecated).
+                    transitionSpec = {
+                        (scaleIn(initialScale = 0.6f, animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)))
+                            .togetherWith(scaleOut(targetScale = 0.6f, animationSpec = tween(150)) + fadeOut(animationSpec = tween(150)))
+                    }
+                ) { playing ->
                     Icon(
                         if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (playing) "Jeda" else "Putar",

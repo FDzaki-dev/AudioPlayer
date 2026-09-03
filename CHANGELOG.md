@@ -1,5 +1,40 @@
 # Changelog
 
+## Batch 332 — Micro-interaction icon morph Play/Pause (Pending Queue item 1, 2 file kode)
+User: "lanjut", melanjutkan item #1 Pending Queue Batch 331 (pra-dicatat, tidak perlu tanya
+ulang — pola sama antrean eksplisit Batch 322-324/330-331).
+
+**Konteks**: tombol Play/Pause di `NowPlayingScreen.kt` & `MiniPlayerBar.kt` sama-sama sudah
+pakai `AnimatedContent(targetState = uiState.isPlaying)` sejak lama (Batch 224/226, utk
+kompensasi ukuran+bias-optik ikon), TAPI tanpa `transitionSpec` eksplisit — jatuh ke default
+Compose (`fadeIn() togetherWith fadeOut()`, crossfade polos), bukan "morph" sungguhan.
+
+**Implementasi (identik di 2 file)**: `transitionSpec` ditambah — ikon baru masuk `scaleIn`
+(dari 0.6x) + `fadeIn` bersamaan; ikon lama keluar `scaleOut` (ke 0.6x) + `fadeOut` bersamaan.
+Durasi REUSE PERSIS pola asimetris "masuk 200ms lebih pelan, keluar 150ms lebih cepat" yang
+sudah divalidasi Batch 330 (NavHost tab transition) — bukan angka tebakan baru, konsisten
+bahasa gerak app ini. `togetherWith` dipakai (infix modern, bukan `with` yang sudah deprecated
+sejak Compose 1.4).
+
+3 import baru per file: `scaleIn`, `scaleOut`, `togetherWith` (`androidx.compose.animation`).
+`MiniPlayerBar.kt` sekalian dapat `fadeIn`/`fadeOut` (belum pernah diimport eksplisit di file
+itu sebelumnya — dulu cuma `AnimatedContent` tanpa transitionSpec jadi tidak butuh). Offset
++1dp kompensasi-bias-optik PlayArrow (Batch 226) TIDAK disentuh — tetap jalan bersamaan dgn
+morph baru ini (independen, beda modifier).
+
+**2 file**: `NowPlayingScreen.kt` (1 titik) + `MiniPlayerBar.kt` (1 titik, non-protected).
+Brace/paren dicek seimbang: `NowPlayingScreen.kt` (219/219, 821/821), `MiniPlayerBar.kt`
+(13/13, 108/108). `FILE_MANIFEST.txt` tidak berubah (188/188, diverifikasi diff eksplisit).
+Docs disinkronkan: README.md (banner), CHANGELOG.md.
+
+**Pending Queue (sisa 1 item dari Batch 330, belum dikerjakan, tunggu instruksi user)**: Feedback
+tekan tombol kontrol pemutaran (scale-down halus saat pressed) — catatan: transport
+Play/Pause/Skip di 2 file ini SUDAH pakai `.bouncyPress()` (scale-down saat pressed, sejak Batch
+72 dst) untuk SEMUA tombolnya termasuk Play/Pause — kandidat ini kemungkinan besar CUMA relevan
+utk kontrol LAIN yang belum py `bouncyPress()` (mis. slider seek, tombol di sheet lain) — perlu
+audit dulu titik mana yang genuinely belum punya feedback tekan sebelum eksekusi, bukan
+diasumsikan "tombol kontrol pemutaran" = transport row yang sudah lama beres.
+
 ## Batch 331 — Transisi push horizontal untuk stats_dashboard (drill-down dari Pengaturan), 1 file kode
 User: "lanjut" — melanjutkan item #1 Pending Queue Batch 330 (kandidat animasi berikutnya).
 

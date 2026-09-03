@@ -36,6 +36,29 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 332 (Micro-interaction icon morph Play/Pause, Pending Queue item 1, 2 file kode)** —
+User: "lanjut", melanjutkan item #1 Pending Queue Batch 331.
+
+**Konteks**: `AnimatedContent(targetState = uiState.isPlaying)` di `NowPlayingScreen.kt` &
+`MiniPlayerBar.kt` (sejak Batch 224/226) 0 `transitionSpec` eksplisit — jatuh ke default
+Compose (crossfade polos), bukan morph. **Implementasi (identik 2 file)**: `transitionSpec`
+ditambah — masuk `scaleIn(0.6x)+fadeIn` togetherWith keluar `scaleOut(0.6x)+fadeOut`. Durasi
+REUSE PERSIS pola asimetris Batch 330 (200ms masuk/150ms keluar, NavHost tab transition) —
+bukan angka baru. `togetherWith` (bukan `with` deprecated). Offset bias-optik PlayArrow
+(Batch 226) tidak disentuh, tetap jalan bersamaan.
+
+**2 file**: `NowPlayingScreen.kt` + `MiniPlayerBar.kt` (non-protected keduanya). Brace/paren
+seimbang (219/219+821/821, 13/13+108/108). `FILE_MANIFEST.txt` tidak berubah (188/188). Docs
+disinkronkan: README.md (banner), CHANGELOG.md.
+
+**Pending Queue (sisa 1 item, belum dikerjakan, tunggu instruksi user)**: Feedback tekan tombol
+kontrol pemutaran (scale-down saat pressed) — **catatan penting**: transport Play/Pause/Skip di
+2 file ini SUDAH pakai `.bouncyPress()` sejak lama (6 titik `NowPlayingScreen.kt`, grep-
+confirmed) — item ini kemungkinan besar cuma relevan utk kontrol LAIN yang belum py
+`bouncyPress()` (slider seek, tombol sheet lain). **WAJIB audit titik mana yang genuinely
+belum punya feedback tekan dulu sebelum eksekusi** — jangan asumsikan "tombol kontrol
+pemutaran" = transport row yang sudah lama beres. Detail: `CHANGELOG.md` Batch 332.
+
 **Batch 331 (Transisi push horizontal untuk `stats_dashboard`, 1 file kode)** — User: "lanjut",
 melanjutkan item #1 Pending Queue Batch 330 (pra-dicatat, tidak perlu tanya ulang — pola sama
 antrean eksplisit Batch 322-324 dst).
