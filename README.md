@@ -8,7 +8,17 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 334 (Bug fix: gesture kecerahan/volume bentrok scroll, 1 file):**
+> 🆕 **Update terbaru — Batch 335 (Bug fix: overscroll kepicu di Column judul-transport meski
+> konten muat, 1 file):** Regresi dari Batch 334 — setelah area judul-transport dipisah jadi
+> Column tersendiri (`weight(1f).verticalScroll(...)`), di layar yang cukup tinggi kontennya
+> sebenarnya sudah muat penuh, TAPI efek overscroll stretch-glow bawaan Android tetap terpicu
+> visual tiap disentuh-drag walau posisi tidak benar-benar berpindah — kebaca user sebagai
+> "masih bisa discroll". Fix: overscroll dimatikan khusus di Column itu lewat parameter resmi
+> `verticalScroll(overscrollEffect = null)` (API modern, dicek ulang ke dokumentasi resmi Compose
+> Foundation — bukan pola `LocalOverscrollConfiguration` lama yang sudah deprecated). Jaring
+> pengaman scroll asli utk layar pendek (Batch 112/334) tidak berubah, tetap berfungsi penuh.
+> `NowPlayingScreen.kt` (non-protected).
+> Batch 334 (Bug fix: gesture kecerahan/volume bentrok scroll, 1 file):
 > Swipe kecerahan/volume di piringan Now Playing sebelumnya tersendat/salah kebaca sebagai
 > scroll layar — root cause: Column induk (jaring pengaman layar pendek, Batch 112) membungkus
 > Box gesture dengan drag vertikal di sumbu yang sama, keduanya berebut touch. Fix: dipisah jadi

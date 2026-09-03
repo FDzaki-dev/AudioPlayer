@@ -1,5 +1,67 @@
 # Changelog
 
+## Batch 335 — BUG FIX: overscroll stretch-glow kepicu di Column judul-transport meski konten muat, regresi dari Batch 334 (1 file kode)
+User laporan device (format T/J singkat): "bagian bawah (judul-tombol transport) yang masih bisa
+discroll — itu gimana?" / "Scroll-nya kepicu padahal konten harusnya muat (bug baru)".
+
+**Root cause — BEDA dari bug Batch 334** (itu soal 2 pointer-drag recognizer axis sama bentrok;
+ini soal ukuran & efek visual, bukan konflik gesture): pemisahan Batch 334 memberi Column
+judul-transport `Modifier.weight(1f)` sendiri — artinya Column ini sekarang punya tinggi TETAP
+dari sisa ruang layar (dipaksa min=max oleh `weight(fill=true)` default), BUKAN lagi unbounded
+seperti Column tunggal lama sebelum Batch 334 yang membungkus SELURUH layar (header+art+body
+sekaligus). Di layar yang cukup tinggi, konten (judul s/d tombol transport) genuinely muat penuh
+di dalam ruang yang dialokasikan (`ScrollState.maxValue` = 0) — TAPI efek overscroll stretch-glow
+bawaan Android 12+/Compose Foundation tetap terpicu VISUAL tiap kali area itu disentuh-drag,
+independen dari apakah posisi scroll benar-benar berpindah atau tidak (rubber-band effect kosong,
+tanpa ada apa pun untuk diungkap). User membaca sensasi visual ini sebagai "masih bisa discroll".
+
+**Fix**: `Modifier.verticalScroll(rememberScrollState())` diganti
+`Modifier.verticalScroll(state = rememberScrollState(), overscrollEffect = null)` — overload
+resmi `Modifier.verticalScroll()` yang menerima `OverscrollEffect?` langsung sebagai parameter,
+matikan overscroll KHUSUS scope Column ini, 0 titik lain di app tersentuh.
+
+**Sengaja BUKAN pola lama** `CompositionLocalProvider(LocalOverscrollConfiguration provides
+null)` (dipakai `SmartPlaylistScreen.kt` sejak Batch 263, saat BOM project masih 2024.05.00) —
+dicek ulang `web_search` ke dokumentasi resmi Compose Foundation sesi ini: `LocalOverscrollConfiguration`/
+`OverscrollConfiguration` **sudah dinyatakan deprecated** (diganti `LocalOverscrollFactory` +
+`rememberPlatformOverscrollFactory`), persis risiko yang sudah ditandai eksplisit di catatan
+Batch 291 soal lompatan Compose BOM 2024.05.00→2026.04.01 ("`LocalOverscrollConfiguration`
+tersangka pertama kalau CI gagal... belum diperbaiki preventif"). Overload `overscrollEffect` di
+`verticalScroll()` sendiri sudah tersedia jauh di bawah BOM 2026.04.01 yang dipakai project ini —
+dipakai langsung sesuai kebijakan prioritas mutakhir (aturan sesi #3, Batch 205), bukan menambah
+1 lagi titik pakai API yang sudah diketahui berisiko usang. `SmartPlaylistScreen.kt` (satu-satunya
+pemakai lama pola deprecated itu) **SENGAJA TIDAK disentuh** batch ini — di luar cakupan laporan
+bug ini, konsisten ZERO-REFACTOR (kandidat modernisasi terpisah kalau diminta user nanti).
+
+**Cakupan fix**: HANYA Column scrollable hasil split Batch 334 (judul s/d tombol transport). Box
+gesture brightness/volume (sekarang tidak lagi scrollable sejak Batch 334) & header (tombol
+atas/hint/art) 0 disentuh — tidak relevan ke bug ini. Jaring pengaman scroll genuine untuk layar
+pendek (Batch 112/334, kalau konten benar-benar overflow) TETAP jalan penuh lewat `scrollState`
+yang sama persis — cuma efek visual overscroll DI LUAR rentang scroll asli yang dimatikan, 0
+logic gesture/scroll/threshold lain diubah.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). Brace/paren dicek seimbang (223/223, 854/854 —
+parens naik dari 840→854 murni dari blok komentar baru yang ditambahkan menjelaskan root
+cause+fix, bukan dari kode; kedua sisi naik jumlah identik, saldo tetap 0). `FILE_MANIFEST.txt`
+tidak berubah (188/188). 0 import baru (`verticalScroll` sudah diimpor sebelumnya di file ini;
+parameter `overscrollEffect` cuma dioper literal `null`, `OverscrollEffect` sendiri tidak perlu
+diimpor eksplisit).
+
+**Belum divalidasi compile Gradle sungguhan** (0 akses jaringan/SDK di sandbox sesi ini) —
+**WAJIB cek CI setelah push**. Risiko sintaks rendah-menengah: overload ini dikonfirmasi ada di
+dokumentasi resmi Compose Foundation lewat `web_search` (bukan tebakan dari training data), TAPI
+ini kali PERTAMA app ini memakai parameter `overscrollEffect` langsung (pola berbeda dari
+`LocalOverscrollConfiguration` lama yang sudah pernah terbukti compile di `SmartPlaylistScreen.kt`)
+— jadi tetap wajib dikonfirmasi CI, bukan diasumsikan aman hanya karena dokumentasinya cocok.
+
+**Belum diverifikasi visual di device** — prioritas cek: (1) buka Now Playing di layar yang cukup
+tinggi (konten judul-transport harusnya muat penuh tanpa perlu scroll) — coba drag di area
+judul/artist/rating/seekbar/baris waktu/tombol transport, TIDAK boleh lagi ada efek stretch/glow/
+pergeseran visual apa pun; (2) di layar PENDEK yang genuinely butuh scroll (skenario asli jaring
+pengaman Batch 112/334), tombol transport harus TETAP reachable via scroll seperti sebelumnya —
+regresi ke arah itu TIDAK boleh terjadi; (3) swipe kecerahan/volume di piringan (fix Batch 334,
+area terpisah — di atas Column ini) harus TETAP mulus, 0 terdampak batch ini.
+
 ## Batch 334 — BUG FIX: gesture brightness/volume bentrok dengan verticalScroll (1 file kode)
 User laporan + screenshot: swipe kecerahan/volume di piringan (Now Playing) "bentrokan langsung"
 dengan sesuatu — dikonfirmasi via baca kode (bukan tebakan): root cause SAMA PERSIS pola bug

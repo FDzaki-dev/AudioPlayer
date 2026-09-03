@@ -507,10 +507,32 @@ fun NowPlayingScreen(
         // Batch 334 — badan scrollable terpisah (lihat komentar Column induk di atas): jaring
         // pengaman Batch 112 utk layar pendek dipindah SPESIFIK ke sini (judul s/d transport),
         // TIDAK LAGI ikut membungkus Box gesture brightness/volume di atas.
+        // Batch 335 — FIX BUG BARU (laporan user, device): begitu Column ini py `weight(1f)`
+        // sendiri (fixed height dari sisa ruang, BUKAN unbounded lagi spt Column tunggal lama
+        // sebelum Batch 334), pada layar yang cukup tinggi kontennya SUDAH muat penuh (maxScroll
+        // scrollState = 0) — TAPI overscroll stretch-glow bawaan Android 12+/Compose Foundation
+        // tetap terpicu visual tiap drag disentuh, walau posisi scroll tidak benar-benar
+        // berpindah (rubber-band kosong). User baca ini sebagai "masih bisa discroll" walau
+        // konten sudah muat. Root cause BEDA dari bug Batch 334 (itu soal 2 recognizer axis sama
+        // bentrok, INI soal efek visual overscroll yang terpicu independen dari maxScroll).
+        // FIX: matikan overscroll KHUSUS di Column ini lewat overload `verticalScroll(state,
+        // overscrollEffect = null, ...)` — API OverscrollEffect langsung di parameter fungsi,
+        // BUKAN pola lama `CompositionLocalProvider(LocalOverscrollConfiguration provides null)`
+        // (dipakai SmartPlaylistScreen.kt Batch 263 saat BOM masih 2024.05.00) — dicek ulang
+        // `web_search` ke dokumentasi resmi Compose Foundation: `LocalOverscrollConfiguration`/
+        // `OverscrollConfiguration` SUDAH DEPRECATED (diganti `LocalOverscrollFactory`), persis
+        // risiko yang sudah ditandai eksplisit di catatan Batch 291 soal lompatan BOM ini —
+        // overload `overscrollEffect` di `verticalScroll()` sendiri sudah tersedia sejak lama di
+        // BOM 2026.04.01 project ini (jauh di atas versi minimum ditambahkannya parameter itu),
+        // jadi dipakai langsung sesuai kebijakan prioritas mutakhir (aturan sesi #3) — bukan
+        // menambah 1 lagi titik pakai API usang yang sudah ketahuan berisiko. Getaran/animasi
+        // scroll GENUINELY dibutuhkan (kalau konten overflow di layar pendek) TETAP jalan penuh
+        // via `scrollState` — cuma efek visual overscroll DI LUAR rentang scroll asli yang
+        // dimatikan, 0 logic gesture/scroll lain diubah.
         Column(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(state = rememberScrollState(), overscrollEffect = null),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
