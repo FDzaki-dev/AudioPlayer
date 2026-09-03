@@ -36,6 +36,49 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 330 (Default crossfade transisi tab navigasi bawah — Beranda/Perpustakaan/Pengaturan, 1
+file kode)** — User: prioritas animasi/transisi pertama = "yang paling berdampak ke user
+langsung"; gaya "smooth kayak iOS" = fade/slide halus, ringan & minim risiko (dijawab lewat 2
+pertanyaan klarifikasi sesi ini).
+
+**Audit sebelum eksekusi**: grep app-wide `navController.navigate(` (`MainActivity.kt`)
+konfirmasi graf rute cuma 5 total — `home`/`library`/`settings`/`stats_dashboard`/`now_playing`.
+Hanya rute "now_playing" yang punya `enterTransition`/`exitTransition`/`popExitTransition` sendiri
+(slide+fade, sudah lama ada). 4 rute lain 0 transisi — cut instan bawaan Compose Navigation. Tab
+bawah (`NavigationBarItem` onClick → `navController.navigate("home"/"library"/"settings"){
+popUpTo(...saveState=true); launchSingleTop=true; restoreState=true}`, pola resmi bottom-nav
+Batch 301) adalah interaksi tersering per sesi user — dipilih sebagai lever #1 "paling berdampak
+langsung".
+
+**Keputusan**: `enterTransition`/`exitTransition`/`popEnterTransition`/`popExitTransition`
+ditambah di level parameter `NavHost(...)` (bukan diduplikasi ke tiap `composable()`) — otomatis
+jadi default untuk semua rute yang belum override sendiri, 0 duplikasi kode. `fadeIn(tween(200))`
+masuk / `fadeOut(tween(150))` keluar, simetris maju-mundur (tab switch bukan hierarki searah).
+Kedua angka REUSE persis dari yang sudah ada di file yang sama (`tween(200)` = exitTransition
+rute "now_playing" yang sudah ada; `tween(150)` = fadeIn di `NowPlayingScreen.kt`) — bukan angka
+tebakan baru, konsisten kebiasaan project ini reuse angka tervalidasi. 0 import baru (`fadeIn`/
+`fadeOut`/`tween` sudah dipakai file ini sejak rute "now_playing" ditambah).
+
+**Rute "now_playing" TIDAK terdampak** — override eksplisitnya sendiri (enter/exit/popExit) selalu
+menang atas default `NavHost` baru ini, tidak berubah sama sekali. `popEnterTransition` baru ini
+secara teknis inert khusus untuk "now_playing" (grep app-wide konfirmasi: 0 rute pernah
+`navigate()` balik ke "now_playing" — dia leaf, jadi tidak ada skenario pop-masuk yang memicu
+parameter itu untuk rute tsb).
+
+**1 file**: `MainActivity.kt` (**Protected, edit parsial** — 4 parameter baru ditambah persis ke
+blok `NavHost(...)` yang sudah ada, 0 baris composable lain disentuh). Brace/paren dicek seimbang
+(260/260 `{}`, 633/633 `()`).
+
+**Ringkasan file** — 1 file kode (jauh di bawah batas Micro-Batch). `FILE_MANIFEST.txt` tidak
+berubah (188/188). Docs disinkronkan: README.md (banner), CHANGELOG.md.
+
+**Pending Queue (kandidat animasi berikutnya, belum dikerjakan, tunggu instruksi user)**: (1)
+transisi push `stats_dashboard` saat ini ikut default fade generik yang sama seperti tab lateral,
+padahal navigasi ini hierarkis (drill-down dari Pengaturan) — kandidat upgrade ke slide-horizontal
+ala iOS push. (2) Micro-interaction tombol Play/Pause (icon morph play↔pause). (3) Feedback tekan
+tombol kontrol pemutaran (scale-down halus saat pressed). Ketiga kandidat ini TIDAK dikerjakan
+batch ini — cuma dicatat sebagai next-candidate, konsisten Micro-Batch (1 batch = 1 task).
+
 **Batch 329 (Matikan blur asli Liquid Glass PERMANEN app-wide, 2 file kode)** — User pilih opsi
 paling aman dari 2 opsi yang ditawarkan, setelah root cause stutter/lag Batch 328 ditelusuri
 lebih dalam.

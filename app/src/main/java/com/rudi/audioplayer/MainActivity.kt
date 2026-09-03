@@ -1089,7 +1089,18 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         ) {
         NavHost(
             navController = navController,
-            startDestination = "home"
+            startDestination = "home",
+            // Batch 330 — default crossfade app-wide (tab bawah home/library/settings +
+            // push stats_dashboard). Sebelum ini 0 enter/exitTransition di level NavHost =
+            // cut instan bawaan Compose Navigation, kontras dgn "now_playing" yang sudah
+            // punya slide+fade sendiri sejak lama. Angka 200/150 REUSE persis dari yang
+            // sudah ada (tween(200) exitTransition "now_playing" bawah, tween(150) fadeIn
+            // NowPlayingScreen.kt) — bukan angka baru. Simetris maju/mundur (pop = sama
+            // dgn forward) karena tab switch bukan hierarki push/pop searah.
+            enterTransition = { fadeIn(animationSpec = tween(200)) },
+            exitTransition = { fadeOut(animationSpec = tween(150)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(200)) },
+            popExitTransition = { fadeOut(animationSpec = tween(150)) }
         ) {
             composable("home") {
                 HomeScreen(

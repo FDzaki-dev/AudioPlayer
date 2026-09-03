@@ -1,5 +1,40 @@
 # Changelog
 
+## Batch 330 — Default crossfade transisi tab navigasi bawah (Beranda/Perpustakaan/Pengaturan), 1 file kode
+User: prioritas animasi/transisi "yang paling berdampak ke user langsung", gaya "smooth kayak
+iOS" didefinisikan sebagai fade/slide halus, ringan & minim risiko.
+
+Audit `NavHost` (`MainActivity.kt`) menemukan hanya rute "now_playing" yang punya
+`enterTransition`/`exitTransition` sendiri (slide+fade, sudah ada sejak lama) — 4 rute lain
+(`home`/`library`/`settings`/`stats_dashboard`) 0 transisi sama sekali, cut instan bawaan Compose
+Navigation. Tab bawah (`NavigationBarItem` onClick → `navController.navigate(...)`) adalah
+interaksi paling sering dipakai user tiap sesi, jadi diprioritaskan duluan dibanding rute lain
+yang lebih jarang disentuh.
+
+`enterTransition`/`exitTransition`/`popEnterTransition`/`popExitTransition` ditambah di level
+parameter `NavHost` (bukan per-`composable()`) — jadi default untuk semua rute yang tidak override
+sendiri, 0 duplikasi ke 4 tempat. `fadeIn(tween(200))` masuk / `fadeOut(tween(150))` keluar,
+simetris maju/mundur — kedua angka REUSE persis dari yang sudah ada di file yang sama
+(`tween(200)` exitTransition rute "now_playing", `tween(150)` fadeIn `NowPlayingScreen.kt`), bukan
+angka tebakan baru. 0 import baru ditambah (`fadeIn`/`fadeOut`/`tween` sudah dipakai file ini).
+
+Rute "now_playing" TIDAK terdampak — override eksplisitnya sendiri menang atas default `NavHost`
+baru ini. `popEnterTransition` baru ini secara teknis inert untuk "now_playing" (diverifikasi grep
+`navController.navigate(` app-wide: tidak ada rute yang pernah pop kembali ke "now_playing" — jadi
+0 risiko regresi walau parameter itu tidak dideklarasikan eksplisit di composable-nya sendiri).
+
+1 file: `MainActivity.kt` (**Protected, edit parsial** — 4 parameter baru ditambah ke `NavHost(...)`
+yang sudah ada, 0 baris lain disentuh). Brace/paren dicek seimbang (260/260 `{}`, 633/633 `()`).
+
+**Ringkasan file** — 1 file kode (jauh di bawah batas Micro-Batch). `FILE_MANIFEST.txt` tidak
+berubah (188/188). Docs disinkronkan: README.md (banner), PROJECT_STATE.md.
+
+**Pending Queue (kandidat animasi berikutnya, belum dikerjakan)**: transisi push `stats_dashboard`
+saat ini ikut default fade generik yang sama seperti tab lateral, padahal ini navigasi hierarkis
+(drill-down dari Pengaturan) — kandidat upgrade ke slide-horizontal ala iOS push kalau user mau
+lanjut. Kandidat lain: micro-interaction tombol Play/Pause (icon morph), feedback tekan tombol
+kontrol pemutaran (scale-down halus).
+
 ## Batch 329 — Matikan blur asli Liquid Glass PERMANEN app-wide, 2 file kode
 User pilih opsi paling aman dari 2 opsi yang ditawarkan, setelah root cause stutter/lag Batch 328
 ditelusuri lebih dalam: blur asli (`hazeEffect`) baru genuinely aktif di 17/17 `ModalBottomSheet`

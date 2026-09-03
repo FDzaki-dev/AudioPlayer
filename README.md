@@ -8,7 +8,14 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 329 (Matikan blur asli Liquid Glass PERMANEN app-wide, 2 file):**
+> 🆕 **Update terbaru — Batch 330 (Default crossfade transisi tab navigasi bawah, 1 file):**
+> Transisi antar tab Beranda/Perpustakaan/Pengaturan (+ buka Statistik dari Pengaturan)
+> sebelumnya cut instan — 0 `enter`/`exitTransition` di level `NavHost`. Sekarang pakai fade
+> ringan (`tween(200)` masuk / `tween(150)` keluar, angka reuse persis dari yang sudah ada di
+> file yang sama, bukan angka baru). Rute "now_playing" TIDAK terdampak — transisi slide+fade
+> khususnya sendiri (sejak lama) tetap berlaku, override eksplisit menang atas default baru
+> ini. `MainActivity.kt` (Protected, edit parsial).
+> Batch 329 (Matikan blur asli Liquid Glass PERMANEN app-wide, 2 file):
 > User pilih opsi paling aman dari 2 opsi yang ditawarkan, setelah root cause stutter/lag Batch
 > 328 ditelusuri lebih dalam: blur asli (`hazeEffect`) genuinely aktif di 17/17 `ModalBottomSheet`
 > sejak Batch 324 + `MiniPlayerBar` yang SELALU tervisible selama musik main adalah persis biaya
