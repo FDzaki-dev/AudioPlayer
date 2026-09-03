@@ -1,5 +1,45 @@
 # Changelog
 
+## Batch 333 — Pending Queue item 2: feedback tekan tombol yang belum punya `bouncyPress` (1 file)
+Lanjutan audit yang sengaja ditunda Batch 332 ("jangan asumsikan 'tombol kontrol pemutaran' =
+transport row yang sudah lama beres — audit dulu"). Hasil audit `grep` menyeluruh SEMUA
+`IconButton`/`FilledIconButton` di `NowPlayingScreen.kt` (9 titik) + `MiniPlayerBar.kt` (1
+titik):
+
+**Transport row (shuffle/prev/play-pause/next/repeat, 5 titik) — 100% SUDAH `bouncyPress`**,
+persis dugaan Batch 332. **0 IconButton di `MiniPlayerBar.kt` yang kurang** (cuma 1 titik total
+di file itu, Play/Pause, sudah ada). TAPI ditemukan **3 titik lain DI LAYAR YANG SAMA**
+(`NowPlayingScreen.kt`) yang 0 `bouncyPress` sama sekali — inkonsisten krn SEMUA tetangganya di
+row/screen yang sama sudah punya:
+
+1. **Tombol tutup** (`KeyboardArrowDown`, baris atas) — `onBack`.
+2. **Tombol "⋮ Kontrol Lanjutan"** (`MoreVert`) — pintu masuk ke sheet Queue/Lirik/Sleep
+   Timer/Speed/Equalizer dkk.
+3. **5 bintang rating** (`StarRatingRow`, loop `for (star in 1..5)`) — masing-masing dapat
+   `MutableInteractionSource` SENDIRI (bukan 1 shared utk 5 tombol — tiap bintang perlu scale
+   independen saat ditekan sendiri-sendiri).
+
+**Fix**: `bouncyPress()` ditambah ke ketiganya, reuse persis pola yg sudah ada di file yang
+sama — tombol tutup & "⋮" pakai default `pressedScale = 0.88f` (sama seperti shuffle/prev/
+next/repeat, tanpa override), 5 bintang pakai `pressedScale = 0.75f` (reuse angka favorite-icon
+di file yang sama, bukan angka baru — favorit & rating sama-sama ikon kecil sekunder, beda
+kelas dari transport 36-68dp).
+
+**Sengaja TIDAK disentuh**: baris-baris di dalam sheet "Kontrol Lanjutan" (`AdvancedControlRow`)
+— itu list-row biasa (touch target selebar row, bukan icon-button lepas), pola feedback-nya
+ripple standar Material row, BUKAN kandidat `bouncyPress` (modifier ini secara konsisten cuma
+dipakai app ini utk kontrol icon-button/circular lepas, 0 preseden dipakai di list row manapun,
+grep-confirmed) — memaksakan di sana justru bikin pola baru yang tidak konsisten, bukan
+menyamakan.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected, 3 titik). Brace/paren dicek seimbang (222/222,
+827/827). `FILE_MANIFEST.txt` tidak berubah (188/188, diverifikasi diff eksplisit). Docs
+disinkronkan: README.md (banner), CHANGELOG.md.
+
+**Pending Queue: KOSONG** — kedua item Batch 330 (icon morph Play/Pause + feedback tekan)
+selesai dikerjakan (Batch 332 + 333). Sesi berikutnya kembali ke `ROADMAP_LIQUID_GLASS_REDESIGN.md`
+kalau tidak ada instruksi/temuan baru dari user (aturan sesi #4).
+
 ## Batch 332 — Micro-interaction icon morph Play/Pause (Pending Queue item 1, 2 file kode)
 User: "lanjut", melanjutkan item #1 Pending Queue Batch 331 (pra-dicatat, tidak perlu tanya
 ulang — pola sama antrean eksplisit Batch 322-324/330-331).

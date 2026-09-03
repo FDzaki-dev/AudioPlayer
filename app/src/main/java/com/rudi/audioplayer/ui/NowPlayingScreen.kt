@@ -363,7 +363,12 @@ fun NowPlayingScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
+            val backInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = onBack,
+                interactionSource = backInteraction,
+                modifier = Modifier.bouncyPress(backInteraction)
+            ) {
                 Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Tutup")
             }
             Spacer(modifier = Modifier.weight(1f))
@@ -382,7 +387,12 @@ fun NowPlayingScreen(
                     tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                 )
             }
-            IconButton(onClick = { showAdvancedSheet = true }) {
+            val advancedInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = { showAdvancedSheet = true },
+                interactionSource = advancedInteraction,
+                modifier = Modifier.bouncyPress(advancedInteraction)
+            ) {
                 Icon(
                     Icons.Default.MoreVert,
                     contentDescription = "Kontrol lanjutan",
@@ -1180,11 +1190,14 @@ private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit, accentColor: Color
     val haptic = LocalHapticFeedback.current
     Row(horizontalArrangement = Arrangement.Center) {
         for (star in 1..5) {
+            val starInteraction = remember { MutableInteractionSource() }
             IconButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onRate(if (rating == star) 0 else star)
-                }
+                },
+                interactionSource = starInteraction,
+                modifier = Modifier.bouncyPress(starInteraction, pressedScale = 0.75f)
             ) {
                 Icon(
                     if (star <= rating) Icons.Default.Star else Icons.Default.StarBorder,

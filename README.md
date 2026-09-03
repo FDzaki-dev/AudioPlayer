@@ -8,7 +8,12 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 332 (Micro-interaction icon morph Play/Pause, 2 file):**
+> 🆕 **Update terbaru — Batch 333 (Feedback tekan tombol yang belum bouncyPress, 1 file):**
+> Menutup Pending Queue Batch 330. Audit temukan 3 tombol di layar Now Playing (tutup, "⋮
+> Kontrol Lanjutan", 5 bintang rating) yang belum ikut efek scale-down saat ditekan — padahal
+> semua tetangganya (shuffle/prev/play-pause/next/repeat/favorit) sudah lama punya. Disamakan.
+> `NowPlayingScreen.kt` (non-protected).
+> Batch 332 (Micro-interaction icon morph Play/Pause, 2 file):
 > Melanjutkan item #1 Pending Queue Batch 331. Tombol Play/Pause di layar Now Playing & mini
 > player sebelumnya cuma crossfade polos (default Compose) saat ganti ikon — sekarang morph
 > scale+fade (ikon baru membesar dari 0.6x sambil fade in, ikon lama mengecil sambil fade out).

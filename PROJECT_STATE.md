@@ -36,6 +36,23 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 333 (Pending Queue item 2 — feedback tekan tombol yang belum `bouncyPress`, 1 file)** —
+Audit menyeluruh `IconButton`/`FilledIconButton` (`NowPlayingScreen.kt` 9 titik +
+`MiniPlayerBar.kt` 1 titik): transport row 100% SUDAH `bouncyPress` (dugaan Batch 332 benar).
+Ditemukan 3 titik LAIN di layar yang sama 0 feedback tekan: tombol tutup (`onBack`), tombol
+"⋮ Kontrol Lanjutan", 5 bintang rating (interaction source sendiri-sendiri per bintang). Fix:
+`bouncyPress()` ditambah ke ketiganya — tombol tutup/"⋮" pakai default 0.88f (sama transport),
+bintang pakai 0.75f (reuse angka favorite-icon di file sama). Sengaja TIDAK sentuh baris list
+`AdvancedControlRow` (row biasa, ripple standar, `bouncyPress` konsisten cuma dipakai utk
+icon-button lepas di app ini).
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). Brace/paren seimbang (222/222, 827/827).
+`FILE_MANIFEST.txt` tidak berubah (188/188). Docs disinkronkan: README.md, CHANGELOG.md.
+
+**Pending Queue: KOSONG** — kedua item Batch 330 selesai (Batch 332+333). Sesi berikutnya
+kembali ke `ROADMAP_LIQUID_GLASS_REDESIGN.md` kalau 0 instruksi/temuan baru user (aturan sesi
+#4). Detail: `CHANGELOG.md` Batch 333.
+
 **Batch 332 (Micro-interaction icon morph Play/Pause, Pending Queue item 1, 2 file kode)** —
 User: "lanjut", melanjutkan item #1 Pending Queue Batch 331.
 
