@@ -20,7 +20,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -1193,7 +1195,36 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     onDeleteSongs = { songs -> deleteSongsFromDevice(songs) }
                 )
             }
-            composable("stats_dashboard") {
+            composable(
+                route = "stats_dashboard",
+                // Batch 331 — override default fade NavHost (Batch 330) khusus rute ini:
+                // "stats_dashboard" adalah push hierarkis (drill-down dari Pengaturan), beda
+                // sifat dari tab lateral home/library/settings yang cukup crossfade generik.
+                // Pola gerak iOS-push: layar ini slide dari kanan + fade saat masuk, slide balik
+                // ke kanan + fade saat di-pop (tombol back). Angka tween(300) REUSE persis dari
+                // popExitTransition rute "now_playing" di file yang sama (bukan angka baru).
+                // HANYA 2 field (bukan 4): per dokumentasi resmi Navigation-Compose,
+                // enterTransition/popExitTransition dievaluasi dari destination ini SENDIRI saat
+                // dia jadi targetState(forward)/initialState(pop) — tapi exitTransition/
+                // popEnterTransition destination ini hanya berlaku kalau dia jadi
+                // initialState(forward)/targetState(pop), yang TIDAK PERNAH terjadi untuk rute
+                // leaf ini (0 rute lain navigate() forward dari sini, 0 rute pop kembali ke
+                // sini — diverifikasi grep app-wide). "settings" (initial saat forward-nav,
+                // target saat pop) pakai default NavHost Batch 330 (fadeOut 150 / fadeIn 200)
+                // buat sisi dia, tidak perlu override tambahan.
+                enterTransition = {
+                    slideInHorizontally(
+                        initialOffsetX = { fullWidth -> fullWidth },
+                        animationSpec = tween(300)
+                    ) + fadeIn(tween(300))
+                },
+                popExitTransition = {
+                    slideOutHorizontally(
+                        targetOffsetX = { fullWidth -> fullWidth },
+                        animationSpec = tween(300)
+                    ) + fadeOut(tween(300))
+                }
+            ) {
                 val statsSnapshot = remember(librarySongs, statsVersion) {
                     playerViewModel.getListeningStats(librarySongs)
                 }

@@ -1,5 +1,37 @@
 # Changelog
 
+## Batch 331 — Transisi push horizontal untuk stats_dashboard (drill-down dari Pengaturan), 1 file kode
+User: "lanjut" — melanjutkan item #1 Pending Queue Batch 330 (kandidat animasi berikutnya).
+
+`stats_dashboard` sebelumnya ikut default fade generik dari `NavHost` (Batch 330), padahal
+navigasi ini hierarkis (drill-down dari Pengaturan), beda sifat dari tab lateral
+home/library/settings yang cukup crossfade. Diberi `enterTransition`/`popExitTransition` sendiri
+di composable-nya: slide dari kanan + fade saat masuk, slide balik ke kanan + fade saat di-pop
+(tombol back) — pola gerak iOS-push. `tween(300)` REUSE persis dari `popExitTransition` rute
+"now_playing" di file yang sama, bukan angka baru. 2 import baru: `slideInHorizontally`,
+`slideOutHorizontally` (`androidx.compose.animation`).
+
+**Koreksi mid-implementasi**: draft awal sempat menambah 4 field transisi (enter/exit/popEnter/
+popExit) ke `stats_dashboard`, tapi diverifikasi ulang lewat dokumentasi resmi Navigation-Compose
+(`exitTransition`/`popEnterTransition` sebuah destination hanya dievaluasi kalau destination itu
+jadi *initialState* forward-nav / *targetState* pop — bukan kondisi yang pernah terjadi untuk rute
+leaf yang cuma dimasuki via forward-nav dari luar & keluar via `popBackStack()`, diverifikasi grep
+`navController.navigate(` app-wide). 2 field itu dibuang sebelum dikirim — cuma `enterTransition`
+(aktif saat dia jadi target forward-nav) & `popExitTransition` (aktif saat dia jadi initial pop)
+yang genuinely dieksekusi. Sisi "settings" (initial saat forward-nav ke sini, target saat pop
+balik) pakai default `NavHost` Batch 330 apa adanya, tidak perlu override tambahan.
+
+1 file: `MainActivity.kt` (**Protected, edit parsial** — `composable("stats_dashboard")` diberi 2
+parameter transisi + route diubah ke bentuk trailing-lambda parameter, 2 import baru ditambah, 0
+baris composable lain disentuh). Brace/paren dicek seimbang (264/264 `{}`, 655/655 `()`).
+
+**Ringkasan file** — 1 file kode (jauh di bawah batas Micro-Batch). `FILE_MANIFEST.txt` tidak
+berubah (188/188). Docs disinkronkan: README.md (banner), PROJECT_STATE.md.
+
+**Pending Queue (sisa 2 item dari Batch 330, belum dikerjakan)**: (1) Micro-interaction tombol
+Play/Pause (icon morph play↔pause). (2) Feedback tekan tombol kontrol pemutaran (scale-down halus
+saat pressed).
+
 ## Batch 330 — Default crossfade transisi tab navigasi bawah (Beranda/Perpustakaan/Pengaturan), 1 file kode
 User: prioritas animasi/transisi "yang paling berdampak ke user langsung", gaya "smooth kayak
 iOS" didefinisikan sebagai fade/slide halus, ringan & minim risiko.

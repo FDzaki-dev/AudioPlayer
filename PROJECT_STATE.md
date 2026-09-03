@@ -36,6 +36,44 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 331 (Transisi push horizontal untuk `stats_dashboard`, 1 file kode)** — User: "lanjut",
+melanjutkan item #1 Pending Queue Batch 330 (pra-dicatat, tidak perlu tanya ulang — pola sama
+antrean eksplisit Batch 322-324 dst).
+
+**Konteks**: `stats_dashboard` (drill-down dari Pengaturan → Statistik) sebelumnya ikut default
+fade generik `NavHost` (Batch 330) yang sama seperti tab lateral home/library/settings, padahal
+navigasinya hierarkis (push, bukan swap lateral) — kandidat upgrade sudah dicatat eksplisit di
+Pending Queue Batch 330.
+
+**Implementasi**: `composable("stats_dashboard")` diberi `enterTransition` (slide dari kanan +
+fade, `tween(300)`) & `popExitTransition` (slide balik ke kanan + fade, `tween(300)`) sendiri —
+pola gerak iOS-push. `tween(300)` REUSE persis dari `popExitTransition` rute "now_playing" di
+file yang sama, bukan angka baru. 2 import baru: `slideInHorizontally`, `slideOutHorizontally`.
+
+**Koreksi mid-implementasi (self-caught sebelum dikirim)**: draft awal sempat menambah 4 field
+(enter/exit/popEnter/popExit), tapi diverifikasi ulang lewat dokumentasi resmi Navigation-Compose
+(`web_search`, bukan tebakan): `exitTransition`/`popEnterTransition` sebuah destination hanya
+dievaluasi kalau destination itu jadi *initialState* forward-nav / *targetState* pop — kondisi
+yang TIDAK PERNAH terjadi untuk rute leaf ini (0 rute lain `navigate()` forward dari sini, 0 rute
+pop kembali ke sini, diverifikasi grep `navController.navigate(` app-wide). 2 field itu dibuang
+sebelum dikirim (dead code kalau dipertahankan) — sisa `enterTransition` (aktif: destination ini
+jadi target forward-nav) & `popExitTransition` (aktif: destination ini jadi initial saat di-pop).
+Sisi "settings" (initial saat forward-nav ke sini, target saat pop balik ke situ) pakai default
+`NavHost` Batch 330 apa adanya (fadeOut 150 masuk / fadeIn 200 balik) — tidak perlu override
+tambahan, sudah cukup untuk sisi dia.
+
+**1 file**: `MainActivity.kt` (**Protected, edit parsial** — `composable("stats_dashboard")`
+diubah ke bentuk dengan parameter transisi (route jadi named-parameter, bukan positional-string),
+2 import baru ditambah dekat import `slideInVertically`/`slideOutVertically` yang sudah ada, 0
+baris composable lain disentuh). Brace/paren dicek seimbang (264/264 `{}`, 655/655 `()`).
+
+**Ringkasan file** — 1 file kode (jauh di bawah batas Micro-Batch). `FILE_MANIFEST.txt` tidak
+berubah (188/188). Docs disinkronkan: README.md (banner), CHANGELOG.md.
+
+**Pending Queue (sisa 2 item dari Batch 330, belum dikerjakan, tunggu instruksi user)**: (1)
+Micro-interaction tombol Play/Pause (icon morph play↔pause). (2) Feedback tekan tombol kontrol
+pemutaran (scale-down halus saat pressed).
+
 **Batch 330 (Default crossfade transisi tab navigasi bawah — Beranda/Perpustakaan/Pengaturan, 1
 file kode)** — User: prioritas animasi/transisi pertama = "yang paling berdampak ke user
 langsung"; gaya "smooth kayak iOS" = fade/slide halus, ringan & minim risiko (dijawab lewat 2
