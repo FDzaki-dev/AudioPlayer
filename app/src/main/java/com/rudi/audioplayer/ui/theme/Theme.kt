@@ -78,20 +78,15 @@ val LocalIsDarkTheme = staticCompositionLocalOf { true }
 // benar2 dipakai runtime.
 val LocalHazeState = staticCompositionLocalOf { HazeState() }
 
-// Batch 326 — Aurora rim-glow §langkah animasi (kandidat yang sudah dicatat sejak komentar
-// Batch 310 di `frostedGlass()`, BlurUtils.kt: "SENGAJA statis ... kandidat animasi kalau user
-// minta lanjut nanti setelah statis ini terverifikasi visual dulu" — precondition itu sudah
-// terpenuhi, blur+rim statis dikonfirmasi user Batch 325). Sama pola PERSIS LocalHazeState di
-// atas: masalah yang mau dihindari SAMA (Batch 310's kekhawatiran eksplisit) — `frostedGlass()`
-// dipanggil 12+ call site, 12+ `rememberInfiniteTransition` independen serentak adalah biaya
-// performa baru yang belum diverifikasi. Solusinya SAMA: 1 phase float dihitung 1 kali
-// (AppNavHost, MainActivity.kt) via `rememberInfiniteTransition`, diteruskan lewat 1
-// CompositionLocal ini ke semua call site `frostedGlass()` sekaligus — 0 transition tambahan
-// per panel, cukup 1 total (terpisah dari transition internal `auroraGlow()`'s ambient wash di
-// root Surface, TIDAK disatukan/disentuh batch ini — scope minimal, 0 risiko ke Surface root).
-// Default `0f` di sini HANYA fallback preview/test, sama seperti LocalHazeState's default di
-// atas — nilai sungguhan SELALU datang dari provider di AppNavHost.
-val LocalAuroraPhase = staticCompositionLocalOf { 0f }
+// Batch 326 sempat menambah `LocalAuroraPhase` di sini (CompositionLocal berbagi 1 phase
+// animasi rim-glow Aurora ke semua `frostedGlass()`, TactileDepth.kt tidak disentuh). Batch 328
+// MENGHAPUS BALIK — user (device sungguhan): musik stuttering + lag/glitch swipe sheet "Kontrol
+// Lanjutan". Root cause: berbagi 1 `rememberInfiniteTransition` mengurangi JUMLAH transition
+// (12+→1) tapi TIDAK menghilangkan bahwa phase berubah tiap frame memicu recomposition brush di
+// semua consumer sekaligus (termasuk `MiniPlayerBar`, selalu tervisible selama musik main).
+// Detail lengkap & rasionalisasi revert: `PROJECT_STATE.md`/`CHANGELOG.md` Batch 328,
+// komentar Aurora branch `frostedGlass()` (BlurUtils.kt). Sengaja dihapus penuh (bukan
+// ditinggal dead code) — risiko re-enable ceroboh tanpa re-baca rasionalisasi ini.
 
 private val AppleDarkColors = darkColorScheme(
     primary = AppleAccent,

@@ -7,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.hazeEffect
@@ -200,21 +199,6 @@ fun Modifier.frostedGlass(
         // `auroraGlow()`'s multiplier 1.0x/0.85x/0.6x dari `AuroraGlowAlpha`) + 1 falloff
         // tambahan 0.35x utk stop ke-4 — 0 token warna/alpha baru ditambah ke Color.kt, murni
         // reuse AuroraGreen/Teal/Violet/Magenta + AuroraGlowAlpha yang sudah ada sejak Batch 306.
-        // Batch 310 — sengaja dibiarkan STATIS dulu (bukan animated ala `auroraGlow()`):
-        // `frostedGlass()` dipanggil 12+ call site sekaligus, 12+ `rememberInfiniteTransition`
-        // independen serentak adalah biaya performa baru yang belum pernah diverifikasi device —
-        // titik awal paling aman, dicatat eksplisit sebagai "kandidat animasi kalau user minta
-        // lanjut nanti setelah statis ini terverifikasi visual dulu".
-        // Batch 326 — user minta lanjut ("Aurora statis -> bergerak"), precondition Batch 310
-        // (statis terverifikasi visual device) TERPENUHI (Batch 325). Kekhawatiran performa di
-        // atas DITANGANI, bukan diabaikan: phase TIDAK dihitung di sini — dibaca dari
-        // `LocalAuroraPhase` (Theme.kt), 1 `rememberInfiniteTransition` dipegang 1 titik
-        // (AppNavHost, MainActivity.kt, pola identik `LocalHazeState`/`hazeState` Batch 295) lalu
-        // dibagi ke SEMUA call site rim-glow — 0 transition tambahan per panel, tetap 1 total.
-        // Mekanisme lerp() antar-hue identik `auroraGlow()`; stop ke-4 di-lerp balik ke
-        // AuroraGreen (bukan diam di Magenta) supaya rim terasa "mengalir memutar" penuh, bukan
-        // cuma 3 dari 4 stop yang bergerak. Resep durasi/easing/RepeatMode (20 detik/arah,
-        // LinearEasing, Reverse) disalin persis dari `auroraGlow()` — bukan angka baru.
         // Batch 327 — user (device sungguhan): "terlalu tipis, hampir tak kasat mata", scope
         // dikonfirmasi cuma rim-glow ini (`auroraGlow()`'s wash 0 dikeluhkan, TIDAK disentuh).
         // Base alpha pindah `AuroraGlowAlpha` (0.34f, dipakai bareng ambient wash) →
@@ -224,17 +208,31 @@ fun Modifier.frostedGlass(
         // naik dari alpha efektif 0.119 (0.34×0.35) ke 0.202 (0.44×0.46), ~70% lebih terang di
         // titik paling redup, sementara taper (tiap stop tetap lebih redup dari sebelumnya) tetap
         // dipertahankan supaya rim masih kebaca "memudar", bukan flat solid.
-        isAurora -> {
-            val rimPhase = LocalAuroraPhase.current
-            Brush.linearGradient(
-                colors = listOf(
-                    lerp(AuroraGreen, AuroraTeal, rimPhase).copy(alpha = AuroraRimGlowAlpha),
-                    lerp(AuroraTeal, AuroraViolet, rimPhase).copy(alpha = AuroraRimGlowAlpha * 0.85f),
-                    lerp(AuroraViolet, AuroraMagenta, rimPhase).copy(alpha = AuroraRimGlowAlpha * 0.65f),
-                    lerp(AuroraMagenta, AuroraGreen, rimPhase).copy(alpha = AuroraRimGlowAlpha * 0.46f)
-                )
+        // Batch 328 — DIREVERT ke statis. User (device sungguhan): musik stuttering/mandek saat
+        // diputar + lag/glitch saat swipe sheet "Kontrol Lanjutan". Root cause paling mungkin:
+        // asumsi Batch 326 "1 `rememberInfiniteTransition` dibagi lewat CompositionLocal = aman"
+        // TERBUKTI KELIRU di device sungguhan — berbagi 1 instance memang mengurangi JUMLAH
+        // transition (12+→1), TAPI tidak menghilangkan bahwa phase berubah tiap frame (~16ms)
+        // memicu recomposition brush di SEMUA consumer sekaligus, termasuk `MiniPlayerBar`
+        // (selalu tervisible SELAMA musik main) — bersaing langsung dgn thread audio/UI pas
+        // playback aktif, PLUS sheet "Kontrol Lanjutan" yang juga baca `frostedGlass()` sambil
+        // menangani gesture swipe. Sesuai `STABILITY > Speed`: TIDAK ditambal/dioptimasi lebih
+        // jauh (mis. `derivedStateOf`/throttle) — direvert PENUH ke statis, konsisten rasionalisasi
+        // ASLI Batch 310 yang sempat (keliru) dianggap sudah teratasi Batch 326. `LocalAuroraPhase`
+        // (Theme.kt) & phase computation (`AppNavHost`, MainActivity.kt) DIHAPUS BALIK — bukan
+        // cuma berhenti dipakai di sini (dead CompositionLocal ditinggal = risiko re-enable
+        // ceroboh nanti). Nilai alpha Batch 327 (`AuroraRimGlowAlpha` 0.44f + taper
+        // 0.85x/0.65x/0.46x) TETAP dipertahankan statis — itu bukan penyebab regresi (keluhan user
+        // soal alpha & soal stutter adalah 2 laporan device terpisah), dan sudah correct
+        // rasionalisasinya (level "accent-glow biasa", lihat Batch 327 di atas).
+        isAurora -> Brush.linearGradient(
+            colors = listOf(
+                AuroraGreen.copy(alpha = AuroraRimGlowAlpha),
+                AuroraTeal.copy(alpha = AuroraRimGlowAlpha * 0.85f),
+                AuroraViolet.copy(alpha = AuroraRimGlowAlpha * 0.65f),
+                AuroraMagenta.copy(alpha = AuroraRimGlowAlpha * 0.46f)
             )
-        }
+        )
         else -> {
             val flat = MaterialTheme.colorScheme.onSurface.copy(
                 alpha = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.14f else 0.24f

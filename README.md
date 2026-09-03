@@ -8,23 +8,11 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 329 (Redesign placeholder "no cover" AlbumArt, 1 file):** User:
-> "Redesign icon placeholder album musik yang kosong jadi lebih menarik!!" — latar flat 1 warna
-> jadi radial-gradient tint lembut ke `primary`, ikon note polos jadi `Icons.Rounded` di dalam
-> badge lingkaran ber-tint — berlaku app-wide (Home/Library/MiniPlayerBar/Now Playing) lewat 1
-> titik render, otomatis ikut semua tema × light/dark (0 literal warna baru).
-> Batch 328 (Fix Radio Auto-Continue + Shuffle mati total saat antrean
-> benar-benar mentok, 1 file): User: "Mode radio, shuffle gak berfungsi sama sekali saat
-> daftar playlist musik user benar-benar habis/mentok!!" — root cause: seek ke lagu baru
-> lewat `seekToNextMediaItem()` bergantung resolusi ShuffleOrder yang bisa ke-mask salah pas
-> shuffle aktif & antrean lama sudah mentok; sekarang lompat pasti via index (`seekTo`), tidak
-> lagi bergantung urutan shuffle sama sekali.
-> Batch 327 (Naikkan alpha rim-glow Aurora, token baru
-> `AuroraRimGlowAlpha` 0.44f, 2 file): User: "terlalu tipis, hampir tak kasat mata" — floor
-> stop ke-4 naik ~70% (alpha efektif 0.119→0.202), ambient wash `auroraGlow()` tidak disentuh.
-> Batch 326 (Aurora rim-glow statis → animated, 3 file): Fase 6/N Aurora
-> selesai — rim-glow 12+ panel sekarang bergerak lewat `LocalAuroraPhase` (1 phase dibagi
-> semua titik, 0 transition tambahan per panel — kekhawatiran performa Batch 310 tertangani).
+> 🆕 **Update terbaru — Batch 328 (REVERT animasi rim-glow Aurora, 3 file):** User laporan device
+> sungguhan: musik stuttering + lag/glitch swipe sheet "Kontrol Lanjutan". Root cause: berbagi 1
+> `rememberInfiniteTransition` (Batch 326) tetap memicu recomposition tiap frame di semua panel
+> — dikembalikan ke statis. Alpha Batch 327 (`AuroraRimGlowAlpha` 0.44f) TETAP dipertahankan,
+> bukan penyebab regresi. Rim-glow Aurora kini: statis, alpha terang, TIDAK animated.
 > Batch 325 (Blur Liquid Glass dikonfirmasi user di device sungguhan —
 > `liquidGlassAlpha` diturunkan balik 0.85f/0.90f→0.38f/0.48f, 1 file): Sub-langkah 5/5
 > (visual) roadmap blur asli selesai. Performa (GPU/lag) masih belum eksplisit dikonfirmasi.
@@ -284,15 +272,18 @@ Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diu
   lain. **Fase 5/N selesai** (Batch 310) — rim-glow per-panel (sebelumnya ditunda sejak Batch 306)
   akhirnya di-wiring app-wide lewat `frostedGlass()`: MiniPlayerBar, panel NowPlaying, tiap bottom
   sheet, dan card Home/Library sekarang punya rim ber-gradasi 4 warna Aurora di tepinya. **Fase
-  6/N selesai (Batch 326)** — rim-glow ini SEKARANG ANIMATED (statis sejak Batch 310, ditunda
-  murni pertimbangan performa): 1 phase float dihitung sekali di `AppNavHost` lewat
-  `LocalAuroraPhase`, dibagi ke semua 12+ titik rim-glow — 0 `rememberInfiniteTransition`
-  tambahan per panel. **Batch 327** — user device sungguhan: rim-glow "terlalu tipis, hampir tak
+  6/N — Batch 326 mencoba ANIMATED (1 phase float dibagi via `LocalAuroraPhase`), TAPI
+  **DIREVERT Batch 328**: user device sungguhan lapor musik stuttering + lag/glitch swipe sheet
+  "Kontrol Lanjutan" — berbagi 1 `rememberInfiniteTransition` tetap memicu recomposition tiap
+  frame di semua panel (termasuk `MiniPlayerBar` yang selalu tervisible selama musik main).
+  Rim-glow kini **statis permanen** (bukan lagi kandidat animasi — keputusan final, proyek masuk
+  fase discontinued). **Batch 327** — user device sungguhan: rim-glow "terlalu tipis, hampir tak
   kasat mata"; alpha puncaknya dinaikkan ke token baru `AuroraRimGlowAlpha` (0.44f, terpisah dari
-  `AuroraGlowAlpha` 0.34f milik ambient wash yang tidak dikeluhkan/tidak disentuh). **Dengan
-  ini cakupan Aurora yang dikonfirmasi user Batch 306 (ambient background + rim-glow per-panel,
-  keduanya kini bergerak) SELESAI PENUH**, di atas color+typography+shape yang sudah lengkap
+  `AuroraGlowAlpha` 0.34f milik ambient wash yang tidak dikeluhkan/tidak disentuh) — nilai ini
+  TETAP dipakai statis pasca-revert Batch 328. **Dengan
+  ini cakupan Aurora yang dikonfirmasi user Batch 306 (ambient background bergerak + rim-glow
+  per-panel statis-terang) SELESAI**, di atas color+typography+shape yang sudah lengkap
   sejak Batch 309.
-  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-310, 326-327.
+  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-310, 326-328.
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)

@@ -36,48 +36,39 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
-**Batch 329 (Redesign placeholder "no cover" AlbumArt jadi lebih menarik, 1 file kode)** —
-User: "Redesign icon placeholder album musik yang kosong jadi lebih menarik!!"
+**Batch 328 (REVERT Aurora rim-glow animation — regresi performa dikonfirmasi user device
+sungguhan, 3 file kode)** — User: "lakukan perbaikan akhir sebelum masuk fase discontinued", scope
+dikonfirmasi eksplisit: "musik stuttering/mandek saat diputar, lagging & nge glitch saat swipe
+kontrol lanjutan".
 
-`AlbumArt()`/`AlbumArtFallbackIcon()` (`Utils.kt`) — 1 titik render dipakai app-wide (8 call
-site: Home, Library ×2, MiniPlayerBar, Now Playing ×2 termasuk backdrop `showIcon=false`), jadi
-cukup 1 file untuk mengubah tampilan "no cover" di mana pun sekaligus. Latar flat 1 warna →
-`Brush.radialGradient` lembut (tint `primary` 12% di tengah, meluruh ke `surfaceVariant` polos
-di tepi — efek spotlight halus). Ikon `MusicNote` filled 50%-alpha polos → `Icons.Rounded.
-MusicNote` di dalam badge lingkaran ber-tint `primary` (14% latar, 85% alpha ikon).
+**Root cause**: asumsi Batch 326 ("1 `rememberInfiniteTransition` dibagi via `LocalAuroraPhase` =
+aman, kekhawatiran performa Batch 310 tertangani") TERBUKTI KELIRU di device sungguhan. Berbagi 1
+instance transition memang mengurangi JUMLAH transition (12+ call site → 1), TAPI TIDAK
+menghilangkan bahwa phase berubah tiap frame (~16ms) tetap memicu recomposition brush di SEMUA
+consumer `frostedGlass()` sekaligus — termasuk `MiniPlayerBar` (SELALU tervisible selama musik
+main, bersaing langsung dgn thread audio/UI pas playback aktif) dan sheet "Kontrol Lanjutan" yang
+juga baca `frostedGlass()` sambil menangani gesture swipe. Analisis "1 instance = performa aman"
+Batch 326 keliru menyamakan "jumlah objek timer" dengan "jumlah recomposition" — 2 hal berbeda.
 
-Keduanya murni token `MaterialTheme.colorScheme` (0 literal warna Aurora/Tactile/Skeu baru) —
-otomatis ikut tiap tema × light/dark persis seperti fill flat lama, 0 percabangan per-tema.
-`radialGradient` dipanggil tanpa center/radius eksplisit → otomatis ikut ukuran box asli, 1 code
-path sama dari thumbnail 44dp (MiniPlayerBar) sampai hero 280dp (Now Playing). Signature publik
-`AlbumArt()` tidak berubah — 0 file caller disentuh. Brace/paren dicek seimbang (19/19 `{}`,
-77/77 `()`).
+**Keputusan (sesuai `STABILITY > Speed`)**: TIDAK ditambal/dioptimasi lebih jauh (mis.
+`derivedStateOf`, throttle update, scope animasi ke kondisi tertentu) — DIREVERT PENUH ke statis,
+konsisten rasionalisasi ASLI Batch 310 yang sempat (keliru) dianggap sudah teratasi Batch 326.
+Alasan tidak coba optimasi lanjutan: proyek akan masuk fase discontinued — lebih aman berhenti di
+state statis yang sudah terbukti stabil (Batch 306-310, 325) daripada wariskan animasi belum
+matang tanpa sesi lanjutan utk iterasi.
 
-**Ringkasan file** — 1 file kode (di bawah batas Micro-Batch). `FILE_MANIFEST.txt` tidak
-berubah (188/188). Docs disinkronkan: README.md (banner "Update terbaru"), CHANGELOG.md.
+**3 file**: `Theme.kt` (`LocalAuroraPhase` DIHAPUS, bukan ditinggal dead code — cegah re-enable
+ceroboh tanpa re-baca rasionalisasi ini), `MainActivity.kt` (**Protected, edit parsial** — blok
+`auroraPhaseTransition`/`auroraPhase` DIHAPUS, `CompositionLocalProvider` balik ke
+`LocalHazeState` saja, 5 import animasi tak terpakai dibuang), `BlurUtils.kt` (Aurora branch balik
+ke `Brush.linearGradient` statis, import `lerp` tak terpakai dibuang). **Alpha Batch 327
+(`AuroraRimGlowAlpha` 0.44f + taper 0.85x/0.65x/0.46x) TETAP dipertahankan** — itu bukan penyebab
+regresi (keluhan alpha & keluhan stutter adalah 2 laporan device terpisah), rasionalisasinya sudah
+benar. Brace/paren dicek seimbang ketiganya (Theme.kt 14/14 `{}` 206/206 `()`; MainActivity.kt
+256/256 `{}` 623/623 `()`; BlurUtils.kt 9/9 `{}` 153/153 `()`).
 
-**Batch 328 (Fix Radio Auto-Continue + Shuffle mati total saat antrean benar-benar mentok, 1
-file kode)** — User laporkan: "Mode radio, shuffle gak berfungsi sama sekali saat daftar
-playlist musik user benar-benar habis/mentok!!"
-
-**Root cause** — `continuePlaybackIfQueueEnded()` (`PlayerViewModel.kt`) sebelumnya panggil
-`c.seekToNextMediaItem()` tepat setelah `c.addMediaItems()`. `MediaController` men-cache lokal
-("mask") hasil command supaya panggilan berantai berikutnya terasa sinkron, TAPI resolusi
-"next" itu bergantung `ShuffleOrder` yang baru saja disisipi — saat shuffle aktif & antrean
-lama sudah BENAR-BENAR habis (posisi sekarang = paling akhir di urutan shuffle lama), lagu
-baru bisa ke-mask jatuh SEBELUM posisi sekarang di urutan shuffle yang baru, jadi
-`seekToNextMediaItem()` diam-diam no-op: antrean di UI kelihatan bertambah (state sudah
-di-update duluan) tapi player tidak pernah lanjut — persis gejala "mati total" yang dilaporkan.
-
-**Fix** — index linear pasti dari lagu baru pertama ditangkap SEBELUM `addMediaItems()`
-(`c.mediaItemCount`, selalu = posisi sisip, terlepas urutan shuffle), lalu lompat langsung via
-`c.seekTo(insertionIndex, 0)` — tidak lagi bergantung resolusi "next" ExoPlayer/shuffle sama
-sekali. Fix bersifat umum (bukan cabang kondisional per mode), berlaku sama baik shuffle aktif
-maupun tidak. Brace/paren dicek seimbang (221/221 `{}`, 795/795 `()`).
-
-**Ringkasan file** — 1 file kode (di bawah batas Micro-Batch). `FILE_MANIFEST.txt` tidak
-berubah (188/188 — diverifikasi ulang `find . -type f | wc -l`). Docs disinkronkan: README.md
-(banner "Update terbaru"), CHANGELOG.md.
+**Ringkasan file** — 3 file kode (pas batas Micro-Batch). `FILE_MANIFEST.txt` tidak berubah
+(188/188). Docs disinkronkan.
 
 **Batch 327 (Naikkan alpha rim-glow Aurora — token baru `AuroraRimGlowAlpha`, 2 file kode)** —
 User dikonfirmasi lewat `ask_user_input_v0`: keluhan "terlalu tipis, hampir tak kasat mata"

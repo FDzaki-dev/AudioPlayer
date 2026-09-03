@@ -17,10 +17,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,9 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -55,15 +52,6 @@ import java.util.Locale
  * (the deprecated per-album cache authority) — that table is frequently empty on modern
  * Android, so most albums silently fell back to the icon below even when the song actually
  * has embedded art. Coil resolves a song's own content URI reliably instead.
- *
- * Batch 329 (laporan user, "placeholder kosong kurang menarik") — the "no cover" look itself
- * redesigned: flat single-tone [surfaceVariant] tile → soft off-center radial tint, and the
- * bare 50%-alpha note icon → an accent-tinted circular badge around a softer [Icons.Rounded]
- * glyph. Both pieces are still built purely from `MaterialTheme.colorScheme` (no hardcoded
- * Aurora/Tactile/Skeu literals here), so the nicer look adapts automatically across every
- * theme × light/dark combo exactly like the old flat fill did — zero per-theme branching
- * added. Every call site (Home/Library/MiniPlayerBar/Now Playing) picks this up for free since
- * none of them pass anything beyond [artworkUri]/[modifier]/[contentScale]/[showIcon].
  */
 @Composable
 fun AlbumArt(
@@ -73,7 +61,7 @@ fun AlbumArt(
     showIcon: Boolean = true
 ) {
     Box(
-        modifier = modifier.background(albumArtFallbackBrush()),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
         if (artworkUri != null) {
@@ -91,35 +79,14 @@ fun AlbumArt(
     }
 }
 
-/** Gentle off-center spotlight over [surfaceVariant] (a hint of [primary] mixed in toward the
- * center, fading back to the plain surface tone at the edges) instead of one dead-flat fill —
- * reads like a soft glow sitting behind the badge in [AlbumArtFallbackIcon], not a gray tile.
- * No explicit center/radius passed to [Brush.radialGradient] on purpose — Compose sizes it to
- * the actual draw bounds automatically, so this scales correctly from a 44dp MiniPlayerBar
- * thumbnail up to a 280dp Now Playing hero with the same one code path. */
-@Composable
-private fun albumArtFallbackBrush(): Brush {
-    val base = MaterialTheme.colorScheme.surfaceVariant
-    val glow = lerp(base, MaterialTheme.colorScheme.primary, 0.12f)
-    return Brush.radialGradient(colors = listOf(glow, base))
-}
-
 @Composable
 private fun AlbumArtFallbackIcon() {
-    val accent = MaterialTheme.colorScheme.primary
-    Box(
-        modifier = Modifier
-            .fillMaxSize(0.56f)
-            .background(accent.copy(alpha = 0.14f), CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            Icons.Rounded.MusicNote,
-            contentDescription = null,
-            tint = accent.copy(alpha = 0.85f),
-            modifier = Modifier.fillMaxSize(0.5f)
-        )
-    }
+    Icon(
+        Icons.Default.MusicNote,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier.fillMaxSize(0.4f)
+    )
 }
 
 /**

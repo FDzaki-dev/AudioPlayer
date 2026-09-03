@@ -1,43 +1,23 @@
 # Changelog
 
-## Batch 329 — Redesign placeholder "no cover" AlbumArt jadi lebih menarik, 1 file kode
-User: "Redesign icon placeholder album musik yang kosong jadi lebih menarik!!"
+## Batch 328 — REVERT Aurora rim-glow animation, regresi performa dikonfirmasi user, 3 file kode
+User: "lakukan perbaikan akhir sebelum masuk fase discontinued" → scope dikonfirmasi: "musik
+stuttering/mandek saat diputar, lagging & nge glitch saat swipe kontrol lanjutan".
 
-`AlbumArt()`/`AlbumArtFallbackIcon()` (`Utils.kt`) — satu-satunya tempat "no cover" dirender,
-dipakai app-wide (Home/Library/MiniPlayerBar/Now Playing) lewat 8 call site, jadi 1 file ini
-cukup untuk mengubah tampilannya di mana pun. Latar flat 1 warna (`surfaceVariant` polos) diganti
-`Brush.radialGradient` lembut yang men-tint sedikit ke `primary` (12%) di tengah lalu meluruh
-balik ke `surfaceVariant` di tepi — efek "spotlight" halus, bukan lagi ubin abu mati. Ikon
-`Icons.Default.MusicNote` 50%-alpha polos diganti `Icons.Rounded.MusicNote` di dalam badge
-lingkaran ber-tint `primary` (14% latar badge, 85% alpha ikon) — lebih berwarna & terasa
-"didesain" alih-alih simbol pudar mengambang sendirian.
+**Root cause**: asumsi Batch 326 ("1 `rememberInfiniteTransition` dibagi = performa aman")
+keliru. Berbagi 1 instance mengurangi JUMLAH transition (12+→1) tapi tidak menghilangkan bahwa
+phase berubah tiap frame memicu recomposition brush di semua consumer `frostedGlass()` sekaligus
+— termasuk `MiniPlayerBar` (selalu tervisible selama musik main) dan sheet "Kontrol Lanjutan".
 
-Keduanya murni dibangun dari `MaterialTheme.colorScheme` (0 literal warna Aurora/Tactile/Skeu
-baru) — otomatis menyesuaikan tiap kombinasi tema × light/dark persis seperti fill flat lama,
-0 percabangan per-tema ditambahkan. `Brush.radialGradient` dipanggil tanpa center/radius eksplisit
-supaya otomatis mengikuti ukuran box sungguhan — 1 code path yang sama berlaku dari thumbnail
-44dp (MiniPlayerBar) sampai hero 280dp (Now Playing). Signature publik `AlbumArt()` tidak
-berubah sama sekali, jadi 0 file caller perlu disentuh. Brace/paren dicek seimbang (19/19 `{}`,
-77/77 `()`).
+**Keputusan**: direvert penuh ke statis (bukan ditambal/dioptimasi lebih jauh), sesuai
+`STABILITY > Speed` dan mengingat proyek akan masuk fase discontinued. Alpha Batch 327
+(`AuroraRimGlowAlpha` 0.44f + taper 0.85x/0.65x/0.46x) tetap dipertahankan statis — bukan
+penyebab regresi.
 
-## Batch 328 — Fix Radio Auto-Continue + Shuffle mati total saat antrean benar-benar mentok, 1 file kode
-User laporkan: "Mode radio, shuffle gak berfungsi sama sekali saat daftar playlist musik user
-benar-benar habis/mentok!!"
-
-Root cause: `continuePlaybackIfQueueEnded()` (`PlayerViewModel.kt`) sebelumnya memanggil
-`c.seekToNextMediaItem()` langsung setelah `c.addMediaItems()`. `MediaController` men-cache
-lokal ("mask") hasil command supaya panggilan berantai terasa sinkron, tapi resolusi "next" itu
-bergantung `ShuffleOrder` yang baru saja disisipi — saat shuffle aktif & antrean benar-benar
-habis (posisi sekarang = paling akhir di urutan shuffle lama), lagu baru bisa ke-mask jatuh
-SEBELUM posisi sekarang di urutan shuffle baru, jadi `seekToNextMediaItem()` diam-diam no-op:
-antrean di UI kelihatan bertambah (state sudah di-update) tapi player tidak pernah lanjut —
-persis gejala "mati total" yang dilaporkan.
-
-Fix: index linear pasti dari lagu baru pertama ditangkap SEBELUM `addMediaItems()`
-(`c.mediaItemCount`, selalu sama dengan posisi sisip, terlepas urutan shuffle), lalu lompat
-langsung via `c.seekTo(insertionIndex, 0)` — tidak lagi bergantung resolusi "next" ExoPlayer/
-shuffle sama sekali. Berlaku sama baik shuffle aktif maupun tidak (fix umum, bukan cabang
-kondisional per mode). Brace/paren dicek seimbang (221/221 `{}`, 795/795 `()`).
+3 file: `Theme.kt` (`LocalAuroraPhase` dihapus penuh, bukan ditinggal dead code),
+`MainActivity.kt` (Protected/edit parsial — blok phase computation dihapus, provider balik ke
+`LocalHazeState` saja, 5 import tak terpakai dibuang), `BlurUtils.kt` (Aurora branch balik ke
+`Brush.linearGradient` statis, import `lerp` dibuang).
 
 ## Batch 327 — Naikkan alpha rim-glow Aurora — token baru `AuroraRimGlowAlpha`, 2 file kode
 User (device sungguhan): "terlalu tipis, hampir tak kasat mata" — dikonfirmasi lewat

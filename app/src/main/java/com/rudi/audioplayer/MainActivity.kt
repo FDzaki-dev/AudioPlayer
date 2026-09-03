@@ -17,11 +17,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -136,7 +131,6 @@ import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
 import com.rudi.audioplayer.ui.theme.calmGrain
 import com.rudi.audioplayer.ui.theme.auroraGlow
 import com.rudi.audioplayer.ui.theme.LocalHazeState
-import com.rudi.audioplayer.ui.theme.LocalAuroraPhase
 import dev.chrisbanes.haze.rememberHazeState
 import dev.chrisbanes.haze.hazeSource
 
@@ -540,27 +534,15 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     // file. 0 consumer sama sekali batch ini (belum ada .hazeSource()/.hazeEffect() dipasang
     // di manapun) — murni plumbing, 0 perubahan visual.
     val hazeState = rememberHazeState()
-    // Batch 326 — LocalAuroraPhase (Theme.kt), sama pola persis hazeState di atas: 1 phase float
-    // dihitung 1 kali di sini, diteruskan ke `frostedGlass()` (BlurUtils.kt) via CompositionLocal
-    // supaya 12+ call site rim-glow tidak masing-masing bikin `rememberInfiniteTransition`
-    // sendiri (kekhawatiran performa eksplisit Batch 310). Resep animasi (durasi/easing/
-    // RepeatMode) SENGAJA disalin persis dari `auroraGlow()` (TactileDepth.kt, Batch 306) —
-    // bukan angka baru, supaya ambient wash root & rim-glow panel terasa satu keluarga gerakan
-    // walau 2 transition terpisah (root Surface's `auroraGlow()` TIDAK disentuh batch ini, 0
-    // risiko ke situ). `rememberInfiniteTransition`/`animateFloat` jalan tanpa syarat (bukan
-    // cuma saat tema Aurora aktif) — biaya 1 animateFloat kosong utk 4 tema lain diputuskan
-    // dapat diterima (sama persis `hazeState` di atas yang juga selalu dihitung tanpa syarat
-    // identitas tema apa pun), jauh lebih murah dari alternatif "if/else di tiap consumer".
-    val auroraPhaseTransition = rememberInfiniteTransition(label = "auroraRimGlowPhase")
-    val auroraPhase by auroraPhaseTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 20000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "auroraRimGlowPhaseValue"
-    )
+    // Batch 326 sempat menambah `auroraPhaseTransition`/`auroraPhase` di sini (1
+    // `rememberInfiniteTransition` dibagi ke semua `frostedGlass()` rim-glow lewat
+    // `LocalAuroraPhase`). Batch 328 MENGHAPUS BALIK — user (device sungguhan): musik
+    // stuttering/mandek + lag/glitch saat swipe sheet "Kontrol Lanjutan". Asumsi Batch 326
+    // ("1 instance dibagi = aman") terbukti keliru: phase berubah tiap frame tetap memicu
+    // recomposition brush di semua consumer sekaligus, termasuk `MiniPlayerBar` yang selalu
+    // tervisible selama musik main — bersaing langsung dgn thread audio/UI. Rasionalisasi penuh:
+    // `PROJECT_STATE.md`/`CHANGELOG.md` Batch 328, komentar Aurora branch `frostedGlass()`
+    // (BlurUtils.kt).
     val uiState by playerViewModel.uiState.collectAsStateWithLifecycle()
     val favoriteIds by playerViewModel.favoriteIds.collectAsStateWithLifecycle()
     val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsStateWithLifecycle()
@@ -891,7 +873,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     // atas) supaya scope-nya jelas 1 titik, sama gaya CompositionLocalProvider yang SUDAH ADA
     // di file ini (Batch 24, baris ~210) — badan blok TIDAK di-reindent (pola sama persis
     // Batch 24: minim-diff, bukan reformat besar-besaran demi estetika indentasi).
-    CompositionLocalProvider(LocalHazeState provides hazeState, LocalAuroraPhase provides auroraPhase) {
+    CompositionLocalProvider(LocalHazeState provides hazeState) {
     Scaffold(
         snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
