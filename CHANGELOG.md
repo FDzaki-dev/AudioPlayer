@@ -1,5 +1,52 @@
 # Changelog
 
+## Batch 337 — BUG FIX: Batch 336 (art box adaptif) terbukti belum cukup — root cause satu level lebih dalam, FeatureHintBanner ~150dp (1 file kode)
+User konfirmasi via klarifikasi: "Layar pendek: tombol transport MASIH belum kejangkau walau
+discroll habis (Batch 336 belum ngefek)".
+
+**Root cause — ditelusuri ulang ke histori Batch 112** (kebijakan Batch 24: fix resmi sudah
+diikuti tapi gejala identik/berlanjut → curigai akar beda level, jangan ulangi variasi kecil dari
+pendekatan sama). Catatan asli Batch 112 (sumber jaring pengaman ini) eksplisit menyebut
+`FeatureHintBanner` (~150dp, kalau belum di-dismiss user) sebagai salah satu kontributor UTAMA
+overflow di layar pendek — setara atau lebih besar dari Box art 300dp, terutama dikombinasikan
+3-button nav (masih umum di device Android 15 ke bawah/budget). Batch 336 hanya menyusutkan art
+box; `FeatureHintBanner` (juga bagian fixed header zone, tidak pernah disentuh) tetap jadi
+bottleneck utama ruang scroll — itu sebabnya perbaikan Batch 336 "belum ngefek" di device user:
+lever yang ditarik bukan yang paling dominan.
+
+**Fix**: `FeatureHintBanner` (0 custom gesture handling — cuma `Card` + teks + tombol dismiss,
+aman dipindah) dipindah dari fixed header zone menjadi child PERTAMA di dalam
+`Column(Modifier.weight(1f).verticalScroll(...))` (Batch 334/335/336) — sekarang ikut menjadi
+bagian yang bisa "discroll lewat" untuk menjangkau transport row, bukan lagi permanen
+menghabiskan jatah fixed zone yang tidak bisa direbut scroll apa pun. Trade-off yang sengaja
+diambil: urutan visual hint banner geser dari SEBELUM Box art menjadi SESUDAH Box art (masih di
+atas judul lagu) — reachability transport row (fungsi inti aplikasi) diprioritaskan di atas
+posisi visual hint banner (onboarding sekali-tampil, dismissable, non-esensial).
+
+Box gesture art (fix nested-scroll-conflict Batch 334), fix overscroll glow (`overscrollEffect =
+null`, Batch 335), dan art box adaptif berbasis `LocalConfiguration` (Batch 336) — **ketiganya 0
+disentuh**, tetap berlaku bersamaan. Ini PELENGKAP, bukan pengganti, Batch 336 — kedua fix
+sama-sama mengurangi porsi fixed non-scrollable, cuma target elemen berbeda (art vs hint banner).
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 0 import baru (dipindah, bukan ditambah —
+`FeatureHintBanner` sudah diimpor/dipakai sebelumnya di file yang sama). Brace/paren dicek
+seimbang (225/225, 880/880).
+
+**Belum divalidasi compile Gradle sungguhan** (0 akses jaringan/SDK di sandbox sesi ini) —
+**WAJIB cek CI setelah push**. Risiko sintaks rendah — perubahan murni pemindahan blok kode
+(`if (showNowPlayingHint) { ... }`) ke lokasi lain di Column yang sama, 0 logic/API baru.
+
+**Belum diverifikasi visual di device** — prioritas cek: (1) layar pendek, hint banner BELUM
+di-dismiss (kondisi paling ketat) — scroll konten sampai habis, transport row (shuffle/prev/
+play/next/repeat) HARUS kejangkau penuh sekarang; (2) hint banner tampil SESUDAH piringan album
+art (posisi baru, bukan sebelum lagi) — tombol dismiss-nya harus tetap berfungsi normal & tidak
+terpotong; (3) layar normal/tinggi — pastikan 0 regresi visual lain selain posisi hint banner
+yang memang sengaja dipindah. **Kalau transport MASIH belum kejangkau setelah batch ini** —
+3 batch beruntun (335/336/337) sama-sama berstatus "belum diverifikasi compile" — curigai
+selanjutnya CI/build sungguhan belum pernah sukses sama sekali sejak Batch 335 (root cause di
+level pipeline, bukan lagi di level kode Compose); minta user cek status GitHub Actions run
+terbaru sebelum sesi berikutnya lanjut mengubah kode `NowPlayingScreen.kt` lagi.
+
 ## Batch 336 — BUG FIX: transport row TETAP tidak kejangkau via scroll di layar pendek, jaring pengaman Batch 112/334 regresi nyata (1 file kode)
 User laporan device: dikonfirmasi lewat 3 opsi klarifikasi (overscroll glow / transport
 kepotong-tidak kejangkau / scroll di layar lain) — user pilih **"transport masih

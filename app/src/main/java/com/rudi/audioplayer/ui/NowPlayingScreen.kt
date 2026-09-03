@@ -419,16 +419,11 @@ fun NowPlayingScreen(
             }
         }
 
-        if (showNowPlayingHint) {
-            Spacer(modifier = Modifier.height(8.dp))
-            FeatureHintBanner(
-                text = "Geser di kiri/kanan piringan buat atur kecerahan & volume HP. Ketuk ⋮ buat Sleep Timer, Kecepatan, dan Equalizer.",
-                onDismiss = {
-                    showNowPlayingHint = false
-                    hintStore.markNowPlayingHintSeen()
-                }
-            )
-        }
+        // Batch 337 — hint banner (~150dp, Batch 112's own catatan) DIPINDAH dari sini ke dalam
+        // Column scrollable di bawah (lihat komentar Batch 337 di sana) — bukan lagi bagian
+        // fixed zone. Zero gesture handling di banner ini (cuma Card+teks+tombol dismiss), jadi
+        // aman dipindah ke ancestor scrollable, 0 regresi ke fix Batch 334 (itu spesifik soal
+        // Box gesture brightness/volume yang TETAP tidak boleh py ancestor scrollable).
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -553,6 +548,33 @@ fun NowPlayingScreen(
                 .verticalScroll(state = rememberScrollState(), overscrollEffect = null),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+
+        // Batch 337 — BUG FIX (laporan user, device): Batch 336 (album art box adaptif) TIDAK
+        // CUKUP — "belum ngefek" di device user. Root cause SATU LEVEL LEBIH DALAM (kebijakan
+        // Batch 24: fix resmi sudah diikuti, gejala IDENTIK, curigai akar beda): `FeatureHintBanner`
+        // (~150dp, dicatat eksplisit di root cause asli Batch 112) SEBELUMNYA ada di fixed header
+        // zone (sebelum Box art) — elemen fixed ~150dp INI, bukan cuma art 300dp, yang jadi
+        // kontributor terbesar ke penyempitan ruang scroll di layar pendek (khususnya kombinasi
+        // 3-button nav + hint belum di-dismiss user, persis skenario asli Batch 112). Susutkan
+        // art (Batch 336) saja tidak cukup selama hint banner MASIH fixed & tidak bisa direbut
+        // ulang ruangnya oleh scroll. FIX: banner ini (0 gesture handling — cuma Card+teks+tombol
+        // dismiss, aman dipindah, 0 regresi Batch 334) dipindah jadi child PERTAMA di Column
+        // scrollable ini — sekarang ikut jadi bagian yang bisa "discroll lewat" utk menjangkau
+        // transport row di layar pendek, alih-alih permanen menghabiskan jatah fixed zone yang
+        // tidak pernah bisa diciutkan scroll. Urutan visual SEDIKIT berubah (hint sekarang di
+        // BAWAH piringan art, bukan di ATAS lagi, sebelum art) — trade-off sengaja diambil demi
+        // reachability transport row (fungsi inti) di atas posisi visual hint (onboarding,
+        // sekali tampil, dismissable).
+        if (showNowPlayingHint) {
+            FeatureHintBanner(
+                text = "Geser di kiri/kanan piringan buat atur kecerahan & volume HP. Ketuk ⋮ buat Sleep Timer, Kecepatan, dan Equalizer.",
+                onDismiss = {
+                    showNowPlayingHint = false
+                    hintStore.markNowPlayingHintSeen()
+                }
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 

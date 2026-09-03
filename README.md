@@ -8,17 +8,15 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 336 (Bug fix: transport row tidak kejangkau via scroll di layar
-> pendek, 1 file):** Regresi nyata dari jaring pengaman Batch 112/334, akar beda dari fix
-> overscroll Batch 335 — header hasil split Batch 334 (tombol atas + hint + Box album art fixed
-> `300.dp`, sengaja tidak scrollable demi gesture brightness/volume) mengunci porsi tetap tinggi
-> layar; di layar pendek (landscape/split-screen/foldable tertutup) sisa ruang buat Column
-> konten scrollable bisa kepepet nyaris 0dp — transport row jadi tidak kejangkau walau discroll.
-> Fix: tinggi Box album art dihitung adaptif dari `LocalConfiguration.current.screenHeightDp`
-> — tetap persis `300.dp` di layar normal/tinggi (0 perubahan visual), disusutkan proporsional
-> (lantai `160.dp`) di layar pendek supaya ruang scroll cukup. Gesture zone tetap di luar
-> ancestor scrollable (0 regresi fix Batch 334); fix overscroll Batch 335 tidak disentuh.
-> `NowPlayingScreen.kt` (non-protected).
+> 🆕 **Update terbaru — Batch 337 (Bug fix: transport row masih tidak kejangkau setelah Batch
+> 336, root cause satu level lebih dalam, 1 file):** Batch 336 (art box adaptif) terbukti belum
+> cukup — ditelusuri ulang ke histori Batch 112: `FeatureHintBanner` (~150dp saat belum
+> di-dismiss) adalah kontributor UTAMA lain yang belum tersentuh, tetap fixed & tidak bisa
+> direbut ruang oleh scroll. Fix: hint banner dipindah dari header fixed jadi bagian dalam
+> Column scrollable (sekarang ikut bisa "discroll lewat") — urutan visualnya geser jadi sesudah
+> piringan album (bukan sebelum lagi). Box gesture art (Batch 334), fix overscroll (Batch 335),
+> & art box adaptif (Batch 336) semuanya tetap berlaku, saling melengkapi. `NowPlayingScreen.kt`
+> (non-protected).
 > Batch 334 (Bug fix: gesture kecerahan/volume bentrok scroll, 1 file):
 > Swipe kecerahan/volume di piringan Now Playing sebelumnya tersendat/salah kebaca sebagai
 > scroll layar — root cause: Column induk (jaring pengaman layar pendek, Batch 112) membungkus

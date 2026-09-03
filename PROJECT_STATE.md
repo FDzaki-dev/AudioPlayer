@@ -36,6 +36,37 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 337 (BUG FIX — Batch 336 (art box adaptif) TERBUKTI belum cukup, "belum ngefek" di
+device user; root cause satu level lebih dalam: FeatureHintBanner ~150dp, 1 file kode)** — User
+konfirmasi lewat klarifikasi: opsi "Layar pendek: tombol transport MASIH belum kejangkau walau
+discroll habis (Batch 336 belum ngefek)". Sesuai kebijakan Batch 24 (fix resmi sudah diikuti,
+gejala identik/berlanjut → curigai akar beda, jangan ulangi variasi kecil), ditelusuri ulang
+histori Batch 112 (asal jaring pengaman ini) — catatan aslinya EKSPLISIT sebut `FeatureHintBanner`
+(~150dp) sebagai salah satu kontributor UTAMA overflow, setara/lebih besar dari art 300dp,
+terutama dikombinasikan 3-button nav. Batch 336 cuma susutkan art; hint banner (juga fixed,
+tidak pernah disentuh) tetap jadi bottleneck ruang scroll — itu kenapa "belum ngefek".
+
+**Fix**: `FeatureHintBanner` (0 gesture handling — cuma Card+teks+tombol dismiss, aman dipindah)
+dipindah dari fixed header zone jadi child PERTAMA di dalam Column scrollable
+(`weight(1f).verticalScroll(...)`, Batch 334/335/336) — sekarang ikut bisa "discroll lewat" utk
+menjangkau transport row, bukan lagi permanen menghabiskan jatah fixed zone yang tidak bisa
+direbut scroll. Trade-off sengaja: urutan visual hint geser dari SEBELUM art jadi SESUDAH art
+(masih di atas judul lagu) — reachability transport (fungsi inti) diprioritaskan di atas posisi
+visual hint (onboarding sekali-tampil, dismissable). Box gesture art (Batch 334) & fix overscroll
+(Batch 335) & art box adaptif (Batch 336) 0 disentuh, tetap berlaku bersamaan (saling melengkapi,
+bukan saling gantikan).
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 0 import baru. Brace/paren seimbang
+(225/225, 880/880). **Belum diverifikasi compile Gradle sungguhan** (0 akses jaringan/SDK di
+sandbox) — **WAJIB cek CI setelah push**. **Belum diverifikasi visual di device** — prioritas
+cek: (1) layar pendek + hint banner BELUM di-dismiss — scroll konten, transport row HARUS
+kejangkau sekarang; (2) hint banner tampil SESUDAH piringan art (bukan sebelum lagi) — pastikan
+tombol dismiss-nya tetap berfungsi & tidak terpotong; (3) layar normal — pastikan tidak ada
+regresi visual selain posisi hint yang memang sengaja pindah. Kalau MASIH belum kejangkau setelah
+ini, curigai berikutnya: CI/build sungguhan belum pernah sukses sejak Batch 335 (3 batch beruntun
+"belum diverifikasi compile" — minta user cek status Actions run terbaru sebelum lanjut fix
+kode lagi). Detail: `CHANGELOG.md` Batch 337.
+
 **Batch 336 (BUG FIX — transport row TETAP TIDAK kejangkau via scroll di layar pendek, jaring
 pengaman Batch 112/334 regresi nyata, root cause beda level dari Batch 335, 1 file kode)** — User
 laporan device: dari 3 opsi klarifikasi (overscroll glow / transport kepotong-tidak kejangkau /
