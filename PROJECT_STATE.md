@@ -36,6 +36,51 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 344 (Fix sistemik: cover art letterbox — `ContentScale.Fit` → `Crop` di 1 fungsi
+bersama `AlbumArt()`, 1 file kode)** — User kirim screenshot lagu "TOBI - Warm Up Mix 2023" +
+instruksi "saya mau layout normal dan generik". Screenshot: kotak seni utama Now Playing (hero
+280dp) tampil dgn bar kosong solid di atas & bawah gambar (mirip letterbox video) — foto
+konser/kembang api TIDAK penuh mengisi kotak persegi, beda drastis dari artwork lagu di
+screenshot Batch 342/343 sebelumnya (penuh edge-to-edge, 0 bar).
+
+**Root cause (dikonfirmasi via kode).** `AlbumArt()` (`Utils.kt`) — composable BERSAMA dipakai
+di 6 titik seluruh app (MiniPlayerBar 44dp, LibraryScreen grid album `aspectRatio(1f)` + row
+48dp, HomeScreen 56dp + 120dp, NowPlayingScreen hero 280dp) — punya default parameter
+`contentScale = ContentScale.Fit`. `Fit` mempertahankan SELURUH gambar tanpa crop di dalam
+batas kotak — untuk artwork non-1:1 (kasus nyata: thumbnail video 16:9 ikut ke-embed saat lagu
+di-rip/tag dari YouTube, umum utk file DJ-mix/mashup), sisa ruang kosong di atas/bawah gambar
+menampilkan `Box.background(surfaceVariant)` polos — di tema gelap kelihatan persis bar hitam
+letterbox. Grep konfirmasi: dari 6 titik pemakaian, HANYA 1 (backdrop blur full-screen Now
+Playing, `NowPlayingScreen.kt` ~baris 368) eksplisit override `Crop` sejak awal — makanya bug
+ini tidak pernah kelihatan di backdrop, tapi laten di 5 titik lain (kotak seni utama/thumbnail),
+baru nampak saat kebetulan artwork lagu yang diputar bukan rasio persegi. Preseden project
+sendiri sudah konsisten ke arah Crop: widget home-screen (`widget_player.xml`, Batch 204) sudah
+`centerCrop`, bukan letterbox — genre-standar universal (Spotify/Apple Music/YouTube Music
+SELALU crop-fill cover art) — persis makna "normal dan generik" yang diminta user.
+
+**Fix.** `Utils.kt`: `contentScale: ContentScale = ContentScale.Fit` → `= ContentScale.Crop`.
+Karena DEFAULT di fungsi bersama, 5 titik yang sebelumnya diam-diam mengandalkannya (MiniPlayerBar,
+Library×2, Home×2, hero Now Playing) otomatis ikut benar sekaligus — TIDAK perlu sentuh 5 file
+caller satu per satu (lebih aman, permukaan diff lebih kecil daripada override eksplisit per
+titik). Override `Crop` eksplisit di backdrop blur Now Playing SENGAJA TIDAK dihapus meski kini
+redundan — bukan bagian dari bug ini, `ZERO-REFACTOR`.
+
+**1 file**: `Utils.kt` (non-protected) — 1 default parameter diganti + 1 blok komentar
+root-cause. 0 logic lain di fungsi disentuh (fallback icon, tinted background "no cover",
+loading/error state `SubcomposeAsyncImage` — semua persis sama). 0 dari 6 titik pemakaian
+`AlbumArt()` di-edit langsung. Brace/paren seimbang (17/17 `{}`, 74/74 `()`, RAW = strip-komentar
+karena tambahan cuma komentar dokumentasi, 0 kode struktural baru). `FILE_MANIFEST.txt` tidak
+berubah.
+
+**Belum diverifikasi compile Gradle sungguhan** — WAJIB cek CI. Risiko sintaks sangat rendah
+(ganti 1 nilai default parameter enum, keduanya API resmi Compose UI yang sudah dipakai project
+ini). **Belum diverifikasi visual di device** — prioritas cek: (1) kotak seni utama Now Playing
+lagu artwork non-1:1 sekarang penuh mengisi 280dp, 0 bar kosong; (2) ke-4 titik thumbnail lain
+(MiniPlayerBar, Library grid & row, Home) konsisten crop-fill juga; (3) lagu artwork PERSEGI
+(mis. cover Batch 342/343) tampilan TIDAK berubah (Crop pada gambar sudah persegi = identik
+hasil dgn Fit sebelumnya, regresi visual 0); (4) lagu tanpa artwork — fallback icon `MusicNote`
+tetap normal (jalur `showIcon`, tidak tersentuh). Detail: `CHANGELOG.md` Batch 344.
+
 **Batch 343 (Fix 2 laporan user dalam 1 pesan: kontrol transport "mengambang" + ikon Info Row
 atas anomali, NowPlayingScreen, 1 file kode)** — User kirim screenshot + instruksi eksplisit:
 "bagian pemutar dilarang keras untuk mengambang/tidak menyentuh dasar sama sekali" DAN

@@ -52,12 +52,31 @@ import java.util.Locale
  * (the deprecated per-album cache authority) — that table is frequently empty on modern
  * Android, so most albums silently fell back to the icon below even when the song actually
  * has embedded art. Coil resolves a song's own content URI reliably instead.
+ *
+ * Batch 344 — BUG FIX (laporan user, screenshot): default [contentScale] SEBELUMNYA
+ * `ContentScale.Fit` — untuk lagu dengan embedded artwork NON-1:1 (mis. thumbnail video
+ * 16:9 yang ikut ke-embed saat rip/tag dari YouTube, kasus nyata user: "TOBI - Warm Up Mix
+ * 2023"), `Fit` mempertahankan seluruh gambar TANPA crop di dalam kotak persegi manapun
+ * (44dp MiniPlayerBar, 48dp/56dp/120dp Library/Home, 280dp hero Now Playing) — sisa
+ * ruang kosong di atas/bawah gambar menampilkan `background(surfaceVariant)` polos, kelihatan
+ * seperti bar hitam/letterbox video, PERSIS "tidak normal/generik" yang dilaporkan. Root cause
+ * SISTEMIK (default di 1 fungsi bersama ini), bukan spesifik 1 layar — SEMUA 6 titik pemakaian
+ * [AlbumArt] app ini (grep) mengandalkan default ini, 0 satu pun override eksplisit KECUALI
+ * backdrop blur Now Playing (`NowPlayingScreen.kt`, sudah `Crop` sejak awal — makanya bug ini
+ * baru kelihatan di kotak seni ART UTAMA/thumbnail, bukan di backdrop). Preseden project SENDIRI
+ * juga sudah konsisten: widget home-screen (`widget_player.xml`, Batch 204) pakai `centerCrop`,
+ * bukan letterbox — dan itu genre-standar universal (Spotify/Apple Music/YouTube Music SELALU
+ * crop-fill cover art, tidak pernah pillarbox/letterbox apa pun rasio sumbernya).
+ * Fix: default diganti `ContentScale.Crop` — cover art SEKARANG selalu penuh mengisi kotaknya
+ * (crop sisi berlebih, 0 bar kosong) di ke-6 titik pemakaian sekaligus, konsisten dgn genre app
+ * ini & preseden widget. Override eksplisit `Crop` di backdrop blur Now Playing SENGAJA TIDAK
+ * dihapus walau kini redundan — bukan bagian dari bug ini, ZERO-REFACTOR.
  */
 @Composable
 fun AlbumArt(
     artworkUri: Uri?,
     modifier: Modifier = Modifier,
-    contentScale: ContentScale = ContentScale.Fit,
+    contentScale: ContentScale = ContentScale.Crop,
     showIcon: Boolean = true
 ) {
     Box(

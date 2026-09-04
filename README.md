@@ -8,7 +8,14 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 343 (Fix laporan user: kontrol transport "mengambang" + ikon Info
+> 🆕 **Update terbaru — Batch 344 (Fix sistemik cover art letterbox, `Utils.kt`, 1 file):**
+> Kotak seni Now Playing (& 4 titik thumbnail lain: MiniPlayerBar/Library/Home) sebelumnya bisa
+> tampil dgn bar kosong di atas/bawah untuk artwork non-1:1 (mis. thumbnail video 16:9 ikut
+> ke-embed dari YouTube) — mirip letterbox. Root cause: default `contentScale` fungsi bersama
+> `AlbumArt()` adalah `Fit` (preserve seluruh gambar, sisakan ruang kosong), bukan `Crop` (isi
+> penuh kotak, standar semua app musik). Diganti jadi `Crop` di 1 titik (default parameter) —
+> otomatis benar di ke-5 titik pemakaian yang belum pernah override.
+> Batch 343 (Fix laporan user: kontrol transport "mengambang" + ikon Info
 > anomali di Row atas, NowPlayingScreen, 1 file):** (1) Row transport (shuffle/prev/play-pause/
 > next/repeat) sebelumnya jadi child terakhir Column scrollable — kalau konten di atasnya lebih
 > pendek dari ruang yang tersedia (kasus umum layar normal), transport berhenti di tengah dengan
