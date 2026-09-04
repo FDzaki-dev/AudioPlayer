@@ -8,13 +8,14 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 338 (Bug fix: scroll masih kepicu di layar "normal" selama hint
-> sekali-tampil belum di-dismiss, 3 lever, 1 file):** Batch 337 sudah bikin transport row
-> kejangkau via scroll — tapi user maunya di layar normal scroll idealnya TIDAK PERLU terjadi
-> sama sekali. Fix (sementara, cuma aktif selagi hint tampil, balik penuh begitu di-dismiss):
-> art box ikut susut ke `260.dp` (bukan cuma di layar `<640dp` lagi), teks hint dipersingkat
-> (isi 2 tip sama, dikemas lebih padat), 2 Spacer sekitarnya diciutkan. Estimasi reklaim
-> ~130-140dp gabungan. `NowPlayingScreen.kt` (non-protected).
+> 🆕 **Update terbaru — Batch 339 (Bug fix x2: tab Cek Update — tembus pandang & unduhan
+> ke-reset, 1 file):** (a) `containerColor = Color.Transparent` (Batch 322/323) ternyata butuh
+> `.frostedGlass()` juga supaya benar-benar blur — `UpdateCheckSheet.kt` satu-satunya sheet yang
+> kelewat, sekarang ditambahkan (pola identik `RingtoneCutterSheet.kt`). 6 sheet lain dengan gap
+> sama didokumentasikan sebagai antrean, belum diperbaiki. (b) Tutup sheet saat unduhan
+> berjalan/sudah `ReadyToInstall` sebelumnya ikut reset ke `Idle` — sekarang 2 state itu
+> dilindungi, tidak lagi harus unduh ulang dari nol kalau sheet salah ke-tap/tertutup.
+> `UpdateCheckSheet.kt` (non-protected).
 > Batch 334 (Bug fix: gesture kecerahan/volume bentrok scroll, 1 file):
 > Swipe kecerahan/volume di piringan Now Playing sebelumnya tersendat/salah kebaca sebagai
 > scroll layar — root cause: Column induk (jaring pengaman layar pendek, Batch 112) membungkus

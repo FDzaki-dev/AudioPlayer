@@ -36,6 +36,52 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 339 (BUG FIX x2 — tab Cek Update: (a) regresi "tembus pandang" krn `frostedGlass()`
+kelewat sejak Batch 322/323, (b) unduhan/APK ke-reset ke nol kalau sheet ke-tap salah/ketutup;
+1 file kode)** — User laporan + screenshot: (2) "tab update masih mengalami regresi tembus
+pandang", (3) "saat user sudah selesai install update package tapi gak sengaja salah mencet,
+malah ke cancel dari awal lagi unduhannya". (Task 1 user — tab onboarding khusus pengganti
+banner ijo — DITANYAKAN dulu ke user, scope-nya besar/arsitektural, lihat pesan terpisah.)
+
+**Bug (a) — root cause**: `containerColor = Color.Transparent` (Batch 322/323, syarat Haze)
+ternyata TIDAK CUKUP sendirian — itu cuma matikan fill solid default, 0 menggambar blur.
+`.frostedGlass()` (`BlurUtils.kt`) itulah yang benar-benar menggambar blur di baliknya —
+`UpdateCheckSheet.kt` SATU-SATUNYA sheet (dibanding 12+ call site lain, mis.
+`RingtoneCutterSheet.kt`, `SongInfoEditSheet.kt`) yang kelewat modifier ini sejak dibuat.
+Transparent TANPA frostedGlass = tembus pandang sungguhan (0 blur, 0 fill) — konten
+"Tentang Aplikasi" dari `SettingsScreen.kt` di baliknya kelihatan penuh tanpa filter, persis
+screenshot user. **Fix**: `.frostedGlass()` ditambah di posisi identik ke-2 sheet contoh di
+atas (setelah `.fillMaxWidth()`, sebelum `.verticalScroll()`).
+
+**🔍 Audit tambahan (TIDAK diperbaiki batch ini, ZERO-REFACTOR — cuma didokumentasikan utk
+antrean nanti, BOLEH dikerjakan tanpa tanya ulang, pola identik)**: grep ulang seluruh sheet
+`containerColor = Color.Transparent` vs `.frostedGlass()` — **6 sheet LAIN** kena gap SAMA
+PERSIS (berpotensi "tembus pandang" sama kalau dibuka): `BackupRestoreSheet.kt`,
+`DiagnosticLogSheet.kt`, `DuplicateFinderSheet.kt`, `SignatureMatcherSheet.kt`,
+`SmartPlaylistScreen.kt`, `VaultSheet.kt`. Tidak disentuh batch ini (user cuma laporkan tab
+Update, Micro-Batch 1 file sudah dipakai bug (b) di bawah) — TAPI kandidat kuat utk sesi
+berikutnya kalau user lapor gejala serupa di salah satu sheet itu.
+
+**Bug (b) — root cause**: `DisposableEffect`'s `onDispose { UpdateManager.reset() }`
+SEBELUMNYA jalan TANPA SYARAT tiap sheet keluar komposisi (sengaja ditutup ATAU salah
+ke-tap/dismiss) — termasuk saat state `Downloading` (thread unduhan TETAP jalan di background,
+tidak ikut ke-cancel betulan) atau `ReadyToInstall` (APK SUDAH lengkap di cache). Reset di
+momen itu buang progres asli SIA-SIA; `checkForUpdate()` (on-enter) juga jalan ulang dari nol
+tiap sheet dibuka lagi. **Fix**: skip `checkForUpdate()`/`reset()` SAMA SEKALI kalau state saat
+itu `Downloading`/`ReadyToInstall` — 2 state itu representasi kerja nyata yang tidak boleh
+hilang cuma krn sheet ke-tutup. State lain (Idle/Checking/UpToDate/Available/Error) — 0
+perubahan perilaku, progres di state itu memang tidak ada yang bisa hilang.
+
+**1 file**: `UpdateCheckSheet.kt` (non-protected). 1 import baru
+(`com.rudi.audioplayer.ui.theme.frostedGlass`). Brace/paren seimbang (27/27, 99/99). **Belum
+diverifikasi compile Gradle sungguhan** — WAJIB cek CI. **Belum diverifikasi visual di device**
+— prioritas cek: (1) buka Cek Update — background sheet harus keliatan blur/frosted, 0 teks
+"Tentang Aplikasi" tembus dari belakang; (2) mulai unduh, TUTUP sheet di tengah proses (tap di
+luar sheet), buka ulang — progres/`Downloading` harus TETAP lanjut, bukan balik ke Checking;
+(3) sampai `ReadyToInstall`, tutup sheet (sengaja/salah tap), buka ulang — harus LANGSUNG
+`ReadyToInstall` lagi (tombol "Buka Installer"), BUKAN unduh ulang dari nol. Detail:
+`CHANGELOG.md` Batch 339.
+
 **Batch 338 (BUG FIX — scroll TETAP kepicu di layar "normal" (user) selama hint banner
 sekali-tampil masih nongol; 3 lever dikombinasi: art box, teks banner, spacer; 1 file kode)** —
 User: "untuk ukuran layar saya, seharusnya mode scroll gak kepicu". Klarifikasi: hint banner

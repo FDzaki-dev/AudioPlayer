@@ -1,5 +1,70 @@
 # Changelog
 
+## Batch 339 — BUG FIX x2: tab Cek Update — (a) regresi "tembus pandang" (frostedGlass kelewat), (b) unduhan/APK ke-reset kalau sheet salah ke-tap/tertutup (1 file kode)
+User laporan + screenshot: "tab update masih mengalami regresi tembus pandang", dan "saat user
+sudah selesai install update package tapi gak sengaja salah mencet, malah ke cancel dari awal
+lagi unduhannya". (Permintaan ke-3 user di sesi ini — "tab onboarding khusus" pengganti banner
+hint — sengaja BELUM dieksekusi, scope-nya arsitektural/besar, ditanyakan dulu terpisah.)
+
+### Bug (a) — "tembus pandang"
+**Root cause**: `containerColor = Color.Transparent` (ditambahkan Batch 322/323, syarat wajib
+sample resmi Haze untuk blur lintas-window) ternyata **tidak cukup sendirian** — parameter itu
+cuma mematikan fill solid default Material3, sama sekali tidak menggambar blur apa pun. Modifier
+yang benar-benar menggambar blur adalah `.frostedGlass()` (`BlurUtils.kt`) — dibandingkan 12+
+call site lain di app ini (`RingtoneCutterSheet.kt`, `SongInfoEditSheet.kt`, dan sejenisnya),
+`UpdateCheckSheet.kt` adalah **satu-satunya** yang kelewat modifier ini sejak sheet ini dibuat.
+Container transparan TANPA `frostedGlass()` = benar-benar tembus pandang (0 blur, 0 fill sama
+sekali) — bagian "Tentang Aplikasi" dari `SettingsScreen.kt` di baliknya (sheet ini dibuka dari
+sana) kelihatan penuh tanpa filter apa pun, tumpang-tindih dengan konten sheet sendiri, persis
+seperti screenshot user.
+
+**Fix**: `.frostedGlass()` ditambahkan pada `Column` konten sheet, di posisi identik dengan
+`RingtoneCutterSheet.kt`/`SongInfoEditSheet.kt` — setelah `.fillMaxWidth()`, sebelum
+`.verticalScroll()`. Pola 1:1, tidak ada penyesuaian tambahan.
+
+**🔍 Audit tambahan (didokumentasikan, TIDAK diperbaiki batch ini — ZERO-REFACTOR, Micro-Batch
+1 file sudah terpakai bug (b) di bawah)**: grep ulang seluruh sheet dengan `containerColor =
+Color.Transparent` dibanding yang punya `.frostedGlass()` — ditemukan **6 sheet lain** dengan
+gap identik, berpotensi mengalami "tembus pandang" yang sama kalau dibuka:
+`BackupRestoreSheet.kt`, `DiagnosticLogSheet.kt`, `DuplicateFinderSheet.kt`,
+`SignatureMatcherSheet.kt`, `SmartPlaylistScreen.kt`, `VaultSheet.kt`. Bukan laporan user
+sekarang, jadi tidak disentuh — tapi kandidat kuat untuk batch berikutnya (pola identik, boleh
+dikerjakan tanpa tanya ulang, sama seperti presedan Batch 322→323).
+
+### Bug (b) — unduhan/APK ke-reset ke nol
+**Root cause**: `DisposableEffect`'s `onDispose { UpdateManager.reset() }` sebelumnya berjalan
+**tanpa syarat** setiap kali sheet ini keluar dari komposisi — baik sengaja ditutup user, maupun
+salah ke-tap/ke-dismiss tidak sengaja. Ini termasuk saat state sedang `Downloading` (thread
+unduhan sungguhan TETAP berjalan di background terpisah dari lifecycle Compose — tidak benar-
+benar ter-cancel) atau sudah `ReadyToInstall` (APK **sudah lengkap** tersimpan di cache).
+Me-reset state ke `Idle` pada momen itu membuang progres nyata secara sia-sia; ditambah
+`checkForUpdate()` (dipanggil di titik masuk `DisposableEffect`) yang otomatis jalan ulang dari
+nol setiap sheet dibuka kembali — hasil akhirnya user harus "mengunduh ulang dari awal" padahal
+APK sebenarnya sudah ada/lengkap di cache device.
+
+**Fix**: baik `checkForUpdate()` (saat masuk) maupun `reset()` (saat `onDispose`) sekarang
+**dilewati sama sekali** kalau state `UpdateManager` saat itu adalah `Downloading` atau
+`ReadyToInstall` — kedua state ini merepresentasikan kerja nyata (unduhan berjalan / APK sudah
+jadi) yang tidak boleh hilang hanya karena sheet-nya tertutup. Untuk state lain (`Idle`,
+`Checking`, `UpToDate`, `Available`, `Error`) — **0 perubahan perilaku**, tetap cek ulang setiap
+dibuka & reset setiap ditutup seperti sebelumnya (tidak ada progres berarti yang bisa hilang di
+state-state itu).
+
+**1 file**: `UpdateCheckSheet.kt` (non-protected). 1 import baru:
+`com.rudi.audioplayer.ui.theme.frostedGlass`. Brace/paren dicek seimbang (27/27, 99/99).
+
+**Belum divalidasi compile Gradle sungguhan** (0 akses jaringan/SDK di sandbox sesi ini) —
+**WAJIB cek CI setelah push**.
+
+**Belum diverifikasi visual di device** — prioritas cek: (1) buka "Cek Update" dari Settings —
+background sheet sekarang harus terlihat blur/frosted (bukan transparan polos), 0 teks "Tentang
+Aplikasi" tembus dari layar Settings di belakangnya; (2) mulai unduhan update, TUTUP sheet di
+tengah proses (tap area gelap di luar sheet) — buka ulang "Cek Update": progres unduhan (state
+`Downloading`) harus **tetap lanjut**, bukan balik ke "Mengecek rilis terbaru…"; (3) tunggu
+sampai `ReadyToInstall`, lalu tutup sheet (baik sengaja maupun simulasi salah-tap) — buka ulang:
+harus **langsung** menampilkan "Unduhan selesai — siap instal" + tombol "Buka Installer",
+**bukan** mengunduh ulang dari nol.
+
 ## Batch 338 — BUG FIX: scroll tetap kepicu di layar "normal" selama hint banner sekali-tampil masih nongol (3 lever: art box, teks banner, spacer; 1 file kode)
 User: "untuk ukuran layar saya, seharusnya mode scroll gak kepicu". Klarifikasi: hint banner
 konfirmasi MASIH nongol (belum pernah di-dismiss) di skenario ini.
