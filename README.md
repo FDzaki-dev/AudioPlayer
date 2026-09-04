@@ -8,7 +8,11 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 339 (Bug fix x2: tab Cek Update — tembus pandang & unduhan
+> 🆕 **Update terbaru — Batch 340 (Lanjutan Batch 339: fix `.frostedGlass()` kelewat di 3 dari 6
+> sheet tersisa, 3 file):** `BackupRestoreSheet`/`DiagnosticLogSheet`/`DuplicateFinderSheet`
+> diperbaiki (gap sama — transparan tanpa blur). Sisa 3 sheet diantre — setelah itu semua 7 sheet
+> dari audit Batch 339 tuntas.
+> Batch 339 (Bug fix x2: tab Cek Update — tembus pandang & unduhan
 > ke-reset, 1 file):** (a) `containerColor = Color.Transparent` (Batch 322/323) ternyata butuh
 > `.frostedGlass()` juga supaya benar-benar blur — `UpdateCheckSheet.kt` satu-satunya sheet yang
 > kelewat, sekarang ditambahkan (pola identik `RingtoneCutterSheet.kt`). 6 sheet lain dengan gap

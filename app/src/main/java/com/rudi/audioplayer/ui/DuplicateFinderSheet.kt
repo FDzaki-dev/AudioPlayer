@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.DuplicateDetector
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.ui.theme.frostedGlass
 
 /**
  * Gap List #2 — Duplicate Detection UI. Full-height ModalBottomSheet (not a small popup — group
@@ -57,9 +58,13 @@ fun DuplicateFinderSheet(
     // penuh + link dokumentasi resmi Haze di sana / PROJECT_STATE.md Batch 321): tambah
     // `containerColor = Color.Transparent` yang kelewat sejak sheet ini dibuat.
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+        // Batch 340 — BUG FIX (lanjutan antrean "🔍 Audit tambahan" Batch 339, pola identik
+        // BackupRestoreSheet.kt/DiagnosticLogSheet.kt/UpdateCheckSheet.kt batch ini — lihat
+        // PROJECT_STATE.md Batch 340): `.frostedGlass()` ditambah setelah `.fillMaxWidth()`.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 .fillMaxHeight(0.9f)
                 .padding(horizontal = 20.dp)
         ) {

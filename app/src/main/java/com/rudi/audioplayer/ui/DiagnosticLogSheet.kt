@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.util.AppLogger
 import kotlinx.coroutines.delay
 
@@ -51,9 +52,13 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
     // penuh + link dokumentasi resmi Haze di sana / PROJECT_STATE.md Batch 321): tambah
     // `containerColor = Color.Transparent` yang kelewat sejak sheet ini dibuat.
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+        // Batch 340 — BUG FIX (lanjutan antrean "🔍 Audit tambahan" Batch 339, pola identik
+        // BackupRestoreSheet.kt/UpdateCheckSheet.kt batch ini — lihat PROJECT_STATE.md Batch 340
+        // utk rasionalisasi penuh): `.frostedGlass()` ditambah setelah `.fillMaxWidth()`.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 .heightIn(max = 480.dp)
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp)

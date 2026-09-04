@@ -1,5 +1,20 @@
 # Changelog
 
+## Batch 340 — Lanjutan Batch 339: fix .frostedGlass() kelewat di 3 dari 6 sheet tersisa, 3 file kode
+User upload ZIP baru (source of truth, Hard Reset — lompat dari Batch 323 internal sesi
+sebelumnya ke Batch 339, isi Batch 324-339 dari sesi lain dibaca ulang bukan ditimpa) +
+"sempurnakan latest task!!". Melanjutkan antrean eksplisit Batch 339 (pola identik,
+pra-disetujui "boleh dikerjakan tanpa tanya ulang").
+
+Batch 339 menemukan `containerColor = Color.Transparent` (Batch 322/323) ternyata tidak cukup
+sendirian tanpa `.frostedGlass()` — hasilnya tembus pandang sungguhan (0 blur, 0 fill), bukan
+cuma "kurang blur". Diverifikasi ulang langsung (bukan percaya log mentah): 6 sheet dikonfirmasi
+0x `frostedGlass()`. Fix diterapkan ke 3 dari 6: `BackupRestoreSheet.kt`, `DiagnosticLogSheet.kt`,
+`DuplicateFinderSheet.kt` (`+.frostedGlass()` setelah `.fillMaxWidth()` + import). Sisa 3
+(`SignatureMatcherSheet.kt`, `SmartPlaylistScreen.kt`, `VaultSheet.kt`) diantre — setelah itu
+semua 7 sheet dari audit Batch 339 tuntas. Tint `liquidGlassAlpha` masih sengaja tidak diturunkan
+(tunggu verifikasi device semua 7 sheet).
+
 ## Batch 339 — BUG FIX x2: tab Cek Update — (a) regresi "tembus pandang" (frostedGlass kelewat), (b) unduhan/APK ke-reset kalau sheet salah ke-tap/tertutup (1 file kode)
 User laporan + screenshot: "tab update masih mengalami regresi tembus pandang", dan "saat user
 sudah selesai install update package tapi gak sengaja salah mencet, malah ke cancel dari awal

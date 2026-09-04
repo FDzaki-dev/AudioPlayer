@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.BackupManager
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import kotlinx.coroutines.delay
 
 /**
@@ -86,9 +87,15 @@ fun BackupRestoreSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
         // pola sama (Column fixed tanpa verticalScroll/LazyColumn jaring pengaman). Konten pendek
         // & risiko rendah (judul, deskripsi, 2 tombol, banner hasil opsional), tapi tetap
         // diterapkan demi konsistensi pola jaring-pengaman di seluruh 22 sheet/screen ModalBottomSheet.
+        // Batch 340 — BUG FIX (lanjutan antrean "🔍 Audit tambahan" Batch 339: gap SAMA PERSIS
+        // dgn UpdateCheckSheet.kt sebelum diperbaiki — `containerColor = Color.Transparent`
+        // (Batch 322) tanpa `.frostedGlass()` = tembus pandang sungguhan, 0 blur/0 fill.
+        // FIX: `.frostedGlass()` ditambah setelah `.fillMaxWidth()`, sebelum `.verticalScroll()` —
+        // pola identik UpdateCheckSheet.kt/RingtoneCutterSheet.kt.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp)

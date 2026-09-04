@@ -36,6 +36,46 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 340 (Lanjutan antrean "🔍 Audit tambahan" Batch 339: fix `.frostedGlass()` kelewat di 3
+dari 6 sheet tersisa, 3 file kode)** — User upload ZIP baru (`AudioPlayer_v339_Batch1.zip`,
+lompat dari internal Batch 323 sesi sebelumnya ke Batch 339 — Hard Reset, ZIP user = source of
+truth, isi Batch 324-339 dari sesi lain TIDAK di-merge/ditimpa, cuma dibaca ulang) + instruksi
+"sempurnakan latest task!!". Batch 339 (sesi lain) menemukan gap lebih dalam dari perkiraan
+Batch 322/323 sesi ini: `containerColor = Color.Transparent` ternyata TIDAK CUKUP sendirian —
+sheet yang kelewat `.frostedGlass()` (elemen yang benar-benar menggambar blur) jadi TEMBUS
+PANDANG SUNGGUHAN (0 blur, 0 fill), bukan cuma "kurang blur" seperti diasumsikan sebelumnya.
+Batch 339 sudah fix 1 contoh (`UpdateCheckSheet.kt`) + catat eksplisit 6 sheet lain kena gap
+SAMA PERSIS sebagai antrean "BOLEH dikerjakan tanpa tanya ulang, pola identik".
+
+**Verifikasi ulang (bukan cuma percaya log Batch 339 mentah-mentah)** — grep langsung ke 7 file
+tsb di ZIP baru: `UpdateCheckSheet.kt` dikonfirmasi 4x `frostedGlass()` (sudah diperbaiki
+Batch 339). 6 sisanya dikonfirmasi 0x `frostedGlass()` di seluruh file (`BackupRestoreSheet.kt`,
+`DiagnosticLogSheet.kt`, `DuplicateFinderSheet.kt`, `SignatureMatcherSheet.kt`,
+`SmartPlaylistScreen.kt`, `VaultSheet.kt`) — gap dikonfirmasi nyata, bukan cuma klaim.
+
+**Fix (3 dari 6, batas Micro-Batch)** — `.frostedGlass()` ditambah di posisi identik
+`UpdateCheckSheet.kt` (setelah `.fillMaxWidth()`, sebelum modifier scroll/height berikutnya) +
+import `com.rudi.audioplayer.ui.theme.frostedGlass` (belum ada di ketiganya sebelumnya):
+- `BackupRestoreSheet.kt`
+- `DiagnosticLogSheet.kt`
+- `DuplicateFinderSheet.kt`
+
+**Antrean tersisa (3 file, sama alasan boleh lanjut tanpa tanya)**: `SignatureMatcherSheet.kt`,
+`SmartPlaylistScreen.kt`, `VaultSheet.kt` — fix identik. Setelah ini SEMUA 7 sheet dari audit
+Batch 339 akan tuntas.
+
+**Verifikasi sintaks** — brace seimbang ketiganya (33/33, 16/16, 56/56). Paren: dicek DUA cara
+— raw grep (108/107 utk `BackupRestoreSheet.kt`, sisanya cocok) SEMPAT beda krn komentar
+multi-baris prosa (bukan kode) yang sudah ada SEJAK Batch 321, bukan diperkenalkan batch ini;
+verifikasi ulang dgn strip semua baris `//` dulu baru hitung → kode SUNGGUHAN seimbang penuh
+ketiganya (88/88, 68/68, 104/104). Pola false-positive raw-count ini sudah pernah dicatat normal
+di histori proyek (Batch 337/338) — bukan tanda korupsi sintaks.
+
+**`liquidGlassAlpha` masih SENGAJA tidak disentuh** (sama alasan Batch 322 — tunggu verifikasi
+visual device dulu untuk SEMUA 7 sheet sebelum menurunkan tint balik).
+
+**Ringkasan file** — 3 file kode (batas Micro-Batch). `FILE_MANIFEST.txt` tidak berubah.
+
 **Batch 339 (BUG FIX x2 — tab Cek Update: (a) regresi "tembus pandang" krn `frostedGlass()`
 kelewat sejak Batch 322/323, (b) unduhan/APK ke-reset ke nol kalau sheet ke-tap salah/ketutup;
 1 file kode)** — User laporan + screenshot: (2) "tab update masih mengalami regresi tembus
