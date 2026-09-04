@@ -1,5 +1,47 @@
 # Changelog
 
+## Batch 338 — BUG FIX: scroll tetap kepicu di layar "normal" selama hint banner sekali-tampil masih nongol (3 lever: art box, teks banner, spacer; 1 file kode)
+User: "untuk ukuran layar saya, seharusnya mode scroll gak kepicu". Klarifikasi: hint banner
+konfirmasi MASIH nongol (belum pernah di-dismiss) di skenario ini.
+
+**Konteks**: Batch 337 menyelesaikan *reachability* (transport row kejangkau via scroll di
+layar pendek) — tapi permintaan user di sini lebih jauh: di layar yang dia anggap NORMAL,
+scroll idealnya tidak perlu terjadi sama sekali, bukan sekadar "berfungsi kalau terpaksa
+terjadi". Root cause: Batch 336 hanya menyusutkan art box di layar `< 640.dp`; Batch 337
+memindahkan hint banner supaya bisa ikut discroll. Di layar `>= 640.dp` (dianggap "normal"),
+art box tetap penuh `300.dp` + `FeatureHintBanner` (~150dp sebelum dipersingkat, kondisi
+sekali-tampil) + sisa konten bisa tetap total melebihi tinggi viewport SELAMA hint masih
+tampil — walau device itu sendiri bukan "layar pendek" dalam pengertian Batch 112/336.
+
+**Fix — 3 lever dikombinasi, semuanya SEMENTARA** (aktif hanya selagi `showNowPlayingHint ==
+true`; kembali ke ukuran/spacing penuh biasa begitu di-dismiss permanen via `hintStore`):
+1. Art box ikut menyusut ke `260.dp` saat hint tampil — tidak lagi bergantung hanya pada
+   `screenHeightDp < 640.dp`; kedua kondisi independen, yang menghasilkan ukuran terkecil yang
+   dipakai.
+2. Teks `FeatureHintBanner` dipersingkat — isi kedua tip (kecerahan/volume via geser piringan;
+   Sleep Timer/Kecepatan/Equalizer via menu ⋮) **tidak berkurang maknanya**, hanya dikemas lebih
+   padat (perkiraan ~5 baris `bodySmall` → ~2 baris).
+3. Dua `Spacer` di sekitar hint banner diciutkan khusus saat hint tampil (`16.dp → 8.dp`,
+   `32.dp → 20.dp`).
+
+Estimasi reklaim ruang gabungan ~130–140dp, ditargetkan cukup untuk layar "normal" muat tanpa
+scroll selama masa onboarding sekali-tampil ini. Di luar kondisi itu (hint sudah pernah
+di-dismiss, atau layar pendek `< 640.dp`) — perilaku Batch 336/337 tidak berubah sama sekali.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 0 import baru. Brace/paren dicek seimbang
+(224/224, 894/894 — turun 1 pasangan brace dari batch sebelumnya karena `if/else` diganti
+`when` untuk `albumArtBoxHeight`; angka baru konsisten seimbang sendiri, bukan indikasi
+kerusakan sintaks).
+
+**Belum divalidasi compile Gradle sungguhan** (0 akses jaringan/SDK di sandbox sesi ini) —
+**WAJIB cek CI setelah push**.
+
+**Belum diverifikasi visual di device** — prioritas cek: (1) buka Now Playing untuk PERTAMA
+KALI (hint tampil) di layar user — harus muat tanpa perlu scroll sama sekali sekarang; (2)
+dismiss hint (tombol X), lalu buka ulang Now Playing — art HARUS balik ke `300.dp` penuh seperti
+sebelum batch manapun di rangkaian ini (0 regresi tampilan permanen di luar masa onboarding);
+(3) teks hint yang dipersingkat tetap jelas, tidak kehilangan makna salah satu dari 2 tip-nya.
+
 ## Batch 337 — BUG FIX: Batch 336 (art box adaptif) terbukti belum cukup — root cause satu level lebih dalam, FeatureHintBanner ~150dp (1 file kode)
 User konfirmasi via klarifikasi: "Layar pendek: tombol transport MASIH belum kejangkau walau
 discroll habis (Batch 336 belum ngefek)".
@@ -36,16 +78,20 @@ seimbang (225/225, 880/880).
 **WAJIB cek CI setelah push**. Risiko sintaks rendah — perubahan murni pemindahan blok kode
 (`if (showNowPlayingHint) { ... }`) ke lokasi lain di Column yang sama, 0 logic/API baru.
 
-**Belum diverifikasi visual di device** — prioritas cek: (1) layar pendek, hint banner BELUM
-di-dismiss (kondisi paling ketat) — scroll konten sampai habis, transport row (shuffle/prev/
-play/next/repeat) HARUS kejangkau penuh sekarang; (2) hint banner tampil SESUDAH piringan album
-art (posisi baru, bukan sebelum lagi) — tombol dismiss-nya harus tetap berfungsi normal & tidak
-terpotong; (3) layar normal/tinggi — pastikan 0 regresi visual lain selain posisi hint banner
-yang memang sengaja dipindah. **Kalau transport MASIH belum kejangkau setelah batch ini** —
-3 batch beruntun (335/336/337) sama-sama berstatus "belum diverifikasi compile" — curigai
-selanjutnya CI/build sungguhan belum pernah sukses sama sekali sejak Batch 335 (root cause di
-level pipeline, bukan lagi di level kode Compose); minta user cek status GitHub Actions run
-terbaru sebelum sesi berikutnya lanjut mengubah kode `NowPlayingScreen.kt` lagi.
+**SUDAH diverifikasi visual di device — user konfirmasi.** Screenshot user (diambil PAS aktif
+discroll, jari masih narik layar) menunjukkan kelima tombol transport (shuffle, prev,
+play/pause, next, repeat) semua kejangkau penuh — persis target fix ini. Teks
+`FeatureHintBanner` yang di screenshot itu kelihatan "kepotong" (mulai dari "volume HP..." bukan
+dari awal kalimat "Geser di...") sempat dicurigai bug baru, tapi setelah dikonfirmasi user itu
+cuma frame mid-scroll yang wajar — sama seperti konten scrollable manapun, bagian atas (hint
+banner, sekarang child pertama Column scrollable) kegeser duluan saat scroll aktif berlangsung,
+otomatis kembali utuh dari awal kalimat begitu scroll berhenti/kembali ke posisi 0. **Bukan
+bug**, 0 perubahan kode diperlukan untuk item ini.
+
+Root cause 3-lapis lintas batch — Batch 335 (overscroll glow palsu) → Batch 336 (art box fixed
+300dp tidak adaptif) → Batch 337 (`FeatureHintBanner` ~150dp ikut fixed, kontributor utama yang
+belum tersentuh) — **kini terbukti tuntas** berdasarkan bukti device nyata, bukan cuma asumsi
+kode benar. 0 perlu lanjutan kode untuk masalah "transport row tidak kejangkau di layar pendek".
 
 ## Batch 336 — BUG FIX: transport row TETAP tidak kejangkau via scroll di layar pendek, jaring pengaman Batch 112/334 regresi nyata (1 file kode)
 User laporan device: dikonfirmasi lewat 3 opsi klarifikasi (overscroll glow / transport

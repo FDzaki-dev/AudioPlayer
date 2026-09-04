@@ -248,13 +248,24 @@ fun NowPlayingScreen(
     // volume-nya lolos dari nested-scroll conflict (Batch 334). Fix: susutkan TINGGI art box
     // (bukan strukturnya — gesture zone TETAP di luar ancestor scrollable, tidak regresi
     // Batch 334) secara proporsional saat layar pendek, supaya sisa ruang scroll cukup buat
-    // transport row selalu kejangkau. Layar normal/tinggi (>=640dp) 100% tidak berubah (tetap
-    // 300dp persis seperti sebelumnya).
+    // transport row selalu kejangkau. (Update Batch 338 di bawah: layar normal SEKARANG BISA
+    // ikut menyusut juga, tapi HANYA sementara selama hint banner tampil — bukan lagi 100%
+    // tetap 300dp seperti klaim awal batch ini.)
     val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-    val albumArtBoxHeight = if (screenHeightDp < 640.dp) {
-        (screenHeightDp * 0.28f).coerceIn(160.dp, 300.dp)
-    } else {
-        300.dp
+    // Batch 338 — BUG FIX lanjutan (laporan user + konfirmasi: hint banner MASIH nongol, belum
+    // pernah di-dismiss): sebelumnya cuma layar pendek (<640dp) yang dapet art box lebih kecil.
+    // Tapi di layar NORMAL sekalipun, jumlah tinggi fixed (art 300dp + header + hint banner
+    // ~150dp, Batch 112) + konten scrollable (judul s/d transport) bisa TETAP melebihi viewport
+    // selama hint SEDANG tampil (kondisi sekali-tampil, sementara) — scroll jadi kepicu padahal
+    // user anggap layarnya "normal", harusnya muat tanpa scroll sama sekali. Fix: pas
+    // `showNowPlayingHint == true`, susutkan art box juga (260dp, bukan cuma saat layar pendek)
+    // — begitu user dismiss (SEKALI, permanen via hintStore, tidak muncul lagi selamanya),
+    // art balik penuh 300dp seperti biasa. Layar pendek (<640dp) tetap pakai rumus proporsional
+    // lama (Batch 336) — dua kondisi ini independen, yang paling kecil yang menang.
+    val albumArtBoxHeight = when {
+        screenHeightDp < 640.dp -> (screenHeightDp * 0.28f).coerceIn(160.dp, 300.dp)
+        showNowPlayingHint -> 260.dp
+        else -> 300.dp
     }
     var brightnessLevel by remember {
         mutableStateOf(
@@ -565,18 +576,25 @@ fun NowPlayingScreen(
         // BAWAH piringan art, bukan di ATAS lagi, sebelum art) — trade-off sengaja diambil demi
         // reachability transport row (fungsi inti) di atas posisi visual hint (onboarding,
         // sekali tampil, dismissable).
+        // Batch 338 — lanjutan (user konfirmasi hint MASIH nongol saat komplain "scroll gak
+        // seharusnya kepicu di layar saya"): selain art box (di atas), teks banner ini sendiri
+        // dipersingkat (5-ish baris → ~2 baris bodySmall) + 2 Spacer sekitarnya diciutkan —
+        // makna/isi 2 tip TIDAK berkurang (kecerahan/volume + menu ⋮), cuma dikemas lebih padat.
+        // Total 3 lever batch ini (art box, teks banner, spacer) sengaja dikombinasi
+        // supaya layar "normal" (bukan cuma yg <640dp) juga muat tanpa scroll SELAMA hint
+        // sekali-tampil ini masih ada — begitu di-dismiss, semua balik ke ukuran penuh biasa.
         if (showNowPlayingHint) {
             FeatureHintBanner(
-                text = "Geser di kiri/kanan piringan buat atur kecerahan & volume HP. Ketuk ⋮ buat Sleep Timer, Kecepatan, dan Equalizer.",
+                text = "Geser piringan: kiri = kecerahan, kanan = volume. Ketuk ⋮ buat Sleep Timer, Kecepatan & Equalizer.",
                 onDismiss = {
                     showNowPlayingHint = false
                     hintStore.markNowPlayingHintSeen()
                 }
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(if (showNowPlayingHint) 20.dp else 32.dp))
 
         Text(
             "SEDANG DIPUTAR",

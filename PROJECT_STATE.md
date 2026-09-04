@@ -36,6 +36,34 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 338 (BUG FIX — scroll TETAP kepicu di layar "normal" (user) selama hint banner
+sekali-tampil masih nongol; 3 lever dikombinasi: art box, teks banner, spacer; 1 file kode)** —
+User: "untuk ukuran layar saya, seharusnya mode scroll gak kepicu". Klarifikasi: hint banner
+MASIH nongol (belum pernah di-dismiss) saat ini terjadi. Batch 337 sudah selesaikan
+REACHABILITY (transport kejangkau via scroll) — tapi user maunya lebih jauh: di layar yang dia
+anggap NORMAL, scroll idealnya TIDAK PERLU terjadi sama sekali, bukan cuma "berfungsi kalau
+terjadi". Root cause: Batch 336 cuma nyusutin art box di layar <640dp; Batch 337 mindahin hint
+banner biar bisa discroll — TAPI di layar >=640dp (dianggap "normal"), art box TETAP full 300dp
++ hint banner (~150dp, sebelum dipersingkat) + semua konten lain bisa TETAP total melebihi
+viewport SELAMA hint (kondisi sekali-tampil) masih ada, walau device-nya sendiri tidak "pendek".
+
+**Fix (3 lever, semuanya SEMENTARA — cuma aktif selagi `showNowPlayingHint == true`, balik ke
+ukuran/spacing penuh biasa begitu di-dismiss PERMANEN)**: (1) art box ikut nyusut ke `260.dp`
+saat hint tampil, TIDAK LAGI cuma bergantung `screenHeightDp < 640.dp`; (2) teks
+`FeatureHintBanner` dipersingkat (isi 2 tip SAMA — kecerahan/volume + menu ⋮ — dikemas lebih
+padat, ~5 baris → ~2 baris); (3) 2 Spacer sekitar hint diciutkan (16dp→8dp, 32dp→20dp khusus
+saat hint tampil). Kombinasi 3 lever ini ditargetkan reklaim ~130-140dp tambahan tanpa
+permanen mengecilkan tampilan Now Playing di luar masa onboarding sekali-tampil ini.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 0 import baru. Brace/paren seimbang
+(224/224, 894/894 — jumlah brace turun 1 dari batch sebelumnya krn `if/else` diganti `when`,
+angka baru tetap seimbang sendiri, bukan tanda korupsi sintaks). **Belum diverifikasi compile
+Gradle sungguhan** — WAJIB cek CI. **Belum diverifikasi visual di device** — prioritas cek:
+(1) buka Now Playing PERTAMA KALI (hint tampil) di layar user — pastikan SEKARANG muat tanpa
+perlu scroll sama sekali; (2) begitu hint di-dismiss (tombol X), buka lagi Now Playing — art
+harus balik full 300dp seperti biasa (0 regresi tampilan permanen); (3) teks hint yang
+dipersingkat tetap jelas & tidak keliru makna. Detail: `CHANGELOG.md` Batch 338.
+
 **Batch 337 (BUG FIX — Batch 336 (art box adaptif) TERBUKTI belum cukup, "belum ngefek" di
 device user; root cause satu level lebih dalam: FeatureHintBanner ~150dp, 1 file kode)** — User
 konfirmasi lewat klarifikasi: opsi "Layar pendek: tombol transport MASIH belum kejangkau walau
@@ -58,14 +86,14 @@ bukan saling gantikan).
 
 **1 file**: `NowPlayingScreen.kt` (non-protected). 0 import baru. Brace/paren seimbang
 (225/225, 880/880). **Belum diverifikasi compile Gradle sungguhan** (0 akses jaringan/SDK di
-sandbox) — **WAJIB cek CI setelah push**. **Belum diverifikasi visual di device** — prioritas
-cek: (1) layar pendek + hint banner BELUM di-dismiss — scroll konten, transport row HARUS
-kejangkau sekarang; (2) hint banner tampil SESUDAH piringan art (bukan sebelum lagi) — pastikan
-tombol dismiss-nya tetap berfungsi & tidak terpotong; (3) layar normal — pastikan tidak ada
-regresi visual selain posisi hint yang memang sengaja pindah. Kalau MASIH belum kejangkau setelah
-ini, curigai berikutnya: CI/build sungguhan belum pernah sukses sejak Batch 335 (3 batch beruntun
-"belum diverifikasi compile" — minta user cek status Actions run terbaru sebelum lanjut fix
-kode lagi). Detail: `CHANGELOG.md` Batch 337.
+sandbox) — **WAJIB cek CI setelah push**. **SUDAH diverifikasi visual di device (user
+konfirmasi)** — screenshot user (diambil PAS aktif discroll, jari masih narik layar) menunjukkan
+5 tombol transport (shuffle/prev/play-pause/next/repeat) semua kejangkau penuh; teks hint banner
+yang kelihatan "kepotong" di screenshot itu cuma frame mid-scroll wajar (bagian atas konten
+kegeser duluan saat discroll aktif — normal utk scrollable manapun, bukan bug), otomatis utuh
+lagi begitu scroll berhenti/scroll=0. Root cause 3-lapis (Batch 335 overscroll glow → Batch 336
+art box adaptif → Batch 337 hint banner relokasi) TERBUKTI SELESAI, 0 perlu perubahan kode lagi
+utk item ini. Detail: `CHANGELOG.md` Batch 337.
 
 **Batch 336 (BUG FIX — transport row TETAP TIDAK kejangkau via scroll di layar pendek, jaring
 pengaman Batch 112/334 regresi nyata, root cause beda level dari Batch 335, 1 file kode)** — User

@@ -8,15 +8,13 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 337 (Bug fix: transport row masih tidak kejangkau setelah Batch
-> 336, root cause satu level lebih dalam, 1 file):** Batch 336 (art box adaptif) terbukti belum
-> cukup — ditelusuri ulang ke histori Batch 112: `FeatureHintBanner` (~150dp saat belum
-> di-dismiss) adalah kontributor UTAMA lain yang belum tersentuh, tetap fixed & tidak bisa
-> direbut ruang oleh scroll. Fix: hint banner dipindah dari header fixed jadi bagian dalam
-> Column scrollable (sekarang ikut bisa "discroll lewat") — urutan visualnya geser jadi sesudah
-> piringan album (bukan sebelum lagi). Box gesture art (Batch 334), fix overscroll (Batch 335),
-> & art box adaptif (Batch 336) semuanya tetap berlaku, saling melengkapi. `NowPlayingScreen.kt`
-> (non-protected).
+> 🆕 **Update terbaru — Batch 338 (Bug fix: scroll masih kepicu di layar "normal" selama hint
+> sekali-tampil belum di-dismiss, 3 lever, 1 file):** Batch 337 sudah bikin transport row
+> kejangkau via scroll — tapi user maunya di layar normal scroll idealnya TIDAK PERLU terjadi
+> sama sekali. Fix (sementara, cuma aktif selagi hint tampil, balik penuh begitu di-dismiss):
+> art box ikut susut ke `260.dp` (bukan cuma di layar `<640dp` lagi), teks hint dipersingkat
+> (isi 2 tip sama, dikemas lebih padat), 2 Spacer sekitarnya diciutkan. Estimasi reklaim
+> ~130-140dp gabungan. `NowPlayingScreen.kt` (non-protected).
 > Batch 334 (Bug fix: gesture kecerahan/volume bentrok scroll, 1 file):
 > Swipe kecerahan/volume di piringan Now Playing sebelumnya tersendat/salah kebaca sebagai
 > scroll layar — root cause: Column induk (jaring pengaman layar pendek, Batch 112) membungkus
