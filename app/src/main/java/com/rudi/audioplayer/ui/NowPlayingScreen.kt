@@ -638,10 +638,37 @@ fun NowPlayingScreen(
         // "terjangkau via scroll"), di layar pendek pun cuma konten judul-slider yang battle-scroll
         // di ruang tersisa, transport tetap fixed & penuh terlihat. 0 logic scroll/gesture/timing
         // lain di Column ini diubah — cuma 1 child (Row transport) yang pindah lokasi.
+        // Batch 345 — user kirim 2 screenshot (crop Row ikon atas + crop area waktu/transport) +
+        // laporan: "susunan badge anomali yang terpaku oleh jarak" & "masih ada bagian kosong
+        // karena bagian atas terlalu mentok ke badge — gak ada susunan normal begitu". Diinvestigasi
+        // eksplisit poin 1 (Row 4-ikon atas) dulu — DIUKUR ULANG per-pixel (bukan cuma lihat
+        // sekilas): jarak antar-ikon 279/280/279px, PERSIS merata (`SpaceBetween` Batch 342 masih
+        // benar), dan bobot visual ke-4 ikon sudah konsisten tipis (`Outlined.Info` Batch 343 juga
+        // masih benar) — 0 regresi di Row itu sendiri. Root cause SEBENARNYA (dikonfirmasi via
+        // screenshot ke-2): fix Batch 343 (Row transport dikeluarkan jadi footer fixed) MEMINDAH
+        // lokasi "gambang" tsb, TIDAK MENGHILANGKANNYA — Column INI (scrollable+weight) masih
+        // `verticalArrangement` default (Top), jadi begitu tinggi konten (judul s/d waktu) LEBIH
+        // PENDEK dari ruang weighted (kasus layar user), semua sisa ruang kosong tetap menumpuk
+        // jadi SATU gap besar, cuma sekarang lokasinya PINDAH ke ANTARA baris waktu & Row
+        // transport (bukan lagi di bawah Row transport) — persis yang kelihatan di screenshot
+        // ke-2 user. Laporan poin 1 ("terpaku oleh jarak") & poin 2 ("bagian atas mentok") SAMA
+        // root cause ini dilihat dari 2 sudut: konten atas (Row ikon+art+judul dst) tetap rapat
+        // ke atas ("mentok"/"terpaku") walau ruang tersedia jauh lebih tinggi — gak ada distribusi
+        // proporsional ("susunan normal") atas sisa ruang tsb, semua dikumpulkan jadi 1 blok di
+        // bawah. FIX: `verticalArrangement = Arrangement.Center` di Column ini — saat konten LEBIH
+        // PENDEK dari ruang weighted, `Center` membagi sisa ruang itu proporsional ke ATAS (antara
+        // art box & judul) DAN ke BAWAH (antara baris waktu & Row transport) alih-alih ditumpuk
+        // 100% di satu sisi — 1 gap besar jadi 2 gap seimbang, lebih dekat ke "susunan normal"
+        // yang diminta. 0 efek saat konten SUDAH >= tinggi viewport (layar pendek/konten panjang)
+        // — `Center` cuma berlaku kalau ada sisa ruang, scroll tetap jalan identik seperti
+        // sebelumnya kalau tidak ada sisa ruang. Row transport TETAP fixed footer presisi di tepi
+        // bawah (Batch 343 TIDAK disentuh/dibatalkan — itu tetap benar & sudah dikonfirmasi user
+        // "no more floating thing").
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(state = rememberScrollState(), overscrollEffect = null),
+            verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 

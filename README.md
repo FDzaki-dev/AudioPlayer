@@ -8,7 +8,14 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 344 (Fix sistemik cover art letterbox, `Utils.kt`, 1 file):**
+> 🆕 **Update terbaru — Batch 345 (Fix gap kosong terdistribusi, `NowPlayingScreen.kt`, 1 file):**
+> Fix Batch 343 (Row transport jadi footer fixed) memindah lokasi gap kosong (bukan
+> menghilangkan) — di layar dengan ruang lebih, semua sisa ruang masih menumpuk jadi 1 gap besar
+> (sekarang antara baris waktu & Row transport, bukan lagi di bawah Row transport). Row ikon atas
+> diukur ulang per-pixel (279/280/279px) — spacing & bobot visual TETAP benar, 0 regresi di situ.
+> Fix: `verticalArrangement = Arrangement.Center` di Column scrollable — 1 gap besar jadi 2 gap
+> seimbang (atas: art↔judul, bawah: waktu↔transport). Row transport tetap presisi di tepi bawah.
+> Batch 344 (Fix sistemik cover art letterbox, `Utils.kt`, 1 file):
 > Kotak seni Now Playing (& 4 titik thumbnail lain: MiniPlayerBar/Library/Home) sebelumnya bisa
 > tampil dgn bar kosong di atas/bawah untuk artwork non-1:1 (mis. thumbnail video 16:9 ikut
 > ke-embed dari YouTube) — mirip letterbox. Root cause: default `contentScale` fungsi bersama

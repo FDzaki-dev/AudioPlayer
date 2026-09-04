@@ -1,5 +1,66 @@
 # Changelog
 
+## Batch 345 — Fix gap kosong tunggal jadi terdistribusi (verticalArrangement Top → Center), NowPlayingScreen, 1 file kode
+User kirim 2 screenshot (crop Row 4-ikon atas + crop area waktu/transport) + 2 laporan: (1)
+"susunan badge anomali yang terpaku oleh jarak", (2) "masih ada bagian kosong karena bagian
+atas terlalu mentok ke badge — gak ada susunan normal begitu".
+
+**Investigasi poin 1 (Row ikon atas) — DIUKUR, bukan ditebak.** Analisis pixel langsung atas
+screenshot: jarak antar-4-ikon 279px/280px/279px — PERSIS merata, `Arrangement.SpaceBetween`
+(Batch 342) masih benar 100%. Bobot visual ke-4 ikon (chevron/heart-border/info-outline/dots)
+juga sudah konsisten tipis — `Icons.Outlined.Info` (Batch 343) masih benar, 0 regresi. Cross-
+check riwayat: Batch 342 sendiri sudah eksplisit reject pola "1 ikon kiri + 3 ikon klaster
+kanan" (dianggap user "berat sebelah") demi symmetric SpaceBetween ini — jadi kembali ke pola
+grouped BUKAN arah yang benar (akan mengulang keluhan lama). Kesimpulan: 0 defect nyata di Row
+itu sendiri.
+
+**Root cause SEBENARNYA (dikonfirmasi via screenshot ke-2).** Fix Batch 343 (Row transport
+dikeluarkan dari Column scrollable jadi footer fixed) MEMINDAH lokasi gap kosong, TIDAK
+MENGHILANGKANNYA. Column scrollable+`weight(1f)` itu masih `verticalArrangement` default (Top)
+— begitu tinggi konten (judul s/d baris waktu) LEBIH PENDEK dari ruang weighted yang tersedia
+(kasus layar user), SEMUA sisa ruang kosong tetap menumpuk jadi SATU gap besar — cuma sekarang
+lokasinya pindah dari "di bawah Row transport" (sebelum Batch 343) jadi "di antara baris waktu
+& Row transport" (setelah Batch 343) — persis yang tampak di screenshot ke-2 user. Laporan poin
+1 & 2 ternyata SATU root cause yang sama, dilihat dari 2 sudut: konten bagian atas (Row
+ikon+art+judul+rating+slider) tetap rapat/"mentok"/"terpaku" ke atas walau ruang tersedia jauh
+lebih tinggi dari kebutuhannya — 0 distribusi proporsional atas sisa ruang, semua dikumpulkan
+jadi 1 blok kosong di 1 sisi saja, bukan "susunan normal" yang biasa dipakai app sejenis.
+
+**Fix.** `verticalArrangement = Arrangement.Center` ditambahkan ke Column scrollable itu (import
+`Arrangement` sudah tersedia lewat wildcard `androidx.compose.foundation.layout.*`, 0 import
+baru). Saat konten LEBIH PENDEK dari tinggi viewport weighted, `Center` membagi sisa ruang
+proporsional ke ATAS (antara art box & judul) DAN ke BAWAH (antara baris waktu & Row transport)
+— 1 gap besar jadi 2 gap seimbang, jauh lebih dekat ke "susunan normal" yang diminta. 0 efek
+saat konten SUDAH >= tinggi viewport (layar pendek/konten panjang, verticalScroll tetap jalan
+identik seperti sebelumnya — `Center` cuma berlaku kalau benar-benar ada sisa ruang, 0 regresi
+untuk kasus itu). Row transport TETAP fixed footer presisi di tepi bawah — Batch 343 TIDAK
+disentuh/dibatalkan (sudah dikonfirmasi user "no more floating thing", tetap valid).
+
+**Trade-off yang disadari (dicatat, bukan diselesaikan diam-diam):** solusi paling "otentik"
+ala Spotify/Apple Music sebenarnya album art yang membesar mengisi sisa ruang layar tinggi
+(bukan fixed 280dp) — tapi itu perubahan cakupan jauh lebih besar (blur/glow circle/hero shape
+semua ikut terdampak, resiko tinggi utk Micro-Batch). `Center` dipilih sebagai fix minimal-resiko
+sekarang; kalau user masih tidak puas & minta art yang scale dinamis, itu task terpisah lebih
+besar — jangan dieksekusi diam-diam tanpa konfirmasi eksplisit dulu.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 1 parameter baru (`verticalArrangement`) + 1
+blok komentar root-cause. 0 komposable lain disentuh, 0 logic scroll/gesture Batch 334 & Batch
+343 diubah (`ZERO-REFACTOR`). Brace/paren seimbang raw (227/227, 974/974 — naik dari komentar
+baru) + strip-komentar (226/226, 672/672 — IDENTIK sebelum batch ini; `Arrangement.Center` tanpa
+kurung panggilan fungsi, 0 paren baru dari kode). Bracket-matcher stack-based (comment/string
+di-strip) dijalankan ulang atas seluruh file — struktur bersarang genuinely valid. Diff terhadap
+ZIP batch 344 terakhir dikonfirmasi HANYA 1 hunk (blok komentar + 1 baris parameter), 0 file lain
+tersentuh. `FILE_MANIFEST.txt` tidak berubah.
+
+**Belum diverifikasi compile Gradle sungguhan** — WAJIB cek CI. Risiko sintaks sangat rendah
+(`Arrangement.Center` API resmi Compose Foundation, sudah dipakai identik di file lain project
+ini). **Belum diverifikasi visual di device** — prioritas cek: (1) di layar tinggi/ruang lebih
+(kasus user), sekarang ada 2 gap breathing room (atas: antara art box & judul; bawah: antara
+baris waktu & Row transport) alih-alih 1 gap besar tunggal di bawah; (2) Row transport TETAP
+presisi di tepi bawah layar (regresi 0 dari Batch 343); (3) di layar pendek/konten kepanjangan,
+scroll tetap berfungsi identik seperti sebelumnya (0 defek baru); (4) Row 4-ikon atas TIDAK
+berubah tampilan sama sekali (0 kode disentuh di situ, sesuai kesimpulan investigasi).
+
 ## Batch 344 — Fix sistemik: cover art letterbox (ContentScale.Fit → Crop di 1 fungsi bersama), 1 file kode
 User kirim screenshot lagu "TOBI - Warm Up Mix 2023" + instruksi: "saya mau layout normal dan
 generik". Screenshot menunjukkan kotak seni utama Now Playing (280dp hero) tampil dengan bar
