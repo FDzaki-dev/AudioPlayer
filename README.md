@@ -8,7 +8,12 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 340 (Lanjutan Batch 339: fix `.frostedGlass()` kelewat di 3 dari 6
+> 🆕 **Update terbaru — Batch 341 (Fitur: ganti banner onboarding auto-tampil-sekali jadi tombol
+> info permanen di samping ikon favorit, NowPlayingScreen, 1 file):** Tip gestur (geser=kecerahan/
+> volume, ⋮=Sleep Timer/Kecepatan/Equalizer) sekarang bisa dibuka-tutup kapan saja lewat tombol,
+> tidak lagi hilang permanen begitu di-dismiss sekali. Sekaligus menuntaskan saga scroll-
+> reachability Batch 336-338 (akarnya justru banner auto-tampil ini).
+> Batch 340 (Lanjutan Batch 339: fix `.frostedGlass()` kelewat di 3 dari 6
 > sheet tersisa, 3 file):** `BackupRestoreSheet`/`DiagnosticLogSheet`/`DuplicateFinderSheet`
 > diperbaiki (gap sama — transparan tanpa blur). Sisa 3 sheet diantre — setelah itu semua 7 sheet
 > dari audit Batch 339 tuntas.

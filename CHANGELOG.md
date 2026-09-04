@@ -1,5 +1,29 @@
 # Changelog
 
+## Batch 341 — FITUR: ganti banner onboarding auto-tampil-sekali jadi tombol info permanen (NowPlayingScreen), 1 file kode
+User laporan + screenshot: banner tip gestur (geser=kecerahan/volume, ⋮=Sleep Timer/Kecepatan/
+Equalizer) "bisa kena dismiss permanen dan gak balik lagi" — begitu di-tap X sekali, hilang
+selamanya, 0 cara buka lagi. Instruksi eksplisit: ganti jadi tombol khusus onboarding di samping
+ikon favorit.
+
+**Mekanisme baru.** `showNowPlayingHint` mulai `false` (bukan lagi auto-`true` di first-launch
+dari `OnboardingHintStore.hasSeenNowPlayingHint()`), dikontrol tombol baru (ikon Info) di Row
+atas, persis di samping ikon favorit. Tap = toggle buka/tutup kartu tip — bisa dibuka lagi
+kapan saja, tidak pernah "habis" secara permanen. `onDismiss` kartu tidak lagi memanggil
+`hintStore.markNowPlayingHintSeen()` — cuma tutup kartu saat ini. `OnboardingHintStore`/
+`hintStore` dihapus dari file ini (class-nya sendiri tetap ada, masih dipakai `LibraryScreen.kt`
+untuk hint lain, tidak disentuh).
+
+**Efek samping disengaja.** Cabang `showNowPlayingHint -> 260.dp` di `albumArtBoxHeight` (Batch
+338, susutkan art box preemptive selama hint kebetulan tampil) dihapus — alasannya sudah tidak
+berlaku sejak hint tidak lagi otomatis muncul tanpa diminta. Ini menuntaskan akar masalah seluruh
+saga scroll-reachability Batch 336-338. Cabang layar pendek (Batch 336, `screenHeightDp <
+640.dp`) tidak disentuh — fix terpisah, tidak terkait hint.
+
+**1 file**: `NowPlayingScreen.kt`. Brace/paren seimbang (226/226, 920/920 raw; 226/226, 674/674
+strip-komentar). Belum diverifikasi compile/device — lihat `PROJECT_STATE.md` Batch 341 untuk
+checklist verifikasi lengkap.
+
 ## Batch 340 — Lanjutan Batch 339: fix .frostedGlass() kelewat di 3 dari 6 sheet tersisa, 3 file kode
 User upload ZIP baru (source of truth, Hard Reset — lompat dari Batch 323 internal sesi
 sebelumnya ke Batch 339, isi Batch 324-339 dari sesi lain dibaca ulang bukan ditimpa) +

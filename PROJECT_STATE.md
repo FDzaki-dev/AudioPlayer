@@ -36,6 +36,48 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 341 (FITUR — ganti banner onboarding auto-tampil-sekali jadi tombol info permanen di
+Row atas NowPlayingScreen, 1 file kode)** — User laporan + screenshot NowPlayingScreen: banner
+tip gestur (Batch 112, "Geser piringan: kiri=kecerahan, kanan=volume. Ketuk ⋮ buat Sleep Timer,
+Kecepatan & Equalizer.") "bisa kena dismiss permanen dan gak balik lagi" — begitu di-tap X
+sekali, hilang SELAMANYA (persist via `OnboardingHintStore.markNowPlayingHintSeen()`), 0 cara
+buka lagi kalau user lupa isinya/salah tap X. Instruksi eksplisit: "mending buat kan button
+khusus onboarding disamping logo love" — bukan lagi banner auto-tampil, tombol permanen.
+
+**Perubahan mekanisme (total, bukan tambal)** — `showNowPlayingHint` (state yang sama, dipakai
+ulang 1:1) TIDAK LAGI diinisialisasi dari `!hintStore.hasSeenNowPlayingHint()` (auto true di
+first-launch) — sekarang mulai `false`, murni dikontrol toggle tombol baru (ikon `Info`, di Row
+atas persis di samping ikon favorit sesuai instruksi). `onDismiss` kartu (`FeatureHintBanner`,
+komponen 0 diubah, dipakai ulang apa adanya) TIDAK LAGI panggil `hintStore.markNowPlayingHintSeen()`
+— cuma toggle tutup kartu SAAT INI, bisa dibuka lagi kapan saja via tombol yang sama (toggle,
+simetris: tap buka / tap lagi tutup, sama seperti tombol X di kartu). `OnboardingHintStore` &
+`hintStore` (import + variabel) DIHAPUS dari file ini (jadi genuinely tidak terpakai) — TAPI
+class `OnboardingHintStore` itu sendiri (`data/OnboardingHintStore.kt`) SENGAJA TIDAK disentuh/
+dihapus, karena masih dipakai `LibraryScreen.kt` untuk hint lain yang tidak terkait (ZERO-REFACTOR).
+
+**Efek samping yang sengaja diikutkan (bukan bug baru, konsekuensi logis)** — cabang
+`showNowPlayingHint -> 260.dp` di `albumArtBoxHeight` (Batch 338, susutkan art box preemptive
+selama hint "kebetulan" masih nongol) DIHAPUS: alasannya sudah tidak berlaku sama sekali sejak
+hint tidak lagi otomatis muncul tanpa diminta — kalau user SEKARANG tap tombol info, itu aksi
+sadar/sengaja, wajar kalau perlu scroll dikit buat nutup lagi, bukan lagi "kejutan" first-launch
+yang harus dikompensasi preemptif. Ini secara efektif MENUNTASKAN seluruh saga scroll-reachability
+Batch 336-338 (yang akar masalahnya justru banner auto-tampil-tak-diminta ini) — cabang layar
+pendek (`screenHeightDp < 640.dp`, Batch 336) TIDAK disentuh sama sekali, itu fix legitimate
+terpisah (device fisik pendek), 0 terkait hint.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 1 import baru (`Icons.Default.Info`), 1 import
+dihapus (`OnboardingHintStore`, sudah tidak terpakai di file ini). Brace/paren seimbang raw
+(226/226, 920/920 — kebetulan bersih tanpa perlu strip komentar batch ini) + dicek ulang strip-
+komentar juga (226/226, 674/674). **Belum diverifikasi compile Gradle sungguhan** — WAJIB cek
+CI. **Belum diverifikasi visual di device** — prioritas cek: (1) tombol info (ikon 🛈, warna
+`primary` saat kartu terbuka / `secondary` saat tertutup) muncul persis di antara ikon favorit
+& ikon Kontrol Lanjutan (⋮); (2) tap sekali → kartu tip muncul (posisi sama seperti banner lama,
+di atas "SEDANG DIPUTAR"); (3) tap tombol info LAGI (atau X di kartu) → kartu tutup; (4) tap
+tombol info berkali-kali (buka-tutup-buka-tutup) → HARUS selalu bisa dibuka lagi, TIDAK PERNAH
+"habis"/permanen hilang seperti sebelumnya — ini inti dari fix batch ini; (5) art box SEKARANG
+selalu 300dp penuh di layar normal (kecuali layar pendek <640dp) — TIDAK lagi menyusut ke 260dp
+cuma krn kartu tip lagi kebuka.
+
 **Batch 340 (Lanjutan antrean "🔍 Audit tambahan" Batch 339: fix `.frostedGlass()` kelewat di 3
 dari 6 sheet tersisa, 3 file kode)** — User upload ZIP baru (`AudioPlayer_v339_Batch1.zip`,
 lompat dari internal Batch 323 sesi sebelumnya ke Batch 339 — Hard Reset, ZIP user = source of

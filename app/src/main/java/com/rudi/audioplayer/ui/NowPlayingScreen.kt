@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
@@ -93,7 +94,6 @@ import android.view.WindowManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.media3.common.Player
-import com.rudi.audioplayer.data.OnboardingHintStore
 import com.rudi.audioplayer.ui.lyrics.LyricsViewModel
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
@@ -230,8 +230,21 @@ fun NowPlayingScreen(
     LaunchedEffect(song?.id) {
         song?.let { lyricsViewModel.loadLyrics(it.artist, it.title, it.album) }
     }
-    val hintStore = remember(context) { OnboardingHintStore(context) }
-    var showNowPlayingHint by remember { mutableStateOf(!hintStore.hasSeenNowPlayingHint()) }
+    // Batch 341 — user eksplisit lapor (screenshot NowPlayingScreen): banner onboarding "bisa
+    // kena dismiss permanen dan gak balik lagi" — begitu di-tap X sekali, hilang selamanya, 0
+    // cara buka lagi kalau lupa isinya. GANTI TOTAL mekanismenya: bukan lagi auto-tampil-sekali
+    // + persist "sudah pernah lihat" (`OnboardingHintStore.hasSeenNowPlayingHint()`/
+    // `markNowPlayingHintSeen()`, dihapus dari file ini — class-nya sendiri TETAP ada & TIDAK
+    // diubah, masih dipakai `LibraryScreen.kt` utk hint lain, ZERO-REFACTOR) — SEKARANG murni
+    // toggle biasa dikontrol tombol info permanen di Row atas (samping ikon favorit, lihat
+    // Row bawah), bisa dibuka/tutup KAPAN SAJA tanpa batas, mulai dari tersembunyi (`false`).
+    // Efek samping yang SENGAJA disertakan: karena hint sekarang cuma tampil atas aksi eksplisit
+    // user (bukan lagi otomatis kejadian di setiap first-launch tanpa diminta), seluruh saga
+    // "art box menyusut buat kompensasi ruang scroll selama hint numpang tampil" (Batch 336-338,
+    // cabang `showNowPlayingHint -> 260.dp` di `albumArtBoxHeight` bawah) TIDAK relevan lagi —
+    // dihapus di titik itu (lihat komentar di sana). Cabang layar pendek (`screenHeightDp <
+    // 640.dp`, Batch 336) TETAP ada — itu fix legitimate terpisah, tidak terkait hint sama sekali.
+    var showNowPlayingHint by remember { mutableStateOf(false) }
     val activity = remember(context) { context.findActivity() }
     // Full 0-100% swing over a fixed 140dp of drag, regardless of how tall the gesture zone
     // itself renders — the old version divided by the zone's full 300dp height, so a normal
@@ -262,9 +275,13 @@ fun NowPlayingScreen(
     // — begitu user dismiss (SEKALI, permanen via hintStore, tidak muncul lagi selamanya),
     // art balik penuh 300dp seperti biasa. Layar pendek (<640dp) tetap pakai rumus proporsional
     // lama (Batch 336) — dua kondisi ini independen, yang paling kecil yang menang.
+    // Batch 341 — cabang `showNowPlayingHint -> 260.dp` (Batch 338) DIHAPUS: hint sekarang
+    // murni opt-in lewat tombol info (Row atas), bukan lagi otomatis tampil tiap first-launch
+    // tanpa diminta — 0 lagi alasan buat preemptive-susutkan art box FIXED cuma krn hint
+    // "kebetulan lagi kebuka". Cabang layar pendek di bawah (Batch 336) TIDAK disentuh, itu
+    // fix legitimate terpisah (device pendek beneran, tidak terkait hint sama sekali).
     val albumArtBoxHeight = when {
         screenHeightDp < 640.dp -> (screenHeightDp * 0.28f).coerceIn(160.dp, 300.dp)
-        showNowPlayingHint -> 260.dp
         else -> 300.dp
     }
     var brightnessLevel by remember {
@@ -414,6 +431,28 @@ fun NowPlayingScreen(
                     if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (isFavorite) "Hapus dari favorit" else "Tambah ke favorit",
                     tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                )
+            }
+            // Batch 341 — user eksplisit (screenshot): ganti banner onboarding auto-tampil-
+            // sekali (bisa "kena dismiss permanen dan gak balik lagi") jadi tombol permanen di
+            // samping ikon favorit ini — buka/tutup kartu tip gestur (geser=kecerahan/volume,
+            // ⋮=Sleep Timer/Kecepatan/Equalizer) KAPAN SAJA, bukan cuma sekali di awal. Toggle
+            // (bukan cuma buka) — tap lagi saat kartu sudah tampil = tutup, simetris dgn tombol
+            // X di kartunya sendiri. `showNowPlayingHint` (state sama yg dulu dikontrol
+            // hintStore) dipakai ulang 1:1 — lihat deklarasi & render kartu di bawah.
+            val hintButtonInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    showNowPlayingHint = !showNowPlayingHint
+                },
+                interactionSource = hintButtonInteraction,
+                modifier = Modifier.bouncyPress(hintButtonInteraction)
+            ) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = if (showNowPlayingHint) "Tutup tip gestur" else "Tip gestur & pintasan",
+                    tint = if (showNowPlayingHint) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                 )
             }
             val advancedInteraction = remember { MutableInteractionSource() }
@@ -583,13 +622,15 @@ fun NowPlayingScreen(
         // Total 3 lever batch ini (art box, teks banner, spacer) sengaja dikombinasi
         // supaya layar "normal" (bukan cuma yg <640dp) juga muat tanpa scroll SELAMA hint
         // sekali-tampil ini masih ada — begitu di-dismiss, semua balik ke ukuran penuh biasa.
+        // Batch 341 — user eksplisit: "kena dismiss permanen dan gak balik lagi" jadi masalah
+        // utama — `onDismiss` di bawah TIDAK lagi panggil `hintStore.markNowPlayingHintSeen()`
+        // (dihapus, lihat deklarasi `showNowPlayingHint` di atas), cuma toggle tutup POPUP saat
+        // ini — bisa dibuka lagi kapan saja lewat tombol info baru di Row atas (samping ikon
+        // favorit). Teks/posisi/tampilan banner ITU SENDIRI 0 diubah (masih card sama, Batch 338).
         if (showNowPlayingHint) {
             FeatureHintBanner(
                 text = "Geser piringan: kiri = kecerahan, kanan = volume. Ketuk ⋮ buat Sleep Timer, Kecepatan & Equalizer.",
-                onDismiss = {
-                    showNowPlayingHint = false
-                    hintStore.markNowPlayingHintSeen()
-                }
+                onDismiss = { showNowPlayingHint = false }
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
