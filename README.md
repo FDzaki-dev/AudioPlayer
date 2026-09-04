@@ -8,7 +8,13 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 341 (Fitur: ganti banner onboarding auto-tampil-sekali jadi tombol
+> 🆕 **Update terbaru — Batch 342 (Relokasi tata letak Row ikon atas NowPlayingScreen jadi
+> simetris, 1 file):** 4 ikon (Tutup/Favorit/Info/Kontrol Lanjutan) sebelumnya berat sebelah —
+> 1 `Spacer` tunggal mendorong 3 ikon terakhir menumpuk rapat di ujung kanan, dilaporkan
+> "tidak simetris/tidak professional". Diganti `Arrangement.SpaceBetween` di `Row` induk: ke-4
+> ikon sekarang renggang merata sepanjang lebar layar (Tutup tetap kiri mentok, Kontrol Lanjutan
+> tetap kanan mentok). 0 ikon/handler/fungsi diubah, murni relokasi tata letak.
+> Batch 341 (Fitur: ganti banner onboarding auto-tampil-sekali jadi tombol
 > info permanen di samping ikon favorit, NowPlayingScreen, 1 file):** Tip gestur (geser=kecerahan/
 > volume, ⋮=Sleep Timer/Kecepatan/Equalizer) sekarang bisa dibuka-tutup kapan saja lewat tombol,
 > tidak lagi hilang permanen begitu di-dismiss sekali. Sekaligus menuntaskan saga scroll-

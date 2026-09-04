@@ -408,7 +408,20 @@ fun NowPlayingScreen(
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        // Batch 342 — user eksplisit (screenshot): 4 ikon Row atas (Tutup/Favorit/Info/Kontrol
+        // Lanjutan) sebelumnya 1 `Spacer(weight(1f))` tunggal setelah tombol Tutup, mendorong 3
+        // ikon SISANYA menumpuk rapat di ujung kanan (1 vs 3, berat sebelah) — dilaporkan
+        // "tidak simetris/tidak professional". Fix RELOKASI murni tata-letak (0 ikon ditambah/
+        // dihapus/diganti fungsi): `Spacer` manual dibuang, `horizontalArrangement =
+        // Arrangement.SpaceBetween` dipasang di `Row` induk — ke-4 ikon sekarang renggang merata
+        // sepanjang lebar layar (Tutup tetap di kiri mentok, Kontrol Lanjutan tetap di kanan
+        // mentok, Favorit & Info renggang di antaranya), bukan lagi 1 ikon terisolasi lawan 3
+        // ikon berdesakan. 0 handler/tooltip/tint/urutan logis diubah.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
             val backInteraction = remember { MutableInteractionSource() }
             IconButton(
                 onClick = onBack,
@@ -417,7 +430,6 @@ fun NowPlayingScreen(
             ) {
                 Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Tutup")
             }
-            Spacer(modifier = Modifier.weight(1f))
             val favoriteInteraction = remember { MutableInteractionSource() }
             IconButton(
                 onClick = {

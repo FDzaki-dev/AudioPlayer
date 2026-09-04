@@ -1,5 +1,40 @@
 # Changelog
 
+## Batch 342 — Relokasi tata letak Row ikon atas NowPlayingScreen jadi simetris, 1 file kode
+User kirim screenshot NowPlayingScreen + instruksi eksplisit: "relokasi layout agar simetris dan
+professional look!!" — Row ikon atas (Tutup/Favorit/Info/Kontrol Lanjutan) di screenshot terlihat
+berat sebelah: tombol Tutup terisolasi di ujung kiri dengan jarak kosong besar, sementara 3 ikon
+lain (Favorit/Info/Kontrol Lanjutan, hasil penambahan tombol Info Batch 341) menumpuk rapat di
+ujung kanan.
+
+**Root cause.** `Row` induk cuma punya 1 `Spacer(modifier = Modifier.weight(1f))` tunggal tepat
+setelah `IconButton` Tutup — mekanisme ini mendorong SEMUA sisa ikon (Favorit/Info/Kontrol
+Lanjutan) menempel jadi satu klaster di ujung kanan, membelah Row jadi kelompok 1 ikon lawan 3
+ikon alih-alih renggang merata. Ini murni akibat tata letak `Spacer` manual, bukan bug fungsional
+— tiap ikon sendiri sudah benar (handler/tint/contentDescription 0 masalah).
+
+**Fix (relokasi murni, 0 ikon ditambah/dihapus/diganti fungsi).** `Spacer(weight(1f))` manual
+dibuang; `Row` induk diberi `horizontalArrangement = Arrangement.SpaceBetween` (import sudah
+tersedia lewat wildcard `androidx.compose.foundation.layout.*` yang sudah ada di file ini sejak
+awal, 0 import baru). Efeknya: ke-4 `IconButton` sekarang tersebar merata sepanjang lebar Row —
+Tutup tetap presisi di kiri mentok, Kontrol Lanjutan tetap presisi di kanan mentok (0 perubahan
+posisi tepi), Favorit & Info kini punya jarak yang proporsional di antara keduanya dan terhadap
+2 ikon tepi, bukan lagi berdesakan sebagai 1 klaster. Urutan logis ikon (Tutup→Favorit→Info→
+Kontrol Lanjutan, dari Batch 341) TIDAK diubah — cuma jarak antar-ikon yang direlokasi.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 0 import baru, 0 handler/tint/contentDescription
+disentuh, 0 komposable lain di file ini disentuh (`ZERO-REFACTOR`). Brace/paren seimbang (226/226,
+925/925 raw; 226/226, 671/671 strip-komentar — parens naik murni dari 1 blok komentar penjelasan
+baru + parameter `horizontalArrangement` baru, bukan dari logic tambahan). `FILE_MANIFEST.txt`
+tidak berubah (0 file baru/dihapus).
+
+**Belum diverifikasi compile Gradle sungguhan** (0 akses jaringan/SDK di sandbox sesi ini) —
+**WAJIB cek CI setelah push**, risiko sintaks sangat rendah (`Arrangement.SpaceBetween` adalah
+enum resmi Compose Foundation yang sudah dipakai identik di file yang sama, mis. baris 689/1798).
+**Belum diverifikasi visual di device** — prioritas cek: buka Now Playing, konfirmasi 4 ikon Row
+atas sekarang renggang merata (bukan lagi 1 ikon kiri + 3 ikon menumpuk kanan), Tutup & Kontrol
+Lanjutan tetap presisi di kedua tepi layar seperti sebelumnya (0 regresi posisi tepi).
+
 ## Batch 341 — FITUR: ganti banner onboarding auto-tampil-sekali jadi tombol info permanen (NowPlayingScreen), 1 file kode
 User laporan + screenshot: banner tip gestur (geser=kecerahan/volume, ⋮=Sleep Timer/Kecepatan/
 Equalizer) "bisa kena dismiss permanen dan gak balik lagi" — begitu di-tap X sekali, hilang

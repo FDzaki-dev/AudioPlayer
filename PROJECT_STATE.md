@@ -36,6 +36,34 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 342 (Relokasi tata letak Row ikon atas NowPlayingScreen jadi simetris, 1 file kode)** —
+User kirim screenshot + instruksi eksplisit: "relokasi layout agar simetris dan professional
+look!!". Screenshot menunjukkan Row ikon atas (Tutup/Favorit/Info/Kontrol Lanjutan) berat
+sebelah: Tutup terisolasi di kiri dengan jarak kosong besar, 3 ikon lain (Favorit/Info/Kontrol
+Lanjutan — Info baru ditambah Batch 341) menumpuk rapat di kanan.
+
+**Root cause** — `Row` induk cuma punya 1 `Spacer(modifier = Modifier.weight(1f))` tunggal tepat
+setelah `IconButton` Tutup, mendorong SEMUA sisa ikon jadi 1 klaster di ujung kanan (1 ikon
+lawan 3, bukan renggang merata). Murni akibat tata letak `Spacer` manual — tiap ikon sendiri
+(handler/tint/contentDescription) sudah benar, 0 bug fungsional.
+
+**Fix (relokasi murni tata letak, 0 ikon ditambah/dihapus/diganti fungsi)** — `Spacer(weight(1f))`
+dibuang, `Row` induk diberi `horizontalArrangement = Arrangement.SpaceBetween` (0 import baru,
+`Arrangement` sudah masuk lewat wildcard `androidx.compose.foundation.layout.*` yang sudah ada
+di file ini). Ke-4 `IconButton` sekarang tersebar merata sepanjang lebar Row — Tutup tetap
+presisi kiri mentok, Kontrol Lanjutan tetap presisi kanan mentok (0 perubahan posisi tepi),
+Favorit & Info dapat jarak proporsional di antaranya, bukan lagi 1 klaster. Urutan logis ikon
+(Tutup→Favorit→Info→Kontrol Lanjutan, dari Batch 341) TIDAK diubah — cuma jarak antar-ikon yang
+direlokasi.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 0 import baru, 0 handler/tint/
+contentDescription disentuh, 0 komposable lain di file ini disentuh (ZERO-REFACTOR). Brace/paren
+seimbang (226/226, 925/925 raw; 226/226, 671/671 strip-komentar). `FILE_MANIFEST.txt` tidak
+berubah. **Belum diverifikasi compile Gradle sungguhan** — WAJIB cek CI. **Belum diverifikasi
+visual di device** — prioritas cek: buka Now Playing, konfirmasi 4 ikon Row atas renggang merata
+(bukan lagi 1 kiri + 3 menumpuk kanan), Tutup & Kontrol Lanjutan tetap presisi di kedua tepi
+layar (0 regresi posisi tepi). Detail: `CHANGELOG.md` Batch 342.
+
 **Batch 341 (FITUR — ganti banner onboarding auto-tampil-sekali jadi tombol info permanen di
 Row atas NowPlayingScreen, 1 file kode)** — User laporan + screenshot NowPlayingScreen: banner
 tip gestur (Batch 112, "Geser piringan: kiri=kecerahan, kanan=volume. Ketuk ⋮ buat Sleep Timer,
