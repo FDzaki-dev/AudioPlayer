@@ -36,6 +36,72 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 343 (Fix 2 laporan user dalam 1 pesan: kontrol transport "mengambang" + ikon Info Row
+atas anomali, NowPlayingScreen, 1 file kode)** — User kirim screenshot + instruksi eksplisit:
+"bagian pemutar dilarang keras untuk mengambang/tidak menyentuh dasar sama sekali" DAN
+"perbaiki layout menu-menu yang kelihatan anomali dibagian atas alih-alih rapi".
+
+**Bug 1 — root cause (transport mengambang).** Row transport (shuffle/prev/play-pause/next/
+repeat) sebelumnya jadi child TERAKHIR di dalam `Column` yang sekaligus `weight(1f)` +
+`verticalScroll(...)` (arsitektur "fixed header + scrollable body", Batch 334). `Column` biasa
+(verticalArrangement default = Top) menaruh anak-anaknya rapat dari ATAS ruang yang tersedia —
+begitu total tinggi konten (judul s/d slider) LEBIH PENDEK dari tinggi weighted-area (kasus umum
+di layar normal/tinggi, art box sudah fixed 300dp duluan di header), transport row berhenti
+persis di bawah kontennya sendiri, MENYISAKAN spasi kosong di antara transport dan tepi bawah
+layar — persis "mengambang" di screenshot user, bukan sekadar kurang padding.
+
+**Fix Bug 1 (struktural, bukan tuning angka).** Penutup `Column` scrollable dipindah lebih awal
+(tepat setelah Row waktu posisi/durasi, SEBELUM Row transport) — Row transport (+ `Spacer(16.dp)`
+pemisahnya) jadi sibling TETAP (fixed) milik `Column` induk (`fillMaxSize`), BUKAN lagi child di
+dalam area scroll. Karena `Column` induk menaruh `Column` scrollable itu dengan `weight(1f)`,
+sisa ruang vertikal SELALU mengalir penuh ke situ dulu, dan Row transport (fixed, ukuran
+instrinsik) otomatis jadi child PALING TERAKHIR `Column` induk — Row transport sekarang SELALU
+presisi di tepi bawah (sebelum padding 20dp layar), 0 spasi kosong tersisa, apa pun tinggi
+konten/layarnya. **Bonus**: ini sekaligus menuntaskan saga reachability transport Batch 336-338
+lebih kuat — transport SEKARANG SELALU terlihat tanpa perlu discroll sama sekali (bukan cuma
+"terjangkau via scroll"). 0 logic scroll/gesture/timing lain diubah — murni 1 child dipindah.
+
+**Bug 2 — root cause (ikon Info anomali).** Batch 342 sudah memperbaiki SPACING Row 4-ikon atas
+(`Arrangement.SpaceBetween`), dan screenshot user kali ini mengonfirmasi spacing itu memang
+sudah renggang merata — TAPI user masih lapor "anomali". Root cause beda level dari Batch 342:
+`Icons.Default.Info` (varian "Filled") me-render sebagai lingkaran PADAT/solid dengan "i" di
+dalamnya — satu-satunya ikon berbentuk badge solid di antara 3 ikon lain di Row yang sama
+(Tutup/chevron, Favorit-border, Kontrol Lanjutan/titik-tiga) yang semuanya guratan tipis/outline.
+Bobot visual jomplang inilah yang terbaca "anomali" — persis kelas masalah "samakan visual weight
+icon sejenis" yang sudah pernah diaudit project ini (Batch 228).
+
+**Fix Bug 2.** `Icons.Default.Info` → `Icons.Outlined.Info` (lingkaran garis tipis + "i" tipis,
+bobot visual seragam dgn 3 ikon lain). Paket `material-icons-extended` (sumber `Icons.Outlined.*`)
+SUDAH jadi dependency app ini sejak lama (grep `app/build.gradle.kts` konfirmasi) — 0 dependency
+baru, TAPI ini pertama kalinya file ini (atau project ini secara umum, grep app-wide 0 hit lain)
+memakai varian `Outlined` — pola baru, sengaja dipilih HANYA di 1 titik ini karena itu yang
+genuinely menjawab laporan user, bukan diterapkan spekulatif ke ikon lain. Import
+`filled.Info` dihapus (1 satu-satunya pemakaian di file ini, dikonfirmasi grep), diganti
+`outlined.Info` — pelajaran Batch 233 (ganti varian ikon WAJIB sertakan update import) diikuti.
+0 posisi/spacing/handler/tooltip Row ini disentuh — `SpaceBetween` Batch 342 dipertahankan apa
+adanya, terbukti sudah benar dari screenshot user.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 1 import dihapus + 1 import baru (net 0). 0
+handler/callback/urutan logis ikon diubah, 0 komposable lain di file ini disentuh
+(`ZERO-REFACTOR`). Brace/paren seimbang raw (227/227, 953/953 — naik murni dari komentar baru,
+pola false-positive yang sudah berulang kali dicatat, mis. Batch 335/342) + strip-komentar
+(226/226, 672/672 — IDENTIK dengan sebelum batch ini, murni relokasi brace + swap 1 ikon, 0
+logic baru/hilang). Verifikasi tambahan: bracket-matcher berbasis stack (comment & string
+di-strip dulu, bukan cuma hitung jumlah simbol) dijalankan atas seluruh file — konfirmasi
+struktur bersarang genuinely valid. `FILE_MANIFEST.txt` tidak berubah.
+
+**Belum diverifikasi compile Gradle sungguhan** — WAJIB cek CI. Risiko sintaks rendah: Bug 1
+murni memindah posisi 1 kurung kurawal penutup + 1 blok kode yang isinya tidak diubah sama
+sekali; Bug 2 pakai API resmi Compose Material Icons Extended dari dependency yang sudah lama
+terpasang (baru pertama kali dipakai sebagai `Outlined` di project ini, tapi paketnya sendiri
+sudah teruji lewat `Icons.Default`/`Filled` di ratusan titik lain). **Belum diverifikasi visual
+di device** — prioritas cek: (1) Row 5 tombol transport presisi menempel tepi bawah layar (0
+spasi kosong di bawahnya) baik di layar tinggi/normal maupun pendek; (2) konten judul-slider di
+atasnya TIDAK terpotong/berubah (murni Row transport yang pindah); (3) ikon Info Row atas
+sekarang lingkaran garis tipis (bukan lagi padat solid), bobot visual seragam dgn 3 ikon lain;
+(4) tap ikon Info tetap toggle kartu tip gestur seperti biasa (0 fungsi berubah). Detail:
+`CHANGELOG.md` Batch 343.
+
 **Batch 342 (Relokasi tata letak Row ikon atas NowPlayingScreen jadi simetris, 1 file kode)** —
 User kirim screenshot + instruksi eksplisit: "relokasi layout agar simetris dan professional
 look!!". Screenshot menunjukkan Row ikon atas (Tutup/Favorit/Info/Kontrol Lanjutan) berat

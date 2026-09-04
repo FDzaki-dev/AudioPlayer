@@ -8,7 +8,17 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 342 (Relokasi tata letak Row ikon atas NowPlayingScreen jadi
+> 🆕 **Update terbaru — Batch 343 (Fix laporan user: kontrol transport "mengambang" + ikon Info
+> anomali di Row atas, NowPlayingScreen, 1 file):** (1) Row transport (shuffle/prev/play-pause/
+> next/repeat) sebelumnya jadi child terakhir Column scrollable — kalau konten di atasnya lebih
+> pendek dari ruang yang tersedia (kasus umum layar normal), transport berhenti di tengah dengan
+> sisa ruang kosong di bawahnya, persis "mengambang" yang dilaporkan. Diperbaiki struktural:
+> transport dikeluarkan jadi footer TETAP di luar Column scrollable — sekarang selalu presisi
+> di tepi bawah layar, terlepas dari tinggi konten/layar. (2) Ikon Info Row atas (ditambah Batch
+> 341) ternyata varian "Filled" Material — render sebagai lingkaran padat solid, beda bobot
+> visual jauh dari 3 ikon lain yang tipis/outline (Tutup/Favorit-border/Kontrol Lanjutan), bikin
+> Row terlihat "anomali". Diganti `Icons.Outlined.Info` — bobot visual sekarang seragam.
+> Batch 342 (Relokasi tata letak Row ikon atas NowPlayingScreen jadi
 > simetris, 1 file):** 4 ikon (Tutup/Favorit/Info/Kontrol Lanjutan) sebelumnya berat sebelah —
 > 1 `Spacer` tunggal mendorong 3 ikon terakhir menumpuk rapat di ujung kanan, dilaporkan
 > "tidak simetris/tidak professional". Diganti `Arrangement.SpaceBetween` di `Row` induk: ke-4

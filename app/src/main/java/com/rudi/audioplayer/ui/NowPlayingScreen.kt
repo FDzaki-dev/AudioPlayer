@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
@@ -59,6 +58,7 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -452,6 +452,18 @@ fun NowPlayingScreen(
             // (bukan cuma buka) — tap lagi saat kartu sudah tampil = tutup, simetris dgn tombol
             // X di kartunya sendiri. `showNowPlayingHint` (state sama yg dulu dikontrol
             // hintStore) dipakai ulang 1:1 — lihat deklarasi & render kartu di bawah.
+            // Batch 343 — user eksplisit (screenshot): Row 4-ikon ini (spacing SpaceBetween sejak
+            // Batch 342) masih "kelihatan anomali" — root cause BUKAN spacing (dikonfirmasi ulang
+            // dari screenshot user: ke-4 posisi ikon renggang merata, sama seperti niat Batch 342),
+            // tapi BOBOT VISUAL: `Icons.Default.Info` (varian "Filled") me-render sebagai lingkaran
+            // PADAT dgn "i" — satu-satunya ikon berbentuk badge solid di antara 3 ikon lain yang
+            // semuanya guratan tipis (Tutup/chevron, Favorit-border, Kontrol Lanjutan/titik tiga)
+            // — persis kelas masalah yang sama dgn audit "samakan visual weight icon sejenis"
+            // (Batch 228). Fix: `Icons.Outlined.Info` (paket `material-icons-extended`, SUDAH jadi
+            // dependency app ini — grep `app/build.gradle.kts` konfirmasi) — cuma lingkaran GARIS
+            // tipis + "i" tipis, bobot visual sama dgn 3 ikon lain, 0 lagi terlihat sbg badge
+            // menonjol sendirian. 0 posisi/spacing/handler/tooltip Row ini disentuh (Batch 342
+            // SpaceBetween tetap dipertahankan, terbukti sudah benar).
             val hintButtonInteraction = remember { MutableInteractionSource() }
             IconButton(
                 onClick = {
@@ -462,7 +474,7 @@ fun NowPlayingScreen(
                 modifier = Modifier.bouncyPress(hintButtonInteraction)
             ) {
                 Icon(
-                    Icons.Default.Info,
+                    Icons.Outlined.Info,
                     contentDescription = if (showNowPlayingHint) "Tutup tip gestur" else "Tip gestur & pintasan",
                     tint = if (showNowPlayingHint) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                 )
@@ -604,6 +616,28 @@ fun NowPlayingScreen(
         // scroll GENUINELY dibutuhkan (kalau konten overflow di layar pendek) TETAP jalan penuh
         // via `scrollState` — cuma efek visual overscroll DI LUAR rentang scroll asli yang
         // dimatikan, 0 logic gesture/scroll lain diubah.
+        // Batch 343 — user eksplisit ("bagian pemutar dilarang keras untuk mengambang/tidak
+        // menyentuh dasar sama sekali"): Row transport (shuffle/prev/play-pause/next/repeat)
+        // SEBELUMNYA jadi child TERAKHIR di dalam Column scrollable+weight(1f) ini. Root cause
+        // "mengambang": `Column` biasa (verticalArrangement default = Top) menaruh anak-anaknya
+        // rapat dari ATAS ruang yang tersedia — begitu total tinggi konten (judul s/d transport)
+        // LEBIH PENDEK dari tinggi weighted-area (kasus umum di layar normal/tinggi, art box
+        // sudah fixed 300dp duluan di atas), transport row berhenti persis di bawah konten
+        // terakhirnya sendiri, MENYISAKAN spasi kosong di antara transport row dan tepi bawah
+        // layar — persis "mengambang" yang dilaporkan, bukan cuma soal padding/margin.
+        // FIX (struktural, bukan tuning angka): Row transport ini DIKELUARKAN dari Column
+        // scrollable ini, jadi sibling TETAP (fixed) tepat SETELAH Column scrollable ini ditutup
+        // (lihat Row transport & Spacer 16dp pemisahnya di bawah, di luar blok `{ }` Column ini).
+        // Karena Column INDUK (fillMaxSize, bukan yang scrollable ini) menaruh Column scrollable
+        // ini dgn `weight(1f)`, Column scrollable otomatis kebagian PERSIS sisa ruang di ATAS Row
+        // transport yang sekarang fixed di posisi TERAKHIR Column induk — hasilnya Row transport
+        // SELALU presisi di tepi bawah (sebelum padding 20dp layar), 0 spasi kosong tersisa di
+        // bawahnya, terlepas dari tinggi konten judul-slider di atasnya ataupun tinggi layar.
+        // Bonus: ini SEKALIGUS menuntaskan seluruh saga reachability Batch 336-338 secara lebih
+        // kuat — transport SEKARANG SELALU terlihat tanpa perlu scroll sama sekali (bukan cuma
+        // "terjangkau via scroll"), di layar pendek pun cuma konten judul-slider yang battle-scroll
+        // di ruang tersisa, transport tetap fixed & penuh terlihat. 0 logic scroll/gesture/timing
+        // lain di Column ini diubah — cuma 1 child (Row transport) yang pindah lokasi.
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -725,6 +759,10 @@ fun NowPlayingScreen(
                 fontFamily = timeFontFamily
             )
         }
+        } // tutup Column scrollable (Batch 334) — Batch 343: penutup ini SENGAJA dipindah ke sini
+          // (sebelumnya menutup SETELAH Row transport di bawah) supaya Row transport jadi sibling
+          // FIXED milik Column induk (fillMaxSize), bukan lagi child terakhir Column scrollable —
+          // rasionalisasi lengkap "mengambang" ada di komentar deklarasi Column scrollable (atas).
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -740,6 +778,11 @@ fun NowPlayingScreen(
             // Column dan kanan tombol Ulangi ke tepi Column TIDAK menempel rapat ke padding
             // 20dp Column — tetap ada ruang, konsisten "bernapas" dengan elemen lain di layar
             // yang sama (title/artist/slider semua punya margin dari tepi).
+            // Batch 343 — Row ini SEKARANG fixed footer (sibling Column induk, BUKAN lagi child
+            // Column scrollable di atasnya) — jaminan "menyentuh dasar" datang dari posisi barunya
+            // ini, bukan dari Row ini sendiri. 0 isi/ikon/handler/spacing Row ini diubah, murni
+            // pindah lokasi struktural (lihat rasionalisasi lengkap di komentar deklarasi Column
+            // scrollable di atas).
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
@@ -873,8 +916,8 @@ fun NowPlayingScreen(
                 )
             }
         }
-        } // tutup Column scrollable baru (Batch 334)
-        }
+        } // tutup Column induk (fillMaxSize, Batch 343) — Row transport di atas persis child
+          // TERAKHIRnya, jadi selalu presisi di tepi bawah layar, 0 spasi kosong tersisa.
 
         AnimatedVisibility(
             visible = showBrightnessIndicator,
