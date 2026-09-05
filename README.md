@@ -8,7 +8,19 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 347 (Penyempurnaan: `Radius.hero` ikut skala proporsional,
+> 🆕 **Update terbaru — Batch 349 (Row 4 ikon atas: revert `SpaceBetween` → Tutup kiri sendiri
+> + 3 ikon rapat kanan, `NowPlayingScreen.kt`, 1 file):** User lapor tata letak Batch 342-348
+> ("disebar rata simetris") "jelek banget" — diklarifikasi 2 tahap via tappable option (bukan
+> ditebak) sebelum eksekusi, user pilih eksplisit pola: Tutup sendiri mentok kiri, Favorit+Info+
+> Kontrol Lanjutan menumpuk rapat di kanan (persis pola pra-Batch-342). **Preferensi user
+> berubah antar-sesi — ini reversal disengaja & dikonfirmasi, BUKAN kesalahan**, jangan
+> di-revert otomatis balik ke `SpaceBetween` di sesi berikutnya. 0 ikon/handler/urutan logis
+> diubah, murni tata letak.
+> Batch 348 (Verifikasi Row 4 ikon atas via screenshot device sungguhan, 0 kode):** Konfirmasi
+> `SpaceBetween` (Batch 342) + `Outlined.Info` (Batch 343) cocok standar generik aplikasi musik
+> sejenis — **kesimpulan ini kemudian DIBATALKAN oleh Batch 349** setelah user eksplisit tidak
+> suka hasilnya di pesan berikutnya (lihat Batch 349 di atas).
+> Batch 347 (Penyempurnaan: `Radius.hero` ikut skala proporsional,
 > `NowPlayingScreen.kt`, 1 file):** Lanjutan trade-off Batch 346 yang sengaja ditunda — sudut
 > piringan (`heroShape`, identitas Apple/default) sekarang ikut membesar/mengecil PROPORSIONAL
 > mengikuti ukuran piringan dinamis (`heroCornerRadius = Radius.hero × artSize/280dp`), bukan

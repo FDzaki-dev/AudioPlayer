@@ -417,19 +417,24 @@ fun NowPlayingScreen(
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-        // Batch 342 — user eksplisit (screenshot): 4 ikon Row atas (Tutup/Favorit/Info/Kontrol
-        // Lanjutan) sebelumnya 1 `Spacer(weight(1f))` tunggal setelah tombol Tutup, mendorong 3
-        // ikon SISANYA menumpuk rapat di ujung kanan (1 vs 3, berat sebelah) — dilaporkan
-        // "tidak simetris/tidak professional". Fix RELOKASI murni tata-letak (0 ikon ditambah/
-        // dihapus/diganti fungsi): `Spacer` manual dibuang, `horizontalArrangement =
-        // Arrangement.SpaceBetween` dipasang di `Row` induk — ke-4 ikon sekarang renggang merata
-        // sepanjang lebar layar (Tutup tetap di kiri mentok, Kontrol Lanjutan tetap di kanan
-        // mentok, Favorit & Info renggang di antaranya), bukan lagi 1 ikon terisolasi lawan 3
-        // ikon berdesakan. 0 handler/tooltip/tint/urutan logis diubah.
+        // Batch 349 — user eksplisit (klarifikasi bertahap via tappable option, bukan tebakan):
+        // `Arrangement.SpaceBetween` (Batch 342, dipertahankan+diverifikasi ulang s.d. Batch 348)
+        // dilaporkan "jelek banget" — user secara eksplisit TIDAK mau ke-4 ikon disebar rata
+        // sepanjang lebar layar. Diklarifikasi 2 tahap sebelum eksekusi (bukan langsung tebak):
+        // (1) "urutan/posisi ikon" vs "jarak/spacing" vs "gaya ikon" -> user pilih spacing; (2)
+        // opsi konkret arah pengelompokan -> user pilih eksplisit "Tutup sendiri di kiri, 3 ikon
+        // lain rapat di kanan" — INI ADALAH POLA YANG SAMA PERSIS yang di-Batch-342 (versi lama,
+        // sebelum SpaceBetween) & sempat dicatat "ditolak" di riwayat investigasi Batch 345. TAPI
+        // preferensi user bisa berubah dari sesi ke sesi — pilihan REALTIME & EKSPLISIT sesi ini
+        // (bukan asumsi ulang dari catatan lama) yang jadi rujukan, sesuai Hierarki `User Inst >
+        // Core Protocol > PROJECT_STATE.md`. Fix: `horizontalArrangement = SpaceBetween` dibuang
+        // dari `Row` (balik ke default `Start`), `Spacer(weight(1f))` dipasang lagi PERSIS setelah
+        // tombol Tutup — Tutup presisi kiri mentok, Favorit+Info+Kontrol Lanjutan menumpuk rapat
+        // di kanan mentok. 0 ikon ditambah/dihapus/diganti fungsi, 0 urutan logis 3 ikon kanan
+        // diubah (tetap Favorit→Info→Kontrol Lanjutan, sesuai Batch 341).
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
             val backInteraction = remember { MutableInteractionSource() }
             IconButton(
@@ -439,6 +444,7 @@ fun NowPlayingScreen(
             ) {
                 Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Tutup")
             }
+            Spacer(modifier = Modifier.weight(1f))
             val favoriteInteraction = remember { MutableInteractionSource() }
             IconButton(
                 onClick = {
@@ -471,8 +477,9 @@ fun NowPlayingScreen(
             // (Batch 228). Fix: `Icons.Outlined.Info` (paket `material-icons-extended`, SUDAH jadi
             // dependency app ini — grep `app/build.gradle.kts` konfirmasi) — cuma lingkaran GARIS
             // tipis + "i" tipis, bobot visual sama dgn 3 ikon lain, 0 lagi terlihat sbg badge
-            // menonjol sendirian. 0 posisi/spacing/handler/tooltip Row ini disentuh (Batch 342
-            // SpaceBetween tetap dipertahankan, terbukti sudah benar).
+            // menonjol sendirian. 0 posisi/handler/tooltip Row ini disentuh batch itu (spacing
+            // `SpaceBetween` Batch 342 waktu itu dipertahankan apa adanya — BELAKANGAN diganti
+            // lagi jadi pengelompokan kanan oleh Batch 349, lihat komentar Batch 349 di atas Row).
             val hintButtonInteraction = remember { MutableInteractionSource() }
             IconButton(
                 onClick = {

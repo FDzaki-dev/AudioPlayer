@@ -1,5 +1,119 @@
 # Changelog
 
+## Batch 349 — Revert Row 4 ikon atas: SpaceBetween → Tutup kiri sendiri + 3 ikon rapat kanan, NowPlayingScreen, 1 file kode
+Lanjutan langsung dari Batch 348, yang baru saja mengonfirmasi (via perbandingan screenshot)
+bahwa `Arrangement.SpaceBetween` (Batch 342) sudah "normal dan generik" sesuai permintaan user
+saat itu. Pada pesan berikutnya, user menyatakan tidak suka dengan hasil tersebut ("jelek
+banget") tanpa detail lebih lanjut di awal.
+
+**Klarifikasi 2 tahap sebelum eksekusi (bukan tebakan langsung).** Sesuai kebijakan
+`STOP->BLOCKER jika info kurang`, permintaan yang masih ambigu ("ubah, saya gak suka") tidak
+langsung dieksekusi:
+1. Ditanya kategori masalah via tappable option (urutan/posisi, spacing, gaya ikon, atau bukan
+   soal ikon ini) — user pilih **"Urutan/posisi ikon"**.
+2. User lalu memperjelas sendiri bahwa keberatannya sebenarnya soal **row yang disebar rata
+   simetris** ("saya gak mau row terkait berjejer simetris kayak begitu, itu jelek banget") —
+   bukan soal urutan logis ke-4 ikon. Ditanya ulang arah pengelompokan konkret (Tutup sendiri +
+   3 rapat kanan / semua 4 rapat kanan / semua 4 rapat kiri / custom) — user pilih eksplisit
+   **"Tutup sendiri di kiri, 3 ikon lain rapat di kanan"**.
+
+**Catatan penting untuk sesi berikutnya — ini BUKAN kesalahan, ini reversal yang disengaja.**
+Pola yang diminta user kali ini ("Tutup sendiri + 3 ikon rapat kanan") persis SAMA dengan pola
+lama SEBELUM Batch 342 — pola yang waktu itu diganti ke `SpaceBetween` karena dilaporkan "berat
+sebelah/tidak profesional" (1 ikon lawan 3 ikon menumpuk), dan bahkan sempat dicatat ulang di
+investigasi Batch 345 sebagai pola yang "pernah ditolak, jangan diulang". Preferensi user
+TERBUKTI bisa berubah antar-sesi/antar-waktu — dan pilihan REALTIME+EKSPLISIT sesi ini
+(dikonfirmasi 2 tahap lewat tappable option, bukan asumsi ulang dari catatan lama) adalah
+rujukan yang berlaku SEKARANG, sesuai Hierarki `User Inst > Core Protocol > PROJECT_STATE.md`.
+Sesi berikutnya JANGAN reflexively "mengoreksi balik" ke `SpaceBetween` hanya karena riwayat
+lama pernah menyebutnya sebagai versi yang benar — kalau user melapor lagi soal Row ini,
+verifikasi dulu preferensi TERBARU, jangan asumsikan otomatis kembali ke versi Batch 342-348.
+
+**Implementasi.** `NowPlayingScreen.kt`, `Row` induk (baris ~429 dst.):
+- `horizontalArrangement = Arrangement.SpaceBetween` dibuang dari parameter `Row` — balik ke
+  default Compose (`Arrangement.Start`).
+- `Spacer(modifier = Modifier.weight(1f))` dipasang lagi tepat setelah `IconButton` Tutup,
+  sebelum `IconButton` Favorit — posisi & bentuk identik dengan versi kode pra-Batch-342.
+
+Hasil tata letak: Tutup presisi mentok di tepi kiri (tidak berubah dari sebelumnya di kedua
+pola), Favorit → Info → Kontrol Lanjutan sekarang menumpuk berdekatan di tepi kanan (bukan lagi
+tersebar merata sepanjang lebar Row). Urutan logis ke-3 ikon kanan TIDAK diubah (tetap
+Favorit→Info→Kontrol Lanjutan, konvensi sejak Batch 341) — permintaan user murni soal
+pengelompokan/jarak, bukan urutan ikon.
+
+**Housekeeping komentar (anti-stale, bukan sekadar kode).** Blok komentar Batch 342 di atas
+`Row` (menjelaskan alasan `SpaceBetween` dipasang) diganti komentar Batch 349 baru yang
+menjelaskan riwayat lengkap termasuk peringatan "jangan revert otomatis" di atas. 1 kalimat di
+komentar Batch 343 ("0 posisi/spacing... Batch 342 SpaceBetween tetap dipertahankan, terbukti
+sudah benar") diperbarui — kalimat itu sekarang salah/kontradiktif dengan state kode setelah
+batch ini, jadi diperbaiki supaya tidak menyesatkan sesi berikutnya yang membaca komentar Batch
+343 secara terpisah dari komentar Batch 349 di atasnya.
+
+**0 ikon ditambah/dihapus/diganti fungsi, 0 handler/tint/contentDescription disentuh** — murni
+relokasi tata letak (`Spacer` dipindah/dipasang ulang, 1 named-argument dibuang), `ZERO-REFACTOR`
+di luar itu (Batch 341's toggle info-hint, Batch 343's ikon outlined, dan semua logic lain di Row
+maupun di luar Row 0 tersentuh).
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). Brace/paren diverifikasi ulang dengan
+stack-based matcher (comment & string literal di-strip dulu, bukan hitung mentah): 228/228 brace
+(identik Batch 347/348 — 0 blok kurung kurawal baru/hilang), 677/677 paren (naik 2 dari 675 di
+Batch 347 — persis dari 1 pemanggilan baru `Spacer(modifier = Modifier.weight(1f))`, sementara
+`horizontalArrangement = Arrangement.SpaceBetween` yang dibuang memang 0 mengandung tanda kurung
+sama sekali), 0/0 bracket. `FILE_MANIFEST.txt` tidak berubah (0 file baru/dihapus).
+
+**Belum diverifikasi compile Gradle sungguhan** — WAJIB cek CI, walau risiko sintaks sangat
+rendah: pola `Spacer(Modifier.weight(1f))` di dalam `Row` non-scrollable adalah API dasar
+Compose Foundation yang sudah terbukti compile+jalan di versi file ini sebelum Batch 342 (bukan
+pola baru yang belum pernah diuji). **Belum diverifikasi visual di device** — prioritas cek
+kalau user build ulang: (1) tombol Tutup presisi di tepi kiri layar; (2) Favorit/Info/Kontrol
+Lanjutan menumpuk rapat berdekatan di tepi kanan (bukan lagi renggang merata sepanjang lebar);
+(3) tap masing-masing ikon tetap berfungsi identik (toggle favorit, toggle kartu tip gestur,
+buka sheet Kontrol Lanjutan) — 0 regresi fungsional, murni tata letak visual yang berubah.
+
+## Batch 348 — Verifikasi Row 4 ikon atas NowPlayingScreen via screenshot device sungguhan, 0 kode
+User mengirim screenshot Now Playing screen sungguhan (identitas Liquid Glass, backdrop artwork
+lagu phonk-mix non-persegi — konsisten dgn fix `ContentScale.Crop` Batch 344) disertai transkrip
+klarifikasi sesi sebelumnya: sempat perlu dipastikan dulu bahwa yang dimaksud "Row 4" adalah Row
+ikon atas Now Playing (Tutup/Favorit/Info/Kontrol Lanjutan, area yang sama yang sudah dikerjakan
+Batch 342/343/345), **bukan** panel album — setelah itu jelas, ditanyakan arah perubahan yang
+diinginkan user untuk Row tersebut. User menjawab eksplisit: **"yang normal dan generik terbaik
+aja!!"** — instruksinya menyerahkan ke standar generik/umum terbaik, bukan preferensi desain
+spesifik baru.
+
+**Metodologi verifikasi.** Dibaca ulang langsung kode `NowPlayingScreen.kt` pada Row 4-ikon atas
+(sekitar baris 429-503) dan dibandingkan satu-per-satu terhadap screenshot yang dikirim:
+- `horizontalArrangement = Arrangement.SpaceBetween` pada `Row` induk — diterapkan sejak Batch
+  342 (menggantikan pola lama "1 `Spacer(weight(1f))` tunggal" yang membuat 3 ikon menumpuk di
+  kanan, sudah eksplisit ditolak user waktu itu), dan dikonfirmasi ulang pixel-perfect merata
+  (279px/280px/279px antar-ikon) lewat analisis Batch 345.
+- `Icons.Outlined.Info` untuk ikon info (bukan `Icons.Default.Info`/varian Filled) — diterapkan
+  Batch 343, menyamakan bobot visual guratan-tipis dengan 3 ikon lain di Row yang sama (chevron
+  Tutup, heart-border Favorit, titik-tiga MoreVert Kontrol Lanjutan) — sebelumnya varian Filled
+  membuat ikon Info tampil sebagai lingkaran padat/solid, menonjol sendirian di antara ikon lain
+  yang semuanya berupa garis tipis.
+
+Hasil pencocokan terhadap screenshot: 4 ikon (chevron-bawah, hati bergaris, lingkaran-info
+bergaris, titik-tiga vertikal) tersebar merata sepanjang lebar layar dengan gaya ikon konsisten
+tipis/outline di keempatnya — pola ini persis sama dengan tata letak generik standar yang dipakai
+aplikasi pemutar musik sejenis (mis. Spotify, Apple Music, YouTube Music) untuk kontrol atas
+layar "sedang diputar" mereka. Ini adalah definisi harfiah dari "normal dan generik terbaik" yang
+diminta user.
+
+**Kesimpulan: 0 gap ditemukan, 0 baris kode diubah.** Implementasi yang sudah ada sejak Batch
+342/343 (dan diverifikasi ulang Batch 345) TERBUKTI — kali ini lewat screenshot device
+sungguhan, bukti yang lebih kuat dibanding analisis pixel statis pada screenshot sebelumnya —
+sudah memenuhi persis apa yang diminta user pada pesan ini. Tidak ada perubahan tata letak,
+spacing, ikon, tint, ataupun handler yang diperlukan; Row 4-ikon atas dipertahankan seperti apa
+adanya (`ZERO-REFACTOR`).
+
+**Ringkasan file** — 0 file kode disentuh. `FILE_MANIFEST.txt` tidak berubah (0 file baru/
+dihapus). 3 dokumentasi VIP disinkronkan: `PROJECT_STATE.md` (entri konfirmasi ini),
+`CHANGELOG.md` (entri ini), `README.md` (banner "Update terbaru" diperbarui menunjuk batch ini).
+
+**Belum ada laporan/instruksi baru tersisa dari user setelah konfirmasi ini** — sesi berikutnya,
+kalau tidak ada instruksi/temuan baru, kembali ke `ROADMAP_LIQUID_GLASS_REDESIGN.md` sesuai
+aturan sesi #4 (`PROJECT_STATE.md`).
+
 ## Batch 347 — Penyempurnaan: Radius.hero ikut skala proporsional ke artSize, NowPlayingScreen, 1 file kode
 User pilih eksplisit lanjutkan trade-off yang sengaja ditunda Batch 346 ("Radius.hero ikut skala",
 opsi ke-2 dari 3 pilihan yang ditawarkan sesi ini setelah Batch 346 terkirim). Batch 346 sendiri
