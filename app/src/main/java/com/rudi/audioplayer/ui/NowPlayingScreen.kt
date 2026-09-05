@@ -148,7 +148,11 @@ fun NowPlayingScreen(
     isFavorite: Boolean,
     currentRating: Int,
     onSetRating: (Int) -> Unit,
-    sleepTimerRemainingMs: Long?,
+    // Batch 354 — sama pola playbackProgress di atas (Batch 353): StateFlow mentah, dikoleksi
+    // LOKAL oleh SleepTimerDialog (teks countdown) & AdvancedControlsSheet (status Aktif/
+    // Nonaktif) di bawah, TIDAK di top-level fungsi ini — tick 1 detik dulu bocor sampai
+    // AppNavHost (MainActivity.kt) lewat parameter Long? polos di sini.
+    sleepTimerRemaining: StateFlow<Long?>,
     accentColor: Color?,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
@@ -188,7 +192,11 @@ fun NowPlayingScreen(
     visualizerEnabled: Boolean,
     visualizerSupported: Boolean,
     visualizerPermissionGranted: Boolean,
-    visualizerBars: FloatArray,
+    // Batch 354 — sama alasan sleepTimerRemaining di atas, malah lebih kritis: ~15fps (bukan
+    // 1 tick/detik) + dulu menembus 4 layer composable (AppNavHost -> NowPlayingScreen ->
+    // VisualizerSheet -> SpectrumBars) sebelum akhirnya dipakai. Dikoleksi LOKAL di SpectrumBars
+    // saja (VisualizerSheet.kt) — VisualizerSheet sendiri & fungsi ini cuma meneruskan referensi.
+    visualizerBars: StateFlow<FloatArray>,
     onOpenVisualizer: () -> Unit,
     onCloseVisualizer: () -> Unit,
     onToggleVisualizerEnabled: (Boolean) -> Unit,
@@ -1102,7 +1110,7 @@ fun NowPlayingScreen(
 
     if (showSleepTimerDialog) {
         SleepTimerDialog(
-            currentRemainingMs = sleepTimerRemainingMs,
+            sleepTimerRemaining = sleepTimerRemaining,
             onDismiss = { showSleepTimerDialog = false },
             onSelect = onSetSleepTimer,
             onCancelTimer = onCancelSleepTimer
@@ -1202,7 +1210,7 @@ fun NowPlayingScreen(
             enabled = visualizerEnabled,
             supported = visualizerSupported,
             permissionGranted = visualizerPermissionGranted,
-            bars = visualizerBars,
+            visualizerBars = visualizerBars,
             accentColor = animatedAccent,
             onDismiss = {
                 showVisualizerSheet = false
@@ -1215,7 +1223,7 @@ fun NowPlayingScreen(
 
     if (showAdvancedSheet) {
         AdvancedControlsSheet(
-            sleepTimerRemainingMs = sleepTimerRemainingMs,
+            sleepTimerRemaining = sleepTimerRemaining,
             playbackSpeed = uiState.playbackSpeed,
             volume = uiState.volume,
             onSetVolume = onSetVolume,
@@ -1383,7 +1391,7 @@ private fun WithLivePlaybackProgress(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AdvancedControlsSheet(
-    sleepTimerRemainingMs: Long?,
+    sleepTimerRemaining: StateFlow<Long?>,
     playbackSpeed: Float,
     volume: Float,
     onSetVolume: (Float) -> Unit,
@@ -1398,6 +1406,12 @@ private fun AdvancedControlsSheet(
     onOpenSongInfoEdit: () -> Unit,
     onOpenRingtoneCutter: () -> Unit
 ) {
+    // Batch 354 — collect lokal di sini (sheet ini sendiri sudah jadi batas scope yang pas,
+    // sama pola MiniPlayerBar.kt Batch 353 — tidak perlu extract composable baru lagi). Tick
+    // sekarang cuma invalidate sheet ini SAAT terbuka (showAdvancedSheet), tidak lagi bocor ke
+    // NowPlayingScreen/AppNavHost. Value ini cuma dipakai null-check (Aktif/Nonaktif) di bawah,
+    // jadi delegated property `by` langsung aman dipakai (0 kebutuhan smart-cast ke Long).
+    val sleepTimerRemainingMs by sleepTimerRemaining.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val haptic = LocalHapticFeedback.current
     ModalBottomSheet(
@@ -1950,11 +1964,18 @@ private fun AlbumArtHero(
 
 @Composable
 private fun SleepTimerDialog(
-    currentRemainingMs: Long?,
+    sleepTimerRemaining: StateFlow<Long?>,
     onDismiss: () -> Unit,
     onSelect: (Int) -> Unit,
     onCancelTimer: () -> Unit
 ) {
+    // Batch 354 — collect lokal di sini (dialog ini genuinely menampilkan countdown-nya lewat
+    // formatDuration di bawah, batas scope paling pas). Disalin ke `val` biasa (BUKAN dipakai
+    // langsung sebagai delegated property `by`) karena Kotlin tidak bisa smart-cast Long? -> Long
+    // lewat local delegated property — tanpa penyalinan ini, null-check di bawah yang lalu
+    // dioper ke formatDuration(Long) TIDAK akan compile.
+    val remainingState by sleepTimerRemaining.collectAsStateWithLifecycle()
+    val currentRemainingMs: Long? = remainingState
     val options = listOf(10, 15, 30, 45, 60)
     AlertDialog(
         onDismissRequest = onDismiss,

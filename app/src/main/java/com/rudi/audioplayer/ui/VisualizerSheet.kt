@@ -15,6 +15,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
@@ -30,7 +32,10 @@ fun VisualizerSheet(
     enabled: Boolean,
     supported: Boolean,
     permissionGranted: Boolean,
-    bars: FloatArray,
+    // Batch 354 — StateFlow mentah, TIDAK dikoleksi di sini (sheet ini juga masih ikut menampilkan
+    // Switch + teks status yang tidak butuh update ~15fps). Diteruskan apa adanya ke SpectrumBars
+    // di bawah, yang genuinely satu-satunya composable perlu re-render tiap frame.
+    visualizerBars: StateFlow<FloatArray>,
     accentColor: Color,
     onDismiss: () -> Unit,
     onToggleEnabled: (Boolean) -> Unit,
@@ -111,7 +116,7 @@ fun VisualizerSheet(
 
             if (enabled && permissionGranted && supported) {
                 SpectrumBars(
-                    bars = bars,
+                    visualizerBars = visualizerBars,
                     color = accentColor,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -126,9 +131,15 @@ fun VisualizerSheet(
  * WeeklyTrendChart (StatsDashboardScreen.kt, Batch 90's first Canvas chart in this codebase):
  * fewer moving parts to get visually wrong without a compiler/emulator available to verify.
  * Redraws every time [bars] changes (AudioVisualizerController pushes a new FloatArray per
- * captured frame, ~15fps — see its TARGET_CAPTURE_RATE_MILLIHZ). */
+ * captured frame, ~15fps — see its TARGET_CAPTURE_RATE_MILLIHZ).
+ *
+ * Batch 354 — [visualizerBars] dikoleksi LOKAL di sini (bukan lagi di AppNavHost/MainActivity.kt,
+ * pola identik `PlaybackProgressRow` Batch 353). Ini composable terdalam yang genuinely
+ * menggambar tiap frame, jadi tick ~15fps sekarang HANYA invalidate Canvas kecil ini sendiri —
+ * tidak lagi bocor ke VisualizerSheet/NowPlayingScreen/AppNavHost di atasnya. */
 @Composable
-private fun SpectrumBars(bars: FloatArray, color: Color, modifier: Modifier = Modifier) {
+private fun SpectrumBars(visualizerBars: StateFlow<FloatArray>, color: Color, modifier: Modifier = Modifier) {
+    val bars by visualizerBars.collectAsStateWithLifecycle()
     val trackColor = color.copy(alpha = 0.15f)
     Canvas(modifier = modifier) {
         if (bars.isEmpty()) return@Canvas

@@ -8,7 +8,19 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 353 (FIX STRUKTURAL PERMANEN: `PlaybackProgress` dipisah dari
+> 🆕 **Update terbaru — Batch 354 (FIX TAMBAHAN: `sleepTimerRemaining`/`visualizerBars`
+> dikoleksi lokal, bukan lagi di `AppNavHost`, 3 file kode):** Lanjutan pola Batch 353, audit
+> susulan (bukan laporan bug baru) menemukan 2 StateFlow lain dengan bug identik — masih
+> dikoleksi `by ...collectAsStateWithLifecycle()` di scope teratas `AppNavHost`, di luar cakupan
+> `PENDING_FixGlobalLagRecomposition.md` asli yang cuma menyasar `position`/`duration`.
+> `visualizerBars` (~15fps) khususnya kandidat kuat lag residual — 15x lebih sering + dulu
+> menembus 4 layer composable. Fix identik Batch 353 (StateFlow diteruskan mentah, dikoleksi
+> lokal di composable terdalam), malah lebih ketat untuk `visualizerBars`: turun sampai
+> `SpectrumBars` (layer ke-4, Canvas-nya sendiri), bukan cuma `VisualizerSheet` (layer ke-3).
+> `MainActivity.kt` tetap minim-diff (protected) — 2 baris koleksi dihapus dari `AppNavHost`, 2
+> call-site oper StateFlow langsung. Belum diverifikasi compile CI & lag hilang total di device
+> sungguhan.
+> Batch 353 (FIX STRUKTURAL PERMANEN: `PlaybackProgress` dipisah dari
 > `PlaybackUiState`, 4 file termasuk 1 protected):** Opsi A dari
 > `PENDING_FixGlobalLagRecomposition.md` (sekarang dihapus, riwayat lengkap ada di
 > `PROJECT_STATE.md`/`CHANGELOG.md`) dieksekusi TUNTAS atas konfirmasi eksplisit user (lanjut

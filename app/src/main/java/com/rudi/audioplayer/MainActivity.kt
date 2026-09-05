@@ -546,7 +546,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     // (BlurUtils.kt).
     val uiState by playerViewModel.uiState.collectAsStateWithLifecycle()
     val favoriteIds by playerViewModel.favoriteIds.collectAsStateWithLifecycle()
-    val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsStateWithLifecycle()
+    // Batch 354 — sleepTimerRemaining SENGAJA TIDAK dikoleksi di sini lagi (dulu `by ...
+    // collectAsStateWithLifecycle()` persis di scope teratas ini, pola identik bug
+    // position/duration Batch 353). StateFlow-nya sendiri dioper mentah ke NowPlayingScreen di
+    // bawah, dikoleksi lokal di SleepTimerDialog/AdvancedControlsSheet.
     val abRepeatPointA by playerViewModel.abRepeatPointA.collectAsStateWithLifecycle()
     val abRepeatPointB by playerViewModel.abRepeatPointB.collectAsStateWithLifecycle()
     val statsVersion by playerViewModel.statsVersion.collectAsStateWithLifecycle()
@@ -571,7 +574,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val appThemeIdentity by playerViewModel.themeIdentity.collectAsStateWithLifecycle()
     val visualizerEnabled by playerViewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerSupported by playerViewModel.visualizerSupported.collectAsStateWithLifecycle()
-    val visualizerBars by playerViewModel.visualizerBars.collectAsStateWithLifecycle()
+    // Batch 354 — visualizerBars sama, dihapus dari sini (dulu `by ...
+    // collectAsStateWithLifecycle()` di scope ini, ~15fps + tembus 4 layer composable turunan —
+    // kandidat kuat kenapa lag masih terasa meski Batch 353 sudah jalan). StateFlow mentah dioper
+    // ke NowPlayingScreen, dikoleksi lokal di SpectrumBars (VisualizerSheet.kt).
     val audiobookModeEnabled by playerViewModel.audiobookModeEnabled.collectAsStateWithLifecycle()
     val floatingBubbleEnabled by playerViewModel.floatingBubbleEnabled.collectAsStateWithLifecycle()
     val silenceSkipEnabled by playerViewModel.silenceSkipEnabled.collectAsStateWithLifecycle()
@@ -818,7 +824,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             isFavorite = uiState.currentSong?.let { favoriteIds.contains(it.id) } ?: false,
             currentRating = currentRating,
             onSetRating = { stars -> playerViewModel.setCurrentSongRating(stars) },
-            sleepTimerRemainingMs = sleepTimerRemaining,
+            sleepTimerRemaining = playerViewModel.sleepTimerRemaining,
             accentColor = accentColor,
             onPlayPause = { playerViewModel.togglePlayPause() },
             onNext = { playerViewModel.next() },
@@ -858,7 +864,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             visualizerEnabled = visualizerEnabled,
             visualizerSupported = visualizerSupported,
             visualizerPermissionGranted = visualizerPermissionGranted,
-            visualizerBars = visualizerBars,
+            visualizerBars = playerViewModel.visualizerBars,
             onOpenVisualizer = { playerViewModel.ensureVisualizerAttached() },
             onCloseVisualizer = { playerViewModel.stopVisualizerCapture() },
             onToggleVisualizerEnabled = { playerViewModel.setVisualizerEnabled(it) },

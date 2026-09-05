@@ -36,6 +36,60 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 354 (FIX TAMBAHAN — 2 StateFlow lain masih dikoleksi di `AppNavHost` seperti bug Batch
+353, 3 file kode)** — Pasca-Batch 353 (fix `position`/`duration`), audit lanjutan menemukan 2
+StateFlow lain dengan pola bug IDENTIK, masih dikoleksi lewat `by ... collectAsStateWithLifecycle()`
+persis di scope teratas `AppNavHost`: `sleepTimerRemaining` (tick 1 detik, sama seperti position
+dulu) dan `visualizerBars` (~15fps dari `AudioVisualizerController`, 15x lebih sering + dulu
+menembus 4 layer composable `AppNavHost` -> `NowPlayingScreen` -> `VisualizerSheet` ->
+`SpectrumBars`). Keduanya di luar cakupan `PENDING_FixGlobalLagRecomposition.md` asli (dokumen
+itu spesifik menyasar `position`/`duration` saja) — jadi kelewat waktu Batch 353 dieksekusi,
+ditemukan lewat audit susulan, bukan laporan bug baru dari user.
+
+**Mekanisme fix (identik Batch 353)**: StateFlow diteruskan sebagai referensi mentah lewat
+parameter — bukan dibaca via `by ...collectAsStateWithLifecycle()` di scope `AppNavHost` — lalu
+dikoleksi LOKAL hanya di composable terdalam yang genuinely menampilkan. Untuk `visualizerBars`,
+isolasi didorong SATU layer lebih dalam dari precedent Batch 353: bukan di `VisualizerSheet`
+(layer ke-3, masih ikut menampilkan Switch + teks status yang tidak butuh update ~15fps), tapi
+sampai `SpectrumBars` (layer ke-4, satu-satunya composable yang genuinely redraw Canvas tiap
+frame).
+
+**Rincian 3 file**:
+1. `NowPlayingScreen.kt` — 3 composable disentuh: signature utama (`sleepTimerRemainingMs: Long?`
+   -> `sleepTimerRemaining: StateFlow<Long?>`; `visualizerBars: FloatArray` ->
+   `StateFlow<FloatArray>`, keduanya cuma diteruskan turun, 0 dibaca langsung di scope ini);
+   `SleepTimerDialog` (collect lokal — nilai disalin ke `val` biasa dulu SEBELUM null-check,
+   karena Kotlin tidak bisa smart-cast `Long?` -> `Long` lewat local delegated property `by`,
+   tanpa penyalinan ini `formatDuration(currentRemainingMs)` tidak akan compile);
+   `AdvancedControlsSheet` (collect lokal langsung via `by`, aman tanpa penyalinan karena
+   nilainya cuma dipakai null-check ke string "Aktif"/"Nonaktif", tidak pernah dioper sebagai
+   `Long` non-null).
+2. `VisualizerSheet.kt` — 2 composable: `VisualizerSheet` sendiri 0 collect (cuma meneruskan
+   `StateFlow<FloatArray>` apa adanya ke `SpectrumBars`, supaya Switch+teks status di sheet ini
+   tidak ikut invalidate tiap frame); `SpectrumBars` collect lokal tepat di titik render
+   Canvas-nya.
+3. `MainActivity.kt` (**protected, edit-parsial**) — 2 baris `val ... by
+   playerViewModel.X.collectAsStateWithLifecycle()` (`sleepTimerRemaining`/`visualizerBars`)
+   DIHAPUS dari `AppNavHost`; 2 call-site diganti oper `playerViewModel.sleepTimerRemaining`/
+   `playerViewModel.visualizerBars` langsung (StateFlow mentah, bukan value hasil koleksi). 0
+   restrukturisasi lain — sama minim-diff seperti Batch 353.
+
+**Cakupan `PlayerViewModel.kt`**: TIDAK disentuh (beda dari Batch 353) — `sleepTimerRemaining`/
+`visualizerBars` sudah jadi `StateFlow` terpisah sejak awal, tidak pernah nyampur ke
+`PlaybackUiState`, jadi cuma titik KOLEKSI-nya (`AppNavHost`) yang salah, bukan strukturnya.
+
+**Verifikasi sebelum packaging**: full-codebase grep — tiap composable yang signature-nya berubah
+(`NowPlayingScreen`, `SleepTimerDialog`, `AdvancedControlsSheet`, `VisualizerSheet`,
+`SpectrumBars`) dikonfirmasi cuma 1 call-site masing-masing, 0 file Preview/test lain
+memanggilnya + brace/paren balance check 3 file (0 selisih). **Belum diverifikasi**: compile CI
+sungguhan & lag hilang TOTAL di device asli (sandbox 0 akses compiler/profiler) — WAJIB
+dikonfirmasi user setelah build jalan, peringatan sama seperti Batch 351-353.
+
+**Ringkasan file** — 3 file kode disentuh (`NowPlayingScreen.kt`, `VisualizerSheet.kt` logic
+penuh; `MainActivity.kt` minim-diff protected) + 3 dokumentasi VIP
+(PROJECT_STATE.md/CHANGELOG.md/README.md), 0 dokumen PENDING baru (scope tuntas dalam 1 batch,
+tidak ada sisa task). `FILE_MANIFEST.txt` TETAP 188 (0 file kode baru/hapus).
+
 **Batch 353 (FIX STRUKTURAL PERMANEN — Opsi A dari `PENDING_FixGlobalLagRecomposition.md`
 dieksekusi tuntas, 4 file kode termasuk 1 protected)** — User eksplisit konfirmasi lanjut Opsi A
 walau belum ada bukti profiler/systrace sungguhan ("kerahkan yang terbaik... selama final
