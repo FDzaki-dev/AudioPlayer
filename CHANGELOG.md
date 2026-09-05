@@ -1,5 +1,34 @@
 # Changelog
 
+## Batch 355 — FIX BUILD: compileDebugKotlin/compileReleaseKotlin gagal (1 file kode) — cascade dari 1 import kelewat di Batch 354
+`log_fail_342.zip` (build GH Actions gagal di 2 task, `compileDebugKotlin` & `compileReleaseKotlin`)
+menunjuk 5 baris error di `VisualizerSheet.kt` (142, 147×2, 150×2). Investigasi menunjukkan ini
+**1 root cause tunggal**, bukan 5 bug terpisah.
+
+**Root cause**: Batch 354 mengubah `SpectrumBars` (composable terdalam, satu-satunya yang
+genuinely redraw Canvas tiap frame) supaya `visualizerBars: StateFlow<FloatArray>` dikoleksi lewat
+`val bars by visualizerBars.collectAsStateWithLifecycle()` — pertama kalinya file ini pakai
+delegate `by` untuk Compose state. Tapi import file ini cuma `androidx.compose.runtime.Composable`
+(eksplisit per-simbol, bukan wildcard `androidx.compose.runtime.*` seperti yang dipakai
+`NowPlayingScreen.kt`), jadi operator ekstensi `getValue` yang dibutuhkan delegate `by` tidak ada
+di scope. Begitu compiler gagal resolve tipe `bars` di baris 142, 4 error lain di baris 147/150
+(`size.width / ...` dilaporkan ketuker tipe `PaddingValues`, `forEachIndexed` gagal infer
+`index`/`magnitude`) adalah CASCADE — compiler menebak tipe ekspresi turunan dari satu unresolved
+reference itu, bukan indikasi bug logika terpisah di baris-baris tersebut.
+
+**Fix (1 file, 1 baris)**: tambah `import androidx.compose.runtime.getValue` di
+`VisualizerSheet.kt`. 0 perubahan logika/tampilan.
+
+**Kenapa `NowPlayingScreen.kt`** (file lain yang juga nambah `by ...collectAsStateWithLifecycle()`
+di Batch 354) **tidak kena bug yang sama**: file itu sudah pakai wildcard import
+`androidx.compose.runtime.*` sejak awal (otomatis mencakup `getValue`), beda dari
+`VisualizerSheet.kt` yang importnya eksplisit per-simbol.
+
+**Verifikasi sebelum packaging**: grep konfirmasi `VisualizerSheet.kt` cuma punya 1 titik delegate
+`by` di seluruh file (baris 142) — persis satu-satunya baris yang genuinely baru di Batch 354,
+memperkuat ini root cause tunggal. **Belum diverifikasi**: compile CI sungguhan (sandbox tidak ada
+akses compiler Kotlin+AGP+Compose) — WAJIB dikonfirmasi user setelah build GH Actions jalan.
+
 ## Batch 354 — FIX TAMBAHAN: sleepTimerRemaining & visualizerBars dikoleksi lokal (3 file kode) — lanjutan pola Batch 353, di luar cakupan PENDING doc asli
 Pasca-Batch 353 (fix `position`/`duration`), audit lanjutan menemukan 2 StateFlow lain dengan pola
 bug IDENTIK — masih dikoleksi lewat `by ... collectAsStateWithLifecycle()` persis di scope

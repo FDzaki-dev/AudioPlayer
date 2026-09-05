@@ -36,6 +36,18 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 355 (FIX BUILD — compileDebugKotlin/compileReleaseKotlin gagal, 1 file kode, cascade dari
+1 import kelewat di Batch 354)** — `log_fail_342.zip` menunjuk 5 baris error di
+`VisualizerSheet.kt` (142, 147×2, 150×2); semuanya 1 root cause tunggal: Batch 354 nambah delegate
+`val bars by visualizerBars.collectAsStateWithLifecycle()` di `SpectrumBars` (pertama kali file ini
+pakai `by` untuk Compose state), tapi importnya cuma `androidx.compose.runtime.Composable`
+eksplisit — bukan wildcard `androidx.compose.runtime.*` seperti `NowPlayingScreen.kt` — jadi
+operator `getValue` yang dibutuhkan delegate itu tidak ada di scope. 4 error lain (147/150) cuma
+cascade dari 1 unresolved reference itu, bukan bug terpisah. **Fix**: tambah 1 baris
+`import androidx.compose.runtime.getValue` di `VisualizerSheet.kt`. 0 perubahan logika/tampilan.
+Belum diverifikasi compile CI sungguhan (sandbox tanpa compiler Kotlin+AGP+Compose) — konfirmasi
+user setelah build GH Actions jalan.
+
 **Batch 354 (FIX TAMBAHAN — 2 StateFlow lain masih dikoleksi di `AppNavHost` seperti bug Batch
 353, 3 file kode)** — Pasca-Batch 353 (fix `position`/`duration`), audit lanjutan menemukan 2
 StateFlow lain dengan pola bug IDENTIK, masih dikoleksi lewat `by ... collectAsStateWithLifecycle()`
