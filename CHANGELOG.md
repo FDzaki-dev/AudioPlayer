@@ -1,5 +1,70 @@
 # Changelog
 
+## Batch 347 — Penyempurnaan: Radius.hero ikut skala proporsional ke artSize, NowPlayingScreen, 1 file kode
+User pilih eksplisit lanjutkan trade-off yang sengaja ditunda Batch 346 ("Radius.hero ikut skala",
+opsi ke-2 dari 3 pilihan yang ditawarkan sesi ini setelah Batch 346 terkirim). Batch 346 sendiri
+sudah mendokumentasikan keputusan ini sbg trade-off sadar/low-risk, bukan hal yang lupa dikerjakan
+— batch ini murni eksekusi lanjutan setelah konfirmasi eksplisit, sesuai kebijakan "jangan
+dieksekusi diam-diam tanpa konfirmasi" yang sama persis dipakai Batch 345→346.
+
+**Masalah yang diperbaiki.** Sebelum batch ini, `heroShape` (cabang non-panel/Apple default) pakai
+`RoundedCornerShape(Radius.hero)` — radius ABSOLUT tetap 28dp, tidak peduli berapa pun `artSize`
+dinamis Batch 346 sekarang. Efeknya: di layar dengan piringan besar (art scale dinamis mengisi
+banyak ruang), sudut 28dp itu jadi terlihat proporsional lebih kecil/"tajam" dibanding ukuran
+piringannya — kebalikannya di piringan kecil (layar pendek/hint tampil), sudut yang sama terlihat
+berlebihan membulat relatif terhadap ukurannya. Sebelum Batch 346 (artSize selalu fixed 280dp),
+masalah ini tidak pernah ada karena rasio radius:ukuran selalu konstan — baru muncul begitu ukuran
+jadi variabel.
+
+**Fix — skala proporsional, bukan clamp/lookup table baru.** `heroCornerRadius = Radius.hero *
+(artSize / 280.dp)`. 280dp dipilih sbg baseline karena PERSIS konvensi yang sudah dipakai formula
+`dynamicArtSize` Batch 346 sendiri (sengaja balik ke 280dp persis di layar 360dp lebar, supaya 0
+lompatan visual di device umum) — baseline yang sama dipakai lagi di sini demi konsistensi rasio:
+pada artSize=280dp (kasus paling umum), `heroCornerRadius` otomatis balik PERSIS ke 28dp lama,
+0 perubahan visual di kasus umum, cuma di ukuran EKSTREM (sangat besar/kecil) beda kelihatan
+proporsional. Operator `Dp.div(other: Dp): Float` ("Divide by another Dp to get a scalar") &
+`Dp.times(other: Float): Dp` dicek ulang lewat dokumentasi resmi Compose (`androidx.compose.ui.
+unit.Dp`) sebelum dipakai — keduanya operator baku bawaan kelas `Dp`, bukan API custom/eksperimen.
+`Dp * Float` sendiri sudah punya preseden JALAN di file yang sama persis (`screenHeightDp * 0.28f`
+di formula `albumArtBoxHeight`, Batch 336) — mengurangi risiko lebih jauh, bukan pola baru buta.
+
+**Scope SENGAJA dibatasi ke cabang non-panel (Apple/default) saja — 2 alasan independen.**
+(1) Token `Radius.hero` GLOBAL itu sendiri (`Spacing.kt`, dipakai juga `Theme.kt` untuk
+`MaterialTheme.shapes.large`) TIDAK disentuh sama sekali — kalau token itu sendiri diubah jadi
+dinamis, dampaknya merembet ke SETIAP elemen lain di app yang memakai `MaterialTheme.shapes.large`
+(dialog/sheet/kartu apa pun), jauh di luar scope 1 layar Now Playing. `heroCornerRadius` di sini
+murni val LOKAL yang memakai `Radius.hero` sbg nilai baseline baca-saja. (2) Cabang Tactile/Skeu
+(`isPanelTheme -> MaterialTheme.shapes.large`) SENGAJA TIDAK ikut diskalakan — 2 identitas itu
+memang didesain memakai bahasa sudut SERAGAM lintas berbagai ukuran permukaan (semua panel/sheet/
+kartu lain di identitas yang sama pakai radius theme konsisten, bukan proporsional per-objek).
+Mengikutkan hero art di sini justru membuatnya beda sendiri dari permukaan besar lain di identitas
+yang sama — kebalikan dari konsistensi yang justru jadi ciri khas bahasa desain panel tsb. Scope
+ini persis sesuai literal yang dikonfirmasi user ("Radius.hero ikut skala") — token itu memang
+spesifik cuma dipakai di cabang non-panel.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 1 `val` baru (`heroCornerRadius`), 1 baris
+`heroShape` diubah (argumen `RoundedCornerShape(...)` dari literal `Radius.hero` menjadi
+`heroCornerRadius` terhitung; cabang `isPanelTheme` 0 disentuh), 1 blok komentar rasional lengkap.
+0 file lain disentuh — termasuk `Spacing.kt`/`Theme.kt`, 0 token global diubah. 0 logic gesture
+Batch 334, footer Batch 343, atau perhitungan `dynamicArtSize`/`dynamicGestureBoxHeight` Batch 346
+diubah sama sekali (`ZERO-REFACTOR`). Bracket-matcher stack-based (comment/string di-strip)
+dijalankan atas seluruh file — struktur bersarang genuinely valid, 0 mismatch. Brace/paren/
+bracket: 228/228 brace (identik Batch 346, 0 blok baru), 675/675 paren (naik 1 dari Batch 346 —
+persis dari 1 ekspresi baru `(artSize / 280.dp)`), 0/0 bracket.
+
+**Belum diverifikasi compile Gradle sungguhan** — WAJIB cek CI. Risiko sintaks rendah: kedua
+operator `Dp` yang dipakai resmi & terdokumentasi, salah satunya (`Dp * Float`) malah sudah
+terbukti jalan di file yang sama. **Belum diverifikasi visual di device** — prioritas cek: (1)
+sudut piringan identitas Apple/default terlihat proporsional konsisten baik di layar tinggi (art
+besar, sudut ikut lebih besar) maupun layar pendek/hint tampil (art kecil, sudut ikut lebih
+kecil) — tidak lagi "kurang membulat" relatif saat piringan besar; (2) identitas Tactile/Skeu
+VISUALNYA TIDAK BERUBAH SAMA SEKALI dari Batch 346 (regresi 0 — cabang itu sengaja tidak
+disentuh, `MaterialTheme.shapes.large` masih dipakai apa adanya); (3) 0 elemen LAIN di seluruh
+app (dialog/bottom sheet/kartu mana pun yang memakai `MaterialTheme.shapes.large`) berubah
+tampilan — mengonfirmasi token global `Radius.hero` benar-benar tidak diedit langsung; (4) pada
+artSize persis 280dp (kasus paling umum, layar ~360dp lebar tanpa hint banner), sudut piringan
+terlihat IDENTIK dengan sebelum batch ini (28dp, 0 perubahan visual di kasus umum).
+
 ## Batch 346 — Fitur: art scale dinamis mengisi sisa ruang ala Spotify, NowPlayingScreen, 1 file kode
 User pilih eksplisit lanjutkan trade-off yang dicatat Batch 345 ("Lanjut ide 'art scale dinamis'",
 salah satu dari 3 pilihan yang ditawarkan sesi ini). Scope memang lebih besar dari Micro-Batch

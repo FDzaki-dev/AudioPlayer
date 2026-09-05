@@ -1616,7 +1616,30 @@ private fun AlbumArtHero(
         // here at all; TactileHighlight/TactileShadow are plain white/black-based again this
         // batch (see Color.kt), so this hero art picks up the new palette automatically through
         // those same two token references.
-        val heroShape = if (isPanelTheme) MaterialTheme.shapes.large else RoundedCornerShape(Radius.hero)
+        // Batch 347 — user pilih lanjut sempurnakan trade-off yang sengaja ditunda Batch 346
+        // ("Radius.hero ikut skala"). Baseline referensi TETAP 280dp (konsisten dgn konvensi
+        // `dynamicArtSize` Batch 346 yang sengaja balik ke 280dp persis di layar 360dp lebar) —
+        // rasio artSize aktual thd baseline ini dikalikan ke `Radius.hero` (28dp, Spacing.kt)
+        // supaya sudut piringan tetap PROPORSIONAL secara visual di ukuran manapun (piringan
+        // besar = sudut ikut besar, piringan kecil = sudut ikut kecil), bukan radius absolut
+        // tetap yang terlihat makin "tajam"/kurang membulat relatif saat piringan membesar (atau
+        // sebaliknya berlebihan membulat saat mengecil). `Dp.div(Dp): Float` & `Dp.times(Float):
+        // Dp` — dicek ulang lewat dokumentasi resmi Compose sebelum dipakai (operator baku kelas
+        // `Dp`, bukan API custom) — `Dp * Float` sendiri sudah ada presedennya di file ini
+        // (`screenHeightDp * 0.28f`, baris `albumArtBoxHeight`).
+        // Token `Radius.hero` GLOBAL ITU SENDIRI (Spacing.kt) TIDAK disentuh — dipakai HANYA sbg
+        // nilai baseline di sini, bukan diubah jadi dinamis (token itu dipakai juga di Theme.kt
+        // utk `MaterialTheme.shapes.large`, dampak globalnya jauh di luar 1 layar ini).
+        // Cabang Tactile/Skeu (`isPanelTheme -> MaterialTheme.shapes.large`) SENGAJA TIDAK ikut
+        // diskalakan — 2 identitas itu memang didesain pakai bahasa sudut SERAGAM lintas berbagai
+        // ukuran permukaan (panel/sheet/kartu lain di app ini semua pakai radius theme yang sama,
+        // bukan proporsional per-objek); mengikutkan hero art di sini justru bikin hero beda
+        // sendiri dari permukaan besar lain di identitas yang sama — kebalikan dari konsistensi
+        // yang justru diinginkan bahasa desain panel itu. Scope PERSIS sesuai literal yang
+        // dikonfirmasi user: "Radius.hero ikut skala" — token itu spesifik cuma dipakai di cabang
+        // non-panel (Apple/default) ini.
+        val heroCornerRadius = Radius.hero * (artSize / 280.dp)
+        val heroShape = if (isPanelTheme) MaterialTheme.shapes.large else RoundedCornerShape(heroCornerRadius)
         Box(
             modifier = Modifier
                 .size(artSize + 20.dp)

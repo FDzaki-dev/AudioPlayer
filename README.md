@@ -8,7 +8,15 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 346 (Fitur: art scale dinamis ala Spotify, `NowPlayingScreen.kt`,
+> 🆕 **Update terbaru — Batch 347 (Penyempurnaan: `Radius.hero` ikut skala proporsional,
+> `NowPlayingScreen.kt`, 1 file):** Lanjutan trade-off Batch 346 yang sengaja ditunda — sudut
+> piringan (`heroShape`, identitas Apple/default) sekarang ikut membesar/mengecil PROPORSIONAL
+> mengikuti ukuran piringan dinamis (`heroCornerRadius = Radius.hero × artSize/280dp`), bukan
+> lagi radius absolut tetap 28dp yang terlihat "kurang membulat" saat piringan besar. Baseline
+> 280dp = kasus umum (0 perubahan visual di situ). Token `Radius.hero` GLOBAL & cabang Tactile/
+> Skeu (`MaterialTheme.shapes.large`) SENGAJA TIDAK disentuh — scope persis "Radius.hero ikut
+> skala" yang dikonfirmasi, 0 dampak ke elemen lain di app.
+> Batch 346 (Fitur: art scale dinamis ala Spotify, `NowPlayingScreen.kt`,
 > 1 file):** Piringan album sekarang MEMBESAR mengisi sisa ruang layar kosong (bukan lagi
 > didistribusikan jadi gap kosong via `Arrangement.Center`, Batch 345) — trade-off yang dicatat
 > Batch 345 dieksekusi setelah user konfirmasi eksplisit. Tinggi grup konten judul-s/d-waktu

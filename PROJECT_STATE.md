@@ -36,6 +36,46 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 347 (Penyempurnaan: `Radius.hero` ikut skala proporsional ke `artSize` dinamis Batch
+346, `NowPlayingScreen.kt`, 1 file kode)** — User pilih eksplisit lanjutkan trade-off yang sengaja
+ditunda Batch 346 ("Radius.hero ikut skala", opsi ke-2 dari 3 pilihan yang ditawarkan sesi ini).
+
+**Formula.** `heroCornerRadius = Radius.hero * (artSize / 280.dp)` — 280dp baseline (konsisten
+dgn konvensi `dynamicArtSize` Batch 346 yang sengaja balik ke 280dp persis di layar 360dp lebar).
+`Dp.div(Dp): Float` & `Dp.times(Float): Dp` dicek ulang lewat dokumentasi resmi Compose sebelum
+dipakai (operator baku kelas `Dp`, `Dp * Float` sendiri sudah punya preseden di file ini —
+`screenHeightDp * 0.28f`, formula `albumArtBoxHeight`). Hasilnya: sudut piringan tetap
+PROPORSIONAL di ukuran manapun (piringan besar → sudut ikut besar, piringan kecil → sudut ikut
+kecil), bukan radius absolut tetap yang relatif makin "tajam" saat piringan membesar.
+
+**Scope SENGAJA dibatasi ke cabang non-panel (Apple/default) saja.** Token `Radius.hero` GLOBAL
+itu sendiri (`Spacing.kt`) TIDAK disentuh — dipakai HANYA sbg nilai baseline lokal di sini, bukan
+diubah jadi dinamis (token itu juga dipakai `Theme.kt` utk `MaterialTheme.shapes.large`, dampak
+globalnya jauh di luar 1 layar ini kalau diubah langsung). Cabang Tactile/Skeu (`isPanelTheme ->
+MaterialTheme.shapes.large`) SENGAJA TIDAK ikut diskalakan — 2 identitas itu memang didesain
+pakai bahasa sudut SERAGAM lintas berbagai ukuran permukaan (panel/sheet/kartu lain di app ini
+semua pakai radius theme yang sama, bukan proporsional per-objek); mengikutkan hero art di sini
+justru bikin hero beda sendiri dari permukaan besar lain di identitas yang sama — kebalikan dari
+konsistensi yang justru diinginkan bahasa desain panel itu. Scope ini persis sesuai literal yang
+dikonfirmasi user ("Radius.hero ikut skala") — token itu spesifik cuma dipakai di cabang non-panel.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 1 val baru (`heroCornerRadius`) + 1 baris
+`heroShape` diubah (`Radius.hero` literal → `heroCornerRadius` terhitung, cabang panel 0
+disentuh) + 1 blok komentar rasional. 0 file lain disentuh (termasuk `Spacing.kt`/`Theme.kt`, 0
+token global diubah), 0 logic Batch 334/343/346 lain diubah (`ZERO-REFACTOR`). Brace/paren/
+bracket seimbang & valid (stack-based matcher, comment/string di-strip): 228/228 brace, 675/675
+paren (naik 1 paren dari Batch 346 — cuma dari `(artSize / 280.dp)`), 0/0 bracket.
+
+**Belum diverifikasi compile Gradle sungguhan** — WAJIB cek CI. Risiko sintaks rendah (`Dp.div`/
+`Dp.times` API resmi Compose, dikonfirmasi via dokumentasi; `Dp * Float` sudah punya preseden
+jalan di file yang sama). **Belum diverifikasi visual di device** — prioritas cek: (1) sudut
+piringan identitas Apple/default terlihat proporsional di layar tinggi (art besar) MAUPUN layar
+pendek/hint tampil (art kecil), tidak lagi "kurang membulat" saat besar; (2) identitas Tactile/
+Skeu VISUALNYA TIDAK BERUBAH SAMA SEKALI dari Batch 346 (regresi 0, cabang itu sengaja tidak
+disentuh); (3) 0 elemen LAIN di app (dialog/sheet/kartu manapun yg pakai `MaterialTheme.shapes.
+large`) berubah tampilan — `Radius.hero` token global dikonfirmasi tidak diedit. Detail:
+`CHANGELOG.md` Batch 347.
+
 **Batch 346 (Fitur: art scale dinamis mengisi sisa ruang ala Spotify — piringan membesar/
 mengecil otomatis, bukan lagi gap kosong, `NowPlayingScreen.kt`, 1 file kode)** — User pilih
 eksplisit lanjutkan trade-off yang dicatat Batch 345 (opsi "Lanjut ide 'art scale dinamis'" dari
