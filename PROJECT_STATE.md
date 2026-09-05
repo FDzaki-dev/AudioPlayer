@@ -36,6 +36,93 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 352 (MITIGASI — Opsi B dari `PENDING_FixGlobalLagRecomposition.md` dieksekusi, 1 file
+kode)** — User keputusan gabungan: Opsi B (mitigasi cepat, throttle tick) dieksekusi SEKARANG
+sebagai quick win 1 batch; Opsi A (fix struktural permanen, sentuh `MainActivity.kt` protected)
+tetap DIANTRE untuk sesi berikutnya. `PlayerViewModel.kt` `startPositionLoop()`:
+`delay(500)`→`delay(1000)`. Dikompensasi mandiri (tidak diminta eksplisit di opsi, ditemukan saat
+baca kode `positionTick` dipakai di mana): modulo `persistPlaybackState()` dari `% 10` ke `% 5`
+supaya cadence save tetap ~5 detik, TIDAK ikut molor ke ~10 detik (mencegah window kehilangan
+posisi playback saat crash 2x lebih lebar dari sebelumnya). `AbRepeatLogic.kt` disentuh
+komentar-doc saja (referensi "~500ms" jadi "~1000ms since Batch 352"), 0 logika berubah.
+
+**Efek samping melekat (bukan bug, konsekuensi Opsi B by design)**: presisi progress bar
+MiniPlayerBar/slider Now Playing turun ke update per 1 detik (dari 0.5 detik); overshoot A-B
+Repeat lewat titik B naik ke maks ~1 detik (dari ~0.5 detik). **SCOPE masalah utama BELUM
+tuntas** — `AppNavHost` (`MainActivity.kt`) masih recompose PENUH tiap tick, cuma lebih jarang
+(1x/detik, bukan 2x/detik). User kemungkinan besar masih lapor "lag berkurang, belum hilang" —
+sudah diperingatkan eksplisit di PENDING doc sebelum eksekusi.
+
+**Status PENDING_FixGlobalLagRecomposition.md**: diupdate (bukan diarsipkan) — Opsi A masih
+berlaku penuh utk sesi berikutnya, root cause & rencana file belum berubah sama sekali, cuma
+status header yang diubah dari "menunggu pilih" jadi "Opsi B sudah jalan Batch 352, Opsi A masih
+nunggu confirm eksekusi".
+
+**Ringkasan file** — 2 file kode disentuh (1 logic: `PlayerViewModel.kt`; 1 komentar-saja:
+`AbRepeatLogic.kt`) + 3 dokumentasi VIP (PROJECT_STATE.md/CHANGELOG.md/README.md) +
+`PENDING_FixGlobalLagRecomposition.md` diupdate (bukan file baru). `FILE_MANIFEST.txt` tetap 189
+(0 file baru/hapus).
+
+**Batch 351 (Investigasi root cause lag/stutter kronis app-wide — DITEMUKAN kandidat kuat,
+0 kode diubah, tunggu konfirmasi user sebelum eksekusi fix)** — User laporan: item terbuka
+terakhir roadmap Liquid Glass (performa GPU/lag) MASIH kerasa stutter walau Haze blur sudah
+dicabut PERMANEN sejak Batch 329 (`hazeEffect` dihapus total dari `frostedGlass()`, 0 blur asli
+lagi di identitas manapun). Diklarifikasi via 2 tappable question: (1) situasi — user pilih
+SEMUA 4 opsi sekaligus (scroll list Home/Library, ganti tab bawah, MiniPlayerBar pas musik
+muter, buka Now Playing/sheet) + tambahan eksplisit **"dari dulu gejala nya gak pernah
+benar-benar fix!!"**; (2) tema — "belum yakin/gak merhatiin". Kombinasi ini MEMBATALKAN asumsi
+lama (blur/GPU cost khusus Liquid Glass, fokus Batch 296-329): kalau gejala muncul di SEMUA
+situasi tanpa exclusive ke 1 tema/1 screen, root cause kemungkinan besar BUKAN soal
+rendering-cost sama sekali — lebih ke arah FREKUENSI/SCOPE recomposition yang tidak pernah
+disentuh batch manapun sebelumnya.
+
+**Root cause candidate — ditemukan via baca kode langsung (grep+view), BUKAN tebakan.**
+`AppNavHost` (`MainActivity.kt`, protected, fungsi ~700 baris mulai baris 530) adalah SATU
+composable raksasa yang mengoleksi **35+ StateFlow sekaligus** lewat `collectAsStateWithLifecycle()`
+tepat di scope teratasnya (baris 547-577 + 696) — termasuk `uiState` (`PlaybackUiState` gabungan,
+field `position`/`duration` di-tick **tiap 500ms selama `isPlaying`** via `startPositionLoop()`
+di `PlayerViewModel.kt` baris 885-909). `Scaffold` (baris 878) yang membungkus `MiniPlayerBar`
+(baris 911, terima `uiState` utuh sbg parameter) DAN `NavHost` (baris 1092, semua destinasi
+termasuk `now_playing`) ada DI DALAM function yang SAMA PERSIS itu — bukan 2 composable terpisah.
+Karena `uiState` dibaca langsung di level teratas function (bukan di dalam lambda anak yang
+sudah terisolasi scope-nya) — dipakai di baris 750/816/907/911/1132/1139/1167 utk keperluan
+MiniPlayerBar visibility/currentSongId/dst. — setiap tick 500ms selama musik main memaksa
+SELURUH scope recomposition `AppNavHost` invalid, bukan cuma bagian yang genuinely butuh posisi
+terbaru (progress bar mini bar / slider Now Playing).
+
+**Kenapa ini match PERSIS ke-4 gejala sekaligus**: MiniPlayerBar (baca `uiState` langsung, jelas
+kena) — scroll list & ganti tab (SEMUA jalan sbg anak `Scaffold`/`NavHost` yang notabene anak
+`AppNavHost` yang sama, jadi ikut kompetisi frame budget dgn recomposition storm 2x/detik function
+induknya) — Now Playing/sheet (composable turunan struktur yang sama). **Kenapa "dari dulu gak
+pernah fix"**: seluruh riwayat tuning performa Liquid Glass (Batch 296-300 blurRadius, Batch 299
+liquidGlassAlpha, Batch 328 revert Aurora rim-glow animasi, Batch 329 cabut hazeEffect total)
+SEMUANYA menyasar **COST render per-frame** (apa yang digambar) — bukan **FREKUENSI+SCOPE
+recomposition** (seberapa sering & seluas apa yang dipaksa gambar ulang). Biarpun Haze dicabut
+100% (Batch 329, cost render sudah nol), pemicu recomposition 2x/detik ini tetap ada & 0 pernah
+tersentuh batch manapun — persis kenapa gejalanya "gak pernah benar-benar fix" walau berkali-kali
+"diperbaiki".
+
+**Kenapa 0 kode diubah batch ini (murni investigasi)**: (1) fix yang genuinely BUKAN sekadar
+mitigasi (menurunkan frekuensi tick 500ms→1000ms cuma mengurangi gejala, bukan akar masalah)
+perlu MEMISAHKAN `position`/`duration` dari `PlaybackUiState` gabungan jadi StateFlow tersendiri
+yang dikoleksi LANGSUNG di scope lokal `MiniPlayerBar`/`NowPlayingScreen` sendiri (bukan
+di-hoist di `AppNavHost`) — supaya tick 500ms cuma invalidate composable yang genuinely butuh,
+bukan seluruh `AppNavHost`; (2) ini WAJIB menyentuh `MainActivity.kt` (**protected asset**, wajib
+edit-parsial + minim-diff) + `PlayerViewModel.kt` + `MiniPlayerBar.kt` (+kemungkinan
+`NowPlayingScreen.kt`) — lebih dari batas Micro-Batch 3 file kode & scope-nya arsitektural,
+bukan micro; (3) sesuai pola project ini (Batch 290 minSdk bump, Batch 322 investigasi
+`MainActivity.kt`): perubahan besar ke file protected WAJIB dikonfirmasi eksplisit user dulu
+sebelum eksekusi, bukan diasumsikan/langsung ditembak.
+
+**Pending Queue (file terpisah dibuat, WAJIB dibaca sesi berikutnya)**:
+`PENDING_FixGlobalLagRecomposition.md` — rencana fix 2-3 batch terpisah + 2 opsi pendekatan
+(surgical state-split vs mitigasi cepat throttle tick), menunggu user pilih sebelum eksekusi.
+
+**Ringkasan file** — 0 file kode, 3 dokumentasi (PROJECT_STATE.md/CHANGELOG.md/README.md) +
+1 file `PENDING_*.md` baru (kebal limit Micro-Batch, dokumentasi VIP). Dicek ulang persis
+(`diff` manifest vs disk, 0 selisih sebelum batch ini): `FILE_MANIFEST.txt` 188→189
+(nambah `PENDING_FixGlobalLagRecomposition.md`).
+
 **Batch 350 (BUG FIX — swipe vertikal brightness/volume yang mendarat DI ATAS vinyl ditelan
 gestur horizontal swipe-next/prev, 1 file kode)** — User laporan (setelah Batch 349 selesai):
 "mau swipe brightness/volume malah yang ke geser album nya" — dan secara eksplisit menandai ini

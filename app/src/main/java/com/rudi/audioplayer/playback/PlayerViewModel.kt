@@ -314,8 +314,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
 
     // A-B Repeat (Roadmap #4, Batch 91) — points live here rather than in PlaybackUiState
-    // because they're checked every 500ms tick in startPositionLoop() and don't need to
-    // trigger a full uiState recomposition on their own; the sheet observes them directly.
+    // because they're checked every tick in startPositionLoop() (1000ms since Batch 352,
+    // was 500ms) and don't need to trigger a full uiState recomposition on their own; the
+    // sheet observes them directly. Batch 352 note: loop-back overshoot past point B can now
+    // be up to ~1s (was ~0.5s) — accepted trade-off of the mitigation, see PENDING_FixGlobalLagRecomposition.md.
     private val _abRepeatPointA = MutableStateFlow<Long?>(null)
     val abRepeatPointA: StateFlow<Long?> = _abRepeatPointA.asStateFlow()
     private val _abRepeatPointB = MutableStateFlow<Long?>(null)
@@ -902,9 +904,12 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                     }
 
                     positionTick++
-                    if (c.isPlaying && positionTick % 10 == 0) persistPlaybackState()
+                    // Batch 352: tick moved 500ms->1000ms (mitigation, see
+                    // PENDING_FixGlobalLagRecomposition.md Opsi B), so modulo halved
+                    // 10->5 to keep the persisted-state cadence at ~5s (unchanged from before).
+                    if (c.isPlaying && positionTick % 5 == 0) persistPlaybackState()
                 }
-                delay(500)
+                delay(1000)
             }
         }
     }

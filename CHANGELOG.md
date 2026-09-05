@@ -1,5 +1,71 @@
 # Changelog
 
+## Batch 352 — MITIGASI: throttle position tick 500ms→1000ms (PlayerViewModel.kt, 1 file kode) — Opsi B dari PENDING_FixGlobalLagRecomposition.md
+User keputusan (gabungan): eksekusi **Opsi B sekarang** sebagai quick win 1 batch, **Opsi A tetap
+diantre** sesi berikutnya sebagai fix permanen/struktural. Ini BUKAN root-cause fix (scope
+recomposition `AppNavHost` masih utuh tiap tick) — cuma menurunkan FREKUENSI storm-nya separuh
+(2x/detik → 1x/detik), sesuai deskripsi trade-off di `PENDING_FixGlobalLagRecomposition.md`.
+
+**Perubahan (1 file kode + 1 file komentar-saja)**:
+1. `PlayerViewModel.kt` — `startPositionLoop()`: `delay(500)` → `delay(1000)`. Dikompensasi:
+   `positionTick % 10 == 0` → `% 5 == 0` supaya cadence `persistPlaybackState()` tetap ~5 detik
+   (tidak ikut molor ke ~10 detik cuma karena tick melambat) — bukan bagian dari Opsi B asli di
+   PENDING doc, ditambahkan sendiri saat eksekusi karena kalau tidak dikompensasi, jendela
+   kehilangan posisi playback saat crash/force-kill jadi 2x lebih lebar (regresi kecil yang tidak
+   disebutkan eksplisit di opsi, ditemukan saat baca kode `positionTick` dipakai di mana saja).
+2. `AbRepeatLogic.kt` — komentar dok saja (bukan logika), update referensi "~500ms" jadi
+   "~1000ms since Batch 352" supaya tidak stale untuk sesi berikutnya.
+
+**Efek samping yang TIDAK dikompensasi (melekat ke sifat mitigasi ini, bukan bug)**:
+- Presisi progress bar MiniPlayerBar & slider Now Playing turun jadi update per 1 detik (dari
+  per 0.5 detik).
+- A-B Repeat: overshoot lewat titik B naik jadi maks ~1 detik (dari ~0.5 detik) sebelum loop-back
+  ke titik A — `shouldLoopBack()` sendiri tidak diubah, cuma dipanggil lebih jarang.
+
+**Yang TIDAK berubah**: `AppNavHost` (`MainActivity.kt`, protected) masih recompose penuh tiap
+tick — SCOPE masalah (bukan cuma frekuensi) baru tuntas kalau Opsi A dieksekusi. Kemungkinan
+besar user masih akan lapor lag berkurang tapi belum hilang total — sesuai peringatan eksplisit
+di `PENDING_FixGlobalLagRecomposition.md`.
+
+**Status Opsi A**: tetap diantre, menunggu sesi berikutnya + konfirmasi eksplisit sebelum sentuh
+`MainActivity.kt` (protected). Detail rencana tidak berubah, masih di
+`PENDING_FixGlobalLagRecomposition.md` (status diupdate, bukan dihapus — dibutuhkan sesi
+berikutnya).
+
+## Batch 351 — Investigasi root cause lag/stutter kronis app-wide, DITEMUKAN kandidat kuat, 0 kode diubah (tunggu konfirmasi user)
+User laporan: item terbuka terakhir roadmap Liquid Glass (performa GPU/lag) MASIH kerasa stutter
+walau Haze blur sudah dicabut PERMANEN sejak Batch 329. Diklarifikasi via 2 tappable question:
+situasi (user pilih SEMUA 4 opsi — scroll list, ganti tab bawah, MiniPlayerBar pas musik muter,
+buka Now Playing/sheet — plus "dari dulu gejala nya gak pernah benar-benar fix!!") dan tema
+("belum yakin/gak merhatiin"). Kombinasi ini membatalkan asumsi lama (blur/GPU cost khusus
+Liquid Glass) — gejala universal ke semua situasi/tema berarti root cause bukan soal
+rendering-cost.
+
+**Root cause candidate (audit kode langsung, bukan tebakan).** `AppNavHost` (`MainActivity.kt`,
+protected) mengoleksi 35+ `StateFlow` sekaligus lewat `collectAsStateWithLifecycle()` di scope
+teratas fungsinya (baris 547-577+696) — termasuk `uiState` (`PlaybackUiState`, field
+`position`/`duration` di-tick tiap 500ms selama `isPlaying`, `startPositionLoop()` di
+`PlayerViewModel.kt`). `Scaffold` (baris 878) yang membungkus `MiniPlayerBar` (baris 911) DAN
+`NavHost` (baris 1092) berada DI DALAM function yang sama. Karena `uiState` dibaca langsung di
+level teratas (baris 750/816/907/911/1132/1139/1167), tiap tick 500ms selama musik main memaksa
+SELURUH scope recomposition `AppNavHost` invalid — bukan cuma progress bar yang genuinely butuh
+posisi terbaru. Ini match ke-4 gejala sekaligus (MiniPlayerBar baca `uiState` langsung; scroll &
+ganti tab jalan sbg anak `Scaffold`/`NavHost` yang sama; Now Playing/sheet turunan struktur yang
+sama) dan menjelaskan kenapa fix performa lama (Batch 296-300 blurRadius, Batch 299
+liquidGlassAlpha, Batch 328 revert animasi Aurora, Batch 329 cabut hazeEffect total) tidak
+pernah menuntaskan — semua menyasar cost render per-frame, bukan frekuensi+scope recomposition.
+
+**0 kode diubah** — fix genuinely non-mitigasi perlu memisahkan `position`/`duration` jadi
+`StateFlow` terpisah yang dikoleksi lokal di `MiniPlayerBar`/`NowPlayingScreen` (bukan di-hoist
+`AppNavHost`), menyentuh `MainActivity.kt` (protected) + `PlayerViewModel.kt` + `MiniPlayerBar.kt`
+(+kemungkinan `NowPlayingScreen.kt`) — lebih dari batas Micro-Batch 3 file & arsitektural, bukan
+micro. Sesuai pola project (Batch 290/322): perubahan besar ke protected file wajib dikonfirmasi
+user dulu.
+
+**File baru**: `PENDING_FixGlobalLagRecomposition.md` — rencana fix 2 opsi (A: state-split
+struktural 2-3 batch, direkomendasikan; B: mitigasi cepat throttle tick 500ms→1000ms, 1 file)
++ pertanyaan yang perlu dijawab user. `FILE_MANIFEST.txt` 188→189. 0 file kode disentuh.
+
 ## Batch 350 — BUG FIX: swipe vertikal brightness/volume di atas vinyl ditelan gestur swipe-next/prev, NowPlayingScreen, 1 file kode
 User laporan setelah Batch 349: "mau swipe brightness/volume malah yang ke geser album nya" —
 ditandai eksplisit sebagai **keluhan kronis, bukan regresi baru**: "dari dulu soal swipe

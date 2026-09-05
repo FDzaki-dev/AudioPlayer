@@ -8,14 +8,31 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 350 (BUG FIX: swipe brightness/volume di atas vinyl ditelan
-> gestur ganti-lagu, `NowPlayingScreen.kt`, 1 file):** Keluhan kronis user ("dari dulu susahnya
-> minta ampun") — swipe vertikal yang mendarat DI ATAS piringan album ikut menggeser lagu,
-> bukan mengubah brightness/volume. Fix: `pointerInput` baru di `PointerEventPass.Initial` yang
-> menentukan SUMBU gerakan (horizontal/vertikal) lebih dulu sebelum event sampai ke gestur
-> swipe-next/prev vinyl — vertikal dialihkan ke brightness/volume, horizontal 0 disentuh (0
-> regresi swipe ganti lagu). 0 baris logic `AlbumArtHero` lama diubah, murni add-on baru.
-> **Belum diverifikasi compile CI & visual device.**
+> 🆕 **Update terbaru — Batch 352 (MITIGASI: throttle position tick 500ms→1000ms,
+> `PlayerViewModel.kt`, 1 file kode):** Opsi B dari `PENDING_FixGlobalLagRecomposition.md`
+> dieksekusi sbg quick win — Opsi A (fix struktural permanen, sentuh `MainActivity.kt`) tetap
+> diantre sesi berikutnya. Frekuensi recomposition storm turun separuh (2x→1x/detik), TAPI SCOPE
+> masalah (`AppNavHost` masih recompose penuh tiap tick) belum tuntas — lag kemungkinan
+> berkurang, belum hilang total. Efek samping: presisi progress bar/slider turun ke per-1-detik,
+> overshoot A-B Repeat naik ke maks ~1 detik. Cadence auto-save posisi (`persistPlaybackState`)
+> sengaja dikompensasi tetap ~5 detik (tidak ikut molor).
+> Batch 351 (Investigasi root cause lag/stutter kronis app-wide, 0
+> kode — tunggu konfirmasi user):** Ditemukan kandidat root cause via audit kode: `AppNavHost`
+> (`MainActivity.kt`) 1 composable raksasa yang koleksi 35+ StateFlow (termasuk posisi playback
+> yang di-tick tiap 500ms) di scope teratasnya — Scaffold pembungkus MiniPlayerBar+NavHost ada
+> di function yang sama, jadi tiap tick selama musik main memaksa SELURUH scope recomposition
+> invalid, bukan cuma progress bar yang genuinely butuh. Match ke-4 gejala user (scroll/ganti
+> tab/MiniPlayerBar/Now Playing-sheet) sekaligus + jelaskan kenapa fix Batch 296-329 (blur/GPU
+> cost) tidak pernah menuntaskan gejala kronis ini. **Fix belum dieksekusi** — rencana 2 opsi di
+> `PENDING_FixGlobalLagRecomposition.md`, menunggu user pilih pendekatan.
+> Batch 350 (BUG FIX: swipe brightness/volume di atas vinyl ditelan gestur ganti-lagu,
+> `NowPlayingScreen.kt`, 1 file):** Keluhan kronis user ("dari dulu susahnya minta ampun") —
+> swipe vertikal yang mendarat DI ATAS piringan album ikut menggeser lagu, bukan mengubah
+> brightness/volume. Fix: `pointerInput` baru di `PointerEventPass.Initial` yang menentukan
+> SUMBU gerakan (horizontal/vertikal) lebih dulu sebelum event sampai ke gestur swipe-next/prev
+> vinyl — vertikal dialihkan ke brightness/volume, horizontal 0 disentuh (0 regresi swipe ganti
+> lagu). 0 baris logic `AlbumArtHero` lama diubah, murni add-on baru. Belum diverifikasi compile
+> CI & visual device.
 > Batch 349 (Row 4 ikon atas: revert `SpaceBetween` → Tutup kiri sendiri + 3 ikon rapat kanan,
 > `NowPlayingScreen.kt`, 1 file):** User eksplisit tidak suka tata letak simetris — diklarifikasi
 > 2 tahap, kembali ke pola Tutup sendiri mentok kiri + Favorit/Info/⋮ menumpuk rapat kanan
