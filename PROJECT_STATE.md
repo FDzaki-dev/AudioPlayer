@@ -36,6 +36,53 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 346 (Fitur: art scale dinamis mengisi sisa ruang ala Spotify — piringan membesar/
+mengecil otomatis, bukan lagi gap kosong, `NowPlayingScreen.kt`, 1 file kode)** — User pilih
+eksplisit lanjutkan trade-off yang dicatat Batch 345 (opsi "Lanjut ide 'art scale dinamis'" dari
+3 pilihan yang ditawarkan sesi ini). Scope memang lebih besar dari Micro-Batch biasa (blur/glow/
+hero shape ikut terdampak, seperti sudah diperingatkan Batch 345) — dieksekusi SEKARANG karena
+user sudah konfirmasi eksplisit, bukan diam-diam.
+
+**Pendekatan: ukur, bukan tebak/hardcode.** Grup konten judul-s/d-waktu (dulu dipusatkan
+`Arrangement.Center` Batch 345) dibungkus 1 Column baru yang diukur `onGloballyPositioned`
+(`contentGroupHeightPx`) — kunci teknis: `verticalScroll` (Column induknya) memberi constraint
+tinggi TAK TERBATAS ke children, jadi tinggi yang dilaporkan SELALU intrinsik/asli, tidak pernah
+terpotong `weight(1f)`. Pola `onGloballyPositioned` ini BUKAN hal baru di codebase (sudah dipakai
+identik di `LibraryScreen.kt`/`QueueSheet.kt`/`SongPickerSheet.kt`/`PlaylistScreen.kt`).
+
+**Formula.** `dynamicArtSize` = (tinggi konten tersedia − chrome tetap [Row ikon 48dp + Spacer
+12dp + Spacer 16dp + Row transport 68dp] − tinggi grup konten terukur − 20dp selisih art↔glow),
+di-clamp `[140dp, lebarLayar−80dp]` (batas lebar: piringan persegi tak boleh lebih lebar dari
+layar; 80dp = margin default lama, formula SENGAJA balik ke 280dp persis di layar 360dp lebar —
+0 lompatan visual di device umum). Row ikon (48dp)/Row transport (68dp) SENGAJA konstanta
+(deterministik dari kode sendiri — IconButton default & `.size(68.dp)` eksplisit), bukan diukur
+run-time, demi 1 measurement loop lebih sedikit. Sebelum pengukuran pertama mendarat
+(`contentGroupHeightPx == 0`, 1 frame awal), fallback ke `albumArtBoxHeight` (formula lama Batch
+336, tetap valid sbg adaptif layar pendek) — 0 flash ukuran aneh. `verticalArrangement = Center`
+(Batch 345) SENGAJA TIDAK dihapus — jaring pengaman visual utk 1 frame transisi itu saja.
+
+**`AlbumArtHero()` diparameterisasi.** Dulu hardcode `.size(300.dp)` (glow)/`.size(280.dp)`
+(art) literal — sekarang terima `artSize: Dp` dari caller, glow tetap `artSize + 20.dp` (rasio
+lama dipertahankan persis). Shadow/bevel Tactile/Skeu/border/scanline TIDAK disentuh (semua pakai
+`size` dari `drawBehind` scope, otomatis ikut skala) — KECUALI 1 komentar basi ("ukurannya selalu
+tetap 280.dp", justifikasi margin halo 18dp) diperbarui supaya tidak menyesatkan sesi berikutnya;
+angka literal margin halo itu sendiri (18dp/14dp/dst) SENGAJA TETAP konstan di semua ukuran
+(bukan proporsi visual yang perlu ikut skala).
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 2 import baru (`onGloballyPositioned`, `Dp`),
+1 state baru (`contentGroupHeightPx`), 1 Column pembungkus pengukur, 1 blok kalkulasi
+`dynamicArtSize`/`dynamicGestureBoxHeight`, 1 parameter baru `AlbumArtHero(artSize)`. 0 file lain
+disentuh, 0 logic gesture Batch 334/footer Batch 343 diubah (`ZERO-REFACTOR`). Brace/paren/
+bracket seimbang & valid (stack-based matcher, comment/string di-strip): 228/228 brace, 674/674
+paren (naik dari 222/222 & 663/663 sebelum batch ini — net penambahan wajar sesuai kode baru).
+
+**Belum diverifikasi compile Gradle sungguhan** — WAJIB cek CI. **Belum diverifikasi visual di
+device** — prioritas cek: (1) piringan membesar mengisi ruang kosong di layar tinggi/normal
+(bukan lagi 2 gap Batch 345); (2) piringan tetap proporsional/tidak melebihi lebar layar; (3) di
+layar pendek/hint banner tampil, piringan menyusut wajar & transport tetap presisi di tepi bawah
+(0 regresi Batch 336-343); (4) transisi ukuran 1 frame awal (fallback → dinamis) tidak kelihatan
+kedip. Detail: `CHANGELOG.md` Batch 346.
+
 **Batch 345 (Fix gap kosong tunggal jadi terdistribusi — `verticalArrangement` Top → `Center`,
 NowPlayingScreen, 1 file kode)** — User kirim 2 screenshot (crop Row 4-ikon atas + crop area
 waktu/transport) + 2 laporan: (1) "susunan badge anomali yang terpaku oleh jarak", (2) "masih

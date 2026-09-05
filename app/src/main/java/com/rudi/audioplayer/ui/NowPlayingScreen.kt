@@ -81,12 +81,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import android.content.Context
 import android.media.AudioManager
@@ -284,6 +286,13 @@ fun NowPlayingScreen(
         screenHeightDp < 640.dp -> (screenHeightDp * 0.28f).coerceIn(160.dp, 300.dp)
         else -> 300.dp
     }
+    // Batch 346 — sejak batch ini, `albumArtBoxHeight` di atas TIDAK LAGI dipakai LANGSUNG sbg
+    // tinggi final Box piringan — perannya berubah jadi fallback PRA-pengukuran saja (lihat
+    // `dynamicArtSize` dekat Box piringan bawah). Formula/komentar di atas TIDAK diubah sama
+    // sekali (masih valid persis sebagai fallback layar-pendek), murni PERAN-nya yang berubah.
+    // `contentGroupHeightPx` — hasil ukur Column pembungkus grup konten (hint s/d baris waktu,
+    // lihat komentar `onGloballyPositioned` di sana) dalam pixel, 0 = belum pernah terukur.
+    var contentGroupHeightPx by remember { mutableStateOf(0) }
     var brightnessLevel by remember {
         mutableStateOf(
             activity?.window?.attributes?.screenBrightness
@@ -513,10 +522,39 @@ fun NowPlayingScreen(
             launch { entranceAlpha.animateTo(1f, animationSpec = tween(280)) }
         }
 
+        // Batch 346 — inti fitur "art scale dinamis". Rasional lengkap ada di komentar Column
+        // pengukur (`onGloballyPositioned`) di atas, dekat blok if(showNowPlayingHint) — cuma
+        // rangkuman perhitungan di sini:
+        // sisaRuang = tinggiKontenTersedia − chromeTetap − tinggiGrupKontenTerukur
+        // dynamicArtSize = sisaRuang − 20dp (selisih art↔glow, lihat AlbumArtHero) lalu di-clamp.
+        // `fixedChromeHeight` SENGAJA konstanta (bukan diukur run-time spt grup konten) — Row
+        // ikon-atas (48dp, default IconButton) & Row transport (68dp, FilledIconButton eksplisit
+        // .size(68.dp) adalah child tertinggi) keduanya deterministik dari kode sendiri, 0
+        // bergantung ke song/font-scale — 1 measurement loop lebih sedikit = risiko lebih rendah.
+        val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+        val fixedChromeHeight = 48.dp + 12.dp + 16.dp + 68.dp
+        // Piringan persegi TIDAK BOLEH lebih lebar dari layar. 80dp = 2×40dp margin yang sudah
+        // dipakai default lama (280dp piringan di layar 360dp lebar = 320dp konten setelah
+        // padding Column 20dp -> 40dp margin tersisa) — formula ini SENGAJA balik ke 280dp
+        // persis di layar 360dp lebar, konsisten dgn tampilan default lama, bukan lompatan baru.
+        val maxArtByWidth = (screenWidthDp - 80.dp).coerceAtLeast(200.dp)
+        val dynamicArtSize = if (contentGroupHeightPx > 0) {
+            val measuredContentHeight = with(density) { contentGroupHeightPx.toDp() }
+            val availableContentHeight = screenHeightDp - 40.dp // padding(20.dp) Column induk, 2 sisi
+            (availableContentHeight - fixedChromeHeight - measuredContentHeight - 20.dp)
+                .coerceIn(140.dp, maxArtByWidth)
+        } else {
+            // Frame pertama sebelum Column pengukur sempat invoke onGloballyPositioned —
+            // fallback ke `albumArtBoxHeight` (formula lama, sudah adaptif layar pendek sejak
+            // Batch 336) supaya 0 flash ukuran aneh sebelum pengukuran nyata mendarat.
+            (albumArtBoxHeight - 20.dp).coerceAtLeast(140.dp)
+        }
+        val dynamicGestureBoxHeight = dynamicArtSize + 20.dp
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(albumArtBoxHeight)
+                .height(dynamicGestureBoxHeight)
         ) {
             // Left half of the whole row: swipe up/down to raise/lower screen brightness.
             // Sized to a true 50% of the available width — independent of however big the
@@ -585,6 +623,7 @@ fun NowPlayingScreen(
                 AlbumArtHero(
                     artworkUri = song?.uri,
                     accentColor = animatedAccent,
+                    artSize = dynamicArtSize,
                     onSwipeNext = onNext,
                     onSwipePrevious = onPrevious
                 )
@@ -700,6 +739,23 @@ fun NowPlayingScreen(
         // (dihapus, lihat deklarasi `showNowPlayingHint` di atas), cuma toggle tutup POPUP saat
         // ini — bisa dibuka lagi kapan saja lewat tombol info baru di Row atas (samping ikon
         // favorit). Teks/posisi/tampilan banner ITU SENDIRI 0 diubah (masih card sama, Batch 338).
+        // Batch 346 — user pilih lanjut ide "art scale dinamis" yang dicatat sbg trade-off
+        // Batch 345 (solusi paling "otentik" ala Spotify: sisa ruang di-ISI PIRINGAN, bukan
+        // didistribusikan jadi 2 gap kosong via Arrangement.Center). Column pembungkus BARU ini
+        // (hint s/d baris waktu, grup yang SAMA yang tadinya dipusatkan Center) diukur tinggi
+        // NYATA-nya lewat `onGloballyPositioned` — kuncinya: `verticalScroll` (parent) memberi
+        // constraint tinggi TAK TERBATAS ke children-nya (supaya tahu total tinggi buat discroll),
+        // jadi tinggi yang dilaporkan grup ini SELALU intrinsik (isi asli), TIDAK PERNAH terpotong/
+        // dipaksa oleh `weight(1f)` Column induknya — beda dari mengukur Column induk itu sendiri
+        // (yang akan selalu melaporkan tinggi teralokasi, bukan tinggi konten). Hasil pengukuran
+        // (`contentGroupHeightPx`) dipakai di deklarasi `dynamicArtSize` bawah (sebelum Box
+        // piringan) buat menghitung sisa ruang yang diberikan ke piringan. Pola `onGloballyPositioned`
+        // ini BUKAN hal baru di codebase — sudah dipakai identik di LibraryScreen.kt/QueueSheet.kt/
+        // SongPickerSheet.kt/PlaylistScreen.kt.
+        Column(
+            modifier = Modifier.onGloballyPositioned { contentGroupHeightPx = it.size.height },
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         if (showNowPlayingHint) {
             FeatureHintBanner(
                 text = "Geser piringan: kiri = kecerahan, kanan = volume. Ketuk ⋮ buat Sleep Timer, Kecepatan & Equalizer.",
@@ -786,6 +842,8 @@ fun NowPlayingScreen(
                 fontFamily = timeFontFamily
             )
         }
+        } // tutup Column pengukur (Batch 346, onGloballyPositioned) — pasangan pembuka di atas,
+          // sebelum blok if(showNowPlayingHint) — lihat rasional lengkap di sana.
         } // tutup Column scrollable (Batch 334) — Batch 343: penutup ini SENGAJA dipindah ke sini
           // (sebelumnya menutup SETELAH Row transport di bawah) supaya Row transport jadi sibling
           // FIXED milik Column induk (fillMaxSize), bukan lagi child terakhir Column scrollable —
@@ -1472,11 +1530,15 @@ private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: 
 
 /** Apple Music-style hero art: a large rounded-square image with a soft ambient glow
  * (tinted by the same accent color already extracted from this song's artwork) instead of
- * the old spinning vinyl. Horizontal swipe-to-skip gesture logic is unchanged from before. */
+ * the old spinning vinyl. Horizontal swipe-to-skip gesture logic is unchanged from before.
+ * Batch 346 — `artSize` baru (dulu literal 280.dp hardcode di sini): caller (NowPlayingScreen)
+ * sekarang menghitung ukuran dinamis ("art scale dinamis") dan meneruskannya ke sini. Glow
+ * Box tetap `artSize + 20.dp` (rasio 300/280 lama dipertahankan persis). */
 @Composable
 private fun AlbumArtHero(
     artworkUri: Uri?,
     accentColor: Color,
+    artSize: Dp,
     onSwipeNext: () -> Unit,
     onSwipePrevious: () -> Unit
 ) {
@@ -1557,14 +1619,14 @@ private fun AlbumArtHero(
         val heroShape = if (isPanelTheme) MaterialTheme.shapes.large else RoundedCornerShape(Radius.hero)
         Box(
             modifier = Modifier
-                .size(300.dp)
+                .size(artSize + 20.dp)
                 .blur(90.dp)
                 .background(accentColor.copy(alpha = 0.38f), CircleShape)
         )
         AlbumArt(
             artworkUri = artworkUri,
             modifier = Modifier
-                .size(280.dp)
+                .size(artSize)
                 .then(
                     when {
                         isTactile -> {
@@ -1645,9 +1707,15 @@ private fun AlbumArtHero(
                                     val outlinePath = Path().apply { addOutline(outline) }
                                     // Halo tetap (18.dp) — offset terjauh yg dipakai di bawah cuma
                                     // 14.dp (literal, bukan proporsional ke param elevation kayak
-                                    // skeuEmboss(), krn hero art ini ukurannya selalu tetap 280.dp),
-                                    // jadi 18.dp cukup longgar utk tidak memotong bentuk bayangan
-                                    // sendiri, sekaligus jadi batas tegas yg dijamin tidak dilewati.
+                                    // skeuEmboss()). Batch 346 — hero art ini TIDAK LAGI selalu
+                                    // 280.dp (sekarang `artSize` dinamis, lihat definisi fungsi) —
+                                    // TAPI margin halo 18dp SENGAJA tetap literal, bukan diikutkan
+                                    // skala: ini jarak bayangan-ke-tepi-shape yang wajar konstan
+                                    // di seluruh rentang ukuran (140dp s/d lebar layar), bukan
+                                    // proporsi visual yang perlu ikut membesar/mengecil bareng art.
+                                    // 18dp tetap cukup longgar utk tidak memotong bentuk bayangan
+                                    // sendiri di ukuran manapun, sekaligus batas tegas yg dijamin
+                                    // tidak dilewati.
                                     val haloPx = 18.dp.toPx()
                                     clipRect(
                                         left = -haloPx,

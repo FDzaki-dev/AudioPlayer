@@ -8,7 +8,15 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 345 (Fix gap kosong terdistribusi, `NowPlayingScreen.kt`, 1 file):**
+> 🆕 **Update terbaru — Batch 346 (Fitur: art scale dinamis ala Spotify, `NowPlayingScreen.kt`,
+> 1 file):** Piringan album sekarang MEMBESAR mengisi sisa ruang layar kosong (bukan lagi
+> didistribusikan jadi gap kosong via `Arrangement.Center`, Batch 345) — trade-off yang dicatat
+> Batch 345 dieksekusi setelah user konfirmasi eksplisit. Tinggi grup konten judul-s/d-waktu
+> diukur nyata (`onGloballyPositioned`, bukan ditebak/hardcode) lalu sisa ruangnya diberikan
+> SELURUHNYA ke piringan (`AlbumArtHero`, dulu hardcode 280dp, sekarang dinamis) — dibatasi
+> `[140dp, lebarLayar−80dp]` supaya tetap proporsional & tak pernah lebih lebar dari layar. Row
+> ikon atas & Row transport tetap presisi seperti sebelumnya (0 regresi Batch 334/342/343).
+> Batch 345 (Fix gap kosong terdistribusi, `NowPlayingScreen.kt`, 1 file):
 > Fix Batch 343 (Row transport jadi footer fixed) memindah lokasi gap kosong (bukan
 > menghilangkan) — di layar dengan ruang lebih, semua sisa ruang masih menumpuk jadi 1 gap besar
 > (sekarang antara baris waktu & Row transport, bukan lagi di bawah Row transport). Row ikon atas

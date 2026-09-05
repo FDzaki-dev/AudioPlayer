@@ -1,5 +1,74 @@
 # Changelog
 
+## Batch 346 — Fitur: art scale dinamis mengisi sisa ruang ala Spotify, NowPlayingScreen, 1 file kode
+User pilih eksplisit lanjutkan trade-off yang dicatat Batch 345 ("Lanjut ide 'art scale dinamis'",
+salah satu dari 3 pilihan yang ditawarkan sesi ini). Scope memang lebih besar dari Micro-Batch
+biasa (blur/glow/hero shape ikut terdampak, seperti sudah diperingatkan Batch 345) — dieksekusi
+sekarang karena user sudah konfirmasi eksplisit, bukan diam-diam.
+
+**Pendekatan: ukur, bukan tebak/hardcode.** Grup konten judul-s/d-baris waktu (dulu dipusatkan
+`Arrangement.Center` Batch 345) dibungkus 1 `Column` baru yang diukur via `onGloballyPositioned`
+(state baru `contentGroupHeightPx`). Kunci teknis: `verticalScroll` pada Column induknya memberi
+constraint tinggi TAK TERBATAS ke children (supaya tahu total tinggi yang bisa discroll) — jadi
+tinggi yang dilaporkan grup ini SELALU intrinsik/asli, TIDAK PERNAH terpotong oleh `weight(1f)`
+Column induk, beda dari kalau yang diukur adalah Column induk itu sendiri (yang akan selalu
+melaporkan tinggi teralokasi, bukan tinggi konten). Pola `onGloballyPositioned` ini bukan hal baru
+di codebase — sudah dipakai identik di `LibraryScreen.kt`/`QueueSheet.kt`/`SongPickerSheet.kt`/
+`PlaylistScreen.kt`.
+
+**Formula.** `dynamicArtSize` = (tinggi konten tersedia − chrome tetap − tinggi grup konten
+terukur − 20dp selisih art↔glow), lalu di-clamp `[140dp, lebarLayar − 80dp]`. "Chrome tetap" =
+Row ikon atas (48dp, default `IconButton`) + `Spacer` 12dp + `Spacer` 16dp + Row transport (68dp,
+`FilledIconButton` play/pause eksplisit `.size(68.dp)`, child tertinggi di row itu) — keempatnya
+SENGAJA dipakai sbg konstanta (bukan diukur run-time seperti grup konten), karena deterministik
+dari kode sendiri (0 bergantung ke song/font-scale), demi 1 measurement loop lebih sedikit = risiko
+lebih rendah. Batas lebar (`lebarLayar − 80dp`) mencegah piringan persegi lebih lebar dari layar;
+80dp = 2× margin 40dp yang sudah dipakai default lama (280dp piringan di layar 360dp lebar = 320dp
+konten setelah padding Column 20dp, sisa 40dp margin) — formula ini SENGAJA balik ke 280dp persis
+di layar 360dp lebar, konsisten dgn tampilan default lama, bukan lompatan baru.
+
+**Fallback pra-pengukuran.** Sebelum `onGloballyPositioned` sempat invoke sekali (frame pertama,
+`contentGroupHeightPx == 0`), `dynamicArtSize` jatuh ke formula lama `albumArtBoxHeight` (Batch
+336, sudah adaptif layar pendek) dikurangi 20dp — supaya 0 flash ukuran aneh sebelum pengukuran
+nyata mendarat. `verticalArrangement = Arrangement.Center` (Batch 345) SENGAJA TIDAK dihapus dari
+Column scrollable — sekarang berperan sbg jaring pengaman visual utk 1 frame transisi itu saja
+(begitu ukuran stabil, gap yang perlu di-center-kan Center seharusnya sudah ~0 duluan lewat
+piringan yang membesar/mengecil).
+
+**`AlbumArtHero()` diparameterisasi — dulu 300dp/280dp hardcode literal.** Fungsi private ini
+(1 titik pemakaian, cuma dipanggil dari `NowPlayingScreen` sendiri) sekarang menerima `artSize: Dp`
+dari caller: glow Box `.size(300.dp)` → `.size(artSize + 20.dp)` (rasio 300−280=20dp lama
+dipertahankan persis), `AlbumArt()` `.size(280.dp)` → `.size(artSize)`. Shadow/bevel/border/
+scanline Tactile/Skeu/Calm Retro TIDAK disentuh sama sekali — semuanya sudah memakai `size` dari
+`drawBehind`/`drawScope` di titik pakainya (bukan literal `280.dp` terpisah), jadi otomatis ikut
+skala baru tanpa perlu diubah. Satu pengecualian: 1 blok komentar (justifikasi margin halo 18dp
+Skeu, sebelumnya bilang "hero art ukurannya selalu tetap 280.dp") diperbarui — klaim itu sekarang
+salah sejak batch ini, komentar diganti supaya tidak menyesatkan sesi berikutnya. Angka literal
+margin halo itu sendiri (18dp/14dp/8dp/3dp) SENGAJA TETAP konstan di semua ukuran art — ini jarak
+bayangan-ke-tepi-shape yang wajar konstan, bukan proporsi visual yang perlu ikut membesar/mengecil.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). 2 import baru (`androidx.compose.ui.layout.
+onGloballyPositioned`, `androidx.compose.ui.unit.Dp`), 1 state baru (`contentGroupHeightPx`), 1
+`Column` pembungkus pengukur baru, 1 blok kalkulasi (`dynamicArtSize`/`dynamicGestureBoxHeight`),
+1 parameter fungsi baru (`AlbumArtHero(artSize)`), 2 `.size()` literal diganti jadi parameter, 1
+komentar basi diperbarui. 0 komposable lain disentuh, 0 logic gesture Batch 334 (brightness/
+volume di luar ancestor scrollable) atau footer Batch 343 (Row transport fixed) diubah
+(`ZERO-REFACTOR`). Bracket-matcher stack-based (comment/string di-strip) dijalankan atas seluruh
+file — struktur bersarang genuinely valid, 0 mismatch. Brace/paren/bracket: 228/228 brace, 674/674
+paren, 0/0 bracket (naik dari 222/222 brace & 663/663 paren sebelum batch ini — net penambahan
+wajar sesuai volume kode/komentar baru, bukan tanda ketidakseimbangan).
+
+**Belum diverifikasi compile Gradle sungguhan** — WAJIB cek CI. Risiko sintaks rendah (`Dp` &
+`onGloballyPositioned` keduanya API resmi Compose, `onGloballyPositioned` sudah dipakai identik
+di 4 file lain project ini; operator aritmatika `Dp` seperti `-`/`+`/`coerceIn`/`coerceAtLeast`
+juga API standar Compose Foundation). **Belum diverifikasi visual di device** — prioritas cek:
+(1) piringan membesar mengisi ruang kosong yang dulu jadi 2 gap Batch 345 di layar tinggi/normal;
+(2) piringan tetap proporsional, tidak pernah melebihi lebar layar di device manapun; (3) di layar
+pendek ATAU saat hint banner tampil (grup konten jadi lebih tinggi), piringan menyusut wajar &
+Row transport tetap presisi di tepi bawah (0 regresi Batch 336-343); (4) transisi 1 frame awal
+(fallback `albumArtBoxHeight` → ukuran dinamis terukur) tidak kelihatan kedip/lompat kasar —
+entrance scale+alpha animation (sudah ada sejak awal) diharapkan cukup menyamarkan kalaupun ada.
+
 ## Batch 345 — Fix gap kosong tunggal jadi terdistribusi (verticalArrangement Top → Center), NowPlayingScreen, 1 file kode
 User kirim 2 screenshot (crop Row 4-ikon atas + crop area waktu/transport) + 2 laporan: (1)
 "susunan badge anomali yang terpaku oleh jarak", (2) "masih ada bagian kosong karena bagian
