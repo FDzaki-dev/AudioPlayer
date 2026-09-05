@@ -34,7 +34,10 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rudi.audioplayer.playback.PlaybackProgress
 import com.rudi.audioplayer.playback.PlaybackUiState
+import kotlinx.coroutines.flow.StateFlow
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
@@ -47,6 +50,11 @@ import com.rudi.audioplayer.ui.theme.Radius
 @Composable
 fun MiniPlayerBar(
     uiState: PlaybackUiState,
+    // Batch 353 (Opsi A) — dikoleksi LOKAL di bawah (bukan lewat uiState) supaya tick posisi
+    // tiap detik cuma invalidasi MiniPlayerBar ini sendiri, bukan ikut memaksa AppNavHost
+    // (pemanggil composable ini di MainActivity.kt) recompose. Lihat PlaybackProgress di
+    // PlayerViewModel.kt untuk rasional lengkap.
+    playbackProgress: StateFlow<PlaybackProgress>,
     accentColor: Color?,
     onPlayPause: () -> Unit,
     onExpand: () -> Unit
@@ -191,15 +199,17 @@ fun MiniPlayerBar(
                 }
             }
         }
-        // Batch 36: uiState.position/duration sudah di-tick tiap detik untuk NowPlayingScreen
-        // (lihat startPositionTicker di PlayerViewModel) tapi mini bar tidak menampilkannya sama
+        // Batch 36: posisi/durasi di-tick tiap detik untuk NowPlayingScreen (lihat
+        // startPositionLoop di PlayerViewModel) tapi mini bar tidak menampilkannya sama
         // sekali — user harus buka full player cuma buat lihat sudah sampai mana. Garis tipis di
         // tepi bawah ini murni glanceable, tidak seekable (bukan Slider), jadi tidak menambah
         // target sentuh baru yang bisa konflik dengan onExpand di Box pembungkus. Overload
         // progress lambda dipakai karena overload Float sudah deprecated sejak Material3 1.2.0
         // (proyek ini pin compose-bom 2024.05.00 / Material3 ~1.2.1, sudah include lambda ini).
-        val progressFraction = if (uiState.duration > 0) {
-            (uiState.position.toFloat() / uiState.duration.toFloat()).coerceIn(0f, 1f)
+        // Batch 353 (Opsi A): sumbernya sekarang playbackProgress, dikoleksi di sini SAJA.
+        val progress by playbackProgress.collectAsStateWithLifecycle()
+        val progressFraction = if (progress.duration > 0) {
+            (progress.position.toFloat() / progress.duration.toFloat()).coerceIn(0f, 1f)
         } else 0f
         LinearProgressIndicator(
             progress = { progressFraction },

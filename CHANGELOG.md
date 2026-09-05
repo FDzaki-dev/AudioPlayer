@@ -1,5 +1,49 @@
 # Changelog
 
+## Batch 353 — FIX STRUKTURAL PERMANEN: PlaybackProgress dipisah dari PlaybackUiState (4 file, termasuk 1 protected) — Opsi A dari PENDING_FixGlobalLagRecomposition.md TUNTAS
+User eksplisit konfirmasi lanjut Opsi A walau belum ada bukti profiler/systrace sungguhan
+("kerahkan yang terbaik... selama final behavior tetap sesuai tujuan awal"). Dieksekusi ATOMIK
+dalam 1 batch (bukan dipecah 2-3 batch seperti perkiraan awal PENDING doc) — investigasi kode
+nyata menunjukkan cakupan minimal sebenarnya 4 file, dan memecah jadi 2 batch cuma akan
+menghasilkan batch pertama tanpa manfaat nyata (dual-write sementara tidak mengurangi frekuensi
+tick di `_uiState` sampai field lama benar-benar dihapus).
+
+**Mekanisme fix (root cause, bukan mitigasi frekuensi seperti Batch 352)**: `position`/`duration`
+dikeluarkan TOTAL dari `PlaybackUiState`, pindah ke `StateFlow` terpisah `PlaybackProgress` yang
+HANYA dikoleksi lokal oleh composable kecil yang genuinely menampilkan posisi — bukan lagi
+di-hoist & dibaca utuh di scope teratas `AppNavHost`. Recompose-scope Compose granular per
+pemanggilan fungsi `@Composable` (termasuk lambda `content` yang dioper ke fungsi non-inline) —
+tick posisi sekarang cuma invalidate composable kecil itu, `AppNavHost` (Scaffold+NavHost+tab
+switching+scroll) tidak lagi ikut ter-restart tiap detik.
+
+**Perubahan (4 file kode)**:
+1. `PlayerViewModel.kt` — `PlaybackUiState` kehilangan `position`/`duration`; `data class` baru
+   `PlaybackProgress` + `StateFlow` `_playbackProgress`/`playbackProgress`. `startPositionLoop()`
+   nulis ke `_playbackProgress` (guard skip-kalau-sama dipertahankan sama persis). 2 titik lain
+   yang ikut break ditemukan via full-codebase sweep (di luar perkiraan awal PENDING doc) & difix
+   di batch yang sama: `onMediaItemTransition` (reset `duration` lewat `_playbackProgress.copy`)
+   dan `setAudiobookModeEnabled` (baca `_playbackProgress.value.position`).
+2. `MiniPlayerBar.kt` — param baru `playbackProgress: StateFlow<PlaybackProgress>`,
+   `collectAsStateWithLifecycle()` langsung di fungsi ini sendiri.
+3. `NowPlayingScreen.kt` — param sama; blok Slider+waveform+teks waktu di-extract jadi
+   `PlaybackProgressRow` (collect lokal, 1:1 tampilan/behavior sama). `LyricsSheet`/
+   `ABRepeatBookmarkSheet` TIDAK ikut diubah signature (0 file tambahan) — dibungkus
+   `WithLivePlaybackProgress`, composable generik yang collect lokal lalu suplai `positionMs`
+   lewat parameter lambda.
+4. `MainActivity.kt` (**protected, edit-parsial**) — 2 baris tambahan di 2 call-site
+   (`playbackProgress = playerViewModel.playbackProgress`). 0 restrukturisasi `AppNavHost` — fungsi
+   ini ternyata tidak pernah baca `uiState.position`/`.duration` langsung, cuma meneruskan
+   `uiState` utuh ke composable anak, jadi otomatis "sembuh" begitu field itu hilang.
+
+**Verifikasi sebelum packaging**: full-codebase grep 0 sisa referensi
+`uiState.position`/`.duration`/`_uiState.value.position`/`.duration` di luar komentar + brace/paren
+balance check 4 file (0 selisih) + 0 file Preview/test lain memanggil composable yang diubah.
+**Belum diverifikasi**: compile CI sungguhan & lag hilang di device asli (sandbox 0 akses
+compiler/profiler) — WAJIB dikonfirmasi user setelah build jalan.
+
+**Status PENDING_FixGlobalLagRecomposition.md**: file DIHAPUS — kedua opsi (A & B) tuntas
+dieksekusi, riwayat lengkap dipindah ke `PROJECT_STATE.md`/`README.md`/changelog ini.
+
 ## Batch 352 — MITIGASI: throttle position tick 500ms→1000ms (PlayerViewModel.kt, 1 file kode) — Opsi B dari PENDING_FixGlobalLagRecomposition.md
 User keputusan (gabungan): eksekusi **Opsi B sekarang** sebagai quick win 1 batch, **Opsi A tetap
 diantre** sesi berikutnya sebagai fix permanen/struktural. Ini BUKAN root-cause fix (scope

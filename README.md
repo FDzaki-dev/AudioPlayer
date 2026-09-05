@@ -8,7 +8,19 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 352 (MITIGASI: throttle position tick 500ms→1000ms,
+> 🆕 **Update terbaru — Batch 353 (FIX STRUKTURAL PERMANEN: `PlaybackProgress` dipisah dari
+> `PlaybackUiState`, 4 file termasuk 1 protected):** Opsi A dari
+> `PENDING_FixGlobalLagRecomposition.md` (sekarang dihapus, riwayat lengkap ada di
+> `PROJECT_STATE.md`/`CHANGELOG.md`) dieksekusi TUNTAS atas konfirmasi eksplisit user (lanjut
+> walau belum ada bukti profiler sungguhan). Posisi/durasi sekarang di `StateFlow` terpisah
+> (`playbackProgress`), dikoleksi LOKAL oleh composable kecil yang genuinely menampilkannya
+> (`MiniPlayerBar`, `PlaybackProgressRow`/`WithLivePlaybackProgress` baru di
+> `NowPlayingScreen.kt`) — bukan lagi lewat `uiState` yang di-hoist utuh di `AppNavHost`. Ini fix
+> TUNTAS akar masalah (bukan mitigasi frekuensi seperti Batch 352) — `AppNavHost` tidak lagi ikut
+> ter-restart tiap tick sama sekali. Presisi progress bar/slider tetap per-1-detik (mengikuti
+> tick Batch 352, di luar cakupan fix ini). Belum diverifikasi lag hilang di device sungguhan —
+> WAJIB user konfirmasi setelah build CI jalan.
+> Batch 352 (MITIGASI: throttle position tick 500ms→1000ms,
 > `PlayerViewModel.kt`, 1 file kode):** Opsi B dari `PENDING_FixGlobalLagRecomposition.md`
 > dieksekusi sbg quick win — Opsi A (fix struktural permanen, sentuh `MainActivity.kt`) tetap
 > diantre sesi berikutnya. Frekuensi recomposition storm turun separuh (2x→1x/detik), TAPI SCOPE

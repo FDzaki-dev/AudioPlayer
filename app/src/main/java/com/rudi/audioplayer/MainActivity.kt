@@ -814,6 +814,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val nowPlayingContent: @Composable (onBack: () -> Unit) -> Unit = { onBackAction ->
         NowPlayingScreen(
             uiState = uiState,
+            playbackProgress = playerViewModel.playbackProgress,
             isFavorite = uiState.currentSong?.let { favoriteIds.contains(it.id) } ?: false,
             currentRating = currentRating,
             onSetRating = { stars -> playerViewModel.setCurrentSongRating(stars) },
@@ -910,6 +911,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 ) {
                     MiniPlayerBar(
                         uiState = uiState,
+                        playbackProgress = playerViewModel.playbackProgress,
                         accentColor = accentColor,
                         onPlayPause = { playerViewModel.togglePlayPause() },
                         onExpand = {

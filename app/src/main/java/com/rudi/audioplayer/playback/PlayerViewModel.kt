@@ -71,8 +71,6 @@ data class PlaybackUiState(
     val currentSong: Song? = null,
     val currentIndex: Int = -1,
     val isPlaying: Boolean = false,
-    val position: Long = 0L,
-    val duration: Long = 0L,
     val shuffleEnabled: Boolean = false,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
     val playbackSpeed: Float = 1f,
@@ -83,6 +81,20 @@ data class PlaybackUiState(
     // stays stable across a move, which is what actually lets item-move animate smoothly
     // instead of every row appearing to be swapped out for a new one.
     val queueSlotIds: List<Long> = emptyList()
+)
+
+// Batch 353 (Opsi A — fix struktural, lihat PENDING_FixGlobalLagRecomposition.md) —
+// position/duration SENGAJA dikeluarkan dari PlaybackUiState di atas. Sebelumnya keduanya
+// tick tiap detik LEWAT _uiState yang sama, padahal _uiState itu dikoleksi UTUH di scope atas
+// AppNavHost (MainActivity.kt) buat baca field lain (currentSong, isPlaying, dst) — akibatnya
+// tiap tick posisi memaksa AppNavHost & seluruh sub-tree Compose di bawahnya recompose, bukan
+// cuma bagian yang benar-benar menampilkan posisi. PlaybackProgress ini hidup di StateFlow
+// sendiri (`playbackProgress` di bawah) yang HANYA dikoleksi lokal oleh composable kecil yang
+// betul-betul butuh (MiniPlayerBar.kt, PlaybackProgressRow & WithLivePlaybackProgress di
+// NowPlayingScreen.kt) — bukan lagi di-hoist ke AppNavHost.
+data class PlaybackProgress(
+    val position: Long = 0L,
+    val duration: Long = 0L
 )
 
 class PlayerViewModel(private val appContext: Context) : ViewModel() {
@@ -250,6 +262,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
+
+    // Batch 353 (Opsi A) — lihat komentar di deklarasi data class PlaybackProgress di atas.
+    private val _playbackProgress = MutableStateFlow(PlaybackProgress())
+    val playbackProgress: StateFlow<PlaybackProgress> = _playbackProgress.asStateFlow()
 
     private val _statsVersion = MutableStateFlow(0)
     val statsVersion: StateFlow<Int> = _statsVersion.asStateFlow()
@@ -502,7 +518,12 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             val song = currentQueue.getOrNull(index)
             _uiState.value = _uiState.value.copy(
                 currentSong = song,
-                currentIndex = index,
+                currentIndex = index
+            )
+            // Batch 353 (Opsi A) — duration pindah rumah ke _playbackProgress. Diupdate
+            // langsung di sini (bukan nunggu tick berikutnya) persis alasan sebelumnya: biar
+            // durasi lagu baru tidak sempat kebaca durasi lagu lama sebelum tick pertama jalan.
+            _playbackProgress.value = _playbackProgress.value.copy(
                 duration = controller?.duration?.coerceAtLeast(0) ?: 0L
             )
             song?.let {
@@ -891,12 +912,13 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 if (c != null) {
                     val position = c.currentPosition.coerceAtLeast(0)
                     val duration = c.duration.coerceAtLeast(0)
-                    val currentState = _uiState.value
+                    val currentProgress = _playbackProgress.value
 
-                    // Avoid emitting a new immutable UI state while paused and nothing changed.
-                    // This prevents needless recompositions across the whole player UI.
-                    if (currentState.position != position || currentState.duration != duration) {
-                        _uiState.value = currentState.copy(position = position, duration = duration)
+                    // Batch 353 (Opsi A) — ditulis ke _playbackProgress, BUKAN _uiState lagi
+                    // (lihat komentar di data class PlaybackProgress). Guard "skip kalau sama"
+                    // ini dipertahankan persis seperti sebelumnya, cuma pindah target flow.
+                    if (currentProgress.position != position || currentProgress.duration != duration) {
+                        _playbackProgress.value = PlaybackProgress(position = position, duration = duration)
                     }
 
                     if (AbRepeatLogic.shouldLoopBack(position, _abRepeatPointA.value, _abRepeatPointB.value)) {
@@ -1312,7 +1334,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val songId = _uiState.value.currentSong?.id ?: return
         val speed = _uiState.value.playbackSpeed
         audiobookModeStore.setEnabled(songId, enabled, speed)
-        if (enabled) audiobookModeStore.updateProgress(songId, speed, _uiState.value.position)
+        // Batch 353 (Opsi A) — position pindah rumah ke _playbackProgress (lihat data class
+        // PlaybackProgress), _uiState tidak punya field ini lagi.
+        if (enabled) audiobookModeStore.updateProgress(songId, speed, _playbackProgress.value.position)
         _audiobookModeEnabled.value = enabled
     }
 

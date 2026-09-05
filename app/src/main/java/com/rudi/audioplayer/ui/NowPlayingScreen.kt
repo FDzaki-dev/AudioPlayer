@@ -87,7 +87,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
@@ -102,6 +105,7 @@ import androidx.media3.common.Player
 import com.rudi.audioplayer.ui.lyrics.LyricsViewModel
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
+import com.rudi.audioplayer.playback.PlaybackProgress
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.tactileEmboss
@@ -136,6 +140,11 @@ import kotlin.math.roundToInt
 @Composable
 fun NowPlayingScreen(
     uiState: PlaybackUiState,
+    // Batch 353 (Opsi A, PENDING_FixGlobalLagRecomposition.md) — dikoleksi LOKAL oleh
+    // PlaybackProgressRow & WithLivePlaybackProgress di bawah, TIDAK di top-level fungsi ini,
+    // supaya tick posisi tiap detik tidak ikut memaksa seluruh NowPlayingScreen (dan
+    // AppNavHost pemanggilnya di MainActivity.kt) recompose.
+    playbackProgress: StateFlow<PlaybackProgress>,
     isFavorite: Boolean,
     currentRating: Int,
     onSetRating: (Int) -> Unit,
@@ -875,59 +884,20 @@ fun NowPlayingScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        var sliderPosition by remember(uiState.position) { mutableStateOf(uiState.position.toFloat()) }
-        val progressFraction = (sliderPosition / uiState.duration.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
-
-        Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
-            WaveformSeekBar(
-                seed = song?.id ?: 0L,
-                progress = progressFraction,
-                playedColor = animatedAccent,
-                unplayedColor = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth().height(32.dp)
-            )
-            Slider(
-                value = sliderPosition,
-                onValueChange = { sliderPosition = it },
-                onValueChangeFinished = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onSeek(sliderPosition.toLong())
-                },
-                valueRange = 0f..(uiState.duration.coerceAtLeast(1L).toFloat()),
-                colors = SliderDefaults.colors(
-                    thumbColor = animatedAccent,
-                    activeTrackColor = Color.Transparent,
-                    inactiveTrackColor = Color.Transparent
-                )
-            )
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            // Batch v3 upgrade — Pilar C spec palet_warna_calm_retro_v3.md ("Muted Monospace"):
-            // font ketikan-mesin HANYA di data fungsional pendek (durasi waktu), sesuai literal
-            // contoh spec `01:42 / 03:55` — bukan judul/lirik (larangan eksplisit §4 "JANGAN").
-            // `isCalmRetro` sudah di-hoist di atas (baris 198, dipakai bareng CTA aberration).
-            val timeFontFamily = if (isCalmRetro) FontFamily.Monospace else FontFamily.Default
-            Text(
-                formatDuration(uiState.position),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary,
-                fontFamily = timeFontFamily
-            )
-            Text(
-                // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — "menit tersisa" alih-alih
-                // total durasi untuk file yang di-opt-in mode ini, format "-mm:ss" sama seperti
-                // konvensi umum podcast player (Spotify/Apple/Google Podcasts) — universal tanpa
-                // perlu kata tambahan, dan langsung beda dari total durasi biasa secara visual.
-                if (audiobookModeEnabled) {
-                    "-" + formatDuration((uiState.duration - uiState.position).coerceAtLeast(0))
-                } else {
-                    formatDuration(uiState.duration)
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary,
-                fontFamily = timeFontFamily
-            )
-        }
+        // Batch 353 (Opsi A) — blok Slider+waveform+teks waktu dipindah ke composable terpisah
+        // (PlaybackProgressRow, definisi di bawah fungsi ini) yang collect playbackProgress
+        // SENDIRI, bukan lewat uiState.position/duration lagi. Behavior/tampilan 1:1 sama,
+        // cuma scope recompose-nya sekarang terisolasi ke composable kecil itu saja. Komentar
+        // asli (Batch v3 font waktu, Roadmap #12 audiobook remaining-time) dipindah ke sana.
+        PlaybackProgressRow(
+            playbackProgress = playbackProgress,
+            audiobookModeEnabled = audiobookModeEnabled,
+            animatedAccent = animatedAccent,
+            isCalmRetro = isCalmRetro,
+            songId = song?.id,
+            haptic = haptic,
+            onSeek = onSeek
+        )
         } // tutup Column pengukur (Batch 346, onGloballyPositioned) — pasangan pembuka di atas,
           // sebelum blok if(showNowPlayingHint) — lihat rasional lengkap di sana.
         } // tutup Column scrollable (Batch 334) — Batch 343: penutup ini SENGAJA dipindah ke sini
@@ -1165,46 +1135,55 @@ fun NowPlayingScreen(
 
     if (showLyricsSheet && song != null) {
         var lyricsText by remember(song.id) { mutableStateOf(onGetLyrics(song.id)) }
-        LyricsSheet(
-            rawLyrics = lyricsText,
-            autoUiState = lyricsAutoState,
-            positionMs = uiState.position,
-            isPlaying = uiState.isPlaying,
-            onPlayPause = onPlayPause,
-            onDismiss = { showLyricsSheet = false },
-            onSave = { text ->
-                onSaveLyrics(song.id, text)
-                lyricsText = text
-            },
-            onDelete = {
-                onDeleteLyrics(song.id)
-                lyricsText = null
-            }
-        )
+        // Batch 353 (Opsi A) — WithLivePlaybackProgress (definisi di bawah fungsi ini) collect
+        // playbackProgress di scope-nya SENDIRI lalu suplai positionMs lewat parameter lambda;
+        // sheet ini aktif live (auto-scroll lirik), jadi WAJAR ikut re-render tiap tick — yang
+        // penting itu TIDAK bocor ke scope NowPlayingScreen di luar blok if ini.
+        WithLivePlaybackProgress(playbackProgress) { livePositionMs, _ ->
+            LyricsSheet(
+                rawLyrics = lyricsText,
+                autoUiState = lyricsAutoState,
+                positionMs = livePositionMs,
+                isPlaying = uiState.isPlaying,
+                onPlayPause = onPlayPause,
+                onDismiss = { showLyricsSheet = false },
+                onSave = { text ->
+                    onSaveLyrics(song.id, text)
+                    lyricsText = text
+                },
+                onDelete = {
+                    onDeleteLyrics(song.id)
+                    lyricsText = null
+                }
+            )
+        }
     }
 
     if (showAbRepeatBookmarkSheet && song != null) {
         var bookmarks by remember(song.id) { mutableStateOf(onGetBookmarks(song.id)) }
-        ABRepeatBookmarkSheet(
-            songId = song.id,
-            positionMs = uiState.position,
-            pointAMs = abRepeatPointA,
-            pointBMs = abRepeatPointB,
-            bookmarks = bookmarks,
-            onDismiss = { showAbRepeatBookmarkSheet = false },
-            onSetPointA = onSetAbRepeatPointA,
-            onSetPointB = onSetAbRepeatPointB,
-            onClearAbRepeat = onClearAbRepeat,
-            onSeek = onSeek,
-            onAddBookmark = { label, positionMs ->
-                onAddBookmark(song.id, label, positionMs)
-                bookmarks = onGetBookmarks(song.id)
-            },
-            onDeleteBookmark = { bookmarkId ->
-                onDeleteBookmark(song.id, bookmarkId)
-                bookmarks = onGetBookmarks(song.id)
-            }
-        )
+        // Batch 353 (Opsi A) — sama alasan dengan LyricsSheet di atas.
+        WithLivePlaybackProgress(playbackProgress) { livePositionMs, _ ->
+            ABRepeatBookmarkSheet(
+                songId = song.id,
+                positionMs = livePositionMs,
+                pointAMs = abRepeatPointA,
+                pointBMs = abRepeatPointB,
+                bookmarks = bookmarks,
+                onDismiss = { showAbRepeatBookmarkSheet = false },
+                onSetPointA = onSetAbRepeatPointA,
+                onSetPointB = onSetAbRepeatPointB,
+                onClearAbRepeat = onClearAbRepeat,
+                onSeek = onSeek,
+                onAddBookmark = { label, positionMs ->
+                    onAddBookmark(song.id, label, positionMs)
+                    bookmarks = onGetBookmarks(song.id)
+                },
+                onDeleteBookmark = { bookmarkId ->
+                    onDeleteBookmark(song.id, bookmarkId)
+                    bookmarks = onGetBookmarks(song.id)
+                }
+            )
+        }
     }
 
     if (showEqualizerSheet) {
@@ -1309,6 +1288,93 @@ fun NowPlayingScreen(
             }
         )
     }
+}
+
+// Batch 353 (Opsi A, PENDING_FixGlobalLagRecomposition.md) — waveform+Slider+teks waktu,
+// dipindah dari isi NowPlayingScreen langsung. Composable TERPISAH ini yang collect
+// playbackProgress (bukan NowPlayingScreen di scope atas), jadi tiap tick posisi cuma
+// invalidasi baris kecil ini — tidak ikut menyeret seluruh NowPlayingScreen recompose.
+// Tampilan & behavior 1:1 sama seperti sebelum dipindah.
+@Composable
+private fun PlaybackProgressRow(
+    playbackProgress: StateFlow<PlaybackProgress>,
+    audiobookModeEnabled: Boolean,
+    animatedAccent: Color,
+    isCalmRetro: Boolean,
+    songId: Long?,
+    haptic: HapticFeedback,
+    onSeek: (Long) -> Unit
+) {
+    val progress by playbackProgress.collectAsStateWithLifecycle()
+    var sliderPosition by remember(progress.position) { mutableStateOf(progress.position.toFloat()) }
+    val progressFraction = (sliderPosition / progress.duration.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
+
+    Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+        WaveformSeekBar(
+            seed = songId ?: 0L,
+            progress = progressFraction,
+            playedColor = animatedAccent,
+            unplayedColor = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.fillMaxWidth().height(32.dp)
+        )
+        Slider(
+            value = sliderPosition,
+            onValueChange = { sliderPosition = it },
+            onValueChangeFinished = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onSeek(sliderPosition.toLong())
+            },
+            valueRange = 0f..(progress.duration.coerceAtLeast(1L).toFloat()),
+            colors = SliderDefaults.colors(
+                thumbColor = animatedAccent,
+                activeTrackColor = Color.Transparent,
+                inactiveTrackColor = Color.Transparent
+            )
+        )
+    }
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        // Batch v3 upgrade — Pilar C spec palet_warna_calm_retro_v3.md ("Muted Monospace"):
+        // font ketikan-mesin HANYA di data fungsional pendek (durasi waktu), sesuai literal
+        // contoh spec `01:42 / 03:55` — bukan judul/lirik (larangan eksplisit §4 "JANGAN").
+        val timeFontFamily = if (isCalmRetro) FontFamily.Monospace else FontFamily.Default
+        Text(
+            formatDuration(progress.position),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary,
+            fontFamily = timeFontFamily
+        )
+        Text(
+            // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — "menit tersisa" alih-alih
+            // total durasi untuk file yang di-opt-in mode ini, format "-mm:ss" sama seperti
+            // konvensi umum podcast player (Spotify/Apple/Google Podcasts) — universal tanpa
+            // perlu kata tambahan, dan langsung beda dari total durasi biasa secara visual.
+            if (audiobookModeEnabled) {
+                "-" + formatDuration((progress.duration - progress.position).coerceAtLeast(0))
+            } else {
+                formatDuration(progress.duration)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary,
+            fontFamily = timeFontFamily
+        )
+    }
+}
+
+// Batch 353 (Opsi A) — helper generik: collect playbackProgress di scope composable INI
+// (bukan di pemanggilnya), lalu suplai position/duration ke `content` lewat parameter lambda.
+// `content` adalah lambda @Composable yang, saat dipanggil dari sini, dapat restart-group-nya
+// SENDIRI (pola sama seperti `content` di Box/Column bawaan Compose) — jadi tick posisi tiap
+// detik cuma invalidasi isi `content`, TIDAK bocor ke scope pemanggil (blok if di
+// NowPlayingScreen). Dipakai untuk LyricsSheet & ABRepeatBookmarkSheet yang perlu positionMs
+// tapi punya closure (var lyricsText/bookmarks) yang lebih aman dibiarkan apa adanya di
+// pemanggil, ketimbang dipindah jadi parameter composable baru.
+@Composable
+private fun WithLivePlaybackProgress(
+    playbackProgress: StateFlow<PlaybackProgress>,
+    content: @Composable (livePositionMs: Long, liveDurationMs: Long) -> Unit
+) {
+    val progress by playbackProgress.collectAsStateWithLifecycle()
+    content(progress.position, progress.duration)
 }
 
 /** Houses the controls a casual listener rarely touches mid-song — antrean, lirik, sleep timer,
