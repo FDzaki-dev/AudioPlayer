@@ -1,5 +1,50 @@
 # Changelog
 
+## Batch 356 — AUDIT LANJUTAN (OPTIMASI): 27 StateFlow sisa di `AppNavHost` ditelusuri satu-satu, 0 tick ditemukan, 0 kode diubah — thread lag-recomposition Batch 351-354 dinyatakan TUNTAS
+Permintaan user eksplisit "perluas cakupan... optimalisasi" pasca Batch 355. Batch 351 sempat
+mencatat `AppNavHost` (`MainActivity.kt`) mengoleksi 35+ `StateFlow` di scope teratas; Batch
+353/354 sudah mengeluarkan 4 yang genuinely tick (`position`/`duration` 1000ms, `sleepTimerRemaining`
+1000ms, `visualizerBars` ~15fps). Batch ini menelusuri SISA 27 `by ...collectAsStateWithLifecycle()`
+yang masih ada di scope `AppNavHost` (baris 548-601 + 173 + 650-651) satu per satu ke sumbernya di
+`PlayerViewModel.kt`/`EqualizerController.kt` — bukan asumsi, baca kode nyata tiap trigger update:
+
+- `uiState` (`PlaybackUiState`: `currentSong/currentIndex/isPlaying/shuffleEnabled/repeatMode/
+  playbackSpeed/volume/queue/queueSlotIds`) — SEMUA 9 field diupdate cuma di titik event diskrit
+  (`_uiState.value = ...copy(...)` di 12 call-site, dipicu listener player: transisi lagu, toggle
+  play/pause/shuffle, ganti speed/volume, edit antrean). 0 loop/tick nulis ke field manapun di sini
+  — `position`/`duration` sudah pindah total ke `PlaybackProgress` sejak Batch 353, TIDAK ada residu.
+- `equalizerState` (`EqualizerUiState` dari `EqualizerController.state`) — cuma band gain/preset/
+  enabled, ditulis saat `attach()` (ganti sesi audio) atau aksi user (geser band/pilih preset). Bukan
+  live level-meter, 0 tick.
+- `favoriteIds`, `playlists`, `smartPlaylists`, `customFolders`, `librarySongs`/`libraryLoading` —
+  event/DB-driven (favorit, edit playlist, `ContentObserver` MediaStore debounce 1.5 detik saat file
+  berubah beneran) — bursty jarang, bukan timer terus-menerus.
+- `abRepeatPointA/B`, `statsVersion`, `currentRating`, `pendingTagWriteConsent`, 5 pesan transient
+  (`celebrationMessage`/`playbackErrorMessage`/`actionErrorMessage`/`undoableAction`/`infoMessage`) —
+  1x tulis per aksi/kejadian, bukan loop.
+- 10 flag boolean setting (`crossfadeEnabled`, `accentColor`, `lockEnabled`, `biometricEnabled`,
+  `shakeToSkipEnabled`, `radioAutoContinueEnabled`, `appThemeIdentity`, `visualizerEnabled`,
+  `visualizerSupported`, `audiobookModeEnabled`, `floatingBubbleEnabled`, `silenceSkipEnabled`) —
+  murni toggle Settings, statis di luar aksi user eksplisit.
+- `settingsThemeIdentity`/`settingsThemeMode` (baris 650-651) sebenarnya SUDAH scoped lokal di
+  dalam route Settings, bukan di top-level `AppNavHost` — sempat ketangkap grep krn 1 fungsi sama,
+  tapi bukan instance bug yang sama.
+
+**Cross-check independen**: full-codebase grep 4 pola tick (`delay(`, `postDelayed`,
+`scheduleAtFixedRate`, `while (true)`) — 4 `while(true)` lain ditemukan di luar `PlayerViewModel.kt`
+(`LockScreen.kt`, `UpdateDownloader.kt`, `RingtoneEncoder.kt`) tapi ketiganya sudah collect lokal
+di composable/scope kecil masing-masing sejak awal (bukan dihoist ke `AppNavHost`) — di luar pola
+bug yang sama, 0 tindakan perlu. `MiniPlayerBar.kt` (composable lain yang selalu visible selama
+musik main, sensitivitas sama seperti `AppNavHost`) dicek terpisah: `playbackProgress` cuma
+dikoleksi 1 titik jauh di dalam fungsi (baris 210, tepat di elemen progress bar), bukan di
+top-level fungsi — konsisten pola fix Batch 353.
+
+**Kesimpulan**: 0 kandidat tick baru ditemukan di scope `AppNavHost` maupun `MiniPlayerBar`. Thread
+optimasi lag-recomposition yang dibuka Batch 351 (`PENDING_FixGlobalLagRecomposition.md`, sudah
+tidak ada sejak doc itu tuntas & dihapus) dinyatakan **TUNTAS** — 4 StateFlow tick yang genuinely
+ada semua sudah diisolasi (Batch 353-354), sisanya by design low-frequency dan aman di-hoist di
+`AppNavHost`. 0 file kode disentuh batch ini (murni audit + dokumentasi).
+
 ## Batch 355 — FIX BUILD: compileDebugKotlin/compileReleaseKotlin gagal (1 file kode) — cascade dari 1 import kelewat di Batch 354
 `log_fail_342.zip` (build GH Actions gagal di 2 task, `compileDebugKotlin` & `compileReleaseKotlin`)
 menunjuk 5 baris error di `VisualizerSheet.kt` (142, 147×2, 150×2). Investigasi menunjukkan ini

@@ -36,6 +36,20 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 356 (AUDIT LANJUTAN OPTIMASI — 27 StateFlow sisa di `AppNavHost` ditelusuri, 0 tick
+ditemukan, thread lag-recomposition Batch 351-354 TUNTAS, 0 kode diubah)** — Permintaan user
+"perluas cakupan optimalisasi". Semua 27 `by ...collectAsStateWithLifecycle()` sisa di scope
+`AppNavHost` ditelusuri ke sumber update di `PlayerViewModel.kt`/`EqualizerController.kt`: `uiState`
+(9 field, semua event-driven, 0 residu `position`/`duration`), `equalizerState` (band/preset saja,
+bukan level-meter), sisanya list/flag/message yang cuma berubah per aksi user atau event DB/
+ContentObserver — 0 yang tick per detik/frame seperti 4 yang sudah difix Batch 353-354. Cross-check
+grep pola tick (`delay`/`while(true)`/dst) di seluruh app: 4 loop lain (`LockScreen.kt`,
+`UpdateDownloader.kt`, `RingtoneEncoder.kt`) sudah collect lokal sejak awal, di luar pola bug yang
+sama. `MiniPlayerBar.kt` (composable lain yang always-visible saat musik main) dicek terpisah:
+`playbackProgress` sudah dikoleksi jauh di dalam fungsi (baris 210), bukan di top-level — konsisten
+fix Batch 353. Kesimpulan: thread optimasi ini TUNTAS, tidak ada kandidat baru. Detail lengkap
+`CHANGELOG.md` Batch 356.
+
 **Batch 355 (FIX BUILD — compileDebugKotlin/compileReleaseKotlin gagal, 1 file kode, cascade dari
 1 import kelewat di Batch 354)** — `log_fail_342.zip` menunjuk 5 baris error di
 `VisualizerSheet.kt` (142, 147×2, 150×2); semuanya 1 root cause tunggal: Batch 354 nambah delegate
