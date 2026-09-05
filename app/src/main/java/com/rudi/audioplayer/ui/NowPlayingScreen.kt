@@ -21,6 +21,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -79,6 +81,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -126,6 +129,7 @@ import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
 import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -614,10 +618,39 @@ fun NowPlayingScreen(
                     }
             )
 
-            // Vinyl sits centered on top of both zones. It gets first claim on touches within
-            // its own bounds (its own pointerInput for horizontal swipe-next/prev), the same
-            // way it already did before this change — only the leftover vertical drag outside
-            // its bounds reaches the brightness/volume zones underneath.
+            // Batch 350 — BUG FIX (laporan berulang user, "dari dulu susahnya minta ampun"):
+            // klaim komentar lama di bawah ("vinyl dapat first claim, HANYA leftover DI LUAR
+            // bounds-nya yang sampai ke zona brightness/volume") ternyata TIDAK match perilaku
+            // asli device — swipe vertikal yang jarinya mendarat DI ATAS vinyl (area yang sangat
+            // wajar disentuh, krn itu elemen visual terbesar di layar) tetap "ditelan" duluan oleh
+            // `detectHorizontalDragGestures` milik `AlbumArtHero` (baris ~1577), walau gerakan
+            // jarinya vertikal murni — root cause: gesture recognizer terpisah (kiri/kanan
+            // vertikal vs vinyl horizontal) sama-sama bersaing di 1 titik sentuh tanpa 1 wasit
+            // tunggal yg menentukan SUMBU gerakan lebih dulu.
+            //
+            // Fix: `pointerInput` BARU di sini (bukan mengubah `AlbumArtHero`/`detectHorizontal-
+            // DragGestures`-nya sama sekali — 0 baris logic swipe-next/prev threshold-120px/
+            // spring/haptic Batch 178/256 disentuh) — didaftarkan di `PointerEventPass.Initial`,
+            // yang dijalankan Compose DULUAN (top-down) SEBELUM event sampai ke pointerInput Main-
+            // pass default milik `AlbumArtHero` di bawahnya. Selama sumbu gerakan belum jelas
+            // (belum lewati `touchSlop`), event dibiarkan lewat APA ADANYA (0 consume) — vinyl
+            // tetap bebas mendeteksi sendiri seperti biasa. Begitu akumulasi gerakan melewati
+            // slop: kalau dominan HORIZONTAL, tetap 0 disentuh (biarkan vinyl lanjut persis
+            // seperti sebelum batch ini — swipe ganti lagu 0 regresi). Kalau dominan VERTIKAL,
+            // baru DARI SITU setiap `change` di-consume() di pass Initial — akibatnya `detect-
+            // HorizontalDragGestures` milik vinyl (jalan belakangan, di pass Main) melihat change
+            // yang SUDAH consumed, jadi otomatis cancel (memicu `onDragCancel` bawaannya sendiri
+            // -> `dragOffset` spring balik ke 0, 0 kode baru perlu ditulis utk itu) — sementara di
+            // sini delta-Y-nya dialihkan ke `applyBrightness`/`applySystemVolume` yang SAMA PERSIS
+            // dipakai 2 Box zona kiri/kanan di bawah (baris ~569-615), termasuk indikator pill +
+            // delay 600ms sebelum hilang, biar konsisten 1 pengalaman dgn versi di luar vinyl.
+            // Separuh kiri/kanan ditentukan dari posisi X sentuh-awal RELATIF ke lebar vinyl itu
+            // sendiri (`size.width` milik Box vinyl ini) — karena vinyl dipusatkan (`Alignment.
+            // Center`) di dalam Box induk yang sama, titik tengah lokal vinyl ini otomatis persis
+            // sejajar garis tengah layar yang sama dipakai 2 zona kiri/kanan itu (0 offset
+            // koordinat perlu dikonversi manual). 2 Box zona kiri/kanan ITU SENDIRI 0 disentuh —
+            // fix ini murni menambal celah "vertikal di ATAS vinyl", bukan mengganti apa pun yang
+            // sudah benar (perilaku touch DI LUAR vinyl 0 berubah).
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -625,6 +658,52 @@ fun NowPlayingScreen(
                         scaleX = entranceScale.value
                         scaleY = entranceScale.value
                         alpha = entranceAlpha.value
+                    }
+                    .pointerInput(Unit) {
+                        val slop = viewConfiguration.touchSlop
+                        awaitEachGesture {
+                            val down = awaitFirstDown(pass = PointerEventPass.Initial)
+                            val isLeftHalf = down.position.x < size.width / 2f
+                            var axisLocked: Boolean? = null // null = belum ketahuan, true = vertikal (intercept), false = horizontal (biarkan)
+                            var accumX = 0f
+                            var accumY = 0f
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!change.pressed) break
+                                    val delta = change.position - change.previousPosition
+                                    when (axisLocked) {
+                                        null -> {
+                                            accumX += delta.x
+                                            accumY += delta.y
+                                            if (abs(accumX) > slop || abs(accumY) > slop) {
+                                                axisLocked = abs(accumY) > abs(accumX)
+                                                if (axisLocked == true) {
+                                                    if (isLeftHalf) showBrightnessIndicator = true else showVolumeIndicator = true
+                                                }
+                                            }
+                                        }
+                                        true -> {
+                                            change.consume()
+                                            if (isLeftHalf) {
+                                                applyBrightness(brightnessLevel - delta.y / gestureRangePx)
+                                            } else {
+                                                applySystemVolume(systemVolumeFraction - delta.y / gestureRangePx)
+                                            }
+                                        }
+                                        false -> { /* horizontal terkunci — 0 disentuh, vinyl lanjut normal */ }
+                                    }
+                                }
+                            } finally {
+                                if (axisLocked == true) {
+                                    gestureScope.launch {
+                                        delay(600)
+                                        if (isLeftHalf) showBrightnessIndicator = false else showVolumeIndicator = false
+                                    }
+                                }
+                            }
+                        }
                     }
             ) {
                 AlbumArtHero(

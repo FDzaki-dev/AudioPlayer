@@ -1,5 +1,89 @@
 # Changelog
 
+## Batch 350 — BUG FIX: swipe vertikal brightness/volume di atas vinyl ditelan gestur swipe-next/prev, NowPlayingScreen, 1 file kode
+User laporan setelah Batch 349: "mau swipe brightness/volume malah yang ke geser album nya" —
+ditandai eksplisit sebagai **keluhan kronis, bukan regresi baru**: "dari dulu soal swipe
+brightness/volume, susahnya minta ampun". Diklarifikasi dulu via tappable option (4 opsi gejala:
+ganti-lagu-ikut-geser-brightness, brightness-ikut-ganti-lagu, salah-satu-mati-total, atau lainnya)
+sebelum eksekusi — user pilih persis opsi ke-2: **swipe brightness/volume malah ikut ganti lagu**.
+
+**Root cause.** Arsitektur gesture Row ini (Box induk berisi: zona kiri `detectVertical-
+DragGestures` = brightness, zona kanan `detectVerticalDragGestures` = volume, vinyl `AlbumArtHero`
+di tengah dgn `detectHorizontalDragGestures` sendiri utk swipe-next/prev) sebelumnya diasumsikan
+(komentar lama, era Batch 112-334): "vinyl dapat first claim di dalam bounds-nya, HANYA leftover
+DI LUAR bounds yang sampai ke 2 zona itu". **Asumsi ini terbukti TIDAK match perilaku device
+asli** — untuk touch yang mendarat DI ATAS vinyl (area paling wajar disentuh pengguna, krn itu
+elemen visual terbesar di layar), `detectHorizontalDragGestures` milik vinyl tetap "menang" duluan
+WALAU gerakan jarinya vertikal murni, karena kedua gesture recognizer (zona kiri/kanan vs vinyl)
+sama-sama independen memproses raw pointer event yang sama tanpa 1 penentu SUMBU gerakan lebih
+dulu — bukan bug baru dari batch manapun, melainkan celah desain sejak awal fitur gesture ini
+dibuat, yang kebetulan baru eksplisit dilaporkan sekarang.
+
+**Fix — axis-disambiguation di `PointerEventPass.Initial`, 0 baris `AlbumArtHero` disentuh.**
+Ditambahkan `pointerInput` BARU (bukan mengganti yang lama) di Box pembungkus vinyl, terdaftar di
+pass `Initial` — Compose menjalankan pass ini LEBIH DULU (top-down, root→leaf) sebelum pass `Main`
+default milik gesture vinyl sendiri (yang terdaftar lebih dalam/lebih belakangan). Logikanya:
+- Selama akumulasi gerakan belum melewati `viewConfiguration.touchSlop`: 0 event di-consume() —
+  vinyl bebas mendeteksi sendiri seperti biasa, sama sekali tidak terpengaruh.
+- Begitu slop terlewati, sumbu ditentukan sekali dari |ΔX| vs |ΔY| kumulatif:
+  - Dominan **horizontal** → tetap 0 disentuh selamanya utk gesture itu — vinyl lanjut PERSIS
+    seperti sebelum batch ini (swipe ganti lagu, threshold 120px, spring-back, haptic Batch
+    178/256 — semua 0 berubah, 0 regresi).
+  - Dominan **vertikal** → dari titik itu setiap `change` di-consume() di pass Initial. Akibatnya
+    `detectHorizontalDragGestures` vinyl (pass Main, berjalan belakangan di frame yang sama)
+    melihat change yang SUDAH ter-consume — logic internalnya sendiri otomatis membatalkan
+    (memicu `onDragCancel` bawaan, spring `dragOffset` balik ke tengah — 0 kode baru ditulis utk
+    efek ini, murni konsekuensi alami API `detectHorizontalDragGestures` yang sudah ada). Delta-Y
+    gerakan itu sendiri dialihkan ke `applyBrightness(...)`/`applySystemVolume(...)` — fungsi yang
+    SAMA PERSIS dipakai 2 Box zona kiri/kanan existing (baris ~569-615), termasuk munculnya
+    indikator pill live + delay 600ms sebelum hilang, supaya pengalaman terasa 1 sistem yang
+    konsisten dgn versi menyentuh di luar vinyl, bukan 2 "rasa" gesture berbeda.
+- Separuh kiri (brightness) vs kanan (volume) ditentukan dari posisi-X sentuh-AWAL relatif ke
+  lebar vinyl itu sendiri (`size.width`, properti bawaan `AwaitPointerEventScope`) — karena vinyl
+  dipusatkan (`Alignment.Center`) persis di dalam Box induk yang sama dgn 2 zona itu, titik tengah
+  lokal vinyl otomatis sejajar garis tengah layar yang sama dipakai 2 zona existing; 0 konversi
+  koordinat manual diperlukan.
+
+**Cakupan perubahan.** 2 Box zona kiri/kanan (`detectVerticalDragGestures`) — 0 disentuh sama
+sekali. Fungsi internal `AlbumArtHero` (`detectHorizontalDragGestures`, `totalDrag`, `dragOffset`,
+threshold 120px, spring Batch 256, haptic) — 0 baris diubah; fix ini murni ADD-ONLY di level Box
+pembungkus yang memanggilnya, bukan REFACTOR komponen itu sendiri, konsisten `ZERO-REFACTOR`.
+
+**Detail implementasi & import.** `pointerInput(Unit) { ... awaitEachGesture { ... } }` — di
+dalamnya: `awaitFirstDown(pass = PointerEventPass.Initial)` sekali di awal gesture (menyimpan
+`isLeftHalf` dari posisi-X-nya), lalu loop `while(true)` memanggil `awaitPointerEvent(pass =
+PointerEventPass.Initial)` berulang selama pointer masih `pressed`, cari `PointerInputChange` yang
+`id`-nya cocok dgn down awal, hitung delta via `change.position - change.previousPosition`
+(operator member `Offset`, DIPILIH KETIMBANG ekstensi `positionChange()` karena tidak bisa
+memastikan path import ekstensi itu tanpa akses dokumentasi online saat batch ini dikerjakan —
+`position`/`previousPosition` dipastikan properti langsung `PointerInputChange`, risiko compile
+lebih rendah). `when (axisLocked: Boolean?)` 3 cabang (`null`/`true`/`false`) exhaustive, dibungkus
+`try { } finally { }` supaya indikator pill tetap di-hide-delay walau loop keluar lewat `break`
+normal (pointer terangkat/lepas). Import baru: `androidx.compose.foundation.gestures.
+awaitEachGesture`, `androidx.compose.foundation.gestures.awaitFirstDown`, `androidx.compose.ui.
+input.pointer.PointerEventPass`, `kotlin.math.abs`.
+
+**1 file**: `NowPlayingScreen.kt` (non-protected). Brace/paren diverifikasi ulang dengan
+stack-based matcher (comment & string literal di-strip dulu): 244/244 brace (naik 16 dari Batch
+349's 228 — blok try/finally + when 3 cabang + while + 2 lambda pointerInput/awaitEachGesture
+baru), 697/697 paren (naik 20 dari 677), 0/0 bracket. `FILE_MANIFEST.txt` tidak berubah (0 file
+baru/dihapus).
+
+**Belum diverifikasi compile Gradle sungguhan — WAJIB dicek CI dgn teliti sebelum batch ini
+dianggap beres.** Pola `PointerEventPass.Initial` + `awaitEachGesture` + `awaitPointerEvent(pass=
+Initial)` adalah idiom axis-disambiguation/pre-emptive-gesture-interception yang dikenal luas di
+ekosistem Compose Foundation, TAPI ini PERTAMA KALINYA dipakai di file/app ini — risiko sintaks
+lebih tinggi drpd batch tata-letak/spacing biasa (bukan sekadar susun ulang `Row`/`Spacer`).
+**Belum diverifikasi visual di device** — 4 prioritas cek saat build ulang:
+1. Swipe vertikal yang MULAI DI ATAS vinyl kini benar-benar mengubah brightness (separuh
+   kiri)/volume (separuh kanan), indikator pill live muncul sama seperti versi di luar vinyl.
+2. Swipe horizontal (ganti lagu) DI ATAS vinyl 0 regresi — threshold 120px, efek geser+spring-
+   back+haptic tetap identik seperti sebelum batch ini.
+3. Tap singkat/sentuhan tanpa gerak berarti di vinyl 0 terpengaruh (axisLocked tetap `null`, 0
+   consume, event tetap diteruskan wajar ke pass Main / handler lain kalau ada).
+4. Swipe DI LUAR vinyl (2 zona kiri/kanan existing, 0 disentuh batch ini) tetap identik seperti
+   sebelumnya — 0 regresi di jalur lama yang sudah benar.
+
 ## Batch 349 — Revert Row 4 ikon atas: SpaceBetween → Tutup kiri sendiri + 3 ikon rapat kanan, NowPlayingScreen, 1 file kode
 Lanjutan langsung dari Batch 348, yang baru saja mengonfirmasi (via perbandingan screenshot)
 bahwa `Arrangement.SpaceBetween` (Batch 342) sudah "normal dan generik" sesuai permintaan user

@@ -8,14 +8,18 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 349 (Row 4 ikon atas: revert `SpaceBetween` → Tutup kiri sendiri
-> + 3 ikon rapat kanan, `NowPlayingScreen.kt`, 1 file):** User lapor tata letak Batch 342-348
-> ("disebar rata simetris") "jelek banget" — diklarifikasi 2 tahap via tappable option (bukan
-> ditebak) sebelum eksekusi, user pilih eksplisit pola: Tutup sendiri mentok kiri, Favorit+Info+
-> Kontrol Lanjutan menumpuk rapat di kanan (persis pola pra-Batch-342). **Preferensi user
-> berubah antar-sesi — ini reversal disengaja & dikonfirmasi, BUKAN kesalahan**, jangan
-> di-revert otomatis balik ke `SpaceBetween` di sesi berikutnya. 0 ikon/handler/urutan logis
-> diubah, murni tata letak.
+> 🆕 **Update terbaru — Batch 350 (BUG FIX: swipe brightness/volume di atas vinyl ditelan
+> gestur ganti-lagu, `NowPlayingScreen.kt`, 1 file):** Keluhan kronis user ("dari dulu susahnya
+> minta ampun") — swipe vertikal yang mendarat DI ATAS piringan album ikut menggeser lagu,
+> bukan mengubah brightness/volume. Fix: `pointerInput` baru di `PointerEventPass.Initial` yang
+> menentukan SUMBU gerakan (horizontal/vertikal) lebih dulu sebelum event sampai ke gestur
+> swipe-next/prev vinyl — vertikal dialihkan ke brightness/volume, horizontal 0 disentuh (0
+> regresi swipe ganti lagu). 0 baris logic `AlbumArtHero` lama diubah, murni add-on baru.
+> **Belum diverifikasi compile CI & visual device.**
+> Batch 349 (Row 4 ikon atas: revert `SpaceBetween` → Tutup kiri sendiri + 3 ikon rapat kanan,
+> `NowPlayingScreen.kt`, 1 file):** User eksplisit tidak suka tata letak simetris — diklarifikasi
+> 2 tahap, kembali ke pola Tutup sendiri mentok kiri + Favorit/Info/⋮ menumpuk rapat kanan
+> (persis versi pra-Batch-342). Reversal disengaja & dikonfirmasi, bukan kesalahan.
 > Batch 348 (Verifikasi Row 4 ikon atas via screenshot device sungguhan, 0 kode):** Konfirmasi
 > `SpaceBetween` (Batch 342) + `Outlined.Info` (Batch 343) cocok standar generik aplikasi musik
 > sejenis — **kesimpulan ini kemudian DIBATALKAN oleh Batch 349** setelah user eksplisit tidak
