@@ -8,7 +8,15 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 358 (Now Playing: ikon "Plus"/Tambah ke Playlist & "Share"
+> 🆕 **Update terbaru — Batch 359 (REVERT Batch 358: ikon Plus/Share dilepas dari samping
+> judul, dipindah jadi entri icon+teks disamakan ke tombol "Lirik", 1 file kode):** User lapor
+> screenshot device hasil Batch 358 terlihat "aneh"/berantakan (judul panjang bikin ikon Share
+> nabrak teks marquee). Judul balik jadi `Text` polos rata-tengah tanpa ikon flanking; Plus
+> (`AddToPlaylistDialog`) & Share (`Intent.ACTION_SEND`) dipindah jadi 2 `TextButton` baru
+> bergaya identik tombol "Lirik" (icon+teks+bouncyPress), digabung 1 Row bertiga. 0 handler/
+> logic berubah, 0 signature/`MainActivity.kt` disentuh, 0 import baru. Belum diverifikasi
+> compile CI & visual device sungguhan.
+> Batch 358 (Now Playing: ikon "Plus"/Tambah ke Playlist & "Share"
 > menempel kiri/kanan judul lagu, 2 file kode):** Permintaan user, prefer ikon Plus/Share
 > langsung di samping judul dibanding ditambahkan sebagai tombol sejenis "Lirik" di bawahnya
 > (tombol "Lirik" 0 disentuh). Plus membuka `AddToPlaylistDialog` yang sama dipakai halaman

@@ -887,40 +887,62 @@ fun NowPlayingScreen(
             color = animatedAccent
         )
         Spacer(modifier = Modifier.height(6.dp))
-        // Batch 358 — user eksplisit prefer ikon "Plus" (Tambah ke Playlist) & "Share" nempel
-        // kiri/kanan judul lagu, DIBANDING ditambahkan sebagai entri sejenis tombol "Lirik" di
-        // bawahnya. Row baru ini HANYA bungkus Text judul lama (Text artist & tombol Lirik di
-        // bawah 0 disentuh) — 2 IconButton baru simetris kiri/kanan, judul tetap 1 baris+marquee
-        // di tengah sisa lebar (weight(1f) + textAlign Center supaya start point tetap center
-        // walau ada 2 ikon di kedua sisi, bukan cuma rata-kiri sisa Row).
+        // Batch 359 — REVERT arah Batch 358. Screenshot device user (Row Plus/Title/Share)
+        // dilaporkan "aneh"/berantakan (judul kepanjangan bikin ikon Share nabrak/nempel teks
+        // marquee, ikon Plus mepet tepi kiri) — user eksplisit minta disamakan ke entry+layout
+        // "Lirik" saja, yaitu opsi yang sudah dicatat (tapi belum dipilih) di komentar Batch 358
+        // sendiri. Judul balik jadi Text polos (0 ikon flanking, 0 Row pembungkus) — sama seperti
+        // sebelum Batch 358, cuma fillMaxWidth+textAlign Center dipertahankan (bukan wrap-content)
+        // supaya basicMarquee tetap mulai dari titik tengah horizontalAlignment Column induk,
+        // identik posisi visual sebelumnya.
+        Text(
+            song?.title ?: "-",
+            style = MaterialTheme.typography.titleLarge,
+            maxLines = 1,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().basicMarquee()
+        )
+        Text(
+            song?.artist ?: "-",
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        // Tambah/Bagikan sekarang REUSE persis pola visual+struktur tombol "Lirik" (icon 16dp +
+        // Spacer 6dp + Text labelMedium bertint animatedAccent, bouncyPress 0.92f, contentPadding
+        // horizontal=14/vertical=6) — bukan cuma disamakan sekilas, tapi 1:1 entry yang sama,
+        // ditaruh dalam 1 Row bareng "Lirik" (Arrangement.Center, jarak alami dari padding tiap
+        // TextButton sendiri, 0 Spacer manual tambahan diperlukan). Handler/logic KEDUANYA 0
+        // diubah dari Batch 358 (AddToPlaylistDialog & Intent.ACTION_SEND sama persis) — murni
+        // migrasi tempat+gaya render, ikon jadi contentDescription = null (pola Batch 230/235:
+        // decorative krn sudah ada Text label sibling di button yang sama, semantics ke-merge ke
+        // 1 title TalkBack per tombol, konsisten cara "Lirik" sudah dari awal).
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
             val addToPlaylistInteraction = remember { MutableInteractionSource() }
-            IconButton(
+            TextButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     showAddToPlaylistDialog = true
                 },
                 interactionSource = addToPlaylistInteraction,
-                modifier = Modifier.bouncyPress(addToPlaylistInteraction, pressedScale = 0.92f)
+                modifier = Modifier.bouncyPress(addToPlaylistInteraction, pressedScale = 0.92f),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
             ) {
                 Icon(
                     Icons.Default.Add,
-                    contentDescription = "Tambah ke playlist",
-                    tint = animatedAccent
+                    contentDescription = null,
+                    tint = animatedAccent,
+                    modifier = Modifier.size(16.dp)
                 )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Tambah", style = MaterialTheme.typography.labelMedium, color = animatedAccent)
             }
-            Text(
-                song?.title ?: "-",
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f).basicMarquee()
-            )
             val shareInteraction = remember { MutableInteractionSource() }
-            IconButton(
+            TextButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     song?.let { s ->
@@ -934,40 +956,37 @@ fun NowPlayingScreen(
                     }
                 },
                 interactionSource = shareInteraction,
-                modifier = Modifier.bouncyPress(shareInteraction, pressedScale = 0.92f)
+                modifier = Modifier.bouncyPress(shareInteraction, pressedScale = 0.92f),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
             ) {
                 Icon(
                     Icons.Default.Share,
-                    contentDescription = "Bagikan lagu",
-                    tint = animatedAccent
+                    contentDescription = null,
+                    tint = animatedAccent,
+                    modifier = Modifier.size(16.dp)
                 )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Bagikan", style = MaterialTheme.typography.labelMedium, color = animatedAccent)
             }
-        }
-        Text(
-            song?.artist ?: "-",
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        val lyricsQuickInteraction = remember { MutableInteractionSource() }
-        TextButton(
-            onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                showLyricsSheet = true
-            },
-            interactionSource = lyricsQuickInteraction,
-            modifier = Modifier.bouncyPress(lyricsQuickInteraction, pressedScale = 0.92f),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-        ) {
-            Icon(
-                Icons.Default.Article,
-                contentDescription = null,
-                tint = animatedAccent,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Lirik", style = MaterialTheme.typography.labelMedium, color = animatedAccent)
+            val lyricsQuickInteraction = remember { MutableInteractionSource() }
+            TextButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    showLyricsSheet = true
+                },
+                interactionSource = lyricsQuickInteraction,
+                modifier = Modifier.bouncyPress(lyricsQuickInteraction, pressedScale = 0.92f),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    Icons.Default.Article,
+                    contentDescription = null,
+                    tint = animatedAccent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Lirik", style = MaterialTheme.typography.labelMedium, color = animatedAccent)
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))

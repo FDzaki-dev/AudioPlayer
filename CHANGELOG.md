@@ -1,5 +1,30 @@
 # Changelog
 
+## Batch 359 — REVERT Batch 358: Plus/Share dipindah dari samping judul jadi entri sejenis "Lirik" (1 file kode)
+User kirim screenshot device hasil Batch 358: Row Plus/Judul/Share dinilai "aneh"/berantakan di
+layar sungguhan (judul panjang bikin ikon Share seperti nabrak teks marquee, ikon Plus mepet
+tepi kiri). Instruksi eksplisit: samakan ke entry+layout tombol "Lirik" — opsi yang literally
+sudah dicatat (tapi belum dipilih) di komentar Batch 358 sendiri.
+
+**1. `NowPlayingScreen.kt`** — Row pembungkus judul (2 `IconButton` Batch 358) dihapus, judul
+balik jadi `Text` polos (`fillMaxWidth().basicMarquee()` + `textAlign = Center`). Ikon Plus
+(`AddToPlaylistDialog`) & Share (`Intent.ACTION_SEND`) TIDAK dihapus — dipindah jadi 2
+`TextButton` baru, digabung 1 `Row(Arrangement.Center)` bareng tombol "Lirik" existing. Ketiganya
+sekarang 1:1 struktur+gaya sama: icon 16dp + `Spacer(6.dp)` + `Text(labelMedium)`, `bouncyPress
+(0.92f)`, `contentPadding(14.dp/6.dp)`. `contentDescription` icon baru → `null` (pola Batch
+230/235, decorative krn ada Text label sibling, sama seperti icon "Lirik").
+
+**2. 0 handler/logic diubah** — `AddToPlaylistDialog`/`Intent.ACTION_SEND` persis Batch 358,
+murni pindah tempat+gaya render. 0 signature `NowPlayingScreen()` berubah, `MainActivity.kt` 0
+disentuh batch ini. 0 import baru (semua ikon/`PaddingValues`/`Arrangement` sudah ada).
+
+1 file kode (jauh di bawah batas Micro-Batch). Brace/paren diverifikasi seimbang string/comment-
+aware (263/263 brace, 749/749 paren, 0/0 bracket — raw-count sempat false-positive gara-gara
+literal `"audio/*"` disalahbaca pembuka block-comment, pola false-positive yang sama seperti
+batch-batch lama). Belum diverifikasi compile CI sungguhan & belum diverifikasi visual device —
+prioritas cek: 3 tombol (Tambah/Bagikan/Lirik) muat 1 baris rapi di layar sempit, judul rata-
+tengah tanpa ikon flanking, ketiga tombol tetap berfungsi identik Batch 358.
+
 ## Batch 358 — Now Playing: ikon "Plus" (Tambah ke Playlist) & "Share" flanking judul lagu (2 file kode)
 Permintaan user eksplisit, respons ke screenshot Now Playing hasil Batch 357: prefer ikon
 Plus/Share ditempel langsung kiri/kanan judul lagu, dibanding ditambahkan sebagai entri sejenis

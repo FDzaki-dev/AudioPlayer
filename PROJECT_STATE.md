@@ -36,6 +36,50 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 359 (REVERT Batch 358 — ikon Plus/Share dilepas dari samping judul, dipindah jadi entri
+icon+teks disamakan 1:1 ke gaya tombol "Lirik", 1 file kode)** — User kirim screenshot device
+hasil Batch 358: Row Plus/Judul/Share dinilai "aneh"/berantakan (judul panjang bikin ikon Share
+kelihatan nabrak teks marquee, ikon Plus mepet tepi kiri layar) — instruksi eksplisit "disamain
+dengan entry+layout lirik aja". Opsi ini PERSIS opsi yang sudah dicatat (tapi tidak dipilih) di
+komentar Batch 358 sendiri ("DIBANDING ditambahkan sebagai entri sejenis tombol Lirik") — jadi
+bukan ide baru, murni preferensi user berubah arah setelah lihat hasil visual sungguhan.
+
+1. **`NowPlayingScreen.kt`** — `Row(fillMaxWidth)` pembungkus judul (2 `IconButton` Batch 358)
+   DIHAPUS, judul balik jadi 1 `Text` polos (`fillMaxWidth().basicMarquee()` + `textAlign =
+   Center`, posisi visual identik ke sebelum Batch 358 lewat `horizontalAlignment =
+   CenterHorizontally` Column induk). Ikon Plus (`AddToPlaylistDialog`) & Share
+   (`Intent.ACTION_SEND`) TIDAK dihapus fungsinya — cuma dipindah render-nya jadi 2 `TextButton`
+   baru (bukan lagi `IconButton` telanjang), digabung 1 `Row(Arrangement.Center)` bareng tombol
+   "Lirik" yang sudah ada. Ketiganya (Tambah/Bagikan/Lirik) sekarang REUSE struktur+gaya visual
+   yang SAMA PERSIS: icon 16dp + `Spacer(6.dp)` + `Text(labelMedium, tint animatedAccent)`,
+   `bouncyPress(0.92f)`, `contentPadding(horizontal=14.dp, vertical=6.dp)` — bukan cuma mirip,
+   tapi 1:1 salinan pola tombol "Lirik" (konsisten literal permintaan user). `contentDescription`
+   kedua icon baru diubah ke `null` (dari string deskriptif Batch 358) — konsisten konvensi
+   Batch 230/235 (icon decorative kalau sudah ada Text label sibling di kontrol yang sama,
+   TalkBack baca 1 title gabungan per tombol, sama seperti icon "Lirik" dari awal).
+
+2. **0 handler/logic diubah** — `showAddToPlaylistDialog`, `AddToPlaylistDialog` reuse dari
+   `LibraryScreen.kt`, dan `Intent.ACTION_SEND` pakai `song.uri` (content:// MediaStore, 0
+   `FileProvider`) SEMUA persis sama dengan Batch 358, murni pindah tempat+gaya render. 0
+   parameter signature `NowPlayingScreen()` berubah (playlists/onAddSongToPlaylist/
+   onCreatePlaylist dari Batch 358 tetap dipakai apa adanya) — **`MainActivity.kt` 0 disentuh**
+   batch ini (beda dari Batch 358 yang wajib menyentuhnya untuk wiring pertama kali).
+
+3. **0 import baru** — `Icons.Default.Add`/`Icons.Default.Share`/`Icons.Default.Article`,
+   `PaddingValues`, `MutableInteractionSource`, `Arrangement` semua sudah diimpor sejak Batch
+   358/357/lebih lama, dipakai ulang apa adanya.
+
+1 file kode disentuh (`NowPlayingScreen.kt`) — jauh di bawah batas Micro-Batch (1 dari maks 3).
+Brace/paren diverifikasi seimbang penuh (string/comment-aware, bukan raw-count — string literal
+`"audio/*"` sempat jadi false-positive di raw-count seperti pola false-positive lain yang sudah
+dicatat batch-batch lama): 263/263 brace, 749/749 paren, 0/0 bracket. Belum diverifikasi compile
+CI sungguhan (sandbox tanpa compiler Kotlin+AGP+Compose) — konfirmasi user setelah build GH
+Actions jalan. **Belum diverifikasi visual di device** — prioritas cek: Row 3 tombol
+(Tambah/Bagikan/Lirik) muat rapi 1 baris di lebar layar sempit sekalipun (3× lebar TextButton +
+padding masing-masing, belum diverifikasi device asli, kandidat penyesuaian kalau ternyata
+mepet/wrap di layar tertentu), judul kembali rata-tengah 1 baris+marquee tanpa ikon di
+kiri/kanannya, tap Tambah/Bagikan/Lirik ketiganya tetap berfungsi identik Batch 358.
+
 **Batch 358 (Now Playing — ikon "Plus" (Tambah ke Playlist) & "Share" flanking judul lagu, 2
 file kode)** — Permintaan user eksplisit (respons ke screenshot Now Playing hasil Batch 357):
 user prefer ikon Plus/Share ditempel LANGSUNG di kiri/kanan judul lagu, DIBANDING ditambahkan
