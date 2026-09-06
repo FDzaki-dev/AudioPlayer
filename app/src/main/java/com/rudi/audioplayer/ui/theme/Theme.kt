@@ -1,5 +1,6 @@
 package com.rudi.audioplayer.ui.theme
 
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -472,7 +473,15 @@ fun AudioPlayerTheme(
     // Batch 61 — provides the mode signal to every descendant (tactileEmboss()/skeuEmboss()/
     // frostedGlass()) so their light/dark token branching stays centralized instead of each call
     // site re-deriving it.
-    CompositionLocalProvider(LocalIsDarkTheme provides isDark) {
+    // Batch 364 — LocalOverscrollFactory provides IosOverscrollFactory: satu baris ini membuat
+    // SEMUA LazyColumn/LazyRow/verticalScroll/horizontalScroll di seluruh app otomatis pakai
+    // rubber-band overscroll ala iOS (lihat IosScrollPhysics.kt), tanpa perlu disentuh 1-per-1 —
+    // komponen level-tinggi seperti LazyColumn otomatis konsumsi CompositionLocal ini lewat
+    // rememberOverscrollEffect() (perilaku resmi Compose Foundation, bukan hack).
+    CompositionLocalProvider(
+        LocalIsDarkTheme provides isDark,
+        LocalOverscrollFactory provides IosOverscrollFactory,
+    ) {
         MaterialTheme(
             colorScheme = colorsFor(identity, isDark),
             // Batch 57 — Skeu awalnya reuse AppleTypography (no separate type-scale spec supplied

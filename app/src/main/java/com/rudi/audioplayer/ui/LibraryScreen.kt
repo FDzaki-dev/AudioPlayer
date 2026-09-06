@@ -68,6 +68,7 @@ import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.ui.theme.Radius
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -1140,7 +1141,12 @@ private fun SongListView(
                     // before either fires).
                     onDragCancel = { sweepAnchorIndex = null; sweepLastIndex = null; suppressClickForId = null }
                 )
-            }
+            },
+        // Batch 364 — kurva fling ala iOS (glide lebih panjang & mulus, lihat
+        // IosScrollPhysics.kt). Rubber-band overscroll-nya sendiri sudah otomatis app-wide lewat
+        // LocalOverscrollFactory (Theme.kt), tidak perlu disentuh di sini. Layar ini duluan krn
+        // paling sering di-scroll user (daftar lagu utama) — sisanya di PENDING_IosFlingBehavior.md.
+        flingBehavior = rememberIosFlingBehavior()
     ) {
         itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
             // Batch 78 — fix: rowBoundsInRoot only ever got entries WRITTEN (onGloballyPositioned),

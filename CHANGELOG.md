@@ -1,5 +1,37 @@
 # Changelog
 
+## Batch 364 — LAPORAN USER: scrolling masih terasa "sat set"/snappy, minta transisi mulus ala iOS (3 file kode)
+User laporan setelah Batch 363 menutup ROADMAP_LIQUID_GLASS_REDESIGN.md 100% (soal GPU-lag): efek
+scroll masih terasa instan/kaku, jauh dari momentum+rubber-band khas iOS UIScrollView — item baru,
+beda akar total dari soal performa/lag batch sebelumnya.
+
+Root cause: (1) overscroll bawaan Android di batas list cuma glow lalu berhenti mendadak, 0
+rubber-band; (2) `flingBehavior` default (`rememberSplineBasedDecay`) di-tune utk feel Android
+native, glide jauh lebih pendek dibanding UIScrollView.
+
+**1. `ui/theme/IosScrollPhysics.kt` (BARU)** — `IosOverscrollFactory`/`IosRubberBandOverscrollEffect`
+(custom `OverscrollEffect`: rubber-band resistance saat ditarik lewat batas, pegas balik
+`spring(DampingRatioMediumBouncy)` saat dilepas) + `rememberIosFlingBehavior()` (custom
+`FlingBehavior` pakai `exponentialDecay(frictionMultiplier = 0.75f)` utk glide lebih panjang &
+mulus, default Compose `1f`).
+
+**2. `ui/theme/Theme.kt`** — `AudioPlayerTheme` provide `LocalOverscrollFactory provides
+IosOverscrollFactory` di root (CompositionLocal resmi Compose Foundation), sebaris `LocalIsDarkTheme`
+yang sudah ada — otomatis berlaku app-wide ke SEMUA LazyColumn/LazyRow/scroll, 0 perlu sentuh
+screen lain utk bagian overscroll.
+
+**3. `LibraryScreen.kt`** — `flingBehavior = rememberIosFlingBehavior()` dipasang di `LazyColumn`
+tab Lagu (layar paling sering di-scroll). `flingBehavior` tidak bisa app-wide seperti overscroll
+(Compose belum expose CompositionLocal utk itu) — wajib opt-in per scrollable, jadi baru 1 dari 15
+layar sesuai batas Micro-Batch. 14 sisanya dicatat di `PENDING_IosFlingBehavior.md` (BARU).
+
+3 file kode (pas batas Micro-Batch). Brace/paren/bracket seimbang penuh: `IosScrollPhysics.kt`
+18/18 brace 56/56 paren 0/0 bracket (baru), `Theme.kt` 14/14 brace 74/74 paren 0/0 bracket,
+`LibraryScreen.kt` 339/339 brace 715/715 paren 9/9 bracket. Belum diverifikasi compile CI &
+belum diverifikasi rasa di device asli — user perlu coba tarik-lewat-batas dan fling di tab Lagu
+utk konfirmasi rubber-band+glide terasa lebih iOS, plus cek overscroll (app-wide) juga muncul di
+layar lain walau fling curve-nya di situ masih default.
+
 ## Batch 363 — KONFIRMASI USER: performa/GPU-lag Liquid Glass hilang di device asli, ROADMAP_LIQUID_GLASS_REDESIGN.md 100% tuntas (0 file kode)
 User konfirmasi lag yang jadi satu-satunya item terbuka roadmap Liquid Glass sudah hilang di
 device asli — menutup rantai Batch 351 (investigasi, ditemukan root cause sebenarnya: frekuensi+

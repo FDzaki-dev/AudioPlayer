@@ -36,6 +36,56 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 364 (LAPORAN USER — scrolling masih terasa "sat set"/snappy, minta transisi mulus ala
+iOS, 3 file kode)** — Muncul persis setelah Batch 363 menutup ROADMAP_LIQUID_GLASS_REDESIGN.md
+100% (soal GPU-lag) — item BARU, beda akar sama sekali: bukan performa/lag, tapi fisika/kurva
+scroll itu sendiri yang terasa instan/kaku dibanding momentum+rubber-band khas iOS UIScrollView.
+
+**Root cause** — 2 gap struktural Compose Foundation (bukan bug logic): (1) overscroll bawaan
+Android di batas atas/bawah list cuma glow lalu berhenti mendadak, 0 rubber-band/pantulan;
+(2) `flingBehavior` default tiap `LazyColumn`/`LazyRow` (`rememberSplineBasedDecay`) di-tune
+utk feel Android native — glide-nya jauh lebih pendek/cepat berhenti dibanding UIScrollView.
+
+**1. `ui/theme/IosScrollPhysics.kt` (BARU)** — `IosOverscrollFactory` + custom `OverscrollEffect`
+(`IosRubberBandOverscrollEffect`): geser konten dengan resistance yang makin kuat seiring jarak
+tarikan (rubber-band, bukan translasi 1:1 ala glow Android), lalu pegas balik
+`spring(DampingRatioMediumBouncy, StiffnessLow)` saat dilepas. Plus `rememberIosFlingBehavior()`:
+custom `FlingBehavior` pakai `exponentialDecay(frictionMultiplier = 0.75f)` (default Compose
+`1f`) supaya glide lebih panjang & mulus.
+
+**2. `ui/theme/Theme.kt`** — `AudioPlayerTheme` provide `LocalOverscrollFactory provides
+IosOverscrollFactory` (CompositionLocal RESMI Compose Foundation, bukan hack), sebaris dengan
+`LocalIsDarkTheme` yang sudah ada. Efeknya app-wide OTOMATIS ke SEMUA `LazyColumn`/`LazyRow`/
+`verticalScroll`/`horizontalScroll` — 0 perlu sentuh screen lain utk bagian overscroll ini
+(komponen level-tinggi seperti `LazyColumn` otomatis konsumsi factory ini lewat
+`rememberOverscrollEffect()`, dikonfirmasi lewat dokumentasi resmi `developer.android.com`
+sebelum implementasi).
+
+**3. `LibraryScreen.kt`** — `flingBehavior = rememberIosFlingBehavior()` dipasang di `LazyColumn`
+daftar lagu utama (tab Lagu, layar paling sering di-scroll). BEDA dari overscroll di atas,
+`flingBehavior` TIDAK bisa app-wide — Compose belum expose CompositionLocal utk default fling
+scrollable (cuma overscroll yang sudah dapat API itu) — jadi WAJIB opt-in per scrollable. Sesuai
+batas Micro-Batch (maks 3 file kode/task), baru 1 dari 15 layar berscroll yang kebagian; 14
+sisanya (`HomeScreen`, `PlaylistScreen`, `QueueSheet`, `SmartPlaylistScreen`, `SettingsScreen`,
+`StatsDashboardScreen`, `VaultSheet`, `SongPickerSheet`, `FolderManagerSheet`,
+`DuplicateFinderSheet`, `ABRepeatBookmarkSheet`, `EqualizerSheet`, `LyricsSheet`, `LyricsView`)
+dicatat di `PENDING_IosFlingBehavior.md` (BARU) lengkap pola persis yang harus dipasang, utk
+sesi/batch lanjutan.
+
+3 file kode (pas batas Micro-Batch) + 1 dokumen pending baru. Brace/paren/bracket diverifikasi
+seimbang penuh (tokenizer single-pass string/comment/char-literal-aware): `IosScrollPhysics.kt`
+18/18 brace, 56/56 paren, 0/0 bracket (file baru); `Theme.kt` 14/14 brace, 74/74 paren, 0/0
+bracket; `LibraryScreen.kt` 339/339 brace, 715/715 paren, 9/9 bracket. Belum diverifikasi compile
+CI sungguhan & **belum diverifikasi visual/rasa di device asli** — prioritas cek user: (1) tarik
+list lewat batas atas/bawah di tab Lagu terasa rubber-band+pantul-balik, bukan glow instan
+seperti sebelumnya; (2) fling di tab Lagu meluncur lebih jauh/mulus tanpa terasa "licin"/susah
+dikendalikan (kalau kurang/kelewat jauh, `frictionMultiplier` di `IosScrollPhysics.kt` gampang
+ditala ulang); (3) overscroll rubber-band JUGA otomatis muncul di layar lain (Playlist/Queue/dst,
+sudah app-wide), walau kurva fling-nya di situ masih default Android sampai
+`PENDING_IosFlingBehavior.md` dikerjakan; (4) 0 regresi di gesture sweep-select long-press
+`LibraryScreen` (modifier chain-nya cuma ditambah 1 parameter sejajar baru, 0 logic gesture
+disentuh).
+
 **Batch 363 (KONFIRMASI USER — performa/GPU-lag Liquid Glass sudah hilang di device asli,
 menutup ROADMAP_LIQUID_GLASS_REDESIGN.md 100% tuntas, 0 file kode)** — User konfirmasi
 eksplisit: lag yang jadi satu-satunya item terbuka roadmap Liquid Glass ("Performa (GPU/lag)
