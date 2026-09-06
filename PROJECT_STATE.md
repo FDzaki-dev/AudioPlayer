@@ -36,6 +36,30 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 363 (KONFIRMASI USER — performa/GPU-lag Liquid Glass sudah hilang di device asli,
+menutup ROADMAP_LIQUID_GLASS_REDESIGN.md 100% tuntas, 0 file kode)** — User konfirmasi
+eksplisit: lag yang jadi satu-satunya item terbuka roadmap Liquid Glass ("Performa (GPU/lag)
+BELUM eksplisit dikonfirmasi") sudah hilang di device asli. Menutup rantai 3 batch investigasi/
+fix sebelumnya: Batch 351 (investigasi statis, ditemukan root cause SEBENARNYA — frekuensi+scope
+recomposition `AppNavHost` dari tick `position`/`duration` 500ms yang di-hoist ke
+`PlaybackUiState` gabungan & dibaca di scope teratas, BUKAN cost render blur Liquid Glass seperti
+asumsi awal Batch 296-329) → Batch 352 (mitigasi cepat, throttle tick 500ms→1000ms) → Batch 353
+(fix struktural permanen, `position`/`duration` dipisah total jadi `PlaybackProgress` StateFlow
+tersendiri yang dikoleksi lokal per-composable, 4 file kode termasuk `MainActivity.kt`
+protected). Ketiganya sudah dieksekusi & dicatat lengkap; batch ini MURNI mencatat konfirmasi
+hasil akhir dari user, 0 kode baru diperlukan.
+
+**0 file kode disentuh** — konfirmasi user, bukan perubahan implementasi. **3 dokumentasi VIP
+diupdate**: `PROJECT_STATE.md` (entri ini), `CHANGELOG.md`, `README.md`. Plus
+`ROADMAP_LIQUID_GLASS_REDESIGN.md` (dokumen roadmap khusus, di luar 3 VIP_DOCS wajib tapi tetap
+disinkronkan karena inilah dokumen yang secara eksplisit mencatat item ini sebagai "sisa
+satu-satunya item terbuka") — status item performa diubah dari ⏳ jadi ✅, ditambah 1 paragraf
+status ringkas di bagian atas dokumen: **ROADMAP INI SEKARANG 100% TUNTAS, 0 item terbuka
+tersisa** (fase 1-4 selesai Batch 279-288, §3b blur asli selesai+dikonfirmasi Batch 290-325,
+performa dikonfirmasi batch ini). `FILE_MANIFEST.txt` tidak berubah (0 file baru/hapus, cuma edit
+isi 4 file dokumen yang sudah ada). Brace/paren/bracket TIDAK relevan dicek batch ini (0 file
+`.kt` disentuh).
+
 **Batch 362 (FIX BUG NYATA — laporan user + screenshot: isi `RatingDialog` [Batch 360] saling
 tumpang tindih, hint text & 5 bintang numpuk di posisi sama, 1 file kode)** — User kirim
 screenshot (crop lebih dekat dari dialog "Beri Rating"): teks hint "Belum ada rating — ketuk

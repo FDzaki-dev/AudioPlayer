@@ -1,5 +1,16 @@
 # Changelog
 
+## Batch 363 — KONFIRMASI USER: performa/GPU-lag Liquid Glass hilang di device asli, ROADMAP_LIQUID_GLASS_REDESIGN.md 100% tuntas (0 file kode)
+User konfirmasi lag yang jadi satu-satunya item terbuka roadmap Liquid Glass sudah hilang di
+device asli — menutup rantai Batch 351 (investigasi, ditemukan root cause sebenarnya: frekuensi+
+scope recomposition `AppNavHost` dari tick posisi 500ms, BUKAN cost render blur seperti diduga
+awalnya) → Batch 352 (mitigasi throttle tick) → Batch 353 (fix struktural permanen, `position`/
+`duration` dipisah jadi `PlaybackProgress` StateFlow lokal). 0 kode baru — murni konfirmasi hasil.
+
+`ROADMAP_LIQUID_GLASS_REDESIGN.md` diupdate: status item performa ⏳→✅, ditambah paragraf
+ringkasan di atas dokumen — **roadmap ini sekarang 100% tuntas, 0 item terbuka**. 0 file kode
+disentuh, 3 dokumentasi VIP disinkronkan.
+
 ## Batch 362 — FIX BUG NYATA: isi RatingDialog (Batch 360) tumpang tindih — hint text & 5 bintang numpuk (laporan user + screenshot, 1 file kode)
 User kirim screenshot dialog "Beri Rating" (crop lebih dekat): hint text 2 baris dan Row 5
 bintang render TUMPANG TINDIH di titik yang sama, tanya eksplisit apa ini ikut kena fix Batch

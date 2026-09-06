@@ -8,7 +8,12 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 362 (FIX BUG NYATA: laporan user + screenshot — isi `RatingDialog`
+> 🆕 **Update terbaru — Batch 363 (KONFIRMASI USER: performa/GPU-lag Liquid Glass sudah hilang
+> di device asli, `ROADMAP_LIQUID_GLASS_REDESIGN.md` 100% tuntas, 0 file kode):** Menutup rantai
+> Batch 351 (investigasi root cause: frekuensi+scope recomposition `AppNavHost`, bukan cost
+> render blur)→352 (mitigasi)→353 (fix struktural permanen). Roadmap Liquid Glass sekarang 100%
+> selesai, 0 item terbuka tersisa. 0 kode baru — murni konfirmasi hasil + sinkron dokumentasi.
+> Batch 362 (FIX BUG NYATA: laporan user + screenshot — isi `RatingDialog`
 > [Batch 360] tumpang tindih, hint text & 5 bintang numpuk di posisi sama, 1 file kode):** Root
 > cause: slot `text` `AlertDialog` mewadahi lewat `Box`, 2 composable sejajar tanpa `Column`
 > numpuk di origin sama — beda bug dari Batch 361 (Row luar), diaudit-silang & dikonfirmasi

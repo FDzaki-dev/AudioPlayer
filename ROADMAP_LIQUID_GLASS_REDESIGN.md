@@ -7,6 +7,14 @@ shape mirip musik player 'CONVX' yang clean+minimalis atau bahkan bisa lebih bai
 only first"). 0 kode disentuh — 0 file `.kt`/`.xml` diedit, 0 shape/warna/tipografi diubah.**
 Dokumen ini adalah peta buat sesi-sesi berikutnya, bukan laporan kerja yang sudah selesai.
 
+**Update status (Batch 363): ROADMAP INI 100% TUNTAS.** Fase 1-4 + §3a/3b sudah selesai sejak
+Batch 288-329 (lihat §5). Satu-satunya item yang masih berstatus "belum eksplisit dikonfirmasi"
+— performa/GPU-lag pasca blur asli — **DIKONFIRMASI user Batch 363: lag sudah hilang di device
+asli**, menutup rantai investigasi Batch 351 (root cause: frekuensi+scope recomposition
+`AppNavHost`, BUKAN cost render blur seperti diasumsikan sebelumnya) → Batch 352 (mitigasi
+cepat, throttle tick) → Batch 353 (fix struktural permanen, `position`/`duration` dipisah dari
+`PlaybackUiState`). 0 item terbuka tersisa di dokumen ini.
+
 ---
 
 ## 1. Apa itu CONVX (riset, bukan asumsi)
@@ -242,8 +250,9 @@ Batch 311 melaporkan blur 0% di sheet cross-window (`liquidGlassAlpha` dinaikkan
 call site `ModalBottomSheet` tidak pasang `containerColor = Color.Transparent` — dituntaskan
 Batch 322-324 (17/17 konsisten). **Sub-langkah 5/5 — VISUAL dikonfirmasi user Batch 325**: blur
 kelihatan benar termasuk cross-window, `liquidGlassAlpha` diturunkan balik ke nilai tuning
-device terakhir yang sah (0.38f/0.48f, Batch 299). **⏳ Performa (GPU/lag) BELUM eksplisit
-dikonfirmasi** — sisa satu-satunya item terbuka di seluruh roadmap ini.
+device terakhir yang sah (0.38f/0.48f, Batch 299). **✅ Performa (GPU/lag) DIKONFIRMASI TUNTAS Batch 363** — user
+verifikasi langsung di device asli: lag sudah hilang, menutup rantai Batch 351 (investigasi root
+cause)→352 (mitigasi)→353 (fix struktural). **ROADMAP INI 100% SELESAI, 0 item terbuka.**
 
 ---
 
