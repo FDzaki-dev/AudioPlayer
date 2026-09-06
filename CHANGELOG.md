@@ -1,5 +1,36 @@
 # Changelog
 
+## Batch 365 — FIX CI: `compileDebugKotlin`/`compileReleaseKotlin` gagal di `IosScrollPhysics.kt` (log_fail user, 1 file kode)
+User upload `log_fail` dari GH Actions run: build gagal di 2 task (`compileDebugKotlin`,
+`compileReleaseKotlin`), 5 baris error compiler, semua di `ui/theme/IosScrollPhysics.kt` (file
+baru Batch 364) — menjawab persis catatan "belum diverifikasi compile CI" di batch itu.
+
+**Root cause (3, semua salah paket/kontrak import — 0 salah logic)**:
+1. `LayoutModifierNode` di-import dari `androidx.compose.ui.layout`, padahal paket yang benar
+   `androidx.compose.ui.node` (dikonfirmasi ke docs resmi `developer.android.com/reference/
+   kotlin/androidx/compose/ui/node/LayoutModifierNode`). Salah paket → 2 unresolved reference
+   (deklarasi interface + implementasi anonim `object : Modifier.Node(), LayoutModifierNode`).
+2. `Offset.VectorConverter` dipakai di `Animatable(Offset.Zero, Offset.VectorConverter)` tanpa
+   import ekstension property-nya, `androidx.compose.animation.core.VectorConverter` — import
+   `Animatable`/`AnimationState`/dkk dari paket yang sama TIDAK otomatis membawa property ini di
+   Kotlin. Tanpa itu compiler juga gagal infer parameter generik `V` di `Animatable<Offset, V>`.
+3. `IosOverscrollFactory : OverscrollFactory` belum override `equals`/`hashCode`. Dikonfirmasi ke
+   docs resmi `OverscrollFactory`: API ini SENGAJA deklarasi keduanya abstract (dipakai buat cek
+   equality tiap `LocalOverscrollFactory` di-provide ulang) — rekomendasi resmi utk singleton:
+   referential equality (`this === other`) + `System.identityHashCode`.
+
+**Fix — `ui/theme/IosScrollPhysics.kt` (1 file, jauh di bawah batas Micro-Batch)**: (1) pindah
+import `LayoutModifierNode` ke `androidx.compose.ui.node`; (2) tambah `import
+androidx.compose.animation.core.VectorConverter`; (3) tambah `override fun equals`/`override fun
+hashCode` (referential) di `IosOverscrollFactory`. 0 logic dirombak — murni 3 perbaikan
+paket/kontrak API sesuai 5 baris error CI, sesuai Zero-Refactor (tidak menyentuh apa pun di luar
+itu, termasuk `PENDING_IosFlingBehavior.md` — 14 layar sisa tetap di luar scope sesi ini).
+
+Belum ada akses re-run CI sungguhan dari sesi ini — verifikasi dilakukan manual baris-per-baris
+terhadap docs resmi Android di atas untuk ketiga error. Rekomendasi: jalankan ulang
+`assembleRelease`/`testDebugUnitTest` di GH Actions run berikutnya setelah `git push` skrip di
+bawah, utk konfirmasi 0 error kompilasi tersisa.
+
 ## Batch 364 — LAPORAN USER: scrolling masih terasa "sat set"/snappy, minta transisi mulus ala iOS (3 file kode)
 User laporan setelah Batch 363 menutup ROADMAP_LIQUID_GLASS_REDESIGN.md 100% (soal GPU-lag): efek
 scroll masih terasa instan/kaku, jauh dari momentum+rubber-band khas iOS UIScrollView — item baru,

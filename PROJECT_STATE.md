@@ -36,6 +36,24 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 365 (FIX CI — `compileDebugKotlin`/`compileReleaseKotlin` gagal di `IosScrollPhysics.kt`,
+dari `log_fail` user, 1 file kode)** — Menjawab catatan "belum diverifikasi compile CI" di Batch
+364. 3 root cause, semua salah paket/kontrak import (0 salah logic): (1) `LayoutModifierNode`
+di-import dari paket salah (`ui.layout`, seharusnya `ui.node`); (2) `Offset.VectorConverter`
+dipakai tanpa import ekstension property-nya (`androidx.compose.animation.core.VectorConverter`),
+bikin compiler juga gagal infer generik `Animatable<Offset, V>`; (3) `IosOverscrollFactory`
+belum override `equals`/`hashCode` — `OverscrollFactory` SENGAJA deklarasi keduanya abstract
+(dikonfirmasi ke docs resmi), fix-nya referential equality (`this === other`) khas singleton.
+
+Fix murni 3 baris (2 perbaikan import + 1 pasang `equals`/`hashCode`) di `IosScrollPhysics.kt`,
+0 file lain disentuh, 0 logic rubber-band/fling dirombak. Belum ada akses re-run CI sungguhan
+dari sesi ini — verifikasi manual baris-per-baris terhadap docs resmi Android
+(`developer.android.com`) utk ketiga error. **Prioritas cek user**: jalankan ulang GH Actions
+(`assembleRelease`/`testDebugUnitTest`) setelah push, konfirmasi 0 error compile tersisa — kalau
+sudah hijau, verifikasi rasa rubber-band/fling di device asli (poin (1)-(4) Batch 364 di bawah
+masih berlaku, belum ada yang berubah dari sisi behavior). `PENDING_IosFlingBehavior.md` (14
+layar sisa) TIDAK disentuh — di luar scope fix CI ini.
+
 **Batch 364 (LAPORAN USER — scrolling masih terasa "sat set"/snappy, minta transisi mulus ala
 iOS, 3 file kode)** — Muncul persis setelah Batch 363 menutup ROADMAP_LIQUID_GLASS_REDESIGN.md
 100% (soal GPU-lag) — item BARU, beda akar sama sekali: bukan performa/lag, tapi fisika/kurva

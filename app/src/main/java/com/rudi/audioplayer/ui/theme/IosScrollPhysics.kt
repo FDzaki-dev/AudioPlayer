@@ -7,6 +7,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.foundation.OverscrollEffect
 import androidx.compose.foundation.OverscrollFactory
 import androidx.compose.foundation.gestures.FlingBehavior
@@ -16,11 +17,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.layout.LayoutModifierNode
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.node.DelegatableNode
+import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Velocity
 import kotlin.math.abs
@@ -152,6 +153,11 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
 /** Dipasang di root (`AudioPlayerTheme`, lihat `Theme.kt`) lewat `LocalOverscrollFactory`. */
 object IosOverscrollFactory : OverscrollFactory {
     override fun createOverscrollEffect(): OverscrollEffect = IosRubberBandOverscrollEffect()
+
+    // OverscrollFactory declares equals/hashCode as abstract (dipakai buat CompositionLocal
+    // equality check) -- singleton jadi cukup referential equality, per rekomendasi resmi API.
+    override fun equals(other: Any?): Boolean = other === this
+    override fun hashCode(): Int = System.identityHashCode(this)
 }
 
 /**
