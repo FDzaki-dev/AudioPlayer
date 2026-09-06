@@ -1,5 +1,23 @@
 # Changelog
 
+## Batch 361 — FIX BUG NYATA: Row 4 tombol overflow, "Rating" wrap vertikal per-huruf (laporan user + screenshot, 1 file kode)
+User kirim 2 screenshot device asli: entry "Rating" (Batch 360) tidak tampil normal — icon ☆
+sendirian di ujung Row, tapi teks "Rating"-nya wrap 1-huruf-per-baris numpuk vertikal di tepi
+kanan layar, menembus sampai overlap waveform. Root cause: Row Tambah/Bagikan/Lirik/Rating tidak
+punya `horizontalScroll`, jadi di layar sempit 4 `TextButton` melebihi lebar layar dan yang
+terakhir dipepetkan sampai nyaris 0dp, memaksa `Text` di dalamnya wrap per-karakter.
+
+**1. `NowPlayingScreen.kt`** — Row dikasih `Modifier.fillMaxWidth().horizontalScroll(
+rememberScrollState())` (scroll ke samping kalau konten tak muat, identik kalau muat). **2.**
+Semua 4 `Text` label tombol (bukan cuma "Rating") dikasih `maxLines = 1` +
+`overflow = TextOverflow.Ellipsis`, pola yang sudah lama dipakai di judul lagu tapi belum pernah
+diterapkan ke Row tombol ini — jaring pengaman independen supaya wrap vertikal tidak bisa
+terjadi lagi di skenario manapun. 0 logic `onClick`/`RatingDialog` disentuh — murni fix layout.
+
+1 file kode. Brace/paren/bracket seimbang penuh: 280/280 brace, 783/783 paren, 0/0 bracket.
+Belum diverifikasi compile CI & belum diverifikasi visual device ulang — user perlu screenshot
+lagi untuk konfirmasi Row scroll mulus dan ke-4 label tampil 1 baris utuh.
+
 ## Batch 360 — Jawaban PENDING_RatingEntryPoint.md: entry "Rating" ringkas kembali ke Now Playing (1 file kode)
 User pilih Opsi 4 dari `PENDING_RatingEntryPoint.md` (terbuka sejak Batch 357): "Balik ke Now
 Playing, versi ringkas" — 1 ikon bintang tunggal yang membuka dialog 5 pilihan, bukan 5 ikon

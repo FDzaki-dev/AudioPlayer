@@ -28,6 +28,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
@@ -921,9 +922,35 @@ fun NowPlayingScreen(
         // migrasi tempat+gaya render, ikon jadi contentDescription = null (pola Batch 230/235:
         // decorative krn sudah ada Text label sibling di button yang sama, semantics ke-merge ke
         // 1 title TalkBack per tombol, konsisten cara "Lirik" sudah dari awal).
+        // Batch 361 — FIX BUG NYATA (laporan user + screenshot): di layar sempit, 4 TextButton
+        // (Tambah/Bagikan/Lirik/Rating, ditambah Batch 360) TIDAK muat 1 baris — Row tanpa scroll
+        // dipaksa mengecilkan lebar TextButton terakhir sampai nyaris 0dp, bikin Text("Rating")
+        // di dalamnya wrap PER-HURUF turun vertikal di tepi kanan layar (persis yang kefoto:
+        // "R/a/t/i/n/g" numpuk 1 kolom, nembus ke bawah sampai overlap area waveform). ROOT CAUSE
+        // GANDA, 2 FIX terpisah tapi saling melengkapi (bukan cuma 1):
+        // (1) Row 0 pernah dikasih jalan keluar kalau kontennya kepanjangan (0 scroll, 0 wrap) —
+        //     ditambah `.horizontalScroll(rememberScrollState())` supaya di layar manapun yang
+        //     kurang lebar, Row jadi scrollable ke samping (bukan overflow diam-diam/kepotong)
+        //     alih-alih maksa compress. Kalau muat (layar lebar), scrollState diam di 0 & visualnya
+        //     IDENTIK versi sebelumnya (Arrangement.Center tetap efektif krn area scroll = area
+        //     Row kalau konten <= viewport). `fillMaxWidth()` ditambah eksplisit di modifier Row
+        //     (dulu implicit ikut ukuran anak) — perlu supaya area scroll punya batas ukur yang
+        //     jelas, bukan supaya krusial untuk fix ini sendiri.
+        // (2) Independen dari (1), SEMUA 4 Text label tombol (Tambah/Bagikan/Lirik/Rating) dikasih
+        //     `maxLines = 1` + `overflow = TextOverflow.Ellipsis` (pola sama persis judul lagu di
+        //     atas — Text(song?.title, maxLines=1,...) — cuma belum pernah diterapkan ke Text di
+        //     Row tombol ini dari batch manapun sebelumnya, termasuk 3 tombol lama). Ini JARING
+        //     PENGAMAN independen dari (1): meskipun (1) sudah bikin Row scrollable (jadi secara
+        //     teori tiap TextButton SELALU dapat lebar penuh sesuai intrinsic width-nya, tidak
+        //     pernah dipaksa compress lagi), maxLines=1 memastikan text tidak PERNAH bisa wrap
+        //     vertikal lagi di skenario manapun (mis. font-scale sistem user disetel besar) —
+        //     4 tombol lama SEHARUSNYA sudah begini dari awal, gap yang baru ketahuan sekarang.
         Row(
             horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
         ) {
             val addToPlaylistInteraction = remember { MutableInteractionSource() }
             TextButton(
@@ -942,7 +969,13 @@ fun NowPlayingScreen(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Tambah", style = MaterialTheme.typography.labelMedium, color = animatedAccent)
+                Text(
+                    "Tambah",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = animatedAccent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             val shareInteraction = remember { MutableInteractionSource() }
             TextButton(
@@ -969,7 +1002,13 @@ fun NowPlayingScreen(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Bagikan", style = MaterialTheme.typography.labelMedium, color = animatedAccent)
+                Text(
+                    "Bagikan",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = animatedAccent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             val lyricsQuickInteraction = remember { MutableInteractionSource() }
             TextButton(
@@ -988,7 +1027,13 @@ fun NowPlayingScreen(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Lirik", style = MaterialTheme.typography.labelMedium, color = animatedAccent)
+                Text(
+                    "Lirik",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = animatedAccent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             // Batch 360 — jawaban PENDING_RatingEntryPoint.md (Batch 357): Opsi 4 dipilih user
             // ("Balik ke Now Playing, versi ringkas") — StarRatingRow LAMA (5 IconButton tetap
@@ -1025,7 +1070,13 @@ fun NowPlayingScreen(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Rating", style = MaterialTheme.typography.labelMedium, color = animatedAccent)
+                Text(
+                    "Rating",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = animatedAccent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
 

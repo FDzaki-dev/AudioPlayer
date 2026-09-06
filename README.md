@@ -8,7 +8,13 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 360 (Jawaban `PENDING_RatingEntryPoint.md`: entry "Rating"
+> 🆕 **Update terbaru — Batch 361 (FIX BUG NYATA: laporan user + screenshot — Row 4 tombol
+> Tambah/Bagikan/Lirik/Rating overflow di layar sempit, teks "Rating" wrap per-huruf vertikal
+> nembus ke area waveform, 1 file kode):** Row dikasih `horizontalScroll` (scroll ke samping
+> kalau tak muat, identik kalau muat) + semua 4 label tombol dikasih `maxLines = 1` +
+> `TextOverflow.Ellipsis` (jaring pengaman independen, gap lama yang baru ketahuan). 0 logic
+> tombol/dialog disentuh — murni fix layout. Belum diverifikasi visual device ulang.
+> Batch 360 (Jawaban `PENDING_RatingEntryPoint.md`: entry "Rating"
 > ringkas kembali ke Now Playing, 1 file kode):** User pilih Opsi 4 (pending sejak Batch 357) —
 > "Balik ke Now Playing, versi ringkas". Entry "Rating" baru ditambah sebagai `TextButton` ke-4
 > di Row Tambah/Bagikan/Lirik, REUSE 1:1 gaya visual 3 sibling-nya. Tap membuka `RatingDialog`

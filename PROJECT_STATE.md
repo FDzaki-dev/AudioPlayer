@@ -36,6 +36,44 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 361 (FIX BUG NYATA — laporan user + 2 screenshot: Row 4 tombol Batch 360 tidak muat di
+layar sempit, `Text("Rating")` wrap per-huruf vertikal di tepi kanan layar, 1 file kode)** — User
+kirim 2 screenshot device asli: entry "Rating" (Batch 360) TIDAK tampil sebagai teks normal
+di sebelah icon-nya di Row — icon ☆ muncul sendirian di ujung Row, sedangkan Text "Rating"-nya
+malah wrap 1-huruf-per-baris ("R","a","t","i","n","g") numpuk vertikal di tepi kanan layar,
+menembus ke bawah sampai overlap area waveform/timestamp. Reaksi user: "hasil jauh dari kata
+layak sama sekali."
+
+**Root cause** — Row Tambah/Bagikan/Lirik/Rating 0 pernah dikasih jalan keluar kalau kontennya
+kepanjangan (0 `horizontalScroll`, 0 wrap eksplisit); Batch 359 sendiri sudah menandai "belum
+diverifikasi visual device utk 3 tombol", Batch 360 menaikkan jadi 4 tombol & menandai risiko
+naik — tervalidasi PERSIS oleh screenshot ini: di layar sempit, 4 `TextButton` melebihi lebar
+layar, `TextButton` terakhir ("Rating") dipepetkan sampai nyaris 0dp lebar, dan `Text` di
+dalamnya (0 `maxLines`, sama seperti 3 sibling lama) terpaksa wrap per-karakter secara vertikal.
+
+**`NowPlayingScreen.kt`** — 2 fix independen tapi saling melengkapi:
+**(1)** `Row` Tambah/Bagikan/Lirik/Rating dikasih `Modifier.fillMaxWidth().horizontalScroll(
+rememberScrollState())` — kalau konten muat, visual IDENTIK (Arrangement.Center tetap berlaku,
+scroll offset diam di 0); kalau tidak muat di layar manapun ke depannya (termasuk kalau nanti ada
+entry ke-5, ke-6, dst.), Row jadi scrollable ke samping alih-alih memaksa compress salah satu
+tombol. **(2)** SEMUA 4 `Text` label tombol (Tambah/Bagikan/Lirik/Rating — bukan cuma "Rating")
+dikasih `maxLines = 1` + `overflow = TextOverflow.Ellipsis`, pola yang sudah lama dipakai buat
+judul lagu (`Text(song?.title, maxLines = 1, ...)`) tapi ternyata belum pernah diterapkan ke 3
+tombol lama sekalipun — gap lama yang baru ketahuan lewat bug ini. Fix (2) berfungsi sebagai
+jaring pengaman independen dari (1): sekalipun (1) sudah bikin Row scrollable, `maxLines = 1`
+memastikan text tombol manapun TIDAK PERNAH lagi bisa wrap vertikal di skenario ekstrem lain
+(mis. font-scale sistem disetel besar oleh user). 1 file kode (jauh di bawah batas Micro-Batch),
+0 file lain disentuh (logic `onClick` ke-4 tombol & `RatingDialog` 0 diubah — murni layout fix).
+
+Brace/paren/bracket diverifikasi seimbang penuh (tokenizer single-pass): 280/280 brace, 783/783
+paren (naik 3 dari `fillMaxWidth()`+`horizontalScroll(...)`+`rememberScrollState()` baru), 0/0
+bracket. Belum diverifikasi compile CI sungguhan — konfirmasi user setelah build GH Actions jalan.
+**Belum diverifikasi visual device lagi** setelah fix ini — user perlu screenshot ulang utk
+konfirmasi: (1) Row 4 tombol sekarang scroll mulus ke samping (bukan overflow/wrap) di layar
+sempit yang sama persis dgn screenshot laporan bug; (2) semua label ("Tambah"/"Bagikan"/"Lirik"/
+"Rating") tampil 1 baris utuh tanpa terpotong; (3) fungsi tap tiap tombol (termasuk buka
+`RatingDialog`) tidak berubah/rusak akibat fix layout ini.
+
 **Batch 360 (Jawab `PENDING_RatingEntryPoint.md` sejak Batch 357 — Opsi 4 dipilih user, entry
 "Rating" ringkas kembali ke Now Playing, 1 file kode)** — User jawab pertanyaan T/J pending:
 "Balik ke Now Playing, versi ringkas" — persis Opsi 4 yang dicatat `PENDING_RatingEntryPoint.md`
