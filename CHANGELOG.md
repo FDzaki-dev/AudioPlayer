@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 362 — FIX BUG NYATA: isi RatingDialog (Batch 360) tumpang tindih — hint text & 5 bintang numpuk (laporan user + screenshot, 1 file kode)
+User kirim screenshot dialog "Beri Rating" (crop lebih dekat): hint text 2 baris dan Row 5
+bintang render TUMPANG TINDIH di titik yang sama, tanya eksplisit apa ini ikut kena fix Batch
+361 — jawabannya tidak, beda composable & beda akar masalah. Root cause: slot `text =` di
+`RatingDialog` diisi 2 composable sejajar (Row, Text) tanpa pembungkus `Column` — slot `text`
+Material3 `AlertDialog` mewadahi kontennya lewat `Box`, jadi anak langsung tanpa Column sendiri
+numpuk di origin yang sama. Sudah diaudit-silang: `SpeedDialog`/`SleepTimerDialog` sudah benar
+(pakai Column), jadi ini oversight terisolasi di `RatingDialog` yang baru (Batch 360), bukan pola
+yang menyebar.
+
+**1. `NowPlayingScreen.kt`** — isi slot `text` `RatingDialog` dibungkus `Column(
+Modifier.fillMaxWidth())`, urutan tetap sama (hint → Spacer 8dp → Row bintang), hint text dikasih
+`textAlign = Center` + `fillMaxWidth()` biar konsisten center-align dgn Row di bawahnya. 0 logic
+tap-bintang/`onSetRating` diubah — murni fix layout wrapper.
+
+1 file kode. Brace/paren/bracket seimbang penuh: 281/281 brace, 788/788 paren, 0/0 bracket.
+Belum diverifikasi compile CI & visual device — user perlu screenshot ulang utk konfirmasi hint
+text & 5 bintang sudah tersusun rapi ke bawah, tap bintang masih berfungsi normal.
+
 ## Batch 361 — FIX BUG NYATA: Row 4 tombol overflow, "Rating" wrap vertikal per-huruf (laporan user + screenshot, 1 file kode)
 User kirim 2 screenshot device asli: entry "Rating" (Batch 360) tidak tampil normal — icon ☆
 sendirian di ujung Row, tapi teks "Rating"-nya wrap 1-huruf-per-baris numpuk vertikal di tepi

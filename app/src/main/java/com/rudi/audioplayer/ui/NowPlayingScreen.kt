@@ -2356,39 +2356,56 @@ private fun RatingDialog(
         onDismissRequest = onDismiss,
         title = { Text("Beri Rating") },
         text = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                for (star in 1..5) {
-                    val starInteraction = remember { MutableInteractionSource() }
-                    IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSetRating(if (currentRating == star) 0 else star)
-                        },
-                        interactionSource = starInteraction,
-                        modifier = Modifier.bouncyPress(starInteraction, pressedScale = 0.75f)
-                    ) {
-                        Icon(
-                            if (star <= currentRating) Icons.Default.Star else Icons.Default.StarBorder,
-                            contentDescription = "$star bintang",
-                            tint = if (star <= currentRating) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.secondary
-                            }
-                        )
+            // Batch 362 — FIX BUG NYATA (laporan user + screenshot): star Row & Text hint
+            // "Belum ada rating..." SALING TUMPANG TINDIH (overlap) — kefoto jelas: teks 2 baris
+            // & 5 bintang render di posisi (x,y) yang sama, numpuk. ROOT CAUSE: slot `text` di
+            // Material3 `AlertDialog` MEWADAHI kontennya pakai `Box` (bukan `Column`) — jadi 2
+            // composable sibling langsung (Row lalu Text, TANPA pembungkus) yang dipasang di sini
+            // sebelumnya otomatis numpuk di titik origin yang sama alih-alih tersusun ke bawah
+            // (gotcha Compose yang cukup umum: slot lambda manapun yang dalamnya nampung LEBIH
+            // DARI 1 composable top-level WAJIB dibungkus Column/Row eksplisit sendiri — TIDAK
+            // ada Column implisit dari sisi pemanggil). FIX: bungkus semua isi slot `text` dalam
+            // 1 `Column` eksplisit — urutan dipertahankan sama seperti niat semula (hint dulu,
+            // baru Row bintang di bawahnya, dikasih `Spacer(8.dp)` supaya ada jarak, bukan cuma
+            // "kebetulan tidak numpuk lagi" krn Column otomatis susun vertikal).
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (currentRating == 0) {
+                    Text(
+                        "Belum ada rating — ketuk bintang untuk memberi rating",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    for (star in 1..5) {
+                        val starInteraction = remember { MutableInteractionSource() }
+                        IconButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSetRating(if (currentRating == star) 0 else star)
+                            },
+                            interactionSource = starInteraction,
+                            modifier = Modifier.bouncyPress(starInteraction, pressedScale = 0.75f)
+                        ) {
+                            Icon(
+                                if (star <= currentRating) Icons.Default.Star else Icons.Default.StarBorder,
+                                contentDescription = "$star bintang",
+                                tint = if (star <= currentRating) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.secondary
+                                }
+                            )
+                        }
                     }
                 }
-            }
-            if (currentRating == 0) {
-                Text(
-                    "Belum ada rating — ketuk bintang untuk memberi rating",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
             }
         },
         confirmButton = {

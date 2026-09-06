@@ -36,6 +36,41 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 362 (FIX BUG NYATA — laporan user + screenshot: isi `RatingDialog` [Batch 360] saling
+tumpang tindih, hint text & 5 bintang numpuk di posisi sama, 1 file kode)** — User kirim
+screenshot (crop lebih dekat dari dialog "Beri Rating"): teks hint "Belum ada rating — ketuk
+bintang untuk memberi rating" (2 baris) dan Row 5 `IconButton` bintang RENDER SALING TUMPANG
+TINDIH di titik yang sama, bukan tersusun rapi ke bawah — user tanya eksplisit apakah ini ikut
+kena fix Batch 361 (JAWAB: TIDAK — Batch 361 fix Row luar Tambah/Bagikan/Lirik/Rating di
+`NowPlayingScreen()`, `RatingDialog` itu composable privat TERPISAH, bugnya juga beda akar).
+
+**Root cause** — slot `text = { ... }` di `RatingDialog` (Batch 360) diisi 2 composable
+top-level SEJAJAR (`Row` lalu `Text`) TANPA pembungkus `Column` eksplisit. Slot `text` Material3
+`AlertDialog` MEWADAHI kontennya lewat `Box` (bukan `Column`) — jadi composable manapun yang
+ditaruh langsung di situ tanpa Column sendiri akan numpuk di origin yang sama alih-alih tersusun
+vertikal. Gotcha Compose yang genuinely umum kejadian; SUDAH ditangani BENAR di 2 dialog lain
+yang polanya mirip (`SpeedDialog` sejak lama, `SleepTimerDialog`) — keduanya sudah bungkus
+`Column` di slot `text`-nya masing-masing — jadi ini murni 1 oversight terisolasi di
+`RatingDialog` (composable BARU Batch 360, belum sempat diaudit silang ke 2 dialog itu sebelum
+kefoto user), BUKAN pola sistemik yang menyebar ke tempat lain (sudah diverifikasi manual: 0
+instance lain).
+
+**`NowPlayingScreen.kt`** — isi slot `text` `RatingDialog` dibungkus 1 `Column(
+Modifier.fillMaxWidth())` eksplisit, urutan dipertahankan sama seperti niat semula (hint dulu,
+`Spacer(8.dp)`, baru Row 5 bintang di bawahnya) — bedanya sekarang genuinely tersusun ke bawah,
+bukan cuma "kebetulan gak numpuk". Hint text dikasih `textAlign = TextAlign.Center` +
+`fillMaxWidth()` biar center-align konsisten sama Row bintang di bawahnya (sebelumnya default
+start-align, tak masalah dulu krn toh numpuk berantakan). 0 logic `onSetRating`/tap-bintang
+diubah — murni fix layout wrapper. 1 file kode (jauh di bawah batas Micro-Batch).
+
+Brace/paren/bracket diverifikasi seimbang penuh (tokenizer single-pass): 281/281 brace, 788/788
+paren (naik dari 280/783 batch sebelumnya — net +1 brace dari 1 `Column {}` baru, +5 paren dari
+`Modifier.fillMaxWidth()`+`textAlign=...`+`Spacer(...)`+dst.), 0/0 bracket. Belum diverifikasi
+compile CI sungguhan. **Belum diverifikasi visual device** — prioritas cek: (1) hint text & 5
+bintang sekarang tersusun rapi ke bawah tanpa tumpang tindih; (2) tap bintang tetap berfungsi
+normal (set/hapus rating) setelah dibungkus Column; (3) dialog masih center-aligned rapi
+mengikuti perubahan `textAlign`/`fillMaxWidth` baru pada hint text.
+
 **Batch 361 (FIX BUG NYATA — laporan user + 2 screenshot: Row 4 tombol Batch 360 tidak muat di
 layar sempit, `Text("Rating")` wrap per-huruf vertikal di tepi kanan layar, 1 file kode)** — User
 kirim 2 screenshot device asli: entry "Rating" (Batch 360) TIDAK tampil sebagai teks normal

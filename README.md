@@ -8,7 +8,14 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 361 (FIX BUG NYATA: laporan user + screenshot — Row 4 tombol
+> 🆕 **Update terbaru — Batch 362 (FIX BUG NYATA: laporan user + screenshot — isi `RatingDialog`
+> [Batch 360] tumpang tindih, hint text & 5 bintang numpuk di posisi sama, 1 file kode):** Root
+> cause: slot `text` `AlertDialog` mewadahi lewat `Box`, 2 composable sejajar tanpa `Column`
+> numpuk di origin sama — beda bug dari Batch 361 (Row luar), diaudit-silang & dikonfirmasi
+> oversight terisolasi (`SpeedDialog`/`SleepTimerDialog` sudah benar pakai Column). Fix: bungkus
+> `Column`, urutan tetap (hint → Row bintang). 0 logic tap-bintang diubah. Belum diverifikasi
+> visual device.
+> Batch 361 (FIX BUG NYATA: laporan user + screenshot — Row 4 tombol
 > Tambah/Bagikan/Lirik/Rating overflow di layar sempit, teks "Rating" wrap per-huruf vertikal
 > nembus ke area waveform, 1 file kode):** Row dikasih `horizontalScroll` (scroll ke samping
 > kalau tak muat, identik kalau muat) + semua 4 label tombol dikasih `maxLines = 1` +
