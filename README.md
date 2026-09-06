@@ -8,7 +8,15 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 359 (REVERT Batch 358: ikon Plus/Share dilepas dari samping
+> 🆕 **Update terbaru — Batch 360 (Jawaban `PENDING_RatingEntryPoint.md`: entry "Rating"
+> ringkas kembali ke Now Playing, 1 file kode):** User pilih Opsi 4 (pending sejak Batch 357) —
+> "Balik ke Now Playing, versi ringkas". Entry "Rating" baru ditambah sebagai `TextButton` ke-4
+> di Row Tambah/Bagikan/Lirik, REUSE 1:1 gaya visual 3 sibling-nya. Tap membuka `RatingDialog`
+> baru (5 `IconButton` bintang, styling REUSE `SmartPlaylistScreen.kt`, termasuk tap-bintang-
+> sama-untuk-hapus) — bukan mengembalikan 5 ikon `StarRatingRow` permanen seperti sebelum Batch
+> 357. `currentRating`/`onSetRating` (disisakan sejak Batch 357) dipakai lagi, `MainActivity.kt`
+> 0 disentuh. Belum diverifikasi compile CI & visual device sungguhan.
+> Batch 359 (REVERT Batch 358: ikon Plus/Share dilepas dari samping
 > judul, dipindah jadi entri icon+teks disamakan ke tombol "Lirik", 1 file kode):** User lapor
 > screenshot device hasil Batch 358 terlihat "aneh"/berantakan (judul panjang bikin ikon Share
 > nabrak teks marquee). Judul balik jadi `Text` polos rata-tengah tanpa ikon flanking; Plus

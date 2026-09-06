@@ -1,5 +1,33 @@
 # Changelog
 
+## Batch 360 — Jawaban PENDING_RatingEntryPoint.md: entry "Rating" ringkas kembali ke Now Playing (1 file kode)
+User pilih Opsi 4 dari `PENDING_RatingEntryPoint.md` (terbuka sejak Batch 357): "Balik ke Now
+Playing, versi ringkas" — 1 ikon bintang tunggal yang membuka dialog 5 pilihan, bukan 5 ikon
+`StarRatingRow` permanen seperti sebelum Batch 357.
+
+**1. `NowPlayingScreen.kt`** — entry "Rating" baru ditambah sebagai `TextButton` ke-4 di Row
+Tambah/Bagikan/Lirik (Batch 359), REUSE 1:1 gaya 3 sibling-nya (icon 16dp + `Spacer(6.dp)` +
+`Text(labelMedium)`, `bouncyPress(0.92f)`, `contentPadding(14.dp/6.dp)`). Icon dinamis
+(`Star`/`StarBorder` sesuai `currentRating`), `contentDescription` menjelaskan rating saat ini
+(beda dari 3 sibling yang `null` — di sini icon membawa info state, bukan cuma dekoratif). Tap
+membuka `RatingDialog` baru (composable privat, pola sama `SpeedDialog`: `AlertDialog` + tombol
+"Tutup"), isinya 5 `IconButton` bintang REUSE styling `SmartPlaylistScreen.kt` (filled/outline +
+primary/secondary), termasuk konvensi tap-bintang-sama-untuk-hapus yang sudah lama dipakai di
+sana. Tiap tap bintang langsung panggil `onSetRating(...)`, dialog tidak auto-close.
+
+**2. 0 `MainActivity.kt` disentuh** — `currentRating`/`onSetRating` (parameter `NowPlayingScreen()`
+yang sengaja tidak dihapus Batch 357) dipakai lagi persis seperti diantisipasi. 2 import baru
+(`Icons.Default.Star`/`StarBorder`, sudah dipakai identik di `SmartPlaylistScreen.kt`).
+`PENDING_RatingEntryPoint.md` dihapus (pertanyaan terjawab & tuntas dieksekusi).
+
+1 file kode (jauh di bawah batas Micro-Batch). Brace/paren/bracket diverifikasi seimbang penuh
+via tokenizer single-pass string/comment/char-literal-aware: 280/280 brace, 780/780 paren, 0/0
+bracket. Belum diverifikasi compile CI sungguhan & belum diverifikasi visual device — prioritas
+cek: 4 tombol (Tambah/Bagikan/Lirik/Rating) masih muat 1 baris rapi di layar sempit (risiko naik
+dari 3 tombol Batch 359 yang juga belum diverifikasi device asli), icon Rating berganti sesuai
+state, dialog 5 bintang berfungsi termasuk tap-untuk-hapus, dan rating yang di-set di sini
+konsisten dengan filter "rating minimum" Smart Playlist yang membacanya.
+
 ## Batch 359 — REVERT Batch 358: Plus/Share dipindah dari samping judul jadi entri sejenis "Lirik" (1 file kode)
 User kirim screenshot device hasil Batch 358: Row Plus/Judul/Share dinilai "aneh"/berantakan di
 layar sungguhan (judul panjang bikin ikon Share seperti nabrak teks marquee, ikon Plus mepet

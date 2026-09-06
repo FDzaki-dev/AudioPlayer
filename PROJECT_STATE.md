@@ -36,6 +36,52 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 360 (Jawab `PENDING_RatingEntryPoint.md` sejak Batch 357 — Opsi 4 dipilih user, entry
+"Rating" ringkas kembali ke Now Playing, 1 file kode)** — User jawab pertanyaan T/J pending:
+"Balik ke Now Playing, versi ringkas" — persis Opsi 4 yang dicatat `PENDING_RatingEntryPoint.md`
+("1 ikon bintang tunggal yang saat ditekan membuka dialog 5 pilihan, alih-alih 5 ikon permanen").
+StarRatingRow LAMA (5 IconButton permanen, dihapus Batch 357) TIDAK dikembalikan.
+
+**`NowPlayingScreen.kt`** — 1 entry baru "Rating" ditambah sebagai `TextButton` ke-4 di Row
+Tambah/Bagikan/Lirik (Batch 359), REUSE 1:1 pola visual+struktur 3 sibling-nya (icon 16dp +
+`Spacer(6.dp)` + `Text(labelMedium, tint=animatedAccent)`, `bouncyPress(0.92f)`,
+`contentPadding(14.dp/6.dp)`) — bukan pola baru. Beda dari 3 sibling: icon DINAMIS
+(`Icons.Default.Star` kalau `currentRating > 0`, else `Icons.Default.StarBorder`) dan
+`contentDescription` TIDAK `null` (diisi "Rating saat ini: N dari 5 bintang"/"Belum ada rating")
+— karena bentuk icon di sini membawa informasi state yang tidak terwakili label statis "Rating",
+beda dari Tambah/Bagikan/Lirik yang iconnya cuma dekoratif (Text sibling sudah menjelaskan
+seluruhnya). Tap tombol buka `RatingDialog` baru (composable privat baru, pola SAMA PERSIS
+`SpeedDialog`: `AlertDialog` + `Row` 5 `IconButton` bintang + tombol "Tutup", styling filled/
+outline + warna primary/secondary di-REUSE dari `SmartPlaylistScreen.kt`'s rating-minimum filter
+yang sudah ada — termasuk konvensi "tap bintang yang sama = hapus rating" yang komentar file itu
+sendiri sebut sebagai warisan langsung dari rating row NowPlayingScreen yang lama). Tiap tap
+bintang di dialog langsung memanggil `onSetRating(...)`, dialog TIDAK auto-close (sama seperti
+`SpeedDialog` — user tutup manual via "Tutup", bisa lihat hasil dulu).
+
+**`currentRating`/`onSetRating`** (parameter `NowPlayingScreen()` yang SENGAJA tidak dihapus
+Batch 357) dipakai lagi persis seperti yang sudah diantisipasi — **`MainActivity.kt` 0 disentuh**
+batch ini, sesuai catatan Batch 357 sendiri. 2 import baru (`Icons.Default.Star`,
+`Icons.Default.StarBorder` — sudah dipakai identik di `SmartPlaylistScreen.kt`, bukan icon baru
+buat app ini). 1 file kode (`NowPlayingScreen.kt`, non-protected) — jauh di bawah batas
+Micro-Batch. `PENDING_RatingEntryPoint.md` **DIHAPUS** (bukan cuma diupdate) — pertanyaan sudah
+terjawab & dieksekusi tuntas, 0 keputusan tersisa dari dokumen itu.
+
+Brace/paren/bracket diverifikasi seimbang penuh (tokenizer string/comment/char-literal-aware,
+single-pass — bukan regex 2-tahap yang rawan false-positive dari literal semacam `"audio/*"`):
+280/280 brace, 780/780 paren, 0/0 bracket (naik dari 259/259 brace + 744/744 paren sebelum batch
+ini — net penambahan wajar dari 1 `TextButton` baru + 1 blok trigger dialog + 1 composable
+`RatingDialog` baru). Belum diverifikasi compile CI sungguhan (sandbox tanpa compiler
+Kotlin+AGP+Compose) — konfirmasi user setelah build GH Actions jalan, pola sama batch-batch lama.
+**Belum diverifikasi visual di device** — prioritas cek: (1) Row 4 tombol (Tambah/Bagikan/Lirik/
+Rating) masih muat rapi 1 baris bahkan di layar sempit (RISIKO NAIK dari Batch 359 yang sudah
+menandai 3 tombol "belum diverifikasi device asli" — sekarang 4 tombol, kandidat wrap/overflow
+kalau ternyata mepet); (2) icon Rating berganti Star/StarBorder sesuai `currentRating` lagu yang
+sedang diputar; (3) tap Rating buka dialog 5 bintang, tap bintang langsung set rating (termasuk
+tap bintang yang sama utk menghapus rating ke 0), warna primary/secondary berubah sesuai
+seleksi; (4) rating yang di-set di sini kebaca balik oleh filter "rating minimum" Smart Playlist
+(`LibraryScreen.kt`/`SmartPlaylistEngine.kt`) — jalur baca lama SENGAJA tidak disentuh batch ini,
+harus tetap konsisten dgn nilai yang baru di-set lewat dialog baru ini.
+
 **Batch 359 (REVERT Batch 358 — ikon Plus/Share dilepas dari samping judul, dipindah jadi entri
 icon+teks disamakan 1:1 ke gaya tombol "Lirik", 1 file kode)** — User kirim screenshot device
 hasil Batch 358: Row Plus/Judul/Share dinilai "aneh"/berantakan (judul panjang bikin ikon Share

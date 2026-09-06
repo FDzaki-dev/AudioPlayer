@@ -57,6 +57,8 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeOff
@@ -245,6 +247,7 @@ fun NowPlayingScreen(
     var showQueueSheet by remember { mutableStateOf(false) }
     var showLyricsSheet by remember { mutableStateOf(false) }
     var showAddToPlaylistDialog by remember { mutableStateOf(false) } // Batch 358
+    var showRatingDialog by remember { mutableStateOf(false) } // Batch 360
     var showEqualizerSheet by remember { mutableStateOf(false) }
     var showVisualizerSheet by remember { mutableStateOf(false) }
     var showAdvancedSheet by remember { mutableStateOf(false) }
@@ -987,6 +990,43 @@ fun NowPlayingScreen(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Lirik", style = MaterialTheme.typography.labelMedium, color = animatedAccent)
             }
+            // Batch 360 — jawaban PENDING_RatingEntryPoint.md (Batch 357): Opsi 4 dipilih user
+            // ("Balik ke Now Playing, versi ringkas") — StarRatingRow LAMA (5 IconButton tetap
+            // tampil) TIDAK dikembalikan; sebagai gantinya 1 entry "Rating" REUSE 1:1 pola
+            // visual+struktur Tambah/Bagikan/Lirik di atas (icon 16dp + Spacer 6dp + Text
+            // labelMedium bertint animatedAccent, bouncyPress 0.92f, contentPadding sama) —
+            // ringkas sesuai literal permintaan user, bukan mengembalikan 5 ikon permanen.
+            // `currentRating`/`onSetRating` dari signature fungsi ini (SENGAJA tidak dihapus
+            // Batch 357, lihat komentar parameter) dipakai lagi di sini tanpa perlu menyentuh
+            // MainActivity.kt sama sekali. Icon dibuat DINAMIS (Star terisi vs StarBorder) —
+            // beda dari Tambah/Bagikan/Lirik yang iconnya statis — karena di sini bentuk icon
+            // itu sendiri membawa informasi (sudah dirating atau belum) yang TIDAK terwakili
+            // oleh label teks statis "Rating"; makanya contentDescription-nya TIDAK null (beda
+            // dari 3 sibling di atas) — konsisten aturan Batch 230/235 (null cuma untuk icon yang
+            // genuinely decorative, di sini icon menyampaikan state, bukan dekoratif semata).
+            val ratingInteraction = remember { MutableInteractionSource() }
+            TextButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    showRatingDialog = true
+                },
+                interactionSource = ratingInteraction,
+                modifier = Modifier.bouncyPress(ratingInteraction, pressedScale = 0.92f),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    if (currentRating > 0) Icons.Default.Star else Icons.Default.StarBorder,
+                    contentDescription = if (currentRating > 0) {
+                        "Rating saat ini: $currentRating dari 5 bintang"
+                    } else {
+                        "Belum ada rating"
+                    },
+                    tint = animatedAccent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Rating", style = MaterialTheme.typography.labelMedium, color = animatedAccent)
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -1262,6 +1302,18 @@ fun NowPlayingScreen(
                 showAddToPlaylistDialog = false
             },
             onDismiss = { showAddToPlaylistDialog = false }
+        )
+    }
+
+    // Batch 360 — dialog untuk entry "Rating" baru di Row Tambah/Bagikan/Lirik/Rating (lihat
+    // komentar di atas Row-nya). RatingDialog (definisi di bawah fungsi ini, pola sama persis
+    // SpeedDialog: AlertDialog + tombol "Tutup", pilihan diterapkan LANGSUNG saat ditekan tanpa
+    // menutup dialog, biar user bisa lihat hasilnya dulu sebelum menutup manual).
+    if (showRatingDialog) {
+        RatingDialog(
+            currentRating = currentRating,
+            onDismiss = { showRatingDialog = false },
+            onSetRating = onSetRating
         )
     }
 
@@ -2224,6 +2276,67 @@ private fun SpeedDialog(
                     subtitle = "Lagu berikutnya mulai main sebelum lagu ini habis, saling menumpuk lalu bertukar halus",
                     selected = crossfadeEnabled,
                     onClick = { onToggleCrossfade(true) }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Tutup") }
+        }
+    )
+}
+
+// Batch 360 — pengganti StarRatingRow lama (5 IconButton permanen di layar, dihapus Batch 357).
+// Isi 5-bintang & konvensi "tap bintang yang sama = hapus rating" DIPERTAHANKAN 1:1 (persis
+// yang direferensikan komentar SmartPlaylistScreen.kt sendiri: "same tap-to-clear convention
+// as NowPlayingScreen's rating row") — cuma WADAHnya yang berubah dari row permanen jadi dialog
+// on-demand (Opsi 4 PENDING_RatingEntryPoint.md). Warna Star terisi/kosong REUSE pola
+// primary/secondary SmartPlaylistScreen.kt (bukan animatedAccent) — dialog ini konteksnya beda
+// (per-lagu absolute rating, bukan filter Smart Playlist), tapi sama-sama "pilihan di dalam
+// AlertDialog" jadi token warna standar M3 lebih pas daripada warna aksen dinamis per-lagu yang
+// dipakai Row entry-point di luar dialog.
+@Composable
+private fun RatingDialog(
+    currentRating: Int,
+    onDismiss: () -> Unit,
+    onSetRating: (Int) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Beri Rating") },
+        text = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                for (star in 1..5) {
+                    val starInteraction = remember { MutableInteractionSource() }
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSetRating(if (currentRating == star) 0 else star)
+                        },
+                        interactionSource = starInteraction,
+                        modifier = Modifier.bouncyPress(starInteraction, pressedScale = 0.75f)
+                    ) {
+                        Icon(
+                            if (star <= currentRating) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = "$star bintang",
+                            tint = if (star <= currentRating) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.secondary
+                            }
+                        )
+                    }
+                }
+            }
+            if (currentRating == 0) {
+                Text(
+                    "Belum ada rating — ketuk bintang untuk memberi rating",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
                 )
             }
         },
