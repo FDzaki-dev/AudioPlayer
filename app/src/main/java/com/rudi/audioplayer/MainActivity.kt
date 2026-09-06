@@ -873,6 +873,13 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             onCutRingtone = { song, range, destination, label ->
                 playerViewModel.requestCutRingtone(song, range, destination, label)
             },
+            // Batch 358 — ikon "Plus" baru di Now Playing (samping judul). Sama persis 3 baris
+            // yang sudah dipakai LibraryScreen (di atas, ~line 1153-1157), playlists StateFlow-nya
+            // pun sudah dikoleksi dari playerViewModel lebih awal di fungsi ini (val playlists),
+            // 0 sumber data baru.
+            playlists = playlists,
+            onAddSongToPlaylist = { id, songId -> playerViewModel.addSongToPlaylist(id, songId) },
+            onCreatePlaylist = { name -> playerViewModel.createPlaylist(name) },
             onBack = onBackAction
         )
     }

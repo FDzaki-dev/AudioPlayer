@@ -1,5 +1,6 @@
 package com.rudi.audioplayer.ui
 
+import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -33,6 +34,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Edit
@@ -50,6 +52,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -99,8 +102,10 @@ import android.content.Context
 import android.media.AudioManager
 import android.view.WindowManager
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.media3.common.Player
+import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.ui.lyrics.LyricsViewModel
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
@@ -204,6 +209,13 @@ fun NowPlayingScreen(
     // di atas: hasil sukses/gagal muncul lewat Snackbar infoMessage/actionErrorMessage yang
     // sudah ada di MainActivity, bukan callback result langsung ke sini.
     onSaveSongTags: (com.rudi.audioplayer.data.Song, com.rudi.audioplayer.data.Id3TagWriter.EditableTags) -> Unit,
+    // Batch 358 — ikon "Plus" baru di samping judul (lihat Row baru di body fungsi ini) reuse
+    // AddToPlaylistDialog (PlaylistScreen.kt) + pola callback yang SAMA PERSIS dgn LibraryScreen.kt
+    // (addToPlaylist lambda di sana), bukan mekanisme baru. 3 param ini wajib supaya sheet itu
+    // bisa dipanggil dari sini juga.
+    playlists: List<Playlist>,
+    onAddSongToPlaylist: (String, Long) -> Boolean,
+    onCreatePlaylist: (String) -> Playlist,
     // Roadmap #5 (Ringtone Cutter) — fire-and-forget sama pola onSaveSongTags di atas.
     onCutRingtone: (
         com.rudi.audioplayer.data.Song,
@@ -232,6 +244,7 @@ fun NowPlayingScreen(
     var showSpeedDialog by remember { mutableStateOf(false) }
     var showQueueSheet by remember { mutableStateOf(false) }
     var showLyricsSheet by remember { mutableStateOf(false) }
+    var showAddToPlaylistDialog by remember { mutableStateOf(false) } // Batch 358
     var showEqualizerSheet by remember { mutableStateOf(false) }
     var showVisualizerSheet by remember { mutableStateOf(false) }
     var showAdvancedSheet by remember { mutableStateOf(false) }
@@ -874,12 +887,62 @@ fun NowPlayingScreen(
             color = animatedAccent
         )
         Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            song?.title ?: "-",
-            style = MaterialTheme.typography.titleLarge,
-            maxLines = 1,
-            modifier = Modifier.basicMarquee()
-        )
+        // Batch 358 — user eksplisit prefer ikon "Plus" (Tambah ke Playlist) & "Share" nempel
+        // kiri/kanan judul lagu, DIBANDING ditambahkan sebagai entri sejenis tombol "Lirik" di
+        // bawahnya. Row baru ini HANYA bungkus Text judul lama (Text artist & tombol Lirik di
+        // bawah 0 disentuh) — 2 IconButton baru simetris kiri/kanan, judul tetap 1 baris+marquee
+        // di tengah sisa lebar (weight(1f) + textAlign Center supaya start point tetap center
+        // walau ada 2 ikon di kedua sisi, bukan cuma rata-kiri sisa Row).
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val addToPlaylistInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    showAddToPlaylistDialog = true
+                },
+                interactionSource = addToPlaylistInteraction,
+                modifier = Modifier.bouncyPress(addToPlaylistInteraction, pressedScale = 0.92f)
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Tambah ke playlist",
+                    tint = animatedAccent
+                )
+            }
+            Text(
+                song?.title ?: "-",
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f).basicMarquee()
+            )
+            val shareInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    song?.let { s ->
+                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "audio/*"
+                            putExtra(Intent.EXTRA_STREAM, s.uri)
+                            putExtra(Intent.EXTRA_TITLE, s.title)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(sendIntent, "Bagikan lagu"))
+                    }
+                },
+                interactionSource = shareInteraction,
+                modifier = Modifier.bouncyPress(shareInteraction, pressedScale = 0.92f)
+            ) {
+                Icon(
+                    Icons.Default.Share,
+                    contentDescription = "Bagikan lagu",
+                    tint = animatedAccent
+                )
+            }
+        }
         Text(
             song?.artist ?: "-",
             style = MaterialTheme.typography.bodyMedium,
@@ -1155,6 +1218,31 @@ fun NowPlayingScreen(
             onPlayIndex = { index -> onPlayQueueIndex(index) },
             onMove = { from, to -> onMoveQueueItem(from, to) },
             onRemove = { index -> onRemoveFromQueue(index) }
+        )
+    }
+
+    // Batch 358 — dialog utk ikon "Plus" baru di Row judul. Reuse AddToPlaylistDialog
+    // (PlaylistScreen.kt) apa adanya, callback body copy pola addToPlaylist/onAddToExisting/
+    // onCreateAndAdd LibraryScreen.kt (baris ~219 & ~474) — beda cuma sumber `song` (di sini dari
+    // uiState.currentSong yg sudah di-scope di atas, bukan songForPlaylistDialog lokal) & 0
+    // onInfoMessage (NowPlayingScreen belum punya param itu, konsisten pola fire-and-forget
+    // lain di file ini spt onAddBookmark/onSetRating — haptic LongPress cukup jadi konfirmasi).
+    if (showAddToPlaylistDialog && song != null) {
+        AddToPlaylistDialog(
+            song = song,
+            playlists = playlists,
+            onAddToExisting = { playlist ->
+                onAddSongToPlaylist(playlist.id, song.id)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                showAddToPlaylistDialog = false
+            },
+            onCreateAndAdd = { name ->
+                val playlist = onCreatePlaylist(name)
+                onAddSongToPlaylist(playlist.id, song.id)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                showAddToPlaylistDialog = false
+            },
+            onDismiss = { showAddToPlaylistDialog = false }
         )
     }
 

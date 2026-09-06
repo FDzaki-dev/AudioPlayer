@@ -8,7 +8,14 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 357 (UI POLISH: rating 5-bintang Now Playing diganti tombol
+> 🆕 **Update terbaru — Batch 358 (Now Playing: ikon "Plus"/Tambah ke Playlist & "Share"
+> menempel kiri/kanan judul lagu, 2 file kode):** Permintaan user, prefer ikon Plus/Share
+> langsung di samping judul dibanding ditambahkan sebagai tombol sejenis "Lirik" di bawahnya
+> (tombol "Lirik" 0 disentuh). Plus membuka `AddToPlaylistDialog` yang sama dipakai halaman
+> Library (0 dialog baru); Share pakai `Intent.ACTION_SEND` langsung dari URI MediaStore lagu
+> (0 FileProvider baru). `MainActivity.kt` ikut disentuh untuk wiring playlist. Belum
+> diverifikasi compile CI sungguhan.
+> Batch 357 (UI POLISH: rating 5-bintang Now Playing diganti tombol
 > pintas "Lirik", kontras waveform played/unplayed diperkuat, 1 file kode):** Permintaan user
 > (acuan visual gaya Spotify/Apple Music). (1) `StarRatingRow` — satu-satunya jalur TULIS ke
 > `RatingStore` di seluruh app (`LibraryScreen.kt` cuma BACA `ratingOf` buat filter, tidak ada UI

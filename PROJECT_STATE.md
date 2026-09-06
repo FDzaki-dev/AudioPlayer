@@ -36,6 +36,40 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 358 (Now Playing — ikon "Plus" (Tambah ke Playlist) & "Share" flanking judul lagu, 2
+file kode)** — Permintaan user eksplisit (respons ke screenshot Now Playing hasil Batch 357):
+user prefer ikon Plus/Share ditempel LANGSUNG di kiri/kanan judul lagu, DIBANDING ditambahkan
+sebagai entri sejenis tombol "Lirik" di bawah judul. Tombol "Lirik" itu sendiri 0
+disentuh/dipindah — cuma Row baru DI ATASnya (bungkus `Text` judul lama) yang berubah.
+1. **`NowPlayingScreen.kt`**: `Text` judul lama dibungkus `Row(fillMaxWidth)` + 2 `IconButton`
+   baru simetris — kiri: `Icons.Default.Add` (buka `AddToPlaylistDialog`, REUSE dialog yang sama
+   dipakai `LibraryScreen.kt`/`PlaylistScreen.kt`, 0 dialog baru dibuat), kanan:
+   `Icons.Default.Share` (langsung `Intent.ACTION_SEND` pakai `song.uri` yang sudah content://
+   MediaStore URI sejak `Song.kt` awal — 0 `FileProvider` baru diperlukan). Judul tetap 1
+   baris+marquee, `textAlign = Center` + `weight(1f)` supaya start-point tetap center walau
+   diapit 2 ikon (bukan rata-kiri sisa Row) — pola full-width-di-dalam-Column-wrap-content sama
+   persis `PlaybackProgressRow` (`Box.fillMaxWidth()`) yang sudah lama ada di file yang sama.
+2. 3 parameter baru ditambah ke signature `NowPlayingScreen()` (`playlists`,
+   `onAddSongToPlaylist`, `onCreatePlaylist`) — pola SAMA PERSIS yang sudah dipakai
+   `LibraryScreen.kt` (`addToPlaylist`/`onAddToExisting`/`onCreateAndAdd`, baris ~219 & ~474 di
+   sana), 0 mekanisme baru diciptakan. **`MainActivity.kt` DISENTUH** (beda dari Batch 357 yang
+   sengaja menghindarinya demi minim-diff) — tidak terhindarkan kali ini, wiring 3 param baru
+   wajib lewat sana (satu-satunya tempat semua callback `NowPlayingScreen` di-assemble); StateFlow
+   `playlists`-nya sendiri sudah dikoleksi dari `playerViewModel` lebih awal di file yang sama
+   (dipakai ulang buat `LibraryScreen` juga), 0 sumber data baru.
+3. **0 `onInfoMessage` ditambahkan** — `NowPlayingScreen` belum pernah punya param itu (beda
+   dari `LibraryScreen` yang punya `onInfoMessage` lokal utk toast "Ditambahkan ke ..."),
+   konfirmasi sukses cuma via haptic `LongPress` (pola sama `onSetRating`/`onAddBookmark`/dst di
+   file ini yang juga fire-and-forget tanpa Snackbar khusus). Kalau user mau feedback teks
+   eksplisit, itu perlu param ke-4 baru — BELUM dilakukan di batch ini, dicatat sebagai opsi
+   terbuka (di luar cakupan pertanyaan klarifikasi wajar untuk task ikon kosmetik ini), bukan
+   diputuskan sepihak.
+4. Belum diverifikasi compile CI sungguhan (sandbox tanpa compiler Kotlin+AGP+Compose) —
+   konfirmasi user setelah build GH Actions jalan, sesuai pola batch-batch sebelumnya.
+
+2 file kode disentuh (`NowPlayingScreen.kt`, `MainActivity.kt`) — dalam batas Micro-Batch (2 dari
+maks 3).
+
 **Batch 357 (UI POLISH — rating 5-bintang Now Playing diganti tombol pintas "Lirik", kontras
 waveform played/unplayed diperkuat, 1 file kode)** — Permintaan user (acuan visual gaya
 Spotify/Apple Music, 3 poin: modernisasi rating, kontras waveform, latar blur dinamis).

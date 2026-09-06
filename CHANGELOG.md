@@ -1,5 +1,30 @@
 # Changelog
 
+## Batch 358 — Now Playing: ikon "Plus" (Tambah ke Playlist) & "Share" flanking judul lagu (2 file kode)
+Permintaan user eksplisit, respons ke screenshot Now Playing hasil Batch 357: prefer ikon
+Plus/Share ditempel langsung kiri/kanan judul lagu, dibanding ditambahkan sebagai entri sejenis
+tombol "Lirik" di bawah judul. Tombol "Lirik" 0 disentuh/dipindah.
+
+**1. `NowPlayingScreen.kt`** — `Text` judul dibungkus `Row(fillMaxWidth)` + 2 `IconButton` baru:
+kiri `Icons.Default.Add` (buka `AddToPlaylistDialog`, dialog yang sama persis dipakai
+`LibraryScreen.kt`, 0 dialog baru), kanan `Icons.Default.Share` (`Intent.ACTION_SEND` pakai
+`song.uri` — sudah content:// MediaStore URI, 0 `FileProvider` diperlukan). Judul tetap 1
+baris+marquee, `textAlign = Center` + `weight(1f)` supaya tetap center diapit 2 ikon.
+
+**2. `MainActivity.kt`** — 3 parameter baru (`playlists`, `onAddSongToPlaylist`,
+`onCreatePlaylist`) diwire ke `NowPlayingScreen(...)`, identik pola yang sudah dipakai
+`LibraryScreen`. File ini disentuh (beda dari Batch 357 yang sengaja menghindarinya) — wiring
+baru wajib lewat sana, `playlists` StateFlow sendiri sudah dikoleksi lebih awal di file yang
+sama, 0 sumber data baru.
+
+**3. Tanpa toast konfirmasi** — `NowPlayingScreen` belum punya param `onInfoMessage`
+(`LibraryScreen` punya, `NowPlayingScreen` tidak), jadi konfirmasi cuma haptic `LongPress`,
+konsisten pola `onSetRating`/`onAddBookmark` di file yang sama. Opsi tambah toast teks dicatat
+sebagai follow-up terbuka, bukan diputuskan sepihak.
+
+2 dari maks 3 file kode Micro-Batch (`NowPlayingScreen.kt`, `MainActivity.kt`). Belum
+diverifikasi compile CI sungguhan (sandbox tanpa compiler Kotlin+AGP+Compose).
+
 ## Batch 357 — UI POLISH: rating 5-bintang Now Playing diganti tombol pintas "Lirik", kontras waveform played/unplayed diperkuat (1 file kode)
 Permintaan user, dengan acuan visual gaya Spotify/Apple Music (3 poin: modernisasi rating,
 kontras waveform, latar blur dinamis).
