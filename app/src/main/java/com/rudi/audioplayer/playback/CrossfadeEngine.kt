@@ -94,6 +94,13 @@ class CrossfadeEngine(
     private var triggeredForIndex = -1
     private var rampJob: Job? = null
 
+    // Batch 366 — nilai sessionPlayer.volume yang ditangkap SEBELUM ramp apa pun menyentuhnya
+    // di awal siklus fade (lihat maybeStartCrossfade()). Satu-satunya sumber kebenaran buat
+    // restore di onSessionAutoTransition() & abort() — jangan pernah coba tebak ulang volume
+    // "utuh" dari nilai yang sudah di tengah jalan diubah ramp, itu akar bug Batch 366 (lihat
+    // abort() di bawah).
+    private var preFadeVolume: Float = 1f
+
     // Tells onSessionManualDiscontinuity apart from this engine's own handback seek in
     // onSessionAutoTransition, which fires the exact same SEEK discontinuity reason and must
     // NOT be treated as a manual skip that aborts itself.
@@ -145,7 +152,8 @@ class CrossfadeEngine(
         triggeredForIndex = currentIndex
         state = State.FADING
 
-        val target = sessionPlayer.volume.let { if (it <= 0f) 1f else it }
+        val target = sessionPlayer.volume.let { if (it < VOLUME_EPSILON) 1f else it }
+        preFadeVolume = target
 
         overlapPlayer.setMediaItem(nextItem)
         overlapPlayer.volume = 0f
@@ -169,7 +177,13 @@ class CrossfadeEngine(
         state = State.HANDBACK
         rampJob?.cancel()
 
-        val target = overlapPlayer.volume.let { if (it <= 0.01f) 1f else it }
+        // Batch 366 — dulu ditebak dari overlapPlayer.volume saat ini (rapuh: kalau ramp awal
+        // maybeStartCrossfade() belum sempat benar-benar sampai ke target pas transisi alami
+        // keburu terjadi — mis. sessionPlayer buru-buru resume dekat ujung lagu abis cold-start
+        // eksternal — target jadi ikut fraksi asal-asalan, bukan volume "utuh" yang benar).
+        // preFadeVolume adalah nilai ASLI yang ditangkap di awal siklus ini, selalu benar apa
+        // pun progress ramp saat ini.
+        val target = preFadeVolume
 
         internalSeekInFlight = true
         // Safe precisely because sessionPlayer's volume is already ~0 here — see class doc
@@ -215,10 +229,33 @@ class CrossfadeEngine(
         rampJob?.cancel()
         rampJob = null
         if (state != State.IDLE) {
-            sessionPlayer.volume = sessionPlayer.volume.let { if (it <= 0f) 1f else it }
+            // Batch 366 BUGFIX (root cause dari laporan user — audio bisu setelah lagu
+            // pertama pasca kill+trigger eksternal, notifikasi/widget tetap "Memutar", cuma
+            // hilang lagi setelah restart device). Baris lama:
+            //   sessionPlayer.volume = sessionPlayer.volume.let { if (it <= 0f) 1f else it }
+            // adalah NO-OP di HAMPIR SEMUA kejadian nyata: volume di tengah ramp (step 60ms,
+            // lihat animateDualVolume) nyaris tidak pernah persis 0.0f, jadi cabang "reset ke
+            // 1f" nyaris tidak pernah kena — baris itu efektif cuma menulis ulang volume ke
+            // NILAINYA SENDIRI yang sudah turun (mis. 0.05), meninggalkan sessionPlayer
+            // nyangkut nyaris bisu SETIAP kali abort() dipicu pertengahan fade/handback:
+            // overlapPlayer.onPlayerError (decoder kedua gagal siap — paling rawan persis
+            // detik-detik awal sesi baru dari cold-start eksternal, saat pipeline audio
+            // pertama sendiri belum tentu selesai stabil), skip manual selagi fading, atau
+            // toggle Nonaktifkan Crossfade pertengahan fade. Karena Service (dan sessionnya)
+            // tetap hidup di background, sekadar buka-lagi App TIDAK membuat ExoPlayer baru
+            // (volume tidak ikut reset ke default 1.0) — cuma restart device (yang benar-benar
+            // mematikan proses Service) yang terasa "menyembuhkan", sampai kondisi yang sama
+            // terpicu lagi. Fix: restore ke preFadeVolume yang ditangkap SEBELUM ramp apa pun
+            // menyentuhnya — satu-satunya nilai yang selalu benar, tidak bergantung sudah
+            // sejauh apa ramp berjalan saat abort() dipanggil.
+            sessionPlayer.volume = preFadeVolume
             overlapPlayer.pause()
             overlapPlayer.clearMediaItems()
             overlapPlayer.volume = 0f
+            AppLogger.w(
+                "CrossfadeEngine",
+                "Crossfade dibatalkan pertengahan (state=$state) — sessionPlayer.volume dipulihkan ke $preFadeVolume"
+            )
         }
         state = State.IDLE
         triggeredForIndex = -1
@@ -247,5 +284,8 @@ class CrossfadeEngine(
     companion object {
         private const val STEP_MS = 60L
         private const val HANDBACK_MS = 400L
+        // Batch 366 — ambang toleransi float utk anggap "sudah 0", dipakai konsisten di semua
+        // pengecekan (dulu ada yang exact `<= 0f`, ada yang `<= 0.01f`, tidak konsisten).
+        private const val VOLUME_EPSILON = 0.01f
     }
 }

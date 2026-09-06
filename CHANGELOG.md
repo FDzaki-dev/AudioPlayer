@@ -1,5 +1,47 @@
 # Changelog
 
+## Batch 366 — FIX REGRESI URGENT: audio bisu pasca kill+trigger eksternal (CrossfadeEngine, 1 file kode)
+User confirm Batch 365 (fix CI) sukses + efek bounce Batch 364 kerasa jelas di device asli (👍,
+sedikit kuat tapi disetujui, tidak diminta di-tune turun batch ini). Laporan baru, ditandai user
+LEBIH URGENT: regresi keluaran suara — utamanya saat app di-kill lalu playback dipicu eksternal
+(widget/notifikasi/lock screen/Bluetooth/Android Auto, lewat `onPlaybackResumption` atau cold-start
+widget), lagu pertama normal, tapi begitu lagu itu habis & pindah ke lagu berikutnya, suara jadi
+bisu — padahal widget & notifikasi media masih tampil "Memutar". Cuma restart DEVICE yang terasa
+menyembuhkan, dan itu pun tidak lama kambuh lagi. Paling sering dilaporkan di OS 15.
+
+**Root cause — bug nyata di `CrossfadeEngine.kt` (Batch 102), bukan spekulasi OS/HAL**: fungsi
+`abort()` (dipanggil dari `overlapPlayer.onPlayerError`, skip manual selagi fading/handback, atau
+toggle Nonaktifkan Crossfade pertengahan fade) merestorasi volume dengan baris
+`sessionPlayer.volume = sessionPlayer.volume.let { if (it <= 0f) 1f else it }` — ini NO-OP di
+hampir semua kejadian nyata, karena volume di tengah ramp (step 60ms) nyaris tidak pernah persis
+`0.0f`. Efeknya, baris itu cuma menulis ulang volume ke NILAINYA SENDIRI yang sudah turun (mis.
+0.05) — sessionPlayer nyangkut nyaris bisu. Karena `PlaybackService` (dan MediaSession-nya) tetap
+hidup di background, sekadar buka-lagi App TIDAK membuat ExoPlayer baru (volume tidak ikut reset
+ke default 1.0) — cuma restart device (mematikan proses Service beneran) yang terasa
+"menyembuhkan", sampai kondisi yang sama (skip/error pertengahan fade) terpicu lagi di sesi
+berikutnya. Kenapa paling sering kena persis di jalur kill+trigger-eksternal: crossfade baru
+mulai kalau posisi lagu tersimpan (`PlaybackStateStore`) kebetulan sudah dekat ujung lagu saat
+proses mati — begitu resume, jendela crossfade langsung kepicu nyaris seketika, dan `overlapPlayer`
+(decoder ExoPlayer KEDUA, baru pertama kali di-`prepare()`) punya peluang lebih besar gagal/telat
+persis di detik-detik awal sesi baru — kondisi yang jarang terjadi di pemakaian normal (app sudah
+lama jalan, pipeline audio sudah stabil).
+
+**Fix — `CrossfadeEngine.kt` (1 file)**: tambah `preFadeVolume` — nilai volume ASLI ditangkap
+SEBELUM ramp apa pun menyentuhnya (di awal `maybeStartCrossfade()`) — jadi satu-satunya sumber
+kebenaran buat restore, dipakai konsisten di `onSessionAutoTransition()` (dulu ditebak dari
+`overlapPlayer.volume` saat ini, sama rapuhnya kalau ramp awal belum sempat penuh) dan di
+`abort()` (fix utama). Tambah `VOLUME_EPSILON` (0.01f) konsisten menggantikan campuran
+`<= 0f`/`<= 0.01f` yang tidak seragam sebelumnya. Tambah `AppLogger.w` tiap `abort()` benar-benar
+memulihkan volume mid-fade — kalau bug ini masih kambuh setelah fix, Log Diagnostik (Settings >
+Lanjutan) akan punya jejaknya kali ini.
+
+Belum ada akses device OS 15 sungguhan dari sesi ini utk reproduksi persis skenario user (kill app
++ trigger eksternal + lagu nyaris habis) — fix ini menutup bug KONKRET yang terverifikasi baca
+kode (bukan tebakan), tapi kalau user masih menemui audio bisu setelah update ini, kemungkinan ada
+faktor kedua (mis. `overlapPlayer` benar-benar gagal `prepare()` di HAL tertentu) yang perlu
+logcat/Log Diagnostik asli utk dikonfirmasi — laporkan balik dengan isi Log Diagnostik kalau
+terulang.
+
 ## Batch 365 — FIX CI: `compileDebugKotlin`/`compileReleaseKotlin` gagal di `IosScrollPhysics.kt` (log_fail user, 1 file kode)
 User upload `log_fail` dari GH Actions run: build gagal di 2 task (`compileDebugKotlin`,
 `compileReleaseKotlin`), 5 baris error compiler, semua di `ui/theme/IosScrollPhysics.kt` (file

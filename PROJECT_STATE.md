@@ -36,6 +36,34 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 366 (FIX REGRESI URGENT — audio bisu pasca kill+trigger eksternal, `CrossfadeEngine.kt`,
+1 file kode)** — User confirm Batch 365 (CI) sukses + bounce Batch 364 kerasa di device (👍).
+Laporan baru lebih urgent: app di-kill lalu playback dipicu eksternal (widget/notifikasi/lock
+screen/Bluetooth/Android Auto) → lagu pertama normal → begitu pindah ke lagu berikutnya, suara
+bisu padahal notifikasi/widget masih "Memutar" → cuma restart device yang terasa menyembuhkan,
+gak lama kambuh lagi → paling sering di OS 15.
+
+**Root cause TERVERIFIKASI baca kode (bukan spekulasi OS/HAL)**: `CrossfadeEngine.abort()` (Batch
+102) merestorasi volume dgn `sessionPlayer.volume.let { if (it <= 0f) 1f else it }` — NO-OP di
+hampir semua kejadian nyata (volume mid-ramp nyaris tidak pernah persis 0.0f), jadi sessionPlayer
+nyangkut nyaris bisu tiap `abort()` dipicu pertengahan fade (`overlapPlayer` error/skip
+manual/toggle nonaktif). Karena Service+session tetap hidup di background, buka-lagi App TIDAK
+membuat ExoPlayer baru (volume tidak reset) — cuma restart device yang benar-benar mematikan
+proses yang terasa menyembuhkan. Kill+trigger-eksternal paling rawan karena posisi tersimpan bisa
+sudah dekat ujung lagu saat proses mati → crossfade langsung kepicu nyaris seketika saat resume →
+`overlapPlayer` (decoder KEDUA, baru pertama `prepare()`) lebih rawan gagal persis di detik awal
+sesi baru dibanding pemakaian normal yang sudah stabil lama.
+
+**Fix**: `preFadeVolume` — volume ASLI ditangkap SEBELUM ramp apa pun, jadi satu-satunya sumber
+restore (dipakai di `onSessionAutoTransition` & `abort()`, ganti tebakan pasca-fakta yang rapuh).
+`VOLUME_EPSILON` (0.01f) konsisten ganti campuran ambang lama. `AppLogger.w` tiap abort mid-fade
+benar2 restore — kalau kambuh lagi, Log Diagnostik akan punya jejaknya. **Prioritas cek user**:
+ulangi skenario asli (force-kill app, trigger play dari widget/notifikasi/lock screen, biarkan
+lagu pertama habis natural) beberapa kali di device OS 15 — kalau MASIH bisu, itu sinyal ada
+faktor kedua (mis. `overlapPlayer.prepare()` gagal di HAL device tsb), tempel isi Log Diagnostik
+(Settings > Lanjutan) di laporan berikutnya. `PENDING_IosFlingBehavior.md` (14 layar sisa) TIDAK
+disentuh — di luar scope fix urgent ini.
+
 **Batch 365 (FIX CI — `compileDebugKotlin`/`compileReleaseKotlin` gagal di `IosScrollPhysics.kt`,
 dari `log_fail` user, 1 file kode)** — Menjawab catatan "belum diverifikasi compile CI" di Batch
 364. 3 root cause, semua salah paket/kontrak import (0 salah logic): (1) `LayoutModifierNode`
