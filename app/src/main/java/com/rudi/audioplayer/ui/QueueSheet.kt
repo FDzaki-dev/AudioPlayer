@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
@@ -114,7 +115,9 @@ fun QueueSheet(
                 state = listState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 480.dp)
+                    .heightIn(max = 480.dp),
+                // Batch 367 — PENDING_IosFlingBehavior.md item 4/14.
+                flingBehavior = rememberIosFlingBehavior()
             ) {
                 itemsIndexed(
                     queue,

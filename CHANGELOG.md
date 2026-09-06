@@ -1,5 +1,36 @@
 # Changelog
 
+## Batch 367 — PENDING_IosFlingBehavior.md: 3/14 layar (HomeScreen, PlaylistScreen, QueueSheet), 3 file kode
+User confirm fix Batch 366 (CrossfadeEngine mute pasca kill+trigger eksternal) "benar-benar
+berpengaruh" di device asli — ditutup, tidak ada laporan bug baru batch ini. Sesuai aturan sesi
+§4 (`ROADMAP_LIQUID_GLASS_REDESIGN.md` sudah 100% ditutup Batch 363, jadi bukan sumber task
+default lagi) dan Auto-Read Pending Queue, lanjut kerjakan antrean `PENDING_IosFlingBehavior.md`
+yang dibuka Batch 364 — comot 3 file kode pertama sesuai batas Micro-Batch (maks 3 file
+kode/task), urutan bebas sesuai catatan pending-nya sendiri.
+
+**3 file (persis pola reuse dari `LibraryScreen.kt` Batch 364, 0 perubahan di `IosScrollPhysics.kt`
+sendiri)**:
+1. `ui/HomeScreen.kt` — 2 scrollable: `LazyColumn` utama Beranda (feed greeting/continue/rail-rail)
+   + `LazyRow` horizontal tiap rail lagu (Baru Ditambahkan, Sering Diputar, dst.).
+2. `ui/PlaylistScreen.kt` — `LazyColumn` di dalam dialog "Tambah ke Playlist" (list playlist
+   existing, `heightIn(max = 260.dp)`).
+3. `ui/QueueSheet.kt` — `LazyColumn` Antrean Putar; sudah punya `state = listState` eksplisit,
+   `flingBehavior` tetap disisip sebagai parameter terpisah tanpa masalah urutan (persis catatan
+   pola #3 di file pending-nya).
+
+Tiap lokasi: 1 baris import `rememberIosFlingBehavior` dari `ui.theme` + 1 parameter
+`flingBehavior = rememberIosFlingBehavior()`, dengan komentar baris menunjuk balik ke item nomor
+berapa di `PENDING_IosFlingBehavior.md`. Checklist pending diupdate (3 dicentang), README.md
+("Belum selesai" + fitur scroll ala iOS) disamakan jadi "4 dari 15 layar selesai, 11 sisa".
+
+**Prioritas cek user**: rasakan glide scroll di Beranda, dialog "Tambah ke Playlist", dan Antrean
+Putar — harus terasa sama seperti tab Lagu di Perpustakaan (meluncur lebih panjang & mulus,
+bukan berhenti mendadak ala Android default). Sisa 11 file (`SmartPlaylistScreen`,
+`SettingsScreen`, `StatsDashboardScreen`, `VaultSheet`, `SongPickerSheet`, `FolderManagerSheet`,
+`DuplicateFinderSheet`, `ABRepeatBookmarkSheet`, `EqualizerSheet`, `LyricsSheet`, `LyricsView`)
+masih di `PENDING_IosFlingBehavior.md`, belum disentuh — lanjut batch berikutnya sampai
+habis/user bilang cukup.
+
 ## Batch 366 — FIX REGRESI URGENT: audio bisu pasca kill+trigger eksternal (CrossfadeEngine, 1 file kode)
 User confirm Batch 365 (fix CI) sukses + efek bounce Batch 364 kerasa jelas di device asli (👍,
 sedikit kuat tapi disetujui, tidak diminta di-tune turun batch ini). Laporan baru, ditandai user

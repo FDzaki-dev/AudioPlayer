@@ -31,6 +31,7 @@ import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.Radius
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import kotlinx.collections.immutable.ImmutableSet
 import java.util.Calendar
 
@@ -64,7 +65,13 @@ fun HomeScreen(
     val artistMix = remember(songs, statsVersion) { topArtistMixProvider(songs) }
     val flashback = remember(songs, statsVersion) { flashbackProvider(songs) }
 
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        // Batch 367 — PENDING_IosFlingBehavior.md item 1/14: kurva fling ala iOS (rubber-band
+        // overscroll-nya sendiri sudah app-wide lewat LocalOverscrollFactory, Theme.kt, tidak
+        // perlu disentuh di sini). Lihat IosScrollPhysics.kt.
+        flingBehavior = rememberIosFlingBehavior()
+    ) {
         item {
             HomeGreeting(
                 showShuffleAll = songs.isNotEmpty(),
@@ -342,7 +349,10 @@ private fun HomeSectionRow(
         Spacer(modifier = Modifier.height(8.dp))
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            // Batch 367 — PENDING_IosFlingBehavior.md item 2/14 (row horizontal "Baru Ditambahkan"
+            // dst. di Home).
+            flingBehavior = rememberIosFlingBehavior()
         ) {
             items(songs, key = { it.id }) { song ->
                 HomeSongCard(song = song, onClick = { onSongClick(song) })

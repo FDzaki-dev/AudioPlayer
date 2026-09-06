@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
 /** Playlist tab content: list of playlists, or the detail view of a selected one. */
 @Composable
@@ -475,7 +476,12 @@ fun AddToPlaylistDialog(
                         color = MaterialTheme.colorScheme.secondary
                     )
                 } else {
-                    LazyColumn(modifier = Modifier.heightIn(max = 260.dp)) {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 260.dp),
+                        // Batch 367 — PENDING_IosFlingBehavior.md item 3/14 (list playlist di
+                        // dialog "Tambah ke Playlist").
+                        flingBehavior = rememberIosFlingBehavior()
+                    ) {
                         itemsIndexed(playlists, key = { _, playlist -> playlist.id }) { _, playlist ->
                             ListItem(
                                 headlineContent = { Text(playlist.name) },

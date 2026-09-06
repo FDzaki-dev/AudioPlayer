@@ -36,6 +36,26 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 367 (PENDING QUEUE — kurva fling iOS di 3 layar baru: `HomeScreen.kt`, `PlaylistScreen.kt`,
+`QueueSheet.kt`, 3 file kode)** — User confirm fix Batch 366 (mute pasca kill+trigger eksternal)
+"benar-benar berpengaruh" di device, tidak ada laporan bug baru. `ROADMAP_LIQUID_GLASS_REDESIGN.md`
+sudah tuntas 100% (Batch 363) jadi bukan sumber task default lagi (§4 atas) — sesuai Auto-Read
+Pending Queue, lanjut `PENDING_IosFlingBehavior.md` (dibuka Batch 364, 14 layar tersisa saat itu).
+Comot 3 file pertama sesuai batas Micro-Batch, reuse persis pola `LibraryScreen.kt`: import
+`rememberIosFlingBehavior` dari `ui.theme` + parameter `flingBehavior = rememberIosFlingBehavior()`
+di tiap `LazyColumn`/`LazyRow` bersangkutan, 0 sentuh `IosScrollPhysics.kt` sendiri.
+
+1. `HomeScreen.kt` — 2 scrollable (`LazyColumn` feed utama + `LazyRow` tiap rail lagu horizontal).
+2. `PlaylistScreen.kt` — 1 scrollable (`LazyColumn` list playlist di dialog "Tambah ke Playlist").
+3. `QueueSheet.kt` — 1 scrollable (`LazyColumn` Antrean Putar, sudah ada `state=listState`
+   eksplisit sebelumnya — `flingBehavior` disisip sebagai parameter terpisah tanpa konflik,
+   konsisten sama catatan pola #3 di dokumen pending).
+
+Checklist `PENDING_IosFlingBehavior.md` diupdate (3 dicentang, 11 sisa), README.md § fitur +
+§ "Belum selesai" disamakan angkanya (4 dari 15 layar). **Prioritas cek user**: rasakan glide
+scroll di Beranda / dialog Tambah ke Playlist / Antrean Putar — harus semulus tab Lagu Perpustakaan
+(Batch 364). Sisa 11 file di `PENDING_IosFlingBehavior.md` belum disentuh, lanjut batch berikutnya.
+
 **Batch 366 (FIX REGRESI URGENT — audio bisu pasca kill+trigger eksternal, `CrossfadeEngine.kt`,
 1 file kode)** — User confirm Batch 365 (CI) sukses + bounce Batch 364 kerasa di device (👍).
 Laporan baru lebih urgent: app di-kill lalu playback dipicu eksternal (widget/notifikasi/lock

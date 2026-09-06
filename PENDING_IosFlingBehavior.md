@@ -18,11 +18,11 @@ overscroll yang sudah dapat `LocalOverscrollFactory`).
 4. 0 perlu sentuh apa pun di `IosScrollPhysics.kt` sendiri kecuali user eksplisit minta tuning
    rasa (`frictionMultiplier`, default `0.75f`, ada di file itu).
 
-## Sisa 14 file (urutan bebas — silakan comot berapa pun sesuai batas Micro-Batch, maks 3 file kode/task)
+## Sisa 11 file (urutan bebas — silakan comot berapa pun sesuai batas Micro-Batch, maks 3 file kode/task)
 
-- [ ] `ui/HomeScreen.kt` — 2 scrollable (cek baris dgn `LazyColumn(`/`LazyRow(`)
-- [ ] `ui/PlaylistScreen.kt` — 1 scrollable
-- [ ] `ui/QueueSheet.kt` — 1 scrollable
+- [x] `ui/HomeScreen.kt` — 2 scrollable **(selesai Batch 367)**
+- [x] `ui/PlaylistScreen.kt` — 1 scrollable **(selesai Batch 367)**
+- [x] `ui/QueueSheet.kt` — 1 scrollable **(selesai Batch 367)**
 - [ ] `ui/SmartPlaylistScreen.kt` — 2 scrollable
 - [ ] `ui/SettingsScreen.kt` — 1 scrollable
 - [ ] `ui/StatsDashboardScreen.kt` — 1 scrollable
