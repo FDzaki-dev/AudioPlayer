@@ -36,6 +36,41 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 357 (UI POLISH — rating 5-bintang Now Playing diganti tombol pintas "Lirik", kontras
+waveform played/unplayed diperkuat, 1 file kode)** — Permintaan user (acuan visual gaya
+Spotify/Apple Music, 3 poin: modernisasi rating, kontras waveform, latar blur dinamis).
+1. **`StarRatingRow` dihapus dari `NowPlayingScreen.kt`**, diganti tombol minimalis ikon+teks
+   "Lirik" (`Icons.Default.Article`, ikon sama yang sudah dipakai entri "Lirik" di Kontrol
+   Lanjutan) yang langsung set `showLyricsSheet = true` (state yang sudah ada di scope,
+   0 wiring baru). **Temuan penting saat audit sebelum eksekusi**: `StarRatingRow` ternyata
+   satu-satunya jalur TULIS ke `RatingStore` di seluruh app — `LibraryScreen.kt` cuma BACA
+   `ratingOf` (buat filter Smart Playlist), tidak ada UI set-rating lain di mana pun. Setelah
+   batch ini, rating LAMA masih kebaca/kefilter normal, tapi TIDAK ADA LAGI cara memberi rating
+   BARU dari UI mana pun. User tidak diminta mengonfirmasi ini dulu (di luar cakupan pertanyaan
+   klarifikasi yang wajar untuk task UI kosmetik) — dicatat sebagai keputusan produk terbuka di
+   `PENDING_RatingEntryPoint.md`, BUKAN diputuskan sepihak (mis. menambah UI set-rating baru di
+   `LibraryScreen.kt` — di luar micro-batch & Zero-Refactor task ini).
+2. Parameter `currentRating`/`onSetRating` di signature `NowPlayingScreen()` **sengaja TIDAK
+   dihapus** (tetap diterima dari `MainActivity.kt`, cuma tidak dipakai lagi di body) — biar
+   `MainActivity.kt` (protected) 0 disentuh. Konsekuensi: 2 parameter unused di file ini sampai
+   ada keputusan lanjutan soal `PENDING_RatingEntryPoint.md`.
+3. **`WaveformSeekBar`** (dipanggil dari `PlaybackProgressRow`): `playedColor` diganti
+   `lerp(animatedAccent, Color.White, 0.2f)` (lebih "menyala"/terang), `unplayedColor` diganti
+   `MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)` (lebih redup/transparan) —
+   sebelumnya dua-duanya warna solid opacity penuh, kontrasnya tipis di beberapa tema (laporan
+   user via screenshot). Perubahan warna murni relatif terhadap token tema masing-masing, jadi
+   konsisten di semua identitas (Apple System/Light/Dark, Matte Noir, Calm Retro, Tactile, Skeu)
+   tanpa perlu cabang kondisional per-tema.
+4. **Latar blur dinamis dari album art (poin ke-3 permintaan user) TERNYATA SUDAH ADA** —
+   `AlbumArt(...).blur(backdropBlurRadius).alpha(backdropAlpha)` di root `NowPlayingScreen`
+   sejak Batch 67 (lihat komentar Batch 132/133 di kode). 0 perubahan kode untuk poin ini, murni
+   dikonfirmasi sudah terpenuhi.
+
+Semua 4 poin di atas cuma menyentuh `NowPlayingScreen.kt` (non-protected) — dalam batas
+Micro-Batch (1 dari maks 3 file kode). Belum diverifikasi compile CI sungguhan (sandbox tanpa
+compiler Kotlin+AGP+Compose) — konfirmasi user setelah build GH Actions jalan, sesuai pola
+batch-batch sebelumnya.
+
 **Batch 356 (AUDIT LANJUTAN OPTIMASI — 27 StateFlow sisa di `AppNavHost` ditelusuri, 0 tick
 ditemukan, thread lag-recomposition Batch 351-354 TUNTAS, 0 kode diubah)** — Permintaan user
 "perluas cakupan optimalisasi". Semua 27 `by ...collectAsStateWithLifecycle()` sisa di scope

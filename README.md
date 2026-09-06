@@ -8,7 +8,24 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 354 (FIX TAMBAHAN: `sleepTimerRemaining`/`visualizerBars`
+> 🆕 **Update terbaru — Batch 357 (UI POLISH: rating 5-bintang Now Playing diganti tombol
+> pintas "Lirik", kontras waveform played/unplayed diperkuat, 1 file kode):** Permintaan user
+> (acuan visual gaya Spotify/Apple Music). (1) `StarRatingRow` — satu-satunya jalur TULIS ke
+> `RatingStore` di seluruh app (`LibraryScreen.kt` cuma BACA `ratingOf` buat filter, tidak ada UI
+> set-rating lain) — dihapus dari Now Playing, diganti tombol minimalis ikon+teks "Lirik"
+> (`Icons.Default.Article`, ikon sama yang sudah dipakai entri "Lirik" di Kontrol Lanjutan) yang
+> langsung membuka `showLyricsSheet` (state yang sudah ada, 0 wiring baru). Parameter
+> `currentRating`/`onSetRating` di signature `NowPlayingScreen()` SENGAJA tidak dihapus (tetap
+> diterima dari `MainActivity.kt`, cuma tidak dipakai lagi di body) supaya `MainActivity.kt`
+> (protected) tidak perlu disentuh — status fitur rating ke depan dicatat di
+> `PENDING_RatingEntryPoint.md`. (2) `WaveformSeekBar`: `playedColor` di-`lerp()` 20% ke putih
+> (lebih "menyala"), `unplayedColor` diberi `alpha = 0.35f` (lebih redup/transparan) — sebelumnya
+> dua warna solid opacity penuh yang kontrasnya tipis di sejumlah tema. (3) Latar blur dinamis
+> dari album art (`AlbumArt().blur()` di root Now Playing) TERNYATA SUDAH ADA sejak Batch 67 — 0
+> perubahan, item ini di luar cakupan kerja nyata batch ini. Semua di `NowPlayingScreen.kt`
+> (non-protected). Belum diverifikasi compile CI sungguhan (sandbox tanpa compiler
+> Kotlin+AGP+Compose).
+> Batch 354 (FIX TAMBAHAN: `sleepTimerRemaining`/`visualizerBars`
 > dikoleksi lokal, bukan lagi di `AppNavHost`, 3 file kode):** Lanjutan pola Batch 353, audit
 > susulan (bukan laporan bug baru) menemukan 2 StateFlow lain dengan bug identik — masih
 > dikoleksi `by ...collectAsStateWithLifecycle()` di scope teratas `AppNavHost`, di luar cakupan

@@ -54,8 +54,6 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeOff
@@ -73,6 +71,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.addOutline
@@ -887,8 +886,26 @@ fun NowPlayingScreen(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        Spacer(modifier = Modifier.height(6.dp))
-        StarRatingRow(rating = currentRating, onRate = onSetRating, accentColor = animatedAccent)
+        Spacer(modifier = Modifier.height(4.dp))
+        val lyricsQuickInteraction = remember { MutableInteractionSource() }
+        TextButton(
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                showLyricsSheet = true
+            },
+            interactionSource = lyricsQuickInteraction,
+            modifier = Modifier.bouncyPress(lyricsQuickInteraction, pressedScale = 0.92f),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                Icons.Default.Article,
+                contentDescription = null,
+                tint = animatedAccent,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Lirik", style = MaterialTheme.typography.labelMedium, color = animatedAccent)
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -1321,8 +1338,8 @@ private fun PlaybackProgressRow(
         WaveformSeekBar(
             seed = songId ?: 0L,
             progress = progressFraction,
-            playedColor = animatedAccent,
-            unplayedColor = MaterialTheme.colorScheme.surfaceVariant,
+            playedColor = lerp(animatedAccent, Color.White, 0.2f),
+            unplayedColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
             modifier = Modifier.fillMaxWidth().height(32.dp)
         )
         Slider(
@@ -1622,31 +1639,6 @@ private fun WaveformSeekBar(
 }
 
 private const val BAR_COUNT = 48
-
-@Composable
-private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit, accentColor: Color) {
-    val haptic = LocalHapticFeedback.current
-    Row(horizontalArrangement = Arrangement.Center) {
-        for (star in 1..5) {
-            val starInteraction = remember { MutableInteractionSource() }
-            IconButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onRate(if (rating == star) 0 else star)
-                },
-                interactionSource = starInteraction,
-                modifier = Modifier.bouncyPress(starInteraction, pressedScale = 0.75f)
-            ) {
-                Icon(
-                    if (star <= rating) Icons.Default.Star else Icons.Default.StarBorder,
-                    contentDescription = "Beri rating $star bintang",
-                    tint = if (star <= rating) accentColor else MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: Color, label: String? = null) {

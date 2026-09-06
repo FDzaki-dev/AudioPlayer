@@ -1,5 +1,36 @@
 # Changelog
 
+## Batch 357 — UI POLISH: rating 5-bintang Now Playing diganti tombol pintas "Lirik", kontras waveform played/unplayed diperkuat (1 file kode)
+Permintaan user, dengan acuan visual gaya Spotify/Apple Music (3 poin: modernisasi rating,
+kontras waveform, latar blur dinamis).
+
+**1. Rating 5-bintang → tombol "Lirik"** (`StarRatingRow` dihapus dari `NowPlayingScreen.kt`,
+diganti tombol ikon+teks minimalis `Icons.Default.Article` + "Lirik" yang langsung set
+`showLyricsSheet = true`, state yang sudah ada — 0 wiring baru). Audit sebelum eksekusi
+menemukan `StarRatingRow` adalah **satu-satunya jalur TULIS** ke `RatingStore` di seluruh app;
+`LibraryScreen.kt` cuma membaca `ratingOf` untuk filter Smart Playlist, tidak ada UI set-rating
+lain. Setelah batch ini rating lama masih terbaca/terfilter normal, tapi tidak ada lagi cara
+memberi rating baru dari UI mana pun — dicatat sebagai keputusan produk terbuka di
+`PENDING_RatingEntryPoint.md` alih-alih diputuskan sepihak (menambah UI baru di luar cakupan
+task kosmetik ini). Parameter `currentRating`/`onSetRating` di signature `NowPlayingScreen()`
+sengaja dibiarkan (tidak dipakai lagi di body) supaya `MainActivity.kt` (protected) 0 disentuh.
+
+**2. Kontras waveform diperkuat**: `WaveformSeekBar` (dipanggil dari `PlaybackProgressRow`) —
+`playedColor` diganti `lerp(animatedAccent, Color.White, 0.2f)` (lebih menyala), `unplayedColor`
+diganti `MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)` (lebih redup/transparan).
+Sebelumnya dua-duanya warna solid opacity penuh, kontrasnya tipis di sejumlah tema — laporan
+user via screenshot. Perubahan relatif terhadap token tema masing-masing, konsisten di semua
+identitas (Apple System/Light/Dark, Matte Noir, Calm Retro, Tactile, Skeu) tanpa cabang
+kondisional per-tema.
+
+**3. Latar blur dinamis dari album art** (poin ke-3 permintaan user) — dicek dulu sebelum
+eksekusi, **ternyata sudah ada**: `AlbumArt(...).blur(backdropBlurRadius).alpha(backdropAlpha)`
+di root `NowPlayingScreen` sejak Batch 67 (diperhalus lebih lanjut Batch 132/133). 0 perubahan
+kode untuk poin ini.
+
+Semua di `NowPlayingScreen.kt` (non-protected) — 1 dari maks 3 file kode Micro-Batch. Belum
+diverifikasi compile CI sungguhan (sandbox tanpa compiler Kotlin+AGP+Compose).
+
 ## Batch 356 — AUDIT LANJUTAN (OPTIMASI): 27 StateFlow sisa di `AppNavHost` ditelusuri satu-satu, 0 tick ditemukan, 0 kode diubah — thread lag-recomposition Batch 351-354 dinyatakan TUNTAS
 Permintaan user eksplisit "perluas cakupan... optimalisasi" pasca Batch 355. Batch 351 sempat
 mencatat `AppNavHost` (`MainActivity.kt`) mengoleksi 35+ `StateFlow` di scope teratas; Batch
