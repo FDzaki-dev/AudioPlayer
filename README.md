@@ -8,7 +8,14 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 363 (KONFIRMASI USER: performa/GPU-lag Liquid Glass sudah hilang
+> 🆕 **Update terbaru — Batch 373 (REVERT: efek bounce settle overscroll terlalu kaku, konstanta
+> `OVERSCROLL_SETTLE_STIFFNESS` diturunkan 4000→1500 (`Spring.StiffnessMedium`), 1 file kode):**
+> User: "revert effect bounce dari yang kaku -> hampir mengambang!!". Fase pegas-balik setelah
+> jari dilepas (`applyToFling`, `IosScrollPhysics.kt`) — beda dari fase tarikan yang jadi target
+> Batch 372. 1500 dipilih krn sudah pernah diuji & didokumentasikan Batch 369 sebagai terasa
+> "ngambang", preset resmi Compose, bukan angka tebakan baru. `dampingRatio` tidak disentuh.
+> Belum ditest di device asli.
+> Batch 363 (KONFIRMASI USER: performa/GPU-lag Liquid Glass sudah hilang
 > di device asli, `ROADMAP_LIQUID_GLASS_REDESIGN.md` 100% tuntas, 0 file kode):** Menutup rantai
 > Batch 351 (investigasi root cause: frekuensi+scope recomposition `AppNavHost`, bukan cost
 > render blur)→352 (mitigasi)→353 (fix struktural permanen). Roadmap Liquid Glass sekarang 100%

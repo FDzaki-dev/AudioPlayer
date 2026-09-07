@@ -1,5 +1,42 @@
 # Changelog
 
+## Batch 373 — REVERT: bounce settle terlalu kaku, `OVERSCROLL_SETTLE_STIFFNESS` 4000→1500 (IosScrollPhysics.kt, 1 file kode)
+User laporan singkat: "revert effect bounce dari yang kaku -> hampir mengambang!!" — sebuah
+instruksi arah, bukan pertanyaan diagnostik baru yang perlu diklarifikasi lebih lanjut. "Bounce"
+di sini merujuk fase PEGAS BALIK setelah jari dilepas (`IosRubberBandOverscrollEffect.applyToFling`),
+BUKAN fase tarikan (`rubberBandResistance()` + `RUBBER_BAND_VIEWPORT_FRACTION`) yang jadi target
+fix Batch 372 — dua fase independen, sama seperti sudah dibedakan eksplisit di batch sebelumnya.
+
+**Kenapa turun ke `1500` (bukan biseksi geometris halus ~2450)**: konstanta
+`OVERSCROLL_SETTLE_STIFFNESS` = `4000` (Batch 371) sudah mendokumentasikan protokol tuning
+eksplisit di komentarnya sendiri — "TURUNKAN kalau masih kerasa kaku/satset (breakeven baru:
+[1500, 4000])". Itu protokol yang tepat untuk laporan "masih sedikit kaku". Tapi kata "revert"
+dikombinasikan dengan "hampir mengambang" (bukan sekadar "masih agak kaku") menunjuk ke tindakan
+yang lebih tegas: user minta balik ke ujung BAWAH bracket, bukan cuma 1 langkah kecil menuju
+tengahnya. `1500` (`Spring.StiffnessMedium`, preset resmi Compose) dipilih karena nilai itu sendiri
+sudah didokumentasikan Batch 369 sebagai titik yang, di skenario yang sama (tarik-lepas-pelan),
+dilaporkan user masih terasa "ngambang" — jadi ini genuinely "revert" ke nilai yang sudah pernah
+diuji nyata & tercatat, bukan tebakan angka custom baru.
+
+**Fix (1 file, `ui/theme/IosScrollPhysics.kt`)**: `private const val OVERSCROLL_SETTLE_STIFFNESS`
+diturunkan dari `4000f` ke `1500f`. Doc-comment di deklarasi konstanta & komentar berurutan di
+`applyToFling` diperbarui menjelaskan keputusan Batch 373 ini, plus arah tuning lanjutan kalau
+masih diperlukan. `dampingRatio = Spring.DampingRatioMediumBouncy` di `spring(...)` yang sama
+TIDAK disentuh — laporan user murni soal KECEPATAN settle ("kaku" -> "mengambang"), bukan soal
+KARAKTER pantulannya (jumlah/besaran osilasi), konsisten dengan pembacaan yang sama di Batch
+369-372. `RUBBER_BAND_VIEWPORT_FRACTION` (fase tarikan, Batch 372) juga TIDAK disentuh — di luar
+scope laporan ini, parameter itu mengatur fase yang berbeda dan belum ada laporan baru soal fase
+itu. README.md § "Update terbaru" disamakan.
+
+**Belum ditest di device asli** (tidak ada environment Android untuk run/compile di sesi ini) —
+brace/paren/bracket file diverifikasi seimbang penuh (18/18 brace, 64/64 paren, 0/0 bracket,
+tokenizer string/comment-aware single-pass), 0 referensi basi ke nilai `4000f` lama tersisa di
+file. Kalau abis test masih kerasa kurang mengambang: TURUNKAN lebih jauh ke
+`Spring.StiffnessMediumLow` (400) atau `Spring.StiffnessLow` (200) — breakeven baru [200, 1500].
+Kalau sebaliknya sekarang terasa JUSTRU kelewat floating/lambat balik ke posisi: NAIKKAN sedikit
+lewat biseksi geometris ke arah [1500, 4000] lagi (`√(1500×4000) ≈ 2449`) — jangan lompat balik
+mentah ke `4000`.
+
 ## Batch 372 — FIX KAKU SAAT TARIK: target ternyata rubber-band range, bukan settle-stiffness (IosScrollPhysics.kt, 1 file kode)
 Setelah Batch 371 (`OVERSCROLL_SETTLE_STIFFNESS` = 4000, biseksi geometris), user masih laporan
 "kaku"+"regresi" BARENG persis kayak sebelumnya — padahal angka stiffness sudah diganti 3x berturut

@@ -36,6 +36,31 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 373 (REVERT — bounce settle terlalu kaku, `OVERSCROLL_SETTLE_STIFFNESS` diturunkan 4000→1500,
+`IosScrollPhysics.kt`, 1 file kode)** — User laporan singkat: "revert effect bounce dari yang kaku ->
+hampir mengambang!!" — instruksi arah, bukan pertanyaan diagnostik baru. "Bounce" di sini merujuk
+fase PEGAS BALIK setelah jari dilepas (`applyToFling`), BUKAN fase tarikan (`RUBBER_BAND_VIEWPORT_
+FRACTION`, target fix Batch 372 yang independen — tidak disentuh batch ini).
+
+**Kenapa turun ke 1500, bukan biseksi geometris halus (~2450)**: `OVERSCROLL_SETTLE_STIFFNESS` =
+4000 (Batch 371) sudah eksplisit mendokumentasikan protokol "TURUNKAN kalau masih kerasa
+kaku/satset (breakeven baru: [1500, 4000])" — tapi kata "revert" + "hampir mengambang" (bukan
+sekadar "masih agak kaku") menunjuk ke tindakan lebih tegas dari 1 langkah biseksi kecil. `1500`
+(`Spring.StiffnessMedium`) dipilih persis karena nilai ITU SENDIRI sudah didokumentasikan Batch
+369 sebagai titik yang user laporkan masih terasa "ngambang" — preset resmi Compose yang sudah
+pernah diuji nyata di batch itu, bukan angka custom baru hasil tebakan.
+
+**Fix**: `OVERSCROLL_SETTLE_STIFFNESS` (`IosScrollPhysics.kt`) 4000f → 1500f. `dampingRatio`
+(`DampingRatioMediumBouncy`) TIDAK disentuh — user cuma bicara soal KECEPATAN settle ("kaku" ->
+"mengambang"), bukan KARAKTER pantulannya, konsisten pola Batch 369-372.
+`RUBBER_BAND_VIEWPORT_FRACTION` (Batch 372, fase tarikan) juga TIDAK disentuh — parameter beda
+fase, di luar scope laporan ini. README.md/CHANGELOG.md disamakan.
+
+**Belum ditest di device asli.** Kalau abis test masih kerasa kurang mengambang: TURUNKAN lebih
+jauh (`Spring.StiffnessMediumLow` 400, atau `StiffnessLow` 200 — breakeven baru [200, 1500]).
+Kalau JUSTRU sekarang kelewat floating/lambat balik: NAIKKAN sedikit via biseksi geometris ke arah
+[1500, 4000] lagi (jangan lompat balik ke 4000 mentah). Detail lengkap CHANGELOG.md Batch 373.
+
 **Batch 372 (FIX KAKU SAAT TARIK — target ternyata bukan settle-stiffness, tapi rubber-band range
 viewport-relative, `IosScrollPhysics.kt`, 1 file kode)** — User laporan Batch 371 masih "kaku"+
 "regresi" BARENG persis kayak sebelumnya walau `OVERSCROLL_SETTLE_STIFFNESS` sudah diganti 3x

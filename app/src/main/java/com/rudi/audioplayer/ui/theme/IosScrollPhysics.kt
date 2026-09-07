@@ -73,6 +73,21 @@ import kotlinx.coroutines.launch
 // [overscrollNode], 0 context/composable tambahan), PER SUMBU (lebar utk drag horizontal, tinggi
 // utk vertikal) — bukan lagi 1 angka tetap yg sama utk semua ukuran layar & kedua arah.
 
+// Batch 373 — User laporan singkat: "revert effect bounce dari yang kaku -> hampir mengambang!!"
+// — instruksi arah, bukan pertanyaan diagnostik baru. "Bounce" di sini merujuk fase PEGAS BALIK
+// setelah jari dilepas ([applyToFling] di bawah), BUKAN fase tarikan ([rubberBandResistance] +
+// [RUBBER_BAND_VIEWPORT_FRACTION] — itu target fix Batch 372 yang terpisah & tidak disentuh batch
+// ini). Ini persis skenario "TURUNKAN kalau masih kerasa kaku/satset" yang sudah diantisipasi
+// eksplisit di komentar [OVERSCROLL_SETTLE_STIFFNESS] sejak Batch 371 — breakeven baru [1500,
+// 4000]. Tapi kata "revert" + "hampir mengambang" (bukan cuma "sedikit kekakuan") menunjuk ke
+// tindakan yang lebih tegas dari sekadar 1 langkah biseksi geometris (~2450) — user minta balik
+// ke ujung BAWAH bracket, bukan titik tengahnya. `1500` (`Spring.StiffnessMedium`) dipilih persis
+// krn nilai ITU SENDIRI yang sudah didokumentasikan Batch 369 sebagai titik yang masih terasa
+// "ngambang" (floating) — preset resmi Compose yang sudah pernah diuji nyata, bukan angka baru
+// hasil tebakan. `dampingRatio` (`DampingRatioMediumBouncy`) TETAP TIDAK disentuh — user cuma
+// bicara soal KECEPATAN settle ("kaku" -> "mengambang"), bukan KARAKTER pantulannya, konsisten
+// pola Batch 369-372.
+
 /**
  * Porsi dimensi viewport (lebar utk sumbu x, tinggi utk sumbu y) yang jadi jarak "separuh
  * resistance" rubber-band — analog konstanta tension `c` WebKit, dipakai di peran "range" formula
@@ -103,12 +118,19 @@ private fun rubberBandResistance(magnitudePx: Float, rangePx: Float): Float =
  * 368) — titik tengah yang benar secara PERSEPSI adalah rata-rata GEOMETRIS di `stiffness`
  * (setara rata-rata aritmetis di ωₙ), bukan rata-rata aritmetis di `stiffness` mentah yang akan
  * bias jauh ke salah satu ujung dari sisi kecepatan rasa. √(1500 × 10000) ≈ 3873, dibulatkan ke
- * `4000` (angka bersih, deviasi <4% dari nilai eksak, diabaikan). Kalau masih perlu tuning:
- * NAIKKAN dari 4000 kalau masih kerasa ngambang (breakeven baru: [4000, 10000]), TURUNKAN kalau
- * masih kerasa kaku/satset (breakeven baru: [1500, 4000]) — cukup ulangi biseksi geometris di
- * rentang yang menyempit, TIDAK perlu balik ke preset resmi.
+ * `4000` (angka bersih, deviasi <4% dari nilai eksak, diabaikan).
+ *
+ * Batch 373 — User: "revert ... dari yang kaku -> hampir mengambang!!" — 4000 masih kerasa
+ * kaku/satset, minta balik ke arah floating secara tegas (bukan cuma 1 langkah biseksi halus).
+ * DITURUNKAN ke `1500f` (= `Spring.StiffnessMedium`, preset resmi Compose) — ujung BAWAH bracket
+ * [1500, 4000] yang sudah didokumentasikan Batch 369 sendiri sebagai titik yang masih terasa
+ * "ngambang" (floating), bukan angka custom baru hasil tebakan. Kalau masih perlu tuning:
+ * TURUNKAN lebih jauh (mis. `Spring.StiffnessMediumLow` 400, atau `StiffnessLow` 200 — breakeven
+ * baru [200, 1500]) kalau MASIH kerasa kurang mengambang; NAIKKAN sedikit (biseksi geometris ke
+ * arah [1500, 4000] lagi) kalau sekarang JUSTRU kelewat floating/lambat balik. `dampingRatio`
+ * (`DampingRatioMediumBouncy`) tetap tidak disentuh.
  */
-private const val OVERSCROLL_SETTLE_STIFFNESS = 4000f
+private const val OVERSCROLL_SETTLE_STIFFNESS = 1500f
 
 /**
  * Overscroll ala iOS: menggeser KONTEN (bukan menggambar glow di atasnya) saat ditarik lewat
@@ -235,6 +257,12 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
         // mass), lihat dokumentasi lengkap di deklarasi konstantanya). `dampingRatio`
         // (`DampingRatioMediumBouncy`) TETAP TIDAK diubah — user cuma keberatan soal KECEPATAN
         // settle ("kaku/satset"), bukan soal KARAKTER pantulannya.
+        //
+        // Batch 373 — User: "revert effect bounce dari yang kaku -> hampir mengambang!!". 4000
+        // (Batch 371) masih dirasakan kaku; diturunkan ke `1500` (`Spring.StiffnessMedium`) —
+        // ujung bawah bracket [1500, 4000], nilai yang sudah pernah diuji & didokumentasikan
+        // Batch 369 sebagai terasa "ngambang". Lihat dokumentasi lengkap di deklarasi
+        // [OVERSCROLL_SETTLE_STIFFNESS] utk arah tuning berikutnya kalau masih perlu.
         overscrollOffset.animateTo(
             targetValue = Offset.Zero,
             initialVelocity = Offset(remaining.x, remaining.y),
