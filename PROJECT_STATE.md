@@ -36,6 +36,23 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 370 (FIX REGRESI LANJUTAN (3) — pegas balik overscroll masih ngambang, naik ke
+`Spring.StiffnessHigh` (10000), `IosScrollPhysics.kt`, 1 file kode)** — User laporan singkat:
+"masih terasa regresi, perbaiki woy!!" (tanpa detail skenario baru) → diperlakukan sebagai
+lanjutan langsung thread regresi Batch 368→369 (skenario tarik-sampai-mentok-lepas-pelan yang
+sama), persis kandidat yang sudah diantisipasi eksplisit di catatan Batch 369 sendiri.
+
+**Fix**: `stiffness` di fungsi `applyToFling` dinaikkan dari `Spring.StiffnessMedium` (1500) ke
+`Spring.StiffnessHigh` (10000, preset resmi Compose TERTINGGI yang tersedia). ωₙ = √(stiffness/
+mass): √(10000/1500) ≈ 2.58x lebih cepat dari Batch 369, ≈5x dari baseline Batch 364. `dampingRatio`
+(`DampingRatioMediumBouncy`) tidak diubah. README.md disamakan. **Belum ditest di device asli**
+(no Android env di sesi ini) — mohon user coba ulang skenario yang sama persis. **Penting**:
+`StiffnessHigh` adalah plafon tertinggi resmi Compose — kalau MASIH ngambang setelah ini, rute
+"naikkan stiffness lagi" sudah mentok, batch berikutnya wajib pindah arah (turunkan `dampingRatio`
+dari `MediumBouncy`, ATAU tambah kick velocity minimum independen dari `remaining`) — lihat detail
+2 opsi itu di CHANGELOG.md Batch 370. Kalau sebaliknya sekarang kerasa terlalu "snap"/pantulan
+kurang, turunkan ke titik tengah 1500–10000.
+
 **Batch 369 (FIX REGRESI LANJUTAN — pegas balik overscroll masih ngambang di "tarik sampai mentok
 ujung layar", `IosScrollPhysics.kt`, 1 file kode)** — User laporan: "regresi nya masih kerasa
 kalau ditarik sampai mentok ujung layar!!" — persis skenario yang sudah diantisipasi eksplisit di

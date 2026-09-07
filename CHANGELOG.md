@@ -1,5 +1,46 @@
 # Changelog
 
+## Batch 370 — FIX REGRESI LANJUTAN (3): pegas balik overscroll masih ngambang, StiffnessHigh (IosScrollPhysics.kt, 1 file kode)
+User laporan: "masih terasa regresi, perbaiki woy!!" — tanpa detail skenario baru, jadi
+diperlakukan sebagai lanjutan langsung thread "FIX REGRESI" yang sama (Batch 368→369), bukan bug
+baru: skenario tarik-sampai-mentok-ujung-layar-lalu-lepas-pelan yang sama, dan ini persis kandidat
+yang sudah diantisipasi eksplisit di catatan Batch 369 sendiri ("kalau masih ngambang, kandidat
+berikutnya `Spring.StiffnessHigh`, 10000").
+
+**Kenapa langsung lompat ke StiffnessHigh tanpa nunggu detail lebih lanjut**: Batch 369 sudah
+eksplisit menulis 2 cabang keputusan untuk laporan berikutnya — "masih ngambang" → StiffnessHigh,
+atau "kelewat snap/pantulan kurang" → turun ke titik tengah. Laporan user kali ini ("masih terasa
+regresi") paling konsisten dibaca sebagai gejala yang SAMA (ngambang), bukan gejala baru (kelewat
+kaku) — tidak ada indikasi user bilang animasinya sekarang malah terlalu snap/kurang mantul. Kalau
+tebakan ini salah (ternyata user maksudnya sekarang kebalikannya, kelewat kaku), koreksinya
+tinggal turunkan `stiffness` ke titik tengah 1500–10000 batch berikutnya begitu dikonfirmasi user.
+
+**Fix (1 file, `ui/theme/IosScrollPhysics.kt`, fungsi `applyToFling`)**: `stiffness` dinaikkan
+dari `Spring.StiffnessMedium` (1500) ke `Spring.StiffnessHigh` (10000) — preset resmi Compose
+paling tinggi yang tersedia (bukan angka custom). Dari sisi ωₙ = √(stiffness/mass): √(10000/1500)
+≈ 2.58x lebih cepat dari Batch 369, ≈ 5x lebih cepat dari baseline Batch 364 (StiffnessLow/200) —
+lompatan jauh lebih besar dari Batch 368 (~1.41x) maupun Batch 369 (~1.94x), yang keduanya
+terbukti di bawah ambang persepsi user. `dampingRatio` (`DampingRatioMediumBouncy`) TETAP TIDAK
+diubah — pantulan khas iOS yang disetujui sejak Batch 366 tidak disentuh sama sekali di batch ini.
+
+**Peringatan penting untuk batch berikutnya kalau ini masih belum cukup**: `Spring.StiffnessHigh`
+(10000) adalah preset TERTINGGI yang disediakan Compose secara resmi — tidak ada lagi ruang naik
+lewat rute "stiffness lebih tinggi lagi" kalau laporan berikutnya masih "ngambang". Kandidat
+selanjutnya harus dari arah berbeda: (a) turunkan `dampingRatio` dari `DampingRatioMediumBouncy` ke
+`DampingRatioNoBouncy` atau nilai custom di antaranya (efek samping: mengurangi pantulan khas iOS
+yang sudah disetujui user, trade-off yang perlu dikonfirmasi dulu), atau (b) beri kick velocity
+minimum yang tidak bergantung pada `remaining` (yang ~0 tepat di skenario tarik-pelan-lepas) supaya
+pegas balik tidak semata mengandalkan gaya pemulihannya sendiri di velocity rendah.
+
+**Belum bisa dipastikan tanpa device asli** (tidak ada environment Android untuk run/compile di
+sesi ini) — analisis ωₙ di atas konsisten dengan rumus fisika pegas standar yang sama dipakai
+Batch 369, dan `Spring.StiffnessHigh` adalah preset resmi Compose (bukan nilai custom belum
+teruji), tapi WAJIB dikonfirmasi user di device: coba lagi skenario tarik-sampai-mentok/lepas-
+pelan-tanpa-sentakan yang sama. Kalau MASIH ngambang, beri tahu — batch berikutnya pindah ke opsi
+(a)/(b) di atas karena rute stiffness sudah mentok. Kalau sekarang malah kerasa terlalu
+"snap"/kaku dan pantulannya jadi kurang berasa, beri tahu juga — turunkan ke titik tengah antara
+1500 dan 10000.
+
 ## Batch 369 — FIX REGRESI LANJUTAN: pegas balik overscroll masih ngambang di "tarik sampai mentok ujung layar" (IosScrollPhysics.kt, 1 file kode)
 User laporan: "regresi nya masih kerasa kalau ditarik sampai mentok ujung layar!!" — persis
 skenario yang sudah diantisipasi eksplisit di catatan Batch 368 sendiri ("kalau masih kerasa

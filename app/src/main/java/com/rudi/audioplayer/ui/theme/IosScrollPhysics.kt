@@ -153,12 +153,30 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
         // `dampingRatio` (`DampingRatioMediumBouncy`) TETAP TIDAK diubah — pantulan khas iOS yang
         // sudah disetujui user (Batch 366) tidak disentuh, murni kecepatan "kembali ke 0" yang
         // dipercepat lagi.
+        //
+        // Batch 370 — User laporan lagi: "regresi nya masih kerasa!!" persis setelah Batch 369
+        // (StiffnessMedium/1500) dikirim — skenario tarik-sampai-mentok-lepas-pelan yang sama,
+        // BUKAN kasus baru. Ini persis kandidat yang sudah diantisipasi eksplisit di catatan
+        // Batch 369 sendiri ("kalau masih ngambang, kandidat berikutnya Spring.StiffnessHigh,
+        // 10000"). Fix: `stiffness` dinaikkan ke `Spring.StiffnessHigh` (10000, preset resmi
+        // Compose paling tinggi yang tersedia — bukan angka custom). Dari sisi ωₙ = √(stiffness/
+        // mass): √(10000/1500) ≈ 2.58x lebih cepat dari Batch 369, ≈ 5x dari baseline Batch 364
+        // (StiffnessLow/200) — lompatan jauh lebih besar dari 2 batch sebelumnya (masing-masing
+        // cuma ~1.4x dan ~1.9x, terbukti di bawah ambang persepsi). Karena `StiffnessHigh` adalah
+        // preset tertinggi resmi Compose, TIDAK ada lagi ruang naik lebih jauh lewat rute
+        // "stiffness lebih tinggi" kalau ini masih belum cukup — kandidat berikutnya kalau masih
+        // ngambang harus dari arah lain (mis. turunkan `dampingRatio` dari `MediumBouncy` ke
+        // `NoBouncy`/custom di bawah itu, yang akan MENGURANGI pantulan khas iOS; atau beri kick
+        // awal minimum independen dari `remaining` biar skenario velocity~0 tidak semata
+        // mengandalkan pegas). `dampingRatio` (`DampingRatioMediumBouncy`) TETAP TIDAK diubah di
+        // batch ini — perbaikan dulu difokuskan murni ke kecepatan settle sebelum menyentuh
+        // karakter pantulannya.
         overscrollOffset.animateTo(
             targetValue = Offset.Zero,
             initialVelocity = Offset(remaining.x, remaining.y),
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium,
+                stiffness = Spring.StiffnessHigh,
             ),
         )
     }
