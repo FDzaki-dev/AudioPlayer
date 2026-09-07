@@ -1,5 +1,42 @@
 # Changelog
 
+## Batch 374 — FIX KARAKTER PANTULAN TIDAK NATURAL: `dampingRatio` MediumBouncy→LowBouncy (IosScrollPhysics.kt, 1 file kode)
+User laporan singkat: "sekarang perbaiki karakter pantulan yang kerasa tidak natural sama sekali
+woy!!" — SUMBU BEDA dari seluruh rentetan Batch 368-373, yang semuanya soal `stiffness` (KECEPATAN
+pegas kembali ke posisi 0 setelah overscroll). "Karakter pantulan" secara eksplisit menunjuk ke
+BENTUK osilasinya sendiri, bukan kecepatannya — parameter itu adalah `dampingRatio`, satu-satunya
+bagian dari `spring(...)` di `applyToFling` yang belum pernah diubah sejak deklarasi awal di Batch
+364. Sempat tercatat di komentar Batch 369-373 sebagai "sudah disetujui user (Batch 366)" — tapi
+laporan baru & lebih tegas ("tidak natural sama sekali") menimpa asumsi lama itu; ini bukan
+kontradiksi berbahaya, cuma sinyal bahwa toleransi user terhadap karakter pantulan itu berubah
+setelah observasi lebih lama di device asli.
+
+**Diagnosis**: `Spring.DampingRatioMediumBouncy` = `0.5f` — rasio redaman di bawah 1 berarti pegas
+UNDERDAMPED, overshoot lalu berosilasi bolak-balik beberapa kali (2-3+ ayunan) sebelum benar-benar
+diam di 0. Karakter ini lebih dekat ke "bola pantul"/spring-toy generik ketimbang rubber-band
+`UIScrollView` iOS asli, yang overshoot SATU KALI secara tipis lalu langsung tenang (nyaris tanpa
+ayunan ulang). Kemungkinan besar inilah akar dari keluhan "tidak natural" — bukan soal kecepatan
+settle, yang sudah benar sejak Batch 373 (`stiffness` 1500).
+
+**Fix (1 file, `ui/theme/IosScrollPhysics.kt`)**: `dampingRatio = Spring.DampingRatioMediumBouncy`
+diganti `dampingRatio = Spring.DampingRatioLowBouncy` (`0.75f`, preset resmi Compose berikutnya
+menuju redaman kritis) di dalam `spring(...)` pada `applyToFling`. Hasilnya: overshoot tunggal
+yang jauh lebih halus — satu ayunan balik kecil lalu langsung settle, tanpa osilasi berulang.
+Sengaja TIDAK lompat langsung ke `Spring.DampingRatioNoBouncy` (`1.0f`, redaman kritis penuh) —
+itu akan MENGHAPUS pantulan sama sekali, sementara user cuma minta perbaikan karakter ("tidak
+natural"), bukan penghapusan pantulan. `stiffness` (`OVERSCROLL_SETTLE_STIFFNESS`, `1500f` sejak
+Batch 373) TIDAK disentuh sama sekali — sumbu yang berbeda, di luar scope laporan ini. Komentar
+inline di deklarasi konstanta & rantai komentar `applyToFling` diperbarui menjelaskan keputusan
+Batch 374 ini. README.md § "Update terbaru" disamakan.
+
+**Belum ditest di device asli** — brace/paren/bracket file diverifikasi seimbang penuh (18/18
+brace, 64/64 paren, 0/0 bracket, tokenizer string/comment-aware single-pass), 0 referensi basi ke
+`DampingRatioMediumBouncy` tersisa di dalam pemanggilan `spring(...)`. Kalau abis test masih
+kerasa berosilasi/tidak natural: NAIKKAN lebih jauh ke `Spring.DampingRatioNoBouncy` (`1.0f`,
+hapus pantulan sepenuhnya) atau nilai custom di antara `0.75`-`1.0`. Kalau JUSTRU sekarang
+pantulannya kelewat datar/nyaris tak terasa: TURUNKAN sedikit ke arah `0.5`-`0.75` (custom,
+JANGAN lompat balik mentah ke `MediumBouncy`).
+
 ## Batch 373 — REVERT: bounce settle terlalu kaku, `OVERSCROLL_SETTLE_STIFFNESS` 4000→1500 (IosScrollPhysics.kt, 1 file kode)
 User laporan singkat: "revert effect bounce dari yang kaku -> hampir mengambang!!" — sebuah
 instruksi arah, bukan pertanyaan diagnostik baru yang perlu diklarifikasi lebih lanjut. "Bounce"

@@ -36,6 +36,32 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 374 (FIX KARAKTER PANTULAN TIDAK NATURAL — `dampingRatio` DampingRatioMediumBouncy→
+LowBouncy, `IosScrollPhysics.kt`, 1 file kode)** — User laporan singkat: "sekarang perbaiki
+karakter pantulan yang kerasa tidak natural sama sekali woy!!" — SUMBU BEDA dari Batch 368-373
+(semuanya soal `stiffness`, KECEPATAN pegas kembali ke 0). "Karakter pantulan" menunjuk ke BENTUK
+osilasinya sendiri — `dampingRatio`, satu-satunya parameter spring bounce ini yang belum pernah
+diubah sejak Batch 364 (sempat tercatat "disetujui user Batch 366", tapi laporan baru user
+menimpa asumsi lama itu).
+
+**Diagnosis**: `DampingRatioMediumBouncy` (0.5) = rasio redaman relatif rendah → pegas overshoot
+lalu berosilasi 2-3+ kali sebelum diam, karakter lebih dekat "bola pantul"/spring-toy ketimbang
+rubber-band UIScrollView asli (overshoot SATU KALI tipis, langsung tenang). Kemungkinan besar ini
+akar dari "tidak natural" — bukan soal kecepatan settle (sudah benar sejak Batch 373).
+
+**Fix**: `dampingRatio` (`IosScrollPhysics.kt`, `applyToFling`) `DampingRatioMediumBouncy` (0.5) →
+`DampingRatioLowBouncy` (0.75, preset resmi Compose berikutnya menuju redaman kritis) — overshoot
+tunggal lebih halus, 1 ayunan balik lalu settle. TIDAK lompat ke `DampingRatioNoBouncy` (1.0,
+redaman kritis penuh, menghapus pantulan sama sekali) — user cuma bilang "tidak natural", bukan
+"hapus pantulan". `stiffness` (`OVERSCROLL_SETTLE_STIFFNESS`, 1500 sejak Batch 373) TIDAK
+disentuh — sumbu berbeda, di luar laporan ini. README.md/CHANGELOG.md disamakan.
+
+**Belum ditest di device asli.** Kalau abis test masih kerasa berosilasi/tidak natural: NAIKKAN
+lebih jauh ke `DampingRatioNoBouncy` (1.0, hapus pantulan sepenuhnya) atau custom antara 0.75-1.0.
+Kalau JUSTRU sekarang kelewat datar/pantulannya nyaris tak terasa: TURUNKAN balik sedikit menuju
+0.5-0.75 (custom, bukan lompat balik mentah ke `MediumBouncy`). Detail lengkap CHANGELOG.md Batch
+374.
+
 **Batch 373 (REVERT — bounce settle terlalu kaku, `OVERSCROLL_SETTLE_STIFFNESS` diturunkan 4000→1500,
 `IosScrollPhysics.kt`, 1 file kode)** — User laporan singkat: "revert effect bounce dari yang kaku ->
 hampir mengambang!!" — instruksi arah, bukan pertanyaan diagnostik baru. "Bounce" di sini merujuk

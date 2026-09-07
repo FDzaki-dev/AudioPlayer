@@ -73,6 +73,14 @@ import kotlinx.coroutines.launch
 // [overscrollNode], 0 context/composable tambahan), PER SUMBU (lebar utk drag horizontal, tinggi
 // utk vertikal) — bukan lagi 1 angka tetap yg sama utk semua ukuran layar & kedua arah.
 
+// Batch 374 — User laporan singkat: "sekarang perbaiki karakter pantulan yang kerasa tidak
+// natural sama sekali woy!!" — beda AKSIS dari Batch 368-373 (yang semuanya soal KECEPATAN
+// settle, `stiffness`). "Karakter pantulan" secara eksplisit menunjuk ke bentuk osilasi pegas
+// itu sendiri — parameter `dampingRatio`, satu-satunya yang TIDAK PERNAH disentuh sejak Batch
+// 364 (tercatat "disetujui user Batch 366", tapi user sekarang eksplisit bilang "sama sekali"
+// tidak natural — feedback baru menimpa asumsi lama itu, bukan kontradiksi berbahaya). Lihat
+// [applyToFling] utk detail diagnosis & fix (`DampingRatioMediumBouncy` -> `DampingRatioLowBouncy`).
+
 // Batch 373 — User laporan singkat: "revert effect bounce dari yang kaku -> hampir mengambang!!"
 // — instruksi arah, bukan pertanyaan diagnostik baru. "Bounce" di sini merujuk fase PEGAS BALIK
 // setelah jari dilepas ([applyToFling] di bawah), BUKAN fase tarikan ([rubberBandResistance] +
@@ -214,8 +222,8 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
         val consumed = performFling(velocity)
         val remaining = velocity - consumed
         // Fling selesai sementara konten masih tertarik ke luar batas (mis. fling ke arah luar) —
-        // pegas balik ke 0. `DampingRatioMediumBouncy` dipilih sengaja: ada sedikit "pantulan"
-        // sekilas (khas iOS) tapi tidak berosilasi berkali-kali seperti bouncy ball.
+        // pegas balik ke 0. `DampingRatioLowBouncy` dipilih (Batch 374, gantikan
+        // `DampingRatioMediumBouncy` Batch 364-373) — lihat catatan Batch 374 di bawah utk alasan.
         //
         // Batch 368 — User laporan regresi: "ditarik maksimal tapi tidak langsung reset ketempat
         // semula". Root cause (verified via kontrak resmi `OverscrollEffect.applyToFling`,
@@ -263,11 +271,27 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
         // ujung bawah bracket [1500, 4000], nilai yang sudah pernah diuji & didokumentasikan
         // Batch 369 sebagai terasa "ngambang". Lihat dokumentasi lengkap di deklarasi
         // [OVERSCROLL_SETTLE_STIFFNESS] utk arah tuning berikutnya kalau masih perlu.
+        //
+        // Batch 374 — User: "perbaiki karakter pantulan yang kerasa tidak natural sama sekali
+        // woy!!" — SUMBU BEDA dari Batch 368-373 (semuanya soal `stiffness`, KECEPATAN pegas
+        // kembali ke 0). "Karakter pantulan" menunjuk ke BENTUK osilasinya sendiri —
+        // `dampingRatio`, satu-satunya parameter spring ini yang belum pernah diubah sejak Batch
+        // 364. `DampingRatioMediumBouncy` (0.5) punya rasio redaman relatif rendah — pegas
+        // overshoot lalu berosilasi 2-3+ kali sebelum benar-benar diam, karakter yang lebih dekat
+        // ke "bola pantul"/spring-toy ketimbang rubber-band UIScrollView asli (yang cuma overshoot
+        // SATU KALI tipis lalu langsung tenang, nyaris tanpa osilasi ulang). Root cause dari
+        // "tidak natural" kemungkinan besar persis osilasi berulang itu — bukan soal kecepatan.
+        // Fix: `DampingRatioMediumBouncy` (0.5) -> `DampingRatioLowBouncy` (0.75, preset resmi
+        // Compose berikutnya menuju redaman kritis) — overshoot tunggal yang jauh lebih halus,
+        // 1 ayunan balik lalu settle, tanpa lompat ke `DampingRatioNoBouncy` (1.0, redaman kritis
+        // penuh) yang akan menghapus pantulan sama sekali (bukan yang diminta — user cuma bilang
+        // "tidak natural", bukan "hapus pantulan"). `stiffness` ([OVERSCROLL_SETTLE_STIFFNESS],
+        // 1500 sejak Batch 373) TIDAK disentuh — sumbu yang berbeda, di luar laporan ini.
         overscrollOffset.animateTo(
             targetValue = Offset.Zero,
             initialVelocity = Offset(remaining.x, remaining.y),
             animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
+                dampingRatio = Spring.DampingRatioLowBouncy,
                 stiffness = OVERSCROLL_SETTLE_STIFFNESS,
             ),
         )

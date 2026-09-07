@@ -8,7 +8,14 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 373 (REVERT: efek bounce settle overscroll terlalu kaku, konstanta
+> 🆕 **Update terbaru — Batch 374 (FIX KARAKTER PANTULAN TIDAK NATURAL: `dampingRatio`
+> `DampingRatioMediumBouncy` → `DampingRatioLowBouncy`, 1 file kode):** User: "sekarang perbaiki
+> karakter pantulan yang kerasa tidak natural sama sekali woy!!". Sumbu beda dari Batch 368-373
+> (soal `stiffness`/kecepatan) — ini soal BENTUK osilasi pegasnya (`dampingRatio`), belum pernah
+> disentuh sejak Batch 364. MediumBouncy (0.5) = underdamped, berosilasi 2-3x sebelum diam,
+> kerasa spring-toy. Diganti LowBouncy (0.75) — overshoot tunggal halus lalu settle, lebih dekat
+> rubber-band `UIScrollView` asli. `stiffness` tidak disentuh. Belum ditest di device asli.
+> Batch 373 (REVERT: efek bounce settle overscroll terlalu kaku, konstanta
 > `OVERSCROLL_SETTLE_STIFFNESS` diturunkan 4000→1500 (`Spring.StiffnessMedium`), 1 file kode):**
 > User: "revert effect bounce dari yang kaku -> hampir mengambang!!". Fase pegas-balik setelah
 > jari dilepas (`applyToFling`, `IosScrollPhysics.kt`) — beda dari fase tarikan yang jadi target
