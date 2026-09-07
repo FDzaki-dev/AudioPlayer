@@ -34,6 +34,7 @@ import com.rudi.audioplayer.data.SmartPlaylistEngine
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.ui.theme.Radius
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
 /**
  * Smart Playlist tab content: list of rule-based playlists (with live match count), or the
@@ -73,7 +74,10 @@ fun SmartPlaylistTabView(
                     onAction = { editingPlaylist = null; showBuilder = true }
                 )
             } else {
-                LazyColumn {
+                LazyColumn(
+                    // Batch 377 — PENDING_IosFlingBehavior.md item 4/14 (daftar playlist otomatis).
+                    flingBehavior = rememberIosFlingBehavior()
+                ) {
                     itemsIndexed(smartPlaylists, key = { _, p -> p.id }) { _, playlist ->
                         val matchCount = remember(playlist, allSongs) {
                             SmartPlaylistEngine.resolve(playlist, allSongs, ratingOf).size
@@ -142,7 +146,11 @@ fun SmartPlaylistTabView(
                         subtitle = "Longgarkan aturan lewat tombol pensil di atas."
                     )
                 } else {
-                    LazyColumn {
+                    LazyColumn(
+                        // Batch 377 — PENDING_IosFlingBehavior.md item 4/14 (daftar lagu yang cocok
+                        // dengan aturan playlist otomatis).
+                        flingBehavior = rememberIosFlingBehavior()
+                    ) {
                         itemsIndexed(matchedSongs, key = { _, song -> song.id }) { index, song ->
                             val isPlaying = song.id == currentSongId
                             val background = if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent

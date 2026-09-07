@@ -36,6 +36,23 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 377 (Lanjut antrean `PENDING_IosFlingBehavior.md`: 6/14 layar — `SmartPlaylistScreen.kt`,
+`SettingsScreen.kt`, `StatsDashboardScreen.kt`, 3 file kode)** — Tidak ada laporan bug baru dari
+user ("lanjutkan progress!!"); Batch 376 masih menunggu verifikasi device asli. Sesuai Auto-Read
+Pending Queue, comot 3 file kode berikutnya dari antrean fling behavior (dibuka Batch 364, 3/14
+selesai Batch 367). Pola reuse persis `LibraryScreen.kt`: import `rememberIosFlingBehavior` dari
+`ui.theme` + parameter `flingBehavior = rememberIosFlingBehavior()` di tiap `LazyColumn` yang
+relevan — 0 perubahan di `IosScrollPhysics.kt` sendiri. `SmartPlaylistScreen.kt` dapat 2 titik
+(daftar playlist otomatis + daftar lagu cocok); 2 `LazyRow` chip filter (Folder/Genre) di dialog
+builder-nya SENGAJA tidak disentuh (bukan carousel konten, cuma beberapa chip pendek — konsisten
+hitungan "2 scrollable" yang sudah dicatat sejak Batch 364). `SettingsScreen.kt` &
+`StatsDashboardScreen.kt` masing-masing 1 `LazyColumn` utama. Checklist pending diupdate (total
+6/14 tercentang), README.md disamakan ("7 dari 15 layar selesai, 8 sisa"). Brace/paren balance
+dicek per file, semua seimbang. **Belum ditest di device asli** — tidak ada env Android nyata di
+sesi ini. Sisa 8 file: `VaultSheet`, `SongPickerSheet`, `FolderManagerSheet`,
+`DuplicateFinderSheet`, `ABRepeatBookmarkSheet`, `EqualizerSheet`, `LyricsSheet`, `LyricsView`.
+Detail lengkap CHANGELOG.md Batch 377.
+
 **Batch 376 (FIX jaring pengaman Batch 375 TIDAK kepicu — race condition async `snapTo` vs guard
 synchronous, `IosScrollPhysics.kt`, 1 file kode)** — User laporan HASIL Batch 375, 2 bagian: (1)
 status fix ACTION_CANCEL: "masih ada delay-nya, belum kepakai" — bukan cuma kurang mulus, jaring

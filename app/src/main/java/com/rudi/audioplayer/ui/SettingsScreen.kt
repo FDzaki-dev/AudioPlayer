@@ -53,6 +53,7 @@ import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.resolveIsDark
 import com.rudi.audioplayer.ui.theme.Radius
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import kotlinx.coroutines.launch
 
 @Composable
@@ -100,7 +101,11 @@ fun SettingsScreen(
     var lyricsPrefetchEnabled by remember { mutableStateOf(LyricsPrefetchStore(context).isEnabled()) }
     var showClearLyricsCacheConfirm by remember { mutableStateOf(false) }
 
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        // Batch 377 — PENDING_IosFlingBehavior.md item 5/14.
+        flingBehavior = rememberIosFlingBehavior()
+    ) {
         item {
             Text(
                 "PENGATURAN",

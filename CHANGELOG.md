@@ -1,5 +1,38 @@
 # Changelog
 
+## Batch 377 — PENDING_IosFlingBehavior.md: 6/14 layar (SmartPlaylistScreen, SettingsScreen, StatsDashboardScreen), 3 file kode
+Tidak ada laporan bug baru dari user batch ini ("lanjutkan progress!!"). Batch 376 (race condition
+async `snapTo` vs guard synchronous) masih menunggu verifikasi device asli — belum ada laporan
+hasil baru yang membatalkan/mengubahnya. Sesuai Auto-Read Pending Queue, lanjut comot 3 file kode
+berikutnya dari antrean `PENDING_IosFlingBehavior.md` (dibuka Batch 364, 3/14 di Batch 367),
+urutan bebas sesuai catatan pending-nya sendiri.
+
+**3 file (persis pola reuse dari `LibraryScreen.kt` Batch 364, 0 perubahan di
+`IosScrollPhysics.kt` sendiri)**:
+1. `ui/SmartPlaylistScreen.kt` — 2 scrollable: `LazyColumn` daftar playlist otomatis + `LazyColumn`
+   daftar lagu yang cocok dengan aturan. 2 `LazyRow` chip filter (Folder/Genre) di dalam dialog
+   builder-nya SENGAJA tidak disentuh — bukan carousel konten seperti rail Beranda, cuma beberapa
+   chip pilihan pendek, konsisten dengan hitungan "2 scrollable" yang sudah dicatat di
+   `PENDING_IosFlingBehavior.md` sejak Batch 364.
+2. `ui/SettingsScreen.kt` — 1 `LazyColumn` utama (satu-satunya scrollable di layar ini).
+3. `ui/StatsDashboardScreen.kt` — 1 `LazyColumn` utama (dashboard statistik dengar).
+
+Tiap lokasi: 1 baris import `rememberIosFlingBehavior` dari `ui.theme` + 1 parameter
+`flingBehavior = rememberIosFlingBehavior()`, komentar baris menunjuk balik ke nomor item di
+`PENDING_IosFlingBehavior.md`. Checklist pending diupdate (3 lagi dicentang, total 6/14), README.md
+("Belum selesai" + fitur scroll ala iOS) disamakan jadi "7 dari 15 layar selesai, 8 sisa". Brace/
+paren balance dicek per file: `SmartPlaylistScreen.kt` 104/104 & 265/265, `SettingsScreen.kt`
+157/157 & 482/482, `StatsDashboardScreen.kt` 46/46 & 141/141.
+
+**Belum ditest di device asli** — tidak ada env Android nyata di sesi ini, sama seperti batch-batch
+sebelumnya. **Prioritas cek user**: rasakan glide scroll di layar Playlist Otomatis (kedua daftar),
+Pengaturan, dan Dashboard Statistik — harus terasa sama seperti tab Lagu/Beranda/Antrean Putar
+(meluncur lebih panjang & mulus, bukan berhenti mendadak ala Android default). Sisa 8 file
+(`VaultSheet`, `SongPickerSheet`, `FolderManagerSheet`, `DuplicateFinderSheet`,
+`ABRepeatBookmarkSheet`, `EqualizerSheet`, `LyricsSheet`, `LyricsView`) masih di
+`PENDING_IosFlingBehavior.md`, belum disentuh — lanjut batch berikutnya sampai habis/user bilang
+cukup.
+
 ## Batch 376 — FIX jaring pengaman Batch 375 tidak kepicu: race condition async snapTo vs guard synchronous (IosScrollPhysics.kt, 1 file kode)
 User laporan HASIL Batch 375, dua bagian: (1) status fix ACTION_CANCEL — "masih ada delay-nya,
 belum kepakai" (bukan cuma "kurang mulus", tapi jaring pengamannya sendiri TIDAK kepicu sama

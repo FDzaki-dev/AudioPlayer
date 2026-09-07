@@ -30,6 +30,7 @@ import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.tactileEmboss
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import java.time.DayOfWeek
 
 /** Full-screen dashboard reached from Settings ("Statistik Dengar"). Every number here is
@@ -58,7 +59,11 @@ fun StatsDashboardScreen(snapshot: ListeningStatsEngine.Snapshot, onBack: () -> 
                 subtitle = "Statistik muncul begitu kamu mulai memutar lagu — jam favorit, artis paling sering, dan tren mingguan akan terisi otomatis."
             )
         } else {
-            LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                // Batch 377 — PENDING_IosFlingBehavior.md item 6/14.
+                flingBehavior = rememberIosFlingBehavior()
+            ) {
                 item {
                     Row(modifier = Modifier.fillMaxWidth()) {
                         SummaryStatCard(
