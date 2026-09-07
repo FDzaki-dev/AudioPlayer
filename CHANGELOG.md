@@ -1,5 +1,48 @@
 # Changelog
 
+## Batch 371 — FIX REGRESI LANJUTAN (4): stiffness custom 4000 (biseksi geometris 1500↔10000), ganti arah dari "naik preset resmi terus" (IosScrollPhysics.kt, 1 file kode)
+User laporan HASIL Batch 370, dan ini sinyal beda dari 3 batch sebelumnya: "regresi nya sendiri
+gak hilang, yang ada malah jadi kaku/Satset!!" — DUA gejala sekaligus, di ARAH BERLAWANAN (masih
+ngambang, DAN sekarang kaku), bukan sekadar "masih kurang cepat" seperti pola laporan Batch
+368/369. Ini mengubah kesimpulan: rute "naikkan stiffness lagi" (yang dipakai 3 batch berturut-
+turut: 200→400→1500→10000) sudah SALAH ARAH kalau diteruskan naik terus — Batch 370
+(StiffnessHigh/10000) sudah TERBUKTI overshoot ke sisi kaku, sementara Batch 369
+(StiffnessMedium/1500) TERBUKTI masih undershoot ke sisi ngambang. Kedua titik ini bersama-sama
+membentuk BRACKET yang valid: titik ideal ("smooth like iOS", tujuan asli sejak Batch 364) ada DI
+ANTARA 1500 dan 10000, bukan di salah satu preset resmi Compose.
+
+**Kenapa tidak coba preset resmi lain dulu**: preset `Spring.Stiffness*` Compose cuma ada 4
+(`StiffnessHigh`=10000, `Medium`=1500, `MediumLow`=400, `Low`=200) — semuanya sudah dicoba (Batch
+364/368/369/370), tidak ada preset resmi lagi di antara 1500 dan 10000. Meneruskan pola "coba
+preset lain" sudah mentok; satu-satunya jalan presisi lebih lanjut adalah nilai custom.
+
+**Fix (1 file, `ui/theme/IosScrollPhysics.kt`)**: tambah konstanta baru
+`OVERSCROLL_SETTLE_STIFFNESS = 4000f` (custom, didokumentasikan lengkap alasan fisikanya di
+deklarasi konstanta) dan pakai di `applyToFling` menggantikan `Spring.StiffnessHigh`. Nilai 4000
+adalah rata-rata GEOMETRIS dari 1500 dan 10000 (√(1500×10000) ≈ 3873, dibulatkan) — BUKAN rata-
+rata aritmetis ((1500+10000)/2=5750, yang akan bias jauh ke sisi cepat/kaku). Alasan pakai rata-
+rata geometris: kecepatan settle berbanding ke ωₙ=√(stiffness/mass) (pelajaran fisika yang sama
+dari Batch 369) — rata-rata geometris di `stiffness` = rata-rata ARITMETIS di ωₙ, yang merupakan
+titik tengah yang benar secara PERSEPSI kecepatan (bukan titik tengah linear di angka mentah
+`stiffness`). Dari ωₙ: √(4000/1500) ≈ 1.63x lebih cepat dari Batch 369 (StiffnessMedium, yang
+undershoot), dan √(10000/4000) ≈ 1.58x lebih lambat dari Batch 370 (StiffnessHigh, yang
+overshoot) — hampir simetris persis di titik tengah persepsi dari kedua arah. `dampingRatio`
+(`DampingRatioMediumBouncy`) TETAP TIDAK diubah sama sekali sejak Batch 366 — laporan user murni
+soal kecepatan settle ("kaku/satset" = terlalu cepat, "ngambang" = terlalu lambat), bukan soal
+karakter pantulan itu sendiri. README.md disamakan.
+
+**Kalau masih perlu tuning lagi (batch berikutnya)**: sekarang bracket menyempit jadi [1500, 4000]
+kalau masih ngambang, atau [4000, 10000] kalau masih kaku — TIDAK perlu balik ke preset resmi,
+ulangi biseksi geometris di rentang yang baru (mis. kalau masih ngambang: √(1500×4000)≈2449; kalau
+masih kaku: √(4000×10000)≈6325). Pola biseksi ini jauh lebih presisi & cepat konvergen dibanding
+lompat antar 4 preset resmi yang jaraknya sangat kasar (kelipatan 2-6.7x tiap naik).
+
+**Belum bisa dipastikan tanpa device asli** (tidak ada environment Android untuk run/compile di
+sesi ini) — matematika ωₙ di atas konsisten dengan rumus fisika pegas standar yang sudah dipakai
+Batch 369/370 (bukan spekulasi baru), tapi 4000 tetap estimasi biseksi yang WAJIB dikonfirmasi
+user di device: coba lagi skenario tarik-sampai-mentok/lepas-pelan yang sama. Kasih tau ke arah
+mana masih kurang pas (ngambang vs kaku) supaya bracket bisa dipersempit lagi sesuai rumus di atas.
+
 ## Batch 370 — FIX REGRESI LANJUTAN (3): pegas balik overscroll masih ngambang, StiffnessHigh (IosScrollPhysics.kt, 1 file kode)
 User laporan: "masih terasa regresi, perbaiki woy!!" — tanpa detail skenario baru, jadi
 diperlakukan sebagai lanjutan langsung thread "FIX REGRESI" yang sama (Batch 368→369), bukan bug

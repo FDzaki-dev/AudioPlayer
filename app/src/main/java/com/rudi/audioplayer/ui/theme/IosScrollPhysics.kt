@@ -59,6 +59,26 @@ private const val RUBBER_BAND_RANGE_PX = 220f
 private fun rubberBandResistance(magnitudePx: Float): Float = 1f / (1f + abs(magnitudePx) / RUBBER_BAND_RANGE_PX)
 
 /**
+ * Stiffness pegas balik overscroll di [IosRubberBandOverscrollEffect.applyToFling] — CUSTOM
+ * (bukan preset `Spring.Stiffness*` resmi). Batch 368→370 mencoba preset resmi berurutan (200 →
+ * 400 → 1500 → 10000) dan berhasil MEMBRACKET titik ideal dari 2 sisi: `StiffnessMedium` (1500,
+ * Batch 369) user masih lapor "ngambang"; `StiffnessHigh` (10000, Batch 370) user lapor kebalikan
+ * persis — "kaku/satset", kehilangan rasa pantulan iOS. Artinya sweet spot ada DI ANTARA keduanya,
+ * tapi lompatan antar preset resmi (kelipatan ~3-6x tiap naik) terlalu kasar buat presisi di sini
+ * — preset berikutnya di atas/bawah rentang [1500, 10000] tidak ada. Batch 371 pindah ke nilai
+ * custom lewat biseksi yang benar secara fisika: karena kecepatan settle berbanding ke frekuensi
+ * natural ωₙ = √(stiffness/mass) — BUKAN linear ke `stiffness` mentah (pelajaran pahit dari Batch
+ * 368) — titik tengah yang benar secara PERSEPSI adalah rata-rata GEOMETRIS di `stiffness`
+ * (setara rata-rata aritmetis di ωₙ), bukan rata-rata aritmetis di `stiffness` mentah yang akan
+ * bias jauh ke salah satu ujung dari sisi kecepatan rasa. √(1500 × 10000) ≈ 3873, dibulatkan ke
+ * `4000` (angka bersih, deviasi <4% dari nilai eksak, diabaikan). Kalau masih perlu tuning:
+ * NAIKKAN dari 4000 kalau masih kerasa ngambang (breakeven baru: [4000, 10000]), TURUNKAN kalau
+ * masih kerasa kaku/satset (breakeven baru: [1500, 4000]) — cukup ulangi biseksi geometris di
+ * rentang yang menyempit, TIDAK perlu balik ke preset resmi.
+ */
+private const val OVERSCROLL_SETTLE_STIFFNESS = 4000f
+
+/**
  * Overscroll ala iOS: menggeser KONTEN (bukan menggambar glow di atasnya) saat ditarik lewat
  * batas list, dengan tahanan yang makin kuat seiring jarak tarikan (rubber-band), lalu pegas
  * balik ke posisi normal saat jari dilepas. Satu instance = satu scrollable (dibuat baru tiap
@@ -154,29 +174,27 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
         // sudah disetujui user (Batch 366) tidak disentuh, murni kecepatan "kembali ke 0" yang
         // dipercepat lagi.
         //
-        // Batch 370 — User laporan lagi: "regresi nya masih kerasa!!" persis setelah Batch 369
-        // (StiffnessMedium/1500) dikirim — skenario tarik-sampai-mentok-lepas-pelan yang sama,
-        // BUKAN kasus baru. Ini persis kandidat yang sudah diantisipasi eksplisit di catatan
-        // Batch 369 sendiri ("kalau masih ngambang, kandidat berikutnya Spring.StiffnessHigh,
-        // 10000"). Fix: `stiffness` dinaikkan ke `Spring.StiffnessHigh` (10000, preset resmi
-        // Compose paling tinggi yang tersedia — bukan angka custom). Dari sisi ωₙ = √(stiffness/
-        // mass): √(10000/1500) ≈ 2.58x lebih cepat dari Batch 369, ≈ 5x dari baseline Batch 364
-        // (StiffnessLow/200) — lompatan jauh lebih besar dari 2 batch sebelumnya (masing-masing
-        // cuma ~1.4x dan ~1.9x, terbukti di bawah ambang persepsi). Karena `StiffnessHigh` adalah
-        // preset tertinggi resmi Compose, TIDAK ada lagi ruang naik lebih jauh lewat rute
-        // "stiffness lebih tinggi" kalau ini masih belum cukup — kandidat berikutnya kalau masih
-        // ngambang harus dari arah lain (mis. turunkan `dampingRatio` dari `MediumBouncy` ke
-        // `NoBouncy`/custom di bawah itu, yang akan MENGURANGI pantulan khas iOS; atau beri kick
-        // awal minimum independen dari `remaining` biar skenario velocity~0 tidak semata
-        // mengandalkan pegas). `dampingRatio` (`DampingRatioMediumBouncy`) TETAP TIDAK diubah di
-        // batch ini — perbaikan dulu difokuskan murni ke kecepatan settle sebelum menyentuh
-        // karakter pantulannya.
+        // Batch 370 — User laporan lagi: "regresi nya masih kerasa!!" — dinaikkan ke
+        // `Spring.StiffnessHigh` (10000, preset resmi tertinggi Compose).
+        //
+        // Batch 371 — User laporan HASIL Batch 370, dan ini SINYAL PENTING: "regresi nya sendiri
+        // gak hilang, yang ada malah jadi kaku/Satset!!" — dua gejala SEKALIGUS, bukan cuma
+        // "masih kurang", dan dua-duanya di ARAH BERLAWANAN (masih ngambang DAN sekarang kaku).
+        // Dibaca sebagai: preset 1500 (Batch 369) undershoot, preset 10000 (Batch 370) overshoot
+        // ke arah berlawanan — rasa "smooth like iOS" yang jadi tujuan asli (Batch 364) ada DI
+        // ANTARA dua titik itu, bukan di salah satu ujung preset resmi. Lompatan antar preset
+        // resmi Compose (200/400/1500/10000) terlalu kasar untuk presisi di titik ini. Fix:
+        // pindah ke [OVERSCROLL_SETTLE_STIFFNESS] (custom, 4000) — rata-rata GEOMETRIS dari 1500
+        // & 10000 (bukan aritmetis; benar secara fisika karena kecepatan settle ~ ωₙ = √(stiffness/
+        // mass), lihat dokumentasi lengkap di deklarasi konstantanya). `dampingRatio`
+        // (`DampingRatioMediumBouncy`) TETAP TIDAK diubah — user cuma keberatan soal KECEPATAN
+        // settle ("kaku/satset"), bukan soal KARAKTER pantulannya.
         overscrollOffset.animateTo(
             targetValue = Offset.Zero,
             initialVelocity = Offset(remaining.x, remaining.y),
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessHigh,
+                stiffness = OVERSCROLL_SETTLE_STIFFNESS,
             ),
         )
     }

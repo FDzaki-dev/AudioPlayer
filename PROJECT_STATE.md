@@ -36,6 +36,23 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 371 (FIX REGRESI LANJUTAN (4) — ganti strategi dari "naik preset terus" ke biseksi
+geometris, stiffness custom 4000, `IosScrollPhysics.kt`, 1 file kode)** — User laporan HASIL Batch
+370: "regresi nya sendiri gak hilang, yang ada malah jadi kaku/Satset!!" — DUA gejala berlawanan
+arah sekaligus (masih ngambang + sekarang kaku), sinyal beda dari pola laporan sebelumnya.
+Dibaca sebagai: Batch 369 (StiffnessMedium/1500) undershoot, Batch 370 (StiffnessHigh/10000)
+overshoot — keduanya BERSAMA membentuk bracket valid, titik ideal di antaranya. Semua 4 preset
+resmi Compose (200/400/1500/10000) sudah dicoba, tidak ada lagi di antara 1500-10000, jadi pindah
+ke custom.
+
+**Fix**: konstanta baru `OVERSCROLL_SETTLE_STIFFNESS = 4000f` (rata-rata GEOMETRIS 1500×10000,
+BUKAN aritmetis — konsisten pelajaran ωₙ=√(stiffness/mass) dari Batch 369), menggantikan
+`Spring.StiffnessHigh` di `applyToFling`. `dampingRatio` tidak diubah. README.md disamakan.
+**Belum ditest di device asli.** Kalau masih perlu tuning: bracket sekarang [1500,4000] (kalau
+masih ngambang) atau [4000,10000] (kalau masih kaku) — ulangi biseksi geometris di rentang baru,
+JANGAN balik ke lompat-preset-resmi (sudah terbukti kekasaran lompatannya jadi masalah sejak
+Batch 368). Detail lengkap CHANGELOG.md Batch 371.
+
 **Batch 370 (FIX REGRESI LANJUTAN (3) — pegas balik overscroll masih ngambang, naik ke
 `Spring.StiffnessHigh` (10000), `IosScrollPhysics.kt`, 1 file kode)** — User laporan singkat:
 "masih terasa regresi, perbaiki woy!!" (tanpa detail skenario baru) → diperlakukan sebagai
