@@ -1,5 +1,66 @@
 # Changelog
 
+## Batch 372 — FIX KAKU SAAT TARIK: target ternyata rubber-band range, bukan settle-stiffness (IosScrollPhysics.kt, 1 file kode)
+Setelah Batch 371 (`OVERSCROLL_SETTLE_STIFFNESS` = 4000, biseksi geometris), user masih laporan
+"kaku"+"regresi" BARENG persis kayak sebelumnya — padahal angka stiffness sudah diganti 3x berturut
+(1500 Batch 369 → 10000 Batch 370 → 4000 Batch 371). Pola ini sendiri sudah sinyal: 3x ganti ANGKA
+dengan gejala yang IDENTIK menunjuk ke salah PARAMETER yang ditune, bukan salah nilainya — kalau
+memang parameter yang benar, minimal salah satu dari 3 percobaan seharusnya mengubah rasa "kaku"
+itu ke arah tertentu.
+
+**Pertanyaan diagnostik 1 — "kaku ini paling kerasa pas ngapain?"** Jawab user: "tarik ujung daftar
+sampai mentok, pakai banget [tenaga]." Ini men-describe FASE TARIKAN — jari masih menempel di
+layar, list masih di-drag melewati batas. `OVERSCROLL_SETTLE_STIFFNESS` yang ditune 3 batch
+terakhir HANYA dipakai di `applyToFling`, yang baru jalan SETELAH jari dilepas — fase yang sama
+sekali berbeda dan independen dari fase tarikan. Fase tarikan itu sendiri diatur sepenuhnya oleh
+`rubberBandResistance()` + `RUBBER_BAND_RANGE_PX`, sepasang kode yang TIDAK PERNAH disentuh sejak
+pertama dibuat di Batch 364. Jadi wajar 3x tuning stiffness settle tidak mengubah gejala ini sama
+sekali — targetnya memang bukan di situ.
+
+**Pertanyaan diagnostik 2 — "testing di layar yang mana?"** (dugaan awal: mungkin cuma sebagian
+dari 11 layar sisa `PENDING_IosFlingBehavior.md` yang bermasalah). Jawab user: tidak yakin
+persisnya layar mana. Ini BUKAN jawaban yang kurang informatif — justru ini sendiri adalah bukti
+diagnostik: `IosRubberBandOverscrollEffect` dipasang SEKALI app-wide lewat `LocalOverscrollFactory`
+di `Theme.kt` (`IosOverscrollFactory`), jadi kalau bug ini memang di situ, ia HARUS terasa di semua
+layar secara merata, tidak spesifik ke satu layar — persis kenapa user tidak bisa nunjuk 1 layar
+tertentu. Ini juga mengonfirmasi bug ini SAMA SEKALI TIDAK terkait `rememberIosFlingBehavior()`
+(kurva fling, opt-in per-layar, itu yang di-track di `PENDING_IosFlingBehavior.md`) — dua sistem
+yang independen, satu app-wide, satu per-layar.
+
+**Root cause**: `RUBBER_BAND_RANGE_PX = 220f` adalah konstanta px TETAP, tidak bergantung ukuran
+device/viewport sama sekali. Formula `rubberBandResistance` menurunkan resistance ke ~separuh
+hanya di 220px jarak tarikan, dan terus turun mendekati nol jauh sebelum jari sempat ditarik
+"pakai banget" di device modern manapun — akibatnya konten berhenti bertambah stretch hampir
+seketika, TIDAK PEDULI sekeras/sejauh apa jari menarik, kerasa persis seperti "mentok"/dinding
+kaku alih-alih pita elastis. UIScrollView/WebKit asli TIDAK memakai angka px tetap untuk parameter
+jarak ini — parameter `d` di formula resminya (`x*d*c/(d+c*x)`) adalah DIMENSI VIEWPORT itu
+sendiri, jadi otomatis ikut skala ke ukuran layar device.
+
+**Fix (1 file, `ui/theme/IosScrollPhysics.kt`)**: `RUBBER_BAND_RANGE_PX` dihapus, diganti
+konstanta baru `RUBBER_BAND_VIEWPORT_FRACTION = 0.55f` (peran serupa konstanta tension `c` WebKit,
+dipakai di formula resistance sederhana file ini sebagai pengali dimensi viewport, bukan port
+formula WebKit persis). Jarak "separuh resistance" sekarang dihitung PER SUMBU dari ukuran viewport
+asli — lebar utk drag horizontal, tinggi utk drag vertikal — diambil dari `placeable.width`/
+`placeable.height` yang sudah tersedia di `measure()` milik `overscrollNode` (0 context/composable
+tambahan diperlukan, cukup 2 field mutable baru `viewportWidthPx`/`viewportHeightPx` yang di-refresh
+tiap measure pass). `rubberBandResistance()` diubah sedikit signature-nya (terima `rangePx`
+sebagai parameter, bukan baca konstanta global langsung) supaya bisa dipanggil beda nilai per
+sumbu. `OVERSCROLL_SETTLE_STIFFNESS` (Batch 371, 4000) SAMA SEKALI TIDAK disentuh — parameter itu
+mengatur fase berbeda (settle setelah lepas) dan sudah terbukti benar utk fase-nya sendiri.
+README.md disamakan (baris deskripsi fitur overscroll, § "Belum selesai" tidak berubah karena
+scope-nya beda topik).
+
+**Kalau masih perlu tuning (batch berikutnya)**: cukup naikkan/turunkan
+`RUBBER_BAND_VIEWPORT_FRACTION` (0.55 sekarang) — NAIKKAN kalau abis test masih kerasa kaku/mentok
+cepat, TURUNKAN kalau kerasa kelewat lentur/susah kerasa "penuh" walau ditarik jauh. JANGAN balik
+ke konstanta px tetap — itu persis root cause bug 372.
+
+**Belum bisa dipastikan tanpa device asli** (tidak ada environment Android untuk run/compile di
+sesi ini) — perubahan sudah dicek manual (brace/paren balance, tidak ada referensi basi ke
+`RUBBER_BAND_RANGE_PX`/signature lama `rubberBandResistance(Float)` di seluruh source), tapi
+0.55 tetap estimasi awal yang WAJIB dikonfirmasi user di device: ulangi skenario yang sama (tarik
+ujung list sampai mentok, pakai tenaga) dan kasih tau masih kaku atau sudah lentur wajar.
+
 ## Batch 371 — FIX REGRESI LANJUTAN (4): stiffness custom 4000 (biseksi geometris 1500↔10000), ganti arah dari "naik preset resmi terus" (IosScrollPhysics.kt, 1 file kode)
 User laporan HASIL Batch 370, dan ini sinyal beda dari 3 batch sebelumnya: "regresi nya sendiri
 gak hilang, yang ada malah jadi kaku/Satset!!" — DUA gejala sekaligus, di ARAH BERLAWANAN (masih

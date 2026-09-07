@@ -36,6 +36,24 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 372 (FIX KAKU SAAT TARIK — target ternyata bukan settle-stiffness, tapi rubber-band range
+viewport-relative, `IosScrollPhysics.kt`, 1 file kode)** — User laporan Batch 371 masih "kaku"+
+"regresi" BARENG persis kayak sebelumnya walau `OVERSCROLL_SETTLE_STIFFNESS` sudah diganti 3x
+(1500→10000→4000) — 3x ganti angka, gejala identik, sinyal salah PARAMETER, bukan salah nilai.
+Ditanya "kaku ini paling kerasa pas ngapain": "tarik ujung daftar sampai mentok, pakai banget" =
+fase TARIKAN (jari masih nempel), bukan fase pegas-balik-setelah-lepas yang jadi target 3 batch
+tuning sebelumnya (dua fase itu independen). Ditanya "testing di layar mana": user tidak yakin —
+justru KONSISTEN, karena overscroll dipasang SEKALI app-wide (`Theme.kt`), bug ini universal, tidak
+spesifik 1 layar (beda dari backlog fling-curve per-layar di `PENDING_IosFlingBehavior.md`).
+
+**Fix**: `RUBBER_BAND_RANGE_PX` lama (220px FIXED, tidak peduli ukuran device) dihapus — jarak
+"separuh resistance" sekarang diturunkan dari viewport asli hasil `measure()`, per sumbu, dikali
+konstanta baru `RUBBER_BAND_VIEWPORT_FRACTION = 0.55f`. `OVERSCROLL_SETTLE_STIFFNESS` (Batch 371,
+4000) TIDAK disentuh — parameter itu sudah benar utk fase-nya sendiri. README.md disamakan.
+**Belum ditest di device asli.** Kalau abis test masih kerasa kaku: NAIKKAN
+`RUBBER_BAND_VIEWPORT_FRACTION`; kalau kelewat lentur/susah "mentok": TURUNKAN — jangan balik ke
+konstanta px tetap. Detail lengkap CHANGELOG.md Batch 372.
+
 **Batch 371 (FIX REGRESI LANJUTAN (4) — ganti strategi dari "naik preset terus" ke biseksi
 geometris, stiffness custom 4000, `IosScrollPhysics.kt`, 1 file kode)** — User laporan HASIL Batch
 370: "regresi nya sendiri gak hilang, yang ada malah jadi kaku/Satset!!" — DUA gejala berlawanan

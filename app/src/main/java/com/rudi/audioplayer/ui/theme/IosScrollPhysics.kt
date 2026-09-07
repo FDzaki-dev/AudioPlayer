@@ -47,16 +47,48 @@ import kotlinx.coroutines.launch
 //       scrollable. Diterapkan bertahap per micro-batch (MICRO_BATCH: maks 3 file kode/task) —
 //       screen yg belum kebagian ada di `PENDING_IosFlingBehavior.md`.
 
-/**
- * Jarak (px) di mana ketahanan tarikan rubber-band sudah turun ke ~separuh. Makin besar nilainya,
- * makin "kaku"/berat konten terasa saat ditarik lewat batas — 220px dipilih supaya terasa ada
- * tahanan sejak awal (bukan translasi 1:1 seperti Android biasa) tapi masih responsif ke jari,
- * mendekati rasa UIScrollView tanpa perlu port formula persis (`x*d*c/(d+c*x)`) milik WebKit.
- */
-private const val RUBBER_BAND_RANGE_PX = 220f
+// Batch 372 — User laporan: "kaku"+"regresi" MASIH bareng persis kayak sebelumnya walau
+// `OVERSCROLL_SETTLE_STIFFNESS` sudah diganti 3x (1500→10000→4000, Batch 369-371) — 3x ganti
+// ANGKA, gejala IDENTIK, adalah sinyal klasik salah PARAMETER yang ditune, bukan salah nilainya.
+// Ditanya "kaku ini paling kerasa pas ngapain": jawab user "tarik ujung daftar sampai mentok,
+// pakai banget [tenaga]" — ini men-describe FASE TARIKAN (jari masih nempel), BUKAN fase pegas-
+// balik-setelah-lepas yang jadi target `OVERSCROLL_SETTLE_STIFFNESS` di [applyToFling] (itu HANYA
+// jalan setelah jari dilepas). Fase tarikan diatur SEPENUHNYA oleh [rubberBandResistance] di bawah
+// — kode yang TIDAK PERNAH disentuh sejak Batch 364, jadi wajar 3x tuning stiffness settle tidak
+// mengubah gejala ini: dua parameter itu independen, mengatur dua fase yang berbeda.
+//
+// Ditanya juga "testing di layar mana" (dugaan: mungkin cuma sebagian dari 11 layar sisa
+// `PENDING_IosFlingBehavior.md` yang bermasalah) — user TIDAK YAKIN layar mana persisnya. Ini
+// KONSISTEN dgn diagnosis di atas, bukan kontradiksi: [IosRubberBandOverscrollEffect] dipasang
+// SEKALI app-wide lewat `LocalOverscrollFactory` di `Theme.kt` ([IosOverscrollFactory] di bawah),
+// jadi bug ini UNIVERSAL ke semua scrollable — beda dgn `rememberIosFlingBehavior()` (kurva fling,
+// opt-in per-layar, itu yg di-track di `PENDING_IosFlingBehavior.md`, TIDAK terkait bug ini).
+//
+// Root cause: range lama (220px, FIXED, tidak bergantung ukuran device/viewport) terlalu kecil
+// di device modern manapun — resistance sudah turun ke ~separuh hanya di 220px tarikan, mendekati
+// nol jauh sebelum jari sempat ditarik "pakai banget" — makanya konten terasa "mentok"/rigid,
+// TIDAK PEDULI sekeras/sejauh apa jari menarik. UIScrollView/WebKit asli mengikat parameter jarak
+// ini ke DIMENSI VIEWPORT (`d` di formula `x*d*c/(d+c*x)`), bukan angka px tetap. Fix: jarak
+// "separuh resistance" diturunkan dari ukuran viewport hasil `measure()` (sudah tersedia di
+// [overscrollNode], 0 context/composable tambahan), PER SUMBU (lebar utk drag horizontal, tinggi
+// utk vertikal) — bukan lagi 1 angka tetap yg sama utk semua ukuran layar & kedua arah.
 
-/** Berapa persen delta tarikan baru yang masih diteruskan ke offset overscroll, pada jarak [magnitudePx]. */
-private fun rubberBandResistance(magnitudePx: Float): Float = 1f / (1f + abs(magnitudePx) / RUBBER_BAND_RANGE_PX)
+/**
+ * Porsi dimensi viewport (lebar utk sumbu x, tinggi utk sumbu y) yang jadi jarak "separuh
+ * resistance" rubber-band — analog konstanta tension `c` WebKit, dipakai di peran "range" formula
+ * sederhana file ini (lihat [rubberBandResistance]), bukan port formula WebKit persis.
+ * Kalau abis testing masih kerasa kaku: NAIKKAN. Kalau kerasa terlalu lentur/susah "mentok":
+ * TURUNKAN. Cukup ubah pecahan ini — JANGAN balik ke konstanta px tetap (itu yg jadi bug 372).
+ */
+private const val RUBBER_BAND_VIEWPORT_FRACTION = 0.55f
+
+/**
+ * Berapa persen delta tarikan baru yang masih diteruskan ke offset overscroll, pada jarak
+ * [magnitudePx], dgn jarak "separuh resistance" [rangePx] (dinamis per viewport & per sumbu —
+ * lihat [RUBBER_BAND_VIEWPORT_FRACTION] dan `rubberBandRangeXPx`/`rubberBandRangeYPx`).
+ */
+private fun rubberBandResistance(magnitudePx: Float, rangePx: Float): Float =
+    1f / (1f + abs(magnitudePx) / rangePx.coerceAtLeast(1f))
 
 /**
  * Stiffness pegas balik overscroll di [IosRubberBandOverscrollEffect.applyToFling] — CUSTOM
@@ -90,6 +122,12 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
 
     private val overscrollOffset = Animatable(Offset.Zero, Offset.VectorConverter)
 
+    // Batch 372 — diisi tiap `measure()`, dipakai `rubberBandRangeXPx`/`rubberBandRangeYPx` di
+    // bawah supaya range resistance rubber-band ikut skala viewport asli (lihat KDoc
+    // [RUBBER_BAND_VIEWPORT_FRACTION]), bukan lagi angka px tetap yang sama di semua ukuran layar.
+    private var viewportWidthPx = 0f
+    private var viewportHeightPx = 0f
+
     // `Modifier.Node` sendiri sudah punya `coroutineScope` (tersedia setelah node ini attach ke
     // hierarchy) — dipakai langsung di `applyToScroll` di bawah supaya effect ini tidak perlu
     // parameter `CoroutineScope` eksternal dari `rememberCoroutineScope()` (yang tidak bisa
@@ -101,12 +139,20 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
                 constraints: Constraints,
             ): MeasureResult {
                 val placeable = measurable.measure(constraints)
+                viewportWidthPx = placeable.width.toFloat()
+                viewportHeightPx = placeable.height.toFloat()
                 return layout(placeable.width, placeable.height) {
                     val offset = overscrollOffset.value
                     placeable.placeRelativeWithLayer(offset.x.roundToInt(), offset.y.roundToInt())
                 }
             }
         }
+
+    /** Jarak (px) "separuh resistance" sumbu x (drag horizontal) — lihat [RUBBER_BAND_VIEWPORT_FRACTION]. */
+    private val rubberBandRangeXPx: Float get() = viewportWidthPx * RUBBER_BAND_VIEWPORT_FRACTION
+
+    /** Jarak (px) "separuh resistance" sumbu y (drag vertikal) — lihat [RUBBER_BAND_VIEWPORT_FRACTION]. */
+    private val rubberBandRangeYPx: Float get() = viewportHeightPx * RUBBER_BAND_VIEWPORT_FRACTION
 
     override val node: DelegatableNode get() = overscrollNode
 
@@ -134,8 +180,8 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
         if (overscrollDelta != Offset.Zero && source == NestedScrollSource.UserInput) {
             val projected = current + consumedByRelease
             val resisted = Offset(
-                x = overscrollDelta.x * rubberBandResistance(projected.x),
-                y = overscrollDelta.y * rubberBandResistance(projected.y),
+                x = overscrollDelta.x * rubberBandResistance(projected.x, rubberBandRangeXPx),
+                y = overscrollDelta.y * rubberBandResistance(projected.y, rubberBandRangeYPx),
             )
             overscrollNode.coroutineScope.launch { overscrollOffset.snapTo(projected + resisted) }
         }
