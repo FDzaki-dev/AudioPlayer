@@ -136,18 +136,29 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
         // dengan velocity rendah/nyaris nol (tarik pelan sampai mentok lalu lepas jari begitu
         // saja, BEDA dgn fling/sentakan cepat ke arah batas), maka `remaining` ikut ~0 — pegas
         // balik cuma mengandalkan gaya pemulihannya sendiri, dan `StiffnessLow` (200) sengaja
-        // "lembut" jadi kerasa lambat/ngambang persis di kasus itu. Fling BERkecepatan (sentakan
-        // ke batas) tetap dapat kick `remaining` besar jadi TIDAK kena masalah ini — itu sebabnya
-        // Batch 364 lolos user-test (ditest pakai fling wajar, bukan tarik-pelan-lepas). Naikkan
-        // `stiffness` ke `StiffnessMediumLow` (400, 2x) supaya pegas balik tetap sigap walau tanpa
-        // kick tambahan, tanpa mengubah `dampingRatio` yg sudah disetujui (jadi pantulan khas iOS
-        // tetap sama, cuma bagian "kembali ke 0"-nya yang dipercepat).
+        // "lembut" jadi kerasa lambat/ngambang persis di kasus itu. Batch 368 menaikkan ke
+        // `StiffnessMediumLow` (400) dgn asumsi "2x nilai = 2x cepat" — TERBUKTI KELIRU (user
+        // masih lapor regresi kerasa persis skenario yang sama, "ditarik sampai mentok ujung
+        // layar").
+        //
+        // Batch 369 — Root cause KENAPA Batch 368 belum cukup: pegas massa-tunggal punya
+        // frekuensi natural ωₙ = sqrt(stiffness/mass), dan waktu settling berbanding TERBALIK
+        // dgn ωₙ — bukan linear ke `stiffness` mentah. Menaikkan `stiffness` 200→400 (2x nilai)
+        // cuma menaikkan ωₙ sebesar sqrt(2) ≈ 1.41x, jadi waktu kembali ke 0 cuma turun ~29%
+        // (bukan 50% seperti diasumsikan Batch 368) — persis kenapa masih "kerasa ngambang" tepat
+        // di kasus tarik-jauh-lepas-pelan yang sama. Fix: naikkan ke `Spring.StiffnessMedium`
+        // (1500, konstanta resmi Compose — bukan angka custom) — sqrt(1500/400) ≈ 1.94x lebih
+        // cepat dari Batch 368, sqrt(1500/200) ≈ 2.74x lebih cepat dari baseline Batch 364,
+        // lompatan yang genuinely terasa alih-alih di bawah ambang persepsi.
+        // `dampingRatio` (`DampingRatioMediumBouncy`) TETAP TIDAK diubah — pantulan khas iOS yang
+        // sudah disetujui user (Batch 366) tidak disentuh, murni kecepatan "kembali ke 0" yang
+        // dipercepat lagi.
         overscrollOffset.animateTo(
             targetValue = Offset.Zero,
             initialVelocity = Offset(remaining.x, remaining.y),
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMediumLow,
+                stiffness = Spring.StiffnessMedium,
             ),
         )
     }

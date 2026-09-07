@@ -36,6 +36,24 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 369 (FIX REGRESI LANJUTAN — pegas balik overscroll masih ngambang di "tarik sampai mentok
+ujung layar", `IosScrollPhysics.kt`, 1 file kode)** — User laporan: "regresi nya masih kerasa
+kalau ditarik sampai mentok ujung layar!!" — persis skenario yang sudah diantisipasi eksplisit di
+catatan Batch 368 sendiri, bukan bug baru, lanjutan iterasi tuning yang sama.
+
+**Root cause kenapa Batch 368 belum cukup**: komentar batch itu mengasumsikan "stiffness 400 (2x
+nilai 200) = 2x lebih cepat" — keliru secara fisika pegas. Frekuensi natural pegas ωₙ =
+√(stiffness/mass), dan kecepatan settle berbanding ke ωₙ, bukan ke `stiffness` mentah — menaikkan
+`stiffness` 2x cuma menaikkan ωₙ sebesar √2 ≈ 1.41x, jadi waktu kembali ke 0 cuma turun ~29%
+(bukan 50%), perbaikan terlalu kecil buat terasa jelas. **Fix**: `stiffness` dinaikkan lagi ke
+`Spring.StiffnessMedium` (1500, preset resmi Compose) — √(1500/400) ≈ 1.94x lebih cepat dari
+Batch 368, √(1500/200) ≈ 2.74x lebih cepat dari baseline Batch 364. `dampingRatio`
+(`DampingRatioMediumBouncy`, pantulan khas iOS yg sudah disetujui Batch 366) tidak diubah. README.md
+disamakan. **Belum ditest di device asli** (no Android env di sesi ini) — mohon user coba ulang
+skenario tarik-sampai-mentok-lepas-pelan yg sama; kalau masih ngambang, kandidat berikutnya
+`Spring.StiffnessHigh` (10000); kalau sekarang malah terlalu "snap"/pantulan kurang kerasa,
+turunkan ke titik tengah 400–1500. Detail lengkap di CHANGELOG.md Batch 369.
+
 **Batch 368 (FIX REGRESI — overscroll "ditarik maksimal tidak langsung reset", `IosScrollPhysics.kt`,
 1 file kode)** — User laporan bounce effect: tarik list sampai mentok, lepas jari, tidak langsung
 balik ke posisi semula. Root cause diverifikasi lewat kontrak resmi `OverscrollEffect.applyToFling`

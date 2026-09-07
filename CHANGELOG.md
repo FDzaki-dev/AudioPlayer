@@ -1,5 +1,38 @@
 # Changelog
 
+## Batch 369 — FIX REGRESI LANJUTAN: pegas balik overscroll masih ngambang di "tarik sampai mentok ujung layar" (IosScrollPhysics.kt, 1 file kode)
+User laporan: "regresi nya masih kerasa kalau ditarik sampai mentok ujung layar!!" — persis
+skenario yang sudah diantisipasi eksplisit di catatan Batch 368 sendiri ("kalau masih kerasa
+lambat, kasih tau... supaya `stiffness` bisa dinaikkan lagi batch berikutnya"). Bukan bug baru,
+lanjutan langsung iterasi tuning yang sama.
+
+**Root cause kenapa fix Batch 368 belum cukup** — kesalahan asumsi di komentar batch itu sendiri:
+"stiffness dinaikkan ke `StiffnessMediumLow` (400, 2x)" mengasumsikan 2x nilai `stiffness` = 2x
+kecepatan kembali ke posisi 0. Itu keliru secara fisika pegas: untuk sistem pegas-massa,
+frekuensi natural ωₙ = √(stiffness/mass), dan kecepatan settle berbanding lurus ke ωₙ — BUKAN ke
+`stiffness` mentah. Menaikkan `stiffness` 200→400 (2x nilai) cuma menaikkan ωₙ sebesar √2 ≈ 1.41x,
+jadi waktu kembali ke 0 cuma turun ~29% (bukan 50% seperti diasumsikan) — perbaikan yang terlalu
+kecil untuk terasa jelas bedanya, persis kenapa user masih melaporkan gejala identik di skenario
+yang sama (tarik jauh/sampai mentok, lepas jari pelan tanpa sentakan).
+
+**Fix (1 file, `ui/theme/IosScrollPhysics.kt`, fungsi `applyToFling`)**: `stiffness` dinaikkan
+lagi dari `Spring.StiffnessMediumLow` (400) ke `Spring.StiffnessMedium` (1500) — konstanta resmi
+Compose (bukan angka custom tebakan, konsisten kebiasaan project pakai preset `Spring.Stiffness*`
+resmi). Dari sisi ωₙ: √(1500/400) ≈ 1.94x lebih cepat dari Batch 368, √(1500/200) ≈ 2.74x lebih
+cepat dari baseline Batch 364 — lompatan yang jauh lebih besar dari Batch 368 (yang cuma ~1.41x),
+diharapkan genuinely terasa alih-alih di bawah ambang persepsi. `dampingRatio`
+(`DampingRatioMediumBouncy`) TETAP TIDAK diubah — pantulan khas iOS yang sudah disetujui user
+sejak Batch 366 tidak disentuh sama sekali, murni kecepatan "kembali ke 0" yang dipercepat lagi.
+
+**Belum bisa 100% dipastikan tanpa device asli** (tidak ada environment Android untuk run/compile
+di sesi ini) — analisis ωₙ di atas sudah diverifikasi lewat rumus fisika pegas standar (bukan
+spekulasi), dan `Spring.StiffnessMedium` adalah preset resmi Compose (bukan nilai custom belum
+teruji), tapi tetap WAJIB dikonfirmasi user di device: coba lagi persis skenario yang sama (tarik
+list sampai mentok/maksimal, lepas jari pelan-pelan tanpa sentakan) — kalau MASIH kerasa
+ngambang, kasih tau supaya dinaikkan lagi (kandidat berikutnya `Spring.StiffnessHigh`, 10000);
+kalau sekarang malah kerasa terlalu "snap"/kaku dan pantulan iOS-nya jadi kurang kerasa, turunkan
+lagi ke titik tengah antara 400 dan 1500.
+
 ## Batch 368 — FIX REGRESI: overscroll "ditarik maksimal tidak langsung reset" (IosScrollPhysics.kt, 1 file kode)
 User laporan: "ditarik maksimal tapi tidak langsung reset ketempat semula!!" pada efek bounce.
 Root cause diverifikasi lewat kontrak resmi `OverscrollEffect.applyToFling` (dokumentasi
