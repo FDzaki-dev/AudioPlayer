@@ -8,7 +8,22 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 374 (FIX KARAKTER PANTULAN TIDAK NATURAL: `dampingRatio`
+> 🆕 **Update terbaru — Batch 375 (FIX: overscroll bisa nyangkut/telat balik kalau jari
+> kehilangan kontak di tepi layar (ke bezel/case) — bukan soal tuning pegas lagi,
+> `IosScrollPhysics.kt`, 1 file kode):** User kasih root cause spesifik: "tarik sampai mentok
+> terus layar kehilangan kontak sentuhan ... itu akan memicu delay sepersekian detik sebelum
+> balik ke kondisi semula". Beda sumbu dari Batch 368-374 (soal parameter spring, tidak
+> disentuh) — `OverscrollEffect` resmi cuma punya 2 pintu event, keduanya bagian alur drag
+> berakhir NORMAL; kalau touch dibatalkan (`ACTION_CANCEL`, mis. jari meluncur ke bezel), tidak
+> ada jaminan pegas balik terpicu — overscroll bisa nyangkut di posisi mentok sampai event lain
+> yang tak terkait kebetulan menyentuhnya. Fix: `overscrollNode` sekarang juga implement
+> `PointerInputModifierNode` resmi, hitung pointer mentah + `onCancelPointerInput()` sebagai
+> jaring pengaman independen yang langsung memicu pegas balik begitu pointer terakhir
+> lepas/batal. Jalur `applyToFling` normal (tuning stiffness/dampingRatio Batch 368-374) tidak
+> disentuh. Sebagian delay tetap bisa berasal dari OS sendiri (window disambiguasi
+> gesture-navigasi sebelum `ACTION_CANCEL` sampai ke app) — di luar kendali app. Belum ditest di
+> device asli.
+> Batch 374 (FIX KARAKTER PANTULAN TIDAK NATURAL: `dampingRatio`
 > `DampingRatioMediumBouncy` → `DampingRatioLowBouncy`, 1 file kode):** User: "sekarang perbaiki
 > karakter pantulan yang kerasa tidak natural sama sekali woy!!". Sumbu beda dari Batch 368-373
 > (soal `stiffness`/kecepatan) — ini soal BENTUK osilasi pegasnya (`dampingRatio`), belum pernah

@@ -1,5 +1,83 @@
 # Changelog
 
+## Batch 375 — FIX overscroll nyangkut/telat balik saat jari kehilangan kontak di tepi layar (IosScrollPhysics.kt, 1 file kode)
+User kasih root cause spesifik (bukan laporan "masih kerasa X" seperti rentetan Batch 368-374):
+"ketika user tarik sampai mentok terus layar kehilangan kontak sentuhan user (misalnya layar ->
+case hp), itu akan memicu semacam delay sepersekian detik sebelum balik ke kondisi semula". Ini
+SUMBU KETIGA yang beda lagi dari 368-374 (yang selalu soal parameter `spring(...)` — `stiffness`
+atau `dampingRatio`, DUA-DUANYA TIDAK disentuh batch ini): laporan ini bukan soal "pegas kurang
+pas", tapi soal pegas baliknya TIDAK PERNAH DIPICU sama sekali sampai sesuatu yang lain (event
+tak terkait) kebetulan menyentuhnya belakangan — kelas bug yang sama sekali berbeda dari 6 batch
+tuning sebelumnya.
+
+**Diagnosis**: diverifikasi via dokumentasi resmi `PointerInputModifierNode.onCancelPointerInput`
+(developer.android.com) — fungsi ini dipicu spesifik saat "Android dispatches ACTION_CANCEL to
+Compose". Jari yang "kehilangan kontak" dengan cara meluncur ke bezel/case (BUKAN diangkat bersih
+dalam batas layar) adalah kandidat kuat menghasilkan `ACTION_CANCEL`, bukan `ACTION_UP` normal —
+salah satu pemicu paling umum di Android modern adalah zona disambiguasi gesture-navigasi (edge
+back-gesture/predictive back) yang menahan touch stream sejenak sebelum akhirnya membatalkannya
+ke app; bagian delay ITU SENDIRI (di level OS, sebelum event apa pun sampai ke Compose) di luar
+kendali kode app mana pun, tidak bisa "diperbaiki" dari sisi ini.
+
+Tapi ada bagian yang MEMANG bug di kode app: kontrak resmi `OverscrollEffect` cuma punya 2 pintu
+masuk event, `applyToScroll` & `applyToFling` — keduanya bagian dari alur "drag berakhir NORMAL"
+yang dikelola `scrollable()` sendiri (dokumentasi resmi `FlingBehavior.performFling`: "When drag
+has ended WITH VELOCITY", tidak menyebut skenario dibatalkan/`ACTION_CANCEL` sama sekali). Sinyal
+analog ditemukan di kodebase resmi androidx sendiri (fork `JetBrains/compose-multiplatform-core`,
+`CupertinoOverscrollEffect.kt`, PR resmi berjudul "Fix freeze when scrolling is cancelled during
+overscroll", deskripsi resmi: "Reset the overscroll effect when no ongoing animation or
+interaction is applied"): overscroll effect BISA macet/frozen kalau drag-nya dibatalkan di
+tengah, karena efeknya cuma direset lewat jalur fling normal — persis kelas bug yang sama, di
+implementasi overscroll berbeda tapi filosofi identik. `overscrollNode` milik file ini sebelum
+batch ini py NOL penanganan untuk skenario cancel — begitu offset ter-`snapTo` ke posisi mentok
+(Batch 372) lalu `ACTION_CANCEL` turun, TIDAK ADA kode yang memicu pegas balik sampai kebetulan
+ada scroll delta baru lain yang menyentuhnya — persis kenapa kerasa "delay", bukan macet permanen,
+cuma menunggu trigger yang salah.
+
+**Fix (1 file, `ui/theme/IosScrollPhysics.kt`)**: `overscrollNode` (anonymous `object :
+Modifier.Node()` di dalam `IosRubberBandOverscrollEffect`) sekarang JUGA implement
+`PointerInputModifierNode` (API resmi — contoh persis pola ini ada di dokumentasi resmi
+`DelegatingNode`: 1 node boleh gabung beberapa interface `Modifier.Node` sekaligus;
+`LayoutModifierNode` yang sudah ada dari Batch 364 TIDAK disentuh/dihapus). Ditambah:
+- `pointersDown: Int` — dihitung mentah dari `onPointerEvent(pointerEvent, pass, bounds)`, hanya
+  di pass `Initial` (supaya hitungan tidak terpengaruh consumer lain di pohon modifier, selalu
+  lihat event mentah): `+1` di `PointerEventType.Press`, `-1` (coerced ≥0) di
+  `PointerEventType.Release`; begitu turun ke 0, panggil `settleIfAbandoned()`.
+- `onCancelPointerInput()` — dipanggil PERSIS saat `ACTION_CANCEL` turun ke Compose (per
+  dokumentasi resmi), reset `pointersDown = 0` lalu panggil `settleIfAbandoned()` juga. Ini
+  pintu masuk utama untuk skenario "jari kehilangan kontak di bezel/case" laporan user.
+- `settleIfAbandoned()` — guard `if (overscrollOffset.value == Offset.Zero ||
+  overscrollOffset.isRunning) return` (supaya tidak duplikat/berebut kalau jalur `applyToFling`
+  normal ternyata TETAP terpanggil — harmless karena `Animatable.animateTo` aman dipanggil ulang,
+  panggilan baru otomatis membatalkan yang lama, tapi guard ini menghindari launch coroutine yang
+  tidak perlu di kasus umum), lalu `coroutineScope.launch { settleToZero() }`.
+
+Logika spring settle itu sendiri (`dampingRatio = Spring.DampingRatioLowBouncy`,
+`stiffness = OVERSCROLL_SETTLE_STIFFNESS`, hasil semua tuning Batch 368-374) diekstrak APA
+ADANYA dari isi lama `applyToFling` ke fungsi baru `private suspend fun settleToZero(
+initialVelocity: Offset = Offset.Zero)` di `IosRubberBandOverscrollEffect` — 0 perubahan
+logika/parameter, murni pemindahan supaya bisa dipanggil ulang dari jaring pengaman di atas tanpa
+duplikasi kode. `applyToFling` sendiri sekarang cuma 3 baris: `performFling(velocity)`, hitung
+`remaining`, lalu `settleToZero(Offset(remaining.x, remaining.y))` — perilaku identik persis
+dengan sebelumnya untuk jalur normal (0 regresi ke tuning Batch 368-374). Semua komentar histori
+Batch 368-374 dipindah utuh (bukan dihapus) ke deklarasi `settleToZero` yang baru. Brace/paren
+file diverifikasi seimbang (25/25 brace, 226/226 paren, hitungan tokenizer sederhana grep — bukan
+compiler sungguhan, tidak ada `kotlinc` di environment kerja). README.md § "Update terbaru" &
+`PROJECT_STATE.md` disamakan.
+
+**Belum ditest di device asli** (tidak ada env Android nyata di sesi ini) — skenario "tarik
+sampai mentok lalu geser jari ke bezel/case sampai kehilangan kontak" perlu direplikasi manual di
+device fisik (edge back-gesture/predictive back paling gampang dipicu di tepi kiri/kanan layar
+device dengan navigasi gesture aktif). Kalau abis test masih kerasa ada jeda: kemungkinan besar
+sisa delay itu murni dari OS (window disambiguasi gesture-navigasi SEBELUM `ACTION_CANCEL` sampai
+ke Compose sama sekali) — di luar apa yang bisa diperbaiki lewat `IosRubberBandOverscrollEffect`
+mana pun, bukan berarti fix batch ini belum lengkap; kalau begitu, satu-satunya opsi lanjutan
+realistis adalah mengurangi lebar zona edge-gesture sistem (di luar scope app ini) atau menerima
+delay itu sebagai karakteristik platform. Kalau SEBALIKNYA sekarang ada regresi baru (mis. pegas
+balik kepicu prematur di tengah scroll normal): kemungkinan besar `pointersDown` salah hitung di
+skenario multi-touch — cek dulu apakah ada Row/Column lain yang overlap bounds `overscrollNode`
+sebelum menambah exclusion khusus.
+
 ## Batch 374 — FIX KARAKTER PANTULAN TIDAK NATURAL: `dampingRatio` MediumBouncy→LowBouncy (IosScrollPhysics.kt, 1 file kode)
 User laporan singkat: "sekarang perbaiki karakter pantulan yang kerasa tidak natural sama sekali
 woy!!" — SUMBU BEDA dari seluruh rentetan Batch 368-373, yang semuanya soal `stiffness` (KECEPATAN

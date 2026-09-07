@@ -17,12 +17,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.LayoutModifierNode
+import androidx.compose.ui.node.PointerInputModifierNode
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -96,6 +101,53 @@ import kotlinx.coroutines.launch
 // bicara soal KECEPATAN settle ("kaku" -> "mengambang"), bukan KARAKTER pantulannya, konsisten
 // pola Batch 369-372.
 
+// Batch 375 — User kasih root cause spesifik (bukan laporan "masih kerasa X" seperti 368-374):
+// "ketika user tarik sampai mentok terus layar kehilangan kontak sentuhan (misalnya layar ->
+// case hp), itu akan memicu semacam delay sepersekian detik sebelum balik ke kondisi semula".
+// Ini SUMBU KETIGA yang beda lagi dari 368-374 (yang selalu soal parameter spring —
+// `stiffness`/`dampingRatio`, DUA-DUANYA TIDAK disentuh batch ini): skenario ini bukan soal
+// "pegas-nya kurang pas", tapi soal pegas baliknya TIDAK PERNAH DIPICU sama sekali sampai
+// sesuatu yang lain (event tak terkait) kebetulan menyentuhnya belakangan.
+//
+// Diagnosis (verified via dokumentasi resmi `PointerInputModifierNode.onCancelPointerInput`,
+// developer.android.com — dipicu spesifik saat "Android dispatches ACTION_CANCEL to Compose"):
+// jari yang "kehilangan kontak" dengan cara meluncur ke bezel/case (BUKAN diangkat bersih dalam
+// batas layar) adalah kandidat kuat `ACTION_CANCEL`, bukan `ACTION_UP` normal — salah satu
+// pemicu paling umum di Android adalah zona disambiguasi gesture-navigasi (edge back-gesture/
+// predictive back) yang MENAHAN touch stream sejenak sebelum akhirnya membatalkannya ke app;
+// bagian delay INI sendiri (di level OS, sebelum event sampai ke Compose sama sekali) di luar
+// kendali kode app mana pun, TIDAK bisa "diperbaiki" dari sisi ini.
+//
+// TAPI: kontrak resmi `OverscrollEffect` cuma punya 2 pintu masuk event, [applyToScroll] &
+// [applyToFling] — keduanya bagian dari alur "drag berakhir NORMAL" yang dikelola `scrollable()`
+// sendiri (dokumentasi resmi `FlingBehavior.performFling`: "When drag has ended WITH VELOCITY",
+// tidak menyebut skenario dibatalkan/`ACTION_CANCEL`). Sinyal analog dari kodebase resmi androidx
+// sendiri (fork `CupertinoOverscrollEffect.kt`, PR resmi "Fix freeze when scrolling is cancelled
+// during overscroll"): overscroll effect BISA macet/frozen kalau drag-nya dibatalkan di tengah,
+// karena efeknya cuma direset lewat jalur fling normal — persis kelas bug yang sama. [overscrollNode]
+// milik file ini punya NOL penanganan untuk skenario cancel — begitu offset ter-`snapTo` ke
+// posisi mentok (Batch 372) lalu `ACTION_CANCEL` turun, TIDAK ADA kode yang memicu [settleToZero]
+// sampai kebetulan ada scroll delta baru lain yang menyentuhnya — persis kenapa kerasa "delay",
+// bukan macet permanen, cuma menunggu trigger yang salah.
+//
+// Fix: [overscrollNode] (di bawah) sekarang JUGA implement `PointerInputModifierNode` (API resmi,
+// contoh persis dari dokumentasi `DelegatingNode` — 1 node boleh gabung beberapa interface
+// `Modifier.Node`, `LayoutModifierNode` yang sudah ada TIDAK disentuh/dihapus) — hitung
+// `pointersDown` mentah dari `onPointerEvent` (pass `Initial`, sebelum ada consumer lain yang bisa
+// mempengaruhi), dan `onCancelPointerInput()` (dipanggil PERSIS saat `ACTION_CANCEL` turun ke
+// Compose, per dokumentasi resmi) sebagai jaring pengaman KEDUA yang independen dari alur fling
+// normal — begitu pointer terakhir lepas/batal, LANGSUNG panggil [settleToZero] kalau overscroll
+// masih punya offset & belum ada animasi jalan (`!isRunning`, guard biar tidak duplikat/berebut
+// sama alur fling normal kalau itu ternyata tetap terpanggil). Ini SEPENUHNYA jaring pengaman
+// tambahan — jalur [applyToFling] normal (termasuk semua tuning stiffness/dampingRatio Batch
+// 368-374) TIDAK diubah sama sekali, cuma dipanggil dari 2 tempat sekarang (lihat [settleToZero]).
+//
+// **Belum ditest di device asli** (tidak ada env Android nyata di sesi ini) — skenario "tarik
+// sampai mentok lalu geser jari ke bezel/case" perlu direplikasi manual. Kalau MASIH kerasa ada
+// jeda setelah ini: kemungkinan besar sisa delay itu murni dari OS (window disambiguasi gesture-
+// navigasi sebelum `ACTION_CANCEL` sampai ke Compose sama sekali) — di luar apa yang bisa
+// diperbaiki lewat [IosRubberBandOverscrollEffect], bukan berarti fix ini belum lengkap.
+
 /**
  * Porsi dimensi viewport (lebar utk sumbu x, tinggi utk sumbu y) yang jadi jarak "separuh
  * resistance" rubber-band — analog konstanta tension `c` WebKit, dipakai di peran "range" formula
@@ -163,7 +215,7 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
     // parameter `CoroutineScope` eksternal dari `rememberCoroutineScope()` (yang tidak bisa
     // dipanggil di `OverscrollFactory.createOverscrollEffect()`, fungsi itu bukan @Composable).
     private val overscrollNode =
-        object : Modifier.Node(), LayoutModifierNode {
+        object : Modifier.Node(), LayoutModifierNode, PointerInputModifierNode {
             override fun MeasureScope.measure(
                 measurable: Measurable,
                 constraints: Constraints,
@@ -175,6 +227,49 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
                     val offset = overscrollOffset.value
                     placeable.placeRelativeWithLayer(offset.x.roundToInt(), offset.y.roundToInt())
                 }
+            }
+
+            // Batch 375 — hitung pointer mentah, independen dari `scrollable()`/`applyToFling`
+            // (lihat catatan Batch 375 di atas file ini utk diagnosis lengkap kenapa jalur fling
+            // normal saja tidak cukup). Pass `Initial` dipakai supaya hitungan ini tidak
+            // terpengaruh consumer lain di pohon modifier (selalu lihat event mentah).
+            private var pointersDown = 0
+
+            override fun onPointerEvent(
+                pointerEvent: PointerEvent,
+                pass: PointerEventPass,
+                bounds: IntSize,
+            ) {
+                if (pass != PointerEventPass.Initial) return
+                when (pointerEvent.type) {
+                    PointerEventType.Press -> pointersDown++
+                    PointerEventType.Release -> {
+                        pointersDown = (pointersDown - 1).coerceAtLeast(0)
+                        if (pointersDown == 0) settleIfAbandoned()
+                    }
+                    else -> Unit
+                }
+            }
+
+            // Dipanggil PERSIS saat Android dispatch `ACTION_CANCEL` ke Compose (dokumentasi
+            // resmi `PointerInputModifierNode.onCancelPointerInput`) — skenario "jari kehilangan
+            // kontak" (mis. meluncur ke bezel/case) yang jadi laporan Batch 375, bukan cuma
+            // pelengkap teoretis.
+            override fun onCancelPointerInput() {
+                pointersDown = 0
+                settleIfAbandoned()
+            }
+
+            // Jaring pengaman: kalau overscroll masih py offset tapi tidak ada animasi settle yg
+            // sedang jalan (berarti jalur [applyToFling] normal TIDAK terpanggil utk gesture ini
+            // — persis kelas bug Batch 375), paksa panggil [settleToZero] langsung dari sini.
+            // Guard `!isRunning` sengaja dicek supaya tidak duplikat/berebut kalau jalur fling
+            // normal ternyata TETAP terpanggil (harmless, Animatable aman dipanggil `animateTo`
+            // 2x — panggilan baru otomatis membatalkan yg lama — tapi guard ini menghindari
+            // launch coroutine yg tidak perlu di kasus umum/normal).
+            private fun settleIfAbandoned() {
+                if (overscrollOffset.value == Offset.Zero || overscrollOffset.isRunning) return
+                coroutineScope.launch { settleToZero() }
             }
         }
 
@@ -221,6 +316,16 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
     override suspend fun applyToFling(velocity: Velocity, performFling: suspend (Velocity) -> Velocity) {
         val consumed = performFling(velocity)
         val remaining = velocity - consumed
+        settleToZero(Offset(remaining.x, remaining.y))
+    }
+
+    // Batch 375 — diekstrak dari isi `applyToFling` (dulu inline langsung di situ) SUPAYA bisa
+    // dipanggil ulang dari [overscrollNode.settleIfAbandoned] (jaring pengaman `onCancelPointerInput`/
+    // pointer-release, lihat catatan Batch 375 di atas file ini) — 0 perubahan LOGIKA/PARAMETER,
+    // murni pemindahan biar tidak duplikasi kode antara 2 titik panggil. `initialVelocity` default
+    // `Offset.Zero` dipakai spesifik dari jalur jaring pengaman (kasus cancel mentah tidak punya
+    // info velocity fling sungguhan); jalur [applyToFling] normal tetap kirim `remaining` asli.
+    private suspend fun settleToZero(initialVelocity: Offset = Offset.Zero) {
         // Fling selesai sementara konten masih tertarik ke luar batas (mis. fling ke arah luar) —
         // pegas balik ke 0. `DampingRatioLowBouncy` dipilih (Batch 374, gantikan
         // `DampingRatioMediumBouncy` Batch 364-373) — lihat catatan Batch 374 di bawah utk alasan.
@@ -289,7 +394,7 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
         // 1500 sejak Batch 373) TIDAK disentuh — sumbu yang berbeda, di luar laporan ini.
         overscrollOffset.animateTo(
             targetValue = Offset.Zero,
-            initialVelocity = Offset(remaining.x, remaining.y),
+            initialVelocity = initialVelocity,
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioLowBouncy,
                 stiffness = OVERSCROLL_SETTLE_STIFFNESS,

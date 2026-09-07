@@ -36,6 +36,51 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 375 (FIX overscroll bisa nyangkut/telat balik kalau jari kehilangan kontak di tepi layar
+— bukan soal tuning pegas lagi, `IosScrollPhysics.kt`, 1 file kode)** — User kasih root cause
+spesifik (bukan laporan "masih kerasa X" seperti Batch 368-374): "ketika user tarik sampai mentok
+terus layar kehilangan kontak sentuhan user (misalnya layar -> case hp), itu akan memicu semacam
+delay sepersekian detik sebelum balik ke kondisi semula". SUMBU KETIGA yang beda lagi dari
+368-374 (yang selalu soal parameter spring, `stiffness`/`dampingRatio` — DUA-DUANYA TIDAK
+disentuh batch ini): bukan soal "pegas kurang pas", tapi pegas baliknya TIDAK PERNAH DIPICU sama
+sekali sampai event lain yang tak terkait kebetulan menyentuhnya belakangan.
+
+**Diagnosis** (diverifikasi via dokumentasi resmi `PointerInputModifierNode.onCancelPointerInput`,
+developer.android.com — dipicu spesifik saat "Android dispatches ACTION_CANCEL to Compose"): jari
+yang "kehilangan kontak" dengan cara meluncur ke bezel/case (bukan diangkat bersih dalam batas
+layar) adalah kandidat kuat `ACTION_CANCEL`, bukan `ACTION_UP` normal — salah satu pemicu paling
+umum di Android adalah zona disambiguasi gesture-navigasi (edge back-gesture/predictive back) yang
+menahan touch stream sejenak sebelum akhirnya membatalkannya ke app; bagian delay ITU SENDIRI (di
+level OS, sebelum event sampai ke Compose sama sekali) di luar kendali kode app mana pun. Tapi:
+kontrak resmi `OverscrollEffect` cuma punya 2 pintu masuk event (`applyToScroll`/`applyToFling`),
+keduanya bagian alur "drag berakhir NORMAL" yang dikelola `scrollable()` sendiri (dokumentasi
+resmi `FlingBehavior.performFling`: "When drag has ended WITH VELOCITY", tidak menyebut skenario
+dibatalkan). Sinyal analog dari kodebase resmi androidx sendiri (fork `CupertinoOverscrollEffect.kt`,
+PR resmi "Fix freeze when scrolling is cancelled during overscroll"): overscroll effect bisa
+macet/frozen kalau drag-nya dibatalkan di tengah, karena efeknya cuma direset lewat jalur fling
+normal — persis kelas bug yang sama. `overscrollNode` milik file ini sebelumnya 0 penanganan
+untuk skenario cancel.
+
+**Fix**: `overscrollNode` (di `IosRubberBandOverscrollEffect`) sekarang juga implement
+`PointerInputModifierNode` (API resmi, contoh persis dari dokumentasi `DelegatingNode` — 1 node
+boleh gabung beberapa interface `Modifier.Node`, `LayoutModifierNode` yang sudah ada tidak
+disentuh) — hitung `pointersDown` mentah dari `onPointerEvent` (pass `Initial`), dan
+`onCancelPointerInput()` (dipanggil persis saat `ACTION_CANCEL` turun ke Compose) sebagai jaring
+pengaman kedua yang independen dari alur fling normal — begitu pointer terakhir lepas/batal,
+langsung panggil pegas balik (`settleToZero`, hasil ekstraksi dari isi lama `applyToFling`, 0
+perubahan parameter) kalau overscroll masih punya offset & belum ada animasi jalan (`!isRunning`,
+guard biar tidak duplikat/berebut sama alur fling normal kalau itu ternyata tetap terpanggil).
+100% jaring pengaman tambahan — jalur `applyToFling` normal (termasuk semua tuning
+stiffness/dampingRatio Batch 368-374) tidak diubah sama sekali, cuma dipanggil dari 2 tempat
+sekarang. Brace/paren balance (25/25, 226/226). README.md/CHANGELOG.md disamakan.
+
+**Belum ditest di device asli** (tidak ada env Android nyata di sesi ini) — skenario "tarik
+sampai mentok lalu geser jari ke bezel/case" perlu direplikasi manual. Kalau MASIH kerasa ada
+jeda setelah ini: kemungkinan besar sisa delay itu murni dari OS (window disambiguasi
+gesture-navigasi sebelum `ACTION_CANCEL` sampai ke Compose sama sekali) — di luar apa yang bisa
+diperbaiki lewat `IosRubberBandOverscrollEffect`, bukan berarti fix ini belum lengkap. Detail
+lengkap CHANGELOG.md Batch 375.
+
 **Batch 374 (FIX KARAKTER PANTULAN TIDAK NATURAL — `dampingRatio` DampingRatioMediumBouncy→
 LowBouncy, `IosScrollPhysics.kt`, 1 file kode)** — User laporan singkat: "sekarang perbaiki
 karakter pantulan yang kerasa tidak natural sama sekali woy!!" — SUMBU BEDA dari Batch 368-373
