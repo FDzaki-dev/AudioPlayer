@@ -128,12 +128,26 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
         // Fling selesai sementara konten masih tertarik ke luar batas (mis. fling ke arah luar) —
         // pegas balik ke 0. `DampingRatioMediumBouncy` dipilih sengaja: ada sedikit "pantulan"
         // sekilas (khas iOS) tapi tidak berosilasi berkali-kali seperti bouncy ball.
+        //
+        // Batch 368 — User laporan regresi: "ditarik maksimal tapi tidak langsung reset ketempat
+        // semula". Root cause (verified via kontrak resmi `OverscrollEffect.applyToFling`,
+        // developer.android.com: performFling mengembalikan velocity yg SUDAH dikonsumsi, jadi
+        // `remaining` di atas = sisa velocity yg BELUM terkonsumsi): kalau rilis jari terjadi
+        // dengan velocity rendah/nyaris nol (tarik pelan sampai mentok lalu lepas jari begitu
+        // saja, BEDA dgn fling/sentakan cepat ke arah batas), maka `remaining` ikut ~0 — pegas
+        // balik cuma mengandalkan gaya pemulihannya sendiri, dan `StiffnessLow` (200) sengaja
+        // "lembut" jadi kerasa lambat/ngambang persis di kasus itu. Fling BERkecepatan (sentakan
+        // ke batas) tetap dapat kick `remaining` besar jadi TIDAK kena masalah ini — itu sebabnya
+        // Batch 364 lolos user-test (ditest pakai fling wajar, bukan tarik-pelan-lepas). Naikkan
+        // `stiffness` ke `StiffnessMediumLow` (400, 2x) supaya pegas balik tetap sigap walau tanpa
+        // kick tambahan, tanpa mengubah `dampingRatio` yg sudah disetujui (jadi pantulan khas iOS
+        // tetap sama, cuma bagian "kembali ke 0"-nya yang dipercepat).
         overscrollOffset.animateTo(
             targetValue = Offset.Zero,
             initialVelocity = Offset(remaining.x, remaining.y),
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow,
+                stiffness = Spring.StiffnessMediumLow,
             ),
         )
     }

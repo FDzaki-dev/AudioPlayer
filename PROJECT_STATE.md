@@ -36,6 +36,20 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 368 (FIX REGRESI — overscroll "ditarik maksimal tidak langsung reset", `IosScrollPhysics.kt`,
+1 file kode)** — User laporan bounce effect: tarik list sampai mentok, lepas jari, tidak langsung
+balik ke posisi semula. Root cause diverifikasi lewat kontrak resmi `OverscrollEffect.applyToFling`
+(developer.android.com): `remaining` (sisa velocity belum terkonsumsi, jadi kick pegas balik) ikut
+~0 kalau rilis jari terjadi pelan-pelan (velocity ~0) — beda dgn fling/sentakan cepat yg dites &
+disetujui di Batch 364/366. Di skenario velocity~0 itu, `stiffness = StiffnessLow` (200, pilihan
+Batch 364) kerasa lambat/ngambang karena pegas cuma mengandalkan gaya pemulihan sendiri tanpa kick.
+Bukan regresi dari Batch 367 (file itu tidak disentuh) — edge case laten Batch 364 yang baru
+kepegang sekarang. **Fix**: `stiffness` dinaikkan ke `StiffnessMediumLow` (400, 2x) di fungsi
+`applyToFling`; `dampingRatio` (pantulan khas iOS yg sudah disetujui) tidak diubah. README.md
+disamakan. **Belum ditest di device asli** (no Android env di sesi ini) — nilai 400 estimasi awal
+rasio 2x, mohon user coba ulang skenario tarik-pelan-lepas yg sama & kasih tau kalau masih
+kurang/kelewat cepat biar bisa di-tune lagi. Detail lengkap di CHANGELOG.md Batch 368.
+
 **Batch 367 (PENDING QUEUE — kurva fling iOS di 3 layar baru: `HomeScreen.kt`, `PlaylistScreen.kt`,
 `QueueSheet.kt`, 3 file kode)** — User confirm fix Batch 366 (mute pasca kill+trigger eksternal)
 "benar-benar berpengaruh" di device, tidak ada laporan bug baru. `ROADMAP_LIQUID_GLASS_REDESIGN.md`

@@ -1,5 +1,39 @@
 # Changelog
 
+## Batch 368 — FIX REGRESI: overscroll "ditarik maksimal tidak langsung reset" (IosScrollPhysics.kt, 1 file kode)
+User laporan: "ditarik maksimal tapi tidak langsung reset ketempat semula!!" pada efek bounce.
+Root cause diverifikasi lewat kontrak resmi `OverscrollEffect.applyToFling` (dokumentasi
+developer.android.com, bukan tebakan): `performFling(velocity)` mengembalikan velocity yang
+**sudah dikonsumsi** oleh scroll asli, jadi `remaining = velocity - consumed` di
+`IosRubberBandOverscrollEffect.applyToFling` (dibuat Batch 364) = sisa velocity yang **belum**
+terkonsumsi, dipakai sebagai kick awal pegas balik ke posisi normal.
+
+Skenario yang kena: tarik list pelan-pelan sampai mentok/maksimal lalu lepas jari begitu saja
+(velocity rilis ~0) — BEDA dengan fling/sentakan cepat ke arah batas (velocity rilis besar).
+Waktu velocity rilis ~0, `remaining` ikut ~0, jadi pegas balik cuma mengandalkan gaya
+pemulihannya sendiri tanpa kick tambahan — dan `stiffness = Spring.StiffnessLow` (200, dipilih
+Batch 364) sengaja lembut, jadi persis di skenario "tarik-pelan-lepas" ini kerasa lambat/ngambang,
+bukan sigap. Fling berkecepatan (yang dites & disetujui user di Batch 364/366) tetap dapat kick
+`remaining` besar sehingga TIDAK kena masalah ini — jadi bukan regresi baru dari Batch 367 (file
+itu tidak disentuh sama sekali), tapi edge case laten Batch 364 yang baru kepegang sekarang
+setelah makin banyak layar dites (dialog pendek/list pendek secara alami lebih sering dites pakai
+tarik-pelan daripada fling).
+
+**Fix (1 file, `ui/theme/IosScrollPhysics.kt`, fungsi `applyToFling`)**: naikkan `stiffness` dari
+`Spring.StiffnessLow` (200) ke `Spring.StiffnessMediumLow` (400, 2x) supaya pegas balik ke posisi
+normal tetap sigap walau tanpa kick velocity tambahan. `dampingRatio` (`DampingRatioMediumBouncy`)
+TIDAK diubah — pantulan khas iOS yang sudah disetujui (Batch 366: "sedikit kuat tapi disetujui,
+tidak diminta di-tune turun") tetap sama, cuma bagian "berapa cepat kembali ke 0"-nya yang
+dipercepat. README.md § fitur scroll iOS disamakan.
+
+**Belum bisa 100% dipastikan tanpa device asli** (tidak ada environment Android buat run/compile
+di sesi ini) — mekanismenya sudah diverifikasi lewat kontrak resmi Compose (bukan spekulasi), tapi
+nilai `stiffness` baru (400) adalah estimasi awal berdasar rasio 2x dari nilai lama, BELUM ditest
+langsung berapa cepat idealnya kerasa "instan" di device. Mohon coba lagi skenario yang sama
+(tarik list maksimal, lepas jari pelan-pelan tanpa sentakan) — kalau masih kerasa lambat, kasih
+tau seberapa lambat masih terasanya supaya `stiffness` bisa dinaikkan lagi batch berikutnya; kalau
+sekarang malah kerasa "terlalu langsung/kaku" dan pantulannya hilang, turunkan lagi ke tengah-tengah.
+
 ## Batch 367 — PENDING_IosFlingBehavior.md: 3/14 layar (HomeScreen, PlaylistScreen, QueueSheet), 3 file kode
 User confirm fix Batch 366 (CrossfadeEngine mute pasca kill+trigger eksternal) "benar-benar
 berpengaruh" di device asli — ditutup, tidak ada laporan bug baru batch ini. Sesuai aturan sesi
