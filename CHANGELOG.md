@@ -1,5 +1,64 @@
 # Changelog
 
+## Batch 376 — FIX jaring pengaman Batch 375 tidak kepicu: race condition async snapTo vs guard synchronous (IosScrollPhysics.kt, 1 file kode)
+User laporan HASIL Batch 375, dua bagian: (1) status fix ACTION_CANCEL — "masih ada delay-nya,
+belum kepakai" (bukan cuma "kurang mulus", tapi jaring pengamannya sendiri TIDAK kepicu sama
+sekali); (2) ditanya fase mana "ultra smooth" paling kerasa — "semua/susah dipisah, pokoknya
+masih kerasa aneh" (tidak bisa ditunjuk ke 1 fase spesifik, beda pola dari laporan-laporan
+sebelumnya Batch 368-375 yang masing-masing selalu bisa ditunjuk ke 1 fase/aksis).
+
+**Diagnosis**: `settleIfAbandoned()` (ditambahkan Batch 375) membaca `overscrollOffset.value`
+secara **synchronous**, tepat saat `onPointerEvent`/`onCancelPointerInput` terpanggil. Tapi
+[applyToScroll] menulis offset lewat `overscrollNode.coroutineScope.launch { overscrollOffset.snapTo(...) }`
+— **fire-and-forget**: `launch` cuma menjadwalkan body coroutine-nya, TIDAK menjalankannya
+seketika di titik panggil (beda dari pemanggilan langsung/synchronous). Persis di skenario yang
+dilaporkan user (tarik cepat lalu jari kehilangan kontak — bukan tarik-pelan-lalu-diam dulu):
+delta tarikan TERAKHIR sebelum `ACTION_CANCEL`/`Release` memicu `applyToScroll` yang me-launch
+`snapTo` barunya, tapi `ACTION_CANCEL` bisa sampai ke `onCancelPointerInput()` SEBELUM giliran
+`snapTo` itu benar-benar jalan di dispatcher — guard `settleIfAbandoned()` membaca
+`overscrollOffset.value` yang MASIH nilai LAMA (paling parah: kebetulan masih `Offset.Zero`,
+persis di frame offset baru mulai terbentuk) dan early-return diam-diam, sehingga
+[settleToZero] tidak pernah ke-launch — jaring pengaman Batch 375 "ada" secara kode tapi tidak
+pernah benar-benar jalan tepat di kasus tercepat/paling umum.
+
+Sinyal analog NYATA (bukan cuma teori, sumber sama yang dirujuk Batch 375): diskusi review PR
+resmi androidx (`JetBrains/compose-multiplatform-core` #1928, "Fix freeze when scrolling is
+cancelled during overscroll") membahas eksplisit kenapa nilai pointer-tracking di situ WAJIB
+`mutableStateOf` — reviewer bertanya "why is it a state?", author menjawab reset itu "has to be
+triggered by the touch up gesture — if it's not a state, it won't work". Kelas bug yang sama:
+membaca nilai penentu-reset di titik/waktu yang salah (sebelum tulisan lain yang masih pending
+sempat kelar) bikin trigger reset gagal secara senyap, walau logika guard-nya sendiri "benar" di
+atas kertas — beda mekanisme (mereka pakai observasi state reaktif, kode ini pakai guard
+imperatif inline), akar masalah yang sama: urutan baca vs tulis yang tidak terjamin.
+
+**Fix (1 file, `ui/theme/IosScrollPhysics.kt`)**: guard `if (overscrollOffset.value ==
+Offset.Zero || overscrollOffset.isRunning) return` DIPINDAH dari sebelum `coroutineScope.launch`
+ke DALAM body `launch` itu sendiri (`return@launch`) — **0 perubahan pada kondisi guard**, murni
+pindah KAPAN ia dibaca. Karena coroutine baru ini di-`launch` ke `coroutineScope` yang SAMA
+dipakai `applyToScroll`, urutan eksekusinya ikut FIFO dispatcher tunggal yang sama — begitu
+giliran coroutine ini tiba, `snapTo` dari delta terakhir (yang di-launch lebih dulu secara
+wall-clock) sudah pasti selesai duluan, jadi `overscrollOffset.value` yang dibaca di dalam
+`launch` sudah nilai TERKINI, bukan basi lagi. `pointersDown`, `onCancelPointerInput()`, dan
+seluruh struktur node dari Batch 375 TIDAK disentuh — begitu juga `dampingRatio`/`stiffness`/
+`rubberBandResistance` (semua tuning Batch 368-374). Brace/paren file diverifikasi ulang seimbang
+(27/27 brace, 246/246 paren, tokenizer grep sederhana — bukan compiler sungguhan, tidak ada
+`kotlinc` di environment kerja). README.md § "Update terbaru" & `PROJECT_STATE.md` disamakan.
+
+Ini juga menjawab laporan ke-2 ("ultra smooth" tidak bisa ditunjuk ke 1 fase): celah balapan ini
+**tidak spesifik ke skenario jari-ke-bezel** — bisa kena gesture cepat MANA PUN (flick/lepas jari
+mendadak dekat titik tarikan maksimal) di scrollable mana pun, karena `IosOverscrollFactory`
+terpasang app-wide. Itu sebabnya kerasa acak/menyebar ("semua/susah dipisah") alih-alih 1 fase
+konsisten seperti laporan-laporan tuning sebelumnya — satu root cause yang sama menjelaskan
+kedua laporan sekaligus, bukan dua bug terpisah.
+
+**Belum ditest di device asli** (tidak ada env Android nyata di sesi ini). Kalau SETELAH ini
+masih kerasa ada jeda: kemungkinan terbesar berikutnya adalah delay OS itu sendiri (window
+disambiguasi gesture-navigasi SEBELUM `ACTION_CANCEL` sampai ke Compose sama sekali — sudah
+dicatat sbg batas di luar kendali app sejak Batch 375), bukan berarti fix batch ini belum
+lengkap. Kalau SEBALIKNYA sekarang ada regresi baru (mis. pegas balik kepicu di tengah scroll
+normal yang masih aktif): cek dulu apakah ada gesture lain yang memicu `Release`/cancel palsu di
+tengah drag berkelanjutan sebelum menambah exclusion khusus.
+
 ## Batch 375 — FIX overscroll nyangkut/telat balik saat jari kehilangan kontak di tepi layar (IosScrollPhysics.kt, 1 file kode)
 User kasih root cause spesifik (bukan laporan "masih kerasa X" seperti rentetan Batch 368-374):
 "ketika user tarik sampai mentok terus layar kehilangan kontak sentuhan user (misalnya layar ->

@@ -148,6 +148,19 @@ import kotlinx.coroutines.launch
 // navigasi sebelum `ACTION_CANCEL` sampai ke Compose sama sekali) — di luar apa yang bisa
 // diperbaiki lewat [IosRubberBandOverscrollEffect], bukan berarti fix ini belum lengkap.
 
+// Batch 376 — User laporan HASIL Batch 375: "masih ada delay-nya, belum kepakai" (jaring pengaman
+// itu sendiri TIDAK kepicu), plus laporan terpisah "ultra smooth" masih kerasa aneh di SEMUA fase
+// (susah dipisah ke 1 titik). Root cause: guard [settleIfAbandoned] baca `overscrollOffset.value`
+// secara SYNCHRONOUS, padahal [applyToScroll] menulis offset lewat `coroutineScope.launch {
+// snapTo(...) }` (fire-and-forget, TIDAK jalan seketika) — persis di skenario "tarik cepat lalu
+// kehilangan kontak", `ACTION_CANCEL` bisa sampai SEBELUM giliran `snapTo` terakhir itu jalan,
+// guard baca nilai LAMA dan early-return diam-diam. Fix: guard dipindah ke DALAM body `launch`
+// (0 perubahan kondisi guard itu sendiri) supaya urutan bacanya ikut FIFO coroutine scope yang
+// sama — lihat [settleIfAbandoned] utk diagnosis lengkap + sinyal analog dari PR resmi androidx
+// yang sama dirujuk Batch 375. Ini juga yang menjelaskan kenapa laporan "ultra smooth" ke-2 tidak
+// bisa ditunjuk ke 1 fase — celah balapan ini bisa kena gesture cepat MANA PUN, bukan cuma
+// skenario bezel. `dampingRatio`/`stiffness`/`rubberBandResistance` TETAP TIDAK disentuh.
+
 /**
  * Porsi dimensi viewport (lebar utk sumbu x, tinggi utk sumbu y) yang jadi jarak "separuh
  * resistance" rubber-band — analog konstanta tension `c` WebKit, dipakai di peran "range" formula
@@ -262,14 +275,54 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
 
             // Jaring pengaman: kalau overscroll masih py offset tapi tidak ada animasi settle yg
             // sedang jalan (berarti jalur [applyToFling] normal TIDAK terpanggil utk gesture ini
-            // — persis kelas bug Batch 375), paksa panggil [settleToZero] langsung dari sini.
-            // Guard `!isRunning` sengaja dicek supaya tidak duplikat/berebut kalau jalur fling
-            // normal ternyata TETAP terpanggil (harmless, Animatable aman dipanggil `animateTo`
-            // 2x — panggilan baru otomatis membatalkan yg lama — tapi guard ini menghindari
-            // launch coroutine yg tidak perlu di kasus umum/normal).
+            // — persis kelas bug Batch 375), paksa panggil [settleToZero] dari sini.
+            //
+            // Batch 376 — User laporan HASIL Batch 375: "masih ada delay-nya, belum kepakai" (jaring
+            // pengaman TIDAK kepicu, bukan cuma "kurang mulus"), dan laporan terpisah "ultra smooth
+            // masih kerasa aneh" TIDAK bisa ditunjuk ke satu fase spesifik ("semua/susah dipisah").
+            // Root cause: guard di sini SEBELUMNYA baca `overscrollOffset.value` secara SYNCHRONOUS,
+            // padahal [applyToScroll] menulis offset lewat `coroutineScope.launch { snapTo(...) }`
+            // (fire-and-forget — `launch` cuma MEN-JADWALKAN body-nya, TIDAK menjalankannya sampai
+            // giliran coroutine itu tiba di dispatcher, beda dari pemanggilan langsung/synchronous).
+            // Persis di skenario yang dilaporkan (tarik cepat lalu jari kehilangan kontak): delta
+            // tarikan TERAKHIR sebelum `ACTION_CANCEL`/`Release` memicu `applyToScroll` yang
+            // me-launch `snapTo` barunya, tapi `ACTION_CANCEL` bisa sampai ke [onCancelPointerInput]
+            // SEBELUM giliran `snapTo` itu benar-benar jalan — guard baca `overscrollOffset.value`
+            // yang MASIH nilai LAMA (kadang kebetulan `Offset.Zero`, mis. persis di frame offset
+            // baru mulai terbentuk) dan early-return, sehingga [settleToZero] tidak pernah
+            // ke-launch sama sekali. Sinyal analog nyata (bukan cuma teori) ditemukan di kodebase
+            // resmi androidx sendiri (`JetBrains/compose-multiplatform-core`, PR #1928 "Fix freeze
+            // when scrolling is cancelled during overscroll" — sumber yang sama persis dirujuk
+            // Batch 375): diskusi review PR itu eksplisit membahas kenapa nilai pointer-tracking di
+            // situ WAJIB "state" ("the change we're looking for has to be triggered by the touch up
+            // gesture — if it's not a state, it won't work"), yaitu kelas bug yang sama — baca nilai
+            // di titik yang salah (sebelum tulisan lain yang masih pending sempat kelar) bikin
+            // trigger reset senyap gagal, walau logikanya sendiri "benar" di atas kertas.
+            //
+            // Fix: guard DIPINDAH dari sebelum `launch` ke DALAM body `launch` — 0 perubahan pada
+            // kondisi guard itu sendiri (masih persis `value == Offset.Zero || isRunning`), murni
+            // pindah kapan ia dibaca. Coroutine baru ini di-enqueue ke `coroutineScope` yang SAMA
+            // dipakai [applyToScroll], jadi urutan eksekusinya FIFO mengikuti dispatcher tunggal
+            // yang sama — begitu giliran coroutine ini tiba, `snapTo` dari delta terakhir (yang
+            // di-launch lebih dulu, secara wall-clock) sudah pasti selesai duluan, jadi
+            // `overscrollOffset.value` yang dibaca di sini sudah nilai TERKINI, bukan basi lagi.
+            // Ini juga menjelaskan KENAPA laporan "ultra smooth" ke-2 "susah dipisah ke 1 fase":
+            // celah balapan ini tidak spesifik ke skenario jari-ke-bezel — bisa kena di TIAP
+            // gesture cepat (flick/lepas jari mendadak) di scrollable MANA PUN (efek ini terpasang
+            // app-wide lewat [IosOverscrollFactory]), jadi kerasa acak/menyebar, bukan 1 fase yang
+            // konsisten — persis pola "semua/susah dipisah" yang dilaporkan. `dampingRatio`/
+            // `stiffness`/`rubberBandResistance` (semua tuning Batch 368-374) TETAP TIDAK disentuh
+            // — sumbu bug ini murni soal KAPAN dibaca, bukan soal pegasnya.
+            //
+            // **Belum ditest di device asli.** Kalau SETELAH ini masih ada jeda kerasa: kemungkinan
+            // terbesar berikutnya adalah delay OS itu sendiri (window disambiguasi gesture-navigasi
+            // SEBELUM `ACTION_CANCEL` sampai ke Compose sama sekali, sudah dicatat sbg batas app
+            // sejak Batch 375) — bukan berarti fix batch ini belum lengkap.
             private fun settleIfAbandoned() {
-                if (overscrollOffset.value == Offset.Zero || overscrollOffset.isRunning) return
-                coroutineScope.launch { settleToZero() }
+                coroutineScope.launch {
+                    if (overscrollOffset.value == Offset.Zero || overscrollOffset.isRunning) return@launch
+                    settleToZero()
+                }
             }
         }
 

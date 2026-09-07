@@ -8,7 +8,19 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 375 (FIX: overscroll bisa nyangkut/telat balik kalau jari
+> 🆕 **Update terbaru — Batch 376 (FIX: jaring pengaman Batch 375 TIDAK kepicu — race condition
+> async `snapTo` vs guard synchronous, `IosScrollPhysics.kt`, 1 file kode):** User laporan hasil
+> Batch 375: "masih ada delay-nya, belum kepakai" (jaring pengamannya sendiri tidak kepicu) + fase
+> "ultra smooth" yang dilaporkan "semua/susah dipisah". Root cause: guard `settleIfAbandoned()`
+> baca `overscrollOffset.value` secara synchronous, padahal offset ditulis lewat
+> `coroutineScope.launch { snapTo(...) }` (fire-and-forget) — di skenario tarik cepat lalu
+> kehilangan kontak, `ACTION_CANCEL` bisa sampai SEBELUM `snapTo` terakhir jalan, guard baca nilai
+> lama dan early-return diam-diam. Fix: guard dipindah ke DALAM body `launch` (0 perubahan kondisi
+> guard, murni kapan dibaca) — FIFO dispatcher yang sama menjamin `snapTo` terakhir sudah kelar
+> duluan. Ini juga menjelaskan laporan "ultra smooth" ke-2: celah balapan ini bisa kena gesture
+> cepat mana pun (app-wide), bukan cuma skenario bezel — persis kenapa "susah dipisah ke 1 fase".
+> `dampingRatio`/`stiffness`/struktur node Batch 375 tidak disentuh. Belum ditest di device asli.
+> Batch 375 (FIX: overscroll bisa nyangkut/telat balik kalau jari
 > kehilangan kontak di tepi layar (ke bezel/case) — bukan soal tuning pegas lagi,
 > `IosScrollPhysics.kt`, 1 file kode):** User kasih root cause spesifik: "tarik sampai mentok
 > terus layar kehilangan kontak sentuhan ... itu akan memicu delay sepersekian detik sebelum
@@ -21,8 +33,8 @@ memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 > jaring pengaman independen yang langsung memicu pegas balik begitu pointer terakhir
 > lepas/batal. Jalur `applyToFling` normal (tuning stiffness/dampingRatio Batch 368-374) tidak
 > disentuh. Sebagian delay tetap bisa berasal dari OS sendiri (window disambiguasi
-> gesture-navigasi sebelum `ACTION_CANCEL` sampai ke app) — di luar kendali app. Belum ditest di
-> device asli.
+> gesture-navigasi sebelum `ACTION_CANCEL` sampai ke app) — di luar kendali app. (Superseded
+> Batch 376 di atas — jaring pengaman ini ternyata tidak kepicu di kasus tercepat.)
 > Batch 374 (FIX KARAKTER PANTULAN TIDAK NATURAL: `dampingRatio`
 > `DampingRatioMediumBouncy` → `DampingRatioLowBouncy`, 1 file kode):** User: "sekarang perbaiki
 > karakter pantulan yang kerasa tidak natural sama sekali woy!!". Sumbu beda dari Batch 368-373

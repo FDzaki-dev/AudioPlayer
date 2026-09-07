@@ -36,6 +36,41 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 376 (FIX jaring pengaman Batch 375 TIDAK kepicu — race condition async `snapTo` vs guard
+synchronous, `IosScrollPhysics.kt`, 1 file kode)** — User laporan HASIL Batch 375, 2 bagian: (1)
+status fix ACTION_CANCEL: "masih ada delay-nya, belum kepakai" — bukan cuma kurang mulus, jaring
+pengamannya sendiri tidak kepicu; (2) fase "ultra smooth" paling kerasa: "semua/susah dipisah,
+pokoknya masih kerasa aneh" — tidak bisa ditunjuk ke 1 fase, beda dari pola laporan 368-375 yang
+selalu bisa ditunjuk ke 1 aksis.
+
+**Diagnosis**: `settleIfAbandoned()` (Batch 375) baca `overscrollOffset.value` SYNCHRONOUS tepat
+saat callback pointer terpanggil, padahal `applyToScroll` menulis offset lewat
+`coroutineScope.launch { snapTo(...) }` — fire-and-forget, TIDAK jalan seketika di titik panggil.
+Persis di skenario dilaporkan (tarik CEPAT lalu kehilangan kontak): delta terakhir sebelum
+`ACTION_CANCEL` men-launch `snapTo` barunya, tapi cancel bisa sampai ke `onCancelPointerInput()`
+SEBELUM giliran `snapTo` itu jalan — guard baca nilai LAMA (kadang kebetulan `Offset.Zero`) dan
+early-return diam-diam, `settleToZero` tidak pernah ke-launch. Sinyal analog nyata: diskusi
+review PR resmi androidx (`compose-multiplatform-core` #1928, sumber sama yg dirujuk Batch 375)
+eksplisit membahas kenapa nilai pointer-tracking WAJIB `mutableStateOf` — "the change ... has to
+be triggered by the touch up gesture — if it's not a state, it won't work" — kelas bug yang sama:
+baca nilai penentu-reset di titik/waktu yang salah bikin trigger gagal senyap.
+
+**Fix**: guard `if (value == Zero || isRunning) return` DIPINDAH dari sebelum `launch` ke DALAM
+body `launch` (`return@launch`) — 0 perubahan kondisi guard, murni kapan ia dibaca. Coroutine baru
+di-launch ke `coroutineScope` yang SAMA dipakai `applyToScroll`, jadi FIFO dispatcher tunggal yang
+sama menjamin `snapTo` terakhir (di-launch lebih dulu) sudah kelar duluan — `value` yang dibaca di
+dalam `launch` sudah nilai terkini. `pointersDown`/`onCancelPointerInput()`/struktur node Batch
+375 dan semua tuning `dampingRatio`/`stiffness`/`rubberBandResistance` Batch 368-374 TIDAK
+disentuh. Ini juga menjawab laporan ke-2: celah balapan ini bisa kena gesture cepat MANA PUN
+(bukan cuma skenario bezel) karena efeknya app-wide — persis kenapa "semua/susah dipisah". Brace/
+paren balance (27/27, 246/246). README.md/CHANGELOG.md disamakan.
+
+**Belum ditest di device asli** — sama seperti Batch 375, tidak ada env Android nyata di sesi ini.
+Kalau MASIH kerasa ada jeda setelah ini: kemungkinan terbesar berikutnya adalah delay OS sendiri
+(window disambiguasi gesture-navigasi sebelum `ACTION_CANCEL` sampai ke Compose — sudah dicatat
+di luar kendali app sejak Batch 375), bukan berarti fix ini belum lengkap. Detail lengkap
+CHANGELOG.md Batch 376.
+
 **Batch 375 (FIX overscroll bisa nyangkut/telat balik kalau jari kehilangan kontak di tepi layar
 — bukan soal tuning pegas lagi, `IosScrollPhysics.kt`, 1 file kode)** — User kasih root cause
 spesifik (bukan laporan "masih kerasa X" seperti Batch 368-374): "ketika user tarik sampai mentok
