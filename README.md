@@ -8,8 +8,21 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 382 (karakter pantulan diselaraskan dengan effect bounce, konstanta
-> custom baru `OVERSCROLL_SETTLE_DAMPING_RATIO` 0.875, 1 file kode):** User: "sesuaikan karakter
+> 🆕 **Update terbaru — Batch 383 (karakter pantulan overscroll dihapus total, `dampingRatio` →
+> `Spring.DampingRatioNoBouncy` (1.0, preset resmi) menggantikan custom
+> `OVERSCROLL_SETTLE_DAMPING_RATIO` 0.875 dari Batch 382 (dihapus), 1 file kode):** User laporan
+> hasil Batch 382: "ternyata gak nyambung sama sekali. hapus total karakter pantulan!!" — `0.875`
+> (biseksi aritmetik ke arah `NoBouncy`) ternyata belum cukup; instruksi kali ini eksplisit ke UJUNG
+> bracket, membalik batas "pantulan diminta tetap ada, cuma disesuaikan" yang berlaku sejak Batch
+> 374. `dampingRatio` dinaikkan ke `1.0` (redaman kritis, preset resmi `Spring.DampingRatioNoBouncy`)
+> — overshoot teoretis persis nol, pegas balik overscroll meluncur monoton ke posisi normal tanpa
+> ayunan balik sama sekali. Konstanta custom `OVERSCROLL_SETTLE_DAMPING_RATIO` dihapus sepenuhnya
+> (tidak perlu lagi — beda dari 0.875, `1.0` sudah punya preset resmi). `stiffness`
+> (`OVERSCROLL_SETTLE_STIFFNESS`, 200 sejak Batch 381) tidak disentuh — sumbu berbeda. Belum ditest
+> di device asli.
+> Batch 382 (karakter pantulan diselaraskan dengan effect bounce, konstanta
+> custom baru `OVERSCROLL_SETTLE_DAMPING_RATIO` 0.875, 1 file kode — *nilai ini kemudian dihapus
+> Batch 383 di atas*):** User: "sesuaikan karakter
 > pantulan agar selaras dengan effect bounce nya" — user sendiri sekarang membuka sumbu
 > `dampingRatio` yang eksplisit dikecualikan Batch 381. Root cause: `DampingRatioLowBouncy` (0.75)
 > ditetapkan Batch 374 dgn konteks `stiffness` 1500; Batch 381 menurunkan `stiffness` ke 200 tanpa

@@ -36,6 +36,27 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 383 (Karakter pantulan overscroll dihapus total — `dampingRatio` → `Spring.DampingRatioNoBouncy`
+(1.0, preset resmi), konstanta custom `OVERSCROLL_SETTLE_DAMPING_RATIO` 0.875 dari Batch 382 dihapus,
+`IosScrollPhysics.kt`, 1 file kode)** — User laporan hasil Batch 382: "ternyata gak nyambung sama
+sekali. hapus total karakter pantulan!!". `0.875` (biseksi aritmetik ke arah `NoBouncy`, Batch 382)
+ternyata belum cukup di rasa user; instruksi kali ini eksplisit ke UJUNG bracket `[0.875, 1.0]`,
+membalik batas "pantulan diminta tetap ada, cuma disesuaikan" yang berlaku sejak Batch 374.
+Matematis: pada `dampingRatio` 0.875 masih underdamped (ζ < 1, overshoot teoretis ≈0,3%, bukan nol)
+— redaman kritis PERSIS (nol overshoot) cuma tercapai tepat di `1.0`, jadi "hapus total" memang
+butuh lompat ke ujung bracket, bukan biseksi lanjutan.
+
+**Fix**: `dampingRatio` dinaikkan ke `1.0f`. Karena `1.0` punya preset resmi Compose PERSIS
+(`Spring.DampingRatioNoBouncy`), konstanta custom `OVERSCROLL_SETTLE_DAMPING_RATIO` (dibuat Batch
+382 justru karena `0.875` tidak punya preset resmi) dihapus sepenuhnya, digantikan pemanggilan
+preset resmi langsung. Import `Spring` (dihapus Batch 382 karena saat itu tidak dipakai di kode
+nyata) dikembalikan. `stiffness` (`OVERSCROLL_SETTLE_STIFFNESS`, 200 sejak Batch 381) TIDAK
+disentuh — sumbu berbeda, di luar laporan ini. Brace/paren balance dicek (strip komentar/string
+dulu): 78/78 `()`, 25/25 `{}`, 0/0 `[]` — seimbang bersih, identik Batch 382 (wajar, cuma 1
+identifier diganti + 1 const dihapus). README.md (blockquote update terbaru) & CHANGELOG.md
+disamakan. **Belum ditest di device asli — prioritas cek user**: pastikan overscroll benar-benar
+TANPA ayunan balik sama sekali setelah jari dilepas. Detail lengkap CHANGELOG.md Batch 383.
+
 **Batch 382 (Karakter pantulan diselaraskan dengan effect bounce — `dampingRatio` custom baru
 `OVERSCROLL_SETTLE_DAMPING_RATIO` 0.875, `IosScrollPhysics.kt`, 1 file kode)** — User instruksi
 eksplisit: "sesuaikan karakter pantulan agar selaras dengan effect bounce nya" — user sendiri

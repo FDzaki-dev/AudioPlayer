@@ -1,5 +1,47 @@
 # Changelog
 
+## Batch 383 — Karakter pantulan overscroll dihapus total, `dampingRatio` → `Spring.DampingRatioNoBouncy` (1.0, preset resmi), konstanta custom `OVERSCROLL_SETTLE_DAMPING_RATIO` (0.875, Batch 382) dihapus, 1 file kode
+User laporan HASIL Batch 382: "ternyata gak nyambung sama sekali. hapus total karakter pantulan!!"
+— dua hal eksplisit: (1) `0.875` (biseksi aritmetik `LowBouncy`/`NoBouncy`, Batch 382) ternyata
+TIDAK menyelesaikan keluhan "tidak selaras"; (2) "hapus TOTAL" adalah instruksi arah yang tegas ke
+UJUNG bracket `[0.875, 1.0]` itu sendiri — pola pembacaan yang sama dengan kata tegas lain di
+project ini ("maksimal" Batch 381, "hampir mengambang" Batch 373): lompat ke ujung range yang sudah
+dipetakan, bukan biseksi halus lanjutan. Ini secara eksplisit MEMBALIK batas yang didokumentasikan
+berulang kali di Batch 374/381/382 ("pantulan diminta tetap ADA, cuma disesuaikan, bukan dihapus")
+— feedback baru menimpa preferensi lama, pola yang sama dengan Batch 374 sendiri terhadap
+persetujuan Batch 366 ("disetujui user" tidak menghalangi override eksplisit belakangan).
+
+**Diagnosis kenapa 0.875 "belum total"**: pada `dampingRatio` 0.875, overshoot teoretis
+(`exp(-π·ζ/√(1-ζ²))`) sudah turun ke ≈0,3% dari ≈2,8% di 0.75 — jauh lebih halus, tapi secara
+matematis MASIH underdamped (ζ < 1), jadi masih ada osilasi balik sekecil apa pun. Redaman kritis
+persis (ζ = 1, nol overshoot secara teoretis) hanya tercapai di `dampingRatio = 1.0`, satu-satunya
+titik di mana pantulan benar-benar hilang, bukan cuma diperkecil — inilah kenapa "hapus total"
+secara matematis memang butuh melompat ke ujung bracket, bukan biseksi lanjutan ke arah situ.
+
+**Perubahan**: `dampingRatio` (`ui/theme/IosScrollPhysics.kt`, dipakai di `settleToZero`) dinaikkan
+dari custom `0.875f` ke `1.0f`. Karena `1.0` punya preset resmi Compose PERSIS
+(`Spring.DampingRatioNoBouncy`), konstanta custom `OVERSCROLL_SETTLE_DAMPING_RATIO` (diperkenalkan
+Batch 382 justru karena `0.875` TIDAK punya preset resmi) dihapus sepenuhnya dan digantikan
+pemanggilan preset resmi langsung di `spring(dampingRatio = Spring.DampingRatioNoBouncy, ...)` —
+konsisten kebijakan proyek memakai preset resmi di atas nilai custom kapan pun tersedia persis.
+Import `Spring` (dihapus Batch 382 karena saat itu cuma tersisa di komentar, tidak dipakai di kode
+nyata) dikembalikan karena sekarang dipakai langsung. `stiffness` (`OVERSCROLL_SETTLE_STIFFNESS`,
+200 sejak Batch 381) **TIDAK disentuh** — sumbu berbeda (KECEPATAN pendekatan, bukan BENTUK
+osilasi), di luar instruksi batch ini, dan tetap relevan sebagai kecepatan meski overshoot sudah
+nol. README.md (blockquote "Update terbaru") & posisi ini di CHANGELOG.md disamakan; KDoc lama
+`OVERSCROLL_SETTLE_DAMPING_RATIO` diringkas jadi catatan pointer singkat (derivasi fisika penuh
+histori 0.75→0.875 tetap ada di entri Batch 382 di bawah). Brace/paren balance dicek (strip
+komentar & string literal dulu): 78/78 `()`, 25/25 `{}`, 0/0 `[]` — seimbang bersih.
+
+**Belum ditest di device asli** — tidak ada env Android nyata di sesi ini. **Prioritas cek user**:
+tarik list sampai mentok lalu lepas jari — konten sekarang harus meluncur balik ke posisi normal
+TANPA ayunan balik/overshoot sama sekali (beda dari batch-batch sebelumnya yang semuanya masih
+menyisakan sedikit pantulan). Kalau ternyata masih terasa ada pantulan sekecil apa pun: kemungkinan
+besar bukan dari `dampingRatio` (sudah di titik matematis maksimum redaman kritis, 1.0 tidak bisa
+dinaikkan lagi tanpa masuk overdamped yang justru memperlambat approach), melainkan dari sumbu lain
+(`stiffness` yang mengatur kecepatan approach, bisa terasa seperti "menetap pelan-pelan" dan
+disalahartikan sebagai pantulan sisa) — laporkan detail rasanya kalau ini terjadi.
+
 ## Batch 382 — Karakter pantulan diselaraskan dengan effect bounce (stiffness 200), `dampingRatio` custom baru `OVERSCROLL_SETTLE_DAMPING_RATIO` 0.875, 1 file kode
 User instruksi eksplisit: "sesuaikan karakter pantulan agar selaras dengan effect bounce nya" —
 user sendiri sekarang membuka sumbu `dampingRatio` ("karakter pantulan") yang eksplisit
