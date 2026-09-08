@@ -1,5 +1,43 @@
 # Changelog
 
+## Batch 381 — Efek bounce settle overscroll dibuat lebih maksimal mengambang, `OVERSCROLL_SETTLE_STIFFNESS` 1500→200, 1 file kode
+User instruksi eksplisit: "ubah effect bounce (bukan karakter pantulan) jadi lebih maksimal
+mengambang nya". Dua bagian dipisah dengan jelas oleh user sendiri, konsisten terminologi yang
+sudah dipakai project sejak Batch 373-374:
+1. **"Effect bounce" + "bukan karakter pantulan"** — menunjuk PERSIS ke sumbu KECEPATAN settle
+   (`stiffness`, parameter `OVERSCROLL_SETTLE_STIFFNESS` di `IosScrollPhysics.kt`), BUKAN sumbu
+   BENTUK osilasi (`dampingRatio`, target Batch 374, sengaja dikecualikan eksplisit oleh user
+   sendiri di instruksi ini). Sama pembacaan "kaku ↔ mengambang = stiffness" vs "karakter
+   pantulan = dampingRatio" yang sudah baku di komentar file ini sejak Batch 373-374.
+2. **"Maksimal"** — dibaca sebagai instruksi tegas ke UJUNG bracket yang sudah dipetakan
+   (breakeven [200, 1500] dari catatan Batch 373 sendiri: "1500 = ujung bawah bracket [1500,4000]
+   yang masih terasa mengambang; kalau MASIH kurang mengambang, turunkan lebih jauh ke
+   `Spring.StiffnessMediumLow` (400) atau `StiffnessLow` (200)"), bukan laporan ambigu yang
+   biasanya dibalas 1 langkah biseksi geometris halus — pola pembacaan yang sama persis dipakai
+   Batch 373 sendiri untuk kata "hampir mengambang" (loncat ke ujung, bukan titik tengah).
+
+**Perubahan**: `OVERSCROLL_SETTLE_STIFFNESS` (`ui/theme/IosScrollPhysics.kt`) diturunkan dari
+`1500f` (`Spring.StiffnessMedium`) ke `200f` (`Spring.StiffnessLow`) — preset resmi Compose
+TERENDAH yang tersedia (tidak ada preset resmi di bawah ini; konsisten kebijakan proyek
+"prioritaskan preset resmi sebelum custom" di §"Kebijakan: prioritas mutakhir"
+`PROJECT_STATE.md`). `dampingRatio` (`Spring.DampingRatioLowBouncy`, sejak Batch 374) **TIDAK
+disentuh sama sekali** — sesuai pengecualian eksplisit user di instruksi batch ini. KDoc di
+deklarasi konstanta diperluas (bukan ditulis ulang) dengan riwayat Batch 381 + arah tuning
+berikutnya kalau masih perlu (naikkan via biseksi geometris ke arah 1500, √(200×1500) ≈ 548, kalau
+sekarang kelewat floating/lambat balik ke posisi normal; kalau MASIH kurang mengambang meski sudah
+preset terendah, berarti plafon rasa dari `stiffness` sendirian sudah tercapai, kemungkinan perlu
+sumbu lain seperti `dampingRatio` yang ikut disesuaikan — bukan `stiffness` diturunkan lagi karena
+sudah di batas bawah preset resmi). README.md (blockquote "Update terbaru") & posisi ini di
+CHANGELOG.md disamakan. Brace/paren balance dicek (strip komentar & string literal dulu): 78/78
+`()`, 25/25 `{}`, 0/0 `[]` — seimbang bersih.
+
+**Belum ditest di device asli** — tidak ada env Android nyata di sesi ini, sama seperti
+batch-batch sebelumnya. **Prioritas cek user**: rasakan pegas-balik overscroll setelah jari
+dilepas di posisi tertarik (rubber-band) mana pun — harus kerasa jauh lebih "ngambang"/perlahan
+dibanding sebelumnya (bukan cuma sedikit lebih lambat). Kalau JUSTRU sekarang kelewat lambat/susah
+berhenti, laporkan — arah tuning berikutnya (naik via biseksi ke 1500) sudah didokumentasikan di
+KDoc `OVERSCROLL_SETTLE_STIFFNESS`.
+
 ## Batch 380 — PENDING_IosFlingBehavior.md: 14/14 layar TUNTAS (LyricsSheet, LyricsView), 2 file kode — dokumen pending dihapus
 Tidak ada laporan bug baru dari user batch ini ("lanjut kerjakan pending task"). Batch 376 (race
 condition async `snapTo` vs guard synchronous) masih menunggu verifikasi device asli — belum ada

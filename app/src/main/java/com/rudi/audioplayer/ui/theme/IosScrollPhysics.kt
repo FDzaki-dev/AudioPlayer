@@ -197,13 +197,30 @@ private fun rubberBandResistance(magnitudePx: Float, rangePx: Float): Float =
  * kaku/satset, minta balik ke arah floating secara tegas (bukan cuma 1 langkah biseksi halus).
  * DITURUNKAN ke `1500f` (= `Spring.StiffnessMedium`, preset resmi Compose) — ujung BAWAH bracket
  * [1500, 4000] yang sudah didokumentasikan Batch 369 sendiri sebagai titik yang masih terasa
- * "ngambang" (floating), bukan angka custom baru hasil tebakan. Kalau masih perlu tuning:
- * TURUNKAN lebih jauh (mis. `Spring.StiffnessMediumLow` 400, atau `StiffnessLow` 200 — breakeven
- * baru [200, 1500]) kalau MASIH kerasa kurang mengambang; NAIKKAN sedikit (biseksi geometris ke
- * arah [1500, 4000] lagi) kalau sekarang JUSTRU kelewat floating/lambat balik. `dampingRatio`
- * (`DampingRatioMediumBouncy`) tetap tidak disentuh.
+ * "ngambang" (floating), bukan angka custom baru hasil tebakan.
+ *
+ * Batch 381 — User instruksi eksplisit: "ubah effect bounce (bukan karakter pantulan) jadi lebih
+ * maksimal mengambang nya" — dua bagian penting: (1) "effect bounce" + penegasan eksplisit "bukan
+ * karakter pantulan" persis membedakan sumbu KECEPATAN settle (`stiffness`, file ini) dari sumbu
+ * BENTUK osilasi (`dampingRatio`, target Batch 374, TETAP TIDAK disentuh batch ini — user secara
+ * eksplisit mengecualikannya); (2) kata "maksimal" dibaca sebagai instruksi tegas ke UJUNG bracket
+ * (persis pola pembacaan "hampir mengambang" Batch 373 di atas: bahasa tegas → lompat ke ujung
+ * range yang sudah dipetakan, bukan 1 langkah biseksi halus), bukan laporan ambigu "masih kurang
+ * X" yang biasanya dibalas kenaikan/penurunan kecil. DITURUNKAN dari `1500f` ke `200f`
+ * (= `Spring.StiffnessLow`, preset resmi TERENDAH yang tersedia di Compose — tidak ada preset
+ * resmi di bawah ini, konsisten kebijakan proyek "pakai preset resmi dulu sebelum custom" di
+ * §"Kebijakan: prioritas mutakhir" `PROJECT_STATE.md`). Ini breakeven baru [200, 1500] dari
+ * catatan Batch 373 sendiri. Kalau abis ini kerasa KELEWAT floating/lambat balik (mis. jeda
+ * kelamaan sebelum konten benar-benar berhenti di posisi normal): NAIKKAN kembali via biseksi
+ * geometris ke arah 1500 (√(200×1500) ≈ 548, bulatkan ke custom const baru kalau perlu — 0 preset
+ * resmi ada di antara 200 & 1500). Kalau MASIH terasa kurang mengambang meski sudah di preset
+ * terendah: berarti titik plafon rasa "floating" dari parameter `stiffness` sendirian sudah
+ * tercapai — kemungkinan besar butuh sumbu LAIN (mis. `dampingRatio`, currently `LowBouncy`) yang
+ * ikut disesuaikan, bukan `stiffness` diturunkan lagi (sudah di batas bawah preset resmi).
+ * `dampingRatio` (`DampingRatioLowBouncy`, sejak Batch 374) TETAP TIDAK diubah batch ini — sesuai
+ * pengecualian eksplisit user di instruksi batch ini sendiri.
  */
-private const val OVERSCROLL_SETTLE_STIFFNESS = 1500f
+private const val OVERSCROLL_SETTLE_STIFFNESS = 200f
 
 /**
  * Overscroll ala iOS: menggeser KONTEN (bukan menggambar glow di atasnya) saat ditarik lewat

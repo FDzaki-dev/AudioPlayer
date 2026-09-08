@@ -8,7 +8,19 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 376 (FIX: jaring pengaman Batch 375 TIDAK kepicu — race condition
+> 🆕 **Update terbaru — Batch 381 (efek bounce settle overscroll dibuat lebih maksimal
+> mengambang, konstanta `OVERSCROLL_SETTLE_STIFFNESS` diturunkan 1500→200
+> (`Spring.StiffnessLow`), 1 file kode):** User: "ubah effect bounce (bukan karakter pantulan)
+> jadi lebih maksimal mengambang nya" — instruksi eksplisit mengecualikan `dampingRatio`
+> (karakter/bentuk osilasi pantulan, TIDAK disentuh), fokus murni ke `stiffness` (kecepatan
+> settle). Kata "maksimal" dibaca sebagai lompat ke ujung range yang sudah dipetakan (breakeven
+> [200, 1500] dari catatan Batch 373 sendiri), bukan biseksi halus — diturunkan langsung ke
+> `200f` (`Spring.StiffnessLow`), preset resmi TERENDAH yang tersedia di Compose (tidak ada
+> preset resmi di bawahnya). Kalau nanti kerasa kelewat floating/lambat balik ke posisi normal,
+> naikkan lagi via biseksi geometris (√(200×1500) ≈ 548, breakeven baru). `dampingRatio`
+> (`DampingRatioLowBouncy`, sejak Batch 374) tidak disentuh sama sekali. Belum ditest di device
+> asli.
+> Batch 376 (FIX: jaring pengaman Batch 375 TIDAK kepicu — race condition
 > async `snapTo` vs guard synchronous, `IosScrollPhysics.kt`, 1 file kode):** User laporan hasil
 > Batch 375: "masih ada delay-nya, belum kepakai" (jaring pengamannya sendiri tidak kepicu) + fase
 > "ultra smooth" yang dilaporkan "semua/susah dipisah". Root cause: guard `settleIfAbandoned()`

@@ -36,6 +36,23 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 381 (Efek bounce settle overscroll dibuat lebih maksimal mengambang —
+`OVERSCROLL_SETTLE_STIFFNESS` 1500→200 di `IosScrollPhysics.kt`, 1 file kode)** — User instruksi
+eksplisit: "ubah effect bounce (bukan karakter pantulan) jadi lebih maksimal mengambang nya".
+Dibaca 2 bagian, konsisten terminologi baku project sejak Batch 373-374: (1) "effect bounce" +
+"bukan karakter pantulan" = sumbu `stiffness` (kecepatan settle), BUKAN `dampingRatio` (bentuk
+osilasi) — user sendiri eksplisit mengecualikan `dampingRatio` dari perubahan; (2) "maksimal" =
+lompat ke ujung bracket yang sudah dipetakan (breakeven [200, 1500] dari catatan Batch 373: "kalau
+MASIH kurang mengambang, turunkan ke StiffnessMediumLow 400 atau StiffnessLow 200"), bukan
+biseksi halus — pola pembacaan sama seperti "hampir mengambang" Batch 373. Diturunkan langsung ke
+`200f` (`Spring.StiffnessLow`), preset resmi TERENDAH Compose yang tersedia. `dampingRatio`
+(`DampingRatioLowBouncy`, sejak Batch 374) TIDAK disentuh sama sekali. KDoc konstanta diperluas
+dengan riwayat + arah tuning berikutnya (naik via biseksi ke 1500 kalau kelewat floating; kalau
+MASIH kurang mengambang di preset terendah, plafon `stiffness` sendirian sudah tercapai — mungkin
+perlu sumbu lain). README.md (blockquote update terbaru) disamakan. Brace/paren balance dicek
+(strip komentar/string dulu): 78/78 `()`, 25/25 `{}`, 0/0 `[]`. **Belum ditest di device asli** —
+tidak ada env Android nyata di sesi ini. Detail lengkap CHANGELOG.md Batch 381.
+
 **Batch 380 (TUNTAS antrean `PENDING_IosFlingBehavior.md`: 14/14 layar — `LyricsSheet.kt`,
 `LyricsView.kt`, 2 file kode, dokumen pending dihapus)** — Tidak ada laporan bug baru dari user
 ("lanjut kerjakan pending task"); Batch 376 masih menunggu verifikasi device asli. Sisa antrean
