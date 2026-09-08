@@ -91,6 +91,39 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 393 (HOTFIX Batch 392 — build gagal, `MainActivity.kt`, 1 file kode)** — User upload
+`log_fail_378.zip` (build-output.log CI run #378) TANPA teks tambahan, diperlakukan sbg laporan
+bug implisit (preseden Batch 29). **Stale Run Guard dicek: log ini valid & langsung relevan** —
+3 error persis menunjuk kode yang Batch 392 baru saja ubah, bukan laporan basi. **Status
+DISCONTINUED tetap permanen tidak diubah** (koreksi langsung atas kerja optimasi Batch 392
+sendiri, tetap payung "optimasi murni").
+
+**Isi log**: `compileDebugKotlin`/`compileReleaseKotlin` GAGAL — 3x "@Composable invocations can
+only happen from the context of a @Composable function" di `MainActivity.kt:356/362/385`, persis
+match 1:1 ke 3 pemanggilan `MaterialTheme.colorScheme.background` yang Batch 392 taruh di dalam
+`remember { }`.
+
+**Root cause**: parameter `calculation` milik `remember()` ditandai `@DisallowComposableCalls`
+oleh Compose runtime — memanggil property `@Composable` (`MaterialTheme.colorScheme`) di
+dalamnya ilegal. Ini kelas kesalahan yang TIDAK kelihatan dari tokenizer balance/pembacaan kode
+manual, cuma dari compiler Kotlin+Compose sungguhan — persis risiko yang sudah berulang kali
+dicatat eksplisit sejak Batch 385 ("belum ditest build sungguhan"), sekarang benar-benar terjadi.
+
+**Fix**: `MaterialTheme.colorScheme.background` dibaca sekali di LUAR `remember{}`
+(`val rootBackgroundColor = ...`, context composable biasa, legal), `remember(...)` menutup atas
+NILAI-nya (ditambah sbg key ke-3, defensif) alih-alih memanggil ulang property composable-nya di
+dalam lambda. **Zero behavior change dari niat asli Batch 392** — nilai & hasil visual brush
+identik, bedanya sekarang bisa dikompilasi.
+
+**1 file kode disentuh** (`MainActivity.kt`, 1365 baris). Brace/paren/bracket balance seimbang
+(502/502 `()`, 266/266 `{}`, 3/3 `[]`, sama seperti Batch 392 — murni substitusi ekspresi). Digrep
+ulang: 0 pemanggilan `MaterialTheme.*` tersisa di dalam badan `remember{}`. Diff-checked terhadap
+ZIP Batch 392: cuma 1 file berubah. **Masih belum ditest build/lint sungguhan** (0
+kotlinc/SDK/network di sandbox) — rekomendasi eksplisit ke user: push & jalankan CI sekali lagi
+utk konfirmasi 0 error tersisa sebelum lanjut batch optimasi berikutnya (preseden Batch 24: fix
+"seharusnya benar dari pembacaan API" tetap perlu dikonfirmasi build asli). Detail lengkap
+CHANGELOG.md Batch 393.
+
 **Batch 392 (Optimasi Compose — `identityRootBrush` remember(), `MainActivity.kt`, 1 file kode)**
 — User instruksi: "next: optimize sektor compose!!" (pindah sektor dari cold-start 385-391 ke
 Compose, salah satu kandidat sisa Batch 388). **Status DISCONTINUED tetap permanen tidak diubah**

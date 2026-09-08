@@ -24,7 +24,21 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 392 (optimasi Compose: `identityRootBrush` remember(),
+> 🆕 **Update terbaru — Batch 393 (HOTFIX Batch 392: build gagal, `MainActivity.kt`, 1
+> file):** User upload `log_fail_378.zip` (CI run #378) tanpa teks — diperlakukan sbg laporan
+> bug implisit (preseden Batch 29). Stale Run Guard dicek: log valid & langsung relevan, 3 error
+> persis menunjuk kode yang Batch 392 baru ubah. Root cause: `remember()`'s `calculation` lambda
+> ditandai `@DisallowComposableCalls` oleh Compose runtime — Batch 392 memanggil
+> `MaterialTheme.colorScheme.background` (property `@Composable`) di dalamnya, ilegal, gagal
+> compile `compileDebugKotlin`/`compileReleaseKotlin`. Fix: warna dibaca sekali DI LUAR
+> `remember{}` (`rootBackgroundColor`, context composable biasa), `remember(...)` menutup atas
+> nilainya (ditambah sbg key ke-3) bukan memanggil ulang property-nya. **Zero behavior change
+> dari niat asli Batch 392** — nilai & hasil visual identik, sekarang bisa dikompilasi. Kelas
+> kesalahan ini TIDAK kelihatan dari tokenizer balance, cuma dari compiler sungguhan — risiko yang
+> sudah dicatat eksplisit sejak Batch 385. **Rekomendasi ke user: push & jalankan CI sekali lagi
+> utk konfirmasi 0 error tersisa** sebelum lanjut batch berikutnya. **Status DISCONTINUED tetap
+> permanen tidak diubah.** Detail lengkap CHANGELOG.md Batch 393.
+> Batch 392 (optimasi Compose: `identityRootBrush` remember(),
 > `MainActivity.kt`, 1 file):** User: "next: optimize sektor compose!!" — pindah dari sektor
 > cold-start (385-391) ke Compose, salah satu kandidat sisa Batch 388. Root cause: root Surface
 > `MainActivity` membangun `identityRootBrush` (`Brush.linearGradient`, dipakai identitas

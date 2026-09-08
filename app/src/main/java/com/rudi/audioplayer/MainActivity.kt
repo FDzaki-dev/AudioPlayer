@@ -329,37 +329,40 @@ class MainActivity : FragmentActivity() {
                 // logam disikat ("brushed metal streak"), lalu turun lagi ke SkeuSurfaceVariant.
                 // Warnanya pun sudah bukan lagi turunan SkeuAccent tembaga (dihapus total) — murni
                 // TitaniumDark/SilverHighlight, keluarga token baru khusus utk efek metalik ini.
-                // Batch 392 — sektor Compose, kandidat pertama yang provably aman dibuktikan
-                // MURNI dari pembacaan kode (bukan cost pengukuran real-device seperti yang
-                // ditunda Batch 388/391): `identityRootBrush` SEBELUM batch ini dibangun ulang
-                // dari nol tiap kali scope composable ini recompose — apa pun state yang
-                // berubah. Scope ini membaca banyak state langsung di badan yang SAMA
-                // (appThemeIdentity/appThemeMode/librarySongsForShortcut/lockEnabled/
-                // biometricEnabled, dst — lihat baris-baris di atas), dan karena semuanya 1
-                // fungsi composable besar yang sama (bukan dipecah jadi child @Composable
-                // terpisah), Compose tidak bisa skip sebagian body-nya saja — SATU state
-                // berubah (mis. `librarySongsForShortcut` tiap kali daftar lagu di-rescan,
-                // TIDAK ADA hubungannya dgn tema) memicu SELURUH body ini re-run, termasuk blok
-                // `when` ini membangun ulang `Brush.linearGradient(...)` (utk Skeu: 6 color
-                // stop, tiap stop punya `Color.copy(alpha=...)` + 1 array alokasi) — padahal
-                // input SEBENARNYA brush ini (`appThemeIdentity`, `isDarkTheme`) genuinely tidak
-                // berubah. Fix: `remember(appThemeIdentity, isDarkTheme)` — cache dibangun ulang
-                // HANYA kalau salah satu dari 2 key ini benar-benar berubah, persis prinsip
-                // "remember pada komputasi Composable berat" (bukan fitur/tampilan baru — hasil
-                // akhir yang dirender identik, cuma dihitung ulang lebih jarang). Detail lengkap
-                // CHANGELOG.md Batch 392.
-                val identityRootBrush = remember(appThemeIdentity, isDarkTheme) {
+                // Batch 393 — HOTFIX Batch 392, laporan build gagal user (log_fail_378.zip,
+                // Gradle 8.14.3 / CI build #378): `compileDebugKotlin`/`compileReleaseKotlin`
+                // GAGAL, 3 error identik "@Composable invocations can only happen from the
+                // context of a @Composable function" persis di 3 baris `MaterialTheme
+                // .colorScheme.background` yang Batch 392 pindahkan ke dalam `remember { }` di
+                // bawah tanpa disadari. Root cause: parameter `calculation` milik `remember()`
+                // ditandai `@DisallowComposableCalls` oleh Compose runtime sendiri — memanggil
+                // property `@Composable` apa pun (termasuk `MaterialTheme.colorScheme`, getter-
+                // nya sendiri `@Composable @ReadOnlyComposable`) di dalam lambda itu ilegal,
+                // bukan sekadar gaya penulisan. Ini TIDAK kelihatan dari pembacaan kode statis
+                // biasa (compiler Kotlin+Compose plugin sungguhan yang menegakkannya) — persis
+                // kelas kesalahan yang PROJECT_STATE.md sendiri sudah wanti-wanti berulang kali:
+                // "belum ditest di device asli ATAU build/lint sungguhan" utk tiap batch sejak
+                // 385, sekarang benar-benar kejadian. Fix: `MaterialTheme.colorScheme.background`
+                // dibaca SEKALI di sini, di context composable biasa (bukan di dalam remember) —
+                // lalu `remember(...)` menutup atas NILAI plain `Color` ini (`rootBackgroundColor`,
+                // ditambahkan sbg key ke-3 supaya tetap benar kalau suatu saat nilainya berubah
+                // lepas dari appThemeIdentity/isDarkTheme), bukan memanggil ulang property
+                // composable-nya. **Zero behavior change** dari niat asli Batch 392 — nilai brush
+                // yang dihasilkan identik, cuma titik pembacaan warnanya yang dipindah ke luar
+                // lambda `remember`. Detail lengkap CHANGELOG.md Batch 393.
+                val rootBackgroundColor = MaterialTheme.colorScheme.background
+                val identityRootBrush = remember(appThemeIdentity, isDarkTheme, rootBackgroundColor) {
                     when (appThemeIdentity) {
                         ThemeIdentity.TACTILE -> Brush.linearGradient(
                             colors = if (isDarkTheme)
                                 listOf(
-                                    MaterialTheme.colorScheme.background,
+                                    rootBackgroundColor,
                                     MidnightBlue.copy(alpha = MidnightBlueAmbientAlpha),
                                     AmoledSurface
                                 )
                             else
                                 listOf(
-                                    MaterialTheme.colorScheme.background,
+                                    rootBackgroundColor,
                                     MidnightBlue.copy(alpha = MidnightBlueLightAmbientAlpha),
                                     TactileLightSurfaceVariant
                                 )
@@ -382,12 +385,12 @@ class MainActivity : FragmentActivity() {
                             val emeraldStreakAlpha = if (isDarkTheme) 0.30f else 0.36f
                             Brush.linearGradient(
                                 *arrayOf(
-                                    0.00f to MaterialTheme.colorScheme.background,
-                                    0.55f to TitaniumDark.copy(alpha = streakAlpha),
+                                    0.00f to rootBackgroundColor,
                                     // Titik kilau sempit (0.60-0.68) ditumpuk tepat setelah TitaniumDark
                                     // — rentang fraction yang sengaja disempitkan (bukan disebar rata
                                     // seperti resep 3-stop Tactile) supaya terbaca sebagai satu garis
                                     // pantulan cahaya di logam, bukan gradasi warna yang mulus.
+                                    0.55f to TitaniumDark.copy(alpha = streakAlpha),
                                     0.62f to SilverHighlight.copy(alpha = streakAlpha * 1.8f),
                                     0.68f to TitaniumDark.copy(alpha = streakAlpha),
                                     0.76f to emerald.copy(alpha = emeraldStreakAlpha),

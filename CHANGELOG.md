@@ -1,5 +1,66 @@
 # Changelog
 
+## Batch 393 — HOTFIX Batch 392: build gagal (`@Composable` call di dalam `remember{}`), `MainActivity.kt`, 1 file
+User upload `log_fail_378.zip` (build-output.log, Gradle 8.14.3, CI run #378) — TANPA teks
+instruksi tambahan. Diperlakukan sebagai laporan bug implisit (preseden Batch 29: `log_fail_91.zip`
+dulu juga cuma diupload tanpa teks, langsung jadi trigger investigasi+fix) — bukan kategori
+"upload ZIP lama tanpa laporan bug" (Batch 320/390). **Stale Run Guard dicek**: log ini BUKAN
+laporan basi — 3 baris error persis menunjuk ke kode yang Batch 392 (sesi sebelumnya, sesi ini)
+baru saja ubah, jadi 100% relevan & langsung actionable, bukan sisa laporan lama yang sudah usang.
+**Status DISCONTINUED tetap permanen tidak diubah** — ini koreksi LANGSUNG atas kerja optimasi
+Batch 392 sendiri (bukan bugfix/fitur di luar kategori optimasi), tetap dalam payung "optimasi
+murni" Batch 387.
+
+**Isi log**: `compileDebugKotlin` DAN `compileReleaseKotlin` GAGAL, 3 error identik:
+```
+e: MainActivity.kt:356:51 @Composable invocations can only happen from the context of a @Composable function
+e: MainActivity.kt:362:51 @Composable invocations can only happen from the context of a @Composable function
+e: MainActivity.kt:385:60 @Composable invocations can only happen from the context of a @Composable function
+```
+
+**Root cause**: Batch 392 membungkus `identityRootBrush` dgn `remember(appThemeIdentity,
+isDarkTheme) { ... }` untuk cache brush yang jarang berubah — TAPI badan `when` di dalamnya
+memanggil `MaterialTheme.colorScheme.background` 3 kali (baris 356/362/385, persis match 1:1 dgn
+3 baris error). `remember()` menandai parameter `calculation`-nya `@DisallowComposableCalls` —
+aturan Compose runtime sendiri, BUKAN gaya penulisan yang bisa diabaikan: memanggil property
+`@Composable` apa pun (termasuk getter `MaterialTheme.colorScheme`, yang beranotasi
+`@Composable @ReadOnlyComposable`) di dalam lambda `remember` ilegal, mengunci compiler error
+persis kelas ini. **Ini TIDAK kelihatan dari tokenizer brace/paren/bracket balance ATAU dari
+pembacaan kode manual biasa** — perlu compiler Kotlin+Compose plugin sungguhan yang menegakkan
+anotasi `@DisallowComposableCalls`, exactly kelas kesalahan yang PROJECT_STATE.md/CHANGELOG.md
+sudah berulang kali dicatat SEBAGAI RISIKO EKSPLISIT sejak Batch 385 ("Belum ditest di device
+asli ATAU build/lint sungguhan — tidak ada kotlinc/Android SDK/network di environment kerja sesi
+ini") — sekarang benar-benar terjadi utk pertama kali di rangkaian batch optimasi 385-393.
+
+**Fix**: `MaterialTheme.colorScheme.background` dibaca SEKALI, `val rootBackgroundColor =
+MaterialTheme.colorScheme.background`, DI LUAR `remember{}` (context composable biasa, legal) —
+`remember(...)` sekarang menutup atas 3 key: `appThemeIdentity`, `isDarkTheme`, DAN
+`rootBackgroundColor` (ditambahkan sbg key ke-3, defensif — walau saat ini nilainya 100% turunan
+2 key lain, `colorsFor()` di `Theme.kt`, biaya membandingkan 1 `Color` tambahan di key remember
+sangat kecil dibanding risiko silently-stale kalau asumsi itu berubah suatu saat). 3 pemanggilan
+`MaterialTheme.colorScheme.background` di dalam lambda diganti jadi referensi ke
+`rootBackgroundColor` (nilai `Color` biasa, bukan composable call, legal dipanggil di mana saja).
+**Zero behavior change dari niat asli Batch 392**: nilai `Color` yang dipakai identik (dibaca
+dari sumber yang sama, cuma titik pembacaannya dipindah), hasil visual brush yang dirender 100%
+sama seperti yang DIMAKSUDKAN Batch 392 — bedanya sekarang benar-benar bisa dikompilasi.
+
+**1 file kode disentuh** (`MainActivity.kt`, 1365 baris — naik 3 baris dari Batch 392 krn 1 baris
+`val rootBackgroundColor` baru + dokumentasi). Brace/paren/bracket balance dicek (strip
+comment/string dulu, python3): 502/502 `()`, 266/266 `{}`, 3/3 `[]` — seimbang (SAMA seperti
+Batch 392 — fix ini murni substitusi ekspresi, 0 struktur baru). Verifikasi TAMBAHAN khusus batch
+ini (di luar metodologi standar, krn root cause spesifik batch ini persis soal ini): digrep ulang
+seluruh badan `remember(...) { }` milik `identityRootBrush` — 0 pemanggilan `MaterialTheme.*`
+tersisa di dalamnya (cuma di titik baca awal `val rootBackgroundColor` yang legal, di luar
+lambda). Diff-checked terhadap ZIP Batch 392: cuma `MainActivity.kt` yang berubah.
+
+**Masih belum ditest di build/lint sungguhan** (tidak ada kotlinc/Android SDK/network di
+environment kerja sesi ini) — fix ini didasarkan pada pemahaman aturan `@DisallowComposableCalls`
+milik Compose runtime (fakta API publik, bukan tebakan) + match 1:1 nomor baris error terhadap
+kode yang diubah, TAPI **rekomendasi eksplisit ke user**: jalankan build CI sekali lagi (push
+batch ini) untuk konfirmasi 0 error tersisa, sebelum lanjut batch optimasi berikutnya — preseden
+Batch 24 (project ini) jadi pengingat: fix yang "seharusnya benar menurut pembacaan API" tetap
+perlu dikonfirmasi build asli, bukan diasumsikan pasti hijau.
+
 ## Batch 392 — Optimasi Compose: `identityRootBrush` remember(), `MainActivity.kt`, 1 file
 User instruksi: "next: optimize sektor compose!!" — permintaan eksplisit pindah dari sektor
 cold-start (Batch 385-391) ke sektor Compose, salah satu dari 2 kandidat sisa yang secara
