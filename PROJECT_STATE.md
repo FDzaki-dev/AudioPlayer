@@ -78,6 +78,61 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 385 (Optimasi cold-start — prewarm 28 file SharedPreferences dari 1 background thread di
+`Application.onCreate()`, `AudioPlayerApplication.kt`, 1 file kode)** — User instruksi: "lanjut
+optimize aplikasi tanpa mengubah status terkini"; fokus dipilih user (opsi yang ditawarkan):
+startup/cold-start speed. **Status DISCONTINUED (banner di atas & README.md) SENGAJA TIDAK
+diubah** — ini deviasi EKSPLISIT dari rule default section ini sendiri ("instruksi kerja baru =
+user membuka kembali proyek, hapus banner"): user secara eksplisit minta status tetap seperti
+sedia kala meski ada 1 batch kerja kode. **Berlaku HANYA utk batch ini** — sesi berikutnya tetap
+ikuti rule asli banner di atas kalau ada instruksi kerja baru TANPA embel-embel "tanpa mengubah
+status" serupa (banner + rule reopening di atas tidak berubah sama sekali oleh batch ini).
+
+**Root cause**: `PlayerViewModel` (dibuat instan begitu `MainActivity.onCreate()` pertama kali
+menyentuh delegate `by viewModels`) membuka 23 file SharedPreferences terpisah lewat property
+initializer-nya sendiri (favorites, playback_state, play_stats, ratings, app_lock, vault,
+listening_history, hourly_listen_stats, shake_settings, radio_settings,
+floating_bubble_settings, silence_skip_settings, playlists, lyrics, bookmarks, audiobook_mode,
+equalizer, visualizer_settings, crossfade, custom_folders, app_theme, smart_playlists,
+sleep_timer) — plus 5 file lain (library_filter, search_history, onboarding_hints,
+lyrics_prefetch_settings, widget_state) dari Store/Updater lain yang dibuat layar/widget tak lama
+sesudahnya, 28 total app-wide. Android baru memulai thread background loading milik 1 file itu
+PERTAMA KALI `Context.getSharedPreferences(name, MODE_PRIVATE)` dipanggil utk nama itu — dan
+beberapa initializer StateFlow `PlayerViewModel` (theme identity/mode, crossfade, playlists,
+smart playlists, toggle shake/bubble/silence-skip/radio, flag app-lock) plus `init{}`-nya (sleep
+timer) langsung memanggil getter pada pemanggilan PERTAMA itu juga, yang mem-blok thread pemanggil
+(`awaitLoadedLocked()` internal Android) sampai parsing file itu selesai. Sebelum batch ini,
+pemanggilan pertama itu — dan karenanya titik AWAL 28 load ini bisa mulai — baru terjadi begitu
+`MainActivity.onCreate()` jalan, setelah proses start + class-loading + window setup sudah
+menghabiskan sebagian budget cold-start.
+
+**Fix**: 1 fungsi baru `warmUpSharedPreferences()` dipanggil dari `AudioPlayerApplication.onCreate()`
+(ditambahkan SETELAH `AppLogger.init()`, yang itu sendiri tidak disentuh) — spawn 1 background
+thread yang menyentuh (`getSharedPreferences(name, MODE_PRIVATE)`, TIDAK membaca/menulis value
+apa pun) ke-28 nama file yang sama, sedini proses boleh (`Application.onCreate()`, sebelum
+Activity mana pun ada). Android men-cache `SharedPreferencesImpl` per file lewat absolute path
+(disinkronkan di `ContextImpl`) — jadi ini instance YANG SAMA yang nanti dikembalikan tiap
+`getSharedPreferences()` milik Store masing-masing, bukan load duplikat. Saat `PlayerViewModel`
+akhirnya membaca tiap file, load sudah dapat "kepala mulai" sepanjang sisa waktu startup
+proses/window, bukan mulai dari nol tepat saat main thread butuh nilainya.
+
+**Zero behavior change**: tidak ada value yang dibaca/ditulis di fungsi baru ini — cuma file
+handle yang di-warm. Getter/setter, default value, dan perilaku first-run tiap Store TIDAK
+disentuh sama sekali. Daftar 28 nama sengaja plain `arrayOf<String>` best-effort (bukan
+generated/reflektif, disimpan sbg `companion object` di file yang sama) — aman kalau 1 nama jadi
+basi (Store dihapus → cuma jadi no-op touch file) atau kalau ada Store baru nanti (tinggal tambah
+1 baris array, TIDAK wajib disinkron sempurna supaya fungsi tetap berjalan).
+
+Brace/paren/bracket balance `AudioPlayerApplication.kt` dicek (strip comment/string dulu): 17/17
+`()`, 9/9 `{}`, 0/0 `[]` — seimbang. **1 file kode disentuh** (`AudioPlayerApplication.kt`) — tidak
+ada file lain yang disentuh batch ini, konsisten batas max-3-file/task.
+
+**Belum ditest di device asli** — prewarm ini murni tuning tanpa akses device fisik (konsisten
+batasan yang sudah dicatat di § "Status penutupan (Batch 384)" poin 1 di bawah); efeknya (durasi
+cold-start berkurang) baru bisa dikonfirmasi lewat pengukuran nyata (mis. `adb shell am start -W`
+atau Macrobenchmark) di device asli, bukan diasumsikan dari pembacaan kode saja. Detail lengkap
+CHANGELOG.md Batch 385.
+
 **Batch 384 (PENUTUPAN PROYEK — status DISCONTINUED, 0 file kode, 4 dokumentasi:
 `README.md`/`PROJECT_STATE.md`/`CHANGELOG.md`/`MANUAL_QA_CHECKLIST.md`)** — User instruksi
 eksplisit: "fokus untuk beres-beres sebelum menutup project dan diberi label discontinued!!".

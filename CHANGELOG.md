@@ -1,5 +1,73 @@
 # Changelog
 
+## Batch 385 — Optimasi cold-start: prewarm 28 file SharedPreferences dari background thread di `Application.onCreate()`, `AudioPlayerApplication.kt`, 1 file kode
+User instruksi: "lanjut optimize aplikasi tanpa mengubah status terkini"; fokus dipilih user
+(dari opsi yang ditawarkan): startup/cold-start speed. **Status DISCONTINUED (banner
+`README.md` + `PROJECT_STATE.md`) SENGAJA TIDAK diubah** — deviasi EKSPLISIT dari rule default
+`PROJECT_STATE.md` § "ATURAN SESI AKTIF" sendiri ("instruksi kerja baru = user membuka kembali
+proyek, hapus banner"): user secara eksplisit minta status tetap seperti sedia kala meski ada 1
+batch kerja kode. Berlaku HANYA utk batch ini — sesi berikutnya tetap ikuti rule asli banner itu
+kalau ada instruksi kerja baru TANPA embel-embel "tanpa mengubah status" serupa.
+
+**Root cause**: `PlayerViewModel` (dibuat instan begitu `MainActivity.onCreate()` pertama kali
+menyentuh delegate `by viewModels`) membuka 23 file SharedPreferences terpisah lewat property
+initializer-nya sendiri — `FavoritesStore` ("favorites"), `PlaybackStateStore`
+("playback_state"), `PlayStatsStore` ("play_stats"), `RatingStore` ("ratings"), `AppLockStore`
+("app_lock"), `VaultStore` ("vault"), `ListeningHistoryStore` ("listening_history"),
+`HourlyListenStore` ("hourly_listen_stats"), `ShakeSettingsStore` ("shake_settings"),
+`RadioSettingsStore` ("radio_settings"), `FloatingBubbleStore` ("floating_bubble_settings"),
+`SilenceSkipStore` ("silence_skip_settings"), `PlaylistStore` ("playlists"), `LyricsStore`
+("lyrics"), `BookmarkStore` ("bookmarks"), `AudiobookModeStore` ("audiobook_mode"),
+`EqualizerController` ("equalizer"), `VisualizerSettingsStore` ("visualizer_settings"),
+`CrossfadeStore` ("crossfade"), `CustomFolderStore` ("custom_folders"), `ThemeStore`
+("app_theme"), `SmartPlaylistStore` ("smart_playlists"), `SleepTimerStore` ("sleep_timer") —
+plus 5 more opened by other Store/Updater classes that screens and the home-screen widget
+construct moments after cold start (`LibraryFilterStore` "library_filter", `SearchHistoryStore`
+"search_history", `OnboardingHintStore` "onboarding_hints", `LyricsPrefetchStore`
+"lyrics_prefetch_settings", `WidgetUpdater` "widget_state"), 28 files in total app-wide.
+
+Android only starts a SharedPreferences file's own background load thread the FIRST time
+`Context.getSharedPreferences(name, MODE_PRIVATE)` is called for that name. Several of
+`PlayerViewModel`'s own StateFlow initializers read straight from that same first call —
+`_shakeToSkipEnabled`/`_floatingBubbleEnabled`/`_silenceSkipEnabled`/`_radioAutoContinueEnabled`
+(toggle stores), `_lockEnabled`/`_biometricEnabled` (`appLockStore`), `_visualizerEnabled`,
+`_themeIdentity`/`_themeMode`, `_crossfadeEnabled`, `_playlists`, `_smartPlaylists` — plus the
+`init {}` block's sleep-timer restore (`sleepTimerStore.getEndAt()`) and `connect()`'s
+`restoreSavedSpeed()` (`playbackStateStore.load()`). Each of those reads blocks the calling
+thread on Android's internal `awaitLoadedLocked()` until that specific file's disk read + XML
+parse finishes — and until this batch, the FIRST moment any of the 28 loads could even begin was
+`MainActivity.onCreate()` itself, well after process start, class-loading, and window setup had
+already spent part of the cold-start budget.
+
+**Fix**: 1 new function `warmUpSharedPreferences()`, called from `AudioPlayerApplication.onCreate()`
+right after `AppLogger.init(this)` (which itself is untouched). It spawns 1 background `Thread`
+named `"PrefsWarmup"` that touches (`getSharedPreferences(name, MODE_PRIVATE)` — never a read or
+write of any value) the same 28 file names, as early as `Application.onCreate()` allows: process
+start, before any `Activity` exists. Android caches the resulting `SharedPreferencesImpl` per
+file by absolute path (synchronized inside `ContextImpl`), so this returns the exact SAME
+instance every Store's own later `getSharedPreferences()` call gets — a genuine head start on
+the same load, not a duplicate one. By the time `PlayerViewModel`'s constructor reaches each
+read, the load has had the entire rest of process/window startup to finish in the background
+instead of starting cold at that point.
+
+**Zero behavior change**: no value is read or written by the new function — only the file handle
+is warmed. Every Store's own getters/setters, defaults, and first-run behavior are completely
+untouched (0 of the 26 Store/Updater files were opened this batch — only
+`AudioPlayerApplication.kt`). The 28 names live in a plain `arrayOf<String>` in a new companion
+object in the same file — a best-effort mirror of each Store's own `PREFS_NAME`, not a generated
+or reflective list, so it's intentionally tolerant of drift: a removed Store leaves a harmless
+no-op file touch behind, and a future new Store just needs one more array entry whenever
+convenient (nothing breaks if that sync lags).
+
+Brace/paren/bracket balance `AudioPlayerApplication.kt` checked (comments/strings stripped
+first): 17/17 `()`, 9/9 `{}`, 0/0 `[]` — balanced. **1 code file touched**, consistent with the
+max-3-files/task limit.
+
+**Not tested on a real device** — this is pure code-reasoning tuning with no physical-device
+access (same constraint already logged in § "Status penutupan (Batch 384)" point 1 below); the
+actual effect (reduced cold-start duration) can only be confirmed with a real measurement (e.g.
+`adb shell am start -W` or Macrobenchmark), not assumed from reading the code alone.
+
 ## Batch 384 — PENUTUPAN PROYEK: status DISCONTINUED, konsolidasi item belum-terverifikasi, 0 file kode + 4 dokumentasi
 User instruksi eksplisit: "fokus untuk beres-beres sebelum menutup project dan diberi label
 discontinued!!". Dua bagian dipisah jelas: (1) **"beres-beres"** — dibaca sebagai konsolidasi &

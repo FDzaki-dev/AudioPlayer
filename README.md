@@ -24,7 +24,24 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 383 (karakter pantulan overscroll dihapus total, `dampingRatio` →
+> 🆕 **Update terbaru — Batch 385 (optimasi cold-start: prewarm 28 file SharedPreferences dari
+> background thread di `Application.onCreate()`, `AudioPlayerApplication.kt`, 1 file kode):**
+> User: "lanjut optimize aplikasi tanpa mengubah status terkini" (fokus dipilih user: startup/
+> cold-start speed) — **status DISCONTINUED di atas SENGAJA TIDAK diubah**, override eksplisit
+> user hanya untuk batch ini (lihat `PROJECT_STATE.md` § "Batch terakhir yang selesai" utk detail
+> rule aslinya). Root cause: `PlayerViewModel` membuka 23 file SharedPreferences lewat property
+> initializer-nya sendiri begitu `MainActivity.onCreate()` pertama kali membuatnya (+5 file lain
+> dari layar/widget lain, 28 total) — beberapa initializer/`init{}`-nya langsung MEMBACA file yang
+> baru saja dibuka itu, mem-blok main thread sampai parsing XML-nya selesai; load file itu sendiri
+> baru mulai begitu `getSharedPreferences()` PERTAMA dipanggil, yaitu saat itu juga, bukan lebih
+> awal. Fix: sentuh (bukan baca/tulis apa pun) ke-28 nama file yang sama dari 1 background thread
+> sedini `Application.onCreate()` mengizinkan — proses start, sebelum Activity mana pun ada —
+> supaya loadnya sudah berjalan paralel sepanjang sisa startup, bukan baru mulai saat ViewModel
+> dibuat. Zero behavior change (tidak ada value Store mana pun yang dibaca/ditulis di sini).
+> **Belum ditest di device asli** — butuh pengukuran cold-start nyata (mis. `adb shell am start -W`
+> atau Macrobenchmark) utk konfirmasi, bukan cuma pembacaan kode. Detail lengkap CHANGELOG.md
+> Batch 385.
+> Batch 383 (karakter pantulan overscroll dihapus total, `dampingRatio` →
 > `Spring.DampingRatioNoBouncy` (1.0, preset resmi) menggantikan custom
 > `OVERSCROLL_SETTLE_DAMPING_RATIO` 0.875 dari Batch 382 (dihapus), 1 file kode):** User laporan
 > hasil Batch 382: "ternyata gak nyambung sama sekali. hapus total karakter pantulan!!" — `0.875`
