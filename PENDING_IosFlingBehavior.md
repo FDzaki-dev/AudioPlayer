@@ -26,9 +26,11 @@ overscroll yang sudah dapat `LocalOverscrollFactory`).
 - [x] `ui/SmartPlaylistScreen.kt` — 2 scrollable **(selesai Batch 377)**
 - [x] `ui/SettingsScreen.kt` — 1 scrollable **(selesai Batch 377)**
 - [x] `ui/StatsDashboardScreen.kt` — 1 scrollable **(selesai Batch 377)**
-- [ ] `ui/VaultSheet.kt` — 1 scrollable
-- [ ] `ui/SongPickerSheet.kt` — 1 scrollable
-- [ ] `ui/FolderManagerSheet.kt` — 1 scrollable
+- [x] `ui/VaultSheet.kt` — 2 scrollable **(selesai Batch 378 — koreksi dari "1": dialog
+      `VaultAddPickerDialog` juga punya `LazyColumn` daftar kandidat lagu asli, bukan chip filter
+      pendek, jadi ikut dipasang)**
+- [x] `ui/SongPickerSheet.kt` — 1 scrollable **(selesai Batch 378)**
+- [x] `ui/FolderManagerSheet.kt` — 1 scrollable **(selesai Batch 378)**
 - [ ] `ui/DuplicateFinderSheet.kt` — 1 scrollable
 - [ ] `ui/ABRepeatBookmarkSheet.kt` — 1 scrollable
 - [ ] `ui/EqualizerSheet.kt` — 2 scrollable

@@ -1,5 +1,44 @@
 # Changelog
 
+## Batch 378 — PENDING_IosFlingBehavior.md: 9/14 layar (VaultSheet, SongPickerSheet, FolderManagerSheet), 3 file kode
+Tidak ada laporan bug baru dari user batch ini ("lanjutkan kerjakan pending task"). Batch 376 (race
+condition async `snapTo` vs guard synchronous) masih menunggu verifikasi device asli — belum ada
+laporan hasil baru yang membatalkan/mengubahnya. Sesuai Auto-Read Pending Queue, lanjut comot 3
+file kode berikutnya dari antrean `PENDING_IosFlingBehavior.md` (dibuka Batch 364, 6/14 di Batch
+377), urutan bebas sesuai catatan pending-nya sendiri.
+
+**3 file (persis pola reuse dari `LibraryScreen.kt` Batch 364, 0 perubahan di
+`IosScrollPhysics.kt` sendiri)**:
+1. `ui/VaultSheet.kt` — **2 scrollable, koreksi dari "1" yang tercatat di
+   `PENDING_IosFlingBehavior.md` sejak Batch 364**: `LazyColumn` daftar lagu vault
+   (`VaultContentSection`) + `LazyColumn` daftar kandidat lagu di dialog `VaultAddPickerDialog`.
+   Yang kedua ini awalnya kelihatan mirip kasus chip-filter Batch 377 (di dalam dialog), tapi
+   bedanya isinya daftar konten asli (bisa sepanjang jumlah lagu belum-di-vault), bukan beberapa
+   chip pilihan pendek — jadi ikut dipasang, bukan dilewati.
+2. `ui/SongPickerSheet.kt` — 1 `LazyColumn` utama (sheet generik "Tambah ke Favorit/Playlist"),
+   sudah ada `pointerInput`/`detectDragGesturesAfterLongPress` sweep-select di modifier yang sama —
+   `flingBehavior` disisipkan sebagai parameter terpisah, 0 perubahan ke gesture sweep-nya.
+3. `ui/FolderManagerSheet.kt` — 1 `LazyColumn` utama (kelola folder + lagu disembunyikan).
+
+Tiap lokasi: 1 baris import `rememberIosFlingBehavior` dari `ui.theme` + 1 parameter
+`flingBehavior = rememberIosFlingBehavior()`, komentar baris menunjuk balik ke nomor item di
+`PENDING_IosFlingBehavior.md`. Checklist pending diupdate (3 lagi dicentang, total 9/14 — hitungan
+`VaultSheet.kt` dikoreksi ke 2 scrollable), README.md ("Belum selesai" + fitur scroll ala iOS)
+disamakan jadi "10 dari 15 layar selesai, 5 sisa". Brace/paren balance dicek per file:
+`VaultSheet.kt` 101/101 & 215/215, `SongPickerSheet.kt` 48/48 & 134/134, `FolderManagerSheet.kt`
+42/42 & 106/106.
+
+**Belum ditest di device asli** — tidak ada env Android nyata di sesi ini, sama seperti batch-batch
+sebelumnya. **Prioritas cek user**: rasakan glide scroll di sheet Vault (kedua daftar — list utama
+& dialog Tambah), sheet Tambah ke Favorit/Playlist, dan sheet Kelola Perpustakaan — harus terasa
+sama seperti tab Lagu/Beranda/Antrean Putar/Playlist Otomatis/Pengaturan/Dashboard Statistik
+(meluncur lebih panjang & mulus, bukan berhenti mendadak ala Android default). Sisa 5 file
+(`DuplicateFinderSheet`, `ABRepeatBookmarkSheet`, `EqualizerSheet`, `LyricsSheet`, `LyricsView`)
+masih di `PENDING_IosFlingBehavior.md`, belum disentuh — lanjut batch berikutnya sampai habis/user
+bilang cukup. Catatan `LyricsView.kt` sudah ada di dokumen pending-nya sendiri: cek dulu apakah
+2 scrollable-nya pakai `animateScrollToItem` terprogram (auto-scroll lirik) sebelum pasang kurva
+fling manual di situ.
+
 ## Batch 377 — PENDING_IosFlingBehavior.md: 6/14 layar (SmartPlaylistScreen, SettingsScreen, StatsDashboardScreen), 3 file kode
 Tidak ada laporan bug baru dari user batch ini ("lanjutkan progress!!"). Batch 376 (race condition
 async `snapTo` vs guard synchronous) masih menunggu verifikasi device asli — belum ada laporan

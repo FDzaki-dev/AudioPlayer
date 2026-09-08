@@ -36,6 +36,23 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 378 (Lanjut antrean `PENDING_IosFlingBehavior.md`: 9/14 layar — `VaultSheet.kt`,
+`SongPickerSheet.kt`, `FolderManagerSheet.kt`, 3 file kode)** — Tidak ada laporan bug baru dari
+user ("lanjutkan kerjakan pending task"); Batch 376 masih menunggu verifikasi device asli. Sesuai
+Auto-Read Pending Queue, comot 3 file kode berikutnya dari antrean fling behavior (dibuka Batch
+364, 6/14 selesai Batch 377). Pola reuse persis `LibraryScreen.kt`: import
+`rememberIosFlingBehavior` dari `ui.theme` + parameter `flingBehavior = rememberIosFlingBehavior()`
+di tiap `LazyColumn` yang relevan — 0 perubahan di `IosScrollPhysics.kt` sendiri. `VaultSheet.kt`
+ternyata **2 scrollable, koreksi dari "1"** yang tercatat sejak Batch 364 — dialog
+`VaultAddPickerDialog`-nya punya `LazyColumn` daftar kandidat lagu asli (bukan chip filter pendek
+seperti kasus dialog builder `SmartPlaylistScreen.kt` Batch 377), jadi ikut dipasang. `SongPickerSheet.kt`
+& `FolderManagerSheet.kt` masing-masing 1 `LazyColumn` utama sesuai catatan pending. Checklist
+pending diupdate (total 9/14 tercentang), README.md disamakan ("10 dari 15 layar selesai, 5
+sisa"). Brace/paren balance dicek per file, semua seimbang. **Belum ditest di device asli** —
+tidak ada env Android nyata di sesi ini. Sisa 5 file: `DuplicateFinderSheet`,
+`ABRepeatBookmarkSheet`, `EqualizerSheet`, `LyricsSheet`, `LyricsView`. Detail lengkap
+CHANGELOG.md Batch 378.
+
 **Batch 377 (Lanjut antrean `PENDING_IosFlingBehavior.md`: 6/14 layar — `SmartPlaylistScreen.kt`,
 `SettingsScreen.kt`, `StatsDashboardScreen.kt`, 3 file kode)** — Tidak ada laporan bug baru dari
 user ("lanjutkan progress!!"); Batch 376 masih menunggu verifikasi device asli. Sesuai Auto-Read

@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
 /**
  * Sheet pilih-banyak-lagu generik. Lahir dari laporan user (screenshot tab Favorit & Playlist
@@ -211,7 +212,9 @@ fun SongPickerSheet(
                                 // (gesture dibatalkan ancestor sebelum keduanya sempat jalan).
                                 onDragCancel = { isSweeping = false; sweepAnchorIndex = null; sweepLastIndex = null; suppressClickForId = null }
                             )
-                        }
+                        },
+                    // Batch 378 — PENDING_IosFlingBehavior.md item 8/14.
+                    flingBehavior = rememberIosFlingBehavior()
                 ) {
                     itemsIndexed(filtered, key = { _, song -> song.id }) { index, song ->
                         DisposableEffect(index) {

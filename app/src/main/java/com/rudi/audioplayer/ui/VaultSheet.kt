@@ -25,6 +25,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.data.VaultStore
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import kotlinx.coroutines.delay
 
 /**
@@ -284,7 +285,11 @@ private fun VaultContentSection(
                 )
             }
         } else {
-            LazyColumn(modifier = Modifier.weight(1f)) {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                // Batch 378 — PENDING_IosFlingBehavior.md item 7/14 (daftar lagu vault).
+                flingBehavior = rememberIosFlingBehavior()
+            ) {
                 items(vaultedSongs, key = { it.id }) { song ->
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -358,7 +363,13 @@ private fun VaultAddPickerDialog(
                         color = MaterialTheme.colorScheme.secondary
                     )
                 } else {
-                    LazyColumn {
+                    LazyColumn(
+                        // Batch 378 — PENDING_IosFlingBehavior.md item 7/14 (daftar kandidat lagu
+                        // di dialog Tambah — bukan chip filter pendek, ini daftar konten asli
+                        // sepanjang jumlah lagu belum-di-vault, jadi ikut dipasang; koreksi
+                        // hitungan dokumen dari "1 scrollable" jadi 2 utk file ini).
+                        flingBehavior = rememberIosFlingBehavior()
+                    ) {
                         items(candidates, key = { it.id }) { song ->
                             Row(
                                 modifier = Modifier
