@@ -1,5 +1,47 @@
 # Changelog
 
+## Batch 384 — PENUTUPAN PROYEK: status DISCONTINUED, konsolidasi item belum-terverifikasi, 0 file kode + 4 dokumentasi
+User instruksi eksplisit: "fokus untuk beres-beres sebelum menutup project dan diberi label
+discontinued!!". Dua bagian dipisah jelas: (1) **"beres-beres"** — dibaca sebagai konsolidasi &
+kerapihan status akhir project, BUKAN instruksi kerja kode baru. Konsisten kebijakan zero-refactor
+project ini (tidak ada bug/fitur konkret yang diminta di sini, jadi tidak ada file `.kt`/build yang
+disentuh — 0 risiko regresi dari batch penutupan itu sendiri). (2) **"label discontinued"** —
+dibaca sebagai penanda status permanen & mudah ditemukan, bukan cuma kata "discontinued" polos:
+konsisten aturan project sejak Batch 155 ("dilarang laporan versi/status polos tanpa isi
+substantif"), jadi label ini disertai konsolidasi JUJUR semua item yang masih benar-benar terbuka
+saat penutupan (bukan "sudah beres semua" yang tidak akurat).
+
+**Isi konsolidasi** (detail penuh + alasan tiap poin ada di `PROJECT_STATE.md` §"Status penutupan
+(Batch 384)"):
+1. `MANUAL_QA_CHECKLIST.md` — 0/19 item pernah dicentang sejak dibuat Batch 103 (audio focus,
+   Bluetooth, lock-screen/notifikasi, headset kabel, process death, background playback jangka
+   panjang) — tidak ada sesi kerja proyek ini yang pernah punya akses device Android fisik.
+2. Overscroll bounce Batch 383 (`dampingRatio` → `Spring.DampingRatioNoBouncy`, pantulan
+   dihapus total) belum dikonfirmasi user di device asli — perubahan PALING BARU sebelum
+   penutupan, dan riwayat Batch 364-383 menunjukkan tuning sumbu ini historically sering butuh
+   koreksi lanjutan dari feedback device asli (9 iterasi: 368→369→370→371→373→374→381→382→383).
+3. `compileSdk`/`targetSdk` masih 34, belum ada audit eksplisit kompatibilitas Android 15/16 —
+   kondisi yang sudah diketahui sejak `MANUAL_QA_CHECKLIST.md` dibuat, tidak berubah saat ini.
+4. (Untuk kelengkapan, BUKAN item terbuka) `ROADMAP_LIQUID_GLASS_REDESIGN.md` sudah 100% tuntas
+   sejak Batch 363, dan `PENDING_IosFlingBehavior.md` sudah tuntas 14/14 layar sejak Batch 380 —
+   keduanya CLOSED, disebut di sini murni supaya sesi berikutnya tidak perlu cek ulang dari nol.
+
+**Perubahan dokumentasi**: `README.md` dapat banner "⛔ PROYEK DIHENTIKAN (DISCONTINUED)" di posisi
+paling atas (di atas tagline, sebelum blockquote "Update terbaru" yang sudah ada) berisi ringkasan
+3 poin pertama di atas. `PROJECT_STATE.md` dapat blockquote status serupa yang ditanam PERMANEN di
+dalam section "⚠️ ATURAN SESI AKTIF" (posisi yang sudah didesain sejak awal untuk tidak ikut
+tergeser batch baru) — isinya instruksi eksplisit ke sesi AI berikutnya: JANGAN eksekusi
+fitur/roadmap/fix baru secara proaktif kecuali user secara eksplisit membuka kembali proyek ini
+(bukan cuma upload ZIP lama tanpa instruksi kerja baru) — dan section "Status penutupan (Batch
+384)" baru berisi detail lengkap 4 poin di atas. `MANUAL_QA_CHECKLIST.md` ditambah 1 baris catatan
+penutupan di ATAS daftar 19 item (isi checklist & 0 centangnya sendiri TIDAK diubah/difabrikasi —
+kejujuran "belum pernah diuji" tetap dipertahankan apa adanya, sesuai prinsip dasar dokumen ini
+sejak awal dibuat: manual QA yang jujur, bukan checklist yang dipalsukan centangnya).
+
+**0 file kode disentuh** — brace/paren balance semua file `.kt` tidak berubah dari Batch 383
+(tidak ada yang diedit). Ini murni batch dokumentasi/administratif, konsisten instruksi user yang
+memang tidak meminta perubahan kode apa pun.
+
 ## Batch 383 — Karakter pantulan overscroll dihapus total, `dampingRatio` → `Spring.DampingRatioNoBouncy` (1.0, preset resmi), konstanta custom `OVERSCROLL_SETTLE_DAMPING_RATIO` (0.875, Batch 382) dihapus, 1 file kode
 User laporan HASIL Batch 382: "ternyata gak nyambung sama sekali. hapus total karakter pantulan!!"
 — dua hal eksplisit: (1) `0.875` (biseksi aritmetik `LowBouncy`/`NoBouncy`, Batch 382) ternyata

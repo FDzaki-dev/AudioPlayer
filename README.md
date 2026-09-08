@@ -1,5 +1,21 @@
 # SONIX
 
+> ## ⛔ PROYEK DIHENTIKAN (DISCONTINUED) — sejak Batch 384
+> Ditutup atas instruksi eksplisit user: *"fokus untuk beres-beres sebelum menutup project dan
+> diberi label discontinued!!"*. **Tidak ada lagi update/fitur/bugfix baru yang direncanakan** —
+> kode & APK di state terakhir (Batch 383) tetap bisa diunduh & dipakai apa adanya. Kalau user
+> membuka kembali proyek ini nanti, label ini yang dihapus/diganti duluan.
+>
+> **Item yang JUJUR belum sempat diverifikasi di device fisik saat penutupan** (bukan diasumsikan
+> beres — daftar lengkap & konteks di `PROJECT_STATE.md` § "Status penutupan (Batch 384)"):
+> - Seluruh **19 item** `MANUAL_QA_CHECKLIST.md` (audio focus, Bluetooth, kontrol lock-screen,
+>   headset kabel, process death, background playback) — **0/19 pernah dicentang**, karena tidak
+>   ada satu pun sesi kerja proyek ini yang punya akses ke device Android fisik.
+> - Perilaku overscroll bounce terbaru (Batch 383 — pantulan dihapus total,
+>   `Spring.DampingRatioNoBouncy`) belum dikonfirmasi user di device asli.
+> - `compileSdk`/`targetSdk` masih terkunci di **34** — belum ada audit eksplisit kompatibilitas
+>   Android 15/16.
+
 Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer. 100% offline, tanpa izin
 INTERNET sama sekali.
 

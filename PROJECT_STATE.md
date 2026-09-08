@@ -7,6 +7,16 @@ kejadian, bukan pengganti keduanya. **Sejak Batch 158**, file ini cuma menyimpan
 paling baru (Batch 58 ke atas) — detail Batch 1-57 ada di `PROJECT_STATE_ARCHIVE.md`.
 
 ## ⚠️ ATURAN SESI AKTIF — WAJIB DIBACA (posisi tetap, tidak ikut tergeser batch baru)
+> ## ⛔ STATUS PROYEK: DISCONTINUED (sejak Batch 384)
+> User eksplisit: *"fokus untuk beres-beres sebelum menutup project dan diberi label
+> discontinued!!"*. **Sesi berikutnya: JANGAN eksekusi fitur/roadmap/fix baru apa pun secara
+> proaktif** (termasuk apa pun sisa di `ROADMAP_LIQUID_GLASS_REDESIGN.md`, meski dokumen itu
+> sendiri sudah 0 item terbuka) — proyek ini sengaja tidak lagi dikembangkan. Kalau user kirim
+> instruksi baru yang jelas-jelas minta lanjut kerja (bukan cuma upload ZIP lama), itu artinya
+> user membuka kembali proyek secara eksplisit — baru boleh lanjut seperti biasa, dan hapus/ganti
+> banner "DISCONTINUED" ini (README.md + section ini) di batch itu juga. Detail penutupan &
+> daftar item belum-terverifikasi ada di § "Status penutupan (Batch 384)" di bawah.
+
 Detail lengkap ada di § "Aturan sesi: transparansi versi & pesan commit" di BAWAH file ini
 (sengaja diringkas ulang di sini juga, supaya tidak tenggelam kalau sesi cuma sempat baca bagian
 atas file yang terus memanjang):
@@ -35,7 +45,55 @@ atas file yang terus memanjang):
    (rename/hapus folder lama kapital) sudah diarahkan ke user Batch 266. Semua skrip Termux
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
+## Status penutupan (Batch 384)
+Proyek resmi **discontinued** — lihat banner di atas & `README.md`. Ini konsolidasi JUJUR semua
+item yang masih belum terverifikasi/terselesaikan saat penutupan (bukan diasumsikan beres cuma
+krn tidak ada laporan bug baru — beda hal). Kalau proyek ini dibuka lagi nanti, ini titik mulai
+audit yang paling efisien:
+
+1. **`MANUAL_QA_CHECKLIST.md` — 0/19 item pernah dicentang.** Dibuat Batch 103, isinya perilaku
+   yang butuh device fisik + interaksi sistem nyata (audio focus/panggilan telepon, Bluetooth
+   connect-disconnect, kontrol lock-screen/notifikasi, tombol headset kabel, process death &
+   low-memory kill, background playback jangka panjang) — TIDAK PERNAH ada 1 sesi kerja pun di
+   proyek ini yang punya akses ke device Android fisik utk mencentangnya. Ini bukan regresi baru
+   Batch 384 — ini kondisi yang sudah berlangsung sejak file itu dibuat, baru sekarang
+   dikonsolidasi eksplisit sebagai bagian "beres-beres" penutupan.
+2. **Overscroll bounce (Batch 383) belum dikonfirmasi di device asli** — perubahan PALING BARU
+   sebelum penutupan (`dampingRatio` → `Spring.DampingRatioNoBouncy`, pantulan dihapus total).
+   Riwayat Batch 364-383 di `IosScrollPhysics.kt` menunjukkan pola tuning ini SERING butuh
+   koreksi lanjutan dari feedback device asli (368→369→370→371→373→374→381→382→383) — tidak ada
+   alasan kuat mengasumsikan iterasi ke-9 ini otomatis final tanpa device asli, cuma karena ini
+   yang terakhir sebelum ditutup.
+3. **`compileSdk`/`targetSdk` masih 34** (`app/build.gradle.kts`) — belum ada audit eksplisit
+   kompatibilitas Android 15/16 (predictive back, foreground service type enforcement,
+   notifikasi, dll berpotensi berubah perilaku). Item ini sudah diketahui & didokumentasikan
+   sejak `MANUAL_QA_CHECKLIST.md` dibuat, sengaja tidak dieksekusi (butuh sesi/batch khusus,
+   § dokumen itu sendiri) — masih di posisi yang sama saat penutupan.
+4. **`ROADMAP_LIQUID_GLASS_REDESIGN.md` & `PENDING_IosFlingBehavior.md`** — TIDAK termasuk item
+   terbuka. Roadmap dikonfirmasi 100% tuntas (0 item terbuka) Batch 363; pending fling behavior
+   tuntas 14/14 layar Batch 380. Disebut di sini cuma supaya sesi berikutnya tidak perlu
+   mengecek ulang dari nol — status keduanya sudah final CLOSED, bukan bagian penutupan Batch 384.
+
+Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupan, sesuai
+instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
+
 ## Batch terakhir yang selesai
+**Batch 384 (PENUTUPAN PROYEK — status DISCONTINUED, 0 file kode, 4 dokumentasi:
+`README.md`/`PROJECT_STATE.md`/`CHANGELOG.md`/`MANUAL_QA_CHECKLIST.md`)** — User instruksi
+eksplisit: "fokus untuk beres-beres sebelum menutup project dan diberi label discontinued!!".
+Dibaca sebagai 2 bagian: (1) "beres-beres" = konsolidasi status akhir, BUKAN kerjaan kode baru
+(zero-refactor tetap berlaku — tidak ada bug/fitur yang diminta, jadi tidak ada kode yang
+disentuh); (2) "label discontinued" = penanda status permanen & terlihat, ditaruh di 2 tempat
+paling sering dibaca: banner paling atas `README.md` (publik) & bagian "ATURAN SESI AKTIF"
+`PROJECT_STATE.md` (sesi AI berikutnya). Isi label mengonsolidasi SEMUA item belum-terverifikasi
+yang masih nyata terbuka saat ini (lihat § "Status penutupan (Batch 384)" di atas) — bukan cuma
+tulisan "selesai" generik, konsisten kebijakan proyek dari awal (Batch 155: dilarang laporan
+versi/status polos tanpa isi substantif). `MANUAL_QA_CHECKLIST.md` ditambah 1 baris catatan
+penutupan di atas daftar (0 centang diubah — TIDAK ada yang difabrikasi sebagai "sudah diuji").
+Brace/paren `IosScrollPhysics.kt` maupun file kode lain tidak disentuh sama sekali batch ini (0
+perubahan kode = 0 risiko sintaks). **Belum ditest di device asli** tidak relevan batch ini (0
+kode). Detail lengkap CHANGELOG.md Batch 384.
+
 **Batch 383 (Karakter pantulan overscroll dihapus total — `dampingRatio` → `Spring.DampingRatioNoBouncy`
 (1.0, preset resmi), konstanta custom `OVERSCROLL_SETTLE_DAMPING_RATIO` 0.875 dari Batch 382 dihapus,
 `IosScrollPhysics.kt`, 1 file kode)** — User laporan hasil Batch 382: "ternyata gak nyambung sama
