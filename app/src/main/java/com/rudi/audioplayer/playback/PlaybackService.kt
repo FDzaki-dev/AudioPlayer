@@ -191,7 +191,7 @@ class PlaybackService : MediaLibraryService() {
                 // sudah menekan jeda.
                 crossfadeEngine?.onSessionPlayWhenReadyChanged(isPlaying)
                 if (isPlaying && ShakeSettingsStore(this@PlaybackService).isEnabled()) {
-                    shakeDetector?.start()
+                    ensureShakeDetector().start()
                 } else {
                     shakeDetector?.stop()
                 }
@@ -226,7 +226,9 @@ class PlaybackService : MediaLibraryService() {
             }
         }
 
-        shakeDetector = ShakeDetector(this) { mediaSession?.player?.seekToNextMediaItem() }
+        // Batch 391 — shakeDetector TIDAK lagi dibangun unconditional di sini. Lihat
+        // ensureShakeDetector() di bawah utk root cause + kenapa ini kelas bug yang sama dgn
+        // WorkManager (Batch 387) / overlapPlayer (Batch 389).
 
         val sessionActivityIntent = PendingIntent.getActivity(
             this,
@@ -279,6 +281,33 @@ class PlaybackService : MediaLibraryService() {
         return CrossfadeEngine(sessionPlayer = sessionPlayer, overlapPlayer = overlapPlayer, scope = serviceScope)
             .also { crossfadeEngine = it }
     }
+
+    /** Batch 391 — sektor cold-start berikutnya yang belum tersentuh Batch 385-390: sebelum
+     * batch ini, `shakeDetector` dibangun UNCONDITIONAL di `onCreate()` (baris di atas, sekarang
+     * dihapus) tiap kali Service dibuat, apa pun nilai [ShakeSettingsStore.isEnabled] — padahal
+     * shake-to-skip default OFF (opt-in, lihat ShakeSettingsStore.kt).
+     *
+     * **Root cause**: konstruktor `ShakeDetector` (lihat ShakeDetector.kt) memanggil
+     * `context.getSystemService(Context.SENSOR_SERVICE)` lalu `getDefaultSensor(TYPE_ACCELEROMETER)`.
+     * Panggilan PERTAMA ke SENSOR_SERVICE dalam 1 proses memaksa `SystemSensorManager` melakukan
+     * enumerasi SEMUA sensor device lewat HAL/JNI (bukan cuma akselerometer) — kerja nyata,
+     * sekali per proses, yang sebelum batch ini SELALU terjadi tiap cold start apa pun
+     * pengaturan user, di jalur `onCreate()` Service yang sama-sama kritis dengan yang disentuh
+     * Batch 387/389. Kelas bug sama persis: resource yang butuh kerja HAL/IPC dibangun di jalur
+     * startup yang provably tidak dibutuhkan buat mayoritas user (default OFF).
+     *
+     * **Fix**: dipindah ke sini, dipanggil LAZY hanya dari titik `ensureShakeDetector().start()`
+     * di listener `onIsPlayingChanged` (kondisi `isPlaying && isEnabled()` — sama persis kondisi
+     * yang sebelum batch ini menentukan apakah `.start()` benar-benar melakukan sesuatu).
+     * `shakeDetector?.stop()` di baris `else` & `onDestroy()` TIDAK diubah — `?.` sudah aman kalau
+     * belum pernah dibangun (no-op, bukan crash), user yang shake-nya OFF permanen sekarang 0
+     * biaya SENSOR_SERVICE sama sekali sepanjang hidup Service. **Zero behavior change**: begitu
+     * genuinely dibutuhkan (isPlaying+enabled pertama kali), instance dibangun sekali lalu dipakai
+     * ulang sepanjang hidup Service — identik siklus hidup `shakeDetector` sebelum batch ini,
+     * cuma titik pembuatannya yang mundur, pola sama persis `ensureCrossfadeEngine()` di atas. */
+    private fun ensureShakeDetector(): ShakeDetector =
+        shakeDetector ?: ShakeDetector(this) { mediaSession?.player?.seekToNextMediaItem() }
+            .also { shakeDetector = it }
 
     /** Gap List #7 (Batch 109) — dipanggil dari `onCustomCommand` (ViewModel set sleep timer
      * baru) DAN dari `resumeSleepTimerFromStore` (restore setelah proses/Service dibuat ulang).

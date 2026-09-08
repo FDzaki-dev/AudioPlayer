@@ -24,8 +24,27 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 390 (verifikasi integritas + repack, `FILE_MANIFEST.txt`
-> dikoreksi, 0 file kode):** User: "repack lalu lampirkan skrip termux nya!!" — tanpa laporan bug/
+> 🆕 **Update terbaru — Batch 391 (optimasi cold-start: ShakeDetector lazy init,
+> `PlaybackService.kt`, 1 file):** User: "lanjut tahap optimize disektor yang belum ke sentuh!!"
+> (lanjutan sesi optimasi Batch 385→386→387→388→389→391; Batch 390 di antaranya cuma repack
+> verifikasi). `onCreate()` ditelusuri ulang baris-per-baris sebelum menulis kode — root cause:
+> `shakeDetector` dibangun UNCONDITIONAL tiap cold start apa pun nilai
+> `ShakeSettingsStore.isEnabled()` (default OFF, opt-in). Konstruktornya memanggil
+> `getSystemService(SENSOR_SERVICE)` + `getDefaultSensor(TYPE_ACCELEROMETER)` — panggilan PERTAMA
+> ke SENSOR_SERVICE dalam 1 proses memaksa enumerasi SEMUA sensor device lewat HAL/JNI, kerja
+> nyata yang sebelum batch ini selalu terjadi apa pun pengaturan user. Kelas bug sama persis dgn
+> WorkManager (Batch 387)/overlapPlayer (Batch 389). Fix: dipindah ke `ensureShakeDetector()` —
+> early-return kalau sudah dibangun (pola sama `ensureCrossfadeEngine()`), dipanggil LAZY dari
+> `onIsPlayingChanged` pada kondisi `isPlaying && isEnabled()` — kondisi yang sama persis yang
+> sebelum batch ini menentukan apakah shake benar-benar aktif. **Zero behavior change** — cuma
+> titik pembuatan objek yang mundur. `EqualizerController`/`AudioVisualizerController`/
+> `SongArtBitmapLoader` turut diperiksa sbg kandidat serupa: sudah lazy by design, tidak diubah.
+> **Belum ditest di device asli** (sama seperti Batch 385-389). Sisa kandidat (Compose
+> first-composition, baseline profile/R8) TIDAK berubah dari kesimpulan Batch 388 — masih butuh
+> data pengukuran device asli. **Status DISCONTINUED tetap permanen tidak diubah.** Detail lengkap
+> CHANGELOG.md Batch 391.
+> Batch 390 (verifikasi integritas + repack, `FILE_MANIFEST.txt`
+> dikoreksi, 0 file kode): User: "repack lalu lampirkan skrip termux nya!!" — tanpa laporan bug/
 > instruksi kerja baru, diperlakukan sama seperti Batch 320 (repack verifikasi murni, netral
 > terhadap status DISCONTINUED). Full-sweep (bukan spot-check): `diff` `FILE_MANIFEST.txt` vs isi
 > ZIP menemukan 1 drift nyata — `ui/theme/IosScrollPhysics.kt` (dibuat Batch 364) ternyata tidak

@@ -91,6 +91,41 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 391 (Optimasi cold-start — ShakeDetector lazy init, `PlaybackService.kt`, 1 file kode)**
+— User instruksi: "lanjut tahap optimize disektor yang belum ke sentuh!!" (lanjutan sesi
+optimasi yang sama, Batch 385→386→387→388→389→391; Batch 390 di antaranya cuma repack
+verifikasi, 0 kerja optimasi). **Status DISCONTINUED tetap permanen tidak diubah** (per
+klarifikasi Batch 387 — kategori "optimasi murni").
+
+Ditelusuri ulang `onCreate()` baris-per-baris sebelum menulis kode (bukan diasumsikan habis
+total cuma krn Batch 389 sudah menemukan overlapPlayer) — `EqualizerController`/
+`AudioVisualizerController` (`PlayerViewModel.kt`) dan `SongArtBitmapLoader`
+(`PlaybackService.kt`) turut diperiksa sebagai kandidat serupa: ketiganya SUDAH lazy by design,
+TIDAK diubah.
+
+**Root cause**: `shakeDetector` dibangun UNCONDITIONAL di `onCreate()` apa pun nilai
+`ShakeSettingsStore.isEnabled()` (default OFF, opt-in). Konstruktornya memanggil
+`getSystemService(SENSOR_SERVICE)` + `getDefaultSensor(TYPE_ACCELEROMETER)` — panggilan PERTAMA
+ke SENSOR_SERVICE dalam 1 proses memaksa `SystemSensorManager` enumerasi SEMUA sensor device
+lewat HAL/JNI, kerja nyata yang sebelum batch ini selalu terjadi tiap cold start apa pun
+pengaturan user. Kelas bug sama persis dengan WorkManager (Batch 387)/overlapPlayer (Batch 389).
+
+**Fix**: dipindah ke `ensureShakeDetector()` (early-return kalau sudah dibangun, pola sama
+`ensureCrossfadeEngine()` Batch 389), dipanggil LAZY dari `onIsPlayingChanged` pada kondisi
+`isPlaying && isEnabled()` — kondisi yang sama persis yang sebelum batch ini menentukan apakah
+`.start()` benar-benar melakukan sesuatu. `shakeDetector?.stop()` (else branch + `onDestroy()`)
+tidak diubah, `?.` aman kalau belum pernah dibangun. **Zero behavior change** utk user yang
+shake-nya OFF sepanjang sesi (mayoritas) maupun yang sudah ON dari sebelumnya — cuma titik
+pembuatan yang mundur beberapa langkah, masih di jalur cold-start yang sama.
+
+**1 file kode disentuh** (`PlaybackService.kt`, 841 baris). Brace/paren/bracket balance
+seimbang (270/270 `()`, 88/88 `{}`, 1/1 `[]`). Diff-checked terhadap ZIP Batch 390: cuma 1 file
+berubah. **Belum ditest di device asli** — sama seperti Batch 385-389, murni pembacaan kode
+tanpa akses device fisik. **Sisa kandidat TIDAK berubah dari kesimpulan Batch 388**: cost riil
+Compose first-composition & baseline profile/R8 minification masih butuh data pengukuran device
+asli (Macrobenchmark/systrace) sebelum sesi mana pun lanjut batch cold-start berikutnya, bukan
+ditebak lagi dari kode statis. Detail lengkap CHANGELOG.md Batch 391.
+
 **Batch 390 (Verifikasi integritas + repack — user minta "repack lalu lampirkan skrip termux
 nya!!" TANPA laporan bug/instruksi kerja baru, 0 file kode, 1 file tracking dikoreksi)** — Sesuai
 pola Batch 320 (verifikasi integritas murni, bukan kerja fitur/fix): permintaan user cuma

@@ -1,5 +1,75 @@
 # Changelog
 
+## Batch 391 — Optimasi cold-start: ShakeDetector lazy init, `PlaybackService.kt`, 1 file
+User instruksi: "lanjut tahap optimize disektor yang belum ke sentuh!!" (lanjutan sesi optimasi
+yang sama, Batch 385→386→387→388→389→391; Batch 390 di antaranya cuma repack verifikasi, 0
+kerja optimasi). **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387
+— instruksi ini murni kategori "optimasi murni", bukan reopening).
+
+Batch 388 menyimpulkan kelas bug "kerja sinkron/eager yang provably tidak dibutuhkan sedini itu"
+sudah habis di layar `Application`/`MainActivity`, dan Batch 389 sudah menuntaskan kandidat
+paling jelas di "setup ExoPlayer/MediaSession `PlaybackService`" (overlapPlayer). Sebelum menulis
+kode apa pun, `onCreate()` PlaybackService ditelusuri ulang baris-per-baris (bukan diasumsikan
+habis total cuma karena 1 kandidat besar sudah ketemu) — juga `EqualizerController`/
+`AudioVisualizerController` (`PlayerViewModel.kt`, konstruksi property initializer) dan
+`SongArtBitmapLoader` (`PlaybackService.kt`) diperiksa sebagai kandidat serupa: ketiganya SUDAH
+lazy by design (konstruktor cuma pegang `Context`/`StateFlow` kosong, kerja nyata baru terjadi di
+method terpisah yang dipanggil belakangan — `attach()`/`decodeBitmap()`/`loadBitmap()`), TIDAK
+ada yang perlu diubah.
+
+**Root cause**: `shakeDetector = ShakeDetector(this) { ... }` dibangun UNCONDITIONAL di
+`onCreate()`, tiap kali Service dibuat, apa pun nilai `ShakeSettingsStore.isEnabled()` — shake-
+to-skip default OFF (opt-in, lihat komentar kelasnya sendiri: "Off by default — a physical-motion
+gesture should be something the user deliberately opts into"). Konstruktor `ShakeDetector`
+memanggil `context.getSystemService(Context.SENSOR_SERVICE)` lalu
+`getDefaultSensor(Sensor.TYPE_ACCELEROMETER)`. Panggilan PERTAMA ke `SENSOR_SERVICE` dalam 1
+proses memaksa `SystemSensorManager` melakukan enumerasi SEMUA sensor device lewat HAL/JNI (bukan
+cuma akselerometer) — kerja nyata sekali per proses, yang sebelum batch ini SELALU terjadi tiap
+cold start apa pun pengaturan user, tepat di `onCreate()` Service yang sama-sama kritis dengan
+titik yang disentuh Batch 387/389. Kelas bug PERSIS sama: resource yang butuh kerja HAL/IPC
+dibangun di jalur startup yang provably tidak dibutuhkan buat mayoritas user (default OFF).
+
+**Fix**: `shakeDetector` dipindah ke method baru `ensureShakeDetector()` — early-return kalau
+sudah pernah dibangun sesi ini (`shakeDetector ?: ShakeDetector(...).also { shakeDetector = it }`
+— pola sama persis `ensureCrossfadeEngine()` Batch 389), dipanggil LAZY hanya dari titik
+`ensureShakeDetector().start()` di listener `onIsPlayingChanged`, pada kondisi
+`isPlaying && ShakeSettingsStore(this).isEnabled()` — kondisi yang SAMA PERSIS yang sebelum batch
+ini menentukan apakah `.start()` benar-benar melakukan sesuatu (kalau kondisi ini `false`,
+`shakeDetector` sebelumnya juga tidak pernah benar-benar aktif, cuma objeknya sudah terlanjur
+dibangun percuma). `shakeDetector?.stop()` di baris `else` listener yang sama dan di `onDestroy()`
+TIDAK diubah — `?.` sudah aman kalau `shakeDetector` belum pernah dibangun sama sekali (no-op,
+bukan crash).
+
+**Zero behavior change**: begitu genuinely dibutuhkan (`isPlaying && enabled` pertama kali),
+instance dibangun sekali lalu dipakai ulang sepanjang hidup Service — identik siklus hidup
+`shakeDetector` sebelum batch ini, cuma titik pembuatannya yang mundur. User yang shake-nya OFF
+sepanjang sesi (mayoritas, default OFF) sekarang 0 biaya `SENSOR_SERVICE`/enumerasi sensor sama
+sekali; user yang shake-nya sudah ON dari sebelumnya akan membangun `ShakeDetector` di kesempatan
+`isPlaying` pertama alih-alih di `onCreate()` — beda titik waktu (masih di jalur cold-start yang
+sama, cuma beberapa langkah lebih lambat, bukan ditunda sampai user benar-benar berinteraksi),
+hasil akhir yang terlihat/terasa user identik di kedua kasus.
+
+**1 file kode disentuh** (`PlaybackService.kt`) — `ShakeDetector.kt`/`ShakeSettingsStore.kt`
+TIDAK disentuh sama sekali, konsisten batas max-3-file/task. Brace/paren/bracket balance dicek
+(strip comment/string dulu, python3, seluruh file 841 baris — naik dari 812 krn dokumentasi baru):
+270/270 `()`, 88/88 `{}`, 1/1 `[]` — seimbang. Diff-checked terhadap ZIP Batch 390: cuma
+`PlaybackService.kt` yang berubah, tidak ada file lain kesenggol.
+
+**Belum ditest di device asli** — sama seperti Batch 385-389: pure code-reading tanpa akses
+device fisik (§ "Status penutupan (Batch 384)" poin 1 di PROJECT_STATE.md masih berlaku); win
+riilnya (sensor enumeration HAL/JNI skipped) baru bisa dikonfirmasi lewat pengukuran nyata
+(Macrobenchmark/systrace), bukan diasumsikan dari kode saja — sama catatan jujur yang sudah
+berulang di Batch 385-389. Tidak ada `kotlinc`/Android SDK/network di environment kerja sesi ini.
+
+**Sisa kandidat setelah batch ini** — sama seperti kesimpulan Batch 388, TIDAK berubah: cost riil
+Compose first-composition, baseline profile/R8 minification, dan bagian `PlaybackService`
+lain yang masih tersisa (mis. `MediaLibrarySession.Builder(...).build()` sendiri, `SongArtBitmapLoader`
+— sudah diverifikasi lazy by design batch ini) semuanya butuh data pengukuran device asli
+(Macrobenchmark/systrace) untuk tahu mana yang benar-benar dominan, atau risiko regresi yang jauh
+lebih tinggi dari kelas bug "resource opt-in dibangun unconditional" yang sudah ditemukan di
+Batch 387/389/391 — rekomendasi Batch 388 (`adb shell am start -W` / Macrobenchmark di device
+fisik sebelum lanjut batch cold-start berikutnya) masih berlaku sepenuhnya.
+
 ## Batch 390 — Verifikasi integritas + repack, `FILE_MANIFEST.txt` dikoreksi, 0 file kode
 User: "repack lalu lampirkan skrip termux nya!!" — tanpa laporan bug, tanpa kata kerja lanjutan
 ("lanjut"/"next"). Diperlakukan sama seperti Batch 320: repack verifikasi murni, netral terhadap
