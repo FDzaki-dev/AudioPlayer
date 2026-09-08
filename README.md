@@ -24,7 +24,23 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 391 (optimasi cold-start: ShakeDetector lazy init,
+> 🆕 **Update terbaru — Batch 392 (optimasi Compose: `identityRootBrush` remember(),
+> `MainActivity.kt`, 1 file):** User: "next: optimize sektor compose!!" — pindah dari sektor
+> cold-start (385-391) ke Compose, salah satu kandidat sisa Batch 388. Root cause: root Surface
+> `MainActivity` membangun `identityRootBrush` (`Brush.linearGradient`, dipakai identitas
+> Tactile/Skeu) LANGSUNG di badan composable besar TANPA `remember` — badan yang sama membaca
+> banyak state lain (termasuk `librarySongsForShortcut`, seluruh daftar lagu, 0 hubungan dgn
+> tema), jadi state APA PUN yang berubah di scope itu memaksa brush dibangun ulang dari nol
+> walau `appThemeIdentity`/`isDarkTheme` tidak berubah. Fix: dibungkus
+> `remember(appThemeIdentity, isDarkTheme)` — 2 key ini satu-satunya input nyata. **Zero behavior
+> change**, cuma frekuensi rebuild berkurang. 2 kandidat lain diperiksa & SENGAJA TIDAK disentuh:
+> `AlbumArt`'s `SubcomposeAsyncImage` (butuh `Painter`, tidak bisa drop-in tanpa risiko regresi
+> visual di 6 titik pakai) dan stabilitas `List<Song>` app-wide (butuh ubah signature lintas
+> banyak file, melampaui batas 3-file/task — kandidat inisiatif multi-batch masa depan). Beda dari
+> fix cold-start sebelumnya, temuan ini TIDAK butuh Macrobenchmark utk membuktikan validitas
+> strukturalnya (fakta kode, bukan soal device) — tapi besar dampak nyata tetap butuh pengukuran.
+> **Status DISCONTINUED tetap permanen tidak diubah.** Detail lengkap CHANGELOG.md Batch 392.
+> Batch 391 (optimasi cold-start: ShakeDetector lazy init,
 > `PlaybackService.kt`, 1 file):** User: "lanjut tahap optimize disektor yang belum ke sentuh!!"
 > (lanjutan sesi optimasi Batch 385→386→387→388→389→391; Batch 390 di antaranya cuma repack
 > verifikasi). `onCreate()` ditelusuri ulang baris-per-baris sebelum menulis kode — root cause:

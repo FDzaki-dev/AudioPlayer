@@ -329,52 +329,73 @@ class MainActivity : FragmentActivity() {
                 // logam disikat ("brushed metal streak"), lalu turun lagi ke SkeuSurfaceVariant.
                 // Warnanya pun sudah bukan lagi turunan SkeuAccent tembaga (dihapus total) — murni
                 // TitaniumDark/SilverHighlight, keluarga token baru khusus utk efek metalik ini.
-                val identityRootBrush = when (appThemeIdentity) {
-                    ThemeIdentity.TACTILE -> Brush.linearGradient(
-                        colors = if (isDarkTheme)
-                            listOf(
-                                MaterialTheme.colorScheme.background,
-                                MidnightBlue.copy(alpha = MidnightBlueAmbientAlpha),
-                                AmoledSurface
-                            )
-                        else
-                            listOf(
-                                MaterialTheme.colorScheme.background,
-                                MidnightBlue.copy(alpha = MidnightBlueLightAmbientAlpha),
-                                TactileLightSurfaceVariant
-                            )
-                    )
-                    ThemeIdentity.SKEU_DARK_LITE -> {
-                        val streakAlpha = if (isDarkTheme) SkeuAmbientAlphaDark else SkeuAmbientAlphaLight
-                        val streakEnd = if (isDarkTheme) SkeuDarkSurfaceVariant else SkeuLightSurfaceVariant
-                        // Batch 80 — fix: Batch 79's emerald stop used `streakAlpha * 0.9f`, tapi
-                        // streakAlpha itself sudah sangat kecil (0.05f gelap / 0.12f terang) —
-                        // hasil akhirnya cuma alpha ~0.045/0.108, praktis tak kelihatan (user:
-                        // "yang kelihatan cuman Titanium dominan, mana zamrudnya??"). Beda dgn
-                        // SilverHighlight yg walau alpha kecil tetap kebaca krn warnanya nyaris
-                        // putih (kontras tinggi thd background gelap/terang), warna emerald yg
-                        // medium-saturation butuh alpha jauh lebih tinggi buat kebaca sama sekali.
-                        // Sekarang pakai alpha TETAP (tidak lagi diturunkan dari streakAlpha),
-                        // sengaja masih di bawah level accent-glow biasa (~0.42-0.45f di tempat
-                        // lain di app ini) supaya tetap terbaca "sentuhan", bukan aksen utama —
-                        // tapi genuinely visible, bukan cuma teknis-ada-di-kode.
-                        val emerald = if (isDarkTheme) SkeuEmerald else SkeuLightEmerald
-                        val emeraldStreakAlpha = if (isDarkTheme) 0.30f else 0.36f
-                        Brush.linearGradient(
-                            *arrayOf(
-                                0.00f to MaterialTheme.colorScheme.background,
-                                0.55f to TitaniumDark.copy(alpha = streakAlpha),
-                                // Titik kilau sempit (0.60-0.68) ditumpuk tepat setelah TitaniumDark
-                                // — rentang fraction yang sengaja disempitkan (bukan disebar rata
-                                // seperti resep 3-stop Tactile) supaya terbaca sebagai satu garis
-                                // pantulan cahaya di logam, bukan gradasi warna yang mulus.
-                                0.62f to SilverHighlight.copy(alpha = streakAlpha * 1.8f),
-                                0.68f to TitaniumDark.copy(alpha = streakAlpha),
-                                0.76f to emerald.copy(alpha = emeraldStreakAlpha),
-                                1.00f to streakEnd
-                            )
-                        )                    }
-                    else -> null
+                // Batch 392 — sektor Compose, kandidat pertama yang provably aman dibuktikan
+                // MURNI dari pembacaan kode (bukan cost pengukuran real-device seperti yang
+                // ditunda Batch 388/391): `identityRootBrush` SEBELUM batch ini dibangun ulang
+                // dari nol tiap kali scope composable ini recompose — apa pun state yang
+                // berubah. Scope ini membaca banyak state langsung di badan yang SAMA
+                // (appThemeIdentity/appThemeMode/librarySongsForShortcut/lockEnabled/
+                // biometricEnabled, dst — lihat baris-baris di atas), dan karena semuanya 1
+                // fungsi composable besar yang sama (bukan dipecah jadi child @Composable
+                // terpisah), Compose tidak bisa skip sebagian body-nya saja — SATU state
+                // berubah (mis. `librarySongsForShortcut` tiap kali daftar lagu di-rescan,
+                // TIDAK ADA hubungannya dgn tema) memicu SELURUH body ini re-run, termasuk blok
+                // `when` ini membangun ulang `Brush.linearGradient(...)` (utk Skeu: 6 color
+                // stop, tiap stop punya `Color.copy(alpha=...)` + 1 array alokasi) — padahal
+                // input SEBENARNYA brush ini (`appThemeIdentity`, `isDarkTheme`) genuinely tidak
+                // berubah. Fix: `remember(appThemeIdentity, isDarkTheme)` — cache dibangun ulang
+                // HANYA kalau salah satu dari 2 key ini benar-benar berubah, persis prinsip
+                // "remember pada komputasi Composable berat" (bukan fitur/tampilan baru — hasil
+                // akhir yang dirender identik, cuma dihitung ulang lebih jarang). Detail lengkap
+                // CHANGELOG.md Batch 392.
+                val identityRootBrush = remember(appThemeIdentity, isDarkTheme) {
+                    when (appThemeIdentity) {
+                        ThemeIdentity.TACTILE -> Brush.linearGradient(
+                            colors = if (isDarkTheme)
+                                listOf(
+                                    MaterialTheme.colorScheme.background,
+                                    MidnightBlue.copy(alpha = MidnightBlueAmbientAlpha),
+                                    AmoledSurface
+                                )
+                            else
+                                listOf(
+                                    MaterialTheme.colorScheme.background,
+                                    MidnightBlue.copy(alpha = MidnightBlueLightAmbientAlpha),
+                                    TactileLightSurfaceVariant
+                                )
+                        )
+                        ThemeIdentity.SKEU_DARK_LITE -> {
+                            val streakAlpha = if (isDarkTheme) SkeuAmbientAlphaDark else SkeuAmbientAlphaLight
+                            val streakEnd = if (isDarkTheme) SkeuDarkSurfaceVariant else SkeuLightSurfaceVariant
+                            // Batch 80 — fix: Batch 79's emerald stop used `streakAlpha * 0.9f`, tapi
+                            // streakAlpha itself sudah sangat kecil (0.05f gelap / 0.12f terang) —
+                            // hasil akhirnya cuma alpha ~0.045/0.108, praktis tak kelihatan (user:
+                            // "yang kelihatan cuman Titanium dominan, mana zamrudnya??"). Beda dgn
+                            // SilverHighlight yg walau alpha kecil tetap kebaca krn warnanya nyaris
+                            // putih (kontras tinggi thd background gelap/terang), warna emerald yg
+                            // medium-saturation butuh alpha jauh lebih tinggi buat kebaca sama sekali.
+                            // Sekarang pakai alpha TETAP (tidak lagi diturunkan dari streakAlpha),
+                            // sengaja masih di bawah level accent-glow biasa (~0.42-0.45f di tempat
+                            // lain di app ini) supaya tetap terbaca "sentuhan", bukan aksen utama —
+                            // tapi genuinely visible, bukan cuma teknis-ada-di-kode.
+                            val emerald = if (isDarkTheme) SkeuEmerald else SkeuLightEmerald
+                            val emeraldStreakAlpha = if (isDarkTheme) 0.30f else 0.36f
+                            Brush.linearGradient(
+                                *arrayOf(
+                                    0.00f to MaterialTheme.colorScheme.background,
+                                    0.55f to TitaniumDark.copy(alpha = streakAlpha),
+                                    // Titik kilau sempit (0.60-0.68) ditumpuk tepat setelah TitaniumDark
+                                    // — rentang fraction yang sengaja disempitkan (bukan disebar rata
+                                    // seperti resep 3-stop Tactile) supaya terbaca sebagai satu garis
+                                    // pantulan cahaya di logam, bukan gradasi warna yang mulus.
+                                    0.62f to SilverHighlight.copy(alpha = streakAlpha * 1.8f),
+                                    0.68f to TitaniumDark.copy(alpha = streakAlpha),
+                                    0.76f to emerald.copy(alpha = emeraldStreakAlpha),
+                                    1.00f to streakEnd
+                                )
+                            )                        }
+                        else -> null
+                    }
                 }
 
                 Surface(

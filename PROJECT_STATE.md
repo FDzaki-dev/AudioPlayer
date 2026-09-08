@@ -91,6 +91,37 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 392 (Optimasi Compose — `identityRootBrush` remember(), `MainActivity.kt`, 1 file kode)**
+— User instruksi: "next: optimize sektor compose!!" (pindah sektor dari cold-start 385-391 ke
+Compose, salah satu kandidat sisa Batch 388). **Status DISCONTINUED tetap permanen tidak diubah**
+(per klarifikasi Batch 387).
+
+Batch 388 menandai kandidat ini butuh data Macrobenchmark utk tahu bottleneck SEBENARNYA — itu
+tetap berlaku utk pertanyaan "apa yang paling dominan". Batch ini fokus ke sub-kelas Compose yang
+provably salah murni dari kode (fakta struktural, bukan soal device): komputasi berat dijalankan
+ulang tiap recomposition tanpa `remember`. 2 kandidat lain diperiksa & SENGAJA TIDAK disentuh
+(detail lengkap CHANGELOG.md Batch 392): `AlbumArt`'s `SubcomposeAsyncImage` (fix butuh
+`Painter`, tidak bisa drop-in pertahankan tint dinamis tanpa regresi visual, 6 titik pakai
+app-wide) dan stabilitas `List<Song>` app-wide (perlu ubah signature Composable lintas banyak
+file, melampaui batas 3-file/task, butuh inisiatif multi-batch tersendiri).
+
+**Root cause**: `identityRootBrush` (root Surface `MainActivity`, pembungkus SEMUA layar)
+dibangun via `when` LANGSUNG di badan composable besar yang SAMA dgn banyak state lain (termasuk
+`librarySongsForShortcut` — SELURUH daftar lagu, dibaca utk shortcut launcher, 0 hubungan dgn
+tema) — TANPA `remember`. Karena 1 badan composable besar (bukan dipecah child terpisah), state
+apa pun yang berubah di scope ini (mis. library di-rescan) memaksa SELURUH body re-run termasuk
+membangun ulang `Brush.linearGradient(...)` dari nol, padahal input sebenarnya
+(`appThemeIdentity`/`isDarkTheme`) tidak berubah.
+
+**Fix**: dibungkus `remember(appThemeIdentity, isDarkTheme)` — 2 key ini satu-satunya input
+nyata brush. **Zero behavior change**, cuma frekuensi rebuild berkurang.
+
+**1 file kode disentuh** (`MainActivity.kt`, 1362 baris). Brace/paren/bracket balance seimbang
+(502/502 `()`, 266/266 `{}`, 3/3 `[]`). Diff-checked terhadap ZIP Batch 391: cuma 1 file berubah.
+**Belum ditest di device asli** — fix ini TIDAK butuh Macrobenchmark utk membuktikan validitas
+strukturalnya, tapi besar dampak nyata di pemakaian sehari-hari tetap butuh pengukuran, bukan
+diasumsikan dari kode saja. Detail lengkap CHANGELOG.md Batch 392.
+
 **Batch 391 (Optimasi cold-start — ShakeDetector lazy init, `PlaybackService.kt`, 1 file kode)**
 — User instruksi: "lanjut tahap optimize disektor yang belum ke sentuh!!" (lanjutan sesi
 optimasi yang sama, Batch 385→386→387→388→389→391; Batch 390 di antaranya cuma repack

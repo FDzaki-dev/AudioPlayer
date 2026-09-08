@@ -1,5 +1,83 @@
 # Changelog
 
+## Batch 392 — Optimasi Compose: `identityRootBrush` remember(), `MainActivity.kt`, 1 file
+User instruksi: "next: optimize sektor compose!!" — permintaan eksplisit pindah dari sektor
+cold-start (Batch 385-391) ke sektor Compose, salah satu dari 2 kandidat sisa yang secara
+eksplisit ditandai Batch 388 ("cost riil Compose first-composition"). **Status DISCONTINUED
+tetap permanen tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
+
+**Penting dicatat jujur di awal**: Batch 388 menandai kandidat ini butuh data pengukuran device
+asli (Macrobenchmark/systrace) untuk tahu bagian mana yang benar-benar dominan — itu MASIH benar
+untuk pertanyaan "apa bottleneck first-composition sesungguhnya". TAPI ada sub-kelas masalah
+Compose yang provably salah murni dari pembacaan kode (fakta struktural compiler/runtime, bukan
+soal kecepatan device): komputasi berat yang dijalankan ULANG tiap recomposition tanpa
+`remember`, terlepas dari apakah input sebenarnya berubah. Batch ini fokus ke sub-kelas itu —
+bukan menebak ulang bottleneck yang butuh data.
+
+**Kandidat lain yang diperiksa & SENGAJA TIDAK disentuh (di luar bar aman batch ini)**:
+- `AlbumArt` (`ui/Utils.kt`, 1 titik dipakai 6 layar) — pakai `SubcomposeAsyncImage` (Coil), yang
+  dokumentasi resminya sendiri mencatat subcomposition punya overhead lebih tinggi drpd
+  `AsyncImage` biasa. TAPI `AsyncImage`'s slot `error`/`placeholder` hanya menerima `Painter`,
+  bukan `@Composable` — mengganti `AlbumArtFallbackIcon()` (Icon bertema, tint dinamis dari
+  `MaterialTheme.colorScheme`) ke `Painter` butuh `colorFilter` yang berlaku SERAGAM ke SEMUA
+  state (termasuk foto album asli yang TIDAK boleh ikut ke-tint) — tidak ada cara drop-in
+  mempertahankan tampilan identik tanpa regresi visual. Dipakai di 6 titik app-wide (blast
+  radius tinggi) + butuh verifikasi visual nyata utk dipastikan zero-regression — di luar bar
+  "provably zero behavior change murni dari kode" yang jadi standar tiap batch optimasi sejak
+  385. TIDAK disentuh.
+- Stabilitas `List<Song>` (parameter banyak Composable app-wide, mis. `HomeScreen`/
+  `HomeSectionRow`/`LibraryScreen`) — `kotlin.collections.List` (interface) selalu diklasifikasi
+  UNSTABLE oleh Compose compiler by design (compiler tidak tahu implementasi konkretnya
+  immutable atau tidak), mematikan recomposition-skip utk composable manapun yang menerimanya
+  sbg parameter. Ini genuinely provable dari dokumentasi resmi Compose compiler (bukan tebakan
+  device), TAPI project ini SUDAH punya preseden fix yang benar utk kelas masalah ini
+  (`ImmutableSet<Long>` utk `favoriteIds` di `HomeScreen.kt`, `kotlinx-collections-immutable`
+  sudah jadi dependency) — mengaplikasikannya konsisten ke `List<Song>` butuh mengubah signature
+  banyak Composable lintas BANYAK file (Home/Library/Playlist/Queue, dst, bukan cuma 1-2) supaya
+  tidak meninggalkan chain yang setengah-konsisten (percuma kalau cuma 1 titik diubah, sisanya
+  tetap `List<Song>` biasa) — jauh melampaui batas Micro-Batch 3-file/task & prinsip
+  ZERO-REFACTOR (mengubah public API Composable signature lintas modul). Butuh inisiatif
+  multi-batch tersendiri (mirip pola `ROADMAP_LIQUID_GLASS_REDESIGN.md`), BUKAN kerja 1 sesi —
+  dicatat di sini sebagai kandidat masa depan, TIDAK dieksekusi batch ini.
+
+**Root cause (yang benar-benar dieksekusi)**: `identityRootBrush` (root Surface `MainActivity`,
+`setContent` — 1 satu-satunya Surface pembungkus SEMUA layar) dibangun via `when (appThemeIdentity)`
+LANGSUNG di badan composable, TANPA `remember`. Composable pembungkusnya sendiri (badan besar di
+dalam `CompositionLocalProvider`/`AudioPlayerTheme`) membaca BANYAK state lain secara langsung di
+scope yang SAMA — termasuk `librarySongsForShortcut by playerViewModel.librarySongs
+.collectAsStateWithLifecycle()` (SELURUH daftar lagu, dibaca utk keperluan shortcut launcher,
+tidak ada hubungannya dgn tema). Karena semua kode ini 1 badan composable besar (bukan dipecah
+child `@Composable` terpisah), Compose tidak bisa skip sebagian body-nya saja — SATU state
+berubah (mis. `librarySongsForShortcut` tiap kali library di-rescan/lagu ditambah/metadata
+diedit) memaksa SELURUH body ini re-run, termasuk membangun ulang `Brush.linearGradient(...)`
+dari nol (utk Skeu: 6 color stop, tiap stop `Color.copy(alpha=...)` + 1 array alokasi) — padahal
+input SEBENARNYA brush ini (`appThemeIdentity`, `isDarkTheme`) genuinely tidak berubah sama
+sekali di resource ini.
+
+**Fix**: `identityRootBrush` dibungkus `remember(appThemeIdentity, isDarkTheme)` — 2 key ini
+adalah SATU-SATUNYA input nyata brush (`MaterialTheme.colorScheme.background` sendiri 100%
+turunan `identity`+`isDark`, lihat `colorsFor()` di `Theme.kt`, jadi tidak perlu key terpisah).
+Rebuild HANYA terjadi kalau salah satu dari 2 key ini benar-benar berubah (ganti tema/mode) —
+bukan lagi tiap kali state app lain mana pun berubah. **Zero behavior change**: hasil visual yang
+dirender identik di setiap kombinasi identity/mode, cuma frekuensi rebuild yang berkurang.
+
+**1 file kode disentuh** (`MainActivity.kt`, 1362 baris — naik dari 1340 krn dokumentasi baru +
+1 baris `remember(...) {` pembuka & `}` penutup). Brace/paren/bracket balance dicek (strip
+comment/string dulu, python3): 502/502 `()`, 266/266 `{}`, 3/3 `[]` — seimbang. Diff-checked
+terhadap ZIP Batch 391: cuma `MainActivity.kt` yang berubah, tidak ada file lain kesenggol.
+
+**Belum ditest di device asli** — sama seperti Batch 385-391: pure code-reading tanpa akses
+device fisik. Beda dari batch cold-start sebelumnya, fix ini TIDAK butuh Macrobenchmark utk
+membuktikan validitasnya (fakta struktural: `remember` mengurangi rebuild yang provably tidak
+perlu, terlepas dari device) — TAPI besar dampaknya (seberapa sering `librarySongsForShortcut`
+benar-benar emit ulang di pemakaian nyata) tetap butuh pengukuran nyata utk dikuantifikasi, bukan
+diasumsikan besar dari kode saja. Tidak ada `kotlinc`/Android SDK/network di environment kerja
+sesi ini.
+
+**Sisa kandidat setelah batch ini**: `AlbumArt` SubcomposeAsyncImage & `List<Song>` stability
+(keduanya didokumentasikan di atas, butuh scope lebih besar dari 1 sesi) — plus cost riil Compose
+first-composition & baseline profile/R8 minification (Batch 388, masih butuh data device asli).
+
 ## Batch 391 — Optimasi cold-start: ShakeDetector lazy init, `PlaybackService.kt`, 1 file
 User instruksi: "lanjut tahap optimize disektor yang belum ke sentuh!!" (lanjutan sesi optimasi
 yang sama, Batch 385→386→387→388→389→391; Batch 390 di antaranya cuma repack verifikasi, 0
