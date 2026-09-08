@@ -1,5 +1,53 @@
 # Changelog
 
+## Batch 386 — Optimasi cold-start (lanjutan Batch 385): buang 1 pemanggilan `loadCustomFolderInfos()` percuma di property initializer, `PlayerViewModel.kt`, 1 file kode
+User instruksi (sama persis Batch 385): "lanjut optimize aplikasi tanpa mengubah status
+terkini"; fokus dipilih user lagi (dari opsi yang ditawarkan): startup/cold-start speed.
+**Status DISCONTINUED (banner `README.md` + `PROJECT_STATE.md`) SENGAJA TIDAK diubah** — pola
+deviasi EKSPLISIT yang sama dengan Batch 385, berlaku HANYA utk batch ini.
+
+**Root cause**: `_customFolders` was initialized as `MutableStateFlow(loadCustomFolderInfos())`
+directly in `PlayerViewModel`'s property initializer. `loadCustomFolderInfos()` is not a cheap
+SharedPreferences read — for every custom folder URI already saved, it calls
+`DocumentFile.fromTreeUri(context, uri)?.name` (a Binder round-trip into the DocumentsProvider
+process to resolve the tree's display name) and `contentResolver.persistedUriPermissions` (an IPC
+call that returns the whole persisted-grant list, walked with `.any { it.uri == uri }`) — real
+cross-process work, not a map lookup. Being a property initializer, this runs synchronously on
+the main thread at the exact moment `PlayerViewModel` is constructed, i.e. the instant
+`MainActivity.onCreate()` first touches the `by viewModels` delegate — before `setContent {}` is
+ever called.
+
+Tracing further: the value this constructor call produces is never actually observed by anything.
+The very next line of `MainActivity.onCreate()`, `playerViewModel.connect()`, always calls
+`ensureLibraryLoaded()` -> `refreshLibrary()` on a cold start (`libraryLoadedOnce` still `false`
+at that point), and `refreshLibrary()`'s own first statement calls the exact same function again
+— `_customFolders.value = loadCustomFolderInfos()` — still inside the same synchronous call
+stack (`viewModelScope` uses `Dispatchers.Main.immediate`, and this line sits before that
+function's own `withContext(Dispatchers.IO)` boundary), before `setContent {}` has run at all
+(so there is no composition yet, and nothing could have collected `customFolders` in between).
+In practice the constructor computed a value from scratch, then immediately threw it away and
+recomputed the identical thing from the same inputs a moment later — one full duplicate pass of
+per-folder Binder/IPC work, sitting on the hottest part of the cold-start path, for zero benefit.
+
+**Fix**: `_customFolders` now defaults to `MutableStateFlow(emptyList())`, the same pattern
+`_librarySongs`/`_libraryLoading` already use (start empty, `refreshLibrary()` fills it in).
+`refreshLibrary()`'s own line that computes the real value is completely untouched — it remains
+the only assignment any collector can ever actually observe, exactly as before this batch.
+
+**Zero behavior change**: the final value any composable ever sees is identical to before. Users
+with zero custom folders added (`getFolderUris()` returns an empty list, the common case) see no
+difference at all — mapping over an empty list already cost nothing. The win is scoped entirely
+to users with one or more custom folders active, and entirely to the cold-start window.
+
+Brace/paren/bracket balance `PlayerViewModel.kt` checked (comments/strings stripped first, full
+1549-line file): 644/644 `()`, 211/211 `{}`, 7/7 `[]` — balanced. **1 code file touched**
+(`PlayerViewModel.kt`) — consistent with the max-3-files/task limit.
+
+**Not tested on a real device** — same constraint as Batch 385: pure code-reasoning tuning with
+no physical-device access (§ "Status penutupan (Batch 384)" point 1 in `PROJECT_STATE.md` still
+applies). The actual win (only meaningful for users with custom folders configured) can only be
+confirmed with a real measurement, not assumed from reading the code alone.
+
 ## Batch 385 — Optimasi cold-start: prewarm 28 file SharedPreferences dari background thread di `Application.onCreate()`, `AudioPlayerApplication.kt`, 1 file kode
 User instruksi: "lanjut optimize aplikasi tanpa mengubah status terkini"; fokus dipilih user
 (dari opsi yang ditawarkan): startup/cold-start speed. **Status DISCONTINUED (banner

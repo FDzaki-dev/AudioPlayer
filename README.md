@@ -24,23 +24,31 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 385 (optimasi cold-start: prewarm 28 file SharedPreferences dari
-> background thread di `Application.onCreate()`, `AudioPlayerApplication.kt`, 1 file kode):**
-> User: "lanjut optimize aplikasi tanpa mengubah status terkini" (fokus dipilih user: startup/
-> cold-start speed) — **status DISCONTINUED di atas SENGAJA TIDAK diubah**, override eksplisit
-> user hanya untuk batch ini (lihat `PROJECT_STATE.md` § "Batch terakhir yang selesai" utk detail
-> rule aslinya). Root cause: `PlayerViewModel` membuka 23 file SharedPreferences lewat property
-> initializer-nya sendiri begitu `MainActivity.onCreate()` pertama kali membuatnya (+5 file lain
-> dari layar/widget lain, 28 total) — beberapa initializer/`init{}`-nya langsung MEMBACA file yang
-> baru saja dibuka itu, mem-blok main thread sampai parsing XML-nya selesai; load file itu sendiri
-> baru mulai begitu `getSharedPreferences()` PERTAMA dipanggil, yaitu saat itu juga, bukan lebih
-> awal. Fix: sentuh (bukan baca/tulis apa pun) ke-28 nama file yang sama dari 1 background thread
-> sedini `Application.onCreate()` mengizinkan — proses start, sebelum Activity mana pun ada —
-> supaya loadnya sudah berjalan paralel sepanjang sisa startup, bukan baru mulai saat ViewModel
-> dibuat. Zero behavior change (tidak ada value Store mana pun yang dibaca/ditulis di sini).
-> **Belum ditest di device asli** — butuh pengukuran cold-start nyata (mis. `adb shell am start -W`
-> atau Macrobenchmark) utk konfirmasi, bukan cuma pembacaan kode. Detail lengkap CHANGELOG.md
-> Batch 385.
+> 🆕 **Update terbaru — Batch 386 (lanjutan optimasi cold-start Batch 385: buang 1 pemanggilan
+> `loadCustomFolderInfos()` yang percuma di property initializer `PlayerViewModel.kt`, 1 file
+> kode):** User: "lanjut optimize aplikasi tanpa mengubah status terkini" (fokus dipilih user
+> lagi: startup/cold-start speed) — **status DISCONTINUED di atas SENGAJA TIDAK diubah**, override
+> eksplisit user hanya untuk batch ini (pola sama Batch 385, lihat `PROJECT_STATE.md` § "Batch
+> terakhir yang selesai" utk rule aslinya). Root cause: `_customFolders` diinisialisasi
+> `MutableStateFlow(loadCustomFolderInfos())` — tiap folder custom tersimpan memicu round-trip
+> Binder (`DocumentFile.fromTreeUri().name` + `contentResolver.persistedUriPermissions`), bukan
+> pembacaan murah — lalu begitu `connect()` (dipanggil MainActivity SEGERA sesudahnya, sebelum
+> `setContent {}`) menjalankan `refreshLibrary()` pertama kali, fungsi yang SAMA dipanggil ULANG
+> (`_customFolders.value = loadCustomFolderInfos()`) sebelum composable mana pun sempat collect
+> nilai constructor-nya — kerja Binder dobel per folder custom, 100% percuma. Fix: constructor
+> sekarang default `emptyList()` (pola sama `_librarySongs`), `refreshLibrary()` tetap yang
+> mengisi nilai sebenarnya seperti sebelumnya — nilai akhir yang benar-benar terlihat composable
+> identik, zero behavior change. User TANPA folder custom aktif: 0 dampak (sudah 0 biaya dari
+> awal). **Belum ditest di device asli** — sama seperti Batch 385, butuh pengukuran cold-start
+> nyata utk konfirmasi, bukan cuma pembacaan kode. Detail lengkap CHANGELOG.md Batch 386.
+> Batch 385 (optimasi cold-start: prewarm 28 file SharedPreferences dari background thread di
+> `Application.onCreate()`, `AudioPlayerApplication.kt`, 1 file kode): Root cause `PlayerViewModel`
+> membuka 23 file SharedPreferences lewat property initializer-nya sendiri (+5 file lain dari
+> layar/widget lain, 28 total) begitu `MainActivity.onCreate()` pertama kali membuatnya — beberapa
+> initializer/`init{}`-nya langsung MEMBACA file yang baru saja dibuka itu, mem-blok main thread
+> sampai parsing selesai. Fix: sentuh (bukan baca/tulis apa pun) ke-28 nama file itu dari 1
+> background thread sedini `Application.onCreate()` mengizinkan, supaya loadnya berjalan paralel
+> sepanjang sisa startup. Zero behavior change. Detail lengkap CHANGELOG.md Batch 385.
 > Batch 383 (karakter pantulan overscroll dihapus total, `dampingRatio` →
 > `Spring.DampingRatioNoBouncy` (1.0, preset resmi) menggantikan custom
 > `OVERSCROLL_SETTLE_DAMPING_RATIO` 0.875 dari Batch 382 (dihapus), 1 file kode):** User laporan

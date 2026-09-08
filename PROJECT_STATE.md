@@ -78,6 +78,50 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 386 (Optimasi cold-start — lanjutan Batch 385, buang 1 pemanggilan `loadCustomFolderInfos()`
+yang percuma di property initializer, `PlayerViewModel.kt`, 1 file kode)** — User instruksi (sama
+persis Batch 385): "lanjut optimize aplikasi tanpa mengubah status terkini"; fokus dipilih user
+lagi (opsi yang ditawarkan): startup/cold-start speed. **Status DISCONTINUED (banner di atas &
+README.md) SENGAJA TIDAK diubah** — pola deviasi EKSPLISIT yang sama dengan Batch 385, **berlaku
+HANYA utk batch ini** (rule reopening asli di atas tidak berubah).
+
+**Root cause**: `_customFolders` (dipakai badge "izin folder" di Settings) diinisialisasi
+`MutableStateFlow(loadCustomFolderInfos())` langsung di property initializer `PlayerViewModel`.
+`loadCustomFolderInfos()` BUKAN pembacaan `SharedPreferences` murah — tiap URI folder custom yang
+tersimpan memicu `DocumentFile.fromTreeUri(uri).name` (round-trip Binder ke proses
+DocumentsProvider) dan `contentResolver.persistedUriPermissions` (query list izin lewat IPC), utk
+tiap folder. Karena ini property initializer, ini berjalan SINKRON di main thread saat
+`PlayerViewModel` dibuat — yaitu saat `MainActivity.onCreate()` pertama kali menyentuh delegate
+`by viewModels`, sebelum `setContent {}` dipanggil. Ditelusuri lebih jauh: nilai hasil panggilan
+ini di constructor TIDAK PERNAH benar-benar terlihat composable mana pun. Baris berikutnya di
+`MainActivity.onCreate()` (`playerViewModel.connect()`) selalu memicu `ensureLibraryLoaded()` ->
+`refreshLibrary()` pada cold start (`libraryLoadedOnce` masih `false`), dan `refreshLibrary()`
+sendiri baris pertamanya memanggil ULANG `_customFolders.value = loadCustomFolderInfos()` —
+MASIH di stack sinkron yang sama (`viewModelScope` pakai `Dispatchers.Main.immediate`, baris ini
+ada SEBELUM `withContext(Dispatchers.IO)` di fungsi yang sama), sebelum `setContent {}` sempat
+dipanggil sama sekali (jadi belum ada composition, belum ada yang collect `customFolders`).
+Praktiknya: constructor menghitung nilai ini dari nol, lalu SEKETIKA dibuang & dihitung ulang dari
+input yang sama persis — kerja Binder/IPC dobel per folder custom aktif, 100% percuma, tepat di
+jalur paling panas cold-start (sebelum frame pertama).
+
+**Fix**: `_customFolders` sekarang default `MutableStateFlow(emptyList())` (pola sama
+`_librarySongs`/`_libraryLoading` — mulai kosong, diisi `refreshLibrary()`). Baris
+`refreshLibrary()` yang mengisi nilai sebenarnya TIDAK diubah sama sekali — itu tetap satu-satunya
+assignment yang bisa diamati composable mana pun, persis seperti sebelum batch ini. **Zero
+behavior change**: nilai akhir yang terlihat user identik; user TANPA folder custom aktif
+(`getFolderUris()` kosong, kasus mayoritas) sudah 0 biaya dari awal (map atas list kosong) — win
+batch ini murni utk user yang punya ≥1 folder custom aktif, di jalur cold-start saja.
+
+Brace/paren/bracket balance `PlayerViewModel.kt` dicek (strip comment/string dulu, python3, seluruh
+file 1549 baris): 644/644 `()`, 211/211 `{}`, 7/7 `[]` — seimbang. **1 file kode disentuh**
+(`PlayerViewModel.kt`) — tidak ada file lain yang disentuh batch ini, konsisten batas
+max-3-file/task.
+
+**Belum ditest di device asli** — sama seperti Batch 385, tuning ini murni dari pembacaan kode
+tanpa akses device fisik (§ "Status penutupan (Batch 384)" poin 1 di bawah masih berlaku); win
+riilnya (khusus user dgn folder custom aktif) baru bisa dikonfirmasi lewat pengukuran nyata, bukan
+diasumsikan dari kode saja. Detail lengkap CHANGELOG.md Batch 386.
+
 **Batch 385 (Optimasi cold-start — prewarm 28 file SharedPreferences dari 1 background thread di
 `Application.onCreate()`, `AudioPlayerApplication.kt`, 1 file kode)** — User instruksi: "lanjut
 optimize aplikasi tanpa mengubah status terkini"; fokus dipilih user (opsi yang ditawarkan):

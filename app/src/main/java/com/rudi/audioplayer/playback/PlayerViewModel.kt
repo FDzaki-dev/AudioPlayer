@@ -255,7 +255,35 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
     private val customFolderScanner = CustomFolderScanner(appContext)
 
-    private val _customFolders = MutableStateFlow(loadCustomFolderInfos())
+    // Batch 386 (cold-start optimization, lanjutan Batch 385) — dulu diinisialisasi
+    // `MutableStateFlow(loadCustomFolderInfos())` di sini. `loadCustomFolderInfos()` bukan
+    // pembacaan SharedPreferences murah: tiap folder custom yang tersimpan memanggil
+    // `DocumentFile.fromTreeUri(...).name` (round-trip Binder ke proses DocumentsProvider) DAN
+    // `contentResolver.persistedUriPermissions` (query list izin lewat IPC) — keduanya nyata,
+    // bukan sekadar map lookup, dan berjalan di main thread karena ini property initializer
+    // (dieksekusi saat `PlayerViewModel` dibuat, sinkron, sebelum `MainActivity.onCreate()`
+    // sempat memanggil `setContent {}`).
+    //
+    // Root cause: nilai hasil panggilan ini di constructor TIDAK PERNAH benar-benar terlihat.
+    // `connect()` (dipanggil MainActivity SEGERA setelah delegate `by viewModels` selesai
+    // membuat ViewModel ini, baris yang sama sebelum `setContent {}`) selalu memanggil
+    // `ensureLibraryLoaded()` -> `refreshLibrary()` pada cold start (`libraryLoadedOnce` masih
+    // false), dan `refreshLibrary()` sendiri langsung memanggil ulang
+    // `_customFolders.value = loadCustomFolderInfos()` (lihat di bawah) SEBELUM baris itu
+    // menyentuh `withContext(Dispatchers.IO)` — yaitu masih di stack sinkron yang sama
+    // (`viewModelScope` pakai `Dispatchers.Main.immediate`), sebelum composable mana pun sempat
+    // collect `customFolders` (belum ada composition sama sekali, `setContent {}` belum
+    // dipanggil). Praktiknya: constructor menghitung nilai ini, lalu SEKETIKA dibuang & dihitung
+    // ulang dari nol dengan input yang sama persis — kerja Binder/IPC dobel per folder custom,
+    // 100% percuma, di jalur paling panas cold-start.
+    //
+    // Fix: default `emptyList()` di sini (sama pola dengan `_librarySongs`/`_libraryLoading` —
+    // mulai kosong, diisi `refreshLibrary()`). Nilai akhir yang benar-benar diamati composable
+    // mana pun tetap identik: satu-satunya assignment yang bisa mereka lihat tetap baris
+    // `refreshLibrary()` di bawah, TIDAK diubah batch ini. Zero behavior change untuk semua
+    // user; user TANPA folder custom (`getFolderUris()` kosong) sudah 0 biaya dari awal (map
+    // atas list kosong) — win batch ini murni utk user yang punya >=1 folder custom aktif.
+    private val _customFolders = MutableStateFlow(emptyList<CustomFolderInfo>())
     val customFolders: StateFlow<List<CustomFolderInfo>> = _customFolders.asStateFlow()
     private var userTargetVolume = 1f
     private var positionTick = 0
