@@ -1,5 +1,43 @@
 # Changelog
 
+## Batch 379 — PENDING_IosFlingBehavior.md: 12/14 layar (DuplicateFinderSheet, ABRepeatBookmarkSheet, EqualizerSheet), 3 file kode
+Tidak ada laporan bug baru dari user batch ini ("lanjut kerjakan pending task"). Batch 376 (race
+condition async `snapTo` vs guard synchronous) masih menunggu verifikasi device asli — belum ada
+laporan hasil baru yang membatalkan/mengubahnya. Sesuai Auto-Read Pending Queue, lanjut comot 3
+file kode berikutnya dari antrean `PENDING_IosFlingBehavior.md` (dibuka Batch 364, 9/14 di Batch
+378), urutan bebas sesuai catatan pending-nya sendiri.
+
+**3 file (persis pola reuse dari `LibraryScreen.kt` Batch 364, 0 perubahan di
+`IosScrollPhysics.kt` sendiri)**:
+1. `ui/DuplicateFinderSheet.kt` — 1 `LazyColumn` utama (daftar grup duplikat library + fisik,
+   digabung 1 list lewat `item {}` header per seksi) — sesuai hitungan "1 scrollable" yang sudah
+   tercatat sejak Batch 364.
+2. `ui/ABRepeatBookmarkSheet.kt` — 1 `LazyColumn` (daftar bookmark posisi, `heightIn(max = 280.dp)`
+   di dalam sheet gabungan Repeat A-B + Bookmark) — sesuai hitungan pending.
+3. `ui/EqualizerSheet.kt` — 2 scrollable, **keduanya `LazyRow`** (chip "Preset Kuat" + chip "Preset
+   Bawaan Perangkat"), bukan `LazyColumn`/`LazyVerticalGrid` — pola pemasangan tetap identik
+   (parameter `flingBehavior` bisa dipasang ke `LazyRow` juga, bukan cuma `LazyColumn`). Column
+   induk sheet ini sendiri pakai `verticalScroll(rememberScrollState())` biasa (jaring pengaman
+   Batch 315), BUKAN `LazyColumn`, jadi sengaja tidak disentuh — di luar cakupan dokumen pending
+   ini yang khusus komponen `Lazy*`.
+
+Tiap lokasi: 1 baris import `rememberIosFlingBehavior` dari `ui.theme` + 1 parameter
+`flingBehavior = rememberIosFlingBehavior()` per `Lazy*` yang relevan. Checklist pending diupdate
+(3 lagi dicentang, total 12/14), README.md ("Belum selesai" + fitur scroll ala iOS) disamakan jadi
+"13 dari 15 layar selesai, 2 sisa". Brace/paren balance dicek per file: `DuplicateFinderSheet.kt`
+56/56 & 109/109, `ABRepeatBookmarkSheet.kt` 54/54 & 140/140, `EqualizerSheet.kt` 27/27 & 108/108.
+
+**Belum ditest di device asli** — tidak ada env Android nyata di sesi ini, sama seperti batch-batch
+sebelumnya. **Prioritas cek user**: rasakan glide scroll di sheet Deteksi File Duplikat, sheet
+Repeat A-B & Bookmark (daftar bookmark), dan kedua baris chip preset di sheet Equalizer — harus
+terasa sama seperti layar-layar yang sudah kelar sebelumnya (meluncur lebih panjang & mulus, bukan
+berhenti mendadak ala Android default). Sisa 2 file (`LyricsSheet`, `LyricsView`) masih di
+`PENDING_IosFlingBehavior.md`, belum disentuh — lanjut batch berikutnya sampai habis/user bilang
+cukup. Catatan `LyricsView.kt` sudah ada di dokumen pending-nya sendiri: cek dulu apakah 2
+scrollable-nya pakai `animateScrollToItem` terprogram (auto-scroll lirik) sebelum pasang kurva
+fling manual di situ — kalau iya, kurva fling manual mungkin cuma relevan untuk jalur drag manual
+user, bukan jalur auto-scroll terprogram.
+
 ## Batch 378 — PENDING_IosFlingBehavior.md: 9/14 layar (VaultSheet, SongPickerSheet, FolderManagerSheet), 3 file kode
 Tidak ada laporan bug baru dari user batch ini ("lanjutkan kerjakan pending task"). Batch 376 (race
 condition async `snapTo` vs guard synchronous) masih menunggu verifikasi device asli — belum ada

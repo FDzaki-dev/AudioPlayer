@@ -23,6 +23,7 @@ import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
 import java.util.Locale
@@ -118,7 +119,10 @@ fun EqualizerSheet(
                     color = MaterialTheme.colorScheme.secondary
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    flingBehavior = rememberIosFlingBehavior()
+                ) {
                     items(boldPresetOptions.size, key = { index -> boldPresetOptions[index].first.name }) { index ->
                         val (preset, label) = boldPresetOptions[index]
                         val chipInteraction = remember { MutableInteractionSource() }
@@ -144,7 +148,10 @@ fun EqualizerSheet(
                         color = MaterialTheme.colorScheme.secondary
                     )
                     Spacer(modifier = Modifier.height(6.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        flingBehavior = rememberIosFlingBehavior()
+                    ) {
                         items(state.presets.size, key = { index -> state.presets[index] }) { index ->
                             val chipInteraction = remember { MutableInteractionSource() }
                             FilterChip(

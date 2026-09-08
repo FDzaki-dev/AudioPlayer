@@ -36,6 +36,23 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 379 (Lanjut antrean `PENDING_IosFlingBehavior.md`: 12/14 layar — `DuplicateFinderSheet.kt`,
+`ABRepeatBookmarkSheet.kt`, `EqualizerSheet.kt`, 3 file kode)** — Tidak ada laporan bug baru dari
+user ("lanjut kerjakan pending task"); Batch 376 masih menunggu verifikasi device asli. Sesuai
+Auto-Read Pending Queue, comot 3 file kode berikutnya dari antrean fling behavior (dibuka Batch
+364, 9/14 selesai Batch 378). Pola reuse persis `LibraryScreen.kt`: import
+`rememberIosFlingBehavior` dari `ui.theme` + parameter `flingBehavior = rememberIosFlingBehavior()`
+di tiap `LazyColumn`/`LazyRow` yang relevan — 0 perubahan di `IosScrollPhysics.kt` sendiri.
+`DuplicateFinderSheet.kt` & `ABRepeatBookmarkSheet.kt` masing-masing 1 `LazyColumn` utama sesuai
+catatan pending. `EqualizerSheet.kt` 2 scrollable, **keduanya `LazyRow`** (chip Preset Kuat + chip
+Preset Bawaan Perangkat) — Column induk sheet-nya sendiri pakai `verticalScroll` biasa (bukan
+`Lazy*`), sengaja tidak disentuh karena di luar cakupan dokumen pending. Checklist pending
+diupdate (total 12/14 tercentang), README.md disamakan ("13 dari 15 layar selesai, 2 sisa").
+Brace/paren balance dicek per file, semua seimbang. **Belum ditest di device asli** — tidak ada env
+Android nyata di sesi ini. Sisa 2 file: `LyricsSheet`, `LyricsView` (yang terakhir perlu cek dulu
+apakah scroll-nya `animateScrollToItem` terprogram sebelum pasang fling manual). Detail lengkap
+CHANGELOG.md Batch 379.
+
 **Batch 378 (Lanjut antrean `PENDING_IosFlingBehavior.md`: 9/14 layar — `VaultSheet.kt`,
 `SongPickerSheet.kt`, `FolderManagerSheet.kt`, 3 file kode)** — Tidak ada laporan bug baru dari
 user ("lanjutkan kerjakan pending task"); Batch 376 masih menunggu verifikasi device asli. Sesuai

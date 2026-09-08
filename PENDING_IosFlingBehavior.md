@@ -31,9 +31,9 @@ overscroll yang sudah dapat `LocalOverscrollFactory`).
       pendek, jadi ikut dipasang)**
 - [x] `ui/SongPickerSheet.kt` — 1 scrollable **(selesai Batch 378)**
 - [x] `ui/FolderManagerSheet.kt` — 1 scrollable **(selesai Batch 378)**
-- [ ] `ui/DuplicateFinderSheet.kt` — 1 scrollable
-- [ ] `ui/ABRepeatBookmarkSheet.kt` — 1 scrollable
-- [ ] `ui/EqualizerSheet.kt` — 2 scrollable
+- [x] `ui/DuplicateFinderSheet.kt` — 1 scrollable **(selesai Batch 379)**
+- [x] `ui/ABRepeatBookmarkSheet.kt` — 1 scrollable **(selesai Batch 379)**
+- [x] `ui/EqualizerSheet.kt` — 2 scrollable **(selesai Batch 379)**
 - [ ] `ui/LyricsSheet.kt` — 1 scrollable
 - [ ] `ui/lyrics/LyricsView.kt` — 2 scrollable (lirik auto-scroll — cek dulu apakah ini pakai
       `animateScrollToItem` terprogram; kalau iya, kurva fling manual mungkin tidak relevan di

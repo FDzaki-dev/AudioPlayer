@@ -26,6 +26,7 @@ import com.rudi.audioplayer.data.Bookmark as BookmarkModel
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
 /**
  * Roadmap #4 (`ROADMAP_15_FITUR_OFFLINE.md`), Batch 91 — combines two related "mark a moment
@@ -155,7 +156,10 @@ fun ABRepeatBookmarkSheet(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp)
                 )
             } else {
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+                    flingBehavior = rememberIosFlingBehavior()
+                ) {
                     items(bookmarks, key = { it.id }) { bookmark ->
                         BookmarkRow(
                             bookmark = bookmark,

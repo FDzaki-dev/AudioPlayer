@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.DuplicateDetector
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
 /**
  * Gap List #2 — Duplicate Detection UI. Full-height ModalBottomSheet (not a small popup — group
@@ -86,7 +87,7 @@ fun DuplicateFinderSheet(
                     )
                 }
             } else {
-                LazyColumn(modifier = Modifier.weight(1f)) {
+                LazyColumn(modifier = Modifier.weight(1f), flingBehavior = rememberIosFlingBehavior()) {
                     if (libraryGroups.isNotEmpty()) {
                         item {
                             DuplicateSectionHeader(
