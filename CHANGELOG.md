@@ -1,5 +1,158 @@
 # Changelog
 
+## Batch 390 — Verifikasi integritas + repack, `FILE_MANIFEST.txt` dikoreksi, 0 file kode
+User: "repack lalu lampirkan skrip termux nya!!" — tanpa laporan bug, tanpa kata kerja lanjutan
+("lanjut"/"next"). Diperlakukan sama seperti Batch 320: repack verifikasi murni, netral terhadap
+status DISCONTINUED (bukan instruksi kerja baru, jadi banner § "ATURAN SESI AKTIF" tidak
+ter-trigger sama sekali — tidak perlu dievaluasi ulang, apalagi dibuka kembali).
+
+**Metodologi verifikasi (full-sweep, bukan spot-check)**:
+1. `diff` `FILE_MANIFEST.txt` (189 baris path setelah fix) vs `find` seluruh isi ZIP (dikecualikan
+   `.git/`) — 1 drift nyata ditemukan & diperbaiki (lihat detail di bawah), sisanya cocok 100%.
+2. Tokenizer brace/paren/bracket balance (string/comment/char-literal-aware, single-pass, python3)
+   dijalankan ke SEMUA 127 file `.kt` di repo (bukan cuma file yang disentuh batch-batch
+   sebelumnya) + 3 file `.kts` root/module — 0 dari 130 file timpang.
+3. Parse XML (`xml.etree.ElementTree`) ke seluruh 22 file `.xml` (manifest, layout, drawable,
+   folder `xml/`) — 0 error, semua well-formed.
+
+**Drift ditemukan (poin 1) — `FILE_MANIFEST.txt` tidak sinkron sejak Batch 364.**
+`app/src/main/java/com/rudi/audioplayer/ui/theme/IosScrollPhysics.kt` (file BARU yang dibuat
+Batch 364, salah satu dari 3 file kode batch itu — lihat entri Batch 364 di bawah) ternyata TIDAK
+PERNAH ditambahkan ke `FILE_MANIFEST.txt` — celah dokumentasi murni (file kodenya sendiri sudah
+benar & sudah diverifikasi seimbang berkali-kali sejak Batch 364, termasuk ulang di batch ini:
+78/78 `()`, 25/25 `{}`, 0/0 `[]`, identik hasil Batch 383), lolos dari SEMUA audit
+`FILE_MANIFEST.txt` sebelumnya (termasuk Batch 320, yang waktu itu cuma bandingkan JUMLAH
+188/188, bukan `diff` isi penuh per-baris seperti batch ini) selama 26 batch berturut-turut.
+**Fix**: 1 baris ditambahkan ke posisi alfabetis yang benar (antara `Color.kt` dan
+`Spacing.kt`), total header dikoreksi 188→189, catatan penjelasan ditambahkan langsung di file
+manifest-nya sendiri supaya sesi berikutnya tahu konteksnya.
+
+**Bukan drift (dicatat supaya tidak disalahartikan sesi berikutnya)**: `.github/workflows/build.yml`
+& `.gitignore` ADA di `FILE_MANIFEST.txt` tapi TIDAK ada di isi ZIP sesi ini — ini BY DESIGN, bukan
+gap. Skrip Termux `[DAILY UPDATE]` (lihat `PROJECT_STATE.md` § skrip) sengaja mengecualikan
+`-name '.*'` dari langkah `rm -rf` isi folder proyek sebelum unzip — 2 file dotfile itu dikelola
+permanen langsung di device pengguna (git secrets/CI config, gitignore keystore), tidak pernah
+ikut siklus kirim-ZIP tiap sesi kerja AI. `FILE_MANIFEST.txt` tetap mencantumkannya karena
+tujuannya "setara `git ls-files`" (representasi repo git yang sebenarnya), bukan "isi ZIP sesi
+ini" — 2 hal yang secara sengaja tidak identik di pipeline ini.
+
+**Ringkasan**: 0 file kode (`.kt`/`.xml`/`.kts`) diubah — HANYA `FILE_MANIFEST.txt` (dokumentasi/
+tracking) yang dikoreksi, jadi tidak menghitung ke batas Micro-Batch 3-file-kode. 0 bug kode
+ditemukan (semua 130 file kode terverifikasi seimbang, semua 22 XML valid). ZIP direpack isi
+kode IDENTIK Batch 389. `PROJECT_STATE.md`/`README.md`/`CHANGELOG.md` (VIP docs) disinkronkan.
+Status **DISCONTINUED tetap tidak berubah** (repack verifikasi ini bukan kategori kerja yang
+relevan ke aturan reopening maupun ke pengecualian "optimasi murni" Batch 385-389 — dua-duanya
+soal INSTRUKSI KERJA baru dari user, sedangkan batch ini 0 instruksi kerja sama sekali).
+
+## Batch 389 — Optimasi cold-start: overlapPlayer/CrossfadeEngine lazy init, `PlaybackService.kt`, 1 file
+User instruksi: "lanjut progress optimize!!" (lanjutan sesi optimasi yang sama, Batch
+385→386→387→388→389). **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi
+Batch 387).
+
+Batch 388 menyimpulkan kelas bug "kerja sinkron/eager yang provably tidak dibutuhkan sedini
+itu" sudah habis di layar `Application`/`MainActivity` — tapi secara eksplisit menandai
+"setup ExoPlayer/MediaSession di `PlaybackService`" sebagai kandidat yang BELUM diperiksa detail
+(baru disebut butuh data device). Batch ini masuk lebih dalam ke titik itu secara spesifik, bukan
+menebak ulang di area yang sudah dinyatakan exhausted.
+
+**Root cause**: `PlaybackService.onCreate()` selalu membangun DUA `ExoPlayer` penuh — `player`
+(session, dipakai notifikasi/lock screen/Bluetooth) DAN `overlapPlayer` (privat, cuma dipakai
+`CrossfadeEngine` buat fitur Crossfade True Fade, Batch 102) — unconditional, tiap kali Service
+dibuat. `CrossfadeStore.isEnabled()` default `false` (opt-in, lihat komentar kelasnya sendiri:
+"Gapless (no fade) is the default"). Artinya di config default (mayoritas kemungkinan besar user
+yang belum pernah menyentuh toggle ini di Settings), `overlapPlayer` — instance ExoPlayer kedua
+lengkap dengan renderer/decoder/AudioTrack native — dibangun tiap cold start padahal
+`CrossfadeEngine.maybeStartCrossfade()` sendiri langsung `return` di baris pertama kalau
+`!enabled` (digrep: satu-satunya jalur yang benar-benar menyentuh `overlapPlayer` lebih jauh dari
+constructor). Kelas bug PERSIS sama dengan WorkManager (Batch 387): resource yang mahal dibangun
+di jalur startup yang provably tidak dibutuhkan buat konfigurasi paling umum.
+
+**Fix**: `overlapPlayer` + `CrossfadeEngine` dipindah ke method baru `ensureCrossfadeEngine
+(sessionPlayer: ExoPlayer)` — early-return kalau sudah pernah dibangun sesi ini, kalau belum baru
+membangun `overlapPlayer` lalu `CrossfadeEngine`. Dipanggil dari 2 titik: (1) `onCreate()`, HANYA
+kalau `CrossfadeStore(this).isEnabled()` sudah `true` sejak sebelum cold start ini (user yang
+sudah pernah menyalakan fitur ini sebelumnya) — jadi buat user ini, hasil akhirnya 100% sama
+persis kayak sebelum batch ini, cuma titik pembuatannya lewat method baru; (2) `onCustomCommand`
+`ACTION_SET_CROSSFADE_ENABLED` saat `enabled == true` — kalau ini pertama kali dinyalakan sesi
+ini, `crossfadeEngine` masih `null`, jadi dibangun di sini juga. AudioAttributes `overlapPlayer`
+dibaca balik dari `sessionPlayer.audioAttributes` (Player interface, sudah dipastikan tidak pernah
+di-mutate lagi setelah `player` dibangun — digrep app-wide, cuma 1 `setAudioAttributes()` call di
+seluruh file) — bukan dibangun ulang dari nol, jadi tetap 100% konsisten dengan `player` seperti
+sebelum batch ini.
+
+**Konsekuensi yang didokumentasikan jujur** (bukan zero-cost murni di semua kasus, sama seperti
+Batch 387): user yang menyalakan Crossfade dari Settings pertama kali di sesi itu sekarang
+menanggung biaya konstruksi `ExoPlayer.Builder(...).build()` (bukan instan, walau ringan) tepat
+di titik toggle di-tap, bukan lagi ditanggung lebih awal saat Service dibuat — `onCustomCommand`
+berjalan synchronous di thread MediaSession (bukan di jalur audio aktif, cuma titik UI toggle,
+jauh sebelum crossfade pertama benar-benar bisa terpicu karena itu baru mungkin dekat akhir lagu)
+jadi risikonya dinilai rendah, tapi dicatat jujur di sini bukan diklaim zero-behavior-change murni
+seperti fix cold-start lain di batch-batch sebelumnya. User yang crossfade-nya SUDAH ON dari
+sebelumnya (jalur onCreate) dan user yang crossfade-nya TETAP OFF sepanjang sesi — dua-duanya
+100% zero behavior change, cuma jalur "baru dinyalakan tengah sesi" yang punya trade-off kecil ini.
+
+**1 file kode disentuh** (`PlaybackService.kt`) — `CrossfadeEngine.kt` TIDAK disentuh sama sekali,
+konsisten batas max-3-file/task. Brace/paren/bracket balance dicek (strip comment/string dulu,
+python3, seluruh file 812 baris): 268/268 `()`, 87/87 `{}`, 1/1 `[]` — seimbang. Diff-checked
+against ZIP asli: cuma `PlaybackService.kt` yang berubah, tidak ada file lain kesenggol.
+
+**Belum ditest di device asli** — sama seperti Batch 385-387: pure code-reading tanpa akses
+device fisik (§ "Status penutupan (Batch 384)" poin 1 masih berlaku). Tidak ada `kotlinc`/Android
+SDK/network di environment kerja sesi ini, jadi build/lint asli (`./gradlew :app:assembleRelease`)
+juga belum dijalankan — sama seperti caveat Batch 387 soal manifest-merge, class ini juga baru
+benar-benar tervalidasi lewat CI/build sungguhan, bukan cuma pembacaan statis.
+
+## Batch 388 — Audit lanjutan cold-start: 0 file kode, murni dokumentasi
+User instruksi: "next" (lanjutan sesi optimasi Batch 385→386→387). **Status DISCONTINUED tetap
+permanen tidak diubah**, per klarifikasi Batch 387.
+
+Before writing any more code, this batch specifically re-verified whether the same bug class
+that produced Batch 385/386/387 (provably-unneeded synchronous/eager work sitting on the
+cold-start path) had any remaining instances, rather than assuming three consecutive wins meant
+a fourth was waiting to be found:
+
+- **Coil's `ImageLoaderFactory`** — already lazy by design; Coil itself calls `newImageLoader()`
+  on demand the first time any `AsyncImage` actually needs a loader, this app never forces it
+  synchronously at startup. Nothing to change.
+- **`LyricsDatabase`** (Room, backs the lyrics cache) — a standard lazy double-checked-locking
+  singleton. Grepped app-wide: exactly 3 construction sites (`LyricsViewModel`,
+  `SettingsScreen`'s clear-cache action, `LyricsPrefetchWorker`), none reachable from
+  `MainActivity`, `PlayerViewModel`, or `AudioPlayerApplication`. Already zero cold-start cost —
+  not something left to defer.
+- **`MediaController.Builder(...).buildAsync()`** in `PlayerViewModel.connect()` — already
+  asynchronous (`ListenableFuture`), not a blocking call.
+- **`installSplashScreen()`** is called with no custom `setKeepOnScreenCondition` — already the
+  fastest available pattern (the splash screen releases as soon as the first frame is drawn,
+  nothing is deliberately holding it open).
+- Other libraries commonly known to self-initialize via App Startup (`androidx.emoji2`,
+  `androidx.lifecycle`'s process-lifecycle owner, `androidx.profileinstaller` if present) were
+  deliberately left untouched. Unlike WorkManager (Batch 387), none of these can be proven safe
+  from a single grep-verified call site — they're each used broadly by other components/
+  libraries, so disabling one risks a silent regression invisible without a real device. Baseline
+  profile installation specifically works in the opposite direction of every other fix in this
+  series: it exists to make *subsequent* cold starts faster, so disabling it would be
+  counter-productive, not an optimization.
+
+**Honest conclusion**: the specific bug class Batch 385/386/387 mined — synchronous/eager work
+demonstrably not needed that early — appears exhausted for what can be verified safely from
+reading code alone, without physical-device access. The remaining candidates (actual Compose
+first-composition cost, ExoPlayer/MediaSession construction inside `PlaybackService`, baseline
+profiles / R8 minification) each require either (a) real device measurement data to know which
+one is actually the dominant cost — guessing further risks optimizing something that isn't the
+real bottleneck — or (b) meaningfully higher regression risk than anything in Batch 385-387 (R8
+minification in particular, on an app with 0/19 QA checklist items ever verified on a physical
+device and already marked discontinued, per `PROJECT_STATE.md` § "Status penutupan (Batch 384)"
+point 1).
+
+**Concrete recommendation for the next session**: if physical Android device access becomes
+available, run `adb shell am start -W com.rudi.audioplayer/.MainActivity` (or set up a proper
+Macrobenchmark test) before requesting another cold-start batch. Without real numbers, a future
+session can only either re-search for the same now-exhausted bug class or start guessing in
+meaningfully riskier territory.
+
+**0 code files touched this batch** — pure audit + documentation, same precedent as Batch 384
+when no safe code work remained to do.
+
 ## Batch 387 — Optimasi cold-start: WorkManager on-demand initialization, `AndroidManifest.xml` + `AudioPlayerApplication.kt`, 2 file
 User instruksi: "next" (lanjutan sesi yang sama setelah Batch 386). User lalu mengklarifikasi
 status proyek lewat pertanyaan sesi ini: "banner status discontinued itu permanen, yang beda

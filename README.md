@@ -24,8 +24,50 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 387 (optimasi cold-start: WorkManager on-demand initialization,
-> `AndroidManifest.xml` + `AudioPlayerApplication.kt`, 2 file):** User: "next" (lanjutan sesi
+> 🆕 **Update terbaru — Batch 390 (verifikasi integritas + repack, `FILE_MANIFEST.txt`
+> dikoreksi, 0 file kode):** User: "repack lalu lampirkan skrip termux nya!!" — tanpa laporan bug/
+> instruksi kerja baru, diperlakukan sama seperti Batch 320 (repack verifikasi murni, netral
+> terhadap status DISCONTINUED). Full-sweep (bukan spot-check): `diff` `FILE_MANIFEST.txt` vs isi
+> ZIP menemukan 1 drift nyata — `ui/theme/IosScrollPhysics.kt` (dibuat Batch 364) ternyata tidak
+> pernah masuk manifest selama 26 batch, sekarang ditambahkan (188→189 file tercatat). Brace/paren/
+> bracket balance dicek ke SEMUA 127 file `.kt` + 3 `.kts` (0 timpang) dan seluruh 22 file `.xml`
+> divalidasi (0 error) — 0 bug kode ditemukan. `.github/workflows/build.yml`/`.gitignore` tetap
+> tercatat di manifest walau tidak ikut ZIP sesi ini — itu memang by design (skrip Termux Update
+> Harian sengaja skip dotfile saat replace isi folder), bukan drift. **0 file kode diubah** — cuma
+> `FILE_MANIFEST.txt` dikoreksi. Detail lengkap CHANGELOG.md Batch 390.
+> Batch 389 (optimasi cold-start: overlapPlayer/CrossfadeEngine lazy init,
+> `PlaybackService.kt`, 1 file): User: "lanjut progress optimize!!" (lanjutan sesi optimasi
+> Batch 385→386→387→388). Batch 388 menandai "setup ExoPlayer/MediaSession di `PlaybackService`"
+> sebagai kandidat yang belum diperiksa detail — batch ini masuk lebih dalam ke titik spesifik itu.
+> Root cause: `onCreate()` selalu membangun DUA `ExoPlayer` penuh tiap Service dibuat — `player`
+> (session) DAN `overlapPlayer` (privat, cuma dipakai `CrossfadeEngine`, fitur Crossfade True Fade
+> Batch 102) — unconditional, walau `CrossfadeStore.isEnabled()` default `false` (opt-in). Di
+> config default, ExoPlayer kedua lengkap dgn renderer/decoder/AudioTrack native dibangun tiap
+> cold start padahal `CrossfadeEngine.maybeStartCrossfade()` sendiri `return` di baris pertama
+> kalau fitur mati — digrep, tidak ada jalur lain yang menyentuhnya lebih jauh. Kelas bug sama
+> persis dgn WorkManager (Batch 387). Fix: dipindah ke `ensureCrossfadeEngine(sessionPlayer)` —
+> early-return kalau sudah dibangun, dipanggil dari `onCreate()` HANYA kalau Crossfade sudah ON
+> sejak sebelum cold start (zero behavior change buat user ini), dan dari `onCustomCommand
+> ACTION_SET_CROSSFADE_ENABLED` saat baru dinyalakan pertama kali sesi ini. **Trade-off yang
+> didokumentasikan jujur** (beda dari Batch 385/386 murni zero-cost): user yang menyalakan
+> Crossfade dari Settings mid-session menanggung biaya konstruksi `ExoPlayer.Builder().build()`
+> tepat di titik toggle (bukan lagi lebih awal saat Service dibuat) — risiko dinilai rendah krn
+> ini titik UI toggle, bukan jalur audio aktif. **Belum ditest di device asli ATAU build/lint
+> sungguhan** — tidak ada kotlinc/Android SDK/network di environment kerja sesi ini. **Status
+> DISCONTINUED tetap permanen tidak diubah.** Detail lengkap CHANGELOG.md Batch 389.
+> Batch 388 (audit lanjutan cold-start, 0 file kode, murni dokumentasi):
+> User: "next" (lanjutan sesi optimasi Batch 385→386→387). Sebelum menulis kode lagi, batch ini
+> mengecek ulang apakah kelas bug yang sama (kerja sinkron/eager yang provably tidak dibutuhkan
+> sedini itu) masih tersisa — Coil `ImageLoaderFactory` sudah lazy, `LyricsDatabase` (Room) sudah
+> singleton lazy dgn 0 call site di jalur cold-start, `MediaController.buildAsync()` sudah async,
+> `installSplashScreen()` sudah pola tercepat tanpa `setKeepOnScreenCondition` custom. **Kesimpulan
+> jujur**: opportunity yang aman dibuktikan murni dari kode sudah habis di layar
+> Application/MainActivity; sisa kandidat (cost Compose first-composition, baseline profile/R8)
+> butuh data pengukuran device asli atau membawa risiko regresi lebih tinggi drpd Batch 385-387 di
+> app yang 0/19 pernah di-QA device fisik. **Status DISCONTINUED tetap permanen tidak diubah.**
+> Detail lengkap CHANGELOG.md Batch 388.
+> Batch 387 (optimasi cold-start: WorkManager on-demand initialization,
+> `AndroidManifest.xml` + `AudioPlayerApplication.kt`, 2 file): User: "next" (lanjutan sesi
 > Batch 386) — user lalu klarifikasi: "banner status discontinued itu permanen, yang beda cuman
 > optimize aplikasi nya!!" — **mulai batch ini, status DISCONTINUED di atas bersifat PERMANEN**
 > saat kerja lanjutannya murni optimasi performa (bukan lagi pengecualian per-batch seperti Batch

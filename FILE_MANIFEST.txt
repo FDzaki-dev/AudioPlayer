@@ -1,7 +1,14 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 188 file
+# Batch 390: app/src/main/java/com/rudi/audioplayer/ui/theme/IosScrollPhysics.kt (dibuat Batch 364)
+# ditemukan tidak pernah masuk manifest — ditambahkan sekarang, 188->189. Ditemukan lewat diff
+# penuh manifest vs isi ZIP (bukan cuma spot-check file yang baru disentuh) saat verifikasi
+# integritas repack. .github/workflows/build.yml & .gitignore TETAP tercatat di manifest ini
+# (mengikuti konvensi 'setara git ls-files') walau TIDAK ikut dikirim di ZIP sesi — sesuai desain:
+# skrip Termux [DAILY UPDATE] sengaja skip `-name '.*'` saat replace isi folder, jadi 2 file itu
+# dikelola permanen di device, bukan lewat siklus ZIP tiap sesi (bukan bug/drift).
+# Total: 189 file (dikoreksi Batch 390 — lihat catatan di bawah)
 
 .github/workflows/build.yml
 .gitignore
@@ -120,6 +127,7 @@ app/src/main/java/com/rudi/audioplayer/ui/VisualizerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/adaptive/WindowAdaptive.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/BlurUtils.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Color.kt
+app/src/main/java/com/rudi/audioplayer/ui/theme/IosScrollPhysics.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Spacing.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/TactileDepth.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Theme.kt

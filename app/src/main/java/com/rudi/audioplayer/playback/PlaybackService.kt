@@ -116,13 +116,18 @@ class PlaybackService : MediaLibraryService() {
         // headset lepas, dua ExoPlayer yang sama-sama minta fokus akan bentrok. Detail mekanisme
         // lengkap + kenapa MediaSession.setPlayer() hot-swap SENGAJA dihindari: lihat
         // CrossfadeEngine.kt (dokumentasi kelasnya) dan CHANGELOG.md Batch 102.
-        val overlapPlayer = ExoPlayer.Builder(this)
-            .setAudioAttributes(audioAttributes, false)
-            .setHandleAudioBecomingNoisy(false)
-            .build()
-        overlapPlayer.setSkipSilenceEnabled(SilenceSkipStore(this).isEnabled())
-        crossfadeEngine = CrossfadeEngine(sessionPlayer = player, overlapPlayer = overlapPlayer, scope = serviceScope)
-        crossfadeEngine?.setEnabled(CrossfadeStore(this).isEnabled())
+        // Batch 389 — overlapPlayer sendiri TIDAK lagi dibangun di sini unconditional. CrossfadeStore
+        // default OFF (opt-in, lihat CrossfadeStore.kt), jadi mayoritas cold start sebelum batch ini
+        // selalu membangun ExoPlayer kedua yang lengkap (native decoder/renderer/AudioTrack) padahal
+        // provably tidak pernah dipakai sesi itu. ensureCrossfadeEngine() di bawah membangunnya LAZY,
+        // hanya kalau Crossfade genuinely pernah aktif (baris di bawah ini utk yang sudah ON sejak
+        // sebelum cold start, atau dari onCustomCommand ACTION_SET_CROSSFADE_ENABLED kalau dinyalakan
+        // belakangan) — bukan fitur/behavior baru, hasil akhir yang user lihat identik: 100% sama
+        // seperti sebelum batch ini di kedua kasus (mati tetap mati, nyala tetap nyala & tetap
+        // instance yang sama sepanjang hidup Service begitu pernah dibangun).
+        if (CrossfadeStore(this).isEnabled()) {
+            ensureCrossfadeEngine(player).setEnabled(true)
+        }
 
         // ExoPlayer assigns its own audio session ID lazily (once the AudioTrack is created).
         // PlayerViewModel talks to playback only through a MediaController, which doesn't expose
@@ -253,6 +258,28 @@ class PlaybackService : MediaLibraryService() {
      * overlay bisa dicabut user dari Pengaturan sistem kapan saja tanpa lewat toggle app ini
      * sama sekali, device settings selalu menang atas preferensi in-app (pola sama persis
      * BubbleBootReceiver.kt). */
+    /** Batch 389 — builds overlapPlayer (ExoPlayer KEDUA, lihat dokumentasi lengkap di
+     * CrossfadeEngine.kt) + CrossfadeEngine sekali, hanya saat Crossfade genuinely diaktifkan
+     * (dipanggil dari onCreate kalau sudah ON sejak sebelum cold start, atau dari onCustomCommand
+     * ACTION_SET_CROSSFADE_ENABLED kalau baru dinyalakan user belakangan). Early-return kalau
+     * sudah pernah dibangun sesi ini — instance yang sama dipakai sepanjang hidup Service persis
+     * seperti sebelum batch ini, cuma titik pembuatannya yang mundur. AudioAttributes overlapPlayer
+     * dibaca balik dari `sessionPlayer.audioAttributes` (Player interface, bukan dibangun ulang
+     * dari nol) — nilainya sendiri cuma di-set SEKALI saat `player` dibangun di onCreate dan tidak
+     * pernah diubah lagi sepanjang hidup Service (digrep app-wide), jadi ini selalu 100% sama
+     * dengan yang dipakai `player`, valid dipanggil dari titik mana pun sesudahnya. */
+    @UnstableApi
+    private fun ensureCrossfadeEngine(sessionPlayer: ExoPlayer): CrossfadeEngine {
+        crossfadeEngine?.let { return it }
+        val overlapPlayer = ExoPlayer.Builder(this)
+            .setAudioAttributes(sessionPlayer.audioAttributes, false)
+            .setHandleAudioBecomingNoisy(false)
+            .build()
+        overlapPlayer.setSkipSilenceEnabled(SilenceSkipStore(this).isEnabled())
+        return CrossfadeEngine(sessionPlayer = sessionPlayer, overlapPlayer = overlapPlayer, scope = serviceScope)
+            .also { crossfadeEngine = it }
+    }
+
     /** Gap List #7 (Batch 109) — dipanggil dari `onCustomCommand` (ViewModel set sleep timer
      * baru) DAN dari `resumeSleepTimerFromStore` (restore setelah proses/Service dibuat ulang).
      * `endAtMillis` SELALU absolut (epoch millis), bukan durasi — supaya kalkulasi sisa waktu
@@ -599,7 +626,21 @@ class PlaybackService : MediaLibraryService() {
                 // menjangkaunya langsung. setEnabled(false) di sini juga otomatis membatalkan
                 // crossfade yang sedang berlangsung (lihat CrossfadeEngine.abort()).
                 val enabled = args.getBoolean(EXTRA_CROSSFADE_ENABLED, false)
-                crossfadeEngine?.setEnabled(enabled)
+                if (enabled) {
+                    // Batch 389 — kalau ini pertama kalinya Crossfade dinyalakan sesi ini,
+                    // crossfadeEngine masih null (overlapPlayer belum pernah dibangun, lihat
+                    // ensureCrossfadeEngine() di atas) — bangun sekarang. Sudah ada = no-op,
+                    // langsung setEnabled(true) di instance yang sama seperti sebelum batch ini.
+                    val sessionPlayer = mediaSession?.player as? ExoPlayer
+                    if (sessionPlayer != null) {
+                        ensureCrossfadeEngine(sessionPlayer).setEnabled(true)
+                    }
+                } else {
+                    // Belum pernah dibangun (crossfadeEngine null) = tidak ada apa pun utk
+                    // dimatikan, sama seperti overlapPlayer yang juga belum pernah ada sebelum
+                    // batch ini kalau OFF sejak awal — no-op yang identik secara hasil akhir.
+                    crossfadeEngine?.setEnabled(false)
+                }
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
             if (customCommand.customAction == ACTION_SET_SLEEP_TIMER) {
