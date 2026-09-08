@@ -1,5 +1,71 @@
 # Changelog
 
+## Batch 387 — Optimasi cold-start: WorkManager on-demand initialization, `AndroidManifest.xml` + `AudioPlayerApplication.kt`, 2 file
+User instruksi: "next" (lanjutan sesi yang sama setelah Batch 386). User lalu mengklarifikasi
+status proyek lewat pertanyaan sesi ini: "banner status discontinued itu permanen, yang beda
+cuman optimize aplikasi nya!!" — lihat `PROJECT_STATE.md` § "ATURAN SESI AKTIF" ("KLARIFIKASI
+PERMANEN, Batch 387") untuk rule barunya: mulai batch ini, instruksi lanjutan yang murni optimasi
+performa tidak lagi dianggap membuka kembali proyek, secara permanen (bukan pengecualian per-batch
+seperti Batch 385/386). **Status DISCONTINUED tetap tidak diubah.**
+
+**Root cause**: `androidx.work:work-runtime-ktx:2.11.2` bundles its own initialization through a
+`ContentProvider` — since WorkManager 2.6, this is the shared `androidx.startup.InitializationProvider`
+(AndroidX App Startup), not a dedicated WorkManager-only provider. Every ContentProvider an app's
+own package declares is instantiated by the platform BEFORE that app's `Application.onCreate()`
+even begins — strictly earlier than anything Batch 385 or 386 could ever reach, since both of
+those only optimize code that already runs inside or after `Application.onCreate()`. That default
+initialization does real synchronous work on the main thread (setting up WorkManager's own
+Room-backed work database) for a feature — `LyricsPrefetchWorker`, a background lyrics-prefetch
+job that only fires over an unmetered (WiFi) connection — that is provably not needed anywhere
+near that early.
+
+Grepping the entire app for `WorkManager.getInstance(` turns up exactly one call site:
+`LyricsPrefetchWorker.enqueue()`, itself only ever called from `PlaybackService`'s
+`Player.Listener.onMediaItemTransition()` callback — i.e. only once a song has actually started
+playing. That in turn requires `MainActivity`'s `connect()` to have already kicked off the async
+`MediaController.Builder(...).buildAsync()` bind and a media item to have actually transitioned,
+which cannot happen before cold start's critical path (process start through the first rendered
+frame) has already finished. Every cold start pays WorkManager's full default setup cost whether
+or not the user ever actually plays a song that session, or is even online.
+
+**Fix**: `AndroidManifest.xml` now merges (`tools:node="merge"`) into the
+`androidx.startup.InitializationProvider` entry and removes (`tools:node="remove"`) only the
+specific `androidx.work.WorkManagerInitializer` meta-data node — not the shared App Startup
+provider itself, so this coexists correctly with any other library also relying on App Startup.
+`AudioPlayerApplication.kt` now implements `Configuration.Provider`
+(`override val workManagerConfiguration: Configuration get() = Configuration.Builder().build()`
+— the exact same unmodified default the removed initializer used internally, so no runtime
+WorkManager behavior changes, only its *timing*). This is Google's own documented "on-demand
+initialization" pattern: WorkManager is now initialized lazily, internally, by the framework
+itself, the first time anything actually calls `WorkManager.getInstance(context)` — comfortably
+after cold start's critical path has already completed, instead of unconditionally before
+`Application.onCreate()` even starts.
+
+**Honestly documented trade-off** (unlike Batch 385/386, this is not pure zero-behavior-change):
+AndroidX's own documentation notes that on-demand initialization delays WorkManager's automatic
+work-rescheduling after a process crash or force-stop until the next `getInstance()` call. Judged
+acceptable here because the only work this app ever schedules (`LyricsPrefetchWorker`) is already
+a best-effort, already-lossy prefetch that silently swallows its own failures by design (see that
+class's own kdoc) — nothing else in the app depends on it completing reliably or on any strict
+timing guarantee.
+
+A version-specific correctness note: the manifest syntax for disabling WorkManager's default
+initializer differs between versions older than 2.6 (a dedicated
+`androidx.work.impl.WorkManagerInitializer` provider) and 2.6+ (the shared App Startup provider
+used here, matching this project's actual `2.11.2`) — using the older syntax against this version
+would likely either silently no-op (defeating the whole point) or fail the manifest merge outright.
+This was checked against current AndroidX documentation before writing the fix, specifically
+because guessing wrong here is a build-time failure mode invisible to a pure code read.
+
+**2 files touched** (`AndroidManifest.xml`, `AudioPlayerApplication.kt`) — consistent with the
+max-3-files/task limit; 0 other Kotlin source files changed.
+
+**Not tested on a real device or a real build** — same physical-device constraint as Batch
+385/386, but this batch specifically also needs a real Gradle build/lint pass
+(`./gradlew :app:assembleRelease` / `lintVitalRelease`) before it can be fully trusted: manifest
+merging and the `RemoveWorkManagerInitializer` lint check (severity Fatal) are error classes that
+only surface at actual build time, not from reading the code and manifest alone.
+
 ## Batch 386 — Optimasi cold-start (lanjutan Batch 385): buang 1 pemanggilan `loadCustomFolderInfos()` percuma di property initializer, `PlayerViewModel.kt`, 1 file kode
 User instruksi (sama persis Batch 385): "lanjut optimize aplikasi tanpa mengubah status
 terkini"; fokus dipilih user lagi (dari opsi yang ditawarkan): startup/cold-start speed.

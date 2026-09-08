@@ -24,23 +24,36 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 386 (lanjutan optimasi cold-start Batch 385: buang 1 pemanggilan
+> 🆕 **Update terbaru — Batch 387 (optimasi cold-start: WorkManager on-demand initialization,
+> `AndroidManifest.xml` + `AudioPlayerApplication.kt`, 2 file):** User: "next" (lanjutan sesi
+> Batch 386) — user lalu klarifikasi: "banner status discontinued itu permanen, yang beda cuman
+> optimize aplikasi nya!!" — **mulai batch ini, status DISCONTINUED di atas bersifat PERMANEN**
+> saat kerja lanjutannya murni optimasi performa (bukan lagi pengecualian per-batch seperti Batch
+> 385/386, lihat `PROJECT_STATE.md` § "ATURAN SESI AKTIF" untuk rule lengkapnya). Root cause:
+> `androidx.work:work-runtime-ktx` menginisialisasi dirinya lewat `ContentProvider`
+> (`androidx.startup.InitializationProvider`, App Startup — mekanisme WorkManager sejak versi
+> 2.6) yang Android jalankan SEBELUM `AudioPlayerApplication.onCreate()` sendiri sempat mulai —
+> lebih awal dari titik mana pun yang disentuh Batch 385/386 — padahal satu-satunya pemakaian
+> WorkManager app ini (`LyricsPrefetchWorker`, prefetch lirik saat WiFi) baru pernah dipanggil
+> begitu 1 lagu benar-benar mulai diputar (`PlaybackService.onMediaItemTransition()`, digrep
+> app-wide sebagai satu-satunya call site). Fix: manifest `merge` + `remove` meta-data initializer
+> WorkManager-nya saja (bukan provider App Startup itu sendiri), `AudioPlayerApplication`
+> implement `Configuration.Provider` dengan config default TIDAK diubah — pola resmi Google
+> "on-demand initialization", WorkManager kini di-init lazy oleh framework sendiri di panggilan
+> pertama, bukan lagi wajib tiap cold start. **Trade-off yang didokumentasikan jujur** (beda dari
+> Batch 385/386 yang zero behavior change murni): auto-reschedule WorkManager setelah crash/
+> force-stop tertunda sampai panggilan berikutnya — diterima krn satu-satunya worker app ini
+> sudah best-effort & menelan gagalnya sendiri diam-diam by design. **Belum ditest di device asli
+> ATAU build/lint sungguhan** — manifest-merge & lint rule `RemoveWorkManagerInitializer`
+> (severity Fatal) cuma kelihatan saat build asli. Detail lengkap CHANGELOG.md Batch 387.
+> Batch 386 (lanjutan optimasi cold-start Batch 385: buang 1 pemanggilan
 > `loadCustomFolderInfos()` yang percuma di property initializer `PlayerViewModel.kt`, 1 file
-> kode):** User: "lanjut optimize aplikasi tanpa mengubah status terkini" (fokus dipilih user
-> lagi: startup/cold-start speed) — **status DISCONTINUED di atas SENGAJA TIDAK diubah**, override
-> eksplisit user hanya untuk batch ini (pola sama Batch 385, lihat `PROJECT_STATE.md` § "Batch
-> terakhir yang selesai" utk rule aslinya). Root cause: `_customFolders` diinisialisasi
-> `MutableStateFlow(loadCustomFolderInfos())` — tiap folder custom tersimpan memicu round-trip
-> Binder (`DocumentFile.fromTreeUri().name` + `contentResolver.persistedUriPermissions`), bukan
-> pembacaan murah — lalu begitu `connect()` (dipanggil MainActivity SEGERA sesudahnya, sebelum
-> `setContent {}`) menjalankan `refreshLibrary()` pertama kali, fungsi yang SAMA dipanggil ULANG
-> (`_customFolders.value = loadCustomFolderInfos()`) sebelum composable mana pun sempat collect
-> nilai constructor-nya — kerja Binder dobel per folder custom, 100% percuma. Fix: constructor
-> sekarang default `emptyList()` (pola sama `_librarySongs`), `refreshLibrary()` tetap yang
-> mengisi nilai sebenarnya seperti sebelumnya — nilai akhir yang benar-benar terlihat composable
-> identik, zero behavior change. User TANPA folder custom aktif: 0 dampak (sudah 0 biaya dari
-> awal). **Belum ditest di device asli** — sama seperti Batch 385, butuh pengukuran cold-start
-> nyata utk konfirmasi, bukan cuma pembacaan kode. Detail lengkap CHANGELOG.md Batch 386.
+> kode): Root cause `_customFolders` diinisialisasi `MutableStateFlow(loadCustomFolderInfos())` —
+> tiap folder custom tersimpan memicu round-trip Binder (`DocumentFile.fromTreeUri().name` +
+> `contentResolver.persistedUriPermissions`) — lalu `refreshLibrary()` memanggil ULANG fungsi yang
+> sama sebelum composable mana pun sempat collect nilai constructor-nya, kerja Binder dobel per
+> folder custom, 100% percuma. Fix: constructor default `emptyList()`, `refreshLibrary()` tetap
+> yang mengisi nilai sebenarnya — zero behavior change. Detail lengkap CHANGELOG.md Batch 386.
 > Batch 385 (optimasi cold-start: prewarm 28 file SharedPreferences dari background thread di
 > `Application.onCreate()`, `AudioPlayerApplication.kt`, 1 file kode): Root cause `PlayerViewModel`
 > membuka 23 file SharedPreferences lewat property initializer-nya sendiri (+5 file lain dari

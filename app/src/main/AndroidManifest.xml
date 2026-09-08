@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -155,6 +156,41 @@
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Batch 387 (cold-start optimization) — `androidx.work:work-runtime-ktx:2.11.2`
+             initializes itself through the shared `androidx.startup.InitializationProvider`
+             ContentProvider (WorkManager >= 2.6 no longer uses its own dedicated
+             `androidx.work.impl.WorkManagerInitializer` provider — confirmed against current
+             AndroidX docs, since guessing wrong here either silently does nothing or fails the
+             manifest merge). Android instantiates every ContentProvider the app's own package
+             declares BEFORE `AudioPlayerApplication.onCreate()` even starts (platform process-
+             start order) — earlier than anything Batch 385/386 could ever reach, since those only
+             optimize code that already runs inside/after `Application.onCreate()`. That default
+             init does real synchronous setup (WorkManager's own Room-backed work database) on the
+             main thread for a feature (`LyricsPrefetchWorker`, background lyrics prefetch over
+             WiFi) that is ONLY ever enqueued later from `PlaybackService`'s
+             `onMediaItemTransition()` — i.e. only once a song actually starts playing, which
+             unavoidably requires the async MediaController bind (`MainActivity`'s `connect()`)
+             to finish first. Merging `tools:node="remove"` onto just the
+             `androidx.work.WorkManagerInitializer` meta-data entry (paired with
+             `Configuration.Provider` in `AudioPlayerApplication.kt`, see that file) switches
+             WorkManager to Google's documented "on-demand initialization": it now initializes
+             lazily on the FIRST real `WorkManager.getInstance(context)` call
+             (`LyricsPrefetchWorker.enqueue()`, grep-verified as the ONLY call site app-wide) —
+             comfortably after a song has already started playing — instead of unconditionally on
+             every single cold start whether or not the user ever plays a song, opens the app
+             offline, etc. this session. See `AudioPlayerApplication.kt` kdoc for the documented
+             trade-off (delayed crash-recovery rescheduling) this pattern accepts. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
         </provider>
 
     </application>

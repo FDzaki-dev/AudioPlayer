@@ -1,6 +1,7 @@
 package com.rudi.audioplayer
 
 import android.app.Application
+import androidx.work.Configuration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.rudi.audioplayer.util.AppLogger
@@ -11,12 +12,37 @@ import com.rudi.audioplayer.util.AudioArtFetcher
  * it once here applies everywhere. Crossfading album art in (instead of it popping in the
  * instant a bitmap decodes) masks normal decode latency and is one of the cheapest, most
  * broadly-felt wins for making list/grid scrolling feel smooth. */
-class AudioPlayerApplication : Application(), ImageLoaderFactory {
+class AudioPlayerApplication : Application(), ImageLoaderFactory, Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         AppLogger.init(this)
         warmUpSharedPreferences()
     }
+
+    /**
+     * Batch 387 (cold-start optimization) — required pairing for removing WorkManager's default
+     * `androidx.startup`-based initializer entry in `AndroidManifest.xml` (see that file's
+     * comment for the full root-cause story). Implementing `Configuration.Provider` is what lets
+     * WorkManager fall back to Google's documented "on-demand initialization": instead of the
+     * removed ContentProvider eagerly calling `WorkManager.initialize()` before this class's own
+     * `onCreate()` even runs, the framework now calls it lazily, internally, the first time
+     * ANYTHING calls `WorkManager.getInstance(context)` — the one and only call site is
+     * `LyricsPrefetchWorker.enqueue()`, invoked only after a song has actually started playing.
+     *
+     * `Configuration.Builder().build()` here is the exact same unmodified default the removed
+     * ContentProvider used internally — so the ONLY thing this batch changes is *when*
+     * WorkManager sets itself up (on first real use instead of unconditionally on every cold
+     * start), never how it behaves once initialized: same executor, same min logging level, same
+     * everything else. Documented trade-off of on-demand init generally (per AndroidX's own
+     * guidance): WorkManager's automatic rescheduling after a process crash/force-stop is
+     * delayed until the next `getInstance()` call instead of happening immediately at the next
+     * app launch — acceptable here since the only work this app ever schedules
+     * (`LyricsPrefetchWorker`) is a best-effort, already-lossy background prefetch that silently
+     * swallows its own failures by design (see that class's kdoc), not something anything else
+     * depends on completing reliably.
+     */
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().build()
 
     /**
      * Batch 385 (cold-start optimization) — `PlayerViewModel` (built the instant

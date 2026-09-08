@@ -16,6 +16,19 @@ paling baru (Batch 58 ke atas) — detail Batch 1-57 ada di `PROJECT_STATE_ARCHI
 > user membuka kembali proyek secara eksplisit — baru boleh lanjut seperti biasa, dan hapus/ganti
 > banner "DISCONTINUED" ini (README.md + section ini) di batch itu juga. Detail penutupan &
 > daftar item belum-terverifikasi ada di § "Status penutupan (Batch 384)" di bawah.
+>
+> **KLARIFIKASI PERMANEN (Batch 387)** — user eksplisit: *"banner status discontinued itu
+> permanen, yang beda cuman optimize aplikasi nya!!"*. Ini FIX PERMANEN pada rule reopening di
+> paragraf atas, BUKAN pengecualian per-batch seperti Batch 385/386 sebelumnya (kedua batch itu
+> masing-masing menulis "berlaku HANYA utk batch ini" — bacaan itu SEKARANG SUDAH TIDAK BERLAKU,
+> digantikan klarifikasi ini). Sejak batch ini: instruksi lanjutan yang MURNI soal optimasi
+> performa/cold-start (tanpa fitur/UI/behavior baru) TIDAK PERNAH dianggap "membuka kembali
+> proyek", walau tanpa qualifier "tanpa mengubah status" diulang tiap kali — sesi berikutnya boleh
+> langsung lanjut batch optimasi berikutnya tanpa bertanya ulang ke user soal status. Banner
+> DISCONTINUED (di sini & README.md) TIDAK BOLEH dihapus/diubah oleh kerja optimasi kategori ini,
+> titik. Reopening asli (paragraf di atas) TETAP berlaku SEPENUHNYA utk kategori lain: fitur baru,
+> item `ROADMAP_LIQUID_GLASS_REDESIGN.md`, bugfix non-optimasi, atau perubahan UI/UX — instruksi
+> baru di kategori itu TETAP trigger reopening seperti biasa, rule ini TIDAK mengubahnya.
 
 Detail lengkap ada di § "Aturan sesi: transparansi versi & pesan commit" di BAWAH file ini
 (sengaja diringkas ulang di sini juga, supaya tidak tenggelam kalau sesi cuma sempat baca bagian
@@ -78,6 +91,59 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 387 (Optimasi cold-start — WorkManager on-demand init, `AndroidManifest.xml` +
+`AudioPlayerApplication.kt`, 2 file)** — User instruksi: "next" (lanjutan sesi yang sama; user
+lalu mengklarifikasi lewat pertanyaan sesi ini: "banner status discontinued itu permanen, yang
+beda cuman optimize aplikasi nya!!" — lihat **KLARIFIKASI PERMANEN (Batch 387)** di banner atas
+utk detail lengkap rule barunya). **Status DISCONTINUED TETAP TIDAK diubah** — sekarang rule
+permanen, bukan pengecualian per-batch.
+
+**Root cause**: `androidx.work:work-runtime-ktx:2.11.2` menginisialisasi dirinya sendiri lewat
+`ContentProvider` (`androidx.startup.InitializationProvider`, mekanisme App Startup internal
+WorkManager sejak versi 2.6) yang Android jalankan SEBELUM `AudioPlayerApplication.onCreate()`
+sendiri sempat mulai (tiap `ContentProvider` yang dideklarasikan app sendiri diinisialisasi lebih
+dulu dari `Application.onCreate()`, urutan proses-start platform — LEBIH AWAL dari titik mana pun
+yang disentuh Batch 385/386, karena keduanya cuma optimasi kode yang berjalan di dalam/sesudah
+`Application.onCreate()`). Init default itu benar-benar mengerjakan setup Room-database milik
+WorkManager sendiri di main thread, padahal SATU-SATUNYA pemakaian WorkManager app ini
+(`LyricsPrefetchWorker`, prefetch lirik 10 lagu depan saat WiFi) baru pernah dipanggil dari
+`PlaybackService.onMediaItemTransition()` — cuma begitu 1 lagu benar-benar mulai diputar, yang
+mustahil terjadi sebelum `MediaController` async berhasil connect (`connect()` di `MainActivity`).
+Digrep app-wide: `WorkManager.getInstance(context)` cuma 1 call site di seluruh kode
+(`LyricsPrefetchWorker.enqueue()`), tidak ada jalur lain yang butuh WorkManager sudah siap lebih
+awal dari itu.
+
+**Fix**: `AndroidManifest.xml` — `tools:node="merge"` ke `androidx.startup.InitializationProvider`,
+hapus (`tools:node="remove"`) meta-data `androidx.work.WorkManagerInitializer` khusus (bukan
+provider App Startup itu sendiri, supaya tidak bentrok kalau ada library lain yang juga pakai App
+Startup) — matikan default-init WorkManager. `AudioPlayerApplication.kt` — implement
+`Configuration.Provider` (`override val workManagerConfiguration: Configuration get() =
+Configuration.Builder().build()`, config default TIDAK diubah, PERSIS sama seperti yang dipakai
+initializer bawaan) — ini pola resmi Google "on-demand initialization", WorkManager kini
+di-init LAZY oleh framework sendiri di panggilan `getInstance()` pertama, bukan lagi wajib
+unconditional tiap cold start.
+
+**Konsekuensi yang didokumentasikan jujur** (bukan zero behavior change murni seperti Batch
+385/386): dokumentasi resmi AndroidX sendiri mencatat on-demand init menunda auto-reschedule
+WorkManager setelah proses crash/force-stop sampai `getInstance()` berikutnya dipanggil. Diterima
+di sini karena satu-satunya kerjaan yang pernah dijadwalkan (`LyricsPrefetchWorker`) memang
+best-effort & sudah menelan gagalnya sendiri secara diam-diam by design (lihat kdoc kelasnya) —
+tidak ada apa pun lain yang bergantung pada worker ini selesai tepat waktu.
+
+**2 file disentuh** (`AndroidManifest.xml`, `AudioPlayerApplication.kt`) — konsisten batas
+max-3-file/task. Verifikasi versi API dicek via dokumentasi resmi AndroidX terkini (bukan diambil
+dari ingatan pelatihan semata) sebelum ditulis, karena sintaks manifest-removal WorkManager
+berbeda antara versi <2.6 (`androidx.work.impl.WorkManagerInitializer` dedicated provider) vs
+>=2.6 (App Startup shared provider) — versi lama SALAH utk 2.11.2 dan berisiko no-op diam-diam
+atau gagal manifest-merge.
+
+**Belum ditest di device asli** — sama seperti Batch 385/386: pure code/manifest-reasoning tanpa
+akses device fisik. Selain pengukuran cold-start nyata, batch ini KHUSUSNYA butuh verifikasi
+build/lint asli (`./gradlew :app:assembleRelease` atau `lintVitalRelease`) sebelum benar-benar
+dipercaya — manifest-merge & lint rule `RemoveWorkManagerInitializer` (severity Fatal) adalah
+kelas kesalahan yang cuma kelihatan saat build sungguhan, tidak lewat pembacaan kode statis saja.
+Detail lengkap CHANGELOG.md Batch 387.
+
 **Batch 386 (Optimasi cold-start — lanjutan Batch 385, buang 1 pemanggilan `loadCustomFolderInfos()`
 yang percuma di property initializer, `PlayerViewModel.kt`, 1 file kode)** — User instruksi (sama
 persis Batch 385): "lanjut optimize aplikasi tanpa mengubah status terkini"; fokus dipilih user
