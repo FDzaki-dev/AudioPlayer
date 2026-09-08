@@ -1,5 +1,52 @@
 # Changelog
 
+## Batch 380 — PENDING_IosFlingBehavior.md: 14/14 layar TUNTAS (LyricsSheet, LyricsView), 2 file kode — dokumen pending dihapus
+Tidak ada laporan bug baru dari user batch ini ("lanjut kerjakan pending task"). Batch 376 (race
+condition async `snapTo` vs guard synchronous) masih menunggu verifikasi device asli — belum ada
+laporan hasil baru yang membatalkan/mengubahnya. Sesuai Auto-Read Pending Queue, comot 2 file kode
+terakhir dari antrean `PENDING_IosFlingBehavior.md` (dibuka Batch 364, 12/14 di Batch 379) — sisa
+tinggal 2 file, di bawah batas 3 file kode/task, jadi langsung dituntaskan sekaligus.
+
+**2 file (persis pola reuse dari `LibraryScreen.kt` Batch 364, 0 perubahan di
+`IosScrollPhysics.kt` sendiri)**:
+1. `ui/LyricsSheet.kt` — 1 `LazyColumn` utama (daftar baris lirik ter-parse, auto-scroll ke baris
+   aktif via `animateScrollToItem` saat lirik sinkron) — sesuai hitungan "1 scrollable" pending.
+2. `ui/lyrics/LyricsView.kt` — 2 `LazyColumn` terpisah: `SyncedLyricsContent` (lirik LRC
+   tersinkron, juga pakai `animateScrollToItem` programatik ke baris aktif) & `PlainLyricsContent`
+   (lirik teks polos, `LazyColumn` 1 `item` biasa). Dicek dulu sesuai catatan pending Batch 364:
+   `animateScrollToItem` di `SyncedLyricsContent` cuma jalur auto-scroll terprogram saat lagu
+   berjalan (pakai animation spec-nya sendiri, bukan fling) — list-nya TETAP bisa di-drag manual
+   kapan saja oleh user (mis. baca lirik lebih jauh ke depan/belakang sambil lagu tetap main),
+   jadi `flingBehavior` tetap relevan & tidak bentrok dengan jalur auto-scroll yang terpisah.
+   `PlainLyricsContent` 0 auto-scroll sama sekali, langsung pasang tanpa pertimbangan tambahan.
+
+Tiap lokasi: 1 baris import `rememberIosFlingBehavior` dari `ui.theme` + 1 parameter
+`flingBehavior = rememberIosFlingBehavior()` per `LazyColumn` yang relevan (3 titik total di 2
+file). Checklist pending diupdate — **14/14 tercentang**, dokumen `PENDING_IosFlingBehavior.md`
+**dihapus** sesuai klausul retirement yang tertulis di dokumen itu sendiri ("Hapus dokumen ini
+kalau semua 14 checkbox sudah tercentang... dicatat sebagai selesai di PROJECT_STATE.md/
+CHANGELOG.md batch penutupnya" — riwayat detail per-batch tetap utuh di `CHANGELOG.md`, tidak
+hilang). README.md disamakan: bullet "Kurva fling ala iOS ... 13 dari 15 layar" di seksi "Belum
+selesai / dalam pengerjaan" DIHAPUS (sudah tidak relevan, tidak ada lagi yang "belum selesai" di
+topik ini), seksi fitur lengkap ("Scroll & overscroll ala iOS") diupdate jadi "sudah terpasang di
+seluruh 14 layar berscroll di app ini". Brace/paren balance dicek per file: `LyricsSheet.kt`
+184/184 `()`, 65/65 `{}`, 2/2 `[]` — seimbang bersih. `LyricsView.kt` naive count sempat kelihatan
+timpang (`()` 84/85, `[]` 8/7) — ditelusuri, penyebabnya SATU komentar KDoc pra-eksisting yang
+menulis notasi interval matematika "interval [start,end)" (bracket setengah-terbuka, bukan kode
+asli, tidak disentuh sama sekali di batch ini); setelah komentar & string literal (termasuk regex
+LRC di baris 25) di-strip dari penghitungan, kode aslinya seimbang bersih 70/70 `()`, 25/25 `{}`,
+1/1 `[]`. Dicatat di sini supaya sesi berikutnya tidak bingung kalau menjalankan naive brace-count
+yang sama di file ini dan menyangka ada regresi.
+
+**Belum ditest di device asli** — tidak ada env Android nyata di sesi ini, sama seperti batch-batch
+sebelumnya. **Prioritas cek user**: rasakan glide scroll di sheet Lirik (`LyricsSheet`, baik mode
+lirik biasa maupun saat sync aktif) dan di tampilan lirik fullscreen kalau sudah di-wire ke Now
+Playing (`LyricsView` — `LyricsStateView` sudah siap dipanggil tapi statusnya masih "belum di-wire
+di batch ini" per komentar existing di file, di luar cakupan task ini untuk diubah). Dengan ini,
+**seluruh 14 layar berscroll di app sudah pakai kurva fling ala iOS** — topik
+`PENDING_IosFlingBehavior.md` (dibuka Batch 364) resmi tuntas, tidak ada lagi task rutin dari
+antrean ini untuk batch berikutnya kecuali ada laporan bug baru dari user.
+
 ## Batch 379 — PENDING_IosFlingBehavior.md: 12/14 layar (DuplicateFinderSheet, ABRepeatBookmarkSheet, EqualizerSheet), 3 file kode
 Tidak ada laporan bug baru dari user batch ini ("lanjut kerjakan pending task"). Batch 376 (race
 condition async `snapTo` vs guard synchronous) masih menunggu verifikasi device asli — belum ada

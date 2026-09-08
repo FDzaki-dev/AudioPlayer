@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
 // Batch 245 — Lyrics offline-first 3/4. Baris LRC ter-parse (`timeMs`, `text`), top-level pure
 // data class — testable tanpa Compose runtime.
@@ -93,7 +94,8 @@ private fun SyncedLyricsContent(lrcString: String, currentPositionMs: Long, modi
         state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 120.dp, horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        flingBehavior = rememberIosFlingBehavior()
     ) {
         itemsIndexed(lines) { index, line ->
             val isActive = index == activeIndex
@@ -113,7 +115,7 @@ private fun SyncedLyricsContent(lrcString: String, currentPositionMs: Long, modi
 
 @Composable
 private fun PlainLyricsContent(text: String, modifier: Modifier) {
-    LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(24.dp)) {
+    LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(24.dp), flingBehavior = rememberIosFlingBehavior()) {
         item {
             Text(
                 text = text,

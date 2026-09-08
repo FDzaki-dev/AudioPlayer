@@ -36,6 +36,29 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 380 (TUNTAS antrean `PENDING_IosFlingBehavior.md`: 14/14 layar — `LyricsSheet.kt`,
+`LyricsView.kt`, 2 file kode, dokumen pending dihapus)** — Tidak ada laporan bug baru dari user
+("lanjut kerjakan pending task"); Batch 376 masih menunggu verifikasi device asli. Sisa antrean
+fling behavior (dibuka Batch 364, 12/14 selesai Batch 379) tinggal 2 file — di bawah batas 3 file
+kode/task, langsung dituntaskan sekaligus. Pola reuse persis `LibraryScreen.kt`: import
+`rememberIosFlingBehavior` dari `ui.theme` + parameter `flingBehavior = rememberIosFlingBehavior()`
+di tiap `LazyColumn` yang relevan — 0 perubahan di `IosScrollPhysics.kt` sendiri. `LyricsSheet.kt`
+1 `LazyColumn` sesuai catatan pending. `LyricsView.kt` 2 `LazyColumn` (`SyncedLyricsContent` +
+`PlainLyricsContent`) — dicek dulu sesuai catatan pending Batch 364: `SyncedLyricsContent` MEMANG
+pakai `animateScrollToItem` terprogram (auto-scroll ke baris aktif), tapi itu jalur terpisah dari
+fling (animation spec vs momentum drag) dan list-nya tetap bisa di-drag manual user kapan saja,
+jadi `flingBehavior` tetap relevan dan dipasang di kedua `LazyColumn`. Checklist pending 14/14
+tercentang, dokumen `PENDING_IosFlingBehavior.md` **dihapus** sesuai klausul retirement-nya sendiri
+(riwayat lengkap tetap ada di `CHANGELOG.md` Batch 364-380). README.md disamakan (bullet "13 dari
+15 layar" di "Belum selesai" dihapus, seksi fitur diupdate jadi "seluruh 14 layar"). Brace/paren
+balance dicek per file — `LyricsSheet.kt` seimbang bersih (184/184, 65/65, 2/2); `LyricsView.kt`
+naive count sempat kelihatan timpang murni gara-gara 1 komentar KDoc pra-eksisting berisi notasi
+interval matematika "[start,end)" (bukan kode, tidak disentuh) — setelah strip komentar/string,
+kode aslinya seimbang bersih 70/70/25/25/1/1. **Belum ditest di device asli** — tidak ada env
+Android nyata di sesi ini. **Topik `PENDING_IosFlingBehavior.md` resmi tuntas** — tidak ada lagi
+task rutin dari antrean ini untuk batch berikutnya kecuali ada laporan bug baru dari user. Detail
+lengkap CHANGELOG.md Batch 380.
+
 **Batch 379 (Lanjut antrean `PENDING_IosFlingBehavior.md`: 12/14 layar — `DuplicateFinderSheet.kt`,
 `ABRepeatBookmarkSheet.kt`, `EqualizerSheet.kt`, 3 file kode)** — Tidak ada laporan bug baru dari
 user ("lanjut kerjakan pending task"); Batch 376 masih menunggu verifikasi device asli. Sesuai

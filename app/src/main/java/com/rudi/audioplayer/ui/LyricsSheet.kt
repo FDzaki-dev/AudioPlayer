@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import com.rudi.audioplayer.data.LrcSyncEditor
 import com.rudi.audioplayer.data.LyricsParser
 import com.rudi.audioplayer.data.SyncSession
@@ -260,7 +261,8 @@ fun LyricsSheet(
                         state = listState,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 420.dp)
+                            .heightIn(max = 420.dp),
+                        flingBehavior = rememberIosFlingBehavior()
                     ) {
                         itemsIndexed(lines, key = { index, _ -> index }) { index, line ->
                             val isActive = synced && index == activeIndex
