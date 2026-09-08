@@ -36,6 +36,32 @@ atas file yang terus memanjang):
    berikutnya WAJIB pakai `~/projects/audioplayer`.
 
 ## Batch terakhir yang selesai
+**Batch 382 (Karakter pantulan diselaraskan dengan effect bounce — `dampingRatio` custom baru
+`OVERSCROLL_SETTLE_DAMPING_RATIO` 0.875, `IosScrollPhysics.kt`, 1 file kode)** — User instruksi
+eksplisit: "sesuaikan karakter pantulan agar selaras dengan effect bounce nya" — user sendiri
+sekarang membuka sumbu `dampingRatio` ("karakter pantulan") yang eksplisit dikecualikan Batch 381
+("bukan karakter pantulan"), persis skenario yang sudah diantisipasi KDoc
+`OVERSCROLL_SETTLE_STIFFNESS` Batch 381 sendiri. Root cause: `DampingRatioLowBouncy` (0.75)
+ditetapkan Batch 374 dengan konteks `stiffness` 1500; Batch 381 menurunkan `stiffness` ke 200 tanpa
+`dampingRatio` ikut disesuaikan. Karena waktu settle pegas ∝ 1/(dampingRatio × ωₙ) dengan
+ωₙ = √(stiffness/mass), turunnya `stiffness` sendirian membuat ωₙ turun ≈2,74× — ayunan balik yang
+overshoot-nya sama kecilnya jadi kerasa berlarut ~2,74× lebih lama, mismatch dengan kesan
+"mengambang tegas" yang jadi tujuan `stiffness` 200. Menyamakan laju decay persis butuh
+`dampingRatio` ≈ 2,05 (overdamped, menghapus pantulan total) — bukan yang diminta user (pantulan
+diminta tetap ada, cuma disesuaikan).
+
+**Fix**: `dampingRatio` dinaikkan sebagian menuju redaman kritis via konstanta custom baru
+`OVERSCROLL_SETTLE_DAMPING_RATIO = 0.875f` (titik tengah ARITMETIK dari 2 preset resmi terdekat,
+`LowBouncy` 0.75 & `NoBouncy` 1.0 — tidak ada preset resmi di antaranya; arithmetic mean tepat di
+sini krn `dampingRatio` sudah rasio tak berdimensi, beda dengan `stiffness` yang perlu geometric
+mean). KDoc lengkap (derivasi fisika + arah tuning berikutnya) ditulis mengikuti pola
+`OVERSCROLL_SETTLE_STIFFNESS`. Import `Spring` yang jadi tidak terpakai di kode nyata (cuma
+tersisa di komentar) ikut dihapus. `stiffness` (`OVERSCROLL_SETTLE_STIFFNESS`, 200 sejak Batch 381)
+TIDAK disentuh — sumbu berbeda, di luar laporan ini. Brace/paren balance dicek (strip komentar/
+string dulu): 78/78 `()`, 25/25 `{}`, 0/0 `[]` — identik Batch 381 (wajar, 0 struktur kode baru,
+cuma 1 const + 1 identifier). README.md (blockquote update terbaru) disamakan. **Belum ditest di
+device asli**. Detail lengkap CHANGELOG.md Batch 382.
+
 **Batch 381 (Efek bounce settle overscroll dibuat lebih maksimal mengambang —
 `OVERSCROLL_SETTLE_STIFFNESS` 1500→200 di `IosScrollPhysics.kt`, 1 file kode)** — User instruksi
 eksplisit: "ubah effect bounce (bukan karakter pantulan) jadi lebih maksimal mengambang nya".

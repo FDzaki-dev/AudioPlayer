@@ -8,7 +8,19 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 381 (efek bounce settle overscroll dibuat lebih maksimal
+> 🆕 **Update terbaru — Batch 382 (karakter pantulan diselaraskan dengan effect bounce, konstanta
+> custom baru `OVERSCROLL_SETTLE_DAMPING_RATIO` 0.875, 1 file kode):** User: "sesuaikan karakter
+> pantulan agar selaras dengan effect bounce nya" — user sendiri sekarang membuka sumbu
+> `dampingRatio` yang eksplisit dikecualikan Batch 381. Root cause: `DampingRatioLowBouncy` (0.75)
+> ditetapkan Batch 374 dgn konteks `stiffness` 1500; Batch 381 menurunkan `stiffness` ke 200 tanpa
+> `dampingRatio` ikut disesuaikan — karena waktu settle ∝ 1/(dampingRatio × ωₙ) dgn
+> ωₙ = √(stiffness/mass), turunnya `stiffness` sendirian bikin ωₙ turun ≈2,74×, jadi pantulan yang
+> sama kecilnya kini berlarut ~2,74× lebih lama, mismatch dgn kesan "mengambang tegas" yang jadi
+> tujuan `stiffness` 200. Dinaikkan ke custom `0.875f` (titik tengah aritmetik `LowBouncy` 0.75 &
+> `NoBouncy` 1.0 — tidak ada preset resmi di antaranya) — pantulan tetap ada tapi ekornya lebih
+> ringkas, tanpa lompat ke `NoBouncy` yang menghapus pantulan total. `stiffness`
+> (`OVERSCROLL_SETTLE_STIFFNESS`, 200 sejak Batch 381) tidak disentuh. Belum ditest di device asli.
+> Batch 381 (efek bounce settle overscroll dibuat lebih maksimal
 > mengambang, konstanta `OVERSCROLL_SETTLE_STIFFNESS` diturunkan 1500→200
 > (`Spring.StiffnessLow`), 1 file kode):** User: "ubah effect bounce (bukan karakter pantulan)
 > jadi lebih maksimal mengambang nya" — instruksi eksplisit mengecualikan `dampingRatio`
@@ -16,10 +28,9 @@ memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 > settle). Kata "maksimal" dibaca sebagai lompat ke ujung range yang sudah dipetakan (breakeven
 > [200, 1500] dari catatan Batch 373 sendiri), bukan biseksi halus — diturunkan langsung ke
 > `200f` (`Spring.StiffnessLow`), preset resmi TERENDAH yang tersedia di Compose (tidak ada
-> preset resmi di bawahnya). Kalau nanti kerasa kelewat floating/lambat balik ke posisi normal,
-> naikkan lagi via biseksi geometris (√(200×1500) ≈ 548, breakeven baru). `dampingRatio`
-> (`DampingRatioLowBouncy`, sejak Batch 374) tidak disentuh sama sekali. Belum ditest di device
-> asli.
+> preset resmi di bawahnya). `dampingRatio` (`DampingRatioLowBouncy`, sejak Batch 374) tidak
+> disentuh sama sekali batch itu — kemudian diselaraskan Batch 382 di atas. Belum ditest di
+> device asli.
 > Batch 376 (FIX: jaring pengaman Batch 375 TIDAK kepicu — race condition
 > async `snapTo` vs guard synchronous, `IosScrollPhysics.kt`, 1 file kode):** User laporan hasil
 > Batch 375: "masih ada delay-nya, belum kepakai" (jaring pengamannya sendiri tidak kepicu) + fase

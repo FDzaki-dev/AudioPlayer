@@ -1,5 +1,53 @@
 # Changelog
 
+## Batch 382 — Karakter pantulan diselaraskan dengan effect bounce (stiffness 200), `dampingRatio` custom baru `OVERSCROLL_SETTLE_DAMPING_RATIO` 0.875, 1 file kode
+User instruksi eksplisit: "sesuaikan karakter pantulan agar selaras dengan effect bounce nya" —
+user sendiri sekarang membuka sumbu `dampingRatio` ("karakter pantulan") yang eksplisit
+dikecualikan Batch 381 ("bukan karakter pantulan"), persis skenario yang sudah diantisipasi KDoc
+`OVERSCROLL_SETTLE_STIFFNESS` Batch 381 sendiri: "kalau MASIH terasa kurang mengambang meski sudah
+di preset terendah... kemungkinan besar butuh sumbu LAIN (mis. `dampingRatio`) yang ikut
+disesuaikan".
+
+**Diagnosis**: `DampingRatioLowBouncy` (0.75) ditetapkan Batch 374 spesifik dengan `stiffness`
+1500 (`Spring.StiffnessMedium`) sebagai konteksnya. Waktu settle pegas massa-tunggal berbanding
+TERBALIK dengan `dampingRatio × ωₙ`, dengan ωₙ = √(stiffness/mass) — pelajaran fisika yang sama
+yang dipakai di seluruh saga tuning `stiffness` Batch 371/381. Batch 381 menurunkan `stiffness`
+1500→200 TANPA menyentuh `dampingRatio` — ωₙ ikut turun √(1500/200) ≈ 2,74× (dari ≈38,7 ke ≈14,1).
+Karena `dampingRatio` tetap sama, "1 ayunan balik halus lalu settle" yang Batch 374 rancang justru
+sekarang butuh waktu ~2,74× lebih lama secara nyata untuk kembali diam — durasi ayunan yang jauh
+lebih panjang inilah kemungkinan besar akar dari kesan "tidak selaras": pantulan yang overshoot-nya
+sama kecilnya kini kelihatan mengambang lebih lama, mismatch dengan filosofi `stiffness` 200 yang
+justru ditujukan untuk kesan mengambang yang TEGAS di fase settle, bukan pantulan yang berlarut.
+Menyamakan laju decay persis ke nilai lama butuh `dampingRatio` ≈ 2,05 (overdamped, ζ > 1) — itu
+justru menghapus pantulan sama sekali, lebih ekstrem dari `DampingRatioNoBouncy` (1.0) dan bukan
+"menyelaraskan karakter" yang diminta user (pantulan diminta tetap ADA, cuma disesuaikan).
+
+**Perubahan**: `dampingRatio` (`ui/theme/IosScrollPhysics.kt`, dipakai di `settleToZero`) dinaikkan
+sebagian menuju redaman kritis — tidak ada preset resmi `Spring.DampingRatio*` di antara
+`LowBouncy` (0.75) dan `NoBouncy` (1.0), jadi dipakai custom `0.875f` (titik tengah ARITMETIK dari
+2 preset resmi terdekat — arithmetic mean tepat di sini karena `dampingRatio` sudah berupa rasio
+tak berdimensi, beda dengan `stiffness` yang perlu geometric mean karena efeknya ke kecepatan lewat
+akar kuadrat ωₙ = √(stiffness/mass)). Konstanta baru `OVERSCROLL_SETTLE_DAMPING_RATIO` dibuat
+(mengikuti pola `OVERSCROLL_SETTLE_STIFFNESS`, KDoc lengkap dengan derivasi fisika + arah tuning
+berikutnya) dan dipasang di `spring(dampingRatio = ..., stiffness = ...)` menggantikan
+`Spring.DampingRatioLowBouncy` langsung. Pada 0.875, overshoot teoretis
+(`exp(-π·ζ/√(1-ζ²))`) turun jadi ≈0,3% (dari ≈2,8% di 0.75) — pantulan makin halus & ringkas tanpa
+lompat ke `NoBouncy` yang menghapus pantulan total. Import `Spring` yang sudah tidak lagi dipakai
+di kode nyata (hanya tersisa di komentar) ikut dihapus. `stiffness` (`OVERSCROLL_SETTLE_STIFFNESS`,
+200 sejak Batch 381) **TIDAK disentuh** — sumbu berbeda, di luar laporan ini. README.md
+(blockquote "Update terbaru") & posisi ini di CHANGELOG.md disamakan. Brace/paren balance dicek
+(strip komentar & string literal dulu): 78/78 `()`, 25/25 `{}`, 0/0 `[]` — seimbang bersih, identik
+dengan Batch 381 (konsisten dengan fakta bahwa perubahan nyata cuma 1 identifier + 1 const baru,
+0 struktur kode baru).
+
+**Belum ditest di device asli** — tidak ada env Android nyata di sesi ini. **Prioritas cek user**:
+rasakan pegas-balik overscroll setelah jari dilepas di posisi tertarik (rubber-band) — pantulan
+harus tetap kerasa ADA (bukan hilang total) tapi ekornya lebih ringkas/tegas, tidak lagi berlarut
+lama seperti sebelum batch ini. Kalau masih kerasa mengambang kelamaan/ekor kepanjangan: naikkan
+lebih jauh ke arah `1.0f` (breakeven baru [0.875, 1.0], TAPI di titik 1.0 pantulan hilang total).
+Kalau justru sekarang pantulannya nyaris tak kerasa: turunkan balik ke arah `0.75f` (breakeven
+[0.75, 0.875]). Arah tuning lengkap sudah didokumentasikan di KDoc `OVERSCROLL_SETTLE_DAMPING_RATIO`.
+
 ## Batch 381 — Efek bounce settle overscroll dibuat lebih maksimal mengambang, `OVERSCROLL_SETTLE_STIFFNESS` 1500→200, 1 file kode
 User instruksi eksplisit: "ubah effect bounce (bukan karakter pantulan) jadi lebih maksimal
 mengambang nya". Dua bagian dipisah dengan jelas oleh user sendiri, konsisten terminologi yang

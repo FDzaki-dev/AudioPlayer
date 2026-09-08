@@ -3,7 +3,6 @@ package com.rudi.audioplayer.ui.theme
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationState
 import androidx.compose.animation.core.DecayAnimationSpec
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
@@ -161,6 +160,23 @@ import kotlinx.coroutines.launch
 // bisa ditunjuk ke 1 fase — celah balapan ini bisa kena gesture cepat MANA PUN, bukan cuma
 // skenario bezel. `dampingRatio`/`stiffness`/`rubberBandResistance` TETAP TIDAK disentuh.
 
+// Batch 382 — User instruksi eksplisit: "sesuaikan karakter pantulan agar selaras dengan effect
+// bounce nya" — user sendiri sekarang membuka sumbu `dampingRatio` ("karakter pantulan") yang
+// eksplisit dikecualikan Batch 381 ("bukan karakter pantulan"). Root cause: `dampingRatio`
+// (`DampingRatioLowBouncy` 0.75) ditetapkan Batch 374 dgn konteks `stiffness` 1500 — Batch 381
+// menurunkan `stiffness` ke 200 (preset terendah) TANPA `dampingRatio` ikut disesuaikan. Karena
+// waktu settle pegas ∝ 1/(dampingRatio × ωₙ) dgn ωₙ = √(stiffness/mass), turunnya `stiffness`
+// sendirian membuat ωₙ ikut turun ≈2,74× — ayunan balik yang overshoot-nya sama kecilnya
+// (LowBouncy) kini makan waktu jauh lebih lama secara nyata, kerasa berlarut/tidak selaras dgn
+// kesan "mengambang tegas" yang jadi tujuan `stiffness` 200. Fix: `dampingRatio` dinaikkan
+// sebagian ke custom `0.875f` (titik tengah aritmetik `LowBouncy` 0.75 & `NoBouncy` 1.0, TIDAK ada
+// preset resmi di antaranya) via konstanta baru [OVERSCROLL_SETTLE_DAMPING_RATIO] — memangkas ekor
+// ayunan tanpa menghapus pantulan sama sekali (`NoBouncy` eksplisit dihindari, sesuai batas yg
+// sudah didokumentasikan Batch 374). `stiffness` ([OVERSCROLL_SETTLE_STIFFNESS], 200 sejak Batch
+// 381) TIDAK disentuh — sumbu berbeda, di luar laporan ini. Lihat KDoc
+// [OVERSCROLL_SETTLE_DAMPING_RATIO] utk derivasi fisika lengkap (formula overshoot, breakeven arah
+// tuning berikutnya).
+
 /**
  * Porsi dimensi viewport (lebar utk sumbu x, tinggi utk sumbu y) yang jadi jarak "separuh
  * resistance" rubber-band — analog konstanta tension `c` WebKit, dipakai di peran "range" formula
@@ -221,6 +237,57 @@ private fun rubberBandResistance(magnitudePx: Float, rangePx: Float): Float =
  * pengecualian eksplisit user di instruksi batch ini sendiri.
  */
 private const val OVERSCROLL_SETTLE_STIFFNESS = 200f
+
+/**
+ * DampingRatio pegas balik overscroll di [IosRubberBandOverscrollEffect.applyToFling]/
+ * [IosRubberBandOverscrollEffect.settleToZero] — CUSTOM (bukan preset `Spring.DampingRatio*`
+ * resmi), diperkenalkan Batch 382.
+ *
+ * Batch 382 — User instruksi eksplisit: "sesuaikan karakter pantulan agar selaras dengan effect
+ * bounce nya" — user sendiri sekarang secara eksplisit membuka sumbu `dampingRatio` (BENTUK
+ * osilasi, "karakter pantulan") yang sengaja dikecualikan Batch 381 ("bukan karakter pantulan"),
+ * persis skenario yang sudah diantisipasi KDoc [OVERSCROLL_SETTLE_STIFFNESS] Batch 381 sendiri:
+ * "kalau MASIH terasa kurang mengambang meski sudah di preset terendah... kemungkinan besar butuh
+ * sumbu LAIN (mis. `dampingRatio`) yang ikut disesuaikan".
+ *
+ * **Diagnosis**: `DampingRatioLowBouncy` (0.75) ditetapkan Batch 374 spesifik dgn `stiffness` 1500
+ * (`Spring.StiffnessMedium`) sebagai konteksnya. Waktu settle pegas massa-tunggal berbanding
+ * TERBALIK dengan `dampingRatio × ωₙ`, dengan ωₙ = √(stiffness/mass) (mass default Compose = 1,
+ * pelajaran fisika yang sama dipakai [OVERSCROLL_SETTLE_STIFFNESS] Batch 371/381). Batch 381
+ * menurunkan `stiffness` 1500→200 TANPA menyentuh `dampingRatio` — ωₙ ikut turun √(1500/200) ≈
+ * 2,74× (dari ≈38,7 ke ≈14,1). Karena `dampingRatio` tetap sama, "1 ayunan balik halus lalu
+ * settle" yang Batch 374 rancang justru sekarang butuh waktu ~2,74× LEBIH LAMA secara nyata utk
+ * kembali diam — durasi ayunan yang jauh lebih panjang inilah kemungkinan besar akar dari kesan
+ * "tidak selaras": pantulan yang overshoot-nya sama kecilnya kini kelihatan "mengambang-ngambang"
+ * lebih lama alih-alih rubber-band yang tegas, mismatch dengan filosofi `stiffness` 200 yang justru
+ * ditujukan utk kesan mengambang yang TEGAS di FASE SETTLE, bukan pantulan yang berlarut.
+ *
+ * **Kenapa tidak menyamakan laju decay persis**: menyamakan `dampingRatio × ωₙ` ke nilai lama
+ * (Batch 374) butuh `dampingRatio` ≈ 0,75 × 2,74 ≈ 2,05 — overdamped (ζ > 1), yang justru
+ * menghapus pantulan SAMA SEKALI (lebih ekstrem dari `DampingRatioNoBouncy` = 1,0) dan malah
+ * memperlambat pendekatan ke posisi normal — bukan "menyelaraskan karakter" yang diminta. User
+ * minta pantulan tetap ADA, cuma disesuaikan, bukan dihapus.
+ *
+ * **Fix**: dinaikkan sebagian menuju redaman kritis, BUKAN preset resmi (tidak ada preset
+ * `Spring.DampingRatio*` di antara `LowBouncy` 0,75 dan `NoBouncy` 1,0) — pakai custom `0.875f`,
+ * TITIK TENGAH ARITMETIK dari 2 preset resmi terdekat. Rata-rata ARITMETIK (bukan geometris
+ * seperti [OVERSCROLL_SETTLE_STIFFNESS]) krn `dampingRatio` di sini SUDAH berupa rasio tak
+ * berdimensi itu sendiri — beda dgn `stiffness` yang efeknya ke kecepatan lewat akar kuadrat
+ * (ωₙ = √(stiffness/mass)), jadi geometric mean di `stiffness` setara arithmetic mean di ωₙ; tidak
+ * ada lapisan akar kuadrat serupa yang perlu dikompensasi di `dampingRatio`. Pada 0,875, overshoot
+ * teoretis (`exp(-π·ζ/√(1-ζ²))`) turun jadi ≈0,3% (dari ≈2,8% di 0,75) — pantulan makin halus &
+ * ringkas, memangkas ekor ayunan yang memanjang tanpa lompat langsung ke `NoBouncy` (yang
+ * menghapus pantulan total, bukan permintaan user).
+ *
+ * **Belum ditest di device asli.** Kalau abis test masih kerasa "mengambang kelamaan"/ekor
+ * pantulan kepanjangan: naikkan lebih jauh ke arah `1.0f` (`DampingRatioNoBouncy` — breakeven baru
+ * [0.875, 1.0], TAPI di titik 1.0 pantulan hilang total, sesuai batas yang sudah didokumentasikan
+ * Batch 374 sebagai TIDAK diminta). Kalau JUSTRU sekarang pantulannya nyaris tak kerasa/kelewat
+ * "flat": turunkan balik ke arah `0.75f` (breakeven [0.75, 0.875]). `stiffness`
+ * ([OVERSCROLL_SETTLE_STIFFNESS], 200 sejak Batch 381) TIDAK disentuh batch ini — sumbu berbeda,
+ * di luar laporan ini.
+ */
+private const val OVERSCROLL_SETTLE_DAMPING_RATIO = 0.875f
 
 /**
  * Overscroll ala iOS: menggeser KONTEN (bukan menggambar glow di atasnya) saat ditarik lewat
@@ -397,8 +464,10 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
     // info velocity fling sungguhan); jalur [applyToFling] normal tetap kirim `remaining` asli.
     private suspend fun settleToZero(initialVelocity: Offset = Offset.Zero) {
         // Fling selesai sementara konten masih tertarik ke luar batas (mis. fling ke arah luar) —
-        // pegas balik ke 0. `DampingRatioLowBouncy` dipilih (Batch 374, gantikan
-        // `DampingRatioMediumBouncy` Batch 364-373) — lihat catatan Batch 374 di bawah utk alasan.
+        // pegas balik ke 0. `dampingRatio` dimulai dari `DampingRatioLowBouncy` (Batch 374,
+        // gantikan `DampingRatioMediumBouncy` Batch 364-373), lalu disesuaikan lagi jadi custom
+        // [OVERSCROLL_SETTLE_DAMPING_RATIO] (Batch 382, menyelaraskan ke `stiffness` 200 Batch
+        // 381) — lihat catatan Batch 374 & 382 di bawah utk alasan masing-masing.
         //
         // Batch 368 — User laporan regresi: "ditarik maksimal tapi tidak langsung reset ketempat
         // semula". Root cause (verified via kontrak resmi `OverscrollEffect.applyToFling`,
@@ -462,11 +531,23 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
         // penuh) yang akan menghapus pantulan sama sekali (bukan yang diminta — user cuma bilang
         // "tidak natural", bukan "hapus pantulan"). `stiffness` ([OVERSCROLL_SETTLE_STIFFNESS],
         // 1500 sejak Batch 373) TIDAK disentuh — sumbu yang berbeda, di luar laporan ini.
+        //
+        // Batch 382 — User instruksi eksplisit: "sesuaikan karakter pantulan agar selaras dengan
+        // effect bounce nya" — user sekarang membuka sumbu `dampingRatio` yang sengaja
+        // dikecualikan Batch 381 ("bukan karakter pantulan"). Root cause: `stiffness` turun ke 200
+        // (Batch 381, ≈2,74× lebih rendah ωₙ dari 1500 basis tuning `dampingRatio` Batch 374)
+        // tanpa `dampingRatio` ikut disesuaikan — ayunan balik yang overshoot-nya sama kecilnya
+        // jadi kerasa berlarut ~2,74× lebih lama, mismatch dgn kesan "mengambang tegas" yang jadi
+        // tujuan `stiffness` 200. Fix: `DampingRatioLowBouncy` (0.75) -> custom
+        // [OVERSCROLL_SETTLE_DAMPING_RATIO] (0.875, titik tengah aritmetik ke
+        // `DampingRatioNoBouncy`) — lihat KDoc di deklarasi konstanta itu utk derivasi fisika
+        // lengkap + arah tuning berikutnya. `stiffness` ([OVERSCROLL_SETTLE_STIFFNESS], 200 sejak
+        // Batch 381) TIDAK disentuh — sumbu berbeda, di luar laporan ini.
         overscrollOffset.animateTo(
             targetValue = Offset.Zero,
             initialVelocity = initialVelocity,
             animationSpec = spring(
-                dampingRatio = Spring.DampingRatioLowBouncy,
+                dampingRatio = OVERSCROLL_SETTLE_DAMPING_RATIO,
                 stiffness = OVERSCROLL_SETTLE_STIFFNESS,
             ),
         )
