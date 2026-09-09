@@ -1,5 +1,80 @@
 # Changelog
 
+## Batch 405 — Sektor `SDK_INT` legacy mati, kategori "campur API 34": bubble services (2 file kode)
+User instruksi: "next" (lanjutan Batch 404, sektor sama). **Status DISCONTINUED tetap permanen
+tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
+
+Masuk ke kategori kandidat berikutnya yang secara eksplisit ditandai Batch 402 "campur sama titik
+`UPSIDE_DOWN_CAKE` yang WAJIB dipertahankan, jangan asal hapus semua `if/else` di file itu" —
+`FloatingBubbleService.kt` & `BubbleTileService.kt`. Setiap titik `Build.VERSION` di kedua file
+dibaca & diklasifikasi satu-satu dulu (bukan asumsi pola sama dgn 6 file Batch 403-404) sebelum
+satu pun disentuh.
+
+**Katalog per-file (dibaca ulang langsung dari source, bukan cuma dari catatan Batch 402)**:
+- **`FloatingBubbleService.kt`** — 6 titik `Build.VERSION` total: **5 MATI** (N baris 197 di
+  `onDestroy()`; O baris 214 guard notification-channel di `startForegroundWithNotification()`;
+  O baris 279 `overlayType` di `addBubbleView()`; O baris 465 fallback start-service di
+  `sendPlaybackAction()`; Q baris 523 `loadAlbumArtBitmap()`), **1 TETAP relevan** (UPSIDE_DOWN_CAKE
+  baris 241 di `startForegroundWithNotification()` — `FOREGROUND_SERVICE_TYPE_SPECIAL_USE` cuma
+  ada API 34+, device API 31-33 WAJIB tetap lewat `startForeground()` tanpa parameter type).
+- **`BubbleTileService.kt`** — 3 titik `Build.VERSION` total: **1 MATI** (O baris 55, fallback
+  start-service di `onClick()`), **1 TETAP relevan** (UPSIDE_DOWN_CAKE baris 74, `PendingIntent`
+  wrapper utk `startActivityAndCollapse` — API 34+ mengharuskan overload `PendingIntent`, API
+  31-33 masih pakai overload `Intent` langsung yang di-`@Suppress("DEPRECATION")`), **1 BUKAN
+  runtime branch** (`@RequiresApi(Build.VERSION_CODES.N)` baris 33, anotasi class-level buat lint
+  `NewApi` — tidak masuk hitungan titik mati/hidup, dibiarkan apa adanya).
+
+**5+1=6 titik dieksekusi batch ini** (5 di `FloatingBubbleService.kt`, 1 di `BubbleTileService.kt`),
+**2 titik UPSIDE_DOWN_CAKE + 1 anotasi `@RequiresApi` DIBIARKAN utuh** di kedua file:
+1. `onDestroy()` — `stopForeground(STOP_FOREGROUND_REMOVE)` sekarang unconditional (cabang
+   `stopForeground(true)` deprecated pre-N dihapus).
+2. `startForegroundWithNotification()` — guard `if (SDK_INT >= O)` di sekitar pembuatan
+   `NotificationChannel` dihapus, pembuatan channel sekarang selalu jalan (channel WAJIB dibuat di
+   semua API yang didukung app ini, jadi guard-nya sendiri sudah lama redundant sejak `minSdk` 26+
+   dijamin OS — TIDAK diubah logikanya, cuma wrapper `if` yang selalu-true-nya yang hilang). Cabang
+   `UPSIDE_DOWN_CAKE` tepat di bawahnya (baris 241) **TIDAK disentuh sama sekali**.
+3. `addBubbleView()` — `overlayType` sekarang selalu `TYPE_APPLICATION_OVERLAY` (cabang
+   `TYPE_PHONE` deprecated pre-O dihapus).
+4. `sendPlaybackAction()` fallback — selalu `startForegroundService(intent)` (cabang
+   `startService()` pre-O dihapus).
+5. `loadAlbumArtBitmap()` — selalu `contentResolver.loadThumbnail(uri, Size(120,120), null)`
+   (cabang `MediaMetadataRetriever`+`BitmapFactory.decodeByteArray` manual pre-Q dihapus). Import
+   `BitmapFactory` & `MediaMetadataRetriever` dihapus (0 pemakaian lain di file setelah titik ini
+   dihapus, dicek eksplisit — `Build` TETAP di-import krn baris 241 UPSIDE_DOWN_CAKE masih pakai).
+6. `BubbleTileService.kt.onClick()` — selalu `startForegroundService(serviceIntent)` (cabang
+   `startService()` pre-O dihapus). `Build` TETAP di-import (dipakai anotasi `@RequiresApi` baris
+   33 + UPSIDE_DOWN_CAKE baris 74).
+
+**Zero behavior change** di titik yang dihapus, alasan sama Batch 402-404: kondisi yang dihapus
+SELALU true di device manapun yang bisa install app ini (`minSdk` 31 dijamin OS). **2 titik
+UPSIDE_DOWN_CAKE dikonfirmasi TIDAK diubah SAMA SEKALI** (baca ulang file setelah edit, diff
+line-by-line vs versi sebelum edit di kedua titik itu — isinya identik karakter demi karakter).
+
+**Batas jaminan (sama seperti seluruh rangkaian batch sebelumnya)**: 0 `kotlinc`/Android SDK/
+network di environment kerja sesi ini — verifikasi terbatas ke (1) baca-ulang manual tiap titik
+yang diubah + baca ulang seluruh isi 2 file setelah edit (termasuk verifikasi eksplisit 2 titik
+UPSIDE_DOWN_CAKE & 1 anotasi `@RequiresApi` tidak kesenggol), (2) balance kurung/kurawal/bracket
+dicek programatis (Python, string/comment-aware — hasil: `FloatingBubbleService.kt` 199/199 `()`
+65/65 `{}` 0/0 `[]`, `BubbleTileService.kt` 33/33 `()` 9/9 `{}` 0/0 `[]` — semua seimbang), (3)
+diff eksplisit terhadap ZIP Batch 404 — dikonfirmasi CUMA 2 file kode ini yang berubah, 0 file
+lain kesenggol. **Belum diverifikasi build/runtime sungguhan** — cek hasil GitHub Actions setelah
+push; secara khusus butuh verifikasi device fisik di API 31-33 (BUKAN cuma API 34+) supaya jalur
+`else` UPSIDE_DOWN_CAKE yang TIDAK disentuh batch ini terbukti masih berjalan benar sama seperti
+sebelumnya — device test yang cuma API 34+ tidak akan pernah melewati jalur `else` itu sama sekali.
+
+**Rekomendasi konkret utk sesi berikutnya**: kategori "campur API 34" sekarang TUNTAS (2/2 file).
+Sisa sektor `SDK_INT` legacy HANYA 3 file "belum diverifikasi, butuh baca konteks penuh dulu" dari
+katalog Batch 402 — `MusicRepository.kt` (4 titik Q/R/Q/R), `PlaybackService.kt` (5 titik
+M/O/O/Q/Q, salah satu Q ada di `SongArtBitmapLoader` yang dipanggil dari background thread Media3
+`CallbackToFutureAdapter`, perlu baca lebih teliti), `MainActivity.kt` (1 titik O biasa baris 645 +
+kasus BEDA baris 738/744 — shadowing antar-cabang `when`, BUKAN sekadar level API di bawah
+`minSdk`). Ketiganya masuk daftar "file paling berisiko" § Keputusan arsitektur `PROJECT_STATE.md`
+— JANGAN asumsikan pola if/else sama dgn 8 file yang sudah tuntas (Batch 402-405), baca kode
+sungguhan dulu sebelum eksekusi apa pun. Kalau ketiganya juga dianggap terlalu berisiko tanpa
+akses device fisik, sektor `SDK_INT` legacy ini bisa dianggap TUNTAS scope-nya (8/11 file, sisa 3
+sengaja tidak disentuh dgn alasan terdokumentasi) — sesi berikutnya bisa kembali ke kandidat
+Compose yang diblokir sejak Batch 392, atau tanya user arah baru.
+
 ## Batch 404 — Lanjutan sektor `SDK_INT` legacy mati: 3 file "guard return" (3 file kode)
 User instruksi: "next" (lanjutan Batch 403, sektor sama). **Status DISCONTINUED tetap permanen
 tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").

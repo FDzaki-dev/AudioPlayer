@@ -91,6 +91,34 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 405 (Sektor `SDK_INT` legacy mati, kategori "campur API 34": `FloatingBubbleService.kt`/
+`BubbleTileService.kt`)** — User: "next" (lanjutan Batch 404, sektor sama). **Status DISCONTINUED
+tetap permanen tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
+
+Kategori kandidat "campur `UPSIDE_DOWN_CAKE`" (Batch 402) dieksekusi hati-hati: 6 titik dihapus
+total (5 di `FloatingBubbleService.kt` — N/O/O/O/Q; 1 di `BubbleTileService.kt` — O), **2 titik
+`UPSIDE_DOWN_CAKE` (API 34) DIBIARKAN UTUH** (`FloatingBubbleService.kt` baris 241 —
+`FOREGROUND_SERVICE_TYPE_SPECIAL_USE`; `BubbleTileService.kt` baris 74 — `PendingIntent` overload
+`startActivityAndCollapse`), krn API 34 > `minSdk` 31, device API 31-33 masih genuinely butuh
+cabang `else`-nya. **1 anotasi `@RequiresApi(N)` (`BubbleTileService.kt` baris 33) juga dibiarkan**
+— beda mekanisme (lint annotation, bukan runtime branch). Import `BitmapFactory`+
+`MediaMetadataRetriever` dihapus dari `FloatingBubbleService.kt`; `Build` TETAP di-import di
+KEDUA file (masih dipakai titik UPSIDE_DOWN_CAKE/anotasi yang dipertahankan). **Zero behavior
+change** di titik yang dihapus. Balance kurung dicek programatis (semua seimbang), diff eksplisit
+vs ZIP Batch 404 dikonfirmasi cuma 2 file ini berubah, dan 2 titik UPSIDE_DOWN_CAKE dikonfirmasi
+identik char-demi-char sebelum/sesudah edit. Belum diverifikasi build/runtime sungguhan — butuh
+device fisik API 31-33 SECARA KHUSUS (bukan cuma API 34+) supaya jalur `else` yang tidak disentuh
+batch ini terbukti masih jalan benar. Detail lengkap CHANGELOG.md Batch 405.
+
+**Sektor `SDK_INT` legacy — status setelah Batch 405**: 8 dari 11 file katalog Batch 402 TUNTAS
+(6 "polanya identik" Batch 403-404 + 2 "campur API 34" Batch 405). **Sisa 3 file, SEMUA "belum
+diverifikasi, butuh baca konteks penuh dulu"**: `MusicRepository.kt` (4 titik), `PlaybackService.kt`
+(5 titik, salah satu di background thread Media3), `MainActivity.kt` (1 titik biasa + 1 kasus BEDA
+baris 738/744 — shadowing `when`, bukan level API). Ketiganya "file paling berisiko" § arsitektur
+— JANGAN asumsikan pola sama dgn 8 file yang sudah tuntas. Kalau dianggap terlalu berisiko tanpa
+device fisik, sektor ini bisa dianggap TUNTAS scope-nya (8/11) — alternatif: kandidat Compose yang
+diblokir sejak Batch 392, atau tanya user arah baru.
+
 **Batch 404 (Lanjutan sektor `SDK_INT` legacy mati — 3 file "guard return": `RingtoneEncoder.kt`/
 `BackupManager.kt`/`AppLogger.kt`)** — User: "next" (lanjutan Batch 403, sektor sama). **Status
 DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").

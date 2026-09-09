@@ -9,10 +9,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Outline
 import android.graphics.PixelFormat
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
@@ -194,12 +192,7 @@ class FloatingBubbleService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
-        }
+        stopForeground(STOP_FOREGROUND_REMOVE)
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         bubbleScope.cancel() // batalkan bubbleArtJob yang mungkin masih in-flight sekalian
@@ -211,17 +204,15 @@ class FloatingBubbleService : Service() {
      * ini. Ikon & channel-creation-guard meniru persis pola `PlaybackService.
      * startForegroundColdStartNotification()` untuk konsistensi gaya di seluruh proyek. */
     private fun startForegroundWithNotification() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = getSystemService(NotificationManager::class.java)
-            if (manager.getNotificationChannel(NOTIFICATION_CHANNEL_ID) == null) {
-                manager.createNotificationChannel(
-                    NotificationChannel(
-                        NOTIFICATION_CHANNEL_ID,
-                        "Mini Player Mengambang",
-                        NotificationManager.IMPORTANCE_MIN
-                    )
+        val manager = getSystemService(NotificationManager::class.java)
+        if (manager.getNotificationChannel(NOTIFICATION_CHANNEL_ID) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    NOTIFICATION_CHANNEL_ID,
+                    "Mini Player Mengambang",
+                    NotificationManager.IMPORTANCE_MIN
                 )
-            }
+            )
         }
 
         val openAppIntent = Intent(this, MainActivity::class.java)
@@ -276,12 +267,7 @@ class FloatingBubbleService : Service() {
         expanded.findViewById<ImageView>(R.id.bubble_album_art).setImageResource(R.mipmap.ic_launcher)
         minimized.findViewById<ImageView>(R.id.bubble_minimized_art).setImageResource(R.mipmap.ic_launcher)
 
-        val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
+        val overlayType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
         isMinimized = bubbleStore.isMinimized()
         val saved = bubbleStore.getPosition()
@@ -462,7 +448,7 @@ class FloatingBubbleService : Service() {
             else -> {
                 // Fallback: controller belum konek, pakai kontrak Intent yang sama widget pakai.
                 val intent = Intent(this, PlaybackService::class.java).setAction(action)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+                startForegroundService(intent)
             }
         }
     }
@@ -520,17 +506,7 @@ class FloatingBubbleService : Service() {
      * lagu itu sendiri (bukan decode byte mentah, lihat catatan Batch 68 di AudioArtFetcher.kt
      * kenapa pendekatan lain pernah gagal total di sini). */
     private fun loadAlbumArtBitmap(uri: Uri): Bitmap? = try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            contentResolver.loadThumbnail(uri, Size(120, 120), null)
-        } else {
-            val retriever = MediaMetadataRetriever()
-            try {
-                retriever.setDataSource(this, uri)
-                retriever.embeddedPicture?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-            } finally {
-                retriever.release()
-            }
-        }
+        contentResolver.loadThumbnail(uri, Size(120, 120), null)
     } catch (e: Exception) {
         AppLogger.e("FloatingBubbleService", "Gagal muat artwork bubble", e)
         null

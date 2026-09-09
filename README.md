@@ -24,19 +24,19 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 404 (lanjutan sektor `SDK_INT` legacy mati, 3 file "guard
-> return"):** User: "next" — lanjutan Batch 403 (sektor sama). `RingtoneEncoder.kt`/
-> `BackupManager.kt`/`AppLogger.kt` — pola guard `if (SDK_INT < Q) return ...` dihapus total
-> (kondisinya selalu false sejak `minSdk` 31). `AppLogger.kt` (crash logger inti) ditangani
-> ekstra hati-hati: import `Build` sengaja TIDAK dihapus krn masih dipakai buat info device di
-> laporan crash. **Zero behavior change.** Sektor `SDK_INT` legacy "polanya identik" (6 file,
-> Batch 402 rekomendasi) sekarang TUNTAS. Sisa kandidat berikutnya semuanya risiko lebih tinggi
-> (`FloatingBubbleService.kt`/`BubbleTileService.kt`, atau `MusicRepository.kt`/
-> `PlaybackService.kt`/`MainActivity.kt`). **Status DISCONTINUED tetap permanen tidak diubah.**
-> Detail lengkap CHANGELOG.md Batch 404.
-> Batch 403 (lanjutan sektor sama, 3 file if/else):** User: "next". `ApkSignatureChecker.kt`/
-> `BubbleBootReceiver.kt`/`TagEditor.kt` disederhanakan ke jalur API-modern tunggal (cabang
-> deprecated pre-P/M/O/R dihapus). Detail lengkap CHANGELOG.md Batch 403.
+> 🆕 **Update terbaru — Batch 405 (sektor `SDK_INT` legacy mati, kategori "campur API 34", 2
+> file):** User: "next" — lanjutan Batch 404. `FloatingBubbleService.kt`/`BubbleTileService.kt`
+> — 6 cabang legacy dihapus (N/O/Q, selalu true sejak `minSdk` 31), **2 titik `UPSIDE_DOWN_CAKE`
+> (API 34) DIBIARKAN UTUH** (device API 31-33 masih genuinely butuh cabangnya) + 1 anotasi
+> `@RequiresApi(N)` dibiarkan (beda mekanisme, bukan runtime branch). **Zero behavior change** di
+> titik yang dihapus. Sektor `SDK_INT` legacy sekarang 8/11 file tuntas — sisa 3 file "paling
+> berisiko" (`MusicRepository.kt`/`PlaybackService.kt`/`MainActivity.kt`) butuh baca konteks
+> penuh dulu sebelum disentuh. **Status DISCONTINUED tetap permanen tidak diubah.** Detail
+> lengkap CHANGELOG.md Batch 405.
+> Batch 404 (lanjutan sektor sama, 3 file "guard return"):** User: "next". `RingtoneEncoder.kt`/
+> `BackupManager.kt`/`AppLogger.kt` — guard `if (SDK_INT < Q) return ...` dihapus total; `Build`
+> import dipertahankan di `AppLogger.kt` (dipakai info device di crash log). Detail lengkap
+> CHANGELOG.md Batch 404.
 > Batch 400 (optimasi Compose: `remember` list `favoriteSongs` tab Favorit
 > di `LibraryScreen.kt`, 1 file):** User: "next" — lanjutan sesi Compose Batch 392→...→399. Kelas
 > bug `Brush.*Gradient()` & `items()` tanpa `key` sudah 0 sisa (Batch 394/398). Sudut audit baru:
