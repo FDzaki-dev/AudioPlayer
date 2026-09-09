@@ -1,5 +1,64 @@
 # Changelog
 
+## Batch 403 — Lanjutan sektor `SDK_INT` legacy mati: 3 file berpola identik (3 file kode)
+User instruksi: "next" (lanjutan Batch 402, sektor sama). **Status DISCONTINUED tetap permanen
+tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
+
+Melanjutkan urutan prioritas yang direkomendasikan Batch 402: dari 6 file "polanya identik"
+(`ApkSignatureChecker.kt`/`BubbleBootReceiver.kt`/`TagEditor.kt`/`RingtoneEncoder.kt`/
+`BackupManager.kt`/`AppLogger.kt`), 3 file pertama dieksekusi batch ini — cakupan 3-file/batch
+sudah penuh, sisa 3 jadi kandidat sesi berikutnya (lihat rekomendasi di bawah).
+
+**3 file dieksekusi batch ini**:
+1. **`ApkSignatureChecker.kt`** — 2 titik mati (P, baris 37 & 46, katalog Batch 402): `flags`
+   sekarang selalu `PackageManager.GET_SIGNING_CERTIFICATES` (cabang `GET_SIGNATURES` deprecated
+   pre-P dihapus); `signatureBytes` cabang `else` pre-P (`info.signatures` deprecated) dihapus,
+   tinggal jalur `signingInfo` (cek `hasMultipleSigners()` lalu `signingCertificateHistory`).
+   Import `Build` dihapus (0 pemakaian lain di file setelah kedua titik dihapus, dicek eksplisit).
+2. **`BubbleBootReceiver.kt`** — 2 titik mati (M baris 27 — guard majemuk `&&`, O baris 30).
+   Guard majemuk `if (SDK_INT >= M && !canDrawOverlays(context)) return` disederhanakan jadi
+   `if (!Settings.canDrawOverlays(context)) return` — sisi kiri (`SDK_INT >= M`) selalu true jadi
+   redundant, dihapus; sisi kanan (`!canDrawOverlays`) TETAP karena itu bukan API-level check,
+   dikonfirmasi dulu tidak ada branch lain yang bergantung pada sisi kiri sebelum dihapus (sesuai
+   catatan Batch 402 "perlu baca lebih teliti sebelum eksekusi"). Cabang start-service
+   disederhanakan jadi selalu `context.startForegroundService(serviceIntent)` (cabang
+   `startService()` pre-O dihapus). Import `Build` dihapus.
+3. **`TagEditor.kt`** — 1 titik mati (R baris 54, POLA BEDA dari 2 file lain — nested try/catch,
+   bukan if/else murni). Cabang `else` pre-R (`performRewrite()` langsung + catch
+   `RecoverableSecurityException`) dihapus — `writeTags()` sekarang selalu ambil jalur
+   `MediaStore.createWriteRequest()` diikuti `TagWriteResult.NeedsConsent`. Import `Build` DAN
+   `RecoverableSecurityException` dihapus (keduanya 0 pemakaian lain di file). Doc-comment
+   `writeTagsWithConsent()` yang menyebut "jalur Android 10 `RecoverableSecurityException`"
+   diperbarui supaya tidak lagi merujuk kode yang sudah tidak ada — murni dokumentasi menyusul
+   kode, 0 perubahan perilaku.
+
+**Zero behavior change** di ketiganya, alasan sama Batch 402: kondisi yang dihapus SELALU true di
+device manapun yang bisa install app ini sama sekali (`minSdk` 31 dijamin OS, bukan asumsi kode) —
+jalur eksekusi runtime 100% identik sebelum/sesudah.
+
+**Batas jaminan (sama seperti seluruh rangkaian batch sebelumnya)**: 0 `kotlinc`/Android SDK/
+network di environment kerja sesi ini — verifikasi terbatas ke (1) baca-ulang manual tiap titik
+yang diubah + baca ulang seluruh isi 3 file setelah edit, (2) balance kurung/kurawal/bracket
+dicek programatis (Python, string/comment-aware — hasil: `ApkSignatureChecker.kt` 26/26 `()`
+12/12 `{}` 0/0 `[]`, `BubbleBootReceiver.kt` 10/10 `()` 2/2 `{}` 0/0 `[]`, `TagEditor.kt` 46/46
+`()` 20/20 `{}` 0/0 `[]` — semua seimbang), (3) diff eksplisit terhadap ZIP Batch 402 —
+dikonfirmasi CUMA 3 file kode ini yang berubah, 0 file lain kesenggol. **Belum diverifikasi
+build/runtime sungguhan** — cek hasil GitHub Actions setelah push; `TagEditor.kt` secara khusus
+butuh verifikasi end-to-end di device fisik (edit tag lagu sungguhan → dialog consent sistem →
+`writeTagsWithConsent` → rescan MediaStore) krn jalur pre-R yang dihapus itu satu-satunya yang
+sebelumnya tidak melalui dialog consent sama sekali.
+
+**Rekomendasi konkret utk sesi berikutnya**: sektor `SDK_INT` legacy masih ada sisa — 3 file
+"polanya identik" tersisa siap eksekusi (`RingtoneEncoder.kt` Q baris 56, `BackupManager.kt` Q
+baris 85 — keduanya pola guard sama seperti `TagEditor.kt`/nested try-catch; `AppLogger.kt` POLA
+BEDA dari keduanya, guard `if (SDK_INT < Q) return`/`return false` bukan if/else, dipakai crash
+logger jadi perlu ekstra hati-hati krn fungsi observability inti). Setelah 3 file itu tuntas, baru
+masuk `FloatingBubbleService.kt`/`BubbleTileService.kt` (campur titik `UPSIDE_DOWN_CAKE` yang
+WAJIB dipertahankan, jangan asal hapus semua `if/else` di file itu), atau 3 file berisiko tinggi
+(`MusicRepository.kt`/`PlaybackService.kt`/`MainActivity.kt` baris 738/744) yang butuh baca
+konteks penuh dulu — jangan asumsikan pola if/else sama, khususnya `MainActivity.kt` yang
+mekanismenya beda (shadowing antar-cabang `when`, bukan sekadar level API di bawah `minSdk`).
+
 ## Batch 402 — Sektor baru: cabang `SDK_INT` legacy mati sejak bump minSdk 23→31 (3 file kode)
 User instruksi: "lanjut optimize sektor yang belum terjamah!!". **Status DISCONTINUED tetap
 permanen tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").

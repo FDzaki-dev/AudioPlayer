@@ -3,7 +3,6 @@ package com.rudi.audioplayer.bubble
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.provider.Settings
 import com.rudi.audioplayer.data.FloatingBubbleStore
 
@@ -24,13 +23,9 @@ class BubbleBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         if (!FloatingBubbleStore(context).isEnabled()) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        if (!Settings.canDrawOverlays(context)) return
 
         val serviceIntent = Intent(context, FloatingBubbleService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(serviceIntent)
-        } else {
-            context.startService(serviceIntent)
-        }
+        context.startForegroundService(serviceIntent)
     }
 }

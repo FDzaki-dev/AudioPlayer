@@ -91,6 +91,32 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 403 (Lanjutan sektor `SDK_INT` legacy mati — 3 file berpola identik: `ApkSignatureChecker.kt`/
+`BubbleBootReceiver.kt`/`TagEditor.kt`)** — User: "next" (lanjutan Batch 402, sektor sama).
+**Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387 — kategori
+"optimasi murni").
+
+Melanjutkan urutan prioritas Batch 402 (6 file "polanya identik", 3 pertama dieksekusi batch ini):
+`ApkSignatureChecker.kt` (2 titik mati P, flags + signatureBytes, cabang deprecated pre-P
+dihapus), `BubbleBootReceiver.kt` (2 titik mati M+O, guard majemuk disederhanakan +
+start-service selalu foreground), `TagEditor.kt` (1 titik mati R, nested try/catch — cabang
+Android 10 `RecoverableSecurityException` dihapus, `writeTags()` selalu lewat
+`createWriteRequest()`). Import `Build` dihapus di ketiga file; `RecoverableSecurityException`
+juga dihapus dari `TagEditor.kt`. **Zero behavior change** (kondisi yang dihapus selalu true di
+device manapun yang bisa install app ini, dijamin `minSdk` 31). Balance kurung dicek programatis
+(semua seimbang), diff eksplisit vs ZIP Batch 402 dikonfirmasi cuma 3 file ini berubah. Belum
+diverifikasi build/runtime sungguhan (0 kotlinc/SDK/network di sandbox) — `TagEditor.kt` perlu
+verifikasi end-to-end device fisik (dialog consent sistem saat edit tag, krn jalur pre-R yang
+dihapus itu satu-satunya yang sebelumnya skip dialog consent). Detail lengkap CHANGELOG.md
+Batch 403.
+
+**Sisa kandidat "polanya identik" utk sesi berikutnya**: `RingtoneEncoder.kt` (Q baris 56),
+`BackupManager.kt` (Q baris 85), `AppLogger.kt` (POLA BEDA — guard `return`/`return false`,
+dipakai crash logger, ekstra hati-hati). Setelah itu baru `FloatingBubbleService.kt`/
+`BubbleTileService.kt` (campur titik `UPSIDE_DOWN_CAKE` yang WAJIB dipertahankan), lalu 3 file
+berisiko tinggi (`MusicRepository.kt`/`PlaybackService.kt`/`MainActivity.kt` baris 738/744) yang
+butuh baca konteks penuh dulu — jangan asumsikan pola sama.
+
 **Batch 402 (Sektor baru: cabang `SDK_INT` legacy mati sejak bump minSdk 23→31 — 3 file kode)** —
 User: "lanjut optimize sektor yang belum terjamah!!". **Status DISCONTINUED tetap permanen tidak
 diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
