@@ -91,6 +91,39 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 394 (Optimasi Compose — `key` pada LazyRow `items()`, `SmartPlaylistScreen.kt`, 1 file
+kode)** — User instruksi: "lanjut optimize sektor compose!!" (lanjutan sesi Batch 392, dgn Batch
+393 di antaranya sbg HOTFIX build gagal atas Batch 392 itu sendiri). **Status DISCONTINUED tetap
+permanen tidak diubah** (per klarifikasi Batch 387).
+
+Digrep app-wide dulu sebelum menulis kode: SEMUA pemanggilan `LazyColumn`/`LazyRow` `items(...)`
+di `ui/*.kt` (19 titik total) — 17/19 sudah pakai `key = {...}` (identitas stabil per item), sisa
+2 titik (keduanya di `SmartPlaylistScreen.kt`, chip picker Folder & Genre builder Smart Playlist)
+TIDAK punya `key` sama sekali, jatuh ke identitas berbasis posisi index. Beda dari 2 kandidat yang
+sengaja tidak disentuh Batch 392, temuan ini murni inkonsistensi 2 titik vs pola 17 titik lain di
+codebase yang sama — provably salah dari struktur kode, scope PERSIS 1 file.
+
+**Root cause**: `items(availableFolders) { folder -> ... }` & `items(availableGenres) { genreOption
+-> ... }` (keduanya `List<String>` hasil `.distinct().sorted()` dari `LibraryScreen.kt`, dijamin
+unik) tanpa `key`. Tanpa key, kalau daftar folder/genre berubah (library di-rescan, folder/genre
+baru muncul), Compose tidak bisa cocokkan composable lama ke item baru berdasarkan KONTEN, cuma
+posisi slot — memaksa recomposition tidak perlu utk chip yang isinya sebenarnya tidak berubah.
+
+**Fix**: ditambahkan `key = { it }` di kedua `items(...)`, persis pola 17 titik lain app-wide utk
+kasus identik `List<String>` (mis. `items(matchedArtists, key = { it })` di `LibraryScreen.kt`).
+**Zero behavior change** — seleksi FilterChip tetap baca state eksternal
+(`selectedFolders`/`selectedGenre`), bukan state internal per-item, jadi tidak ada risiko regresi
+seleksi.
+
+**1 file kode disentuh** (`SmartPlaylistScreen.kt`, 476 baris). Brace/paren/bracket balance
+seimbang (265/265 `()`, 106/106 `{}`, 4/4 `[]`, sama sebelum & sesudah — murni 2 baris disisipi 1
+parameter). Import `items` sudah ada dari awal (overload yang sama, bukan import baru). Masih
+belum ditest build/lint sungguhan (0 kotlinc/SDK/network di sandbox) — rekomendasi ke user: push &
+jalankan CI sekali lagi sebelum lanjut batch berikutnya. Sisa kandidat compose sector tetap sama
+seperti Batch 392 (`AlbumArt` SubcomposeAsyncImage, stabilitas `List<Song>` app-wide) — belum
+dieksekusi, alasan sama (di luar batas 3-file/risiko regresi). Detail lengkap CHANGELOG.md
+Batch 394.
+
 **Batch 393 (HOTFIX Batch 392 — build gagal, `MainActivity.kt`, 1 file kode)** — User upload
 `log_fail_378.zip` (build-output.log CI run #378) TANPA teks tambahan, diperlakukan sbg laporan
 bug implisit (preseden Batch 29). **Stale Run Guard dicek: log ini valid & langsung relevan** —

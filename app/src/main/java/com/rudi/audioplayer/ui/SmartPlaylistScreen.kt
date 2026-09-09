@@ -317,7 +317,7 @@ private fun SmartPlaylistBuilderSheet(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(availableFolders) { folder ->
+                    items(availableFolders, key = { it }) { folder ->
                         FilterChip(
                             selected = folder in selectedFolders,
                             onClick = {
@@ -345,7 +345,7 @@ private fun SmartPlaylistBuilderSheet(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(availableGenres) { genreOption ->
+                    items(availableGenres, key = { it }) { genreOption ->
                         FilterChip(
                             selected = genreOption == selectedGenre,
                             onClick = {

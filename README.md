@@ -24,7 +24,17 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 393 (HOTFIX Batch 392: build gagal, `MainActivity.kt`, 1
+> 🆕 **Update terbaru — Batch 394 (optimasi Compose: `key` pada LazyRow `items()`,
+> `SmartPlaylistScreen.kt`, 1 file):** User: "lanjut optimize sektor compose!!" — lanjutan sesi
+> Batch 392, dgn Batch 393 di antaranya sbg HOTFIX. Digrep app-wide SEMUA pemanggilan
+> `items(...)` LazyColumn/LazyRow (19 titik) — 17/19 sudah pakai `key`, 2 sisanya (chip Folder &
+> Genre di `SmartPlaylistScreen.kt`) tidak, jatuh ke identitas berbasis posisi index. Tanpa key,
+> perubahan daftar folder/genre (rescan library) memaksa recomposition chip yang isinya sebenarnya
+> tidak berubah. Fix: `key = { it }` ditambahkan di kedua `items(...)`, persis pola 17 titik lain
+> app-wide (`List<String>` unik, aman dipakai langsung sbg key). **Zero behavior change** — seleksi
+> FilterChip tetap baca state eksternal, bukan state internal per-item. **Status DISCONTINUED
+> tetap permanen tidak diubah.** Detail lengkap CHANGELOG.md Batch 394.
+> Batch 393 (HOTFIX Batch 392: build gagal, `MainActivity.kt`, 1
 > file):** User upload `log_fail_378.zip` (CI run #378) tanpa teks — diperlakukan sbg laporan
 > bug implisit (preseden Batch 29). Stale Run Guard dicek: log valid & langsung relevan, 3 error
 > persis menunjuk kode yang Batch 392 baru ubah. Root cause: `remember()`'s `calculation` lambda

@@ -1,5 +1,71 @@
 # Changelog
 
+## Batch 394 — Optimasi Compose: `key` pada LazyRow `items()`, `SmartPlaylistScreen.kt`, 1 file
+User instruksi: "lanjut optimize sektor compose!!" — lanjutan sesi Batch 392 (Compose), dengan
+Batch 393 di antaranya sebagai HOTFIX build gagal atas Batch 392 itu sendiri. **Status
+DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi
+murni").
+
+**Metodologi**: sebelum menulis kode apa pun, digrep app-wide SEMUA pemanggilan
+`LazyColumn`/`LazyRow` `items(...)` di seluruh `ui/*.kt` (19 titik total, app-wide, bukan cuma 1
+file dilihat sekilas). Hasil: **17 dari 19 titik sudah pakai parameter `key = {...}`** (identitas
+stabil per item, best practice resmi Compose untuk `items()` — lihat dokumentasi
+`androidx.compose.foundation.lazy.items`), sisanya **2 titik, KEDUANYA di `SmartPlaylistScreen.kt`**
+(chip picker Folder & Genre di dalam builder Smart Playlist), sama sekali tidak punya `key`. Ini
+konsisten dengan kelas temuan Batch 392 ("provably salah murni dari struktur kode, bukan
+tebakan/butuh data device") — bedanya kali ini buktinya inkonsistensi lawan pola 17 titik lain di
+codebase yang sama persis, bukan aturan compiler seperti Batch 393.
+
+**Root cause**: `items(availableFolders) { folder -> ... }` (baris 320) dan
+`items(availableGenres) { genreOption -> ... }` (baris 348) — keduanya menerima `List<String>`
+yang dipasok `LibraryScreen.kt` (`availableFolderNames`/`availableGenreNames`, masing-masing hasil
+`.distinct().sorted()` dari daftar lagu, jadi ISI-nya dijamin unik) — dipanggil TANPA parameter
+`key`. Tanpa `key`, Compose menjatuhkan diri ke identitas berbasis **posisi index** slot LazyRow,
+bukan konten item. Konsekuensinya: begitu daftar folder/genre berubah (library di-rescan, folder
+baru discan, tag genre baru muncul di metadata lagu, dst — bukan skenario langka di app musik),
+Compose tidak bisa mencocokkan composable LAMA ke item BARU berdasarkan kontennya — item yang
+identitasnya sebenarnya sama (mis. folder "Downloads" tetap "Downloads") bisa dianggap composable
+berbeda kalau posisinya bergeser akibat sorting ulang, memicu recomposition/pembuangan-state yang
+tidak perlu untuk chip yang isinya sebenarnya tidak berubah sama sekali.
+
+**Fix**: ditambahkan `key = { it }` di kedua pemanggilan `items(...)`, PERSIS pola yang sudah
+dipakai konsisten di 17 titik lain app-wide untuk kasus identik `List<String>` (pembanding
+langsung: `items(matchedArtists, key = { it })` dan `items(matchedAlbums, key = { it })` di
+`LibraryScreen.kt` — sama-sama daftar `String` unik dipakai sebagai key literal). **Zero behavior
+change**: logika seleksi FilterChip di kedua blok membaca dari state EKSTERNAL
+(`folder in selectedFolders`, `genreOption == selectedGenre`) — bukan `remember`/state internal
+di dalam lambda item — jadi tidak ada state per-item yang bisa "salah nempel" ke identitas lama;
+perubahan ini murni memperbaiki efisiensi diffing/recomposition Compose, tidak menyentuh hasil
+visual atau perilaku seleksi sama sekali.
+
+**1 file kode disentuh** (`SmartPlaylistScreen.kt`, 476 baris — jumlah baris tidak berubah, cuma
+2 baris disisipi 1 parameter masing-masing). Brace/paren/bracket balance dicek (python3,
+`content.count()` per karakter): 265/265 `()`, 106/106 `{}`, 4/4 `[]` — seimbang, identik sebelum
+& sesudah edit (murni penambahan argumen bernama, 0 struktur baru). Import
+`androidx.compose.foundation.lazy.items` sudah ada dari awal file (baris 9) — parameter `key`
+adalah bagian dari overload fungsi `items()` yang SAMA, bukan import baru/API berbeda. Ditelusuri
+ulang: 0 `remember`/state internal per-item di dalam kedua lambda `items()` yang bergantung pada
+identitas lama berbasis posisi — tidak ada state yang berisiko "salah pindah" akibat perubahan
+strategi keying ini. Diff-checked terhadap ZIP Batch 393: cuma `SmartPlaylistScreen.kt` yang
+berubah.
+
+**Masih belum ditest di build/lint sungguhan** (0 kotlinc/Android SDK/network di environment kerja
+sesi ini) — sama seperti seluruh rangkaian batch optimasi 385-393. Fix ini risikonya jauh lebih
+rendah dari kelas Batch 392/393 (bukan mengubah aturan `@DisallowComposableCalls` compiler, cuma
+menambah 1 parameter opsional bertipe primitif yang sudah dipakai identik di 17 titik lain pada
+file/codebase yang sama) — tapi **tetap direkomendasikan push & jalankan CI** sebelum lanjut batch
+berikutnya, konsisten preseden Batch 24/393 ("seharusnya benar dari pembacaan API" tetap perlu
+dikonfirmasi build asli).
+
+**Sisa kandidat compose sector setelah batch ini** (belum berubah dari Batch 392, keduanya TETAP
+TIDAK dieksekusi batch ini, alasan sama): `AlbumArt`'s `SubcomposeAsyncImage` (butuh `Painter`
+drop-in, risiko regresi visual tint dinamis di 6 titik pakai app-wide) dan stabilitas `List<Song>`
+app-wide (perlu ubah signature Composable lintas banyak file, melampaui batas 3-file/task —
+kandidat inisiatif multi-batch tersendiri, mirip pola `ROADMAP_LIQUID_GLASS_REDESIGN.md`). Plus
+cost riil Compose first-composition & baseline profile/R8 minification (Batch 388) — masih butuh
+data pengukuran device asli (Macrobenchmark/systrace), bukan sesuatu yang bisa dibuktikan/dieksekusi
+aman murni dari pembacaan kode.
+
 ## Batch 393 — HOTFIX Batch 392: build gagal (`@Composable` call di dalam `remember{}`), `MainActivity.kt`, 1 file
 User upload `log_fail_378.zip` (build-output.log, Gradle 8.14.3, CI run #378) — TANPA teks
 instruksi tambahan. Diperlakukan sebagai laporan bug implisit (preseden Batch 29: `log_fail_91.zip`
