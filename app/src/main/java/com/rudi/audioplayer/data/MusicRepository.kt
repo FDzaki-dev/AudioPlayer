@@ -2,7 +2,6 @@ package com.rudi.audioplayer.data
 
 import android.content.ContentUris
 import android.content.Context
-import android.os.Build
 import android.provider.MediaStore
 import java.io.File
 
@@ -70,11 +69,13 @@ class MusicRepository(private val context: Context) {
         val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         val genreMap = buildGenreMap()
 
-        val folderColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStore.Audio.Media.RELATIVE_PATH
-        } else {
-            MediaStore.Audio.Media.DATA
-        }
+        // Sektor SDK_INT legacy mati (Batch 402 katalog, dieksekusi hati-hati batch ini): minSdk
+        // 31 (sejak Batch 290) sudah di atas Q (29) — RELATIVE_PATH SELALU tersedia, cabang DATA
+        // (pre-Q) tidak pernah bisa tereksekusi lagi di device manapun yang bisa install app ini.
+        // deriveFolderName() sendiri (companion object di bawah) TETAP mendukung kedua mode apa
+        // adanya — masih diuji langsung lewat useRelativePath=false di
+        // MusicRepositoryFolderNameTest.kt, fungsinya TIDAK disentuh, cuma call site ini.
+        val folderColumn = MediaStore.Audio.Media.RELATIVE_PATH
 
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
@@ -110,9 +111,10 @@ class MusicRepository(private val context: Context) {
             val composerCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.COMPOSER)
             val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
             val mimeTypeCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.MIME_TYPE)
-            val useModernTrackColumns = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
-            val trackCol = cursor.getColumnIndex(if (useModernTrackColumns) CD_TRACK_NUMBER_COLUMN else MediaStore.Audio.Media.TRACK)
-            val discCol = if (useModernTrackColumns) cursor.getColumnIndex(DISC_NUMBER_COLUMN) else -1
+            // minSdk 31 sudah di atas R (30) — CD_TRACK_NUMBER/DISC_NUMBER SELALU ada, kolom
+            // TRACK gabungan lama (pre-R) tidak pernah dibaca lagi lewat jalur query ini.
+            val trackCol = cursor.getColumnIndex(CD_TRACK_NUMBER_COLUMN)
+            val discCol = cursor.getColumnIndex(DISC_NUMBER_COLUMN)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
@@ -129,16 +131,11 @@ class MusicRepository(private val context: Context) {
                 val fileSize = cursor.getLong(sizeCol)
                 val mimeType = cursor.getString(mimeTypeCol)?.takeIf { it.isNotBlank() }
 
-                val (trackNumber, discNumber) = if (useModernTrackColumns) {
-                    val trackStr = trackCol.takeIf { it >= 0 }?.let { cursor.getString(it) }
-                    val discStr = discCol.takeIf { it >= 0 }?.let { cursor.getString(it) }
-                    parseTrackOrDiscString(trackStr) to parseTrackOrDiscString(discStr)
-                } else {
-                    val legacyRaw = trackCol.takeIf { it >= 0 }?.let { cursor.getInt(it) } ?: 0
-                    parseLegacyTrackColumn(legacyRaw)
-                }
+                val trackStr = trackCol.takeIf { it >= 0 }?.let { cursor.getString(it) }
+                val discStr = discCol.takeIf { it >= 0 }?.let { cursor.getString(it) }
+                val (trackNumber, discNumber) = parseTrackOrDiscString(trackStr) to parseTrackOrDiscString(discStr)
 
-                val folderName = deriveFolderName(rawFolder, Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                val folderName = deriveFolderName(rawFolder, useRelativePath = true)
 
                 val uri = ContentUris.withAppendedId(collection, id)
 
@@ -169,16 +166,12 @@ class MusicRepository(private val context: Context) {
         return songs
     }
 
-    /** API 30+ has dedicated CD_TRACK_NUMBER/DISC_NUMBER string columns; below that, only
-     *  the legacy combined TRACK int column exists. Requesting a column name the OS doesn't
-     *  know about throws `IllegalArgumentException` at query time, so branch project-side
-     *  and read back with `getColumnIndex` (not `getColumnIndexOrThrow`) defensively. */
-    private fun trackDiscColumns(): Array<String> =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            arrayOf(CD_TRACK_NUMBER_COLUMN, DISC_NUMBER_COLUMN)
-        } else {
-            arrayOf(MediaStore.Audio.Media.TRACK)
-        }
+    /** minSdk 31 sudah di atas R (30) — CD_TRACK_NUMBER/DISC_NUMBER SELALU ada di projection,
+     *  cabang TRACK gabungan lama (pre-R) tidak pernah diminta lagi (dihapus, Batch 402 sektor
+     *  SDK_INT legacy mati). Dibaca balik tetap lewat `getColumnIndex` (bukan
+     *  `getColumnIndexOrThrow`) di `querySongs()` — bukan lagi karena API level, tapi jaring
+     *  pengaman kalau provider MediaStore device tertentu genuinely tidak expose kolom ini. */
+    private fun trackDiscColumns(): Array<String> = arrayOf(CD_TRACK_NUMBER_COLUMN, DISC_NUMBER_COLUMN)
 
     companion object {
         private val BASE_SELECTION = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} > 0"

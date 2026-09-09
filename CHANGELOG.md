@@ -1,5 +1,88 @@
 # Changelog
 
+## Batch 406 — Sektor `SDK_INT` legacy mati, file berisiko #1: `MusicRepository.kt` (1 file kode)
+User instruksi: "next" (lanjutan Batch 405, sektor sama). **Status DISCONTINUED tetap permanen
+tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
+
+Masuk ke 3 file "belum diverifikasi, butuh baca konteks penuh dulu" yang ditandai Batch 402/405
+sebagai "file paling berisiko" — `MusicRepository.kt` dipilih duluan (bukan `PlaybackService.kt`/
+`MainActivity.kt`) krn scope-nya paling self-contained: 1 class, 0 dependensi ke lifecycle
+Service/Activity. **Seluruh file dibaca penuh dulu (224 baris) sebelum 1 baris pun disentuh**,
+termasuk 2 file test yang mereferensikannya (`MusicRepositoryFolderNameTest.kt`,
+`MusicRepositoryTrackDiscTest.kt`) — bukan diasumsikan pola sama dgn 8 file Batch 402-405 yang
+sudah tuntas, sesuai peringatan eksplisit PROJECT_STATE.md.
+
+**Temuan kunci sebelum eksekusi (alasan file ini ditandai berisiko, terbukti benar)**: 4 titik
+`Build.VERSION.SDK_INT` (Q/R/Q/R, katalog Batch 402) SEMUANYA di dalam `querySongs()`/
+`trackDiscColumns()` — TAPI 2 dari 4 titik itu memanggil fungsi pure di `companion object`
+(`deriveFolderName(rawFolder, useRelativePath)`, `parseLegacyTrackColumn(raw)`) yang **masih
+diuji LANGSUNG lewat parameter/nilai sisi "lama"** di 2 file test:
+`MusicRepositoryFolderNameTest.kt` eksplisit memanggil `deriveFolderName(..., useRelativePath =
+false)` (8 kasus, baris 40-64), `MusicRepositoryTrackDiscTest.kt` eksplisit memanggil
+`parseLegacyTrackColumn(...)` (5 kasus, baris 38-58). Kedua fungsi TETAP dipertahankan utuh —
+yang dihapus HANYA titik panggilan (`call site`) di `querySongs()`/`trackDiscColumns()` yang
+menentukan CABANG mana yang dipakai berdasar `SDK_INT`, bukan fungsi tujuannya sendiri. Ini beda
+kelas dari 8 file Batch 402-405 sebelumnya (di situ, cabang mati langsung berupa kode inline, 0
+fungsi shared bertingkat yang juga dikonsumsi test terpisah) — persis alasan file ini butuh baca
+detail dulu, bukan pola tempel-cepat.
+
+**4 titik dieksekusi (semua di `MusicRepository.kt`)**:
+1. `querySongs()` — `folderColumn = if (SDK_INT >= Q) RELATIVE_PATH else DATA` → selalu
+   `RELATIVE_PATH` (minSdk 31 > Q/29). Cabang `MediaStore.Audio.Media.DATA` (pre-Q) dihapus.
+2. `querySongs()` — `useModernTrackColumns = SDK_INT >= R` + 2 baris lookup kolom
+   (`trackCol`/`discCol`) yang bercabang atasnya → variabel dihapus total, `trackCol`/`discCol`
+   sekarang selalu baca `CD_TRACK_NUMBER_COLUMN`/`DISC_NUMBER_COLUMN` (minSdk 31 > R/30).
+3. `querySongs()` — blok `if (useModernTrackColumns) {...parseTrackOrDiscString... } else
+   {...parseLegacyTrackColumn...}` → cabang `else` (pemanggilan `parseLegacyTrackColumn` DI
+   SINI) dihapus, selalu jalur `parseTrackOrDiscString`. **`parseLegacyTrackColumn()` sendiri
+   (companion object) TIDAK dihapus** — masih dipertahankan penuh krn `MusicRepositoryTrackDiscTest.kt`
+   memanggilnya langsung sbg pure function (5 test case, independen dari `SDK_INT` device).
+4. `querySongs()` — `deriveFolderName(rawFolder, SDK_INT >= Q)` → `deriveFolderName(rawFolder,
+   useRelativePath = true)` (selalu true). **`deriveFolderName()` sendiri (companion object,
+   parameter `useRelativePath: Boolean`) TIDAK dihapus/disederhanakan** — cabang `else`
+   (`File(rawFolder).parentFile?.name`) tetap ada apa adanya krn
+   `MusicRepositoryFolderNameTest.kt` memanggilnya langsung dgn `useRelativePath = false` (4 test
+   case).
+5. `trackDiscColumns()` — `if (SDK_INT >= R) arrayOf(CD_TRACK_NUMBER_COLUMN, DISC_NUMBER_COLUMN)
+   else arrayOf(TRACK)` → selalu `arrayOf(CD_TRACK_NUMBER_COLUMN, DISC_NUMBER_COLUMN)`. Doc-comment
+   di atasnya diperbarui (bukan dibiarkan basi) — alasan `getColumnIndex` (bukan
+   `getColumnIndexOrThrow`) dijelaskan ulang: sekarang jaring pengaman device-provider, bukan lagi
+   soal API level.
+
+**Verifikasi app-wide sebelum eksekusi** (bukan cuma grep dalam file ini) — `parseTrackOrDiscString()`
+dikonfirmasi masih dipakai `CustomFolderScanner.kt` (2 call site, jalur pemindaian folder custom
+terpisah dari MediaStore) — TIDAK disentuh, di luar scope file ini. `deriveFolderName()`/
+`parseLegacyTrackColumn()`/`trackDiscColumns()`/`useModernTrackColumns` dikonfirmasi 0 dipanggil
+dari file lain mana pun di luar `MusicRepository.kt` sendiri + kedua file test — aman disederhanakan
+di titik panggil tanpa merambat ke consumer lain. Import `Build` dihapus (dicek eksplisit: 0
+pemakaian `Build.` tersisa di seluruh file setelah 4 titik di atas dihapus).
+
+**Zero behavior change** di keempat titik: kondisi yang dihapus SELALU true di device manapun yang
+bisa install app ini (`minSdk` 31 dijamin OS, bukan asumsi). Fungsi pure yang tetap dipertahankan
+(`deriveFolderName`/`parseLegacyTrackColumn`) TIDAK diubah 1 karakter pun — 0 risiko ke 12 test
+case yang menguji keduanya.
+
+**Batas jaminan (sama seperti seluruh rangkaian batch sebelumnya)**: 0 `kotlinc`/Android SDK/
+network di environment kerja sesi ini — verifikasi terbatas ke (1) baca-ulang manual seluruh file
+setelah edit (224→217 baris) + baca ulang 2 file test terkait (dikonfirmasi 0 disentuh, tetap
+akan lolos krn fungsi yang diujinya tidak berubah), (2) balance kurung/kurawal/bracket dicek
+programatis (Python, string/comment-aware): 29/29 `{}`, 92/92 `()`, 2/2 `[]` — seimbang, (3) diff
+eksplisit terhadap ZIP Batch 405 — dikonfirmasi CUMA `MusicRepository.kt` yang berubah, 0 file
+lain kesenggol (termasuk 0 file test tersentuh). **Belum diverifikasi build/runtime sungguhan** —
+WAJIB cek hasil GitHub Actions setelah push, termasuk run unit test JVM (`MusicRepositoryFolderNameTest`/
+`MusicRepositoryTrackDiscTest`, 12 test case gabungan) utk konfirmasi 0 regresi di fungsi yang
+dipertahankan.
+
+**Rekomendasi konkret utk sesi berikutnya**: sektor `SDK_INT` legacy sekarang 9/11 file tuntas.
+Sisa 2 file "belum diverifikasi, butuh baca konteks penuh dulu" dari katalog Batch 402:
+`PlaybackService.kt` (5 titik M/O/O/Q/Q, salah satu Q ada di `SongArtBitmapLoader` yang dipanggil
+dari background thread Media3 `CallbackToFutureAdapter` — kemungkinan besar juga perlu dicek
+apakah ada fungsi pure serupa yang diuji test terpisah, sama seperti temuan batch ini),
+`MainActivity.kt` (1 titik O biasa baris 645 + kasus BEDA baris 738/744 — shadowing antar-cabang
+`when`, BUKAN sekadar level API di bawah `minSdk`, protected asset). JANGAN asumsikan pola sama
+persis dgn `MusicRepository.kt` — tiap file di kelas "berisiko" ini punya alasan berbeda kenapa
+ditandai berisiko (lihat katalog Batch 402/405), baca kode sungguhan dulu.
+
 ## Batch 405 — Sektor `SDK_INT` legacy mati, kategori "campur API 34": bubble services (2 file kode)
 User instruksi: "next" (lanjutan Batch 404, sektor sama). **Status DISCONTINUED tetap permanen
 tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").

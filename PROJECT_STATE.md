@@ -91,6 +91,35 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 406 (Sektor `SDK_INT` legacy mati, file berisiko #1: `MusicRepository.kt`, 1 file kode)**
+— User: "next" (lanjutan Batch 405, sektor sama). **Status DISCONTINUED tetap permanen tidak
+diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
+
+Dibaca penuh dulu (224 baris + 2 file test terkait) sebelum eksekusi, sesuai peringatan eksplisit
+Batch 402/405 (file ini masuk "paling berisiko"). Temuan kunci: 4 titik `SDK_INT` (Q/R/Q/R) di
+`querySongs()`/`trackDiscColumns()`, TAPI 2 di antaranya memanggil fungsi pure companion object
+(`deriveFolderName()`, `parseLegacyTrackColumn()`) yang MASIH diuji langsung sisi "lama"-nya oleh
+`MusicRepositoryFolderNameTest.kt`/`MusicRepositoryTrackDiscTest.kt` (12 test case gabungan). **Fix
+HANYA di titik panggil** (`folderColumn`, `useModernTrackColumns`+lookup kolom, blok if/else
+track/disc, argumen `deriveFolderName`, `trackDiscColumns()`) — kedua fungsi companion object itu
+sendiri **TIDAK disentuh sama sekali**, supaya 0 risiko ke 12 test case yang menguji cabang
+"lama"-nya secara independen dari `SDK_INT` device. `parseTrackOrDiscString()` dikonfirmasi masih
+dipakai `CustomFolderScanner.kt` (di luar file ini, tidak disentuh). Import `Build` dihapus (0
+pemakaian tersisa). **Zero behavior change** — kondisi yang dihapus selalu true di `minSdk` 31.
+Balance kurung dicek programatis (29/29 `{}`, 92/92 `()`, 2/2 `[]`, seimbang), diff eksplisit vs
+ZIP Batch 405 dikonfirmasi cuma 1 file ini berubah (0 file test tersentuh). Belum diverifikasi
+build/runtime sungguhan — WAJIB cek CI termasuk hasil unit test JVM (12 test case) utk konfirmasi
+0 regresi di fungsi yang dipertahankan. Detail lengkap CHANGELOG.md Batch 406.
+
+**Sektor `SDK_INT` legacy — status setelah Batch 406**: 9/11 file tuntas. Sisa 2 file "belum
+diverifikasi, butuh baca konteks penuh dulu": `PlaybackService.kt` (5 titik M/O/O/Q/Q, salah satu
+Q di `SongArtBitmapLoader` yang dipanggil dari background thread Media3), `MainActivity.kt` (1
+titik O biasa baris 645 + kasus BEDA baris 738/744 — shadowing antar-cabang `when`, protected
+asset). JANGAN asumsikan pola sama persis dgn `MusicRepository.kt` — baca kode sungguhan dulu,
+tiap file "berisiko" ini punya alasan beda. Alternatif kalau dianggap terlalu berisiko: sektor ini
+bisa dianggap TUNTAS scope-nya (9/11), lanjut ke kandidat Compose yang diblokir sejak Batch 392,
+atau tanya user arah baru.
+
 **Batch 405 (Sektor `SDK_INT` legacy mati, kategori "campur API 34": `FloatingBubbleService.kt`/
 `BubbleTileService.kt`)** — User: "next" (lanjutan Batch 404, sektor sama). **Status DISCONTINUED
 tetap permanen tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
