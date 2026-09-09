@@ -91,6 +91,34 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 401 (Audit lanjutan Compose recomposition — 0 file kode, murni dokumentasi)** — User:
+"next" (lanjutan sesi optimasi Compose Batch 392→...→400). **Status DISCONTINUED tetap permanen
+tidak diubah** (per klarifikasi Batch 387).
+
+Sebelum menulis kode lagi, batch ini mengecek ulang app-wide apakah kelas bug yang menghasilkan
+Batch 392-400 (allocation objek "mahal" tanpa `remember` di badan composable yang sering recompose
+krn state tak-terkait di scope sama) masih punya sisa titik: `Brush.*Gradient()` tanpa `remember`
+— 0 titik baru (semua sudah `remember`-ed / accepted-cost draw-phase / dead code `auroraGlow`).
+`items()` tanpa `key` — masih 19/19 pakai `key`. Operasi `List` (`.filter{}`/`.sortedBy{}`/
+`.groupBy{}`/dst) tanpa `remember` di badan composable — ditelusuri ulang 13 file, SEMUA titik
+sisa sudah benar `remember`-ed, di dalam event lambda (bukan badan composable), atau genuinely
+perlu jalan tiap tick (`activeLyricIndex` `LyricsView.kt`, linear scan murah, sama kelas
+"accepted cost" dgn `progressFraction` `MiniPlayerBar.kt`). `derivedStateOf` yang seharusnya ada
+(scroll state dibaca langsung di kondisi UI) — 0 occurrence app-wide, tidak ada UI yang butuh pola
+ini. `Regex()`/`BitmapFactory`/`rememberTextMeasurer` dibangun ulang di badan composable — 0
+occurrence.
+
+**Kesimpulan jujur**: kelas bug yang sama menghasilkan Batch 392-400 sudah habis untuk apa yang
+bisa diverifikasi aman dari membaca kode saja tanpa device fisik. Sisa kandidat yang genuinely ada
+(`AlbumArt` `SubcomposeAsyncImage` — 6 titik app-wide, risiko regresi tint dinamis; stabilitas
+`List<Song>` app-wide — ubah signature Composable lintas banyak file, melampaui batas 3-file/task)
+tetap diblokir sejak Batch 392, bukan sesuatu yang baru bisa dipecah lebih kecil. Rekomendasi ke
+user: kalau device fisik tersedia, ukur recomposition count sungguhan (Layout Inspector/
+Macrobenchmark) di tab Favorit `LibraryScreen` + `MiniPlayerBar` selama playback, supaya optimasi
+berikutnya diarahkan ke titik yang TERBUKTI panas — tanpa angka nyata, sesi berikutnya cuma bisa
+mengulang pencarian kelas bug yang sudah habis ini. **0 file kode disentuh batch ini** — murni
+audit + dokumentasi, preseden sama Batch 388/390. Detail lengkap CHANGELOG.md Batch 401.
+
 **Batch 400 (Optimasi Compose — `remember` list `favoriteSongs` tab Favorit di `LibraryScreen.kt`,
 1 file kode)** — User: "next" (lanjutan sesi optimasi Compose Batch 392→...→399). **Status
 DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).

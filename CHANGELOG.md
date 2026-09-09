@@ -1,5 +1,64 @@
 # Changelog
 
+## Batch 401 — Audit lanjutan Compose recomposition: 0 file kode, murni dokumentasi
+User instruksi: "next" (lanjutan sesi optimasi Compose Batch 392→...→400). **Status DISCONTINUED
+tetap permanen tidak diubah**, per klarifikasi Batch 387.
+
+Sebelum menulis kode lagi, batch ini secara khusus mengecek ulang apakah kelas bug yang
+menghasilkan Batch 392-400 (allocation objek "mahal" tanpa `remember` di badan composable yang
+sering recompose krn state tak-terkait di scope sama) masih punya sisa titik, bukan asumsi 9
+batch beruntun berarti yang ke-10 pasti ada:
+
+- **`Brush.*Gradient()` tanpa `remember`** — digrep ulang app-wide (`MiniPlayerBar.kt`,
+  `BlurUtils.kt`, `Theme.kt`, `TactileDepth.kt`, `LibraryScreen.kt`, `NowPlayingScreen.kt`,
+  `MainActivity.kt`): semua occurrence sekarang salah satu dari 3: (a) sudah `remember`-ed
+  (`identityRootBrush` Batch 392, `rowAccentBrush`/`edgeBrush`/accent wash Batch 396-398), (b)
+  deliberately draw-phase/`drawBehind{}` native (skeuEmboss bevel, NavigationBar catch-light —
+  accepted-cost sejak Batch 398), atau (c) `auroraGlow()` — 0 call site (dead code, belum
+  dipasang). 0 titik baru.
+- **`items()` LazyColumn/LazyRow tanpa `key`** — masih 19/19 titik app-wide pakai `key` (tuntas
+  Batch 394, diverifikasi ulang).
+- **Operasi `List` (`.filter{}`/`.sortedBy{}`/`.groupBy{}`/`.map{}`/`.associateBy{}`) tanpa
+  `remember` di badan composable** — kelas yang sama menghasilkan fix Batch 400. Ditelusuri ULANG
+  app-wide (13 file: `LibraryScreen.kt`, `HomeScreen.kt`, `PlaylistScreen.kt`,
+  `SongPickerSheet.kt`, `VaultSheet.kt`, `DuplicateFinderSheet.kt`, `SmartPlaylistScreen.kt`,
+  `SongInfoEditSheet.kt`, `LibrarySearchIndex.kt`, `lyrics/LyricsView.kt`, dll): SEMUA titik yang
+  tersisa sudah salah satu dari 3: (a) sudah `remember`-ed dgn key yang benar (`favoriteSongs`
+  `HomeScreen.kt`/`PlaylistScreen.kt`'s `songMap`/`SongPickerSheet.kt`'s `candidates`+`filtered`/
+  `VaultSheet.kt` x2/`SearchResultsView`'s 3 turunan — semua sudah pola benar), (b) di dalam event
+  lambda (`onClick`/`onValueChange`), bukan badan composable — cuma jalan sekali per klik/keystroke
+  user, bukan per-recompose (`DuplicateFinderSheet.kt`'s `toDelete`, `SmartPlaylistScreen.kt`'s
+  digit-filter input, `LibraryScreen.kt`'s `songsPendingDelete`), atau (c) `activeLyricIndex()`
+  (`LyricsView.kt`) — genuinely perlu jalan ulang tiap `currentPositionMs` tick (linear scan O(n)
+  lirik, bukan alokasi List/objek baru, sama kelas "accepted cost" dgn `progressFraction`
+  `MiniPlayerBar.kt`). 0 titik baru tersisa.
+- **`derivedStateOf` yang seharusnya ada tapi belum** (pola umum lain: baca `LazyListState`/
+  `ScrollState` langsung di kondisi UI tanpa `derivedStateOf`, invalidasi per-pixel-scroll) —
+  digrep app-wide (`firstVisibleItemIndex`, `scrollState.value`, `canScrollBackward`, dst): 0
+  occurrence sama sekali di codebase ini (tidak ada scroll-to-top button / collapsing toolbar yang
+  butuh pola ini).
+- **`Regex()`/`BitmapFactory`/`rememberTextMeasurer` dibangun ulang di badan composable** — digrep
+  app-wide: 0 occurrence (satu-satunya `Regex()` di UI package, `LyricsView.kt`'s
+  `LRC_LINE_REGEX`, sudah top-level `val`, dikompilasi sekali).
+
+**Kesimpulan jujur**: kelas bug yang sama menghasilkan Batch 392-400 (allocation objek yang
+provably tidak perlu diulang tiap recomposition) sudah habis untuk apa yang bisa diverifikasi
+dengan aman dari membaca kode saja, tanpa akses device fisik. Sisa kandidat yang genuinely ada
+(`AlbumArt` `SubcomposeAsyncImage`, stabilitas `List<Song>` app-wide) masing-masing butuh entah
+(a) ubah signature Composable lintas banyak file — melampaui batas 3-file/task, atau (b) risiko
+regresi visual (tint dinamis) yang tidak bisa diverifikasi tanpa device fisik — sama alasan
+diblokir sejak Batch 392, bukan sesuatu yang baru bisa dipecah lebih kecil.
+
+**Rekomendasi konkret utk sesi berikutnya**: kalau akses device Android fisik tersedia, ukur
+recomposition count sungguhan (Layout Inspector "Recomposition counts" atau Macrobenchmark) di tab
+Favorit `LibraryScreen` + `MiniPlayerBar` selama playback, supaya optimasi berikutnya diarahkan ke
+titik yang TERBUKTI panas (bukan cuma provably-benar secara struktural spt batch-batch sebelumnya).
+Tanpa angka nyata, sesi berikutnya cuma bisa mengulang pencarian kelas bug yang sudah habis ini,
+atau mulai masuk ke `AlbumArt`/`List<Song>` yang risikonya lebih tinggi.
+
+**0 file kode disentuh batch ini** — murni audit + dokumentasi, sama preseden Batch 388/390 saat
+tidak ada lagi pekerjaan kode yang aman utk dilakukan.
+
 ## Batch 400 — Optimasi Compose: `remember` list `favoriteSongs` tab Favorit, `LibraryScreen.kt`, 1 file
 User instruksi: "next" — lanjutan sesi optimasi Compose yang sama (Batch 392→...→399), sektor
 belum berubah. **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387 —

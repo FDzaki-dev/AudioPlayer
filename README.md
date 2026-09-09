@@ -24,7 +24,19 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 400 (optimasi Compose: `remember` list `favoriteSongs` tab Favorit
+> 🆕 **Update terbaru — Batch 401 (audit lanjutan Compose recomposition: 0 file kode, murni
+> dokumentasi):** User: "next" — lanjutan sesi Compose Batch 392→...→400. Dicek ulang app-wide:
+> kelas bug `Brush.*Gradient()`/`items()` tanpa `key`/operasi `List` tanpa `remember` (Batch
+> 392-400) sudah 0 sisa titik baru — semua sudah `remember`-ed, accepted-cost draw-phase, di
+> event lambda (bukan badan composable), atau genuinely perlu jalan tiap tick. `derivedStateOf`
+> yang seharusnya ada & `Regex`/`Bitmap` dibangun ulang di badan composable — 0 occurrence
+> app-wide. **Kesimpulan jujur: kelas bug ini habis** untuk apa yang bisa diverifikasi aman tanpa
+> device fisik. Sisa kandidat (`AlbumArt` `SubcomposeAsyncImage`, stabilitas `List<Song>`
+> app-wide) tetap diblokir sejak Batch 392 (alasan sama: risiko regresi visual / lintas >3 file).
+> Rekomendasi: ukur recomposition count sungguhan di device fisik (Layout Inspector/
+> Macrobenchmark) sebelum sesi optimasi berikutnya. **Status DISCONTINUED tetap permanen tidak
+> diubah.** Detail lengkap CHANGELOG.md Batch 401.
+> Batch 400 (optimasi Compose: `remember` list `favoriteSongs` tab Favorit
 > di `LibraryScreen.kt`, 1 file):** User: "next" — lanjutan sesi Compose Batch 392→...→399. Kelas
 > bug `Brush.*Gradient()` & `items()` tanpa `key` sudah 0 sisa (Batch 394/398). Sudut audit baru:
 > operasi `List.filter{}`/`.sortedBy{}` dibangun langsung di badan screen besar tanpa `remember` —
