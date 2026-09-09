@@ -24,7 +24,17 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 397 (optimasi Compose: `remember` accent Brush di
+> 🆕 **Update terbaru — Batch 398 (optimasi Compose: `remember` accent wash Brush di
+> `NowPlayingScreen`, 1 file):** User: "next" — lanjutan sesi Compose Batch 392→...→397. Digrep
+> sisa Brush gradient app-wide: `WelcomeScreen`/`NavigationBar` catch-light/`ShimmerBrush()`
+> diperiksa & TIDAK disentuh (bukan bug — sekali-tampil/draw-phase/legitimately animasi). Sisa 1
+> titik: accent wash Brush `NowPlayingScreen` (1400-baris badan composable, baca banyak state
+> tak-terkait di scope sama) dibangun tanpa `remember` — pola identik `identityRootBrush` Batch
+> 392. Fix: `remember(animatedAccent, nowPlayingBgColor)`. **Zero behavior change**, rebuild cuma
+> saat accent/background berubah. Grep Brush gradient app-wide sekarang 0 sisa titik
+> provably-bug. **Status DISCONTINUED tetap permanen tidak diubah.** Detail lengkap
+> CHANGELOG.md Batch 398.
+> Batch 397 (optimasi Compose: `remember` accent Brush di
 > `MiniPlayerBar`, `MiniPlayerBar.kt`, 1 file):** User: "next" — lanjutan sesi Compose
 > Batch 392→...→396. Digrep ulang semua Brush gradient app-wide, kali ini fokus ke
 > `MiniPlayerBar.kt` sendiri (bukan utility yang dipanggilnya). `Brush.horizontalGradient(...)`

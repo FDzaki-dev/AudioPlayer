@@ -1,5 +1,62 @@
 # Changelog
 
+## Batch 398 — Optimasi Compose: `remember` accent wash Brush di `NowPlayingScreen`, 1 file
+User instruksi: "next" — lanjutan sesi optimasi Compose yang sama (Batch 392→...→397), sektor
+belum berubah. **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).
+
+**Metodologi**: setelah Batch 397 menuntaskan `MiniPlayerBar.kt`, digrep ulang sisa
+`Brush.*Gradient(...)` app-wide yang BELUM diperiksa (23 titik total, 4 sudah di-fix Batch
+392/395/396/397): `WelcomeScreen` (`MainActivity.kt`, layar onboarding sekali-tampil, frekuensi
+recompose sangat rendah — TIDAK bernilai dioptimasi), `NavigationBar` catch-light
+(`MainActivity.kt`, sudah di dalam `drawBehind{}`/draw-phase, pola accepted-cost yang SAMA persis
+dgn `skeuEmboss()`/`calmAberration()` — bukan bug), `ShimmerBrush()` (`LibraryScreen.kt`, brush-nya
+MEMANG didesain mengikuti `translateAnim` animasi infinite shimmer — legitimately per-frame,
+bukan bug) — SEMUA diperiksa & TIDAK disentuh, alasan didokumentasikan di masing-masing. Sisa 1
+titik: `Brush.verticalGradient(...)` (accent wash di belakang album art blur, `NowPlayingScreen`)
+— TERNYATA masih bug kelas yang sama.
+
+**Root cause**: `NowPlayingScreen(...)` adalah 1 badan `@Composable fun` BESAR (baris 148-1532,
+~1400 baris) — live position sendiri SUDAH diisolasi ke child composable terpisah
+(`PlaybackProgressRow`, via `WithLivePlaybackProgress`, preseden Batch 353) sehingga TIDAK memicu
+recompose fungsi ini tiap detik seperti `MiniPlayerBar`, TAPI fungsi sebesar ini tetap membaca
+BANYAK state lain langsung di scope top-level-nya sendiri (dialog show/hide 6+, queue, sleep
+timer, rating, dst) — SIAPA PUN dari state itu berubah memaksa SELURUH body ini re-run. Brush
+wash 3-stop (`animatedAccent`.copy + 2x `MaterialTheme.colorScheme.background`.copy) dibangun
+LANGSUNG di scope itu TANPA `remember`, padahal 2 input nyatanya (`animatedAccent`,
+`colorScheme.background`) jauh lebih jarang berubah drpd frekuensi recomposition scope
+keseluruhan — pola root-cause IDENTIK `identityRootBrush` (Batch 392, `MainActivity.kt`: "badan
+composable besar... membaca banyak state lain... state APA PUN yang berubah memaksa brush
+dibangun ulang").
+
+**Fix**: `MaterialTheme.colorScheme.background` dibaca ke `val nowPlayingBgColor` biasa DI LUAR
+`remember{}` (pola fix Batch 393 utk `@DisallowComposableCalls` — 0 pemanggilan property
+`@Composable` di dalam lambda `remember`, dicek eksplisit), brush dibungkus
+`remember(animatedAccent, nowPlayingBgColor)` sebagai `val accentWashBrush` sebelum `Box`-nya,
+`.background(accentWashBrush)` menggantikan konstruksi inline. **Zero behavior change** — brush
+identik di tiap kombinasi accent/background, rebuild hanya saat salah satu dari 2 input itu
+benar-benar berubah (transisi warna aksen antar-lagu, atau ganti tema), bukan lagi tiap kali
+state TIDAK TERKAIT apa pun di scope 1400-baris ini berubah.
+
+**1 file kode disentuh** (`NowPlayingScreen.kt`, 2447 -> 2458 baris, naik krn komentar penjelasan
++ 2 `val` ekstraksi). Brace/paren balance dicek (`tr -cd | wc -c`): 1266/1266 `()`, 288/288 `{}`
+— seimbang (file besar, tapi delta ini sendiri 0 struktur baru selain 1 `remember{}` yang
+seimbang). `remember` sudah tersedia lewat wildcard import `androidx.compose.runtime.*` yang
+sudah ada dari awal — 0 import baru. Diff-checked terhadap ZIP Batch 397: cuma
+`NowPlayingScreen.kt` yang berubah.
+
+**Masih belum ditest di build/lint sungguhan** (0 kotlinc/SDK/network di sandbox) — rekomendasi
+tetap sama: push & jalankan CI. Risiko regresi rendah (pola ke-5 yang identik & sudah
+tervalidasi manual bebas `@DisallowComposableCalls`), tapi tetap direkomendasikan verifikasi
+visual device fisik utk layar Now Playing (wash accent di belakang album art) sebelum dianggap
+100% final.
+
+**Sisa kandidat compose sector setelah batch ini**: `AlbumArt`'s `SubcomposeAsyncImage` &
+stabilitas `List<Song>` app-wide (tetap di luar bar 3-file/zero-regresi batch tunggal). Grep
+`Brush.*Gradient()` app-wide sekarang 0 sisa titik yang provably-bug (semua titik lain sudah
+diperiksa: draw-phase/accepted-cost, atau legitimately-tied-ke-animasi, atau sudah di-fix). Plus
+cost riil Compose first-composition & baseline profile/R8 (Batch 388) — masih butuh data
+Macrobenchmark device asli.
+
 ## Batch 397 — Optimasi Compose: `remember` accent Brush di `MiniPlayerBar`, `MiniPlayerBar.kt`, 1 file
 User instruksi: "next" — lanjutan sesi optimasi Compose yang sama (Batch 392→393→394→395→396),
 sektor belum berubah. **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch

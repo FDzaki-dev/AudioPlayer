@@ -91,6 +91,33 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 398 (Optimasi Compose — `remember` accent wash Brush di `NowPlayingScreen`,
+`NowPlayingScreen.kt`, 1 file kode)** — User: "next" (lanjutan sesi optimasi Compose Batch
+392→...→397). **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).
+
+Digrep ulang sisa `Brush.*Gradient(...)` app-wide yang belum diperiksa — `WelcomeScreen` (layar
+sekali-tampil, tidak bernilai), `NavigationBar` catch-light (sudah draw-phase/`drawBehind{}`,
+accepted-cost sama spt `skeuEmboss()`), `ShimmerBrush()` (legitimately ikut animasi infinite
+shimmer) — 3 titik ini diperiksa & TIDAK disentuh (bukan bug). Sisa 1 titik: accent wash Brush di
+`NowPlayingScreen` — masih bug kelas sama.
+
+**Root cause**: `NowPlayingScreen(...)` 1 badan `@Composable` BESAR (~1400 baris) — live
+position sudah diisolasi terpisah sejak Batch 353 (`WithLivePlaybackProgress`), TAPI fungsi ini
+tetap baca BANYAK state lain (dialog, queue, sleep timer, dst) langsung di scope yang sama. Brush
+wash 3-stop (`animatedAccent` + 2x `MaterialTheme.colorScheme.background`) dibangun tanpa
+`remember` di scope itu — pola root-cause IDENTIK `identityRootBrush` (Batch 392).
+
+**Fix**: background dibaca ke `val` biasa DI LUAR `remember{}` (pola Batch 393), brush dibungkus
+`remember(animatedAccent, nowPlayingBgColor)`. **Zero behavior change** — rebuild cuma saat
+accent/background benar-benar berubah, bukan lagi tiap state tak-terkait di scope 1400-baris ini.
+
+**1 file kode disentuh** (`NowPlayingScreen.kt`, 2447->2458 baris). Brace/paren balance seimbang
+(1266/1266 `()`, 288/288 `{}`). `remember` sudah tersedia via wildcard import yang ada. Masih
+belum ditest build/lint sungguhan — rekomendasi ke user: push & jalankan CI + verifikasi visual
+device fisik utk layar Now Playing. Sisa kandidat compose sector tetap sama (`AlbumArt`
+SubcomposeAsyncImage, stabilitas `List<Song>` app-wide) — grep `Brush.*Gradient()` app-wide
+sekarang 0 sisa titik provably-bug. Detail lengkap CHANGELOG.md Batch 398.
+
 **Batch 397 (Optimasi Compose — `remember` accent Brush di `MiniPlayerBar`, `MiniPlayerBar.kt`,
 1 file kode)** — User: "next" (lanjutan sesi optimasi Compose Batch 392→393→394→395→396).
 **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).

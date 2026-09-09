@@ -419,18 +419,29 @@ fun NowPlayingScreen(
                 .alpha(backdropAlpha)
         )
 
+        // Batch 398 — `NowPlayingScreen(...)` (fungsi ini) adalah 1 badan composable BESAR
+        // (~1400 baris) yang membaca BANYAK state langsung di scope yang sama (dialog show/hide,
+        // queue, sleep timer, dst — live position sendiri SUDAH diisolasi terpisah sejak Batch
+        // 353, lihat `WithLivePlaybackProgress` di bawah, tapi state lain TIDAK). Brush wash
+        // di bawah cuma bergantung 2 input nyata (`animatedAccent`,
+        // `MaterialTheme.colorScheme.background`) yang jauh lebih jarang berubah drpd frekuensi
+        // recomposition scope ini secara keseluruhan — pola identik `identityRootBrush` (Batch
+        // 392, `MainActivity.kt`). Warna background dibaca ke `val` biasa DI LUAR `remember{}`
+        // (pola fix Batch 393 utk `@DisallowComposableCalls`) sebelum jadi remember key.
+        val nowPlayingBgColor = MaterialTheme.colorScheme.background
+        val accentWashBrush = remember(animatedAccent, nowPlayingBgColor) {
+            Brush.verticalGradient(
+                listOf(
+                    animatedAccent.copy(alpha = 0.35f),
+                    nowPlayingBgColor.copy(alpha = 0.75f),
+                    nowPlayingBgColor.copy(alpha = 0.97f)
+                )
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            animatedAccent.copy(alpha = 0.35f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.75f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.97f)
-                        )
-                    )
-                )
+                .background(accentWashBrush)
         )
 
         Column(
