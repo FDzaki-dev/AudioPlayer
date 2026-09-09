@@ -1,5 +1,67 @@
 # Changelog
 
+## Batch 400 — Optimasi Compose: `remember` list `favoriteSongs` tab Favorit, `LibraryScreen.kt`, 1 file
+User instruksi: "next" — lanjutan sesi optimasi Compose yang sama (Batch 392→...→399), sektor
+belum berubah. **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387 —
+kategori "optimasi murni").
+
+**Metodologi**: kelas bug `Brush.*Gradient()` tanpa `remember` sudah 0 sisa titik provably-bug
+app-wide (ditutup Batch 398, diverifikasi ulang batch ini — masih 0). Grep `items(...)`
+LazyColumn/LazyRow app-wide juga masih 19/19 titik sudah pakai `key` (tuntas Batch 394). Batch ini
+membuka sudut audit BARU: operasi transformasi `List` (`.filter{}`/`.sortedBy{}`/`.groupBy{}`, dst)
+yang dibangun LANGSUNG di badan sebuah screen besar tanpa `remember` — kelas bug struktural yang
+SAMA dengan `identityRootBrush`/accent wash (state tak-terkait di scope sama memaksa seluruh body
+re-run), tapi objeknya `List` hasil filter, bukan `Brush`. Ditelusuri `LibraryScreen.kt` (1551
+baris, badan composable besar dgn ~15 `var` state lokal tak-terkait: `searchHistory`,
+`showFolderManager`, `songForBulkPlaylistDialog`, `undoHideIds`, `undoBarKey`, `filterVersion`,
+dst) baris-per-baris: SEBAGIAN BESAR turunan `List` sudah benar dibungkus `remember` (`songs`,
+`folderSummaries`, `hiddenSongsList`, `availableFolderNames`, `availableGenreNames`, `searchIndex`,
+`filteredSongs`, plus `grouped`/`sortedAlbumKeys` di composable terpisah `AlbumGridView`) —
+**kecuali 1 titik**: cabang `selectedTab == 4` (tab Favorit) di dalam `when` block utama,
+`val favoriteSongs = filteredSongs.filter { favoriteIds.contains(it.id) }`, dibangun polos tanpa
+`remember`. 5 tab lain (`selectedTab == 0/1/2/5/6`, `else`) semuanya lolos — masing-masing cuma
+meneruskan `filteredSongs`/`rawSongs` yang SUDAH `remember`, tidak ada operasi List tambahan di
+badan `when`-nya.
+
+**Root cause**: `LibraryScreen(...)` 1 badan `@Composable` besar — mirip pola `NowPlayingScreen`
+(Batch 398) tapi bedanya di sini TIDAK ada state per-tick (LibraryScreen tidak collect
+`playbackProgress` sama sekali, cuma terima `currentSongId` sbg parameter), jadi frekuensi
+recompose-nya bukan "tiap detik" melainkan "tiap kali salah satu dari banyak state lokal
+tak-terkait berubah" (mis. `undoBarKey` naik setelah hide lagu, `searchHistory` di-update setelah
+submit pencarian, dialog `songForBulkPlaylistDialog` dibuka/ditutup) — SELAMA user sedang berada
+di tab Favorit. Karena `when` block (termasuk cabang tab 4) ada di scope composable ROOT yang sama
+(bukan `@Composable` anak terpisah), Compose tidak bisa skip cabang ini — filter `List<Song>`
+dijalankan ulang dari nol meski `filteredSongs` (hasil `remember` di atasnya) dan `favoriteIds`
+(parameter `ImmutableSet<Long>`, sama preseden stabilitas Batch 392 § `HomeScreen.kt`) genuinely
+tidak berubah sama sekali.
+
+**Fix**: `favoriteSongs` dibungkus `remember(filteredSongs, favoriteIds)` — 2 key ini SATU-SATUNYA
+input nyata operasi filter (`filteredSongs` sendiri turunan `remember(searchIndex, searchQuery)`
+di atasnya, `favoriteIds` parameter langsung). Rebuild HANYA terjadi kalau salah satu benar-benar
+berubah (daftar lagu tersaring ganti, atau status favorit berubah) — bukan lagi tiap state lokal
+tak-terkait berubah selagi user di tab Favorit. **Zero behavior change**: hasil filter identik,
+`favoriteSongs.isEmpty()` check + `SongListView`/`FloatingActionButton` di bawahnya tidak disentuh
+sama sekali — cuma titik konstruksi List-nya yang sekarang di-cache. 0 pemanggilan `@Composable`
+di dalam lambda `remember` (`filteredSongs.filter{}` murni operasi Kotlin `List`, dicek eksplisit
+supaya tidak mengulang kesalahan `@DisallowComposableCalls` Batch 393).
+
+**1 file kode disentuh** (`LibraryScreen.kt`, 1551->1562 baris). Brace/paren/bracket balance
+seimbang (716/716 `()`, 340/340 `{}`, 9/9 `[]`, dicek python3 tokenizer string/comment-aware
+sebelum & sesudah edit — sama metode Batch 392-399). Diff-checked terhadap ZIP Batch 399: cuma
+`LibraryScreen.kt` yang berubah, 0 file lain kesenggol. `remember` sudah tersedia via wildcard
+import `androidx.compose.runtime.*` yang ada sejak awal file (baris 50) — 0 import baru. 5 tab
+lain (`SongListView`/`AlbumGridView`/`GroupedListView`/`PlaylistTabView`/`SmartPlaylistTabView`)
+TIDAK disentuh sama sekali — perubahan terkurung 100% di 1 cabang `when` tab Favorit.
+
+Masih belum ditest build/lint sungguhan (0 `kotlinc`/Android SDK/network di environment kerja
+sesi ini) — sama seperti seluruh rangkaian batch optimasi 385-399. Rekomendasi ke user: push &
+jalankan CI, lalu verifikasi visual device fisik untuk tab Favorit (daftar tetap sama isinya,
+toggle status favorit dari tab ini/tab lain tetap ter-refresh benar, 0 lag baru). Sisa kandidat
+compose sector tetap sama sejak Batch 392 (`AlbumArt` `SubcomposeAsyncImage` — butuh `Painter`
+drop-in, 6 titik app-wide, risiko regresi visual tint dinamis; stabilitas `List<Song>` app-wide —
+perlu ubah signature Composable lintas banyak file, melampaui batas 3-file/task) — keduanya BELUM
+dieksekusi, alasan sama sejak Batch 392. Detail lengkap di atas.
+
 ## Batch 399 — Optimasi Compose: `remember` Modifier `calmAberration()`, `TactileDepth.kt`, 1 file
 User instruksi: "lanjutkan progress optimize!!" — lanjutan sesi optimasi Compose yang sama (Batch
 392→...→398), sektor belum berubah. **Status DISCONTINUED tetap permanen tidak diubah** (per

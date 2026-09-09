@@ -91,6 +91,43 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 400 (Optimasi Compose — `remember` list `favoriteSongs` tab Favorit di `LibraryScreen.kt`,
+1 file kode)** — User: "next" (lanjutan sesi optimasi Compose Batch 392→...→399). **Status
+DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).
+
+Kelas bug `Brush.*Gradient()` tanpa `remember` masih 0 sisa titik provably-bug app-wide (dicek
+ulang, tuntas sejak Batch 398); grep `items(...)` LazyColumn/LazyRow juga masih 19/19 titik pakai
+`key` (tuntas Batch 394). Sudut audit baru batch ini: operasi transformasi `List`
+(`.filter{}`/`.sortedBy{}`/`.groupBy{}`) dibangun langsung di badan screen besar tanpa `remember`
+— kelas bug struktural sama dgn `identityRootBrush`/accent wash, objeknya `List`, bukan `Brush`.
+
+**Root cause**: `LibraryScreen.kt` (1551 baris, ~15 `var` state lokal tak-terkait di scope
+composable root yang sama — `searchHistory`, `showFolderManager`, `undoBarKey`, `filterVersion`,
+dst) sudah benar membungkus SEBAGIAN BESAR turunan `List`-nya dgn `remember` (`songs`,
+`folderSummaries`, `filteredSongs`, dst) — kecuali 1 titik: cabang `selectedTab == 4` (tab
+Favorit), `val favoriteSongs = filteredSongs.filter { favoriteIds.contains(it.id) }`, polos tanpa
+`remember`. Beda dari `NowPlayingScreen` (Batch 398): `LibraryScreen` tidak collect
+`playbackProgress` (tidak ada tick 1x/detik) — pemicu re-run di sini murni state lokal tak-terkait
+lain yang berubah SELAGI user ada di tab Favorit (mis. `undoBarKey` naik stlh hide lagu). 5 tab
+lain (`0/1/2/5/6`/`else`) diperiksa & TIDAK punya masalah sama — masing-masing cuma meneruskan
+`filteredSongs`/`rawSongs` yang sudah `remember`, 0 operasi List tambahan di badan `when`-nya.
+
+**Fix**: `favoriteSongs` dibungkus `remember(filteredSongs, favoriteIds)` — 2 key ini satu-satunya
+input nyata (`favoriteIds` sudah `ImmutableSet<Long>`, preseden stabilitas sama Batch 392 §
+`HomeScreen.kt`). **Zero behavior change** — hasil filter identik, cuma dihitung ulang saat salah
+satu key benar-benar berubah. 0 pemanggilan `@Composable` di dalam lambda `remember` (dicek
+eksplisit, tidak mengulang kesalahan `@DisallowComposableCalls` Batch 393).
+
+**1 file kode disentuh** (`LibraryScreen.kt`, 1551->1562 baris). Brace/paren/bracket balance
+seimbang (716/716 `()`, 340/340 `{}`, 9/9 `[]`, python3 tokenizer string/comment-aware). Diff-
+checked terhadap ZIP Batch 399: cuma `LibraryScreen.kt` berubah. Masih belum ditest build/lint
+sungguhan — rekomendasi ke user: push & jalankan CI + verifikasi visual device fisik tab Favorit
+(isi list sama, toggle favorit dari tab ini/tab lain tetap ter-refresh benar, 0 lag baru). Sisa
+kandidat compose sector tetap sama sejak Batch 392: `AlbumArt` `SubcomposeAsyncImage` (butuh
+`Painter` drop-in, 6 titik app-wide, risiko regresi tint dinamis) dan stabilitas `List<Song>`
+app-wide (ubah signature Composable lintas banyak file, melampaui batas 3-file/task) — keduanya
+BELUM dieksekusi, alasan sama. Detail lengkap CHANGELOG.md Batch 400.
+
 **Batch 399 (Optimasi Compose — `remember` Modifier `calmAberration()` di `TactileDepth.kt`, 1
 file kode)** — User: "lanjutkan progress optimize!!" (lanjutan sesi optimasi Compose Batch
 392→...→398). **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).

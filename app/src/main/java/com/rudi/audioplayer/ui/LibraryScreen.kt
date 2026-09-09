@@ -326,7 +326,18 @@ fun LibraryScreen(
                 onAction = onRescan
             )
             selectedTab == 4 -> {
-                val favoriteSongs = filteredSongs.filter { favoriteIds.contains(it.id) }
+                // Batch 400 — Optimasi Compose: badan besar LibraryScreen (banyak `var` state
+                // tak-terkait di scope yang sama — searchHistory, showFolderManager,
+                // songForBulkPlaylistDialog, undoBarKey, dst) memaksa SELURUH `when` block ini
+                // re-run tiap kali salah satu state itu berubah, termasuk cabang tab Favorit
+                // ini kalau sedang aktif — persis kelas bug identityRootBrush (Batch 392) /
+                // accent wash NowPlayingScreen (Batch 398), bedanya di sini objeknya List hasil
+                // filter, bukan Brush. `remember` dgn key `filteredSongs`+`favoriteIds` (2 input
+                // NYATA operasi filter ini) memastikan list favorit cuma dihitung ulang saat
+                // salah satunya benar-benar berubah, bukan tiap recomposition state tak-terkait.
+                val favoriteSongs = remember(filteredSongs, favoriteIds) {
+                    filteredSongs.filter { favoriteIds.contains(it.id) }
+                }
                 Box(modifier = Modifier.fillMaxSize()) {
                     if (favoriteSongs.isEmpty()) {
                         EmptyState(

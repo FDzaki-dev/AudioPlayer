@@ -24,7 +24,19 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 399 (optimasi Compose: `remember` Modifier `calmAberration()` di
+> 🆕 **Update terbaru — Batch 400 (optimasi Compose: `remember` list `favoriteSongs` tab Favorit
+> di `LibraryScreen.kt`, 1 file):** User: "next" — lanjutan sesi Compose Batch 392→...→399. Kelas
+> bug `Brush.*Gradient()` & `items()` tanpa `key` sudah 0 sisa (Batch 394/398). Sudut audit baru:
+> operasi `List.filter{}`/`.sortedBy{}` dibangun langsung di badan screen besar tanpa `remember` —
+> kelas bug struktural sama `identityRootBrush`, objeknya `List` bukan `Brush`. Ditemukan 1 titik
+> di `LibraryScreen.kt` (1551 baris, banyak state lokal tak-terkait di scope sama): cabang tab
+> Favorit (`selectedTab == 4`), `filteredSongs.filter { favoriteIds.contains(it.id) }`, dibangun
+> ulang tiap kali state lain (mis. `undoBarKey`, `searchHistory`) berubah selagi user di tab itu —
+> 5 tab lain sudah aman (cuma teruskan `List` yang sudah `remember`). Fix:
+> `remember(filteredSongs, favoriteIds)`. **Zero behavior change**, hasil filter identik, cuma
+> dihitung ulang saat key benar-benar berubah. **Status DISCONTINUED tetap permanen tidak
+> diubah.** Detail lengkap CHANGELOG.md Batch 400.
+> Batch 399 (optimasi Compose: `remember` Modifier `calmAberration()` di
 > `TactileDepth.kt`, 1 file):** User: "lanjutkan progress optimize!!" — lanjutan sesi Compose
 > Batch 392→...→398. Batch 398 menutup kelas bug `Brush.*Gradient()` langsung di badan screen (0
 > sisa app-wide). Sudut audit baru: fungsi Modifier extension `TactileDepth.kt` yang dipanggil
