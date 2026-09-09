@@ -91,6 +91,58 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 399 (Optimasi Compose — `remember` Modifier `calmAberration()` di `TactileDepth.kt`, 1
+file kode)** — User: "lanjutkan progress optimize!!" (lanjutan sesi optimasi Compose Batch
+392→...→398). **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).
+
+Batch 398 menutup kelas bug "`Brush.*Gradient()` LANGSUNG di badan sebuah screen tanpa
+`remember`" (0 sisa titik provably-bug app-wide). Batch ini membuka sudut audit baru yang belum
+pernah digrep eksplisit sebelumnya: fungsi Modifier **extension** di `theme/TactileDepth.kt`
+(`calmAberration()`/`calmScanlines()`/`calmGrain()` — pola drawBehind/drawWithContent, beda
+mekanisme dari `embossSurface()`/`frostedGlass()` yang sudah dituntaskan Batch 395/396) yang
+dipanggil ulang dari scope panas MiniPlayerBar — grep `Brush.*Gradient()` app-wide sebelumnya
+TIDAK menangkap ini karena occurrence-nya ada di DALAM fungsi shared di `TactileDepth.kt`, bukan
+langsung di badan file screen manapun.
+
+**Root cause**: `calmAberration()` (efek "aberrasi kromatik" 2-lingkaran radial-gradient,
+identitas Calm Retro) dipanggil dari `MiniPlayerBar.kt` (`isCalmRetro -> Modifier.calmAberration(
+bias = 2.dp)` pada tombol Play/Pause). MiniPlayerBar sengaja koleksi `playbackProgress` LOKAL
+tiap detik selama musik main (desain Batch 353) — SELURUH badan fungsinya (termasuk `when` yang
+memanggil `calmAberration()`) recompose 1x/detik untuk user yang pakai identitas Calm Retro.
+Sebelum fix ini, tiap tick memanggil ulang `this.drawBehind { ... }` — lambda BARU (capture
+`bias`) tiap panggilan, artinya 1 instance `DrawBehindElement` baru (2x `Brush.radialGradient`
+di dalamnya) dibangun tiap detik, padahal `bias` itu sendiri konstan (literal `2.dp` di
+MiniPlayerBar, `3.dp` default di 2 pemanggil lain — `NowPlayingScreen.kt`/`SettingsScreen.kt`,
+keduanya TIDAK dalam scope tick 1x/detik sejak Batch 353 memisahkan posisi/durasi keluar dari
+body composable besar `NowPlayingScreen`).
+
+**Fix**: Modifier hasil `drawBehind { ... }` dibungkus `remember(bias)` di dalam fungsi
+`calmAberration()` sendiri (`TactileDepth.kt`) — begitu `bias` sama (kasus SEMUA 3 pemanggil,
+tiap panggilan pakai literal `Dp` tetap), instance Modifier yang SAMA dipakai ulang lintas
+recomposition, alih-alih dibangun dari nol tiap tick. `size`/`center`/`radius` di dalam lambda
+draw TETAP dihitung fresh tiap draw call sungguhan (`DrawScope`, nilai yang genuinely bergantung
+ukuran layout aktual — bukan sesuatu yang bisa/perlu ikut di-remember) — cuma WADAH Modifier-nya
+yang sekarang stabil. 0 pemanggilan `@Composable` di dalam lambda `remember` (`Modifier.drawBehind`
+adalah fungsi biasa, bukan `@Composable` — dicek eksplisit, tidak mengulang kesalahan
+`@DisallowComposableCalls` Batch 393). **Zero behavior change** — 2 lingkaran radial-gradient
+aberrasi tetap identik visual & posisi persis, cuma alokasi objek berkurang saat `bias` tidak
+berubah (mayoritas waktu playback untuk user Calm Retro).
+
+**1 file kode disentuh** (`TactileDepth.kt`, 515->537 baris). Brace/paren balance seimbang
+(33/33 `{}`, 146/146 `()`, dicek python3 tokenizer string/comment-aware sebelum & sesudah edit).
+0 pemanggil (`MiniPlayerBar.kt`/`NowPlayingScreen.kt`/`SettingsScreen.kt`) perlu diubah — signature
+`calmAberration(bias: Dp = 3.dp): Modifier` 100% tidak berubah. Masih belum ditest build/lint
+sungguhan — rekomendasi ke user: push & jalankan CI, lalu verifikasi visual device fisik untuk
+identitas Calm Retro (tombol Play/Pause MiniPlayerBar + 2 pemanggil lain) — pastikan efek aberrasi
+kromatik tetap identik, 0 stutter baru. Sisa kandidat compose sector: `AlbumArt` SubcomposeAsyncImage
+(butuh Painter, tidak bisa drop-in pertahankan tint dinamis tanpa regresi visual, 6 titik app-wide)
+dan stabilitas `List<Song>` app-wide (perlu ubah signature Composable lintas banyak file, melampaui
+batas 3-file/task) — keduanya BELUM dieksekusi, sama alasan sejak Batch 392. `calmScanlines()`/
+`calmGrain()` (2 fungsi bertetangga di file yang sama) diperiksa juga: 0 call site keduanya berada
+di scope tick 1x/detik (`calmGrain()` cuma dipanggil sekali di root Surface `MainActivity.kt`,
+`calmScanlines()` dipanggil di `SongRow`/sheet lain yang recompose per-aksi bukan per-detik) —
+SENGAJA TIDAK disentuh, bukan bug di kelas yang sama. Detail lengkap CHANGELOG.md Batch 399.
+
 **Batch 398 (Optimasi Compose — `remember` accent wash Brush di `NowPlayingScreen`,
 `NowPlayingScreen.kt`, 1 file kode)** — User: "next" (lanjutan sesi optimasi Compose Batch
 392→...→397). **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).

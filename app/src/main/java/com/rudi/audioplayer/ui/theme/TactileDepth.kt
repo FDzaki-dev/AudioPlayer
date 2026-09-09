@@ -353,32 +353,54 @@ fun Modifier.skeuEmboss(
 // Calm Retro (isCalmRetroTheme()), tidak menyentuh mekanisme embossSurface() identitas lain.
 // Alpha 0.35f — dalam rentang 30%-40% yang diminta eksplisit spec §"Panduan Desain Penting" #1
 // ("opacity rendah ... agar tidak berubah menjadi neon yang tajam").
+// Batch 399 — Optimasi Compose: kelas bug sama Batch 392/395/396/397/398 (allocation dibangun
+// ulang tiap recomposition tanpa `remember`), tapi titik penyebarannya beda — bukan
+// `Brush.*Gradient()` LANGSUNG di badan sebuah screen (grep app-wide sudah 0 sisa sejak Batch
+// 398), melainkan fungsi Modifier EXTENSION di file ini yang dipanggil ulang dari scope panas.
+// Ditemukan lewat audit lanjutan: `calmAberration()` dipanggil `MiniPlayerBar.kt` (baris
+// `isCalmRetro -> Modifier.calmAberration(bias = 2.dp)`) — MiniPlayerBar sengaja koleksi
+// `playbackProgress` LOKAL tiap detik selama musik main (desain Batch 353), jadi SELURUH badan
+// fungsi itu (termasuk `when` yang memanggil `calmAberration()` ini) recompose 1x/detik. Sebelum
+// fix ini, tiap tick memanggil ulang `this.drawBehind { ... }` — lambda BARU (capture `biasPx`)
+// tiap panggilan, ekuivalen 1 instance `DrawBehindElement` baru tiap detik untuk identitas Calm
+// Retro, padahal `bias` itu sendiri konstan (literal `2.dp` di MiniPlayerBar, `3.dp` default di
+// 2 pemanggil lain — NowPlayingScreen.kt/SettingsScreen.kt, keduanya TIDAK dalam scope panas
+// tick 1x/detik sejak Batch 353 memisahkan posisi/durasi keluar dari body composable besar).
+// Fix: Modifier hasil `drawBehind` dibungkus `remember(bias)` — begitu `bias` sama (kasus
+// SEMUA 3 pemanggil, tiap panggilan pakai literal Dp tetap), instance yang sama dipakai ulang
+// alih-alih dibangun dari nol. `size`/`center`/`radius` di dalam lambda draw TETAP dihitung
+// fresh tiap draw call sungguhan (DrawScope, bukan sesuatu yang bisa/perlu di-remember —
+// bergantung ukuran layout aktual) — cuma WADAH Modifier-nya yang sekarang stabil lintas
+// recomposition tak-terkait. **Zero behavior change**: 2 lingkaran radial-gradient aberrasi
+// tetap identik visual & posisi, cuma alokasi objek berkurang saat `bias` tidak berubah.
 @Composable
 fun Modifier.calmAberration(bias: Dp = 3.dp): Modifier {
-    val biasPx = bias
-    return this.drawBehind {
-        val off = biasPx.toPx()
-        val radius = size.minDimension / 2f + off * 2f
-        val center = Offset(size.width / 2f, size.height / 2f)
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(CalmRetroAberrationLeft.copy(alpha = 0.35f), Color.Transparent),
-                center = center - Offset(off, off),
-                radius = radius
-            ),
-            radius = radius,
-            center = center - Offset(off, off)
-        )
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(CalmRetroAberrationRight.copy(alpha = 0.35f), Color.Transparent),
-                center = center + Offset(off, off),
-                radius = radius
-            ),
-            radius = radius,
-            center = center + Offset(off, off)
-        )
+    val aberrationModifier = remember(bias) {
+        Modifier.drawBehind {
+            val off = bias.toPx()
+            val radius = size.minDimension / 2f + off * 2f
+            val center = Offset(size.width / 2f, size.height / 2f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(CalmRetroAberrationLeft.copy(alpha = 0.35f), Color.Transparent),
+                    center = center - Offset(off, off),
+                    radius = radius
+                ),
+                radius = radius,
+                center = center - Offset(off, off)
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(CalmRetroAberrationRight.copy(alpha = 0.35f), Color.Transparent),
+                    center = center + Offset(off, off),
+                    radius = radius
+                ),
+                radius = radius,
+                center = center + Offset(off, off)
+            )
+        }
     }
+    return this.then(aberrationModifier)
 }
 
 // ============================================================================

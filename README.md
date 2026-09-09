@@ -24,7 +24,20 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 398 (optimasi Compose: `remember` accent wash Brush di
+> 🆕 **Update terbaru — Batch 399 (optimasi Compose: `remember` Modifier `calmAberration()` di
+> `TactileDepth.kt`, 1 file):** User: "lanjutkan progress optimize!!" — lanjutan sesi Compose
+> Batch 392→...→398. Batch 398 menutup kelas bug `Brush.*Gradient()` langsung di badan screen (0
+> sisa app-wide). Sudut audit baru: fungsi Modifier extension `TactileDepth.kt` yang dipanggil
+> ulang dari scope panas `MiniPlayerBar` — grep Brush gradient sebelumnya tidak menangkap ini
+> krn occurrence-nya di DALAM fungsi shared, bukan langsung di badan screen. `calmAberration()`
+> (efek aberrasi Calm Retro, dipanggil `MiniPlayerBar` tombol Play/Pause) dibangun ulang
+> (`drawBehind{}` baru, 2x `Brush.radialGradient`) tiap tick 1 detik selama musik main, padahal
+> `bias`-nya konstan. Fix: `remember(bias)`. **Zero behavior change**, alokasi berkurang saat
+> `bias` tidak berubah (mayoritas waktu playback). `calmScanlines()`/`calmGrain()`/`auroraGlow()`
+> diperiksa & TIDAK disentuh (bukan bug kelas sama — 0 di scope tick 1x/detik, atau genuinely
+> terikat animasi tak-pernah-settle). **Status DISCONTINUED tetap permanen tidak diubah.** Detail
+> lengkap CHANGELOG.md Batch 399.
+> Batch 398 (optimasi Compose: `remember` accent wash Brush di
 > `NowPlayingScreen`, 1 file):** User: "next" — lanjutan sesi Compose Batch 392→...→397. Digrep
 > sisa Brush gradient app-wide: `WelcomeScreen`/`NavigationBar` catch-light/`ShimmerBrush()`
 > diperiksa & TIDAK disentuh (bukan bug — sekali-tampil/draw-phase/legitimately animasi). Sisa 1
