@@ -107,6 +107,37 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 413 (Kandidat blocked Batch 392 dibuka: `List<Song>` stability via config, 1 file
+NON-kode)** — User: *"List<Song> stability (perlu exception cap 3-file)"* — dari 2 kandidat
+blocked Batch 392, user pilih `List<Song>`, otorisasi exception cap 3-file (asumsi lama: butuh
+refactor signature Composable lintas banyak file). **Status DISCONTINUED tetap permanen tidak
+diubah** (final lock Batch 410).
+
+**Temuan kunci: asumsi "butuh multi-file" TIDAK berlaku.** Mekanisme sama dengan fix
+`android.net.Uri` (Batch 20, `app/compose_stability_config.conf`) berlaku juga untuk `List`:
+`kotlin.collections.List` adalah interface → Compose compiler SELALU menandainya unstable
+terlepas dari elemen di dalamnya (walau `Song` sendiri sudah fully stable), dan Google resmi
+mendokumentasikan `kotlin.collections.*` di stability config sebagai alternatif `ImmutableList`
+(developer.android.com/develop/ui/compose/performance/stability/fix). Diaudit dulu sebelum
+ditambahkan (wajib — kontrak stability config berarti janji "tidak dimutasi in-place"): 0
+`mutableStateListOf` app-wide; 2 titik `mutableListOf<Song>` (`MusicRepository`/
+`CustomFolderScanner`) accumulator lokal fungsi yang return-sekali; reorder/hapus antrean
+(`PlayerViewModel`) selalu `.toMutableList().apply{}` + reassign (copy baru tiap perubahan, bukan
+mutasi in-place). Aman ditandai stable.
+
+**Fix**: 1 baris (`kotlin.collections.List`) + komentar dokumentasi di
+`app/compose_stability_config.conf`. **0 file kode Kotlin disentuh**, `build.gradle.kts` tidak
+perlu diubah (`stabilityConfigurationPath` sudah baca file config ini dinamis sejak Batch 20).
+**Exception cap 3-file yang diotorisasi TIDAK sampai terpakai** — solusi final 1 file, di bawah
+cap normal. Diff eksplisit vs ZIP Batch 412 dikonfirmasi CUMA file ini berubah. **Belum
+diverifikasi build/runtime sungguhan** (0 kotlinc di sandbox) — WAJIB cek GitHub Actions. Cakupan
+sengaja dibatasi `kotlin.collections.List` saja (bukan `Set`/`Map`), sesuai permintaan spesifik
+`List<Song>`. Detail lengkap CHANGELOG.md Batch 413.
+
+**Kandidat blocked Batch 392 — status setelah Batch 413**: `List<Song>` TUNTAS (via config). Sisa
+1 kandidat: `AlbumArt` `SubcomposeAsyncImage` (6 titik, butuh `Painter` drop-in tanpa regresi tint
+— BUKAN masalah stability collection, mekanisme config file ini tidak applicable ke situ).
+
 **Batch 412 (Lanjut sektor optimasi Batch 409: 2 kandidat dieksekusi/ditutup, 1 file kode)** —
 User: *"lanjut optimize seperti sebelumnya!!"* — lanjut sektor optimasi Batch 402-409 yang tersela
 Batch 410 (lock dok.) & 411 (bugfix di luar sektor). **Status DISCONTINUED tetap permanen tidak

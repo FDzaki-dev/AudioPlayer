@@ -1,5 +1,75 @@
 # Changelog
 
+## Batch 413 — Kandidat blocked Batch 392 (`List<Song>` stability) dibuka: 1 file config, bukan multi-file signature refactor
+User instruksi: *"List<Song> stability (perlu exception cap 3-file)"* — dari 2 kandidat yang TETAP
+diblokir sejak Batch 392 (`AlbumArt` `SubcomposeAsyncImage` & stabilitas `List<Song>` app-wide),
+user pilih buka `List<Song>` batch ini, dengan otorisasi eksplisit exception cap 3-file (asumsi
+sejak Batch 392: fix ini butuh ubah signature Composable lintas banyak file, > 3 file/task).
+**Status DISCONTINUED tetap permanen tidak diubah** (final lock Batch 410, 0 kecuali). Tidak ada
+ZIP baru sesi ini (upload terakhir tetap `AudioPlayer_v412.zip`).
+
+**Temuan sebelum eksekusi: asumsi "butuh multi-file" tidak berlaku — solusi 1 file, 0 file kode
+Kotlin.** Sejak Batch 392 kandidat ini diasumsikan perlu konversi tiap parameter Composable
+bertipe `List<Song>` (ditemukan di 10 file `ui/`: `DuplicateFinderSheet.kt`,
+`FolderManagerSheet.kt`, `HomeScreen.kt`, `LibraryScreen.kt`, `PlaylistScreen.kt`, `QueueSheet.kt`,
+`SettingsScreen.kt`, `SmartPlaylistScreen.kt`, `SongPickerSheet.kt`, `VaultSheet.kt`) ke
+`kotlinx.collections.immutable.ImmutableList<Song>` (dependency sudah ada,
+`kotlinx-collections-immutable:0.3.7`, dipakai `favoriteIds`/`selectedIds` sejak +/- Batch 27) —
+jelas > 3 file, makanya diblokir. Batch ini menemukan mekanisme yang PERSIS sama dengan fix
+`android.net.Uri` di `app/compose_stability_config.conf` (Batch 20) berlaku juga untuk `List`:
+`kotlin.collections.List` adalah interface (bisa dibungkus implementasi mutable seperti
+`ArrayList`), jadi Compose compiler SELALU menandainya unstable terlepas dari elemen di dalamnya —
+walau `Song` sendiri sudah fully stable (semua field stable, termasuk `Uri` yang sudah ditandai
+stable Batch 20). Google mendokumentasikan ini resmi sebagai alternatif `ImmutableList`: opsi
+"adding kotlin.collections.* to your stability configuration file" di
+developer.android.com/develop/ui/compose/performance/stability/fix.
+
+**Audit keamanan sebelum menambahkan entry** (wajib — kontrak stability config berarti "list ini
+tidak pernah dimutasi in-place setelah masuk composition"; salah di sini bisa bikin UI stale, bukan
+bug yang gampang kelihatan):
+- Grep app-wide `mutableStateListOf` → 0 hasil di seluruh `app/src/main`.
+- 2 titik `mutableListOf<Song>()`/`MutableList<Song>` (`MusicRepository.querySongs()`,
+  `CustomFolderScanner.scan()`/`collect()`) — keduanya accumulator lokal fungsi, dibangun lalu
+  di-`return` SEKALI sebagai `List` selesai, tidak pernah dimutasi lagi setelah itu.
+- Satu-satunya tempat app ini benar-benar mengedit daftar lagu yang sedang "hidup" — reorder/hapus
+  antrean (`PlayerViewModel.moveQueueItem()`/`removeFromQueue()`) — selalu
+  `currentQueue.toMutableList().apply { ... }` lalu reassign ke `currentQueue`, artinya COPY baru
+  tiap perubahan, bukan mutasi in-place pada instance `List` yang sudah dipublikasikan ke
+  `_uiState`/Compose.
+- Kesimpulan: kontrak "List ini immutable secara praktik" berlaku app-wide di codebase ini, aman
+  ditandai stable.
+
+**Fix**: 1 baris ditambah di `app/compose_stability_config.conf`: `kotlin.collections.List`, plus
+komentar dokumentasi (pola sama entry `android.net.Uri` yang sudah ada) menjelaskan alasan & hasil
+audit di atas. **0 file Kotlin/kode disentuh** — `app/build.gradle.kts` juga TIDAK perlu diubah,
+`stabilityConfigurationPath` di sana sudah baca file config ini secara dinamis sejak Batch 20.
+
+**Efek**: seluruh composable yang menerima `List<Song>` (10 file `ui/` di atas) sekarang eligible
+untuk skip recomposition berbasis `equals()` kalau list-nya genuinely tidak berubah — TANPA ubah 1
+baris pun signature/call site di file-file itu. Cakupan disengaja dibatasi ke
+`kotlin.collections.List` saja (bukan `Set`/`Map`) — permintaan batch ini spesifik `List<Song>`,
+bukan koleksi lain, jadi tidak melebar dari yang diminta.
+
+**Scope**: 1 file (`app/compose_stability_config.conf`, config Compose compiler — BUKAN file kode
+Kotlin). Diff eksplisit vs ZIP Batch 412 dikonfirmasi CUMA file ini berubah (0 file lain kesenggol,
+termasuk 0 `FILE_MANIFEST.txt` — jumlah file tidak berubah, murni edit isi file yang sudah ada
+sejak Batch 20). **Exception cap 3-file yang diotorisasi user TIDAK sampai terpakai** — solusi
+final 1 file, di bawah bahkan cap normal (3), dicatat eksplisit supaya jelas kenapa exception yang
+sudah disetujui tidak dipakai penuh.
+
+**Belum diverifikasi build/runtime sungguhan** (0 kotlinc/Android SDK di sandbox, sama seperti
+seluruh riwayat proyek ini) — WAJIB cek GitHub Actions setelah push. Risiko regresi dinilai SANGAT
+RENDAH secara struktural (murni compiler hint, 0 logic diubah), tapi dampak nyata (berapa banyak
+recomposition yang benar-benar ter-skip) tetap butuh compose compiler metrics/pengukuran device
+asli, bukan diasumsikan dari analisis kode saja (pola sama seperti Batch 392 mencatat fix
+`identityRootBrush`-nya sendiri "belum ditest di device asli").
+
+**Sektor kandidat blocked Batch 392 — status setelah Batch 413**: `List<Song>` stability TUNTAS
+(via config, bukan refactor signature). Sisa 1 kandidat: `AlbumArt` `SubcomposeAsyncImage` (6 titik
+app-wide, butuh `Painter` drop-in yang bisa pertahankan tint dinamis tanpa regresi visual — TIDAK
+bisa dipecahkan lewat mekanisme config file yang sama, karena masalahnya bukan soal stability
+collection, tapi soal API `Painter` vs `SubcomposeAsyncImage`).
+
 ## Batch 412 — Lanjut sektor optimasi Batch 409: 2 kandidat dieksekusi/ditutup, 1 file kode
 User instruksi: *"lanjut optimize seperti sebelumnya!!"* — melanjutkan sektor optimasi Batch
 402-409 yang tersela Batch 410 (lock dokumentasi, 0 kode) dan Batch 411 (bugfix laporan user, di
