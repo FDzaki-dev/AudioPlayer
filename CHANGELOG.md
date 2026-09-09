@@ -1,5 +1,68 @@
 # Changelog
 
+## Batch 412 — Lanjut sektor optimasi Batch 409: 2 kandidat dieksekusi/ditutup, 1 file kode
+User instruksi: *"lanjut optimize seperti sebelumnya!!"* — melanjutkan sektor optimasi Batch
+402-409 yang tersela Batch 410 (lock dokumentasi, 0 kode) dan Batch 411 (bugfix laporan user, di
+luar sektor optimasi). **Status DISCONTINUED tetap permanen tidak diubah** — final lock Batch 410
+(0 kecuali) tidak disentuh sama sekali. Tidak ada ZIP baru sejak `AudioPlayer_v411.zip`; batch ini
+lanjut dari state kerja sesi (pola sama seluruh rangkaian batch "next" sejak Batch 393).
+
+Kedua kandidat yang dicatat sebagai rekomendasi di penutup Batch 409 diselesaikan sekaligus batch
+ini:
+
+**1. `Regex(...)` dibangun ulang tiap panggilan — `RingtoneEncoder.kt:150` (`buildDisplayName()`)**
+`Regex("[^A-Za-z0-9 _-]")` sebelumnya dikompilasi ulang tiap kali `cut()` dipanggil (tiap aksi
+potong ringtone manual user), padahal pattern-nya konstan sepanjang hidup instance. Dipindah jadi
+`private val displayNameSanitizerRegex` di level class, persis pola `fileStampFormat` yang sudah
+ada tepat di atasnya di file yang sama — juga pola yang sudah dipakai `LRC_LINE_REGEX`
+(`LyricsView.kt`, top-level `val`) dan `lrcLineRegex` (`LyricsParser.kt`, class-level `val`). Nilai
+optimasi kecil (dipanggil manual oleh user, bukan hot loop/tick loop) tapi zero-risk dan
+zero-behavior-change — drop-in, murni titik kompilasi Regex-nya yang berubah, hasil `.replace()`
+identik.
+
+**2. Audit `LaunchedEffect(key)` app-wide — hasil NEGATIF, 0 bug, 0 kode diubah**
+Grep app-wide `LaunchedEffect(` menemukan 19 titik nyata (di luar 1 sebutan dalam komentar
+`BubbleBootReceiver.kt`) tersebar di 9 file: `LyricsView.kt` (1), `LyricsSheet.kt` (1),
+`LockScreen.kt` (2), `VaultSheet.kt` (1), `BackupRestoreSheet.kt` (1), `LibraryScreen.kt` (1),
+`DiagnosticLogSheet.kt` (1), `NowPlayingScreen.kt` (2), `MainActivity.kt` (8, titik terbanyak).
+Setiap titik dibaca dengan konteks di sekitarnya (bukan cuma baris key-nya) untuk menilai apakah
+key sudah genuinely tepat — kelas bug yang dicari: key terlalu sempit (efek tidak re-run saat
+seharusnya) atau terlalu lebar/`Unit` yang seharusnya lebih spesifik (efek re-run/tidak pernah
+re-run secara keliru).
+
+**Hasil**: seluruh 19 titik sudah tepat. Pola yang konsisten ditemukan: (a) efek reaktif terhadap
+1 nilai state yang jelas jadi trigger-nya sendiri (`error`, `lockedOutUntil`, `activeIndex`,
+`pendingTagWriteConsent`, `celebrationMessage`/`playbackErrorMessage`/`actionErrorMessage`/
+`infoMessage`/`undoableAction`, dst.) — bukan `Unit` yang seharusnya lebih spesifik; (b) key
+majemuk (`pendingShortcutAction, librarySongsForShortcut.isEmpty()`; `needsUnlock,
+biometricEnabled`) dipakai justru karena efeknya genuinely butuh re-evaluasi saat KEDUA nilai
+berubah, bukan cuma salah satu; (c) `LaunchedEffect(Unit)` yang tersisa (`MainActivity.kt` 2 titik,
+`NowPlayingScreen.kt` 1 titik) dikonfirmasi genuinely "jalankan sekali per masuk composition"
+(restart service sekali per proses, observer setup) — bukan kasus key hilang yang seharusnya ada.
+0 titik yang re-run tidak perlu/gagal re-run saat perlu ditemukan. **0 kode diubah dari audit ini**
+— dicatat eksplisit (pola sama audit accessibility Batch 18 & audit `SDK_INT` katalog Batch 402)
+supaya sesi berikutnya tidak mengulang audit app-wide yang sama dari nol.
+
+**Scope**: 1 file kode (`RingtoneEncoder.kt`), 1 val baru + 1 baris pemakaian diubah di
+`buildDisplayName()`. Balance kurung dicek programatis (Python, string/comment-aware): 22/22 `{}`,
+86/86 `()`, 0/0 `[]` — seimbang. Diff eksplisit terhadap ZIP Batch 411 dikonfirmasi **CUMA file ini
+berubah**, 0 file lain kesenggol (termasuk 0 file test, 0 `FILE_MANIFEST.txt` — jumlah file tidak
+berubah).
+
+**Belum diverifikasi build/runtime sungguhan** (0 kotlinc/Android SDK/network di sandbox, sama
+seperti seluruh riwayat proyek ini) — WAJIB cek hasil GitHub Actions setelah push. Risiko regresi
+dinilai SANGAT RENDAH: perubahan #1 murni titik kompilasi Regex (drop-in, hasil identik),
+perubahan #2 nihil (audit tanpa kode).
+
+**Sektor "belum terjamah" Batch 409 — TUNTAS** (kedua kandidat dieksekusi/ditutup batch ini). 2
+kandidat lama TETAP diblokir sejak Batch 392, status tidak berubah: `AlbumArt`
+`SubcomposeAsyncImage` (6 titik app-wide, risiko regresi tint dinamis, butuh device fisik utk
+verifikasi visual) dan stabilitas `List<Song>` (lintas banyak file, melampaui batas 3-file/task).
+**Rekomendasi sesi berikutnya**: tidak ada lagi kandidat optimasi low-risk single-file yang belum
+tersentuh app-wide setelah sektor 409 dan 412 ini tuntas — sesi berikutnya perlu tanya user pilih
+antara (a) buka salah satu dari 2 kandidat lama yang diblokir (butuh diskusi relaksasi cap 3-file
+atau breakdown per-file terlebih dulu), atau (b) arah baru di luar 2 kandidat itu.
+
 ## Batch 411 — Bugfix: shuffle "cuma repeat lagu terakhir" pas antrean/radio habis, 1 file kode
 User lapor langsung di sesi ini (laporan bug baru, BUKAN lanjutan "next" sektor optimasi Batch
 402-409): *"fitur shuffle music ternyata hanya melakukan repeat last musik ketika trek musik user

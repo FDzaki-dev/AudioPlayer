@@ -107,6 +107,37 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 412 (Lanjut sektor optimasi Batch 409: 2 kandidat dieksekusi/ditutup, 1 file kode)** —
+User: *"lanjut optimize seperti sebelumnya!!"* — lanjut sektor optimasi Batch 402-409 yang tersela
+Batch 410 (lock dok.) & 411 (bugfix di luar sektor). **Status DISCONTINUED tetap permanen tidak
+diubah** (final lock Batch 410). TIDAK ada ZIP baru sesi ini (upload terakhir tetap
+`AudioPlayer_v411.zip`); lanjut dari state kerja sesi.
+
+**2 kandidat rekomendasi Batch 409 diselesaikan**: (1) `Regex(...)` di
+`RingtoneEncoder.kt:150` (`buildDisplayName()`) dipindah jadi `private val
+displayNameSanitizerRegex` class-level — pola sama `fileStampFormat` tepat di atasnya /
+`LRC_LINE_REGEX` (`LyricsView.kt`) / `lrcLineRegex` (`LyricsParser.kt`). Zero-behavior-change,
+nilai optimasi kecil (dipanggil manual, bukan hot loop) tapi zero-risk. (2) Audit
+`LaunchedEffect(key)` app-wide (19 titik, 9 file — `LyricsView.kt`, `LyricsSheet.kt`,
+`LockScreen.kt` ×2, `VaultSheet.kt`, `BackupRestoreSheet.kt`, `LibraryScreen.kt`,
+`DiagnosticLogSheet.kt`, `NowPlayingScreen.kt` ×2, `MainActivity.kt` ×8) — **hasil NEGATIF**:
+seluruh key dikonfirmasi tepat (state tunggal/majemuk yang genuinely relevan, `LaunchedEffect(Unit)`
+yang tersisa dikonfirmasi genuinely "sekali per composition"), 0 bug, 0 kode diubah dari audit ini.
+Dicatat eksplisit (pola sama audit accessibility Batch 18) supaya sesi berikutnya tidak mengulang.
+Detail lengkap CHANGELOG.md Batch 412.
+
+**Scope**: 1 file kode (`RingtoneEncoder.kt`). Balance kurung dicek programatis, seimbang (22/22
+`{}`, 86/86 `()`, 0/0 `[]`). Diff eksplisit vs ZIP Batch 411 dikonfirmasi CUMA file ini berubah.
+**Belum diverifikasi build/runtime sungguhan** (0 kotlinc/SDK/network di sandbox) — WAJIB cek
+GitHub Actions setelah push. Risiko regresi dinilai SANGAT RENDAH (drop-in Regex + audit tanpa
+kode).
+
+**Sektor "belum terjamah" Batch 409 — TUNTAS.** 2 kandidat lama TETAP diblokir sejak Batch 392:
+`AlbumArt` `SubcomposeAsyncImage` (6 titik, risiko regresi tint), stabilitas `List<Song>`
+(multi-file, lampaui cap 3-file). **Sesi berikutnya**: 0 kandidat low-risk single-file baru yang
+belum tersentuh app-wide tersisa — perlu tanya user pilih buka salah satu kandidat lama (butuh
+diskusi relaksasi cap 3-file/breakdown per-file) atau arah baru.
+
 **Batch 411 (Bugfix laporan user: shuffle "cuma repeat lagu terakhir" pas antrean/radio habis, 1
 file kode)** — User lapor LANGSUNG di sesi ini (bug report baru, BUKAN lanjutan "next" sektor
 optimasi Batch 402-409): *"fitur shuffle music ternyata hanya melakukan repeat last musik ketika

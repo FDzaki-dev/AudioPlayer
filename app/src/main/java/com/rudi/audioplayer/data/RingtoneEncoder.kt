@@ -51,6 +51,12 @@ class RingtoneEncoder(private val context: Context) {
 
     private val fileStampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
 
+    // Batch 412: dipindah keluar dari buildDisplayName() — sebelumnya Regex baru dikompilasi
+    // ulang tiap panggilan cut(), padahal pattern-nya konstan. Pola sama LRC_LINE_REGEX
+    // (LyricsView.kt) / lrcLineRegex (LyricsParser.kt), yang sudah top-level/class-level sejak
+    // awal.
+    private val displayNameSanitizerRegex = Regex("[^A-Za-z0-9 _-]")
+
     private fun editabilityCheck(song: Song): CutResult.Unsupported? {
         if (song.uri.authority != MediaStore.AUTHORITY) {
             return CutResult.Unsupported("Lagu dari folder tambahan belum didukung untuk dipotong.")
@@ -147,7 +153,7 @@ class RingtoneEncoder(private val context: Context) {
 
     private fun buildDisplayName(label: String): String {
         val safeLabel = label.trim().ifEmpty { "Ringtone" }
-            .replace(Regex("[^A-Za-z0-9 _-]"), "")
+            .replace(displayNameSanitizerRegex, "")
             .take(40)
         return "${safeLabel}_${fileStampFormat.format(Date())}_${UUID.randomUUID().toString().take(8)}.m4a"
     }
