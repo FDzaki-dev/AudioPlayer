@@ -24,16 +24,21 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 407 (sektor `SDK_INT` legacy mati, file berisiko #2, 1 file):**
-> User: "next" — lanjutan Batch 406. `MainActivity.kt` — 2 titik: `startBubbleService()`
-> (if/else biasa `SDK_INT >= O`, selalu true di `minSdk` 31) + `deleteSongsFromDevice()` (`when`
-> 3-cabang di mana cabang `R`(30) SENDIRI selalu match duluan krn `minSdk` 31 > R, cabang `Q`/
-> `else` di bawahnya permanent-shadowed — bukan sekadar "di bawah minSdk" seperti 10 file
-> sebelumnya di sektor ini). Import `RecoverableSecurityException` dihapus (0 pemakaian
-> tersisa); `Build` dipertahankan (masih dipakai 2 titik `TIRAMISU` yang TETAP relevan, tidak
-> disentuh). **Zero behavior change.** Sektor `SDK_INT` legacy sekarang 10/11 file tuntas — sisa
-> 1 file (`PlaybackService.kt`, butuh baca thread-safety Media3 dulu sebelum disentuh). **Status
-> DISCONTINUED tetap permanen tidak diubah.** Detail lengkap CHANGELOG.md Batch 407.
+> 🆕 **Update terbaru — Batch 408 (sektor `SDK_INT` legacy mati, file terakhir, 1 file —
+> SEKTOR TUNTAS 11/11):** User: "next" — lanjutan Batch 407. `PlaybackService.kt` — 7 titik
+> (koreksi dari katalog lama "5 titik": audit ulang penuh menemukan 7 sebenarnya, dicatat jujur)
+> dihapus: 2 di `maybeStartFloatingBubble()`, 1 di `buildColdStartNotification()`, 2 di
+> `startForegroundColdStartNotification()`/`updateColdStartNotification()`, 1 di
+> `SongArtBitmapLoader.loadBitmap()` (background thread Media3 — dikonfirmasi 0 hubungan ke
+> threading, SDK_INT check-nya cuma boolean sinkron biasa). **Zero behavior change.** Sektor
+> `SDK_INT` legacy mati (Batch 402-408, 7 sesi) sekarang **TUNTAS 11/11 file** — titik API
+> 32-34 yang masih relevan (`TIRAMISU`/`UPSIDE_DOWN_CAKE`) TETAP dipertahankan apa adanya. **Status
+> DISCONTINUED tetap permanen tidak diubah.** Detail lengkap CHANGELOG.md Batch 408.
+> Batch 407 (sektor `SDK_INT` legacy mati, file berisiko #2, 1 file):** User: "next" — lanjutan
+> Batch 406. `MainActivity.kt` — 2 titik: `startBubbleService()` (if/else biasa, selalu true) +
+> `deleteSongsFromDevice()` (`when` 3-cabang di mana cabang `R`(30) selalu match duluan krn
+> `minSdk` 31, cabang `Q`/`else` permanent-shadowed). **Zero behavior change.** Sektor `SDK_INT`
+> legacy sekarang 10/11 file tuntas. Detail lengkap CHANGELOG.md Batch 407.
 > Batch 406 (sektor `SDK_INT` legacy mati, file berisiko #1, 1 file):** User: "next" — lanjutan
 > Batch 405. `MusicRepository.kt` — 4 titik `SDK_INT` (Q/R/Q/R) dihapus di titik panggil
 > `querySongs()`/`trackDiscColumns()`; 2 fungsi pure companion object (`deriveFolderName()`,

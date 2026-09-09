@@ -91,6 +91,80 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 408 (Sektor `SDK_INT` legacy mati, file terakhir: `PlaybackService.kt`, 1 file kode —
+SEKTOR TUNTAS 11/11)** — User: "next" (lanjutan Batch 407, sektor sama, TANPA ZIP baru — lihat
+catatan integritas di bawah). **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi
+Batch 387 — kategori "optimasi murni").
+
+**Catatan integritas alur kerja**: sesi ini TIDAK menerima ZIP baru dari user (upload terakhir
+tetap `AudioPlayer_v406.zip`) — instruksi "next" datang langsung setelah output Batch 407 di
+percakapan yang sama, sebelum user sempat menjalankan skrip Termux [DAILY UPDATE]. Batch ini
+melanjutkan dari state kerja sesi (`AudioPlayer_v407.zip` yang baru dikirim), BUKAN dari ZIP user
+yang lebih baru — dicatat eksplisit di sini krn aturan "ZIP dari user = sumber kebenaran mutlak"
+biasanya mengasumsikan ZIP baru tiap batch. Kalau user ternyata sempat push/edit manual di luar
+ZIP yang diproses sesi ini sebelum instruksi "next" ini terkirim, state itu TIDAK tercermin di
+batch ini — sesi berikutnya yang menerima ZIP baru wajib diff dulu terhadap asumsi ini.
+
+Dibaca penuh dulu (840 baris) sebelum eksekusi, sesuai peringatan eksplisit Batch 402/405/406/407
+(file ini masuk "paling berisiko" § arsitektur, plus kekhawatiran khusus soal
+`SongArtBitmapLoader` yang dipanggil dari background thread Media3). **Temuan penting: katalog
+Batch 402 mencatat "5 titik M/O/O/Q/Q" utk file ini — grep ulang app-wide+baca penuh sesi ini
+menemukan SEBENARNYA 7 titik** (1×M, 3×O, 3×Q — bukan 1×M/2×O/2×Q). Dicatat jujur di sini
+(bukan disembunyikan/diselaraskan diam-diam ke angka lama) — kemungkinan besar audit awal Batch
+402 cuma grep pattern tanpa membaca tiap fungsi penuh utk file "berisiko" ini (sesuai catatan
+batch itu sendiri: "SENGAJA BELUM disentuh krn butuh baca konteks penuh dulu"), jadi undercount
+wajar terjadi, bukan indikasi ada yang salah di kode.
+
+**7 titik dieksekusi (semua di `PlaybackService.kt`)**:
+1. `maybeStartFloatingBubble()` — guard majemuk `SDK_INT >= M(23) && !canDrawOverlays()` →
+   `SDK_INT` selalu true di `minSdk` 31, disederhanakan jadi `!canDrawOverlays()` saja.
+2. `maybeStartFloatingBubble()` — if/else `SDK_INT >= O(26)` → selalu `startForegroundService()`.
+3. `buildColdStartNotification()` — `togglePendingIntent` if/else `SDK_INT >= O(26)` → selalu
+   `PendingIntent.getForegroundService(...)`.
+4. `updateColdStartNotification()` — if/else `SDK_INT >= Q(29)` → selalu `startForeground(...,
+   FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)`.
+5. `startForegroundColdStartNotification()` — guard `SDK_INT >= O(26)` yang membungkus pembuatan
+   notification channel → selalu true di `minSdk` 31, dihapus (channel selalu dibuat, bukan
+   dihapus channel-nya — cuma guard-nya yang redundant).
+6. `startForegroundColdStartNotification()` — if/else `SDK_INT >= Q(29)` (pola identik #4, fungsi
+   berbeda) → selalu `startForeground(..., FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)`.
+7. `SongArtBitmapLoader.loadBitmap()` — if/else `SDK_INT >= Q(29)` (pola identik ke
+   `AccentColorExtractor.kt`/`AudioArtFetcher.kt`/`WidgetUpdater.kt` Batch 402: `loadThumbnail()`
+   vs fallback manual `BitmapFactory.decodeStream`) → selalu `loadThumbnail(uri, Size(512,512),
+   null)`. **Soal kekhawatiran "background thread Media3"**: dikonfirmasi cek eksekusi tetap di
+   `scope.launch(Dispatchers.IO)` yang SAMA, tidak berubah sama sekali — SDK_INT check itu sendiri
+   cuma boolean sinkron biasa, 0 hubungan dgn threading; kekhawatiran katalog Batch 402/406 valid
+   sbg alasan "baca detail dulu" tapi TIDAK menghasilkan risiko tambahan di fix aktualnya.
+
+**Verifikasi app-wide sebelum eksekusi**: 2 file `androidTest`
+(`PlaybackServiceTestHelper.kt`/`PlaybackTransportTest.kt`) digrep utk 6 simbol yang disentuh —
+0 match, konfirmasi tidak ada test yang menguji fungsi-fungsi ini (test transport murni, bukan
+foreground-service/notification/bitmap-loading). `SongArtBitmapLoader` dikonfirmasi 0 dirujuk
+file lain (`private class`, cuma dipakai internal file ini). Import `Build` dihapus (0 pemakaian
+tersisa setelah ketujuh titik di atas — dicek eksplisit, file ini 0 titik `TIRAMISU`/`S_V2`/
+`UPSIDE_DOWN_CAKE` yang perlu dipertahankan, beda dari `MainActivity.kt`/`FloatingBubbleService.kt`).
+
+**Zero behavior change** di ketujuh titik: kondisi yang dihapus SELALU true di `minSdk` 31
+manapun (dijamin OS, bukan asumsi) — jalur eksekusi runtime 100% identik sebelum/sesudah, termasuk
+thread/dispatcher di titik 7. Balance kurung dicek programatis (78/78 `{}`, 258/258 `()`, 1/1
+`[]`, seimbang), diff eksplisit vs ZIP Batch 407 dikonfirmasi cuma 1 file kode ini berubah
+(840 → 819 baris, turun 21 baris net). Belum diverifikasi build/runtime sungguhan (0 kotlinc/SDK/
+network di sandbox, sama seperti seluruh rangkaian batch sektor ini) — titik #7
+(`SongArtBitmapLoader`) & foreground-service start (#2/#3/#4/#5/#6) layak diverifikasi device
+fisik ekstra teliti (artwork notifikasi/lock-screen tetap termuat, cold-start widget tetap jadi
+foreground service tanpa crash `ForegroundServiceStartNotAllowedException`) krn file ini memang
+ditandai paling berisiko sejak awal sektor ini. Detail lengkap CHANGELOG.md Batch 408.
+
+**Sektor `SDK_INT` legacy — status setelah Batch 408: TUNTAS 11/11 file.** Seluruh cabang mati
+`Build.VERSION_CODES` di bawah `minSdk` 31 (M/N/O/P/Q/R, katalog app-wide Batch 402) sudah
+diaudit & dibersihkan lintas 8 sesi (Batch 402-408), 0 sisa yang diketahui. Titik `S_V2`(32)/
+`TIRAMISU`(33)/`UPSIDE_DOWN_CAKE`(34) di `FloatingBubbleService.kt`/`BubbleTileService.kt`/
+`MainActivity.kt` SENGAJA dipertahankan (masih relevan, level API-nya > `minSdk` 31). **Sesi
+berikutnya**: sektor ini resmi ditutup, kembali ke kandidat Compose yang diblokir sejak Batch 392
+(`AlbumArt` `SubcomposeAsyncImage` — 6 titik app-wide, risiko regresi tint dinamis; stabilitas
+`List<Song>` app-wide — lintas banyak file, melampaui batas 3-file/task) — ATAU tanya user arah
+baru kalau kedua kandidat itu masih dianggap terlalu berisiko tanpa device fisik.
+
 **Batch 407 (Sektor `SDK_INT` legacy mati, file berisiko #2: `MainActivity.kt`, 1 file kode)** —
 User: "next" (lanjutan Batch 406, sektor sama). **Status DISCONTINUED tetap permanen tidak diubah**
 (per klarifikasi Batch 387 — kategori "optimasi murni").

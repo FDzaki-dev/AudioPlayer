@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
@@ -356,9 +355,9 @@ class PlaybackService : MediaLibraryService() {
 
     private fun maybeStartFloatingBubble() {
         if (!FloatingBubbleStore(this).isEnabled()) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) return
+        if (!Settings.canDrawOverlays(this)) return
         val intent = Intent(this, FloatingBubbleService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+        startForegroundService(intent)
     }
 
     private fun pushWidgetUpdate(player: Player) {
@@ -450,11 +449,7 @@ class PlaybackService : MediaLibraryService() {
     private fun buildColdStartNotification(): android.app.Notification {
         val toggleIntent = Intent(this, PlaybackService::class.java).setAction(WidgetUpdater.ACTION_TOGGLE_PLAY)
         val toggleFlags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        val togglePendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            PendingIntent.getForegroundService(this, 101, toggleIntent, toggleFlags)
-        } else {
-            PendingIntent.getService(this, 101, toggleIntent, toggleFlags)
-        }
+        val togglePendingIntent = PendingIntent.getForegroundService(this, 101, toggleIntent, toggleFlags)
 
         return NotificationCompat.Builder(this, COLD_START_CHANNEL_ID)
             .setContentTitle("SONIX")
@@ -495,11 +490,7 @@ class PlaybackService : MediaLibraryService() {
      * scope 2 laporan user). */
     private fun updateColdStartNotification() {
         val notification = buildColdStartNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        } else {
-            startForeground(COLD_START_NOTIFICATION_ID, notification)
-        }
+        startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
     }
 
     /** Bare-minimum "waking up" notification so the OS treats this process as a legitimate
@@ -508,26 +499,20 @@ class PlaybackService : MediaLibraryService() {
      * Media3's own full notification takes over, the user has something to tap instead of a
      * dead, control-less notification. */
     private fun startForegroundColdStartNotification() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = getSystemService(NotificationManager::class.java)
-            if (manager.getNotificationChannel(COLD_START_CHANNEL_ID) == null) {
-                manager.createNotificationChannel(
-                    NotificationChannel(
-                        COLD_START_CHANNEL_ID,
-                        "Memulai Pemutaran",
-                        NotificationManager.IMPORTANCE_LOW
-                    )
+        val manager = getSystemService(NotificationManager::class.java)
+        if (manager.getNotificationChannel(COLD_START_CHANNEL_ID) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    COLD_START_CHANNEL_ID,
+                    "Memulai Pemutaran",
+                    NotificationManager.IMPORTANCE_LOW
                 )
-            }
+            )
         }
 
         val notification = buildColdStartNotification()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        } else {
-            startForeground(COLD_START_NOTIFICATION_ID, notification)
-        }
+        startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
     }
 
     private fun applyWidgetAction(action: String?) {
@@ -813,13 +798,7 @@ private class SongArtBitmapLoader(
         CallbackToFutureAdapter.getFuture { completer ->
             scope.launch(Dispatchers.IO) {
                 try {
-                    val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        context.contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null)
-                    } else {
-                        context.contentResolver.openInputStream(uri)?.use {
-                            android.graphics.BitmapFactory.decodeStream(it)
-                        }
-                    }
+                    val bitmap = context.contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null)
                     if (bitmap != null) completer.set(bitmap)
                     else completer.setException(java.io.FileNotFoundException("Tidak ada artwork utk $uri"))
                 } catch (e: Exception) {
