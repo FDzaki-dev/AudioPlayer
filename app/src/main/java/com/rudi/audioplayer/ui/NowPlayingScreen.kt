@@ -265,7 +265,7 @@ fun NowPlayingScreen(
     // API tiap transisi cepat), bukan baru mulai fetch pas user buka sheet — lirik sudah siap
     // duluan saat sheet dibuka.
     val lyricsViewModel: LyricsViewModel = viewModel(factory = LyricsViewModel.factory(context))
-    val lyricsAutoState by lyricsViewModel.uiState.collectAsState()
+    val lyricsAutoState by lyricsViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(song?.id) {
         song?.let { lyricsViewModel.loadLyrics(it.artist, it.title, it.album) }
     }

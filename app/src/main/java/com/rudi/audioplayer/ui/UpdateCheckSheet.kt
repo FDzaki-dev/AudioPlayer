@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rudi.audioplayer.BuildConfig
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.update.UpdateManager
@@ -28,7 +29,7 @@ import com.rudi.audioplayer.update.UpdateManager
 fun UpdateCheckSheet(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val state by UpdateManager.state.collectAsState()
+    val state by UpdateManager.state.collectAsStateWithLifecycle()
 
     // Batch 339 — BUG FIX (laporan user: "sudah selesai install update package tapi gak sengaja
     // salah mencet, malah ke cancel dari awal lagi unduhannya"). Root cause: `onDispose` di bawah

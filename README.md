@@ -24,7 +24,16 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 408 (sektor `SDK_INT` legacy mati, file terakhir, 1 file —
+> 🆕 **Update terbaru — Batch 409 (sektor baru: `collectAsState()` non-lifecycle-aware, 2
+> file):** User: "fokus sektor lain yang belum terjamah optimalisasi, dan tentu saja low-risk!!"
+> Proyek konsisten pakai `collectAsStateWithLifecycle()` di 41 titik app-wide, tapi 0 sesi pernah
+> grep khusus cari outlier `collectAsState()` polos — ditemukan tepat 2 titik kelewat:
+> `NowPlayingScreen.kt` (`lyricsAutoState`) & `UpdateCheckSheet.kt` (`state`, dari
+> `UpdateManager`). Keduanya diganti ke `collectAsStateWithLifecycle()` — mencegah StateFlow
+> tetap di-collect (buang CPU/battery) saat app di background. **Zero behavior change** selagi
+> app foreground. Sektor ini sekarang **TUNTAS** (0 sisa app-wide). **Status DISCONTINUED tetap
+> permanen tidak diubah.** Detail lengkap CHANGELOG.md Batch 409.
+> Batch 408 (sektor `SDK_INT` legacy mati, file terakhir, 1 file —
 > SEKTOR TUNTAS 11/11):** User: "next" — lanjutan Batch 407. `PlaybackService.kt` — 7 titik
 > (koreksi dari katalog lama "5 titik": audit ulang penuh menemukan 7 sebenarnya, dicatat jujur)
 > dihapus: 2 di `maybeStartFloatingBubble()`, 1 di `buildColdStartNotification()`, 2 di

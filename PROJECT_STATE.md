@@ -91,6 +91,47 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 409 (Sektor baru: `collectAsState()` non-lifecycle-aware, 2 file kode)** — User: "fokus
+sektor lain yang belum terjamah optimalisasi, dan tentu saja low-risk!!" (dipilih via opsi
+eksplisit setelah ditawari lanjut `AlbumArt`/`List<Song>` yang diblokir, atau arah baru — user
+pilih arah baru). **Status DISCONTINUED tetap permanen tidak diubah** (Batch 387 — "optimasi
+murni"). TIDAK ada ZIP baru sesi ini (upload terakhir tetap `AudioPlayer_v408.zip`); lanjut dari
+state kerja sesi.
+
+**Temuan**: proyek konsisten pakai `collectAsStateWithLifecycle()` (dependency
+`lifecycle-runtime-compose:2.8.2` sudah ada) — 41 titik app-wide SUDAH benar
+(`MainActivity.kt` 33, `NowPlayingScreen.kt` 4, dst). 0 sesi sebelumnya pernah grep khusus cari
+OUTLIER `collectAsState()` polos — grep app-wide `\.collectAsState()\b` (regex terpisah dari
+`collectAsStateWithLifecycle`) menemukan **tepat 2 titik kelewat**, pas di bawah batas 3-file.
+
+**2 titik fix**: (1) `NowPlayingScreen.kt:268` — `lyricsAutoState`
+(`StateFlow<LyricsUiState>` dari `LyricsViewModel.uiState`) → `collectAsStateWithLifecycle()`,
+import sudah ada di file yang sama (dipakai 4 titik lain). (2) `UpdateCheckSheet.kt:31` — `state`
+(`StateFlow<UpdateState>` dari `UpdateManager.state`, singleton `object`) →
+`collectAsStateWithLifecycle()`, import baru ditambahkan.
+
+**Kelas bug**: `collectAsState()` polos tetap collect Flow walau lifecycle di bawah `STARTED`
+(app background) — buang CPU/battery. `collectAsStateWithLifecycle()` (default `STARTED`) pause
+otomatis saat `STOPPED`, resume transparan (StateFlow re-emit `.value` terbaru, 0 event hilang).
+
+**Verifikasi**: kedua properti dikonfirmasi genuinely `StateFlow` (bukan `SharedFlow`/`Flow`
+biasa). 0 pemanggil lain di luar 2 titik ini (grep app-wide). **Zero behavior change** selagi app
+foreground — beda perilaku HANYA saat background (manfaat, bukan regresi). Balance kurung dicek
+programatis (Python, string/comment-aware): `NowPlayingScreen.kt` 282/282 `{}` 789/789 `()`;
+`UpdateCheckSheet.kt` 22/22 `{}` 61/61 `()` — seimbang. Diff eksplisit vs ZIP Batch 408
+dikonfirmasi CUMA 2 file ini berubah, 0 file lain kesenggol. Detail lengkap CHANGELOG.md Batch 409.
+
+**Belum diverifikasi build/runtime sungguhan** (0 kotlinc/SDK/network di sandbox) — WAJIB cek
+GitHub Actions setelah push. Risiko dinilai LEBIH RENDAH dari sektor sebelumnya krn murni ganti
+1 API resmi AndroidX dgn API resmi AndroidX lain (drop-in).
+
+**Sektor `collectAsState()` non-lifecycle-aware — TUNTAS** (0 sisa titik app-wide, dikonfirmasi
+grep ulang). **Sesi berikutnya**: kandidat baru yang belum pernah teraudit — (a) `Regex(...)`
+dibangun ulang tiap panggilan di `RingtoneEncoder.kt:150` (bukan hot-path, prioritas rendah);
+(b) audit `LaunchedEffect(key)` app-wide vs key yang tepat (belum pernah digrep sistematis). 2
+kandidat lama (`AlbumArt` `SubcomposeAsyncImage`, stabilitas `List<Song>`) TETAP diblokir sejak
+Batch 392, status tidak berubah.
+
 **Batch 408 (Sektor `SDK_INT` legacy mati, file terakhir: `PlaybackService.kt`, 1 file kode —
 SEKTOR TUNTAS 11/11)** — User: "next" (lanjutan Batch 407, sektor sama, TANPA ZIP baru — lihat
 catatan integritas di bawah). **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi
