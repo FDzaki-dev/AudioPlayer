@@ -91,6 +91,38 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 395 (Optimasi Compose — `remember` 2 Brush di `embossSurface()`, `TactileDepth.kt`, 1
+file kode)** — User: "next" (lanjutan sesi optimasi Compose Batch 392→393→394). **Status
+DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).
+
+Setelah Batch 394 menuntaskan kelas bug "`items()` tanpa `key`" (0 sisa app-wide), diaudit ulang
+kelas bug Batch 392 ("komputasi berat tanpa `remember`") tapi ke fungsi UTILITY lintas-layar,
+bukan 1 screen. Ditemukan `embossSurface()` (private, `TactileDepth.kt`, mekanisme bersama di
+balik `tactileEmboss()`/`skeuEmboss()`) — `@Composable`, membaca `animatedElevation`/`scale` lewat
+`by animateDpAsState`/`animateFloatAsState` di scope yang SAMA, jadi tiap frame animasi
+press/release (~15-20 frame/tekan) me-rerun seluruh badan termasuk 2 alokasi
+`Brush.linearGradient(...)` segar yang TIDAK bergantung pada `animatedElevation`/`scale` — cuma
+pada 4 param Color/2 Float yang cuma berubah 2x per tekan (turun & lepas). Dipakai app-wide (tiap
+tombol/panel Tactile & Skeu), jadi blast radius lebih luas dari Batch 392 (1 layar), kelas bug &
+level pembuktiannya sama — fakta struktural dari kode, bukan tebakan.
+
+**Fix**: 2 Brush dibungkus `remember` atas key input asli (`remember(surfaceTop, surfaceBottom)`
+& `remember(highlight, shadow, borderTopAlpha, borderBottomAlpha)`) — BUKAN key
+`animatedElevation`/`scale` (itu akan mengulang bug). `Color` sbg remember key sudah ada
+presedennya sendiri di project ini (Batch 393, `rootBackgroundColor` di `MainActivity.kt`). 0
+pemanggilan `@Composable` di dalam lambda `remember` — dicek eksplisit supaya tidak mengulang
+kesalahan `@DisallowComposableCalls` Batch 393. **Zero behavior change** — brush identik, cuma
+rebuild berkurang.
+
+**1 file kode disentuh** (`TactileDepth.kt`, 495->514 baris). Brace/paren/bracket balance seimbang
+(285/285 `()`, 35/35 `{}`, 0/0 `[]`). `tactileEmboss()`/`skeuEmboss()` (2 pemanggil, sama file)
+TIDAK diubah sama sekali — perubahan terkurung 100% di private function-nya. Masih belum ditest
+build/lint sungguhan — rekomendasi ke user: push & jalankan CI. Blast radius pemakaian lebih luas
+dari batch sebelumnya (app-wide via 2 fungsi publik), jadi tetap perlu verifikasi visual device
+asli sebelum dianggap final, konsisten kebijakan 385-394. Sisa kandidat compose sector tetap sama
+(`AlbumArt` SubcomposeAsyncImage, stabilitas `List<Song>` app-wide) — belum dieksekusi, alasan
+sama. Detail lengkap CHANGELOG.md Batch 395.
+
 **Batch 394 (Optimasi Compose — `key` pada LazyRow `items()`, `SmartPlaylistScreen.kt`, 1 file
 kode)** — User instruksi: "lanjut optimize sektor compose!!" (lanjutan sesi Batch 392, dgn Batch
 393 di antaranya sbg HOTFIX build gagal atas Batch 392 itu sendiri). **Status DISCONTINUED tetap

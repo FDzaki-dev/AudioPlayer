@@ -1,5 +1,64 @@
 # Changelog
 
+## Batch 395 — Optimasi Compose: `remember` 2 Brush di `embossSurface()`, `TactileDepth.kt`, 1 file
+User instruksi: "next" — lanjutan sesi optimasi Compose yang sama (Batch 392→393→394), sektor
+belum berubah. **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).
+
+**Metodologi**: setelah Batch 394 menuntaskan kelas bug "`items()` tanpa `key`" (app-wide, 0 sisa),
+diaudit kelas bug Batch 392 lagi ("komputasi berat tanpa `remember` di badan composable") tapi kali
+ini ke fungsi UTILITY yang dipakai LINTAS BANYAK layar, bukan 1 screen spesifik — `TactileDepth.kt`
+(495 baris, berisi `tactileEmboss()`/`skeuEmboss()`/`calmAberration()`/dst, dipakai app-wide utk
+efek "kedalaman" tombol & panel identitas Tactile/Skeu). Ditemukan: `embossSurface()` (private,
+Batch 57, mekanisme BERSAMA di balik `tactileEmboss()` MAUPUN `skeuEmboss()`) — `@Composable`,
+membaca `animatedElevation`/`scale` lewat `by animateDpAsState(...)`/`by animateFloatAsState(...)`
+DI SCOPE YANG SAMA — jadi SETIAP frame animasi press/release (~200-300ms, ~15-20 frame per
+tekan/lepas tombol) me-rerun SELURUH badan fungsi ini, termasuk 2 alokasi `Brush.linearGradient(...)`
+segar (1 utk `.background()`, 1 lagi di dalam `BorderStroke` utk `.border()`) yang TIDAK bergantung
+pada `animatedElevation`/`scale` sama sekali — cuma pada `surfaceTop`/`surfaceBottom` (background)
+dan `highlight`/`shadow`/`borderTopAlpha`/`borderBottomAlpha` (border), yang cuma berubah 2x per
+tekan (turun & lepas), bukan tiap frame. Karena `embossSurface()` dipakai app-wide (tiap tombol/
+panel bertema Tactile ATAU Skeu), realokasi ini terjadi berulang kali di HAMPIR SETIAP interaksi
+tekan-tombol di seluruh app — blast radius lebih luas dari `identityRootBrush` Batch 392 (yang
+cuma 1 titik/1 layar), tapi kelas bug & tingkat pembuktiannya SAMA PERSIS: fakta struktural dari
+pembacaan kode (parameter mana yang benar-benar dipakai brush vs yang cuma kebetulan 1 scope),
+bukan tebakan yang butuh data device.
+
+**Fix**: 2 `Brush.linearGradient(...)` dibungkus `remember` masing-masing atas key INPUT ASLINYA
+— `remember(surfaceTop, surfaceBottom)` utk background, `remember(highlight, shadow,
+borderTopAlpha, borderBottomAlpha)` utk border — BUKAN `remember` tanpa key/dgn key
+`animatedElevation`/`scale` (yang justru akan mengembalikan bug ini, rebuild tiap frame lagi).
+`Color` aman dipakai sbg remember key (`value class` dgn `equals`/`hashCode` berbasis nilai) —
+preseden SUDAH ADA di file lain project ini sendiri: Batch 393 menambahkan `rootBackgroundColor`
+(`Color`) sbg key ke-3 `remember(...)` di `MainActivity.kt`, jadi ini bukan asumsi baru. 0
+pemanggilan properti `@Composable` di dalam kedua lambda `remember` (cuma `Brush.linearGradient`/
+`.copy`/`listOf`, semua fungsi biasa) — dicek eksplisit supaya TIDAK mengulang kelas kesalahan
+`@DisallowComposableCalls` yang baru saja terjadi di Batch 393. **Zero behavior change**: brush
+yang dihasilkan identik (input sama persis, cuma titik alokasi ulangnya yang berkurang) — rebuild
+sekarang HANYA terjadi saat `pressed`/tema benar-benar berubah, bukan lagi tiap frame animasi
+elevation/scale di antaranya.
+
+**1 file kode disentuh** (`TactileDepth.kt`, 495 -> 514 baris, naik krn 1 baris import
+`androidx.compose.runtime.remember` baru + komentar penjelasan + deklarasi 2 `val` baru). Brace/
+paren/bracket balance dicek (python3): 285/285 `()`, 35/35 `{}`, 0/0 `[]` — seimbang. Ditelusuri:
+`tactileEmboss()`/`skeuEmboss()` (2 pemanggil `embossSurface()`, sama file) TIDAK diubah sama
+sekali (signature & argumen yang dikirim byte-identical) — perubahan 100% terkurung di private
+function-nya sendiri, 0 dampak ke call site. Diff-checked terhadap ZIP Batch 394: cuma
+`TactileDepth.kt` yang berubah.
+
+**Masih belum ditest di build/lint sungguhan** (0 kotlinc/SDK/network di sandbox) — rekomendasi
+tetap sama: push & jalankan CI sebelum lanjut batch berikutnya (preseden Batch 24/393). Risiko
+regresi fix ini serupa Batch 394 (rendah — cuma menambah cache di sekitar alokasi objek yang
+sudah ada, bukan mengubah aturan compiler seperti Batch 392/393), TAPI blast radius PEMAKAIAN
+lebih luas (app-wide via `tactileEmboss()`/`skeuEmboss()`, bukan 1 layar) — jadi tetap
+direkomendasikan device asli utk verifikasi visual identik sebelum dianggap 100% final, konsisten
+kebijakan "belum di-QA device fisik" yang berlaku ke SEMUA batch optimasi 385-394.
+
+**Sisa kandidat compose sector setelah batch ini** (belum berubah dari Batch 392/394):
+`AlbumArt`'s `SubcomposeAsyncImage` dan stabilitas `List<Song>` app-wide — keduanya TETAP di luar
+bar 3-file/zero-regresi batch tunggal, kandidat inisiatif multi-batch tersendiri. Plus cost riil
+Compose first-composition & baseline profile/R8 (Batch 388) — masih butuh data Macrobenchmark
+device asli.
+
 ## Batch 394 — Optimasi Compose: `key` pada LazyRow `items()`, `SmartPlaylistScreen.kt`, 1 file
 User instruksi: "lanjut optimize sektor compose!!" — lanjutan sesi Batch 392 (Compose), dengan
 Batch 393 di antaranya sebagai HOTFIX build gagal atas Batch 392 itu sendiri. **Status

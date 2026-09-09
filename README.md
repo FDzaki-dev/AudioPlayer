@@ -24,7 +24,17 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 394 (optimasi Compose: `key` pada LazyRow `items()`,
+> 🆕 **Update terbaru — Batch 395 (optimasi Compose: `remember` 2 Brush di
+> `embossSurface()`, `TactileDepth.kt`, 1 file):** User: "next" — lanjutan sesi Compose
+> Batch 392→393→394. `embossSurface()` (mekanisme bersama `tactileEmboss()`/`skeuEmboss()`,
+> dipakai app-wide) baca `animatedElevation`/`scale` di scope yang sama, jadi tiap frame animasi
+> tekan-tombol (~15-20 frame) rebuild ulang 2 `Brush.linearGradient(...)` yang sebenarnya cuma
+> bergantung pada warna/alpha yang berubah 2x per tekan, bukan tiap frame. Fix: kedua Brush
+> dibungkus `remember` atas key sebenarnya. **Zero behavior change** — brush identik, blast
+> radius lebih luas dari Batch 392 (app-wide, bukan 1 layar) krn dipakai tiap tombol/panel
+> Tactile & Skeu. **Status DISCONTINUED tetap permanen tidak diubah.** Detail lengkap
+> CHANGELOG.md Batch 395.
+> Batch 394 (optimasi Compose: `key` pada LazyRow `items()`,
 > `SmartPlaylistScreen.kt`, 1 file):** User: "lanjut optimize sektor compose!!" — lanjutan sesi
 > Batch 392, dgn Batch 393 di antaranya sbg HOTFIX. Digrep app-wide SEMUA pemanggilan
 > `items(...)` LazyColumn/LazyRow (19 titik) — 17/19 sudah pakai `key`, 2 sisanya (chip Folder &

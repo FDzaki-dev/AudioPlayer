@@ -14,6 +14,7 @@ import androidx.compose.foundation.border
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -120,6 +121,29 @@ private fun Modifier.embossSurface(
     // mistake (PROJECT_STATE.md Batch 39-44), not repeated here.
     val shadowAlpha = if (pressed) shadowAlphaPressed else shadowAlphaNormal
 
+    // Batch 395 — `animatedElevation`/`scale` above are read via `by` in THIS SAME composable
+    // scope, so every intermediate frame of their press/release animation (animateDpAsState/
+    // animateFloatAsState, ~200-300ms, up to ~15-20 frames per press) reruns this whole function
+    // body — including, before this batch, 2 fresh `Brush.linearGradient(...)` allocations below
+    // that DON'T actually depend on `animatedElevation`/`scale` at all (only on the 6 Color/Float
+    // params, which only change twice per press: down and up, not per-frame). `embossSurface()`
+    // is the shared mechanism behind `tactileEmboss()`/`skeuEmboss()` (Batch 57 comment above),
+    // so this reallocation was happening app-wide on every tactile/skeu button & panel press.
+    // Fix: cache both brushes against their REAL inputs — zero behavior change (identical Brush
+    // built from identical inputs), rebuild now only happens on an actual press-state/theme
+    // change instead of every animation frame in between.
+    val backgroundBrush = remember(surfaceTop, surfaceBottom) {
+        Brush.linearGradient(colors = listOf(surfaceTop, surfaceBottom))
+    }
+    val borderBrush = remember(highlight, shadow, borderTopAlpha, borderBottomAlpha) {
+        Brush.linearGradient(
+            colors = listOf(
+                highlight.copy(alpha = borderTopAlpha),
+                shadow.copy(alpha = borderBottomAlpha)
+            )
+        )
+    }
+
     return this
         .scale(scale)
         .drawBehind {
@@ -133,17 +157,12 @@ private fun Modifier.embossSurface(
         .background(
             // Diagonal top-left -> bottom-right gradient (spec §9) between the two elevated
             // surface levels, replacing the old vertical bevel.
-            Brush.linearGradient(colors = listOf(surfaceTop, surfaceBottom))
+            backgroundBrush
         )
         .border(
             BorderStroke(
                 1.dp,
-                Brush.linearGradient(
-                    colors = listOf(
-                        highlight.copy(alpha = borderTopAlpha),
-                        shadow.copy(alpha = borderBottomAlpha)
-                    )
-                )
+                borderBrush
             ),
             shape
         )
