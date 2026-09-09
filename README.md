@@ -24,7 +24,24 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 405 (sektor `SDK_INT` legacy mati, kategori "campur API 34", 2
+> 🆕 **Update terbaru — Batch 407 (sektor `SDK_INT` legacy mati, file berisiko #2, 1 file):**
+> User: "next" — lanjutan Batch 406. `MainActivity.kt` — 2 titik: `startBubbleService()`
+> (if/else biasa `SDK_INT >= O`, selalu true di `minSdk` 31) + `deleteSongsFromDevice()` (`when`
+> 3-cabang di mana cabang `R`(30) SENDIRI selalu match duluan krn `minSdk` 31 > R, cabang `Q`/
+> `else` di bawahnya permanent-shadowed — bukan sekadar "di bawah minSdk" seperti 10 file
+> sebelumnya di sektor ini). Import `RecoverableSecurityException` dihapus (0 pemakaian
+> tersisa); `Build` dipertahankan (masih dipakai 2 titik `TIRAMISU` yang TETAP relevan, tidak
+> disentuh). **Zero behavior change.** Sektor `SDK_INT` legacy sekarang 10/11 file tuntas — sisa
+> 1 file (`PlaybackService.kt`, butuh baca thread-safety Media3 dulu sebelum disentuh). **Status
+> DISCONTINUED tetap permanen tidak diubah.** Detail lengkap CHANGELOG.md Batch 407.
+> Batch 406 (sektor `SDK_INT` legacy mati, file berisiko #1, 1 file):** User: "next" — lanjutan
+> Batch 405. `MusicRepository.kt` — 4 titik `SDK_INT` (Q/R/Q/R) dihapus di titik panggil
+> `querySongs()`/`trackDiscColumns()`; 2 fungsi pure companion object (`deriveFolderName()`,
+> `parseLegacyTrackColumn()`) SENGAJA TIDAK disentuh krn masih diuji langsung oleh 12 test case
+> gabungan (`MusicRepositoryFolderNameTest.kt`/`MusicRepositoryTrackDiscTest.kt`). **Zero
+> behavior change.** Sektor `SDK_INT` legacy sekarang 9/11 file tuntas. Detail lengkap
+> CHANGELOG.md Batch 406.
+> Batch 405 (sektor `SDK_INT` legacy mati, kategori "campur API 34", 2
 > file):** User: "next" — lanjutan Batch 404. `FloatingBubbleService.kt`/`BubbleTileService.kt`
 > — 6 cabang legacy dihapus (N/O/Q, selalu true sejak `minSdk` 31), **2 titik `UPSIDE_DOWN_CAKE`
 > (API 34) DIBIARKAN UTUH** (device API 31-33 masih genuinely butuh cabangnya) + 1 anotasi

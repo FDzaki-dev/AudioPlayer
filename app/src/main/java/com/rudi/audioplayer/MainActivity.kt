@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.app.RecoverableSecurityException
 import android.os.Bundle
 import android.provider.Settings
 import androidx.fragment.app.FragmentActivity
@@ -642,7 +641,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     // fallback, sekarang disatukan di 1 helper biar tidak diketik ulang 3x di bawah.
     fun startBubbleService(context: android.content.Context) {
         val intent = Intent(context, FloatingBubbleService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
+        context.startForegroundService(intent)
     }
 
     val overlayPermissionLauncher = rememberLauncherForActivityResult(
@@ -734,37 +733,13 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         if (songs.isEmpty()) return
         val resolver = deleteContext.contentResolver
         val uris = songs.map { it.uri }
-        when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
-                // Android 11+: the only correct path — the system shows its own confirmation
-                // and handles the actual deletion; we never touch the files directly.
-                val pendingIntent = android.provider.MediaStore.createDeleteRequest(resolver, uris)
-                deleteRequestLauncher.launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
-            }
-            Build.VERSION.SDK_INT == Build.VERSION_CODES.Q -> {
-                // Android 10: delete() throws a RecoverableSecurityException carrying the
-                // exact system confirmation prompt to launch for files this app doesn't own.
-                try {
-                    uris.forEach { resolver.delete(it, null, null) }
-                    playerViewModel.refreshLibrary()
-                } catch (e: RecoverableSecurityException) {
-                    deleteRequestLauncher.launch(IntentSenderRequest.Builder(e.userAction.actionIntent.intentSender).build())
-                }
-            }
-            else -> {
-                // Pre-Android 10: no scoped-storage confirmation flow exists yet; a direct
-                // delete (content resolver + backing file) is the standard approach.
-                uris.forEach { uri ->
-                    try {
-                        resolver.delete(uri, null, null)
-                    } catch (e: Exception) {
-                        // Leave library state consistent even if one file couldn't be removed
-                        // (e.g. already gone) — refreshLibrary() below re-syncs regardless.
-                    }
-                }
-                playerViewModel.refreshLibrary()
-            }
-        }
+        // minSdk 31 (Android 12) guarantees SDK_INT >= R (30) unconditionally — this used to be
+        // the first branch of a `when` whose Q/else branches were shadowed dead code (R always
+        // matched first, not because Q/pre-Q were individually below minSdk). The only path any
+        // device on this app can actually take: the system shows its own confirmation and
+        // handles the actual deletion; we never touch the files directly.
+        val pendingIntent = android.provider.MediaStore.createDeleteRequest(resolver, uris)
+        deleteRequestLauncher.launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
     }
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()

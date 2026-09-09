@@ -1,5 +1,73 @@
 # Changelog
 
+## Batch 407 — Sektor `SDK_INT` legacy mati, file berisiko #2: `MainActivity.kt` (1 file kode)
+User instruksi: "next" (lanjutan Batch 406, sektor sama). **Status DISCONTINUED tetap permanen
+tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
+
+Masuk ke file terakhir-tapi-satu dari 2 sisa "belum diverifikasi, butuh baca konteks penuh dulu"
+(katalog Batch 402, diperbarui rekomendasi Batch 405/406) — `MainActivity.kt` dipilih duluan
+drpd `PlaybackService.kt` krn scope titik SDK_INT-nya lebih sempit & sudah punya nomor baris pasti
+dari audit sebelumnya (645, 738, 744), sementara `PlaybackService.kt` masih butuh audit baris-per-
+baris penuh + pemahaman thread-safety Media3 (`SongArtBitmapLoader`/`CallbackToFutureAdapter`)
+sebelum aman disentuh. **Seluruh file dibaca penuh dulu (1364 baris) sebelum 1 baris pun
+disentuh**, sesuai peringatan eksplisit PROJECT_STATE.md soal file ini ("protected asset").
+
+**Temuan kunci sebelum eksekusi**:
+1. `startBubbleService()` baris 645 — if/else biasa, `SDK_INT >= O`(26) selalu true di `minSdk`
+   31, pola identik ke sektor "polanya identik" (Batch 403-404), 0 kejutan.
+2. `deleteSongsFromDevice()` baris 737-767 — **kasus BEDA yang jadi alasan file ini "ditahan" 3
+   batch berturut-turut**: `when` 3-cabang (`SDK_INT >= R`(30) → `SDK_INT == Q`(29) → `else`),
+   BUKAN sekadar 1 kondisi vs `minSdk`. Dibaca isi ketiga cabang penuh (bukan cuma kondisinya):
+   cabang R (`MediaStore.createDeleteRequest` + `deleteRequestLauncher`) sendiri SELALU match
+   duluan krn `minSdk` 31 > R 30 — bukan cabang Q/`else` yang "di bawah minSdk" secara individual
+   (Q=29 memang < 31, tapi itu bukan sebab langsung unreachable-nya; sebabnya cabang R di atasnya
+   yang mengambil semua kasus duluan). Isi cabang Q (`resolver.delete()` + tangkap
+   `RecoverableSecurityException`) dan `else` (loop delete manual) dikonfirmasi 100% tidak pernah
+   tereksekusi runtime apa pun — bukan diasumsikan, diverifikasi lewat baca urutan evaluasi `when`
+   Kotlin (top-to-bottom, first-match).
+
+**2 titik dieksekusi (semua di `MainActivity.kt`)**:
+1. `startBubbleService()` — `if (SDK_INT >= O) startForegroundService(intent) else
+   startService(intent)` → selalu `context.startForegroundService(intent)`.
+2. `deleteSongsFromDevice()` — `when` 3-cabang dihapus total, badan cabang R (`MediaStore.
+   createDeleteRequest` + `deleteRequestLauncher.launch(...)`) jadi kode linear langsung
+   menggantikan seluruh blok. Komentar baru ditulis menjelaskan KENAPA (shadowing, bukan sekadar
+   level API) — supaya sesi berikutnya yang baca file ini tidak bingung kenapa cuma 1 jalur yang
+   tersisa dari 3 cabang aslinya.
+
+**Verifikasi app-wide sebelum eksekusi**: 0 file test (`app/src/test`, `app/src/androidTest`)
+mereferensikan `startBubbleService()`/`deleteSongsFromDevice()` — keduanya fungsi lokal di dalam
+`@Composable` `AppNavHost`/setup, butuh `Context`/`ContentResolver` Android nyata, bukan kandidat
+unit test JVM sama sekali (beda dari `MusicRepository.kt` Batch 406 yang punya 12 test case
+terkait). Import `RecoverableSecurityException` dihapus (dicek eksplisit: HANYA dipakai di cabang
+Q yang baru dihapus, 0 pemakaian lain di seluruh file). Import `Build` **TIDAK dihapus** — masih
+genuinely dipakai 2 titik `TIRAMISU`(33) baris 254/259 (`READ_MEDIA_AUDIO`/`POST_NOTIFICATIONS`,
+33 > `minSdk` 31, device API 31-32 real butuh cabang lama itu) — dikonfirmasi TIDAK disentuh sama
+sekali, sesuai katalog Batch 402 "TETAP RELEVAN".
+
+**Zero behavior change** di kedua titik: titik 1 kondisinya SELALU true di `minSdk` 31 manapun;
+titik 2 cabang Q/`else` sudah permanently unreachable sejak `minSdk` naik ke 31 (dijamin urutan
+evaluasi `when` Kotlin, bukan asumsi) — jalur yang benar-benar bisa jalan runtime 100% identik
+sebelum/sesudah edit.
+
+**Batas jaminan (sama seperti seluruh rangkaian batch sebelumnya)**: 0 `kotlinc`/Android SDK/
+network di environment kerja sesi ini — verifikasi terbatas ke (1) baca-ulang manual seluruh file
+setelah edit (1364→1339 baris), (2) balance kurung/kurawal/bracket dicek programatis (Python,
+string/comment-aware): 256/256 `{}`, 491/491 `()`, 3/3 `[]` — seimbang, (3) diff eksplisit
+terhadap ZIP Batch 406 — dikonfirmasi CUMA `MainActivity.kt` yang berubah, 0 file lain kesenggol.
+**Belum diverifikasi build/runtime sungguhan** — WAJIB cek hasil GitHub Actions setelah push, dan
+`deleteSongsFromDevice()` KHUSUSNYA layak diverifikasi manual di device fisik (alur hapus lagu dari
+Library: konfirmasi dialog sistem `MediaStore.createDeleteRequest` masih muncul & lagu benar
+terhapus) krn titik ini sengaja ditahan 3 batch beruntun justru karena dianggap paling berisiko di
+sektor ini setelah `MusicRepository.kt`.
+
+**Rekomendasi konkret utk sesi berikutnya**: sektor `SDK_INT` legacy sekarang 10/11 file tuntas.
+Sisa 1 file: `PlaybackService.kt` (5 titik M/O/O/Q/Q, salah satu Q di `SongArtBitmapLoader` yang
+dipanggil dari background thread Media3 `CallbackToFutureAdapter` — kelas risiko beda lagi dari
+`MainActivity.kt`, butuh pemahaman thread-safety dulu, bukan cuma baca if/else atau urutan `when`).
+Kalau dianggap terlalu berisiko tanpa baca super teliti: sektor ini bisa dianggap TUNTAS scope-nya
+(10/11) — alternatif: kandidat Compose yang diblokir sejak Batch 392, atau tanya user arah baru.
+
 ## Batch 406 — Sektor `SDK_INT` legacy mati, file berisiko #1: `MusicRepository.kt` (1 file kode)
 User instruksi: "next" (lanjutan Batch 405, sektor sama). **Status DISCONTINUED tetap permanen
 tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").

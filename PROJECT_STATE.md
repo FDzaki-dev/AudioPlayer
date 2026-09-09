@@ -91,6 +91,48 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 407 (Sektor `SDK_INT` legacy mati, file berisiko #2: `MainActivity.kt`, 1 file kode)** —
+User: "next" (lanjutan Batch 406, sektor sama). **Status DISCONTINUED tetap permanen tidak diubah**
+(per klarifikasi Batch 387 — kategori "optimasi murni").
+
+Dibaca penuh dulu (1364 baris) sebelum eksekusi, sesuai peringatan eksplisit Batch 402/405/406
+(file ini masuk "paling berisiko" + berlabel "protected asset" di banyak batch UI sebelumnya).
+Katalog Batch 402 mencatat 2 titik: (1) `startBubbleService()` baris 645, if/else biasa
+`SDK_INT >= O`(26) — dihapus, selalu `context.startForegroundService(intent)`; (2)
+`deleteSongsFromDevice()` baris 738/744, kasus BEDA yang sengaja belum dieksekusi 3 batch
+berturut-turut krn mekanismenya beda dari 10 file lain di sektor ini — BUKAN sekadar cabang di
+bawah `minSdk`, tapi `when` 3-cabang (`SDK_INT >= R`(30) → `SDK_INT == Q`(29) → `else`) di mana
+cabang R **sendiri** selalu match duluan (dijamin `minSdk` 31 > R 30), jadi cabang Q & `else` di
+bawahnya ke-shadow permanen — dikonfirmasi dengan membaca isi ketiga cabang penuh (bukan cuma
+kondisinya), isi cabang R (`MediaStore.createDeleteRequest` + `deleteRequestLauncher`) dipastikan
+100% cukup jadi satu-satunya jalur eksekusi. **Fix HANYA di 2 titik ini + 1 import terkait**
+(`RecoverableSecurityException`, dipakai HANYA di cabang Q yang dihapus, 0 pemakaian lain di file
+— dihapus). Import `Build` TETAP dipertahankan — masih genuinely dipakai 2 titik `TIRAMISU`(33)
+baris 254/259 (`READ_MEDIA_AUDIO`/`POST_NOTIFICATIONS`), 33 > `minSdk` 31 jadi device API 31-32
+real butuh cabang lama itu, **TIDAK disentuh** (sesuai katalog "TETAP RELEVAN"). 0 file test
+mereferensikan `startBubbleService()`/`deleteSongsFromDevice()` (keduanya fungsi lokal di dalam
+Composable, butuh Context/ContentResolver nyata — tidak ada unit test JVM yang mungkin utk fungsi
+ini, beda dari `MusicRepository.kt` Batch 406 yang punya 12 test case terkait). **Zero behavior
+change** — kondisi yang dihapus semuanya selalu true (titik 1) atau permanently shadowed jadi
+tidak pernah reachable (titik 2) di `minSdk` 31 manapun. Balance kurung dicek programatis (256/256
+`{}`, 491/491 `()`, 3/3 `[]`, seimbang), diff eksplisit vs ZIP Batch 406 dikonfirmasi cuma 1 file
+kode ini berubah (1364 → 1339 baris, turun 25 baris net krn `when` 3-cabang ~30 baris diringkas
+jadi ~7 baris linear + 1 baris import dihapus). Belum diverifikasi build/runtime sungguhan (0
+kotlinc/SDK/network di sandbox, sama seperti seluruh rangkaian batch sektor ini) —
+`deleteSongsFromDevice()` layak diverifikasi ekstra teliti di device fisik (alur hapus lagu dari
+Library, konfirmasi dialog sistem `MediaStore.createDeleteRequest` tetap muncul & lagu benar
+terhapus) krn titik ini sengaja "dilewati" 3 batch berturut-turut justru karena mekanismenya
+dianggap berisiko dibanding 10 file lain di sektor ini. Detail lengkap CHANGELOG.md Batch 407.
+
+**Sektor `SDK_INT` legacy — status setelah Batch 407**: 10/11 file katalog Batch 402 TUNTAS. Sisa
+1 file, "belum diverifikasi, butuh baca konteks penuh dulu": `PlaybackService.kt` (5 titik
+M/O/O/Q/Q, salah satu Q di `SongArtBitmapLoader` yang dipanggil dari background thread Media3 via
+`CallbackToFutureAdapter` — beda kelas risiko dari `MainActivity.kt`, butuh pemahaman thread-safety
+Media3 dulu sebelum sentuh, bukan cuma baca if/else biasa). Kalau dianggap terlalu berisiko: sektor
+ini bisa dianggap TUNTAS scope-nya (10/11, sisa 1 file genuinely butuh baca lebih dalam soal
+Media3 threading utk diverifikasi aman) — alternatif: kandidat Compose yang diblokir sejak Batch
+392, atau tanya user arah baru.
+
 **Batch 406 (Sektor `SDK_INT` legacy mati, file berisiko #1: `MusicRepository.kt`, 1 file kode)**
 — User: "next" (lanjutan Batch 405, sektor sama). **Status DISCONTINUED tetap permanen tidak
 diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
