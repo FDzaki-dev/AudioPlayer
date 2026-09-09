@@ -107,6 +107,36 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 411 (Bugfix laporan user: shuffle "cuma repeat lagu terakhir" pas antrean/radio habis, 1
+file kode)** — User lapor LANGSUNG di sesi ini (bug report baru, BUKAN lanjutan "next" sektor
+optimasi Batch 402-409): *"fitur shuffle music ternyata hanya melakukan repeat last musik ketika
+trek musik user udah habis/mentok total!!"*. **Status DISCONTINUED tetap permanen tidak diubah**
+(banner di atas & `README.md` tidak disentuh sama sekali — final lock Batch 410) — batch ini murni
+eksekusi bugfix atas instruksi eksplisit user, bukan perubahan status proyek. TIDAK ada ZIP baru
+sesi ini (upload terakhir tetap `AudioPlayer_v410.zip`).
+
+**Root cause**: fitur "Radio Otomatis" (`continuePlaybackIfQueueEnded()`, nyala default — lihat
+`RadioSettingsStore.kt`) dipicu tiap `Player.STATE_ENDED` selagi `repeatMode == REPEAT_MODE_OFF`.
+Urutan lama `addMediaItems(20 lagu) → seekToNextMediaItem() → play()` rapuh: `seekToNextMediaItem()`
+cuma jalan kalau `hasNextMediaItem()` true, dihitung dari timeline HASIL MASKING lokal
+`MediaController` (media3 1.3.1, lihat `CrossfadeEngine.kt` § alasan pin versi) yang belum tentu
+sinkron persis di tick yang sama dengan `addMediaItems()` barusan (round-trip session masih
+di-flight) — kalau kejadian, jadi no-op senyap, lalu `play()` dipanggil selagi player MASIH
+`STATE_ENDED` di lagu terakhir → ExoPlayer restart lagu itu dari 0 (perilaku baku `play()` saat
+`STATE_ENDED`) — persis gejala laporan. Fix: `seekTo(insertIndex, 0L)` langsung ke index yang
+sudah pasti diketahui (`c.mediaItemCount` dibaca SEBELUM `addMediaItems()`, append selalu ke akhir
+timeline), tidak lagi bergantung `hasNextMediaItem()`/shuffle-order controller-side sama sekali —
+urutan acak 20 lagunya sendiri sudah dijamin lewat `.shuffled()` (pola sama `shuffleAll()`). Detail
+lengkap + analisis race CHANGELOG.md Batch 411.
+
+**Scope**: 1 file kode (`PlayerViewModel.kt`, fungsi `continuePlaybackIfQueueEnded()`) —
+`CrossfadeEngine.kt`/`PlaybackService.kt` TIDAK disentuh (§ "Keputusan arsitektur" di bawah,
+keduanya berisiko), bug murni di titik `MediaController` sisi ViewModel. Balance kurung dicek
+programatis, seimbang. **Belum diverifikasi build/runtime sungguhan** (0 kotlinc/SDK/network di
+sandbox) — WAJIB cek GitHub Actions setelah push, dan reproduksi manual: shuffle ON, radio-continue
+ON (default), biarkan antrean benar-benar habis, konfirmasi lagu BARU yang mulai (bukan lagu lama
+restart dari 0).
+
 **Batch 409 (Sektor baru: `collectAsState()` non-lifecycle-aware, 2 file kode)** — User: "fokus
 sektor lain yang belum terjamah optimalisasi, dan tentu saja low-risk!!" (dipilih via opsi
 eksplisit setelah ditawari lanjut `AlbumArt`/`List<Song>` yang diblokir, atau arah baru — user

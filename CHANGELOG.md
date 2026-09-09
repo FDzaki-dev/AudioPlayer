@@ -1,5 +1,49 @@
 # Changelog
 
+## Batch 411 — Bugfix: shuffle "cuma repeat lagu terakhir" pas antrean/radio habis, 1 file kode
+User lapor langsung di sesi ini (laporan bug baru, BUKAN lanjutan "next" sektor optimasi Batch
+402-409): *"fitur shuffle music ternyata hanya melakukan repeat last musik ketika trek musik user
+udah habis/mentok total!!"*. **Status DISCONTINUED tetap permanen tidak diubah** — banner di
+`PROJECT_STATE.md`/`README.md` tidak disentuh sama sekali, sesuai kunci final Batch 410. Batch ini
+murni eksekusi bugfix atas instruksi eksplisit langsung dari user di percakapan ini, bukan
+perubahan status proyek.
+
+**Root cause**: fitur "Radio Otomatis" (`continuePlaybackIfQueueEnded()` di `PlayerViewModel.kt`
+— nyala default, lihat `RadioSettingsStore.kt`) dipicu tiap `Player.STATE_ENDED` selagi
+`repeatMode == REPEAT_MODE_OFF`. Urutan lama: `c.addMediaItems(20 lagu baru)` →
+`c.seekToNextMediaItem()` → `c.play()`. `seekToNextMediaItem()` adalah default method `Player`
+yang cuma jalan kalau `hasNextMediaItem()` true, dan itu dihitung dari timeline HASIL MASKING
+lokal `MediaController` — project ini terkunci media3 1.3.1 (lihat `CrossfadeEngine.kt` § alasan
+pin versi) — yang tidak selalu langsung sinkron persis di tick yang sama dengan `addMediaItems()`
+barusan (round-trip session masih di-flight). Saat kejadian: `hasNextMediaItem()` masih baca
+state LAMA (sebelum 20 lagu ditambah) → false → `seekToNextMediaItem()` jadi no-op senyap →
+`c.play()` dipanggil selagi player MASIH `STATE_ENDED` tepat di lagu terakhir → perilaku baku
+ExoPlayer saat `play()` dipanggil dalam `STATE_ENDED` adalah restart item sekarang dari posisi 0
+— persis gejala laporan user: shuffle "cuma repeat lagu terakhir" pas antrean habis. Race ini
+intermiten (kadang keburu sinkron, makanya lolos QA manual sebelumnya), tapi sistemik: selalu
+berpotensi kena PERSIS di titik antrean/radio habis, cocok 1:1 sama laporan.
+
+**Fix** (`PlayerViewModel.kt`, `continuePlaybackIfQueueEnded()`): ganti `seekToNextMediaItem()`
+dengan `seekTo(insertIndex, 0L)` langsung — index dihitung sendiri dari `c.mediaItemCount` yang
+DIBACA SEBELUM `addMediaItems()` dipanggil (append selalu ke akhir timeline, jadi ini pasti index
+lagu baru pertama). Urutan acak 20 lagu itu sendiri SUDAH dibikin lewat `.shuffled()` di baris
+sebelumnya (pola sama persis `shuffleAll()`), jadi tidak perlu percaya/nunggu ExoPlayer hitung
+ulang shuffle-order controller-side sama sekali untuk kasus spesifik ini. `seekTo(index,
+position)` adalah command langsung ke session (bukan default method yang precondition-check state
+lokal dulu), jadi tidak kena race yang sama.
+
+**Scope**: 1 file kode (`PlayerViewModel.kt`), 1 fungsi diubah. `CrossfadeEngine.kt`/
+`PlaybackService.kt` TIDAK disentuh (keduanya berisiko, lihat § "Keputusan arsitektur"
+`PROJECT_STATE.md`) — bug ini murni di titik pemanggilan `MediaController` dari ViewModel, bukan
+di sessionPlayer/crossfade, jadi tidak ada alasan menyentuh keduanya. Balance kurung dicek
+programatis (Python, string/comment-aware): `{}` 211/211, `()` 644/644, `[]` 7/7 — seimbang, 0
+file lain kesenggol.
+
+**Belum diverifikasi build/runtime sungguhan** (0 kotlinc/SDK/network di sandbox) — WAJIB cek
+GitHub Actions setelah push, dan idealnya reproduksi manual laporan asli user: shuffle ON,
+radio-continue ON (default), biarkan antrean benar-benar habis, konfirmasi yang mulai lagu BARU
+dari 20 yang ditambahkan — bukan lagu lama yang restart dari 0.
+
 ## Batch 409 — Sektor baru: `collectAsState()` non-lifecycle-aware (StateFlow Compose), 2 file kode
 User instruksi: "fokus sektor lain yang belum terjamah optimalisasi, dan tentu saja low-risk!!" —
 dipilih lewat opsi eksplisit setelah user diberi 3 pilihan (lanjut `AlbumArt` berisiko, lanjut

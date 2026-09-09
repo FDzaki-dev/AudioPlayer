@@ -688,11 +688,29 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val toAdd = pool.shuffled().take(20)
         if (toAdd.isEmpty()) return
 
+        // Batch 411 (bugfix laporan user — "shuffle cuma repeat lagu terakhir pas antrean
+        // habis"). Root cause: `seekToNextMediaItem()` lama bergantung `hasNextMediaItem()`/
+        // `getNextMediaItemIndex()` MediaController, yang dibaca dari timeline HASIL MASKING
+        // lokal sisi controller (media3 1.3.1, lihat CrossfadeEngine.kt § kenapa project ini
+        // terkunci versi itu) — masking timeline+shuffle-order abis `addMediaItems()` yang
+        // dipanggil SAMA PERSIS di baris di atas belum tentu langsung tercermin sinkron di
+        // titik ini (round-trip session masih di-flight). Efek nyata: `hasNextMediaItem()`
+        // sempat masih baca state LAMA (sebelum 20 lagu baru ditambah) → false →
+        // seekToNextMediaItem() jadi no-op → c.play() dipanggil selagi player masih
+        // STATE_ENDED di lagu TERAKHIR → ExoPlayer restart lagu itu dari posisi 0 (perilaku
+        // baku play() saat STATE_ENDED) — persis gejala shuffle "repeat lagu terakhir".
+        // Fix: JANGAN andalkan hasNextMediaItem()/shuffle-order controller di titik ini sama
+        // sekali — index lagu baru sudah pasti diketahui (append ke akhir timeline = posisi
+        // `insertIndex`, dibaca SEBELUM addMediaItems dipanggil), dan urutan acaknya sendiri
+        // sudah dibikin lewat `.shuffled()` di atas (pola sama dgn shuffleAll()) — jadi
+        // seekTo(index) langsung ke situ, tidak perlu nunggu/percaya ExoPlayer hitung ulang
+        // next/shuffle order controller-side.
+        val insertIndex = c.mediaItemCount
         c.addMediaItems(toAdd.map { mediaItemFor(it) })
         currentQueue = currentQueue + toAdd
         currentQueueSlotIds = currentQueueSlotIds + newSlotIds(toAdd.size)
         _uiState.value = _uiState.value.copy(queue = currentQueue, queueSlotIds = currentQueueSlotIds)
-        c.seekToNextMediaItem()
+        c.seekTo(insertIndex, 0L)
         c.play()
     }
 
