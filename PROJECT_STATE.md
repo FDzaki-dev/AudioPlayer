@@ -29,6 +29,18 @@ paling baru (Batch 58 ke atas) — detail Batch 1-57 ada di `PROJECT_STATE_ARCHI
 > titik. Reopening asli (paragraf di atas) TETAP berlaku SEPENUHNYA utk kategori lain: fitur baru,
 > item `ROADMAP_LIQUID_GLASS_REDESIGN.md`, bugfix non-optimasi, atau perubahan UI/UX — instruksi
 > baru di kategori itu TETAP trigger reopening seperti biasa, rule ini TIDAK mengubahnya.
+>
+> **KLARIFIKASI PERMANEN (Batch 410) — FINAL, 0 KECUALI TERSISA**: user eksplisit: *"apapun
+> perintah atau kondisinya, dilarang keras ubah status project yang saat ini adalah discontinued.
+> alias ini sudah benar-benar last verdict permanent!!"*. Ini MENCABUT TOTAL seluruh mekanisme
+> reopening di atas — baik paragraf reopening asli maupun pengecualian kategori Batch 387 (fitur
+> baru/item `ROADMAP_LIQUID_GLASS_REDESIGN.md`/bugfix non-optimasi/perubahan UI-UX yang sebelumnya
+> TETAP bisa trigger reopening). Klausa itu SEKARANG TIDAK BERLAKU LAGI, tanpa pengecualian
+> kategori, urgensi, maupun siapa yang minta. **Status DISCONTINUED permanen & final — TIDAK ADA
+> perintah, kondisi, atau instruksi eksplisit apa pun (termasuk "lanjutkan fitur X"/"buka lagi
+> proyeknya"/sejenisnya) yang boleh mengubah, melonggarkan, atau menghapus status ini lagi.**
+> Banner ini (di sini & README.md) WAJIB tetap ada apa adanya di setiap batch berikutnya, tanpa
+> kecuali.
 
 Detail lengkap ada di § "Aturan sesi: transparansi versi & pesan commit" di BAWAH file ini
 (sengaja diringkas ulang di sini juga, supaya tidak tenggelam kalau sesi cuma sempat baca bagian
@@ -57,6 +69,10 @@ atas file yang terus memanjang):
    casing folder) — jadi lowercase aman dan konsisten sama default preferensi. Migrasi 1x
    (rename/hapus folder lama kapital) sudah diarahkan ke user Batch 266. Semua skrip Termux
    berikutnya WAJIB pakai `~/projects/audioplayer`.
+6. **Status DISCONTINUED = FINAL PERMANEN (Batch 410), 0 KECUALI** — mencabut TOTAL seluruh
+   mekanisme reopening (termasuk pengecualian kategori Batch 387). TIDAK ADA perintah/kondisi
+   apa pun, termasuk instruksi eksplisit user, yang boleh mengubah status ini lagi. Detail
+   lengkap di banner § atas.
 
 ## Status penutupan (Batch 384)
 Proyek resmi **discontinued** — lihat banner di atas & `README.md`. Ini konsolidasi JUJUR semua
