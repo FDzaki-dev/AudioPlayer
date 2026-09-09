@@ -1,5 +1,72 @@
 # Changelog
 
+## Batch 396 — Optimasi Compose: `remember` `edgeBrush` di `frostedGlass()`, `BlurUtils.kt`, 1 file
+User instruksi: "next" — lanjutan sesi optimasi Compose yang sama (Batch 392→393→394→395), sektor
+belum berubah. **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).
+
+**Metodologi**: setelah Batch 395 menuntaskan `TactileDepth.kt` (fungsi utility lintas-layar),
+diaudit fungsi utility lintas-layar LAIN yang levelnya lebih tinggi lagi cakupannya —
+`frostedGlass()` (`BlurUtils.kt`), SATU-SATUNYA titik shared yang dilalui SEMUA panel glass
+app-wide (dikonfirmasi lewat komentar Batch 281 di file itu sendiri: MiniPlayerBar, tiap bottom
+sheet, card Home/Library, panel NowPlaying — 12+ call site). Ditemukan: `edgeBrush` (`when` block
+4-cabang: Tactile/LiquidGlass/Aurora/else) dibangun LANGSUNG di badan `@Composable fun
+Modifier.frostedGlass()`, TANPA `remember` — pola bug SAMA PERSIS kelas Batch 392/395, tapi kali
+ini di titik pemakaian PALING SERING di-recompose di seluruh app: `MiniPlayerBar.kt` (komentar
+Batch 353 di file itu sendiri) SENGAJA membaca `playbackProgress` LANGSUNG di badan
+composable-nya sendiri ("tick posisi tiap detik cuma invalidasi MiniPlayerBar ini sendiri, bukan
+ikut memaksa AppNavHost recompose") — desain itu valid utk mencegah propagasi ke parent, TAPI
+konsekuensinya SELURUH badan `MiniPlayerBar` (termasuk 1 pemanggilan `.frostedGlass()` di
+dalamnya) tetap recompose SETIAP DETIK selama musik main. Sebelum batch ini, itu berarti
+`edgeBrush` dibangun ulang dari nol (Brush + List + Color.copy) SETIAP DETIK PLAYBACK — padahal
+isi 4 cabangnya 100% cuma bergantung pada identitas tema aktif + isDark, yang TIDAK PERNAH
+berubah selama musik main (beda total dari histori Batch 326-328 di file yang sama — root cause
+KALI ITU adalah phase ANIMASI `LocalAuroraPhase` yang ikut dibaca di sini, sudah dihapus balik
+Batch 328; kelas bug batch ini murni "dibangun ulang tanpa alasan", bukan "berubah tanpa alasan").
+
+**Kenapa ini AMAN dieksekusi meski histori Batch 328 eksplisit menolak "dioptimasi lebih jauh
+(mis. derivedStateOf/throttle)"**: penolakan itu soal MENAMBAH mekanisme baru (CompositionLocal
+animasi dibagi, derivedStateOf, throttle) yang justru terbukti MENAMBAH kompleksitas & regresi
+device sungguhan (stuttering). Fix batch ini TIDAK menambah mekanisme baru — `remember` adalah
+tool paling dasar yang SAMA PERSIS sudah dipakai & terbukti aman di Batch 392/395, MENGURANGI
+kerja per recomposition yang sudah given (Batch 353 desain), bukan mengubah KAPAN/KENAPA
+recomposition terjadi. Justru selaras `STABILITY > Speed`: konsekuensi tak terhindarkan dari
+desain Batch 353 (MiniPlayerBar recompose tiap detik) kini lebih murah per kejadiannya.
+
+**Fix**: `MaterialTheme.colorScheme.onSurface`/`.background` dibaca SEKALI ke `val` biasa DI LUAR
+`remember{}` (`onSurfaceColor`/`themeBackgroundColor`, pola persis fix Batch 393 utk
+`@DisallowComposableCalls` — 0 pemanggilan property `@Composable` di dalam lambda `remember`,
+dicek eksplisit). `edgeBrush` dibungkus `remember(isTactile, isLiquidGlass, isAurora, isDark,
+onSurfaceColor, themeBackgroundColor)` — 6 key ini SATU-SATUNYA input nyata `when` block-nya.
+**Zero behavior change**: brush yang dihasilkan identik di tiap kombinasi identitas/mode, rebuild
+sekarang hanya terjadi saat salah satu dari 6 input itu benar-benar berubah (ganti tema/mode),
+bukan lagi tiap detik playback.
+
+**1 file kode disentuh** (`BlurUtils.kt`, 292 -> 310 baris, naik krn 1 import
+`androidx.compose.runtime.remember` + komentar penjelasan + 2 `val` ekstraksi + pembungkus
+`remember{}`). Brace/paren/bracket balance dicek (`tr -cd | wc -c`, lebih akurat dari
+`str.count()` python utk file dgn sedikit brace eksplisit): 169/169 `()`, 7/7 `{}`, 0/0 `[]` —
+seimbang. Isi internal `when` block (4 cabang + komentar Batch 281/310/327/328 di dalamnya) TIDAK
+disentuh sama sekali KECUALI 2 baris di cabang `else` (`MaterialTheme.colorScheme.onSurface` →
+`onSurfaceColor`, `MaterialTheme.colorScheme.background` → `themeBackgroundColor`, substitusi
+referensi murni, nilai identik) — histori panjang batch 53-328 di blok komentar ini dipertahankan
+utuh, tidak ada yang dihapus/diringkas. `edgeWidth`/`glassBase`/`base`/`return` (badan fungsi
+setelah edgeBrush) TIDAK diubah. Diff-checked terhadap ZIP Batch 395: cuma `BlurUtils.kt` yang
+berubah.
+
+**Masih belum ditest di build/lint sungguhan** (0 kotlinc/SDK/network di sandbox) — rekomendasi
+tetap sama: push & jalankan CI. Batch ini justru punya blast radius PALING LUAS dari 3 batch
+compose sebelumnya (dipanggil app-wide TERMASUK MiniPlayerBar yang aktif tiap detik selama musik
+main) — mengingat file ini sendiri punya histori regresi device nyata (Batch 326-328), **sangat
+direkomendasikan verifikasi device fisik** (bukan cuma CI compile) sebelum dianggap 100% final:
+konfirmasi (a) tampilan glass tiap identitas visual identik sebelum/sesudah, (b) tidak ada
+stuttering baru saat playback (fix ini SEHARUSNYA cuma mengurangi kerja, tapi histori file ini
+menjustifikasi kehati-hatian ekstra).
+
+**Sisa kandidat compose sector setelah batch ini** (belum berubah): `AlbumArt`'s
+`SubcomposeAsyncImage` dan stabilitas `List<Song>` app-wide — tetap di luar bar 3-file/
+zero-regresi batch tunggal. Plus cost riil Compose first-composition & baseline profile/R8
+(Batch 388) — masih butuh data Macrobenchmark device asli.
+
 ## Batch 395 — Optimasi Compose: `remember` 2 Brush di `embossSurface()`, `TactileDepth.kt`, 1 file
 User instruksi: "next" — lanjutan sesi optimasi Compose yang sama (Batch 392→393→394), sektor
 belum berubah. **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).

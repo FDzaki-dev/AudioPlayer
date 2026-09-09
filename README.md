@@ -24,7 +24,18 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 395 (optimasi Compose: `remember` 2 Brush di
+> 🆕 **Update terbaru — Batch 396 (optimasi Compose: `remember` `edgeBrush` di
+> `frostedGlass()`, `BlurUtils.kt`, 1 file):** User: "next" — lanjutan sesi Compose
+> Batch 392→393→394→395. `frostedGlass()` (titik shared 12+ panel glass app-wide) bangun ulang
+> `edgeBrush` tiap recomposition — termasuk `MiniPlayerBar` yang recompose TIAP DETIK selama
+> musik main (desain Batch 353), padahal isi brush cuma bergantung identitas tema+isDark, tidak
+> berubah selama playback. Beda dari histori regresi Batch 326-328 di file yang sama (root cause
+> waktu itu phase animasi, sudah dihapus balik) — fix ini cuma `remember` biasa, tidak menambah
+> mekanisme baru. **Zero behavior change**, blast radius PALING LUAS dari batch compose
+> sebelumnya — direkomendasikan verifikasi device fisik (visual + tidak ada stuttering baru)
+> mengingat histori file ini. **Status DISCONTINUED tetap permanen tidak diubah.** Detail
+> lengkap CHANGELOG.md Batch 396.
+> Batch 395 (optimasi Compose: `remember` 2 Brush di
 > `embossSurface()`, `TactileDepth.kt`, 1 file):** User: "next" — lanjutan sesi Compose
 > Batch 392→393→394. `embossSurface()` (mekanisme bersama `tactileEmboss()`/`skeuEmboss()`,
 > dipakai app-wide) baca `animatedElevation`/`scale` di scope yang sama, jadi tiap frame animasi

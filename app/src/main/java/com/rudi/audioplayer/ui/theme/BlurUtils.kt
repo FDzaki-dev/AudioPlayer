@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -159,7 +160,23 @@ fun Modifier.frostedGlass(
     // bespoke per-corner draw. Batch 61 — both Tactile and Skeu now branch on `isDark` for their
     // own light-tuned token pair (Color.kt "LIGHT VARIANT" sections); Apple's flat branch already
     // handled its own light/dark via the background comparison below, unchanged.
-    val edgeBrush = when {
+    // Batch 396 — `frostedGlass()` adalah titik shared 12+ call site app-wide (komentar Batch
+    // 281 di bawah) TERMASUK `MiniPlayerBar`, yang badan composable-nya (Batch 353's komentar
+    // sendiri, `MiniPlayerBar.kt`) SENGAJA membaca `playbackProgress` LANGSUNG di scope yang SAMA
+    // supaya tick posisi tiap detik "cuma invalidasi MiniPlayerBar ini sendiri" — tapi itu berarti
+    // SELURUH badan `MiniPlayerBar` (termasuk pemanggilan `.frostedGlass()` ini) tetap recompose
+    // tiap detik SELAMA musik main. Sebelum batch ini, `edgeBrush` (`when` block di bawah)
+    // dibangun ULANG dari nol di SETIAP recomposition itu — padahal isi 4 cabangnya (Tactile/
+    // LiquidGlass/Aurora/else) 100% cuma bergantung pada identitas tema + isDark, yang TIDAK
+    // pernah berubah selama playback jalan (beda dari kasus Batch 328 di atas, yang akarnya
+    // phase ANIMASI ikut dibaca di sini — itu sudah dihapus balik, bukan yang disentuh batch
+    // ini). `MaterialTheme.colorScheme.onSurface`/`.background` dibaca SEKALI ke `val` biasa DI
+    // LUAR `remember{}` (pola persis fix Batch 393 utk `@DisallowComposableCalls`) sebelum jadi
+    // remember key/dipakai di dalam lambda — bukan dipanggil ulang di dalamnya.
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val themeBackgroundColor = MaterialTheme.colorScheme.background
+    val edgeBrush = remember(isTactile, isLiquidGlass, isAurora, isDark, onSurfaceColor, themeBackgroundColor) {
+        when {
         isTactile -> Brush.linearGradient(
             colors = if (isDark) listOf(TactileHighlight, TactileEdge) else listOf(TactileLightHighlight, TactileLightEdge)
         )
@@ -242,11 +259,12 @@ fun Modifier.frostedGlass(
             )
         )
         else -> {
-            val flat = MaterialTheme.colorScheme.onSurface.copy(
-                alpha = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.14f else 0.24f
+            val flat = onSurfaceColor.copy(
+                alpha = if (themeBackgroundColor == AppleLightBackground) 0.14f else 0.24f
             )
             Brush.linearGradient(colors = listOf(flat, flat))
         }
+    }
     }
     // Batch 58 — Skeu's now-stronger bevel border reads better a hair over the glass-theme
     // hairline (1.dp); Tactile/Apple unchanged.

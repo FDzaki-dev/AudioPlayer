@@ -91,6 +91,37 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 396 (Optimasi Compose — `remember` `edgeBrush` di `frostedGlass()`, `BlurUtils.kt`, 1
+file kode)** — User: "next" (lanjutan sesi optimasi Compose Batch 392→393→394→395). **Status
+DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).
+
+Diaudit `frostedGlass()` (`BlurUtils.kt`) — SATU-SATUNYA titik shared glass panel app-wide (12+
+call site, komentar Batch 281). `edgeBrush` (`when` 4-cabang: Tactile/LiquidGlass/Aurora/else)
+dibangun TANPA `remember` di badan `@Composable`-nya — kelas bug sama Batch 392/395, tapi kali ini
+di titik ter-recompose PALING SERING app-wide: `MiniPlayerBar.kt` (Batch 353) sengaja baca
+`playbackProgress` di scope yang sama supaya tick posisi "cuma invalidasi MiniPlayerBar sendiri,
+bukan AppNavHost" — konsekuensinya SELURUH badan MiniPlayerBar (termasuk `.frostedGlass()`)
+recompose TIAP DETIK selama musik main, membangun ulang `edgeBrush` yang isinya 100% cuma
+bergantung identitas tema+isDark (tidak berubah selama playback). **Beda dari histori regresi
+Batch 326-328 file yang sama** — root cause KALI ITU phase animasi ikut dibaca di sini (sudah
+dihapus balik); kelas bug batch ini murni "dibangun ulang tanpa alasan", fix-nya TIDAK menambah
+mekanisme baru (cuma `remember`, tool yang sama dgn Batch 392/395), selaras `STABILITY > Speed`.
+
+**Fix**: `MaterialTheme.colorScheme.onSurface`/`.background` dibaca ke `val` biasa DI LUAR
+`remember{}` (pola fix Batch 393), `edgeBrush` dibungkus `remember(isTactile, isLiquidGlass,
+isAurora, isDark, onSurfaceColor, themeBackgroundColor)` — 6 key ini input nyatanya. **Zero
+behavior change** — rebuild cuma saat identitas/mode benar-benar ganti, bukan tiap detik.
+
+**1 file kode disentuh** (`BlurUtils.kt`, 292->310 baris). Brace/paren/bracket balance seimbang
+(169/169 `()`, 7/7 `{}`, 0/0 `[]`, dicek `tr -cd`). Histori komentar Batch 53-328 di dalam `when`
+block dipertahankan utuh, cuma 2 baris di cabang `else` diganti referensi (nilai identik). Masih
+belum ditest build/lint sungguhan. **Blast radius PALING LUAS dari 3 batch compose sebelumnya**
+(app-wide + MiniPlayerBar aktif tiap detik) — mengingat file ini sendiri punya histori regresi
+device nyata (Batch 326-328), sangat direkomendasikan verifikasi device fisik (visual + tidak ada
+stuttering baru) sebelum dianggap 100% final, bukan cuma CI compile. Sisa kandidat compose sector
+tetap sama (`AlbumArt` SubcomposeAsyncImage, stabilitas `List<Song>` app-wide). Detail lengkap
+CHANGELOG.md Batch 396.
+
 **Batch 395 (Optimasi Compose — `remember` 2 Brush di `embossSurface()`, `TactileDepth.kt`, 1
 file kode)** — User: "next" (lanjutan sesi optimasi Compose Batch 392→393→394). **Status
 DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).
