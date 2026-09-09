@@ -91,6 +91,32 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 404 (Lanjutan sektor `SDK_INT` legacy mati — 3 file "guard return": `RingtoneEncoder.kt`/
+`BackupManager.kt`/`AppLogger.kt`)** — User: "next" (lanjutan Batch 403, sektor sama). **Status
+DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
+
+Menuntaskan sisa 3 file "polanya identik" dari katalog Batch 402 (pola guard return `if (SDK_INT
+< Q) return ...`, bukan if/else murni): `RingtoneEncoder.kt` (1 titik, editabilityCheck), 
+`BackupManager.kt` (1 titik, exportToDocuments), `AppLogger.kt` (2 titik, exportLogToDocuments +
+writePublicCrashLog). **`AppLogger.kt` ditangani ekstra hati-hati** (crash logger inti): import
+`Build` SENGAJA TIDAK dihapus (beda dari 5 file lain di sektor ini) krn masih dipakai genuinely
+buat info device (`Build.MANUFACTURER`/`MODEL`/dst) di isi laporan crash — dikonfirmasi eksplisit
+dulu sebelum sentuh importnya. Doc-comment 3 fungsi yang menyebut "di bawah API 29" diperbarui
+menyusul kode (alasan itu sudah tidak mungkin terjadi). **Zero behavior change**. Balance kurung
+dicek programatis (semua seimbang), diff eksplisit vs ZIP Batch 403 dikonfirmasi cuma 3 file ini
+berubah. Belum diverifikasi build/runtime sungguhan — `AppLogger.kt` layak diverifikasi lebih
+teliti (paksa crash di device test build, konfirmasi `crash_*.txt` tetap muncul). Detail lengkap
+CHANGELOG.md Batch 404.
+
+**Sektor `SDK_INT` legacy — status setelah Batch 404**: seluruh 6 file "polanya identik" TUNTAS
+(3 Batch 403 + 3 Batch 404). **Sisa kandidat utk sesi berikutnya, semuanya risiko lebih tinggi**:
+`FloatingBubbleService.kt`/`BubbleTileService.kt` (campur titik `UPSIDE_DOWN_CAKE`(34) WAJIB
+dipertahankan, jangan asal hapus semua `if/else`), atau `MusicRepository.kt`/`PlaybackService.kt`
+(file paling berisiko § arsitektur) + `MainActivity.kt` baris 738/744 (kasus BEDA — shadowing
+`when`, bukan level API di bawah `minSdk`) — 3 file terakhir ini SENGAJA belum dibaca detail,
+jangan asumsikan pola sama dengan 6 file yang sudah tuntas. Alternatif: kembali ke kandidat
+Compose yang diblokir sejak Batch 392, atau tanya user arah baru.
+
 **Batch 403 (Lanjutan sektor `SDK_INT` legacy mati — 3 file berpola identik: `ApkSignatureChecker.kt`/
 `BubbleBootReceiver.kt`/`TagEditor.kt`)** — User: "next" (lanjutan Batch 402, sektor sama).
 **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387 — kategori

@@ -6,7 +6,6 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import com.rudi.audioplayer.util.AppLogger
@@ -53,9 +52,6 @@ class RingtoneEncoder(private val context: Context) {
     private val fileStampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
 
     private fun editabilityCheck(song: Song): CutResult.Unsupported? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            return CutResult.Unsupported("Potong nada dering butuh Android 10 ke atas.")
-        }
         if (song.uri.authority != MediaStore.AUTHORITY) {
             return CutResult.Unsupported("Lagu dari folder tambahan belum didukung untuk dipotong.")
         }

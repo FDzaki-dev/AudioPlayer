@@ -93,10 +93,9 @@ object AppLogger {
     /** Repacks the current in-app diagnostic log into a standalone log_<timestamp>.txt file inside
      * the public Documents/AudioPlayer/logs folder (same folder crash reports use via MediaStore,
      * API 29+, no storage permission needed) so it can be pulled off with any file manager instead
-     * of only living in the clipboard. Returns true on success, false if there's nothing to export,
-     * the write failed, or the device is below API 29. */
+     * of only living in the clipboard. Returns true on success, false if there's nothing to export
+     * or the write failed. */
     fun exportLogToDocuments(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
         val text = readLog()
         if (text.isBlank()) return false
         return runCatching {
@@ -151,9 +150,7 @@ object AppLogger {
     }
 
     /** Writes a standalone crash report to the public Documents/AudioPlayer/logs folder so it's
-     * reachable with a normal file manager even if the app can no longer be opened at all. Silently
-     * does nothing below API 29 (pre-scoped-storage) rather than risk needing a storage permission
-     * mid-crash.
+     * reachable with a normal file manager even if the app can no longer be opened at all.
      *
      * Batch 34: brought in line with the original crash-logger spec, which this had drifted from —
      * filename now carries a UUID (two crashes in the same second no longer overwrite each other),
@@ -161,7 +158,6 @@ object AppLogger {
      * isn't enough to tell which build or which device a report came from), and a FIFO sweep now
      * caps this folder at 50 files instead of growing forever. */
     private fun writePublicCrashLog(thread: Thread, throwable: Throwable) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
         val context = appContext ?: return
         val fileName = "crash_${fileStampFormat.format(Date())}_${UUID.randomUUID()}.txt"
         val versionInfo = runCatching {

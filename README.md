@@ -24,20 +24,19 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 403 (lanjutan sektor `SDK_INT` legacy mati, 3 file berpola
-> identik):** User: "next" — lanjutan Batch 402 (sektor cabang `if/else` `Build.VERSION.SDK_INT`
-> yang levelnya sudah di bawah `minSdk` 31, jadi tidak pernah bisa tereksekusi lagi tapi masih ada
-> di file). 3 file dieksekusi: `ApkSignatureChecker.kt` (flags + signature reading selalu jalur
-> API 28+), `BubbleBootReceiver.kt` (guard overlay + start service disederhanakan), `TagEditor.kt`
-> (tulis tag selalu lewat `MediaStore.createWriteRequest()`, cabang Android 10 lama dihapus).
-> **Zero behavior change** — kondisi yang dihapus selalu true di device manapun yang bisa install
-> app ini. Sisa 3 file berpola sama (`RingtoneEncoder.kt`/`BackupManager.kt`/`AppLogger.kt`) jadi
-> kandidat sesi berikutnya. **Status DISCONTINUED tetap permanen tidak diubah.** Detail lengkap
-> CHANGELOG.md Batch 403.
-> Batch 402 (sektor baru — 3 file kode, `SDK_INT` legacy mati sejak bump minSdk 23→31):** User:
-> "lanjut optimize sektor yang belum terjamah!!". `AccentColorExtractor.kt`/`AudioArtFetcher.kt`/
-> `WidgetUpdater.kt` disederhanakan ke jalur `loadThumbnail()` tunggal (cabang `BitmapFactory`
-> manual pre-Q/pre-O dihapus). Detail lengkap CHANGELOG.md Batch 402.
+> 🆕 **Update terbaru — Batch 404 (lanjutan sektor `SDK_INT` legacy mati, 3 file "guard
+> return"):** User: "next" — lanjutan Batch 403 (sektor sama). `RingtoneEncoder.kt`/
+> `BackupManager.kt`/`AppLogger.kt` — pola guard `if (SDK_INT < Q) return ...` dihapus total
+> (kondisinya selalu false sejak `minSdk` 31). `AppLogger.kt` (crash logger inti) ditangani
+> ekstra hati-hati: import `Build` sengaja TIDAK dihapus krn masih dipakai buat info device di
+> laporan crash. **Zero behavior change.** Sektor `SDK_INT` legacy "polanya identik" (6 file,
+> Batch 402 rekomendasi) sekarang TUNTAS. Sisa kandidat berikutnya semuanya risiko lebih tinggi
+> (`FloatingBubbleService.kt`/`BubbleTileService.kt`, atau `MusicRepository.kt`/
+> `PlaybackService.kt`/`MainActivity.kt`). **Status DISCONTINUED tetap permanen tidak diubah.**
+> Detail lengkap CHANGELOG.md Batch 404.
+> Batch 403 (lanjutan sektor sama, 3 file if/else):** User: "next". `ApkSignatureChecker.kt`/
+> `BubbleBootReceiver.kt`/`TagEditor.kt` disederhanakan ke jalur API-modern tunggal (cabang
+> deprecated pre-P/M/O/R dihapus). Detail lengkap CHANGELOG.md Batch 403.
 > Batch 400 (optimasi Compose: `remember` list `favoriteSongs` tab Favorit
 > di `LibraryScreen.kt`, 1 file):** User: "next" — lanjutan sesi Compose Batch 392→...→399. Kelas
 > bug `Brush.*Gradient()` & `items()` tanpa `key` sudah 0 sisa (Batch 394/398). Sudut audit baru:

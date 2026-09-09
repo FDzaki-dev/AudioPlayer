@@ -4,7 +4,6 @@ import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import com.rudi.audioplayer.util.AppLogger
@@ -80,9 +79,8 @@ object BackupManager {
     }
 
     /** Serialize seluruh prefs whitelist ke 1 file JSON di Documents/AudioPlayer/backups.
-     * Return nama file kalau sukses, null kalau gagal/di bawah API 29. */
+     * Return nama file kalau sukses, null kalau gagal. */
     fun exportToDocuments(context: Context): String? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
         return runCatching {
             val app = context.applicationContext
             val root = JSONObject()

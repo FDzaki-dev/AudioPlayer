@@ -1,5 +1,63 @@
 # Changelog
 
+## Batch 404 — Lanjutan sektor `SDK_INT` legacy mati: 3 file "guard return" (3 file kode)
+User instruksi: "next" (lanjutan Batch 403, sektor sama). **Status DISCONTINUED tetap permanen
+tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
+
+Menuntaskan sisa 3 file terakhir dari daftar "polanya identik" Batch 402 (setelah
+`ApkSignatureChecker.kt`/`BubbleBootReceiver.kt`/`TagEditor.kt` di Batch 403): `RingtoneEncoder.kt`,
+`BackupManager.kt`, `AppLogger.kt`. Ketiganya pola **guard return** (`if (SDK_INT < Q) return
+...`), bukan if/else murni seperti `ApkSignatureChecker.kt`/`BubbleBootReceiver.kt` — kondisinya
+selalu false sejak `minSdk` 31 (Q = API 29), jadi seluruh badan guard dihapus, bukan disederhanakan
+jadi 1 cabang.
+
+**3 file dieksekusi batch ini**:
+1. **`RingtoneEncoder.kt`** — 1 titik mati (Q baris 56, `editabilityCheck()`): guard
+   `if (SDK_INT < Q) return CutResult.Unsupported("Potong nada dering butuh Android 10 ke atas.")`
+   dihapus total — pesan itu sendiri tidak pernah bisa muncul lagi ke user. Import `Build` dihapus
+   (0 pemakaian lain di file).
+2. **`BackupManager.kt`** — 1 titik mati (Q baris 85, `exportToDocuments()`): guard
+   `if (SDK_INT < Q) return null` dihapus. Doc-comment fungsi ("null kalau gagal/di bawah API 29")
+   diperbarui — alasan "di bawah API 29" sudah tidak mungkin terjadi lagi, disederhanakan jadi
+   "null kalau gagal". Import `Build` dihapus.
+3. **`AppLogger.kt`** — 2 titik mati (Q baris 99 `exportLogToDocuments()`, Q baris 164
+   `writePublicCrashLog()`) — **file paling sensitif dari 6 file batch 403+404** krn dipakai crash
+   logger inti, ditangani ekstra hati-hati sesuai catatan Batch 402: **import `Build` TIDAK
+   dihapus** (beda dari 5 file lain di sektor ini) karena `writePublicCrashLog()` masih genuinely
+   memakai `Build.VERSION.RELEASE`/`Build.VERSION.SDK_INT`/`Build.MANUFACTURER`/`Build.MODEL` untuk
+   mengisi info device di isi laporan crash — dikonfirmasi eksplisit sebelum sentuh importnya sama
+   sekali. Kedua guard return dihapus; doc-comment kedua fungsi ("false/silently does nothing di
+   bawah API 29") diperbarui menyusul kode, krn alasan itu sudah tidak mungkin terjadi.
+
+**Zero behavior change** di ketiganya, alasan sama Batch 402/403: kondisi yang dihapus SELALU
+false (guard tidak pernah `return` lagi) di device manapun yang bisa install app ini (`minSdk` 31
+dijamin OS) — jalur eksekusi runtime 100% identik sebelum/sesudah.
+
+**Batas jaminan (sama seperti seluruh rangkaian batch sebelumnya)**: 0 `kotlinc`/Android SDK/
+network di environment kerja sesi ini — verifikasi terbatas ke (1) baca-ulang manual tiap titik
+yang diubah + baca ulang seluruh isi 3 file setelah edit, (2) balance kurung/kurawal/bracket
+dicek programatis (Python, string/comment-aware — hasil: `RingtoneEncoder.kt` 86/86 `()` 22/22
+`{}` 0/0 `[]`, `BackupManager.kt` 130/130 `()` 37/37 `{}` 8/8 `[]`, `AppLogger.kt` 97/97 `()`
+33/33 `{}` 0/0 `[]` — semua seimbang), (3) diff eksplisit terhadap ZIP Batch 403 — dikonfirmasi
+CUMA 3 file kode ini yang berubah, 0 file lain kesenggol. **Belum diverifikasi build/runtime
+sungguhan** — cek hasil GitHub Actions setelah push; `AppLogger.kt` secara khusus layak diverifikasi
+lebih teliti (paksa uncaught exception di device test build, konfirmasi `crash_*.txt` tetap muncul
+di Documents/AudioPlayer/logs seperti sebelumnya) krn fungsi ini satu-satunya jalur observability
+kalau app benar-benar crash total.
+
+**Sektor `SDK_INT` legacy — status setelah batch ini**: seluruh 6 file "polanya identik" (Batch
+402 rekomendasi) SUDAH TUNTAS (3 di Batch 403 + 3 di batch ini). **Rekomendasi konkret utk sesi
+berikutnya**: sisa sektor ini HANYA kandidat berisiko lebih tinggi — `FloatingBubbleService.kt`/
+`BubbleTileService.kt` (campur titik `UPSIDE_DOWN_CAKE`(34) yang WAJIB dipertahankan, JANGAN asal
+hapus semua `if/else` di file itu — cuma titik N/O/Q yang mati), atau 3 file "belum diverifikasi"
+yang butuh baca konteks penuh dulu sebelum disentuh (`MusicRepository.kt`, `PlaybackService.kt` —
+keduanya masuk daftar "file paling berisiko" § Keputusan arsitektur di `PROJECT_STATE.md`, dan
+`MainActivity.kt` baris 738/744 — kasus BEDA, shadowing antar-cabang `when`, bukan sekadar level
+API di bawah `minSdk`, JANGAN diasumsikan pola sama dengan 6 file yang sudah tuntas). Kalau sektor
+ini juga dianggap selesai/terlalu berisiko utk lanjut tanpa device fisik, sesi berikutnya bisa
+kembali ke kandidat Compose yang diblokir sejak Batch 392 (`AlbumArt` `SubcomposeAsyncImage`,
+stabilitas `List<Song>` app-wide) atau tanya user arah baru.
+
 ## Batch 403 — Lanjutan sektor `SDK_INT` legacy mati: 3 file berpola identik (3 file kode)
 User instruksi: "next" (lanjutan Batch 402, sektor sama). **Status DISCONTINUED tetap permanen
 tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
