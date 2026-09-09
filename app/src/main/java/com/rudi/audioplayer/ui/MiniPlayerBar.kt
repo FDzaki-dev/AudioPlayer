@@ -117,13 +117,25 @@ fun MiniPlayerBar(
             .then(if (isSkeu) Modifier else Modifier.frostedGlass())
             .clickable(onClick = onExpand)
     ) {
+        // Batch 397 — `MiniPlayerBar`'s badan composable ini SENGAJA membaca `playbackProgress`
+        // langsung di scope yang sama (Batch 353's komentar di parameter atas: "tick posisi tiap
+        // detik cuma invalidasi MiniPlayerBar ini sendiri") — jadi SELURUH badan fungsi ini,
+        // termasuk Brush di bawah, tetap recompose tiap detik selama musik main (persis konteks
+        // yang baru dioptimasi Batch 396 di `frostedGlass()`, kali ini di dalam file yang sama
+        // persis, bukan fungsi utility terpisah). `animatedAccent` (`animateColorAsState`, tween
+        // 700ms) MEMANG legitimately berubah selama transisi warna aksen antar-lagu — remember di
+        // sini TIDAK menghilangkan rebuild SELAMA transisi itu (key-nya berubah tiap frame transisi
+        // spt seharusnya), tapi menghilangkan rebuild yang sebelumnya terjadi tiap detik DI LUAR
+        // masa transisi (mayoritas waktu playback, saat `animatedAccent` sudah settle & progress
+        // tick adalah satu-satunya alasan recompose). Zero behavior change — nilai Brush identik.
+        val rowAccentBrush = remember(animatedAccent) {
+            Brush.horizontalGradient(
+                listOf(animatedAccent.copy(alpha = 0.16f), Color.Transparent)
+            )
+        }
         Row(
             modifier = Modifier
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(animatedAccent.copy(alpha = 0.16f), Color.Transparent)
-                    )
-                )
+                .background(rowAccentBrush)
                 .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

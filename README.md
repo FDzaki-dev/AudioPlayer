@@ -24,7 +24,17 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 396 (optimasi Compose: `remember` `edgeBrush` di
+> 🆕 **Update terbaru — Batch 397 (optimasi Compose: `remember` accent Brush di
+> `MiniPlayerBar`, `MiniPlayerBar.kt`, 1 file):** User: "next" — lanjutan sesi Compose
+> Batch 392→...→396. Digrep ulang semua Brush gradient app-wide, kali ini fokus ke
+> `MiniPlayerBar.kt` sendiri (bukan utility yang dipanggilnya). `Brush.horizontalGradient(...)`
+> accent di Row background dibangun tanpa `remember`, padahal `MiniPlayerBar` recompose tiap
+> detik selama musik main (desain Batch 353). Beda dari fix sebelumnya: `animatedAccent` MEMANG
+> legitimately animasi (tween 700ms tiap ganti lagu) — `remember(animatedAccent)` tetap rebuild
+> selama transisi itu, cuma menghilangkan rebuild tiap detik DI LUAR masa transisi. **Zero
+> behavior change**, animasi transisi warna 100% identik. **Status DISCONTINUED tetap permanen
+> tidak diubah.** Detail lengkap CHANGELOG.md Batch 397.
+> Batch 396 (optimasi Compose: `remember` `edgeBrush` di
 > `frostedGlass()`, `BlurUtils.kt`, 1 file):** User: "next" — lanjutan sesi Compose
 > Batch 392→393→394→395. `frostedGlass()` (titik shared 12+ panel glass app-wide) bangun ulang
 > `edgeBrush` tiap recomposition — termasuk `MiniPlayerBar` yang recompose TIAP DETIK selama

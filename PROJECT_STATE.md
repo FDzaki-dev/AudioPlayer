@@ -91,6 +91,36 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 397 (Optimasi Compose — `remember` accent Brush di `MiniPlayerBar`, `MiniPlayerBar.kt`,
+1 file kode)** — User: "next" (lanjutan sesi optimasi Compose Batch 392→393→394→395→396).
+**Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).
+
+Digrep ulang semua `Brush.*Gradient(...)` app-wide (23 titik) setelah Batch 396 menuntaskan
+`frostedGlass()` — kali ini fokus ke `MiniPlayerBar.kt` sendiri (bukan fungsi utility yang
+dipanggilnya). Ditemukan `Brush.horizontalGradient(listOf(animatedAccent.copy(alpha=0.16f),
+Color.Transparent))` di `Row`'s background, dibangun tanpa `remember` di badan
+`@Composable fun MiniPlayerBar(...)` — persis konteks Batch 396 (`playbackProgress` dibaca
+langsung di scope yang sama per desain Batch 353, jadi seluruh fungsi recompose tiap detik selama
+musik main), tapi kali ini bug-nya di dalam MiniPlayerBar sendiri.
+
+**Beda dari 3 fix sebelumnya**: `animatedAccent` (`animateColorAsState`, tween 700ms) MEMANG
+legitimately berubah selama transisi warna aksen antar-lagu — `remember(animatedAccent)` TIDAK
+menghilangkan rebuild SELAMA transisi (key ikut berubah tiap frame, brush tetap rebuild sesuai
+animasi), yang dihilangkan cuma rebuild tiap detik DI LUAR masa transisi (mayoritas waktu
+playback, saat aksen sudah settle tapi progress tick tetap memicu recompose).
+
+**Fix**: brush dipindah ke `val rowAccentBrush = remember(animatedAccent) { ... }` sebelum `Row`,
+`.background(rowAccentBrush)` menggantikan konstruksi inline. **Zero behavior change** — animasi
+transisi warna 100% identik, cuma alokasi berulang saat aksen sudah stabil yang berkurang.
+
+**1 file kode disentuh** (`MiniPlayerBar.kt`, 225->237 baris). Brace/paren balance seimbang
+(120/120 `()`, 14/14 `{}`). `remember` sudah diimpor dari awal. Masih belum ditest build/lint
+sungguhan — rekomendasi ke user: push & jalankan CI + verifikasi device fisik utk transisi warna
+aksen. Sisa kandidat compose sector tetap sama (`AlbumArt` SubcomposeAsyncImage, stabilitas
+`List<Song>` app-wide) — belum dieksekusi. Brush lain yang diperiksa & SENGAJA tidak disentuh
+(legitimately tied ke nilai animasi, bukan bug): `skeuEmboss()`'s emerald glint, `auroraGlow()`
+(0 call site). Detail lengkap CHANGELOG.md Batch 397.
+
 **Batch 396 (Optimasi Compose — `remember` `edgeBrush` di `frostedGlass()`, `BlurUtils.kt`, 1
 file kode)** — User: "next" (lanjutan sesi optimasi Compose Batch 392→393→394→395). **Status
 DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).

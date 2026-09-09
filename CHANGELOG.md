@@ -1,5 +1,59 @@
 # Changelog
 
+## Batch 397 — Optimasi Compose: `remember` accent Brush di `MiniPlayerBar`, `MiniPlayerBar.kt`, 1 file
+User instruksi: "next" — lanjutan sesi optimasi Compose yang sama (Batch 392→393→394→395→396),
+sektor belum berubah. **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch
+387).
+
+**Metodologi**: Batch 396 baru saja menuntaskan `frostedGlass()` (utility eksternal yang dipanggil
+`MiniPlayerBar`) — digrep ulang SEMUA `Brush.*Gradient(...)` app-wide (23 titik total) utk cari
+sisa kelas bug yang sama, kali ini fokus ke titik yang PALING SERING recompose sendiri:
+`MiniPlayerBar.kt` itu sendiri (bukan cuma fungsi utility yang dipanggilnya). Ditemukan:
+`Brush.horizontalGradient(listOf(animatedAccent.copy(alpha = 0.16f), Color.Transparent))` di
+`Row`'s `.background(...)`, dibangun LANGSUNG di badan `@Composable fun MiniPlayerBar(...)` TANPA
+`remember` — persis di file & konteks yang sama dgn temuan Batch 396 (`playbackProgress` dibaca
+LANGSUNG di badan fungsi ini sendiri per desain Batch 353, jadi SELURUH fungsi recompose tiap
+detik selama musik main), tapi kali ini bug-nya ada DI DALAM `MiniPlayerBar` sendiri, bukan di
+fungsi utility yang dipanggilnya.
+
+**Beda penting dari Batch 392/395/396**: `animatedAccent` (`by animateColorAsState(...)`, tween
+700ms) BUKAN nilai yang selalu-statis seperti `appThemeIdentity`/tema/isDark di 3 fix sebelumnya —
+nilai ini MEMANG legitimately berubah selama ~700ms transisi warna aksen tiap kali lagu berganti.
+`remember(animatedAccent)` TIDAK menghilangkan rebuild SELAMA transisi itu (key berubah tiap frame
+transisi, brush tetap rebuild sesuai animasi, seperti seharusnya) — yang dihilangkan adalah
+rebuild yang SEBELUMNYA terjadi tiap detik DI LUAR masa transisi (mayoritas waktu playback nyata:
+user dengar 1 lagu selama beberapa menit, `animatedAccent` sudah settle ke nilai akhir, TAPI
+`Brush.horizontalGradient(...)` tetap dibangun ulang tiap tick posisi krn 1 scope composable yang
+sama). Distingsi ini penting: fix cuma valid krn `remember` MEMANG dirancang utk kasus persis ini
+(skip rebuild HANYA kalau key benar-benar sama, tetap rebuild kalau key beda) — bukan
+menghilangkan animasi transisi warna itu sendiri.
+
+**Fix**: brush dipindah ke `val rowAccentBrush = remember(animatedAccent) { Brush.horizontalGradient(...) }`
+sebelum `Row(...)`, `.background(rowAccentBrush)` menggantikan konstruksi inline. **Zero behavior
+change** — nilai & animasi transisi warna aksen 100% identik (`remember` dgn key yang berubah tiap
+frame transisi = rebuild tiap frame itu juga, sama seperti sebelumnya); yang berkurang murni
+alokasi berulang saat `animatedAccent` sudah stabil.
+
+**1 file kode disentuh** (`MiniPlayerBar.kt`, 225 -> 237 baris, naik krn komentar penjelasan + 1
+`val` + pembungkus `remember{}`). Brace/paren balance dicek (`tr -cd | wc -c`): 120/120 `()`,
+14/14 `{}` — seimbang. `remember` sudah diimpor dari awal (dipakai fungsi lain di file yang sama)
+— 0 import baru. Diff-checked terhadap ZIP Batch 396: cuma `MiniPlayerBar.kt` yang berubah.
+
+**Masih belum ditest di build/lint sungguhan** (0 kotlinc/SDK/network di sandbox) — rekomendasi
+tetap sama: push & jalankan CI. Risiko regresi rendah (pola identik Batch 392/395/396, sudah 4x
+tervalidasi konsisten kompilasi-legal via review manual — 0 pemanggilan `@Composable` di dalam
+lambda `remember`), tapi tetap direkomendasikan verifikasi device fisik utk transisi warna aksen
+antar-lagu (bukan cuma tampilan statis) mengingat `MiniPlayerBar` adalah komponen yang SELALU
+tervisible selama musik main.
+
+**Sisa kandidat compose sector setelah batch ini**: `AlbumArt`'s `SubcomposeAsyncImage` &
+stabilitas `List<Song>` app-wide (tetap di luar bar 3-file/zero-regresi batch tunggal). Brush
+gradient lain yang sudah diperiksa & TIDAK disentuh (bukan bug, sudah correctly tied ke
+nilai yang legitimately animasi/per-frame): `TactileDepth.kt`'s `skeuEmboss()` emerald glint
+(`emeraldAlpha` animated), `auroraGlow()` (0 call site, brush-nya sendiri MEMANG didesain
+mengikuti `phase` animasi). Plus cost riil Compose first-composition & baseline profile/R8
+(Batch 388) — masih butuh data Macrobenchmark device asli.
+
 ## Batch 396 — Optimasi Compose: `remember` `edgeBrush` di `frostedGlass()`, `BlurUtils.kt`, 1 file
 User instruksi: "next" — lanjutan sesi optimasi Compose yang sama (Batch 392→393→394→395), sektor
 belum berubah. **Status DISCONTINUED tetap permanen tidak diubah** (per klarifikasi Batch 387).
