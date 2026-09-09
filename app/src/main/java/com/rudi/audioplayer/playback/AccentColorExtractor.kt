@@ -1,9 +1,7 @@
 package com.rudi.audioplayer.playback
 
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.Build
 import android.util.Size
 import androidx.compose.ui.graphics.Color
 import androidx.palette.graphics.Palette
@@ -26,11 +24,10 @@ object AccentColorExtractor {
     fun extract(context: Context, songUri: Uri?): Color? {
         if (songUri == null) return null
         return try {
-            val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                context.contentResolver.loadThumbnail(songUri, Size(160, 160), null)
-            } else {
-                context.contentResolver.openInputStream(songUri)?.use { BitmapFactory.decodeStream(it) }
-            } ?: return null
+            // Batch 402: pre-Q decodeStream() fallback removed — minSdk 31 (Batch 290)
+            // guarantees API>=29 on every installable device, so that branch was unreachable
+            // dead code (loadThumbnail() is the only path that has ever actually run).
+            val bitmap = context.contentResolver.loadThumbnail(songUri, Size(160, 160), null)
 
             val palette = Palette.from(bitmap).generate()
             val swatch = palette.vibrantSwatch ?: palette.dominantSwatch ?: palette.mutedSwatch

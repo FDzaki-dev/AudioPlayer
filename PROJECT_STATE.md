@@ -91,6 +91,42 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 402 (Sektor baru: cabang `SDK_INT` legacy mati sejak bump minSdk 23→31 — 3 file kode)** —
+User: "lanjut optimize sektor yang belum terjamah!!". **Status DISCONTINUED tetap permanen tidak
+diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
+
+Batch 401 menyimpulkan kelas bug Compose (`remember`/Batch 392-401) sudah habis tanpa device
+fisik, jadi batch ini membuka sektor BARU yang belum pernah diaudit: cabang `if/else` berbasis
+`Build.VERSION.SDK_INT` yang dibandingkan ke level API di bawah `minSdk` project saat ini (31,
+sejak Batch 290) — begitu `minSdk` naik, cabang "belum sampai API itu" tidak pernah bisa
+tereksekusi lagi meski masih ada di file. Ketahuan lewat grep `Build.VERSION_CODES\.` app-wide
+(bukan pattern `SDK_INT < 31` literal yang sudah dicek 0-hasil di Batch 290 — itu tidak menangkap
+cabang lama yang ditulis terhadap konstanta bernama Q/R/O/N/M/P dari sebelum project naik dari
+minSdk 23).
+
+**Katalog app-wide (14 file total)**: 11 file punya minimal 1 titik MATI (else/guard tak
+terjangkau lagi) — **3 di antaranya dieksekusi batch ini** (`AccentColorExtractor.kt`,
+`AudioArtFetcher.kt`, `WidgetUpdater.kt` — semuanya pola "loadThumbnail() vs fallback manual
+BitmapFactory/MediaMetadataRetriever tanpa downsampling", 100% self-contained, 0 file berisiko).
+**8 file MATI belum dieksekusi** (kandidat siap sesi berikutnya, urutan disarankan mulai dari
+yang polanya identik: `ApkSignatureChecker.kt`, `BubbleBootReceiver.kt`, `TagEditor.kt`,
+`RingtoneEncoder.kt`, `BackupManager.kt`, `AppLogger.kt`, baru `FloatingBubbleService.kt`/
+`BubbleTileService.kt` — 2 file ini campur sama titik `UPSIDE_DOWN_CAKE`(34) yang WAJIB
+dipertahankan, jangan asal hapus semua `if/else` di file itu). **3 file SENGAJA BELUM disentuh
+krn butuh baca konteks penuh dulu**: `MusicRepository.kt` & `PlaybackService.kt` (masuk daftar
+"file paling berisiko" § Keputusan arsitektur), dan `MainActivity.kt` baris 738/744 (kasus BEDA
+— shadowing antar-cabang `when`, bukan sekadar level API di bawah minSdk, mekanismenya belum
+diverifikasi ke kode sungguhan). Detail lengkap tiap titik (nomor baris + klasifikasi) ada di
+CHANGELOG.md Batch 402 — JANGAN diulang grep dari nol, katalognya sudah lengkap di sana.
+
+**Zero behavior change** (kondisi yang dihapus selalu true di device manapun yang bisa install
+app ini — dijamin OS via `minSdk`, bukan asumsi). Balance kurung dicek programatis (semua
+seimbang), diff eksplisit vs ZIP Batch 401 dikonfirmasi cuma 3 file ini berubah. Belum diverifikasi
+build/runtime sungguhan (0 kotlinc/SDK/network di sandbox, sama seperti seluruh rangkaian batch
+sebelumnya) — rekomendasi: push & jalankan CI, verifikasi visual device fisik utk accent
+color/Now Playing cover/widget art (harusnya identik, jalur eksekusinya memang sudah selalu itu).
+Detail lengkap CHANGELOG.md Batch 402.
+
 **Batch 401 (Audit lanjutan Compose recomposition — 0 file kode, murni dokumentasi)** — User:
 "next" (lanjutan sesi optimasi Compose Batch 392→...→400). **Status DISCONTINUED tetap permanen
 tidak diubah** (per klarifikasi Batch 387).

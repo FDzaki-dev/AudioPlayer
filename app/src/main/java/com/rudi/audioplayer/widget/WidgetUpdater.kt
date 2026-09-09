@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Build
 import android.widget.RemoteViews
 import com.rudi.audioplayer.MainActivity
 import com.rudi.audioplayer.R
@@ -179,20 +178,16 @@ object WidgetUpdater {
         // instead calls startForegroundService(), which IS allowed from the background, on the
         // condition the service promotes itself with startForeground() within 5 seconds —
         // PlaybackService's cold-start path already does exactly that as its very first step.
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            PendingIntent.getForegroundService(context, requestCode, intent, flags)
-        } else {
-            PendingIntent.getService(context, requestCode, intent, flags)
-        }
+        // Batch 402: pre-O getService() fallback removed — minSdk 31 (Batch 290) guarantees
+        // API>=26 on every installable device, so that branch was unreachable dead code.
+        return PendingIntent.getForegroundService(context, requestCode, intent, flags)
     }
 
     private fun loadAlbumArtBitmap(context: Context, uri: Uri): Bitmap? {
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                context.contentResolver.loadThumbnail(uri, android.util.Size(200, 200), null)
-            } else {
-                context.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it) }
-            }
+            // Batch 402: pre-Q decodeStream() fallback removed — minSdk 31 guarantees API>=29
+            // on every installable device, so that branch was unreachable dead code.
+            context.contentResolver.loadThumbnail(uri, android.util.Size(200, 200), null)
         } catch (e: Exception) {
             // Widget jatuh balik ke ikon aplikasi kalau ini gagal (masih terlihat wajar di layar
             // beranda), tapi dicatat supaya kegagalan muat artwork tidak sepenuhnya tak terlihat.

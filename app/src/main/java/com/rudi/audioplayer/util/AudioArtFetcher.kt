@@ -2,11 +2,8 @@ package com.rudi.audioplayer.util
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
-import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.os.Build
 import android.util.Size
 import coil.ImageLoader
 import coil.decode.DataSource
@@ -56,24 +53,13 @@ class AudioArtFetcher(
         )
     }
 
-    private fun loadEmbeddedArt(): Bitmap? {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            return try {
-                context.contentResolver.loadThumbnail(uri, Size(512, 512), null)
-            } catch (e: Exception) {
-                null
-            }
-        }
-        // Pre-Q: loadThumbnail() doesn't exist yet — read embedded art via MediaMetadataRetriever.
-        val retriever = MediaMetadataRetriever()
-        return try {
-            retriever.setDataSource(context, uri)
-            retriever.embeddedPicture?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-        } catch (e: Exception) {
-            null
-        } finally {
-            retriever.release()
-        }
+    // Batch 402: pre-Q MediaMetadataRetriever fallback removed — minSdk 31 (Batch 290)
+    // guarantees API>=29 on every installable device, so that branch was unreachable dead code
+    // (loadThumbnail() is the only path that has ever actually run).
+    private fun loadEmbeddedArt(): Bitmap? = try {
+        context.contentResolver.loadThumbnail(uri, Size(512, 512), null)
+    } catch (e: Exception) {
+        null
     }
 
     /** Only claims audio URIs, so this never intercepts a real image model if one is ever added. */

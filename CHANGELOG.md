@@ -1,5 +1,111 @@
 # Changelog
 
+## Batch 402 — Sektor baru: cabang `SDK_INT` legacy mati sejak bump minSdk 23→31 (3 file kode)
+User instruksi: "lanjut optimize sektor yang belum terjamah!!". **Status DISCONTINUED tetap
+permanen tidak diubah** (per klarifikasi Batch 387 — kategori "optimasi murni").
+
+**Kenapa sektor ini, bukan lanjutan Compose/Brush**: Batch 401 menyimpulkan kelas bug
+`remember`/alokasi objek per-recomposition sudah habis untuk apa yang bisa diverifikasi aman
+tanpa device fisik — 2 kandidat sisa (`AlbumArt` `SubcomposeAsyncImage`, stabilitas `List<Song>`)
+masih terblokir alasan yang sama sejak Batch 392. Daripada mengulang grep yang sudah 0 hasil,
+batch ini membuka sudut audit yang genuinely belum pernah disentuh: cabang `if/else` berbasis
+`Build.VERSION.SDK_INT` yang dibandingkan ke level API **di bawah `minSdk` project saat ini
+(31, sejak Batch 290)** — begitu `minSdk` naik, OS mana pun yang benar-benar menjalankan app
+SUDAH PASTI di atas level itu, jadi cabang "belum sampai API tersebut" tidak pernah bisa
+dieksekusi lagi, walau textually masih ada di file.
+
+**Kenapa ini belum pernah teraudit sebelumnya (dicek ke sejarah, bukan asumsi)**: Batch 290
+(bump `minSdk` 23→31) sudah men-grep codebase untuk dead code — tapi query-nya cuma pola literal
+`SDK_INT < 31`, hasilnya 0 (wajar, tidak ada yang menulis threshold persis "31" sebelum bump-nya
+sendiri terjadi). Itu tidak menangkap cabang lama yang ditulis terhadap konstanta BERNAMA
+(`Build.VERSION_CODES.Q`/`R`/`O`/`N`/`M`/`P`, dari sebelum project menaikkan `minSdk` dari 23) —
+semuanya numerically < 31 tapi tidak match pattern literal yang dicari batch itu. Celah ini baru
+ketahuan sekarang lewat grep `Build.VERSION_CODES\.` app-wide tanpa filter pattern spesifik.
+
+**Katalog penuh (digrep app-wide, 14 file, diklasifikasi manual satu-satu terhadap `minSdk` 31)**:
+- **MATI (cabang `else`/guard tidak pernah tercapai lagi) — 11 file**: `AccentColorExtractor.kt`
+  (Q), `AudioArtFetcher.kt` (Q), `WidgetUpdater.kt` (O + Q, 2 titik) — **3 file INI, dieksekusi
+  batch ini**. Sisa 8 file BELUM dieksekusi (dicatat sbg kandidat sesi berikutnya, alasan sama
+  persis: cakupan 3-file/batch sudah penuh):
+  - `FloatingBubbleService.kt` — 4 dari 6 titik mati (N baris 197, O baris 214/279/465, Q baris
+    523); 1 titik (`UPSIDE_DOWN_CAKE` baris 241) **TETAP relevan** (34 > 31, HARUS dipertahankan)
+  - `BubbleTileService.kt` — 1 dari 2 titik mati (O baris 55); `UPSIDE_DOWN_CAKE` baris 74 TETAP
+    relevan; `@RequiresApi(N)` baris 33 anotasi, beda kelas (bukan runtime branch, tidak masuk
+    hitungan ini)
+  - `BubbleBootReceiver.kt` — 2 titik mati (M baris 27 — guard `&&` majemuk, bukan if/else murni,
+    perlu baca lebih teliti sebelum eksekusi; O baris 30)
+  - `ApkSignatureChecker.kt` — 2 titik mati (P baris 37 & 46, dalam fungsi yang sama)
+  - `AppLogger.kt` — 2 titik mati, POLA BEDA dari yang lain (guard `if (SDK_INT < Q) return`/
+    `return false`, bukan if/else — baris 99 & 164, di `AppLogger` yang dipakai crash logger,
+    perlu ekstra hati-hati krn fungsi observability inti)
+  - `TagEditor.kt` — 1 titik mati (R baris 54)
+  - `RingtoneEncoder.kt` — 1 titik mati (Q baris 56, pola guard sama seperti `AppLogger.kt`)
+  - `BackupManager.kt` — 1 titik mati (Q baris 85, pola guard sama)
+- **BELUM DIVERIFIKASI (butuh baca konteks penuh dulu, JANGAN diasumsikan pola sama) — 3 file,
+  SENGAJA TIDAK disentuh batch ini**:
+  - `MusicRepository.kt` — 4 titik (Q/R/Q/R) — file ini eksplisit tercatat di § "Keputusan
+    arsitektur utama" sbg salah satu dari 3 file paling berisiko diubah tanpa cek dokumentasi
+    dulu (kueri MediaStore/pemilihan kolom, bukan sekadar if/else art loading)
+  - `PlaybackService.kt` — 5 titik (M/O/O/Q/Q) — file berisiko sama (§ arsitektur), plus salah
+    satu titik Q ada di `SongArtBitmapLoader` yang manggil dari background thread Media3
+    (`CallbackToFutureAdapter`), perlu baca lebih teliti drpd 3 file yg sudah dieksekusi
+  - `MainActivity.kt` — 1 titik O (mati, baris 645, if/else biasa) + kasus BEDA di baris 738/744:
+    `when` block dgn cabang `SDK_INT >= R` (30, selalu true) di ATAS cabang `SDK_INT == Q` (29) —
+    kalau benar branch-nya urut dari atas ke bawah, cabang Q jadi unreachable BUKAN krn nilainya
+    sendiri < minSdk, tapi krn keduanya ke-shadow oleh cabang R yang selalu match duluan — beda
+    mekanisme dari 11 file di atas, wajib dibaca detail sebelum disentuh (belum dibaca batch ini)
+- **TETAP RELEVAN (JANGAN disentuh — level API-nya > minSdk 31, device di API 31 real butuh
+  cabang lama)**: setiap titik `S_V2`(32)/`TIRAMISU`(33)/`UPSIDE_DOWN_CAKE`(34) — dikonfirmasi 3
+  titik (`FloatingBubbleService.kt` baris 241, `BubbleTileService.kt` baris 74,
+  `MainActivity.kt` baris 255 & 260, keduanya `TIRAMISU`)
+
+**3 file dieksekusi batch ini** (dipilih krn paling self-contained, 1 pola sama persis, 0
+ketergantungan silang, bukan file yang ditandai berisiko):
+1. **`AccentColorExtractor.kt`** — `extract()`: cabang `else` (`BitmapFactory.decodeStream`
+   mentah, tanpa downsampling) dihapus, langsung panggil `contentResolver.loadThumbnail(songUri,
+   Size(160, 160), null)` tanpa gate. Import `BitmapFactory`+`Build` dihapus (sudah tidak
+   dipakai lagi di file ini).
+2. **`AudioArtFetcher.kt`** — `loadEmbeddedArt()`: cabang pre-Q (`MediaMetadataRetriever` +
+   `BitmapFactory.decodeByteArray` manual, full-res tanpa downsampling) dihapus, fungsi jadi
+   1 baris `try` langsung ke `loadThumbnail(uri, Size(512, 512), null)`. Import
+   `MediaMetadataRetriever`+`BitmapFactory`+`Build` dihapus.
+3. **`WidgetUpdater.kt`** — 2 titik dalam 1 file: (a) `servicePendingIntent()`, cabang `else`
+   (`PendingIntent.getService()`, API<26) dihapus — selalu `getForegroundService()`; (b)
+   `loadAlbumArtBitmap()`, cabang `else` (`BitmapFactory.decodeStream` mentah) dihapus, selalu
+   `loadThumbnail(uri, Size(200, 200), null)`. Import `Build` dihapus (0 pemakaian lain di file
+   ini setelah kedua titik dihapus, dicek eksplisit).
+
+**Zero behavior change** di ketiganya: kondisi yang dihapus SELALU true di setiap device yang
+bisa menginstall app ini sama sekali (`minSdk` 31 dijamin OS sendiri, bukan asumsi kode) — jalur
+yang dieksekusi runtime 100% identik sebelum/sesudah, cuma cabang yang textually tidak pernah
+tercapai yang hilang. Efek samping positif: 3 fungsi ini sebelumnya viewport pertama pun sudah
+melewati satu percabangan yang tidak pernah bisa beda hasil — sekarang linear, sedikit lebih
+mudah dibaca & sedikit lebih kecil bytecode-nya (tidak ada branch/pengecekan versi yang perlu
+dievaluasi tiap panggilan). Ini BUKAN kelas bug/optimasi yang sama dengan Batch 392-401
+(bukan soal `remember`/recomposition Compose) — sektor baru, murni platform/legacy-compat.
+
+**Batas jaminan (sama seperti seluruh rangkaian batch sebelumnya)**: 0 `kotlinc`/Android SDK/
+network di environment kerja sesi ini — verifikasi terbatas ke (1) baca-ulang manual tiap titik
+yang diubah + baca ulang seluruh isi 3 file setelah edit, (2) balance kurung/kurawal/bracket
+dicek programatis (Python, string/comment-aware — hasil: `WidgetUpdater.kt` 88/88 `()` 15/15
+`{}` 0/0 `[]`, `AccentColorExtractor.kt` 23/23 `()` 6/6 `{}` 4/4 `[]`, `AudioArtFetcher.kt` 18/18
+`()` 8/8 `{}` 0/0 `[]` — semua seimbang), (3) diff eksplisit terhadap ZIP Batch 401 — dikonfirmasi
+CUMA 3 file kode ini yang berubah, 0 file lain kesenggol. **Belum diverifikasi build/runtime
+sungguhan** — cek hasil GitHub Actions setelah push, lalu (kalau memungkinkan) konfirmasi visual
+device fisik bahwa artwork accent color/Now Playing cover/widget art tetap termuat identik
+seperti sebelumnya (harusnya 100% sama krn jalur eksekusinya memang sudah selalu itu-itu saja).
+
+**Rekomendasi konkret utk sesi berikutnya**: sektor ini BELUM habis — 8 file "MATI, belum
+dieksekusi" + 3 file "belum diverifikasi" di atas adalah kandidat langsung siap eksekusi
+(prioritaskan yang polanya identik ke 3 file batch ini dulu — `ApkSignatureChecker.kt`/
+`BubbleBootReceiver.kt`/`TagEditor.kt`/`RingtoneEncoder.kt`/`BackupManager.kt`/`AppLogger.kt` —
+sebelum masuk ke `FloatingBubbleService.kt`/`BubbleTileService.kt` yang campur sama titik
+`UPSIDE_DOWN_CAKE` yang WAJIB dipertahankan, atau ke 3 file berisiko tinggi yang butuh baca
+konteks penuh dulu). Jangan asumsikan pola if/else sama utk `MusicRepository.kt`/
+`PlaybackService.kt`/`MainActivity.kt` baris 738/744 — baca kode sungguhan dulu, khususnya kasus
+`MainActivity.kt` yang mekanismenya beda (shadowing antar-cabang `when`, bukan sekadar level API
+di bawah `minSdk`).
+
 ## Batch 401 — Audit lanjutan Compose recomposition: 0 file kode, murni dokumentasi
 User instruksi: "next" (lanjutan sesi optimasi Compose Batch 392→...→400). **Status DISCONTINUED
 tetap permanen tidak diubah**, per klarifikasi Batch 387.
