@@ -24,7 +24,20 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 409 (sektor baru: `collectAsState()` non-lifecycle-aware, 2
+> 🆕 **Update terbaru — Batch 416 (Sektor optimasi Compose Batch 392-415 resmi DITUTUP,
+> instruksi eksplisit user, 0 kode):** 24 batch (392-415) menyisir kelas bug Compose yang bisa
+> dibuktikan zero-risk murni dari kode: `remember()` sweep utk komputasi/objek mahal (392-401),
+> `SDK_INT` legacy dead-code TUNTAS 11/11 (402-408), `collectAsState()` lifecycle (409), Regex
+> hoist + audit `LaunchedEffect` (412), `List<Song>` stability via config compiler — 0 kode
+> Kotlin disentuh (413), hoist `listOf()` literal (414), dan 4 kelas audit lanjutan (filter/sort/
+> groupBy tanpa remember, `.values()` vs `.entries`, `Set` vs `List` contains,
+> `MutableInteractionSource` tanpa remember — 415-416) yang semuanya kembali NEGATIF/bersih.
+> Sektor ini resmi ditutup atas instruksi eksplisit user — bukan karena kehabisan effort, tapi
+> karena 1 kandidat tersisa (`AlbumArt` `SubcomposeAsyncImage`, ganti ke `AsyncImage`+`Painter`)
+> genuinely butuh verifikasi visual device fisik yang tidak tersedia di sesi kerja mana pun
+> proyek ini — TETAP tercatat sbg utang teknis, bukan "selesai". **Status DISCONTINUED tetap
+> permanen tidak diubah.** Detail lengkap CHANGELOG.md Batch 416.
+> Batch 409 (sektor baru: `collectAsState()` non-lifecycle-aware, 2
 > file):** User: "fokus sektor lain yang belum terjamah optimalisasi, dan tentu saja low-risk!!"
 > Proyek konsisten pakai `collectAsStateWithLifecycle()` di 41 titik app-wide, tapi 0 sesi pernah
 > grep khusus cari outlier `collectAsState()` polos — ditemukan tepat 2 titik kelewat:
@@ -779,6 +792,11 @@ tulis, ubah supaya menerima field mentah (`folderPath`, `id`) saja, bukan `Song`
 (`LibrarySearchIndexTest`, karena fungsi yang ditest menerima `List<Song>`), pakai
 `org.mockito:mockito-core` → `mock(Uri::class.java)` untuk dapat instance yang tidak throw,
 tanpa peduli isinya.
+
+**Batch 417** — audit cakupan test app-wide menemukan `DuplicateDetector.kt` (Gap List #2, pure,
+0 Context/I/O) sebagai satu-satunya kelas pure yang belum punya test file sejak dibuat;
+`DuplicateDetectorTest.kt` ditambah (12 test, fixture `mock(Uri::class.java)` sama seperti
+`SmartPlaylistEngineTest`) — 0 kelas pure lain tersisa tanpa test per audit ini.
 
 ## Belum selesai / dalam pengerjaan
 - Tag Editor (Edit Info Lagu) baru menulis MP3/ID3v2.3 untuk lagu MediaStore — FLAC/OGG/M4A/WMA belum didukung (masing-masing format biner beda total, butuh writer terpisah per format), dan lagu dari folder tambahan (SAF) juga belum bisa diedit (folder tambahan cuma diberi izin baca saat ditambahkan, belum ada alur minta izin tulis). Kedua batasan ini ditampilkan langsung ke user lewat pesan di sheet edit, bukan gagal diam-diam

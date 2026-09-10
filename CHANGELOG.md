@@ -1,5 +1,194 @@
 # Changelog
 
+## Batch 417 — Sektor baru: Testing/unit-test coverage (instruksi user "optimize di sektor lain")
+User instruksi: *"lanjut optimize disektor lain!!"*. Dibaca sebagai pindah ke sektor kerja BEDA
+sepenuhnya dari Compose (yang eksplisit DITUTUP Batch 416, item 7 § "ATURAN SESI AKTIF" melarang
+membukanya lagi pada instruksi generik) — bukan permintaan reopen. **Status DISCONTINUED tetap
+permanen tidak diubah** (final lock Batch 410, 0 kecuali). ZIP yang dipakai: `AudioPlayer_v416.zip`
+(upload user).
+
+**Audit sektor dipilih**: cakupan unit test (`app/src/test`, pure-JVM murni, 0 Robolectric —
+lihat README § Testing untuk konvensinya). Digrep seluruh kelas `data`/logic yang genuinely pure
+(0 `Context`, 0 I/O langsung) lalu dibandingkan terhadap 16 file test yang sudah ada
+(`app/src/test/java/com/rudi/audioplayer/**`): `DuplicateDetector.kt` (Gap List #2, dibuat sejak
+proyek punya fitur pencarian lagu duplikat) ketemu sebagai **satu-satunya** kelas pure yang belum
+pernah punya test file — KDoc-nya sendiri di file itu eksplisit bilang "trivially unit-testable
+on its own" (alasan kenapa file itu sengaja dipisah dari `PlayerViewModel`), tapi klaim itu tidak
+pernah benar-benar dibuktikan lewat test sungguhan sejak dibuat. Kelas pure lain di codebase
+(`PinLockoutPolicy`, `ShakePulseTracker`, `MusicRepository.parseTrackOrDiscString`/
+`deriveFolderName`, `LibraryFilterStore.shouldKeep`, `AbRepeatLogic`, `LrcSyncEditor`,
+`LyricsParser`, `SmartPlaylistEngine`, `ListeningStatsEngine`, `LibrarySearchIndex`, `Utils.kt`)
+semua sudah punya test file masing-masing — 0 kandidat lain ditemukan di sektor ini.
+
+**File baru**: `app/src/test/java/com/rudi/audioplayer/data/DuplicateDetectorTest.kt`, 12 test —
+
+- `findLibraryDuplicates` (signature title+artist trim/lowercase + duration dibulatkan ke detik):
+  grouping dasar 2 lagu identik; case-insensitive + whitespace-trim pada title/artist; boundary
+  tepat di detik penuh (200_999ms vs 201_000ms — beda bucket, TIDAK boleh grup, ini kasus paling
+  rawan off-by-one dari pembulatan `/1000`); title beda total tidak pernah grup walau artist/
+  durasi sama; entri singleton (0 pasangan) dikecualikan dari hasil; hasil diurutkan descending
+  by ukuran grup (dites dgn urutan INPUT sengaja dibalik — grup lebih kecil dikirim duluan — supaya
+  test ini benar-benar menguji sorting, bukan kebetulan ikut urutan input).
+- `findPhysicalDuplicates` (signature fileSize + duration dibulatkan ke detik, fileSize<=0
+  dikecualikan): grouping dasar 2 lagu fileSize+durasi sama walau title/artist beda total;
+  fileSize 0 ATAU negatif dikecualikan (2 varian ditest terpisah, bukan cuma salah satu);
+  fileSize beda tidak pernah grup walau durasi sama persis.
+- 1 test independensi silang eksplisit: 2 "lagu" title/artist beda total tapi fileSize+durasi
+  identik (skenario nyata fitur ini — file korup/silent placeholder yang di-copy) — lolos
+  `findPhysicalDuplicates` TAPI tidak pernah lolos `findLibraryDuplicates`, membuktikan kedua
+  fungsi genuinely independen satu sama lain, bukan salah satu delegasi ke lainnya.
+
+Fixture `song()` mengikuti pola persis `SmartPlaylistEngineTest`/`LibrarySearchIndexTest`:
+`mock(Uri::class.java)` untuk field `uri` (`Uri.parse(...)` mengembalikan `null` di JVM murni,
+insiden ini sudah pernah terjadi & diperbaiki di Batch 27 revisi 2 — dependency `mockito-core`
+sudah ada di `app/build.gradle.kts` sejak saat itu, 0 dependency baru ditambah batch ini). Brace/
+paren balance file baru: 12/12, 101/101.
+
+**0 file kode app disentuh** — `DuplicateDetector.kt` sendiri TIDAK diubah sama sekali (ZERO-
+REFACTOR aman by construction: murni penambahan test baru, 0 risiko regresi runtime karena tidak
+ada 1 baris pun kode produksi yang tersentuh). **Belum pernah dijalankan compiler sungguhan** —
+lingkungan kerja sesi ini tidak punya Gradle/Android SDK terpasang (batasan yang sama sudah
+didokumentasikan sejak awal proyek, lihat README § Testing & § "Belum selesai"); verifikasi
+sungguhan terjadi otomatis lewat CI `testDebugUnitTest` (berjalan tiap push sejak Batch 27) begitu
+ZIP ini di-push. Manual dicek: nama field `Song` yang dipakai fixture (`id`/`title`/`artist`/
+`album`/`albumId`/`duration`/`dateAdded`/`uri`/`folderName`/`folderPath`/`fileSize`) cocok 1:1
+verbatim terhadap `data class Song` di `Song.kt`, dan nama method/tipe `DuplicateDetector` yang
+dipanggil (`findLibraryDuplicates`/`findPhysicalDuplicates`/`DuplicateGroup`/`Reason`) cocok
+verbatim terhadap definisinya.
+
+`FILE_MANIFEST.txt` diupdate: 189→190 file, 1 baris baru (`DuplicateDetectorTest.kt`) disisipkan
+alfabetis di antara `CustomFolderScannerStableIdTest.kt` dan `Id3TagWriterTest.kt`. `README.md`
+§ Testing ditambah 1 kalimat penutup menyebut penambahan ini.
+
+**Scope**: 1 file kode BARU (0 file kode existing diubah). 4 file dokumentasi (`PROJECT_STATE.md`,
+`CHANGELOG.md` — ini —, `README.md`, `FILE_MANIFEST.txt`). Diff eksplisit vs ZIP Batch 416
+dikonfirmasi cuma 5 file ini yang berubah/baru.
+
+## Batch 416 — Sektor optimasi Compose (Batch 392-415) resmi DITUTUP, instruksi eksplisit user
+User instruksi: *"Tutup sektor optimasi Compose"* (dipilih via opsi setelah Batch 415 melaporkan
+0 kandidat baru tersisa dari 4 kelas audit yang sudah dicoba). **Status DISCONTINUED tetap
+permanen tidak diubah** (final lock Batch 410, 0 kecuali — ini penutupan SEKTOR optimasi Compose
+di dalam proyek yang sudah discontinued, BUKAN pembukaan kembali proyek). Tidak ada ZIP baru sesi
+ini (upload terakhir tetap `AudioPlayer_v412.zip`). **0 kode diubah** — murni dokumentasi
+penutupan.
+
+**Ringkasan penuh sektor (Batch 392 → 415, 24 batch, ~separuh riwayat batch proyek ini)**:
+
+- **Batch 392-401 (10 batch)**: kelas bug "komputasi/objek mahal dibangun ulang tiap
+  recomposition tanpa `remember`" — `identityRootBrush` (`MainActivity.kt`), lalu grep ulang
+  sistematis pola `Brush.*Gradient(...)` app-wide menemukan beberapa titik serupa di layar lain.
+  Batch 401 menyimpulkan kelas bug ini "habis" untuk pola yang bisa ditemukan lewat grep app-wide.
+- **Batch 402-408 (7 batch)**: sektor terpisah (bukan Compose murni, tapi ditemukan sambil di
+  sektor yang sama) — `SDK_INT` legacy mati (`minSdk` 31 sejak Batch 290 bikin banyak cabang
+  `if (SDK_INT >= ...)` lama selalu-true/selalu-false). TUNTAS 11/11 file katalog Batch 402.
+- **Batch 409**: sektor `collectAsState()` non-lifecycle-aware — 2 titik ditemukan & diperbaiki
+  (`NowPlayingScreen.kt`, `UpdateCheckSheet.kt`) → `collectAsStateWithLifecycle()`.
+- **Batch 412**: (a) hoist `Regex(...)` `RingtoneEncoder.kt` (pola sama `LRC_LINE_REGEX`/
+  `fileStampFormat`); (b) audit `LaunchedEffect(key)` app-wide (19 titik, 9 file) — NEGATIF, 0
+  bug ditemukan, seluruh key sudah tepat.
+- **Batch 413**: kandidat `List<Song>` stability (diblokir sejak Batch 392, diasumsikan butuh
+  refactor signature multi-file) dibuka via `app/compose_stability_config.conf` — 1 baris
+  `kotlin.collections.List`, 0 file kode Kotlin disentuh. Audit keamanan (0
+  `mutableStateListOf`, 2 accumulator lokal return-sekali, queue reorder selalu copy+reassign)
+  mengonfirmasi aman.
+- **Batch 414**: hoist 2 `listOf(...)` literal (`LibraryFilterChips`, `LibraryScreen.kt`) yang
+  dialokasikan ulang tiap tab switch → top-level `private val`.
+- **Batch 415**: audit 3 kelas baru — `.filter{}`/`.sortedBy{}`/`.groupBy{}` tanpa `remember` (27
+  titik, 100% sudah benar), `.values()` vs `.entries` (0 usage `.values()`), `Set` vs `List`
+  `.contains()` di filter ID lagu (semua sudah `Set`). Ketiganya NEGATIF.
+- **Batch 416 (batch ini)**: dicoba 1 kelas lagi sebelum penutupan — `MutableInteractionSource()`
+  tanpa `remember` (functional bug risk, bukan cuma perf — interaction source baru tiap
+  recomposition merusak state ripple/press). Grep app-wide: **35 titik, 100% sudah
+  `remember { MutableInteractionSource() }`**. NEGATIF juga.
+
+**Kandidat yang TETAP tidak terselesaikan (bukan "selesai", TETAP tercatat sbg utang teknis)**:
+`AlbumArt` `SubcomposeAsyncImage` (`ui/Utils.kt`, 1 definisi dipakai 6 layar) — optimasi yang
+mungkin (`AsyncImage` biasa, overhead subcomposition lebih rendah per dokumentasi resmi Coil)
+butuh ganti slot `error`/`placeholder` dari `@Composable` ke `Painter`, yang mengubah mekanisme
+pengukuran/gambar (`SubcomposeAsyncImage` lewat sistem layout Compose biasa vs `AsyncImage` lewat
+intrinsic-size `Painter`) — **provably TIDAK bisa dibuktikan zero-visual-difference murni dari
+kode**, butuh perbandingan screenshot device asli. Ini SATU-SATUNYA alasan sektor ini ditutup
+sekarang, bukan karena kehabisan waktu/effort — 4 kelas audit dicoba tuntas (Batch 415-416) dan
+semuanya genuinely nihil kandidat code-provable baru.
+
+**Kenapa DITUTUP (bukan cuma "dijeda")**: user eksplisit pilih opsi "Tutup sektor optimasi
+Compose" dari 4 opsi yang ditawarkan (AlbumArt butuh device user / kirim data
+profiling-Macrobenchmark / arah baru / tutup sektor). Instruksi ini SPESIFIK menutup PENCARIAN
+kandidat baru sektor Compose — **bukan** mengubah status `AlbumArt` jadi "resolved" (tetap
+tercatat utang teknis di atas, kalau user suatu saat sediakan device/screenshot, ini bisa dibuka
+lagi via instruksi eksplisit baru).
+
+**Aturan baru ditambahkan** (§ "ATURAN SESI AKTIF", item 7): sesi berikutnya JANGAN proaktif
+mencari kandidat optimasi Compose baru pada instruksi generik ("next"/"lanjut") tanpa instruksi
+eksplisit yang secara spesifik minta dibuka lagi (mis. "buka lagi sektor optimasi Compose",
+"coba lagi AlbumArt", atau sejenisnya) — mencegah sesi berikutnya otomatis mengulang 4 kelas
+audit yang sudah tuntas dicoba nihil di Batch 415-416.
+
+**Scope**: 0 file kode. 3 file dokumentasi (`PROJECT_STATE.md`, `CHANGELOG.md` — ini —, `README.md`
+— ringkasan penutupan). Diff eksplisit vs ZIP Batch 415 dikonfirmasi CUMA 3 file dokumentasi ini
+berubah, 0 file kode/`FILE_MANIFEST.txt` kesenggol.
+
+## Batch 415 — Audit 3 kelas alokasi/lookup potensial app-wide: hasil NEGATIF, 0 kode diubah
+User instruksi: *"next"* (lanjutan sesi "next" sejak Batch 393, tanpa ZIP baru — upload terakhir
+tetap `AudioPlayer_v412.zip`, lanjut dari state kerja Batch 414). **Status DISCONTINUED tetap
+permanen tidak diubah** (final lock Batch 410, 0 kecuali).
+
+Sektor `listOf(...)` literal (Batch 414) TUNTAS (2/2 titik app-wide dibereskan, dikonfirmasi grep
+ulang `= listOf("` — 0 sisa). Batch ini membuka 3 kelas audit BARU (belum pernah digrep sistematis
+sebelumnya di proyek ini), pola sama audit `LaunchedEffect` Batch 412 (audit tanpa asumsi ada bug,
+laporkan jujur kalau hasilnya nihil):
+
+**1. `.filter{}`/`.sortedBy{}`/`.sortedByDescending{}`/`.groupBy{}` di dalam badan `@Composable`
+tanpa `remember` (kelas bug sama `identityRootBrush` Batch 392, tapi utk operasi koleksi, bukan
+`Brush`)** — grep app-wide `ui/` menemukan 27 titik. Diperiksa SATU PER SATU dgn konteks
+sekitarnya (bukan cuma baris pemanggilannya): 100% SUDAH BENAR. Polanya konsisten 3 kategori: (a)
+mayoritas sudah di dalam `remember(dependency) { ... }` dengan key yang tepat — grep single-line
+sebelumnya tidak menangkap ini krn `remember(...) {` ada beberapa baris di atas pemanggilan
+sebenarnya (`LibraryScreen.kt` `folderSummaries`/`hiddenSongsList`/`SearchResultsView`'s
+`matchedSongs`/`matchedArtists`/`matchedAlbums`; `SongPickerSheet.kt` `candidates`/`filtered`;
+`VaultSheet.kt` `vaultedSongs`/`VaultAddPickerDialog`'s `candidates`); (b) beberapa di dalam
+fungsi/method BIASA (bukan `@Composable`), dipanggil sekali per event bukan per recomposition
+(`parseLRC()` `LyricsView.kt`, `LibrarySearchIndex.search()`); (c) sisanya di dalam lambda event
+handler (`onValueChange`/`onClick`) yang cuma jalan saat event terjadi, bukan tiap recomposition
+(`SmartPlaylistScreen.kt`/`SongInfoEditSheet.kt` digit-filter TextField, `DuplicateFinderSheet.kt`
+`toDelete` di dalam `if (showConfirm)`). **0 titik yang genuinely re-run tiap recomposition tanpa
+alasan** ditemukan.
+
+**2. `EnumClass.values()` (alokasi array BARU tiap panggilan) vs `.entries` (Kotlin 1.9+, cached,
+0 alokasi)** — grep app-wide `.values()` pada enum: **0 hasil**. Proyek sudah konsisten pakai
+`.entries` (`ThemeIdentity.entries.toList()` di `SettingsScreen.kt`, dkk).
+
+**3. `Set` vs `List` untuk `.contains()` di hot-path filter lagu (`List.contains()` O(n), `Set.
+contains()` O(1) — signifikan utk library ribuan lagu)** — seluruh koleksi ID yang dipakai buat
+`.filter { xxxIds.contains(it.id) }` app-wide (`hiddenIds`/`LibraryFilterStore.getHiddenSongIds()`,
+`vaultedIds`/`VaultStore.getVaultedSongIds()`, `excludedFolders`/`getExcludedFolders()`,
+`alreadyAddedIds` `SongPickerSheet.kt`, `favoriteIds`/`selectedIds` — sudah didokumentasikan
+`ImmutableSet<Long>` di README) dikonfirmasi SUDAH `Set<Long>`/`Set<String>` di titik deklarasinya
+(`LibraryFilterStore.kt`, `VaultStore.kt`, signature parameter `SongPickerSheet.kt`/
+`VaultSheet.kt`). 0 titik pakai `List` polos ditemukan.
+
+**Tambahan pemeriksaan singkat**: `SimpleDateFormat(...)`/`DateTimeFormatter.ofPattern(...)`
+(konstruksi formatter tanggal mahal, kelas bug sama Regex Batch 409/412 kalau dibangun ulang tiap
+panggilan) — grep app-wide `ui/`: **0 hasil**, proyek ini tidak memakai formatter tanggal manual
+sama sekali (`formatDuration()` di `Utils.kt` pakai `String.format` langsung, bukan objek
+formatter yang perlu di-cache).
+
+**Kesimpulan jujur**: ketiga kelas ini NIHIL app-wide — bukan berarti tidak ada usaha, tapi
+codebase ini genuinely sudah bersih di kelas-kelas ini (konsisten dengan 21+ batch optimasi Compose
+sebelumnya, Batch 392-414). **0 kode diubah batch ini** — dicatat eksplisit (pola sama audit
+`LaunchedEffect` Batch 412, `collectAsState` sebelum ditemukan 2 titik Batch 409) supaya sesi
+berikutnya tidak mengulang audit app-wide yang sama dari nol.
+
+**Sektor kandidat blocked Batch 392 — status tidak berubah**: `List<Song>` TUNTAS (Batch 413).
+Sisa 1: `AlbumArt` `SubcomposeAsyncImage`, tetap diblokir (butuh device fisik, dicek ulang Batch
+414) — TIDAK diperiksa ulang lagi batch ini, statusnya tidak berubah dari Batch 414.
+
+**Sesi berikutnya**: 0 kandidat low-risk baru yang belum teraudit ditemukan dari 3 kelas yang
+dicoba batch ini. Opsi realistis yang tersisa: (a) `AlbumArt` (butuh user sediakan cara verifikasi
+visual/device fisik), (b) minta user coba kelas audit baru yang belum dicoba sesi manapun
+(mis. Macrobenchmark/profiling device asli sesuai rekomendasi Batch 388 yang dari awal butuh data
+device, bukan dari kode), atau (c) arah baru di luar sektor optimasi.
+
 ## Batch 414 — Sektor baru: `listOf(...)` literal dialokasikan ulang tiap recomposition, `LibraryScreen.kt`, 1 file kode
 User instruksi: *"next"* (lanjutan sesi "next" yang sama sejak Batch 393, tanpa ZIP baru — upload
 terakhir tetap `AudioPlayer_v412.zip`, batch ini lanjut dari state kerja Batch 413). **Status

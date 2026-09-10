@@ -8,7 +8,9 @@
 # (mengikuti konvensi 'setara git ls-files') walau TIDAK ikut dikirim di ZIP sesi — sesuai desain:
 # skrip Termux [DAILY UPDATE] sengaja skip `-name '.*'` saat replace isi folder, jadi 2 file itu
 # dikelola permanen di device, bukan lewat siklus ZIP tiap sesi (bukan bug/drift).
-# Total: 189 file (dikoreksi Batch 390 — lihat catatan di bawah)
+# Batch 417: app/src/test/java/com/rudi/audioplayer/data/DuplicateDetectorTest.kt (file baru,
+# audit cakupan test) ditambahkan — 189->190.
+# Total: 190 file
 
 .github/workflows/build.yml
 .gitignore
@@ -182,6 +184,7 @@ app/src/main/res/xml/file_paths.xml
 app/src/main/res/xml/shortcuts.xml
 app/src/main/res/xml/widget_player_info.xml
 app/src/test/java/com/rudi/audioplayer/data/CustomFolderScannerStableIdTest.kt
+app/src/test/java/com/rudi/audioplayer/data/DuplicateDetectorTest.kt
 app/src/test/java/com/rudi/audioplayer/data/Id3TagWriterTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LibraryFilterStoreTest.kt
 app/src/test/java/com/rudi/audioplayer/data/ListeningStatsEngineTest.kt
