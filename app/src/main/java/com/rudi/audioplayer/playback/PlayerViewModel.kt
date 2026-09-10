@@ -787,7 +787,22 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             // Gap List #5: refresh the permission-status badge every scan, not just right
             // after add/remove — a grant can be revoked from outside the app at any time
             // with no callback, so "was true last time we checked" can go stale silently.
-            _customFolders.value = loadCustomFolderInfos()
+            //
+            // Batch 419 — sama kelas bug & sumber persis yang diperbaiki Batch 418
+            // (`addCustomFolder`/`removeCustomFolder`): `loadCustomFolderInfos()` melakukan
+            // Binder/IPC nyata per folder custom (`DocumentFile.fromTreeUri(...).name` +
+            // `persistedUriPermissions` query — didokumentasikan Batch 386 di komentar
+            // `_customFolders` di atas), tapi baris ini SEBELUMNYA berjalan di Main
+            // (dispatcher default `viewModelScope.launch`, SEBELUM `withContext(Dispatchers
+            // .IO)` di bawah) — dan fungsi ini dipanggil dari `ensureLibraryLoaded()` pada
+            // SETIAP cold start (Batch 386 sendiri menyebutnya "jalur paling panas
+            // cold-start") plus tombol "Pindai Ulang". Ini panggilan ke-3 dari 3 — 2 lainnya
+            // (`addCustomFolder`/`removeCustomFolder`) sudah dibenerin Batch 418, baris ini
+            // kelewat karena bukan di dalam fungsi yang sama. Fix: bungkus
+            // `withContext(Dispatchers.IO)`, 0 perubahan urutan terhadap baris2 di sekitarnya
+            // (tetap sebelum blok scan MediaStore, tetap di luar try/catch persis seperti
+            // semula — exception-safety TIDAK diubah batch ini, di luar scope fix ini).
+            _customFolders.value = withContext(Dispatchers.IO) { loadCustomFolderInfos() }
             try {
                 val songs = withContext(Dispatchers.IO) {
                     val mediaStoreSongs = musicRepository.getAllSongs()

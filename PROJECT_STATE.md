@@ -117,6 +117,25 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 419 (Thread Safety: fix Main-thread I/O ke-3/terakhir di refreshLibrary(), 1 file kode +
+2 dokumentasi)** — User: *"next"*. **Status DISCONTINUED tetap permanen** (final lock Batch 410).
+Tidak ada ZIP baru (upload terakhir tetap `AudioPlayer_v418.zip`).
+
+Lanjutan langsung Batch 418 (masih sektor Thread Safety): call site ke-3 `loadCustomFolderInfos()`
+yang kelewat — di `refreshLibrary()` sendiri, sebelumnya jalan di Main SEBELUM `withContext
+(Dispatchers.IO)` yg membungkus scan MediaStore. Ini jalur PALING panas dari ketiganya:
+`refreshLibrary()` dipanggil tiap cold start (via `ensureLibraryLoaded()`) + tombol "Pindai Ulang".
+Root cause identik Batch 418 (lihat CHANGELOG Batch 418: Binder/IPC nyata per folder custom via
+`loadCustomFolderInfos()`, didokumentasikan Batch 386). Fix: bungkus baris itu
+`withContext(Dispatchers.IO) { ... }`, 0 perubahan urutan/exception-safety terhadap baris
+sekitarnya. Verifikasi ulang: 3/3 call site `loadCustomFolderInfos()` app-wide sekarang IO-wrapped,
+0 sisa — **benang merah bug ini TUNTAS** (sektor Thread Safety scr umum belum tentu tuntas total,
+cuma kelas bug spesifik ini). Brace/paren balance `PlayerViewModel.kt` (228/228, 880/880). Belum
+pernah dijalankan compiler sungguhan / device asli. Detail lengkap `CHANGELOG.md` Batch 419.
+
+**Scope**: 1 file kode (`PlayerViewModel.kt`). 2 file dokumentasi (`PROJECT_STATE.md`,
+`CHANGELOG.md`).
+
 **Batch 418 (Thread Safety: fix Main-thread I/O di addCustomFolder/removeCustomFolder, 1 file
 kode + 2 dokumentasi)** — User: *"next"*. **Status DISCONTINUED tetap permanen tidak diubah**
 (final lock Batch 410). Tidak ada ZIP baru (upload terakhir tetap `AudioPlayer_v417.zip`).

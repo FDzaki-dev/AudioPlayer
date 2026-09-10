@@ -1,5 +1,47 @@
 # Changelog
 
+## Batch 419 — Thread Safety: fix Main-thread I/O ke-3 (dan terakhir) di refreshLibrary()
+User instruksi: *"next"* (generik, tanpa ZIP baru — upload terakhir tetap `AudioPlayer_v418.zip`).
+**Status DISCONTINUED tetap permanen tidak diubah** (final lock Batch 410).
+
+**Lanjutan langsung Batch 418** (masih sektor Thread Safety, bukan sektor baru): Batch 418 fix
+`addCustomFolder`/`removeCustomFolder` tapi TIDAK cek call site ke-3 `loadCustomFolderInfos()` —
+yaitu `refreshLibrary()` sendiri, baris `_customFolders.value = loadCustomFolderInfos()` yang
+berjalan di Main (dispatcher default `viewModelScope.launch`) SEBELUM `withContext(Dispatchers
+.IO)` yang membungkus scan MediaStore di baris-baris setelahnya. Ini justru jalur PALING panas
+dari 3 call site: `refreshLibrary()` dipanggil `ensureLibraryLoaded()` pada **setiap cold start**
+(Batch 386 sendiri menyebutnya "jalur paling panas cold-start" — kutipan yang sama yang jadi dasar
+fix Batch 418) plus tiap kali tombol "Pindai Ulang" ditekan. Root cause & bukti biaya nyatanya
+identik persis dengan Batch 418 (`DocumentFile.fromTreeUri(...).name` Binder round-trip +
+`persistedUriPermissions` IPC query, per folder custom, didokumentasikan Batch 386) — tidak
+diulang detailnya di sini, lihat Batch 418 di atas.
+
+**Fix** (`PlayerViewModel.kt`, 1 file, satu-satunya file yg diubah 2 batch berturut-turut —
+masih dalam batas "maks 3 file/tugas", dihitung per-batch bukan kumulatif): baris
+`_customFolders.value = loadCustomFolderInfos()` dibungkus `withContext(Dispatchers.IO) { ... }`.
+**0 perubahan urutan** relatif ke baris-baris di sekitarnya (`_libraryLoading.value = true` tetap
+sebelum, blok scan MediaStore tetap sesudah) — **0 perubahan exception-safety**: baris ini SUDAH
+di luar blok `try/catch` sebelum fix batch ini, dan TETAP di luar `try/catch` sesudahnya (kalau
+`loadCustomFolderInfos()` throw, perilakunya sama persis dgn sebelum batch ini — itu bug
+terpisah, di luar scope Thread-Safety-only fix ini, sengaja tidak disentuh sekalian supaya diff
+tetap minimal & tunggal-tujuan). Verifikasi: seluruh 3 call site `loadCustomFolderInfos()` app-wide
+digrep ulang setelah fix — confirmed 0 sisa yang belum IO-wrapped. Brace/paren balance
+`PlayerViewModel.kt` penuh (228/228, 880/880, naik dari 227/227 & 868/868 Batch 418 — selisih
+persis sesuai 1 `withContext(Dispatchers.IO) { }` baru yg disisipkan: +1 brace pair, +12 paren
+dari komentar/kode baru).
+
+**Sektor Thread Safety kini TUNTAS** untuk kelas bug "Main-thread I/O lewat `loadCustomFolderInfos
+()`" — seluruh 3 call site (Batch 418 x2 + Batch 419 x1) sudah IO-wrapped, 0 sisa. Kelas bug thread
+-safety LAIN (di luar fungsi ini) belum diaudit — sektor Thread Safety sendiri belum tentu tuntas
+total, cuma benang merah spesifik ini yang tuntas. **Belum pernah dijalankan compiler sungguhan**
+(batasan sama sejak Batch 417). **Belum diverifikasi device asli** — prioritas cek gabungan dgn
+Batch 418: cold start dgn >=1 folder custom tersimpan + tombol "Pindai Ulang", pastikan 0 freeze
+UI yg terasa.
+
+**Scope**: 1 file kode (`PlayerViewModel.kt`). 2 file dokumentasi (`PROJECT_STATE.md`,
+`CHANGELOG.md` — ini). `README.md`/`FILE_MANIFEST.txt` tidak disentuh (sama alasan Batch 418: 0
+file baru, 0 perilaku user-facing berubah).
+
 ## Batch 418 — Thread Safety: addCustomFolder/removeCustomFolder Main-thread I/O fix
 User instruksi: *"next"* (lanjutan generik, tanpa ZIP baru — upload terakhir tetap
 `AudioPlayer_v417.zip`, lanjut dari state kerja Batch 417). **Status DISCONTINUED tetap permanen
