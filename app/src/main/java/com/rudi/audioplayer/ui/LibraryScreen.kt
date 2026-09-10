@@ -810,13 +810,23 @@ private fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, o
     )
 }
 
+// Batch 413: LibraryFilterChips menerima `selectedTab: Int` sebagai parameter yang dibaca
+// langsung di badan fungsi (`selectedTab in 3..6`, `selectedTab == index`) — artinya SELURUH
+// badan composable ini re-run tiap kali user ganti tab, termasuk 2 `listOf(...)` literal di
+// bawah yang isinya TETAP SAMA (bukan turunan dari `selectedTab`/parameter apa pun). Sebelum
+// batch ini keduanya dideklarasi ulang (alokasi List + array baru) di badan fungsi tiap
+// recomposition; dipindah jadi top-level val (pola sama `LRC_LINE_REGEX` di
+// `ui/lyrics/LyricsView.kt`/`fileStampFormat` `RingtoneEncoder.kt`) supaya dialokasikan SEKALI
+// per proses, bukan sekali per tab switch. Zero behavior change — isi, urutan, dan index yang
+// dipakai (`LIBRARY_MORE_TAB_LABELS[selectedTab - 3]`) identik persis dengan sebelumnya.
+private val LIBRARY_PRIMARY_TAB_LABELS = listOf("Lagu", "Album", "Artis")
+private val LIBRARY_MORE_TAB_LABELS = listOf("Folder", "Favorit", "Playlist", "Otomatis") // indices 3, 4, 5, 6
+
 @Composable
 private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
-    val primaryLabels = listOf("Lagu", "Album", "Artis")
-    val moreLabels = listOf("Folder", "Favorit", "Playlist", "Otomatis") // indices 3, 4, 5, 6
     var showMoreMenu by remember { mutableStateOf(false) }
     val moreSelected = selectedTab in 3..6
-    val moreChipLabel = if (moreSelected) moreLabels[selectedTab - 3] else "Lainnya"
+    val moreChipLabel = if (moreSelected) LIBRARY_MORE_TAB_LABELS[selectedTab - 3] else "Lainnya"
     // Batch 287 — Liquid Glass fase 3 sisa langkah: audit pill/chip lebar. Chip filter tab ini
     // (lebar≠tinggi, teks pendek dgn padding, BUKAN tombol persegi/lingkaran) genuinely pill
     // secara visual tapi radius-nya `Radius.xxl` (20dp FIXED) — cuma KEBETULAN terlihat pill
@@ -832,7 +842,7 @@ private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        itemsIndexed(primaryLabels) { index, label ->
+        itemsIndexed(LIBRARY_PRIMARY_TAB_LABELS) { index, label ->
             val selected = selectedTab == index
             Box(
                 modifier = Modifier
@@ -871,7 +881,7 @@ private fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
                     )
                 }
                 DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
-                    moreLabels.forEachIndexed { offset, label ->
+                    LIBRARY_MORE_TAB_LABELS.forEachIndexed { offset, label ->
                         DropdownMenuItem(
                             text = { Text(label) },
                             onClick = {

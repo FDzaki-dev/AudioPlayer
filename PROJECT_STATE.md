@@ -107,6 +107,37 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 414 (Sektor baru: `listOf(...)` literal realokasi tiap recomposition,
+`LibraryScreen.kt`, 1 file kode)** — User: *"next"*. **Status DISCONTINUED tetap permanen tidak
+diubah** (final lock Batch 410). Tidak ada ZIP baru sesi ini (upload terakhir tetap
+`AudioPlayer_v412.zip`); lanjut dari state kerja Batch 413.
+
+**`AlbumArt` `SubcomposeAsyncImage` dicek ulang dulu** (satu-satunya kandidat blocked Batch 392
+yang tersisa) — ide baru dipertimbangkan (`Painter` wrapper custom + `ColorFilter.tint` di slot
+`error`/`placeholder` `AsyncImage`), tapi TETAP diblokir: `SubcomposeAsyncImage` mengukur slot
+`error`/`placeholder` lewat sistem layout Compose biasa (`@Composable`), `AsyncImage` lewat
+mekanisme intrinsic-size `Painter` yang berbeda secara struktural — tidak bisa dibuktikan "zero
+visual difference" murni dari kode, butuh device asli. 0 kode disentuh untuk kandidat ini.
+
+**Sektor baru**: grep app-wide `= listOf("` di `ui/` menemukan 2 titik, keduanya di
+`LibraryFilterChips()` (`LibraryScreen.kt`) — `primaryLabels`/`moreLabels` dibangun ulang
+(alokasi `List` baru) tiap recomposition fungsi ini, padahal isinya 100% konstan. Fungsi ini
+recompose tiap user ganti tab filter (`selectedTab: Int` dibaca langsung di badan fungsi) — kelas
+bug sama seperti hoist Regex Batch 409/412 (nilai invariant di scope yang re-run tiap panggilan).
+
+**Fix**: dipindah jadi top-level `private val` (`LIBRARY_PRIMARY_TAB_LABELS`,
+`LIBRARY_MORE_TAB_LABELS`), pola sama `LRC_LINE_REGEX`/`fileStampFormat`. 3 titik pemakaian
+diarahkan ke konstanta baru (grep ulang nama variabel lama dulu sebelum dianggap selesai — 1
+titik ketiga di dropdown menu awalnya terlewat, 0 unresolved reference tersisa setelah dicek).
+**Zero behavior change** — isi/urutan/index identik persis. **Scope**: 1 file kode. Balance
+kurung dicek programatis: 716/716 `()`, 340/340 `{}`, 9/9 `[]` — seimbang. Diff eksplisit vs ZIP
+Batch 413 dikonfirmasi CUMA file ini berubah. **Belum diverifikasi build/runtime sungguhan** —
+WAJIB cek GitHub Actions. Detail lengkap CHANGELOG.md Batch 414.
+
+**Kandidat blocked Batch 392 — status tidak berubah**: `List<Song>` TUNTAS (Batch 413). Sisa 1:
+`AlbumArt` `SubcomposeAsyncImage`, tetap diblokir (butuh device fisik, dicek ulang batch ini —
+lihat detail di atas), bukan lagi bisa dipecahkan lewat audit kode tambahan.
+
 **Batch 413 (Kandidat blocked Batch 392 dibuka: `List<Song>` stability via config, 1 file
 NON-kode)** — User: *"List<Song> stability (perlu exception cap 3-file)"* — dari 2 kandidat
 blocked Batch 392, user pilih `List<Song>`, otorisasi exception cap 3-file (asumsi lama: butuh

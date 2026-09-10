@@ -1,5 +1,70 @@
 # Changelog
 
+## Batch 414 — Sektor baru: `listOf(...)` literal dialokasikan ulang tiap recomposition, `LibraryScreen.kt`, 1 file kode
+User instruksi: *"next"* (lanjutan sesi "next" yang sama sejak Batch 393, tanpa ZIP baru — upload
+terakhir tetap `AudioPlayer_v412.zip`, batch ini lanjut dari state kerja Batch 413). **Status
+DISCONTINUED tetap permanen tidak diubah** (final lock Batch 410, 0 kecuali).
+
+**Kandidat blocked Batch 392 dicek ulang dulu**: `AlbumArt` `SubcomposeAsyncImage` (satu-satunya
+kandidat lama yang masih tersisa setelah `List<Song>` tuntas Batch 413) — dipertimbangkan ulang
+apakah bisa dipecahkan lewat cara lain (mis. wrapper `Painter` custom yang menerapkan
+`ColorFilter.tint(...)` hasil resolve `MaterialTheme.colorScheme` di dalam composable, dipasang ke
+slot `error`/`placeholder` `AsyncImage` biasa, bukan `SubcomposeAsyncImage`). **Tetap TIDAK
+dieksekusi** — alasan Batch 392 masih berlaku penuh: `SubcomposeAsyncImage`'s slot
+`error`/`placeholder` menerima `@Composable` (layout diukur lewat sistem layout Compose biasa,
+termasuk `Modifier.fillMaxSize(0.4f)` milik `AlbumArtFallbackIcon()`), sedangkan `AsyncImage`'s
+slot setara menerima `Painter` (diukur/digambar lewat mekanisme intrinsic-size Painter yang
+BERBEDA, dikombinasikan dengan `contentScale` yang sama dipakai untuk gambar sungguhan) — dua
+mekanisme pengukuran/gambar yang berbeda secara struktural, bukan sekadar beda tipe parameter,
+jadi TIDAK bisa dibuktikan "zero visual difference" murni dari pembacaan kode seperti kandidat
+lain sesi ini. Butuh perbandingan screenshot device asli sebelum/sesudah untuk dipastikan aman —
+tetap di luar bar "provably zero behavior change murni dari kode" yang jadi standar batch optimasi
+sejak 385. **0 kode disentuh untuk kandidat ini.**
+
+**Sektor baru dibuka: literal `listOf(...)` yang dibangun ulang tiap recomposition padahal
+isinya konstan.** Grep app-wide `= listOf("` di `ui/` — 2 titik ditemukan, KEDUANYA di fungsi yang
+sama: `LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit)` di `LibraryScreen.kt`.
+
+**Root cause**: `LibraryFilterChips` menerima `selectedTab: Int` sebagai parameter yang dibaca
+langsung di badan fungsi (`selectedTab in 3..6`, `selectedTab == index`) — parameter primitif yang
+genuinely sering berubah (tiap kali user ganti tab filter Lagu/Album/Artis/dst.). Karena `Int`
+adalah primitif stabil, Compose TIDAK bisa skip recomposition fungsi ini saat `selectedTab`
+berubah (memang seharusnya re-run — itu bukan bug), TAPI 2 baris di baris pertama badan fungsi —
+`val primaryLabels = listOf("Lagu", "Album", "Artis")` dan
+`val moreLabels = listOf("Folder", "Favorit", "Playlist", "Otomatis")` — ikut dieksekusi ulang
+(alokasi `List` + array baru) setiap kali, padahal isinya 100% konstan, 0 hubungan ke
+`selectedTab`/parameter apa pun. Kelas bug yang sama seperti hoist Regex Batch 409/412
+(`RingtoneEncoder.kt`) — nilai yang genuinely tidak pernah berubah, tapi ditempatkan di scope yang
+re-run tiap kali dipanggil.
+
+**Fix**: kedua `listOf(...)` dipindah jadi top-level `private val` (`LIBRARY_PRIMARY_TAB_LABELS`,
+`LIBRARY_MORE_TAB_LABELS`) tepat di atas fungsi — pola sama `LRC_LINE_REGEX` (`LyricsView.kt`)/
+`fileStampFormat` (`RingtoneEncoder.kt`): dialokasikan SEKALI per proses, bukan sekali per tab
+switch. 3 titik pemakaian di dalam fungsi diarahkan ke konstanta baru
+(`itemsIndexed(LIBRARY_PRIMARY_TAB_LABELS)`, `LIBRARY_MORE_TAB_LABELS[selectedTab - 3]`,
+`LIBRARY_MORE_TAB_LABELS.forEachIndexed { ... }` — titik ke-3 ini awalnya terlewat saat rename
+pertama, ketemu lewat grep ulang nama variabel lama sebelum dianggap selesai, 0 unresolved
+reference tersisa). **Zero behavior change**: isi, urutan, dan index yang dipakai
+(`LIBRARY_MORE_TAB_LABELS[selectedTab - 3]` untuk index 3-6) identik persis dengan sebelumnya.
+
+**Nilai optimasi**: kecil (2 alokasi `List` pendek dihindari per tab switch, bukan hot/tick loop),
+tapi zero-risk dan zero-behavior-change — konsisten dengan bar batch-batch sebelumnya di sektor
+"hoist konstanta" (Regex Batch 409/412).
+
+**Scope**: 1 file kode (`LibraryScreen.kt`). Balance kurung dicek programatis (Python,
+string/comment-aware, termasuk raw string `"""..."""`): 716/716 `()`, 340/340 `{}`, 9/9 `[]` —
+seimbang. Diff eksplisit terhadap ZIP Batch 413 dikonfirmasi CUMA file ini berubah, 0 file lain
+kesenggol (termasuk 0 `FILE_MANIFEST.txt` — jumlah file tidak berubah).
+
+**Belum diverifikasi build/runtime sungguhan** (0 kotlinc/SDK di sandbox, sama seperti seluruh
+riwayat proyek ini) — WAJIB cek GitHub Actions setelah push. Risiko regresi dinilai SANGAT RENDAH:
+murni pemindahan deklarasi konstanta literal ke scope lebih luas, 0 logic/nilai diubah.
+
+**Sektor kandidat blocked Batch 392 — status tidak berubah**: `List<Song>` TUNTAS (Batch 413).
+Sisa 1 kandidat: `AlbumArt` `SubcomposeAsyncImage`, dicek ulang batch ini, TETAP diblokir (butuh
+verifikasi visual device asli, lihat penjelasan di atas) — bukan sesuatu yang bisa dipecahkan lagi
+lewat audit kode tambahan tanpa akses device fisik.
+
 ## Batch 413 — Kandidat blocked Batch 392 (`List<Song>` stability) dibuka: 1 file config, bukan multi-file signature refactor
 User instruksi: *"List<Song> stability (perlu exception cap 3-file)"* — dari 2 kandidat yang TETAP
 diblokir sejak Batch 392 (`AlbumArt` `SubcomposeAsyncImage` & stabilitas `List<Song>` app-wide),
