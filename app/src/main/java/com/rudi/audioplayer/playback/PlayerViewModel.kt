@@ -872,37 +872,61 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     )
 
     /** Grants persistent access to a folder the user picked via the system folder picker,
-     * remembers it, and rescans so its audio shows up immediately. */
+     * remembers it, and rescans so its audio shows up immediately.
+     *
+     * Batch 418 — seluruh body dulu berjalan SINKRON di caller thread (Main — dipanggil
+     * langsung dari `addFolderLauncher` result callback di `LibraryScreen.kt` via
+     * `MainActivity.kt`'s `onAddCustomFolder`, keduanya Main thread biasa, 0 coroutine
+     * wrapper di sisi caller). Isinya BUKAN kerja murah: `takePersistableUriPermission` itu
+     * Binder IPC ke system, dan [loadCustomFolderInfos] sendiri sudah didokumentasikan Batch
+     * 386 (lihat komentar `_customFolders` di atas) melakukan `DocumentFile.fromTreeUri(...)
+     * .name` (round-trip Binder ke proses DocumentsProvider) + `persistedUriPermissions`
+     * (query IPC) PER folder custom — "nyata, bukan sekadar map lookup". Batch 386 sendiri
+     * cuma membereskan constructor (panggilan ganda yang terbuang), TIDAK memindahkan
+     * panggilan yang tersisa ini dari Main — persis kelas bug yang sama dengan
+     * `setThemeIdentity`/`setThemeMode` (Batch 72, lihat komentarnya: "leaving Main-thread I/O
+     * in a newly-added call path is a real bug on its own regardless"). Fix: seluruh body
+     * dipindah ke `viewModelScope.launch(Dispatchers.IO)`, 0 perubahan urutan/logic — murni
+     * dispatcher. `_customFolders`/`_actionErrorMessage` StateFlow aman di-set dari thread
+     * mana pun (atomic), `refreshLibrary()` sendiri sudah aman dipanggil dari coroutine lain
+     * (cuma `launch{}` job baru). */
     fun addCustomFolder(treeUri: Uri) {
-        try {
-            appContext.contentResolver.takePersistableUriPermission(
-                treeUri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        } catch (e: SecurityException) {
-            // Sebelumnya gagal 100% diam-diam — user memilih folder, tidak terjadi apa-apa, dan
-            // tidak ada cara untuk tahu kenapa. Sekarang dicatat dan dikabari lewat Snackbar.
-            AppLogger.e("PlayerViewModel", "Gagal ambil izin folder tambahan", e)
-            _actionErrorMessage.value = "Gagal menambahkan folder — izin ditolak sistem."
-            return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                appContext.contentResolver.takePersistableUriPermission(
+                    treeUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: SecurityException) {
+                // Sebelumnya gagal 100% diam-diam — user memilih folder, tidak terjadi apa-apa, dan
+                // tidak ada cara untuk tahu kenapa. Sekarang dicatat dan dikabari lewat Snackbar.
+                AppLogger.e("PlayerViewModel", "Gagal ambil izin folder tambahan", e)
+                _actionErrorMessage.value = "Gagal menambahkan folder — izin ditolak sistem."
+                return@launch
+            }
+            customFolderStore.addFolder(treeUri.toString())
+            _customFolders.value = loadCustomFolderInfos()
+            refreshLibrary()
         }
-        customFolderStore.addFolder(treeUri.toString())
-        _customFolders.value = loadCustomFolderInfos()
-        refreshLibrary()
     }
 
+    /** Batch 418 — sama kelas bug & fix persis [addCustomFolder] di atas (lihat KDoc-nya):
+     * dulu sinkron di Main (dipanggil dari tombol hapus `FolderManagerSheet.kt` via
+     * `MainActivity.kt`'s `onRemoveCustomFolder`), sekarang dipindah IO. */
     fun removeCustomFolder(uriString: String) {
-        try {
-            appContext.contentResolver.releasePersistableUriPermission(
-                Uri.parse(uriString),
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        } catch (e: Exception) {
-            // Permission may already be gone (e.g. folder moved/deleted) — still forget it locally.
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                appContext.contentResolver.releasePersistableUriPermission(
+                    Uri.parse(uriString),
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: Exception) {
+                // Permission may already be gone (e.g. folder moved/deleted) — still forget it locally.
+            }
+            customFolderStore.removeFolder(uriString)
+            _customFolders.value = loadCustomFolderInfos()
+            refreshLibrary()
         }
-        customFolderStore.removeFolder(uriString)
-        _customFolders.value = loadCustomFolderInfos()
-        refreshLibrary()
     }
 
     fun setThemeIdentity(identity: ThemeIdentity) {

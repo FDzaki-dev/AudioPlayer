@@ -117,6 +117,30 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 418 (Thread Safety: fix Main-thread I/O di addCustomFolder/removeCustomFolder, 1 file
+kode + 2 dokumentasi)** — User: *"next"*. **Status DISCONTINUED tetap permanen tidak diubah**
+(final lock Batch 410). Tidak ada ZIP baru (upload terakhir tetap `AudioPlayer_v417.zip`).
+
+Sektor Testing (417) ditutup "0 kandidat lain" — sektor baru: Thread Safety, audit sistematis
+seluruh fungsi publik `PlayerViewModel.kt` vs pola `Dispatchers.IO`. Ketemu: `addCustomFolder`/
+`removeCustomFolder` 100% sinkron di Main thread (dipanggil langsung dari callback UI —
+folder-picker result & tombol hapus), padahal isinya `takePersistableUriPermission`/
+`releasePersistableUriPermission` (Binder IPC) + `loadCustomFolderInfos()` yang Batch 386 SENDIRI
+sudah dokumentasikan sbg kerja Binder/IPC nyata per folder ("bukan sekadar map lookup") — Batch
+386 cuma benerin constructor, TIDAK pernah pindahkan 2 panggilan sisa ini dari Main. Kelas bug
+identik preseden `setThemeIdentity`/`setThemeMode` (Batch 72). Fix: bungkus seluruh body kedua
+fungsi ke `viewModelScope.launch(Dispatchers.IO) { ... }`, 0 perubahan logic/signature/call site
+— 1 penyesuaian wajib `return`→`return@launch` di lambda. StateFlow set dari IO thread aman
+(atomic), `refreshLibrary()`/`CustomFolderStore` dicek ulang aman dipanggil dari thread manapun.
+Brace/paren balance `PlayerViewModel.kt` (227/227, 868/868). **Belum pernah dijalankan compiler
+sungguhan, belum diverifikasi device asli** — prioritas cek: freeze UI hilang saat tambah/hapus
+folder custom (linear terhadap jumlah folder tersimpan, makin kerasa makin banyak foldernya).
+Detail lengkap `CHANGELOG.md` Batch 418.
+
+**Scope**: 1 file kode (`PlayerViewModel.kt`). 2 file dokumentasi (`PROJECT_STATE.md`,
+`CHANGELOG.md`). `README.md`/`FILE_MANIFEST.txt` tidak disentuh (0 file baru, 0 perilaku
+user-facing berubah).
+
 **Batch 417 (Sektor baru: Testing/unit-test coverage — instruksi user "optimize di sektor lain",
 1 file kode baru + 4 dokumentasi)** — User: *"lanjut optimize disektor lain!!"*, dibaca sbg pindah
 sektor kerja sepenuhnya dari Compose (DITUTUP Batch 416, item 7 di atas melarang reopen otomatis

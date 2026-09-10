@@ -1,5 +1,66 @@
 # Changelog
 
+## Batch 418 — Thread Safety: addCustomFolder/removeCustomFolder Main-thread I/O fix
+User instruksi: *"next"* (lanjutan generik, tanpa ZIP baru — upload terakhir tetap
+`AudioPlayer_v417.zip`, lanjut dari state kerja Batch 417). **Status DISCONTINUED tetap permanen
+tidak diubah** (final lock Batch 410).
+
+**Sektor**: Testing (Batch 417) ditutup dgn kesimpulan "0 kandidat lain" — sektor baru dibuka:
+Thread Safety (audit `Dispatchers`/blocking-call app-wide, belum pernah jadi sektor namanya
+sendiri meski disinggung tidak langsung lewat fix Batch 72/409). Digrep semua fungsi publik
+`PlayerViewModel.kt` yang melakukan `ContentResolver`/SAF/`SharedPreferences` I/O TANPA
+`viewModelScope.launch(Dispatchers.IO)` di sekelilingnya (kontras dgn `requestSaveTags`/
+`requestCutRingtone`/`refreshLibrary` yang semuanya sudah benar) — ketemu 2: `addCustomFolder(
+treeUri: Uri)` & `removeCustomFolder(uriString: String)`.
+
+**Root cause**: kedua fungsi ini sinkron total, dipanggil LANGSUNG dari callback Main thread
+(`LibraryScreen.kt`'s `addFolderLauncher` — hasil SAF folder picker — via `MainActivity.kt`'s
+`onAddCustomFolder`; & tombol hapus `FolderManagerSheet.kt` via `onRemoveCustomFolder`), 0
+coroutine wrapper sama sekali di sisi caller MAUPUN di dalam fungsinya sendiri. Isinya bukan kerja
+murah: `takePersistableUriPermission`/`releasePersistableUriPermission` adalah Binder IPC ke
+system, dan `loadCustomFolderInfos()` yang dipanggil di baris terakhir keduanya SUDAH
+didokumentasikan eksplisit oleh Batch 386 (komentar di atas deklarasi `_customFolders`,
+`PlayerViewModel.kt`) melakukan `DocumentFile.fromTreeUri(...).name` (round-trip Binder ke proses
+DocumentsProvider) + query `persistedUriPermissions` (IPC) **per folder custom** — dikutip
+langsung: "nyata, bukan sekadar map lookup". Batch 386 sendiri cuma membereskan pemborosan
+constructor (panggilan ganda yang hasilnya terbuang di cold-start); TIDAK pernah menyentuh 2
+panggilan yang tersisa ini, yang tetap berjalan di Main tiap kali user tambah/hapus folder custom
+— makin banyak folder custom yang sudah tersimpan, makin lama UI freeze tiap kali nambah/hapus 1
+folder baru (linear terhadap jumlah folder, bukan konstan).
+
+**Preseden kelas bug identik di proyek ini**: `setThemeIdentity`/`setThemeMode` (Batch 72) —
+komentarnya sendiri masih ada persis di atas kedua fungsi itu sekarang: *"leaving Main-thread I/O
+in a newly-added call path is a real bug on its own regardless"*. `addCustomFolder`/
+`removeCustomFolder` adalah instans lain dari kelas bug yang sama persis, belum ketahuan sampai
+batch ini karena belum pernah ada sektor audit yang secara sistematis membandingkan tiap fungsi
+publik `PlayerViewModel` terhadap pola `Dispatchers.IO`-nya.
+
+**Fix** (`PlayerViewModel.kt`, 1 file): seluruh body kedua fungsi dipindah ke dalam
+`viewModelScope.launch(Dispatchers.IO) { ... }` — **0 perubahan urutan logic, 0 perubahan pesan
+error, 0 perubahan signature publik** (keduanya tetap `fun` biasa bukan `suspend fun`, jadi 0
+call site di `MainActivity.kt`/`LibraryScreen.kt`/`FolderManagerSheet.kt` perlu disentuh — murni
+dispatcher swap internal). 1 penyesuaian teknis wajib: `return` polos di dalam blok
+`catch (e: SecurityException)` (`addCustomFolder`) diganti `return@launch` (non-local return dari
+lambda `launch{}` butuh label eksplisit, beda dari `return` biasa di badan fungsi langsung).
+Verifikasi thread-safety: `_customFolders`/`_actionErrorMessage` (`MutableStateFlow.value` setter
+atomic, aman di-set dari thread mana pun — pola sama seperti FloatArray `bars` di
+`AudioVisualizerController`) & `refreshLibrary()` (non-suspend, cuma `viewModelScope.launch{}` job
+baru — aman dipanggil dari coroutine manapun, sama seperti dipanggil dari Main). `CustomFolderStore
+.addFolder`/`removeFolder` dicek ulang: `SharedPreferences.edit().putStringSet(...).apply()` biasa
+(bukan `.commit()`), aman dari thread mana pun. Brace/paren balance `PlayerViewModel.kt` penuh
+(227/227, 868/868).
+
+**Belum pernah dijalankan compiler sungguhan** (lingkungan kerja sesi ini 0 Gradle/Android SDK,
+batasan yang sama seperti Batch 417) — verifikasi sungguhan lewat CI `testDebugUnitTest` +
+`assembleRelease` begitu di-push. **Belum diverifikasi visual/perilaku di device asli** — prioritas
+cek: tambah/hapus folder custom saat sudah ada beberapa folder tersimpan, pastikan UI tidak lagi
+"nge-freeze" sesaat & Snackbar error (folder gagal ditambah karena izin ditolak) tetap muncul benar
+dari thread background.
+
+**Scope**: 1 file kode (`PlayerViewModel.kt`). 2 file dokumentasi (`PROJECT_STATE.md`,
+`CHANGELOG.md` — ini). `README.md`/`FILE_MANIFEST.txt` TIDAK disentuh — 0 file baru, 0 perilaku
+user-facing berubah, cuma detail thread internal.
+
 ## Batch 417 — Sektor baru: Testing/unit-test coverage (instruksi user "optimize di sektor lain")
 User instruksi: *"lanjut optimize disektor lain!!"*. Dibaca sebagai pindah ke sektor kerja BEDA
 sepenuhnya dari Compose (yang eksplisit DITUTUP Batch 416, item 7 § "ATURAN SESI AKTIF" melarang
