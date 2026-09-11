@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 430 — Konfirmasi device: `AlbumArt` AsyncImage (Batch 429) render normal, 0 regresi
+User konfirmasi device fisik: render `AlbumArt` pasca-swap `SubcomposeAsyncImage` → `AsyncImage`
+(Batch 429) tampil normal, gambar tetap muncul di seluruh 7 titik pemakaian. 0 kode diubah batch
+ini — murni housekeeping dokumentasi, menutup item verifikasi terakhir yang tersisa dari Batch
+429. Sektor Compose optimization (`AlbumArt`) sekarang TUNTAS penuh (CI + device), 0 utang
+teknis residual.
+
 ## Batch 429 — Compose optimization: `AlbumArt` SubcomposeAsyncImage → AsyncImage
 Sektor dibuka eksplisit user (bukan generik) sesuai utang teknis tercatat `PROJECT_STATE.md`.
 **1 file diubah**: `ui/Utils.kt` (`AlbumArt` composable) — 7 call site (`MiniPlayerBar.kt`,

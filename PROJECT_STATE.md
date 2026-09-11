@@ -13,21 +13,17 @@ fix baru apa pun secara proaktif.
 **Catatan Batch 425–429**: user secara eksplisit reopen **satu kali khusus** untuk Coil migration
 (bump 2.6.0→3.x, 3 file + `build.gradle.kts`), lalu reopen KEDUA secara terpisah eksplisit untuk
 sektor Compose optimization (`AlbumArt`, Batch 429) — bukan pencabutan status permanen. Banner
-ini tetap berlaku penuh mulai sesi berikutnya. Versi final Coil: **3.3.0**. Status compile: Coil
-migration (Batch 425-428) HIJAU terverifikasi CI. `AlbumArt` AsyncImage swap (Batch 429) BELUM
-ada log CI terpisah. Detail teknis lengkap: `CHANGELOG.md` § Batch 425–429.
+ini tetap berlaku penuh mulai sesi berikutnya. Versi final Coil: **3.3.0**. Status: Coil migration
+(Batch 425-428) HIJAU terverifikasi CI. `AlbumArt` AsyncImage swap (Batch 429) — user konfirmasi
+device asli render NORMAL pasca-perubahan, 0 regresi visual. **Seluruh sektor Coil migration +
+Compose optimization (AlbumArt) SEKARANG tuntas & terverifikasi penuh (CI + device).** Detail
+teknis lengkap: `CHANGELOG.md` § Batch 425–429.
 
 **Item belum-terverifikasi saat penutupan** (device fisik tidak pernah tersedia di sesi kerja):
 - `docs/archive/MANUAL_QA_CHECKLIST.md` — 0/19 item tercentang (audio focus, Bluetooth, lock-screen,
   headset kabel, process death, background playback jangka panjang).
 - Overscroll bounce (`IosScrollPhysics.kt`, `Spring.DampingRatioNoBouncy`) belum dikonfirmasi
   device asli.
-- **Batch 425–429 (Coil 3.3.0 final + AlbumArt AsyncImage)** — artwork on-screen di 7 titik
-  pemakaian `AlbumArt` (MiniPlayerBar, LibraryScreen x2, HomeScreen x2, NowPlayingScreen x2)
-  belum dikonfirmasi tampil normal di device asli — baik kasus artwork ada, gagal, maupun
-  `artworkUri == null`. CI compile Kotlin Coil sendiri (Batch 425-428) SUDAH hijau, tapi Batch 429
-  (`AsyncImage` swap) BELUM ada log CI terpisah. Pola "compiler tidak tersedia di sesi kerja,
-  device fisik tidak tersedia untuk verifikasi visual" TETAP risiko struktural aktif.
 - `docs/archive/ROADMAP_LIQUID_GLASS_REDESIGN.md` & fling behavior 14/14 layar — **sudah final CLOSED**,
   bukan item terbuka.
 
@@ -53,10 +49,9 @@ ada log CI terpisah. Detail teknis lengkap: `CHANGELOG.md` § Batch 425–429.
      device user Android 16 (edge-to-edge/predictive back terverifikasi device asli). 0 item
      residual kecuali user eksplisit minta bump API 37 (blocked di migrasi AGP 9.x) atau ada
      temuan baru.
-   - **Compose optimization (`AlbumArt`)** — SUDAH dieksekusi Batch 429 (`SubcomposeAsyncImage`
-     → `AsyncImage`), TAPI verifikasi visual device fisik masih 0 (0 compiler/device sesi kerja).
-     Ditutup lagi untuk item BARU di sektor ini, tapi item spesifik "verifikasi render 7 titik
-     pemakaian" tetap tercatat sebagai belum-terverifikasi (lihat bawah), bukan tuntas.
+   - **Compose optimization (`AlbumArt`)** — TUNTAS Batch 429 (`SubcomposeAsyncImage` →
+     `AsyncImage`), device asli konfirmasi render normal 0 regresi. 0 utang teknis residual di
+     sektor ini.
 
 ## Keputusan arsitektur utama
 Ringkasan penuh + alasan: README.md § "Keputusan Arsitektur". Poin paling kritis:
