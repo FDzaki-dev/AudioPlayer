@@ -9,6 +9,31 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 438**: permintaan eksplisit user — lampiran `drag_drop_glass_ios_kotlin.md` +
+screenshot bottom nav, "hasil sebelumnya (Batch 437, efek kaca PEMBESAR di label) mengecewakan,
+adaptasi 100% berdasarkan panduan". Perluasan langsung dari sektor nav bawah yang sama (Batch
+301/435/437), bukan reopen sektor DITUTUP manapun.
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` — composable baru
+`GlassTabIcon(icon, selected, interactionSource)` jadi pill indicator translucent (tint 16%
+alpha + border 14% alpha, `RoundedCornerShape(percent = 50)`, animasi cross-fade `tween(220)`
+mengikuti `selected`) menggantikan indicator flat default M3 di belakang ikon 3 tab bawah,
+plus `bouncyPress()` (konvensi tekan-tactile existing) untuk scale-down halus saat ditekan.
+Detail penuh + rasionalisasi kenapa 2 elemen panduan asli (reorder drag-to-swap tab, dan
+`Modifier.blur(20.dp)` literal di container) SENGAJA tidak dipakai 1:1 — bukan penolakan,
+adaptasi ke arsitektur riil (route nav permanen + blur asli Haze sudah dimatikan permanen Batch
+329 + `frostedGlass()` existing didesain utk panel besar bukan pill sekecil ini): `CHANGELOG.md`
+§ Batch 438. `isSkeuTheme()` dikecualikan (aturan "solid, bukan kaca" Batch 58/61/79, app-wide).
+Catatan desain lama Batch 53 ("§15 jangan jadikan item nav jadi glowing glass capsule") SECARA
+EKSPLISIT disupersede oleh instruksi user batch ini utk 5 identitas non-Skeu — kaskade
+DESCENDING TRUTH: instruksi eksplisit baru > catatan/spec lama, dicatat di sini + README.md
+(bukan dihapus diam-diam dari histori). `MagnifyingTabLabel`/`tabMagnifyFocus` (Batch 437) TIDAK
+dihapus — 2 efek (kaca ikon + pembesar label) jalan berdampingan.
+
+**0 diverifikasi CI/device Batch 438** — review manual (baca kode + cek balance brace/paren:
+`{}` 293/293, `()` 792/792, `[]` 3/3), tidak ada env Android nyata/device fisik/compiler Kotlin
+di sesi ini. Item belum-terverifikasi bertambah 1 (lihat daftar di bawah).
+
 **Catatan Batch 437**: permintaan FITUR BARU eksplisit user (lampiran screenshot bottom nav) —
 efek "kaca pembesar ala iOS" di LABEL 3 tab bawah (Beranda/Perpustakaan/Pengaturan), bereaksi
 tergantung "kaca diarahkan kesitu/bukan". Bukan reopen sektor DITUTUP manapun — perluasan
@@ -222,6 +247,11 @@ murni review manual (baca kode + cross-reference pola batch sebelumnya + cek bal
 brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
 
 **Item belum-terverifikasi saat penutupan** (device fisik tidak pernah tersedia di sesi kerja):
+- `MainActivity.kt` pill indicator glass ikon tab bawah (Batch 438, di atas) — 0 compile log, 0
+  konfirmasi device. Perlu ditest: transisi cross-fade pill saat pindah tab (halus, bukan
+  patah), kontras pill translucent tetap terbaca di 5 identitas non-Skeu (Apple/Tactile/Liquid
+  Glass/Aurora/Calm Retro) x mode terang/gelap, scale-down `bouncyPress` saat tap terasa wajar
+  (bukan berlebihan), dan pill Skeu tetap solid 100% (0 kebocoran efek glass ke identitas ini).
 - `MainActivity.kt` efek kaca-pembesar label tab bawah (Batch 437, di atas) — 0 compile log, 0
   konfirmasi device. Perlu ditest: drag pelan (fokus label bergeser mulus tab-ke-tab, bukan
   patah-patah), drag cepat lalu lepas sebelum threshold (springback fokus kembali ke tab asal

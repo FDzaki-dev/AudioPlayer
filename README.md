@@ -11,6 +11,8 @@
 >   dikonfirmasi user di device asli.
 > - Efek kaca pembesar label tab bawah (Batch 437) belum dikonfirmasi user di device asli —
 >   khususnya kemulusan transisi fokus saat drag & 0 frame-drop tambahan.
+> - Pill indicator glassmorphism ikon tab bawah (Batch 438) belum dikonfirmasi user di device asli
+>   — khususnya kontras/keterbacaan di tiap identitas tema x mode terang/gelap.
 > - Flow "Cek Update" (`update/UpdateManager.kt`, Batch 432) belum ditest ulang di device asli
 >   setelah migrasi Thread→Coroutines.
 
@@ -104,6 +106,7 @@ permukaan kaca lainnya.
 - **Navigasi gesture back**: gesture back sistem sekarang navigasi bertahap sesuai stack (Now Playing → Perpustakaan/Beranda), bukan langsung keluar aplikasi
 - **Swipe lintas 3 tab** (Batch 435): geser horizontal di konten Beranda/Perpustakaan/Pengaturan untuk pindah tab — alih-alih harus tap ikon navigasi bawah/rail satu-satu. Berlaku di layout ponsel (NavigationBar bawah) maupun tablet/lipat (NavigationRail samping). Tidak aktif di layar Now Playing/Dashboard Statistik (supaya tidak rebutan dengan swipe next/prev lagu di piringan album)
 - **Efek kaca pembesar pada label tab bawah** (Batch 437): selama swipe di atas berlangsung, label Beranda/Perpustakaan/Pengaturan di NavigationBar bawah (layout ponsel) ikut bereaksi kontinu mengikuti arah jari — label tab yang sedang "disorot" tampak sedikit lebih besar & tajam, label lainnya mengecil dan buram sebagian, mirip lensa pembesar ala iOS yang bergeser dari satu label ke label sebelah selagi jari masih menekan. Belum berlaku di NavigationRail tablet/lipat (di luar scope permintaan)
+- **Pill indicator glassmorphism ala iOS pada ikon tab bawah** (Batch 438): pill di belakang ikon tab yang aktif (Beranda/Perpustakaan/Pengaturan) kini translucent dengan rim tipis (bukan warna flat solid bawaan), menyala/meredup halus saat pindah tab, plus animasi tekan (scale-down halus) tiap tab disentuh — mengikuti panduan glassmorphism iOS yang diberikan user, diadaptasi ke arsitektur nav app ini (bukan blur asli — blur asli/Haze sudah dimatikan permanen sejak Batch 329 karena stutter musik di device asli). Khusus identitas tema **Skeu** (identitasnya sendiri "solid, bukan kaca") pill tetap solid seperti sebelumnya, tidak ikut efek ini. Berjalan berdampingan dengan efek kaca-pembesar label (Batch 437) di atas, sama-sama hanya di NavigationBar bawah (ponsel), belum di NavigationRail tablet/lipat
 - **Now Playing lebih atmosferik**: backdrop blur dari album art (seperti Spotify/Apple Music) di belakang piringan hitam yang berputar, dipadu warna aksen dinamis per lagu
 - **Micro-interaction**: tombol play/pause, shuffle, repeat, favorit, dan navigasi lagu kini punya animasi "bounce" halus tiap ditekan — bukan cuma ganti ikon instan
 - **Status bar & navigation bar** ikut mode terang/gelap tema aktif (ikon gelap di tema terang, ikon terang di tema gelap/Tactile) — bukan dipaksa satu arah

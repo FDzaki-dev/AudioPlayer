@@ -1,5 +1,76 @@
 # Changelog
 
+## Batch 438 — Glassmorphism iOS pada indicator pill 3 tab bawah (adaptasi panduan user)
+User melampirkan `drag_drop_glass_ios_kotlin.md` + screenshot bottom nav, dengan pesan: "hasil
+sebelumnya (Batch 437, efek kaca pembesar di LABEL) cukup mengecewakan ... adaptasi 100%
+berdasarkan panduan yang saya lampirkan". Panduan yang dilampirkan adalah demo generik (bukan
+app ini): tab bar custom 3-item draggable-reorder dengan `Modifier.blur(20.dp)` di container.
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. Composable baru `GlassTabIcon(icon, selected, interactionSource)` — pill indicator translucent
+   (`background(primary.copy(alpha = 0.16f * glassAlpha))` + `border(1.dp, White.copy(alpha =
+   0.14f * glassAlpha))`, `RoundedCornerShape(percent = 50)`) menggantikan indicator flat default
+   M3 di belakang ikon Beranda/Perpustakaan/Pengaturan (`indicatorColor` M3 dimatikan jadi
+   `Color.Transparent` lewat `NavigationBarItemDefaults.colors(...)` di titik pemakaian, supaya
+   composable baru ini jadi satu-satunya penggambar indicator — 0 dobel-render). `glassAlpha`
+   (`animateFloatAsState`, `tween(220)`) cross-fade kontinu 0f↔1f mengikuti `selected`, bukan snap
+   ON/OFF. `bouncyPress(interactionSource, pressedScale = 0.9f)` (`Utils.kt`, konvensi tekan-
+   tactile yang sudah dipakai `LockScreen.kt`/`MiniPlayerBar.kt`) dipasang di pill yang sama untuk
+   scale-down halus saat tab ditekan — 1 `MutableInteractionSource` baru per tab, dibagi ke
+   `NavigationBarItem` (`interactionSource = ...`) dan `GlassTabIcon` sekaligus, pola identik
+   `PinKey`/`RoundGlyphButton` (`LockScreen.kt`).
+
+   **2 bagian panduan TIDAK dipakai literal** — bukan penolakan, adaptasi ke arsitektur riil app
+   ini (0 solusi "asal jadi" generik):
+   - **Reorder drag-to-swap tab**: 3 tab ini adalah route top-level Navigation Compose permanen
+     (`home`/`library`/`settings`) yang dipakai state-restoration (Batch 301), gesture swipe-lintas-
+     tab (Batch 435), dan `NavigationRailItem` tablet — reorder akan memutus pasangan tetap
+     ikon↔rute (mis. ikon Settings bisa berpindah ke slot yang secara semantik berarti Home),
+     breaking change jauh di luar scope "efek visual kaca" yang diminta (pola penolakan identik
+     dengan penolakan swap-ke-`HorizontalPager` di Batch 435). Elemen "scale saat berinteraksi"
+     dari drag guide (1.08x saat hold) diadaptasi jadi scale-down saat tap (`bouncyPress`, 0.9x) —
+     gesture tap tetap 100% dipegang `NavigationBarItem` sendiri, 0 `pointerInput`/
+     `detectDragGesturesAfterLongPress` kustom baru dipasang (kalau dipasang akan bersaing gesture
+     langsung dengan klik pindah-tab, risiko regresi tap-navigate).
+   - **`Modifier.blur(20.dp)` di container**: ini persis anti-pattern yang sudah didokumentasikan
+     proyek ini sendiri di `BlurUtils.kt` — `Modifier.blur()` mengaburkan konten composable itu
+     SENDIRI (bukan piksel di belakangnya), sehingga ikon/teks di dalam container ikut buram,
+     kebalikan dari kaca yang mestinya bikin BACKDROP buram sementara ikon di atasnya tetap tajam.
+     Blur asli (Haze `hazeEffect`/`hazeSource`) sendiri sudah **dimatikan permanen app-wide sejak
+     Batch 329** (keputusan eksplisit user setelah laporan device asli: musik stuttering saat
+     `MiniPlayerBar` + sheet "Kontrol Lanjutan" resample tiap frame) — tidak diaktifkan ulang batch
+     ini. Diadaptasi jadi translucent-tint + border tipis (teknik sama seperti `frostedGlass()`),
+     TIDAK memanggil `frostedGlass()` langsung karena shape (`MaterialTheme.shapes.large`) dan
+     alpha (0.92/0.96) fungsi itu disetel khusus untuk panel besar (card/sheet/mini player) yang
+     harus tetap terbaca TANPA blur asli di belakangnya — bukan untuk pill nav sekecil ini. Dibuat
+     versi lokal skala-pill di `MainActivity.kt` sendiri: 0 perubahan ke `BlurUtils.kt` maupun
+     12+ call site `frostedGlass()` lain di app ini.
+
+   **Pengecualian identitas tema**: `isSkeuTheme()` dikecualikan dari efek glass ini — identitas
+   Skeu punya aturan tegas sejak Batch 58/61/79 ("panel solid, bukan lapisan kaca, 0 garis tepi
+   apa pun") yang berlaku app-wide, bukan spesifik ke komponen ini; pill Skeu tetap solid
+   (`secondaryContainer`, direplikasi manual di `GlassTabIcon` karena `indicatorColor` M3 sudah
+   dimatikan/transparan untuk semua identitas di titik pemakaian). Untuk 5 identitas lain (Apple/
+   Tactile/Liquid Glass/Aurora/Calm Retro): catatan desain lama Batch 53 ("§15 — jangan jadikan
+   item navigasi jadi glowing glass capsule") secara eksplisit **disupersede** oleh instruksi user
+   batch ini (instruksi eksplisit baru mengalahkan catatan/spec lama, bukan dihapus diam-diam —
+   didokumentasikan di sini + `PROJECT_STATE.md`/`README.md`).
+
+   0 breaking change: `selected`/`onClick`/route logic (Batch 301/435) tidak disentuh. Warna
+   ikon selected/unselected TETAP 100% dari `LocalContentColor` bawaan M3 (hanya `indicatorColor`
+   yang di-override jadi transparan, warna konten tidak disentuh) — garansi yang sama persis yang
+   sudah dijaga Batch 437 untuk label. `MagnifyingTabLabel`/`tabMagnifyFocus` (Batch 437) TIDAK
+   dihapus/diubah — 2 efek ("kaca" di ikon, "pembesar" di label) berjalan berdampingan, sesuai
+   scope permintaan user (tambahan, bukan pergantian eksplisit atas Batch 437). Scope SENGAJA
+   dibatasi ke `NavigationBar` bawah (layout ponsel COMPACT) saja, sama seperti Batch 437 —
+   `NavigationRailItem` (tablet/foldable) TIDAK ikut diubah, di luar scope screenshot user, 0
+   side-quest.
+
+**0 diverifikasi CI/device Batch 438** — review manual (baca kode + cek balance brace/paren:
+`{}` 293/293, `()` 792/792, `[]` 3/3), tidak ada env Android nyata/device fisik/compiler Kotlin
+di sesi ini (lingkungan kerja sesi ini juga tidak ada akses jaringan untuk Gradle sync).
+
 ## Batch 437 — Fitur baru: efek "kaca pembesar" iOS pada label 3 tab bawah (Beranda/Perpustakaan/Pengaturan)
 User minta fitur baru (lampiran screenshot bottom nav): "fitur drag horizontal antar tab sudah
 jadi, sekarang itu juga berlaku untuk label tab — macam frosted glass iPhone, kaca pembesar,

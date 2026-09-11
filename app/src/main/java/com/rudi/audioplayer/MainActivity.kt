@@ -45,6 +45,10 @@ import androidx.compose.material3.NavigationRailItem
 import com.rudi.audioplayer.ui.adaptive.AppWidthClass
 import com.rudi.audioplayer.ui.adaptive.rememberAppWidthClass
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.GraphicEq
@@ -59,6 +63,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
@@ -83,6 +88,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
@@ -110,6 +116,8 @@ import com.rudi.audioplayer.ui.StatsDashboardScreen
 import com.rudi.audioplayer.ui.MiniPlayerBar
 import com.rudi.audioplayer.ui.NowPlayingScreen
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
+import com.rudi.audioplayer.ui.theme.isSkeuTheme
+import com.rudi.audioplayer.ui.bouncyPress
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.AudioPlayerTheme
 import com.rudi.audioplayer.ui.theme.resolveIsDark
@@ -602,6 +610,78 @@ private fun MagnifyingTabLabel(text: String, focus: Float) {
     )
 }
 
+// Batch 438 — request eksplisit user: lampiran `drag_drop_glass_ios_kotlin.md` + screenshot
+// bottom nav, "hasil sebelumnya (Batch 437, efek kaca PEMBESAR di LABEL) mengecewakan ...
+// adaptasi 100% berdasarkan panduan". Panduan asli = demo generik (bukan app ini): 3 tab
+// custom draggable-reorder + `Modifier.blur(20.dp)` di container. 2 bagian TIDAK dipakai
+// literal — bukan penolakan, adaptasi ke arsitektur riil (SOP §HIGH-RISK ADAPTABILITY):
+//   1. Reorder drag-to-swap: 3 tab ini route top-level Nav Compose permanen
+//      (home/library/settings — dipakai state-restoration Batch 301, gesture-swipe Batch 435,
+//      NavigationRailItem tablet). Reorder mengubah pasangan ikon<->rute jadi tidak tetap,
+//      breaking change jauh di luar scope "efek visual kaca" yang diminta (pola penolakan sama
+//      persis swap-ke-HorizontalPager Batch 435). Interaksi drag guide diadaptasi jadi tap
+//      press-scale saja (lihat `bouncyPress` di bawah) — gesture tap tetap 100% dipegang
+//      `NavigationBarItem` sendiri, 0 `pointerInput` kustom baru (kalau dipasang akan bersaing
+//      gesture dgn klik pindah tab = risiko regresi persis yg diperingatkan SOP §HIGH-RISK).
+//   2. `Modifier.blur(20.dp)` di container: PERSIS anti-pattern yang didokumentasikan sendiri
+//      oleh proyek ini di `BlurUtils.kt` (blur() mengaburkan KONTEN sendiri, ikon/teks di
+//      dalamnya ikut buram — bukan "kaca" yg dimaksud), DAN blur asli (Haze/`hazeEffect`) sudah
+//      DIMATIKAN PERMANEN app-wide (Batch 329, root cause: stutter musik device asli — keputusan
+//      eksplisit user, tidak diaktifkan ulang batch ini). Diadaptasi jadi translucent-tint +
+//      border tipis (teknik sama `frostedGlass()`), TIDAK memanggil `frostedGlass()` langsung
+//      karena shape-nya (`MaterialTheme.shapes.large`) + alpha-nya (0.92/0.96, disetel utk panel
+//      besar/card/sheet supaya tetap kebaca TANPA blur asli di belakangnya) didesain utk panel
+//      besar, bukan pill nav sekecil ini — dipakai versi lokal skala-pill di sini (0 perubahan
+//      ke `BlurUtils.kt`/12+ call site lain, sesuai batas 3 file/tugas).
+// Elemen guide yang DIPAKAI: translucent overlay tipis + border rim tipis (glass rim) + scale
+// saat berinteraksi (guide: 1.08 saat drag-hold; di sini: `bouncyPress` 0.9 saat tap-press,
+// konvensi tekan-tactile yg SUDAH dipakai LockScreen/MiniPlayerBar/dst — bukan sistem baru).
+// `isSkeuTheme()` DIKECUALIKAN dari efek glass ini — identitas ini punya aturan tegas sejak
+// Batch 58/61/79 "panel solid, bukan lapisan kaca, 0 garis tepi apa pun", berlaku app-wide (0
+// spesifik ke nav) — pill Skeu tetap solid (indicator M3 default look, direplikasi manual krn
+// `indicatorColor` M3 dimatikan/transparent di titik pemakaian, lihat `AppNavHost`).
+// Utk 5 identitas lain: catatan lama Batch 53 "§15 jangan jadikan nav item glowing glass
+// capsule" DISUPERSEDE eksplisit oleh instruksi user batch ini (kaskade DESCENDING TRUTH SOP:
+// instruksi eksplisit baru > catatan/spec lama) — didokumentasikan di PROJECT_STATE.md/README.md,
+// bukan dihapus diam-diam.
+@Composable
+private fun GlassTabIcon(icon: ImageVector, selected: Boolean, interactionSource: MutableInteractionSource) {
+    val isSkeu = isSkeuTheme()
+    // Cross-fade kontinu (bukan snap ON/OFF) — pill kaca menyala/meredup halus mengikuti
+    // transisi selected, pola animasi sama (tween) yang sudah dipakai transisi NavHost (Batch
+    // 330, 200/150ms) supaya "rasa" transisi tetap konsisten satu app.
+    val glassAlpha by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(220),
+        label = "GlassTabIndicatorAlpha"
+    )
+    val pillShape = RoundedCornerShape(percent = 50)
+    val tint = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = Modifier
+            .height(32.dp)
+            .widthIn(min = 56.dp)
+            .then(
+                if (isSkeu) {
+                    // Skeu: 0 kaca, replikasi manual solid pill M3 default (indicatorColor
+                    // dimatikan/transparent di titik pemakaian supaya 1 composable ini jadi
+                    // SATU-SATUNYA penggambar indicator, konsisten lintas identitas).
+                    if (selected) Modifier.background(MaterialTheme.colorScheme.secondaryContainer, pillShape)
+                    else Modifier
+                } else {
+                    Modifier
+                        .background(tint.copy(alpha = 0.16f * glassAlpha), pillShape)
+                        .border(1.dp, Color.White.copy(alpha = 0.14f * glassAlpha), pillShape)
+                }
+            )
+            .bouncyPress(interactionSource, pressedScale = 0.9f)
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null)
+    }
+}
+
 @Composable
 private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boolean) {
     val navController = rememberNavController()
@@ -1047,6 +1127,12 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         ThemeIdentity.SKEU_DARK_LITE -> SkeuHighlight
                         else -> null
                     }
+                    // Batch 438 — 1 interactionSource per tab, dibagi ke NavigationBarItem (klik)
+                    // dan GlassTabIcon (bouncyPress) supaya keduanya sepakat kapan "pressed" true,
+                    // pola identik `PinKey`/`RoundGlyphButton` (LockScreen.kt).
+                    val homeTabInteraction = remember { MutableInteractionSource() }
+                    val libraryTabInteraction = remember { MutableInteractionSource() }
+                    val settingsTabInteraction = remember { MutableInteractionSource() }
                     NavigationBar(
                         modifier = if (navCatchLightColor != null)
                             Modifier.drawBehind {
@@ -1095,8 +1181,16 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     restoreState = true
                                 }
                             },
-                            icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                            label = { MagnifyingTabLabel("Beranda", tabMagnifyFocus(0)) }
+                            icon = {
+                                GlassTabIcon(
+                                    icon = Icons.Default.Home,
+                                    selected = currentRoute == "home",
+                                    interactionSource = homeTabInteraction
+                                )
+                            },
+                            label = { MagnifyingTabLabel("Beranda", tabMagnifyFocus(0)) },
+                            interactionSource = homeTabInteraction,
+                            colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
                         )
                         NavigationBarItem(
                             selected = currentRoute == "library",
@@ -1108,8 +1202,16 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     restoreState = true
                                 }
                             },
-                            icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
-                            label = { MagnifyingTabLabel("Perpustakaan", tabMagnifyFocus(1)) }
+                            icon = {
+                                GlassTabIcon(
+                                    icon = Icons.Default.LibraryMusic,
+                                    selected = currentRoute == "library",
+                                    interactionSource = libraryTabInteraction
+                                )
+                            },
+                            label = { MagnifyingTabLabel("Perpustakaan", tabMagnifyFocus(1)) },
+                            interactionSource = libraryTabInteraction,
+                            colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
                         )
                         NavigationBarItem(
                             selected = currentRoute == "settings",
@@ -1121,8 +1223,16 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     restoreState = true
                                 }
                             },
-                            icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                            label = { MagnifyingTabLabel("Pengaturan", tabMagnifyFocus(2)) }
+                            icon = {
+                                GlassTabIcon(
+                                    icon = Icons.Default.Settings,
+                                    selected = currentRoute == "settings",
+                                    interactionSource = settingsTabInteraction
+                                )
+                            },
+                            label = { MagnifyingTabLabel("Pengaturan", tabMagnifyFocus(2)) },
+                            interactionSource = settingsTabInteraction,
+                            colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
                         )
                     }
                 }
