@@ -26,6 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.util.ApkSignatureChecker
 import com.rudi.audioplayer.util.ApkSignatureResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Lets the user pick two APK files (e.g. the currently-installed build and a freshly
@@ -42,12 +45,31 @@ fun SignatureMatcherSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit
     var oldResult by remember { mutableStateOf<ApkSignatureResult?>(null) }
     var newResult by remember { mutableStateOf<ApkSignatureResult?>(null) }
     var showLogDialog by remember { mutableStateOf(false) }
+    // Batch 421 — Thread Safety (lanjutan sektor Batch 418-420): `ApkSignatureChecker.inspect()`
+    // sinkron total (`openInputStream`+`copyTo` menyalin SELURUH APK ke cacheDir, lalu
+    // `getPackageArchiveInfo`+SHA-256 digest) + `displayNameFor()` (`ContentResolver.query` Binder
+    // IPC) sebelumnya — keduanya dipanggil LANGSUNG dari callback `rememberLauncherForActivityResult`
+    // (Main thread), 0 coroutine wrapper. APK bisa puluhan MB — kandidat freeze UI PALING parah
+    // di sektor ini sejauh ini (dibanding file JSON kecil di BackupManager, Batch 420). Fix sama
+    // pola: `rememberCoroutineScope()` (bukan ViewModel) + `Dispatchers.IO`, switch balik
+    // `Dispatchers.Main` cuma untuk assignment state.
+    val scope = rememberCoroutineScope()
 
     val oldPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) oldResult = ApkSignatureChecker.inspect(context, uri, displayNameFor(context, uri))
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                val result = ApkSignatureChecker.inspect(context, uri, displayNameFor(context, uri))
+                withContext(Dispatchers.Main) { oldResult = result }
+            }
+        }
     }
     val newPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) newResult = ApkSignatureChecker.inspect(context, uri, displayNameFor(context, uri))
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                val result = ApkSignatureChecker.inspect(context, uri, displayNameFor(context, uri))
+                withContext(Dispatchers.Main) { newResult = result }
+            }
+        }
     }
 
     val matchState: MatchState? = remember(oldResult, newResult) {

@@ -1,5 +1,65 @@
 # Changelog
 
+## Batch 421 — Thread Safety: SignatureMatcherSheet.kt, ApkSignatureChecker.inspect() Main-thread I/O
+User instruksi: *"next"* (generik, tanpa ZIP baru — upload terakhir tetap `AudioPlayer_v419.zip`,
+lanjut dari state kerja Batch 420). **Status DISCONTINUED tetap permanen tidak diubah** (final
+lock Batch 410).
+
+**Lanjutan sektor Thread Safety** (Batch 418-420). Audit dilanjutkan app-wide: grep seluruh `ui/`
+untuk pola I/O nyata (`openInputStream`/`openOutputStream`/`contentResolver.query`/`insert`/
+`delete`/`DocumentFile`/`readText()`/`FileOutputStream`/`FileInputStream`) — 2 hasil: 1 di
+`BackupRestoreSheet.kt` (sudah fix Batch 420, muncul di grep krn komentar batch itu sendiri
+menyebut nama fungsinya) dan 1 BARU: `SignatureMatcherSheet.kt` baris 240,
+`context.contentResolver.query(...)` di dalam `displayNameFor()`.
+
+**Root cause — kandidat PALING parah sejauh ini di sektor ini**: `oldPicker`/`newPicker`
+(`rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument())`, hasil pemilihan
+file APK via SAF) memanggil `ApkSignatureChecker.inspect(context, uri, displayNameFor(context,
+uri))` LANGSUNG di callback Main thread, 0 coroutine sama sekali. `inspect()` sendiri
+(`util/ApkSignatureChecker.kt`) genuinely berat: `contentResolver.openInputStream(apkUri)` lalu
+`input.copyTo(output)` MENYALIN SELURUH ISI FILE APK ke `cacheDir` (APK bisa puluhan MB — beda
+kelas dari JSON backup kecil di Batch 420), lalu `PackageManager.getPackageArchiveInfo()` (parse
+archive) + `MessageDigest.getInstance("SHA-256").digest(...)` (hash penuh, CPU-bound), plus
+`displayNameFor()` sendiri: `ContentResolver.query()` Binder IPC dipanggil DUA KALI (sekali per
+picker) sebelum `inspect()`. Kelas bug identik preseden `loadCustomFolderInfos()` (Batch 418/419)
+& `BackupManager` (Batch 420) — tidak pernah ketahuan sebelumnya karena bukan bagian
+`PlayerViewModel.kt` maupun `BackupRestoreSheet.kt`.
+
+**Fix** (`SignatureMatcherSheet.kt`, 1 file — `ApkSignatureChecker.kt`/`displayNameFor()` sendiri
+TIDAK disentuh, tetap fungsi sinkron biasa, pola sama persis Batch 420 "polos di sisi callee,
+wrap di sisi caller"): `rememberCoroutineScope()` (composable ini bukan ViewModel), kedua callback
+`oldPicker`/`newPicker` dibungkus `scope.launch(Dispatchers.IO) { ... }`, assignment
+`oldResult`/`newResult` dipindah ke `withContext(Dispatchers.Main) { ... }` setelah `inspect()`
+selesai. **0 perubahan urutan logic** (`displayNameFor()` tetap dipanggil sebelum `inspect()`,
+sama seperti sebelumnya, cuma sekarang keduanya di dalam blok IO yang sama) — **0 perubahan
+signature publik**, `matchState` (`remember(oldResult, newResult) { ... }`) otomatis re-derive
+begitu kedua state ini berubah, tidak perlu disentuh.
+
+**Verifikasi**: grep ulang pola I/O app-wide (daftar sama seperti di atas) — confirmed 0 sisa
+call site yang belum ter-dispatch di seluruh `ui/`. Brace/paren balance `SignatureMatcherSheet.kt`
+naik dari 52/52 & 126/126 (SEBELUM, dikonfirmasi dari ZIP asli — sudah seimbang, TIDAK ada gap
+pre-existing seperti kasus Batch 420) jadi 58/58 & 140/140 SETELAH — kedua sisi tetap seimbang
+persis, +6/+6 brace (2 call site × [`if{}` baru + `launch{}` + `withContext{}`] = 3 pair/site),
++14/+14 paren (2 call site × 2 pasang baru `launch(...)`/`withContext(...)` + sisa dari komentar
+batch ini).
+
+**Belum pernah dijalankan compiler sungguhan / device asli** (batasan sama seperti batch-batch
+sebelumnya). **Prioritas cek device**: pilih file APK besar (puluhan MB) di kedua picker, pastikan
+UI tidak freeze — ini kasus paling terasa dari seluruh sektor Thread Safety karena ukuran file
+jauh lebih besar dari file JSON backup (Batch 420) atau operasi per-folder (Batch 418/419).
+
+**Sektor Thread Safety kini mencakup 3 file** (`PlayerViewModel.kt` sejak Batch 419,
+`BackupRestoreSheet.kt` Batch 420, `SignatureMatcherSheet.kt` batch ini) — grep app-wide pola I/O
+literal (`openInputStream` dkk.) sekarang 0 sisa di `ui/`, TAPI ini bukan bukti sektor tuntas
+total: audit baru mencakup pola I/O *literal* yang di-grep, belum mencakup kemungkinan lain (mis.
+pemanggilan fungsi Binder-heavy tanpa nama API yang eksplisit ter-grep, atau computation berat
+non-I/O). `DuplicateFinderSheet.kt` `remember` CPU-heavy tetap dicatat TIDAK dieksekusi (beda
+kelas — Compose/performance, sektor itu DITUTUP Batch 416).
+
+**Scope**: 1 file kode (`SignatureMatcherSheet.kt`). 2 file dokumentasi (`PROJECT_STATE.md`,
+`CHANGELOG.md` — ini). `README.md`/`FILE_MANIFEST.txt` tidak disentuh (0 file baru, 0 perilaku
+user-facing berubah, 0 dependency baru).
+
 ## Batch 420 — Thread Safety: BackupRestoreSheet.kt, 3 call site BackupManager Main-thread I/O
 User instruksi: *"next"* (generik, tanpa ZIP baru dari user — upload sesi ini `AudioPlayer_v419.zip`,
 hasil Batch 419 sendiri). **Status DISCONTINUED tetap permanen tidak diubah** (final lock Batch 410).

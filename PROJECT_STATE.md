@@ -117,6 +117,34 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 421 (Thread Safety: `SignatureMatcherSheet.kt`, `ApkSignatureChecker.inspect()`
+Main-thread I/O, 1 file kode + 2 dokumentasi)** — User: *"next"*. **Status DISCONTINUED tetap
+permanen** (final lock Batch 410). Tidak ada ZIP baru (upload terakhir tetap
+`AudioPlayer_v419.zip`, lanjut dari state kerja Batch 420).
+
+Lanjutan sektor Thread Safety, grep app-wide pola I/O literal (`openInputStream`/
+`contentResolver.query` dkk.) di `ui/` — ketemu `SignatureMatcherSheet.kt`:
+`oldPicker`/`newPicker` (hasil SAF `OpenDocument`) panggil `ApkSignatureChecker.inspect()`
+LANGSUNG dari callback Main thread, 0 coroutine. `inspect()` menyalin SELURUH file APK
+(`openInputStream`+`copyTo`, bisa puluhan MB) ke cacheDir + parse archive + hash SHA-256, plus
+`displayNameFor()` (`ContentResolver.query` Binder IPC) sebelumnya — **kandidat freeze UI PALING
+parah di sektor ini sejauh ini** (lebih besar dari JSON backup Batch 420). Fix: pola sama persis
+Batch 420 — `rememberCoroutineScope()` + `scope.launch(Dispatchers.IO) { ...
+withContext(Dispatchers.Main) { assignment state } }` di kedua callback picker.
+`ApkSignatureChecker.kt` sendiri TIDAK disentuh (tetap sinkron). 0 perubahan urutan logic, 0
+perubahan signature publik. Brace/paren balance naik 52/52→58/58, 126/126→140/140 (file ini SUDAH
+seimbang dari awal, 0 gap pre-existing — beda dari kasus Batch 420). Belum pernah dijalankan
+compiler sungguhan/device asli. Detail lengkap `CHANGELOG.md` Batch 421.
+
+**Sektor Thread Safety**: 3 file TUNTAS untuk kelas masing-masing (`PlayerViewModel.kt` Batch 419,
+`BackupRestoreSheet.kt` Batch 420, `SignatureMatcherSheet.kt` batch ini). Grep pola I/O literal
+app-wide di `ui/` sekarang 0 sisa — TAPI ini bukan bukti sektor tuntas total (baru mencakup pola
+yang di-grep eksplisit). `DuplicateFinderSheet.kt` `remember` CPU-heavy tetap dicatat, TIDAK
+dieksekusi (beda kelas — sektor Compose sudah DITUTUP Batch 416).
+
+**Scope**: 1 file kode (`SignatureMatcherSheet.kt`). 2 file dokumentasi (`PROJECT_STATE.md`,
+`CHANGELOG.md`). `README.md`/`FILE_MANIFEST.txt` tidak disentuh.
+
 **Batch 420 (Thread Safety: `BackupRestoreSheet.kt`, 3 call site `BackupManager` Main-thread I/O,
 1 file kode + 2 dokumentasi)** — User: *"next"*. **Status DISCONTINUED tetap permanen** (final
 lock Batch 410). Tidak ada ZIP baru dari user (upload sesi ini `AudioPlayer_v419.zip`, itu hasil
