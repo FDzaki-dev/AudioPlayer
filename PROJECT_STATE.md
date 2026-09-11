@@ -5,108 +5,49 @@ menyentuh kode apa pun. Detail lengkap tiap batch ada di `CHANGELOG.md`; ringkas
 lengkap ada di `README.md`. File ini adalah ringkasan status + jebakan yang sudah pernah
 kejadian, bukan pengganti keduanya. **Sejak Batch 158**, file ini cuma menyimpan 100 batch
 paling baru (Batch 58 ke atas) — detail Batch 1-57 ada di `PROJECT_STATE_ARCHIVE.md`.
+**Format aturan/kebijakan di file ini (permanen):** hanya rule AKTIF final — tanpa histori
+revisi, kutipan user, atau kronologi perubahan. Kalau rule lama disupersede, tulis ulang
+hasil finalnya saja.
 
 ## ⚠️ ATURAN SESI AKTIF — WAJIB DIBACA (posisi tetap, tidak ikut tergeser batch baru)
-> ## ⛔ STATUS PROYEK: DISCONTINUED (sejak Batch 384)
-> User eksplisit: *"fokus untuk beres-beres sebelum menutup project dan diberi label
-> discontinued!!"*. **Sesi berikutnya: JANGAN eksekusi fitur/roadmap/fix baru apa pun secara
-> proaktif** (termasuk apa pun sisa di `ROADMAP_LIQUID_GLASS_REDESIGN.md`, meski dokumen itu
-> sendiri sudah 0 item terbuka) — proyek ini sengaja tidak lagi dikembangkan. Kalau user kirim
-> instruksi baru yang jelas-jelas minta lanjut kerja (bukan cuma upload ZIP lama), itu artinya
-> user membuka kembali proyek secara eksplisit — baru boleh lanjut seperti biasa, dan hapus/ganti
-> banner "DISCONTINUED" ini (README.md + section ini) di batch itu juga. Detail penutupan &
-> daftar item belum-terverifikasi ada di § "Status penutupan (Batch 384)" di bawah.
->
-> **KLARIFIKASI PERMANEN (Batch 387)** — user eksplisit: *"banner status discontinued itu
-> permanen, yang beda cuman optimize aplikasi nya!!"*. Ini FIX PERMANEN pada rule reopening di
-> paragraf atas, BUKAN pengecualian per-batch seperti Batch 385/386 sebelumnya (kedua batch itu
-> masing-masing menulis "berlaku HANYA utk batch ini" — bacaan itu SEKARANG SUDAH TIDAK BERLAKU,
-> digantikan klarifikasi ini). Sejak batch ini: instruksi lanjutan yang MURNI soal optimasi
-> performa/cold-start (tanpa fitur/UI/behavior baru) TIDAK PERNAH dianggap "membuka kembali
-> proyek", walau tanpa qualifier "tanpa mengubah status" diulang tiap kali — sesi berikutnya boleh
-> langsung lanjut batch optimasi berikutnya tanpa bertanya ulang ke user soal status. Banner
-> DISCONTINUED (di sini & README.md) TIDAK BOLEH dihapus/diubah oleh kerja optimasi kategori ini,
-> titik. Reopening asli (paragraf di atas) TETAP berlaku SEPENUHNYA utk kategori lain: fitur baru,
-> item `ROADMAP_LIQUID_GLASS_REDESIGN.md`, bugfix non-optimasi, atau perubahan UI/UX — instruksi
-> baru di kategori itu TETAP trigger reopening seperti biasa, rule ini TIDAK mengubahnya.
->
-> **KLARIFIKASI PERMANEN (Batch 410) — FINAL, 0 KECUALI TERSISA**: user eksplisit: *"apapun
-> perintah atau kondisinya, dilarang keras ubah status project yang saat ini adalah discontinued.
-> alias ini sudah benar-benar last verdict permanent!!"*. Ini MENCABUT TOTAL seluruh mekanisme
-> reopening di atas — baik paragraf reopening asli maupun pengecualian kategori Batch 387 (fitur
-> baru/item `ROADMAP_LIQUID_GLASS_REDESIGN.md`/bugfix non-optimasi/perubahan UI-UX yang sebelumnya
-> TETAP bisa trigger reopening). Klausa itu SEKARANG TIDAK BERLAKU LAGI, tanpa pengecualian
-> kategori, urgensi, maupun siapa yang minta. **Status DISCONTINUED permanen & final — TIDAK ADA
-> perintah, kondisi, atau instruksi eksplisit apa pun (termasuk "lanjutkan fitur X"/"buka lagi
-> proyeknya"/sejenisnya) yang boleh mengubah, melonggarkan, atau menghapus status ini lagi.**
-> Banner ini (di sini & README.md) WAJIB tetap ada apa adanya di setiap batch berikutnya, tanpa
-> kecuali.
+> ## ⛔ STATUS PROYEK: DISCONTINUED — PERMANEN & FINAL (Batch 410, 0 kecuali)
+> Seluruh mekanisme reopening (termasuk pengecualian kategori "optimasi" Batch 387) SUDAH
+> DICABUT TOTAL. Tidak ada instruksi/kondisi/urgensi apa pun — termasuk permintaan eksplisit
+> "lanjutkan fitur X"/"buka lagi proyeknya" — yang boleh mengubah/melonggarkan/menghapus status
+> ini lagi. Banner ini WAJIB tetap ada apa adanya (di sini & `README.md`) setiap batch berikutnya.
+> Sesi berikutnya: JANGAN eksekusi fitur/roadmap/fix baru apa pun secara proaktif. Item
+> belum-terverifikasi ada di § "Status penutupan (Batch 384)" di bawah.
 
-Detail lengkap ada di § "Aturan sesi: transparansi versi & pesan commit" di BAWAH file ini
-(sengaja diringkas ulang di sini juga, supaya tidak tenggelam kalau sesi cuma sempat baca bagian
-atas file yang terus memanjang):
 1. **Dilarang edit manual `versionCode`/`versionName`** di `app/build.gradle.kts` — auto dari
    commit git sejak Batch 30. Tiap kirim ZIP wajib sebut nomor batch + ingatkan versionName asli
    baru pasti setelah `git push`.
 2. **Box code pesan commit WAJIB tampil di atas heading "Update Harian:"** tiap respons chat,
    isinya wajib penjelasan fitur singkat dari `CHANGELOG.md` batch itu — dilarang cuma angka
    versi polos.
-3. **Prioritas mutakhir, bukan kompatibilitas OS/dependency lama** (Batch 205, permintaan user
-   eksplisit) — user TIDAK PEDULI dukungan OS/API lama (mis. Android <12/API 31). Struktur,
-   komponen, dan dependency WAJIB pakai versi paling mutakhir yang tersedia; JANGAN habiskan
-   effort bikin/pertahankan fallback kompatibilitas legacy yang rumit kalau ada opsi modern yang
-   lebih bersih. Detail lengkap § "Kebijakan: prioritas mutakhir" di bawah.
-4. **`POLISH_AUDIT.md`/`MICRO_UIUX_AUDIT.md` DIARSIPKAN Batch 278** (jadi
-   `ARCHIVED_POLISH_AUDIT.md`/`ARCHIVED_MICRO_UIUX_AUDIT.md`) — digantikan
-   `ROADMAP_LIQUID_GLASS_REDESIGN.md` sebagai sumber task default kalau tidak ada instruksi/
-   log_fail baru dari user. **TAPI**: roadmap itu butuh konfirmasi user dulu (§3 di dalamnya)
-   sebelum sesi mana pun mulai eksekusi kode — kalau belum ada konfirmasi, JANGAN eksekusi
-   apa pun dari situ, tanya user dulu.
-5. **Nama folder Termux proyek ini `audioplayer` (lowercase, default kebab-case) — SUDAH FINAL,
-   JANGAN diubah lagi.** Sempat direvisi ke `AudioPlayer` (kapital) tapi DIBATALKAN user: local
-   folder Termux TIDAK terikat ke `rootProject.name` (sudah di-hardcode `"AudioPlayer"` di
-   `settings.gradle.kts`, tidak baca nama folder) maupun ke `git remote` (cuma URL, bukan
-   casing folder) — jadi lowercase aman dan konsisten sama default preferensi. Migrasi 1x
-   (rename/hapus folder lama kapital) sudah diarahkan ke user Batch 266. Semua skrip Termux
-   berikutnya WAJIB pakai `~/projects/audioplayer`.
-6. **Status DISCONTINUED = FINAL PERMANEN (Batch 410), 0 KECUALI** — mencabut TOTAL seluruh
-   mekanisme reopening (termasuk pengecualian kategori Batch 387). TIDAK ADA perintah/kondisi
-   apa pun, termasuk instruksi eksplisit user, yang boleh mengubah status ini lagi. Detail
-   lengkap di banner § atas.
-7. **Sektor optimasi Compose (Batch 392-415) DITUTUP (Batch 416, instruksi eksplisit user
-   "Tutup sektor optimasi Compose").** Sesi berikutnya JANGAN proaktif mencari kandidat optimasi
-   Compose baru pada instruksi generik ("next"/"lanjut") — 4 kelas audit (computed-without-
-   remember, `.values()` vs `.entries`, `Set` vs `List` contains, `MutableInteractionSource`
-   tanpa remember) sudah dicoba tuntas Batch 415-416, hasilnya NEGATIF/habis. **TAPI**:
-   `AlbumArt` `SubcomposeAsyncImage` TETAP tercatat sbg utang teknis belum terselesaikan (bukan
-   "selesai") — kalau user beri instruksi eksplisit baru yang spesifik minta dibuka lagi sektor
-   ini atau kandidat `AlbumArt` secara khusus, itu BOLEH dieksekusi seperti biasa (beda dari
-   rule #6 yang soal status proyek, bukan soal sektor kerja teknis). Detail lengkap CHANGELOG.md
-   Batch 416.
-8. **Sektor Thread Safety (Batch 418-421) DITUTUP (Batch 422, instruksi eksplisit user "Tutup
-   sektor ini").** Sesi berikutnya JANGAN proaktif mencari kandidat Main-thread I/O baru pada
-   instruksi generik ("next"/"lanjut") — grep pola I/O literal app-wide di `ui/` sudah 0 sisa
-   (Batch 419: `PlayerViewModel.kt`; Batch 420: `BackupRestoreSheet.kt`; Batch 421:
-   `SignatureMatcherSheet.kt`). **TAPI**: audit ini baru mencakup pola I/O literal yang di-grep
-   eksplisit (bukan bukti tuntas total) — ~90 file Kotlin lain di luar itu belum diaudit
-   menyeluruh, dan `DuplicateFinderSheet.kt` `remember` CPU-heavy TETAP tercatat sbg utang teknis
-   beda kelas (Compose/performance, bukan I/O — sektor itu sendiri sudah DITUTUP Batch 416, TIDAK
-   dibuka lagi di sini). Kalau user beri instruksi eksplisit baru yang spesifik minta dibuka lagi
-   sektor Thread Safety, itu BOLEH dieksekusi seperti biasa (beda dari rule #6 soal status
-   proyek). Detail lengkap CHANGELOG.md Batch 422.
-9. **Sektor audit compileSdk/targetSdk (Batch 422) DITUTUP (Batch 423).** User klarifikasi 0
-   rencana publish Play Store (personal use only) + konfirmasi device pribadi SUDAH Android 16 —
-   audit source code (bukan build baru) menemukan `targetSdk` 34→36 (Batch 422) = 0 perubahan
-   perilaku edge-to-edge/predictive back utk app ini: `MainActivity.kt` SUDAH panggil
-   `enableEdgeToEdge()` eksplisit + `AndroidManifest.xml` SUDAH `enableOnBackInvokedCallback=
-   "true"`, keduanya dari SEBELUM bump targetSdk (opt-in manual, bukan hasil OS enforcement yang
-   baru kena krn bump). Gap insets utk 3 layar di luar Scaffold (`WelcomeScreen`/
-   `PermissionRationale`/`LockScreen`) SUDAH ditest & difix di device Android 16 asli sejak Batch
-   111 (komentar eksplisit "Android 16 test device" di `MainActivity.kt`) — jauh sebelum sektor
-   audit ini dibuka Batch 422. 0 item residual tersisa. Sesi berikutnya JANGAN buka lagi sektor
-   ini pada instruksi generik — kecuali user eksplisit minta bump ke API 37 (blocked di migrasi
-   AGP 9.x, lihat Batch 422/291) atau ada temuan baru spesifik. Detail lengkap CHANGELOG.md
-   Batch 423.
+3. **Prioritas versi/dependency/komponen paling mutakhir, bukan kompatibilitas OS lama**
+   (Batch 205) — user tidak peduli dukungan Android <12/API 31. Jangan bikin/pertahankan
+   fallback legacy rumit kalau ada opsi modern yang lebih bersih. `minSdk` tidak pernah diubah
+   otomatis — WAJIB konfirmasi eksplisit user dulu.
+4. **`POLISH_AUDIT.md`/`MICRO_UIUX_AUDIT.md` diarsipkan** (Batch 278) →
+   `ARCHIVED_POLISH_AUDIT.md`/`ARCHIVED_MICRO_UIUX_AUDIT.md`. `ROADMAP_LIQUID_GLASS_REDESIGN.md`
+   = sumber task default kalau tidak ada instruksi/log_fail baru dari user, TAPI wajib konfirmasi
+   user dulu (§3 di dalamnya) sebelum sesi mana pun mulai eksekusi kode dari situ.
+5. **Nama folder Termux: `~/projects/audioplayer`** (lowercase) — FINAL, jangan diubah lagi.
+   `rootProject.name` tetap `"AudioPlayer"` (hardcoded di `settings.gradle.kts`), tidak terikat
+   ke nama folder maupun `git remote`.
+6. **Sektor DITUTUP** — jangan proaktif dibuka ulang pada instruksi generik ("next"/"lanjut");
+   BOLEH dieksekusi kalau user beri instruksi eksplisit spesifik minta sektor/kandidat ini
+   dibuka lagi:
+   - Compose optimization (Batch 392-415, ditutup Batch 416) — utang teknis tersisa: `AlbumArt`
+     `SubcomposeAsyncImage`.
+   - Thread Safety I/O (Batch 418-421, ditutup Batch 422) — grep pola I/O literal app-wide
+     `ui/` = 0 sisa, tapi ~90 file Kotlin lain di luar itu belum diaudit menyeluruh.
+     `DuplicateFinderSheet.kt` `remember` CPU-heavy = utang teknis kelas Compose/performance
+     (bukan I/O — sektor itu tertutup terpisah).
+   - compileSdk/targetSdk (Batch 422, ditutup Batch 423) — targetSdk 36, compileSdk 36; 0
+     rencana Play Store, device user Android 16. Edge-to-edge/predictive back sudah ditest
+     device asli sejak Batch 111. 0 item residual — kecuali user eksplisit minta bump API 37
+     (blocked di migrasi AGP 9.x) atau ada temuan baru.
 
 ## Status penutupan (Batch 384)
 Proyek resmi **discontinued** — lihat banner di atas & `README.md`. Ini konsolidasi JUJUR semua
@@ -146,6 +87,32 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 424 (Pangkas total rule permanen `PROJECT_STATE.md` jadi padat/berdaging, 0 file kode +
+2 dokumentasi)** — User instruksi eksplisit: *"pangkas total rule permanen pada project_state.md
+jadi murni isinya 'berdaging', zero narasi ikut dicantumkan yang gak dibutuhkan sesi
+selanjutnya"*. **Status DISCONTINUED tetap permanen** (final lock Batch 410) — murni housekeeping
+dokumentasi, bukan fitur/UI/behavior baru.
+
+**Perubahan** — 3 section rule/kebijakan `PROJECT_STATE.md` dipadatkan jadi hasil final saja
+(histori revisi/kutipan/kronologi dibuang, bukan diringkas ulang):
+1. Banner § "ATURAN SESI AKTIF" — saga status DISCONTINUED (Batch 384→387→410, 3 paragraf
+   berlapis saling mencabut) dipadatkan jadi 1 paragraf: hasil final Batch 410 saja (permanen,
+   0 mekanisme reopening).
+2. Rule #6 lama (status discontinued, duplikat isi banner) DIHAPUS — sudah tercakup banner.
+3. Rule #7/#8/#9 lama (3 sektor tertutup: Compose/Thread Safety/compileSdk-targetSdk) digabung
+   jadi rule #6 baru (1 sub-bullet per sektor, fakta inti saja).
+4. 2 section duplikat di bagian bawah file (§ "Aturan sesi: transparansi versi & pesan commit" &
+   § "Kebijakan: prioritas mutakhir") dipadatkan jadi pointer balik ke rule #1-3 § "ATURAN SESI
+   AKTIF" — isinya sebelumnya 100% duplikat, 0 info unik hilang.
+5. Cross-reference "rule #8"/"rule #9" lama di entri Batch 422/423 (bawah) & `CHANGELOG.md`
+   diupdate ke "rule #6" baru supaya tidak dangling.
+6. Ditambah 1 baris kebijakan permanen di header file: rule/kebijakan berikutnya WAJIB ditulis
+   sebagai hasil final saja, tanpa histori/kutipan — supaya section ini tidak menggelembung lagi.
+
+**Scope**: 0 file kode. 2 file dokumentasi (`PROJECT_STATE.md`, `CHANGELOG.md`).
+`README.md`/`FILE_MANIFEST.txt`/`app/build.gradle.kts` tidak disentuh. Detail lengkap
+`CHANGELOG.md` Batch 424.
+
 **Batch 423 (Verifikasi edge-to-edge/predictive back, Android 16 device dikonfirmasi user —
 sektor audit compileSdk/targetSdk TUNTAS, 0 file kode + 2 dokumentasi)** — User klarifikasi: (1)
 0 rencana publish Play Store, personal use only — driver "syarat Google Play" di Batch 422 tidak
@@ -172,7 +139,8 @@ karena tidak ada device", device Android 16 asli SUDAH pernah dipakai test (Batc
 bukan di sektor/sesi ini. `foregroundServiceType` (item (c) Batch 422) tidak berubah kesimpulan,
 tetap compliant sejak minSdk naik ke 31.
 
-**Sektor audit compileSdk/targetSdk (Batch 422) — DITUTUP.** Lihat rule #9 § "ATURAN SESI AKTIF"
+**Sektor audit compileSdk/targetSdk (Batch 422) — DITUTUP.** Lihat rule #6 (sub-bullet
+compileSdk/targetSdk) § "ATURAN SESI AKTIF"
 di atas untuk kondisi penutupan lengkap.
 
 **Scope**: 0 file kode (audit murni baca-kode, 0 baris diubah). 2 file dokumentasi
@@ -188,7 +156,8 @@ memicu mekanisme reopening (yang toh sudah dicabut total sejak Batch 410). Tidak
 user (upload terakhir tetap `AudioPlayer_v421.zip`, hasil Batch 421 sendiri, lanjut dari state
 kerja batch itu).
 
-**(1) Sektor Thread Safety DITUTUP** — lihat rule #8 § "ATURAN SESI AKTIF" di atas untuk detail
+**(1) Sektor Thread Safety DITUTUP** — lihat rule #6 (sub-bullet Thread Safety) § "ATURAN SESI
+AKTIF" di atas untuk detail
 lengkap kondisi penutupan & utang teknis tersisa (`DuplicateFinderSheet.kt`, ~90 file belum
 diaudit). 0 file kode disentuh untuk bagian ini (murni update dokumentasi status sektor).
 
@@ -5810,43 +5779,9 @@ com.rudi.audioplayer/
 tidak ada lagi bump manual untuk keduanya. Detail lengkap di README.md § "Standar Penomoran
 Versi".
 
-## Aturan sesi: transparansi versi & pesan commit (Batch 155, permintaan user)
-Berlaku untuk SEMUA sesi AI berikutnya yang mengirim artifact ZIP dari repo ini:
-1. **Transparansi versi, BUKAN bump manual di kode.** Setiap sesi WAJIB menyatakan status versi
-   di chat sebelum/saat mengirim ZIP — TAPI dilarang mengedit `versionCode`/`versionName` secara
-   manual di `app/build.gradle.kts`. Angka itu sengaja auto-derive dari jumlah commit git sejak
-   Batch 30 (arsitektur, § "Keputusan arsitektur utama" atas) justru untuk MENGHILANGKAN risiko
-   lupa bump manual — mengedit manual balik ke pola lama akan mengembalikan bug class yang
-   sengaja dihindari. Yang WAJIB ditampilkan tiap kirim ZIP: nomor batch ZIP saat ini, dan
-   pengingat bahwa versionName asli baru pasti setelah `git push` (auto dari commit count, bukan
-   dari nomor batch chat).
-2. **Box code pesan commit, DI ATAS heading "Update Harian:".** Tiap respons yang menyertakan
-   skrip "Update Harian:" WAJIB diawali 1 code-box terpisah berisi draft pesan commit (persis
-   yang dipakai di `git commit -m "..."` pada skrip di bawahnya), diletakkan sebelum heading
-   "Update Harian:". **DILARANG** isinya cuma angka versi/perbandingan versi belaka (mis. "bump
-   v1.1.43 -> v1.1.44") — WAJIB memuat penjelasan fitur/perbaikan singkat yang diambil LANGSUNG
-   dari isi entri `CHANGELOG.md` batch tersebut, bukan digeneralisasi ulang jadi generik.
+## Aturan sesi: transparansi versi & pesan commit
+Sudah termuat penuh di § "ATURAN SESI AKTIF" item #1 (transparansi versi) & #2 (box pesan
+commit) di atas — tidak diulang di sini.
 
-## Kebijakan: prioritas mutakhir, bukan kompatibilitas OS/dependency lama (Batch 205, permintaan user)
-Berlaku untuk SEMUA sesi AI berikutnya, permanen sampai user bilang sebaliknya:
-
-**User TIDAK PEDULI dukungan OS/API/dependency lama.** Konteks asal: widget "tahan banting"
-(Batch 201-204) — sempat dibikinkan fallback threshold buat Android <12/API 31 (device tanpa
-`RemoteViews(Map<SizeF,...>)`), padahal user cuma mau solusi PALING BENAR/modern, bukan solusi
-yang juga jalan di device lama.
-
-**Implikasi konkret buat sesi berikutnya**:
-1. Kalau ada API/library/pendekatan MODERN yang lebih bersih/robust secara struktural
-   (bukan sekadar preferensi gaya) tapi butuh `minSdk`/versi dependency lebih baru — WAJIB
-   diutamakan/ditawarkan, JANGAN otomatis dihindari cuma karena "nanti device lama gak kebagian".
-2. JANGAN habiskan effort ekstra bikin/pertahankan fallback compat kompleks buat OS/API lama
-   kalau ada opsi modern yang jauh lebih sederhana & robust — cukup catat keterbatasannya (device
-   mana yang tidak kebagian), tidak perlu direkayasa workaround rumit.
-3. **`minSdk` (`app/build.gradle.kts`, protected asset) TIDAK diubah otomatis** oleh kebijakan
-   ini sendiri — itu keputusan terpisah dengan konsekuensi instalasi nyata (device existing di
-   bawah `minSdk` baru tidak bisa install app sama sekali, beda dari "cuma fallback visual
-   kurang optimal"). Sesi berikutnya boleh MENYARANKAN naikkan `minSdk` kalau relevan, tapi tetap
-   minta konfirmasi eksplisit dulu sebelum mengeksekusi — bukan diam-diam dinaikkan.
-4. Dependency (`build.gradle.kts` versions, library versi) — prioritaskan versi stabil TERBARU
-   yang tersedia saat sesi berjalan, bukan versi lama yang "aman/teruji" tanpa alasan konkret.
-
+## Kebijakan: prioritas mutakhir, bukan kompatibilitas OS/dependency lama
+Sudah termuat penuh di § "ATURAN SESI AKTIF" item #3 di atas — tidak diulang di sini.

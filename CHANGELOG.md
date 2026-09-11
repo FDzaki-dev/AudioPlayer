@@ -1,5 +1,47 @@
 # Changelog
 
+## Batch 424 — Pangkas total rule permanen `PROJECT_STATE.md` jadi padat, 0 narasi historis
+User instruksi eksplisit: *"pangkas total rule permanen pada project_state.md jadi murni isinya
+'berdaging', zero narasi ikut dicantumkan yang gak dibutuhkan sesi selanjutnya"*. **Status
+DISCONTINUED tetap permanen tidak diubah** (final lock Batch 410) — murni housekeeping
+dokumentasi, 0 fitur/UI/behavior baru, 0 kode disentuh.
+
+**Masalah**: § "ATURAN SESI AKTIF" `PROJECT_STATE.md` sudah menumpuk histori revisi berlapis
+(saga status DISCONTINUED ditulis ulang 3x — Batch 384, klarifikasi Batch 387, klarifikasi final
+Batch 410 — masing-masing menjelaskan apa yang disupersede oleh yang sebelumnya) plus 2 rule
+duplikat penuh di bagian bawah file (§ "Aturan sesi: transparansi versi..." & § "Kebijakan:
+prioritas mutakhir..."). Isinya sudah bukan lagi "rule aktif", tapi arsip kronologi perubahan
+rule — padahal kronologi lengkap itu memang sudah tugasnya `CHANGELOG.md`, bukan
+`PROJECT_STATE.md`.
+
+**Perubahan**:
+1. Banner status DISCONTINUED dipadatkan jadi 1 paragraf berisi hasil final Batch 410 saja: status
+   permanen, 0 mekanisme reopening tersisa (termasuk pengecualian kategori "optimasi" Batch 387
+   yang sudah dicabut total), banner wajib tetap ada tiap batch. Histori Batch 384/387 (kutipan
+   user, penjelasan apa yang disupersede) dibuang — sudah tidak actionable, cuma menjelaskan cara
+   rule ini sampai ke bentuk sekarang.
+2. Rule #6 lama ("status DISCONTINUED = FINAL PERMANEN") DIHAPUS — 100% duplikat isi banner di
+   atasnya, 0 info unik.
+3. Rule #7 (Compose optimization ditutup), #8 (Thread Safety ditutup), #9 (compileSdk/targetSdk
+   ditutup) — masing-masing sebelumnya 1 paragraf panjang berisi alasan/histori penutupan — digabung
+   jadi rule #6 baru, 1 sub-bullet per sektor, isi fakta inti yang masih actionable saja (kondisi
+   penutupan, utang teknis tersisa, syarat buka ulang).
+4. § "Aturan sesi: transparansi versi & pesan commit" (Batch 155) & § "Kebijakan: prioritas
+   mutakhir" (Batch 205) di bagian bawah file — isinya 100% duplikat rule #1/#2/#3 § "ATURAN SESI
+   AKTIF" (cuma versi lebih panjang dari rule yang sama) — dipadatkan jadi pointer balik ke rule
+   #1-3, 0 konten unik hilang.
+5. Cross-reference "rule #8"/"rule #9" lama (entri Batch 422/423 § "Batch terakhir yang selesai"
+   `PROJECT_STATE.md`, dan entri setara di `CHANGELOG.md` ini) diupdate ke "rule #6 (sub-bullet
+   ...)" supaya tidak dangling setelah renumbering.
+6. Ditambah 1 baris kebijakan permanen baru di header `PROJECT_STATE.md`: rule/kebijakan
+   berikutnya WAJIB ditulis sebagai hasil final saja (tanpa histori revisi/kutipan/kronologi) —
+   kalau rule lama disupersede, tulis ulang hasil finalnya, bukan tambahkan lapisan klarifikasi
+   baru di atas lapisan lama. Ini permanen, mencegah section ini menggelembung lagi ke pola yang
+   sama ke depannya.
+
+**Scope**: 0 file kode. 2 file dokumentasi (`PROJECT_STATE.md`, `CHANGELOG.md` — ini).
+`README.md`/`FILE_MANIFEST.txt`/`app/build.gradle.kts`/`PROJECT_STATE_ARCHIVE.md` tidak disentuh.
+
 ## Batch 423 — Verifikasi edge-to-edge/predictive back (Android 16 device dikonfirmasi); sektor audit compileSdk/targetSdk TUNTAS
 User klarifikasi (chat, tanpa ZIP baru): **(1)** *"terkait Sdk ini, saya gak tertarik sama sekali
 untuk mempublish project saya di playstore. ini murni karena saya mau manfaat nya secara
@@ -45,7 +87,8 @@ murni administrative (align angka `targetSdk` ke `compileSdk` yang sudah 36 dulu
 tidak ada perubahan spesifik API 36 yang ditemukan relevan thd 2 service yang di-declare.
 
 **Sektor audit compileSdk/targetSdk (dibuka Batch 422) — DITUTUP batch ini.** Aturan penutupan
-lengkap: rule #9 `PROJECT_STATE.md` § "ATURAN SESI AKTIF". Sesi berikutnya JANGAN buka lagi
+lengkap: rule #6 (sub-bullet compileSdk/targetSdk) `PROJECT_STATE.md` § "ATURAN SESI AKTIF".
+Sesi berikutnya JANGAN buka lagi
 sektor ini pada instruksi generik ("next"/"lanjut") — kecuali user eksplisit minta bump ke API 37
 (masih blocked di migrasi breaking AGP 9.x, lihat Batch 422/291) atau ada temuan baru yang
 spesifik disebut user.
@@ -80,8 +123,8 @@ walau namanya kebetulan muncul lagi.
 
 Sesi berikutnya JANGAN proaktif mencari kandidat Main-thread I/O baru pada instruksi generik
 ("next"/"lanjut") — kalau user beri instruksi eksplisit baru yang spesifik minta dibuka lagi
-sektor ini, BOLEH dieksekusi seperti biasa. Aturan permanen lengkap: rule #8 `PROJECT_STATE.md`
-§ "ATURAN SESI AKTIF". **0 file kode disentuh untuk bagian ini** — murni penutupan/dokumentasi
+sektor ini, BOLEH dieksekusi seperti biasa. Aturan permanen lengkap: rule #6 (sub-bullet Thread
+Safety) `PROJECT_STATE.md` § "ATURAN SESI AKTIF". **0 file kode disentuh untuk bagian ini** — murni penutupan/dokumentasi
 status sektor, tidak ada grep/fix baru dijalankan batch ini di luar yang sudah selesai Batch 421.
 
 ### (2) Sektor baru: audit compileSdk/targetSdk
