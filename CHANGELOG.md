@@ -1,5 +1,58 @@
 # Changelog
 
+## Batch 435 — Fitur baru: gesture swipe lintas 3 tab (Beranda/Perpustakaan/Pengaturan)
+User minta fitur baru: "tambahkan gesture swipe able lintas 3 tab. alih-alih user hanya bisa
+tap-tab manual berulang!!". Bukan bugfix/reopen sektor — navigasi tab bawah belum pernah masuk
+daftar sektor DITUTUP.
+
+**1 file diubah**:
+
+1. **`MainActivity.kt`** (`AppNavHost`) — app ini pakai Jetpack Navigation Compose dengan 3
+   route top-level TERPISAH (`"home"`/`"library"`/`"settings"`), bukan `HorizontalPager`
+   1-route. Mengganti seluruh fondasi navigasi ke `HorizontalPager` ditolak sebagai pendekatan
+   (butuh restrukturisasi besar: `now_playing`/`stats_dashboard` yang sekarang di-push DI ATAS
+   3 tab itu lewat backstack NavHost harus dipindah jadi lapisan terpisah di luar pager — risiko
+   regresi jauh melebihi scope diminta user). Pendekatan dipilih: deteksi gesture, bukan ganti
+   struktur navigasi.
+
+   `Modifier.pointerInput` + `detectHorizontalDragGestures` dipasang di `Box` pembungkus
+   `NavHost`, dibungkus kondisi `TAB_ROUTES.any { it == currentRoute }` (konstanta baru
+   `TAB_ROUTES = listOf("home","library","settings")`, top-level, satu sumber kebenaran urutan
+   tab yang dipakai bareng dgn `NavigationBarItem`/`NavigationRailItem`) — modifier gesture ini
+   SAMA SEKALI TIDAK terpasang saat `currentRoute` di luar 3 itu (`"now_playing"`,
+   `"stats_dashboard"`), jadi 0 rebutan dengan `detectHorizontalDragGestures` milik
+   `AlbumArtHero` (`NowPlayingScreen.kt`, Batch 434) yang sudah lebih dulu ada di situ.
+
+   Saat swipe kiri melewati threshold (`totalTabDrag < -120f`) → pindah ke tab berikutnya
+   (`TAB_ROUTES.getOrNull(fromIdx + 1)`); swipe kanan (`> 120f`) → tab sebelumnya
+   (`fromIdx - 1`). Di tab paling kiri/kanan, `getOrNull` di luar rentang mengembalikan `null` →
+   tidak ada navigasi (tidak wrap-around), cuma snapback — konsisten konvensi tab iOS. Saat
+   berhasil, `navController.navigate(target)` dipanggil dengan opsi IDENTIK ke `onClick`
+   `NavigationBarItem`/`NavigationRailItem` yang sudah ada (`popUpTo("home"){saveState=true}` +
+   `launchSingleTop` + `restoreState`, pola Batch 301) — 0 perubahan ke state-preservation
+   antar-tab yang sudah berjalan, plus haptic (`HapticFeedbackType.LongPress`).
+   `enterTransition`/`exitTransition` `NavHost` (fade 200/150ms, Batch 330 — sengaja fade
+   simetris, bukan slide berarah, karena "tab switch bukan hierarki push/pop searah") TIDAK
+   disentuh sama sekali — dipakai apa adanya baik dipicu tap maupun swipe.
+
+   Feedback visual selama drag: `graphicsLayer { translationX = tabDragOffsetPx.floatValue }`
+   di `Box` pembungkus, sumber nilainya `dragOffsetPx`/`Animatable` springback — pola REUSE 1:1
+   dari `AlbumArtHero` (threshold 120px, haptic, `spring(DampingRatioMediumBouncy,
+   StiffnessLow)`, termasuk `onDragStart` yang panggil `dragOffset.stop()` sebagai jaring
+   pengaman sinkron-vs-asinkron yang sama seperti fix Batch 434) — sengaja tidak reinvent pola
+   yang baru saja dibuktikan benar. Beda satu-satunya: batas nudge visual diperkecil (±40px,
+   multiplier ×0.3, bukan ±48dp/×0.5 milik `AlbumArtHero`) karena yang digeser di sini konten
+   satu layar penuh, bukan satu kartu album — nudge cuma sinyal "tergenggam", bukan preview
+   halaman berikutnya (page-swap sungguhan tetap lewat fade `NavHost` di atas).
+
+   Detail kecil: perbandingan route pakai `TAB_ROUTES.any { it == currentRoute }` dan
+   `TAB_ROUTES.indexOfFirst { it == currentRoute }` — BUKAN `currentRoute in TAB_ROUTES` atau
+   `TAB_ROUTES.indexOf(currentRoute)` langsung — karena `currentRoute` bertipe `String?`
+   sedangkan `List<String>.contains`/`indexOf` mengharap parameter non-null (risiko
+   unresolved-reference/type-mismatch kalau dipaksa); pembanding `==` selalu type-safe untuk
+   operand nullable di kedua sisi. 0 breaking change ke `NavigationBarItem`/
+   `NavigationRailItem`/route lain — pola `onClick` tap lama tidak disentuh sama sekali.
+
 ## Batch 434 — Fix stutter efek bounce swipe next/prev (`AlbumArtHero`, sinkron dragOffsetPx bukan launch per delta)
 User laporan: "effect bounce juga masih stuttering, belum smooth like butter!!" — SAMA KELAS BUG
 dengan Batch 433 (`ui/theme/IosScrollPhysics.kt`), kali ini di file berbeda: `ui/NowPlayingScreen.kt`

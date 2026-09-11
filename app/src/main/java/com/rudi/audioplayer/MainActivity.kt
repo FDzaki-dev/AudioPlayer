@@ -133,6 +133,25 @@ import com.rudi.audioplayer.ui.theme.calmGrain
 import com.rudi.audioplayer.ui.theme.auroraGlow
 import com.rudi.audioplayer.ui.theme.LocalHazeState
 import dev.chrisbanes.haze.rememberHazeState
+// Batch 435 — swipe-lintas-3-tab (Beranda/Perpustakaan/Pengaturan). Semua import di bawah
+// disalin persis dari path yang SUDAH terbukti compile di ui/NowPlayingScreen.kt
+// (AlbumArtHero, Batch 434) — bukan tebakan path baru.
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.launch
+
+// Batch 435 — urutan resmi 3 tab bawah (sama persis urutan NavigationBarItem/NavigationRailItem
+// di AppNavHost bawah: Beranda, Perpustakaan, Pengaturan). Dipakai gesture swipe untuk hitung
+// tab tujuan (index±1) — SATU sumber kebenaran urutan, bukan didup di 2 tempat.
+private val TAB_ROUTES = listOf("home", "library", "settings")
 
 class MainActivity : FragmentActivity() {
 
@@ -745,6 +764,24 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
+    // Batch 435 — request eksplisit user: "tambahkan gesture swipe able lintas 3 tab, alih-alih
+    // user hanya bisa tap-tab manual berulang". App ini pakai Jetpack Navigation Compose dengan
+    // 3 route top-level TERPISAH (home/library/settings, bukan HorizontalPager 1-route) — swipe
+    // di sini DIDETEKSI lalu memicu navController.navigate() yang SAMA PERSIS dgn onClick
+    // NavigationBarItem/NavigationRailItem di bawah (popUpTo("home"){saveState=true} +
+    // launchSingleTop + restoreState), jadi 0 perubahan ke state-preservation tab yang sudah ada.
+    // enter/exitTransition NavHost (Batch 330, fade 200/150ms) SENGAJA tidak disentuh — tetap
+    // dipakai apa adanya baik utk tap maupun swipe. Pola threshold 120px + haptic +
+    // dragOffsetPx(sinkron)/Animatable(springback-only) di bawah REUSE 1:1 dari AlbumArtHero
+    // (NowPlayingScreen.kt, Batch 434) — sumbu bug sinkron-vs-asinkron yang sama sengaja tidak
+    // diulang di sini. Modifier gesture-nya sendiri HANYA dipasang saat currentRoute ada di
+    // TAB_ROUTES (lihat Box pembungkus NavHost di bawah) supaya 0 rebutan dgn gesture horizontal
+    // lain yang sudah ada di layar non-tab (mis. swipe next/prev AlbumArtHero di "now_playing").
+    val tabSwipeHaptic = LocalHapticFeedback.current
+    val tabSwipeScope = rememberCoroutineScope()
+    val tabDragOffsetPx = remember { mutableFloatStateOf(0f) }
+    val tabDragOffset = remember { Animatable(0f) }
+
     // Batch 101 — Adaptive (multi-device). widthClass dihitung dari LocalConfiguration, jadi
     // otomatis berubah live saat rotasi/lipat-buka foldable/resize split-screen — TIDAK perlu
     // di-remember manual. showTwoPane sengaja exclude currentRoute == "now_playing" supaya
@@ -1090,6 +1127,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     )
                 }
             }
+        val isOnTabRoute = TAB_ROUTES.any { it == currentRoute }
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -1102,6 +1140,77 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 // `CompositionLocalProvider(LocalHazeState)` di bawah SENGAJA TIDAK dibongkar —
                 // reuse persis state Batch 295 (murni plumbing, 0 consumer), lihat rasionalisasi
                 // penuh di BlurUtils.kt.
+                // Batch 435 — nudge visual damped searah jari selama swipe (feedback "tergenggam",
+                // bukan page-turn 1:1 — page-swap SEBENARNYA tetap lewat fade NavHost Batch 330
+                // begitu navigate() terpicu, translationX ini cuma sinyal tangkapan gesture).
+                .graphicsLayer { translationX = tabDragOffsetPx.floatValue }
+                .then(
+                    if (isOnTabRoute) {
+                        Modifier.pointerInput(currentRoute) {
+                            var totalTabDrag = 0f
+                            detectHorizontalDragGestures(
+                                onDragStart = {
+                                    totalTabDrag = 0f
+                                    // jaring pengaman sama seperti AlbumArtHero: hentikan
+                                    // springback lama supaya tidak menimpa drag baru.
+                                    tabSwipeScope.launch { tabDragOffset.stop() }
+                                },
+                                onDragEnd = {
+                                    val fromIdx = TAB_ROUTES.indexOfFirst { it == currentRoute }
+                                    val targetRoute = when {
+                                        totalTabDrag < -120f -> TAB_ROUTES.getOrNull(fromIdx + 1)
+                                        totalTabDrag > 120f -> TAB_ROUTES.getOrNull(fromIdx - 1)
+                                        else -> null
+                                    }
+                                    if (targetRoute != null) {
+                                        tabSwipeHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        // Pola navigate IDENTIK dgn onClick NavigationBarItem/
+                                        // NavigationRailItem (Batch 301) — 0 state baru, reuse
+                                        // saveState/restoreState yang sudah ada.
+                                        navController.navigate(targetRoute) {
+                                            popUpTo("home") { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                    tabSwipeScope.launch {
+                                        tabDragOffset.snapTo(tabDragOffsetPx.floatValue)
+                                        tabDragOffset.animateTo(
+                                            0f,
+                                            spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessLow
+                                            )
+                                        ) {
+                                            tabDragOffsetPx.floatValue = value
+                                        }
+                                    }
+                                },
+                                onDragCancel = {
+                                    tabSwipeScope.launch {
+                                        tabDragOffset.snapTo(tabDragOffsetPx.floatValue)
+                                        tabDragOffset.animateTo(
+                                            0f,
+                                            spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessLow
+                                            )
+                                        ) {
+                                            tabDragOffsetPx.floatValue = value
+                                        }
+                                    }
+                                },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    totalTabDrag += dragAmount
+                                    change.consume()
+                                    tabDragOffsetPx.floatValue = (totalTabDrag * 0.3f).coerceIn(-40f, 40f)
+                                }
+                            )
+                        }
+                    } else {
+                        Modifier
+                    }
+                )
         ) {
         NavHost(
             navController = navController,

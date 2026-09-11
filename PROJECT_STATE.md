@@ -9,6 +9,46 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 435**: permintaan FITUR BARU eksplisit user — "tambahkan gesture swipe able
+lintas 3 tab. alih-alih user hanya bisa tap-tab manual berulang!!" (Beranda/Perpustakaan/
+Pengaturan). Bukan reopen sektor DITUTUP manapun (lihat daftar "Sektor DITUTUP" di bawah) —
+sektor terpisah, navigasi tab bawah belum pernah masuk 3 sektor yang ditutup itu.
+
+**1 file diubah** (dalam batas 3 file/tugas):
+1. `MainActivity.kt` (`AppNavHost`) — app ini pakai Jetpack Navigation Compose dengan 3 route
+   top-level TERPISAH (`"home"`/`"library"`/`"settings"`, BUKAN `HorizontalPager` 1-route) —
+   swap ke arsitektur pager penuh ditolak sebagai solusi (butuh restrukturisasi NavHost +
+   `now_playing`/`stats_dashboard` jadi push-di-atas-pager, risiko regresi jauh lebih besar dari
+   scope diminta). Pendekatan dipilih: `Modifier.pointerInput` + `detectHorizontalDragGestures`
+   dipasang di `Box` pembungkus `NavHost`, HANYA aktif saat `currentRoute` ada di 3 tab itu
+   (`TAB_ROUTES`, konstanta baru) — di `"now_playing"`/`"stats_dashboard"` modifier ini tidak
+   terpasang sama sekali (0 rebutan dgn `detectHorizontalDragGestures` `AlbumArtHero` yang sudah
+   ada di `now_playing`, Batch 434). Saat threshold ±120px terlampaui, swipe memicu
+   `navController.navigate()` dengan opsi IDENTIK ke `onClick` `NavigationBarItem`/
+   `NavigationRailItem` yang sudah ada (`popUpTo("home"){saveState=true}` + `launchSingleTop` +
+   `restoreState`, pola Batch 301) — 0 state baru di sisi state-preservation, murni trigger
+   berbeda (gesture, bukan cuma tap). `enterTransition`/`exitTransition` `NavHost` (fade
+   200/150ms, Batch 330) TIDAK disentuh — dipakai apa adanya baik utk tap maupun swipe.
+
+   Pola threshold 120px + haptic (`HapticFeedbackType.LongPress`) + `dragOffsetPx`
+   (`MutableFloatState`, sinkron)/`Animatable` (springback-only, via `spring(DampingRatioMediumBouncy,
+   StiffnessLow)`) REUSE 1:1 dari `AlbumArtHero` (`NowPlayingScreen.kt`, Batch 434) — sengaja
+   tidak reinvent, termasuk `onDragStart` yang panggil `dragOffset.stop()` (jaring pengaman
+   sinkron-vs-asinkron yang sama). Beda dari `AlbumArtHero`: nudge visual (`graphicsLayer
+   translationX`) di sini dibatasi lebih kecil (±40px, multiplier 0.3, bukan ±48dp/0.5) karena
+   yang digeser konten SATU LAYAR PENUH (bukan 1 kartu album), dan page-swap sesungguhnya tetap
+   lewat fade `NavHost` yang sudah ada — nudge ini murni sinyal "tergenggam", bukan preview
+   halaman berikutnya. `TAB_ROUTES.any{it==currentRoute}`/`indexOfFirst{it==currentRoute}`
+   dipakai (bukan `in`/`indexOf` langsung) karena `currentRoute` bertipe `String?` sedangkan
+   `List<String>.contains`/`indexOf` mengharap parameter non-null — perbandingan `==` selalu
+   type-safe utk operand nullable, `in`/`indexOf` langsung berisiko unresolved/type-mismatch.
+   0 breaking change ke `NavigationBarItem`/`NavigationRailItem`/route lain (signature/pola tap
+   lama tidak disentuh sama sekali).
+
+**0 diverifikasi CI/device Batch 435** — review manual (baca kode + cek balance brace/paren:
+`{}` 280/280, `()` 700/700, `[]` 3/3), tidak ada env Android nyata/device fisik di sesi ini.
+Item belum-terverifikasi bertambah 1 (lihat daftar di bawah).
+
 **Catatan Batch 434**: reopen eksplisit user — laporan spesifik "effect bounce juga masih
 stuttering, belum smooth like butter!!". SAMA KELAS BUG dgn Batch 433 (`IosScrollPhysics.kt`),
 tapi di file BEDA: `ui/NowPlayingScreen.kt` → `AlbumArtHero` (swipe horizontal next/prev pada
@@ -129,6 +169,10 @@ murni review manual (baca kode + cross-reference pola batch sebelumnya + cek bal
 brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
 
 **Item belum-terverifikasi saat penutupan** (device fisik tidak pernah tersedia di sesi kerja):
+- `MainActivity.kt` swipe-lintas-3-tab (Batch 435, di atas) — 0 compile log, 0 konfirmasi device.
+  Perlu ditest: swipe kiri/kanan di Beranda/Perpustakaan/Pengaturan (compact & rail/tablet),
+  swipe di tab ujung (Beranda/Pengaturan) tidak nyasar/crash, swipe pendek (di bawah threshold)
+  snapback mulus, dan gesture TIDAK kepicu sama sekali di `now_playing`/`stats_dashboard`.
 - `ui/NowPlayingScreen.kt` `AlbumArtHero` (Batch 434, di atas) — 0 compile log, 0 konfirmasi
   device. Perlu ditest: swipe cepat berulang next/prev, springback di dragEnd/dragCancel, dan
   drag baru yang menyusul cepat sebelum springback lama selesai (skenario baru yang dijaga

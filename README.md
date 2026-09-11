@@ -100,6 +100,7 @@ permukaan kaca lainnya.
 - **Onboarding**: layar selamat datang menjelaskan kenapa izin dibutuhkan sebelum dialog izin muncul, dengan fallback "Buka Pengaturan Aplikasi" kalau izin ditolak permanen
 - **Optimalisasi**: pemindaian MediaStore kini terpusat satu kali di ViewModel (bukan diulang di setiap Beranda/Perpustakaan/Playlist), mengurangi kerja I/O berulang dan flicker loading tiap pindah tab
 - **Navigasi gesture back**: gesture back sistem sekarang navigasi bertahap sesuai stack (Now Playing → Perpustakaan/Beranda), bukan langsung keluar aplikasi
+- **Swipe lintas 3 tab** (Batch 435): geser horizontal di konten Beranda/Perpustakaan/Pengaturan untuk pindah tab — alih-alih harus tap ikon navigasi bawah/rail satu-satu. Berlaku di layout ponsel (NavigationBar bawah) maupun tablet/lipat (NavigationRail samping). Tidak aktif di layar Now Playing/Dashboard Statistik (supaya tidak rebutan dengan swipe next/prev lagu di piringan album)
 - **Now Playing lebih atmosferik**: backdrop blur dari album art (seperti Spotify/Apple Music) di belakang piringan hitam yang berputar, dipadu warna aksen dinamis per lagu
 - **Micro-interaction**: tombol play/pause, shuffle, repeat, favorit, dan navigasi lagu kini punya animasi "bounce" halus tiap ditekan — bukan cuma ganti ikon instan
 - **Status bar & navigation bar** ikut mode terang/gelap tema aktif (ikon gelap di tema terang, ikon terang di tema gelap/Tactile) — bukan dipaksa satu arah
