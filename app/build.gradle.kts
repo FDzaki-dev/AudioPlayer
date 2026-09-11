@@ -92,7 +92,24 @@ android {
         // drop dukungan Android <12 (API <31) total — device lama TIDAK BISA install app ini
         // lagi sejak versi ini, bukan cuma fitur blur yang hilang di device lama.
         minSdk = 31
-        targetSdk = 34
+        // Batch 422 — bump 34→36 (sektor baru: audit compileSdk/targetSdk, item #3 status
+        // penutupan Batch 384 "belum ada audit eksplisit kompatibilitas Android 15/16", dibuka
+        // sesuai instruksi eksplisit user, bukan proaktif). Trigger konkret, bukan cuma "prioritas
+        // mutakhir" rule #3: Google Play WAJIB target API 36 (Android 16) utk app update sejak
+        // 31 Agu 2026 (dicek web_search Sep 2026, support.google.com/googleplay/android-developer/
+        // answer/11926878) — targetSdk 34 project ini SUDAH lewat deadline itu. Disamakan ke 36,
+        // bukan dinaikkan lagi ke compileSdk (masih 36 juga, tidak diubah batch ini) — API 37 SUDAH
+        // ada tapi butuh AGP 9.1+, migrasi breaking (hapus DSL BaseExtension/AppExtension lama
+        // total) yang SENGAJA ditunda sejak Batch 291 (lihat compose-bom di bawah) — di luar scope
+        // 1-task audit ini, konsisten STABILITY > Speed & ZERO-REFACTOR.
+        // Perilaku Android 15/16 yang BELUM diverifikasi batch ini (audit BARU dibuka, belum
+        // tuntas — lihat PROJECT_STATE.md § "Batch terakhir yang selesai" utk daftar lengkap):
+        // edge-to-edge wajib (enforced sejak targetSdk 35, project ini lompat 34→36 langsung jadi
+        // baru kena skrg), predictive back, foreground service type (SUDAH declared dari batch
+        // lampau, tapi belum diverifikasi ulang thd 36). 0 kode UI disentuh batch ini — murni
+        // bump angka config, verifikasi visual butuh compiler+device asli yang tidak tersedia di
+        // environment kerja ini.
+        targetSdk = 36
         versionCode = appVersionCode
         // versionCode and versionName both auto-derive from git commit count (see
         // gitCommitCount()/appVersionName above) — neither needs a manual bump.

@@ -83,6 +83,17 @@ atas file yang terus memanjang):
    ini atau kandidat `AlbumArt` secara khusus, itu BOLEH dieksekusi seperti biasa (beda dari
    rule #6 yang soal status proyek, bukan soal sektor kerja teknis). Detail lengkap CHANGELOG.md
    Batch 416.
+8. **Sektor Thread Safety (Batch 418-421) DITUTUP (Batch 422, instruksi eksplisit user "Tutup
+   sektor ini").** Sesi berikutnya JANGAN proaktif mencari kandidat Main-thread I/O baru pada
+   instruksi generik ("next"/"lanjut") — grep pola I/O literal app-wide di `ui/` sudah 0 sisa
+   (Batch 419: `PlayerViewModel.kt`; Batch 420: `BackupRestoreSheet.kt`; Batch 421:
+   `SignatureMatcherSheet.kt`). **TAPI**: audit ini baru mencakup pola I/O literal yang di-grep
+   eksplisit (bukan bukti tuntas total) — ~90 file Kotlin lain di luar itu belum diaudit
+   menyeluruh, dan `DuplicateFinderSheet.kt` `remember` CPU-heavy TETAP tercatat sbg utang teknis
+   beda kelas (Compose/performance, bukan I/O — sektor itu sendiri sudah DITUTUP Batch 416, TIDAK
+   dibuka lagi di sini). Kalau user beri instruksi eksplisit baru yang spesifik minta dibuka lagi
+   sektor Thread Safety, itu BOLEH dieksekusi seperti biasa (beda dari rule #6 soal status
+   proyek). Detail lengkap CHANGELOG.md Batch 422.
 
 ## Status penutupan (Batch 384)
 Proyek resmi **discontinued** — lihat banner di atas & `README.md`. Ini konsolidasi JUJUR semua
@@ -107,7 +118,12 @@ audit yang paling efisien:
    kompatibilitas Android 15/16 (predictive back, foreground service type enforcement,
    notifikasi, dll berpotensi berubah perilaku). Item ini sudah diketahui & didokumentasikan
    sejak `MANUAL_QA_CHECKLIST.md` dibuat, sengaja tidak dieksekusi (butuh sesi/batch khusus,
-   § dokumen itu sendiri) — masih di posisi yang sama saat penutupan.
+   § dokumen itu sendiri) — masih di posisi yang sama saat penutupan. **Update Batch 422**: sesi
+   khusus itu SUDAH dibuka — `targetSdk` sekarang 36 (`compileSdk` sudah 36 sejak Batch 249,
+   sebelum penutupan ini, alasan lain). Edge-to-edge/predictive back TETAP belum diverifikasi
+   device asli — lihat entri Batch 422 § "Batch terakhir yang selesai" utk residual lengkap. Teks
+   asli di atas SENGAJA tidak dihapus/diedit, cuma ditambah catatan ini, supaya snapshot historis
+   Batch 384 tetap utuh.
 4. **`ROADMAP_LIQUID_GLASS_REDESIGN.md` & `PENDING_IosFlingBehavior.md`** — TIDAK termasuk item
    terbuka. Roadmap dikonfirmasi 100% tuntas (0 item terbuka) Batch 363; pending fling behavior
    tuntas 14/14 layar Batch 380. Disebut di sini cuma supaya sesi berikutnya tidak perlu
@@ -117,6 +133,51 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 422 (Sektor Thread Safety DITUTUP + sektor baru dibuka: audit compileSdk/targetSdk,
+`targetSdk` 34→36, 1 file kode + 2 dokumentasi)** — User: 2 instruksi eksplisit — (1) *"Tutup
+sektor ini"* (Thread Safety, lanjutan T1/J1 dari sesi ini), (2) *"Ya, mulai sekarang"* atas
+tawaran *"Mulai audit compileSdk/targetSdk 34 → terbaru sekarang?"* (T2/J2). **Status DISCONTINUED
+tetap permanen** (final lock Batch 410) — 2 instruksi di atas dikategorikan maintenance/dependency
+(rule #3 "prioritas mutakhir") & penutupan sektor kerja, BUKAN fitur/UI/behavior baru, jadi tidak
+memicu mekanisme reopening (yang toh sudah dicabut total sejak Batch 410). Tidak ada ZIP baru dari
+user (upload terakhir tetap `AudioPlayer_v421.zip`, hasil Batch 421 sendiri, lanjut dari state
+kerja batch itu).
+
+**(1) Sektor Thread Safety DITUTUP** — lihat rule #8 § "ATURAN SESI AKTIF" di atas untuk detail
+lengkap kondisi penutupan & utang teknis tersisa (`DuplicateFinderSheet.kt`, ~90 file belum
+diaudit). 0 file kode disentuh untuk bagian ini (murni update dokumentasi status sektor).
+
+**(2) Sektor baru: audit compileSdk/targetSdk** — item #3 § "Status penutupan (Batch 384)" di
+atas ("compileSdk/targetSdk masih 34 ... butuh sesi/batch khusus") resmi dibuka batch ini.
+Temuan: `compileSdk` SUDAH 36 sejak Batch 249 (alasan waktu itu: kebutuhan dependency, bukan audit
+kompatibilitas OS eksplisit), `targetSdk` masih tertinggal di 34. `web_search` (Sep 2026,
+support.google.com/googleplay/android-developer/answer/11926878) konfirmasi Google Play WAJIB
+target API 36 (Android 16) utk app UPDATE sejak 31 Agu 2026 — deadline itu SUDAH lewat per tanggal
+sesi ini, jadi `targetSdk 34` project ini sudah tidak compliant, bukan cuma "belum optimal".
+
+**Fix** (`app/build.gradle.kts`, 1 file): `targetSdk` 34→36, disamakan ke `compileSdk` yang sudah
+36 (tidak dinaikkan). **API 37 SENGAJA TIDAK dipakai** — butuh AGP 9.1+, migrasi breaking (DSL
+`BaseExtension`/`AppExtension` lama dihapus total) yang sudah SENGAJA ditunda sejak Batch 291
+(lihat comment `compose-bom` di file yang sama) — di luar scope 1-task audit ini, konsisten
+STABILITY > Speed & `ZERO-REFACTOR`. `minSdk` (protected asset, 31) TIDAK disentuh. 0 kode UI
+disentuh — murni bump angka config di `defaultConfig`. Brace/paren balance `app/build.gradle.kts`
+36/36→36/36 (braces tidak berubah, comment-only di luar itu), 179/179→188/188 (parens, +9/+9 murni
+dari tanda kurung di teks komentar penjelasan, TIDAK ada kode baru).
+
+**Item audit BELUM diverifikasi batch ini (residual, utk sesi berikutnya)** — targetSdk 35+
+mewajibkan edge-to-edge (project ini lompat 34→36 langsung, baru kena efek ini sekarang) &
+predictive back; `foregroundServiceType` sudah ada dari batch lampau tapi belum diverifikasi ulang
+thd API 36 spesifik. **Belum pernah dijalankan compiler sungguhan/device asli** (batasan sama
+seperti batch-batch sebelumnya) — verifikasi visual (system bar insets, navigasi gesture) butuh
+device Android 16 asli, sama kelas keterbatasan seperti item #1/#2 § "Status penutupan (Batch
+384)" di atas.
+
+**Scope**: 1 file kode (`app/build.gradle.kts`). 2 file dokumentasi (`PROJECT_STATE.md`,
+`CHANGELOG.md`). `README.md`/`FILE_MANIFEST.txt` tidak disentuh (0 file baru, 0 dependency baru,
+0 perilaku user-facing yang SUDAH terverifikasi berubah — edge-to-edge/predictive back masih
+berstatus "belum diverifikasi", bukan "dikonfirmasi berubah"). Detail lengkap `CHANGELOG.md`
+Batch 422.
+
 **Batch 421 (Thread Safety: `SignatureMatcherSheet.kt`, `ApkSignatureChecker.inspect()`
 Main-thread I/O, 1 file kode + 2 dokumentasi)** — User: *"next"*. **Status DISCONTINUED tetap
 permanen** (final lock Batch 410). Tidak ada ZIP baru (upload terakhir tetap

@@ -1,5 +1,91 @@
 # Changelog
 
+## Batch 422 — Sektor Thread Safety ditutup; sektor baru dibuka: audit compileSdk/targetSdk (34→36)
+User instruksi (2 eksplisit, format T/J sesi ini): **T1** *"Sektor Thread Safety, lanjut ke
+mana?"* → **J1** *"Tutup sektor ini"*. **T2** *"Mulai audit compileSdk/targetSdk 34 → terbaru
+sekarang?"* → **J2** *"Ya, mulai sekarang"*. **Status DISCONTINUED tetap permanen tidak diubah**
+(final lock Batch 410) — kedua instruksi dikategorikan penutupan sektor kerja teknis + maintenance
+dependency (rule #3 "prioritas mutakhir"), bukan fitur/UI/behavior baru, jadi tidak masuk kategori
+manapun yang relevan dengan mekanisme reopening (yang sendiri sudah dicabut total). Tidak ada ZIP
+baru dari user — upload sesi ini tetap `AudioPlayer_v421.zip`, hasil Batch 421 sendiri, dipakai
+sbg source of truth per aturan ZIP, lanjut dari state kerja batch itu.
+
+### (1) Sektor Thread Safety — DITUTUP
+Dibuka Batch 418, mencakup Batch 418-421 (4 batch, 3 file kode: `PlayerViewModel.kt` /
+`BackupRestoreSheet.kt` / `SignatureMatcherSheet.kt`). Grep pola I/O literal app-wide di `ui/`
+(`openInputStream`/`openOutputStream`/`contentResolver.query`/`insert`/`delete`/`DocumentFile`/
+`readText()`/`FileOutputStream`/`FileInputStream`) sekarang 0 sisa call site yang belum
+di-dispatch ke `Dispatchers.IO`. **Ini bukan klaim "0 Main-thread I/O di seluruh codebase"** —
+cakupan audit terbatas pada pola literal yang di-grep eksplisit; ~90 file Kotlin lain di luar
+`ui/` (atau di `ui/` tapi tidak match pola grep, mis. Binder-heavy call tanpa nama API yang
+ter-grep) belum diaudit menyeluruh. `DuplicateFinderSheet.kt` (`remember` CPU-heavy tanpa
+`Dispatchers.Default`) TETAP tercatat sbg utang teknis TAPI beda kelas bug (Compose/performance,
+bukan I/O) — sektor itu sendiri sudah DITUTUP terpisah sejak Batch 416, TIDAK dibuka lagi di sini
+walau namanya kebetulan muncul lagi.
+
+Sesi berikutnya JANGAN proaktif mencari kandidat Main-thread I/O baru pada instruksi generik
+("next"/"lanjut") — kalau user beri instruksi eksplisit baru yang spesifik minta dibuka lagi
+sektor ini, BOLEH dieksekusi seperti biasa. Aturan permanen lengkap: rule #8 `PROJECT_STATE.md`
+§ "ATURAN SESI AKTIF". **0 file kode disentuh untuk bagian ini** — murni penutupan/dokumentasi
+status sektor, tidak ada grep/fix baru dijalankan batch ini di luar yang sudah selesai Batch 421.
+
+### (2) Sektor baru: audit compileSdk/targetSdk
+Item #3 daftar "Status penutupan (Batch 384)" (`compileSdk`/`targetSdk` masih 34, "belum ada audit
+eksplisit kompatibilitas Android 15/16 ... butuh sesi/batch khusus") resmi dibuka batch ini atas
+instruksi eksplisit user — bukan dieksekusi proaktif.
+
+**Temuan awal**: `compileSdk` di `app/build.gradle.kts` SUDAH 36, dibump sejak Batch 249 (alasan
+saat itu: `androidx.work:work-runtime-ktx:2.11.2` butuh compileSdk 35+/AGP 8.6.0+, BUKAN hasil
+audit kompatibilitas OS eksplisit). `targetSdk` sendiri TIDAK ikut naik saat itu, masih tertinggal
+di 34 — inkonsistensi persis yang item #3 catat.
+
+**Trigger konkret (bukan cuma rule #3 "prioritas mutakhir" generik)**: `web_search` (dijalankan
+sesi ini, Sep 2026) ke halaman resmi Google Play (`support.google.com/googleplay/android-developer/
+answer/11926878` + `developer.android.com/google/play/requirements/target-sdk`) konfirmasi app
+BARU dan app UPDATE WAJIB target API 36 (Android 16) atau lebih tinggi utk bisa disubmit ke Google
+Play, efektif **31 Agustus 2026** — tanggal itu SUDAH LEWAT per tanggal sesi ini (11 Sep 2026).
+Artinya `targetSdk 34` project ini bukan cuma "belum ikut versi terbaru" (kategori "nice to have"
+rule #3 biasa) — ini sudah di luar syarat minimum publish Google Play utk update berikutnya, kelas
+urgensi lebih tinggi dari dependency bump biasa.
+
+**API 37 dicek juga (`web_search`, Sep 2026) — SENGAJA TIDAK dipakai batch ini**: API 37 sudah ada
+(beberapa project/repo publik sudah migrasi), tapi butuh AGP 9.1+ — migrasi breaking (DSL
+`BaseExtension`/`AppExtension` lama Gradle dihapus total, bukan sekadar deprecation warning). Ini
+persis migrasi yang sudah SENGAJA ditunda sejak Batch 291 (lihat comment `compose-bom` di
+`app/build.gradle.kts`, keputusan compose-bom 2026.04.01 bukan 2026.08.00 justru krn alasan yang
+sama: BOM terbaru "memaksa compileSdk 37 + AGP minimum 9.1.1"). Membuka migrasi AGP 9.x di batch
+"audit compileSdk/targetSdk" ini akan jauh melebihi scope 1-task & `ZERO-REFACTOR` — `compileSdk`
+DIBIARKAN 36 (tidak diubah batch ini, sudah cukup utk syarat Google Play `targetSdk 36`), `targetSdk`
+disamakan ke situ.
+
+**Fix** (`app/build.gradle.kts`, 1 file kode): `defaultConfig.targetSdk` 34→36. `minSdk` (protected
+asset, 31) TIDAK disentuh — keputusan itu terpisah dgn konsekuensi instalasi device lama, di luar
+scope audit versi target/compile. 0 file/kode UI disentuh. Comment penjelasan ditambah persis di
+atas baris `targetSdk`, pola sama seperti comment Batch 249/290/291 lain di file yang sama.
+
+**Verifikasi statis**: brace/paren balance `app/build.gradle.kts` — SEBELUM 36 brace / 36 brace
+(seimbang) & 179 paren / 179 paren (seimbang); SETELAH tetap 36/36 brace (0 kode baru, cuma 1
+angka value berubah), 188/188 paren (naik +9/+9, murni dari tanda kurung di dalam teks komentar
+penjelasan batch ini, bukan dari kode — dicek manual, semua paren baru ada di baris `//`).
+
+**Item BELUM diverifikasi batch ini (residual eksplisit utk sesi berikutnya, BUKAN diklaim
+selesai)**: (a) edge-to-edge WAJIB terenforce sejak targetSdk 35 — project ini lompat langsung
+34→36 jadi baru kena efek ini sekarang, custom Compose UI "Liquid Glass" (system bar insets) belum
+dicek ulang thd ini; (b) predictive back — kemungkinan ada refinement behavior di API 36 vs 34
+lama, belum diverifikasi; (c) `foregroundServiceType` (`mediaPlayback`/`specialUse`) sudah
+di-declare `AndroidManifest.xml` dari batch lampau (compliant sejak minSdk naik ke 31), tapi belum
+diverifikasi ulang spesifik thd behavior API 36. **Belum pernah dijalankan compiler sungguhan /
+device asli** (batasan sama seperti seluruh batch sebelumnya di sektor manapun) — verifikasi
+visual (a)/(b)/(c) di atas butuh device Android 16 asli, kelas keterbatasan sama seperti item
+#1 (`MANUAL_QA_CHECKLIST.md` 0/19) & #2 (overscroll bounce) di § "Status penutupan (Batch 384)"
+`PROJECT_STATE.md`.
+
+**Scope**: 1 file kode (`app/build.gradle.kts`). 2 file dokumentasi (`PROJECT_STATE.md`,
+`CHANGELOG.md` — ini). `README.md`/`FILE_MANIFEST.txt` tidak disentuh (0 file baru, 0 dependency
+baru, 0 perilaku user-facing yang SUDAH terkonfirmasi berubah — item (a)/(b)/(c) di atas masih
+"belum diverifikasi", bukan "dikonfirmasi berubah", jadi belum ada yang perlu didokumentasikan
+ulang di README user-facing).
+
 ## Batch 421 — Thread Safety: SignatureMatcherSheet.kt, ApkSignatureChecker.inspect() Main-thread I/O
 User instruksi: *"next"* (generik, tanpa ZIP baru — upload terakhir tetap `AudioPlayer_v419.zip`,
 lanjut dari state kerja Batch 420). **Status DISCONTINUED tetap permanen tidak diubah** (final
