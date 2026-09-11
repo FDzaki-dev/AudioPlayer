@@ -1,5 +1,34 @@
 # Changelog
 
+## Batch 427 — Koreksi Batch 425/426: CI compile FAILED, 2 extension import Coil 3 hilang
+User upload log CI `log_fail_411.zip` — `compileDebugKotlin`/`compileReleaseKotlin` FAILED, 2x
+`Unresolved reference` di `AudioPlayerApplication.kt` baris 96 (`crossfade`) & 102 (`add`).
+**compileSdk check (Batch 426) LULUS** — kegagalan ini murni tahap Kotlin compile berikutnya,
+bukan regresi dari koreksi versi sebelumnya.
+
+**Root cause**: `crossfade()` (`ImageLoader.Builder`) & `components { }` adalah top-level Kotlin
+**extension function** di Coil 3 (`coil3.request.crossfade`, `coil3.components`) — BUKAN member
+method builder seperti efeknya di Coil 2. Kotlin tidak auto-resolve extension function lintas
+package seperti method biasa; wajib `import` eksplisit atau "Unresolved reference" di compile
+time walau `ImageLoader`-nya sendiri resolve normal (class biasa, sudah ter-import, itu sebabnya
+error HANYA di 2 baris pemanggilan method itu, bukan di seluruh file). `add(...)` (baris 102)
+adalah efek beruntun — lambda receiver `ComponentRegistry.Builder` dari `components{}` tidak
+pernah ter-resolve karena `components` sendiri gagal resolve duluan.
+
+**Fix**: `AudioPlayerApplication.kt` — tambah 2 import: `coil3.components`,
+`coil3.request.crossfade`. **0 baris logika diubah** (crossfade(200) & `.components { add(...) }`
+tetap sama persis). File lain diperiksa ulang untuk gap import serupa:
+- `util/AudioArtFetcher.kt` — SUDAH benar sejak Batch 425 (`coil3.asImage`, `coil3.toAndroidUri`
+  eksplisit ter-import; log CI ini 0 error di file ini, konsisten).
+- `ui/Utils.kt` — 0 extension function Coil dipakai (`SubcomposeAsyncImage` fungsi biasa, bukan
+  extension) — tidak berisiko gap yang sama.
+
+**Item belum-terverifikasi**: run CI berikutnya adalah verifikasi PERTAMA bahwa
+`compileDebugKotlin`/`compileReleaseKotlin` benar-benar clear dengan 2 import ini (log yang
+diupload adalah kegagalan SEBELUM koreksi). Tahap-tahap setelah compile (packaging, signing,
+lint release) masih 0 data run — item baru kalau CI berikutnya lolos compile tapi gagal di
+tahap lain.
+
 ## Batch 426 — Koreksi Batch 425: Coil 3.6.2 → 3.3.0 (CI build FAILED, compileSdk 37 conflict)
 User upload log CI `log_fail_410.zip` — `checkDebugAarMetadata` FAILED, 22 issues. Root cause
 TUNGGAL (bukan bug baru): Coil `3.6.2` transitively menarik `androidx.compose.foundation`/

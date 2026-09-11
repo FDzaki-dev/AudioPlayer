@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import coil3.components
+import coil3.request.crossfade
 import coil3.Uri as CoilUri
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.AudioArtFetcher
@@ -16,7 +18,13 @@ import com.rudi.audioplayer.util.AudioArtFetcher
  *
  * Batch 425 (Coil 2.6.0 -> 3.6.2 migration): `ImageLoaderFactory` was renamed
  * `SingletonImageLoader.Factory` and now receives the platform `Context` as a `newImageLoader`
- * parameter instead of relying on `this@AudioPlayerApplication` as an implicit receiver. */
+ * parameter instead of relying on `this@AudioPlayerApplication` as an implicit receiver.
+ * Batch 427 (CI FAILED, corrected): `crossfade()` and `components { }` are top-level Kotlin
+ * extension functions in Coil 3 (`coil3.request.crossfade`, `coil3.components`), not
+ * `ImageLoader.Builder` members like they effectively were in Coil 2 — Kotlin doesn't
+ * auto-resolve extension functions the way it does regular members, so both need an explicit
+ * import or they're "Unresolved reference" at compile time despite `ImageLoader` itself
+ * resolving fine (it's a plain top-level class, same package, no import gap there). */
 class AudioPlayerApplication : Application(), SingletonImageLoader.Factory, Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
