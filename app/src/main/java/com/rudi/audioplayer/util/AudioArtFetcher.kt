@@ -3,15 +3,17 @@ package com.rudi.audioplayer.util
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
-import android.net.Uri
 import android.util.Size
-import coil.ImageLoader
-import coil.decode.DataSource
-import coil.fetch.DrawableResult
-import coil.fetch.FetchResult
-import coil.fetch.Fetcher
-import coil.request.Options
+import coil3.ImageLoader
+import coil3.asImage
+import coil3.decode.DataSource
+import coil3.fetch.FetchResult
+import coil3.fetch.Fetcher
+import coil3.fetch.ImageFetchResult
+import coil3.request.Options
+import coil3.toAndroidUri
 import java.io.FileNotFoundException
+import coil3.Uri as CoilUri
 
 /**
  * Batch 68: root cause of the "album art hilang semua" regression shipped in Batch 67.
@@ -37,17 +39,25 @@ import java.io.FileNotFoundException
  * Fix: intercept audio content URIs before Coil's default fetcher and extract the embedded
  * artwork the same way those 3 call sites already do, so Coil gets an actual [Bitmap] instead
  * of raw audio bytes.
+ *
+ * Batch 425 (Coil 2.6.0 -> 3.6.2 migration): `AlbumArt` still passes a plain `android.net.Uri`
+ * as `model` (untouched, ZERO-REFACTOR) — Coil 3's built-in `AndroidUriMapper` runs first and
+ * maps that to a `coil3.Uri` before any Fetcher.Factory is consulted, so this Factory must now
+ * match on `coil3.Uri`, NOT `android.net.Uri`, or it silently never claims the data and every
+ * song falls through to Coil's default fetcher again — same failure shape as the Batch 68
+ * regression this class exists to fix, just with a different trigger. `data.toAndroidUri()`
+ * converts back so `loadThumbnail()`'s `ContentResolver` call is untouched below.
  */
 class AudioArtFetcher(
-    private val uri: Uri,
+    private val uri: android.net.Uri,
     private val context: Context
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult {
         val bitmap = loadEmbeddedArt()
             ?: throw FileNotFoundException("Tidak ada artwork tertanam di $uri")
-        return DrawableResult(
-            drawable = BitmapDrawable(context.resources, bitmap),
+        return ImageFetchResult(
+            image = BitmapDrawable(context.resources, bitmap).asImage(),
             isSampled = true,
             dataSource = DataSource.DISK
         )
@@ -63,16 +73,17 @@ class AudioArtFetcher(
     }
 
     /** Only claims audio URIs, so this never intercepts a real image model if one is ever added. */
-    class Factory(private val context: Context) : Fetcher.Factory<Uri> {
-        override fun create(data: Uri, options: Options, imageLoader: ImageLoader): Fetcher? {
-            if (data.scheme != "content") return null
+    class Factory(private val context: Context) : Fetcher.Factory<CoilUri> {
+        override fun create(data: CoilUri, options: Options, imageLoader: ImageLoader): Fetcher? {
+            val androidUri = data.toAndroidUri()
+            if (androidUri.scheme != "content") return null
             val mimeType = try {
-                context.contentResolver.getType(data)
+                context.contentResolver.getType(androidUri)
             } catch (e: Exception) {
                 null
             }
             if (mimeType == null || !mimeType.startsWith("audio/")) return null
-            return AudioArtFetcher(data, context)
+            return AudioArtFetcher(androidUri, context)
         }
     }
 }

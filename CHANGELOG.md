@@ -1,5 +1,49 @@
 # Changelog
 
+## Batch 425 — Dependency bump: Coil 2.6.0 → 3.6.2 (one-time reopen, sektor DISCONTINUED)
+User instruksi eksplisit reopen **satu kali khusus tugas ini** ("one-time exception") atas
+status DISCONTINUED (final lock Batch 410) — banner tetap permanen untuk sesi berikutnya, tidak
+dicabut. 3 file diubah (batas SOP): `AudioPlayerApplication.kt`, `util/AudioArtFetcher.kt`,
+`ui/Utils.kt`; ditambah `app/build.gradle.kts` (koordinat dependency, di luar hitungan 3 file
+kode). Tidak ada device fisik/compiler tersedia di environment sesi ini untuk verifikasi runtime
+— risiko ini sudah dikonfirmasi & diterima user sebelum eksekusi.
+
+**Root cause risiko utama (dicegah, bukan terjadi)**: Coil 3 mengganti tipe `model` custom
+`Fetcher.Factory` dari `android.net.Uri` ke `coil3.Uri` (tipe common multiplatform baru).
+`AndroidUriMapper` bawaan Coil 3 memetakan `android.net.Uri` yang dikirim `AlbumArt`
+(`Utils.kt`, tidak diubah) ke `coil3.Uri` SEBELUM fetcher mana pun dikonsultasi — kalau
+`AudioArtFetcher.Factory` tetap key `android.net.Uri` (kode Coil 2 apa adanya), factory itu
+tidak akan pernah match lagi, dan SEMUA artwork gagal senyap — bentuk kegagalan identik Batch
+68 ("album art hilang semua"), trigger berbeda. Fix: `Factory` sekarang `Fetcher.Factory<coil3.Uri>`,
+convert balik ke `android.net.Uri` via `.toAndroidUri()` di titik masuk `create()` sebelum
+`ContentResolver.getType()`/`loadThumbnail()` (keduanya API Android biasa, tidak disentuh).
+
+**Perubahan per file**:
+- `util/AudioArtFetcher.kt` — package `coil.*` → `coil3.*`; `Fetcher.Factory<Uri>` (Android Uri)
+  → `Fetcher.Factory<coil3.Uri>` + `.toAndroidUri()` convert-back; `DrawableResult` (dihapus di
+  Coil 3) → `ImageFetchResult` + `.asImage()` extension pada `BitmapDrawable`. Logic
+  `loadEmbeddedArt()`/`loadThumbnail()` — 0 baris diubah.
+- `AudioPlayerApplication.kt` — `ImageLoaderFactory` → `SingletonImageLoader.Factory`;
+  `newImageLoader()` sekarang menerima `context: Context` sebagai parameter (bukan implisit
+  `this@AudioPlayerApplication`); registrasi `.components { add(...) }` sekarang eksplisit
+  sertakan `CoilUri::class` supaya factory ter-key dengan benar (lihat root cause di atas).
+  `crossfade(200)`, `warmUpSharedPreferences()`, `workManagerConfiguration` — 0 baris diubah.
+- `ui/Utils.kt` — HANYA 1 baris: `import coil.compose.SubcomposeAsyncImage` →
+  `import coil3.compose.SubcomposeAsyncImage`. Composable `AlbumArt` (model, contentScale,
+  loading/error slot) — 0 baris diubah, API `SubcomposeAsyncImage` identik di Coil 3.
+- `app/build.gradle.kts` — `io.coil-kt:coil-compose:2.6.0` → `io.coil-kt.coil3:coil-compose:3.6.2`
+  + baris baru `io.coil-kt.coil3:coil-network-okhttp:3.6.2` (Coil 3 pisah artifact networking
+  dari `coil-core`, wajib ditambah eksplisit — OkHttp 4.12.0 sudah ada di project, tidak ada
+  versi baru ditambah/dipaksa).
+
+**Diverifikasi tanpa compiler** (grep manual, bukan build): 0 sisa `import coil.` (namespace Coil
+2) di `app/src/`; proguard-rules.pro baris Coil = komentar generik, tidak perlu ubah (Coil ships
+consumer rules sendiri kedua versi). **Item BELUM terverifikasi** (device fisik tidak tersedia
+sesi ini, sama seperti status QA existing project): urutan real `AndroidUriMapper` di pipeline
+resolve Coil 3 (diverifikasi dari dokumentasi resmi Coil, bukan device), dan hasil visual
+artwork on-screen (Library/Home/MiniPlayerBar/NowPlaying) pasca-bump — masuk item terbuka
+`docs/archive/MANUAL_QA_CHECKLIST.md`.
+
 ## Batch 424 — Pangkas total rule permanen `PROJECT_STATE.md` jadi padat, 0 narasi historis
 User instruksi eksplisit: *"pangkas total rule permanen pada project_state.md jadi murni isinya
 'berdaging', zero narasi ikut dicantumkan yang gak dibutuhkan sesi selanjutnya"*. **Status

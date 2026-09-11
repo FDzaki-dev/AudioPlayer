@@ -306,7 +306,12 @@ dependencies {
     implementation("androidx.media3:media3-session:1.3.1")
     implementation("androidx.media3:media3-common:1.3.1")
 
-    implementation("io.coil-kt:coil-compose:2.6.0")
+    // Batch 425: Coil 2.6.0 -> 3.6.2. Coil 3 splits networking into a separate artifact
+    // (coil-core no longer bundles it) — okhttp added since AudioArtFetcher's embedded-art
+    // path is local-only, but AsyncImage call sites elsewhere in the app may still resolve
+    // remote models through Coil's default pipeline.
+    implementation("io.coil-kt.coil3:coil-compose:3.6.2")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.2")
     implementation("androidx.palette:palette:1.0.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.fragment:fragment-ktx:1.7.1")

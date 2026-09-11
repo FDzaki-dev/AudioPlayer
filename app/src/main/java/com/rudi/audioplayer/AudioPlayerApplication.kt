@@ -2,8 +2,9 @@ package com.rudi.audioplayer
 
 import android.app.Application
 import androidx.work.Configuration
-import coil.ImageLoader
-import coil.ImageLoaderFactory
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.Uri as CoilUri
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.AudioArtFetcher
 
@@ -11,8 +12,12 @@ import com.rudi.audioplayer.util.AudioArtFetcher
  * uses Coil's default singleton ImageLoader unless it builds its own request — so configuring
  * it once here applies everywhere. Crossfading album art in (instead of it popping in the
  * instant a bitmap decodes) masks normal decode latency and is one of the cheapest, most
- * broadly-felt wins for making list/grid scrolling feel smooth. */
-class AudioPlayerApplication : Application(), ImageLoaderFactory, Configuration.Provider {
+ * broadly-felt wins for making list/grid scrolling feel smooth.
+ *
+ * Batch 425 (Coil 2.6.0 -> 3.6.2 migration): `ImageLoaderFactory` was renamed
+ * `SingletonImageLoader.Factory` and now receives the platform `Context` as a `newImageLoader`
+ * parameter instead of relying on `this@AudioPlayerApplication` as an implicit receiver. */
+class AudioPlayerApplication : Application(), SingletonImageLoader.Factory, Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         AppLogger.init(this)
@@ -86,13 +91,15 @@ class AudioPlayerApplication : Application(), ImageLoaderFactory, Configuration.
         }, "PrefsWarmup").start()
     }
 
-    override fun newImageLoader(): ImageLoader {
-        return ImageLoader.Builder(this)
+    override fun newImageLoader(context: android.content.Context): ImageLoader {
+        return ImageLoader.Builder(context)
             .crossfade(200)
             // Batch 68: extracts embedded art from song.uri instead of Coil's default
             // fetcher trying (and failing) to decode audio bytes as an image. See
             // AudioArtFetcher kdoc for the full regression story.
-            .components { add(AudioArtFetcher.Factory(this@AudioPlayerApplication)) }
+            // Batch 425: explicit CoilUri::class required — Coil 3's `components { add(...) }`
+            // overload can't always infer the KClass from a Fetcher.Factory<coil3.Uri> alone.
+            .components { add(AudioArtFetcher.Factory(context), CoilUri::class) }
             .build()
     }
 
