@@ -13,6 +13,7 @@ import androidx.compose.foundation.OverscrollFactory
 import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -278,8 +279,54 @@ private const val OVERSCROLL_SETTLE_STIFFNESS = 200f
  * `LazyColumn` (vertikal) sumbu x instance ini tidak akan pernah bergerak dari 0, dan sebaliknya
  * utk `LazyRow`.
  */
+// Batch 433 — User laporan: "effect scrolling/transition like iOS masih terasa stuttering gak
+// halus sama sekali". SUMBU BARU, beda dari SEMUA laporan 364-383 di atas (yang selalu soal
+// KARAKTER pegas — stiffness/dampingRatio/rubberBand, dites lewat rentetan preset & sudah
+// terkonfirmasi user via banyak iterasi) — "stuttering" = gejala frame drop/jank, bukan soal
+// parameter animasi mana yang dipakai.
+//
+// Root cause (verified via kontrak resmi `OverscrollEffect.applyToScroll`, developer.android.com:
+// method ini SENGAJA non-suspend justru supaya efek overscroll bisa diterapkan SINKRON dalam
+// frame sentuhan yang sama): [applyToScroll] sebelumnya menulis offset lewat
+// `coroutineScope.launch { overscrollOffset.snapTo(...) }` di SETIAP event scroll delta selama
+// drag di zona overscroll (berpotensi tiap frame sentuhan). `Animatable.snapTo` hanya suspend
+// (dijaga `MutatorMutex` internal), jadi tiap delta MEMBUAT coroutine baru lewat `launch` alih-
+// alih menulis nilai langsung — tiap `launch` menambah minimal 1 giliran dispatcher SEBELUM
+// tulisannya benar-benar berlaku, dan kalau delta datang lebih cepat dari giliran dispatcher
+// (umum saat drag cepat), coroutine-coroutine ini menumpuk & bisa selesai TIDAK berurutan dengan
+// frame sentuhan aslinya — offset yang ditampilkan jadi "kejar-kejaran" di belakang jari, persis
+// gejala stutter/tidak halus yang dilaporkan (BUKAN soal bentuk/kecepatan pegasnya, yang sudah
+// benar sejak Batch 383).
+//
+// Fix: [dragOffset] (di bawah) — `MutableState<Offset>` polos, ditulis LANGSUNG/sinkron (0
+// coroutine) dari [applyToScroll] selama fase drag aktif, sama pola `Modifier.pointerInput {
+// detectDragGestures { offsetState.value += it } }` yang sudah standar di seluruh Compose. Hanya
+// FASE SETTLE (pegas balik setelah jari lepas, [settleToZero], sudah suspend by design lewat
+// [applyToFling]/[PointerInputModifierNode] callback) yang tetap pakai [overscrollOffset]
+// (`Animatable`, WAJIB tetap ada — `animateTo`/spring physics tidak bisa jalan di luar coroutine),
+// dan tiap frame animasinya disinkronkan balik ke [dragOffset] lewat parameter `block` resmi
+// `Animatable.animateTo` (dokumentasi resmi: dieksekusi tiap frame animasi). [measure] sekarang
+// baca [dragOffset] (satu-satunya sumber kebenaran utk posisi layout, baik saat drag maupun
+// settle), bukan lagi [overscrollOffset] langsung. `dampingRatio`/`stiffness`/`rubberBandResistance`
+// (semua tuning Batch 368-383) TIDAK disentuh sama sekali — sumbu bug ini murni soal SINKRON vs
+// ASINKRON-nya penulisan offset, bukan parameter pegasnya.
+//
+// **Belum ditest di device asli** (tidak ada env Android nyata di sesi ini) — perlu konfirmasi
+// drag cepat berulang di list panjang, transisi antar layar, dan flow settle (lepas jari di
+// tengah overscroll) semuanya tetap mulus 0 regresi ke perilaku pegas Batch 368-383 yang sudah
+// disetujui user.
 private class IosRubberBandOverscrollEffect : OverscrollEffect {
 
+    /**
+     * Sumber kebenaran SINKRON utk posisi overscroll yang dibaca [measure] tiap frame layout —
+     * ditulis LANGSUNG (0 coroutine) dari [applyToScroll] selama drag aktif, dan disinkronkan tiap
+     * frame animasi dari [overscrollOffset] selama fase settle ([settleToZero]). Lihat catatan
+     * Batch 433 di atas file ini utk alasan lengkap kenapa `Animatable` sendirian tidak cukup di
+     * jalur drag (non-suspend context).
+     */
+    private val dragOffset = mutableStateOf(Offset.Zero)
+
+    /** Dipakai HANYA utk animasi pegas balik ([settleToZero]) — suspend by design, lihat Batch 433. */
     private val overscrollOffset = Animatable(Offset.Zero, Offset.VectorConverter)
 
     // Batch 372 — diisi tiap `measure()`, dipakai `rubberBandRangeXPx`/`rubberBandRangeYPx` di
@@ -289,9 +336,12 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
     private var viewportHeightPx = 0f
 
     // `Modifier.Node` sendiri sudah punya `coroutineScope` (tersedia setelah node ini attach ke
-    // hierarchy) — dipakai langsung di `applyToScroll` di bawah supaya effect ini tidak perlu
-    // parameter `CoroutineScope` eksternal dari `rememberCoroutineScope()` (yang tidak bisa
-    // dipanggil di `OverscrollFactory.createOverscrollEffect()`, fungsi itu bukan @Composable).
+    // hierarchy) — dipakai `settleIfAbandoned`/`onCancelPointerInput` di bawah (jaring pengaman
+    // Batch 375) supaya effect ini tidak perlu parameter `CoroutineScope` eksternal dari
+    // `rememberCoroutineScope()` (yang tidak bisa dipanggil di `OverscrollFactory.
+    // createOverscrollEffect()`, fungsi itu bukan @Composable). Batch 433 — `applyToScroll` TIDAK
+    // lagi pakai coroutineScope ini (dragOffset ditulis sinkron, lihat catatan Batch 433 di atas
+    // file ini); dipertahankan di sini murni utk jalur settle/safety-net yang memang suspend.
     private val overscrollNode =
         object : Modifier.Node(), LayoutModifierNode, PointerInputModifierNode {
             override fun MeasureScope.measure(
@@ -302,7 +352,7 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
                 viewportWidthPx = placeable.width.toFloat()
                 viewportHeightPx = placeable.height.toFloat()
                 return layout(placeable.width, placeable.height) {
-                    val offset = overscrollOffset.value
+                    val offset = dragOffset.value
                     placeable.placeRelativeWithLayer(offset.x.roundToInt(), offset.y.roundToInt())
                 }
             }
@@ -385,7 +435,13 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
             // sejak Batch 375) — bukan berarti fix batch ini belum lengkap.
             private fun settleIfAbandoned() {
                 coroutineScope.launch {
-                    if (overscrollOffset.value == Offset.Zero || overscrollOffset.isRunning) return@launch
+                    // Batch 433 — dragOffset (bukan overscrollOffset) yang jadi posisi LIVE selama
+                    // drag sekarang (lihat catatan Batch 433 di atas file ini); overscrollOffset
+                    // hanya bergerak selama fase settle, jadi guard "ada residual overscroll?" harus
+                    // baca dragOffset supaya tidak selalu Offset.Zero/stale saat dipanggil di tengah
+                    // drag aktif. Kondisi isRunning tetap dari overscrollOffset (masih representasi
+                    // valid: "ada settle animation yang sedang jalan?").
+                    if (dragOffset.value == Offset.Zero || overscrollOffset.isRunning) return@launch
                     settleToZero()
                 }
             }
@@ -400,22 +456,31 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
     override val node: DelegatableNode get() = overscrollNode
 
     override val isInProgress: Boolean
-        get() = overscrollOffset.isRunning || overscrollOffset.value != Offset.Zero
+        // Batch 433 — dragOffset represents the live position during active drag (overscrollOffset
+        // stays untouched until settle starts, see Batch 433 note above), so it must be checked
+        // here too or isInProgress would wrongly report false mid-drag.
+        get() = overscrollOffset.isRunning || dragOffset.value != Offset.Zero
 
     override fun applyToScroll(
         delta: Offset,
         source: NestedScrollSource,
         performScroll: (Offset) -> Offset,
     ): Offset {
-        val current = overscrollOffset.value
+        val current = dragOffset.value
         // Lepas tegangan overscroll dulu kalau user mulai scroll balik arah, per sumbu — sama
         // pola dengan contoh resmi Google utk OverscrollEffect (1 sumbu), digeneralisasi ke 2.
         val consumedByRelease = Offset(
             x = relaxAxis(delta.x, current.x),
             y = relaxAxis(delta.y, current.y),
         )
+        // Batch 433 — tulis LANGSUNG ke dragOffset (0 coroutine/launch), bukan lagi
+        // `coroutineScope.launch { overscrollOffset.snapTo(...) }` per delta. applyToScroll SENGAJA
+        // non-suspend justru supaya overscroll bisa diterapkan sinkron dalam frame sentuhan yang
+        // sama (kontrak resmi `OverscrollEffect`) — launch per delta menambah giliran dispatcher yg
+        // bisa menumpuk/tidak berurutan saat drag cepat, root cause stutter yang dilaporkan. Lihat
+        // catatan Batch 433 lengkap di atas file ini.
         if (consumedByRelease != Offset.Zero) {
-            overscrollNode.coroutineScope.launch { overscrollOffset.snapTo(current + consumedByRelease) }
+            dragOffset.value = current + consumedByRelease
         }
         val leftForScroll = delta - consumedByRelease
         val consumedByScroll = performScroll(leftForScroll)
@@ -426,7 +491,7 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
                 x = overscrollDelta.x * rubberBandResistance(projected.x, rubberBandRangeXPx),
                 y = overscrollDelta.y * rubberBandResistance(projected.y, rubberBandRangeYPx),
             )
-            overscrollNode.coroutineScope.launch { overscrollOffset.snapTo(projected + resisted) }
+            dragOffset.value = projected + resisted
         }
         return consumedByRelease + consumedByScroll
     }
@@ -532,6 +597,15 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
         // teoretis, pantulan/osilasi pegas balik hilang total, bukan cuma dipangkas. Lihat catatan
         // Batch 383 lengkap di bagian atas file ini utk alasan penuh (termasuk kenapa preset resmi
         // dipakai lagi menggantikan const custom). `stiffness` TIDAK disentuh — sumbu berbeda.
+        //
+        // Batch 433 — overscrollOffset (Animatable) kini HANYA dipakai internal di sini (drag aktif
+        // pakai dragOffset langsung, lihat catatan Batch 433 di atas file ini). Sebelum animasi
+        // mulai, snapTo dragOffset.value dulu supaya titik AWAL pegas balik = posisi drag TERAKHIR
+        // yang benar (bukan Offset.Zero basi dari settle sebelumnya). Tiap frame animasi
+        // disinkronkan balik ke dragOffset lewat parameter `block` resmi `Animatable.animateTo`
+        // (dieksekusi tiap frame animasi, dokumentasi resmi androidx) — dragOffset tetap jadi
+        // SATU-SATUNYA sumber yang dibaca [measure], baik selama drag maupun settle.
+        overscrollOffset.snapTo(dragOffset.value)
         overscrollOffset.animateTo(
             targetValue = Offset.Zero,
             initialVelocity = initialVelocity,
@@ -539,7 +613,9 @@ private class IosRubberBandOverscrollEffect : OverscrollEffect {
                 dampingRatio = Spring.DampingRatioNoBouncy,
                 stiffness = OVERSCROLL_SETTLE_STIFFNESS,
             ),
-        )
+        ) {
+            dragOffset.value = value
+        }
     }
 
     /** Berapa banyak [deltaAxis] yang diserap untuk melepas tegangan overscroll [currentAxis] yang sudah ada. */

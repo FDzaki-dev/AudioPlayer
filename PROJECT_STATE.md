@@ -9,6 +9,32 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 433**: reopen eksplisit user — laporan spesifik "effect scrolling/transition like
+iOS masih terasa stuttering gak halus sama sekali". Sumbu BARU, beda dari seluruh histori tuning
+`ui/theme/IosScrollPhysics.kt` Batch 364-383 (semuanya soal KARAKTER pegas — stiffness/
+dampingRatio/rubberBand, sudah dikonfirmasi user via banyak iterasi) — "stuttering" = gejala frame
+drop/jank, bukan parameter animasi mana yang dipakai.
+
+**1 file diubah** (dalam batas 3 file/tugas):
+1. `ui/theme/IosScrollPhysics.kt` — root cause: `applyToScroll` (kontrak resmi non-suspend, justru
+   supaya overscroll bisa diterapkan sinkron dalam frame sentuhan yang sama) sebelumnya menulis
+   posisi lewat `coroutineScope.launch { overscrollOffset.snapTo(...) }` di SETIAP event scroll
+   delta selama drag di zona overscroll — tiap delta bikin coroutine baru krn `Animatable.snapTo`
+   cuma suspend, dan `launch` menambah giliran dispatcher yang bisa menumpuk/tidak berurutan saat
+   drag cepat = persis gejala stutter yang dilaporkan. Fix: state baru `dragOffset`
+   (`MutableState<Offset>` polos) jadi sumber kebenaran SINKRON yang ditulis LANGSUNG (0 coroutine)
+   dari `applyToScroll`, pola sama `Modifier.pointerInput { detectDragGestures { ... } }` standar
+   Compose. `overscrollOffset` (`Animatable`) tetap ada, sekarang HANYA dipakai internal di fase
+   settle (`settleToZero`, sudah suspend by design) — tiap frame animasinya disinkron balik ke
+   `dragOffset` lewat parameter `block` resmi `Animatable.animateTo`. `measure()` baca `dragOffset`
+   (bukan lagi `overscrollOffset` langsung). `dampingRatio`/`stiffness`/`rubberBandResistance`
+   (semua tuning Batch 368-383) TIDAK disentuh — sumbu bug ini murni soal SINKRON vs ASINKRON-nya
+   penulisan offset, bukan parameter pegasnya. Detail lengkap: `CHANGELOG.md` § Batch 433.
+
+**0 diverifikasi CI/device Batch 433** — review manual (baca kode + cek balance brace/paren), tidak
+ada env Android nyata/device fisik di sesi ini. Item belum-terverifikasi bertambah 1 (lihat daftar
+di bawah).
+
 **Catatan Batch 425–430**: user secara eksplisit reopen **satu kali khusus** untuk Coil migration
 (bump 2.6.0→3.x, 3 file + `build.gradle.kts`), lalu reopen KEDUA secara terpisah eksplisit untuk
 sektor Compose optimization (`AlbumArt`, Batch 429) — bukan pencabutan status permanen. Versi
@@ -76,6 +102,10 @@ murni review manual (baca kode + cross-reference pola batch sebelumnya + cek bal
 brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
 
 **Item belum-terverifikasi saat penutupan** (device fisik tidak pernah tersedia di sesi kerja):
+- `ui/theme/IosScrollPhysics.kt` (Batch 433, di atas) — 0 compile log, 0 konfirmasi device. Perlu
+  ditest: drag cepat berulang di list panjang (stutter hilang?), transisi antar layar, dan flow
+  settle (lepas jari di tengah overscroll) tetap 0 regresi ke karakter pegas Batch 368-383 yang
+  sudah disetujui user.
 - `ui/DiagnosticLogSheet.kt` & `ui/DuplicateFinderSheet.kt` (Batch 431, di atas) — 0 compile log,
   0 konfirmasi device.
 - `update/UpdateManager.kt` (Batch 432, di atas) — 0 compile log, 0 konfirmasi device (Thread →

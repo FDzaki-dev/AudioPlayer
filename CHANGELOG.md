@@ -1,5 +1,52 @@
 # Changelog
 
+## Batch 433 — Fix stutter efek scroll iOS (`applyToScroll` sinkron, bukan launch per delta)
+Reopen eksplisit user — laporan spesifik: "effect scrolling/transition like iOS masih terasa
+stuttering gak halus sama sekali". Sumbu BARU dari seluruh histori tuning `IosScrollPhysics.kt`
+Batch 364-383 (semuanya soal KARAKTER pegas: stiffness/dampingRatio/rubberBand) — "stuttering"
+adalah gejala frame drop/jank, bukan soal parameter animasi yang dipakai.
+
+**1 file diubah**:
+
+1. **`ui/theme/IosScrollPhysics.kt`** — Root cause (verified via kontrak resmi
+   `OverscrollEffect.applyToScroll`, developer.android.com: method ini sengaja non-suspend justru
+   supaya overscroll bisa diterapkan sinkron dalam frame sentuhan yang sama): `applyToScroll`
+   sebelumnya menulis posisi lewat `coroutineScope.launch { overscrollOffset.snapTo(...) }` pada
+   SETIAP event scroll delta selama drag di zona overscroll. `Animatable.snapTo` cuma suspend
+   (dijaga `MutatorMutex` internal), jadi tiap delta membuat coroutine baru lewat `launch`
+   alih-alih menulis nilai langsung — tiap `launch` menambah minimal 1 giliran dispatcher sebelum
+   tulisannya berlaku, dan saat delta datang lebih cepat dari giliran dispatcher (umum saat drag
+   cepat), coroutine-coroutine ini menumpuk/bisa selesai tidak berurutan dengan frame sentuhan
+   aslinya — offset yang ditampilkan jadi "kejar-kejaran" di belakang jari, persis gejala stutter
+   yang dilaporkan.
+
+   Fix: state baru `dragOffset` (`MutableState<Offset>` polos, via `mutableStateOf`) jadi sumber
+   kebenaran SINKRON yang dibaca `measure()` tiap frame layout — ditulis LANGSUNG (0 coroutine)
+   dari `applyToScroll` selama drag aktif, pola identik `Modifier.pointerInput {
+   detectDragGestures { offsetState.value += it } }` yang sudah standar di seluruh Compose.
+   `overscrollOffset` (`Animatable`) tetap dipertahankan — WAJIB tetap ada karena `animateTo`/
+   physics-based spring tidak bisa jalan di luar coroutine — tapi sekarang HANYA dipakai internal
+   di `settleToZero` (fase pegas balik setelah jari dilepas, sudah suspend by design lewat
+   `applyToFling`/safety-net `onCancelPointerInput`). Sebelum animasi settle mulai, `overscrollOffset`
+   di-`snapTo` dulu dari `dragOffset.value` (titik awal pegas balik = posisi drag terakhir yang
+   benar, bukan `Offset.Zero` basi dari settle sebelumnya); tiap frame animasinya disinkron balik
+   ke `dragOffset` lewat parameter `block` resmi `Animatable.animateTo` (dieksekusi tiap frame
+   animasi, dokumentasi resmi androidx). `settleIfAbandoned()` (guard safety-net Batch 375/376) dan
+   `isInProgress` turut disesuaikan membaca `dragOffset` untuk posisi live selama drag —
+   `overscrollOffset.isRunning` tetap dipakai sebagai indikator "ada settle animation yang sedang
+   jalan?".
+
+   `dampingRatio` (`Spring.DampingRatioNoBouncy` sejak Batch 383), `stiffness`
+   (`OVERSCROLL_SETTLE_STIFFNESS` 200 sejak Batch 381), dan `rubberBandResistance`/
+   `RUBBER_BAND_VIEWPORT_FRACTION` (Batch 372) TIDAK disentuh sama sekali — sumbu bug ini murni
+   soal SINKRON vs ASINKRON-nya penulisan offset, bukan parameter pegasnya. 0 breaking change ke
+   API publik (`IosOverscrollFactory`, `rememberIosFlingBehavior` tidak berubah).
+
+**0 diverifikasi CI/device** — review manual (baca kode + cek balance brace/paren), tidak ada env
+Android nyata/device fisik di sesi ini. Perlu ditest ulang di device asli: drag cepat berulang di
+list panjang (stutter hilang?), transisi antar layar, dan flow settle (lepas jari di tengah
+overscroll) tetap 0 regresi ke karakter pegas Batch 368-383 yang sudah disetujui user.
+
 ## Batch 432 — Audit paket `update/` (Thread → Coroutines)
 Sektor dibuka eksplisit user: paket `update/` (3 file), sengaja dikecualikan dari audit Batch 431
 saat itu. Status proyek juga dicabut dari DISCONTINUED ke ACTIVE atas instruksi eksplisit user
