@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -20,7 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.util.AppLogger
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Read-only viewer for AppLogger's local diagnostic log — errors it caught, and the
@@ -33,8 +37,24 @@ import kotlinx.coroutines.delay
 fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var logText by remember { mutableStateOf(AppLogger.readLog()) }
+    // Batch 431 — Thread Safety (sektor "belum terjamah" di luar ui/, dibuka eksplisit per
+    // instruksi user): `AppLogger.readLog()` sebelumnya dipanggil LANGSUNG di body composable
+    // (initial value `remember`) — baca file (bisa sampai ~200KB, MAX_LOG_BYTES) di Main thread
+    // tiap sheet ini pertama dibuka. Gap-nya spesifik: audit literal grep I/O app-wide `ui/`
+    // (PROJECT_STATE.md) hanya menyisir syntax I/O yang ADA LANGSUNG di file `ui/` — 0 hit di sini
+    // karena `FileInputStream`/`readText()` sendiri hidup di `util/AppLogger.kt` (paket lain, belum
+    // diaudit), bukan di file ini; audit sebelumnya tidak menyisir call site fungsi lintas-paket
+    // yang blocking. Fix: pindah ke `LaunchedEffect(Unit)` + `Dispatchers.IO`, pola sama
+    // SignatureMatcherSheet.kt (Batch 421)/BackupRestoreSheet.kt.
+    var logText by remember { mutableStateOf("") }
+    var isLoadingLog by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        val text = withContext(Dispatchers.IO) { AppLogger.readLog() }
+        logText = text
+        isLoadingLog = false
+    }
     // Inline feedback instead of relying solely on onInfoMessage's Snackbar: ModalBottomSheet
     // renders in its own layer above Scaffold, so a Snackbar fired while this sheet is open is
     // visually stuck behind it — user taps "Repack ke Dokumen" and sees nothing happen, easy to
@@ -72,7 +92,11 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (logText.isBlank()) {
+            if (isLoadingLog) {
+                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (logText.isBlank()) {
                 Text(
                     "Belum ada catatan. Kalau nanti ada error atau crash, jejaknya akan muncul di sini.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -97,15 +121,19 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
                     onClick = {
-                        val ok = AppLogger.exportLogToDocuments(context)
-                        haptic.performHapticFeedback(
-                            if (ok) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
-                        )
-                        exportResult = ok
-                        onInfoMessage(
-                            if (ok) "Log disimpan ke Documents/AudioPlayer/logs"
-                            else "Gagal menyimpan log (perlu Android 10+)"
-                        )
+                        scope.launch(Dispatchers.IO) {
+                            val ok = AppLogger.exportLogToDocuments(context)
+                            withContext(Dispatchers.Main) {
+                                haptic.performHapticFeedback(
+                                    if (ok) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
+                                )
+                                exportResult = ok
+                                onInfoMessage(
+                                    if (ok) "Log disimpan ke Documents/AudioPlayer/logs"
+                                    else "Gagal menyimpan log (perlu Android 10+)"
+                                )
+                            }
+                        }
                     },
                     enabled = logText.isNotBlank(),
                     modifier = Modifier.weight(1f)
@@ -116,10 +144,14 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                 }
                 OutlinedButton(
                     onClick = {
-                        AppLogger.clearLog()
-                        logText = ""
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onInfoMessage("Log diagnostik dihapus")
+                        scope.launch(Dispatchers.IO) {
+                            AppLogger.clearLog()
+                            withContext(Dispatchers.Main) {
+                                logText = ""
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onInfoMessage("Log diagnostik dihapus")
+                            }
+                        }
                     },
                     enabled = logText.isNotBlank(),
                     modifier = Modifier.weight(1f)

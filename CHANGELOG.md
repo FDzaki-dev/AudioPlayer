@@ -1,5 +1,62 @@
 # Changelog
 
+## Batch 431 — Thread Safety audit menyeluruh (di luar `ui/`, kecuali `update/`) + Compose perf fix
+Sektor dibuka eksplisit user (reopen ketiga, bukan generik) — audit atas seluruh sektor "belum
+terjamah" tercatat `PROJECT_STATE.md`, KECUALI paket `update/` (`GitHubReleaseChecker.kt`,
+`UpdateDownloader.kt`, `UpdateManager.kt`) yang eksplisit dikecualikan user dari cakupan ini.
+
+**Metode audit**: grep pola blocking I/O (`commit()`, `Thread.sleep`, `HttpURLConnection`/
+`.execute()`, `FileInputStream`/`FileOutputStream`/`open{Input,Output}Stream`, `readBytes`/
+`readText`/`writeText`/`writeBytes`, `runBlocking`, `BitmapFactory`, `MediaMetadataRetriever`,
+`listFiles`/`walk`, `contentResolver.query`) di seluruh 70 file Kotlin di luar `ui/`/`update/`,
+lalu telusuri tiap hit ke call site-nya untuk cek dispatcher wrapping.
+
+**2 file diubah**:
+
+1. **`ui/DiagnosticLogSheet.kt`** — `AppLogger.readLog()` (initial value `remember`),
+   `exportLogToDocuments()` dan `clearLog()` (keduanya di `onClick`) sebelumnya jalan LANGSUNG di
+   Main thread, 0 coroutine wrapper. Root cause spesifik kenapa ini lolos audit `ui/` sebelumnya:
+   syntax I/O aslinya (`FileInputStream`, `.readText()`, `resolver.openOutputStream()`) hidup di
+   `util/AppLogger.kt` — file lain, di luar `ui/` — sedangkan yang dipanggil dari `ui/` cuma nama
+   fungsi tanpa syntax I/O yang kelihatan; audit literal-grep sebelumnya cuma menyisir syntax yang
+   ADA LANGSUNG di file `ui/`, tidak menyusul call site fungsi lintas-paket. Fix:
+   `rememberCoroutineScope()` ditambah, baca log dipindah ke `LaunchedEffect(Unit)` +
+   `withContext(Dispatchers.IO)` (dengan `isLoadingLog` state buat indikator muat), kedua
+   `onClick` dibungkus `scope.launch(Dispatchers.IO) { ... withContext(Dispatchers.Main) { ... } }`
+   — pola identik `SignatureMatcherSheet.kt` (Batch 421)/`BackupRestoreSheet.kt`. 0 perubahan
+   perilaku/pesan yang terlihat user, hanya thread eksekusinya yang pindah.
+
+2. **`ui/DuplicateFinderSheet.kt`** — utang teknis Compose-perf yang sudah tercatat sebelumnya:
+   `DuplicateDetector.findLibraryDuplicates`/`findPhysicalDuplicates` (`groupBy` +
+   `sortedByDescending` atas seluruh `songs`) dipanggil di dalam `remember(songs)` — ini
+   synchronous di dalam fase composition itu sendiri (Main thread), jadi library besar berpotensi
+   freeze singkat tiap sheet dibuka atau `songs` berubah. Fix: komputasi dipindah ke
+   `LaunchedEffect(songs)` + `withContext(Dispatchers.Default)` (murni CPU-bound, bukan I/O —
+   `DuplicateDetector` sendiri 0 Context/I/O by design, lihat KDoc-nya), ditambah state
+   `isScanning` supaya UI menampilkan indikator muat alih-alih sempat salah menampilkan "Tidak
+   ditemukan duplikat" sebelum hasil async selesai dihitung.
+
+**Sisa cakupan audit (68 file lain) — dikonfirmasi SUDAH BENAR, 0 perubahan**:
+`ApkSignatureChecker.inspect()` (sudah dibungkus Batch 421), `TagEditor.writeTags*`/
+`RingtoneEncoder.cut` (sudah `viewModelScope.launch(Dispatchers.IO)` di `PlayerViewModel.kt`),
+`BackupManager.exportToDocuments`/`readAndValidate`/`applyBackup` (sudah `scope.launch
+(Dispatchers.IO)` di `BackupRestoreSheet.kt`), `CustomFolderScanner.scan()` (sudah `withContext
+(Dispatchers.IO)`, Batch 386/418), `LyricsApi.getLyrics` (`suspend fun` + Retrofit, bukan
+`.execute()` mentah). `AppLogger.writePublicCrashLog()` sengaja TIDAK diubah — dipanggil dari
+uncaught-exception-handler saat proses bisa mati kapan saja; mendispatch ke thread lain di titik
+krisis ini justru tidak aman, jadi synchronous di sini memang benar by design.
+
+**Tidak disentuh (eksplisit dikecualikan user)**: paket `update/` (`GitHubReleaseChecker.kt`,
+`UpdateDownloader.kt`, `UpdateManager.kt`) — belum pernah diaudit sektor ini, tetap berstatus
+demikian. `compileSdk`/`targetSdk` bump ke API 37 — masih blocked migrasi AGP 9.x, tidak diminta
+user batch ini.
+
+**Item belum-terverifikasi**: 0 compiler/device fisik tersedia sesi ini — kedua fix di atas murni
+hasil review manual (baca kode langsung + cross-reference pola dispatcher yang sudah established
+di batch-batch sebelumnya + cek balance brace/paren). Render `DiagnosticLogSheet`/
+`DuplicateFinderSheet` pasca-perubahan (termasuk indikator muat baru di keduanya) BELUM dikonfirmasi
+CI maupun device asli.
+
 ## Batch 430 — Konfirmasi device: `AlbumArt` AsyncImage (Batch 429) render normal, 0 regresi
 User konfirmasi device fisik: render `AlbumArt` pasca-swap `SubcomposeAsyncImage` → `AsyncImage`
 (Batch 429) tampil normal, gambar tetap muncul di seluruh 7 titik pemakaian. 0 kode diubah batch
