@@ -1,5 +1,32 @@
 # Changelog
 
+## Batch 432 — Audit paket `update/` (Thread → Coroutines)
+Sektor dibuka eksplisit user: paket `update/` (3 file), sengaja dikecualikan dari audit Batch 431
+saat itu. Status proyek juga dicabut dari DISCONTINUED ke ACTIVE atas instruksi eksplisit user
+(detail: `PROJECT_STATE.md`).
+
+**1 file diubah**:
+
+1. **`update/UpdateManager.kt`** — `checkForUpdate()` dan `downloadAndPrepareInstall()` sebelumnya
+   jalan di `Thread { ... }.start()` mentah — bukan crash risk (StateFlow aman diupdate dari
+   thread manapun, consumer pakai `collectAsStateWithLifecycle()`), tapi melanggar SOP Thread
+   Safety (wajib Coroutines) dan Thread lepas tidak punya cancellation/lifecycle sama sekali.
+   Fix: scope baru `private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)` milik
+   singleton `UpdateManager`, kedua `Thread { ... }.start()` diganti `scope.launch { ... }`.
+   `kotlinx.coroutines` sudah dependency existing (dipakai `FloatingBubbleService.kt` dkk.) — 0
+   dependency baru ditambah. API publik tidak berubah, 0 breaking change ke `UpdateCheckSheet.kt`.
+
+**2 file dikonfirmasi sudah benar, tidak diubah**:
+- **`update/GitHubReleaseChecker.kt`** — `fetchLatest()` pakai `.execute()` blocking by design
+  (bukan `suspend`), tapi hanya pernah dipanggil dari dalam `UpdateManager.scope.launch`
+  (Dispatchers.IO), tidak pernah di Main thread.
+- **`update/UpdateDownloader.kt`** — `download()` streaming APK 8 KB per chunk langsung ke disk,
+  tidak pernah `readBytes()`/`.string()` pada body biner — sesuai Safety Locks SOP.
+
+**0 diverifikasi CI/device** — review manual (baca kode + cek balance brace/paren), device fisik
+tidak tersedia sesi ini. Flow "Cek Update" (check → download → install) perlu ditest ulang di
+device asli.
+
 ## Batch 431 — Thread Safety audit menyeluruh (di luar `ui/`, kecuali `update/`) + Compose perf fix
 Sektor dibuka eksplisit user (reopen ketiga, bukan generik) — audit atas seluruh sektor "belum
 terjamah" tercatat `PROJECT_STATE.md`, KECUALI paket `update/` (`GitHubReleaseChecker.kt`,

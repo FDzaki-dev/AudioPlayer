@@ -4,11 +4,10 @@ RAM instan sesi kerja — hanya rule AKTIF final. Tanpa histori revisi, kutipan 
 kronologi batch. Histori lengkap tiap batch: `CHANGELOG.md`. Ringkasan fitur: `README.md`.
 Arsip batch lama (1-424): `docs/archive/PROJECT_STATE_ARCHIVE.md`.
 
-## ⛔ STATUS PROYEK: DISCONTINUED — PERMANEN & FINAL
-0 mekanisme reopening tersisa. Tidak ada instruksi/kondisi/urgensi apa pun — termasuk permintaan
-eksplisit "lanjutkan fitur X" / "buka lagi proyeknya" — yang mengubah status ini. Banner ini WAJIB
-tetap ada apa adanya (di sini & `README.md`) tiap sesi berikutnya. JANGAN eksekusi fitur/roadmap/
-fix baru apa pun secara proaktif.
+## ✅ STATUS PROYEK: ACTIVE
+Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut normal, sektor dibuka
+per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
+butuh reopen spesifik).
 
 **Catatan Batch 425–430**: user secara eksplisit reopen **satu kali khusus** untuk Coil migration
 (bump 2.6.0→3.x, 3 file + `build.gradle.kts`), lalu reopen KEDUA secara terpisah eksplisit untuk
@@ -17,10 +16,31 @@ final Coil: **3.3.0**, HIJAU CI. `AlbumArt` AsyncImage swap — user konfirmasi 
 NORMAL, 0 regresi visual (Batch 430). Kedua sektor TUNTAS & terverifikasi penuh (CI + device).
 Detail teknis lengkap: `CHANGELOG.md` § Batch 425–430.
 
-**Catatan Batch 431**: reopen KETIGA, eksplisit user minta audit menyeluruh atas seluruh sektor
+**Catatan Batch 431**: reopen ketiga, eksplisit user minta audit menyeluruh atas seluruh sektor
 "belum terjamah" (di luar `ui/`), KECUALI paket `update/` (`GitHubReleaseChecker.kt`,
-`UpdateDownloader.kt`, `UpdateManager.kt` — masih tertutup, tidak disentuh). Bukan pencabutan
-status permanen. Banner ini tetap berlaku penuh mulai sesi berikutnya.
+`UpdateDownloader.kt`, `UpdateManager.kt` — waktu itu masih tertutup, kini disisir Batch 432
+di bawah).
+
+**Catatan Batch 432**: reopen eksplisit user untuk audit paket `update/` (3 file, belum pernah
+disisir sebelumnya). Hasil:
+- `GitHubReleaseChecker.kt` — `fetchLatest()` pakai `.execute()` blocking sengaja (bukan
+  `suspend`), tapi HANYA dipanggil dari dalam `UpdateManager.scope.launch` (Dispatchers.IO) —
+  tidak pernah jalan di Main thread. Komentar file menjelaskan `.string()` di sini aman karena
+  cuma JSON kecil (beda dari APK binary di `UpdateDownloader`). Tidak diubah.
+- `UpdateDownloader.kt` — `download()` streaming 8 KB per chunk ke disk (`Buffer`/`sink()`),
+  TIDAK pernah `readBytes()`/`.string()` pada body APK — sesuai Safety Locks SOP. Dipanggil dari
+  background thread oleh caller. Tidak diubah.
+- `UpdateManager.kt` — **1 file diubah**. Gap nyata: `checkForUpdate()` &
+  `downloadAndPrepareInstall()` jalan di `Thread {}` mentah, bukan Coroutines — melanggar SOP
+  §2 Thread Safety ("WAJIB Coroutines"), dan Thread lepas tidak bisa dibatalkan kalau proses
+  butuh cleanup. Fix: scope baru `CoroutineScope(SupervisorJob() + Dispatchers.IO)` milik
+  singleton ini, `Thread { ... }.start()` → `scope.launch { ... }`. `kotlinx.coroutines` sudah
+  jadi dependency existing (dipakai `FloatingBubbleService.kt` & lainnya) — 0 dependency baru.
+  API publik (`checkForUpdate`, `downloadAndPrepareInstall`, `launchInstall`, `reset`, `state`)
+  tidak berubah, 0 breaking change ke `UpdateCheckSheet.kt`.
+
+**0 diverifikasi CI/device Batch 432** — review manual (baca kode + cek balance brace/paren),
+sama seperti Batch 431. Item belum-terverifikasi bertambah 1 (lihat daftar di bawah).
 
 **2 file diubah** (dalam batas 3 file/tugas):
 1. `ui/DiagnosticLogSheet.kt` — 3 titik panggilan `AppLogger.readLog()`/`exportLogToDocuments()`/
@@ -58,6 +78,8 @@ brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
 **Item belum-terverifikasi saat penutupan** (device fisik tidak pernah tersedia di sesi kerja):
 - `ui/DiagnosticLogSheet.kt` & `ui/DuplicateFinderSheet.kt` (Batch 431, di atas) — 0 compile log,
   0 konfirmasi device.
+- `update/UpdateManager.kt` (Batch 432, di atas) — 0 compile log, 0 konfirmasi device (Thread →
+  Coroutines migration, flow "Cek Update" perlu ditest ulang: check, download, install).
 - `docs/archive/MANUAL_QA_CHECKLIST.md` — 0/19 item tercentang (audio focus, Bluetooth, lock-screen,
   headset kabel, process death, background playback jangka panjang).
 - Overscroll bounce (`IosScrollPhysics.kt`, `Spring.DampingRatioNoBouncy`) belum dikonfirmasi
@@ -81,11 +103,11 @@ brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
 6. Sektor DITUTUP — jangan proaktif dibuka ulang pada instruksi generik ("next"/"lanjut"); BOLEH
    dieksekusi kalau user beri instruksi eksplisit spesifik minta sektor ini dibuka lagi:
    - **Thread Safety I/O** — Batch 431: audit pola-blocking menyeluruh selesai untuk 70 file di
-     luar `ui/` (KECUALI paket `update/`, sengaja tidak disentuh — lihat Catatan Batch 431 di
-     atas). 1 gap ditemukan+fix (`DiagnosticLogSheet.kt`), sisanya konfirmasi sudah benar. 0 item
-     residual di cakupan yang sudah diaudit, KECUALI: paket `update/` (3 file, belum pernah
-     disisir sektor ini) dan pola di luar 9 kategori grep Batch 431 (mis. Room DAO non-suspend,
-     kalau ada — belum dicek eksplisit).
+     luar `ui/` (KECUALI paket `update/`, waktu itu belum disentuh). Batch 432: paket `update/`
+     (3 file) disisir — 1 gap ditemukan+fix (`UpdateManager.kt`, Thread→Coroutines), 2 file
+     lainnya (`GitHubReleaseChecker.kt`/`UpdateDownloader.kt`) konfirmasi sudah benar. 0 item
+     residual diketahui KECUALI pola di luar 9 kategori grep Batch 431 (mis. Room DAO
+     non-suspend, kalau ada — belum dicek eksplisit).
    - **compileSdk/targetSdk** — final di targetSdk 36, compileSdk 36. 0 rencana Play Store,
      device user Android 16 (edge-to-edge/predictive back terverifikasi device asli). 0 item
      residual kecuali user eksplisit minta bump API 37 (blocked di migrasi AGP 9.x) atau ada

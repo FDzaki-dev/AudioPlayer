@@ -3,6 +3,10 @@ package com.rudi.audioplayer.update
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.io.File
@@ -13,11 +17,16 @@ import java.io.File
  * its own package/singleton so it never touches PlayerViewModel/PlaybackService or any existing
  * app logic — worst case if this fails, only the update screen shows an error.
  *
- * Runs its background work on a plain Thread rather than a coroutine scope: this is a singleton
- * object (not a ViewModel), and a raw Thread avoids introducing a long-lived CoroutineScope that
- * would need its own cancellation/lifecycle management for what is a short, one-shot operation.
+ * Batch 432 — background work pindah dari `Thread {}` mentah ke `CoroutineScope(SupervisorJob()
+ * + Dispatchers.IO)` milik singleton ini sendiri: `SupervisorJob` supaya 1 gagal job (mis. check
+ * gagal) tidak membatalkan job lain di scope yang sama, `Dispatchers.IO` untuk I/O jaringan/disk
+ * sesuai SOP Thread Safety. Scope ini sengaja live selama proses aplikasi (bukan
+ * viewModelScope) — job tetap definisikan cara kerja sama seperti Thread lama, tapi kini pakai
+ * primitif yang terstruktur alih-alih Thread lepas tanpa pelacakan.
  */
 object UpdateManager {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     sealed class UpdateState {
         data object Idle : UpdateState()
@@ -34,7 +43,7 @@ object UpdateManager {
 
     fun checkForUpdate(currentVersionName: String) {
         _state.value = UpdateState.Checking
-        Thread {
+        scope.launch {
             val result = GitHubReleaseChecker.fetchLatest(
                 owner = com.rudi.audioplayer.BuildConfig.UPDATE_REPO_OWNER,
                 repo = com.rudi.audioplayer.BuildConfig.UPDATE_REPO_NAME
@@ -55,12 +64,12 @@ object UpdateManager {
                 is GitHubReleaseChecker.CheckResult.Failure ->
                     UpdateState.Error(result.message)
             }
-        }.start()
+        }
     }
 
     fun downloadAndPrepareInstall(context: Context, release: GitHubReleaseChecker.ReleaseInfo) {
         val appContext = context.applicationContext
-        Thread {
+        scope.launch {
             val destFile = File(appContext.cacheDir, "update_${release.apkAssetName}")
             val result = UpdateDownloader.download(
                 url = release.apkDownloadUrl,
@@ -75,7 +84,7 @@ object UpdateManager {
                 is UpdateDownloader.DownloadResult.Success -> UpdateState.ReadyToInstall(result.file)
                 is UpdateDownloader.DownloadResult.Failure -> UpdateState.Error(result.message)
             }
-        }.start()
+        }
     }
 
     /** Hands the downloaded APK to the system installer via FileProvider (see file_paths.xml /
