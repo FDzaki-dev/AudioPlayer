@@ -10,26 +10,24 @@ eksplisit "lanjutkan fitur X" / "buka lagi proyeknya" — yang mengubah status i
 tetap ada apa adanya (di sini & `README.md`) tiap sesi berikutnya. JANGAN eksekusi fitur/roadmap/
 fix baru apa pun secara proaktif.
 
-**Catatan Batch 425–428**: user secara eksplisit reopen **satu kali khusus** untuk 1 tugas (bump
-Coil 2.6.0→3.x, 3 file + `build.gradle.kts`) — bukan pencabutan status. Banner ini tetap berlaku
-penuh mulai sesi berikutnya, sama seperti sebelum Batch 425. Versi final terpasang: **Coil 3.3.0**
-(dikoreksi dari 3.6.2 di Batch 426 — compileSdk 37 conflict). Batch 427/428: rangkaian 2 gap
-compile Kotlin di `AudioPlayerApplication.kt` — `crossfade` butuh import eksplisit (fixed 427),
-`import coil3.components` itu sendiri invalid + `add()` 2-argumen tidak ada overload-nya untuk
-Fetcher (fixed 428, digantI 1-argumen). BELUM ada satu pun run CI hijau yang mengonfirmasi
-seluruh rantai compile lolos bersamaan. Detail teknis lengkap: `CHANGELOG.md` § Batch 425–428.
+**Catatan Batch 425–429**: user secara eksplisit reopen **satu kali khusus** untuk Coil migration
+(bump 2.6.0→3.x, 3 file + `build.gradle.kts`), lalu reopen KEDUA secara terpisah eksplisit untuk
+sektor Compose optimization (`AlbumArt`, Batch 429) — bukan pencabutan status permanen. Banner
+ini tetap berlaku penuh mulai sesi berikutnya. Versi final Coil: **3.3.0**. Status compile: Coil
+migration (Batch 425-428) HIJAU terverifikasi CI. `AlbumArt` AsyncImage swap (Batch 429) BELUM
+ada log CI terpisah. Detail teknis lengkap: `CHANGELOG.md` § Batch 425–429.
 
 **Item belum-terverifikasi saat penutupan** (device fisik tidak pernah tersedia di sesi kerja):
 - `docs/archive/MANUAL_QA_CHECKLIST.md` — 0/19 item tercentang (audio focus, Bluetooth, lock-screen,
   headset kabel, process death, background playback jangka panjang).
 - Overscroll bounce (`IosScrollPhysics.kt`, `Spring.DampingRatioNoBouncy`) belum dikonfirmasi
   device asli.
-- **Batch 425–428 (Coil 3.3.0 final)** — artwork on-screen di 4 titik pemakaian `AlbumArt`
-  (Library/Home/MiniPlayerBar/NowPlaying) belum dikonfirmasi tampil normal di device asli. CI
-  compile Kotlin dikoreksi 2x berturut-turut (Batch 427: `crossfade` import hilang; Batch 428:
-  `components` import invalid + `add()` overload salah) — BELUM ada satu pun run CI hijau untuk
-  kode ini sama sekali. Pola "compiler tidak tersedia di sesi kerja, tiap kesalahan API baru
-  hanya ketahuan 1 per log upload" TETAP risiko struktural aktif, bukan sudah tuntas.
+- **Batch 425–429 (Coil 3.3.0 final + AlbumArt AsyncImage)** — artwork on-screen di 7 titik
+  pemakaian `AlbumArt` (MiniPlayerBar, LibraryScreen x2, HomeScreen x2, NowPlayingScreen x2)
+  belum dikonfirmasi tampil normal di device asli — baik kasus artwork ada, gagal, maupun
+  `artworkUri == null`. CI compile Kotlin Coil sendiri (Batch 425-428) SUDAH hijau, tapi Batch 429
+  (`AsyncImage` swap) BELUM ada log CI terpisah. Pola "compiler tidak tersedia di sesi kerja,
+  device fisik tidak tersedia untuk verifikasi visual" TETAP risiko struktural aktif.
 - `docs/archive/ROADMAP_LIQUID_GLASS_REDESIGN.md` & fling behavior 14/14 layar — **sudah final CLOSED**,
   bukan item terbuka.
 
@@ -48,8 +46,6 @@ seluruh rantai compile lolos bersamaan. Detail teknis lengkap: `CHANGELOG.md` §
    `"AudioPlayer"` (hardcoded `settings.gradle.kts`), tidak terikat nama folder/`git remote`.
 6. Sektor DITUTUP — jangan proaktif dibuka ulang pada instruksi generik ("next"/"lanjut"); BOLEH
    dieksekusi kalau user beri instruksi eksplisit spesifik minta sektor ini dibuka lagi:
-   - **Compose optimization** — utang teknis tersisa: `AlbumArt` `SubcomposeAsyncImage` (perlu
-     verifikasi visual device fisik untuk ganti ke `AsyncImage`+`Painter`).
    - **Thread Safety I/O** — grep pola I/O literal app-wide `ui/` = 0 sisa; ~90 file Kotlin di
      luar `ui/` belum diaudit menyeluruh. `DuplicateFinderSheet.kt` `remember` CPU-heavy = utang
      teknis kelas Compose/performance (bukan I/O).
@@ -57,6 +53,10 @@ seluruh rantai compile lolos bersamaan. Detail teknis lengkap: `CHANGELOG.md` §
      device user Android 16 (edge-to-edge/predictive back terverifikasi device asli). 0 item
      residual kecuali user eksplisit minta bump API 37 (blocked di migrasi AGP 9.x) atau ada
      temuan baru.
+   - **Compose optimization (`AlbumArt`)** — SUDAH dieksekusi Batch 429 (`SubcomposeAsyncImage`
+     → `AsyncImage`), TAPI verifikasi visual device fisik masih 0 (0 compiler/device sesi kerja).
+     Ditutup lagi untuk item BARU di sektor ini, tapi item spesifik "verifikasi render 7 titik
+     pemakaian" tetap tercatat sebagai belum-terverifikasi (lihat bawah), bukan tuntas.
 
 ## Keputusan arsitektur utama
 Ringkasan penuh + alasan: README.md § "Keputusan Arsitektur". Poin paling kritis:

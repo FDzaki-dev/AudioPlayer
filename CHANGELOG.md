@@ -1,5 +1,33 @@
 # Changelog
 
+## Batch 429 — Compose optimization: `AlbumArt` SubcomposeAsyncImage → AsyncImage
+Sektor dibuka eksplisit user (bukan generik) sesuai utang teknis tercatat `PROJECT_STATE.md`.
+**1 file diubah**: `ui/Utils.kt` (`AlbumArt` composable) — 7 call site (`MiniPlayerBar.kt`,
+`LibraryScreen.kt` x2, `HomeScreen.kt` x2, `NowPlayingScreen.kt` x2) 0 disentuh, signature publik
+`AlbumArt(artworkUri, modifier, contentScale?, showIcon?)` sama persis.
+
+**Alasan**: `SubcomposeAsyncImage` menjalankan subcomposition pass ASLI tiap state berubah
+(loading/success/error) — berguna kalau slot loading/error butuh layout constraint SENDIRI
+terpisah dari gambar, yang tidak pernah dibutuhkan usage ini (kedua slot cuma gambar di dalam
+`Box` yang sama, 0 sizing independen). `AsyncImage` render lewat 1 Painter swap — 0 subcomposition,
+lebih murah per recomposition, terasa terutama saat scroll Library/Home (banyak instance
+`AlbumArt` mount/recompose berurutan cepat).
+
+**Perubahan logic**: `loading = {}` (blank) hilang tanpa pengganti — gambar null/loading sudah 0
+tampilan by design, sama persis. `error = { AlbumArtFallbackIcon() }` tidak bisa jadi parameter
+`AsyncImage.error: Painter?` langsung (`AlbumArtFallbackIcon` resolve `MaterialTheme.colorScheme`
++ gambar vector, bukan Painter statis) — diganti `remember`-ed `var showFallback` yang di-update
+via `onState { state -> showFallback = state is AsyncImagePainter.State.Error }`, icon render
+sebagai composable sibling biasa di `Box` yang sama (visual sama persis: 1 background tint, 1
+elemen tampak di atasnya). `remember(artworkUri)` re-key per URI — ganti lagu di scroll reset flag,
+tidak nyangkut di state error lagu sebelumnya.
+
+**Item belum-terverifikasi** (0 compiler/device di sesi kerja, sama seperti seluruh Coil batch
+sebelumnya): render visual `AlbumArt` di 7 titik pemakaian pasca-perubahan ini BELUM dikonfirmasi
+device asli — baik untuk kasus artwork ada, gagal, maupun `artworkUri == null`. CI compile juga
+BELUM ada log run untuk perubahan spesifik ini (terpisah dari verifikasi Coil 3.3.0 Batch 425-428
+yang sudah hijau).
+
 ## Batch 428 — Koreksi Batch 427: CI compile FAILED lagi, `import coil3.components` invalid
 User upload log CI `log_fail_412.zip` — `compileDebugKotlin`/`compileReleaseKotlin` FAILED, 1x
 `Unresolved reference 'components'` di `AudioPlayerApplication.kt` baris 7 (baris IMPORT itu

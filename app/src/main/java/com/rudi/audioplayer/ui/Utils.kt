@@ -25,6 +25,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -33,7 +36,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 import java.util.Locale
 
 /**
@@ -71,6 +75,22 @@ import java.util.Locale
  * (crop sisi berlebih, 0 bar kosong) di ke-6 titik pemakaian sekaligus, konsisten dgn genre app
  * ini & preseden widget. Override eksplisit `Crop` di backdrop blur Now Playing SENGAJA TIDAK
  * dihapus walau kini redundan — bukan bagian dari bug ini, ZERO-REFACTOR.
+ *
+ * Batch 429 (Compose optimization, sektor dibuka eksplisit): `SubcomposeAsyncImage` -> `AsyncImage`.
+ * `SubcomposeAsyncImage` re-runs a real subcomposition pass per state change (loading/success/
+ * error) — genuinely useful when the loading/error slots need their OWN layout constraints
+ * separate from the image's, which this usage never needed (both slots here just draw inside
+ * the same [Box], no independent sizing). `AsyncImage` renders through a single Painter swap
+ * instead — no subcomposition, cheaper per recomposition, especially felt across list/grid
+ * scrolling (Library/Home) where many `AlbumArt` instances mount/recompose in quick succession.
+ * `loading = {}` (blank, unchanged) needs no representation at all — a null/loading image draws
+ * nothing already, matching prior behavior exactly. `error = { AlbumArtFallbackIcon() }` doesn't
+ * fit `AsyncImage`'s `error: Painter?` param directly ([AlbumArtFallbackIcon] resolves
+ * `MaterialTheme.colorScheme` and draws a vector, not expressible as a static Painter without
+ * its own composable context) — tracked via `onState` into a plain `remember`-ed flag instead,
+ * so the icon renders as a normal sibling composable in the same [Box], visually identical to
+ * before (both draw on top of the same tinted background, only one visible at a time). Device
+ * visual verification still pending (0 compiler/device in this session) — see PROJECT_STATE.md.
  */
 @Composable
 fun AlbumArt(
@@ -79,20 +99,23 @@ fun AlbumArt(
     contentScale: ContentScale = ContentScale.Crop,
     showIcon: Boolean = true
 ) {
+    var showFallback by remember(artworkUri) { mutableStateOf(artworkUri == null) }
     Box(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
         if (artworkUri != null) {
-            SubcomposeAsyncImage(
+            AsyncImage(
                 model = artworkUri,
                 contentDescription = null,
                 contentScale = contentScale,
                 modifier = Modifier.matchParentSize(),
-                loading = {},
-                error = { if (showIcon) AlbumArtFallbackIcon() }
+                onState = { state ->
+                    showFallback = state is AsyncImagePainter.State.Error
+                }
             )
-        } else if (showIcon) {
+        }
+        if (showIcon && showFallback) {
             AlbumArtFallbackIcon()
         }
     }
