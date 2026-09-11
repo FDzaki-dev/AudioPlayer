@@ -1,5 +1,23 @@
 # Changelog
 
+## Batch 436 — Investigasi: buffer ~20s pasca-update (bukan regresi Batch 435)
+User laporan: "abis update saya nunggu buffer screen lumayan ±20s", menduga terkait fitur swipe
+Batch 435.
+
+**0 file diubah** — investigasi murni:
+1. Diff `AppNavHost` Batch 435 dibaca ulang penuh: hanya `pointerInput`/
+   `detectHorizontalDragGestures` + `graphicsLayer` (kerja UI-thread ringan, 0 I/O, 0 network/
+   disk). Tidak mungkin jadi sumber jeda 20 detik.
+2. Root cause sebenarnya (sudah ada SEBELUM Batch 435): `ensureLibraryLoaded()` →
+   `refreshLibrary()` (`PlayerViewModel.kt`) jalan di setiap cold start proses (`libraryLoadedOnce`
+   flag in-memory, reset tiap proses baru) — komentar existing Batch 419 sendiri menyebutnya
+   "jalur paling panas cold-start". Scan `musicRepository.getAllSongs()` (+ SAF custom folder via
+   Binder/IPC kalau ada) jalan di `Dispatchers.IO` (thread sudah benar), tapi durasi wall-clock
+   naik seiring ukuran library — install APK baru = proses baru = scan trigger ulang dari nol,
+   persis skenario "abis update". UX loading-nya sendiri (shimmer skeleton) sudah didokumentasikan
+   di README, bukan hal baru.
+3. Kesimpulan: bukan regresi Batch 435, perilaku pre-existing.
+
 ## Batch 435 — Fitur baru: gesture swipe lintas 3 tab (Beranda/Perpustakaan/Pengaturan)
 User minta fitur baru: "tambahkan gesture swipe able lintas 3 tab. alih-alih user hanya bisa
 tap-tab manual berulang!!". Bukan bugfix/reopen sektor — navigasi tab bawah belum pernah masuk

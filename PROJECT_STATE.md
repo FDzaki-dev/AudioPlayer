@@ -9,6 +9,26 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 436**: user laporan "abis update saya nunggu buffer screen lumayan ±20s",
+menduga terkait fitur swipe Batch 435. Investigasi (grep, bukan asumsi) — **0 file diubah**:
+1. Diff Batch 435 (`AppNavHost`) di-baca ulang penuh: isinya murni `pointerInput`/
+   `detectHorizontalDragGestures` + `graphicsLayer` (kerja UI-thread, non-blocking, 0 I/O, 0
+   panggilan network/disk baru). Tidak mungkin jadi sumber jeda 20 detik secara struktural.
+2. Root cause sesungguhnya (kode sudah ada SEBELUM Batch 435, tidak disentuh): `ensureLibraryLoaded()`
+   → `refreshLibrary()` (`PlayerViewModel.kt`) jalan di **setiap cold start proses** (flag
+   `libraryLoadedOnce` in-memory, bukan persisted) — dikonfirmasi lewat komentar existing Batch
+   419 sendiri: **"jalur paling panas cold-start"**. Scan `musicRepository.getAllSongs()` +
+   (kalau ada) SAF custom folder via Binder/IPC per folder (`customFolderScanner.scan()`) jalan
+   di `Dispatchers.IO` — sudah benar secara threading (non-blocking Main), tapi durasi wall-clock
+   scan MediaStore tetap naik seiring ukuran library/jumlah folder custom, TIDAK instan. Install
+   APK baru = proses baru = scan ini trigger ulang dari nol — persis skenario "abis update".
+3. Kesimpulan: **bukan regresi Batch 435**. Perilaku ini sudah ada sebelum swipe gesture ditambah,
+   ter-dokumentasi sendiri di README § fitur ("Shimmer skeleton loading" selama fase ini). Tidak
+   ada perubahan kode.
+
+**0 diverifikasi CI/device Batch 436** — kesimpulan murni dari pembacaan kode (grep + baca
+`PlayerViewModel.kt`/`MusicRepository.kt`), tidak ada env Android nyata/device fisik di sesi ini.
+
 **Catatan Batch 435**: permintaan FITUR BARU eksplisit user — "tambahkan gesture swipe able
 lintas 3 tab. alih-alih user hanya bisa tap-tab manual berulang!!" (Beranda/Perpustakaan/
 Pengaturan). Bukan reopen sektor DITUTUP manapun (lihat daftar "Sektor DITUTUP" di bawah) —
