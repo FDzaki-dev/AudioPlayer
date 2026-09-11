@@ -22,7 +22,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.BackupManager
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Gap List #10 — UI backup/restore. Launcher SAF (`OpenDocument`) sengaja dideklarasikan LANGSUNG
@@ -38,6 +41,14 @@ fun BackupRestoreSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Batch 420 — Thread Safety (lanjutan sektor Batch 418-419, PlayerViewModel.kt): 3 call site
+    // BackupManager di bawah (readAndValidate/exportToDocuments/applyBackup) sama sekali belum
+    // suspend, dipanggil langsung dari callback Main thread (importLauncher/onClick) — masing-
+    // masing genuinely blocking I/O (openInputStream+readText, openOutputStream+write,
+    // ContentResolver query+delete retensi). Beda dari kasus PlayerViewModel: sheet ini bukan
+    // ViewModel (0 viewModelScope tersedia) — scope diambil via rememberCoroutineScope, pola
+    // resmi Compose utk coroutine terikat lifecycle composable dari event handler.
+    val scope = rememberCoroutineScope()
 
     // Sama alasan DiagnosticLogSheet: ModalBottomSheet ada di layer sendiri di atas Scaffold,
     // Snackbar dari onInfoMessage bisa tertutup selagi sheet ini terbuka — banner inline supaya
@@ -56,16 +67,20 @@ fun BackupRestoreSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val payload = BackupManager.readAndValidate(context, uri)
-        haptic.performHapticFeedback(
-            if (payload != null) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
-        )
-        if (payload == null) {
-            resultBanner = false to "File bukan backup SONIX yang valid, atau formatnya sudah tidak dikenali versi ini"
-        } else {
-            // Validasi lolos, TAPI belum langsung diterapkan — konfirmasi eksplisit dari user
-            // (dialog di bawah) adalah pagar terakhir sebelum data saat ini benar-benar ditimpa.
-            pendingPayload = payload
+        scope.launch(Dispatchers.IO) {
+            val payload = BackupManager.readAndValidate(context, uri)
+            withContext(Dispatchers.Main) {
+                haptic.performHapticFeedback(
+                    if (payload != null) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
+                )
+                if (payload == null) {
+                    resultBanner = false to "File bukan backup SONIX yang valid, atau formatnya sudah tidak dikenali versi ini"
+                } else {
+                    // Validasi lolos, TAPI belum langsung diterapkan — konfirmasi eksplisit dari user
+                    // (dialog di bawah) adalah pagar terakhir sebelum data saat ini benar-benar ditimpa.
+                    pendingPayload = payload
+                }
+            }
         }
     }
 
@@ -112,19 +127,23 @@ fun BackupRestoreSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
             val backupInteraction = remember { MutableInteractionSource() }
             OutlinedButton(
                 onClick = {
-                    val fileName = BackupManager.exportToDocuments(context)
-                    haptic.performHapticFeedback(
-                        if (fileName != null) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
-                    )
-                    resultBanner = if (fileName != null) {
-                        true to "Backup tersimpan: Documents/AudioPlayer/backups/$fileName"
-                    } else {
-                        false to "Gagal membuat backup (perlu Android 10 ke atas)"
+                    scope.launch(Dispatchers.IO) {
+                        val fileName = BackupManager.exportToDocuments(context)
+                        withContext(Dispatchers.Main) {
+                            haptic.performHapticFeedback(
+                                if (fileName != null) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
+                            )
+                            resultBanner = if (fileName != null) {
+                                true to "Backup tersimpan: Documents/AudioPlayer/backups/$fileName"
+                            } else {
+                                false to "Gagal membuat backup (perlu Android 10 ke atas)"
+                            }
+                            onInfoMessage(
+                                if (fileName != null) "Backup tersimpan ke Documents/AudioPlayer/backups"
+                                else "Gagal membuat backup"
+                            )
+                        }
                     }
-                    onInfoMessage(
-                        if (fileName != null) "Backup tersimpan ke Documents/AudioPlayer/backups"
-                        else "Gagal membuat backup"
-                    )
                 },
                 interactionSource = backupInteraction,
                 modifier = Modifier.fillMaxWidth().bouncyPress(backupInteraction)
@@ -193,11 +212,15 @@ fun BackupRestoreSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
             confirmButton = {
                 TextButton(
                     onClick = {
-                        BackupManager.applyBackup(context, payload)
-                        pendingPayload = null
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        resultBanner = true to "Data berhasil dipulihkan. Tutup dan buka ulang app supaya semua layar ikut ter-refresh."
-                        onInfoMessage("Data berhasil dipulihkan")
+                        scope.launch(Dispatchers.IO) {
+                            BackupManager.applyBackup(context, payload)
+                            withContext(Dispatchers.Main) {
+                                pendingPayload = null
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                resultBanner = true to "Data berhasil dipulihkan. Tutup dan buka ulang app supaya semua layar ikut ter-refresh."
+                                onInfoMessage("Data berhasil dipulihkan")
+                            }
+                        }
                     },
                     enabled = counts.isNotEmpty()
                 ) {

@@ -1,5 +1,71 @@
 # Changelog
 
+## Batch 420 — Thread Safety: BackupRestoreSheet.kt, 3 call site BackupManager Main-thread I/O
+User instruksi: *"next"* (generik, tanpa ZIP baru dari user — upload sesi ini `AudioPlayer_v419.zip`,
+hasil Batch 419 sendiri). **Status DISCONTINUED tetap permanen tidak diubah** (final lock Batch 410).
+
+**Lanjutan sektor Thread Safety** (dibuka Batch 418, bukan sektor baru) — Batch 419 mencatat
+eksplisit kelas bug spesifik `loadCustomFolderInfos()` (`PlayerViewModel.kt`) TUNTAS, tapi sektor
+secara umum "belum tentu tuntas total". Batch ini memperluas audit ke luar `PlayerViewModel.kt`:
+grep app-wide pemanggil `Store`/`Manager` object LANGSUNG dari `ui/` (bukan lewat ViewModel) yang
+isinya I/O nyata (`ContentResolver`/SAF/`MediaStore`) tanpa dispatcher wrapper. Ketemu
+`BackupRestoreSheet.kt` — 3 call site `BackupManager` (`readAndValidate`/`exportToDocuments`/
+`applyBackup`), ketiganya fungsi biasa (bukan `suspend`) dipanggil LANGSUNG dari callback Main
+thread (`importLauncher` result & 2 `onClick`), 0 coroutine wrapper di caller maupun di
+`BackupManager.kt` sendiri.
+
+**Root cause**: isi ketiga fungsi genuinely blocking — `readAndValidate` baca seluruh isi file
+lewat SAF (`openInputStream(...).reader().readText()`) + parse JSON; `exportToDocuments` insert
+`MediaStore.Files` + tulis file (`openOutputStream(...).write(...)`) + `enforceBackupRetention`
+(query + delete FIFO 20 file via `ContentResolver`); `applyBackup` loop `clear()`+refill sampai 17
+`SharedPreferences` whitelisted. Kelas bug identik preseden `loadCustomFolderInfos()` (Batch
+418/419) & `setThemeIdentity`/`setThemeMode` (Batch 72) — Main-thread I/O di call path yang belum
+pernah diaudit sistematis karena bukan bagian `PlayerViewModel.kt`.
+
+**Fix** (`BackupRestoreSheet.kt`, 1 file — `BackupManager.kt` sendiri TIDAK disentuh, tetap fungsi
+sinkron biasa, konsisten pola "Store polos, caller yang wrap dispatcher" yang sudah established
+codebase ini): sheet ini BUKAN ViewModel (0 `viewModelScope` tersedia) — dipakai
+`rememberCoroutineScope()` (pola resmi Compose untuk coroutine dari event handler composable),
+ketiga call site dibungkus `scope.launch(Dispatchers.IO) { ... }`, lalu switch balik
+`withContext(Dispatchers.Main) { ... }` untuk bagian yang WAJIB tetap di Main:
+`haptic.performHapticFeedback(...)` (delegasi ke method `View`, berisiko crash kalau dipanggil dari
+thread lain) & semua state Compose (`resultBanner`/`pendingPayload`) + `onInfoMessage(...)`. **0
+perubahan urutan logic relatif ke versi sebelumnya** per call site (haptic → state → callback tetap
+urutan yang sama, cuma sekarang di dalam `withContext(Main)` setelah bagian I/O-nya pindah ke `IO`
+duluan) — 0 perubahan signature publik `BackupRestoreSheet`/`BackupManager`, 0 call site lain di
+luar file ini perlu disentuh.
+
+**Verifikasi**: grep ulang `BackupManager\.` app-wide — confirmed 3/3 call site (semuanya di file
+ini) sekarang IO-wrapped, 0 sisa. Brace/paren balance `BackupRestoreSheet.kt` naik dari 33/33 &
+108/107 (SEBELUM batch ini) jadi 39/39 & 120/119 — brace bertambah persis +6 pair (3 call site ×
+`launch{}` + `withContext{}`), paren bertambah persis +12 (3 call site × 2 pasang baru
+`launch(...)`/`withContext(...)`, sisanya komentar batch ini). **Catatan jujur, BUKAN dari batch
+ini**: paren file ini SUDAH tidak seimbang 1 sejak SEBELUM diedit (108/107, dikonfirmasi dari ZIP
+asli user sebelum disentuh) — ditelusuri sampai ketemu: komentar Batch 340 baris "// Batch 340 —
+BUG FIX (lanjutan antrean..." buka `(` yang tidak pernah ditutup di 4 baris komentar sesudahnya
+(murni typo di teks komentar, 0 dampak kompilasi karena ini komentar bukan kode). TIDAK diperbaiki
+batch ini (di luar scope Thread Safety, `ZERO-REFACTOR`) — dicatat di sini murni supaya audit
+brace/paren sesi berikutnya tidak salah curiga batch ini yang menyebabkan gap-nya.
+
+**Belum pernah dijalankan compiler sungguhan** (0 Gradle/Android SDK/jaringan di sandbox sesi ini,
+batasan sama sejak batch-batch sebelumnya). **Belum diverifikasi device asli** — prioritas cek:
+buat backup & restore backup, pastikan sheet tidak freeze sesaat saat tombol ditekan (terutama
+restore kalau file backup besar), dan Snackbar/banner hasil tetap muncul benar dari alur baru ini.
+
+**Sektor Thread Safety kini mencakup 2 file** (`PlayerViewModel.kt` TUNTAS untuk kelasnya sendiri
+sejak Batch 419; `BackupRestoreSheet.kt` TUNTAS untuk 3 call site-nya batch ini) — sektor secara
+umum MASIH belum tentu tuntas total, ~90 file Kotlin lain di codebase belum diaudit sistematis pola
+yang sama. Kandidat berikutnya yang belum diperiksa: `RingtoneCutterSheet.kt`/`SongInfoEditSheet.kt`
+(tag/audio file I/O langsung dari UI). **Dicatat, TIDAK dieksekusi batch ini** (beda kelas, di luar
+Thread Safety murni): `DuplicateFinderSheet.kt` (`remember(songs) { DuplicateDetector.find...() }`
+CPU-heavy tanpa `Dispatchers.Default` — ini kandidat sektor Compose/performance, bukan I/O, dan
+sektor Compose sudah DITUTUP eksplisit Batch 416 (item 7 `PROJECT_STATE.md`) — TIDAK dibuka lagi di
+sini pada instruksi generik.
+
+**Scope**: 1 file kode (`BackupRestoreSheet.kt`). 2 file dokumentasi (`PROJECT_STATE.md`,
+`CHANGELOG.md` — ini). `README.md`/`FILE_MANIFEST.txt` tidak disentuh (0 file baru, 0 perilaku
+user-facing berubah, 0 dependency baru).
+
 ## Batch 419 — Thread Safety: fix Main-thread I/O ke-3 (dan terakhir) di refreshLibrary()
 User instruksi: *"next"* (generik, tanpa ZIP baru — upload terakhir tetap `AudioPlayer_v418.zip`).
 **Status DISCONTINUED tetap permanen tidak diubah** (final lock Batch 410).

@@ -117,6 +117,37 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 420 (Thread Safety: `BackupRestoreSheet.kt`, 3 call site `BackupManager` Main-thread I/O,
+1 file kode + 2 dokumentasi)** — User: *"next"*. **Status DISCONTINUED tetap permanen** (final
+lock Batch 410). Tidak ada ZIP baru dari user (upload sesi ini `AudioPlayer_v419.zip`, itu hasil
+Batch 419 sendiri, dipakai sbg source of truth per aturan ZIP).
+
+Lanjutan sektor Thread Safety (Batch 418-419), diperluas keluar `PlayerViewModel.kt`: grep
+app-wide pemanggil `Store`/`Manager` LANGSUNG dari `ui/` (bukan lewat ViewModel) — ketemu
+`BackupRestoreSheet.kt`, 3 call site `BackupManager` (`readAndValidate`/`exportToDocuments`/
+`applyBackup`) yang genuinely blocking I/O (baca/tulis file via SAF & MediaStore, query+delete
+retensi) dipanggil langsung dari callback Main thread, kelas bug identik preseden
+`loadCustomFolderInfos()`. Fix: `rememberCoroutineScope()` (sheet ini bukan ViewModel) +
+`scope.launch(Dispatchers.IO) { ... withContext(Dispatchers.Main) { haptic/state/callback } }`
+di ketiga call site — `BackupManager.kt` sendiri TIDAK disentuh (tetap sinkron, pola "Store polos"
+konsisten codebase). 0 perubahan urutan logic, 0 perubahan signature publik. Brace/paren balance
+`BackupRestoreSheet.kt` naik 33/33→39/39, 108/107→120/119 (edit sendiri +6/+6 brace, +12/+12
+paren, seimbang). **Temuan sampingan jujur**: gap 108/107 SUDAH ada sebelum diedit — typo 1 `(`
+tak tertutup di komentar Batch 340 (bukan kode, 0 dampak kompilasi), TIDAK diperbaiki (di luar
+scope). Belum pernah dijalankan compiler sungguhan/device asli. Detail lengkap `CHANGELOG.md`
+Batch 420.
+
+**Sektor Thread Safety**: 2 file TUNTAS untuk kelas masing-masing (`PlayerViewModel.kt` sejak
+Batch 419, `BackupRestoreSheet.kt` batch ini) — sektor umum MASIH belum tuntas total, ~90 file
+Kotlin lain belum diaudit. Kandidat berikutnya: `RingtoneCutterSheet.kt`/`SongInfoEditSheet.kt`
+(tag/audio file I/O langsung UI). Dicatat tapi TIDAK dieksekusi: `DuplicateFinderSheet.kt`
+`remember` CPU-heavy tanpa `Dispatchers.Default` — beda kelas (Compose/performance, bukan I/O),
+sektor itu sudah DITUTUP Batch 416, tidak dibuka lagi pada instruksi generik.
+
+**Scope**: 1 file kode (`BackupRestoreSheet.kt`). 2 file dokumentasi (`PROJECT_STATE.md`,
+`CHANGELOG.md`). `README.md`/`FILE_MANIFEST.txt` tidak disentuh (0 file baru, 0 perilaku
+user-facing berubah).
+
 **Batch 419 (Thread Safety: fix Main-thread I/O ke-3/terakhir di refreshLibrary(), 1 file kode +
 2 dokumentasi)** — User: *"next"*. **Status DISCONTINUED tetap permanen** (final lock Batch 410).
 Tidak ada ZIP baru (upload terakhir tetap `AudioPlayer_v418.zip`).
