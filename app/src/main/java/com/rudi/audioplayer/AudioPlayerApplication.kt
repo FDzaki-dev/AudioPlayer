@@ -4,9 +4,7 @@ import android.app.Application
 import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
-import coil3.components
 import coil3.request.crossfade
-import coil3.Uri as CoilUri
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.AudioArtFetcher
 
@@ -19,12 +17,18 @@ import com.rudi.audioplayer.util.AudioArtFetcher
  * Batch 425 (Coil 2.6.0 -> 3.6.2 migration): `ImageLoaderFactory` was renamed
  * `SingletonImageLoader.Factory` and now receives the platform `Context` as a `newImageLoader`
  * parameter instead of relying on `this@AudioPlayerApplication` as an implicit receiver.
- * Batch 427 (CI FAILED, corrected): `crossfade()` and `components { }` are top-level Kotlin
- * extension functions in Coil 3 (`coil3.request.crossfade`, `coil3.components`), not
- * `ImageLoader.Builder` members like they effectively were in Coil 2 — Kotlin doesn't
- * auto-resolve extension functions the way it does regular members, so both need an explicit
- * import or they're "Unresolved reference" at compile time despite `ImageLoader` itself
- * resolving fine (it's a plain top-level class, same package, no import gap there). */
+ * Batch 427 (CI FAILED, corrected): `crossfade()` is a top-level Kotlin extension function in
+ * Coil 3 (`coil3.request.crossfade`), not an `ImageLoader.Builder` member like it effectively
+ * was in Coil 2 — needs its own explicit import.
+ * Batch 428 (CI FAILED again, corrected): `components { }` IS a genuine member function of
+ * `ImageLoader.Builder` (needs no import, unlike `crossfade`) — removed the invalid
+ * `import coil3.components` (no such top-level symbol exists). Also removed the invalid 2-arg
+ * `add(factory, CoilUri::class)` call below: `ComponentRegistry.Builder`'s only `Fetcher.Factory`
+ * overload is `inline fun <T : Any> add(factory: Fetcher.Factory<T>)` — no KClass-taking
+ * overload exists for fetchers (that 2-arg form only exists for `Keyer`/`Mapper`). The
+ * single-arg call infers `T = coil3.Uri` automatically from `AudioArtFetcher.Factory`'s own
+ * declared type (`Fetcher.Factory<coil3.Uri>`, see that class), same pattern as every working
+ * example in Coil's own docs (`add(CustomFetcher.Factory())`, no explicit type argument). */
 class AudioPlayerApplication : Application(), SingletonImageLoader.Factory, Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
@@ -105,9 +109,9 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory, Conf
             // Batch 68: extracts embedded art from song.uri instead of Coil's default
             // fetcher trying (and failing) to decode audio bytes as an image. See
             // AudioArtFetcher kdoc for the full regression story.
-            // Batch 425: explicit CoilUri::class required — Coil 3's `components { add(...) }`
-            // overload can't always infer the KClass from a Fetcher.Factory<coil3.Uri> alone.
-            .components { add(AudioArtFetcher.Factory(context), CoilUri::class) }
+            // Batch 428: single-arg add() — T (coil3.Uri) infers from AudioArtFetcher.Factory's
+            // own Fetcher.Factory<coil3.Uri> declaration, no KClass overload exists to pass one.
+            .components { add(AudioArtFetcher.Factory(context)) }
             .build()
     }
 

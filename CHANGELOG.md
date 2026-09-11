@@ -1,5 +1,37 @@
 # Changelog
 
+## Batch 428 — Koreksi Batch 427: CI compile FAILED lagi, `import coil3.components` invalid
+User upload log CI `log_fail_412.zip` — `compileDebugKotlin`/`compileReleaseKotlin` FAILED, 1x
+`Unresolved reference 'components'` di `AudioPlayerApplication.kt` baris 7 (baris IMPORT itu
+sendiri, bukan titik pemanggilan). **`crossfade` (fix Batch 427) sudah LULUS** — 0 error lagi di
+baris itu, konfirmasi fix sebelumnya benar untuk simbol itu.
+
+**Root cause**: `import coil3.components` yang ditambahkan Batch 427 itu sendiri SALAH — tidak
+ada top-level symbol `coil3.components`. `components { }` ternyata BUKAN top-level extension
+function seperti `crossfade()` — dikonfirmasi ulang dari dokumentasi resmi Coil (`coil-core /
+coil3 / ImageLoader / Builder`, listing "Members & Extensions"): `components` adalah member
+function ASLI `ImageLoader.Builder` (`inline fun components(builder: ComponentRegistry.Builder.()
+-> Unit)`), jadi 0 import diperlukan — pola sama seperti `.crossfade(200)` di Coil 2 dulu
+(langsung chainable, tanpa import tambahan).
+
+**Temuan kedua (preventif, sebelum sempat jadi error CI berikutnya)**: baris pemanggilan
+`.components { add(AudioArtFetcher.Factory(context), CoilUri::class) }` — 2 argumen (`factory,
+KClass`) — DIVERIFIKASI ULANG terhadap `ComponentRegistry.Builder` API resmi: overload itu HANYA
+ada untuk `Keyer`/`Mapper`, TIDAK ada untuk `Fetcher.Factory`. Satu-satunya overload fetcher
+adalah `inline fun <T : Any> add(factory: Fetcher.Factory<T>)` — 1 argumen, `T` infer otomatis
+dari tipe generik factory itu sendiri. Diperbaiki SEKARANG (bukan menunggu log CI berikutnya)
+supaya tidak jadi kegagalan compile ke-4 berturut-turut untuk simbol yang sama persis.
+
+**Fix**: `AudioPlayerApplication.kt` — hapus `import coil3.components` (invalid), hapus juga
+import `coil3.Uri as CoilUri` yang jadi tidak terpakai setelah argumen ke-2 `add()` dihapus.
+Panggilan `add(AudioArtFetcher.Factory(context))` sekarang 1 argumen. **0 baris logika lain
+diubah** — `crossfade(200)` (fix Batch 427) tetap.
+
+**Item belum-terverifikasi**: run CI berikutnya adalah verifikasi PERTAMA seluruh rantai
+compile (`crossfade` + `components` + `add`) benar-benar clear bersamaan — 3 log CI berturut-
+turut sejauh ini semuanya baru menguji 1 simbol baru per run, belum pernah satu run pun lolos
+compile sepenuhnya.
+
 ## Batch 427 — Koreksi Batch 425/426: CI compile FAILED, 2 extension import Coil 3 hilang
 User upload log CI `log_fail_411.zip` — `compileDebugKotlin`/`compileReleaseKotlin` FAILED, 2x
 `Unresolved reference` di `AudioPlayerApplication.kt` baris 96 (`crossfade`) & 102 (`add`).
