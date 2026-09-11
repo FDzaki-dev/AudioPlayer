@@ -1,5 +1,52 @@
 # Changelog
 
+## Batch 437 — Fitur baru: efek "kaca pembesar" iOS pada label 3 tab bawah (Beranda/Perpustakaan/Pengaturan)
+User minta fitur baru (lampiran screenshot bottom nav): "fitur drag horizontal antar tab sudah
+jadi, sekarang itu juga berlaku untuk label tab — macam frosted glass iPhone, kaca pembesar,
+tulisan di bawahnya bereaksi tergantung kaca diarahkan kesitu atau bukan". Perluasan langsung
+dari fitur swipe Batch 435, bukan reopen sektor DITUTUP manapun.
+
+**1 file diubah**:
+
+1. **`MainActivity.kt`** (`AppNavHost`) — 0 gesture/state baru ditambahkan. Signal yang sudah ada
+   dari Batch 435, `tabDragOffsetPx` (`MutableFloatState`, ±40px, ditulis langsung tiap frame
+   dari `onHorizontalDrag`, sudah spring-back ke 0 lewat `Animatable` di `onDragEnd`/
+   `onDragCancel`), dibaca ulang oleh fungsi lokal baru `tabMagnifyFocus(tabIndex): Float` sebagai
+   bobot fokus 0f..1f per tab: tab yang sedang aktif (`currentRoute`) mulai di fokus 1f dan turun
+   sebesar `max(towardNext, towardPrev)` selama drag berlangsung, sementara tab tetangga yang
+   dituju (`fromIdx+1` untuk geser ke kiri/next, `fromIdx-1` untuk geser ke kanan/prev) naik dari
+   0f menuju 1f — kontinu frame-demi-frame, BUKAN snap di ujung threshold ±120px yang sudah ada.
+
+   Label `NavigationBarItem` (sebelumnya `Text("Beranda")` polos, dan padanannya untuk
+   Perpustakaan/Pengaturan) diganti composable baru `MagnifyingTabLabel(text, focus)`:
+   - `fontSize` di-scale kontinu dari `baseStyle.fontSize` (`LocalTextStyle.current`, BUKAN angka
+     sp hardcode) — ikut style/tema label bawaan apa pun yang sedang aktif (Apple/Tactile/
+     SkeuDarkLite/LiquidGlass/dst), hanya `fontSize` yang di-override eksplisit.
+   - `graphicsLayer { scaleX/scaleY/alpha }` — scale hingga ~1.08x tambahan & alpha 0.68→1.0
+     mengikuti `focus`.
+   - `Modifier.blur()` — radius turun dari ~1.3dp (buram, tidak fokus) ke 0dp (tajam, fokus
+     penuh). Dipakai tanpa percabangan `Build.VERSION` — `minSdk` project ini sudah 31,
+     `RenderEffect` (dasar `Modifier.blur` di Compose) tersedia sejak API 31, jadi selalu aktif.
+
+   Hasil gabungan: tab yang "disorot kaca" tampak sedikit lebih besar, tajam, dan terang; tab
+   lain mengecil, buram sebagian, dan redup — bergeser mulus dari satu label ke label sebelah
+   selama jari menekan, persis referensi user (lensa pembesar iOS).
+
+   **Scope SENGAJA dibatasi** ke `NavigationBar` bawah (layout ponsel COMPACT) saja, sesuai
+   screenshot user (bottom nav bar ponsel) — `NavigationRailItem` (tablet/foldable Medium/
+   Expanded) TIDAK ikut diubah, di luar permintaan, 0 side-quest. Dibaca di titik pemakaian
+   (dalam tiap `label = { ... }` NavigationBarItem, bukan di-hoist ke `NavigationBar`) SENGAJA —
+   scope recomposition tetap sekecil mungkin (hanya `Text` label yang recompose tiap frame drag,
+   bukan seluruh bar), pola yang sama dipakai `BlurUtils.kt`/`IosScrollPhysics.kt` di app ini.
+
+   0 breaking change: `selected`/`onClick`/`icon`/route logic (Batch 301/435) tidak disentuh sama
+   sekali. Warna label selected/unselected TETAP 100% dari `LocalContentColor` bawaan M3 (tidak
+   di-override sama sekali oleh composable baru ini) — hanya ukuran/ketajaman/opacity yang
+   bereaksi terhadap drag, bukan warnanya.
+
+**0 diverifikasi CI/device Batch 437** — review manual (baca kode + cek balance brace/paren:
+`{}` 286/286, `()` 734/734, `[]` 3/3), tidak ada env Android nyata/device fisik di sesi ini.
+
 ## Batch 436 — Investigasi: buffer ~20s pasca-update (bukan regresi Batch 435)
 User laporan: "abis update saya nunggu buffer screen lumayan ±20s", menduga terkait fitur swipe
 Batch 435.

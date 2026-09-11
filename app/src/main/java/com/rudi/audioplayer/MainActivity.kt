@@ -147,6 +147,11 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import kotlinx.coroutines.launch
+// Batch 437 — kaca pembesar label tab bawah: LocalTextStyle (baca style label bawaan
+// NavigationBarItem apa adanya, cuma fontSize yg di-override) + blur (RenderEffect, aman krn
+// minSdk 31).
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.ui.draw.blur
 
 // Batch 435 — urutan resmi 3 tab bawah (sama persis urutan NavigationBarItem/NavigationRailItem
 // di AppNavHost bawah: Beranda, Perpustakaan, Pengaturan). Dipakai gesture swipe untuk hitung
@@ -568,6 +573,35 @@ private fun WelcomeHighlight(icon: androidx.compose.ui.graphics.vector.ImageVect
     }
 }
 
+// Batch 437 — request eksplisit user: label NavigationBarItem bawah (Beranda/Perpustakaan/
+// Pengaturan) diganti dari `Text("Beranda")` polos jadi composable ini — efek "kaca pembesar"
+// ala iOS, ukuran/blur/opacity Text bereaksi KONTINU terhadap `focus` (0f..1f, lihat
+// `tabMagnifyFocus` di AppNavHost) alih-alih cuma snap ON/OFF ikut boolean `selected`. `style`
+// diturunkan dari `LocalTextStyle.current` (bukan style baru) — hanya `fontSize` yang
+// di-override eksplisit, warna (selected/unselected, dianimasikan sendiri oleh M3 lewat
+// LocalContentColor) & sisanya (letterSpacing/lineHeight/fontWeight) TETAP ikut identitas tema
+// aktif apa pun (Apple/Tactile/SkeuDarkLite/LiquidGlass/dst) — 0 hardcode warna baru. `blur()`
+// dipakai tanpa percabangan Build.VERSION: minSdk project ini sudah 31, RenderEffect (dasar
+// Modifier.blur di Compose) tersedia sejak API 31.
+@Composable
+private fun MagnifyingTabLabel(text: String, focus: Float) {
+    val clampedFocus = focus.coerceIn(0f, 1f)
+    val baseStyle = LocalTextStyle.current
+    Text(
+        text = text,
+        maxLines = 1,
+        style = baseStyle.copy(fontSize = baseStyle.fontSize * (1f + clampedFocus * 0.14f)),
+        modifier = Modifier
+            .graphicsLayer {
+                val scale = 1f + clampedFocus * 0.08f
+                scaleX = scale
+                scaleY = scale
+                alpha = 0.68f + 0.32f * clampedFocus
+            }
+            .blur(((1f - clampedFocus) * 1.3f).dp)
+    )
+}
+
 @Composable
 private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boolean) {
     val navController = rememberNavController()
@@ -781,6 +815,28 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val tabSwipeScope = rememberCoroutineScope()
     val tabDragOffsetPx = remember { mutableFloatStateOf(0f) }
     val tabDragOffset = remember { Animatable(0f) }
+
+    // Batch 437 — request eksplisit user: efek "kaca pembesar" ala iOS di label bawah, bereaksi
+    // kontinu mengikuti gesture drag yang SAMA PERSIS dgn Batch 435 (0 gesture/state baru) —
+    // `tabDragOffsetPx` di atas SUDAH live ter-update tiap frame selama `onHorizontalDrag`
+    // (±40px, lihat Box pembungkus NavHost di bawah) dan sudah spring-back ke 0 di `onDragEnd`/
+    // `onDragCancel`; fungsi ini murni MEMBACA ulang sinyal itu sebagai bobot fokus per-tab, 0
+    // pointerInput/Animatable kedua. Dipanggil di titik pemakaian (dalam tiap `label = { ... }`
+    // NavigationBarItem, bukan di-hoist ke NavigationBar) SENGAJA — scope recomposition tetap
+    // sekecil mungkin (hanya Text label yang berubah tiap frame drag, bukan seluruh NavigationBar).
+    fun tabMagnifyFocus(tabIndex: Int): Float {
+        val fromIdx = TAB_ROUTES.indexOfFirst { it == currentRoute }
+        if (fromIdx < 0) return 0f
+        val offset = tabDragOffsetPx.floatValue // -40f..40f; negatif = geser ke arah tab BERIKUTNYA
+        val towardNext = (-offset / 40f).coerceIn(0f, 1f)
+        val towardPrev = (offset / 40f).coerceIn(0f, 1f)
+        return when (tabIndex) {
+            fromIdx -> 1f - maxOf(towardNext, towardPrev)
+            fromIdx + 1 -> towardNext
+            fromIdx - 1 -> towardPrev
+            else -> 0f
+        }
+    }
 
     // Batch 101 — Adaptive (multi-device). widthClass dihitung dari LocalConfiguration, jadi
     // otomatis berubah live saat rotasi/lipat-buka foldable/resize split-screen — TIDAK perlu
@@ -1040,7 +1096,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 }
                             },
                             icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                            label = { Text("Beranda") }
+                            label = { MagnifyingTabLabel("Beranda", tabMagnifyFocus(0)) }
                         )
                         NavigationBarItem(
                             selected = currentRoute == "library",
@@ -1053,7 +1109,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 }
                             },
                             icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
-                            label = { Text("Perpustakaan") }
+                            label = { MagnifyingTabLabel("Perpustakaan", tabMagnifyFocus(1)) }
                         )
                         NavigationBarItem(
                             selected = currentRoute == "settings",
@@ -1066,7 +1122,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 }
                             },
                             icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                            label = { Text("Pengaturan") }
+                            label = { MagnifyingTabLabel("Pengaturan", tabMagnifyFocus(2)) }
                         )
                     }
                 }

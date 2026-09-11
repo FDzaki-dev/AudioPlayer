@@ -9,6 +9,39 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 437**: permintaan FITUR BARU eksplisit user (lampiran screenshot bottom nav) —
+efek "kaca pembesar ala iOS" di LABEL 3 tab bawah (Beranda/Perpustakaan/Pengaturan), bereaksi
+tergantung "kaca diarahkan kesitu/bukan". Bukan reopen sektor DITUTUP manapun — perluasan
+langsung dari fitur swipe Batch 435 (sektor sama, belum pernah ditutup).
+
+**1 file diubah** (dalam batas 3 file/tugas):
+1. `MainActivity.kt` (`AppNavHost`) — 0 gesture/state baru: `tabMagnifyFocus(tabIndex)` (fungsi
+   lokal baru) murni MEMBACA ULANG `tabDragOffsetPx` (`MutableFloatState` Batch 435, ±40px,
+   sudah live tiap frame `onHorizontalDrag` + sudah spring-back ke 0 di `onDragEnd`/
+   `onDragCancel`) sebagai bobot fokus 0f..1f per tab — tab yang sedang aktif mulai dari fokus
+   1f dan turun mengikuti `max(towardNext, towardPrev)` selama drag, tab tetangga yang dituju
+   naik dari 0f ke arah 1f secara kontinu (BUKAN snap di ujung threshold 120px) — persis efek
+   lensa bergeser dari 1 label ke label sebelah selama jari masih menekan.
+   Label `NavigationBarItem` (`Text("Beranda")` polos dkk) diganti composable baru
+   `MagnifyingTabLabel(text, focus)`: `fontSize` discale kontinu dari `LocalTextStyle.current`
+   (bukan angka sp hardcode — ikut style/tema label bawaan apa pun yang aktif), plus
+   `graphicsLayer{scaleX/scaleY/alpha}` + `Modifier.blur()` (aman tanpa cek `Build.VERSION`,
+   minSdk project ini 31 = RenderEffect selalu tersedia) — tab fokus penuh jadi sedikit lebih
+   besar/tajam/terang, tab non-fokus mengecil/buram/redup sebagian, transisi mengikuti jari
+   frame-demi-frame. HANYA `NavigationBar` bawah (layout ponsel COMPACT, sesuai screenshot user)
+   yang disentuh — `NavigationRailItem` (tablet/foldable Medium/Expanded) SENGAJA tidak ikut
+   diubah, di luar scope diminta (screenshot user = bottom bar ponsel), 0 side-quest. Dibaca di
+   titik pemakaian (dalam tiap `label = { ... }`, bukan di-hoist ke `NavigationBar`) supaya scope
+   recomposition sekecil mungkin (hanya `Text` label yang recompose tiap frame drag, bukan
+   seluruh bar) — pola read-state-di-leaf yang sama dipakai `BlurUtils.kt`/`IosScrollPhysics.kt`.
+   0 breaking change: `selected`/`onClick`/`icon`/route logic Batch 301/435 tidak disentuh sama
+   sekali, warna label selected/unselected tetap 100% dari `LocalContentColor` bawaan M3 (tidak
+   di-override). Detail lengkap: `CHANGELOG.md` § Batch 437.
+
+**0 diverifikasi CI/device Batch 437** — review manual (baca kode + cek balance brace/paren:
+`{}` 286/286, `()` 734/734, `[]` 3/3), tidak ada env Android nyata/device fisik di sesi ini.
+Item belum-terverifikasi bertambah 1 (lihat daftar di bawah).
+
 **Catatan Batch 436**: user laporan "abis update saya nunggu buffer screen lumayan ±20s",
 menduga terkait fitur swipe Batch 435. Investigasi (grep, bukan asumsi) — **0 file diubah**:
 1. Diff Batch 435 (`AppNavHost`) di-baca ulang penuh: isinya murni `pointerInput`/
@@ -189,6 +222,11 @@ murni review manual (baca kode + cross-reference pola batch sebelumnya + cek bal
 brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
 
 **Item belum-terverifikasi saat penutupan** (device fisik tidak pernah tersedia di sesi kerja):
+- `MainActivity.kt` efek kaca-pembesar label tab bawah (Batch 437, di atas) — 0 compile log, 0
+  konfirmasi device. Perlu ditest: drag pelan (fokus label bergeser mulus tab-ke-tab, bukan
+  patah-patah), drag cepat lalu lepas sebelum threshold (springback fokus kembali ke tab asal
+  mulus), drag di tab ujung (Beranda/Pengaturan, tidak crash walau tidak ada tab tujuan), dan
+  0 frame-drop/jank tambahan di atas nudge konten yang sudah ada saat 3 label render bersamaan.
 - `MainActivity.kt` swipe-lintas-3-tab (Batch 435, di atas) — 0 compile log, 0 konfirmasi device.
   Perlu ditest: swipe kiri/kanan di Beranda/Perpustakaan/Pengaturan (compact & rail/tablet),
   swipe di tab ujung (Beranda/Pengaturan) tidak nyasar/crash, swipe pendek (di bawah threshold)
