@@ -306,12 +306,14 @@ dependencies {
     implementation("androidx.media3:media3-session:1.3.1")
     implementation("androidx.media3:media3-common:1.3.1")
 
-    // Batch 425: Coil 2.6.0 -> 3.6.2. Coil 3 splits networking into a separate artifact
-    // (coil-core no longer bundles it) — okhttp added since AudioArtFetcher's embedded-art
-    // path is local-only, but AsyncImage call sites elsewhere in the app may still resolve
-    // remote models through Coil's default pipeline.
-    implementation("io.coil-kt.coil3:coil-compose:3.6.2")
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.2")
+    // Batch 426 (correction, was 3.6.2 in Batch 425): CI build FAILED — checkDebugAarMetadata,
+    // 3.4.0+ transitively requires Compose Foundation/Animation/UI 1.12.0 -> compileSdk 37 +
+    // AGP 9.1.0, this project is locked compileSdk 36 / AGP 8.13.0 (PROJECT_STATE.md, AGP 9.x
+    // migration blocked). Pinned 3.3.0 — its own README/POM targets compileSdk 36, last version
+    // before that transitive bump. Same io.coil-kt.coil3 namespace/API used in the 3 migrated
+    // files (Batch 425) — 0 source changed, version string only.
+    implementation("io.coil-kt.coil3:coil-compose:3.3.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
     implementation("androidx.palette:palette:1.0.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.fragment:fragment-ktx:1.7.1")

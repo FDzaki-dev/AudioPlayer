@@ -10,19 +10,23 @@ eksplisit "lanjutkan fitur X" / "buka lagi proyeknya" — yang mengubah status i
 tetap ada apa adanya (di sini & `README.md`) tiap sesi berikutnya. JANGAN eksekusi fitur/roadmap/
 fix baru apa pun secara proaktif.
 
-**Catatan Batch 425**: user secara eksplisit reopen **satu kali khusus** untuk 1 tugas (bump
-Coil 2.6.0→3.6.2, 3 file + `build.gradle.kts`) — bukan pencabutan status. Banner ini tetap
-berlaku penuh mulai sesi berikutnya, sama seperti sebelum Batch 425. Detail teknis lengkap: `CHANGELOG.md` § Batch 425.
+**Catatan Batch 425/426**: user secara eksplisit reopen **satu kali khusus** untuk 1 tugas (bump
+Coil 2.6.0→3.x, 3 file + `build.gradle.kts`) — bukan pencabutan status. Banner ini tetap berlaku
+penuh mulai sesi berikutnya, sama seperti sebelum Batch 425. Versi final terpasang: **Coil 3.3.0**
+(dikoreksi dari 3.6.2 di Batch 426 — CI FAILED, 3.4.0+ butuh compileSdk 37, project terkunci 36).
+Detail teknis lengkap: `CHANGELOG.md` § Batch 425 & 426.
 
 **Item belum-terverifikasi saat penutupan** (device fisik tidak pernah tersedia di sesi kerja):
 - `docs/archive/MANUAL_QA_CHECKLIST.md` — 0/19 item tercentang (audio focus, Bluetooth, lock-screen,
   headset kabel, process death, background playback jangka panjang).
 - Overscroll bounce (`IosScrollPhysics.kt`, `Spring.DampingRatioNoBouncy`) belum dikonfirmasi
   device asli.
-- **Batch 425 (Coil 3.6.2)** — artwork on-screen di 4 titik pemakaian `AlbumArt`
+- **Batch 425/426 (Coil 3.3.0 final)** — artwork on-screen di 4 titik pemakaian `AlbumArt`
   (Library/Home/MiniPlayerBar/NowPlaying) belum dikonfirmasi tampil normal pasca-bump di device
   asli. Root cause regresi Batch 68 dicegah via `coil3.Uri`-typed `Fetcher.Factory` (bukan
-  di-guess), tapi tetap belum ada compiler/device di sesi kerja untuk verifikasi build+runtime.
+  di-guess). CI build juga belum diverifikasi ULANG dengan versi 3.3.0 (log yang pernah diupload
+  adalah kegagalan versi 3.6.2 SEBELUM koreksi) — compileSdk check maupun compile Kotlin tahap
+  berikutnya sama-sama belum ada konfirmasi run hijau.
 - `docs/archive/ROADMAP_LIQUID_GLASS_REDESIGN.md` & fling behavior 14/14 layar — **sudah final CLOSED**,
   bukan item terbuka.
 

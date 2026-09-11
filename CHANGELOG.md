@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 426 — Koreksi Batch 425: Coil 3.6.2 → 3.3.0 (CI build FAILED, compileSdk 37 conflict)
+User upload log CI `log_fail_410.zip` — `checkDebugAarMetadata` FAILED, 22 issues. Root cause
+TUNGGAL (bukan bug baru): Coil `3.6.2` transitively menarik `androidx.compose.foundation`/
+`animation`/`ui` **1.12.0**, yang mewajibkan `compileSdk 37` + AGP `9.1.0`. Project ini terkunci
+`compileSdk 36` / AGP `8.13.0` (`app/build.gradle.kts` baris 84 & root `build.gradle.kts` —
+migrasi AGP 9.x sudah didokumentasikan sebagai BLOCKED di batch-batch sebelumnya, breaking DSL).
+
+**Fix**: 4 koordinat Coil (`app/build.gradle.kts`) `3.6.2` → **`3.3.0`** — versi Coil 3.x
+terakhir yang README/POM resminya masih target `compileSdk 36`, sebelum bump transitive Compose
+1.12.0 masuk di rilis setelahnya. **0 baris di 3 file Kotlin (Batch 425) diubah** —
+`AudioArtFetcher.kt`, `AudioPlayerApplication.kt`, `ui/Utils.kt` semua sudah pakai API
+`coil3.*`/`SingletonImageLoader.Factory`/`Fetcher.Factory<coil3.Uri>` yang identik di 3.3.0
+maupun 3.6.2, murni string versi di `build.gradle.kts` yang salah pilih. Root cause regresi
+Batch 68 (`coil3.Uri`-typed Factory, `.toAndroidUri()` convert-back) — TETAP berlaku, tidak
+tersentuh koreksi ini.
+
+**Item belum-terverifikasi** — sama seperti Batch 425 (0 compiler/device di sesi kerja): CI log
+kali ini konfirmasi tahap `checkDebugAarMetadata` LULUS secara struktural sampai titik ini belum
+diverifikasi ulang (log yang diupload adalah kegagalan versi SEBELUM koreksi ini) — CI run
+berikutnya adalah verifikasi pertama versi 3.3.0 ini benar-benar clear compileSdk check +
+lanjut ke tahap compile Kotlin.
+
 ## Batch 425 — Dependency bump: Coil 2.6.0 → 3.6.2 (one-time reopen, sektor DISCONTINUED)
 User instruksi eksplisit reopen **satu kali khusus tugas ini** ("one-time exception") atas
 status DISCONTINUED (final lock Batch 410) — banner tetap permanen untuk sesi berikutnya, tidak
