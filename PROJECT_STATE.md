@@ -9,6 +9,33 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 434**: reopen eksplisit user — laporan spesifik "effect bounce juga masih
+stuttering, belum smooth like butter!!". SAMA KELAS BUG dgn Batch 433 (`IosScrollPhysics.kt`),
+tapi di file BEDA: `ui/NowPlayingScreen.kt` → `AlbumArtHero` (swipe horizontal next/prev pada
+album art) — ditemukan lewat grep `bounce`/`spring(` menyeluruh ke seluruh `app/src/main/java`
+(bukan tebakan single-file), setelah `IosScrollPhysics.kt` sendiri dikonfirmasi baca-kode sudah
+bersih dari sumbu bug ini (drag sinkron via `dragOffset` sejak Batch 433, tidak disentuh lagi).
+
+**1 file diubah** (dalam batas 3 file/tugas):
+1. `ui/NowPlayingScreen.kt` (`AlbumArtHero`) — root cause identik Batch 433: `onHorizontalDrag`
+   menulis posisi lewat `dragScope.launch { dragOffset.snapTo(...) }` di SETIAP delta drag —
+   coroutine baru per delta, bisa menumpuk/tidak berurutan saat drag cepat. Fix: `dragOffsetPx`
+   (`MutableFloatState` polos, via `mutableFloatStateOf`) jadi sumber kebenaran SINKRON yang
+   dibaca `graphicsLayer` (ditulis LANGSUNG dari `onHorizontalDrag`, 0 coroutine). `dragOffset`
+   (`Animatable`) tetap ada, sekarang HANYA dipakai di fase springback (`onDragEnd`/
+   `onDragCancel`) — `snapTo` posisi drag terakhir dulu, tiap frame `animateTo` disinkronkan
+   balik ke `dragOffsetPx` lewat parameter `block` resmi. Tambahan (gap yang tidak muncul di
+   Batch 433 krn kasusnya scroll/fling bawaan `scrollable()`, bukan drag-gesture manual):
+   `onDragStart` sekarang panggil `dragOffset.stop()` — jaring pengaman springback-lama-vs-
+   drag-baru, supaya `block` lama berhenti menimpa `dragOffsetPx` kalau user mulai drag baru
+   sebelum springback sebelumnya selesai. `totalDrag`/threshold swipe-next/prev 120px/haptic/
+   `dampingRatio`/`stiffness` (Batch 256) TIDAK disentuh — sumbu bug ini murni SINKRON vs
+   ASINKRON penulisan offset. Detail lengkap: `CHANGELOG.md` § Batch 434.
+
+**0 diverifikasi CI/device Batch 434** — review manual (baca kode + cek balance brace/paren:
+`{}` 292/292, `()` 1287/1287, `[]` 1/1), tidak ada env Android nyata/device fisik di sesi ini.
+Item belum-terverifikasi bertambah 1 (lihat daftar di bawah).
+
 **Catatan Batch 433**: reopen eksplisit user — laporan spesifik "effect scrolling/transition like
 iOS masih terasa stuttering gak halus sama sekali". Sumbu BARU, beda dari seluruh histori tuning
 `ui/theme/IosScrollPhysics.kt` Batch 364-383 (semuanya soal KARAKTER pegas — stiffness/
@@ -102,6 +129,10 @@ murni review manual (baca kode + cross-reference pola batch sebelumnya + cek bal
 brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
 
 **Item belum-terverifikasi saat penutupan** (device fisik tidak pernah tersedia di sesi kerja):
+- `ui/NowPlayingScreen.kt` `AlbumArtHero` (Batch 434, di atas) — 0 compile log, 0 konfirmasi
+  device. Perlu ditest: swipe cepat berulang next/prev, springback di dragEnd/dragCancel, dan
+  drag baru yang menyusul cepat sebelum springback lama selesai (skenario baru yang dijaga
+  `dragOffset.stop()`).
 - `ui/theme/IosScrollPhysics.kt` (Batch 433, di atas) — 0 compile log, 0 konfirmasi device. Perlu
   ditest: drag cepat berulang di list panjang (stutter hilang?), transisi antar layar, dan flow
   settle (lepas jari di tengah overscroll) tetap 0 regresi ke karakter pegas Batch 368-383 yang

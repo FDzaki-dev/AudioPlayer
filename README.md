@@ -7,6 +7,8 @@
 >   ada satu pun sesi kerja proyek ini yang punya akses ke device Android fisik.
 > - Perilaku overscroll bounce terbaru (`Spring.DampingRatioNoBouncy`, pantulan dihapus total)
 >   belum dikonfirmasi user di device asli.
+> - Fix stutter efek bounce swipe next/prev album art (Now Playing, Batch 434) belum
+>   dikonfirmasi user di device asli.
 > - Flow "Cek Update" (`update/UpdateManager.kt`, Batch 432) belum ditest ulang di device asli
 >   setelah migrasi Thread→Coroutines.
 

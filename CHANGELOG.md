@@ -1,5 +1,49 @@
 # Changelog
 
+## Batch 434 — Fix stutter efek bounce swipe next/prev (`AlbumArtHero`, sinkron dragOffsetPx bukan launch per delta)
+User laporan: "effect bounce juga masih stuttering, belum smooth like butter!!" — SAMA KELAS BUG
+dengan Batch 433 (`ui/theme/IosScrollPhysics.kt`), kali ini di file berbeda: `ui/NowPlayingScreen.kt`
+→ `AlbumArtHero` (swipe horizontal next/prev pada album art), ditemukan lewat grep `bounce`/
+`spring(` menyeluruh ke `app/src/main/java` setelah `IosScrollPhysics.kt` sendiri dikonfirmasi
+sudah bersih dari sumbu bug ini.
+
+**1 file diubah**:
+
+1. **`ui/NowPlayingScreen.kt`** (`AlbumArtHero`) — `onHorizontalDrag` sebelumnya menulis posisi
+   drag lewat `dragScope.launch { dragOffset.snapTo(...) }` pada SETIAP delta drag.
+   `Animatable.snapTo` cuma suspend (dijaga `MutatorMutex` internal), jadi tiap delta membuat
+   coroutine baru lewat `launch` alih-alih menulis nilai langsung — persis root cause Batch 433.
+   Efeknya rangkap di sini dibanding kasus scroll: springback `onDragEnd`/`onDragCancel`
+   (`animateTo`) masuk `MutatorMutex` queue YANG SAMA dengan `snapTo` — kalau masih ada `snapTo`
+   lama menumpuk pas jari lepas, pegas balik ("bounce") baru mulai SETELAH semuanya beres, bukan
+   seketika jari lepas — persis gejala "belum smooth like butter" yang dilaporkan.
+
+   Fix: pola identik Batch 433 — `dragOffsetPx` (`MutableFloatState` polos, via
+   `mutableFloatStateOf`) jadi sumber kebenaran SINKRON yang dibaca `graphicsLayer` tiap frame,
+   ditulis LANGSUNG (0 coroutine) dari `onHorizontalDrag`. `dragOffset` (`Animatable`) tetap
+   dipertahankan, sekarang HANYA dipakai di fase springback (`onDragEnd`/`onDragCancel`, sudah
+   suspend by design) — `snapTo` posisi drag terakhir dulu, lalu tiap frame animasinya
+   disinkronkan balik ke `dragOffsetPx` lewat parameter `block` resmi `Animatable.animateTo`.
+
+   Tambahan baru (gap yang tidak ada di Batch 433 karena kasusnya scroll/fling bawaan
+   `scrollable()`, bukan drag-gesture manual): `onDragStart` sekarang panggil `dragOffset.stop()`
+   — jaring pengaman supaya springback lama tidak terus menimpa `dragOffsetPx` kalau user
+   memulai drag baru sebelum springback sebelumnya selesai (perilaku ini otomatis didapat gratis
+   sebelumnya karena semua tulisan lewat 1 `Animatable`/`MutatorMutex` yang sama; harus
+   dipulihkan manual sekarang karena jalur drag aktif sudah lepas dari `Animatable`).
+
+   `totalDrag`/threshold swipe-next/prev 120px/haptic/`dampingRatio`
+   (`DampingRatioMediumBouncy`)/`stiffness` (`Spring.StiffnessLow`, Batch 256) TIDAK disentuh —
+   sumbu bug ini murni soal SINKRON vs ASINKRON penulisan offset, bukan parameter gesture/
+   pegasnya. 0 breaking change ke `onSwipeNext`/`onSwipePrevious` (signature/caller tidak
+   berubah).
+
+**0 diverifikasi CI/device** — review manual (baca kode + cek balance brace/paren: `{}` 292/292,
+`()` 1287/1287, `[]` 1/1), tidak ada env Android nyata/device fisik di sesi ini. Perlu ditest
+ulang di device asli: swipe cepat berulang (next/prev), springback di dragEnd/dragCancel, dan
+drag baru yang menyusul cepat sebelum springback lama selesai — semuanya diharapkan 0 regresi ke
+threshold/haptic/karakter pegas Batch 178/256 yang sudah disetujui user.
+
 ## Batch 433 — Fix stutter efek scroll iOS (`applyToScroll` sinkron, bukan launch per delta)
 Reopen eksplisit user — laporan spesifik: "effect scrolling/transition like iOS masih terasa
 stuttering gak halus sama sekali". Sumbu BARU dari seluruh histori tuning `IosScrollPhysics.kt`

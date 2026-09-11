@@ -1932,13 +1932,46 @@ private fun AlbumArtHero(
     // spring balik ke tengah begitu jari dilepas/gesture dibatalkan. Threshold/logic
     // swipe-next/prev itu sendiri (totalDrag, 120px) SAMA SEKALI TIDAK DIUBAH — murni layer
     // visual tambahan di atasnya, bukan perubahan playback/navigation logic.
+    // Batch 434 — User laporan: "effect bounce juga masih stuttering, belum smooth like
+    // butter!!". SAMA KELAS BUG dgn Batch 433 (`ui/theme/IosScrollPhysics.kt`), file BEDA:
+    // `onHorizontalDrag` di bawah sebelumnya menulis posisi lewat `dragScope.launch {
+    // dragOffset.snapTo(...) }` di SETIAP delta drag. `Animatable.snapTo` cuma suspend (dijaga
+    // `MutatorMutex` internal) — tiap delta bikin coroutine baru lewat `launch` alih-alih
+    // menulis nilai langsung, dan coroutine-coroutine ini bisa menumpuk/tidak berurutan saat
+    // drag cepat (persis root cause Batch 433). Efeknya RANGKAP di sini dibanding kasus
+    // scroll: springback `onDragEnd`/`onDragCancel` (`animateTo`) masuk `MutatorMutex` queue
+    // YANG SAMA dgn `snapTo` — kalau masih ada `snapTo` lama menumpuk pas jari lepas, pegas
+    // balik ("bounce") baru mulai SETELAH semuanya itu beres (bukan seketika jari lepas),
+    // persis gejala "belum smooth like butter" yang dilaporkan.
+    //
+    // Fix: pola identik Batch 433 — `dragOffsetPx` (`MutableFloatState` polos) jadi sumber
+    // kebenaran SINKRON yang dibaca `graphicsLayer` (ditulis LANGSUNG, 0 coroutine, dari
+    // `onHorizontalDrag`). `dragOffset` (`Animatable`) TETAP ADA, sekarang HANYA dipakai di
+    // fase springback (`onDragEnd`/`onDragCancel`, sudah suspend by design) — `snapTo` posisi
+    // drag TERAKHIR dulu (titik AWAL pegas balik = posisi jari terakhir yang benar), lalu tiap
+    // frame animasinya disinkronkan balik ke `dragOffsetPx` lewat parameter `block` resmi
+    // `Animatable.animateTo`. `onDragStart` baru panggil `dragOffset.stop()` — jaring pengaman
+    // supaya kalau user mulai drag BARU sementara springback drag SEBELUMNYA masih jalan,
+    // `block` lama itu berhenti menimpa `dragOffsetPx` (perilaku ini otomatis didapat GRATIS
+    // sebelum fix ini krn semua tulisan lewat 1 `Animatable`/`MutatorMutex` yang sama —
+    // konsekuensi wajib dipulihkan manual sekarang krn jalur drag aktif sudah lepas dari
+    // Animatable itu). `totalDrag`/threshold 120px/haptic/`dampingRatio`/`stiffness` (Batch 256)
+    // TIDAK disentuh — sumbu bug ini murni SINKRON vs ASINKRON penulisan offset, bukan
+    // parameter gesture/pegasnya.
+    //
+    // **Belum ditest di device asli** (tidak ada env Android nyata/device fisik di sesi ini) —
+    // perlu konfirmasi: drag horizontal cepat berulang (swipe next/prev), springback di
+    // dragEnd/dragCancel, dan drag baru yang menyusul cepat sebelum springback lama selesai —
+    // semuanya diharapkan 0 regresi ke threshold/haptic/karakter pegas Batch 178/256 yang sudah
+    // disetujui user.
+    val dragOffsetPx = remember { mutableFloatStateOf(0f) }
     val dragOffset = remember { Animatable(0f) }
     val dragScope = rememberCoroutineScope()
 
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .graphicsLayer { translationX = dragOffset.value }
+            .graphicsLayer { translationX = dragOffsetPx.floatValue }
             .pointerInput(Unit) {
             val maxOffsetPx = 48.dp.toPx()
             // Batch 256 — POLISH_AUDIT §Motion: stiffness = Spring.StiffnessLow ditambah ke 2
@@ -1947,7 +1980,12 @@ private fun AlbumArtHero(
             // StiffnessLow eksplisit — biar swipe-snap terasa 1 sistem sama animasi bouncy lain
             // di screen ini, bukan 2 "rasa" beda. dampingRatio (MediumBouncy) tidak diubah.
             detectHorizontalDragGestures(
-                onDragStart = { totalDrag = 0f },
+                onDragStart = {
+                    totalDrag = 0f
+                    // Batch 434 — hentikan springback lama (kalau masih jalan) supaya block-nya
+                    // stop menimpa dragOffsetPx; lihat catatan Batch 434 di atas fungsi ini.
+                    dragScope.launch { dragOffset.stop() }
+                },
                 onDragEnd = {
                     if (totalDrag < -120f) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -1956,15 +1994,25 @@ private fun AlbumArtHero(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onSwipePrevious()
                     }
-                    dragScope.launch { dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) }
+                    dragScope.launch {
+                        dragOffset.snapTo(dragOffsetPx.floatValue)
+                        dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) {
+                            dragOffsetPx.floatValue = value
+                        }
+                    }
                 },
                 onDragCancel = {
-                    dragScope.launch { dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) }
+                    dragScope.launch {
+                        dragOffset.snapTo(dragOffsetPx.floatValue)
+                        dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) {
+                            dragOffsetPx.floatValue = value
+                        }
+                    }
                 },
                 onHorizontalDrag = { change, dragAmount ->
                     totalDrag += dragAmount
                     change.consume()
-                    dragScope.launch { dragOffset.snapTo((totalDrag * 0.5f).coerceIn(-maxOffsetPx, maxOffsetPx)) }
+                    dragOffsetPx.floatValue = (totalDrag * 0.5f).coerceIn(-maxOffsetPx, maxOffsetPx)
                 }
             )
         }
