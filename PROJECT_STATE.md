@@ -94,6 +94,19 @@ atas file yang terus memanjang):
    dibuka lagi di sini). Kalau user beri instruksi eksplisit baru yang spesifik minta dibuka lagi
    sektor Thread Safety, itu BOLEH dieksekusi seperti biasa (beda dari rule #6 soal status
    proyek). Detail lengkap CHANGELOG.md Batch 422.
+9. **Sektor audit compileSdk/targetSdk (Batch 422) DITUTUP (Batch 423).** User klarifikasi 0
+   rencana publish Play Store (personal use only) + konfirmasi device pribadi SUDAH Android 16 —
+   audit source code (bukan build baru) menemukan `targetSdk` 34→36 (Batch 422) = 0 perubahan
+   perilaku edge-to-edge/predictive back utk app ini: `MainActivity.kt` SUDAH panggil
+   `enableEdgeToEdge()` eksplisit + `AndroidManifest.xml` SUDAH `enableOnBackInvokedCallback=
+   "true"`, keduanya dari SEBELUM bump targetSdk (opt-in manual, bukan hasil OS enforcement yang
+   baru kena krn bump). Gap insets utk 3 layar di luar Scaffold (`WelcomeScreen`/
+   `PermissionRationale`/`LockScreen`) SUDAH ditest & difix di device Android 16 asli sejak Batch
+   111 (komentar eksplisit "Android 16 test device" di `MainActivity.kt`) — jauh sebelum sektor
+   audit ini dibuka Batch 422. 0 item residual tersisa. Sesi berikutnya JANGAN buka lagi sektor
+   ini pada instruksi generik — kecuali user eksplisit minta bump ke API 37 (blocked di migrasi
+   AGP 9.x, lihat Batch 422/291) atau ada temuan baru spesifik. Detail lengkap CHANGELOG.md
+   Batch 423.
 
 ## Status penutupan (Batch 384)
 Proyek resmi **discontinued** — lihat banner di atas & `README.md`. Ini konsolidasi JUJUR semua
@@ -133,6 +146,38 @@ Tidak ada file kode yang disentuh Batch 384 (murni dokumentasi + status penutupa
 instruksi user "beres-beres" — 0 refactor, 0 fitur baru). Detail lengkap CHANGELOG.md Batch 384.
 
 ## Batch terakhir yang selesai
+**Batch 423 (Verifikasi edge-to-edge/predictive back, Android 16 device dikonfirmasi user —
+sektor audit compileSdk/targetSdk TUNTAS, 0 file kode + 2 dokumentasi)** — User klarifikasi: (1)
+0 rencana publish Play Store, personal use only — driver "syarat Google Play" di Batch 422 tidak
+relevan buat user; (2) atas pilihan opsi *"Device saya udah Android 16"*, konfirmasi device
+pribadi user SUDAH Android 16 (jadi behavior gate targetSdk 36 SUDAH aktif nyata, bukan
+future-proofing kosong). **Status DISCONTINUED tetap permanen** (final lock Batch 410). Tidak ada
+ZIP baru dari user.
+
+Audit source code (baca kode existing, BUKAN build/run baru — compiler/device asli tetap tidak
+tersedia di environment kerja): `MainActivity.kt` `onCreate()` SUDAH panggil `enableEdgeToEdge()`
+eksplisit (opt-in manual, bukan hasil enforcement OS dari targetSdk 35+) — app ini SUDAH
+edge-to-edge di SEMUA API level yang didukung, dari SEBELUM bump targetSdk Batch 422.
+`AndroidManifest.xml` SUDAH `android:enableOnBackInvokedCallback="true"`, juga dari sebelum batch
+ini. **Temuan kunci**: komentar Batch 111 di 3 titik (`WelcomeScreen`, `PermissionRationale` di
+`MainActivity.kt`, `LockScreen.kt` — layar yang render DI LUAR `Scaffold` jadi tidak dapat
+`contentWindowInsets` otomatis) eksplisit menyebut SUDAH ditest di "device Android 16 test"
+(gesture-nav, bar overlay tipis) DAN 3-button nav (Android 15 ke bawah, bar opaque) — gap insets
+ketemu & difix Batch 111, jauh sebelum sektor audit compileSdk/targetSdk ini dibuka.
+
+**Kesimpulan**: `targetSdk` 34→36 (Batch 422) = 0 perubahan perilaku observable utk app ini.
+2 item residual yang ditandai "belum diverifikasi" di entri Batch 422 (edge-to-edge, predictive
+back) SEKARANG diverifikasi TUNTAS via bukti kode + histori Batch 111 — bukan lagi "unverified
+karena tidak ada device", device Android 16 asli SUDAH pernah dipakai test (Batch 111), cuma
+bukan di sektor/sesi ini. `foregroundServiceType` (item (c) Batch 422) tidak berubah kesimpulan,
+tetap compliant sejak minSdk naik ke 31.
+
+**Sektor audit compileSdk/targetSdk (Batch 422) — DITUTUP.** Lihat rule #9 § "ATURAN SESI AKTIF"
+di atas untuk kondisi penutupan lengkap.
+
+**Scope**: 0 file kode (audit murni baca-kode, 0 baris diubah). 2 file dokumentasi
+(`PROJECT_STATE.md`, `CHANGELOG.md`). Detail lengkap `CHANGELOG.md` Batch 423.
+
 **Batch 422 (Sektor Thread Safety DITUTUP + sektor baru dibuka: audit compileSdk/targetSdk,
 `targetSdk` 34→36, 1 file kode + 2 dokumentasi)** — User: 2 instruksi eksplisit — (1) *"Tutup
 sektor ini"* (Thread Safety, lanjutan T1/J1 dari sesi ini), (2) *"Ya, mulai sekarang"* atas

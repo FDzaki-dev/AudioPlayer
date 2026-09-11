@@ -1,5 +1,60 @@
 # Changelog
 
+## Batch 423 — Verifikasi edge-to-edge/predictive back (Android 16 device dikonfirmasi); sektor audit compileSdk/targetSdk TUNTAS
+User klarifikasi (chat, tanpa ZIP baru): **(1)** *"terkait Sdk ini, saya gak tertarik sama sekali
+untuk mempublish project saya di playstore. ini murni karena saya mau manfaat nya secara
+individual, jikalau zero value untuk penggunaan mending kerjakan yang lain"* — driver "syarat
+Google Play 31 Agu 2026" di Batch 422 dikonfirmasi TIDAK relevan buat use-case user (personal,
+sideload, bukan publish). **(2)** Atas opsi yang ditawarkan sesi ini (targetSdk 36 berdampak 0
+selama device belum Android 16 — behavior gate ada di OS device, bukan `compileSdk`), user pilih
+*"Device saya udah Android 16"* — artinya behavior gate targetSdk 36 SUDAH aktif nyata di device
+harian user, bukan future-proofing kosong. **Status DISCONTINUED tetap permanen tidak diubah**
+(final lock Batch 410) — ini audit lanjutan sektor yang sudah dibuka Batch 422 atas instruksi
+eksplisit, bukan fitur/UI baru.
+
+**Audit dilakukan**: baca kode existing (grep + `view`), BUKAN build/run baru — compiler
+sungguhan/device asli tetap tidak tersedia di environment kerja sesi ini (device Android 16 yang
+dimaksud adalah device user, bukan environment kerja sesi ini).
+
+1. **Edge-to-edge**: `MainActivity.kt` `onCreate()` (baris ~196) SUDAH panggil
+   `enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(TRANSPARENT), navigationBarStyle =
+   SystemBarStyle.dark(TRANSPARENT))` — ini panggilan EKSPLISIT dari `androidx.activity`, opt-in
+   manual yang jalan di SEMUA API level (bukan hasil enforcement OS yang baru "nyala sendiri"
+   krn targetSdk 35+ mewajibkannya). Artinya app ini SUDAH edge-to-edge dari SEBELUM bump
+   targetSdk Batch 422 — bump kemarin 0 mengubah rendering nyata di titik ini.
+2. **Predictive back**: `AndroidManifest.xml` baris 56 SUDAH
+   `android:enableOnBackInvokedCallback="true"`, juga sudah ada dari sebelum batch ini (bukan
+   ditambahkan Batch 422).
+3. **Temuan kunci — gap insets sudah pernah ditest di Android 16 asli, jauh sebelum sektor audit
+   ini ada**: 3 layar render DI LUAR `Scaffold` jadi TIDAK dapat `contentWindowInsets` otomatis
+   bawaan Scaffold — `WelcomeScreen` & `PermissionRationale` (keduanya `MainActivity.kt`) dan
+   `LockScreen.kt`. Ketiganya pakai `.windowInsetsPadding(WindowInsets.safeDrawing)` manual,
+   dengan komentar Batch 111 eksplisit: *"Di gesture-nav (Android 16 test device) bar cuma
+   overlay tipis nyaris tak kelihatan; di 3-button nav (masih umum Android 15 ke bawah) bar
+   opaque menutupi konten — insets manual di sini yang menutup gap-nya."* Ini BUKTI LANGSUNG
+   bahwa kondisi persis yang ditandai "belum diverifikasi" di Batch 422 (edge-to-edge di device
+   Android 16 asli) SUDAH pernah ditest & difix — di Batch 111, bukan baru sekarang, dan bukan
+   dipicu oleh bump targetSdk kemarin sama sekali.
+
+**Kesimpulan**: `targetSdk` 34→36 (Batch 422) dikonfirmasi **0 perubahan perilaku observable**
+utk app ini — baik edge-to-edge maupun predictive back sudah opt-in manual & sudah pernah
+divalidasi di device Android 16 asli (Batch 111), independen dari nilai `targetSdk`. Bump kemarin
+murni administrative (align angka `targetSdk` ke `compileSdk` yang sudah 36 duluan sejak Batch
+249) — TIDAK membuka celah UI yang belum pernah dilewati device asli. `foregroundServiceType`
+(item (c) residual Batch 422) tidak berubah kesimpulan, tetap compliant sejak minSdk naik ke 31,
+tidak ada perubahan spesifik API 36 yang ditemukan relevan thd 2 service yang di-declare.
+
+**Sektor audit compileSdk/targetSdk (dibuka Batch 422) — DITUTUP batch ini.** Aturan penutupan
+lengkap: rule #9 `PROJECT_STATE.md` § "ATURAN SESI AKTIF". Sesi berikutnya JANGAN buka lagi
+sektor ini pada instruksi generik ("next"/"lanjut") — kecuali user eksplisit minta bump ke API 37
+(masih blocked di migrasi breaking AGP 9.x, lihat Batch 422/291) atau ada temuan baru yang
+spesifik disebut user.
+
+**Scope**: 0 file kode — audit ini murni membaca ulang kode existing (`MainActivity.kt`,
+`AndroidManifest.xml`, `LockScreen.kt`), 0 baris diubah, 0 perilaku app berubah. 2 file
+dokumentasi (`PROJECT_STATE.md`, `CHANGELOG.md` — ini). `README.md`/`FILE_MANIFEST.txt`/
+`app/build.gradle.kts` tidak disentuh.
+
 ## Batch 422 — Sektor Thread Safety ditutup; sektor baru dibuka: audit compileSdk/targetSdk (34→36)
 User instruksi (2 eksplisit, format T/J sesi ini): **T1** *"Sektor Thread Safety, lanjut ke
 mana?"* → **J1** *"Tutup sektor ini"*. **T2** *"Mulai audit compileSdk/targetSdk 34 → terbaru
