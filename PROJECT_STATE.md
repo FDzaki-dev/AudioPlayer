@@ -9,6 +9,35 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 439**: permintaan eksplisit user — 2 screenshot referensi (nav app ini vs tab bar
+iOS Jam/Clock), "perbaiki bottom nav bar agar lebih mirip gaya visual iOS app jam tersebut,
+matikan ripple khas Android saat klik". Perluasan langsung dari sektor nav bawah yang sama
+(Batch 301/435/437/438), bukan reopen sektor DITUTUP manapun.
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` —
+1. `GlassTabIcon` (Batch 438) diperluas ambil alih slot label (`label`/`focus` param baru,
+   memanggil `MagnifyingTabLabel` Batch 437 yang sama persis) supaya highlight pill tab aktif
+   membungkus IKON+LABEL sekaligus jadi 1 blok (dulu cuma bungkus ikon) — meniru referensi iOS
+   Jam. Bentuk pill jadi `RoundedCornerShape(16.dp)` (dari stadium penuh `percent = 50`, yang
+   di tinggi baru ini akan terlihat kapsul obat, bukan kotak rounded seperti referensi).
+2. `NavigationBar` bawah kini kapsul mengambang (`.padding(horizontal 16.dp, bottom 12.dp)` LALU
+   `.clip(RoundedCornerShape(28.dp))`, urutan modifier ini krusial) alih-alih persegi nempel edge-
+   to-edge — meniru referensi iOS Jam. `windowInsets` bawaan (gesture-nav) tidak disentuh, margin
+   ini tambahan di atasnya.
+3. Ripple Android bawaan di 3 `NavigationBarItem` dimatikan lewat `Indication` kosong baru
+   (`NoRippleIndication`, cuma `drawContent()`) dipasang via `CompositionLocalProvider(LocalIndication
+   provides ...)` yang MEMBUNGKUS 3 `NavigationBarItem` — bukan `Modifier.clickable` baru, 0
+   sentuh `selected`/`onClick`/route logic. `bouncyPress` (scale-down tekan, Batch 438) TETAP
+   jalan sebagai feedback tekan pengganti.
+
+`NavigationRailItem` (tablet/foldable) TIDAK disentuh — 2 screenshot referensi user keduanya nav
+ponsel, di luar scope. Detail penuh + rasionalisasi: `CHANGELOG.md` § Batch 439.
+
+**0 diverifikasi CI/device Batch 439** — review manual (baca kode + cek balance brace/paren:
+`{}` 298/298, `()` 833/833, `[]` 3/3), tidak ada env Android nyata/device fisik/compiler
+Kotlin/akses jaringan Gradle di sesi ini. Item belum-terverifikasi bertambah 1 (lihat daftar di
+bawah).
+
 **Catatan Batch 438**: permintaan eksplisit user — lampiran `drag_drop_glass_ios_kotlin.md` +
 screenshot bottom nav, "hasil sebelumnya (Batch 437, efek kaca PEMBESAR di label) mengecewakan,
 adaptasi 100% berdasarkan panduan". Perluasan langsung dari sektor nav bawah yang sama (Batch
@@ -247,6 +276,11 @@ murni review manual (baca kode + cross-reference pola batch sebelumnya + cek bal
 brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
 
 **Item belum-terverifikasi saat penutupan** (device fisik tidak pernah tersedia di sesi kerja):
+- `MainActivity.kt` kapsul mengambang + pill gabungan ikon+label + ripple mati (Batch 439, di
+  atas) — 0 compile log, 0 konfirmasi device. Perlu ditest: kapsul bawah tidak ketutup gesture-
+  nav bar di device asli (margin 12.dp bawah cukup?), pill gabungan ikon+label tetap center &
+  tidak overflow di 3 label (Beranda/Perpustakaan/Pengaturan) x font-scale besar (aksesibilitas),
+  dan 0 ripple sama sekali terasa saat tap ketiga tab di 5 identitas tema non-Skeu + Skeu.
 - `MainActivity.kt` pill indicator glass ikon tab bawah (Batch 438, di atas) — 0 compile log, 0
   konfirmasi device. Perlu ditest: transisi cross-fade pill saat pindah tab (halus, bukan
   patah), kontras pill translucent tetap terbaca di 5 identitas non-Skeu (Apple/Tactile/Liquid

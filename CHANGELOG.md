@@ -1,5 +1,67 @@
 # Changelog
 
+## Batch 439 — Bottom nav lebih mirip iOS Jam: pill gabungan ikon+label, kapsul mengambang, 0 ripple
+User melampirkan 2 screenshot referensi (bottom nav app ini vs tab bar iOS Jam/Clock) dengan
+instruksi: "perbaiki bottom nav bar agar lebih mirip dengan gaya visual iOS app jam tersebut,
+matikan indikator ripple khas Android saat click menu". Perluasan langsung dari sektor nav bawah
+yang sama (Batch 301/435/437/438), bukan reopen sektor DITUTUP manapun.
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. **Pill gabungan ikon+label** — `GlassTabIcon` (composable pill translucent dari Batch 438)
+   diperluas menerima 2 parameter baru, `label: String` dan `focus: Float`, lalu memanggil balik
+   `MagnifyingTabLabel` (Batch 437, 0 logic-nya diubah sama sekali) di dalam `Column` yang sama
+   dengan `Icon`. Sebelumnya pill (`background`/`border` translucent + `bouncyPress`) cuma
+   membungkus `Icon` sendirian lewat `Box`, sedangkan label dirender terpisah oleh
+   `NavigationBarItem` di slot `label = { ... }` miliknya sendiri (di LUAR pill) — beda nyata dari
+   referensi iOS Jam yang highlight-nya membungkus ikon+teks jadi 1 blok utuh. Fix: `Box` diganti
+   `Column` (ikon di atas, `MagnifyingTabLabel` di bawah, `Arrangement.spacedBy(2.dp)`), lalu di 3
+   titik pemakaian (`NavigationBarItem` Beranda/Perpustakaan/Pengaturan) parameter `label = { ... }`
+   milik `NavigationBarItem` DIHAPUS sepenuhnya (M3 selalu naruh slot label itu terpisah di bawah
+   ikon secara internal — tidak bisa "digabung" ke 1 pill dari luar `NavigationBarItem`, jadi
+   satu-satunya cara adalah pindahkan rendering label ke DALAM slot `icon`, seperti yang sudah
+   dilakukan). 0 breaking ke `selected`/`onClick`/route (Batch 301) — cuma pindah tempat render.
+   Bentuk pill ikut diganti dari stadium penuh (`RoundedCornerShape(percent = 50)`, pas untuk
+   lingkaran-ikon-saja setinggi 32dp) jadi `RoundedCornerShape(16.dp)` — di tinggi baru (ikon+
+   label+padding, ~50-60dp) stadium penuh akan terlihat seperti kapsul obat vertikal, bukan kotak
+   rounded seperti pill tab aktif di referensi iOS Jam.
+
+2. **Kapsul mengambang** — `NavigationBar` bawah sebelumnya persegi, nempel penuh ke 3 tepi layar
+   (perilaku default M3, `NavigationBar` sendiri 0 punya parameter `shape` publik). Sekarang
+   `.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)` LALU `.clip(RoundedCornerShape(28.dp))`
+   dipasang di modifier terluarnya — urutan ini krusial: `padding` dulu supaya jaraknya jadi MARGIN
+   di luar kapsul (mengambang dari 3 tepi, sama seperti referensi), baru `clip` supaya sudut yang
+   dibulatkan adalah sudut kapsul itu sendiri (kalau urutan dibalik, `clip` akan memotong sudut
+   duluan lalu `padding` menambah jarak DI DALAM bentuk yang sudah terlanjur dibulatkan — hasilnya
+   beda). `windowInsets` bawaan `NavigationBar` (penyesuaian ke gesture-nav Android) TIDAK
+   disentuh/dihapus — margin 12.dp ini tambahan DI ATAS inset itu, bukan pengganti, supaya 0
+   risiko kapsul ketutup gesture bar di device dengan navigasi gestur.
+
+3. **0 ripple Android** — `object NoRippleIndication : Indication` baru (implementasi kosong,
+   method `drawIndication()`-nya cuma `drawContent()`, 0 layer visual apa pun digambar di atasnya)
+   dipasang lewat `CompositionLocalProvider(LocalIndication provides NoRippleIndication) { ... }`
+   yang MEMBUNGKUS 3 `NavigationBarItem` (bukan mengganti `onClick`/`selected` atau memasang
+   `Modifier.clickable` custom baru). `NavigationBarItem` (M3) — sama seperti komponen
+   selectable/clickable Compose Foundation lain — membaca ripple-nya dari `LocalIndication.current`
+   secara internal, jadi override di titik pemakaian ini saja sudah cukup mematikan gelombang
+   ripple bawaan Android tanpa perlu bongkar `NavigationBarItem` sendiri. Scope override ini HANYA
+   di dalam blok ini — `NavigationRailItem` tablet, `Button`/`TextButton`/komponen lain di app TIDAK
+   ikut kehilangan ripple-nya (`CompositionLocalProvider` otomatis kembali ke ripple normal begitu
+   keluar dari blok `{ }`-nya). Feedback tekan tidak hilang total: scale-down `bouncyPress` (Batch
+   438) di `GlassTabIcon` tetap berjalan penuh sebagai pengganti — 2 mekanisme independen, cuma 1
+   yang dimatikan (ripple gelombang Android), sesuai referensi iOS Jam yang tidak punya ripple tapi
+   tetap ada feedback visual tekan (di app ini: scale-down, bukan opacity-flash ala iOS asli, 0
+   perubahan ke `bouncyPress` itu sendiri di batch ini).
+
+`NavigationRailItem` (tablet/foldable, di bawah blok `if (widthClass != AppWidthClass.COMPACT)`)
+TIDAK disentuh sama sekali — tidak memakai `GlassTabIcon` (pakai `Icon`/`Text` polos), dan 2
+screenshot referensi user keduanya nav ponsel (bukan rail tablet), di luar scope, 0 side-quest.
+
+**0 diverifikasi CI/device Batch 439** — review manual (baca kode + cek balance brace/paren: `{}`
+298/298, `()` 833/833, `[]` 3/3), tidak ada env Android nyata/device fisik/compiler Kotlin di sesi
+ini (lingkungan kerja sesi ini juga tidak ada akses jaringan untuk Gradle sync, sama seperti Batch
+438).
+
 ## Batch 438 — Glassmorphism iOS pada indicator pill 3 tab bawah (adaptasi panduan user)
 User melampirkan `drag_drop_glass_ios_kotlin.md` + screenshot bottom nav, dengan pesan: "hasil
 sebelumnya (Batch 437, efek kaca pembesar di LABEL) cukup mengecewakan ... adaptasi 100%

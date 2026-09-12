@@ -47,6 +47,18 @@ import com.rudi.audioplayer.ui.adaptive.rememberAppWidthClass
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
+// Batch 439 — 4 import baru, semua utk 1 tujuan: matikan ripple Android bawaan di 3
+// NavigationBarItem tab bawah tanpa mengganti mekanisme klik (lihat `NoRippleIndication` +
+// pemakaiannya di `bottomBar`). `Indication`/`IndicationInstance` = kontrak resmi yang dibaca
+// `LocalIndication` (dipakai internal semua komponen selectable/clickable Compose Foundation,
+// termasuk `NavigationBarItem`), `InteractionSource` = tipe parameter kontrak itu (beda dari
+// `MutableInteractionSource` di atas yang sudah lama dipakai — itu implementasi konkretnya),
+// `ContentDrawScope` = receiver wajib method `drawIndication()`.
+import androidx.compose.foundation.Indication
+import androidx.compose.foundation.IndicationInstance
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.Icons
@@ -644,8 +656,30 @@ private fun MagnifyingTabLabel(text: String, focus: Float) {
 // capsule" DISUPERSEDE eksplisit oleh instruksi user batch ini (kaskade DESCENDING TRUTH SOP:
 // instruksi eksplisit baru > catatan/spec lama) — didokumentasikan di PROJECT_STATE.md/README.md,
 // bukan dihapus diam-diam.
+// Batch 439 — permintaan eksplisit user: 2 screenshot referensi (nav app ini vs tab bar iOS
+// Jam/Clock) + instruksi "perbaiki bottom nav bar agar lebih mirip gaya visual iOS app jam
+// tersebut, matikan ripple khas Android saat klik". Dibanding referensi iOS Jam, gap utama pill
+// Batch 438 (di atas) cuma membungkus IKON — di iOS Jam, highlight tab aktif membungkus IKON+
+// LABEL sekaligus jadi satu blok. `GlassTabIcon` diperluas ambil alih slot label juga (param
+// `label`/`focus` baru, dipanggil balik ke `MagnifyingTabLabel` yang SAMA PERSIS, 0 logic
+// pembesar Batch 437 diubah) lalu 3 titik pemakaian di bawah (`icon = { GlassTabIcon(...) }`)
+// melepas parameter `label = { MagnifyingTabLabel(...) }` milik `NavigationBarItem` (M3 selalu
+// naruh label itu di SLOT terpisah di bawah ikon, tidak bisa disatukan ke 1 pill dari luar
+// composable-nya) — 0 breaking ke `NavigationBarItem` sendiri, cuma pindah tempat rendernya.
+// Bentuk pill juga diganti dari stadium penuh (`percent = 50`, cocok utk lingkaran-ikon-saja)
+// jadi `RoundedCornerShape(16.dp)` — kotak rounded, sama seperti referensi iOS Jam yang
+// membungkus blok ikon+teks (stadium penuh di blok setinggi itu akan terlihat seperti kapsul
+// obat, bukan seperti referensi). `NavigationRailItem` (tablet) TIDAK disentuh — tidak dipakai
+// `GlassTabIcon` sama sekali (lihat definisinya di `AppNavHost`, pakai `Icon`/`Text` polos), di
+// luar scope 2 screenshot yang keduanya nav ponsel.
 @Composable
-private fun GlassTabIcon(icon: ImageVector, selected: Boolean, interactionSource: MutableInteractionSource) {
+private fun GlassTabIcon(
+    icon: ImageVector,
+    label: String,
+    focus: Float,
+    selected: Boolean,
+    interactionSource: MutableInteractionSource
+) {
     val isSkeu = isSkeuTheme()
     // Cross-fade kontinu (bukan snap ON/OFF) — pill kaca menyala/meredup halus mengikuti
     // transisi selected, pola animasi sama (tween) yang sudah dipakai transisi NavHost (Batch
@@ -655,12 +689,11 @@ private fun GlassTabIcon(icon: ImageVector, selected: Boolean, interactionSource
         animationSpec = tween(220),
         label = "GlassTabIndicatorAlpha"
     )
-    val pillShape = RoundedCornerShape(percent = 50)
+    val pillShape = RoundedCornerShape(16.dp)
     val tint = MaterialTheme.colorScheme.primary
-    Box(
+    Column(
         modifier = Modifier
-            .height(32.dp)
-            .widthIn(min = 56.dp)
+            .widthIn(min = 64.dp)
             .then(
                 if (isSkeu) {
                     // Skeu: 0 kaca, replikasi manual solid pill M3 default (indicatorColor
@@ -675,10 +708,34 @@ private fun GlassTabIcon(icon: ImageVector, selected: Boolean, interactionSource
                 }
             )
             .bouncyPress(interactionSource, pressedScale = 0.9f)
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Icon(icon, contentDescription = null)
+        MagnifyingTabLabel(label, focus)
+    }
+}
+
+// Batch 439 — 0 dampak ke `selected`/klik: `Indication` kosong (cuma `drawContent()`, 0 layer
+// visual digambar) dipasang lewat `CompositionLocalProvider(LocalIndication provides ...)` di
+// `bottomBar`, BUKAN `Modifier.clickable` baru. `NavigationBarItem` (M3) membaca ripple-nya dari
+// `LocalIndication.current` secara internal persis seperti komponen selectable/clickable
+// Compose Foundation lain — override di titik pemakaian ini cukup, 0 perlu sentuh
+// `NavigationBarItem`/`selected`/route logic sama sekali. Efek gelombang ripple bawaan Android
+// hilang, tapi warna & scale-down `bouncyPress` (Batch 438) di `GlassTabIcon` tetap jalan penuh
+// (2 mekanisme feedback tekan yang independen) — cocok dengan referensi iOS Jam yang 0 ripple
+// tapi tetap ada feedback visual saat tab ditekan.
+private object NoRippleIndication : Indication {
+    private object NoOpIndicationInstance : IndicationInstance {
+        override fun ContentDrawScope.drawIndication() {
+            drawContent()
+        }
+    }
+
+    @Composable
+    override fun rememberUpdatedInstance(interactionSource: InteractionSource): IndicationInstance {
+        return NoOpIndicationInstance
     }
 }
 
@@ -1134,21 +1191,38 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     val libraryTabInteraction = remember { MutableInteractionSource() }
                     val settingsTabInteraction = remember { MutableInteractionSource() }
                     NavigationBar(
-                        modifier = if (navCatchLightColor != null)
-                            Modifier.drawBehind {
-                                drawLine(
-                                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                        listOf(
-                                            navCatchLightColor.copy(alpha = 0.13f),
-                                            navCatchLightColor.copy(alpha = 0.03f)
+                        // Batch 439 — referensi iOS Jam: bar bawah bukan persegi nempel penuh
+                        // ke tepi layar, tapi kapsul rounded yang "mengambang" dengan jarak dari
+                        // 3 tepi (kiri/kanan/bawah). `NavigationBar` M3 sendiri 0 parameter
+                        // `shape` publik (Surface internalnya default persegi) — `.clip(...)`
+                        // dipasang LANGSUNG di modifier terluar composable ini, cukup untuk
+                        // membulatkan render akhirnya tanpa bongkar internal M3. `.padding(...)`
+                        // WAJIB di LUAR `.clip(...)` (urutan modifier menentukan) supaya jaraknya
+                        // benar-benar "di luar" kapsul (margin), bukan padding konten di DALAM
+                        // kapsul yang sudah dibulatkan. `windowInsets` bawaan NavigationBar (utk
+                        // gesture-nav Android) TIDAK disentuh — margin 12.dp di bawah ini
+                        // tambahan DI ATAS inset itu, bukan pengganti, jadi 0 risiko kapsul
+                        // ketutup gesture bar.
+                        modifier = Modifier
+                            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                            .clip(RoundedCornerShape(28.dp))
+                            .then(
+                                if (navCatchLightColor != null)
+                                    Modifier.drawBehind {
+                                        drawLine(
+                                            brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                                listOf(
+                                                    navCatchLightColor.copy(alpha = 0.13f),
+                                                    navCatchLightColor.copy(alpha = 0.03f)
+                                                )
+                                            ),
+                                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                                            end = androidx.compose.ui.geometry.Offset(size.width, 0f),
+                                            strokeWidth = 2f
                                         )
-                                    ),
-                                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                                    end = androidx.compose.ui.geometry.Offset(size.width, 0f),
-                                    strokeWidth = 2f
-                                )
-                            }
-                        else Modifier,
+                                    }
+                                else Modifier
+                            ),
                         // Batch 53: lowered from 12.dp — spec §15 keeps navigation "calm and
                         // immediately understandable" and explicitly warns against every item (or
                         // in this case, the whole bar) reading as an accent-tinted glow. M3's
@@ -1160,6 +1234,13 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         // same reasoning (SkeuAccent as surfaceTint would otherwise dominate).
                         tonalElevation = if (navCatchLightColor != null) 6.dp else NavigationBarDefaults.Elevation
                     ) {
+                        // Batch 439 — bungkus 3 NavigationBarItem dgn Indication kosong
+                        // (`NoRippleIndication`, definisi di atas dekat `GlassTabIcon`) supaya
+                        // ripple gelombang Android bawaan mati di titik pemakaian ini SAJA
+                        // (CompositionLocalProvider otomatis kembali ke ripple normal di luar
+                        // scope ini — `NavigationRailItem` tablet, Button/TextButton lain di app
+                        // 0 kesentuh). `selected`/`onClick`/route logic di bawah 0 diubah.
+                        CompositionLocalProvider(LocalIndication provides NoRippleIndication) {
                         NavigationBarItem(
                             selected = currentRoute == "home",
                             onClick = {
@@ -1182,13 +1263,17 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 }
                             },
                             icon = {
+                                // Batch 439 — `label` pindah ke dalam sini (dulu slot terpisah
+                                // `label = { MagnifyingTabLabel(...) }` di bawah `icon`, lihat
+                                // komentar Batch 439 di definisi `GlassTabIcon`).
                                 GlassTabIcon(
                                     icon = Icons.Default.Home,
+                                    label = "Beranda",
+                                    focus = tabMagnifyFocus(0),
                                     selected = currentRoute == "home",
                                     interactionSource = homeTabInteraction
                                 )
                             },
-                            label = { MagnifyingTabLabel("Beranda", tabMagnifyFocus(0)) },
                             interactionSource = homeTabInteraction,
                             colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
                         )
@@ -1203,13 +1288,15 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 }
                             },
                             icon = {
+                                // Batch 439 — sama seperti "home" di atas.
                                 GlassTabIcon(
                                     icon = Icons.Default.LibraryMusic,
+                                    label = "Perpustakaan",
+                                    focus = tabMagnifyFocus(1),
                                     selected = currentRoute == "library",
                                     interactionSource = libraryTabInteraction
                                 )
                             },
-                            label = { MagnifyingTabLabel("Perpustakaan", tabMagnifyFocus(1)) },
                             interactionSource = libraryTabInteraction,
                             colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
                         )
@@ -1224,16 +1311,19 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 }
                             },
                             icon = {
+                                // Batch 439 — sama seperti "home" di atas.
                                 GlassTabIcon(
                                     icon = Icons.Default.Settings,
+                                    label = "Pengaturan",
+                                    focus = tabMagnifyFocus(2),
                                     selected = currentRoute == "settings",
                                     interactionSource = settingsTabInteraction
                                 )
                             },
-                            label = { MagnifyingTabLabel("Pengaturan", tabMagnifyFocus(2)) },
                             interactionSource = settingsTabInteraction,
                             colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
                         )
+                        } // tutup CompositionLocalProvider (Batch 439, NoRippleIndication)
                     }
                 }
             }
