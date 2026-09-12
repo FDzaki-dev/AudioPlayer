@@ -9,6 +9,26 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 441**: trigger `log_fail_425.zip` — fix Batch 440 (`IndicationNodeFactory`)
+ternyata belum lengkap: interface itu me-re-abstract `equals`/`hashCode` (deklarasi ulang
+eksplisit, bukan cuma warisan default `Any`), jadi `object NoRippleIndication` WAJIB
+mengimplementasi keduanya eksplisit — 0 diketahui saat migrasi Batch 440 (bukan bagian pesan
+error compile SEBELUMNYA, baru muncul SETELAH kontrak lamanya diganti). Perluasan langsung fix
+compile Batch 440, sektor sama (nav bawah, Batch 301/435/437/438/439/440).
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` — `NoRippleIndication`
+ditambah `override fun equals(other: Any?): Boolean = other === this` +
+`override fun hashCode(): Int = -1`. Identity check sederhana cukup (1 instance singleton
+sepanjang hidup app, 0 state pembeda) — bukan logic baru, murni memenuhi kontrak interface.
+0 file lain disentuh.
+
+**0 diverifikasi CI/device Batch 441** — review manual (baca kode + cek balance brace/paren:
+`{}` 300/300, `()` 865/865, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Fix ke-2 berturut-turut utk kontrak `IndicationNodeFactory` yang
+sama (Batch 440 lalu ini) — BELUM dikonfirmasi CI hijau nyata, run berikutnya WAJIB dicek utuh
+(bukan cuma diasumsikan beres krn pesan error sebelumnya sudah hilang dari log). Item
+belum-terverifikasi bertambah 1 (lihat daftar di bawah).
+
 **Catatan Batch 440**: trigger ganda dari user — (1) `log_fail_424.zip`, `compileDebugKotlin`/
 `compileReleaseKotlin` FAILED di CI (`e:` bukan `w:` — level deprecation `Indication`/
 `IndicationInstance` yang dipakai `NoRippleIndication` Batch 439 sudah naik jadi HARD ERROR di

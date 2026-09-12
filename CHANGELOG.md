@@ -1,5 +1,35 @@
 # Changelog
 
+## Batch 441 — Fix compile CI lanjutan: IndicationNodeFactory butuh equals/hashCode eksplisit
+Trigger `log_fail_425.zip` — migrasi `NoRippleIndication` ke `IndicationNodeFactory` (Batch 440)
+memperbaiki error compile Batch 439 tapi memunculkan error BARU: `Object 'NoRippleIndication' is
+not abstract and does not implement abstract members: fun hashCode(): Int, fun equals(other:
+Any?): Boolean`. Root cause: interface `IndicationNodeFactory` me-re-abstract kedua method itu
+secara eksplisit di kontraknya sendiri (bukan cuma mengandalkan implementasi default `Any`) —
+konsekuensinya, `object` Kotlin apa pun yang mengimplementasi interface ini WAJIB menyediakan
+`equals`/`hashCode` sendiri, walau secara semantik sebuah `object` singleton sudah otomatis unik
+tanpa itu. Detail ini tidak muncul di pesan error `log_fail_424.zip` sebelumnya (baru muncul
+SETELAH kontrak `Indication`/`IndicationInstance` lama diganti Batch 440) — bukan sesuatu yang
+terlewat saat migrasi, melainkan lapisan requirement baru yang baru "terlihat" compiler-nya
+setelah lapisan pertama teratasi.
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. **`NoRippleIndication` — lengkapi kontrak `IndicationNodeFactory`**: ditambah
+   `override fun equals(other: Any?): Boolean = other === this` (identity check by reference —
+   cukup, karena `NoRippleIndication` adalah `object` singleton, cuma ada 1 instance sepanjang
+   hidup proses app) dan `override fun hashCode(): Int = -1` (nilai tetap, konsisten dengan
+   `equals` — kontrak `hashCode` cuma mensyaratkan objek yang `equals` menghasilkan `hashCode`
+   sama, dan di sini objek yang `equals` HANYA `this` sendiri, jadi nilai tetap apa pun valid).
+   0 logic/behavior baru — murni memenuhi kewajiban interface, `create()`/
+   `NoRippleIndicationNode.draw()` (Batch 440) TIDAK disentuh sama sekali.
+
+**0 diverifikasi CI/device Batch 441** — review manual (baca kode + cek balance brace/paren:
+`{}` 300/300, `()` 865/865, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Ini fix ke-2 berturut-turut utk migrasi `IndicationNodeFactory` yang
+sama — run CI berikutnya WAJIB dicek utuh sampai `BUILD SUCCESSFUL`, bukan diasumsikan beres
+hanya karena 1 pesan error sebelumnya sudah tidak muncul lagi.
+
 ## Batch 440 — Fix compile CI (Indication hard-deprecated) + ikon tab ikut lerp warna real-time saat drag
 Trigger ganda: (1) user melampirkan `log_fail_424.zip` — `compileDebugKotlin`/`compileReleaseKotlin`
 FAILED di CI, bukan cuma warning (`e:`, bukan `w:`); (2) user melampirkan ulang panduan

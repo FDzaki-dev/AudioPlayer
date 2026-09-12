@@ -778,6 +778,16 @@ private object NoRippleIndication : IndicationNodeFactory {
     override fun create(interactionSource: InteractionSource): DelegatableNode {
         return NoRippleIndicationNode()
     }
+
+    // Batch 441 — trigger `log_fail_425.zip`: kontrak `IndicationNodeFactory` (Batch 440)
+    // me-re-abstract `equals`/`hashCode` (bukan cuma warisan default `Any`, interface-nya sendiri
+    // deklarasi ulang keduanya sbg abstract) — WAJIB diimplementasi eksplisit di titik
+    // implementasi, `object` Kotlin TIDAK otomatis dianggap cukup oleh compiler walau secara
+    // semantik singleton sudah unik. Identity check sederhana cukup: 1 instance tunggal
+    // sepanjang hidup app, 0 state yang membedakan.
+    override fun equals(other: Any?): Boolean = other === this
+
+    override fun hashCode(): Int = -1
 }
 
 @Composable

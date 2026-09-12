@@ -16,9 +16,10 @@
 > - Kapsul mengambang + pill gabungan ikon-label + ripple mati di bottom nav (Batch 439) belum
 >   dikonfirmasi user di device asli — khususnya jarak kapsul ke gesture-nav bar & feedback tekan
 >   tanpa ripple terasa wajar.
-> - Fix compile `NoRippleIndication` (migrasi `Indication`→`IndicationNodeFactory`, Batch 440)
->   belum dikonfirmasi CI hijau nyata — cuma review manual kode, 0 akses compiler Kotlin/Gradle
->   sesi ini. Ikon tab ikut lerp warna real-time saat drag (Batch 440, sama batch) juga belum
+> - Fix compile `NoRippleIndication` (migrasi `Indication`→`IndicationNodeFactory` Batch 440,
+>   lalu tambahan wajib `equals`/`hashCode` Batch 441 — 2 fix berturut-turut utk kontrak yang
+>   sama) belum dikonfirmasi CI hijau nyata — cuma review manual kode, 0 akses compiler
+>   Kotlin/Gradle sesi ini. Ikon tab ikut lerp warna real-time saat drag (Batch 440) juga belum
 >   dikonfirmasi user di device asli — khususnya kemulusan transisi warna ikon+pill 1 aksen
 >   selama jari masih menggeser.
 > - Flow "Cek Update" (`update/UpdateManager.kt`, Batch 432) belum ditest ulang di device asli
