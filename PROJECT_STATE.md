@@ -9,6 +9,57 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 442**: laporan eksplisit user (screenshot bottom nav bar) — 3 masalah sekaligus:
+(1) label "Perpustakaan"/"Pengaturan" terpotong jadi "Perpusta"/"Pengatur", (2) pill "Beranda"
+tampak anomali besar, (3) "efek blur useless" di 2 label nonaktif, + permintaan fitur baru
+(4) "tambahkan fitur drag pada tab, bukan hanya tap-tab doang". Perluasan langsung sektor nav
+bawah yang sama (Batch 301/435/437/438/439/440/441), bukan reopen sektor DITUTUP manapun.
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` —
+1. **Fix (1)+(2), root cause tunggal**: `MagnifyingTabLabel` (Batch 437) baca `LocalTextStyle
+   .current` sbg base style — asumsi ini SALAH sejak Batch 439 memindahkannya dari slot `label`
+   NavigationBarItem (yg M3 otomatis bungkus `ProvideTextStyle(labelMedium)`) ke slot `icon`
+   (`GlassTabIcon`), di mana `LocalTextStyle.current` jatuh balik ke ambient default
+   MaterialTheme (bodyLarge, jauh lebih besar) — persis item "belum-terverifikasi" yg sudah
+   diperingatkan sendiri di PROJECT_STATE.md sejak penutupan Batch 439 ("x font-scale besar").
+   Fix: baca `MaterialTheme.typography.labelMedium` langsung (token M3 resmi, IDENTIK dgn
+   default `label` slot) — 0 hardcode sp baru. `overflow = TextOverflow.Ellipsis` ditambah sbg
+   jaring pengaman (sebelumnya 0 di-set, default `Clip` yg menghasilkan potongan huruf mentah).
+2. **Fix (3)**: `.blur(((1f - clampedFocus) * 1.3f).dp)` di `MagnifyingTabLabel` DICABUT — radius
+   idle (tab tidak sedang digeser) = 1.3dp KONSTAN di 2 dari 3 label SETIAP SAAT, bukan cuma
+   sesaat selama drag; screenshot user konfirmasi 0 manfaat visual, cuma bikin
+   "Perpustakaan"/"Pengaturan" buram permanen. `scaleX`/`scaleY`/`alpha` (`graphicsLayer`, sinyal
+   fokus kontinu Batch 437) TETAP jalan — cuma komponen blur yg dicabut. Import
+   `LocalTextStyle`/`androidx.compose.ui.draw.blur` ikut dilepas (sudah 0 pemakaian lain).
+3. **Fitur baru (4)**: drag LANGSUNG di atas tab bar (bukan cuma di konten layar spt swipe Batch
+   435) — gaya segmented-control iOS, tekan 1 tab lalu geser jari TANPA angkat, tab ikut
+   berpindah mengikuti posisi jari lintas 3 kolom (equal-width, M3 default). Teknik:
+   `Modifier.pointerInput(Unit) { awaitEachGesture { ... } }` di `PointerEventPass.Initial`
+   (bukan default `Main`) + 0 `change.consume()` sama sekali — event dibaca SEBELUM child
+   `NavigationBarItem` memproses Main pass-nya sendiri, jadi tap polos/ripple-feedback
+   (`bouncyPress` Batch 438) 0 terganggu (tap singkat = index hover tidak pernah berubah dari
+   titik down = blok navigate() custom ini tidak pernah tereksekusi, murni `onClick` bawaan yg
+   menangani). Key `pointerInput` sengaja `Unit` (bukan `currentRoute`) + `rememberUpdatedState
+   (currentRoute)` baru (`currentRouteState`) — `NavigationBar` composable ini TIDAK
+   keluar-masuk komposisi selama pindah antar 3 tab (kondisi pembungkusnya tetap true), jadi
+   coroutine gesture aman hidup terus lintas tab (drag 1 jari lewat >1 batas tab, mis. Beranda
+   langsung ke Pengaturan, tidak macet di tab tengah) — kalau di-key `currentRoute` malah restart
+   tiap 1 batas terlewati krn `navigate()` mengubah key itu sendiri di tengah gesture yg sama.
+   `navController.navigate` pakai opsi IDENTIK popUpTo/launchSingleTop/restoreState (pola Batch
+   301/435), 0 state-preservation baru. Haptic tick per tab berpindah REUSE `tabSwipeHaptic`
+   (Batch 435, `HapticFeedbackType.LongPress`), 0 API haptic baru. Swipe konten Batch 435 (Box
+   pembungkus NavHost) TIDAK disentuh — 2 mekanisme drag independen, beda area sentuh.
+
+`NavigationRailItem` (tablet) TIDAK disentuh — di luar scope (sama seperti Batch 437-441).
+
+**0 diverifikasi CI/device Batch 442** — review manual (baca kode + cek balance brace/paren:
+`{}` 308/308, `()` 924/924, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Perlu ditest device asli: label "Perpustakaan"/"Pengaturan" tidak
+lagi terpotong di ukuran font default MAUPUN font-scale aksesibilitas besar, pill "Beranda"
+proporsional (bukan lagi anomali besar), 0 blur tersisa di 2 label nonaktif, dan drag jari
+lintas tab bar berpindah tab dgn benar (termasuk drag cepat lintas >1 batas tab) TANPA
+mengganggu tap biasa/ripple-feedback yang sudah ada. Item belum-terverifikasi bertambah 1.
+
 **Catatan Batch 441**: trigger `log_fail_425.zip` — fix Batch 440 (`IndicationNodeFactory`)
 ternyata belum lengkap: interface itu me-re-abstract `equals`/`hashCode` (deklarasi ulang
 eksplisit, bukan cuma warisan default `Any`), jadi `object NoRippleIndication` WAJIB
@@ -337,21 +388,30 @@ murni review manual (baca kode + cross-reference pola batch sebelumnya + cek bal
 brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
 
 **Item belum-terverifikasi saat penutupan** (device fisik tidak pernah tersedia di sesi kerja):
+- `MainActivity.kt` fix label terpotong/pill oversized + drag-on-tab-bar baru (Batch 442, di
+  atas) — 0 compile log, 0 konfirmasi device. Perlu ditest: label 3 tab tidak terpotong di
+  ukuran default MAUPUN font-scale aksesibilitas besar, pill "Beranda" proporsional, 0 blur
+  tersisa, dan drag jari lintas tab bar (termasuk lintas >1 batas tab dalam 1 drag) berpindah
+  tab dgn benar tanpa mengganggu tap/ripple-feedback biasa.
 - `MainActivity.kt` kapsul mengambang + pill gabungan ikon+label + ripple mati (Batch 439, di
-  atas) — 0 compile log, 0 konfirmasi device. Perlu ditest: kapsul bawah tidak ketutup gesture-
-  nav bar di device asli (margin 12.dp bawah cukup?), pill gabungan ikon+label tetap center &
-  tidak overflow di 3 label (Beranda/Perpustakaan/Pengaturan) x font-scale besar (aksesibilitas),
-  dan 0 ripple sama sekali terasa saat tap ketiga tab di 5 identitas tema non-Skeu + Skeu.
+  atas) — 0 compile log, 0 konfirmasi device. **[Update Batch 442]** sub-item overflow/oversized
+  text SUDAH ditemukan+fix (root cause: `LocalTextStyle.current` salah baca style di slot
+  `icon`, lihat Batch 442 di atas) — dihapus dari daftar perlu-test di sini, gantinya lihat item
+  Batch 442 di atas. 2 sub-item SISA (belum tersentuh batch mana pun): kapsul bawah tidak
+  ketutup gesture-nav bar di device asli (margin 12.dp bawah cukup?), dan 0 ripple sama sekali
+  terasa saat tap ketiga tab di 5 identitas tema non-Skeu + Skeu.
 - `MainActivity.kt` pill indicator glass ikon tab bawah (Batch 438, di atas) — 0 compile log, 0
   konfirmasi device. Perlu ditest: transisi cross-fade pill saat pindah tab (halus, bukan
   patah), kontras pill translucent tetap terbaca di 5 identitas non-Skeu (Apple/Tactile/Liquid
   Glass/Aurora/Calm Retro) x mode terang/gelap, scale-down `bouncyPress` saat tap terasa wajar
   (bukan berlebihan), dan pill Skeu tetap solid 100% (0 kebocoran efek glass ke identitas ini).
 - `MainActivity.kt` efek kaca-pembesar label tab bawah (Batch 437, di atas) — 0 compile log, 0
-  konfirmasi device. Perlu ditest: drag pelan (fokus label bergeser mulus tab-ke-tab, bukan
-  patah-patah), drag cepat lalu lepas sebelum threshold (springback fokus kembali ke tab asal
-  mulus), drag di tab ujung (Beranda/Pengaturan, tidak crash walau tidak ada tab tujuan), dan
-  0 frame-drop/jank tambahan di atas nudge konten yang sudah ada saat 3 label render bersamaan.
+  konfirmasi device. **[Update Batch 442]** komponen `.blur()` DICABUT (screenshot user
+  konfirmasi 0 manfaat, cuma bikin buram permanen 2 label nonaktif) — item test blur DIHAPUS.
+  Sisa perlu ditest (scale/opacity kontinu, TETAP jalan): drag pelan (fokus label bergeser mulus
+  tab-ke-tab, bukan patah-patah), drag cepat lalu lepas sebelum threshold (springback fokus
+  kembali ke tab asal mulus), drag di tab ujung (Beranda/Pengaturan, tidak crash walau tidak ada
+  tab tujuan), dan 0 frame-drop/jank tambahan saat 3 label render bersamaan.
 - `MainActivity.kt` swipe-lintas-3-tab (Batch 435, di atas) — 0 compile log, 0 konfirmasi device.
   Perlu ditest: swipe kiri/kanan di Beranda/Perpustakaan/Pengaturan (compact & rail/tablet),
   swipe di tab ujung (Beranda/Pengaturan) tidak nyasar/crash, swipe pendek (di bawah threshold)

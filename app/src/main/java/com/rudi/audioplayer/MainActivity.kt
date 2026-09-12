@@ -174,11 +174,17 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import kotlinx.coroutines.launch
-// Batch 437 — kaca pembesar label tab bawah: LocalTextStyle (baca style label bawaan
-// NavigationBarItem apa adanya, cuma fontSize yg di-override) + blur (RenderEffect, aman krn
-// minSdk 31).
-import androidx.compose.material3.LocalTextStyle
-import androidx.compose.ui.draw.blur
+// Batch 442 — fix label nav bawah terpotong/oversized (regresi Batch 439, lihat komentar
+// MagnifyingTabLabel) + drag langsung di tab bar (bukan cuma tap). LocalTextStyle/blur (Batch
+// 437) DILEPAS — diganti MaterialTheme.typography.labelMedium (style resmi label nav M3) +
+// TextOverflow.Ellipsis (jaring pengaman); 0 blur lagi (root cause efek blur "useless" di
+// screenshot user). awaitEachGesture/PointerEventPass/awaitFirstDown = drag-to-switch pada tab
+// bar itu sendiri (PointerEventPass.Initial, 0 consume, 0 rebutan dgn tap/ripple NavigationBarItem).
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.awaitFirstDown
 
 // Batch 435 — urutan resmi 3 tab bawah (sama persis urutan NavigationBarItem/NavigationRailItem
 // di AppNavHost bawah: Beranda, Perpustakaan, Pengaturan). Dipakai gesture swipe untuk hitung
@@ -610,13 +616,28 @@ private fun WelcomeHighlight(icon: androidx.compose.ui.graphics.vector.ImageVect
 // aktif apa pun (Apple/Tactile/SkeuDarkLite/LiquidGlass/dst) — 0 hardcode warna baru. `blur()`
 // dipakai tanpa percabangan Build.VERSION: minSdk project ini sudah 31, RenderEffect (dasar
 // Modifier.blur di Compose) tersedia sejak API 31.
+// Batch 442 — fix bug (user screenshot: "Perpustakaan"/"Pengaturan" terpotong jadi
+// "Perpusta"/"Pengatur", pill "Beranda" tampak anomali besar). Root cause: Batch 439 memindah
+// composable ini dari slot `label` NavigationBarItem (M3 otomatis bungkus slot itu dgn
+// ProvideTextStyle(labelMedium)) ke dalam slot `icon` (lihat `GlassTabIcon`) — di slot `icon`,
+// `LocalTextStyle.current` TIDAK di-provide M3 sbg style label kecil, jatuh balik ke ambient
+// default di root MaterialTheme (bodyLarge, jauh lebih besar dari label nav semestinya) —
+// persis item "belum-terverifikasi" yang sudah diperingatkan PROJECT_STATE.md sejak Batch 439
+// ("pill gabungan ikon+label ... x font-scale besar") sebelum device asli tersedia utk
+// mengonfirmasi. Fix: baca style resmi label nav LANGSUNG dari token M3
+// (`MaterialTheme.typography.labelMedium`, IDENTIK dgn yang M3 pakai di slot `label` default)
+// alih-alih ambient yang salah — 0 hardcode sp baru, tetap ikut identitas tema aktif apa pun.
+// `overflow = TextOverflow.Ellipsis` ditambah sbg jaring pengaman (mis. font-scale aksesibilitas
+// besar) — dulu 0 di-set (default Clip), itu sebabnya kliping lama menghasilkan huruf terpotong
+// mentah alih-alih "..." yang jelas.
 @Composable
 private fun MagnifyingTabLabel(text: String, focus: Float) {
     val clampedFocus = focus.coerceIn(0f, 1f)
-    val baseStyle = LocalTextStyle.current
+    val baseStyle = MaterialTheme.typography.labelMedium
     Text(
         text = text,
         maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         style = baseStyle.copy(fontSize = baseStyle.fontSize * (1f + clampedFocus * 0.14f)),
         modifier = Modifier
             .graphicsLayer {
@@ -625,7 +646,14 @@ private fun MagnifyingTabLabel(text: String, focus: Float) {
                 scaleY = scale
                 alpha = 0.68f + 0.32f * clampedFocus
             }
-            .blur(((1f - clampedFocus) * 1.3f).dp)
+            // Batch 442 — `.blur()` efek "kaca pembesar" (Batch 437) DICABUT. Root cause
+            // terpisah dari fix style di atas: radius idle (focus=0, tab TIDAK sedang digeser)
+            // = (1-0)*1.3 = 1.3dp KONSTAN di 2 dari 3 label SETIAP SAAT (bukan cuma sesaat
+            // selama drag) — laporan+screenshot user konfirmasi efeknya cuma bikin
+            // "Perpustakaan"/"Pengaturan" terlihat buram permanen, 0 manfaat visual nyata
+            // (kaskade DESCENDING TRUTH: laporan eksplisit user > spec lama Batch 437).
+            // `scaleX`/`scaleY`/`alpha` (graphicsLayer di atas) TETAP jalan sbg sinyal fokus
+            // kontinu selama drag — cuma komponen blur yang dicabut, 0 elemen lain disentuh.
     )
 }
 
@@ -1238,6 +1266,14 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // Batch 438 — 1 interactionSource per tab, dibagi ke NavigationBarItem (klik)
                     // dan GlassTabIcon (bouncyPress) supaya keduanya sepakat kapan "pressed" true,
                     // pola identik `PinKey`/`RoundGlyphButton` (LockScreen.kt).
+                    // Batch 442 — dibaca oleh pointerInput drag-on-tab-bar di bawah (key `Unit`,
+                    // coroutine gesture HIDUP TERUS lintas 3 tab supaya 1 drag jari bisa lewati
+                    // lebih dari 1 batas tab tanpa putus — lihat rasionalisasi penuh di situ).
+                    // `rememberUpdatedState` WAJIB di sini (bukan baca `currentRoute` langsung di
+                    // closure `pointerInput(Unit)`) — closure key-`Unit` cuma dibuat SEKALI, baca
+                    // `currentRoute` polos di dalamnya akan BEKU ke nilai komposisi pertama
+                    // (stale), tidak ikut update tiap kali tab berpindah selama drag berlangsung.
+                    val currentRouteState = rememberUpdatedState(currentRoute)
                     val homeTabInteraction = remember { MutableInteractionSource() }
                     val libraryTabInteraction = remember { MutableInteractionSource() }
                     val settingsTabInteraction = remember { MutableInteractionSource() }
@@ -1273,7 +1309,74 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                         )
                                     }
                                 else Modifier
-                            ),
+                            )
+                            // Batch 442 — permintaan eksplisit user: "tambahkan fitur drag pada
+                            // tab, bukan hanya tap-tab doang" (screenshot bottom nav bar). Beda
+                            // dari swipe Batch 435 (drag di KONTEN layar, Box pembungkus NavHost
+                            // di bawah, dipicu geser di ATAS layar) — ini drag LANGSUNG di atas
+                            // bar tab itu sendiri, gaya segmented-control iOS: tekan salah satu
+                            // tab lalu geser jari TANPA angkat, tab aktif ikut berpindah mengikuti
+                            // posisi jari melintasi 3 kolom (lebar dibagi rata `TAB_ROUTES.size`
+                            // — valid krn 0 weight kustom dipasang di 3 `NavigationBarItem` di
+                            // bawah, M3 default-nya memang equal-width). 2 mekanisme (tap lama +
+                            // drag baru ini) hidup berdampingan, 0 saling timpa:
+                            // `PointerEventPass.Initial` dipakai (bukan default Main) supaya
+                            // event dibaca SEBELUM `NavigationBarItem` (child, lebih dalam di
+                            // tree) memprosesnya di Main pass-nya sendiri — dan `change.consume()`
+                            // SENGAJA 0 pernah dipanggil sama sekali di blok ini, jadi tap
+                            // polos/ripple-feedback bawaan `NavigationBarItem`+`bouncyPress`
+                            // (Batch 438) TIDAK terganggu sedikit pun (tap singkat = jari tidak
+                            // pernah keluar kolom awal = `newIndex` tidak pernah beda dari
+                            // `hoveredIndex` awal = blok navigate() di bawah tidak pernah
+                            // tereksekusi — murni `onClick` bawaan `NavigationBarItem` yang
+                            // menangani tap biasa, sama seperti sebelum batch ini). `navController
+                            // .navigate` dipanggil dgn opsi IDENTIK popUpTo/launchSingleTop/
+                            // restoreState (pola Batch 301/435), 0 state-preservation baru. Key
+                            // `pointerInput` sengaja `Unit` (BUKAN `currentRoute`) — lihat
+                            // rasionalisasi `currentRouteState` di atas dekat deklarasi
+                            // `homeTabInteraction`: NavigationBar composable ini sendiri TIDAK
+                            // pernah keluar-masuk komposisi selama pindah antar 3 tab (kondisi
+                            // `if` pembungkusnya tetap true di ketiganya), jadi coroutine gesture
+                            // key-`Unit` ini aman hidup terus lintas tab tanpa restart — kalau
+                            // di-key `currentRoute`, coroutine akan MATI-HIDUP ULANG setiap kali
+                            // 1 batas tab terlewati (navigate() mengubah currentRoute = state
+                            // baru = key baru), padahal jari MASIH menekan di tengah gesture yang
+                            // sama — drag yg melewati lebih dari 1 batas tab (mis. Beranda
+                            // langsung ke Pengaturan) akan macet di tab kedua krn instance baru
+                            // cuma menunggu event DOWN baru, bukan lanjutan drag yg sudah berjalan.
+                            .pointerInput(Unit) {
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(pass = PointerEventPass.Initial)
+                                    val barWidthPx = size.width.toFloat()
+                                    if (barWidthPx <= 0f) return@awaitEachGesture
+                                    var hoveredIndex = (down.position.x / barWidthPx * TAB_ROUTES.size)
+                                        .toInt()
+                                        .coerceIn(0, TAB_ROUTES.size - 1)
+                                    while (true) {
+                                        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                        val change = event.changes.firstOrNull { it.id == down.id }
+                                            ?: break
+                                        if (!change.pressed) break
+                                        val x = change.position.x.coerceIn(0f, barWidthPx)
+                                        val newIndex = (x / barWidthPx * TAB_ROUTES.size)
+                                            .toInt()
+                                            .coerceIn(0, TAB_ROUTES.size - 1)
+                                        if (newIndex != hoveredIndex) {
+                                            hoveredIndex = newIndex
+                                            val target = TAB_ROUTES.getOrNull(newIndex)
+                                            val fromRoute = currentRouteState.value
+                                            if (target != null && target != fromRoute) {
+                                                tabSwipeHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                navController.navigate(target) {
+                                                    popUpTo("home") { saveState = true }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
                         // Batch 53: lowered from 12.dp — spec §15 keeps navigation "calm and
                         // immediately understandable" and explicitly warns against every item (or
                         // in this case, the whole bar) reading as an accent-tinted glow. M3's

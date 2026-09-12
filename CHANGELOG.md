@@ -1,5 +1,33 @@
 # Changelog
 
+## Batch 442 — Fix label tab bawah terpotong/oversized + blur dicabut + drag langsung di tab bar
+Laporan eksplisit user (screenshot bottom nav bar): label "Perpustakaan"/"Pengaturan" terpotong
+jadi "Perpusta"/"Pengatur", pill "Beranda" tampak anomali besar, efek blur di 2 label nonaktif
+dinilai "useless", plus permintaan fitur baru "tambahkan fitur drag pada tab, bukan hanya
+tap-tab doang". Perluasan langsung sektor nav bawah yang sama (Batch 301/435/437/438/439/440/441).
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. **Fix label terpotong/pill oversized**: root cause tunggal — `MagnifyingTabLabel` (Batch 437)
+   baca `LocalTextStyle.current` sbg ukuran dasar, yang sejak Batch 439 memindah komposabel ini
+   ke slot `icon` NavigationBarItem (bukan lagi slot `label` bawaan yang M3 otomatis kasih style
+   kecil `labelMedium`) — `LocalTextStyle.current` di slot itu jatuh balik ke ambient default
+   yang jauh lebih besar (`bodyLarge`), bikin teks oversized dan label panjang jadi terpotong
+   mentah. Fix: baca `MaterialTheme.typography.labelMedium` langsung (token resmi M3, sama
+   seperti default `label` slot), plus `overflow = TextOverflow.Ellipsis` sbg jaring pengaman.
+2. **Blur label dicabut**: `.blur()` di `MagnifyingTabLabel` (Batch 437) selalu aktif 1.3dp di
+   2 dari 3 label kapan pun tidak sedang digeser (bukan cuma efek sesaat) — dicabut total sesuai
+   laporan user, animasi skala/opacity kontinu tetap jalan tanpa blur.
+3. **Fitur baru — drag langsung di tab bar**: geser jari langsung di atas bar tab (bukan cuma di
+   konten layar seperti swipe Batch 435) untuk pindah tab, gaya segmented-control iOS — tekan
+   1 tab lalu geser tanpa angkat jari, tab ikut berpindah mengikuti posisi jari, termasuk
+   melewati lebih dari 1 tab dalam satu gerakan. Tap satu-satu tetap berfungsi seperti biasa,
+   berdampingan dengan cara baru ini, 0 saling mengganggu.
+
+**0 diverifikasi CI/device Batch 442** — review manual (baca kode + cek balance brace/paren:
+`{}` 308/308, `()` 924/924, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini.
+
 ## Batch 441 — Fix compile CI lanjutan: IndicationNodeFactory butuh equals/hashCode eksplisit
 Trigger `log_fail_425.zip` — migrasi `NoRippleIndication` ke `IndicationNodeFactory` (Batch 440)
 memperbaiki error compile Batch 439 tapi memunculkan error BARU: `Object 'NoRippleIndication' is
