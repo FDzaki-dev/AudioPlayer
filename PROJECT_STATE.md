@@ -9,6 +9,25 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 443**: trigger `log_fail_427.zip` — fix Batch 442 (drag langsung di tab bar) GAGAL
+compile CI: `Unresolved reference 'awaitFirstDown'` di 2 titik (`MainActivity.kt:187` importnya
+sendiri, `:1349` titik pakainya). Root cause: salah paket saat penulisan Batch 442 — `awaitFirstDown`
+(extension fun `AwaitPointerEventScope`, dipakai dgn parameter `pass`) sebenarnya dideklarasikan
+di `androidx.compose.foundation.gestures` (satu paket persis dgn `awaitEachGesture` yg SUDAH benar
+diimport baris atasnya), BUKAN `androidx.compose.ui.input.pointer` (paket itu isinya
+`PointerEventPass`/`AwaitPointerEventScope` doang, 0 fungsi util gesture semacam ini) — bukan API
+yang berubah/deprecated, murni asumsi paket keliru.
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` — 1 baris import diganti:
+`androidx.compose.ui.input.pointer.awaitFirstDown` → `androidx.compose.foundation.gestures.awaitFirstDown`.
+0 baris lain disentuh, 0 logic/behavior berubah (fix murni resolusi symbol compile-time).
+
+**0 diverifikasi CI/device Batch 443** — review manual (baca kode + cek balance brace/paren:
+`{}` 308/308, `()` 924/924, `[]` 3/3 — IDENTIK Batch 442 krn cuma ganti teks path 1 baris import),
+0 env Android nyata/device fisik/compiler Kotlin/akses jaringan Gradle di sesi ini. Seluruh item
+belum-terverifikasi Batch 442 (label/pill/blur/drag tab bar) TETAP di daftar bawah apa adanya —
+fix compile ini TIDAK otomatis mengkonfirmasi behavior runtime-nya, cuma membuka jalan CI hijau.
+
 **Catatan Batch 442**: laporan eksplisit user (screenshot bottom nav bar) — 3 masalah sekaligus:
 (1) label "Perpustakaan"/"Pengaturan" terpotong jadi "Perpusta"/"Pengatur", (2) pill "Beranda"
 tampak anomali besar, (3) "efek blur useless" di 2 label nonaktif, + permintaan fitur baru

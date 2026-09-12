@@ -1,5 +1,21 @@
 # Changelog
 
+## Batch 443 — Fix compile CI: awaitFirstDown salah paket import (regresi Batch 442)
+Trigger `log_fail_427.zip` — fitur drag-tab-bar Batch 442 gagal compile CI: `Unresolved reference
+'awaitFirstDown'` di `MainActivity.kt` (baris import & baris pakainya). Root cause: `awaitFirstDown`
+diimport dari `androidx.compose.ui.input.pointer`, padahal fungsi ini sebenarnya ada di paket
+`androidx.compose.foundation.gestures` (satu paket dengan `awaitEachGesture` yang sudah diimport
+benar di baris sebelahnya) — salah asumsi paket saat penulisan awal, bukan perubahan API.
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. **Fix compile**: 1 baris import diperbaiki ke paket yang benar
+   (`androidx.compose.foundation.gestures.awaitFirstDown`). 0 logic/behavior lain berubah.
+
+**0 diverifikasi CI/device Batch 443** — review manual (baca kode + cek balance brace/paren:
+`{}` 308/308, `()` 924/924, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini.
+
 ## Batch 442 — Fix label tab bawah terpotong/oversized + blur dicabut + drag langsung di tab bar
 Laporan eksplisit user (screenshot bottom nav bar): label "Perpustakaan"/"Pengaturan" terpotong
 jadi "Perpusta"/"Pengatur", pill "Beranda" tampak anomali besar, efek blur di 2 label nonaktif
