@@ -49,13 +49,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
 // Batch 439 — 4 import baru, semua utk 1 tujuan: matikan ripple Android bawaan di 3
 // NavigationBarItem tab bawah tanpa mengganti mekanisme klik (lihat `NoRippleIndication` +
-// pemakaiannya di `bottomBar`). `Indication`/`IndicationInstance` = kontrak resmi yang dibaca
-// `LocalIndication` (dipakai internal semua komponen selectable/clickable Compose Foundation,
-// termasuk `NavigationBarItem`), `InteractionSource` = tipe parameter kontrak itu (beda dari
-// `MutableInteractionSource` di atas yang sudah lama dipakai — itu implementasi konkretnya),
-// `ContentDrawScope` = receiver wajib method `drawIndication()`.
-import androidx.compose.foundation.Indication
-import androidx.compose.foundation.IndicationInstance
+// pemakaiannya di `bottomBar`). `LocalIndication` (dipakai internal semua komponen
+// selectable/clickable Compose Foundation, termasuk `NavigationBarItem`), `InteractionSource`
+// = tipe parameter kontrak itu (beda dari `MutableInteractionSource` di atas yang sudah lama
+// dipakai — itu implementasi konkretnya), `ContentDrawScope` = receiver wajib method `draw()`.
+// Batch 440 — trigger `log_fail_424.zip`: `Indication`/`IndicationInstance` (kontrak lama)
+// DIHAPUS dari sini, `compileDebugKotlin`/`compileReleaseKotlin` FAILED (bukan cuma warning —
+// versi Compose Foundation di compose-bom 2026.04.01 sudah menaikkan level deprecation
+// interface itu jadi ERROR, bukan lagi WARNING). Diganti `IndicationNodeFactory`
+// (`NoRippleIndication` di bawah) — kontrak pengganti resmi berbasis `Modifier.Node`, 0 API
+// publik lain disentuh, 0 perubahan behavior (masih murni `drawContent()` kosong).
+import androidx.compose.foundation.IndicationNodeFactory
+import androidx.compose.ui.node.DelegatableNode
+import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
@@ -100,6 +106,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -684,8 +691,21 @@ private fun GlassTabIcon(
     // Cross-fade kontinu (bukan snap ON/OFF) — pill kaca menyala/meredup halus mengikuti
     // transisi selected, pola animasi sama (tween) yang sudah dipakai transisi NavHost (Batch
     // 330, 200/150ms) supaya "rasa" transisi tetap konsisten satu app.
+    // Batch 440 — request eksplisit user: adaptasi behavior dari panduan
+    // `drag_drop_glass_ios_kotlin.md` (dilampirkan ulang) — kapsul & warna ikon di referensi
+    // bertransisi MENGIKUTI PERSENTASE GESER JARI SECARA LANGSUNG (`pageOffsetFraction`
+    // HorizontalPager), bukan cuma snap ikut boolean `selected` setelah tab commit. Arsitektur
+    // riil app ini TETAP permanent NavHost routes (bukan HorizontalPager — lihat rasionalisasi
+    // Batch 438 di atas, reorder/pager sengaja tidak dipakai literal), tapi app ini SUDAH punya
+    // padanan persis `pageOffsetFraction` guide: `focus` (param di atas, dihitung live tiap
+    // frame selama drag oleh `tabMagnifyFocus`, Batch 435/437 — 1f di tab aktif idle, turun ke
+    // 0f digeser menjauh, tab tetangga naik 0f→1f digeser mendekat). Target
+    // `animateFloatAsState` diganti dari `if (selected) 1f else 0f` (statis, cuma bereaksi
+    // setelah commit) jadi `focus` langsung — idle-nya SAMA PERSIS 1f/0f seperti sebelumnya (0
+    // regresi tap, tween 220ms yang sama tetap jalan sbg smoothing), bedanya sekarang capsule
+    // ini juga ikut bereaksi kontinu selama jari masih menggeser, persis seperti referensi.
     val glassAlpha by animateFloatAsState(
-        targetValue = if (selected) 1f else 0f,
+        targetValue = focus,
         animationSpec = tween(220),
         label = "GlassTabIndicatorAlpha"
     )
@@ -712,7 +732,21 @@ private fun GlassTabIcon(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Icon(icon, contentDescription = null)
+        // Batch 440 — elemen guide yang BELUM diadaptasi batch-batch sebelumnya: ikon sendiri
+        // (bukan cuma pill di belakangnya) ikut `lerp` warna kontinu, teknik PERSIS
+        // `androidx.compose.ui.graphics.lerp` di guide. Titik awal `unselectedIconColor` =
+        // token M3 resmi (`NavigationBarItemDefaults`, IDENTIK dgn default lama sebelum batch
+        // ini — 0 hardcode warna baru, ikut identitas tema aktif apa pun, konsisten dgn aturan
+        // Batch 437 §warna). Titik akhir = `tint` (primary) yang sama dgn aksen pill di atas,
+        // supaya ikon & pill bergerak sebagai 1 aksen, bukan 2 warna lepas. Skeu DIKECUALIKAN
+        // (aturan "solid, bukan kaca" Batch 58/61/79, app-wide) — tetap tint default M3 apa
+        // adanya, 0 lerp.
+        if (isSkeu) {
+            Icon(icon, contentDescription = null)
+        } else {
+            val unselectedIconColor = NavigationBarItemDefaults.colors().unselectedIconColor
+            Icon(icon, contentDescription = null, tint = lerp(unselectedIconColor, tint, glassAlpha))
+        }
         MagnifyingTabLabel(label, focus)
     }
 }
@@ -726,16 +760,23 @@ private fun GlassTabIcon(
 // hilang, tapi warna & scale-down `bouncyPress` (Batch 438) di `GlassTabIcon` tetap jalan penuh
 // (2 mekanisme feedback tekan yang independen) — cocok dengan referensi iOS Jam yang 0 ripple
 // tapi tetap ada feedback visual saat tab ditekan.
-private object NoRippleIndication : Indication {
-    private object NoOpIndicationInstance : IndicationInstance {
-        override fun ContentDrawScope.drawIndication() {
+// Batch 440 — implementasi kontrak `Indication`/`IndicationInstance` (`rememberUpdatedInstance`
+// + objek `drawIndication()`) di atas kini HARD ERROR compiler (bukan lagi cuma deprecated
+// warning) di compose-bom 2026.04.01 — `compileDebugKotlin`/`compileReleaseKotlin` FAILED,
+// lihat `log_fail_424.zip`. Migrasi ke kontrak resmi pengganti (`IndicationNodeFactory` +
+// `Modifier.Node`/`DrawModifierNode`) — 0 behavior berubah, MASIH murni `drawContent()` kosong,
+// 0 layer visual digambar, titik pemakaian `CompositionLocalProvider(LocalIndication provides
+// NoRippleIndication)` di `bottomBar` TIDAK disentuh (tetap kompatibel — `IndicationNodeFactory`
+// adalah subtipe `Indication`).
+private object NoRippleIndication : IndicationNodeFactory {
+    private class NoRippleIndicationNode : Modifier.Node(), DrawModifierNode {
+        override fun ContentDrawScope.draw() {
             drawContent()
         }
     }
 
-    @Composable
-    override fun rememberUpdatedInstance(interactionSource: InteractionSource): IndicationInstance {
-        return NoOpIndicationInstance
+    override fun create(interactionSource: InteractionSource): DelegatableNode {
+        return NoRippleIndicationNode()
     }
 }
 

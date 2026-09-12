@@ -9,6 +9,47 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 440**: trigger ganda dari user — (1) `log_fail_424.zip`, `compileDebugKotlin`/
+`compileReleaseKotlin` FAILED di CI (`e:` bukan `w:` — level deprecation `Indication`/
+`IndicationInstance` yang dipakai `NoRippleIndication` Batch 439 sudah naik jadi HARD ERROR di
+compose-bom 2026.04.01, bukan lagi cuma warning); (2) re-lampiran panduan
+`drag_drop_glass_ios_kotlin.md` + instruksi eksplisit "ubah behavior sesuai source code
+lampiran, adaptasi bukan timpa plek ketiplek". Perluasan langsung sektor nav bawah yang sama
+(Batch 301/435/437/438/439), bukan reopen sektor DITUTUP manapun.
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` —
+1. **Fix compile**: `NoRippleIndication` dimigrasi dari kontrak lama `Indication`/
+   `IndicationInstance` (`rememberUpdatedInstance`) ke kontrak resmi pengganti
+   `IndicationNodeFactory` + `Modifier.Node`/`DrawModifierNode` (`create()`/`ContentDrawScope.draw()`).
+   0 behavior berubah — masih murni `drawContent()` kosong, 0 layer visual, titik pemakaian
+   `CompositionLocalProvider(LocalIndication provides NoRippleIndication)` di `bottomBar` TIDAK
+   disentuh (`IndicationNodeFactory` = subtipe `Indication`, tetap kompatibel).
+2. **Adaptasi behavior guide**: 2 elemen guide (`lerp` posisi/opacity kapsul & warna ikon
+   mengikuti persentase geser jari `HorizontalPager` secara langsung) diadaptasi ke arsitektur
+   riil (permanent NavHost routes, BUKAN HorizontalPager — swap ke pager tetap ditolak sejak
+   Batch 435/438 dgn alasan sama: breaking ke state-restoration/NavigationRail tablet). App ini
+   sudah punya padanan persis `pageOffsetFraction` guide sejak Batch 435/437: `focus`
+   (`tabMagnifyFocus`, live tiap frame drag). Target `glassAlpha` (`GlassTabIcon`) diganti dari
+   `if (selected) 1f else 0f` (statis, cuma reaksi post-commit) jadi `focus` langsung — idle
+   value SAMA PERSIS 1f/0f (0 regresi tap, tween 220ms Batch 439 tetap jalan), bedanya kini
+   pill JUGA bereaksi kontinu selama drag berlangsung. Ikon sendiri (elemen guide yg belum
+   pernah diadaptasi batch manapun) kini ikut `lerp` warna kontinu persis teknik guide
+   (`androidx.compose.ui.graphics.lerp`) dari `NavigationBarItemDefaults.colors().unselectedIconColor`
+   (token M3 resmi, 0 hardcode warna baru) ke `tint` (primary, aksen sama dgn pill) — ikon & pill
+   kini 1 aksen bergerak bersama. Skeu DIKECUALIKAN dari lerp ikon (aturan solid Batch 58/61/79),
+   tetap tint default M3 apa adanya. Reorder drag-to-swap & `HorizontalPager` literal dari guide
+   TETAP tidak dipakai (rasionalisasi sama persis Batch 438, tidak diulang di sini).
+
+`NavigationRailItem` (tablet) TIDAK disentuh — di luar scope (sama seperti Batch 437/438/439).
+Detail penuh: `CHANGELOG.md` § Batch 440.
+
+**0 diverifikasi CI/device Batch 440** — review manual (baca kode + cek balance brace/paren:
+`{}` 300/300, `()` 861/861, `[]` 3/3), tidak ada env Android nyata/device fisik/compiler
+Kotlin/akses jaringan Gradle di sesi ini — fix compile berbasis pembacaan API resmi
+`IndicationNodeFactory`/`DrawModifierNode` (stabil sejak Compose UI 1.6+, konsisten dgn
+compose-bom 2026.04.01 project ini), BELUM dikonfirmasi CI hijau nyata. Item belum-terverifikasi
+bertambah 1 (lihat daftar di bawah).
+
 **Catatan Batch 439**: permintaan eksplisit user — 2 screenshot referensi (nav app ini vs tab bar
 iOS Jam/Clock), "perbaiki bottom nav bar agar lebih mirip gaya visual iOS app jam tersebut,
 matikan ripple khas Android saat klik". Perluasan langsung dari sektor nav bawah yang sama

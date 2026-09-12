@@ -1,5 +1,76 @@
 # Changelog
 
+## Batch 440 — Fix compile CI (Indication hard-deprecated) + ikon tab ikut lerp warna real-time saat drag
+Trigger ganda: (1) user melampirkan `log_fail_424.zip` — `compileDebugKotlin`/`compileReleaseKotlin`
+FAILED di CI, bukan cuma warning (`e:`, bukan `w:`); (2) user melampirkan ulang panduan
+`drag_drop_glass_ios_kotlin.md` dengan instruksi eksplisit "ubah behavior sesuai source code
+lampiran, adaptasi hasilnya bukan timpa plek ketiplek". Perluasan langsung sektor nav bawah yang
+sama (Batch 301/435/437/438/439), bukan reopen sektor DITUTUP manapun.
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. **Fix compile — migrasi `NoRippleIndication`**: root cause `log_fail_424.zip` — interface
+   `Indication`/`IndicationInstance` (kontrak lama yang dipakai `NoRippleIndication`, Batch 439)
+   sudah naik level deprecation-nya jadi ERROR (bukan lagi WARNING) di versi Compose Foundation
+   yang datang dari `compose-bom 2026.04.01` project ini, jadi `override fun
+   rememberUpdatedInstance(...)` di `MainActivity.kt:730` gagal kompilasi kedua variant
+   (debug & release). Migrasi ke kontrak resmi pengganti: `object NoRippleIndication :
+   IndicationNodeFactory` dengan `override fun create(interactionSource): DelegatableNode`
+   mengembalikan `class NoRippleIndicationNode : Modifier.Node(), DrawModifierNode` yang
+   meng-override `ContentDrawScope.draw()` — isinya TETAP PERSIS `drawContent()` kosong, 0 layer
+   visual baru digambar, 0 behavior berubah. Titik pemakaian
+   `CompositionLocalProvider(LocalIndication provides NoRippleIndication)` di `bottomBar` TIDAK
+   disentuh sama sekali — `IndicationNodeFactory` adalah subtipe resmi `Indication`, jadi tetap
+   type-compatible dengan `LocalIndication` (`CompositionLocal<Indication>`) tanpa perubahan di
+   sisi konsumen. Import `Indication`/`IndicationInstance` dihapus (sudah tidak dipakai kode apa
+   pun lagi di file ini — dicek eksplisit, 0 sisa referensi), diganti `IndicationNodeFactory`/
+   `DelegatableNode`/`DrawModifierNode`.
+
+2. **Ikon tab ikut lerp warna real-time saat drag** — 2 gap dari guide `drag_drop_glass_ios_kotlin.md`
+   yang belum pernah diadaptasi Batch 437/438/439 manapun, dituntaskan batch ini TANPA mengadopsi
+   arsitektur `HorizontalPager` guide secara literal (app ini permanent NavHost routes — alasan
+   penolakan swap-ke-pager identik Batch 435/438, tidak diulang detail di sini):
+   - **Kapsul (pill) kini bereaksi kontinu saat drag, bukan cuma post-commit**: `glassAlpha` di
+     `GlassTabIcon` (Batch 439, animated lewat `animateFloatAsState(tween(220))`) targetnya
+     diganti dari `if (selected) 1f else 0f` (snap ikut boolean, cuma berubah SETELAH tab
+     ter-commit) jadi `focus` — parameter yang SUDAH ADA & SUDAH live tiap frame selama drag
+     (dihitung `tabMagnifyFocus`, Batch 435/437, sebelumnya cuma dipakai `MagnifyingTabLabel`).
+     Nilai idle (tanpa drag) `focus` SAMA PERSIS 1f (tab aktif) / 0f (tab lain) seperti target
+     lama — 0 regresi kasus tap, tween 220ms yang sama tetap jalan sbg smoothing. Bedanya:
+     sekarang pill JUGA memudar/menyala mengikuti jarak geser jari secara real-time, persis
+     `pageOffsetFraction` guide (`focus` = padanan 1:1 yang sudah ada, arsitektur beda tapi
+     sinyal sama persis: 1f→0f tab asal saat digeser menjauh, 0f→1f tab tetangga saat digeser
+     mendekat).
+   - **Ikon sendiri kini ikut `lerp` warna** — sebelumnya HANYA pill di belakang ikon yang
+     berwarna aksen (`tint.copy(alpha=...)`), ikon itu sendiri dibiarkan warna default M3 statis
+     (Crossfade internal M3 ikut `selected` boolean, 0 reaksi terhadap drag). Ditambahkan
+     `tint = lerp(unselectedIconColor, tint, glassAlpha)` (fungsi `androidx.compose.ui.graphics.lerp`
+     — teknik PERSIS sama dengan guide, cuma driver fraction-nya diganti `pageOffsetFraction`
+     pager → `glassAlpha`/`focus` arsitektur nyata di atas). `unselectedIconColor` diambil dari
+     `NavigationBarItemDefaults.colors().unselectedIconColor` (token M3 resmi, identik dgn
+     warna default sebelum batch ini — 0 hardcode warna baru, konsisten `identitas tema aktif
+     apa pun` per aturan Batch 437 §warna), titik akhir lerp = `tint` (`colorScheme.primary`,
+     variabel yang sudah ada, sama persis aksen yang dipakai pill) — ikon & pill kini 1 aksen
+     visual yang bergerak bersama, bukan 2 sistem warna terpisah. **Skeu DIKECUALIKAN** dari lerp
+     ini (aturan "solid, bukan kaca" Batch 58/61/79, app-wide) — tetap render `Icon(icon,
+     contentDescription = null)` polos, 0 tint override, sama persis sebelum batch ini.
+   - Elemen guide yang TETAP tidak dipakai literal (sama persis rasionalisasi Batch 438, tidak
+     diulang): reorder drag-to-swap tab (breaking ke 3 route top-level permanen), dan geometri
+     1-kapsul-bergeser-lintas-posisi via `onGloballyPositioned`/`tabPositions` (guide didesain utk
+     N-tab reorderable dalam 1 `HorizontalPager`; arsitektur nyata app ini per-tab
+     independent pill dalam `NavigationBarItem` M3 masing-masing, bukan 1 capsule bersama yang
+     meluncur lintas Row — mengadopsi geometri itu 1:1 adalah refactor struktural `GlassTabIcon`
+     jauh di luar scope "adaptasi behavior warna/opacity" yang diminta, dan berisiko regresi
+     langsung ke pola tap-independent + Skeu-exception yang sudah mapan sejak Batch 438/439).
+
+`NavigationRailItem` (tablet/lipat) TIDAK disentuh — di luar scope, sama seperti Batch 437/438/439.
+
+**0 diverifikasi CI/device Batch 440** — review manual (baca kode + cek balance brace/paren:
+`{}` 300/300, `()` 861/861, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Migrasi `IndicationNodeFactory`/`DrawModifierNode` berbasis
+pembacaan kontrak resmi API (stabil sejak Compose UI 1.6+), BELUM dikonfirmasi CI hijau nyata —
+jalankan `DAILY UPDATE` lalu cek run GitHub Actions berikutnya untuk verifikasi compile FIXED.
+
 ## Batch 439 — Bottom nav lebih mirip iOS Jam: pill gabungan ikon+label, kapsul mengambang, 0 ripple
 User melampirkan 2 screenshot referensi (bottom nav app ini vs tab bar iOS Jam/Clock) dengan
 instruksi: "perbaiki bottom nav bar agar lebih mirip dengan gaya visual iOS app jam tersebut,
