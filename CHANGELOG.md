@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 444 — Drag tab-bar: live pill-tracking + tahanan ujung kolom + fix kapsul kebesaran
+User konfirmasi CI Batch 443 hijau, minta 3 penajaman atas fitur drag-tab-bar (Batch 442):
+pill belum ikut jari real-time, 0 tahanan visual di ujung kolom, dan kapsul bar dinilai kebesaran.
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. **Pill ikut jari real-time**: sebelumnya pill cuma "lompat" begitu index-crossing commit
+   (navigate() terpicu). Sekarang ada pelacakan posisi jari kontinu selama drag di tab-bar
+   berlangsung — pill mulai bereaksi (membesar/menyala) SEBELUM batas kolom terlewati, mengikuti
+   gerak jari langsung, gaya segmented-control iOS asli.
+2. **Tahanan visual di ujung kolom**: menggeser jari lewat ujung Beranda/Pengaturan kini terasa
+   kapsul "memberi sedikit" (rubber-band halus) alih-alih diam kaku, lalu kembali pegas ke posisi
+   semula begitu jari dilepas.
+3. **Kapsul tidak lagi kebesaran**: root cause — spasi cadangan sistem (system-nav-bar) yang
+   sebelumnya ikut terhitung DI DALAM tinggi kapsul, padahal margin mengambangnya sendiri (Batch
+   439) sudah menangani jarak ke gesture-nav — dobel spasi ini yang membuat kapsul terlihat lebih
+   tebal dari seharusnya. Dihapus di titik ini saja, margin mengambang lama tetap jalan.
+
+**0 diverifikasi CI/device Batch 444** — review manual (baca kode + cek balance brace/paren:
+`{}` 317/317, `()` 977/977, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini.
+
 ## Batch 443 — Fix compile CI: awaitFirstDown salah paket import (regresi Batch 442)
 Trigger `log_fail_427.zip` — fitur drag-tab-bar Batch 442 gagal compile CI: `Unresolved reference
 'awaitFirstDown'` di `MainActivity.kt` (baris import & baris pakainya). Root cause: `awaitFirstDown`

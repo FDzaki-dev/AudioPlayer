@@ -9,6 +9,50 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 444**: user konfirmasi CI Batch 443 hijau, lanjut feedback eksplisit (bukan
+reopen sektor DITUTUP manapun, perluasan langsung drag tab-bar Batch 442) — 3 poin dipilih via
+opsi tersaring: (1) pill/capsule 0 ikut posisi jari real-time (baru "lompat" pas commit
+index-crossing), (2) 0 tahanan visual di ujung kolom (Beranda/Pengaturan), (3) "border tab nav
+terluar kebesaran".
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` —
+1. **Live pill-tracking**: state baru `tabBarDragIndexPx` (posisi kontinu 0f..3f, NaN = 0 drag
+   aktif di tab-bar ini — TERPISAH dari `tabDragOffsetPx` milik swipe konten Batch 435/437, beda
+   area sentuh, 0 saling pakai), ditulis SINKRON di loop `awaitEachGesture` yang sudah ada (dari
+   `x` yang SAMA PERSIS dipakai hitung `newIndex`, 0 hitungan ganda). Fungsi baru
+   `tabBarDragFocus(tabIndex)`: NaN → fallback `tabMagnifyFocus` (0 regresi nudge swipe-konten
+   lama); aktif → fungsi tenda (jarak posisi kontinu ke titik tengah tiap kolom, 1f di tengah
+   turun linear ke 0f di jarak 1 kolom) gantikan `tabMagnifyFocus` di 3 titik pemakaian
+   `GlassTabIcon(focus = ...)` — pill kini "hidup" mengikuti jari kontinu SEBELUM index-crossing
+   commit, bukan cuma bereaksi sesudahnya.
+2. **Tahanan visual ujung kolom**: `tabBarOverscrollPx` (sumber kebenaran sinkron, dibaca
+   `graphicsLayer{translationX=...}` di modifier terluar `NavigationBar`) dari `rawX` (posisi
+   jari SEBELUM di-coerce ke batas bar) redaman 0.3f + batas ±24px (pola identik
+   `tabDragOffsetPx.floatValue = totalTabDrag * 0.3f` yg sudah ada) — kapsul nge-"give" halus
+   pas jari didorong lewat ujung Beranda/Pengaturan, springback ke 0 lewat `tabBarOverscrollAnim`
+   (`Animatable`, spring dampingRatio/stiffness IDENTIK `tabDragOffset`/`AlbumArtHero`) via
+   `tabSwipeScope` (REUSE scope yang sudah ada) — pola *Px-sinkron/Animatable-springback-only
+   PERSIS sumbu fix Batch 433/434 (0 coroutine per-delta), non-blocking (awaitEachGesture 0
+   nunggu springback selesai sebelum siap terima down berikutnya).
+3. **Fix "kebesaran"**: root cause — `windowInsets` default `NavigationBar`
+   (`NavigationBarDefaults.windowInsets`) masih mereservasi tinggi system-nav-bar DI DALAM
+   kapsul, padahal Batch 439 sudah floating-kan kapsul via margin LUAR (`.padding(bottom=12.dp)`)
+   — inset itu jadi DOBEL terhitung (dalam tinggi kapsul + margin luar), bikin kapsul lebih
+   tebal dari semestinya. Fix: `windowInsets = WindowInsets(0,0,0,0)` di titik pemakaian INI SAJA
+   (bukan ganti default app-wide). Margin luar 12.dp (Batch 439) TETAP jalan sendiri, 0 risiko
+   baru ketutup gesture-nav.
+
+0 file lain disentuh. 0 dependency baru, 0 import baru (`Animatable`/`spring`/`Spring`/
+`WindowInsets`/`graphicsLayer` semua sudah ada sejak batch sebelumnya).
+
+**0 diverifikasi CI/device Batch 444** — review manual (baca kode + cek balance brace/paren:
+`{}` 317/317, `()` 977/977, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Item belum-terverifikasi bertambah 1: live-tracking pill (halus
+mengikuti jari lintas kolom, 0 lag/jitter), tahanan ujung Beranda/Pengaturan (terasa "ketahan"
+bukan keras/kaku, springback halus), dan kapsul terlihat lebih ramping (bukan lagi "kebesaran")
+tanpa closeup ke gesture-nav bar di device asli — SEMUA perlu konfirmasi device fisik (0 tersedia
+sesi ini, sama seperti Batch 435-443).
+
 **Catatan Batch 443**: trigger `log_fail_427.zip` — fix Batch 442 (drag langsung di tab bar) GAGAL
 compile CI: `Unresolved reference 'awaitFirstDown'` di 2 titik (`MainActivity.kt:187` importnya
 sendiri, `:1349` titik pakainya). Root cause: salah paket saat penulisan Batch 442 — `awaitFirstDown`

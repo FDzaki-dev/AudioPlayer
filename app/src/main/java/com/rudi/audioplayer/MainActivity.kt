@@ -1277,6 +1277,38 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     val homeTabInteraction = remember { MutableInteractionSource() }
                     val libraryTabInteraction = remember { MutableInteractionSource() }
                     val settingsTabInteraction = remember { MutableInteractionSource() }
+                    // Batch 444 — user eksplisit: pill/capsule drag tab-bar (Batch 442) 0 ikut
+                    // posisi jari real-time (baru "lompat" pas commit index-crossing). Posisi
+                    // kontinu (satuan "index", 0f..TAB_ROUTES.size) selama drag tab-bar aktif,
+                    // NaN = tidak sedang drag di SINI (state TERPISAH dari tabDragOffsetPx milik
+                    // swipe KONTEN Batch 435/437 — beda area sentuh, 0 saling pakai). Ditulis
+                    // SINKRON langsung di loop awaitEachGesture yang sudah ada (bukan lewat
+                    // coroutine/snapTo per-delta) — sumbu sinkron-vs-asinkron yang sama yang
+                    // sudah dijaga Batch 433/434.
+                    val tabBarDragIndexPx = remember { mutableFloatStateOf(Float.NaN) }
+                    // Tahanan visual (rubber-band) saat jari didorong lewat ujung kolom
+                    // pertama/terakhir (Beranda/Pengaturan) — sebelumnya 0 sinyal apa pun, index
+                    // cuma coerceIn diam-diam. Pola SAMA PERSIS dgn tabDragOffsetPx/tabDragOffset
+                    // (swipe konten Batch 435, di bawah) & AlbumArtHero (NowPlayingScreen.kt,
+                    // Batch 434): *Px = sumber kebenaran sinkron dibaca graphicsLayer, Animatable
+                    // HANYA dipakai fase springback (reuse tabSwipeScope yang sudah ada) supaya
+                    // 0 nge-block awaitEachGesture menunggu gesture berikutnya selama springback
+                    // masih jalan.
+                    val tabBarOverscrollPx = remember { mutableFloatStateOf(0f) }
+                    val tabBarOverscrollAnim = remember { Animatable(0f) }
+                    // Fallback ke tabMagnifyFocus (Batch 437) kalau 0 drag tab-bar aktif — 0
+                    // regresi ke behavior lama (nudge dari swipe konten tetap jalan apa adanya).
+                    // Aktif (idxPos bukan NaN): fungsi tenda (segitiga) sederhana dari jarak posisi
+                    // kontinu jari ke titik tengah tiap kolom (`tabIndex + 0.5f`) — 1f persis di
+                    // tengah kolom, turun linear ke 0f pas jarak 1 kolom penuh (= tengah kolom
+                    // tetangga), pas gaya "lensa mengikuti jari" segmented-control asli, 0 nunggu
+                    // navigate() commit index-crossing dulu spt sebelumnya.
+                    fun tabBarDragFocus(tabIndex: Int): Float {
+                        val idxPos = tabBarDragIndexPx.floatValue
+                        if (idxPos.isNaN()) return tabMagnifyFocus(tabIndex)
+                        val dist = kotlin.math.abs(idxPos - (tabIndex + 0.5f))
+                        return (1f - dist).coerceIn(0f, 1f)
+                    }
                     NavigationBar(
                         // Batch 439 — referensi iOS Jam: bar bawah bukan persegi nempel penuh
                         // ke tepi layar, tapi kapsul rounded yang "mengambang" dengan jarak dari
@@ -1349,6 +1381,13 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     val down = awaitFirstDown(pass = PointerEventPass.Initial)
                                     val barWidthPx = size.width.toFloat()
                                     if (barWidthPx <= 0f) return@awaitEachGesture
+                                    // Batch 444 — jaring pengaman sama pola tabDragOffset/
+                                    // AlbumArtHero: hentikan springback overscroll lama supaya
+                                    // tidak menimpa drag baru yang mulai lagi cepat.
+                                    tabSwipeScope.launch { tabBarOverscrollAnim.stop() }
+                                    tabBarDragIndexPx.floatValue =
+                                        (down.position.x / barWidthPx * TAB_ROUTES.size)
+                                            .coerceIn(0f, TAB_ROUTES.size.toFloat())
                                     var hoveredIndex = (down.position.x / barWidthPx * TAB_ROUTES.size)
                                         .toInt()
                                         .coerceIn(0, TAB_ROUTES.size - 1)
@@ -1357,7 +1396,25 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                         val change = event.changes.firstOrNull { it.id == down.id }
                                             ?: break
                                         if (!change.pressed) break
-                                        val x = change.position.x.coerceIn(0f, barWidthPx)
+                                        val rawX = change.position.x
+                                        val x = rawX.coerceIn(0f, barWidthPx)
+                                        // Batch 444 — posisi kontinu utk pill live-tracking
+                                        // (tabBarDragFocus di atas), dari `x` yg SAMA PERSIS
+                                        // dipakai hitung newIndex di bawah (0 hitungan ganda).
+                                        tabBarDragIndexPx.floatValue = x / barWidthPx * TAB_ROUTES.size
+                                        // Batch 444 — tahanan visual: overscroll dari rawX
+                                        // (BUKAN x yg sudah di-coerce) supaya kebaca begitu jari
+                                        // lewat ujung kolom pertama/terakhir. Redaman 0.3f (pola
+                                        // sama persis tabDragOffsetPx.floatValue = totalTabDrag *
+                                        // 0.3f di bawah) + batas ±24px (jauh lebih kecil dari
+                                        // lebar 1 kolom) supaya terasa "ketahan", bukan ikut
+                                        // sepenuhnya.
+                                        val overscroll = when {
+                                            rawX < 0f -> rawX
+                                            rawX > barWidthPx -> rawX - barWidthPx
+                                            else -> 0f
+                                        }
+                                        tabBarOverscrollPx.floatValue = (overscroll * 0.3f).coerceIn(-24f, 24f)
                                         val newIndex = (x / barWidthPx * TAB_ROUTES.size)
                                             .toInt()
                                             .coerceIn(0, TAB_ROUTES.size - 1)
@@ -1375,8 +1432,27 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                             }
                                         }
                                     }
+                                    // Batch 444 — gesture selesai (naik/batal, 2 jalur break di
+                                    // atas SAMA-SAMA jatuh ke sini): lepas live-tracking (fallback
+                                    // balik ke tabMagnifyFocus lewat NaN) + springback overscroll
+                                    // ke 0 lewat tabSwipeScope (non-blocking, awaitEachGesture
+                                    // langsung siap terima down berikutnya tanpa nunggu spring).
+                                    tabBarDragIndexPx.floatValue = Float.NaN
+                                    tabSwipeScope.launch {
+                                        tabBarOverscrollAnim.snapTo(tabBarOverscrollPx.floatValue)
+                                        tabBarOverscrollAnim.animateTo(
+                                            0f,
+                                            spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessLow
+                                            )
+                                        ) {
+                                            tabBarOverscrollPx.floatValue = value
+                                        }
+                                    }
                                 }
-                            },
+                            }
+                            .graphicsLayer { translationX = tabBarOverscrollPx.floatValue },
                         // Batch 53: lowered from 12.dp — spec §15 keeps navigation "calm and
                         // immediately understandable" and explicitly warns against every item (or
                         // in this case, the whole bar) reading as an accent-tinted glow. M3's
@@ -1386,7 +1462,21 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         // (Level 2, spec §4) without the accent wash dominating the one piece of
                         // chrome that's always on screen. Batch 57: Skeu shares this same 6.dp —
                         // same reasoning (SkeuAccent as surfaceTint would otherwise dominate).
-                        tonalElevation = if (navCatchLightColor != null) 6.dp else NavigationBarDefaults.Elevation
+                        tonalElevation = if (navCatchLightColor != null) 6.dp else NavigationBarDefaults.Elevation,
+                        // Batch 444 — user: "border tab nav terluar kebesaran". Root cause:
+                        // `windowInsets` DEFAULT NavigationBar (`NavigationBarDefaults.windowInsets`)
+                        // masih mereservasi tinggi system-nav-bar DI DALAM capsule (Batch 439 0
+                        // pernah sentuh param ini — lihat komentar lama di `.padding(...)` atas:
+                        // "margin 12.dp TAMBAHAN di atas inset itu, BUKAN pengganti"), padahal
+                        // capsule ini sudah "mengambang" lewat margin luar sejak Batch 439 — jadi
+                        // inset system-bar itu kini DOBEL terhitung (sekali di dalam tinggi
+                        // capsule, sekali lagi di margin luar), bikin capsule terlihat lebih
+                        // tebal/besar dari semestinya. Fix: nolkan `windowInsets` di titik ini
+                        // SAJA (bukan ganti default NavigationBarDefaults.windowInsets app-wide) —
+                        // margin luar 12.dp bawah (Batch 439) TETAP jalan sendiri, tetap 0 risiko
+                        // capsule ketutup gesture-nav (device minSdk 31 = gesture-nav umum, margin
+                        // 12.dp historisnya sudah cukup sebelum inset dobel ini ditambah).
+                        windowInsets = WindowInsets(0, 0, 0, 0)
                     ) {
                         // Batch 439 — bungkus 3 NavigationBarItem dgn Indication kosong
                         // (`NoRippleIndication`, definisi di atas dekat `GlassTabIcon`) supaya
@@ -1423,7 +1513,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 GlassTabIcon(
                                     icon = Icons.Default.Home,
                                     label = "Beranda",
-                                    focus = tabMagnifyFocus(0),
+                                    focus = tabBarDragFocus(0),
                                     selected = currentRoute == "home",
                                     interactionSource = homeTabInteraction
                                 )
@@ -1446,7 +1536,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 GlassTabIcon(
                                     icon = Icons.Default.LibraryMusic,
                                     label = "Perpustakaan",
-                                    focus = tabMagnifyFocus(1),
+                                    focus = tabBarDragFocus(1),
                                     selected = currentRoute == "library",
                                     interactionSource = libraryTabInteraction
                                 )
@@ -1469,7 +1559,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 GlassTabIcon(
                                     icon = Icons.Default.Settings,
                                     label = "Pengaturan",
-                                    focus = tabMagnifyFocus(2),
+                                    focus = tabBarDragFocus(2),
                                     selected = currentRoute == "settings",
                                     interactionSource = settingsTabInteraction
                                 )
