@@ -9,6 +9,42 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 445**: feedback eksplisit user PASCA Batch 444 (bukan reopen sektor DITUTUP
+manapun, perluasan langsung drag tab-bar Batch 442/444) — 2 poin: (1) "drag jari real-time belum
+sepenuhnya smooth like iOS", (2) "floating effect HANYA saat drag, tampilan yang dilewati berubah
+warna seketika real-time (bukan cuma pindah warna instant lintas tab)".
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` — root cause TUNGGAL utk kedua
+poin: `animateFloatAsState(targetValue = focus, tween(220))` di `GlassTabIcon` (Batch 440) adalah
+lapis smoothing KEDUA di atas `focus` yang SUDAH kontinu real-time (fungsi tenda
+`tabBarDragFocus`, Batch 444) — targetnya bergerak tiap event pointer-move selama drag, jadi
+tween 220ms terus "mengejar" target yang TERUS PINDAH → nilai yang dirender SELALU tertinggal
+dari posisi jari asli (poin 1), dan warna ikon/pill (lerp ikut `glassAlpha`) terlihat
+menyusul-lompat bukan berubah seketika sinkron dgn jari (poin 2).
+1. **Fix utama**: `animateFloatAsState` → `Animatable` manual + param baru `isDragging: Boolean`
+   di `GlassTabIcon` (dihitung 1x di pemanggil: `isTabBarDragging = tabBarDragIndexPx bukan NaN
+   ATAU tabDragOffsetPx != 0`, cover 2 sumber drag — tab-bar langsung + nudge swipe-konten).
+   Selama `isDragging` true: `snapTo(focus)` tiap frame (0 animasi, 1:1 sinkron mentah — pola
+   sama `tabDragOffsetPx`/`tabBarOverscrollPx`). Selesai drag: `animateTo(focus, tween(220))`
+   dari titik sinkron terakhir (0 lompatan). Tap biasa (0 drag) tetap tween(220) lama, 0 regresi.
+2. **Fix pendukung**: `MagnifyingTabLabel` — `style = baseStyle.copy(fontSize = ...)` (real
+   remeasure/relayout tiap frame drag, dobel dgn `graphicsLayer` scale) DICABUT, diganti
+   `style = baseStyle` polos + faktor `graphicsLayer` scale dinaikkan 0.08f→0.23f (magnitude
+   visual akhir dipertahankan sama, ≈1.23x lama). Kontribusi ke stutter drag (layout-pass
+   berulang) dihapus, 0 perubahan tampilan yang diminta user.
+3. Import `animateFloatAsState` dicabut (0 pemakaian lain tersisa di file).
+
+0 file lain disentuh. 0 dependency baru, 0 import baru (`Animatable`/`tween`/`LaunchedEffect`/
+`remember` semua sudah ada sejak batch sebelumnya).
+
+**0 diverifikasi CI/device Batch 445** — review manual (baca kode + cek balance brace/paren:
+`{}` 321/321, `()` 1014/1014, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Item belum-terverifikasi bertambah 1: real-time drag tab-bar terasa
+1:1 mengikuti jari TANPA lag (poin 1), warna ikon/pill berubah seketika sinkron jari selama drag
+DAN tetap cross-fade halus untuk tap biasa (poin 2), transisi mulus TANPA lompatan visual pas
+jari dilepas (handoff drag→settle) — SEMUA perlu konfirmasi device fisik (0 tersedia sesi ini,
+sama seperti Batch 435-444).
+
 **Catatan Batch 444**: user konfirmasi CI Batch 443 hijau, lanjut feedback eksplisit (bukan
 reopen sektor DITUTUP manapun, perluasan langsung drag tab-bar Batch 442) — 3 poin dipilih via
 opsi tersaring: (1) pill/capsule 0 ikut posisi jari real-time (baru "lompat" pas commit

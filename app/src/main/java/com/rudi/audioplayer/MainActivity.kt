@@ -66,7 +66,6 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.GraphicEq
@@ -634,14 +633,28 @@ private fun WelcomeHighlight(icon: androidx.compose.ui.graphics.vector.ImageVect
 private fun MagnifyingTabLabel(text: String, focus: Float) {
     val clampedFocus = focus.coerceIn(0f, 1f)
     val baseStyle = MaterialTheme.typography.labelMedium
+    // Batch 445 — user eksplisit: drag real-time tab-bar "kurang smooth". Root cause KEDUA
+    // (selain fix `glassAlpha` di `GlassTabIcon`): `style = baseStyle.copy(fontSize = ...)` di
+    // bawah ini mengubah fontSize SUNGGUHAN tiap frame drag (bukan cuma transform) — Text harus
+    // di-remeasure+relayout ULANG tiap kali `focus` berubah (tiap pointer-move event selama
+    // drag), dobel dgn scale visual `graphicsLayer` di bawah yang SUDAH cukup utk efek membesar
+    // (2 mekanisme scale independen bertumpuk = magnitude gabungan lebih besar dari maksud awal
+    // DAN beban layout-pass berulang yang berkontribusi ke drag terasa tersendat). Fix: fontSize
+    // asli (`baseStyle`, 0 di-copy) dipertahankan APA ADANYA — 0 remeasure lagi selama drag,
+    // efek "membesar" SEPENUHNYA lewat `graphicsLayer` scale (draw-phase murni, pola sama
+    // persis "Px-sinkron dibaca graphicsLayer" yang sudah dipakai `tabDragOffsetPx`/
+    // `tabBarOverscrollPx`, Batch 433/434/444). Faktor scale dinaikkan dari 0.08f ke 0.23f
+    // (≈ gabungan magnitude lama 1.14×1.08=1.231) supaya besar visual akhir label saat fokus
+    // penuh TETAP sama seperti sebelumnya — 0 perubahan tampilan yang diminta, murni pindah
+    // mekanisme jadi lebih ringan.
     Text(
         text = text,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        style = baseStyle.copy(fontSize = baseStyle.fontSize * (1f + clampedFocus * 0.14f)),
+        style = baseStyle,
         modifier = Modifier
             .graphicsLayer {
-                val scale = 1f + clampedFocus * 0.08f
+                val scale = 1f + clampedFocus * 0.23f
                 scaleX = scale
                 scaleY = scale
                 alpha = 0.68f + 0.32f * clampedFocus
@@ -713,7 +726,8 @@ private fun GlassTabIcon(
     label: String,
     focus: Float,
     selected: Boolean,
-    interactionSource: MutableInteractionSource
+    interactionSource: MutableInteractionSource,
+    isDragging: Boolean
 ) {
     val isSkeu = isSkeuTheme()
     // Cross-fade kontinu (bukan snap ON/OFF) — pill kaca menyala/meredup halus mengikuti
@@ -732,11 +746,35 @@ private fun GlassTabIcon(
     // setelah commit) jadi `focus` langsung — idle-nya SAMA PERSIS 1f/0f seperti sebelumnya (0
     // regresi tap, tween 220ms yang sama tetap jalan sbg smoothing), bedanya sekarang capsule
     // ini juga ikut bereaksi kontinu selama jari masih menggeser, persis seperti referensi.
-    val glassAlpha by animateFloatAsState(
-        targetValue = focus,
-        animationSpec = tween(220),
-        label = "GlassTabIndicatorAlpha"
-    )
+    // Batch 445 — feedback lanjutan user PASCA Batch 444 di device asli, 2 poin: (1) "drag jari
+    // real-time belum sepenuhnya smooth", (2) "floating effect HANYA saat drag, warna berubah
+    // seketika real-time (bukan cuma pindah warna instant lintas tab)". Root cause TUNGGAL utk
+    // keduanya: `animateFloatAsState(targetValue = focus, tween(220))` di atas adalah lapis
+    // smoothing KEDUA di atas `focus` yang SUDAH kontinu real-time (fungsi tenda
+    // `tabBarDragFocus`, Batch 444) — targetnya sendiri bergerak tiap event pointer-move selama
+    // drag, jadi tween 220ms itu terus "mengejar" target yang TERUS PINDAH (bukan mengejar 1
+    // target diam spt transisi tap biasa), hasil yang dirender SELALU tertinggal dari posisi
+    // jari asli: lag itu yang terasa "kurang smooth" (poin 1), dan karena tertinggal, warna
+    // ikon/pill (baca `glassAlpha` di bawah) terlihat menyusul-lompat bukan berubah seketika
+    // sinkron dgn jari (poin 2).
+    // Fix: `animateFloatAsState` diganti `Animatable` manual dikontrol lewat `isDragging` (param
+    // baru, dihitung sekali di pemanggil dari `tabBarDragIndexPx`/`tabDragOffsetPx` — lihat titik
+    // pemakaian di `AppNavHost`) — SELAMA drag aktif: `snapTo(focus)` tiap kali `focus` berubah
+    // (0 animasi, 1:1 sinkron per frame dgn posisi jari mentah, pola sama seperti
+    // `tabDragOffsetPx`/`tabBarOverscrollPx` yang baca nilai mentah langsung tanpa animasi utk
+    // real-time tracking, Batch 433/434/444). Begitu drag lepas (`isDragging` → false):
+    // `animateTo(focus, tween(220))` dari titik SINKRON terakhir itu — nyambung mulus ke posisi
+    // commit final (0f/1f) TANPA lompatan mundur. Tap biasa (0 drag aktif sama sekali) tetap
+    // dapat cross-fade tween(220) yang SAMA PERSIS seperti sebelumnya (Batch 440) — 0 regresi.
+    val glassAlphaAnim = remember { Animatable(focus) }
+    LaunchedEffect(focus, isDragging) {
+        if (isDragging) {
+            glassAlphaAnim.snapTo(focus)
+        } else {
+            glassAlphaAnim.animateTo(focus, tween(220))
+        }
+    }
+    val glassAlpha = glassAlphaAnim.value
     val pillShape = RoundedCornerShape(16.dp)
     val tint = MaterialTheme.colorScheme.primary
     Column(
@@ -1309,6 +1347,17 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         val dist = kotlin.math.abs(idxPos - (tabIndex + 0.5f))
                         return (1f - dist).coerceIn(0f, 1f)
                     }
+                    // Batch 445 — dibaca `GlassTabIcon` (param `isDragging` baru, lihat 3 titik
+                    // pemakaian di bawah) supaya glassAlpha snap 1:1 real-time HANYA selama drag
+                    // sungguhan berlangsung — 2 sumber `focus` kontinu yang masuk
+                    // `tabBarDragFocus` di atas SAMA-SAMA dicek: drag LANGSUNG di tab-bar
+                    // (`tabBarDragIndexPx` bukan NaN) ATAU nudge dari swipe KONTEN (`tabDragOffsetPx`
+                    // != 0, termasuk saat masih springback menuju 0 pasca lepas jari — begitu
+                    // benar-benar 0 lagi, `tabMagnifyFocus` sudah balik ke nilai stabil 0f/1f,
+                    // handoff ke tween(220) di GlassTabIcon 0 lompatan). Tap biasa (0 drag
+                    // manapun aktif) = false, tetap dapat cross-fade tween(220) lama.
+                    val isTabBarDragging = !tabBarDragIndexPx.floatValue.isNaN() ||
+                        tabDragOffsetPx.floatValue != 0f
                     NavigationBar(
                         // Batch 439 — referensi iOS Jam: bar bawah bukan persegi nempel penuh
                         // ke tepi layar, tapi kapsul rounded yang "mengambang" dengan jarak dari
@@ -1515,7 +1564,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     label = "Beranda",
                                     focus = tabBarDragFocus(0),
                                     selected = currentRoute == "home",
-                                    interactionSource = homeTabInteraction
+                                    interactionSource = homeTabInteraction,
+                                    isDragging = isTabBarDragging
                                 )
                             },
                             interactionSource = homeTabInteraction,
@@ -1538,7 +1588,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     label = "Perpustakaan",
                                     focus = tabBarDragFocus(1),
                                     selected = currentRoute == "library",
-                                    interactionSource = libraryTabInteraction
+                                    interactionSource = libraryTabInteraction,
+                                    isDragging = isTabBarDragging
                                 )
                             },
                             interactionSource = libraryTabInteraction,
@@ -1561,7 +1612,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     label = "Pengaturan",
                                     focus = tabBarDragFocus(2),
                                     selected = currentRoute == "settings",
-                                    interactionSource = settingsTabInteraction
+                                    interactionSource = settingsTabInteraction,
+                                    isDragging = isTabBarDragging
                                 )
                             },
                             interactionSource = settingsTabInteraction,

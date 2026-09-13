@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 445 — Drag tab-bar: hilangkan lag real-time + floating-color sync ke jari
+Feedback pasca Batch 444: drag jari di tab-bar dinilai belum sepenuhnya smooth ala iOS, dan efek
+warna "floating" belum berubah seketika mengikuti posisi jari saat digeser.
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. **Drag 1:1 real-time**: pill/ikon kini melacak posisi jari TANPA lag animasi selama drag
+   berlangsung — sebelumnya ada lapis smoothing tersembunyi yang membuat tampilan sedikit
+   tertinggal dari gerak jari asli. Begitu jari dilepas, transisi tetap mulus ke posisi akhir
+   (0 lompatan).
+2. **Floating-color sinkron**: saat drag, warna ikon/pill yang dilewati kini berubah seketika
+   mengikuti posisi jari secara langsung (bukan menyusul/lompat). Tap biasa (tanpa drag) tetap
+   memakai transisi warna halus seperti sebelumnya — 0 berubah.
+3. Sisi performa: penskalaan label tab saat drag dipindah sepenuhnya ke mekanisme visual ringan
+   (0 lagi memicu pengukuran ulang teks tiap frame) — ukuran akhir label tetap sama, cuma lebih
+   ringan dijalankan selama drag.
+
+**0 diverifikasi CI/device Batch 445** — review manual (baca kode + cek balance brace/paren:
+`{}` 321/321, `()` 1014/1014, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini.
+
 ## Batch 444 — Drag tab-bar: live pill-tracking + tahanan ujung kolom + fix kapsul kebesaran
 User konfirmasi CI Batch 443 hijau, minta 3 penajaman atas fitur drag-tab-bar (Batch 442):
 pill belum ikut jari real-time, 0 tahanan visual di ujung kolom, dan kapsul bar dinilai kebesaran.
