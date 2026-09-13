@@ -12,14 +12,16 @@
 > - Efek pembesar label tab bawah (Batch 437) belum dikonfirmasi user di device asli —
 >   khususnya kemulusan transisi fokus saat drag & 0 frame-drop tambahan. Komponen blur-nya
 >   sendiri sudah DICABUT (Batch 442, lihat di bawah), jadi bukan lagi "efek kaca".
-> - Drag langsung di tab bar (Batch 442, disempurnakan Batch 444/445/446) belum dikonfirmasi user
->   di device asli — khususnya: label 3 tab tidak terpotong di font-scale aksesibilitas besar;
->   drag jari lintas tab bar (termasuk lintas >1 batas tab) berpindah tab dgn benar tanpa
->   mengganggu tap/ripple-feedback biasa; pill/warna ikon melacak posisi jari 1:1 real-time TANPA
->   lag/jitter selama drag (Batch 445); tahanan visual halus di ujung kolom Beranda/Pengaturan
->   (Batch 444); transisi mulus TANPA lompatan visual persis saat jari dilepas (handoff
->   drag→settle, Batch 445); dan pill highlight kini MENYATU melintasi celah antar-label alih-alih
->   terlihat 2 pill terpisah (Batch 446, adaptasi visual dari video ilustrasi user).
+> - Drag langsung di tab bar (Batch 442, dirombak total Batch 448 setelah user konfirmasi lewat
+>   video rekaman layar bahwa mekanisme Batch 446 — 3 pill per-tab + 1 pill "bridge" tambahan —
+>   tampak 2 kotak tumpang-tindih dgn seam kelihatan saat drag) belum dikonfirmasi user di device
+>   asli — khususnya: SATU pill unified (bukan lagi 3 pill + bridge) meluncur mulus lintas kolom
+>   tanpa seam/kotak ganda; label 3 tab tidak terpotong di font-scale aksesibilitas besar; drag
+>   jari lintas tab bar (termasuk lintas >1 batas tab) berpindah tab dgn benar tanpa mengganggu
+>   tap/ripple-feedback biasa; pill/warna ikon melacak posisi jari 1:1 real-time TANPA lag/jitter
+>   selama drag (Batch 445); tahanan visual halus di ujung kolom Beranda/Pengaturan (Batch 444);
+>   dan transisi mulus TANPA lompatan visual persis saat jari dilepas (handoff drag→settle, pola
+>   Batch 445, sumber posisi diperbarui Batch 448).
 > - Pill indicator glassmorphism ikon tab bawah (Batch 438) belum dikonfirmasi user di device asli
 >   — khususnya kontras/keterbacaan di tiap identitas tema x mode terang/gelap.
 > - Kapsul mengambang + pill gabungan ikon-label + ripple mati di bottom nav (Batch 439) belum

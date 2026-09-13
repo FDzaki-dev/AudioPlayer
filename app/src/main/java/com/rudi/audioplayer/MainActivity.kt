@@ -104,9 +104,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 // Batch 446 — `drawWithContent` (gambar SESUDAH content; `drawBehind` di atas cuma bisa SEBELUM)
-// dipakai NavigationBar di AppNavHost utk pill drag bersama lintas-kolom (lihat titik pemakaian,
-// dekat `tabBarDragBridgeAlpha`). Offset/Size/CornerRadius/Stroke sengaja fully-qualified inline
-// di situ (pola sama persis `Offset(0f,0f)` yang sudah ada di file ini) — 0 import baru selain ini.
+// dipakai NavigationBar di AppNavHost. Batch 448 — titik pemakaian ini diperluas jadi SATU-SATUNYA
+// penggambar pill tab-bar (gantikan bridge Batch 446 + 3 pill lama `GlassTabIcon`, lihat
+// `navPillIndexAnim`), aktif di semua state bukan cuma saat drag. Offset/Size/CornerRadius/Stroke
+// sengaja fully-qualified inline di situ (pola sama persis `Offset(0f,0f)` yang sudah ada di file
+// ini) — 0 import baru selain ini.
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -802,6 +804,21 @@ private fun GlassTabIcon(
     val glassAlpha = glassAlphaAnim.value
     val pillShape = RoundedCornerShape(16.dp)
     val tint = MaterialTheme.colorScheme.primary
+    // Batch 448 — ROMBAK TOTAL mekanisme drag bottom nav (instruksi eksplisit user + video
+    // referensi iOS Jam asli). Root cause bug "gak bagus sama sekali" (2 kotak pill
+    // tumpang-tindih dgn seam/celah kelihatan pas drag, dikonfirmasi lewat frame-by-frame video
+    // user): sejak Batch 446, ADA 2 SISTEM GAMBAR PILL BERJALAN BERSAMAAN — (1) pill per-tab DI
+    // SINI (dibatasi lebar kolomnya sendiri) DAN (2) 1 pill "bridge" tambahan yang digambar
+    // `drawWithContent` di `NavigationBar` (AppNavHost) BEBAS lintas kolom. Keduanya nyala
+    // BERSAMAAN selama drag (bridge utk lintas-kolom, punya function ini utk idle/tap) — 2 kotak
+    // rounded-rect beda ukuran/beda sumber saling tumpuk = seam persis yg kelihatan di video.
+    // Fix: pill glass (non-Skeu) DIHAPUS TOTAL dari sini — SATU-SATUNYA penggambar pill utk
+    // identitas kaca kini pill unified di `NavigationBar` (AppNavHost, selalu aktif di SEMUA
+    // state: idle/tap/drag/nudge, bukan cuma saat drag spt bridge lama) yang bebas meluncur
+    // mulus lintas kolom tanpa batas/seam krn 1 kanvas bersama. Icon+label lerp warna (baris di
+    // bawah fungsi ini) TIDAK disentuh — itu SUDAH benar 1:1 sesuai video (state Batch 447),
+    // murni pill BACKGROUND yang direstrukturisasi. Skeu TIDAK disentuh sama sekali (aturan lama
+    // "solid, bukan kaca", Batch 58/61/79) — tetap pill diskrit sendiri di bawah, 0 regresi.
     Column(
         modifier = Modifier
             .widthIn(min = 64.dp)
@@ -813,9 +830,10 @@ private fun GlassTabIcon(
                     if (selected) Modifier.background(MaterialTheme.colorScheme.secondaryContainer, pillShape)
                     else Modifier
                 } else {
+                    // Batch 448 — 0 background/border digambar di sini lagi (lihat komentar
+                    // panjang di atas fungsi ini). Pill glass tunggal kini digambar 1x di
+                    // `NavigationBar` (AppNavHost), bebas lintas kolom, 0 duplikasi.
                     Modifier
-                        .background(tint.copy(alpha = 0.16f * glassAlpha), pillShape)
-                        .border(1.dp, Color.White.copy(alpha = 0.14f * glassAlpha), pillShape)
                 }
             )
             .bouncyPress(interactionSource, pressedScale = 0.9f)
@@ -1394,41 +1412,30 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // manapun aktif) = false, tetap dapat cross-fade tween(220) lama.
                     val isTabBarDragging = !tabBarDragIndexPx.floatValue.isNaN() ||
                         tabDragOffsetPx.floatValue != 0f
-                    // Batch 446 — laporan eksplisit user (video ilustrasi dilampirkan): drag
-                    // real-time SUDAH benar posisinya (Batch 445), tapi warna/sorotan "putus"
-                    // persis di celah kecil ANTAR pill tab. Root cause: `tabBarDragFocus` di atas
-                    // SUDAH kontinu (diverifikasi manual — crossfade tepat 0.5/0.5 di batas 2
-                    // kolom), tapi tiap `GlassTabIcon` (3 titik pemakaian di bawah) menggambar
-                    // pill-nya SENDIRI-SENDIRI dibatasi ke kolomnya sendiri — 2 pill setengah-nyala
-                    // itu tetap 2 kotak TERPISAH dgn spasi tak-tergambar di antaranya, kebaca mata
-                    // sbg "jeda" walau angkanya kontinu. 0 lapis gambar bersama yang membentang
-                    // lintas kolom sebelum batch ini.
-                    // Fix: 1 pill TAMBAHAN (bukan pengganti 3 pill lama — itu TETAP jalan apa
-                    // adanya utk tap/nudge-konten/idle, 0 regresi) digambar via `drawWithContent`
-                    // pada `NavigationBar` ini sendiri (titik pemakaian di bawah, dekat
-                    // `graphicsLayer` overscroll) — BUKAN composable/Box baru, 0 restrukturisasi
-                    // tree, 0 risiko ke scope recomposition 3 `NavigationBarItem` yang sudah ada.
-                    // Aktif HANYA selama drag LANGSUNG di tab-bar (`tabBarDragIndexPx` bukan NaN,
-                    // BUKAN sumber nudge-konten Batch 435/437 — itu skalanya cuma ±40px, 0 masalah
-                    // celah yang sama). Posisi X pill dari nilai kontinu yang SAMA PERSIS
-                    // (`idxPos * columnWidth`, 0 hitungan baru) — bebas meluncur MELINTASI celah
-                    // antar kolom krn digambar di 1 kanvas bersama, bukan per-composable.
-                    // `tabBarDragLastIndexPx` menyimpan posisi valid TERAKHIR (`tabBarDragIndexPx`
-                    // sendiri sudah balik NaN duluan tepat saat jari lepas) supaya fade-out
-                    // tween(220ms) — durasi sinkron dgn `glassAlphaAnim` yg sudah ada — punya
-                    // posisi utk digambar, 0 lompatan/pop visual pas transisi ke 3 pill lama.
-                    // Warna/alpha/radius pill baru IDENTIK pill lama (`tint`/0.16f/0.14f/16.dp di
-                    // `GlassTabIcon`) — 1 aksen visual yang sama, cuma lapisannya beda. Skeu
-                    // DIKECUALIKAN (`navBarIsSkeu`) — aturan lama "solid, bukan kaca" (Batch
-                    // 58/61/79) tidak disentuh sama sekali.
-                    val tabBarDragLastIndexPx = remember { mutableFloatStateOf(TAB_ROUTES.size / 2f) }
-                    val tabBarDragBridgeAlpha = remember { Animatable(0f) }
-                    LaunchedEffect(tabBarDragIndexPx.floatValue.isNaN()) {
-                        if (!tabBarDragIndexPx.floatValue.isNaN()) {
-                            tabBarDragBridgeAlpha.snapTo(1f)
-                        } else {
-                            tabBarDragBridgeAlpha.animateTo(0f, tween(220))
-                        }
+                    // Batch 448 — ROMBAK TOTAL (gantikan pendekatan "bridge" Batch 446). Root
+                    // cause seam/double-pill yang dilaporkan user (dikonfirmasi frame-by-frame
+                    // dari video referensi): Batch 446 menambah 1 pill BARU via `drawWithContent`
+                    // tapi 3 pill LAMA per-tab (`GlassTabIcon`) TETAP jalan bersamaan — 2 sistem
+                    // gambar pill aktif serentak selama drag = tumpang-tindih kotak dgn seam
+                    // kelihatan (persis yg direkam user). Fix root-cause (bukan tempel lapisan
+                    // ke-3): 3 pill lama DIHAPUS TOTAL (lihat `GlassTabIcon`) — SEKARANG HANYA 1
+                    // pill yang pernah digambar, di SINI, aktif di SEMUA state (idle/tap/drag/
+                    // nudge), bukan cuma saat drag spt bridge lama.
+                    // `navPillIndexAnim`: satu-satunya sumber posisi "rest" pill (satuan index
+                    // kontinu, mis. 1.5 = tengah kolom ke-2 dari 3), dipakai saat TIDAK sedang
+                    // drag langsung di tab-bar (idle/nudge-konten/baru selesai drag). Selama drag
+                    // LANGSUNG di tab-bar, posisi dibaca live dari `tabBarDragIndexPx` (mentah,
+                    // 1:1 jari, pola sinkron yang sama persis dipertahankan dari Batch 444/445) —
+                    // `navPillIndexAnim` di-snapTo+animateTo HANYA di titik SELESAI drag (di bawah,
+                    // dekat `tabBarDragIndexPx.floatValue = Float.NaN`) & di 3 onClick tap biasa
+                    // (dekat tiap `NavigationBarItem`) — 0 LaunchedEffect(currentRoute) terpisah
+                    // supaya 0 race kondisi start-animasi ganda. Nilai awal = index tab aktif SAAT
+                    // AppNavHost pertama komposisi (bukan hardcode 0/tengah), 0 lompatan visual
+                    // pas start app di tab mana pun.
+                    val navPillIndexAnim = remember {
+                        Animatable(
+                            (TAB_ROUTES.indexOfFirst { it == currentRoute }.coerceAtLeast(0) + 0.5f)
+                        )
                     }
                     val navBarIsSkeu = isSkeuTheme()
                     val navBarAccentTint = MaterialTheme.colorScheme.primary
@@ -1511,9 +1518,6 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     tabBarDragIndexPx.floatValue =
                                         (down.position.x / barWidthPx * TAB_ROUTES.size)
                                             .coerceIn(0f, TAB_ROUTES.size.toFloat())
-                                    // Batch 446 — cermin sinkron ke posisi valid TERAKHIR, lihat
-                                    // rasionalisasi lengkap `tabBarDragLastIndexPx` di atas.
-                                    tabBarDragLastIndexPx.floatValue = tabBarDragIndexPx.floatValue
                                     var hoveredIndex = (down.position.x / barWidthPx * TAB_ROUTES.size)
                                         .toInt()
                                         .coerceIn(0, TAB_ROUTES.size - 1)
@@ -1528,8 +1532,6 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                         // (tabBarDragFocus di atas), dari `x` yg SAMA PERSIS
                                         // dipakai hitung newIndex di bawah (0 hitungan ganda).
                                         tabBarDragIndexPx.floatValue = x / barWidthPx * TAB_ROUTES.size
-                                        // Batch 446 — sama seperti di gesture down di atas.
-                                        tabBarDragLastIndexPx.floatValue = tabBarDragIndexPx.floatValue
                                         // Batch 444 — tahanan visual: overscroll dari rawX
                                         // (BUKAN x yg sudah di-coerce) supaya kebaca begitu jari
                                         // lewat ujung kolom pertama/terakhir. Redaman 0.3f (pola
@@ -1565,7 +1567,19 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     // balik ke tabMagnifyFocus lewat NaN) + springback overscroll
                                     // ke 0 lewat tabSwipeScope (non-blocking, awaitEachGesture
                                     // langsung siap terima down berikutnya tanpa nunggu spring).
+                                    // Batch 448 — handoff pill unified: simpan posisi jari
+                                    // TERAKHIR sebelum di-reset NaN (lokal, 0 state `remember`
+                                    // tambahan — 1 gesture = 1 pemanggilan coroutine ini), lalu
+                                    // `navPillIndexAnim` snapTo persis di situ dulu (0 lompatan)
+                                    // baru animateTo pusat kolom final (`hoveredIndex + 0.5f`,
+                                    // tween 220ms — durasi SAMA PERSIS `glassAlphaAnim` supaya
+                                    // pill & warna ikon/label tiba di tujuan BERSAMAAN).
+                                    val lastLiveIdxPos = tabBarDragIndexPx.floatValue
                                     tabBarDragIndexPx.floatValue = Float.NaN
+                                    tabSwipeScope.launch {
+                                        navPillIndexAnim.snapTo(lastLiveIdxPos)
+                                        navPillIndexAnim.animateTo(hoveredIndex + 0.5f, tween(220))
+                                    }
                                     tabSwipeScope.launch {
                                         tabBarOverscrollAnim.snapTo(tabBarOverscrollPx.floatValue)
                                         tabBarOverscrollAnim.animateTo(
@@ -1581,52 +1595,65 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 }
                             }
                             .graphicsLayer { translationX = tabBarOverscrollPx.floatValue }
-                            // Batch 446 — pill drag bersama lintas-kolom, lihat rasionalisasi
-                            // lengkap dekat deklarasi `tabBarDragBridgeAlpha` di atas. Digambar
-                            // SESUDAH `drawContent()` (di atas ikon/label, bukan di belakangnya —
-                            // `drawBehind` di titik lain pada modifier ini SENGAJA tidak dipakai
-                            // di sini krn dia hanya bisa gambar SEBELUM, akan tertutup total oleh
-                            // Surface+Row NavigationBar sendiri yang digambar setelahnya) — alpha
-                            // rendah (0.16f/0.14f, IDENTIK pill `GlassTabIcon`) jadi tetap tidak
-                            // mengganggu keterbacaan ikon/label yang ada di atasnya.
+                            // Batch 448 — SATU-SATUNYA pill yang pernah digambar utk identitas
+                            // kaca (gantikan bridge Batch 446 + 3 pill lama `GlassTabIcon` yang
+                            // SUDAH dihapus, lihat komentar panjang di situ). Digambar SESUDAH
+                            // `drawContent()` (di atas ikon/label — `drawBehind` cuma bisa SEBELUM,
+                            // akan tertutup total oleh Surface+Row NavigationBar sendiri) — alpha
+                            // rendah (0.16f/0.14f, IDENTIK pill lama) jadi tetap tidak mengganggu
+                            // keterbacaan ikon/label. AKTIF SETIAP SAAT (bukan cuma saat drag spt
+                            // bridge lama) — pill kini SELALU ada di bawah tab aktif idle, bukan
+                            // cuma nongol pas jari nyentuh bar.
                             .drawWithContent {
                                 drawContent()
                                 if (!navBarIsSkeu) {
-                                    val bridgeAlpha = tabBarDragBridgeAlpha.value
-                                    if (bridgeAlpha > 0f) {
-                                        val liveIdxPos = tabBarDragIndexPx.floatValue
-                                        val idxPos = if (liveIdxPos.isNaN()) {
-                                            tabBarDragLastIndexPx.floatValue
-                                        } else {
-                                            liveIdxPos
+                                    // Batch 448 — 1 sumber posisi, urut prioritas: (1) drag
+                                    // LANGSUNG di tab-bar (`tabBarDragIndexPx` bukan NaN, mentah
+                                    // 1:1 jari — pola sinkron sama persis Batch 444/445, 0 lag);
+                                    // (2) nudge dari swipe KONTEN (`tabDragOffsetPx` != 0, geser
+                                    // kecil ±0.5 kolom dari titik rest `navPillIndexAnim`, pola
+                                    // pecahan SAMA PERSIS `tabMagnifyFocus` di atas — 0 hitungan
+                                    // baru, cuma dipetakan ke satuan index alih-alih 0f..1f);
+                                    // (3) rest — `navPillIndexAnim.value`, di-animate-kan tween
+                                    // 220ms di titik SELESAI drag & di 3 onClick tap (lihat
+                                    // deklarasinya di atas).
+                                    val liveBarDrag = tabBarDragIndexPx.floatValue
+                                    val nudge = tabDragOffsetPx.floatValue
+                                    val idxPos = when {
+                                        !liveBarDrag.isNaN() -> liveBarDrag
+                                        nudge != 0f -> {
+                                            val towardNext = (-nudge / 40f).coerceIn(0f, 1f)
+                                            val towardPrev = (nudge / 40f).coerceIn(0f, 1f)
+                                            navPillIndexAnim.value + (towardNext - towardPrev) * 0.5f
                                         }
-                                        val columnWidthPx = size.width / TAB_ROUTES.size
-                                        val pillWidthPx = columnWidthPx * 0.74f
-                                        val pillHeightPx = size.height * 0.62f
-                                        val centerX = (idxPos * columnWidthPx)
-                                            .coerceIn(pillWidthPx / 2f, size.width - pillWidthPx / 2f)
-                                        val topLeft = androidx.compose.ui.geometry.Offset(
-                                            centerX - pillWidthPx / 2f,
-                                            (size.height - pillHeightPx) / 2f
-                                        )
-                                        val pillSize = androidx.compose.ui.geometry.Size(pillWidthPx, pillHeightPx)
-                                        val corner = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
-                                        drawRoundRect(
-                                            color = navBarAccentTint,
-                                            topLeft = topLeft,
-                                            size = pillSize,
-                                            cornerRadius = corner,
-                                            alpha = 0.16f * bridgeAlpha
-                                        )
-                                        drawRoundRect(
-                                            color = Color.White,
-                                            topLeft = topLeft,
-                                            size = pillSize,
-                                            cornerRadius = corner,
-                                            alpha = 0.14f * bridgeAlpha,
-                                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
-                                        )
+                                        else -> navPillIndexAnim.value
                                     }
+                                    val columnWidthPx = size.width / TAB_ROUTES.size
+                                    val pillWidthPx = columnWidthPx * 0.74f
+                                    val pillHeightPx = size.height * 0.62f
+                                    val centerX = (idxPos * columnWidthPx)
+                                        .coerceIn(pillWidthPx / 2f, size.width - pillWidthPx / 2f)
+                                    val topLeft = androidx.compose.ui.geometry.Offset(
+                                        centerX - pillWidthPx / 2f,
+                                        (size.height - pillHeightPx) / 2f
+                                    )
+                                    val pillSize = androidx.compose.ui.geometry.Size(pillWidthPx, pillHeightPx)
+                                    val corner = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
+                                    drawRoundRect(
+                                        color = navBarAccentTint,
+                                        topLeft = topLeft,
+                                        size = pillSize,
+                                        cornerRadius = corner,
+                                        alpha = 0.16f
+                                    )
+                                    drawRoundRect(
+                                        color = Color.White,
+                                        topLeft = topLeft,
+                                        size = pillSize,
+                                        cornerRadius = corner,
+                                        alpha = 0.14f,
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                                    )
                                 }
                             },
                         // Batch 53: lowered from 12.dp — spec §15 keeps navigation "calm and
@@ -1681,6 +1708,12 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     launchSingleTop = true
                                     restoreState = true
                                 }
+                                // Batch 448 — tap biasa (0 drag): pill unified ikut pindah ke
+                                // kolom ini, tween 220ms SAMA PERSIS `glassAlphaAnim` (icon/label)
+                                // supaya tiba bersamaan. Animatable.animateTo mulai otomatis dari
+                                // posisi TERKINI (kalau lagi mid-animasi tap sebelumnya, pola sama
+                                // `glassAlphaAnim`) — 0 penanganan spesial dibutuhkan.
+                                tabSwipeScope.launch { navPillIndexAnim.animateTo(0.5f, tween(220)) }
                             },
                             icon = {
                                 // Batch 439 — `label` pindah ke dalam sini (dulu slot terpisah
@@ -1707,6 +1740,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     launchSingleTop = true
                                     restoreState = true
                                 }
+                                // Batch 448 — sama seperti onClick "home" di atas.
+                                tabSwipeScope.launch { navPillIndexAnim.animateTo(1.5f, tween(220)) }
                             },
                             icon = {
                                 // Batch 439 — sama seperti "home" di atas.
@@ -1731,6 +1766,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     launchSingleTop = true
                                     restoreState = true
                                 }
+                                // Batch 448 — sama seperti onClick "home" di atas.
+                                tabSwipeScope.launch { navPillIndexAnim.animateTo(2.5f, tween(220)) }
                             },
                             icon = {
                                 // Batch 439 — sama seperti "home" di atas.

@@ -1,5 +1,34 @@
 # Changelog
 
+## Batch 448 — Rombak total mekanisme drag bottom nav (fix pill tumpang-tindih/seam)
+User melampirkan 2 video (rekaman iOS Jam asli sbg referensi + rekaman app SONIX sendiri) +
+instruksi eksplisit "rombak total mekanisme drag bottom nav, gak bagus sama sekali". Analisis
+frame-by-frame kedua video mengonfirmasi: sejak Batch 446, ada 2 sistem gambar pill aktif
+BERSAMAAN saat drag — 3 pill lama per-tab (dibatasi lebar kolom sendiri-sendiri) DAN 1 pill
+"bridge" tambahan yang meluncur bebas lintas kolom — keduanya tumpang-tindih dengan seam/kotak
+ganda yang kelihatan jelas persis seperti dilaporkan user. Lingkaran abu-abu yang juga tampak di
+kedua video dikonfirmasi BUKAN elemen app (overlay "tampilkan sentuhan" bawaan perekam layar),
+tidak direplikasi.
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. Pill glass per-tab lama (`GlassTabIcon`, 3 titik pemakaian) dihapus total — bukan ditimpa
+   lapisan baru lagi, root cause-nya (2 sistem gambar bersamaan) dihilangkan sepenuhnya.
+2. Satu pill unified (di `NavigationBar`, `drawWithContent`) kini SATU-SATUNYA yang pernah
+   digambar untuk identitas kaca — aktif di SEMUA state (diam/tap/drag/nudge-konten), bukan cuma
+   saat jari menyentuh tab-bar seperti pill "bridge" sebelumnya. Posisinya mengikuti jari mentah
+   1:1 selama drag langsung (0 lag, pola Batch 444/445 dipertahankan), atau melembut (220ms) ke
+   tengah tab tujuan saat tap biasa maupun sesaat setelah jari dilepas — pill & warna ikon/label
+   kini tiba di tujuan bersamaan, 0 lompatan visual.
+3. Tema identitas "Skeu" (solid, bukan kaca — aturan Batch 58/61/79) sengaja tidak disentuh sama
+   sekali — tetap pill diskrit sendiri seperti sebelumnya, 0 regresi.
+4. Warna ikon/label (lerp kontinu mengikuti jari, Batch 440/446/447) TIDAK diubah — bagian itu
+   sudah sesuai referensi, murni pill BACKGROUND yang direstrukturisasi.
+
+**0 diverifikasi CI/device Batch 448** — review manual (baca kode + cek balance brace/paren: `{}`
+331/331, `()` 1117/1117, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini.
+
 ## Batch 447 — Drag tab-bar: label teks kini ikut berubah warna bersama ikon (bukan menyusul)
 User melampirkan video referensi rekaman asli tab bar iOS Jam (drag lintas Alarm/Jam dunia/Timer/
 Stopwatch) sebagai acuan mekanisme yang diinginkan. Setelah dicocokkan ke kode: pill dan warna

@@ -1,5 +1,8 @@
 # PROJECT_STATE.md
 
+[BRANDING_NAME: SONIX]
+[TERMUX_ROOT: audioplayer]
+
 RAM instan sesi kerja — hanya rule AKTIF final. Tanpa histori revisi, kutipan user, atau
 kronologi batch. Histori lengkap tiap batch: `CHANGELOG.md`. Ringkasan fitur: `README.md`.
 Arsip batch lama (1-424): `docs/archive/PROJECT_STATE_ARCHIVE.md`.
@@ -8,6 +11,50 @@ Arsip batch lama (1-424): `docs/archive/PROJECT_STATE_ARCHIVE.md`.
 Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut normal, sektor dibuka
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
+
+**Catatan Batch 448**: user lampirkan 2 video (rekaman iOS Jam asli + rekaman app SONIX sendiri)
++ instruksi eksplisit "rombak total mekanisme drag bottom nav gak bagus sama sekali tersebut".
+Analisis frame-by-frame (ffmpeg, kedua video) mengonfirmasi laporan user: root cause bug ADA di
+kode, bukan salah-lihat — sejak Batch 446, 3 pill lama per-tab (`GlassTabIcon`) DAN 1 pill
+"bridge" tambahan (Batch 446) aktif BERSAMAAN selama drag, menghasilkan 2 kotak rounded-rect
+tumpang-tindih dgn seam kelihatan (dikonfirmasi visual di crop-zoom frame video SONIX). Lingkaran
+abu-abu di kedua video dikonfirmasi BUKAN elemen app (overlay "tampilkan sentuhan" perekam layar
+bawaan OS) — tidak direplikasi ke kode. Perluasan langsung sektor drag tab-bar yang sama (Batch
+442/444/445/446/447), bukan reopen sektor DITUTUP manapun — sekaligus "rombak total" eksplisit
+user jadi dasar utk fix ROOT CAUSE (hapus sistem gambar duplikat) alih-alih tempel lapisan
+ke-3/4 di atas yang sudah menumpuk sejak Batch 446.
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` —
+1. `GlassTabIcon`: background/border pill glass per-tab (non-Skeu) DIHAPUS TOTAL — dulu setiap
+   tab menggambar pill sendiri dibatasi lebar kolomnya. Skeu (pill solid diskrit, aturan Batch
+   58/61/79) TIDAK disentuh.
+2. `AppNavHost`/`NavigationBar`: `tabBarDragLastIndexPx` + `tabBarDragBridgeAlpha` (state Batch
+   446, pill "bridge" yang hanya aktif KONDISIONAL saat drag) dihapus, diganti 1
+   `Animatable navPillIndexAnim` — sumber posisi rest pill tunggal, valid di SEMUA state.
+   `drawWithContent` pada `NavigationBar` sekarang SATU-SATUNYA penggambar pill (aktif idle/tap/
+   drag/nudge, dulu cuma drag), posisi: live `tabBarDragIndexPx` saat drag langsung (0 lag,
+   mentah 1:1 jari — pola Batch 444/445 dipertahankan persis), fallback nudge-konten
+   (`tabDragOffsetPx`, pecahan ±0.5 kolom dari titik rest) atau `navPillIndexAnim.value` saat
+   diam. `navPillIndexAnim` di-snapTo+animateTo(tween 220ms) di titik SELESAI drag (handoff dari
+   posisi jari terakhir) & di 3 `onClick` tap biasa — durasi SAMA PERSIS `glassAlphaAnim`
+   (warna ikon/label) supaya pill & warna tiba bersamaan.
+3. Warna ikon/label (`lerp` kontinu ikut jari, `tabBarDragFocus`/`tabMagnifyFocus`) TIDAK
+   diubah — bagian itu SUDAH 1:1 sesuai video (state Batch 447), murni pill BACKGROUND yang
+   direstrukturisasi total.
+4. 0 import baru (`Animatable`/`tween`/`drawWithContent`/dll semua sudah ada sejak batch lalu).
+   1 komentar header import (`drawWithContent`, dekat baris import) diperbarui — sebelumnya
+   menyebut identifier `tabBarDragBridgeAlpha` yang kini sudah dihapus (anti-stale).
+
+0 file lain disentuh. `README.md` + `CHANGELOG.md` diperbarui (bullet unverified tab-bar +
+entry Batch 448 baru) — detail lengkap di masing-masing file.
+
+**0 diverifikasi CI/device Batch 448** — review manual (baca kode + cek balance brace/paren:
+`{}` 331/331, `()` 1117/1117, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Item belum-terverifikasi bertambah 1: pill unified meluncur mulus
+lintas kolom TANPA seam/kotak ganda (fix utama batch ini, PALING PENTING dikonfirmasi krn itu
+persis komplain user), TANPA regresi ke item Batch 442/444/445/446/447 yang sudah ada (label tak
+terpotong, tahanan visual ujung kolom, 0 lag drag, warna ikon+label lerp bersamaan) — perlu
+konfirmasi device fisik (0 tersedia sesi ini, sama seperti Batch 435-447).
 
 **Catatan Batch 447**: user lampirkan video referensi baru (rekaman iOS Jam asli — drag lintas 4
 tab Alarm/Jam dunia/Timer/Stopwatch) + instruksi "lanjutkan progress menuju mekanisme tampilan
@@ -670,3 +717,24 @@ com.rudi.audioplayer/
 `AudioPlayer` cuma nama teknis package/rootProject, SENGAJA tetap, lihat "Aturan sesi aktif" #5).
 `versionCode`/`versionName` otomatis dari jumlah commit git — TIDAK terkait, TIDAK ikut berubah.
 Detail lengkap: README.md § "Standar Penomoran Versi".
+
+[RESUME POINT]
+- Batch terakhir: 448. ZIP terakhir: `SONIX_v448.zip`. 1 file source diubah: `MainActivity.kt`.
+- Sektor barusan: drag bottom nav (`GlassTabIcon` + `NavigationBar` di `AppNavHost`) — ROMBAK
+  TOTAL, bukan patch tambahan. Root cause bug user ("gak bagus sama sekali") sudah ditemukan &
+  diperbaiki: 3 pill lama per-tab + 1 pill "bridge" (Batch 446) yang tadinya aktif BERSAMAAN
+  (sumber seam/kotak-ganda) sudah dihapus total, diganti 1 pill unified (`navPillIndexAnim` +
+  `drawWithContent` di `NavigationBar`) yang selalu aktif di semua state.
+- **0 diverifikasi device/CI** — SOP builder/compiler Kotlin/Gradle/device fisik 0 tersedia sesi
+  ini (sama seperti Batch 435-447 sebelumnya). Mandat sesi berikutnya JIKA user kirim video/
+  laporan baru soal drag tab-bar: cross-check DULU ke kode Batch 448 ini sebelum nambah patch
+  baru — kalau user laporkan seam/kotak-ganda LAGI, curigai regresi baru dulu (bukan asumsi
+  "tabBarDragIndexPx.floatValue" NaN-check gagal di edge-case tertentu), BUKAN ulangi pola lama
+  "tempel lapisan ke-3" seperti Batch 446 — root cause sudah dihapus, jangan dibangun ulang.
+- 0 ZIP baru dari user di sesi ini (SONIX_v447.zip → source dipakai, output SONIX_v448.zip).
+  Kalau sesi berikutnya mulai dari ZIP baru user, cek dulu apakah `MainActivity.kt` versi user
+  masih mengandung perubahan Batch 448 ini (grep `navPillIndexAnim`) — kalau HILANG/di-revert,
+  itu tanda ZIP user berasal dari titik SEBELUM batch ini, bukan berarti Batch 448 perlu diulang
+  buta tanpa konfirmasi ke user dulu.
+- Mandat lain: 0 ada, lanjutkan sektor manapun yang diminta user berikutnya (0 sektor DITUTUP
+  baru dibuka batch ini, 0 sektor baru ditutup juga).
