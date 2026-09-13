@@ -634,8 +634,24 @@ private fun WelcomeHighlight(icon: androidx.compose.ui.graphics.vector.ImageVect
 // `overflow = TextOverflow.Ellipsis` ditambah sbg jaring pengaman (mis. font-scale aksesibilitas
 // besar) — dulu 0 di-set (default Clip), itu sebabnya kliping lama menghasilkan huruf terpotong
 // mentah alih-alih "..." yang jelas.
+// Batch 447 — user lampirkan video referensi iOS Jam (drag lintas tab Alarm/Jam dunia/Timer/
+// Stopwatch): ikon+pill SUDAH ikut lerp warna kontinu 1:1 sinkron jari (Batch 440/446), TAPI
+// label teks di bawahnya TIDAK — root cause: `Text(...)` di bawah 0 pernah di-set `color`
+// eksplisit sejak fungsi ini dibuat (Batch 437), jadi warnanya 100% inherit `LocalContentColor`
+// bawaan `NavigationBarItem` M3, yang HANYA bereaksi ke boolean `selected` (snap begitu
+// navigate() commit index-crossing) — BUKAN ke `focus` kontinu yang sudah dipakai utk
+// scale/opacity DI FUNGSI INI JUGA. Efeknya: selama drag pelan/parsial (belum commit index),
+// ikon sudah keburu blend warna (mengikuti jari), tapi teks di bawahnya masih warna lama 100%
+// sampai commit — "1 aksen bergerak bersama" (tujuan eksplisit Batch 440) putus di teks,
+// persis beda dari referensi video (ikon+label iOS Jam berubah warna BERSAMAAN, bukan teks
+// menyusul lompat). Fix: param baru `color: Color?` (default null = 0 override, IDENTIK
+// perilaku lama persis, 0 regresi ke satu-satunya titik pemakaian lain manapun kalau ada) —
+// dipetakan ke `Text(color = ...)` di bawah. Nilai dihitung di 1 titik pemanggil
+// (`GlassTabIcon`, SUDAH punya `tint`+`unselectedIconColor`+`glassAlpha` yg sama persis
+// dipakai ikon) via `lerp` yang SAMA PERSIS, 0 hitungan/token warna baru — Skeu DIKECUALIKAN
+// (tetap kirim null, warna default M3 apa adanya, aturan solid Batch 58/61/79 tidak disentuh).
 @Composable
-private fun MagnifyingTabLabel(text: String, focus: Float) {
+private fun MagnifyingTabLabel(text: String, focus: Float, color: Color? = null) {
     val clampedFocus = focus.coerceIn(0f, 1f)
     val baseStyle = MaterialTheme.typography.labelMedium
     // Batch 445 — user eksplisit: drag real-time tab-bar "kurang smooth". Root cause KEDUA
@@ -657,6 +673,10 @@ private fun MagnifyingTabLabel(text: String, focus: Float) {
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         style = baseStyle,
+        // Batch 447 — lihat komentar lengkap di atas fungsi ini. `Color.Unspecified` (default
+        // param Compose `Text`, bukan literal baru dari batch ini) = perilaku identik dgn 0
+        // parameter `color` sama sekali — inherit LocalContentColor bawaan M3 apa adanya.
+        color = color ?: Color.Unspecified,
         modifier = Modifier
             .graphicsLayer {
                 val scale = 1f + clampedFocus * 0.23f
@@ -818,7 +838,18 @@ private fun GlassTabIcon(
             val unselectedIconColor = NavigationBarItemDefaults.colors().unselectedIconColor
             Icon(icon, contentDescription = null, tint = lerp(unselectedIconColor, tint, glassAlpha))
         }
-        MagnifyingTabLabel(label, focus)
+        // Batch 447 — labelColor: PERSIS pola unselectedIconColor/lerp di atas, target token
+        // resmi `unselectedTextColor` (bukan `unselectedIconColor` yg dipakai ikon), 0 hardcode
+        // baru. null utk Skeu (dibaca `MagnifyingTabLabel` sbg "0 override", lihat definisinya).
+        // `glassAlpha` (bukan `focus` mentah) dipakai di SINI (parameter ke-2) juga — identik
+        // nilai selama drag aktif (glassAlpha snapTo(focus) tiap frame), bedanya HANYA di jendela
+        // easing 220ms pasca lepas jari: scale/opacity label kini ikut melunak bareng warna
+        // ikon+labelColor baru ini, bukan snap instan sendirian seperti sebelumnya — konsisten
+        // dgn tujuan "1 aksen bergerak bersama" (Batch 440), 0 dampak ke tap biasa/idle (identik
+        // 0f/1f di kedua kasus).
+        val labelColor = if (isSkeu) null else
+            lerp(NavigationBarItemDefaults.colors().unselectedTextColor, tint, glassAlpha)
+        MagnifyingTabLabel(label, glassAlpha, labelColor)
     }
 }
 

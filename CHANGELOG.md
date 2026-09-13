@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 447 — Drag tab-bar: label teks kini ikut berubah warna bersama ikon (bukan menyusul)
+User melampirkan video referensi rekaman asli tab bar iOS Jam (drag lintas Alarm/Jam dunia/Timer/
+Stopwatch) sebagai acuan mekanisme yang diinginkan. Setelah dicocokkan ke kode: pill dan warna
+ikon (Batch 440/446) sudah sesuai referensi, tapi ditemukan 1 kejanggalan tersisa — warna teks
+label di bawah ikon belum ikut berubah secara halus mengikuti jari, hanya "melompat" begitu tab
+benar-benar berpindah, berbeda dari ikon yang sudah berubah warna secara bertahap sejak awal
+digeser.
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. Warna teks label kini ikut melebur (blend) dari abu-abu ke warna aksen secara bertahap,
+   persis sinkron dengan ikon di atasnya, selama jari masih menggeser di tab-bar — bukan lagi
+   menunggu tab benar-benar commit berpindah baru berubah warna.
+2. Ukuran/transparansi label saat jari dilepas kini juga melembut (220ms) alih-alih langsung
+   loncat ke ukuran akhir, konsisten dengan warna ikon yang sudah melembut lebih dulu.
+3. Tema identitas "Skeu" (solid, bukan kaca) sengaja tidak disentuh — tetap seperti sebelumnya.
+
+**0 diverifikasi CI/device Batch 447** — review manual (baca kode + cek balance brace/paren: `{}`
+331/331, `()` 1086/1086, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini.
+
 ## Batch 446 — Drag tab-bar: pill highlight menyatu lintas celah antar-label (bukan 2 pill terpisah)
 Feedback pasca Batch 445 (video ilustrasi dilampirkan): drag jari real-time sudah pas posisinya,
 tapi animasi warna/sorotan terlihat "putus" persis di celah kecil antara label 2 tab yang

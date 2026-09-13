@@ -9,6 +9,37 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 447**: user lampirkan video referensi baru (rekaman iOS Jam asli — drag lintas 4
+tab Alarm/Jam dunia/Timer/Stopwatch) + instruksi "lanjutkan progress menuju mekanisme tampilan
+sesuai video" — 0 poin komplain tertulis eksplisit, ZIP sama (`SONIX_v446.zip`, 0 source baru).
+Perluasan langsung sektor drag tab-bar yang sama (Batch 442/444/445/446), bukan reopen sektor
+DITUTUP manapun.
+
+**Analisis video** (50 frame @3fps, cross-check ke kode): mekanisme bridging pill lintas-kolom +
+lerp warna ikon (Batch 440/446) SUDAH cocok 1:1 dgn video. 1 gap ditemukan lewat pembacaan kode
+(bukan asumsi visual semata): label teks (`MagnifyingTabLabel`) TIDAK ikut lerp warna kontinu —
+beda dari ikon yang sudah (root cause detail: komentar inline kode dekat definisi fungsi ini).
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` —
+1. `MagnifyingTabLabel` param baru `color: Color? = null` (default = 0 override, IDENTIK
+   perilaku lama) → `Text(color = color ?: Color.Unspecified, ...)`.
+2. `GlassTabIcon` (titik pemanggil): `labelColor` baru = `lerp(unselectedTextColor, tint,
+   glassAlpha)` (pola PERSIS `unselectedIconColor` ikon, 0 hitungan/token warna baru), null utk
+   Skeu (aturan solid Batch 58/61/79 tidak disentuh). Parameter ke-2 `MagnifyingTabLabel`
+   diganti dari `focus` mentah → `glassAlpha` (identik selama drag aktif — `glassAlpha`
+   snapTo(focus) tiap frame drag; beda HANYA di jendela easing 220ms pasca lepas jari: kini
+   scale/opacity label ikut melunak bareng warna, bukan snap instan sendirian spt sebelumnya).
+3. 0 import baru (`Color`/`lerp`/`NavigationBarItemDefaults` semua sudah ada sejak batch lalu).
+
+0 file lain disentuh.
+
+**0 diverifikasi CI/device Batch 447** — review manual (baca kode + cek balance brace/paren:
+`{}` 331/331, `()` 1086/1086, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Item belum-terverifikasi bertambah 1: label teks kini benar2 berubah
+warna BERSAMAAN dgn ikon secara kontinu selama drag (bukan cuma ikon, teks menyusul-lompat pas
+commit index-crossing) DAN scale/opacity label easing mulus pasca lepas jari (0 snap instan) —
+perlu konfirmasi device fisik (0 tersedia sesi ini, sama seperti Batch 435-446).
+
 **Catatan Batch 446**: feedback eksplisit user PASCA Batch 445 (video ilustrasi dilampirkan,
 perluasan langsung drag tab-bar Batch 442/444/445) — 1 poin: animasi pill masih terpisah oleh
 gap kosong kecil di antara label tab; seharusnya warna/semantik ikut jari juga lintas celah itu.
@@ -529,6 +560,10 @@ murni review manual (baca kode + cross-reference pola batch sebelumnya + cek bal
 brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
 
 **Item belum-terverifikasi saat penutupan** (device fisik tidak pernah tersedia di sesi kerja):
+- `MainActivity.kt` labelColor kontinu + easing post-release label (Batch 447, di atas) — 0
+  compile log, 0 konfirmasi device. Perlu ditest: teks label berubah warna BERSAMAAN dgn ikon
+  (bukan menyusul-lompat) selama drag pelan/parsial (belum commit index-crossing), dan
+  scale/opacity label tidak snap instan pasca lepas jari (ikut easing 220ms spt ikon).
 - `MainActivity.kt` fix label terpotong/pill oversized + drag-on-tab-bar baru (Batch 442, di
   atas) — 0 compile log, 0 konfirmasi device. Perlu ditest: label 3 tab tidak terpotong di
   ukuran default MAUPUN font-scale aksesibilitas besar, pill "Beranda" proporsional, 0 blur
