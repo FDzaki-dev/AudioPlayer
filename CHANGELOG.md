@@ -1,5 +1,33 @@
 # Changelog
 
+## Batch 446 — Drag tab-bar: pill highlight menyatu lintas celah antar-label (bukan 2 pill terpisah)
+Feedback pasca Batch 445 (video ilustrasi dilampirkan): drag jari real-time sudah pas posisinya,
+tapi animasi warna/sorotan terlihat "putus" persis di celah kecil antara label 2 tab yang
+berdekatan — seharusnya ikut jari secara mulus lintas celah itu juga.
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. **Pill bersama lintas-kolom**: root cause bukan angka (crossfade fokus per-tab sudah kontinu
+   sejak Batch 444), tapi lapisan render — tiap tab menggambar pill-nya sendiri-sendiri dibatasi
+   ke kolom masing-masing, jadi 2 pill setengah-nyala saat crossfade tetap tampak sebagai 2 kotak
+   terpisah dengan spasi kosong di antaranya. Fix: 1 pill highlight tambahan digambar sebagai
+   lapisan bersama yang membentang di atas seluruh bar (bukan mengganti 3 pill lama, yang tetap
+   dipakai untuk tap/idle) — posisinya mengikuti jari secara kontinu sehingga bisa meluncur mulus
+   melintasi celah antar label, aktif hanya selama jari benar-benar menggeser di atas tab-bar.
+2. Warna, transparansi, dan bentuk pill baru ini dibuat identik dengan pill lama supaya terlihat
+   sebagai satu aksen visual yang konsisten. Saat jari dilepas, pill ini meredup halus (220ms)
+   alih-alih hilang mendadak, supaya serah-terima ke tampilan normal tidak terasa melompat.
+3. Tema identitas "Skeu" (solid, bukan kaca) sengaja tidak disentuh — tetap seperti sebelumnya.
+
+**0 diverifikasi CI/device Batch 446** — review manual (baca kode + cek balance brace/paren: `{}`
+331/331, `()` 1060/1060, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini.
+
+**Koreksi dokumentasi (anti-stale)**: `PROJECT_STATE.md`/README.md masih menyebut nama ZIP lama
+`AudioPlayer-batchN-release.zip` — diperbarui ke `SONIX_v<N>.zip` mengikuti branding aktif app ini
+(SONIX). Nama teknis package/rootProject (`AudioPlayer`) sengaja tidak berubah, terpisah dari
+branding.
+
 ## Batch 445 — Drag tab-bar: hilangkan lag real-time + floating-color sync ke jari
 Feedback pasca Batch 444: drag jari di tab-bar dinilai belum sepenuhnya smooth ala iOS, dan efek
 warna "floating" belum berubah seketika mengikuti posisi jari saat digeser.

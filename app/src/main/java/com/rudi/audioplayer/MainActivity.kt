@@ -103,6 +103,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+// Batch 446 — `drawWithContent` (gambar SESUDAH content; `drawBehind` di atas cuma bisa SEBELUM)
+// dipakai NavigationBar di AppNavHost utk pill drag bersama lintas-kolom (lihat titik pemakaian,
+// dekat `tabBarDragBridgeAlpha`). Offset/Size/CornerRadius/Stroke sengaja fully-qualified inline
+// di situ (pola sama persis `Offset(0f,0f)` yang sudah ada di file ini) — 0 import baru selain ini.
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -1358,6 +1363,44 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // manapun aktif) = false, tetap dapat cross-fade tween(220) lama.
                     val isTabBarDragging = !tabBarDragIndexPx.floatValue.isNaN() ||
                         tabDragOffsetPx.floatValue != 0f
+                    // Batch 446 — laporan eksplisit user (video ilustrasi dilampirkan): drag
+                    // real-time SUDAH benar posisinya (Batch 445), tapi warna/sorotan "putus"
+                    // persis di celah kecil ANTAR pill tab. Root cause: `tabBarDragFocus` di atas
+                    // SUDAH kontinu (diverifikasi manual — crossfade tepat 0.5/0.5 di batas 2
+                    // kolom), tapi tiap `GlassTabIcon` (3 titik pemakaian di bawah) menggambar
+                    // pill-nya SENDIRI-SENDIRI dibatasi ke kolomnya sendiri — 2 pill setengah-nyala
+                    // itu tetap 2 kotak TERPISAH dgn spasi tak-tergambar di antaranya, kebaca mata
+                    // sbg "jeda" walau angkanya kontinu. 0 lapis gambar bersama yang membentang
+                    // lintas kolom sebelum batch ini.
+                    // Fix: 1 pill TAMBAHAN (bukan pengganti 3 pill lama — itu TETAP jalan apa
+                    // adanya utk tap/nudge-konten/idle, 0 regresi) digambar via `drawWithContent`
+                    // pada `NavigationBar` ini sendiri (titik pemakaian di bawah, dekat
+                    // `graphicsLayer` overscroll) — BUKAN composable/Box baru, 0 restrukturisasi
+                    // tree, 0 risiko ke scope recomposition 3 `NavigationBarItem` yang sudah ada.
+                    // Aktif HANYA selama drag LANGSUNG di tab-bar (`tabBarDragIndexPx` bukan NaN,
+                    // BUKAN sumber nudge-konten Batch 435/437 — itu skalanya cuma ±40px, 0 masalah
+                    // celah yang sama). Posisi X pill dari nilai kontinu yang SAMA PERSIS
+                    // (`idxPos * columnWidth`, 0 hitungan baru) — bebas meluncur MELINTASI celah
+                    // antar kolom krn digambar di 1 kanvas bersama, bukan per-composable.
+                    // `tabBarDragLastIndexPx` menyimpan posisi valid TERAKHIR (`tabBarDragIndexPx`
+                    // sendiri sudah balik NaN duluan tepat saat jari lepas) supaya fade-out
+                    // tween(220ms) — durasi sinkron dgn `glassAlphaAnim` yg sudah ada — punya
+                    // posisi utk digambar, 0 lompatan/pop visual pas transisi ke 3 pill lama.
+                    // Warna/alpha/radius pill baru IDENTIK pill lama (`tint`/0.16f/0.14f/16.dp di
+                    // `GlassTabIcon`) — 1 aksen visual yang sama, cuma lapisannya beda. Skeu
+                    // DIKECUALIKAN (`navBarIsSkeu`) — aturan lama "solid, bukan kaca" (Batch
+                    // 58/61/79) tidak disentuh sama sekali.
+                    val tabBarDragLastIndexPx = remember { mutableFloatStateOf(TAB_ROUTES.size / 2f) }
+                    val tabBarDragBridgeAlpha = remember { Animatable(0f) }
+                    LaunchedEffect(tabBarDragIndexPx.floatValue.isNaN()) {
+                        if (!tabBarDragIndexPx.floatValue.isNaN()) {
+                            tabBarDragBridgeAlpha.snapTo(1f)
+                        } else {
+                            tabBarDragBridgeAlpha.animateTo(0f, tween(220))
+                        }
+                    }
+                    val navBarIsSkeu = isSkeuTheme()
+                    val navBarAccentTint = MaterialTheme.colorScheme.primary
                     NavigationBar(
                         // Batch 439 — referensi iOS Jam: bar bawah bukan persegi nempel penuh
                         // ke tepi layar, tapi kapsul rounded yang "mengambang" dengan jarak dari
@@ -1437,6 +1480,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     tabBarDragIndexPx.floatValue =
                                         (down.position.x / barWidthPx * TAB_ROUTES.size)
                                             .coerceIn(0f, TAB_ROUTES.size.toFloat())
+                                    // Batch 446 — cermin sinkron ke posisi valid TERAKHIR, lihat
+                                    // rasionalisasi lengkap `tabBarDragLastIndexPx` di atas.
+                                    tabBarDragLastIndexPx.floatValue = tabBarDragIndexPx.floatValue
                                     var hoveredIndex = (down.position.x / barWidthPx * TAB_ROUTES.size)
                                         .toInt()
                                         .coerceIn(0, TAB_ROUTES.size - 1)
@@ -1451,6 +1497,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                         // (tabBarDragFocus di atas), dari `x` yg SAMA PERSIS
                                         // dipakai hitung newIndex di bawah (0 hitungan ganda).
                                         tabBarDragIndexPx.floatValue = x / barWidthPx * TAB_ROUTES.size
+                                        // Batch 446 — sama seperti di gesture down di atas.
+                                        tabBarDragLastIndexPx.floatValue = tabBarDragIndexPx.floatValue
                                         // Batch 444 — tahanan visual: overscroll dari rawX
                                         // (BUKAN x yg sudah di-coerce) supaya kebaca begitu jari
                                         // lewat ujung kolom pertama/terakhir. Redaman 0.3f (pola
@@ -1501,7 +1549,55 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     }
                                 }
                             }
-                            .graphicsLayer { translationX = tabBarOverscrollPx.floatValue },
+                            .graphicsLayer { translationX = tabBarOverscrollPx.floatValue }
+                            // Batch 446 — pill drag bersama lintas-kolom, lihat rasionalisasi
+                            // lengkap dekat deklarasi `tabBarDragBridgeAlpha` di atas. Digambar
+                            // SESUDAH `drawContent()` (di atas ikon/label, bukan di belakangnya —
+                            // `drawBehind` di titik lain pada modifier ini SENGAJA tidak dipakai
+                            // di sini krn dia hanya bisa gambar SEBELUM, akan tertutup total oleh
+                            // Surface+Row NavigationBar sendiri yang digambar setelahnya) — alpha
+                            // rendah (0.16f/0.14f, IDENTIK pill `GlassTabIcon`) jadi tetap tidak
+                            // mengganggu keterbacaan ikon/label yang ada di atasnya.
+                            .drawWithContent {
+                                drawContent()
+                                if (!navBarIsSkeu) {
+                                    val bridgeAlpha = tabBarDragBridgeAlpha.value
+                                    if (bridgeAlpha > 0f) {
+                                        val liveIdxPos = tabBarDragIndexPx.floatValue
+                                        val idxPos = if (liveIdxPos.isNaN()) {
+                                            tabBarDragLastIndexPx.floatValue
+                                        } else {
+                                            liveIdxPos
+                                        }
+                                        val columnWidthPx = size.width / TAB_ROUTES.size
+                                        val pillWidthPx = columnWidthPx * 0.74f
+                                        val pillHeightPx = size.height * 0.62f
+                                        val centerX = (idxPos * columnWidthPx)
+                                            .coerceIn(pillWidthPx / 2f, size.width - pillWidthPx / 2f)
+                                        val topLeft = androidx.compose.ui.geometry.Offset(
+                                            centerX - pillWidthPx / 2f,
+                                            (size.height - pillHeightPx) / 2f
+                                        )
+                                        val pillSize = androidx.compose.ui.geometry.Size(pillWidthPx, pillHeightPx)
+                                        val corner = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
+                                        drawRoundRect(
+                                            color = navBarAccentTint,
+                                            topLeft = topLeft,
+                                            size = pillSize,
+                                            cornerRadius = corner,
+                                            alpha = 0.16f * bridgeAlpha
+                                        )
+                                        drawRoundRect(
+                                            color = Color.White,
+                                            topLeft = topLeft,
+                                            size = pillSize,
+                                            cornerRadius = corner,
+                                            alpha = 0.14f * bridgeAlpha,
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                                        )
+                                    }
+                                }
+                            },
                         // Batch 53: lowered from 12.dp — spec §15 keeps navigation "calm and
                         // immediately understandable" and explicitly warns against every item (or
                         // in this case, the whole bar) reading as an accent-tinted glow. M3's

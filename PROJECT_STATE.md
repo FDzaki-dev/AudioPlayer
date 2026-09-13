@@ -9,6 +9,48 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 446**: feedback eksplisit user PASCA Batch 445 (video ilustrasi dilampirkan,
+perluasan langsung drag tab-bar Batch 442/444/445) — 1 poin: animasi pill masih terpisah oleh
+gap kosong kecil di antara label tab; seharusnya warna/semantik ikut jari juga lintas celah itu.
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` — root cause: `tabBarDragFocus`
+(Batch 444) SUDAH kontinu secara matematis (diverifikasi manual — crossfade tepat 0.5/0.5 pas di
+batas 2 kolom), TAPI tiap `GlassTabIcon` (3 titik pemakaian) menggambar pill highlight-nya
+SENDIRI-SENDIRI dibatasi ke kolom masing-masing — 2 pill setengah-nyala itu tetap 2 kotak
+TERPISAH dgn spasi tak-tergambar (padding internal kolom NavigationBarItem) di antaranya, kebaca
+mata sbg "jeda"/patah walau angka focus-nya kontinu. Bug lapisan render, bukan bug angka.
+1. **Fix utama**: 1 pill TAMBAHAN (bukan pengganti 3 pill `GlassTabIcon` lama — itu TETAP jalan
+   apa adanya utk tap/nudge-konten-swipe/idle, 0 regresi di situ) digambar via
+   `Modifier.drawWithContent` pada `NavigationBar` itu sendiri (bukan composable/Box baru, 0
+   restrukturisasi tree) — HANYA aktif selama drag LANGSUNG di tab-bar (`tabBarDragIndexPx` bukan
+   NaN). Posisi X dari nilai kontinu yang SAMA PERSIS (`idxPos * columnWidth`) — bebas meluncur
+   MELINTASI celah antar kolom krn 1 kanvas bersama, bukan per-composable. Warna/alpha/radius
+   IDENTIK pill lama (tint primary, 0.16f/0.14f, 16.dp) — 1 aksen visual, cuma lapisannya beda.
+2. **State baru**: `tabBarDragLastIndexPx` (posisi valid terakhir, krn `tabBarDragIndexPx` sendiri
+   balik NaN duluan tepat saat jari lepas) + `tabBarDragBridgeAlpha` (`Animatable`, snapTo(1)
+   instan saat drag mulai — konsisten filosofi real-time Batch 445 — animateTo(0, tween(220)) saat
+   jari lepas, durasi sinkron `glassAlphaAnim` yg sudah ada) supaya fade-out pill baru 0
+   lompatan/pop visual pas handoff ke 3 pill lama.
+3. Skeu DIKECUALIKAN (`isSkeuTheme()`, dibaca 1x baru sbg `navBarIsSkeu`) — aturan lama "solid,
+   bukan kaca" (Batch 58/61/79) tidak disentuh.
+4. Import baru: `androidx.compose.ui.draw.drawWithContent` (SATU-SATUNYA import baru — Offset/
+   Size/CornerRadius/Stroke fully-qualified inline, pola sama persis `Offset(0f,0f)` yg sudah ada).
+
+0 file lain disentuh. **Koreksi dok tambahan** (Anti-Stale): "Konvensi penamaan ZIP & versi" di
+bawah & README.md § "Standar Penomoran Versi" masih menyebut `AudioPlayer-batchN-release.zip` —
+sumber P1 (nama ZIP user, `SONIX_v445.zip`) & `app_name`/judul README konfirmasi branding AKTIF =
+**SONIX** (package `com.rudi.audioplayer`/`rootProject.name="AudioPlayer"` SENGAJA tetap, lihat
+"Aturan sesi aktif" #5 — tidak terikat branding). Kedua baris diperbarui ke `SONIX_v<batch>.zip` —
+skema versionCode/versionName/APK/tag rilis TIDAK terkait, TIDAK ikut diubah.
+
+**0 diverifikasi CI/device Batch 446** — review manual (baca kode + cek balance brace/paren: `{}`
+331/331, `()` 1060/1060, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses jaringan
+Gradle di sesi ini. Item belum-terverifikasi bertambah 1: pill drag bersama terlihat MENYATU mulus
+melintasi celah antar-label (bukan 2 pill terpisah) sesuai video ilustrasi user, warna/posisi tetap
+1:1 sinkron jari (regresi Batch 445 tidak terjadi), DAN handoff ke 3 pill lama pas jari dilepas 0
+lompatan visual — semua perlu konfirmasi device fisik (0 tersedia sesi ini, sama seperti Batch
+435-445).
+
 **Catatan Batch 445**: feedback eksplisit user PASCA Batch 444 (bukan reopen sektor DITUTUP
 manapun, perluasan langsung drag tab-bar Batch 442/444) — 2 poin: (1) "drag jari real-time belum
 sepenuhnya smooth like iOS", (2) "floating effect HANYA saat drag, tampilan yang dilewati berubah
@@ -588,6 +630,8 @@ com.rudi.audioplayer/
 ```
 
 ## Konvensi penamaan ZIP & versi
-`AudioPlayer-batchN-release.zip` melacak nomor batch percakapan (bukan versionName/versionCode).
-`versionCode`/`versionName` otomatis dari jumlah commit git. Detail lengkap: README.md §
-"Standar Penomoran Versi".
+`SONIX_vN.zip` melacak nomor batch percakapan (bukan versionName/versionCode) — diperbarui Batch
+446 dari `AudioPlayer-batchN-release.zip` lama (branding aktif = SONIX, lihat `app_name`/README;
+`AudioPlayer` cuma nama teknis package/rootProject, SENGAJA tetap, lihat "Aturan sesi aktif" #5).
+`versionCode`/`versionName` otomatis dari jumlah commit git — TIDAK terkait, TIDAK ikut berubah.
+Detail lengkap: README.md § "Standar Penomoran Versi".
