@@ -927,28 +927,26 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 458. ZIP terakhir: `SONIX_v458.zip`. 1 file source diubah:
-  `FloatingBubbleService.kt` (`EDGE_CLIP_FRACTION` 0.5f→0.7f — tuning lanjutan, bagian TIMBUL/
-  kelihatan tab minimized diturunkan ke ~30% sesuai konfirmasi tap user ["~30%" = timbul, bukan
-  fraksi klip]. Detail lengkap di catatan Batch 458 di atas & CHANGELOG.md). Sektor bubble
-  (Roadmap #11) masih terbuka, TIDAK ada sektor DITUTUP yang tersentuh.
-- **BELUM dikonfirmasi (baru, Batch 458 — PRIORITAS)**: (1) tab minimized SEKARANG ~30%
-  kelihatan/~70% tersembunyi (lebih ngumpet dari Batch 455/457) di semua jalur snap; (2) mini
-  trigger MASIH gampang di-tap walau bagian kelihatan makin kecil; (3) drag tab minimized tetap
-  100% kelihatan/terkontrol penuh selagi digeser; (4) 0 regresi
-  minimize/expand/fade/auto-minimize Batch 98-100/453/454. 0 compile/device/CI sesi ini
-  (konsisten pola Batch 435-457).
+- Batch terakhir: 459 (**doc-only**, 0 file source diubah). ZIP terakhir: `SONIX_v459.zip`. User
+  konfirmasi device fisik hasil Batch 458 (lihat blok DIKONFIRMASI di bawah) — `PROJECT_STATE.md`/
+  `CHANGELOG.md` diperbarui mencatat hasil, 0 kode disentuh (0 aksi diambil atas catatan "sedikit
+  susah" di item 2, sesuai instruksi user yang cuma konfirmasi, bukan minta perbaikan). Batch 458
+  sebelumnya (`FloatingBubbleService.kt`, `EDGE_CLIP_FRACTION` 0.5f→0.7f) tetap berlaku, tidak
+  diubah. Sektor bubble (Roadmap #11) masih terbuka, TIDAK ada sektor DITUTUP yang tersentuh.
+- **DIKONFIRMASI device fisik user (Batch 458)**: (1) tab minimized ~30% kelihatan/~70%
+  tersembunyi di semua jalur snap — sesuai target; (2) mini trigger tetap bisa di-tap, TAPI user
+  laporkan **sedikit lebih susah** dari sebelumnya (touch target mengecil seiring fraksi kelihatan
+  turun ke 30%) — **residual UX minor, BELUM diminta perbaikan eksplisit oleh user, 0 aksi diambil
+  sesi ini**; kalau user minta perbaikan ke depan, opsi umum: perbesar touch target tap-listener
+  independen dari lebar visual tab (jangan otomatis kecilkan lagi `EDGE_CLIP_FRACTION` — itu
+  parameter visual, bukan touch target); (3) drag tab minimized 100% kelihatan/terkontrol penuh
+  selagi digeser — confirmed; (4) 0 regresi ke minimize/expand/fade/auto-minimize Batch
+  98-100/453/454 — confirmed, MENUTUP item verifikasi Batch 453/454 yang sebelumnya digabung di
+  sini.
 - **CATATAN proses (berlaku terus)**: istilah user "timbul" = bagian KELIHATAN tab, bukan fraksi
   klip (`EDGE_CLIP_FRACTION`) itu sendiri — dua hal berlawanan arah. Kalau user minta angka
   persentase lagi tanpa kata eksplisit "sembunyi/klip" vs "timbul/kelihatan", WAJIB klarifikasi
   arah dulu (pola Batch 456→457→458), jangan tebak.
-- **BELUM dikonfirmasi (Batch 454, masih berlaku, digabung verifikasi dgn Batch 456 di atas)**:
-  bubble auto-collapse jadi tab tepi layar setelah ±6 detik idle TANPA sentuhan (menyusul fade
-  ±2.5 detik); TIDAK auto-collapse selagi masih digeser/tombol kontrol ditekan; minimize manual
-  (chevron) & auto-minimize 0 saling konflik.
-- **BELUM dikonfirmasi (Batch 453, masih berlaku)**: bubble meredup ~45% opacity setelah ±2.5
-  detik diam (pill penuh maupun tab minimized); opacity kembali penuh seketika begitu disentuh
-  lagi. Diverifikasi BERSAMAAN dengan item Batch 454 di atas (satu alur idle yang sama).
 - **BELUM dikonfirmasi (Batch 452, masih berlaku)**: (1) label 3 tab 0 lagi ellipsis di font
   normal; (2) drag flick cepat + tap-tab biasa berhenti TEPAT di tab tujuan, 0 "mundur 1 kolom".
 - **DIKONFIRMASI device fisik user (Batch 451, masih berlaku)**: (1) pill ukuran normal, 0 kapsul

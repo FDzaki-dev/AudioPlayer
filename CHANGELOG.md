@@ -1,5 +1,16 @@
 # Changelog
 
+## Batch 459 — Konfirmasi device fisik Batch 458 (doc-only, 0 kode diubah)
+User konfirmasi device fisik hasil Batch 458 (EDGE_CLIP_FRACTION 70%): (1) tab minimized ~30%
+kelihatan — sesuai target; (2) mini trigger tetap bisa di-tap, TAPI sedikit lebih susah dari
+sebelumnya (touch target mengecil seiring bagian kelihatan mengecil) — dicatat sebagai residual
+UX minor, 0 perbaikan diminta/diambil sesi ini; (3) drag tab minimized 100% kelihatan/terkontrol
+penuh — confirmed; (4) 0 regresi minimize/expand/fade/auto-minimize — confirmed, menutup item
+verifikasi Batch 453/454 yang sebelumnya masih terbuka.
+
+0 file source diubah. `PROJECT_STATE.md` diperbarui (status verifikasi + catatan residual untuk
+sesi berikutnya kalau user minta touch target diperbesar).
+
 ## Batch 458 — Kurangi bagian TIMBUL tab minimized ke ~30% (EDGE_CLIP_FRACTION 50% → 70%)
 User minta lanjut tuning ("ubah jadi ~30%!!") setelah Batch 457. Angka mentah tanpa konteks —
 diklarifikasi via pilihan tap (bukan ditebak) agar tidak mengulang salah-arah Batch 456: "~30%"
