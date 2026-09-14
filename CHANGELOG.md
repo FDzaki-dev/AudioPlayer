@@ -1,5 +1,36 @@
 # Changelog
 
+## Batch 455 — Tab minimized bubble kliping setengah, mentok tepi layar saat idle
+Feedback eksplisit user langsung setelah Batch 454: "minimize otomatis nya berhasil", tapi yang
+benar-benar diinginkan adalah tab tepi layarnya (circle bubble) bisa "kliping setengah/menyisakan
+mini trigger" dan "wajib mentok maksimal ke tepi layar device saat idle". Refinement visual murni
+ke tab minimized Batch 100, bukan mandat/sektor baru.
+
+**1 file diubah** (`FloatingBubbleService.kt`, dalam batas 3 file/tugas):
+
+1. **1 titik kontrol yang sama, 0 fungsi baru**: `snapMinimizedToNearestEdge()` — satu-satunya
+   fungsi yang menghitung X tab minimized (dipanggil dari drag-lepas, auto-minimize Batch 454,
+   tombol chevron manual, restart service, rotasi) — formula X berubah dari `0`/`screenWidth -
+   lebarTab` (flush, 100% kelihatan) jadi `-lebarTab/2`/`screenWidth - lebarTab/2` (setengah lebar
+   sengaja melewati batas layar).
+2. **0 flag/permission baru**: window overlay sudah `FLAG_LAYOUT_NO_LIMITS` sejak Batch 100 —
+   prasyarat X negatif/lewat `screenWidth` diterima WindowManager sudah ada sejak awal; sistem
+   yang otomatis memotong render di luar layar.
+3. **0 mekanisme/state/timer baru**: `lebarTab/2` dihitung dari `container.width` real via
+   `container.post{}` yang sudah ada — bukan angka dp ditebak manual.
+4. **Drag aktif tidak terpengaruh**: `setupDrag()` (clamp `[0, maxX]` pakai lebar penuh) 0
+   disentuh — half-clip hanya berlaku setelah jari dilepas & tab snap diam di tepi (idle), sesuai
+   kata "saat idle" di instruksi user.
+5. 0 file lain disentuh, 0 breaking change ke `minimize()`/`expand()`/fade Batch 453/auto-minimize
+   Batch 454 — cuma posisi X akhir tab yang berubah.
+
+**0 diverifikasi CI/device Batch 455** — review manual (baca kode + cek balance brace/paren:
+`{}` 71/71, `()` 325/325, `[]` 46/46), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Perlu konfirmasi device fisik: tab minimized kelihatan kepotong
+setengah mentok tepi (bukan bulat utuh) di semua jalur snap, mini trigger yang tersisa tetap
+gampang di-tap, tab tetap 100% kelihatan selagi masih di-drag (half-clip cuma setelah dilepas), 0
+regresi ke minimize/expand/fade/auto-minimize-idle Batch 98-100/453/454.
+
 ## Batch 454 — Auto-minimize total bubble mini player saat idle berkepanjangan
 Lanjutan langsung Batch 453. Instruksi asli user minta mini player bubble "wajib bisa
 split/di-minimize total, ATAU minimal dulu bisa fade out" — Batch 453 baru menuntaskan fallback

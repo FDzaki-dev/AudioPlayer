@@ -12,6 +12,40 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 455**: feedback eksplisit user langsung setelah Batch 454 ("minimize otomatis nya
+berhasil, TAPI yang benar-benar diinginkan: circle bubble kliping setengah/menyisakan mini
+trigger, wajib mentok maksimal ke tepi layar saat idle"). Refinement VISUAL murni ke tab minimized
+Batch 100 (bukan mandat baru/sektor baru) — tab yang tadinya flush-tapi-100%-kelihatan di tepi
+sekarang setengah lebarnya sengaja melewati batas layar. 0 sektor DITUTUP disentuh.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt` —
+1. **1 titik kontrol yang sama, 0 fungsi baru**: `snapMinimizedToNearestEdge()` — SATU-SATUNYA
+   fungsi yang menghitung posisi X tab minimized (dipanggil dari drag-lepas, auto-minimize Batch
+   454, tombol chevron manual, restart service, rotasi) — cuma formula X-nya yang berubah, dari
+   `0`/`screenWidth - lebarTab` (flush, 100% kelihatan) jadi `-lebarTab/2`/`screenWidth -
+   lebarTab/2` (setengah lebar melewati batas layar).
+2. **0 flag/permission baru**: window overlay SUDAH `FLAG_LAYOUT_NO_LIMITS` sejak Batch 100 —
+   prasyarat X negatif/lewat `screenWidth` diterima WindowManager sudah terpenuhi dari awal,
+   sistem yang otomatis memotong render di luar layar, 0 clip manual perlu ditulis.
+3. **0 mekanisme/state/timer baru**: `lebarTab/2` dihitung dari `container.width` real via
+   `container.post{}` yang sudah ada (pola sama Batch 100) — bukan angka dp ditebak manual.
+4. **Drag aktif tidak terpengaruh**: `setupDrag()` (clamp `[0, maxX]` pakai lebar penuh) 0
+   disentuh — half-clip HANYA berlaku begitu jari dilepas & tab snap ke tepi dalam keadaan diam
+   (idle), sesuai kata "saat idle" di instruksi user, bukan selagi masih digeser.
+5. 0 file lain disentuh, 0 breaking change ke `minimize()`/`expand()`/fade Batch 453/auto-minimize
+   Batch 454 — cuma X akhir tab yang berubah, mekanisme kapan snap dipanggil sama sekali tidak
+   disentuh.
+
+**0 diverifikasi CI/device Batch 455** — review manual (baca kode + cek balance brace/paren:
+`{}` 71/71, `()` 325/325, `[]` 46/46), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini (konsisten pola Batch 435-454). Perlu konfirmasi device fisik
+berikutnya: (1) tab minimized kelihatan kepotong SETENGAH mentok tepi kiri/kanan (bukan lagi bulat
+utuh 100% kelihatan) baik saat manual-minimize, auto-minimize idle, restart app, maupun rotasi;
+(2) sisa "mini trigger" yang kelihatan tetap bisa di-tap untuk expand() — touch target setengah
+lingkaran tidak "meleset"/butuh tap presisi berlebihan; (3) drag tab minimized (pindah ke posisi
+lain) tetap 100% kelihatan/terkontrol penuh SELAGI digeser, cuma clip setengah setelah dilepas;
+(4) 0 regresi ke minimize/expand/fade/auto-minimize-idle Batch 98-100/453/454.
+
 **Catatan Batch 454**: lanjutan langsung Batch 453 — mandat UTAMA user ("wajib bisa
 split/di-minimize total") belum tuntas Batch 453 (baru fallback minimumnya, fade). Batch ini
 menuntaskan mandat utamanya: auto-minimize total otomatis kalau bubble tetap idle lebih lama
@@ -818,18 +852,24 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 454. ZIP terakhir: `SONIX_v454.zip`. 1 file source diubah:
-  `FloatingBubbleService.kt` (fitur baru: auto-minimize TOTAL ke tab tepi layar otomatis kalau
-  bubble tetap idle ±6 detik setelah fade Batch 453 — reuse `minimize()` Batch 100 apa adanya,
-  detail lengkap di catatan Batch 454 di atas & CHANGELOG.md). Ini menuntaskan mandat UTAMA user
-  yang sempat baru fallback-nya saja (fade) yang terealisasi Batch 453. Sektor bubble (Roadmap
-  #11) masih terbuka, TIDAK ada sektor DITUTUP yang tersentuh.
-- **BELUM dikonfirmasi (baru, Batch 454)**: (1) bubble auto-collapse jadi tab 48dp tepi layar
-  setelah ±6 detik idle (menyusul fade ±2.5 detik yang sudah jalan lebih dulu); (2) TIDAK
-  auto-collapse selagi masih digeser/tombol kontrolnya ditekan; (3) minimize manual (chevron) &
-  auto-minimize 0 saling konflik; (4) 0 regresi ke minimize/expand/snap-tepi/drag-bebas Batch
-  98-100 & fade Batch 453. 0 compile/device/CI sesi ini (konsisten pola Batch 435-453) —
-  prioritas verifikasi user BERIKUTNYA.
+- Batch terakhir: 455. ZIP terakhir: `SONIX_v455.zip`. 1 file source diubah:
+  `FloatingBubbleService.kt` (`snapMinimizedToNearestEdge()`: tab minimized sekarang kliping
+  SETENGAH lebar melewati batas layar — `-lebarTab/2`/`screenWidth - lebarTab/2`, bukan lagi flush
+  100% kelihatan Batch 100 — reuse `FLAG_LAYOUT_NO_LIMITS` yang sudah ada, 0 flag/state/timer baru,
+  detail lengkap di catatan Batch 455 di atas & CHANGELOG.md). Feedback langsung user atas hasil
+  Batch 454 (auto-minimize-nya sendiri sudah dikonfirmasi "berhasil" oleh user, tinggal bentuk
+  visual akhir tab-nya yang direvisi). Sektor bubble (Roadmap #11) masih terbuka, TIDAK ada sektor
+  DITUTUP yang tersentuh.
+- **BELUM dikonfirmasi (baru, Batch 455 — PRIORITAS)**: (1) tab minimized kepotong SETENGAH mentok
+  tepi (bukan bulat utuh) di SEMUA jalur snap (manual-minimize, auto-minimize idle, restart app,
+  rotasi); (2) sisa "mini trigger" yang kelihatan tetap gampang di-tap utk expand(); (3) tab TETAP
+  100% kelihatan/terkontrol penuh SELAGI masih di-drag, half-clip cuma muncul setelah dilepas &
+  diam; (4) 0 regresi ke minimize/expand/fade Batch 453/auto-minimize-idle Batch 454. 0
+  compile/device/CI sesi ini (konsisten pola Batch 435-454).
+- **BELUM dikonfirmasi (Batch 454, masih berlaku, digabung verifikasi dgn Batch 455 di atas)**:
+  bubble auto-collapse jadi tab tepi layar setelah ±6 detik idle TANPA sentuhan (menyusul fade
+  ±2.5 detik); TIDAK auto-collapse selagi masih digeser/tombol kontrol ditekan; minimize manual
+  (chevron) & auto-minimize 0 saling konflik.
 - **BELUM dikonfirmasi (Batch 453, masih berlaku)**: bubble meredup ~45% opacity setelah ±2.5
   detik diam (pill penuh maupun tab minimized); opacity kembali penuh seketika begitu disentuh
   lagi. Diverifikasi BERSAMAAN dengan item Batch 454 di atas (satu alur idle yang sama).

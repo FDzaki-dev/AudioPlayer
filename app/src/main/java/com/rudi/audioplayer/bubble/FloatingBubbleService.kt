@@ -148,6 +148,20 @@ import kotlin.math.abs
  * apa pun (drag maupun tombol kontrol) tetap membatalkan KEDUA timer via pemanggilan
  * [keepAwakeAndScheduleFade] yang sudah ada di [setupDrag]/[setupControls] — 0 perubahan di
  * kedua fungsi itu.
+ *
+ * **Batch 455 — tab minimized kliping SETENGAH di tepi layar**: feedback eksplisit user setelah
+ * Batch 454 ("minimize otomatis nya berhasil, TAPI yang benar-benar diinginkan: circle bubble
+ * bisa kliping setengah/menyisakan mini trigger, wajib mentok maksimal ke tepi layar saat idle").
+ * Tab 48dp bundar (Batch 100) sebelumnya berhenti flush-tapi-100%-kelihatan di X=0/`screenWidth -
+ * lebarTab`. Sekarang [snapMinimizedToNearestEdge] mendorong X SETENGAH lebar tab melewati batas
+ * layar (`-lebarTab/2` kiri, `screenWidth - lebarTab/2` kanan) — window overlay SUDAH
+ * `FLAG_LAYOUT_NO_LIMITS` sejak Batch 100 ([addBubbleView]), jadi 0 flag/permission baru,
+ * WindowManager & sistem yang otomatis memotong render di luar layar. **0 fungsi/state/timer
+ * baru** — cuma formula X di 1 titik kontrol yang sudah ada, otomatis berlaku ke semua pemicu
+ * snap yang sudah ada (lepas-drag minimized, auto-minimize Batch 454, tombol chevron manual,
+ * restart service, rotasi). Selagi masih di-drag aktif tab tetap dibatasi penuh di dalam layar
+ * ([setupDrag] tidak disentuh) — setengah-tersembunyi HANYA muncul begitu benar-benar idle/diam
+ * di tepi, sesuai kata "saat idle" di instruksi user.
  */
 class FloatingBubbleService : Service() {
 
@@ -491,12 +505,24 @@ class FloatingBubbleService : Service() {
         }
     }
 
-    /** Chat-head-style "nempel tepi": X dipaksa ke 0 (kiri) atau `screenWidth - lebarTab`
-     * (kanan) — mana pun yang lebih dekat dari posisi X saat ini, TIDAK PERNAH mengambang bebas
-     * di tengah layar selagi minimized. `container.post{}` supaya ukuran tab yang SEBENARNYA
-     * (dari `layout_width="48dp"` di bubble_minimized.xml, sudah ke-measure oleh sistem) yang
-     * dipakai hitung tepi kanan — bukan angka dp ditebak manual dari kode, yang gampang meleset
-     * kalau ukuran layout diubah lagi nanti dan lupa disinkronkan ke sini. */
+    /** Chat-head-style "nempel tepi", **Batch 455 — kliping SETENGAH**: X dipaksa ke `-lebarTab/2`
+     * (kiri) atau `screenWidth - lebarTab/2` (kanan) — mana pun yang lebih dekat dari posisi X
+     * saat ini, TIDAK PERNAH mengambang bebas di tengah layar selagi minimized. Sebelumnya
+     * (Batch 100) tab berhenti flush tapi 100% kelihatan (`0`/`screenWidth - lebarTab`) — instruksi
+     * eksplisit user menolak itu ("kliping setengah/menyisakan mini trigger", "wajib mentok
+     * maksimal ke tepi"): sekarang SETENGAH lebar tab sengaja diposisikan MELEWATI batas layar,
+     * sisa setengah yang kelihatan jadi tap-target "mini trigger" mentok tepi. Window overlay
+     * SUDAH `FLAG_LAYOUT_NO_LIMITS` sejak awal (lihat [addBubbleView]) — prasyarat X negatif/lewat
+     * `screenWidth` diterima WindowManager, 0 flag baru; sistem otomatis memotong render di luar
+     * layar, tidak perlu clip manual. `container.post{}` supaya ukuran tab yang SEBENARNYA (dari
+     * `layout_width="48dp"` di bubble_minimized.xml, sudah ke-measure oleh sistem) yang dipakai
+     * hitung `lebarTab/2` — bukan angka dp ditebak manual dari kode. **1 titik kontrol ini saja**
+     * yang diubah — otomatis berlaku ke SEMUA pemanggil yang sudah ada (drag-lepas saat minimized,
+     * auto-minimize idle Batch 454, tombol chevron manual via [minimize], restart service, rotasi
+     * via [onConfigurationChanged]) — 0 titik panggil baru, 0 state/timer baru. Saat masih di-drag
+     * aktif, tab TETAP dibatasi penuh di dalam layar seperti biasa ([setupDrag] clamp `[0, maxX]`
+     * pakai lebar penuh) — half-clip HANYA berlaku begitu jari dilepas & tab benar-benar diam
+     * (idle) di tepi, bukan selagi masih dipegang/dipindah. */
     private fun snapMinimizedToNearestEdge() {
         val container = bubbleView as? FrameLayout ?: return
         val params = layoutParams ?: return
@@ -504,8 +530,9 @@ class FloatingBubbleService : Service() {
             val width = container.width.takeIf { it > 0 } ?: return@post
             val metrics = resources.displayMetrics
             val screenWidth = metrics.widthPixels
+            val halfWidth = width / 2
             val nearestRight = (params.x + width / 2) > screenWidth / 2
-            params.x = if (nearestRight) (screenWidth - width).coerceAtLeast(0) else 0
+            params.x = if (nearestRight) (screenWidth - halfWidth) else -halfWidth
             // Y juga di-clamp (bukan cuma X yang "dipaksa tepi") — rotasi bisa mengubah tinggi
             // layar juga, Y lama yang valid di orientasi sebelumnya bisa jadi melebihi batas.
             val maxY = (metrics.heightPixels - container.height).coerceAtLeast(0)
