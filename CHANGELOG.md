@@ -1,5 +1,40 @@
 # Changelog
 
+## Batch 463 — Pivot ke instrumentasi: Batch 462 gagal lagi, logcat user 0 sinyal app-level
+Konfirmasi device fisik user: Batch 462 (safety-net re-assert 2x delay) **GAGAL LAGI** — "masih
+nongol/gak ke kliping" saat rotate, sama seperti Batch 460/461. User membawa `bubble_log.txt`
+(logcat `-iE "floatingbubble|configurationchanged|windowmanager"`) sesuai permintaan eksplisit
+Batch 462. **Log dicek baris-per-baris**: 0 baris dari `FloatingBubbleService` — 2 satu-satunya
+kecocokan "floatingbubble" adalah ECHO PERINTAH grep-nya sendiri, bukan output aplikasi. Root
+cause: service ini tidak pernah menulis logcat sama sekali, jadi 3 teori berturut-turut (Batch
+460/461/462) semuanya tebakan murni dari baca-kode, tanpa validasi eksekusi nyata.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+
+1. **0 formula/logic diubah** — `EDGE_CLIP_FRACTION`/`touchPad`/`visualWidth`/`screenBounds`/
+   `ROTATION_RESNAP_DELAYS_MS` semua TETAP persis Batch 460-462.
+2. **`AppLogger.w()` ditambah di 4 titik** (tag `"FloatingBubbleService"`, pola sama existing
+   `AppLogger.e` di `loadAlbumArtBitmap`): entry `onConfigurationChanged` (orientation+bounds+
+   isMinimized), 2 guard null `bubbleView`/`layoutParams` yang sebelumnya return diam-diam, tiap
+   callback `ROTATION_RESNAP_DELAYS_MS` benar tereksekusi, dan di `snapMinimizedToNearestEdge()`
+   nilai X/Y TARGET + outcome sukses/gagal `updateViewLayout` (sebelumnya `runCatching` membungkam
+   exception total, 0 sinyal kalau apply-nya sendiri gagal).
+3. **Readback +250ms baru**: `container.postDelayed { getLocationOnScreen() }` membaca posisi
+   NYATA container di layar 250ms setelah tiap apply, dibanding ke X/Y target yang di-snapshot —
+   satu-satunya cara membuktikan/membantah teori Batch 462 ("sistem menimpa posisi window
+   pasca-snap") dengan data, bukan dugaan.
+4. `AppLogger.w()` dipilih (bukan `Log.d` polos) — otomatis kepakai ke 2 kanal: logcat (kena grep
+   sama yang user pakai) DAN `diagnostic_log.txt` privat app (Settings > Lanjutan > Log
+   Diagnostik, 0 perlu Termux/adb kalau kanal itu gagal lagi).
+5. 0 breaking change ke minimize/expand/fade/auto-minimize Batch 98-100/453-458/460, 0 import/
+   dependency baru, 0 sektor DITUTUP disentuh.
+
+**0 diverifikasi CI/device Batch 463** — review manual (baca kode + cek balance brace/paren:
+`{}` 84/84, `()` 486/486, `[]` 83/83), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Batch ini SENGAJA 0 mengklaim fix — perlu dari user: rotasi sekali ke
+landscape sambil bubble diminimize, lalu kirim balik logcat baru ATAU ekspor Log Diagnostik
+in-app. Fix ke-4 (kalau perlu) diputuskan dari log itu, bukan teori baru.
+
 ## Batch 462 — Fix residual #2: Batch 461 GAGAL TOTAL (tab 100% kelihatan, gak keclip sama sekali di landscape)
 Konfirmasi device fisik user Batch 461: masih "nongol" — DIPERJELAS via klarifikasi tap: **100%
 kelihatan, sama sekali gak keclip** (bukan versi "kurang tepat dikit"). Sinyal ini membuktikan

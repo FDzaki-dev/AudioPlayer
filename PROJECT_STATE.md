@@ -12,6 +12,49 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 463 [PIVOT KE INSTRUMENTASI]**: user konfirmasi device fisik Batch 462 — "masih
+nongol/gak ke kliping" (GAGAL, sama seperti Batch 460/461). User membawa `bubble_log.txt` (logcat
+`-iE "floatingbubble|configurationchanged|windowmanager"`) sesuai permintaan eksplisit
+PROJECT_STATE.md Batch 462 ("WAJIB logcat device asli sebelum lanjut tebak lagi"). **Log dicek
+baris-per-baris (bukan diasumsikan berisi sinyal)**: 0 baris dari `FloatingBubbleService` sama
+sekali — 2 satu-satunya kecocokan "floatingbubble" di file itu adalah ECHO PERINTAH grep-nya
+sendiri (baris command Termux), BUKAN output aplikasi. Kesimpulan wajib: service ini TIDAK PERNAH
+menulis logcat, jadi 3 teori berturut-turut (Batch 460/461/462) SEMUA murni tebakan dari baca-kode,
+0 pernah divalidasi data eksekusi nyata. Sesuai SOP sendiri (dilarang tebak fix ke-4 tanpa data),
+batch ini **PIVOT — 0 fix baru ke formula/logic, murni instrumentasi**. 0 sektor DITUTUP disentuh.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+1. **0 formula/state/logic diubah** — `EDGE_CLIP_FRACTION`/`touchPad`/`visualWidth`/`screenBounds`/
+   `ROTATION_RESNAP_DELAYS_MS` semuanya TETAP persis Batch 460-462, TIDAK disentuh sama sekali.
+2. **`AppLogger.w(tag="FloatingBubbleService", ...)` ditambah di 4 titik** (pola sama existing
+   `AppLogger.e` di `loadAlbumArtBitmap`, BUKAN `Log.d` polos): (a) entry `onConfigurationChanged`
+   — orientation + screenBounds + isMinimized; (b) 2 guard null `bubbleView`/`layoutParams` yang
+   sebelumnya `return` diam-diam 0 sinyal; (c) tiap callback `ROTATION_RESNAP_DELAYS_MS` (150ms/
+   400ms) benar tereksekusi; (d) di `snapMinimizedToNearestEdge()` — X/Y TARGET tepat sebelum
+   `updateViewLayout` + outcome sukses/gagalnya (`runCatching` lama SEBELUMNYA membungkam
+   exception total, 0 pernah tahu kalau apply-nya sendiri gagal).
+3. **Readback +250ms baru** (tambahan, bukan cuma log): `container.postDelayed { getLocationOnScreen() }`
+   membaca posisi NYATA container di layar 250ms setelah tiap apply, dibandingkan ke X/Y target
+   yang di-snapshot ke `val` lokal (`targetX`/`targetY`, BUKAN baca ulang `params.x` yang
+   objeknya sama dipakai bergantian oleh 3 panggilan snap) — satu-satunya cara MEMBUKTIKAN atau
+   MEMBANTAH teori Batch 462 ("sistem menimpa posisi window pasca-snap") dengan data asli, bukan
+   dugaan lagi.
+4. **`AppLogger.w()` dipilih (bukan `Log.d`)** — otomatis kepakai ke 2 kanal: logcat (tag persis
+   "FloatingBubbleService", akan kena grep SAMA yang user pakai) DAN `diagnostic_log.txt` privat
+   app (baca/ekspor lewat Settings > Lanjutan > Log Diagnostik) — kalau kanal Termux/adb gagal
+   nangkap lagi, kanal kedua tetap ada tanpa perlu setup ADB sama sekali.
+5. 0 breaking change ke minimize/expand/fade/auto-minimize Batch 98-100/453/454/455/457/458/460,
+   0 sektor DITUTUP disentuh. `AppLogger.w` sudah ada sejak awal (dipakai class lain) — 0 import
+   baru, 0 dependency baru.
+
+**0 diverifikasi CI/device Batch 463** — review manual (baca kode + cek balance brace/paren:
+`{}` 84/84, `()` 486/486, `[]` 83/83), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Batch ini SENGAJA 0 mengklaim fix — perlu dari user: (1) buka bubble,
+minimize, rotasi ke landscape sekali; (2) ambil salah satu — logcat Termux (perintah SAMA persis
+`bubble_log.txt` sebelumnya, sekarang HARUS muncul baris "Batch463...") ATAU buka app > Settings >
+Lanjutan > Log Diagnostik > ekspor/salin; (3) kirim hasilnya balik. Fix ke-4 (kalau perlu) baru
+diputuskan dari log itu, BUKAN teori baru.
+
 **Catatan Batch 462 [FIX RESIDUAL #2]**: konfirmasi device fisik user Batch 461 — masih "nongol",
 DIPERJELAS via klarifikasi tap: **100% kelihatan, gak keclip sama sekali** (bukan "kurang tepat
 dikit"). Ini membuktikan diagnosis Batch 460/461 ("sumber bounds kurang akurat") SALAH ARAH —
@@ -1023,36 +1066,39 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 462. ZIP terakhir: `SONIX_v462.zip`. **1 file diubah** (dalam batas 3
-  file/tugas): `FloatingBubbleService.kt` — safety-net re-assert (2x `postDelayed` 150ms/400ms)
-  di `onConfigurationChanged` setelah Batch 461 device-test TERBUKTI GAGAL TOTAL (100% kelihatan,
-  gak keclip sama sekali di landscape — bukan cuma "kurang tepat"). Formula
-  EDGE_CLIP_FRACTION/touchPad/visualWidth/screenBounds TIDAK disentuh (2 batch sebelumnya sudah
-  membuktikan itu bukan akar masalah). Detail penuh: "Catatan Batch 462" di atas & `CHANGELOG.md`.
-  Sektor bubble (Roadmap #11) masih terbuka, TIDAK ada sektor DITUTUP yang tersentuh.
-- **BELUM dikonfirmasi device fisik (Batch 462, baru, PALING PRIORITAS)**: (1) rotasi ke landscape
-  (bolak-balik beberapa kali berturut-turut) → tab minimized SELALU mentok tepi ~10% timbul, 0 lagi
-  100% kelihatan/"nongol" — **item ini GAGAL 2x berturut-turut (Batch 460 & 461) dengan approach
-  beda-beda, kalau GAGAL LAGI di batch ini JANGAN tebak fix ke-4 tanpa data baru** (lihat "CATATAN
-  PROSES" di bawah — WAJIB minta logcat device asli sebelum lanjut); (2) re-konfirmasi item
-  1/2/4/5 Batch 460 (mini trigger gampang di-tap, ~10% timbul, drag 100% kelihatan, 0 regresi)
-  TETAP ✅ (risiko regresi rendah, tidak ada logika yang disentuh untuk item ini).
-- **HISTORI KEGAGALAN item (3) — WAJIB dibaca sebelum lanjut kalau residual muncul lagi**:
-  Batch 460 (`resources.displayMetrics`→`currentWindowMetrics.bounds`) ❌ "masih nongol" (belum
-  spesifik). Batch 461 (`currentWindowMetrics`→`screenBounds` dari `newConfig`, root-cause teori:
-  Context Service non-UI tidak sinkron) ❌ SAMA PERSIS "masih nongol", diklarifikasi tap: **100%
-  kelihatan, gak keclip sama sekali**. Batch 462 (safety-net re-assert 2x delay, TIDAK ganti
-  formula/sumber data lagi) — hasil BELUM diketahui. **Kalau Batch 462 JUGA gagal**: 2 teori
-  "sumber data" sudah terbukti salah (screenBounds Batch 461 sendiri sudah benar dp→px), dan
-  mitigasi "re-assert delay" Batch 462 kalau gagal berarti override sistem terjadi LEBIH LAMBAT
-  dari 400ms ATAU bukan soal timing sama sekali — **STOP tebak fix kode, WAJIB minta user
-  jalankan logcat device asli** (`adb logcat | grep -i "floatingbubble\|windowmanager"` saat rotasi
-  berlangsung) sebelum eksekusi apa pun lagi ke file ini.
+- Batch terakhir: 463. ZIP terakhir: `SONIX_v463.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `FloatingBubbleService.kt` — **PIVOT KE INSTRUMENTASI, 0 fix formula/logic baru**.
+  Batch 462 dikonfirmasi GAGAL LAGI oleh user ("masih nongol/gak ke kliping"), DAN `bubble_log.txt`
+  yang dibawa user TERBUKTI (dicek baris-per-baris) 0 baris dari `FloatingBubbleService` sama
+  sekali — service ini tidak pernah menulis logcat, jadi Batch 460/461/462 semua tebakan buta.
+  Batch ini menambah `AppLogger.w()` di 4 titik (entry rotasi, 2 guard null, callback delay,
+  target X/Y + outcome apply) + readback posisi NYATA di layar +250ms setelah tiap snap — supaya
+  SESI BERIKUTNYA punya data asli, bukan teori lagi. Detail penuh: "Catatan Batch 463" di atas &
+  `CHANGELOG.md`. Sektor bubble (Roadmap #11) masih terbuka, TIDAK ada sektor DITUTUP disentuh.
+- **WAJIB DILAKUKAN sebelum lanjut fix apa pun ke file ini (PALING PRIORITAS)**: minta user (1)
+  buka bubble → minimize → rotasi ke landscape sekali; (2) ambil salah satu — logcat Termux
+  (command SAMA persis yang menghasilkan `bubble_log.txt`, sekarang HARUS ada baris "Batch463...")
+  ATAU buka app → Settings → Lanjutan → Log Diagnostik → salin/ekspor; (3) kirim hasilnya balik ke
+  sesi ini. **JANGAN eksekusi fix ke-4 ke formula/logic sebelum log ini ada di tangan** — itu akan
+  mengulang pola tebak-buta Batch 460-462 persis yang baru saja terbukti gagal 3x.
+- **HISTORI KEGAGALAN item (3) — WAJIB dibaca sebelum lanjut**: Batch 460
+  (`resources.displayMetrics`→`currentWindowMetrics.bounds`) ❌ "masih nongol" (belum spesifik).
+  Batch 461 (`currentWindowMetrics`→`screenBounds` dari `newConfig`) ❌ SAMA PERSIS "masih nongol",
+  diklarifikasi tap: **100% kelihatan, gak keclip sama sekali**. Batch 462 (safety-net re-assert 2x
+  delay, TIDAK ganti formula/sumber data) ❌ GAGAL LAGI ("masih nongol/gak ke kliping", konfirmasi
+  user sesi ini). Batch 463: **BUKAN fix ke-4** — logcat yang dibawa user Batch 462 TERBUKTI 0
+  sinyal (service tidak pernah logcat), jadi pivot ke instrumentasi murni (lihat "Catatan Batch
+  463" di atas) supaya fix ke-4 (kalau perlu) diputuskan dari DATA, bukan teori. **Begitu log hasil
+  Batch 463 masuk**: baca urutan snap-target vs readback +250ms tiap 3 titik (immediate/150ms/
+  400ms) — kalau readback SELALU cocok dgn target di SEMUA titik, bug bukan soal window
+  kita ditimpa (kemungkinan lain: `visualWidth`/`touchPad` salah baca ukuran view, atau
+  bug ada di layer render/tema, bukan posisi window sama sekali); kalau readback beda dari
+  target di titik tertentu, itu bukti langsung SIAPA/KAPAN menimpanya — putuskan fix dari situ.
 - **DIKONFIRMASI device fisik user (Batch 460)**: (1) mini trigger lebih gampang di-tap ✅; (2)
   bagian timbul ~10% ✅; (4) drag tab minimized 100% kelihatan/terkontrol penuh selagi digeser ✅;
   (5) 0 regresi ke minimize/expand/fade/auto-minimize Batch 98-100/453/454 ✅. **(3) mentok tepi
-  konsisten landscape ❌ GAGAL 2x berturut-turut (Batch 460, 461)** — lihat "HISTORI KEGAGALAN" di
-  atas.
+  konsisten landscape ❌ GAGAL 3x berturut-turut (Batch 460, 461, 462)** — lihat "HISTORI
+  KEGAGALAN" di atas. Batch 463 TIDAK mencoba fix ke-4, murni instrumentasi.
 - **DIKONFIRMASI device fisik user (Batch 458, masih berlaku sebagai baseline utk item 2/4/5)**:
   (1) tab minimized ~30% kelihatan/~70% tersembunyi — nilai ini SUDAH DIGANTIKAN ~10%/~90% oleh
   Batch 460 (dikonfirmasi ✅ di atas); (2) mini trigger tetap bisa di-tap, TAPI "sedikit lebih
@@ -1065,10 +1111,13 @@ Detail lengkap: README.md § "Standar Penomoran Versi".
   arah dulu (pola Batch 456→457→458), jangan tebak. Sejak Batch 460, "timbul"/`EDGE_CLIP_FRACTION`
   TIDAK LAGI otomatis mengontrol lebar area sentuh (dipisah via `touchPad`) — permintaan "perkecil
   timbul" ke depan AMAN dieksekusi tanpa risiko balik memperkecil touch target. **PELAJARAN PROSES
-  Batch 461→462 (WAJIB diikuti)**: kalau residual landscape item (3) muncul LAGI setelah Batch 462,
-  JANGAN ulangi pola "ganti API/sumber baca metrics lagi" (sudah 2x terbukti bukan akar masalah) —
-  WAJIB minta logcat device asli dulu (lihat "HISTORI KEGAGALAN" di atas), BARU putuskan fix
-  berikutnya dari data logcat itu, bukan teori baru tanpa bukti.
+  Batch 461→462→463 (WAJIB diikuti)**: JANGAN ulangi pola "ganti API/sumber baca metrics lagi"
+  (sudah 3x terbukti bukan akar masalah, Batch 460/461/462). Minta logcat generik SAJA juga
+  TERBUKTI TIDAK CUKUP (Batch 462→463: user bawa logcat, tapi 0 baris app-level karena service
+  tidak pernah logcat) — WAJIB ada instrumentasi eksplisit DULU di kode (sudah ditambah Batch 463)
+  SEBELUM logcat/Log Diagnostik device asli benar-benar berguna. Kalau residual item (3) muncul
+  LAGI setelah log Batch 463 masuk dan dibaca: putuskan fix ke-4 dari perbandingan snap-target vs
+  readback +250ms di log itu (lihat "HISTORI KEGAGALAN" di atas), bukan teori baru tanpa bukti.
 - **BELUM dikonfirmasi (Batch 452, masih berlaku)**: (1) label 3 tab 0 lagi ellipsis di font
   normal; (2) drag flick cepat + tap-tab biasa berhenti TEPAT di tab tujuan, 0 "mundur 1 kolom".
 - **DIKONFIRMASI device fisik user (Batch 451, masih berlaku)**: (1) pill ukuran normal, 0 kapsul

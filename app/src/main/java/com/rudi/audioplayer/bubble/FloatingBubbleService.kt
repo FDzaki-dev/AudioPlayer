@@ -237,6 +237,28 @@ import kotlin.math.abs
  * DITUTUP disentuh. **CATATAN JUJUR**: ini mitigasi defensif berdasar sinyal device fisik, BUKAN
  * root-cause pasti (0 akses logcat/device fisik di sesi ini) — kalau residual masih muncul lagi
  * setelah batch ini, WAJIB logcat device asli sebelum lanjut tebak lagi (lihat PROJECT_STATE.md).
+ *
+ * **Batch 463 [PIVOT KE INSTRUMENTASI] — Batch 462 GAGAL LAGI, logcat user 0 sinyal**: user
+ * konfirmasi device fisik "masih nongol" pasca Batch 462, DAN membawa `bubble_log.txt` (logcat
+ * `-iE "floatingbubble|configurationchanged|windowmanager"`) — dicek baris-per-baris, hasilnya
+ * NOL baris dari service ini (2 satu-satunya kecocokan "floatingbubble" adalah ECHO PERINTAH
+ * grep-nya sendiri, bukan output). Kesimpulan: service ini TIDAK PERNAH menulis apa pun ke
+ * logcat — 3 teori berturut-turut (Batch 460/461/462) semua ditebak murni dari baca-kode +
+ * dokumentasi resmi, TANPA data eksekusi nyata. SOP sendiri (PROJECT_STATE.md, "PELAJARAN PROSES
+ * Batch 461→462") melarang tebakan fix ke-4 tanpa data baru. **0 formula/logic diubah sama
+ * sekali** — batch ini murni menambah [AppLogger].w() (tag `"FloatingBubbleService"`, pola sama
+ * [loadAlbumArtBitmap]) di 4 titik: (1) entry [onConfigurationChanged] (orientation+screenBounds+
+ * isMinimized), (2) 2 guard null `bubbleView`/`layoutParams` yang sebelumnya return diam-diam,
+ * (3) tiap callback [ROTATION_RESNAP_DELAYS_MS] benar tereksekusi, (4) di [snapMinimizedToNearestEdge]:
+ * nilai X TARGET tepat sebelum `updateViewLayout` + hasil sukses/gagalnya (`runCatching` lama
+ * SEBELUMNYA membungkam exception total, 0 sinyal kalau apply gagal) + **readback posisi NYATA
+ * di layar 250ms kemudian** (`container.getLocationOnScreen()`) — satu-satunya cara membuktikan
+ * atau membantah teori Batch 462 ("sistem menimpa posisi window pasca-snap") dengan data, bukan
+ * dugaan. `AppLogger.w()` (bukan `Log.d` polos) sengaja dipilih — otomatis kepakai ke ATAU
+ * logcat ATAU `diagnostic_log.txt` privat app yang bisa diekspor lewat Settings > Lanjutan > Log
+ * Diagnostik (0 perlu Termux/adb kalau salah satu kanal gagal lagi, lihat `AppLogger.kt`).
+ * Sesi berikutnya: baca log HASIL rotasi nyata dulu (logcat ATAU ekspor Log Diagnostik), BARU
+ * putuskan fix ke-4 dari situ — bukan dari teori baru tanpa bukti (lihat PROJECT_STATE.md).
  */
 class FloatingBubbleService : Service() {
 
@@ -318,8 +340,28 @@ class FloatingBubbleService : Service() {
         // sempat null (mis. timing race view belum sempat di-attach).
         val density = resources.displayMetrics.density
         screenBounds.set(0, 0, (newConfig.screenWidthDp * density).toInt(), (newConfig.screenHeightDp * density).toInt())
-        val view = bubbleView ?: return
-        val params = layoutParams ?: return
+        // Batch 463 — instrumentasi MURNI (0 formula/logic diubah): Batch 462 (re-assert 2x
+        // delay) dikonfirmasi GAGAL LAGI oleh user ("masih nongol") dan logcat yang dibawa user
+        // (grep floatingbubble|configurationchanged|windowmanager) TERBUKTI 0 baris dari service
+        // ini sama sekali — cuma berisi echo command-nya sendiri. Root cause tidak bisa ditebak
+        // lagi tanpa data; log ini adalah data itu. AppLogger.w() dipilih (bukan Log.d polos)
+        // supaya OTOMATIS tersimpan ke 2 kanal sekaligus: logcat (tag "FloatingBubbleService",
+        // akan kena grep yang SAMA persis dipakai user) DAN diagnostic_log.txt privat app
+        // (dibaca/diekspor lewat Settings > Lanjutan > Log Diagnostik, 0 perlu Termux/adb sama
+        // sekali) — 2 jalur pengambilan data, salah satu pasti kepakai.
+        AppLogger.w(
+            "FloatingBubbleService",
+            "Batch463 onConfigurationChanged: orientation=${newConfig.orientation} " +
+                "screenBounds=$screenBounds isMinimized=$isMinimized"
+        )
+        val view = bubbleView ?: run {
+            AppLogger.w("FloatingBubbleService", "Batch463 onConfigurationChanged: bubbleView NULL, skip re-snap")
+            return
+        }
+        val params = layoutParams ?: run {
+            AppLogger.w("FloatingBubbleService", "Batch463 onConfigurationChanged: layoutParams NULL, skip re-snap")
+            return
+        }
         // Batch 100 — kalau lagi minimized, X SELALU harus tetap di tepi 0/maxX (bukan cuma
         // di-clamp masuk batas layar baru) — re-snap penuh, bukan clamp biasa yang bisa saja
         // menyisakan X "nyaris tepi tapi bukan tepi" pas rotasi mengubah lebar layar.
@@ -333,7 +375,12 @@ class FloatingBubbleService : Service() {
             // idempotent kalau snap pertama sudah benar (re-apply nilai sama, 0 efek kelihatan),
             // tapi jadi fallback pasti kalau snap pertama sempat ketiban sistem.
             for (delay in ROTATION_RESNAP_DELAYS_MS) {
-                view.postDelayed({ if (isMinimized) snapMinimizedToNearestEdge() }, delay)
+                view.postDelayed({
+                    // Batch 463 — instrumentasi: buktikan apakah callback delay ini BENAR
+                    // tereksekusi sama sekali (0 cara lain memverifikasi ini dari luar).
+                    AppLogger.w("FloatingBubbleService", "Batch463 re-snap delay=${delay}ms terpanggil, isMinimized=$isMinimized")
+                    if (isMinimized) snapMinimizedToNearestEdge()
+                }, delay)
             }
             return
         }
@@ -680,8 +727,39 @@ class FloatingBubbleService : Service() {
             // layar juga, Y lama yang valid di orientasi sebelumnya bisa jadi melebihi batas.
             val maxY = (bounds.height() - container.height).coerceAtLeast(0)
             params.y = params.y.coerceIn(0, maxY)
-            runCatching { windowManager.updateViewLayout(container, params) }
+            // Batch 463 — instrumentasi MURNI (0 formula diubah, lihat KDoc kelas "Batch 463"):
+            // log nilai TARGET tepat sebelum apply, supaya bisa dibandingkan ke posisi NYATA di
+            // layar (readback di bawah) — satu-satunya cara membuktikan/membantah teori Batch 462
+            // ("ada pihak lain menimpa posisi window pasca-snap") tanpa menebak lagi.
+            AppLogger.w(
+                "FloatingBubbleService",
+                "Batch463 snap target: screenWidth=$screenWidth hiddenWidth=$hiddenWidth " +
+                    "nearestRight=$nearestRight -> x=${params.x} y=${params.y}"
+            )
+            val applied = runCatching { windowManager.updateViewLayout(container, params) }
+            applied.exceptionOrNull()?.let { err ->
+                AppLogger.w("FloatingBubbleService", "Batch463 snap: updateViewLayout GAGAL - $err")
+            }
             bubbleStore.savePosition(params.x, params.y)
+            // Batch 463 — readback +250ms: baca posisi NYATA container di layar (bukan
+            // layoutParams kita, yang cuma mencatat apa yang KITA minta) — kalau sistem
+            // menimpanya setelah apply (teori Batch 462), angka ini akan beda dari x target di
+            // atas. 250ms dipilih supaya readback tiap snap (immediate/150ms/400ms) sempat
+            // menangkap window SEBELUM re-assert berikutnya menimpanya lagi. Target di-snapshot
+            // ke `val` LOKAL (`targetX`/`targetY`, bukan baca `params.x` lagi di dalam lambda) —
+            // `params` object yang SAMA dipakai bergantian oleh 3 panggilan snap (immediate/150ms/
+            // 400ms), jadi kalau dibaca lagi nanti isinya bisa saja sudah ditimpa panggilan
+            // berikutnya, bukan lagi nilai yang di-apply oleh panggilan INI.
+            val targetX = params.x
+            val targetY = params.y
+            container.postDelayed({
+                val loc = IntArray(2)
+                container.getLocationOnScreen(loc)
+                AppLogger.w(
+                    "FloatingBubbleService",
+                    "Batch463 readback (+250ms): posisi layar nyata x=${loc[0]} y=${loc[1]} (target x=$targetX y=$targetY)"
+                )
+            }, 250L)
         }
     }
 
