@@ -12,17 +12,17 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
-**Catatan Batch 448**: user lampirkan 2 video (rekaman iOS Jam asli + rekaman app SONIX sendiri)
-+ instruksi eksplisit "rombak total mekanisme drag bottom nav gak bagus sama sekali tersebut".
-Analisis frame-by-frame (ffmpeg, kedua video) mengonfirmasi laporan user: root cause bug ADA di
-kode, bukan salah-lihat — sejak Batch 446, 3 pill lama per-tab (`GlassTabIcon`) DAN 1 pill
-"bridge" tambahan (Batch 446) aktif BERSAMAAN selama drag, menghasilkan 2 kotak rounded-rect
-tumpang-tindih dgn seam kelihatan (dikonfirmasi visual di crop-zoom frame video SONIX). Lingkaran
-abu-abu di kedua video dikonfirmasi BUKAN elemen app (overlay "tampilkan sentuhan" perekam layar
-bawaan OS) — tidak direplikasi ke kode. Perluasan langsung sektor drag tab-bar yang sama (Batch
-442/444/445/446/447), bukan reopen sektor DITUTUP manapun — sekaligus "rombak total" eksplisit
-user jadi dasar utk fix ROOT CAUSE (hapus sistem gambar duplikat) alih-alih tempel lapisan
-ke-3/4 di atas yang sudah menumpuk sejak Batch 446.
+**Catatan Batch 449**: user device-test Batch 448 (video rekaman layar asli) — pill unified DIKONFIRMASI
+0 seam/kotak-ganda (fix Batch 448 valid). Temuan baru: kilatan kotak abu-abu ~0.25 detik di tab
+yang baru ditinggalkan, tiap pindah tab — root cause `NavigationBarItem` M3 sendiri (state-layer
+internal hardcoded, TIDAK baca `LocalIndication.current` — override `NoRippleIndication` Batch 439
+TIDAK PERNAH menyentuhnya), BUKAN regresi pill Batch 448. User instruksi eksplisit rombak total
+(scope besar, risiko lebih tinggi, disetujui eksplisit): `NavigationBarItem` dihapus total dari
+bottom nav, diganti `CustomNavBarTabItem` (Row+Box manual + `Modifier.selectable(indication =
+null)`). Efek samping wajib ikut fix: warna ikon/label tema Skeu (dulu implisit lewat
+`LocalContentColor` yang disuplai `NavigationBarItem`) diganti snap eksplisit ke token M3 resmi.
+`NavigationRailItem` tablet TIDAK disentuh (0 laporan bug, di luar scope). Detail lengkap:
+`CHANGELOG.md` Batch 449.
 
 **1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` —
 1. `GlassTabIcon`: background/border pill glass per-tab (non-Skeu) DIHAPUS TOTAL — dulu setiap
@@ -719,22 +719,33 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 448. ZIP terakhir: `SONIX_v448.zip`. 1 file source diubah: `MainActivity.kt`.
-- Sektor barusan: drag bottom nav (`GlassTabIcon` + `NavigationBar` di `AppNavHost`) — ROMBAK
-  TOTAL, bukan patch tambahan. Root cause bug user ("gak bagus sama sekali") sudah ditemukan &
-  diperbaiki: 3 pill lama per-tab + 1 pill "bridge" (Batch 446) yang tadinya aktif BERSAMAAN
-  (sumber seam/kotak-ganda) sudah dihapus total, diganti 1 pill unified (`navPillIndexAnim` +
-  `drawWithContent` di `NavigationBar`) yang selalu aktif di semua state.
-- **0 diverifikasi device/CI** — SOP builder/compiler Kotlin/Gradle/device fisik 0 tersedia sesi
-  ini (sama seperti Batch 435-447 sebelumnya). Mandat sesi berikutnya JIKA user kirim video/
-  laporan baru soal drag tab-bar: cross-check DULU ke kode Batch 448 ini sebelum nambah patch
-  baru — kalau user laporkan seam/kotak-ganda LAGI, curigai regresi baru dulu (bukan asumsi
-  "tabBarDragIndexPx.floatValue" NaN-check gagal di edge-case tertentu), BUKAN ulangi pola lama
-  "tempel lapisan ke-3" seperti Batch 446 — root cause sudah dihapus, jangan dibangun ulang.
-- 0 ZIP baru dari user di sesi ini (SONIX_v447.zip → source dipakai, output SONIX_v448.zip).
+- Batch terakhir: 449. ZIP terakhir: `SONIX_v449.zip`. 1 file source diubah: `MainActivity.kt`.
+- Sektor barusan: bottom nav phone (`AppNavHost`) — `NavigationBarItem` M3 DIHAPUS TOTAL dari 3
+  titik pemakaian, diganti `CustomNavBarTabItem` (composable baru, Row+Box manual). Root cause bug
+  user (kilatan kotak abu-abu ~0.25 detik di tab yang baru ditinggalkan, tiap pindah tab) sudah
+  ditemukan & diperbaiki: state-layer internal `NavigationBarItem` M3 (hardcoded, tidak baca
+  `LocalIndication.current`) yang TIDAK PERNAH benar-benar dimatikan oleh `NoRippleIndication`
+  (Batch 439) — sekarang 0 lagi `NavigationBarItem` di titik ini, 0 lagi state-layer bawaan M3 yang
+  bisa berkedip. Efek samping ikut diperbaiki: warna ikon/label tema Skeu (dulu implisit lewat
+  `LocalContentColor` NavigationBarItem) kini eksplisit token M3 resmi (0 lerp, aturan solid Batch
+  58/61/79 tidak disentuh). `NavigationBar` (pembungkus M3, pill `drawWithContent` Batch 448) DAN
+  `NavigationRailItem` tablet TIDAK disentuh sama sekali.
+- Pill unified Batch 448 sendiri **DIKONFIRMASI user di device asli Batch 449**: 0 seam/kotak-ganda.
+  Item ini pindah dari "belum diverifikasi" ke "confirmed" — lihat README.md § unverified-list.
+- **0 diverifikasi device/CI untuk fix Batch 449 ini sendiri** — SOP builder/compiler Kotlin/
+  Gradle/device fisik 0 tersedia sesi ini (sama seperti Batch 435-448 sebelumnya). Mandat sesi
+  berikutnya JIKA user kirim video/laporan baru soal bottom nav: cross-check DULU ke kode Batch
+  449 ini (grep `CustomNavBarTabItem`) sebelum nambah patch baru. Kalau user laporkan kilatan
+  abu-abu LAGI, curigai regresi baru dulu (mis. `indication` param diam-diam ke-override lagi di
+  titik lain) — BUKAN ulangi pola lama "bungkus LocalIndication" (Batch 439) yang sudah TERBUKTI
+  gagal/tidak menyentuh akar masalah. Verifikasi spesifik yang perlu dicek user: (1) 0 kilatan
+  abu-abu di tab yang ditinggalkan, (2) 0 regresi warna ikon/label tema Skeu (kontras selected vs
+  unselected masih kelihatan beda), (3) klik/routing/haptic-bouncyPress semua tab masih normal,
+  (4) TalkBack/screen-reader masih baca tab sebagai "Tab, terpilih/tidak terpilih" seperti biasa.
+- 0 ZIP baru dari user di sesi ini (SONIX_v448.zip → source dipakai, output SONIX_v449.zip).
   Kalau sesi berikutnya mulai dari ZIP baru user, cek dulu apakah `MainActivity.kt` versi user
-  masih mengandung perubahan Batch 448 ini (grep `navPillIndexAnim`) — kalau HILANG/di-revert,
-  itu tanda ZIP user berasal dari titik SEBELUM batch ini, bukan berarti Batch 448 perlu diulang
+  masih mengandung perubahan Batch 449 ini (grep `CustomNavBarTabItem`) — kalau HILANG/di-revert,
+  itu tanda ZIP user berasal dari titik SEBELUM batch ini, bukan berarti Batch 449 perlu diulang
   buta tanpa konfirmasi ke user dulu.
 - Mandat lain: 0 ada, lanjutkan sektor manapun yang diminta user berikutnya (0 sektor DITUTUP
   baru dibuka batch ini, 0 sektor baru ditutup juga).

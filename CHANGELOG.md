@@ -1,5 +1,45 @@
 # Changelog
 
+## Batch 449 — Hapus total NavigationBarItem M3 (fix kilatan kotak abu-abu tab ditinggalkan)
+User device-test Batch 448 (video rekaman layar asli): pill unified (fix Batch 448) DIKONFIRMASI
+meluncur mulus lintas kolom, 0 seam/kotak-ganda. Ditemukan 1 bug baru tak terkait pill: kilatan
+kotak abu-abu ~0.25 detik di tab yang BARU DITINGGALKAN, tiap pindah tab. Root cause: bukan
+`GlassTabIcon`/pill unified (0 disentuh Batch 448) — `NavigationBarItem` M3 itu sendiri.
+`indicatorColor = Color.Transparent` + `NoRippleIndication` (Batch 439, override
+`LocalIndication`) terbukti 0 cukup: `NavigationBarItem` construct ripple/state-layer internal
+LANGSUNG di titik panggilnya sendiri (hardcoded), bukan baca `LocalIndication.current` — override
+composition-local Batch 439 tidak pernah menyentuh mekanisme itu. Kotak abu-abu = fade-out
+state-layer bawaan tsb (durasi default match ~0.25s laporan user). Instruksi eksplisit user:
+rombak total (scope besar, risiko lebih tinggi, disetujui eksplisit), bukan tempel workaround
+ke-2 di atas yang sudah gagal.
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. `NavigationBarItem` dihapus total dari 3 titik pemakaian `bottomBar` — diganti
+   `CustomNavBarTabItem` (composable baru: Row+Box manual, `Modifier.selectable(indication =
+   null, role = Role.Tab, ...)`, kontrak resmi Compose Foundation, bukan lagi override
+   composition-local). `NavigationBar` (composable pembungkus M3, insets/elevation/pill
+   `drawWithContent` Batch 448) TIDAK dihapus/disentuh. `NavigationRailItem` tablet TIDAK
+   disentuh — 0 laporan bug di situ, di luar scope temuan ini.
+2. Efek samping wajib ikut diperbaiki: warna ikon/label tema **Skeu** dulu implisit lewat
+   `LocalContentColor` yang disuplai `NavigationBarItem` (kini dihapus) — tanpa fix ini, ikon/
+   label Skeu akan STATIS 1 warna (kehilangan beda selected/unselected sama sekali, regresi
+   fungsional, bukan cuma soal gray-flash). Diganti snap eksplisit ke token
+   `NavigationBarItemDefaults` yang sama persis (0 lerp, aturan solid Batch 58/61/79 tidak
+   disentuh).
+3. `bouncyPress` (Batch 438, di `GlassTabIcon`) 0 diubah — baca `interactionSource` yang sama,
+   kini dikumpulkan oleh `.selectable()` manual, bukan `NavigationBarItem` internal.
+4. Import: `+selectable`, `+Role`, `+RowScope`; `-NavigationBarItem`, `-LocalIndication` (unused
+   pasca fix). `NoRippleIndication` object TIDAK dihapus (riwayat arsitektur, 0 dipakai lagi di
+   titik ini saja).
+5. Anti-stale: 3 komentar lama yang mengklaim "Skeu kirim null ke MagnifyingTabLabel" diberi
+   anotasi ANTI-STALE (klaim itu akurat sampai Batch 448, tidak lagi sejak fix ini).
+
+**0 diverifikasi CI/device Batch 449** — review manual (baca kode + cek balance brace/paren: `{}`
+333/333, `()` 1166/1166, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Klaim "0 kilatan abu-abu" & "0 regresi warna Skeu" BELUM dikonfirmasi
+device fisik — mandat verifikasi sesi berikutnya.
+
 ## Batch 448 — Rombak total mekanisme drag bottom nav (fix pill tumpang-tindih/seam)
 User melampirkan 2 video (rekaman iOS Jam asli sbg referensi + rekaman app SONIX sendiri) +
 instruksi eksplisit "rombak total mekanisme drag bottom nav, gak bagus sama sekali". Analisis

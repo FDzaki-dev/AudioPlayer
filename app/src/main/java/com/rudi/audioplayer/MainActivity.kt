@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,6 +48,11 @@ import com.rudi.audioplayer.ui.adaptive.rememberAppWidthClass
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
+// Batch 449 — `selectable` (kontrak resmi Compose Foundation, param `indication` eksplisit) +
+// `Role` (semantics aksesibilitas Tab) — pengganti langsung `NavigationBarItem` M3 yang dihapus
+// dari 3 titik pemakaian `bottomBar` (root cause kilatan kotak abu-abu, lihat komentar panjang
+// di `CustomNavBarTabItem`, dekat `GlassTabIcon`).
+import androidx.compose.foundation.selection.selectable
 // Batch 439 — 4 import baru, semua utk 1 tujuan: matikan ripple Android bawaan di 3
 // NavigationBarItem tab bawah tanpa mengganti mekanisme klik (lihat `NoRippleIndication` +
 // pemakaiannya di `bottomBar`). `LocalIndication` (dipakai internal semua komponen
@@ -62,7 +68,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.foundation.layout.widthIn
@@ -79,7 +84,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -121,6 +125,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.core.view.WindowCompat
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -652,6 +657,9 @@ private fun WelcomeHighlight(icon: androidx.compose.ui.graphics.vector.ImageVect
 // (`GlassTabIcon`, SUDAH punya `tint`+`unselectedIconColor`+`glassAlpha` yg sama persis
 // dipakai ikon) via `lerp` yang SAMA PERSIS, 0 hitungan/token warna baru — Skeu DIKECUALIKAN
 // (tetap kirim null, warna default M3 apa adanya, aturan solid Batch 58/61/79 tidak disentuh).
+// (ANTI-STALE Batch 449: "tetap kirim null" akurat sampai Batch 448 — `NavigationBarItem` yang
+// menyuplai LocalContentColor tsb DIHAPUS Batch 449, Skeu kini kirim token eksplisit, bukan null
+// lagi. Lihat blok `labelColor`/`skeuIconColor` di `GlassTabIcon` utk kondisi terkini.)
 @Composable
 private fun MagnifyingTabLabel(text: String, focus: Float, color: Color? = null) {
     val clampedFocus = focus.coerceIn(0f, 1f)
@@ -851,22 +859,34 @@ private fun GlassTabIcon(
         // (aturan "solid, bukan kaca" Batch 58/61/79, app-wide) — tetap tint default M3 apa
         // adanya, 0 lerp.
         if (isSkeu) {
-            Icon(icon, contentDescription = null)
+            // Batch 449 — dulu implisit lewat `LocalContentColor` bawaan `NavigationBarItem` M3
+            // (DIHAPUS batch ini, lihat `CustomNavBarTabItem`) — tanpa titik ini, ikon Skeu akan
+            // STATIS 1 warna (kehilangan beda selected/unselected sama sekali, bukan cuma soal
+            // gray-flash). Snap biner (0 lerp, aturan solid Batch 58/61/79 tidak disentuh), token
+            // M3 resmi PERSIS yang dulu dipakai NavigationBarItem secara default.
+            val skeuIconColor = if (selected) NavigationBarItemDefaults.colors().selectedIconColor
+                else NavigationBarItemDefaults.colors().unselectedIconColor
+            Icon(icon, contentDescription = null, tint = skeuIconColor)
         } else {
             val unselectedIconColor = NavigationBarItemDefaults.colors().unselectedIconColor
             Icon(icon, contentDescription = null, tint = lerp(unselectedIconColor, tint, glassAlpha))
         }
         // Batch 447 — labelColor: PERSIS pola unselectedIconColor/lerp di atas, target token
         // resmi `unselectedTextColor` (bukan `unselectedIconColor` yg dipakai ikon), 0 hardcode
-        // baru. null utk Skeu (dibaca `MagnifyingTabLabel` sbg "0 override", lihat definisinya).
+        // baru. (ANTI-STALE Batch 449: dulu null utk Skeu di sini — sejak Batch 449 Skeu kirim
+        // token eksplisit, lihat blok `labelColor` di bawah, komentarnya sendiri.)
         // `glassAlpha` (bukan `focus` mentah) dipakai di SINI (parameter ke-2) juga — identik
         // nilai selama drag aktif (glassAlpha snapTo(focus) tiap frame), bedanya HANYA di jendela
         // easing 220ms pasca lepas jari: scale/opacity label kini ikut melunak bareng warna
         // ikon+labelColor baru ini, bukan snap instan sendirian seperti sebelumnya — konsisten
         // dgn tujuan "1 aksen bergerak bersama" (Batch 440), 0 dampak ke tap biasa/idle (identik
         // 0f/1f di kedua kasus).
-        val labelColor = if (isSkeu) null else
-            lerp(NavigationBarItemDefaults.colors().unselectedTextColor, tint, glassAlpha)
+        // Batch 449 — sama alasan `skeuIconColor` di atas: dulu implisit `LocalContentColor`
+        // `NavigationBarItem` (DIHAPUS), kini eksplisit token resmi selected/unselectedTextColor.
+        val labelColor = if (isSkeu) {
+            if (selected) NavigationBarItemDefaults.colors().selectedTextColor
+            else NavigationBarItemDefaults.colors().unselectedTextColor
+        } else lerp(NavigationBarItemDefaults.colors().unselectedTextColor, tint, glassAlpha)
         MagnifyingTabLabel(label, glassAlpha, labelColor)
     }
 }
@@ -908,6 +928,64 @@ private object NoRippleIndication : IndicationNodeFactory {
     override fun equals(other: Any?): Boolean = other === this
 
     override fun hashCode(): Int = -1
+}
+
+// Batch 449 — user device-test Batch 448 (video asli, tab bar unified-pill): seam/kotak-ganda
+// pill 0 masalah (fix Batch 448 terkonfirmasi device fisik). 1 temuan baru: kilatan kotak abu-abu
+// ~0.25 detik di tab yang BARU DITINGGALKAN, tiap pindah tab. Root cause BUKAN `GlassTabIcon`/
+// pill unified Batch 448 (0 disentuh batch ini) — `NavigationBarItem` M3 itu sendiri.
+// `indicatorColor = Color.Transparent` (titik pemakaian lama) + `NoRippleIndication` (Batch 439,
+// override `LocalIndication`) TERBUKTI 0 cukup: `NavigationBarItem` versi M3 dipakai project ini
+// construct ripple/state-layer LANGSUNG di titik panggil internalnya sendiri (hardcoded),
+// BUKAN baca `LocalIndication.current` — override composition-local Batch 439 TIDAK PERNAH
+// menyentuh mekanisme itu. Kotak abu-abu = fade-out state-layer bawaan tsb (durasi default match
+// ~0.25s persis laporan user). Instruksi eksplisit user: rombak total (bukan tempel workaround
+// ke-2 di atas yang sudah gagal) — `NavigationBarItem` DIHAPUS TOTAL dari 3 titik pemakaian
+// `bottomBar` (`NavigationRailItem` tablet TIDAK disentuh — 0 laporan bug di situ, di luar scope
+// temuan ini, 0 sektor baru dibuka).
+// Pengganti: composable ini (Row+Box manual) — `NavigationBar` (composable pembungkus M3, TETAP
+// dipakai, TIDAK dihapus — insets/elevation/clip-kapsul/pill drawWithContent Batch 448 di
+// `AppNavHost` 0 disentuh) sudah menyediakan `RowScope` di content lambda-nya (itu sebabnya
+// `NavigationBarItem` versi lama bisa pakai `Modifier.weight(1f, true)` internal utk bagi rata 3
+// kolom) — direplikasi manual di bawah, `Modifier.weight(1f, fill = true)` PERSIS sama, 0 kolom
+// jadi tidak-rata. Isi tiap `Box`: cuma `content()` (GlassTabIcon, icon+label sudah 1 slot sejak
+// Batch 439, 0 disentuh) dibungkus `Modifier.selectable(indication = null, ...)` — kontrak RESMI
+// Compose Foundation, param `indication` eksplisit SELALU menang di titik panggil (0 celah spt
+// `NavigationBarItem` internal di atas, 0 override composition-local diperlukan lagi).
+// `role = Role.Tab` + `selected` otomatis jadi semantics oleh `.selectable()` sendiri — kontrak
+// aksesibilitas TalkBack/screen-reader IDENTIK milik `NavigationBarItem` lama, 0 regresi.
+// `bouncyPress` (Batch 438, di `GlassTabIcon`) baca interactionSource yang SAMA yang dipasang di
+// `.selectable()` ini — press-feedback 0 berubah, cuma pindah sumber pengumpul event dari
+// `NavigationBarItem` internal ke `.selectable()` manual ini.
+// `NoRippleIndication` (definisi di atas) TIDAK dihapus — riwayat arsitektur (log_fail_424/425),
+// 0 dipakai lagi di titik ini SAJA, tetap tersedia kalau ada kebutuhan lain nanti.
+// Efek samping WAJIB ikut diperbaiki (lihat `GlassTabIcon`, blok Skeu icon+label): warna Skeu
+// dulu implisit lewat `LocalContentColor` yang disuplai `NavigationBarItem` — tanpa itu, ikon/
+// label Skeu akan STATIS 1 warna (regresi fungsional, bukan cuma soal gray-flash) — diganti snap
+// biner eksplisit ke token `NavigationBarItemDefaults` yang sama, 0 lerp (aturan solid Batch
+// 58/61/79 tidak disentuh).
+@Composable
+private fun RowScope.CustomNavBarTabItem(
+    selected: Boolean,
+    onClick: () -> Unit,
+    interactionSource: MutableInteractionSource,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .weight(1f, fill = true)
+            .fillMaxHeight()
+            .selectable(
+                selected = selected,
+                onClick = onClick,
+                role = Role.Tab,
+                interactionSource = interactionSource,
+                indication = null
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
+    }
 }
 
 @Composable
@@ -1681,20 +1759,26 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         // 12.dp historisnya sudah cukup sebelum inset dobel ini ditambah).
                         windowInsets = WindowInsets(0, 0, 0, 0)
                     ) {
-                        // Batch 439 — bungkus 3 NavigationBarItem dgn Indication kosong
-                        // (`NoRippleIndication`, definisi di atas dekat `GlassTabIcon`) supaya
-                        // ripple gelombang Android bawaan mati di titik pemakaian ini SAJA
-                        // (CompositionLocalProvider otomatis kembali ke ripple normal di luar
-                        // scope ini — `NavigationRailItem` tablet, Button/TextButton lain di app
-                        // 0 kesentuh). `selected`/`onClick`/route logic di bawah 0 diubah.
-                        CompositionLocalProvider(LocalIndication provides NoRippleIndication) {
-                        NavigationBarItem(
+                        // Batch 449 — `NavigationBarItem` M3 DIHAPUS TOTAL dari 3 titik pemakaian
+                        // ini (root cause kilatan kotak abu-abu di tab yang baru ditinggalkan,
+                        // lihat komentar panjang di definisi `CustomNavBarTabItem`, dekat
+                        // `GlassTabIcon`/`NoRippleIndication`) — diganti `CustomNavBarTabItem` x3.
+                        // `selected`/`onClick`/route-navigate/`navPillIndexAnim.animateTo(...)` di
+                        // masing-masing 0 diubah SAMA SEKALI (logic isinya identik persis, cuma
+                        // pindah wadah pemanggilan dari slot `onClick=`/`icon=` NavigationBarItem
+                        // ke param `onClick=`/trailing-lambda `CustomNavBarTabItem`).
+                        // `CompositionLocalProvider(LocalIndication provides NoRippleIndication)`
+                        // (Batch 439) yang dulu membungkus blok ini juga DIHAPUS — sudah tidak
+                        // relevan (0 lagi ada NavigationBarItem yang baca `LocalIndication` di
+                        // sini), `.selectable(indication = null, ...)` di `CustomNavBarTabItem`
+                        // sudah cukup, 0 override composition-local diperlukan lagi.
+                        CustomNavBarTabItem(
                             selected = currentRoute == "home",
                             onClick = {
                                 // Batch 301 — user melaporkan stuttering pas transisi antar tab
                                 // (beda dari stutter SCROLL Batch 300 yang sudah dijawab lewat
                                 // blurRadius). Root cause: `popUpTo`/`navigate` di 6 titik ini
-                                // (3 NavigationBarItem + 3 NavigationRailItem, pola identik) 0
+                                // (3 tab bawah + 3 NavigationRailItem, pola identik) 0
                                 // pernah pakai `saveState`/`restoreState` — tiap tap tab
                                 // MENGHANCURKAN TOTAL layar tujuan (LazyColumn state, scroll
                                 // position, ViewModel scope) lalu membangunnya dari nol, bukan
@@ -1715,23 +1799,23 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 // `glassAlphaAnim`) — 0 penanganan spesial dibutuhkan.
                                 tabSwipeScope.launch { navPillIndexAnim.animateTo(0.5f, tween(220)) }
                             },
-                            icon = {
-                                // Batch 439 — `label` pindah ke dalam sini (dulu slot terpisah
-                                // `label = { MagnifyingTabLabel(...) }` di bawah `icon`, lihat
-                                // komentar Batch 439 di definisi `GlassTabIcon`).
-                                GlassTabIcon(
-                                    icon = Icons.Default.Home,
-                                    label = "Beranda",
-                                    focus = tabBarDragFocus(0),
-                                    selected = currentRoute == "home",
-                                    interactionSource = homeTabInteraction,
-                                    isDragging = isTabBarDragging
-                                )
-                            },
-                            interactionSource = homeTabInteraction,
-                            colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
-                        )
-                        NavigationBarItem(
+                            interactionSource = homeTabInteraction
+                        ) {
+                            // Batch 439 — label sudah digabung ke 1 slot ini (dulu slot terpisah
+                            // `label = { MagnifyingTabLabel(...) }`, lihat komentar Batch 439 di
+                            // definisi `GlassTabIcon`). Batch 449 — trailing-lambda
+                            // `CustomNavBarTabItem` ini gantikan slot `icon=` NavigationBarItem
+                            // lama, isi 0 berubah.
+                            GlassTabIcon(
+                                icon = Icons.Default.Home,
+                                label = "Beranda",
+                                focus = tabBarDragFocus(0),
+                                selected = currentRoute == "home",
+                                interactionSource = homeTabInteraction,
+                                isDragging = isTabBarDragging
+                            )
+                        }
+                        CustomNavBarTabItem(
                             selected = currentRoute == "library",
                             onClick = {
                                 // Batch 301 — sama seperti onClick "home" di atas.
@@ -1743,21 +1827,19 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 // Batch 448 — sama seperti onClick "home" di atas.
                                 tabSwipeScope.launch { navPillIndexAnim.animateTo(1.5f, tween(220)) }
                             },
-                            icon = {
-                                // Batch 439 — sama seperti "home" di atas.
-                                GlassTabIcon(
-                                    icon = Icons.Default.LibraryMusic,
-                                    label = "Perpustakaan",
-                                    focus = tabBarDragFocus(1),
-                                    selected = currentRoute == "library",
-                                    interactionSource = libraryTabInteraction,
-                                    isDragging = isTabBarDragging
-                                )
-                            },
-                            interactionSource = libraryTabInteraction,
-                            colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
-                        )
-                        NavigationBarItem(
+                            interactionSource = libraryTabInteraction
+                        ) {
+                            // Batch 439/449 — sama seperti "home" di atas.
+                            GlassTabIcon(
+                                icon = Icons.Default.LibraryMusic,
+                                label = "Perpustakaan",
+                                focus = tabBarDragFocus(1),
+                                selected = currentRoute == "library",
+                                interactionSource = libraryTabInteraction,
+                                isDragging = isTabBarDragging
+                            )
+                        }
+                        CustomNavBarTabItem(
                             selected = currentRoute == "settings",
                             onClick = {
                                 // Batch 301 — sama seperti onClick "home" di atas.
@@ -1769,21 +1851,18 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 // Batch 448 — sama seperti onClick "home" di atas.
                                 tabSwipeScope.launch { navPillIndexAnim.animateTo(2.5f, tween(220)) }
                             },
-                            icon = {
-                                // Batch 439 — sama seperti "home" di atas.
-                                GlassTabIcon(
-                                    icon = Icons.Default.Settings,
-                                    label = "Pengaturan",
-                                    focus = tabBarDragFocus(2),
-                                    selected = currentRoute == "settings",
-                                    interactionSource = settingsTabInteraction,
-                                    isDragging = isTabBarDragging
-                                )
-                            },
-                            interactionSource = settingsTabInteraction,
-                            colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
-                        )
-                        } // tutup CompositionLocalProvider (Batch 439, NoRippleIndication)
+                            interactionSource = settingsTabInteraction
+                        ) {
+                            // Batch 439/449 — sama seperti "home" di atas.
+                            GlassTabIcon(
+                                icon = Icons.Default.Settings,
+                                label = "Pengaturan",
+                                focus = tabBarDragFocus(2),
+                                selected = currentRoute == "settings",
+                                interactionSource = settingsTabInteraction,
+                                isDragging = isTabBarDragging
+                            )
+                        }
                     }
                 }
             }
