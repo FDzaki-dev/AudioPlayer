@@ -12,6 +12,41 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 460**: 2 instruksi eksplisit user sekaligus — (1) "perluas touch target nya biar
+gak nyusahin, sedangkan visual turunkan jadi ~10% yang timbul saja"; (2) "fix juga agar fitur
+bubble bisa ke kliping mentok ujung layar walaupun hp sedang dalam mode horizontal". Kelanjutan
+langsung dari residual UX yang dicatat Batch 458/459 (mini trigger "sedikit lebih susah" di-tap)
+— opsi umum yang sudah dicatat di situ ("perbesar touch target independen dari lebar visual")
+sekarang dieksekusi. 0 klarifikasi tap diperlukan untuk instruksi (1): kata "timbul" dipakai
+eksplisit, konsisten catatan proses di bawah (Batch 456→457→458). 0 sektor DITUTUP disentuh.
+
+**2 file diubah** (dalam batas 3 file/tugas): `bubble_minimized.xml` + `FloatingBubbleService.kt`.
+1. **Touch target dipisah dari visual**: `bubble_minimized.xml` root 48dp→88dp (100% transparan,
+   0 background baru) jadi murni area-sentuh; visual bulat asli (background+art) pindah ke child
+   baru `bubble_minimized_visual` (tetap 48dp, gravity CENTER, padding sentuh simetris kiri/kanan
+   supaya valid di sisi mana pun tab menempel).
+2. **`snapMinimizedToNearestEdge()` — 1 fungsi yang sama, dipisah jadi 2 lebar**: `visualWidth`
+   dipakai `EDGE_CLIP_FRACTION` (formula lama tidak berubah), `width` root dipakai posisi X
+   window. `touchPad` (selisih /2) selalu ikut ke sisi yang tetap di layar — area sentuh naik
+   TANPA ikut mengecil saat `EDGE_CLIP_FRACTION` naik (akar masalah residual UX Batch 458: 1 angka
+   dulu mengontrol visual DAN touch sekaligus, sekarang 2 parameter independen).
+3. **`EDGE_CLIP_FRACTION` 0.7f → 0.9f**: bagian TIMBUL turun 30%→~10% sesuai instruksi (1).
+4. **Fix landscape (instruksi 2)**: `resources.displayMetrics` (4 titik: `onConfigurationChanged`,
+   `setupDrag`, `expand`, `snapMinimizedToNearestEdge`) diganti `windowManager.
+   currentWindowMetrics.bounds` (API 30+, aman minSdk 31) — root cause paling mungkin: metrics
+   Context Service tidak dijamin ter-refresh seketika saat `onConfigurationChanged` terpanggil
+   pasca-rotasi, beda dari Activity/WindowContext.
+5. 0 breaking change ke minimize/expand/fade/auto-minimize Batch 98-100/453/454/455/457/458.
+
+**0 diverifikasi CI/device Batch 460** — review manual (baca kode + cek balance brace/paren:
+`{}` 72/72, `()` 390/390, `[]` 63/63), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Perlu konfirmasi device fisik berikutnya: (1) mini trigger LEBIH
+GAMPANG di-tap dari Batch 458/459 (target: fix residual UX yang dilaporkan user, BUKAN cuma "masih
+bisa di-tap"); (2) bagian kelihatan tab minimized ~10% (lebih ngumpet dari Batch 458's ~30%); (3)
+rotasi ke landscape (dan bolak-balik beberapa kali) → tab minimized SELALU mentok tepi kiri/kanan
+dengan benar; (4) drag tab minimized tetap 100% kelihatan/terkontrol penuh selagi digeser; (5) 0
+regresi ke minimize/expand/fade/auto-minimize Batch 98-100/453/454.
+
 **Catatan Batch 458**: user eksplisit lanjut tuning setelah Batch 457 ("ubah jadi ~30%!!") — angka
 mentah tanpa konteks ulang, berisiko ulang kesalahan arah Batch 456. **Diklarifikasi via pilihan
 tap (BUKAN ditebak)**: "~30%" merujuk ke bagian TIMBUL (kelihatan), bukan ke fraksi klip itu
@@ -927,26 +962,33 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 459 (**doc-only**, 0 file source diubah). ZIP terakhir: `SONIX_v459.zip`. User
-  konfirmasi device fisik hasil Batch 458 (lihat blok DIKONFIRMASI di bawah) — `PROJECT_STATE.md`/
-  `CHANGELOG.md` diperbarui mencatat hasil, 0 kode disentuh (0 aksi diambil atas catatan "sedikit
-  susah" di item 2, sesuai instruksi user yang cuma konfirmasi, bukan minta perbaikan). Batch 458
-  sebelumnya (`FloatingBubbleService.kt`, `EDGE_CLIP_FRACTION` 0.5f→0.7f) tetap berlaku, tidak
-  diubah. Sektor bubble (Roadmap #11) masih terbuka, TIDAK ada sektor DITUTUP yang tersentuh.
-- **DIKONFIRMASI device fisik user (Batch 458)**: (1) tab minimized ~30% kelihatan/~70%
-  tersembunyi di semua jalur snap — sesuai target; (2) mini trigger tetap bisa di-tap, TAPI user
-  laporkan **sedikit lebih susah** dari sebelumnya (touch target mengecil seiring fraksi kelihatan
-  turun ke 30%) — **residual UX minor, BELUM diminta perbaikan eksplisit oleh user, 0 aksi diambil
-  sesi ini**; kalau user minta perbaikan ke depan, opsi umum: perbesar touch target tap-listener
-  independen dari lebar visual tab (jangan otomatis kecilkan lagi `EDGE_CLIP_FRACTION` — itu
-  parameter visual, bukan touch target); (3) drag tab minimized 100% kelihatan/terkontrol penuh
-  selagi digeser — confirmed; (4) 0 regresi ke minimize/expand/fade/auto-minimize Batch
-  98-100/453/454 — confirmed, MENUTUP item verifikasi Batch 453/454 yang sebelumnya digabung di
-  sini.
+- Batch terakhir: 460. ZIP terakhir: `SONIX_v460.zip`. **2 file diubah** (dalam batas 3
+  file/tugas): `bubble_minimized.xml` (root 48dp→88dp, touch target dipisah dari visual lewat
+  child baru `bubble_minimized_visual`) + `FloatingBubbleService.kt` (`snapMinimizedToNearestEdge`
+  dipisah jadi `visualWidth`/`touchPad`, `EDGE_CLIP_FRACTION` 0.7f→0.9f, 4 titik
+  `resources.displayMetrics`→`windowManager.currentWindowMetrics.bounds` untuk fix kliping
+  landscape). Detail penuh di blok "Catatan Batch 460" di atas & `CHANGELOG.md`. Sektor bubble
+  (Roadmap #11) masih terbuka, TIDAK ada sektor DITUTUP yang tersentuh.
+- **BELUM dikonfirmasi device fisik (Batch 460, baru)**: (1) mini trigger LEBIH GAMPANG di-tap
+  dari Batch 458/459 (fix residual UX "sedikit lebih susah" yang dilaporkan user); (2) bagian
+  kelihatan tab minimized ~10% (turun dari Batch 458's ~30%); (3) rotasi ke landscape (bolak-balik
+  beberapa kali) → tab minimized SELALU mentok tepi kiri/kanan dengan benar; (4) drag tab
+  minimized tetap 100% kelihatan/terkontrol penuh selagi digeser; (5) 0 regresi ke
+  minimize/expand/fade/auto-minimize Batch 98-100/453/454.
+- **DIKONFIRMASI device fisik user (Batch 458, masih berlaku sebagai baseline)**: (1) tab
+  minimized ~30% kelihatan/~70% tersembunyi di semua jalur snap — sesuai target Batch 458 (nilai
+  ini SUDAH DIGANTIKAN ~10%/~90% oleh Batch 460 di atas, belum dikonfirmasi ulang); (2) mini
+  trigger tetap bisa di-tap, TAPI user laporkan "sedikit lebih susah" — **residual ini yang
+  dieksekusi fix-nya di Batch 460**, belum dikonfirmasi hasilnya; (3) drag tab minimized 100%
+  kelihatan/terkontrol penuh selagi digeser — confirmed; (4) 0 regresi ke
+  minimize/expand/fade/auto-minimize Batch 98-100/453/454 — confirmed.
 - **CATATAN proses (berlaku terus)**: istilah user "timbul" = bagian KELIHATAN tab, bukan fraksi
   klip (`EDGE_CLIP_FRACTION`) itu sendiri — dua hal berlawanan arah. Kalau user minta angka
   persentase lagi tanpa kata eksplisit "sembunyi/klip" vs "timbul/kelihatan", WAJIB klarifikasi
-  arah dulu (pola Batch 456→457→458), jangan tebak.
+  arah dulu (pola Batch 456→457→458), jangan tebak. **Batch 460 catatan tambahan**: sejak Batch
+  460, "timbul"/`EDGE_CLIP_FRACTION` TIDAK LAGI otomatis mengontrol lebar area sentuh (dipisah via
+  `touchPad`) — permintaan "perkecil timbul" ke depan AMAN dieksekusi tanpa risiko balik memperkecil
+  touch target seperti sebelumnya.
 - **BELUM dikonfirmasi (Batch 452, masih berlaku)**: (1) label 3 tab 0 lagi ellipsis di font
   normal; (2) drag flick cepat + tap-tab biasa berhenti TEPAT di tab tujuan, 0 "mundur 1 kolom".
 - **DIKONFIRMASI device fisik user (Batch 451, masih berlaku)**: (1) pill ukuran normal, 0 kapsul

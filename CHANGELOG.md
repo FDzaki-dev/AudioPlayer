@@ -1,5 +1,41 @@
 # Changelog
 
+## Batch 460 — Touch target tab minimized diperluas independen dari visual + fix kliping landscape
+2 instruksi eksplisit user, dijalankan sekaligus (bukan mandat baru — kelanjutan langsung dari
+residual UX yang dicatat Batch 458/459: "mini trigger sedikit lebih susah di-tap"):
+
+**2 file diubah** (dalam batas 3 file/tugas): `bubble_minimized.xml` + `FloatingBubbleService.kt`.
+
+1. **Touch target diperluas, visual TIDAK ikut membesar**: `bubble_minimized.xml` root
+   dilebarkan 48dp → 88dp, 100% transparan (0 background baru) — visual bulat asli (background +
+   art) dipindah ke child baru `bubble_minimized_visual`, tetap 48dp, gravity CENTER. Padding
+   sentuh ekstra simetris kiri/kanan (jadi valid dari sisi mana pun tab menempel).
+2. **`snapMinimizedToNearestEdge()` dipisah jadi 2 lebar**: `visualWidth` (dipakai
+   `EDGE_CLIP_FRACTION`, formula lama tidak berubah) vs `width` root (dipakai posisi X window).
+   `touchPad` (selisih keduanya /2) selalu ikut ke sisi yang tetap di layar tiap arah snap — hasil:
+   area sentuh naik TANPA ikut mengecil saat `EDGE_CLIP_FRACTION` naik (2 parameter independen,
+   sebelumnya 1 angka mengontrol keduanya sekaligus — itu akar masalah residual UX Batch 458).
+3. **`EDGE_CLIP_FRACTION` 70% → 90%**: instruksi eksplisit user pakai kata "timbul" ("visual
+   turunkan jadi ~10% yang timbul saja") — konsisten arah konvensi Batch 456→458, 0 klarifikasi
+   tap diperlukan (kata sudah eksplisit, sesuai catatan proses `PROJECT_STATE.md`).
+4. **Fix kliping landscape**: `resources.displayMetrics` (4 titik: `onConfigurationChanged`,
+   `setupDrag`, `expand`, `snapMinimizedToNearestEdge`) diganti `windowManager.
+   currentWindowMetrics.bounds` (API 30+, aman di minSdk 31) — root cause bubble gagal konsisten
+   mentok ke ujung layar saat HP landscape: `resources.displayMetrics` di Context Service tidak
+   dijamin ter-refresh seketika saat `onConfigurationChanged` terpanggil pasca-rotasi.
+5. 0 breaking change ke minimize/expand/fade/auto-minimize Batch 98-100/453/454/455/457/458, 0
+   sektor DITUTUP disentuh, 0 fungsi baru selain 1 pembacaan lebar tambahan (`visualWidth`).
+
+**0 diverifikasi CI/device Batch 460** — review manual (baca kode + cek balance brace/paren:
+`{}` 72/72, `()` 390/390, `[]` 63/63), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Perlu konfirmasi device fisik berikutnya: (1) mini trigger tab
+minimized terasa LEBIH GAMPANG di-tap dari Batch 458/459 (target: fix residual UX yang dilaporkan
+user); (2) bagian yang KELIHATAN dari tab minimized ~10% (lebih ngumpet dari Batch 458's ~30%);
+(3) rotasi ke landscape lalu tab minimized SELALU mentok tepi layar (kiri/kanan) dengan benar,
+termasuk sesudah beberapa kali rotasi bolak-balik; (4) drag tab minimized tetap 100%
+kelihatan/terkontrol penuh selagi digeser; (5) 0 regresi ke minimize/expand/fade/auto-minimize
+Batch 98-100/453/454.
+
 ## Batch 459 — Konfirmasi device fisik Batch 458 (doc-only, 0 kode diubah)
 User konfirmasi device fisik hasil Batch 458 (EDGE_CLIP_FRACTION 70%): (1) tab minimized ~30%
 kelihatan — sesuai target; (2) mini trigger tetap bisa di-tap, TAPI sedikit lebih susah dari

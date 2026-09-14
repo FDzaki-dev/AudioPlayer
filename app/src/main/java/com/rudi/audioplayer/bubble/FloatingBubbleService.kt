@@ -180,6 +180,27 @@ import kotlin.math.abs
  * klip itu sendiri, supaya tidak mengulang kesalahan arah Batch 456. [EDGE_CLIP_FRACTION]
  * dinaikkan 50%→70% (fraksi SEMBUNYI), hasilnya bagian kelihatan turun jadi ~30%. 0
  * formula/fungsi/titik panggil baru — cuma nilai konstanta.
+ *
+ * **Batch 460 — touch target independen dari visual, + fix kliping landscape**: 2 instruksi
+ * eksplisit user, 2 file (`bubble_minimized.xml` + file ini). (1) Konfirmasi device fisik Batch
+ * 458 mencatat mini trigger "sedikit lebih susah" di-tap seiring bagian TIMBUL mengecil — opsi
+ * yang sudah dicatat PROJECT_STATE.md ("perbesar touch target independen dari lebar visual")
+ * dieksekusi sekarang: `bubble_minimized.xml` root DILEBARKAN jadi murni area-sentuh (48dp→88dp),
+ * visual bulat asli DIPINDAH ke child baru `R.id.bubble_minimized_visual` (tetap 48dp, gravity
+ * CENTER) — area ekstra 100% transparan (0 background), murni menambah hit-box tanpa menambah
+ * apa pun yang kelihatan. [snapMinimizedToNearestEdge] dipisah jadi 2 lebar (`visualWidth` untuk
+ * [EDGE_CLIP_FRACTION], `width`/root untuk posisi X) — `touchPad` (selisih keduanya /2) SELALU
+ * ikut ke sisi yang tetap di layar, jadi [EDGE_CLIP_FRACTION] naik = visual makin ngumpet TANPA
+ * ikut mengecilkan area sentuh (2 parameter independen). (2) [EDGE_CLIP_FRACTION] dinaikkan lagi
+ * 70%→90% — instruksi eksplisit user pakai kata "timbul" ("visual turunkan jadi ~10% yang timbul
+ * saja"), konsisten arah konvensi Batch 456→458, 0 klarifikasi tap diperlukan (kata sudah
+ * eksplisit, lihat catatan proses PROJECT_STATE.md). (3) `resources.displayMetrics` (4 titik:
+ * [onConfigurationChanged], [setupDrag], [expand], [snapMinimizedToNearestEdge]) DIGANTI
+ * `windowManager.currentWindowMetrics.bounds` — root cause bubble gagal konsisten mentok ke ujung
+ * layar saat landscape: `resources.displayMetrics` di Context Service tidak dijamin ter-refresh
+ * SEKETIKA saat [onConfigurationChanged] terpanggil pasca-rotasi (beda dari Activity/
+ * WindowContext), `currentWindowMetrics` (API 30+, aman di minSdk 31) selalu bounds window
+ * REAL-TIME. 0 breaking change ke formula/state lain, 0 sektor DITUTUP disentuh.
  */
 class FloatingBubbleService : Service() {
 
@@ -248,9 +269,11 @@ class FloatingBubbleService : Service() {
             snapMinimizedToNearestEdge()
             return
         }
-        val metrics = resources.displayMetrics
-        val maxX = (metrics.widthPixels - view.width).coerceAtLeast(0)
-        val maxY = (metrics.heightPixels - view.height).coerceAtLeast(0)
+        // Batch 460 — currentWindowMetrics (bukan resources.displayMetrics), lihat KDoc kelas
+        // "Batch 460" kenapa sumber ini dipilih (fix kliping landscape).
+        val bounds = windowManager.currentWindowMetrics.bounds
+        val maxX = (bounds.width() - view.width).coerceAtLeast(0)
+        val maxY = (bounds.height() - view.height).coerceAtLeast(0)
         val clampedX = params.x.coerceIn(0, maxX)
         val clampedY = params.y.coerceIn(0, maxY)
         if (clampedX != params.x || clampedY != params.y) {
@@ -412,9 +435,10 @@ class FloatingBubbleService : Service() {
      * Tombol play/pause/prev/next tetap dapat event klik normal — ImageButton clickable
      * mengonsumsi ACTION_DOWN duluan sebelum sempat ke OnTouchListener root ini, jadi drag/tap
      * di sini otomatis cuma aktif di luar area ke-3 tombol tanpa perlu logic pemisah manual.
-     * Batch 98: DisplayMetrics dibaca ULANG tiap ACTION_MOVE (bukan di-cache sekali di awal
-     * seperti sebelumnya) — device bisa saja rotasi PAS lagi di-drag, metrics yang di-cache di
-     * awal akan basi. */
+     * Batch 98: metrics dibaca ULANG tiap ACTION_MOVE (bukan di-cache sekali di awal seperti
+     * sebelumnya) — device bisa saja rotasi PAS lagi di-drag, metrics yang di-cache di awal akan
+     * basi. Batch 460: sumbernya `windowManager.currentWindowMetrics` (bukan lagi
+     * `resources.displayMetrics`, lihat KDoc kelas "Batch 460"). */
     private fun setupDrag(view: View, params: WindowManager.LayoutParams) {
         var initialX = 0
         var initialY = 0
@@ -438,9 +462,11 @@ class FloatingBubbleService : Service() {
                     val dy = event.rawY - initialTouchY
                     totalMovement += abs(dx) + abs(dy)
                     if (totalMovement > TOUCH_SLOP) {
-                        val metrics = resources.displayMetrics
-                        val maxX = (metrics.widthPixels - v.width).coerceAtLeast(0)
-                        val maxY = (metrics.heightPixels - v.height).coerceAtLeast(0)
+                        // Batch 460 — currentWindowMetrics, sama alasan onConfigurationChanged
+                        // (lihat KDoc kelas "Batch 460").
+                        val bounds = windowManager.currentWindowMetrics.bounds
+                        val maxX = (bounds.width() - v.width).coerceAtLeast(0)
+                        val maxY = (bounds.height() - v.height).coerceAtLeast(0)
                         params.x = (initialX + dx.toInt()).coerceIn(0, maxX)
                         params.y = (initialY + dy.toInt()).coerceIn(0, maxY)
                         runCatching { windowManager.updateViewLayout(v, params) }
@@ -516,7 +542,10 @@ class FloatingBubbleService : Service() {
         expandedView?.visibility = View.VISIBLE
         bubbleStore.setMinimized(false)
         container.post {
-            val maxX = (resources.displayMetrics.widthPixels - container.width).coerceAtLeast(0)
+            // Batch 460 — currentWindowMetrics, sama alasan onConfigurationChanged (lihat KDoc
+            // kelas "Batch 460").
+            val maxX = (windowManager.currentWindowMetrics.bounds.width() - container.width)
+                .coerceAtLeast(0)
             params.x = (lastExpandedX ?: params.x).coerceIn(0, maxX)
             runCatching { windowManager.updateViewLayout(container, params) }
             bubbleStore.savePosition(params.x, params.y)
@@ -553,20 +582,36 @@ class FloatingBubbleService : Service() {
      *
      * **Batch 458**: [EDGE_CLIP_FRACTION] dinaikkan 50%→70% — user minta bagian TIMBUL turun ke
      * ~30%, dikonfirmasi via tap-choice merujuk ke "kelihatan" bukan ke fraksi klip (menghindari
-     * ulang salah-arah Batch 456). 0 formula/titik panggil baru. */
+     * ulang salah-arah Batch 456). 0 formula/titik panggil baru.
+     *
+     * **Batch 460**: 2 perubahan. (1) `hiddenWidth` dipisah jadi `touchPad + visualWidth *
+     * EDGE_CLIP_FRACTION` (bukan `width * EDGE_CLIP_FRACTION` polos) — `width` root sekarang
+     * lebih lebar dari `visualWidth` sejak `bubble_minimized.xml` dapat child
+     * `R.id.bubble_minimized_visual` terpisah (area ekstra transparan, murni perluas area sentuh,
+     * lihat KDoc kelas). `touchPad` (selisih root-visual /2, simetris kiri/kanan by design) SELALU
+     * ikut nempel di sisi yang tetap di layar tiap arah snap — area sentuh naik TANPA ikut
+     * mengecil saat [EDGE_CLIP_FRACTION] naik. (2) [EDGE_CLIP_FRACTION] 70%→90% (bagian TIMBUL
+     * turun ke ~10%). `windowManager.currentWindowMetrics` ganti `resources.displayMetrics` (fix
+     * kliping landscape, lihat KDoc kelas) — 0 formula lain berubah. */
     private fun snapMinimizedToNearestEdge() {
         val container = bubbleView as? FrameLayout ?: return
         val params = layoutParams ?: return
         container.post {
             val width = container.width.takeIf { it > 0 } ?: return@post
-            val metrics = resources.displayMetrics
-            val screenWidth = metrics.widthPixels
-            val hiddenWidth = (width * EDGE_CLIP_FRACTION).toInt()
+            // Batch 460 — lebar VISUAL (tab bulat asli) dibaca terpisah dari lebar ROOT/area-
+            // sentuh (`width`, sekarang lebih lebar) — EDGE_CLIP_FRACTION cuma memotong bagian
+            // VISUAL, `touchPad` (selisih root-visual) selalu ikut ke sisi yang tetap di layar.
+            val visualWidth = minimizedView?.findViewById<View>(R.id.bubble_minimized_visual)
+                ?.width?.takeIf { it > 0 } ?: width
+            val touchPad = ((width - visualWidth) / 2).coerceAtLeast(0)
+            val bounds = windowManager.currentWindowMetrics.bounds
+            val screenWidth = bounds.width()
+            val hiddenWidth = touchPad + (visualWidth * EDGE_CLIP_FRACTION).toInt()
             val nearestRight = (params.x + width / 2) > screenWidth / 2
             params.x = if (nearestRight) (screenWidth - width + hiddenWidth) else -hiddenWidth
             // Y juga di-clamp (bukan cuma X yang "dipaksa tepi") — rotasi bisa mengubah tinggi
             // layar juga, Y lama yang valid di orientasi sebelumnya bisa jadi melebihi batas.
-            val maxY = (metrics.heightPixels - container.height).coerceAtLeast(0)
+            val maxY = (bounds.height() - container.height).coerceAtLeast(0)
             params.y = params.y.coerceIn(0, maxY)
             runCatching { windowManager.updateViewLayout(container, params) }
             bubbleStore.savePosition(params.x, params.y)
@@ -660,13 +705,13 @@ class FloatingBubbleService : Service() {
         // supaya urutan visual selalu fade dulu, baru collapse — user masih sempat lihat bubble
         // meredup sebelum menciut total, bukan langsung "hilang" tiba-tiba dari opaque penuh.
         private const val IDLE_AUTO_MINIMIZE_DELAY_MS = 6000L
-        // Batch 455/456/457/458 — tuning half-clip tepi layar tab minimized, lihat KDoc
-        // snapMinimizedToNearestEdge(). Fraksi lebar tab yang sengaja disembunyikan di luar
-        // layar. Batch 456 SALAH ARAH (0.5f->0.3f menaikkan bagian kelihatan = tambah timbul,
-        // kebalikan dari yang diminta user), Batch 457 REVERT ke 0.5f. Batch 458: user eksplisit
-        // minta bagian TIMBUL (kelihatan) diperkecil ke ~30% — dikonfirmasi via pilihan tap
-        // (bukan tebakan) bahwa "~30%" merujuk ke timbul, BUKAN ke fraksi klip — jadi
-        // EDGE_CLIP_FRACTION (fraksi SEMBUNYI) dinaikkan ke 0.7f (70% sembunyi, 30% timbul).
-        private const val EDGE_CLIP_FRACTION = 0.7f
+        // Batch 455/456/457/458/460 — tuning half-clip tepi layar tab minimized (fraksi bagian
+        // VISUAL saja sejak Batch 460, lihat KDoc snapMinimizedToNearestEdge()). Batch 456 SALAH
+        // ARAH (0.5f->0.3f menaikkan bagian kelihatan = tambah timbul, kebalikan dari diminta),
+        // Batch 457 REVERT ke 0.5f, Batch 458 naik ke 0.7f (30% timbul, dikonfirmasi tap). Batch
+        // 460: user eksplisit pakai kata "timbul" minta turun ke ~10% — naik lagi ke 0.9f (90%
+        // sembunyi, 10% timbul). Sejak Batch 460 TIDAK LAGI ikut mengecilkan area sentuh (lihat
+        // touchPad independen di snapMinimizedToNearestEdge()).
+        private const val EDGE_CLIP_FRACTION = 0.9f
     }
 }
