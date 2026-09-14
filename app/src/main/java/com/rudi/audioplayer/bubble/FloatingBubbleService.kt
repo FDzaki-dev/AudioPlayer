@@ -130,6 +130,24 @@ import kotlin.math.abs
  * import `kotlinx.coroutines.delay` (satu paket dengan `launch`/`withContext` yang sudah dipakai).
  * Alpha window overlay tidak mengubah keterjangkauan sentuh (`FLAG_NOT_FOCUSABLE` tidak terkait
  * alpha) — tap pada bubble yang lagi pudar tetap normal, jadi ini murni sinyal visual "idle".
+ *
+ * **Batch 454 — auto-minimize total saat idle berkepanjangan**: instruksi asli user (dikutip di
+ * catatan Batch 453) minta "wajib bisa split/di-minimize total, ATAU minimal dulu bisa fade out"
+ * — Batch 453 baru menuntaskan fallback minimumnya (fade). Fix ini menuntaskan mandat utamanya:
+ * kalau bubble TETAP idle lebih lama lagi setelah fade ([IDLE_AUTO_MINIMIZE_DELAY_MS] dihitung
+ * dari titik interaksi terakhir yang sama dgn timer fade, BUKAN ditambah setelah fade selesai),
+ * [minimize] ke tab tepi layar dipanggil OTOMATIS — 0 logic collapse baru, reuse fungsi [minimize]
+ * yang sudah ada sejak Batch 100 apa adanya (termasuk guard `if (isMinimized) return` di
+ * dalamnya, jadi aman dipanggil berulang tanpa efek samping kalau user sempat minimize manual
+ * duluan). Timer kedua ([idleMinimizeJob]) dijadwalkan/dibatalkan di titik yang SAMA PERSIS
+ * dengan [idleFadeJob] di [keepAwakeAndScheduleFade] — 1 titik kontrol utk kedua timer, 0
+ * Handler/Thread baru, otomatis ikut ter-cancel oleh `bubbleScope.cancel()` di [onDestroy] yang
+ * sudah ada. Alpha container TIDAK direset ke opaque saat auto-minimize terjadi (bubble sudah
+ * pudar dari fade sebelumnya, tab hasil minimize mewarisi alpha yang sama — konsisten dengan
+ * desain "1 titik kontrol alpha di container" Batch 453, 0 percabangan state baru). Sentuhan/tap
+ * apa pun (drag maupun tombol kontrol) tetap membatalkan KEDUA timer via pemanggilan
+ * [keepAwakeAndScheduleFade] yang sudah ada di [setupDrag]/[setupControls] — 0 perubahan di
+ * kedua fungsi itu.
  */
 class FloatingBubbleService : Service() {
 
@@ -153,6 +171,8 @@ class FloatingBubbleService : Service() {
     private var bubbleArtJob: Job? = null
     // Batch 453 — timer auto-fade idle, lihat KDoc kelas ini & keepAwakeAndScheduleFade().
     private var idleFadeJob: Job? = null
+    // Batch 454 — timer auto-minimize-total idle, lihat KDoc kelas ini & keepAwakeAndScheduleFade().
+    private var idleMinimizeJob: Job? = null
 
     // Optimistic default TRUE — sebelum controller sempat konek, tap tombol tetap harus jatuh
     // ke fallback Intent lama (lihat sendPlaybackAction), bukan langsung dianggap "kosong".
@@ -337,12 +357,21 @@ class FloatingBubbleService : Service() {
      * untuk rasionalisasi penuh (kenapa [bubbleScope] dipakai ulang, kenapa alpha di container). */
     private fun keepAwakeAndScheduleFade() {
         idleFadeJob?.cancel()
+        idleMinimizeJob?.cancel()
         val view = bubbleView ?: return
         view.animate().cancel()
         if (view.alpha != 1f) view.alpha = 1f
         idleFadeJob = bubbleScope.launch {
             delay(IDLE_FADE_DELAY_MS)
             bubbleView?.animate()?.alpha(IDLE_FADE_ALPHA)?.setDuration(IDLE_FADE_ANIM_MS)?.start()
+        }
+        // Batch 454 — mandat utama user ("wajib bisa split/di-minimize total"), lihat KDoc kelas.
+        // Guard `!isMinimized` murni optimisasi (skip launch sia-sia kalau sudah minimized manual
+        // duluan) — minimize() sendiri SUDAH guard `if (isMinimized) return`, jadi aman tanpa cek
+        // ini juga kalau state berubah di tengah delay.
+        idleMinimizeJob = bubbleScope.launch {
+            delay(IDLE_AUTO_MINIMIZE_DELAY_MS)
+            if (!isMinimized) minimize()
         }
     }
 
@@ -568,5 +597,10 @@ class FloatingBubbleService : Service() {
         private const val IDLE_FADE_DELAY_MS = 2500L
         private const val IDLE_FADE_ALPHA = 0.45f
         private const val IDLE_FADE_ANIM_MS = 250L
+        // Batch 454 — tuning auto-minimize idle (dihitung dari titik interaksi terakhir, SAMA
+        // dgn titik hitung IDLE_FADE_DELAY_MS, bukan ditambah setelahnya). > IDLE_FADE_DELAY_MS
+        // supaya urutan visual selalu fade dulu, baru collapse — user masih sempat lihat bubble
+        // meredup sebelum menciut total, bukan langsung "hilang" tiba-tiba dari opaque penuh.
+        private const val IDLE_AUTO_MINIMIZE_DELAY_MS = 6000L
     }
 }

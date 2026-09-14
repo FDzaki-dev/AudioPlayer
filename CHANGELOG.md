@@ -1,5 +1,34 @@
 # Changelog
 
+## Batch 454 — Auto-minimize total bubble mini player saat idle berkepanjangan
+Lanjutan langsung Batch 453. Instruksi asli user minta mini player bubble "wajib bisa
+split/di-minimize total, ATAU minimal dulu bisa fade out" — Batch 453 baru menuntaskan fallback
+minimumnya (fade). Batch ini menuntaskan mandat utamanya.
+
+**1 file diubah** (`FloatingBubbleService.kt`, dalam batas 3 file/tugas):
+
+1. **Timer kedua, 1 titik kontrol yang sama**: `idleMinimizeJob` baru, dijadwalkan/dibatalkan di
+   `keepAwakeAndScheduleFade()` — fungsi yang SAMA PERSIS dipanggil `setupDrag`/`setupControls`
+   Batch 453, jadi 0 perubahan di kedua fungsi itu. Delay dihitung dari titik interaksi terakhir
+   yang SAMA dengan timer fade, `IDLE_AUTO_MINIMIZE_DELAY_MS = 6000ms` (> `IDLE_FADE_DELAY_MS`
+   2500ms supaya urutan visual selalu fade dulu, baru collapse).
+2. **0 logic collapse baru**: auto-trigger cuma manggil `minimize()` yang sudah ada sejak Batch
+   100 apa adanya (termasuk guard `if (isMinimized) return` di dalamnya — aman dipanggil berulang
+   walau user sempat minimize manual duluan lewat chevron).
+3. **0 mekanisme timer baru**: reuse `bubbleScope` yang sama dengan `idleFadeJob`/`bubbleArtJob`
+   — otomatis ikut ter-cancel oleh `bubbleScope.cancel()` di `onDestroy()` yang sudah ada. 0
+   import baru.
+4. Alpha container TIDAK direset saat auto-minimize (tab hasil collapse mewarisi alpha fade yang
+   sedang berjalan — konsisten desain "1 titik kontrol alpha" Batch 453).
+5. 0 file lain disentuh, 0 breaking change ke `minimize()`/`expand()`/`setupDrag`/fade Batch 453.
+
+**0 diverifikasi CI/device Batch 454** — review manual (baca kode + cek balance brace/paren:
+`{}` 71/71, `()` 313/313, `[]` 38/38), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Perlu konfirmasi device fisik: bubble auto-collapse jadi tab 48dp
+tepi layar setelah ±6 detik idle (menyusul fade ±2.5 detik), TIDAK auto-collapse selagi masih
+digeser/tombol ditekan, minimize manual & auto-minimize 0 saling konflik, 0 regresi ke
+minimize/expand/snap-tepi/drag-bebas Batch 98-100 & fade Batch 453.
+
 ## Batch 453 — Auto-fade bubble mini player saat idle
 Instruksi eksplisit user: mini player mengambang (bubble) "wajib bisa split/di-minimize total,
 atau minimal dulu bisa fade out saat tidak digeser". Video user menunjukkan pill penuh dibiarkan

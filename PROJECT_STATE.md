@@ -12,6 +12,36 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 454**: lanjutan langsung Batch 453 — mandat UTAMA user ("wajib bisa
+split/di-minimize total") belum tuntas Batch 453 (baru fallback minimumnya, fade). Batch ini
+menuntaskan mandat utamanya: auto-minimize total otomatis kalau bubble tetap idle lebih lama
+lagi setelah fade. Perluasan sektor bubble (Roadmap #11), 0 sektor DITUTUP disentuh.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt` —
+1. **Timer kedua, 1 titik kontrol yang sama**: `idleMinimizeJob` baru, dijadwalkan/dibatalkan di
+   `keepAwakeAndScheduleFade()` — fungsi yang SAMA PERSIS dipanggil `setupDrag`/`setupControls`
+   Batch 453, jadi 0 perubahan di kedua fungsi itu. Delay dihitung dari titik interaksi terakhir
+   yang SAMA dengan timer fade (bukan ditambah setelah fade selesai) — `IDLE_AUTO_MINIMIZE_DELAY_MS`
+   = 6000ms, > `IDLE_FADE_DELAY_MS` (2500ms) supaya urutan visual selalu fade dulu baru collapse.
+2. **0 logic collapse baru**: auto-trigger cuma manggil `minimize()` yang sudah ada sejak Batch
+   100 apa adanya (termasuk guard `if (isMinimized) return` di dalamnya — aman dipanggil berulang
+   walau user sempat minimize manual duluan lewat chevron).
+3. **0 mekanisme timer baru**: reuse `bubbleScope` yang sama dgn `idleFadeJob`/`bubbleArtJob` —
+   otomatis ikut ter-cancel oleh `bubbleScope.cancel()` di `onDestroy()` yang sudah ada. 0 import
+   baru (delay/launch sudah diimport Batch 453).
+4. Alpha container TIDAK direset saat auto-minimize (tab hasil collapse mewarisi alpha fade yang
+   sedang berjalan — konsisten desain "1 titik kontrol alpha di container" Batch 453).
+5. 0 file lain disentuh, 0 breaking change ke `minimize()`/`expand()`/`setupDrag`/fade Batch 453.
+
+**0 diverifikasi CI/device Batch 454** — review manual (baca kode + cek balance brace/paren:
+`{}` 71/71, `()` 313/313, `[]` 38/38), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini (konsisten pola Batch 435-453). Perlu konfirmasi device fisik
+berikutnya: (1) bubble auto-collapse jadi tab 48dp tepi layar setelah ±6 detik idle TANPA
+sentuhan (menyusul fade ±2.5 detik yang sudah jalan lebih dulu); (2) TIDAK auto-collapse selagi
+masih digeser/tombol kontrolnya ditekan (timer ikut ter-reset sama seperti fade); (3) minimize
+manual (tap chevron) & auto-minimize tidak saling konflik/duplikasi state; (4) 0 regresi ke
+mekanisme minimize/expand/snap-tepi/drag-bebas Batch 98-100 & fade Batch 453.
+
 **Catatan Batch 453**: instruksi eksplisit user — fitur mini player mengambang (bubble) "wajib
 bisa split/di-minimize total, atau minimal dulu bisa fade out saat tidak digeser". Perluasan
 langsung sektor bubble (Roadmap #11, Batch 95-100), bukan reopen sektor DITUTUP manapun.
@@ -788,18 +818,21 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 453. ZIP terakhir: `SONIX_v453.zip`. 1 file source diubah:
-  `FloatingBubbleService.kt` (fitur baru: auto-fade alpha bubble ke 0.45f setelah 2.5 detik
-  idle, restore opaque penuh seketika di setiap sentuhan/tap kontrol — detail lengkap di catatan
-  Batch 453 di atas & CHANGELOG.md). Sektor bubble (Roadmap #11) dibuka lagi batch ini per
-  instruksi eksplisit user, TIDAK ada sektor DITUTUP yang tersentuh.
-- **BELUM dikonfirmasi (baru, Batch 453)**: (1) bubble meredup ~45% opacity setelah ±2.5 detik
-  diam (pill penuh maupun tab minimized); (2) TIDAK meredup selagi masih digeser/tombol
-  kontrolnya ditekan; (3) opacity kembali penuh seketika begitu disentuh lagi; (4) 0 regresi ke
-  minimize/expand/snap-tepi/drag-bebas Batch 98-100. 0 compile/device/CI sesi ini (konsisten pola
-  Batch 435-452) — prioritas verifikasi user BERIKUTNYA. Catatan: kalau user masih menganggap
-  fade saja belum cukup, mandat "split/di-minimize TOTAL otomatis saat idle" (bukan cuma
-  fade+manual-minimize yang ada sekarang) adalah kandidat perluasan batch berikutnya.
+- Batch terakhir: 454. ZIP terakhir: `SONIX_v454.zip`. 1 file source diubah:
+  `FloatingBubbleService.kt` (fitur baru: auto-minimize TOTAL ke tab tepi layar otomatis kalau
+  bubble tetap idle ±6 detik setelah fade Batch 453 — reuse `minimize()` Batch 100 apa adanya,
+  detail lengkap di catatan Batch 454 di atas & CHANGELOG.md). Ini menuntaskan mandat UTAMA user
+  yang sempat baru fallback-nya saja (fade) yang terealisasi Batch 453. Sektor bubble (Roadmap
+  #11) masih terbuka, TIDAK ada sektor DITUTUP yang tersentuh.
+- **BELUM dikonfirmasi (baru, Batch 454)**: (1) bubble auto-collapse jadi tab 48dp tepi layar
+  setelah ±6 detik idle (menyusul fade ±2.5 detik yang sudah jalan lebih dulu); (2) TIDAK
+  auto-collapse selagi masih digeser/tombol kontrolnya ditekan; (3) minimize manual (chevron) &
+  auto-minimize 0 saling konflik; (4) 0 regresi ke minimize/expand/snap-tepi/drag-bebas Batch
+  98-100 & fade Batch 453. 0 compile/device/CI sesi ini (konsisten pola Batch 435-453) —
+  prioritas verifikasi user BERIKUTNYA.
+- **BELUM dikonfirmasi (Batch 453, masih berlaku)**: bubble meredup ~45% opacity setelah ±2.5
+  detik diam (pill penuh maupun tab minimized); opacity kembali penuh seketika begitu disentuh
+  lagi. Diverifikasi BERSAMAAN dengan item Batch 454 di atas (satu alur idle yang sama).
 - **BELUM dikonfirmasi (Batch 452, masih berlaku)**: (1) label 3 tab 0 lagi ellipsis di font
   normal; (2) drag flick cepat + tap-tab biasa berhenti TEPAT di tab tujuan, 0 "mundur 1 kolom".
 - **DIKONFIRMASI device fisik user (Batch 451, masih berlaku)**: (1) pill ukuran normal, 0 kapsul
