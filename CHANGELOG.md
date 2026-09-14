@@ -1,5 +1,23 @@
 # Changelog
 
+## Batch 451 — Konfirmasi device: fix Batch 449/450 valid (0 kode diubah)
+User kirim video device asli. 0 kode diubah — murni sinkronisasi status verifikasi.
+
+**Dikonfirmasi**:
+1. Pill kembali ukuran normal (fix Batch 450: hapus `.fillMaxHeight()`) — 0 lagi kapsul raksasa,
+   di semua 3 tab, sepanjang video.
+2. Analisis tambahan frame-by-frame 60fps (bukan cuma nonton laporan user) pada momen pill
+   berpindah tab: pill meluncur mulus TANPA kilatan kotak abu-abu di tab yang ditinggalkan —
+   temuan asli Batch 449 (root cause `NavigationBarItem` M3) TERBUKTI benar fix-nya di device
+   fisik, bukan cuma analisis kode.
+
+**Belum dikonfirmasi** (di luar cakupan video ini): warna ikon/label tema Skeu (video pakai tema
+default/gelap, bukan Skeu) — tetap di README § unverified-list. TalkBack/screen-reader (tidak
+bisa dicek dari rekaman visual).
+
+Sektor bottom nav (Batch 448-450) dianggap SELESAI & stabil per konfirmasi user, kecuali ada
+temuan baru.
+
 ## Batch 450 — REGRESI FATAL Batch 449: pill melar jadi kapsul raksasa (fillMaxHeight keliru)
 User lampirkan video: pill (unified, Batch 448) melar total — dari pertengahan layar sampai
 hampir dasar layar, bukan lagi pas di belakang ikon+label 1 tab. Regresi TERPARAH yang pernah

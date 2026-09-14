@@ -12,15 +12,12 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
-**Catatan Batch 450**: REGRESI FATAL dari Batch 449 — user lampirkan video, pill unified (Batch
-448) melar jadi kapsul raksasa (dari pertengahan layar sampai hampir dasar layar). Root cause:
-`Modifier.fillMaxHeight()` yang ditambahkan ke `CustomNavBarTabItem` (Batch 449) berdasar asumsi
-KELIRU soal sizing internal `NavigationBarItem` M3 (tidak pernah fillMaxHeight, cuma wrap-content)
-— TIDAK diverifikasi ke source resmi sebelum ditulis. `Row` konten `NavigationBar` ikut melar
-minta tinggi maksimal, pill `drawWithContent` (Batch 448) yang skalanya ikut `size.height`
-composable itu ikut melar. Fix: `.fillMaxHeight()` dihapus total, `Box` kembali wrap-content.
-0 perubahan lain dari Batch 449 (temuan kilatan abu-abu & fix Skeu color Batch 449 TETAP berlaku,
-tidak disentuh batch ini). Detail lengkap: `CHANGELOG.md` Batch 450.
+**Catatan Batch 451**: user konfirmasi via video device asli — pill kembali ukuran NORMAL (fix
+Batch 450 valid, 0 lagi kapsul raksasa). Analisis frame-by-frame 60fps tambahan (bukan cuma
+laporan user) juga mengonfirmasi temuan ASLI Batch 449: pill kini meluncur mulus dari 1 tab ke
+tab lain TANPA kilatan kotak abu-abu di tab yang ditinggalkan — fix hapus `NavigationBarItem`
+(Batch 449) + fix `fillMaxHeight` (Batch 450) keduanya TERBUKTI benar di device fisik. 0 kode
+diubah batch ini (murni sinkronisasi status verifikasi ke docs). Detail: `CHANGELOG.md` Batch 451.
 
 **1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` —
 1. `GlassTabIcon`: background/border pill glass per-tab (non-Skeu) DIHAPUS TOTAL — dulu setiap
@@ -717,29 +714,19 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 450. ZIP terakhir: `SONIX_v450.zip`. 1 file source diubah: `MainActivity.kt`.
-- Sektor barusan: REGRESI FATAL dari Batch 449 sendiri — `Modifier.fillMaxHeight()` di
-  `CustomNavBarTabItem` (asumsi keliru, tidak diverifikasi ke source M3 resmi) bikin pill unified
-  Batch 448 melar jadi kapsul raksasa. Fix: `.fillMaxHeight()` dihapus, `Box` kembali wrap-content.
-  Temuan/fix Batch 449 lain (hapus `NavigationBarItem`, fix warna Skeu) TETAP berlaku, 0 disentuh.
-- **0 diverifikasi device/CI** — SOP builder/compiler Kotlin/Gradle/device fisik 0 tersedia sesi
-  ini (sama seperti Batch 435-449 sebelumnya). **Mandat KRITIS sesi berikutnya**: begitu user
-  kirim video/laporan verifikasi, urutan cek WAJIB: (1) pill kembali ukuran NORMAL (pas di
-  belakang icon+label 1 tab, bukan kapsul raksasa) — ini yang PALING PRIORITAS karena regresinya
-  paling parah/paling terlihat; (2) baru setelah itu cek temuan asli Batch 449 (0 kilatan abu-abu
-  di tab yang ditinggalkan); (3) 0 regresi warna ikon/label tema Skeu; (4) klik/routing/haptic/
-  TalkBack semua tab masih normal. JANGAN asumsikan (1) otomatis beres tanpa konfirmasi user —
-  hanya dianalisis dari kode + pola dari video regresi, bukan device fisik.
-- **PELAJARAN PROSES (wajib diingat lintas sesi)**: modifier layout yang meniru/menggantikan
-  perilaku API resmi M3 (`NavigationBarItem`, dst.) WAJIB diverifikasi dulu ke source/dokumentasi
-  asli (web_search kalau perlu) sebelum ditulis — JANGAN diasumsikan dari pola modifier lain di
-  codebase yang tampak mirip tapi beda konteks. Kesalahan 1 modifier (`fillMaxHeight`) bisa
-  merusak SELURUH bottom nav, bukan cuma 1 komponen kecil — jauh lebih parah dari bug asal yang
-  sedang diperbaiki. Terapkan kewaspadaan ekstra ini di SEMUA rombakan scope-besar berikutnya.
-- 0 ZIP baru dari user di sesi ini (SONIX_v449.zip → source dipakai, output SONIX_v450.zip).
-  Kalau sesi berikutnya mulai dari ZIP baru user, cek dulu apakah `MainActivity.kt` versi user
-  masih mengandung perubahan Batch 450 ini (grep `CustomNavBarTabItem`, pastikan 0 ada
-  `fillMaxHeight` di fungsi itu) — kalau regresi Batch 449 muncul lagi (fillMaxHeight balik), itu
-  tanda ZIP user berasal dari titik SEBELUM batch ini.
-- Mandat lain: 0 ada, lanjutkan sektor manapun yang diminta user berikutnya (0 sektor DITUTUP
+- Batch terakhir: 451. ZIP terakhir: `SONIX_v451.zip`. 0 file source diubah (docs-only, murni
+  sinkronisasi status verifikasi device — kode sudah final sejak Batch 450).
+- **DIKONFIRMASI device fisik user (Batch 451)**: (1) pill kembali ukuran normal, 0 lagi kapsul
+  raksasa (fix Batch 450 valid); (2) 0 kilatan kotak abu-abu di tab yang ditinggalkan (temuan asli
+  Batch 449, fix `NavigationBarItem` dihapus TERBUKTI benar). Kedua item ini pindah dari "belum
+  diverifikasi" ke "confirmed" — lihat README.md § unverified-list.
+- **BELUM dikonfirmasi**: regresi warna ikon/label tema Skeu (video user pakai tema default/gelap,
+  bukan Skeu — belum ada data device utk klaim ini) — TETAP di unverified-list README. Klik/
+  routing/haptic/TalkBack semua tab tampak normal di video (navigasi Beranda↔Perpustakaan↔
+  Pengaturan mulus, tapi TalkBack sendiri tidak bisa dicek dari rekaman visual).
+- Mandat lain: 0 ada. Sektor bottom nav (Batch 448-450) dianggap SELESAI & stabil kecuali user
+  laporkan temuan baru. Lanjutkan sektor manapun yang diminta user berikutnya (0 sektor DITUTUP
   baru dibuka batch ini, 0 sektor baru ditutup juga).
+- **PELAJARAN PROSES Batch 450 TETAP berlaku** (lihat komentar kode di `CustomNavBarTabItem`):
+  modifier layout yang meniru API resmi WAJIB diverifikasi ke source/dokumentasi asli dulu,
+  jangan diasumsikan.

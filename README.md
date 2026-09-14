@@ -19,19 +19,16 @@
 >   benar; pill/warna ikon melacak posisi jari 1:1 real-time TANPA lag/jitter selama drag (Batch
 >   445); tahanan visual halus di ujung kolom Beranda/Pengaturan (Batch 444); transisi mulus TANPA
 >   lompatan visual persis saat jari dilepas (handoff drag→settle, pola Batch 445).
-> - **BARU (Batch 449, REGRESI ditemukan+fix Batch 450)**: user device-test Batch 448 menemukan
+> - **Batch 449 (fix DIKONFIRMASI device, Batch 451)**: user device-test Batch 448 menemukan
 >   kilatan kotak abu-abu ~0.25 detik di tab yang BARU DITINGGALKAN tiap pindah tab — root cause
 >   `NavigationBarItem` M3 (state-layer internalnya TIDAK benar-benar mati oleh `NoRippleIndication`
->   Batch 439, ternyata cuma override `LocalIndication` yang tidak pernah dibaca komponen itu). Fix
->   Batch 449: `NavigationBarItem` DIHAPUS TOTAL dari bottom nav, diganti `CustomNavBarTabItem`
->   (Row+Box manual + `Modifier.selectable(indication = null, ...)`). **Batch 449 ITU SENDIRI
->   ternyata membawa 1 regresi fatal** (`.fillMaxHeight()` keliru bikin pill melar jadi kapsul
->   raksasa) — sudah ditemukan+diperbaiki Batch 450 (`.fillMaxHeight()` dihapus). Belum
->   dikonfirmasi device: (1) pill kembali ukuran normal (PRIORITAS, regresi Batch 449→450 paling
->   parah/paling terlihat); (2) 0 lagi kilatan abu-abu di tab yang ditinggalkan (temuan asli Batch
->   449); (3) 0 regresi warna ikon/label tema Skeu (dulu implisit `LocalContentColor`
->   NavigationBarItem, kini eksplisit snap token M3 resmi); (4) 0 regresi klik/routing/
->   `bouncyPress`/aksesibilitas TalkBack (role Tab).
+>   Batch 439). Fix Batch 449: `NavigationBarItem` DIHAPUS TOTAL, diganti `CustomNavBarTabItem`.
+>   Batch 449 itu sendiri sempat membawa 1 regresi fatal (`.fillMaxHeight()` keliru bikin pill
+>   melar jadi kapsul raksasa) — diperbaiki Batch 450. **Batch 451: user konfirmasi via video +
+>   analisis frame-by-frame 60fps tambahan — pill kembali ukuran normal DAN 0 lagi kilatan
+>   abu-abu, keduanya terbukti benar di device fisik.** Masih belum dikonfirmasi: regresi warna
+>   ikon/label tema Skeu (video test pakai tema default/gelap, bukan Skeu); TalkBack/screen-reader
+>   (tidak bisa dicek dari rekaman visual).
 > - Pill indicator glassmorphism ikon tab bawah (Batch 438) belum dikonfirmasi user di device asli
 >   — khususnya kontras/keterbacaan di tiap identitas tema x mode terang/gelap.
 > - Kapsul mengambang di bottom nav (Batch 439) belum dikonfirmasi user di device asli — khususnya
