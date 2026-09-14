@@ -1,5 +1,40 @@
 # Changelog
 
+## Batch 452 — Fix truncation label nav bawah + "offside" pill/tab drag-tap
+2 instruksi eksplisit user: (1) minimalkan tulisan label nav bawah yang terpotong ellipsis, (2)
+animasi pill/tab WAJIB berhenti tepat di tab tujuan tanpa "offside" (mode drag-langsung-di-bar
+maupun tap-tab biasa).
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. **Fix truncation**: root cause — padding horizontal 12.dp (kiri+kanan) pada `Column`
+   `GlassTabIcon` memakan 24.dp dari ~1/3 lebar bar SEBELUM `Text` diukur, cukup untuk memicu
+   ellipsis pada label 12 huruf ("Perpustakaan") di layar sempit pada KONDISI NORMAL — bukan cuma
+   font-scale aksesibilitas besar seperti catatan lama Batch 442. Fix: 12.dp -> 4.dp. Touch target
+   0 terdampak (area sentuh = `Box.weight(1f, fill = true)` pada `CustomNavBarTabItem`, pembungkus
+   DI LUAR `Column` ini — bukan padding `Column`). 0 mengubah style/fontSize/token typography
+   (`labelMedium` dari Batch 442 tetap dipakai apa adanya) — murni jarak. Efek samping disengaja:
+   pill solid Skeu (dibungkus padding yang sama) ikut sedikit lebih ramping, tetap proporsional
+   (aturan solid Batch 58/61/79 tidak disentuh).
+2. **Fix "offside" drag/tap**: root cause — pada loop drag-langsung-di-tab-bar (Batch 442/448),
+   `if (!change.pressed) break` lama dicek DI AWAL badan loop, SEBELUM posisi event dibaca. Untuk
+   event UP (pelepasan jari), loop break LANGSUNG tanpa pernah memproses posisi UP itu sendiri ke
+   `tabBarDragIndexPx`/`hoveredIndex` — keduanya nyangkut di posisi event MOVE kedua-dari-akhir.
+   Pada drag cepat (flick, event batching sistem), posisi MOVE terakhir bisa beda 1 kolom penuh
+   dari titik lepas jari sungguhan, sehingga pill/route commit ke tab yang SALAH (1 kolom sebelum
+   tujuan asli). Fix: posisi TIAP event (termasuk UP) diproses dulu sama seperti MOVE, `pressed`
+   dicek TERAKHIR (di akhir badan loop) sebagai syarat lanjut/berhenti — bukan lagi syarat lewati
+   pemrosesan posisi. 0 state/Animatable/mekanisme baru — murni urutan 2 baris dipertukar dalam
+   loop yang sudah ada. Perbaikan ini sekaligus menjamin `hoveredIndex` akurat untuk tap biasa
+   (down+up di kolom yang sama), karena posisi UP kini selalu ikut diproses.
+3. 0 import baru, 0 file lain disentuh.
+
+**0 diverifikasi CI/device Batch 452** — review manual (baca kode + cek balance brace/paren: `{}`
+333/333, `()` 1201/1201, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Perlu konfirmasi device fisik berikutnya: (1) label 3 tab 0 lagi
+ellipsis di font-scale NORMAL; (2) drag flick cepat & tap-tab biasa berhenti TEPAT di tab tujuan,
+0 lagi "mundur 1 kolom".
+
 ## Batch 451 — Konfirmasi device: fix Batch 449/450 valid (0 kode diubah)
 User kirim video device asli. 0 kode diubah — murni sinkronisasi status verifikasi.
 

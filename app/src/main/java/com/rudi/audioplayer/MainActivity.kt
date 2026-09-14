@@ -845,7 +845,19 @@ private fun GlassTabIcon(
                 }
             )
             .bouncyPress(interactionSource, pressedScale = 0.9f)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            // Batch 452 — user: label nav bawah masih kepotong ellipsis ("Perpustakaan"/
+            // "Pengaturan") di kondisi normal (bukan cuma font-scale aksesibilitas besar spt
+            // catatan lama Batch 442). Root cause: 12.dp padding kiri+kanan di sini memakan 24.dp
+            // dari lebar kolom (~1/3 lebar bar) SEBELUM Text diukur — margin tipis tapi cukup utk
+            // memicu ellipsis pada label 12 huruf di layar sempit. Touch target 0 kena dampak sama
+            // sekali: area sentuh tab = `Box.weight(1f, fill=true)` di `CustomNavBarTabItem`
+            // (pembungkus di LUAR Column ini), BUKAN padding Column ini — padding ini murni jarak
+            // visual internal. Fix: 12.dp -> 4.dp (bebaskan 16.dp lebar tambahan utk Text, 0
+            // sentuh style/fontSize/theme token). Efek samping disengaja: pill solid Skeu (background
+            // di atas, dibungkus padding yg SAMA) ikut sedikit lebih ramping ke arah teks — masih
+            // proporsional (aturan solid Batch 58/61/79 tidak disentuh), bukan regresi ukuran
+            // kapsul raksasa Batch 450.
+            .padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
@@ -1615,11 +1627,25 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     var hoveredIndex = (down.position.x / barWidthPx * TAB_ROUTES.size)
                                         .toInt()
                                         .coerceIn(0, TAB_ROUTES.size - 1)
+                                    // Batch 452 — user: pill/tab kadang berhenti 1 kolom SEBELUM
+                                    // posisi jari sungguhan saat lepas ("offside"), terutama drag
+                                    // cepat (flick). Root cause: `if (!change.pressed) break` (lama)
+                                    // dicek DI AWAL badan loop, SEBELUM posisi event ini dibaca —
+                                    // utk event UP (pressed=false) loop break LANGSUNG, jadi posisi
+                                    // asli titik lepas jari itu TIDAK PERNAH diproses ke
+                                    // `tabBarDragIndexPx`/`hoveredIndex`. `hoveredIndex` (dipakai
+                                    // navigate() + target akhir `navPillIndexAnim.animateTo` pasca-
+                                    // loop) jadi nyangkut di event MOVE kedua-dari-akhir, yang pada
+                                    // flick cepat (event batching sistem) bisa beda 1 kolom penuh dari
+                                    // titik lepas sebenarnya. Fix: posisi TIAP event (termasuk UP)
+                                    // diproses dulu sama seperti event MOVE, `pressed` dicek
+                                    // TERAKHIR (akhir badan loop, lihat bawah) sbg syarat
+                                    // lanjut/berhenti — bukan lagi syarat lewati pemrosesan posisi.
+                                    // 0 state/mekanisme baru, murni urutan 2 baris dipertukar.
                                     while (true) {
                                         val event = awaitPointerEvent(pass = PointerEventPass.Initial)
                                         val change = event.changes.firstOrNull { it.id == down.id }
                                             ?: break
-                                        if (!change.pressed) break
                                         val rawX = change.position.x
                                         val x = rawX.coerceIn(0f, barWidthPx)
                                         // Batch 444 — posisi kontinu utk pill live-tracking
@@ -1655,6 +1681,11 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                                 }
                                             }
                                         }
+                                        // Batch 452 — `pressed` dicek TERAKHIR (lihat komentar
+                                        // panjang di atas `while (true)`): posisi event UP ini SUDAH
+                                        // diproses (tabBarDragIndexPx/hoveredIndex/navigate di atas)
+                                        // sebelum keluar loop, 0 lagi kehilangan 1 event terakhir.
+                                        if (!change.pressed) break
                                     }
                                     // Batch 444 — gesture selesai (naik/batal, 2 jalur break di
                                     // atas SAMA-SAMA jatuh ke sini): lepas live-tracking (fallback

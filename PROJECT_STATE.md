@@ -12,6 +12,42 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 452**: 2 instruksi eksplisit user — (1) minimalkan tulisan label nav bawah yang
+terpotong ellipsis, (2) animasi pill/tab WAJIB berhenti tepat di tab tujuan tanpa "offside" (baik
+mode drag-langsung-di-bar maupun tap-tab biasa).
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` —
+1. **Fix truncation**: root cause — padding horizontal 12.dp (kiri+kanan) di `Column`
+   `GlassTabIcon` memakan 24.dp dari ~1/3 lebar bar SEBELUM `Text` diukur, cukup memicu ellipsis
+   pada label 12 huruf ("Perpustakaan") di layar sempit KONDISI NORMAL (bukan cuma font-scale
+   aksesibilitas besar spt catatan lama Batch 442). Fix: 12.dp -> 4.dp. Touch target 0 terdampak
+   (area sentuh = `Box.weight(1f, fill=true)` di `CustomNavBarTabItem`, pembungkus DI LUAR Column
+   ini, bukan padding Column). 0 sentuh style/fontSize/typography token (`labelMedium` dari Batch
+   442 tetap dipakai apa adanya) — murni jarak. Efek samping disengaja: pill solid Skeu (dibungkus
+   padding sama) ikut sedikit lebih ramping, masih proporsional (aturan solid Batch 58/61/79 tidak
+   disentuh).
+2. **Fix "offside" drag/tap**: root cause — di loop drag-langsung-di-tab-bar (Batch 442/448),
+   `if (!change.pressed) break` lama dicek DI AWAL badan loop, SEBELUM posisi event dibaca. Untuk
+   event UP (pelepasan jari), loop break LANGSUNG tanpa pernah memproses posisi UP itu sendiri ke
+   `tabBarDragIndexPx`/`hoveredIndex` — keduanya nyangkut di event MOVE kedua-dari-akhir. Pada
+   drag cepat (flick, event batching sistem), posisi MOVE terakhir bisa beda 1 kolom penuh dari
+   titik lepas jari sungguhan → pill/route commit ke tab yang SALAH (1 kolom sebelum tujuan asli).
+   Fix: posisi TIAP event (termasuk UP) diproses dulu sama seperti MOVE, `pressed` dicek TERAKHIR
+   (akhir badan loop) sbg syarat lanjut/berhenti — bukan lagi syarat lewati pemrosesan. 0
+   state/Animatable/mekanisme baru — murni urutan 2 baris dipertukar dalam loop yang sudah ada.
+   Perbaikan ini juga menjamin `hoveredIndex` akurat utk tap biasa (down+up di kolom sama) krn
+   posisi UP kini selalu ikut diproses, bukan cuma diasumsikan sama dgn `down`.
+3. 0 import baru, 0 file lain disentuh.
+
+**0 diverifikasi CI/device Batch 452** — review manual (baca kode + cek balance brace/paren: `{}`
+333/333, `()` 1201/1201, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Item belum-terverifikasi bertambah 2: (1) label 3 tab tidak lagi
+kepotong ellipsis di kondisi FONT normal (perlu device fisik, layar sempit maupun lebar — font-
+scale aksesibilitas BESAR tetap bisa memicu ellipsis by design, itu memang jaring pengaman Batch
+442 yang disengaja, bukan target "minimize" batch ini); (2) drag cepat (flick) di tab-bar berhenti
+TEPAT di tab yang jari lepaskan (0 lagi "mundur 1 kolom"), demikian pula tap-tab biasa — perlu
+device fisik, terutama drag flick cepat lintas >1 kolom.
+
 **Catatan Batch 451**: user konfirmasi via video device asli — pill kembali ukuran NORMAL (fix
 Batch 450 valid, 0 lagi kapsul raksasa). Analisis frame-by-frame 60fps tambahan (bukan cuma
 laporan user) juga mengonfirmasi temuan ASLI Batch 449: pill kini meluncur mulus dari 1 tab ke
@@ -714,19 +750,20 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 451. ZIP terakhir: `SONIX_v451.zip`. 0 file source diubah (docs-only, murni
-  sinkronisasi status verifikasi device — kode sudah final sejak Batch 450).
-- **DIKONFIRMASI device fisik user (Batch 451)**: (1) pill kembali ukuran normal, 0 lagi kapsul
-  raksasa (fix Batch 450 valid); (2) 0 kilatan kotak abu-abu di tab yang ditinggalkan (temuan asli
-  Batch 449, fix `NavigationBarItem` dihapus TERBUKTI benar). Kedua item ini pindah dari "belum
-  diverifikasi" ke "confirmed" — lihat README.md § unverified-list.
-- **BELUM dikonfirmasi**: regresi warna ikon/label tema Skeu (video user pakai tema default/gelap,
-  bukan Skeu — belum ada data device utk klaim ini) — TETAP di unverified-list README. Klik/
-  routing/haptic/TalkBack semua tab tampak normal di video (navigasi Beranda↔Perpustakaan↔
-  Pengaturan mulus, tapi TalkBack sendiri tidak bisa dicek dari rekaman visual).
-- Mandat lain: 0 ada. Sektor bottom nav (Batch 448-450) dianggap SELESAI & stabil kecuali user
-  laporkan temuan baru. Lanjutkan sektor manapun yang diminta user berikutnya (0 sektor DITUTUP
-  baru dibuka batch ini, 0 sektor baru ditutup juga).
+- Batch terakhir: 452. ZIP terakhir: `SONIX_v452.zip`. 1 file source diubah: `MainActivity.kt`
+  (2 fix: padding label nav 12.dp->4.dp anti-truncation; urutan pressed-check loop drag-tab-bar
+  anti-"offside" — detail lengkap di catatan Batch 452 di atas & CHANGELOG.md).
+- **BELUM dikonfirmasi (baru, Batch 452)**: (1) label 3 tab 0 lagi ellipsis di font normal; (2)
+  drag flick cepat + tap-tab biasa berhenti TEPAT di tab tujuan, 0 "mundur 1 kolom". 0
+  compile/device/CI sesi ini (konsisten pola Batch 435-451) — prioritas verifikasi user
+  BERIKUTNYA.
+- **DIKONFIRMASI device fisik user (Batch 451, masih berlaku)**: (1) pill ukuran normal, 0 kapsul
+  raksasa (fix Batch 450); (2) 0 kilatan kotak abu-abu di tab ditinggalkan (fix Batch 449).
+- **BELUM dikonfirmasi (lama)**: regresi warna ikon/label tema Skeu (video user Batch 451 pakai
+  tema default/gelap, bukan Skeu). TalkBack tidak bisa dicek dari rekaman visual.
+- Mandat lain: 0 ada. Sektor bottom nav (Batch 448-451, +2 fix Batch 452) dianggap aktif-stabil
+  kecuali user laporkan temuan baru. Lanjutkan sektor manapun yang diminta user berikutnya (0
+  sektor DITUTUP baru dibuka batch ini, 0 sektor baru ditutup juga).
 - **PELAJARAN PROSES Batch 450 TETAP berlaku** (lihat komentar kode di `CustomNavBarTabItem`):
   modifier layout yang meniru API resmi WAJIB diverifikasi ke source/dokumentasi asli dulu,
   jangan diasumsikan.
