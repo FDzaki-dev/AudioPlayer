@@ -1,5 +1,30 @@
 # Changelog
 
+## Batch 456 — Kurangi fraksi clip tepi tab minimized bubble (50% → 30%)
+Feedback lanjutan user langsung setelah Batch 455: "sudah ke kliping walaupun agak timbul" →
+diklarifikasi via pilihan tap: "bagian yang kepotong terlalu besar, perkecil clip-nya". Refinement
+tuning murni, bukan mandat baru.
+
+**1 file diubah** (`FloatingBubbleService.kt`, dalam batas 3 file/tugas):
+
+1. **1 konstanta baru**: `EDGE_CLIP_FRACTION = 0.3f` (companion object, pola sama
+   `IDLE_FADE_ALPHA` dkk) — fraksi lebar tab yang disembunyikan di luar layar, turun dari 50%
+   (`width/2` hardcoded, Batch 455) ke 30%.
+2. **Formula digeneralisasi**: `snapMinimizedToNearestEdge()` — `hiddenWidth = width *
+   EDGE_CLIP_FRACTION` menggantikan `width/2` hardcoded. Di `EDGE_CLIP_FRACTION = 0.5f` formula
+   identik matematis dengan Batch 455 (regresi-aman), tuning berikutnya tinggal ubah 1 angka.
+3. **0 titik panggil baru**: semua pemicu snap yang sudah ada (drag-lepas, auto-minimize Batch
+   454, chevron manual, restart service, rotasi) otomatis ikut fraksi baru.
+4. 0 file lain disentuh, 0 breaking change ke minimize/expand/fade Batch 453/auto-minimize Batch
+   454/half-clip Batch 455.
+
+**0 diverifikasi CI/device Batch 456** — review manual (baca kode + cek balance brace/paren:
+`{}` 71/71, `()` 339/339, `[]` 49/49), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Perlu konfirmasi device fisik: tab minimized kelihatan lebih
+"penuh"/kurang timbul dibanding Batch 455 (~70% lebar kelihatan, bukan 50%), mini trigger tetap
+gampang di-tap, drag tetap 100% kelihatan/terkontrol penuh, 0 regresi ke
+minimize/expand/fade/auto-minimize Batch 98-100/453/454.
+
 ## Batch 455 — Tab minimized bubble kliping setengah, mentok tepi layar saat idle
 Feedback eksplisit user langsung setelah Batch 454: "minimize otomatis nya berhasil", tapi yang
 benar-benar diinginkan adalah tab tepi layarnya (circle bubble) bisa "kliping setengah/menyisakan
