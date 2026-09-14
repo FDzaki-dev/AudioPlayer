@@ -1,5 +1,39 @@
 # Changelog
 
+## Batch 462 — Fix residual #2: Batch 461 GAGAL TOTAL (tab 100% kelihatan, gak keclip sama sekali di landscape)
+Konfirmasi device fisik user Batch 461: masih "nongol" — DIPERJELAS via klarifikasi tap: **100%
+kelihatan, sama sekali gak keclip** (bukan versi "kurang tepat dikit"). Sinyal ini membuktikan
+diagnosis Batch 460/461 ("sumber data bounds kurang akurat") SALAH ARAH — `screenBounds` Batch 461
+sendiri sudah benar (dp→px dari `newConfig`, sumber dijamin fresh sistem). Kalau sumbernya sudah
+benar tapi hasil akhirnya 100% tidak ter-klip sama sekali, kesimpulan paling masuk akal: SESUATU
+DI LUAR kode kita menimpa posisi window SETELAH snap kita apply — paling mungkin sanitasi posisi
+window oleh sistem selama transisi animasi rotasi (perilaku `TYPE_APPLICATION_OVERLAY` yang tidak
+seragam lintas OEM, tidak bisa dipastikan pasti tanpa logcat device asli).
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+
+1. **BUKAN ganti formula/sumber data lagi** (mengikuti catatan proses PROJECT_STATE.md: "jangan
+   ulang pola ganti API baca metrics" kalau residual muncul lagi) — formula
+   `EDGE_CLIP_FRACTION`/`touchPad`/`visualWidth`/`screenBounds` Batch 460/461 TETAP tidak disentuh,
+   semua sudah terbukti benar secara matematis.
+2. **Fix — safety-net re-assert 2x delay**: `onConfigurationChanged` sekarang memanggil
+   `snapMinimizedToNearestEdge()` immediate (seperti sebelumnya) DITAMBAH 2x re-panggil dengan
+   delay 150ms & 400ms (`ROTATION_RESNAP_DELAYS_MS`, `view.postDelayed`) — membracket durasi
+   animasi transisi rotasi tipikal sistem. Idempotent kalau snap pertama sudah benar (re-apply
+   nilai sama, 0 efek kelihatan tambahan) — jadi fallback pasti kalau snap pertama sempat ketiban
+   override sistem.
+3. 0 breaking change ke formula/state lain, 0 sektor DITUTUP disentuh.
+
+**0 diverifikasi CI/device Batch 462** — review manual (baca kode + cek balance brace/paren:
+`{}` 74/74, `()` 436/436, `[]` 75/75), 0 env Android nyata/device fisik/logcat/compiler Kotlin di
+sesi ini. **CATATAN JUJUR**: ini mitigasi defensif berdasar sinyal device fisik (gejala berubah
+dari "tidak konsisten" jadi "100% gagal total" antar 2 laporan user dengan kata yang SAMA persis,
+"masih nongol"), BUKAN root-cause pasti yang terverifikasi — kalau residual masih muncul lagi
+setelah batch ini, WAJIB logcat device asli sebelum lanjut tebak lagi (lihat catatan proses
+`PROJECT_STATE.md`). Perlu konfirmasi device fisik: (1) rotasi landscape bolak-balik berkali² → tab
+minimized SELALU mentok tepi ~10% timbul (0 lagi 100% kelihatan); (2) re-cek item 1/2/4/5 Batch 460
+tetap ✅; (3) 0 regresi ke minimize/expand/fade/auto-minimize Batch 98-100/453/454.
+
 ## Batch 461 — Fix residual: landscape masih tidak konsisten mentok tepi (device fisik Batch 460: item 3 ❌)
 Konfirmasi device fisik user Batch 460 — (1) mini trigger lebih gampang di-tap ✅, (2) bagian
 timbul ~10% ✅, (3) mentok tepi konsisten landscape ❌ **"masih nongol"**, (4) drag 100% kelihatan

@@ -219,6 +219,24 @@ import kotlin.math.abs
  * (`onCreate`, baseline sebelum rotasi pertama). 0 breaking change ke formula
  * EDGE_CLIP_FRACTION/touchPad/visualWidth Batch 460, 0 sektor DITUTUP disentuh. BELUM
  * diverifikasi device fisik (0 env Android nyata di sesi ini).
+ *
+ * **Batch 462 [FIX RESIDUAL #2] — Batch 461 GAGAL TOTAL, bukan cuma kurang tepat**: konfirmasi
+ * device fisik user: tab minimized 100% KELIHATAN/gak keclip sama sekali di landscape (bukan versi
+ * "kurang pas dikit" — total tidak ter-klip). Sinyal ini menggeser diagnosis dari "sumber bounds
+ * kurang akurat" (teori Batch 460/461, TERBUKTI SALAH — `screenBounds` Batch 461 sendiri sudah
+ * benar dp→px dari `newConfig`) ke **"ada pihak lain menimpa posisi window SETELAH snap kita
+ * apply"** — paling mungkin sanitasi/enforcement posisi window oleh sistem selama transisi ANIMASI
+ * rotasi (perilaku umum overlay `TYPE_APPLICATION_OVERLAY` lintas OEM, tidak seragam & tidak bisa
+ * dipastikan tanpa logcat device asli). **Fix — safety-net re-assert, BUKAN ganti formula/sumber
+ * data lagi** (SOP eksplisit: jangan ulang pola "ganti API baca metrics"): [onConfigurationChanged]
+ * sekarang re-panggil [snapMinimizedToNearestEdge] 2x tambahan dengan delay 150ms & 400ms
+ * (`ROTATION_RESNAP_DELAYS_MS`) SETELAH panggilan immediate yang sudah ada — membracket durasi
+ * animasi transisi rotasi tipikal. Idempotent kalau snap pertama sudah benar (re-apply nilai sama,
+ * 0 efek kelihatan tambahan), jadi fallback pasti kalau snap pertama sempat ketiban sistem. 0
+ * breaking change ke formula EDGE_CLIP_FRACTION/touchPad/visualWidth/screenBounds, 0 sektor
+ * DITUTUP disentuh. **CATATAN JUJUR**: ini mitigasi defensif berdasar sinyal device fisik, BUKAN
+ * root-cause pasti (0 akses logcat/device fisik di sesi ini) — kalau residual masih muncul lagi
+ * setelah batch ini, WAJIB logcat device asli sebelum lanjut tebak lagi (lihat PROJECT_STATE.md).
  */
 class FloatingBubbleService : Service() {
 
@@ -307,6 +325,16 @@ class FloatingBubbleService : Service() {
         // menyisakan X "nyaris tepi tapi bukan tepi" pas rotasi mengubah lebar layar.
         if (isMinimized) {
             snapMinimizedToNearestEdge()
+            // Batch 462 — safety-net re-assert, lihat KDoc kelas "Batch 462". Device fisik
+            // konfirmasi Batch 461 GAGAL total (tab 100% kelihatan/gak keclip sama sekali di
+            // landscape, bukan cuma "kurang tepat") — indikasi kuat ADA pihak lain (transisi
+            // animasi rotasi sistem) menimpa posisi window SETELAH snap pertama kita apply.
+            // Re-assert 2x dengan delay berbeda (bracket durasi animasi rotasi tipikal) —
+            // idempotent kalau snap pertama sudah benar (re-apply nilai sama, 0 efek kelihatan),
+            // tapi jadi fallback pasti kalau snap pertama sempat ketiban sistem.
+            for (delay in ROTATION_RESNAP_DELAYS_MS) {
+                view.postDelayed({ if (isMinimized) snapMinimizedToNearestEdge() }, delay)
+            }
             return
         }
         // Batch 461 — baca dari screenBounds ter-cache (bukan lagi query currentWindowMetrics
@@ -752,5 +780,10 @@ class FloatingBubbleService : Service() {
         // sembunyi, 10% timbul). Sejak Batch 460 TIDAK LAGI ikut mengecilkan area sentuh (lihat
         // touchPad independen di snapMinimizedToNearestEdge()).
         private const val EDGE_CLIP_FRACTION = 0.9f
+        // Batch 462 — 2 delay safety-net re-assert kliping pasca rotasi (lihat KDoc kelas
+        // "Batch 462" & onConfigurationChanged). Bracket durasi animasi transisi rotasi tipikal
+        // sistem (bervariasi antar OEM/API level) — jaga-jaga ada override posisi window dari
+        // sistem SETELAH snap pertama (immediate) tapi SEBELUM animasi rotasi selesai settle.
+        private val ROTATION_RESNAP_DELAYS_MS = longArrayOf(150L, 400L)
     }
 }
