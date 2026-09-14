@@ -1,5 +1,38 @@
 # Changelog
 
+## Batch 453 — Auto-fade bubble mini player saat idle
+Instruksi eksplisit user: mini player mengambang (bubble) "wajib bisa split/di-minimize total,
+atau minimal dulu bisa fade out saat tidak digeser". Video user menunjukkan pill penuh dibiarkan
+diam opaque 100% di atas daftar lagu, menutupi konten di baliknya.
+
+**1 file diubah** (`FloatingBubbleService.kt`, dalam batas 3 file/tugas):
+
+1. **Analisis dulu**: mekanisme "total" (manual) SUDAH ada sejak Batch 100 — tombol chevron
+   minimize menciutkan pill jadi tab 48dp nempel tepi layar. Celah sesungguhnya: kondisi IDLE
+   (tanpa aksi user sama sekali) tidak pernah meredup — persis yang dikeluhkan di video. Fix ini
+   menyasar celah itu, sesuai opsi fallback eksplisit user.
+2. **Fitur baru**: `keepAwakeAndScheduleFade()` — alpha `bubbleView` (container `FrameLayout`,
+   berlaku otomatis ke child mana pun yang `VISIBLE`: pill penuh ATAU tab minimized) diredupkan
+   ke `0.45f` via `View.animate().alpha(...).setDuration(250)` setelah `2500ms` tanpa sentuhan.
+   Dikembalikan ke opaque penuh SEKETIKA (`animate().cancel()` + `alpha = 1f`) di setiap awal
+   interaksi baru: `OnTouchListener` root (`setupDrag`) DAN ke-4 `OnClickListener` tombol kontrol
+   (`setupControls`) — 2 titik pemanggilan diperlukan karena `ImageButton` clickable mengonsumsi
+   `ACTION_DOWN` duluan sebelum sempat ke `OnTouchListener` root (perilaku existing, lihat
+   KDoc `setupDrag`).
+3. **0 mekanisme timer baru**: reuse `bubbleScope` (`CoroutineScope(Dispatchers.Main + Job())`)
+   yang sudah dipakai `bubbleArtJob` — job baru `idleFadeJob` otomatis ikut ter-cancel oleh
+   `bubbleScope.cancel()` di `onDestroy()` yang sudah ada, 0 Handler/Thread baru. 1 import baru:
+   `kotlinx.coroutines.delay` (satu paket persis `launch`/`withContext` yang sudah diimport).
+4. Alpha window TIDAK mengubah keterjangkauan sentuh (`FLAG_NOT_FOCUSABLE` independen dari
+   alpha) — tap pada bubble yang lagi pudar tetap normal, murni sinyal visual "idle".
+5. 0 file lain disentuh, 0 breaking change ke `minimize()`/`expand()`/drag/snap-tepi lama.
+
+**0 diverifikasi CI/device Batch 453** — review manual (baca kode + cek balance brace/paren: `{}`
+70/70, `()` 294/294, `[]` 28/28), 0 env Android nyata/device fisik/compiler Kotlin/akses jaringan
+Gradle di sesi ini. Perlu konfirmasi device fisik: bubble meredup ~45% setelah ±2.5 detik diam,
+TIDAK meredup selagi masih digeser/tombol ditekan, opacity pulih seketika saat disentuh lagi, dan
+0 regresi ke minimize/expand/snap-tepi/drag-bebas Batch 98-100.
+
 ## Batch 452 — Fix truncation label nav bawah + "offside" pill/tab drag-tap
 2 instruksi eksplisit user: (1) minimalkan tulisan label nav bawah yang terpotong ellipsis, (2)
 animasi pill/tab WAJIB berhenti tepat di tab tujuan tanpa "offside" (mode drag-langsung-di-bar

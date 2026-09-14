@@ -39,6 +39,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executor
@@ -113,6 +114,22 @@ import kotlin.math.abs
  * `withContext(Dispatchers.IO)` untuk decode, `bubbleArtJob?.cancel()` sebelum tiap relaunch
  * (pola identik `widgetUpdateJob` di `PlaybackService.kt` — skip/next cepat berturut-turut tidak
  * boleh bikin hasil decode lama landing belakangan menimpa art lagu yang lebih baru).
+ *
+ * **Batch 453 — auto-fade saat idle**: instruksi eksplisit user — pill/tab dibiarkan diam di atas
+ * konten app lain (opaque penuh) dirasa terlalu menutupi, minta "bisa split/di-minimize total,
+ * atau minimal fade out saat tidak digeser". [minimize] ke tepi layar (Batch 100) SUDAH ada
+ * sebagai mekanisme "total" (manual, lewat tombol chevron) — celah yang belum ada adalah kondisi
+ * IDLE tanpa aksi user sama sekali. Fix: [keepAwakeAndScheduleFade] meredupkan alpha
+ * [bubbleView] (container, bukan per-child — otomatis ikut kena baik pill penuh MAUPUN tab
+ * minimized, mana pun yang sedang terlihat) ke [IDLE_FADE_ALPHA] setelah [IDLE_FADE_DELAY_MS]
+ * tanpa sentuhan, dan mengembalikannya ke opaque penuh SEKETIKA di setiap awal interaksi baru
+ * (sentuh/drag di [setupDrag], atau tap tombol kontrol/minimize di [setupControls]) — bubble
+ * TIDAK PERNAH pudar selagi benar-benar sedang dipakai/digeser, cuma saat benar-benar dibiarkan
+ * diam. Timer pakai [bubbleScope] yang SUDAH ada (bukan Handler/Thread baru) supaya otomatis ikut
+ * ter-cancel oleh `bubbleScope.cancel()` di [onDestroy] — 0 leak, 0 dependency baru selain 1
+ * import `kotlinx.coroutines.delay` (satu paket dengan `launch`/`withContext` yang sudah dipakai).
+ * Alpha window overlay tidak mengubah keterjangkauan sentuh (`FLAG_NOT_FOCUSABLE` tidak terkait
+ * alpha) — tap pada bubble yang lagi pudar tetap normal, jadi ini murni sinyal visual "idle".
  */
 class FloatingBubbleService : Service() {
 
@@ -134,6 +151,8 @@ class FloatingBubbleService : Service() {
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private val bubbleScope = CoroutineScope(Dispatchers.Main + Job())
     private var bubbleArtJob: Job? = null
+    // Batch 453 — timer auto-fade idle, lihat KDoc kelas ini & keepAwakeAndScheduleFade().
+    private var idleFadeJob: Job? = null
 
     // Optimistic default TRUE — sebelum controller sempat konek, tap tombol tetap harus jatuh
     // ke fallback Intent lama (lihat sendPlaybackAction), bukan langsung dianggap "kosong".
@@ -298,6 +317,7 @@ class FloatingBubbleService : Service() {
         // posisi tepi yang valid lagi (mis. rotasi/resolusi beda sejak terakhir disimpan).
         // Snap ulang begitu container ke-layout, konsisten sama kondisi minimize() manapun.
         if (isMinimized) snapMinimizedToNearestEdge()
+        keepAwakeAndScheduleFade() // Batch 453 — mulai idle timer dari saat bubble pertama tampil
     }
 
     private fun applyOvalClip(imageView: ImageView) {
@@ -306,6 +326,23 @@ class FloatingBubbleService : Service() {
             override fun getOutline(v: View, outline: Outline) {
                 outline.setOval(0, 0, v.width, v.height)
             }
+        }
+    }
+
+    /** Batch 453 — reset bubble ke opaque penuh SEKETIKA (batalkan fade yang mungkin lagi
+     * berjalan/sudah selesai) lalu jadwalkan ulang fade berikutnya [IDLE_FADE_DELAY_MS] dari
+     * SEKARANG. Dipanggil di SETIAP titik masuk interaksi user (lihat pemanggil di [setupDrag]
+     * & [setupControls]) — hasilnya bubble selalu full-opacity selama masih dipakai, mulai
+     * meredup hanya setelah benar-benar tidak disentuh selama durasi itu. Lihat KDoc kelas ini
+     * untuk rasionalisasi penuh (kenapa [bubbleScope] dipakai ulang, kenapa alpha di container). */
+    private fun keepAwakeAndScheduleFade() {
+        idleFadeJob?.cancel()
+        val view = bubbleView ?: return
+        view.animate().cancel()
+        if (view.alpha != 1f) view.alpha = 1f
+        idleFadeJob = bubbleScope.launch {
+            delay(IDLE_FADE_DELAY_MS)
+            bubbleView?.animate()?.alpha(IDLE_FADE_ALPHA)?.setDuration(IDLE_FADE_ANIM_MS)?.start()
         }
     }
 
@@ -325,6 +362,7 @@ class FloatingBubbleService : Service() {
         var totalMovement = 0f
 
         view.setOnTouchListener { v, event ->
+            keepAwakeAndScheduleFade() // Batch 453 — sentuhan apa pun = full-opacity + reset timer
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = params.x
@@ -368,16 +406,25 @@ class FloatingBubbleService : Service() {
     }
 
     private fun setupControls(view: View) {
+        // Batch 453 — 4 tombol ini clickable, jadi mengonsumsi ACTION_DOWN SEBELUM sempat ke
+        // OnTouchListener root di setupDrag (lihat KDoc di sana) — reset idle-fade dipanggil
+        // ulang eksplisit di sini supaya tap tombol kontrol juga dihitung "sedang dipakai".
         view.findViewById<ImageButton>(R.id.bubble_play_pause).setOnClickListener {
+            keepAwakeAndScheduleFade()
             if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_TOGGLE_PLAY) else openApp()
         }
         view.findViewById<ImageButton>(R.id.bubble_prev).setOnClickListener {
+            keepAwakeAndScheduleFade()
             if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_PREVIOUS) else openApp()
         }
         view.findViewById<ImageButton>(R.id.bubble_next).setOnClickListener {
+            keepAwakeAndScheduleFade()
             if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_NEXT) else openApp()
         }
-        view.findViewById<ImageButton>(R.id.bubble_minimize).setOnClickListener { minimize() }
+        view.findViewById<ImageButton>(R.id.bubble_minimize).setOnClickListener {
+            keepAwakeAndScheduleFade()
+            minimize()
+        }
     }
 
     /** Ciutkan pill penuh jadi tab 48dp nempel tepi layar. Service/notifikasi foreground TIDAK
@@ -516,5 +563,10 @@ class FloatingBubbleService : Service() {
         private const val TOUCH_SLOP = 12f
         private const val NOTIFICATION_CHANNEL_ID = "floating_bubble"
         private const val NOTIFICATION_ID = 7002 // beda dari COLD_START_NOTIFICATION_ID (7001)
+
+        // Batch 453 — tuning auto-fade idle, lihat KDoc kelas & keepAwakeAndScheduleFade().
+        private const val IDLE_FADE_DELAY_MS = 2500L
+        private const val IDLE_FADE_ALPHA = 0.45f
+        private const val IDLE_FADE_ANIM_MS = 250L
     }
 }

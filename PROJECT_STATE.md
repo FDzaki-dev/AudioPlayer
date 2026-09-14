@@ -12,6 +12,44 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 453**: instruksi eksplisit user — fitur mini player mengambang (bubble) "wajib
+bisa split/di-minimize total, atau minimal dulu bisa fade out saat tidak digeser". Perluasan
+langsung sektor bubble (Roadmap #11, Batch 95-100), bukan reopen sektor DITUTUP manapun.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt` —
+1. **Cek dulu, bukan reimplementasi dari nol**: mekanisme "total" SUDAH ada sejak Batch 100 —
+   tombol chevron minimize mengciutkan pill jadi tab 48dp nempel tepi layar (manual, lewat tap).
+   Celah sesungguhnya: kondisi IDLE (bubble dibiarkan diam TANPA aksi apa pun) tetap 100% opaque
+   selamanya, menutupi konten di baliknya — persis skenario di video user (pill mengambang diam
+   di atas daftar "Paling Sering Diputar"). Fix batch ini menyasar celah itu, sesuai opsi fallback
+   eksplisit user ("minimal dulu bisa fade out").
+2. **Fitur baru**: `keepAwakeAndScheduleFade()` — meredupkan alpha `bubbleView` (container
+   `FrameLayout`, BUKAN per-child) ke 0.45f setelah 2.5 detik tanpa sentuhan, `ViewPropertyAnimator`
+   `View.animate()` 250ms. Mengembalikan ke opaque penuh SEKETIKA (`view.animate().cancel()` +
+   `alpha=1f`) di SETIAP titik masuk interaksi baru: `setOnTouchListener` root (`setupDrag`, drag
+   MAUPUN tap-buka-app) dan ke-4 `setOnClickListener` tombol kontrol (`setupControls` —
+   play/pause/prev/next/minimize, WAJIB direset terpisah karena `ImageButton` clickable
+   mengonsumsi `ACTION_DOWN` duluan sebelum sempat ke `OnTouchListener` root, lihat KDoc
+   `setupDrag` yang sudah ada). Alpha container otomatis berlaku ke child mana pun yang sedang
+   `VISIBLE` (pill penuh ATAU tab minimized, mengikuti pola toggle-visibility 1-container Batch
+   100) — 1 titik kontrol, 0 duplikasi logic per state.
+3. **0 mekanisme baru untuk timer**: reuse `bubbleScope` (`CoroutineScope(Dispatchers.Main +
+   Job())`) yang SUDAH ada untuk `bubbleArtJob` — job baru `idleFadeJob` (`delay()` +
+   cek-null-lalu-animate), otomatis ikut ter-cancel oleh `bubbleScope.cancel()` di `onDestroy()`
+   yang sudah ada, 0 Handler/Thread baru, 0 leak. 1 import baru: `kotlinx.coroutines.delay`
+   (satu paket persis dengan `launch`/`withContext` yang sudah diimport).
+4. Alpha window TIDAK mengubah keterjangkauan sentuh (`FLAG_NOT_FOCUSABLE` independen dari
+   alpha) — tap pada bubble yang lagi pudar tetap berfungsi normal, murni sinyal visual.
+5. 0 file lain disentuh, 0 breaking change ke `minimize()`/`expand()`/`setupDrag` logic lama.
+
+**0 diverifikasi CI/device Batch 453** — review manual (baca kode + cek balance brace/paren:
+`{}` 70/70, `()` 294/294, `[]` 28/28), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini (konsisten pola Batch 435-452). Perlu konfirmasi device fisik
+berikutnya: (1) bubble (pill penuh MAUPUN tab minimized) benar meredup ke ~45% opacity setelah
+±2.5 detik diam, TIDAK meredup selagi masih di-drag/di-tap kontrolnya; (2) opacity kembali penuh
+SEKETIKA begitu disentuh lagi (drag maupun tap tombol), 0 delay/lompatan visual; (3) 0 regresi ke
+mekanisme minimize/expand/snap-tepi/drag-bebas Batch 98-100 yang sudah ada.
+
 **Catatan Batch 452**: 2 instruksi eksplisit user — (1) minimalkan tulisan label nav bawah yang
 terpotong ellipsis, (2) animasi pill/tab WAJIB berhenti tepat di tab tujuan tanpa "offside" (baik
 mode drag-langsung-di-bar maupun tap-tab biasa).
@@ -750,20 +788,27 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 452. ZIP terakhir: `SONIX_v452.zip`. 1 file source diubah: `MainActivity.kt`
-  (2 fix: padding label nav 12.dp->4.dp anti-truncation; urutan pressed-check loop drag-tab-bar
-  anti-"offside" — detail lengkap di catatan Batch 452 di atas & CHANGELOG.md).
-- **BELUM dikonfirmasi (baru, Batch 452)**: (1) label 3 tab 0 lagi ellipsis di font normal; (2)
-  drag flick cepat + tap-tab biasa berhenti TEPAT di tab tujuan, 0 "mundur 1 kolom". 0
-  compile/device/CI sesi ini (konsisten pola Batch 435-451) — prioritas verifikasi user
-  BERIKUTNYA.
+- Batch terakhir: 453. ZIP terakhir: `SONIX_v453.zip`. 1 file source diubah:
+  `FloatingBubbleService.kt` (fitur baru: auto-fade alpha bubble ke 0.45f setelah 2.5 detik
+  idle, restore opaque penuh seketika di setiap sentuhan/tap kontrol — detail lengkap di catatan
+  Batch 453 di atas & CHANGELOG.md). Sektor bubble (Roadmap #11) dibuka lagi batch ini per
+  instruksi eksplisit user, TIDAK ada sektor DITUTUP yang tersentuh.
+- **BELUM dikonfirmasi (baru, Batch 453)**: (1) bubble meredup ~45% opacity setelah ±2.5 detik
+  diam (pill penuh maupun tab minimized); (2) TIDAK meredup selagi masih digeser/tombol
+  kontrolnya ditekan; (3) opacity kembali penuh seketika begitu disentuh lagi; (4) 0 regresi ke
+  minimize/expand/snap-tepi/drag-bebas Batch 98-100. 0 compile/device/CI sesi ini (konsisten pola
+  Batch 435-452) — prioritas verifikasi user BERIKUTNYA. Catatan: kalau user masih menganggap
+  fade saja belum cukup, mandat "split/di-minimize TOTAL otomatis saat idle" (bukan cuma
+  fade+manual-minimize yang ada sekarang) adalah kandidat perluasan batch berikutnya.
+- **BELUM dikonfirmasi (Batch 452, masih berlaku)**: (1) label 3 tab 0 lagi ellipsis di font
+  normal; (2) drag flick cepat + tap-tab biasa berhenti TEPAT di tab tujuan, 0 "mundur 1 kolom".
 - **DIKONFIRMASI device fisik user (Batch 451, masih berlaku)**: (1) pill ukuran normal, 0 kapsul
   raksasa (fix Batch 450); (2) 0 kilatan kotak abu-abu di tab ditinggalkan (fix Batch 449).
 - **BELUM dikonfirmasi (lama)**: regresi warna ikon/label tema Skeu (video user Batch 451 pakai
   tema default/gelap, bukan Skeu). TalkBack tidak bisa dicek dari rekaman visual.
-- Mandat lain: 0 ada. Sektor bottom nav (Batch 448-451, +2 fix Batch 452) dianggap aktif-stabil
-  kecuali user laporkan temuan baru. Lanjutkan sektor manapun yang diminta user berikutnya (0
-  sektor DITUTUP baru dibuka batch ini, 0 sektor baru ditutup juga).
+- Mandat lain: 0 ada. Sektor bottom nav (Batch 448-452) dianggap aktif-stabil kecuali user
+  laporkan temuan baru. Lanjutkan sektor manapun yang diminta user berikutnya (0 sektor DITUTUP
+  baru dibuka permanen, 0 sektor baru ditutup juga).
 - **PELAJARAN PROSES Batch 450 TETAP berlaku** (lihat komentar kode di `CustomNavBarTabItem`):
   modifier layout yang meniru API resmi WAJIB diverifikasi ke source/dokumentasi asli dulu,
   jangan diasumsikan.
