@@ -964,6 +964,23 @@ private object NoRippleIndication : IndicationNodeFactory {
 // label Skeu akan STATIS 1 warna (regresi fungsional, bukan cuma soal gray-flash) — diganti snap
 // biner eksplisit ke token `NavigationBarItemDefaults` yang sama, 0 lerp (aturan solid Batch
 // 58/61/79 tidak disentuh).
+// Batch 450 — REGRESI FATAL: user lampirkan video, pill (`drawWithContent` Batch 448 di
+// `NavigationBar`) melar jadi kapsul raksasa (dari pertengahan layar sampai hampir dasar layar),
+// bukan lagi pas di belakang ikon+label. Root cause: `Modifier.fillMaxHeight()` DITAMBAHKAN di
+// `Box` bawah ini (Batch 449) — asumsi keliru bahwa `NavigationBarItem` internal juga
+// `fillMaxHeight()` (TIDAK PERNAH diverifikasi ke source asli M3 sebelum ditulis, cuma tebakan).
+// Faktanya `NavigationBarItem` cuma bungkus konten ke ukuran NATURAL (icon+label, wrap-content),
+// TIDAK PERNAH fillMaxHeight. `Box(fillMaxHeight())` di sini bikin `Row` konten `NavigationBar`
+// (non-weighted child di Column luar, diukur dgn constraint maxHeight LONGGAR/belum dipotong)
+// ikut melar minta tinggi maksimal yg tersedia — `NavigationBar` (composable pembungkus) jadi
+// jauh lebih tinggi dari seharusnya, dan pill `drawWithContent` yg skalanya ikut `size.height`
+// composable itu ikut melar sama persis. FIX: `.fillMaxHeight()` DIHAPUS TOTAL, `Box` kembali
+// wrap-content PERSIS kontrak asli `NavigationBarItem` (0 pengganti lain dibutuhkan — konten
+// `GlassTabIcon` sendiri sudah py padding/minWidth cukup utk touch target, terbukti device Batch
+// 448 sebelum Batch 449 mengacaukannya). PELAJARAN: modifier layout (`fillMaxHeight`/`weight`/dst)
+// yg meniru API resmi WAJIB diverifikasi ke source/dokumentasi asli dulu, bukan diasumsikan dari
+// pola modifier lain di codebase yg mirip tapi beda konteks — kesalahan 1 modifier bisa merusak
+// SELURUH bottom nav (bukan cuma 1 tab), lebih parah dari bug yg sedang diperbaiki.
 @Composable
 private fun RowScope.CustomNavBarTabItem(
     selected: Boolean,
@@ -974,7 +991,6 @@ private fun RowScope.CustomNavBarTabItem(
     Box(
         modifier = Modifier
             .weight(1f, fill = true)
-            .fillMaxHeight()
             .selectable(
                 selected = selected,
                 onClick = onClick,

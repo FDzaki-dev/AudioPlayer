@@ -12,17 +12,15 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
-**Catatan Batch 449**: user device-test Batch 448 (video rekaman layar asli) — pill unified DIKONFIRMASI
-0 seam/kotak-ganda (fix Batch 448 valid). Temuan baru: kilatan kotak abu-abu ~0.25 detik di tab
-yang baru ditinggalkan, tiap pindah tab — root cause `NavigationBarItem` M3 sendiri (state-layer
-internal hardcoded, TIDAK baca `LocalIndication.current` — override `NoRippleIndication` Batch 439
-TIDAK PERNAH menyentuhnya), BUKAN regresi pill Batch 448. User instruksi eksplisit rombak total
-(scope besar, risiko lebih tinggi, disetujui eksplisit): `NavigationBarItem` dihapus total dari
-bottom nav, diganti `CustomNavBarTabItem` (Row+Box manual + `Modifier.selectable(indication =
-null)`). Efek samping wajib ikut fix: warna ikon/label tema Skeu (dulu implisit lewat
-`LocalContentColor` yang disuplai `NavigationBarItem`) diganti snap eksplisit ke token M3 resmi.
-`NavigationRailItem` tablet TIDAK disentuh (0 laporan bug, di luar scope). Detail lengkap:
-`CHANGELOG.md` Batch 449.
+**Catatan Batch 450**: REGRESI FATAL dari Batch 449 — user lampirkan video, pill unified (Batch
+448) melar jadi kapsul raksasa (dari pertengahan layar sampai hampir dasar layar). Root cause:
+`Modifier.fillMaxHeight()` yang ditambahkan ke `CustomNavBarTabItem` (Batch 449) berdasar asumsi
+KELIRU soal sizing internal `NavigationBarItem` M3 (tidak pernah fillMaxHeight, cuma wrap-content)
+— TIDAK diverifikasi ke source resmi sebelum ditulis. `Row` konten `NavigationBar` ikut melar
+minta tinggi maksimal, pill `drawWithContent` (Batch 448) yang skalanya ikut `size.height`
+composable itu ikut melar. Fix: `.fillMaxHeight()` dihapus total, `Box` kembali wrap-content.
+0 perubahan lain dari Batch 449 (temuan kilatan abu-abu & fix Skeu color Batch 449 TETAP berlaku,
+tidak disentuh batch ini). Detail lengkap: `CHANGELOG.md` Batch 450.
 
 **1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt` —
 1. `GlassTabIcon`: background/border pill glass per-tab (non-Skeu) DIHAPUS TOTAL — dulu setiap
@@ -719,33 +717,29 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 449. ZIP terakhir: `SONIX_v449.zip`. 1 file source diubah: `MainActivity.kt`.
-- Sektor barusan: bottom nav phone (`AppNavHost`) — `NavigationBarItem` M3 DIHAPUS TOTAL dari 3
-  titik pemakaian, diganti `CustomNavBarTabItem` (composable baru, Row+Box manual). Root cause bug
-  user (kilatan kotak abu-abu ~0.25 detik di tab yang baru ditinggalkan, tiap pindah tab) sudah
-  ditemukan & diperbaiki: state-layer internal `NavigationBarItem` M3 (hardcoded, tidak baca
-  `LocalIndication.current`) yang TIDAK PERNAH benar-benar dimatikan oleh `NoRippleIndication`
-  (Batch 439) — sekarang 0 lagi `NavigationBarItem` di titik ini, 0 lagi state-layer bawaan M3 yang
-  bisa berkedip. Efek samping ikut diperbaiki: warna ikon/label tema Skeu (dulu implisit lewat
-  `LocalContentColor` NavigationBarItem) kini eksplisit token M3 resmi (0 lerp, aturan solid Batch
-  58/61/79 tidak disentuh). `NavigationBar` (pembungkus M3, pill `drawWithContent` Batch 448) DAN
-  `NavigationRailItem` tablet TIDAK disentuh sama sekali.
-- Pill unified Batch 448 sendiri **DIKONFIRMASI user di device asli Batch 449**: 0 seam/kotak-ganda.
-  Item ini pindah dari "belum diverifikasi" ke "confirmed" — lihat README.md § unverified-list.
-- **0 diverifikasi device/CI untuk fix Batch 449 ini sendiri** — SOP builder/compiler Kotlin/
-  Gradle/device fisik 0 tersedia sesi ini (sama seperti Batch 435-448 sebelumnya). Mandat sesi
-  berikutnya JIKA user kirim video/laporan baru soal bottom nav: cross-check DULU ke kode Batch
-  449 ini (grep `CustomNavBarTabItem`) sebelum nambah patch baru. Kalau user laporkan kilatan
-  abu-abu LAGI, curigai regresi baru dulu (mis. `indication` param diam-diam ke-override lagi di
-  titik lain) — BUKAN ulangi pola lama "bungkus LocalIndication" (Batch 439) yang sudah TERBUKTI
-  gagal/tidak menyentuh akar masalah. Verifikasi spesifik yang perlu dicek user: (1) 0 kilatan
-  abu-abu di tab yang ditinggalkan, (2) 0 regresi warna ikon/label tema Skeu (kontras selected vs
-  unselected masih kelihatan beda), (3) klik/routing/haptic-bouncyPress semua tab masih normal,
-  (4) TalkBack/screen-reader masih baca tab sebagai "Tab, terpilih/tidak terpilih" seperti biasa.
-- 0 ZIP baru dari user di sesi ini (SONIX_v448.zip → source dipakai, output SONIX_v449.zip).
+- Batch terakhir: 450. ZIP terakhir: `SONIX_v450.zip`. 1 file source diubah: `MainActivity.kt`.
+- Sektor barusan: REGRESI FATAL dari Batch 449 sendiri — `Modifier.fillMaxHeight()` di
+  `CustomNavBarTabItem` (asumsi keliru, tidak diverifikasi ke source M3 resmi) bikin pill unified
+  Batch 448 melar jadi kapsul raksasa. Fix: `.fillMaxHeight()` dihapus, `Box` kembali wrap-content.
+  Temuan/fix Batch 449 lain (hapus `NavigationBarItem`, fix warna Skeu) TETAP berlaku, 0 disentuh.
+- **0 diverifikasi device/CI** — SOP builder/compiler Kotlin/Gradle/device fisik 0 tersedia sesi
+  ini (sama seperti Batch 435-449 sebelumnya). **Mandat KRITIS sesi berikutnya**: begitu user
+  kirim video/laporan verifikasi, urutan cek WAJIB: (1) pill kembali ukuran NORMAL (pas di
+  belakang icon+label 1 tab, bukan kapsul raksasa) — ini yang PALING PRIORITAS karena regresinya
+  paling parah/paling terlihat; (2) baru setelah itu cek temuan asli Batch 449 (0 kilatan abu-abu
+  di tab yang ditinggalkan); (3) 0 regresi warna ikon/label tema Skeu; (4) klik/routing/haptic/
+  TalkBack semua tab masih normal. JANGAN asumsikan (1) otomatis beres tanpa konfirmasi user —
+  hanya dianalisis dari kode + pola dari video regresi, bukan device fisik.
+- **PELAJARAN PROSES (wajib diingat lintas sesi)**: modifier layout yang meniru/menggantikan
+  perilaku API resmi M3 (`NavigationBarItem`, dst.) WAJIB diverifikasi dulu ke source/dokumentasi
+  asli (web_search kalau perlu) sebelum ditulis — JANGAN diasumsikan dari pola modifier lain di
+  codebase yang tampak mirip tapi beda konteks. Kesalahan 1 modifier (`fillMaxHeight`) bisa
+  merusak SELURUH bottom nav, bukan cuma 1 komponen kecil — jauh lebih parah dari bug asal yang
+  sedang diperbaiki. Terapkan kewaspadaan ekstra ini di SEMUA rombakan scope-besar berikutnya.
+- 0 ZIP baru dari user di sesi ini (SONIX_v449.zip → source dipakai, output SONIX_v450.zip).
   Kalau sesi berikutnya mulai dari ZIP baru user, cek dulu apakah `MainActivity.kt` versi user
-  masih mengandung perubahan Batch 449 ini (grep `CustomNavBarTabItem`) — kalau HILANG/di-revert,
-  itu tanda ZIP user berasal dari titik SEBELUM batch ini, bukan berarti Batch 449 perlu diulang
-  buta tanpa konfirmasi ke user dulu.
+  masih mengandung perubahan Batch 450 ini (grep `CustomNavBarTabItem`, pastikan 0 ada
+  `fillMaxHeight` di fungsi itu) — kalau regresi Batch 449 muncul lagi (fillMaxHeight balik), itu
+  tanda ZIP user berasal dari titik SEBELUM batch ini.
 - Mandat lain: 0 ada, lanjutkan sektor manapun yang diminta user berikutnya (0 sektor DITUTUP
   baru dibuka batch ini, 0 sektor baru ditutup juga).

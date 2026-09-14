@@ -1,5 +1,41 @@
 # Changelog
 
+## Batch 450 — REGRESI FATAL Batch 449: pill melar jadi kapsul raksasa (fillMaxHeight keliru)
+User lampirkan video: pill (unified, Batch 448) melar total — dari pertengahan layar sampai
+hampir dasar layar, bukan lagi pas di belakang ikon+label 1 tab. Regresi TERPARAH yang pernah
+dilaporkan user di proyek ini.
+
+**Root cause**: `Modifier.fillMaxHeight()` yang ditambahkan ke `Box` `CustomNavBarTabItem` di
+Batch 449, berdasar ASUMSI KELIRU bahwa `NavigationBarItem` M3 internal juga `fillMaxHeight()`
+— asumsi ini TIDAK PERNAH diverifikasi ke source/dokumentasi resmi sebelum ditulis. Faktanya
+`NavigationBarItem` cuma wrap-content (ukuran natural icon+label), tidak pernah fillMaxHeight.
+Akibatnya: `Row` konten `NavigationBar` (non-weighted child di Column luar, diukur dgn
+constraint maxHeight LONGGAR/belum dipotong oleh Compose) ikut melar minta tinggi maksimal yang
+tersedia — `NavigationBar` (composable pembungkus) jadi jauh lebih tinggi dari seharusnya, dan
+pill `drawWithContent` (Batch 448) yang skalanya mengikuti `size.height` composable itu ikut
+melar sama persis.
+
+**1 file diubah** (`MainActivity.kt`, dalam batas 3 file/tugas):
+
+1. `.fillMaxHeight()` DIHAPUS TOTAL dari `CustomNavBarTabItem` — `Box` kembali wrap-content,
+   PERSIS kontrak asli `NavigationBarItem` yang sebelumnya sudah terbukti benar (device Batch
+   448 confirmed 0 masalah, sebelum Batch 449 mengacaukannya). 0 pengganti lain dibutuhkan —
+   `GlassTabIcon` sendiri sudah punya padding/minWidth cukup untuk touch target.
+2. 0 perubahan lain — `.weight(1f, fill = true)`, `.selectable(indication = null, ...)`, isi
+   `GlassTabIcon` di 3 titik pemakaian, semuanya PERSIS sama seperti Batch 449 (yang salah cuma
+   1 baris modifier).
+
+**Pelajaran dicatat di komentar kode** (di definisi `CustomNavBarTabItem`): modifier layout yang
+meniru API resmi WAJIB diverifikasi ke source/dokumentasi asli dulu, bukan diasumsikan dari pola
+modifier lain di codebase yang mirip tapi beda konteks — 1 modifier salah bisa merusak SELURUH
+bottom nav (bukan cuma 1 tab), jauh lebih parah dari bug asal yang sedang diperbaiki.
+
+**0 diverifikasi CI/device Batch 450** — review manual (baca kode + cek balance brace/paren: `{}`
+333/333, `()` 1180/1180, `[]` 3/3), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. **Prioritas verifikasi user berikutnya: pastikan pill kembali ukuran
+NORMAL (pas di belakang icon+label 1 tab, bukan kapsul raksasa) sebelum cek ulang temuan kilatan
+abu-abu Batch 449 (yang jadi TIDAK TERLIHAT/tidak relevan selama regresi Batch 450 ini masih ada).**
+
 ## Batch 449 — Hapus total NavigationBarItem M3 (fix kilatan kotak abu-abu tab ditinggalkan)
 User device-test Batch 448 (video rekaman layar asli): pill unified (fix Batch 448) DIKONFIRMASI
 meluncur mulus lintas kolom, 0 seam/kotak-ganda. Ditemukan 1 bug baru tak terkait pill: kilatan
