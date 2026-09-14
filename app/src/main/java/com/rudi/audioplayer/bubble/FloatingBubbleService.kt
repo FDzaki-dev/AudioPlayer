@@ -11,6 +11,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Outline
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
@@ -201,6 +202,23 @@ import kotlin.math.abs
  * SEKETIKA saat [onConfigurationChanged] terpanggil pasca-rotasi (beda dari Activity/
  * WindowContext), `currentWindowMetrics` (API 30+, aman di minSdk 31) selalu bounds window
  * REAL-TIME. 0 breaking change ke formula/state lain, 0 sektor DITUTUP disentuh.
+ *
+ * **Batch 461 [FIX RESIDUAL] — bounds landscape masih tidak konsisten meski Batch 460**:
+ * konfirmasi device fisik user (1,2,4,5 ✅, 3 ❌ "masih nongol" — tab minimized belum SELALU
+ * mentok tepi kiri/kanan pas rotasi landscape berulang). Root cause: `windowManager` di kelas ini
+ * didapat dari Context Service BIASA (bukan `UiContext`/`WindowContext` seperti Activity) — per
+ * dokumentasi resmi `WindowManager#getCurrentWindowMetrics()`, Context non-UI SELALU jatuh ke
+ * `getMaximumWindowMetrics()`, hasilnya BUKAN dijamin sinkron atomik persis di momen rotasi (kelas
+ * masalah sama dengan `resources.displayMetrics` yang sudah didiagnosis Batch 460 — cuma API-nya
+ * beda, root sumbernya sama-sama Context Service). **Fix**: [screenBounds] (field baru, single
+ * source of truth) SEKARANG diisi dari `newConfig` (parameter [onConfigurationChanged]) — SATU-
+ * SATUNYA sumber yang dijamin sistem fresh PERSIS di momen callback rotasi terpanggil, bukan
+ * re-query Context async. 4 titik baca (sama seperti Batch 460: [onConfigurationChanged],
+ * [setupDrag], [expand], [snapMinimizedToNearestEdge]) sekarang baca [screenBounds] ter-cache,
+ * 0 lagi query `windowManager.currentWindowMetrics` langsung di titik mana pun selain nilai awal
+ * (`onCreate`, baseline sebelum rotasi pertama). 0 breaking change ke formula
+ * EDGE_CLIP_FRACTION/touchPad/visualWidth Batch 460, 0 sektor DITUTUP disentuh. BELUM
+ * diverifikasi device fisik (0 env Android nyata di sesi ini).
  */
 class FloatingBubbleService : Service() {
 
@@ -217,6 +235,19 @@ class FloatingBubbleService : Service() {
     // mati total lalu restart, posisi tersimpan yang dibaca ulang toh sudah posisi APAPUN state
     // terakhir, expanded atau minimized, cukup akurat untuk titik awal).
     private var lastExpandedX: Int? = null
+    // Batch 461 — single source of truth utk bounds layar, GANTI 4 titik baca langsung
+    // `windowManager.currentWindowMetrics.bounds` (Batch 460). Root cause residual landscape
+    // masih tidak konsisten mentok tepi meski Batch 460 sudah pakai currentWindowMetrics:
+    // `windowManager` di sini didapat dari Context Service biasa (BUKAN UiContext/WindowContext) —
+    // per dokumentasi resmi Android, `currentWindowMetrics` pada Context non-UI selalu jatuh ke
+    // `getMaximumWindowMetrics()`, yang bergantung pada objek Display yang di-cache Context itu;
+    // TIDAK ada jaminan sinkron atomik dengan momen persis rotasi terjadi (beda kelas masalah dari
+    // `resources.displayMetrics`, tapi akar sama: keduanya nebeng Context Service yang sama).
+    // Fix: [onConfigurationChanged] di-refresh dari `newConfig` — SATU-SATUNYA sumber yang
+    // dijamin sistem fresh PERSIS di momen rotasi (bukan re-query async) — field ini lalu dibaca
+    // oleh 3 fungsi lain (`setupDrag`, `expand`, `snapMinimizedToNearestEdge`), 0 lagi query
+    // WindowManager langsung di tempat lain.
+    private val screenBounds = Rect()
     private var layoutParams: WindowManager.LayoutParams? = null
     private var controller: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -249,6 +280,9 @@ class FloatingBubbleService : Service() {
         super.onCreate()
         bubbleStore = FloatingBubbleStore(this)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        // Batch 461 — nilai awal screenBounds sebelum rotasi pertama terjadi (baseline, lihat
+        // KDoc field). Sesudah ini SATU-SATUNYA writer adalah onConfigurationChanged.
+        screenBounds.set(windowManager.currentWindowMetrics.bounds)
         startForegroundWithNotification()
         addBubbleView()
         connectController()
@@ -260,6 +294,12 @@ class FloatingBubbleService : Service() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        // Batch 461 — `newConfig` DIJAMIN sistem fresh persis di momen rotasi (lihat KDoc field
+        // screenBounds) — refresh SATU-SATUNYA writer ini DULUAN, SEBELUM early-return guard di
+        // bawah, supaya screenBounds tidak pernah lewat ter-skip walau bubbleView/layoutParams
+        // sempat null (mis. timing race view belum sempat di-attach).
+        val density = resources.displayMetrics.density
+        screenBounds.set(0, 0, (newConfig.screenWidthDp * density).toInt(), (newConfig.screenHeightDp * density).toInt())
         val view = bubbleView ?: return
         val params = layoutParams ?: return
         // Batch 100 — kalau lagi minimized, X SELALU harus tetap di tepi 0/maxX (bukan cuma
@@ -269,9 +309,9 @@ class FloatingBubbleService : Service() {
             snapMinimizedToNearestEdge()
             return
         }
-        // Batch 460 — currentWindowMetrics (bukan resources.displayMetrics), lihat KDoc kelas
-        // "Batch 460" kenapa sumber ini dipilih (fix kliping landscape).
-        val bounds = windowManager.currentWindowMetrics.bounds
+        // Batch 461 — baca dari screenBounds ter-cache (bukan lagi query currentWindowMetrics
+        // langsung), lihat KDoc field.
+        val bounds = screenBounds
         val maxX = (bounds.width() - view.width).coerceAtLeast(0)
         val maxY = (bounds.height() - view.height).coerceAtLeast(0)
         val clampedX = params.x.coerceIn(0, maxX)
@@ -462,9 +502,8 @@ class FloatingBubbleService : Service() {
                     val dy = event.rawY - initialTouchY
                     totalMovement += abs(dx) + abs(dy)
                     if (totalMovement > TOUCH_SLOP) {
-                        // Batch 460 — currentWindowMetrics, sama alasan onConfigurationChanged
-                        // (lihat KDoc kelas "Batch 460").
-                        val bounds = windowManager.currentWindowMetrics.bounds
+                        // Batch 461 — screenBounds ter-cache, lihat KDoc field (ganti currentWindowMetrics).
+                        val bounds = screenBounds
                         val maxX = (bounds.width() - v.width).coerceAtLeast(0)
                         val maxY = (bounds.height() - v.height).coerceAtLeast(0)
                         params.x = (initialX + dx.toInt()).coerceIn(0, maxX)
@@ -542,9 +581,8 @@ class FloatingBubbleService : Service() {
         expandedView?.visibility = View.VISIBLE
         bubbleStore.setMinimized(false)
         container.post {
-            // Batch 460 — currentWindowMetrics, sama alasan onConfigurationChanged (lihat KDoc
-            // kelas "Batch 460").
-            val maxX = (windowManager.currentWindowMetrics.bounds.width() - container.width)
+            // Batch 461 — screenBounds ter-cache, lihat KDoc field (ganti currentWindowMetrics).
+            val maxX = (screenBounds.width() - container.width)
                 .coerceAtLeast(0)
             params.x = (lastExpandedX ?: params.x).coerceIn(0, maxX)
             runCatching { windowManager.updateViewLayout(container, params) }
@@ -604,7 +642,8 @@ class FloatingBubbleService : Service() {
             val visualWidth = minimizedView?.findViewById<View>(R.id.bubble_minimized_visual)
                 ?.width?.takeIf { it > 0 } ?: width
             val touchPad = ((width - visualWidth) / 2).coerceAtLeast(0)
-            val bounds = windowManager.currentWindowMetrics.bounds
+            // Batch 461 — screenBounds ter-cache, lihat KDoc field (ganti currentWindowMetrics).
+            val bounds = screenBounds
             val screenWidth = bounds.width()
             val hiddenWidth = touchPad + (visualWidth * EDGE_CLIP_FRACTION).toInt()
             val nearestRight = (params.x + width / 2) > screenWidth / 2

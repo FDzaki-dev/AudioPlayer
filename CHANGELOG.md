@@ -1,5 +1,42 @@
 # Changelog
 
+## Batch 461 — Fix residual: landscape masih tidak konsisten mentok tepi (device fisik Batch 460: item 3 ❌)
+Konfirmasi device fisik user Batch 460 — (1) mini trigger lebih gampang di-tap ✅, (2) bagian
+timbul ~10% ✅, (3) mentok tepi konsisten landscape ❌ **"masih nongol"**, (4) drag 100% kelihatan
+✅, (5) 0 regresi ✅. Fix Batch 460 (`resources.displayMetrics` → `windowManager.
+currentWindowMetrics.bounds`) TERBUKTI BELUM CUKUP untuk item (3) — root cause sebenarnya
+ditemukan & diperbaiki di batch ini.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+
+1. **Root cause sebenarnya**: `windowManager` di kelas ini didapat dari Context `Service` BIASA
+   (bukan `UiContext`/`WindowContext` seperti Activity). Per dokumentasi resmi
+   `WindowManager#getCurrentWindowMetrics()`, Context non-UI SELALU jatuh ke
+   `getMaximumWindowMetrics()` — hasilnya TIDAK dijamin sinkron atomik persis di momen rotasi
+   terjadi. Kelas masalah SAMA dengan `resources.displayMetrics` yang didiagnosis Batch 460 (root
+   sumbernya sama-sama Context Service yang sama) — swap API Batch 460 mengurangi tapi tidak
+   menghilangkan race ini, terutama saat rotasi bolak-balik cepat (persis skenario device-test #3).
+2. **Fix — single source of truth `screenBounds`**: field baru `private val screenBounds = Rect()`
+   diisi dari parameter `newConfig` di `onConfigurationChanged` (dp → px via
+   `resources.displayMetrics.density`) — SATU-SATUNYA sumber yang DIJAMIN sistem fresh PERSIS di
+   momen callback rotasi terpanggil, bukan re-query Context async. Nilai awal (sebelum rotasi
+   pertama) di-set sekali di `onCreate` dari `currentWindowMetrics.bounds` sebagai baseline.
+3. **4 titik baca diganti ke `screenBounds` ter-cache** (sama seperti daftar titik Batch 460):
+   `onConfigurationChanged` (clamp expanded), `setupDrag` (ACTION_MOVE), `expand()`,
+   `snapMinimizedToNearestEdge()`. Refresh `screenBounds` dipindah ke BARIS PALING ATAS
+   `onConfigurationChanged` (sebelum early-return guard `bubbleView`/`layoutParams` null) supaya
+   tidak pernah ter-skip.
+4. 0 breaking change ke formula `EDGE_CLIP_FRACTION`/`touchPad`/`visualWidth` Batch 460, 0
+   breaking change ke minimize/expand/fade/auto-minimize Batch 98-100/453/454/455/457/458, 0
+   sektor DITUTUP disentuh.
+
+**0 diverifikasi CI/device Batch 461** — review manual (baca kode + cek balance brace/paren:
+`{}` 72/72, `()` 416/416, `[]` 72/72), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Perlu konfirmasi device fisik berikutnya: (1) rotasi ke landscape
+(bolak-balik beberapa kali berturut-turut) → tab minimized SELALU mentok tepi kiri/kanan dengan
+benar, 0 lagi "nongol"; (2) re-konfirmasi item 1/2/4/5 Batch 460 tetap ✅ (0 regresi dari perubahan
+sumber bounds); (3) 0 regresi ke minimize/expand/fade/auto-minimize Batch 98-100/453/454.
+
 ## Batch 460 — Touch target tab minimized diperluas independen dari visual + fix kliping landscape
 2 instruksi eksplisit user, dijalankan sekaligus (bukan mandat baru — kelanjutan langsung dari
 residual UX yang dicatat Batch 458/459: "mini trigger sedikit lebih susah di-tap"):

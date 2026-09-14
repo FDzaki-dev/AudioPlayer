@@ -12,6 +12,39 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 461 [FIX RESIDUAL]**: konfirmasi device fisik user Batch 460 — (1)/(2)/(4)/(5) ✅,
+(3) mentok tepi konsisten landscape ❌ ("masih nongol", rotasi bolak-balik). Fix Batch 460
+(`resources.displayMetrics`→`currentWindowMetrics.bounds`) TERBUKTI BELUM CUKUP untuk item (3).
+0 klarifikasi tap diperlukan — laporan user ("except no.3 ❌ masih nongol") cukup spesifik
+dipadukan dengan review kode static (root cause dapat ditentukan deterministik dari dokumentasi
+resmi WindowManager, bukan ambiguitas material). 0 sektor DITUTUP disentuh.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+1. **Root cause sebenarnya ditemukan**: `windowManager` di kelas ini didapat dari Context `Service`
+   biasa (BUKAN `UiContext`/`WindowContext`) — per dokumentasi resmi
+   `WindowManager#getCurrentWindowMetrics()`, Context non-UI SELALU jatuh ke
+   `getMaximumWindowMetrics()`, TIDAK dijamin sinkron atomik persis di momen rotasi. Kelas masalah
+   SAMA dengan `resources.displayMetrics` (Batch 460) — root sumber sama-sama Context Service yang
+   sama, swap API Batch 460 mengurangi tapi tidak menghilangkan race, terutama saat rotasi
+   bolak-balik cepat (persis skenario device-test #3).
+2. **Fix — `screenBounds` (single source of truth, field baru `Rect`)**: diisi dari parameter
+   `newConfig` di `onConfigurationChanged` (dp→px via `resources.displayMetrics.density`) — SATU-
+   SATUNYA sumber yang DIJAMIN sistem fresh PERSIS di momen callback rotasi, bukan re-query Context
+   async. Nilai awal (sebelum rotasi pertama) di-set sekali di `onCreate` dari
+   `currentWindowMetrics.bounds` (baseline). Refresh dipindah ke baris PALING ATAS
+   `onConfigurationChanged`, sebelum early-return guard `bubbleView`/`layoutParams` null.
+3. **4 titik baca diganti ke `screenBounds` ter-cache** (titik sama seperti Batch 460):
+   `onConfigurationChanged`, `setupDrag`, `expand()`, `snapMinimizedToNearestEdge()`. 0 lagi query
+   `windowManager.currentWindowMetrics` langsung di titik mana pun selain nilai awal `onCreate`.
+4. 0 breaking change ke `EDGE_CLIP_FRACTION`/`touchPad`/`visualWidth` (Batch 460), 0 breaking
+   change ke minimize/expand/fade/auto-minimize Batch 98-100/453/454/455/457/458.
+
+**0 diverifikasi CI/device Batch 461** — review manual (baca kode + cek balance brace/paren:
+`{}` 72/72, `()` 416/416, `[]` 72/72), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. README.md diperbarui (blockquote Batch 460 dikoreksi ANTI-STALE:
+item 1/2/4/5 ditandai ✅ device-fisik, item 3 ditandai ❌+fix baru; deskripsi fitur bubble
+dikoreksi dari klaim "konsisten landscape" yang ternyata belum terbukti).
+
 **Catatan Batch 460**: 2 instruksi eksplisit user sekaligus — (1) "perluas touch target nya biar
 gak nyusahin, sedangkan visual turunkan jadi ~10% yang timbul saja"; (2) "fix juga agar fitur
 bubble bisa ke kliping mentok ujung layar walaupun hp sedang dalam mode horizontal". Kelanjutan
@@ -962,33 +995,44 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 460. ZIP terakhir: `SONIX_v460.zip`. **2 file diubah** (dalam batas 3
-  file/tugas): `bubble_minimized.xml` (root 48dp→88dp, touch target dipisah dari visual lewat
-  child baru `bubble_minimized_visual`) + `FloatingBubbleService.kt` (`snapMinimizedToNearestEdge`
-  dipisah jadi `visualWidth`/`touchPad`, `EDGE_CLIP_FRACTION` 0.7f→0.9f, 4 titik
-  `resources.displayMetrics`→`windowManager.currentWindowMetrics.bounds` untuk fix kliping
-  landscape). Detail penuh di blok "Catatan Batch 460" di atas & `CHANGELOG.md`. Sektor bubble
-  (Roadmap #11) masih terbuka, TIDAK ada sektor DITUTUP yang tersentuh.
-- **BELUM dikonfirmasi device fisik (Batch 460, baru)**: (1) mini trigger LEBIH GAMPANG di-tap
-  dari Batch 458/459 (fix residual UX "sedikit lebih susah" yang dilaporkan user); (2) bagian
-  kelihatan tab minimized ~10% (turun dari Batch 458's ~30%); (3) rotasi ke landscape (bolak-balik
-  beberapa kali) → tab minimized SELALU mentok tepi kiri/kanan dengan benar; (4) drag tab
-  minimized tetap 100% kelihatan/terkontrol penuh selagi digeser; (5) 0 regresi ke
-  minimize/expand/fade/auto-minimize Batch 98-100/453/454.
-- **DIKONFIRMASI device fisik user (Batch 458, masih berlaku sebagai baseline)**: (1) tab
-  minimized ~30% kelihatan/~70% tersembunyi di semua jalur snap — sesuai target Batch 458 (nilai
-  ini SUDAH DIGANTIKAN ~10%/~90% oleh Batch 460 di atas, belum dikonfirmasi ulang); (2) mini
-  trigger tetap bisa di-tap, TAPI user laporkan "sedikit lebih susah" — **residual ini yang
-  dieksekusi fix-nya di Batch 460**, belum dikonfirmasi hasilnya; (3) drag tab minimized 100%
-  kelihatan/terkontrol penuh selagi digeser — confirmed; (4) 0 regresi ke
-  minimize/expand/fade/auto-minimize Batch 98-100/453/454 — confirmed.
+- Batch terakhir: 461. ZIP terakhir: `SONIX_v461.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `FloatingBubbleService.kt` — fix residual item (3) Batch 460 (landscape "masih
+  nongol"). Root cause: `currentWindowMetrics` dari Context Service biasa tidak dijamin sinkron
+  atomik persis di momen rotasi (kelas masalah sama dgn `resources.displayMetrics` Batch 460).
+  Fix: `screenBounds` (field `Rect` baru, single source of truth) diisi dari `newConfig` di
+  `onConfigurationChanged` (satu-satunya sumber dijamin fresh persis di momen rotasi), 4 titik baca
+  (`onConfigurationChanged`/`setupDrag`/`expand`/`snapMinimizedToNearestEdge`) diganti baca
+  `screenBounds` ter-cache. Detail penuh: "Catatan Batch 461" di atas & `CHANGELOG.md`. Sektor
+  bubble (Roadmap #11) masih terbuka, TIDAK ada sektor DITUTUP yang tersentuh.
+- **BELUM dikonfirmasi device fisik (Batch 461, baru)**: (1) rotasi ke landscape (bolak-balik
+  beberapa kali berturut-turut) → tab minimized SELALU mentok tepi kiri/kanan dengan benar, 0 lagi
+  "nongol" — **INI YANG PALING PRIORITAS dikonfirmasi ulang, karena Batch 460 sudah pernah gagal di
+  item persis ini**; (2) re-konfirmasi item 1/2/4/5 Batch 460 (mini trigger gampang di-tap, ~10%
+  timbul, drag 100% kelihatan, 0 regresi minimize/expand/fade/auto-minimize) TETAP ✅ pasca ganti
+  sumber bounds Batch 461 (risiko regresi rendah — formula EDGE_CLIP_FRACTION/touchPad/visualWidth
+  TIDAK disentuh, tapi belum diverifikasi ulang di device).
+- **DIKONFIRMASI device fisik user (Batch 460)**: (1) mini trigger lebih gampang di-tap ✅; (2)
+  bagian timbul ~10% ✅; (4) drag tab minimized 100% kelihatan/terkontrol penuh selagi digeser ✅;
+  (5) 0 regresi ke minimize/expand/fade/auto-minimize Batch 98-100/453/454 ✅. **(3) mentok tepi
+  konsisten landscape ❌ GAGAL** ("masih nongol") — **fix root cause baru dieksekusi Batch 461 di
+  atas, BELUM dikonfirmasi ulang**.
+- **DIKONFIRMASI device fisik user (Batch 458, masih berlaku sebagai baseline utk item 2/4/5)**:
+  (1) tab minimized ~30% kelihatan/~70% tersembunyi — nilai ini SUDAH DIGANTIKAN ~10%/~90% oleh
+  Batch 460 (dikonfirmasi ✅ di atas); (2) mini trigger tetap bisa di-tap, TAPI "sedikit lebih
+  susah" — residual ini DIKONFIRMASI FIX di Batch 460 (✅ di atas); (3) drag tab minimized 100%
+  kelihatan/terkontrol penuh selagi digeser — confirmed (baseline utk item 4 Batch 460 di atas);
+  (4) 0 regresi ke minimize/expand/fade/auto-minimize Batch 98-100/453/454 — confirmed.
 - **CATATAN proses (berlaku terus)**: istilah user "timbul" = bagian KELIHATAN tab, bukan fraksi
   klip (`EDGE_CLIP_FRACTION`) itu sendiri — dua hal berlawanan arah. Kalau user minta angka
   persentase lagi tanpa kata eksplisit "sembunyi/klip" vs "timbul/kelihatan", WAJIB klarifikasi
-  arah dulu (pola Batch 456→457→458), jangan tebak. **Batch 460 catatan tambahan**: sejak Batch
-  460, "timbul"/`EDGE_CLIP_FRACTION` TIDAK LAGI otomatis mengontrol lebar area sentuh (dipisah via
-  `touchPad`) — permintaan "perkecil timbul" ke depan AMAN dieksekusi tanpa risiko balik memperkecil
-  touch target seperti sebelumnya.
+  arah dulu (pola Batch 456→457→458), jangan tebak. Sejak Batch 460, "timbul"/`EDGE_CLIP_FRACTION`
+  TIDAK LAGI otomatis mengontrol lebar area sentuh (dipisah via `touchPad`) — permintaan "perkecil
+  timbul" ke depan AMAN dieksekusi tanpa risiko balik memperkecil touch target. **Batch 461 catatan
+  tambahan**: sumber bounds layar (`windowManager.currentWindowMetrics` dari Context Service biasa)
+  TERBUKTI tidak cukup andal untuk timing rotasi — kalau residual landscape muncul LAGI setelah
+  Batch 461, JANGAN ulangi pola "ganti API baca metrics lagi"; investigasi arah lain (mis. apakah
+  `onConfigurationChanged` benar-benar terpanggil tiap rotasi di device spesifik user, atau delay
+  animasi rotasi sistem vs `container.post{}` di `snapMinimizedToNearestEdge`).
 - **BELUM dikonfirmasi (Batch 452, masih berlaku)**: (1) label 3 tab 0 lagi ellipsis di font
   normal; (2) drag flick cepat + tap-tab biasa berhenti TEPAT di tab tujuan, 0 "mundur 1 kolom".
 - **DIKONFIRMASI device fisik user (Batch 451, masih berlaku)**: (1) pill ukuran normal, 0 kapsul
