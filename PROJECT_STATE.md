@@ -12,7 +12,57 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
-**Catatan Batch 456**: feedback lanjutan user langsung setelah Batch 455 ("sudah ke kliping
+**Catatan Batch 458**: user eksplisit lanjut tuning setelah Batch 457 ("ubah jadi ~30%!!") — angka
+mentah tanpa konteks ulang, berisiko ulang kesalahan arah Batch 456. **Diklarifikasi via pilihan
+tap (BUKAN ditebak)**: "~30%" merujuk ke bagian TIMBUL (kelihatan), bukan ke fraksi klip itu
+sendiri. Tuning lanjutan murni, bukan mandat baru. 0 sektor DITUTUP disentuh.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt` —
+1. **1 nilai konstanta dinaikkan, 0 fungsi baru**: `EDGE_CLIP_FRACTION` 0.5f → 0.7f (fraksi
+   SEMBUNYI naik, supaya fraksi TIMBUL/kelihatan turun ke ~30% sesuai konfirmasi tap user).
+2. **0 titik panggil baru**: semua pemicu snap (drag-lepas, auto-minimize, chevron, restart,
+   rotasi) otomatis ikut nilai baru.
+3. Formula `hiddenWidth = width * EDGE_CLIP_FRACTION` (Batch 456) TETAP tidak disentuh — cuma
+   nilai konstanta.
+4. KDoc kelas & `snapMinimizedToNearestEdge()` diperbarui dengan catatan Batch 458.
+5. 0 file lain disentuh, 0 breaking change ke minimize/expand/fade/auto-minimize Batch 453/454.
+
+**0 diverifikasi CI/device Batch 458** — review manual (baca kode + cek balance brace/paren:
+`{}` 71/71, `()` 347/347, `[]` 52/52), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini (konsisten pola Batch 435-457). Perlu konfirmasi device fisik
+berikutnya: (1) tab minimized SEKARANG ~30% kelihatan/~70% tersembunyi (lebih ngumpet dari Batch
+455/457 yang 50/50) di semua jalur snap; (2) mini trigger MASIH gampang di-tap walau makin kecil
+bagian kelihatannya (touch target tidak "meleset"); (3) drag tab minimized tetap 100%
+kelihatan/terkontrol penuh selagi digeser; (4) 0 regresi ke minimize/expand/fade/auto-minimize
+Batch 98-100/453/454.
+
+**Catatan Batch 457**: feedback eksplisit user langsung setelah Batch 456 ("revert progress
+kliping. bukannya hilangin yang timbul malah dibikin tambah timbul, bukan saya suruh") — Batch 456
+SALAH ARAH: `EDGE_CLIP_FRACTION` 50%→30% justru MEMPERBESAR bagian tab yang kelihatan (nambah
+"timbul"), kebalikan dari yang diinginkan. **REVERT murni**, bukan mandat baru. 0 sektor DITUTUP
+disentuh.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt` —
+1. **1 nilai konstanta dikembalikan, 0 fungsi baru**: `EDGE_CLIP_FRACTION` 0.3f → 0.5f (nilai asli
+   Batch 455). Formula `hiddenWidth = width * EDGE_CLIP_FRACTION` (generalisasi Batch 456) TETAP
+   DIPERTAHANKAN — netral arah, cuma nilai konstanta yang salah kemarin.
+2. **0 titik panggil baru**: semua pemicu snap (drag-lepas, auto-minimize, chevron, restart,
+   rotasi) otomatis ikut nilai revert, 0 perubahan lain.
+3. Hasil setelah revert identik matematis dengan Batch 455 (regresi-aman, sudah diverifikasi
+   formula-nya di Batch 456).
+4. KDoc kelas & KDoc `snapMinimizedToNearestEdge()` diperbarui — Batch 456 ditandai [SALAH ARAH],
+   Batch 457 dicatat sebagai revert (ANTI-STALE, 1 file yang sama, 0 file dok terpisah disentuh).
+5. 0 file lain disentuh, 0 breaking change ke minimize/expand/fade/auto-minimize Batch 453/454.
+
+**0 diverifikasi CI/device Batch 457** — review manual (baca kode + cek balance brace/paren:
+`{}` 71/71, `()` 340/340, `[]` 50/50), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini (konsisten pola Batch 435-456). Perlu konfirmasi device fisik
+berikutnya: (1) tab minimized kembali separuh tersembunyi di luar layar/separuh kelihatan sebagai
+mini trigger (SAMA seperti Batch 455, BUKAN lagi ~70% kelihatan Batch 456) di semua jalur snap;
+(2) mini trigger tetap gampang di-tap; (3) drag tab minimized tetap 100% kelihatan/terkontrol
+penuh selagi digeser; (4) 0 regresi ke minimize/expand/fade/auto-minimize Batch 98-100/453/454.
+
+**Catatan Batch 456 [SALAH ARAH — DIREVERT Batch 457 di atas]**: feedback lanjutan user langsung setelah Batch 455 ("sudah ke kliping
 walaupun agak timbul") — diklarifikasi via pilihan tap: **"bagian yang kepotong terlalu besar,
 perkecil clip-nya"**. Refinement tuning murni ke [snapMinimizedToNearestEdge], bukan mandat baru.
 0 sektor DITUTUP disentuh.
@@ -877,16 +927,21 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 456. ZIP terakhir: `SONIX_v456.zip`. 1 file source diubah:
-  `FloatingBubbleService.kt` (`EDGE_CLIP_FRACTION` 0.5f→0.3f + formula `snapMinimizedToNearestEdge`
-  digeneralisasi — tab minimized clip tepi turun dari 50% ke 30%, feedback user Batch 455 "kepotong
-  terlalu besar". Detail lengkap di catatan Batch 456 di atas & CHANGELOG.md). Sektor bubble
+- Batch terakhir: 458. ZIP terakhir: `SONIX_v458.zip`. 1 file source diubah:
+  `FloatingBubbleService.kt` (`EDGE_CLIP_FRACTION` 0.5f→0.7f — tuning lanjutan, bagian TIMBUL/
+  kelihatan tab minimized diturunkan ke ~30% sesuai konfirmasi tap user ["~30%" = timbul, bukan
+  fraksi klip]. Detail lengkap di catatan Batch 458 di atas & CHANGELOG.md). Sektor bubble
   (Roadmap #11) masih terbuka, TIDAK ada sektor DITUTUP yang tersentuh.
-- **BELUM dikonfirmasi (baru, Batch 456 — PRIORITAS)**: (1) tab minimized kelihatan lebih
-  "penuh"/kurang timbul dibanding Batch 455 (~70% lebar kelihatan, bukan 50%) di semua jalur snap;
-  (2) mini trigger tetap gampang di-tap; (3) drag tab minimized tetap 100% kelihatan/terkontrol
-  penuh selagi digeser; (4) 0 regresi minimize/expand/fade/auto-minimize Batch 98-100/453/454. 0
-  compile/device/CI sesi ini (konsisten pola Batch 435-455).
+- **BELUM dikonfirmasi (baru, Batch 458 — PRIORITAS)**: (1) tab minimized SEKARANG ~30%
+  kelihatan/~70% tersembunyi (lebih ngumpet dari Batch 455/457) di semua jalur snap; (2) mini
+  trigger MASIH gampang di-tap walau bagian kelihatan makin kecil; (3) drag tab minimized tetap
+  100% kelihatan/terkontrol penuh selagi digeser; (4) 0 regresi
+  minimize/expand/fade/auto-minimize Batch 98-100/453/454. 0 compile/device/CI sesi ini
+  (konsisten pola Batch 435-457).
+- **CATATAN proses (berlaku terus)**: istilah user "timbul" = bagian KELIHATAN tab, bukan fraksi
+  klip (`EDGE_CLIP_FRACTION`) itu sendiri — dua hal berlawanan arah. Kalau user minta angka
+  persentase lagi tanpa kata eksplisit "sembunyi/klip" vs "timbul/kelihatan", WAJIB klarifikasi
+  arah dulu (pola Batch 456→457→458), jangan tebak.
 - **BELUM dikonfirmasi (Batch 454, masih berlaku, digabung verifikasi dgn Batch 456 di atas)**:
   bubble auto-collapse jadi tab tepi layar setelah ±6 detik idle TANPA sentuhan (menyusul fade
   ±2.5 detik); TIDAK auto-collapse selagi masih digeser/tombol kontrol ditekan; minimize manual

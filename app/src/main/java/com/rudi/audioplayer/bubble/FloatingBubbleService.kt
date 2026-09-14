@@ -163,15 +163,23 @@ import kotlin.math.abs
  * ([setupDrag] tidak disentuh) — setengah-tersembunyi HANYA muncul begitu benar-benar idle/diam
  * di tepi, sesuai kata "saat idle" di instruksi user.
  *
- * **Batch 456 — kurangi fraksi clip tepi**: feedback eksplisit user atas hasil visual Batch 455
- * ("sudah ke kliping walaupun agak timbul" → diklarifikasi: "bagian yang kepotong terlalu besar,
- * perkecil clip-nya"). Fraksi lebar tab yang disembunyikan di luar layar dikecilkan dari 50%
- * (`width/2` hardcoded) ke [EDGE_CLIP_FRACTION] (30%) — lebih banyak bagian tab yang tetap
- * kelihatan di layar, "mini trigger" tidak lagi kelihatan seperti bongkahan timbul terlalu besar.
- * **0 fungsi/state/timer baru** — 1 titik kontrol yang sama ([snapMinimizedToNearestEdge])
- * digeneralisasi formulanya (fraksi via konstanta, bukan `/2` hardcoded) supaya tuning berikutnya
- * (kalau ada) tinggal ubah 1 angka tanpa sentuh geometri. Semua pemicu snap yang sudah ada tetap
- * otomatis ikut fraksi baru tanpa perubahan titik panggil.
+ * **Batch 456 — kurangi fraksi clip tepi [SALAH ARAH, DIREVERT Batch 457]**: fraksi
+ * disembunyikan dikecilkan 50%→30%, TAPI ini justru MEMPERBESAR bagian tab yang kelihatan
+ * (`hiddenWidth` turun → sisa kelihatan naik) — kebalikan dari maksud user, hasilnya tab makin
+ * "timbul" bukan makin ke-clip. Formula generalisasi (`hiddenWidth = width * EDGE_CLIP_FRACTION`)
+ * DIPERTAHANKAN (regresi-aman, netral arah), cuma nilai konstantanya yang salah.
+ *
+ * **Batch 457 — revert fraksi clip ke Batch 455**: feedback eksplisit user ("bukannya hilangin
+ * yang timbul malah dibikin tambah timbul"). [EDGE_CLIP_FRACTION] dikembalikan 30%→50% (nilai
+ * awal Batch 455) — satu-satunya perubahan, 0 formula/fungsi/titik panggil baru disentuh. Hasil
+ * setelah revert identik matematis dengan Batch 455 (tab minimized separuh lebar tersembunyi di
+ * luar layar, separuh kelihatan sebagai mini trigger).
+ *
+ * **Batch 458 — kurangi timbul lebih jauh dari Batch 455/457**: user minta "~30%" — DIKONFIRMASI
+ * via pilihan tap (bukan ditebak) bahwa ini merujuk ke bagian TIMBUL (kelihatan), bukan ke fraksi
+ * klip itu sendiri, supaya tidak mengulang kesalahan arah Batch 456. [EDGE_CLIP_FRACTION]
+ * dinaikkan 50%→70% (fraksi SEMBUNYI), hasilnya bagian kelihatan turun jadi ~30%. 0
+ * formula/fungsi/titik panggil baru — cuma nilai konstanta.
  */
 class FloatingBubbleService : Service() {
 
@@ -534,12 +542,18 @@ class FloatingBubbleService : Service() {
      * pakai lebar penuh) — half-clip HANYA berlaku begitu jari dilepas & tab benar-benar diam
      * (idle) di tepi, bukan selagi masih dipegang/dipindah.
      *
-     * **Batch 456**: fraksi clip DIKECILKAN dari 50% (`width/2`, Batch 455) ke
-     * [EDGE_CLIP_FRACTION] (30%) — feedback eksplisit user atas hasil Batch 455 ("bagian yang
-     * kepotong terlalu besar, perkecil clip-nya"). Formula digeneralisasi (`hiddenWidth = width *
-     * EDGE_CLIP_FRACTION`, bukan `width/2` hardcoded) supaya fraksi ke depannya tinggal ubah 1
-     * konstanta tanpa sentuh geometri sama sekali — pada `EDGE_CLIP_FRACTION = 0.5f` formula ini
-     * identik matematis dengan Batch 455. */
+     * **Batch 456 [SALAH ARAH]**: fraksi clip dikecilkan 50%→30% — efek sebenarnya menambah
+     * bagian tab yang kelihatan (tambah "timbul"), kebalikan dari maksud user. Formula
+     * digeneralisasi (`hiddenWidth = width * EDGE_CLIP_FRACTION`, bukan `width/2` hardcoded)
+     * TETAP DIPERTAHANKAN — netral arah, cuma nilai konstanta yang salah.
+     *
+     * **Batch 457**: [EDGE_CLIP_FRACTION] DIREVERT 30%→50% atas feedback eksplisit user ("malah
+     * dibikin tambah timbul, bukan saya suruh"). 0 formula/titik panggil lain disentuh — pada
+     * 0.5f formula ini identik matematis dengan Batch 455 (regresi-aman).
+     *
+     * **Batch 458**: [EDGE_CLIP_FRACTION] dinaikkan 50%→70% — user minta bagian TIMBUL turun ke
+     * ~30%, dikonfirmasi via tap-choice merujuk ke "kelihatan" bukan ke fraksi klip (menghindari
+     * ulang salah-arah Batch 456). 0 formula/titik panggil baru. */
     private fun snapMinimizedToNearestEdge() {
         val container = bubbleView as? FrameLayout ?: return
         val params = layoutParams ?: return
@@ -646,10 +660,13 @@ class FloatingBubbleService : Service() {
         // supaya urutan visual selalu fade dulu, baru collapse — user masih sempat lihat bubble
         // meredup sebelum menciut total, bukan langsung "hilang" tiba-tiba dari opaque penuh.
         private const val IDLE_AUTO_MINIMIZE_DELAY_MS = 6000L
-        // Batch 455/456 — tuning half-clip tepi layar tab minimized, lihat KDoc
+        // Batch 455/456/457/458 — tuning half-clip tepi layar tab minimized, lihat KDoc
         // snapMinimizedToNearestEdge(). Fraksi lebar tab yang sengaja disembunyikan di luar
-        // layar (0.5f = Batch 455 awal/50%, DIKECILKAN ke 0.3f Batch 456 atas feedback user
-        // "kepotong terlalu besar").
-        private const val EDGE_CLIP_FRACTION = 0.3f
+        // layar. Batch 456 SALAH ARAH (0.5f->0.3f menaikkan bagian kelihatan = tambah timbul,
+        // kebalikan dari yang diminta user), Batch 457 REVERT ke 0.5f. Batch 458: user eksplisit
+        // minta bagian TIMBUL (kelihatan) diperkecil ke ~30% — dikonfirmasi via pilihan tap
+        // (bukan tebakan) bahwa "~30%" merujuk ke timbul, BUKAN ke fraksi klip — jadi
+        // EDGE_CLIP_FRACTION (fraksi SEMBUNYI) dinaikkan ke 0.7f (70% sembunyi, 30% timbul).
+        private const val EDGE_CLIP_FRACTION = 0.7f
     }
 }

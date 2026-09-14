@@ -1,6 +1,53 @@
 # Changelog
 
-## Batch 456 — Kurangi fraksi clip tepi tab minimized bubble (50% → 30%)
+## Batch 458 — Kurangi bagian TIMBUL tab minimized ke ~30% (EDGE_CLIP_FRACTION 50% → 70%)
+User minta lanjut tuning ("ubah jadi ~30%!!") setelah Batch 457. Angka mentah tanpa konteks —
+diklarifikasi via pilihan tap (bukan ditebak) agar tidak mengulang salah-arah Batch 456: "~30%"
+merujuk ke bagian TIMBUL/kelihatan, bukan ke fraksi klip.
+
+**1 file diubah** (`FloatingBubbleService.kt`, dalam batas 3 file/tugas):
+
+1. **1 nilai konstanta dinaikkan**: `EDGE_CLIP_FRACTION` 0.5f → 0.7f (fraksi SEMBUNYI naik supaya
+   fraksi TIMBUL/kelihatan turun ke ~30%).
+2. **0 titik panggil baru**: semua pemicu snap yang sudah ada otomatis ikut nilai baru.
+3. Formula `hiddenWidth = width * EDGE_CLIP_FRACTION` (Batch 456) tidak disentuh — cuma nilai
+   konstanta.
+4. 0 file lain disentuh, 0 breaking change ke minimize/expand/fade Batch 453/auto-minimize Batch
+   454.
+
+**0 diverifikasi CI/device Batch 458** — review manual (baca kode + cek balance brace/paren:
+`{}` 71/71, `()` 347/347, `[]` 52/52), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Perlu konfirmasi device fisik: tab minimized ~30% kelihatan/~70%
+tersembunyi, mini trigger masih gampang di-tap, drag tetap 100% kelihatan/terkontrol penuh, 0
+regresi ke minimize/expand/fade/auto-minimize Batch 98-100/453/454.
+
+## Batch 457 — REVERT Batch 456 (salah arah): fraksi clip tepi dikembalikan 30% → 50%
+Feedback eksplisit user langsung setelah Batch 456: "revert progress kliping. bukannya hilangin
+yang timbul malah dibikin tambah timbul, bukan saya suruh". Batch 456 SALAH ARAH — mengecilkan
+`EDGE_CLIP_FRACTION` (50%→30%) justru MEMPERBESAR bagian tab yang kelihatan, kebalikan dari yang
+diminta. Revert murni, bukan mandat baru.
+
+**1 file diubah** (`FloatingBubbleService.kt`, dalam batas 3 file/tugas):
+
+1. **1 nilai konstanta dikembalikan**: `EDGE_CLIP_FRACTION` 0.3f → 0.5f (nilai asli Batch 455).
+   Formula `hiddenWidth = width * EDGE_CLIP_FRACTION` (generalisasi Batch 456) tetap dipertahankan
+   — netral arah, cuma nilai konstantanya yang salah kemarin.
+2. **0 titik panggil baru**: semua pemicu snap (drag-lepas, auto-minimize, chevron, restart,
+   rotasi) otomatis ikut nilai revert.
+3. Hasil setelah revert identik matematis dengan Batch 455 (regresi-aman).
+4. KDoc kelas & fungsi `snapMinimizedToNearestEdge()` diperbarui — Batch 456 ditandai salah arah,
+   Batch 457 dicatat sebagai revert.
+5. 0 file lain disentuh, 0 breaking change ke minimize/expand/fade Batch 453/auto-minimize Batch
+   454.
+
+**0 diverifikasi CI/device Batch 457** — review manual (baca kode + cek balance brace/paren:
+`{}` 71/71, `()` 340/340, `[]` 50/50), 0 env Android nyata/device fisik/compiler Kotlin/akses
+jaringan Gradle di sesi ini. Perlu konfirmasi device fisik: tab minimized kembali separuh
+tersembunyi/separuh kelihatan (sama seperti Batch 455), mini trigger tetap gampang di-tap, drag
+tetap 100% kelihatan/terkontrol penuh, 0 regresi ke minimize/expand/fade/auto-minimize Batch
+98-100/453/454.
+
+## Batch 456 — Kurangi fraksi clip tepi tab minimized bubble (50% → 30%) [SALAH ARAH, DIREVERT Batch 457]
 Feedback lanjutan user langsung setelah Batch 455: "sudah ke kliping walaupun agak timbul" →
 diklarifikasi via pilihan tap: "bagian yang kepotong terlalu besar, perkecil clip-nya". Refinement
 tuning murni, bukan mandat baru.
