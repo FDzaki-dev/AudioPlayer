@@ -12,6 +12,41 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 470 [2 fitur baru dari user, 0 tumpang tindih investigasi Batch 469]**: user
+konfirmasi kliping landscape SEKARANG bekerja ("sudah bisa kliping dalam mode landscape
+sekalipun") — konfirmasi UMUM, BUKAN reproduksi protokol spesifik Batch 469 (drag ke tepi
+nav-bottom + JANGAN rotasi balik + ekspor Log Diagnostik) yang masih belum pernah dikirim.
+Regresi "MENGHILANG TOTAL" Batch 469 karena itu **BELUM RESMI dianggap selesai** (juga belum
+terbantahkan) — kalau device fisik user memicunya lagi, protokol reproduksi Batch 469 di bawah
+TETAP berlaku, minta log itu duluan sebelum coding fix apa pun ke [screenBounds]/formula clamp.
+User mengarahkan sesi ke 2 permintaan baru, **0 pernah menyentuh [screenBounds]/formula
+clamp/posisi** (aman dari investigasi Batch 469 yang masih terbuka):
+1. **Cold-start bubble**: bug ditemukan lewat review kode (bukan laporan user eksplisit) —
+   `FloatingBubbleService.sendPlaybackAction()` pakai panggilan `MediaController` langsung begitu
+   `controller != null`, TANPA cek `mediaItemCount`. Di boot murni (bubble auto-start lewat
+   `BubbleBootReceiver`, user belum pernah buka app/widget), controller lokal bisa konek DULUAN
+   (bind doang) SEBELUM antrean sempat di-restore → `hasQueue` nge-latch `false` selamanya →
+   SETIAP tap play/prev/next di bubble jatuh ke `openApp()`, padahal `PlaybackService` sudah
+   punya jalur cold-start-restore (dipicu Intent `onStartCommand`, BUKAN panggilan controller
+   langsung). Fix: syarat `c.mediaItemCount > 0` sebelum pakai controller langsung; kalau tidak,
+   fallback ke Intent yang sama seperti widget (yang memang tidak pernah kena celah ini).
+2. **Drag & tap-buka-app discoped ke `bubble_album_art` saja**: sebelumnya seluruh badan pill
+   (termasuk padding kosong `bubble_root`, bukan cuma area ke-4 tombol yang memang sudah aman)
+   jadi pemicu drag/buka-app. Sekarang `setupDrag` dipanggil 2x terpisah (minimized tab: 0
+   berubah; expanded: scoped ke `bubble_album_art`), diperluas via `TouchDelegate` (hit-test
+   SAJA, 0 perubahan layout/dp XML) biar tetap gampang disentuh. Jangkauan GERAK drag (setelah
+   tersentuh) tetap bebas penuh ke seluruh layar seperti sebelumnya — cuma titik awal sentuh sah
+   yang berubah.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`. Detail lengkap KDoc
+"Batch 470" di file itu. **0 diverifikasi CI/device** — review manual (baca kode + cek balance
+`{}`/`()`/`[]`: 99/99, 640/640, 160/160), 0 env Android nyata/compiler Kotlin di sesi ini —
+**WAJIB dari user**: install APK baru, test (a) tap play/prev/next di bubble SEGERA setelah
+reboot HP tanpa buka app/widget dulu (cold-start), (b) coba drag mulai dari padding kosong pill
+(bukan album art/tombol) → pastikan TIDAK lagi memicu drag/buka-app, (c) drag mulai dari album
+art (termasuk sedikit di luar 40dp-nya) → pastikan MASIH memicu drag seperti biasa, jangkauan
+gerak tetap bebas ke seluruh layar.
+
 **Catatan Batch 469 [REGRESI BARU pasca-468 — instrumentasi, BUKAN fix lagi]**: user laporkan
 temuan baru — bubble MENGHILANG TOTAL saat di-drag ke tepi landscape yang berbeda (sisi
 nav-bar-bottom), balik normal HANYA kalau device dirotasi ke portrait lagi. Gejala BARU, LEBIH
@@ -1273,7 +1308,30 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 469. ZIP terakhir: `SONIX_v469.zip`. **1 file diubah** (dalam batas 3
+- Batch terakhir: 470. ZIP terakhir: `SONIX_v470.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `FloatingBubbleService.kt`. 2 fitur baru dari user (lihat "Catatan Batch 470" di
+  atas untuk detail): (1) cold-start fix `sendPlaybackAction`/`setupControls` (tap kontrol bubble
+  segera setelah reboot, sebelum app/widget pernah dibuka, sekarang tetap bisa trigger restore
+  antrean — dulu jatuh ke `openApp()` selamanya begitu controller lokal konek duluan dgn antrean
+  kosong); (2) `setupDrag` discoped ke `bubble_album_art` saja untuk state expanded (minimized
+  tab 0 berubah) + `TouchDelegate` biar area sentuh tetap luas TANPA ubah layout/dp XML. **0
+  pernah menyentuh [screenBounds]/formula clamp/posisi** — 0 tumpang tindih dgn investigasi
+  Batch 469 di bawah, yang MASIH terbuka/belum resmi selesai (user cuma konfirmasi kliping
+  landscape UMUM, BUKAN protokol reproduksi spesifik Batch 469).
+- **WAJIB dari user sebelum lanjut fitur baru lain**: (a) test cold-start — reboot HP, JANGAN
+  buka app/widget sama sekali, langsung tap play/prev/next di bubble → harus mulai memutar
+  (bukan cuma buka app); (b) test touch-scope — drag mulai dari padding kosong pill (BUKAN album
+  art/tombol) harus 0 efek; drag mulai dari album art (termasuk sedikit meleset di luar 40dp-nya)
+  harus tetap jalan seperti biasa, jangkauan gerak tetap bebas penuh ke seluruh layar seperti
+  sebelumnya. Kirim hasil kedua test ini balik.
+- **ITEM WAJIB PALING PRIORITAS begitu regresi Batch 469 muncul lagi** (belum terjadi/dilaporkan
+  ulang sesi ini, tapi statusnya BELUM ditutup — lihat "Catatan Batch 469" & "Catatan Batch 470"):
+  terima log dari user — WAJIB direproduksi PERSIS (landscape, drag ke tepi nav-bottom sampai
+  hilang, **JANGAN rotasi balik ke portrait dulu**, baru ekspor Log Diagnostik) — baca
+  `Batch469 bounds-compare` & `Batch469 drag readback` SEBELUM coding fix apa pun. **JANGAN
+  tebak fix ke-5** tanpa data ini (pola terlarang eksplisit, lihat KDoc kelas "PELAJARAN PROSES
+  Batch 461→462").
+- Batch 469 (sebelum 470). ZIP: `SONIX_v469.zip`. **1 file diubah** (dalam batas 3
   file/tugas): `FloatingBubbleService.kt` — **0 formula/clamp/posisi diubah**, murni 2 log baru
   (bounds-compare `onConfigurationChanged` + drag-release/readback `ACTION_UP`). Respons ke
   REGRESI BARU: bubble hilang total saat drag ke tepi landscape berbeda (nav-bottom), balik

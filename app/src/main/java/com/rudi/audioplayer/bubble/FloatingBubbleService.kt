@@ -19,6 +19,7 @@ import android.util.Size
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
+import android.view.TouchDelegate
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
@@ -62,9 +63,11 @@ import kotlin.math.abs
  *
  * **Kontrol/state**: [MediaController] asli (pola sama `PlayerViewModel.connect()`) untuk
  * update LIVE play/pause/art lewat `Player.Listener` — bukan polling. Tap tombol pakai
- * controller langsung kalau sudah konek; `WidgetUpdater.ACTION_TOGGLE_PLAY/NEXT/PREVIOUS` ke
- * `PlaybackService` (kontrak Intent yang SAMA dipakai widget) jadi fallback kalau controller
- * belum sempat konek — tidak ada action constant baru yang perlu ditambah.
+ * controller langsung kalau sudah konek DAN antrean sesi itu tidak kosong (Batch 470, lihat KDoc
+ * "Batch 470" & [sendPlaybackAction]); `WidgetUpdater.ACTION_TOGGLE_PLAY/NEXT/PREVIOUS` ke
+ * `PlaybackService` (kontrak Intent yang SAMA dipakai widget) jadi fallback baik saat controller
+ * belum konek MAUPUN saat konek tapi antrean masih kosong (cold-start) — tidak ada action
+ * constant baru yang perlu ditambah.
  *
  * **Touch pass-through**: window overlay di-`WRAP_CONTENT` (bukan `MATCH_PARENT`) + tanpa flag
  * fullscreen — area di luar pill 100% tembus ke app di bawahnya secara struktural, bukan
@@ -81,9 +84,11 @@ import kotlin.math.abs
  * ditangani [BubbleBootReceiver], bukan di sini.
  *
  * **Batch 98 — state antrean kosong**: sebelumnya tombol play/prev/next tetap "aktif" walau
- * tidak ada lagu dimuat sama sekali (tap play = no-op senyap yang membingungkan). Sekarang
- * [hasQueue] dicek tiap update — kalau kosong, tombol jadi setengah transparan dan tap-nya
- * membuka app alih-alih coba mainkan apa pun.
+ * tidak ada lagu dimuat sama sekali (tap play = no-op senyap yang membingungkan). [hasQueue]
+ * dicek tiap update — kalau kosong, tombol jadi setengah transparan (indikasi visual, MASIH
+ * berlaku). **Koreksi Batch 470**: routing tap TIDAK lagi digerbang oleh [hasQueue] (lihat KDoc
+ * "Batch 470" & [sendPlaybackAction]) — [hasQueue] SEKARANG murni sinyal visual alpha, bukan
+ * penentu buka-app-atau-tidak lagi.
  *
  * **Batch 98 — rotasi layar**: posisi bubble di-clamp ulang di [onConfigurationChanged] —
  * sebelumnya rotasi bisa membuat bubble kepental separuh di luar layar (mis. y besar di
@@ -344,6 +349,48 @@ import kotlin.math.abs
  * ini (landscape, drag ke tepi nav-bottom, JANGAN rotasi balik dulu sebelum ekspor Log
  * Diagnostik — rotasi ke portrait "memperbaiki" gejala tapi JUGA menghapus jendela diagnostik)
  * SEBELUM coding fix apa pun — bukan tebakan ke-5.
+ *
+ * **Batch 470 [status Batch 469 + 2 fitur baru]**: user konfirmasi kliping landscape SEKARANG
+ * bekerja ("sudah bisa kliping dalam mode landscape sekalipun") — TAPI ini konfirmasi umum, BUKAN
+ * reproduksi protokol spesifik Batch 469 (drag ke tepi nav-bottom, jangan rotasi balik, ekspor
+ * Log Diagnostik) yang masih belum pernah dikirim. Regresi "MENGHILANG TOTAL" Batch 469 karena itu
+ * dianggap BELUM RESMI terkonfirmasi selesai (bukan juga terbantahkan) — kalau muncul lagi,
+ * protokol lama di atas TETAP berlaku. User mengarahkan sesi ini ke 2 permintaan baru (0 sentuh
+ * [screenBounds]/formula clamp/posisi sama sekali, 0 tumpang tindih dengan investigasi Batch 469):
+ *
+ * 1. **Cold-start**: [sendPlaybackAction] sebelumnya pakai panggilan [MediaController] langsung
+ *    begitu [controller] lokal != null, TANPA cek `mediaItemCount` — celah: pada boot murni
+ *    (bubble auto-start lewat [BubbleBootReceiver], user belum pernah buka app/widget), MediaController
+ *    lokal bisa konek DUAN (bind doang, 0 lewat `onStartCommand`) SEBELUM antrean sempat
+ *    di-restore, mengonfirmasi `mediaItemCount == 0` lalu [hasQueue] nge-latch `false` selamanya —
+ *    akibatnya SETIAP tap play/prev/next di bubble jatuh ke `openApp()`, padahal `PlaybackService`
+ *    punya jalur cold-start-restore yang justru dirancang untuk skenario ini (lihat KDoc
+ *    `PlaybackService.onStartCommand`'s `isWidgetAction` branch) — cuma jalur itu HANYA terpicu
+ *    lewat Intent (`startForegroundService`), BUKAN panggilan controller langsung lewat binder
+ *    sesi. Fix: [sendPlaybackAction] sekarang syarat `c.mediaItemCount > 0` sebelum pakai
+ *    controller langsung; kalau tidak, SELALU fallback ke Intent yang sama seperti widget home-
+ *    screen (yang memang TIDAK PERNAH pegang referensi controller lokal sama sekali, lihat KDoc
+ *    `WidgetUpdater.servicePendingIntent`, jadi TIDAK PERNAH kena celah ini). [setupControls] 3
+ *    tombol (play/prev/next) tidak lagi gerbang lewat [hasQueue] duluan — keputusan "controller
+ *    langsung vs fallback" 100% dipindah ke 1 titik ([sendPlaybackAction]) yang selalu baca state
+ *    FRESH, bukan snapshot [hasQueue] yang bisa basi.
+ * 2. **Drag & tap-buka-app discoped ke album art saja**: SEBELUMNYA [setupDrag] dipasang di
+ *    [bubbleView] (`container`) penuh — termasuk padding kosong `bubble_root` di sekitar pill
+ *    (bukan cuma tombol, yang memang sudah aman lewat prioritas child, lihat KDoc [setupDrag]) —
+ *    jadi drag/tap-buka-app bisa kepicu dari mana saja di badan pill, bukan cuma [bubble_album_art].
+ *    Sekarang [setupDrag] dipanggil 2x terpisah: 1x ke [minimizedView] (chat-head, 0 berubah — tab
+ *    minimized MEMANG murni area sentuh luas by design sejak Batch 460), 1x ke `bubble_album_art`
+ *    SAJA untuk state expanded. Supaya area sentuh album art TETAP gampang disentuh (bukan cuma
+ *    40dp mentah) tanpa mengubah layout/ukuran view NYATA (0 dp baru di XML), dipasang
+ *    [TouchDelegate] (lihat [applyAlbumArtTouchDelegate]) — memperluas HIT-TEST doang, padding
+ *    kosong sisa `bubble_root` yang dulu ikut memicu SEKARANG diam (window tetap menelan
+ *    sentuhannya, cuma 0 efek apa pun, TIDAK diteruskan ke app di bawah — konsisten sama perilaku
+ *    "touch pass-through" yang didesain hanya untuk di LUAR pill). Pergerakan drag itu sendiri
+ *    (setelah tersentuh) TETAP bebas penuh ke seluruh [screenBounds] seperti sebelumnya — SATU-
+ *    SATUNYA yang berubah adalah TITIK AWAL sentuhan yang sah, bukan jangkauan gerak. 0 formula
+ *    clamp/posisi/[screenBounds] disentuh sama sekali (lihat guard Batch 469 di atas).
+ *
+ * **File diubah**: HANYA `FloatingBubbleService.kt` (dalam batas 3 file/tugas).
  */
 class FloatingBubbleService : Service() {
 
@@ -601,10 +648,17 @@ class FloatingBubbleService : Service() {
         minimized.visibility = if (isMinimized) View.VISIBLE else View.GONE
         if (!isMinimized) lastExpandedX = params.x
 
-        setupDrag(container, params)
+        // Batch 470 — 2 titik drag terpisah, windowView SELALU `container` di keduanya (lihat
+        // KDoc [setupDrag] "Batch 470" & KDoc kelas "Batch 470"): minimized (chat-head) tetap
+        // 0 berubah (touch source = seluruh tab, sudah luas by design sejak Batch 460); expanded
+        // SEKARANG discoped ke `bubble_album_art` saja (bukan lagi seluruh `container`), diperluas
+        // lewat TouchDelegate di [applyAlbumArtTouchDelegate] biar tetap gampang disentuh.
+        setupDrag(minimized, container, params)
+        setupDrag(expanded.findViewById<ImageView>(R.id.bubble_album_art), container, params)
         setupControls(expanded)
 
         runCatching { windowManager.addView(container, params) }
+            .onSuccess { container.post { applyAlbumArtTouchDelegate() } }
             .onFailure { AppLogger.e("FloatingBubbleService", "Gagal memasang overlay bubble", it) }
 
         // Sesi sebelumnya diakhiri dalam keadaan minimized — posisi tersimpan mungkin bukan
@@ -649,23 +703,31 @@ class FloatingBubbleService : Service() {
         }
     }
 
-    /** Drag-untuk-pindah + tap-untuk-buka-app di area kosong pill, dibedakan lewat TOTAL jarak
-     * gerak (bukan cuma delta awal-akhir, supaya jari gemetar kecil tidak salah dianggap drag).
-     * Tombol play/pause/prev/next tetap dapat event klik normal — ImageButton clickable
-     * mengonsumsi ACTION_DOWN duluan sebelum sempat ke OnTouchListener root ini, jadi drag/tap
-     * di sini otomatis cuma aktif di luar area ke-3 tombol tanpa perlu logic pemisah manual.
+    /** Drag-untuk-pindah + tap-untuk-buka-app, dibedakan lewat TOTAL jarak gerak (bukan cuma
+     * delta awal-akhir, supaya jari gemetar kecil tidak salah dianggap drag). Tombol
+     * play/pause/prev/next tetap dapat event klik normal — ImageButton clickable mengonsumsi
+     * ACTION_DOWN duluan sebelum sempat ke OnTouchListener [touchSource] ini, jadi drag/tap di
+     * sini otomatis cuma aktif di luar area ke-3 tombol tanpa perlu logic pemisah manual.
      * Batch 98: metrics dibaca ULANG tiap ACTION_MOVE (bukan di-cache sekali di awal seperti
      * sebelumnya) — device bisa saja rotasi PAS lagi di-drag, metrics yang di-cache di awal akan
      * basi. Batch 460: sumbernya `windowManager.currentWindowMetrics` (bukan lagi
-     * `resources.displayMetrics`, lihat KDoc kelas "Batch 460"). */
-    private fun setupDrag(view: View, params: WindowManager.LayoutParams) {
+     * `resources.displayMetrics`, lihat KDoc kelas "Batch 460").
+     *
+     * **Batch 470**: [touchSource] (view yang menerima sentuhan) DIPISAH dari [windowView] (view
+     * jendela WindowManager yang SEBENARNYA dipindah/di-resize/di-baca ukurannya) — sebelumnya 1
+     * parameter `view` dipakai untuk KEDUANYA sekaligus (selalu `container`). Pemisahan ini MURNI
+     * supaya pemanggil bisa memasang listener di child spesifik (mis. `bubble_album_art`, lihat
+     * pemanggil di [addBubbleView]) SEMENTARA clamp/`updateViewLayout`/readback tetap konsisten
+     * memakai ukuran & identitas [windowView] (`container`) seperti sebelumnya — 0 formula clamp,
+     * 0 nilai posisi, 0 logic drag/tap yang berubah, cuma sumber event-nya. */
+    private fun setupDrag(touchSource: View, windowView: View, params: WindowManager.LayoutParams) {
         var initialX = 0
         var initialY = 0
         var initialTouchX = 0f
         var initialTouchY = 0f
         var totalMovement = 0f
 
-        view.setOnTouchListener { v, event ->
+        touchSource.setOnTouchListener { _, event ->
             keepAwakeAndScheduleFade() // Batch 453 — sentuhan apa pun = full-opacity + reset timer
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
@@ -683,11 +745,11 @@ class FloatingBubbleService : Service() {
                     if (totalMovement > TOUCH_SLOP) {
                         // Batch 461 — screenBounds ter-cache, lihat KDoc field (ganti currentWindowMetrics).
                         val bounds = screenBounds
-                        val maxX = (bounds.width() - v.width).coerceAtLeast(0)
-                        val maxY = (bounds.height() - v.height).coerceAtLeast(0)
+                        val maxX = (bounds.width() - windowView.width).coerceAtLeast(0)
+                        val maxY = (bounds.height() - windowView.height).coerceAtLeast(0)
                         params.x = (initialX + dx.toInt()).coerceIn(0, maxX)
                         params.y = (initialY + dy.toInt()).coerceIn(0, maxY)
-                        runCatching { windowManager.updateViewLayout(v, params) }
+                        runCatching { windowManager.updateViewLayout(windowView, params) }
                     }
                     true
                 }
@@ -712,9 +774,9 @@ class FloatingBubbleService : Service() {
                             "Batch469 drag release target: x=$dragTargetX y=$dragTargetY " +
                                 "screenBounds=$dragBounds isMinimized=$isMinimized"
                         )
-                        v.postDelayed({
+                        windowView.postDelayed({
                             val loc = IntArray(2)
-                            v.getLocationOnScreen(loc)
+                            windowView.getLocationOnScreen(loc)
                             AppLogger.w(
                                 "FloatingBubbleService",
                                 "Batch469 drag readback (+250ms): posisi layar nyata x=${loc[0]} " +
@@ -738,21 +800,55 @@ class FloatingBubbleService : Service() {
         }
     }
 
+    /** Batch 470 — perluas area TAP/DRAG `bubble_album_art` pakai [TouchDelegate] (hit-test
+     * SAJA, 0 perubahan layout/ukuran view nyata, 0 dp baru di XML) supaya tetap gampang
+     * disentuh biarpun sentuhan sekarang discoped ke album art (lihat KDoc kelas "Batch 470" &
+     * [setupDrag]). Sentuhan di padding kosong DI SEKITAR album art (dalam radius delegate) tetap
+     * kena listener [setupDrag] yang terpasang di `bubble_album_art`; sentuhan di LUAR delegate
+     * (termasuk seluruh area ke-4 tombol kontrol) 0 terpengaruh — anak/tombol SELALU menang
+     * duluan untuk hit PERSIS di bounds-nya sendiri (dispatch Android baku), [TouchDelegate] cuma
+     * fallback untuk dead-space yang sebelumnya tidak diklaim siapa pun. Sisi kanan (arah tombol
+     * `bubble_prev`) sengaja dapat padding LEBIH KECIL dari sisi lain — gap asli cuma 6dp (lihat
+     * `bubble_mini_player.xml`), nilai konservatif dipilih SENGAJA biar tidak pernah mepet ke
+     * tombol, bukan cuma karena "toh aman secara teori". Dipanggil setelah layout pass (album art
+     * harus sudah ter-measure) — lihat pemanggil di [addBubbleView] & [expand]. */
+    private fun applyAlbumArtTouchDelegate() {
+        val expanded = expandedView ?: return
+        val albumArt = expanded.findViewById<ImageView>(R.id.bubble_album_art) ?: return
+        if (albumArt.width <= 0 || albumArt.height <= 0) return // belum ter-measure; pemanggil lain akan re-apply
+        val density = resources.displayMetrics.density
+        val padSidePx = (ALBUM_ART_TOUCH_PAD_DP * density).toInt()
+        val padRightPx = (ALBUM_ART_TOUCH_PAD_RIGHT_DP * density).toInt()
+        val rect = Rect()
+        albumArt.getHitRect(rect)
+        rect.left -= padSidePx
+        rect.top -= padSidePx
+        rect.bottom += padSidePx
+        rect.right += padRightPx
+        expanded.touchDelegate = TouchDelegate(rect, albumArt)
+    }
+
     private fun setupControls(view: View) {
         // Batch 453 — 4 tombol ini clickable, jadi mengonsumsi ACTION_DOWN SEBELUM sempat ke
         // OnTouchListener root di setupDrag (lihat KDoc di sana) — reset idle-fade dipanggil
         // ulang eksplisit di sini supaya tap tombol kontrol juga dihitung "sedang dipakai".
+        // Batch 470 — 0 lagi gerbang [hasQueue] di sini (dulu: `if (hasQueue) ... else openApp()`).
+        // [hasQueue] cuma snapshot terakhir kali `refreshBubbleContent` jalan — pada cold start
+        // snapshot itu SAH-SAH SAJA `false` (antrean session memang masih 0 SAAT itu) tapi TIDAK
+        // BERARTI selamanya kosong (lihat KDoc kelas "Batch 470" & [sendPlaybackAction]). Selalu
+        // dispatch; [sendPlaybackAction] yang memutuskan controller-langsung vs fallback Intent
+        // cold-start-capable pakai state FRESH detik itu juga, bukan snapshot ini.
         view.findViewById<ImageButton>(R.id.bubble_play_pause).setOnClickListener {
             keepAwakeAndScheduleFade()
-            if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_TOGGLE_PLAY) else openApp()
+            sendPlaybackAction(WidgetUpdater.ACTION_TOGGLE_PLAY)
         }
         view.findViewById<ImageButton>(R.id.bubble_prev).setOnClickListener {
             keepAwakeAndScheduleFade()
-            if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_PREVIOUS) else openApp()
+            sendPlaybackAction(WidgetUpdater.ACTION_PREVIOUS)
         }
         view.findViewById<ImageButton>(R.id.bubble_next).setOnClickListener {
             keepAwakeAndScheduleFade()
-            if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_NEXT) else openApp()
+            sendPlaybackAction(WidgetUpdater.ACTION_NEXT)
         }
         view.findViewById<ImageButton>(R.id.bubble_minimize).setOnClickListener {
             keepAwakeAndScheduleFade()
@@ -794,6 +890,11 @@ class FloatingBubbleService : Service() {
             params.x = (lastExpandedX ?: params.x).coerceIn(0, maxX)
             runCatching { windowManager.updateViewLayout(container, params) }
             bubbleStore.savePosition(params.x, params.y)
+            // Batch 470 — re-apply (idempotent): kalau Service start LANGSUNG minimized (state
+            // tersimpan), `bubble_album_art` 0 pernah ter-measure sampai expand() pertama ini —
+            // panggilan di [addBubbleView] kebagian rect kosong (0x0), delegate baru valid dari
+            // sini. Lihat KDoc [applyAlbumArtTouchDelegate].
+            applyAlbumArtTouchDelegate()
         }
     }
 
@@ -916,14 +1017,28 @@ class FloatingBubbleService : Service() {
         }
     }
 
+    /** Batch 470 [cold-start fix] — lihat KDoc kelas "Batch 470" untuk kronologi lengkap celahnya.
+     * Ringkas: `c != null` SAJA tidak cukup buat aman pakai panggilan controller langsung —
+     * kalau [controller] lokal ini konek tapi sesi `PlaybackService` masih 0 antrean (cold start,
+     * restore belum pernah terpicu SAMA SEKALI karena connect controller murni BIND lewat binder
+     * sesi, 0 lewat `onStartCommand`), `c.play()` dkk di situ adalah NO-OP SENYAP — TIDAK PERNAH
+     * memicu `PlaybackService.restoreLastQueue()` (jalur itu HANYA ada di `onStartCommand`'s
+     * `isWidgetAction` branch, dipicu Intent). Syarat tambahan `c.mediaItemCount > 0` DI SINI
+     * (dibaca FRESH tiap panggilan, bukan snapshot [hasQueue] yang bisa basi) memastikan kondisi
+     * cold-start SELALU jatuh ke fallback Intent yang sama persis dipakai widget home-screen
+     * (lihat KDoc `WidgetUpdater.servicePendingIntent`) — widget TIDAK PERNAH kena celah ini
+     * karena memang TIDAK PERNAH pegang referensi controller lokal sama sekali. */
     private fun sendPlaybackAction(action: String) {
         val c = controller
         when {
-            c != null && action == WidgetUpdater.ACTION_TOGGLE_PLAY -> if (c.isPlaying) c.pause() else c.play()
-            c != null && action == WidgetUpdater.ACTION_NEXT -> c.seekToNextMediaItem()
-            c != null && action == WidgetUpdater.ACTION_PREVIOUS -> c.seekToPreviousMediaItem()
+            c != null && c.mediaItemCount > 0 && action == WidgetUpdater.ACTION_TOGGLE_PLAY ->
+                if (c.isPlaying) c.pause() else c.play()
+            c != null && c.mediaItemCount > 0 && action == WidgetUpdater.ACTION_NEXT -> c.seekToNextMediaItem()
+            c != null && c.mediaItemCount > 0 && action == WidgetUpdater.ACTION_PREVIOUS -> c.seekToPreviousMediaItem()
             else -> {
-                // Fallback: controller belum konek, pakai kontrak Intent yang sama widget pakai.
+                // Fallback: controller belum konek ATAU antrean sesi ini masih kosong (cold-start,
+                // lihat KDoc fungsi) — pakai kontrak Intent yang sama widget pakai, memicu jalur
+                // cold-start restore PlaybackService.onStartCommand.
                 val intent = Intent(this, PlaybackService::class.java).setAction(action)
                 startForegroundService(intent)
             }
@@ -943,8 +1058,9 @@ class FloatingBubbleService : Service() {
         val next = view.findViewById<ImageButton>(R.id.bubble_next)
         playPause.setImageResource(if (player.isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play)
         // Batch 98 — indikasi visual antrean kosong: tombol tetap kelihatan (bukan disembunyikan
-        // total, biar bentuk pill tidak "loncat" ukuran) tapi setengah transparan, dan tap-nya
-        // membuka app alih-alih coba mainkan apa pun (lihat setupControls).
+        // total, biar bentuk pill tidak "loncat" ukuran) tapi setengah transparan. **Batch 470**:
+        // ini SEKARANG murni sinyal visual — tap tombol TIDAK lagi otomatis buka app saat alpha
+        // ini aktif (lihat KDoc kelas "Batch 470" & setupControls/sendPlaybackAction).
         val alpha = if (hasQueue) 1f else 0.4f
         playPause.alpha = alpha
         prev.alpha = alpha
@@ -1016,5 +1132,10 @@ class FloatingBubbleService : Service() {
         // sistem (bervariasi antar OEM/API level) — jaga-jaga ada override posisi window dari
         // sistem SETELAH snap pertama (immediate) tapi SEBELUM animasi rotasi selesai settle.
         private val ROTATION_RESNAP_DELAYS_MS = longArrayOf(150L, 400L)
+        // Batch 470 — padding TouchDelegate `bubble_album_art` (hit-test saja, lihat KDoc
+        // [applyAlbumArtTouchDelegate]). Sisi kanan lebih kecil karena gap asli ke `bubble_prev`
+        // cuma 6dp (lihat bubble_mini_player.xml) — nilai konservatif SENGAJA, bukan batas teori.
+        private const val ALBUM_ART_TOUCH_PAD_DP = 10f
+        private const val ALBUM_ART_TOUCH_PAD_RIGHT_DP = 3f
     }
 }
