@@ -1,5 +1,58 @@
 # Changelog
 
+## Batch 469 — REGRESI BARU pasca-468: bubble hilang saat drag landscape (instrumentasi, bukan fix)
+User laporkan bubble minimized MENGHILANG TOTAL saat di-drag ke tepi landscape berbeda (sisi
+nav-bar-bottom), balik normal cuma kalau device dirotasi ke portrait lagi. Gejala baru, lebih
+parah dari sebelum Batch 468 (dulu kosmetik, sekarang fungsional/unreachable).
+
+Dugaan (belum dipastikan): `screenBounds` diisi dari 2 API beda tergantung kapan —
+`onCreate` pakai `currentWindowMetrics.bounds`, `onConfigurationChanged` pakai
+`newConfig.screenWidthDp/HeightDp * density` (keputusan sah Batch 461, alasan freshness). 2 API
+ini tidak dijamin identik secara semantik. Sebelum Batch 468 (posisi content-area-relative)
+selisih ini "aman"; sejak Batch 468 (posisi full-screen-absolute) selisih bisa dorong posisi
+clamp keluar dari layar nyata.
+
+**Keputusan**: TIDAK menebak fix ke-5 (larangan eksplisit SOP: ganti-ganti API metrics tanpa
+data). **1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt` — 0
+formula/clamp/posisi diubah, murni 2 log baru: (1) bounds-compare di `onConfigurationChanged`
+(currentWindowMetrics vs newConfig, read-only); (2) drag-release target + readback +250ms di
+`setupDrag` ACTION_UP (path yang sebelumnya 0 instrumentasi).
+
+**0 diverifikasi CI/device Batch 469** — review manual (cek balance brace/paren: `{}` 96/96,
+`()` 571/571, `[]` 111/111). Perlu dari user: reproduksi PERSIS (landscape, drag ke tepi
+nav-bottom sampai hilang, JANGAN rotasi balik dulu, ekspor Log Diagnostik saat itu juga).
+
+## Batch 468 — FIX bubble snap-mismatch: FLAG_LAYOUT_IN_SCREEN (root cause branch C jadi kode)
+User kirim hasil device-test Method A/B (3 screenshot, protokol Batch 467). Portrait: gap kosong
+konfirmasi bubble tidak nutupin status bar. Landscape: bubble minimized mentok ujung layar TANPA
+ter-klip — gejala identik kegagalan landscape-edge-clip Batch 460-462 yang sebelumnya dianggap
+bug terpisah.
+
+Root cause: `addBubbleView()` pasang `FLAG_LAYOUT_NO_LIMITS` tanpa `FLAG_LAYOUT_IN_SCREEN` →
+posisi diterapkan WindowManager relatif content-area (exclude status/nav bar), sedangkan target
+(`screenBounds`) & readback (`getLocationOnScreen()`) sama-sama full-screen absolut. Origin
+mismatch ini sumber delta readback Batch 463-466, kemungkinan juga sumber landscape-tak-terklip.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+1. Tambah `FLAG_LAYOUT_IN_SCREEN` ke flags overlay (1 baris).
+2. 0 formula lain diubah (EDGE_CLIP_FRACTION/touchPad/visualWidth/screenBounds tetap persis
+   Batch 460-464). Readback instrumentasi tetap ada, dipakai validasi post-fix.
+
+**RISIKO**: posisi tersimpan dari sesi lama mungkin "geser" sekali di buka pertama pasca-update
+(expected, bukan bug — re-snap manual sekali cukup). WAJIB regression-test penuh: drag/mini
+trigger/minimize-expand-fade-auto-minimize + khususnya landscape-edge-clip.
+
+**0 diverifikasi CI/device Batch 468** — review manual (baca kode + cek balance brace/paren:
+`{}` 90/90, `()` 535/535, `[]` 93/93). Perlu dari user: install APK baru, ulangi Method A/B +
+tes landscape-edge-clip, kirim hasil lagi.
+
+## Batch 467 — Klarifikasi crash Batch 466 + keputusan user: device-test dulu (0 kode)
+User konfirmasi crash Batch 466 tidak pernah keliatan sebagai force-close visible — wajar, itu
+crash BOOT_COMPLETED di background sebelum ada UI. Fix Batch 466 tetap valid (bukti stack trace
+log independen dari ingatan user). Untuk hipotesis bubble FLAG_LAYOUT_IN_SCREEN: user pilih
+device-test dulu (Method A visual gap-check, Method B log-based perbandingan kondisi) sebelum
+coding fix apa pun — 0 kode diubah batch ini, PROJECT_STATE.md diupdate dgn protokol test.
+
 ## Batch 466 — FIX FATAL crash boot (BubbleBootReceiver) + data pertama investigasi bubble snap
 User kirim ekspor Log Diagnostik pertama (`log_20260915_133616...txt`, 1130 baris) — sekaligus
 konfirmasi implisit fix Batch 465 (file utuh/tidak korup → sheet Log Diagnostik terbukti tidak

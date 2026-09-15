@@ -276,6 +276,74 @@ import kotlin.math.abs
  * PERMANEN, bukan soal waktu tunggu. Sesi berikutnya: baca PERBANDINGAN kedua readback (250ms vs
  * 800ms) + ukuran nyata vs target SEBELUM memutuskan fix apa pun — 2 hasil berbeda mengarah ke 2
  * kelas fix yang sama sekali berbeda (delay lebih panjang vs re-urutan resize-lalu-posisikan).
+ *
+ * **Batch 468 [FIX — branch (c) Batch 464 dikonfirmasi jadi kode, berdasar data device Batch
+ * 467]**: user jalankan device-test Method A/B (protokol lengkap: PROJECT_STATE.md Batch 467).
+ * (A) drag bubble ke tepi ATAS layar (portrait) — GAP KOSONG terlihat sebelum bubble mulai,
+ * bubble TIDAK pernah menutupi status bar. (B) screenshot landscape (app lain fullscreen)
+ * menunjukkan pola sama + 1 temuan tambahan: bubble minimized landscape tetap mentok PERSIS ke
+ * ujung layar TANPA ter-klip sama sekali — gejala IDENTIK dengan kegagalan landscape-edge-clip
+ * Batch 460/461/462 yang SEBELUMNYA dianggap bug terpisah & gagal terdiagnosis 3x berturut-turut.
+ *
+ * Root cause: [addBubbleView] pasang `FLAG_LAYOUT_NO_LIMITS` TANPA `FLAG_LAYOUT_IN_SCREEN`.
+ * Tanpa flag itu, per dokumentasi resmi `WindowManager.LayoutParams`, posisi x/y dengan
+ * `Gravity.TOP|START` diinterpretasi RELATIF ke content area (exclude status bar & inset sistem
+ * lain, beda tiap orientasi/config), sedangkan [screenBounds] (sumber target, sejak Batch
+ * 460/461 dari `currentWindowMetrics.bounds`) SELALU full-screen absolut — SAMA seperti
+ * `container.getLocationOnScreen()` yang dipakai readback Batch 463. Target dihitung di 1 sistem
+ * koordinat, diterapkan window manager di sistem koordinat LAIN — origin mismatch itu sumber
+ * SEMUA delta readback Batch 463-466 (99px/66px, cocok kisaran inset status/nav bar), DAN
+ * kemungkinan besar JUGA sumber gejala "tidak ter-klip landscape": kalau inset landscape (nav
+ * bar sisi) cukup besar, ia bisa mengkompensasi hampir seluruh `hiddenWidth`/[EDGE_CLIP_FRACTION]
+ * yang seharusnya menyembunyikan bubble, membuatnya nongol utuh walau formula clip Batch 456-459
+ * sendiri BENAR. **Ini hipotesis PENYATUAN 2 gejala yang sebelumnya dianggap terpisah** — kuat
+ * didukung data, TAPI belum kepastian mutlak sampai dikonfirmasi device pasca-build.
+ *
+ * **Fix (1 baris)**: tambah `WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN` ke flags
+ * [addBubbleView] (sebelah `FLAG_NOT_FOCUSABLE or FLAG_LAYOUT_NO_LIMITS` yang sudah ada sejak
+ * Batch 100). **0 formula lain diubah** — [EDGE_CLIP_FRACTION]/`touchPad`/`visualWidth`/
+ * [screenBounds]/`ROTATION_RESNAP_DELAYS_MS` TETAP persis Batch 460-464, tidak disentuh sama
+ * sekali (1 variabel diubah per percobaan, supaya efeknya terisolasi & bisa dibaca dari data).
+ * Readback instrumentasi Batch 463/464 SENGAJA TIDAK dihapus — dipakai validasi: kalau fix ini
+ * benar, delta readback harusnya (0,0) di semua kasus pasca-update.
+ *
+ * **RISIKO**: flag ini mengubah origin koordinat SELURUH window overlay, bukan cuma snap-to-edge
+ * — termasuk posisi awal expand/drag manual & posisi TERSIMPAN (`FloatingBubbleStore.getPosition()`)
+ * dari sesi SEBELUM update (dihitung di sistem koordinat lama/salah, mungkin kelihatan "geser"
+ * sekali di buka pertama pasca-update — EXPECTED, bukan bug baru, re-snap 1x manual akan
+ * memperbaikinya). WAJIB regression-test manual penuh ke SEMUA yang sebelumnya "confirmed"
+ * (Batch 98-100/451/453-458/460-463): drag manual, mini trigger, minimize/expand/fade/
+ * auto-minimize, DAN khususnya mentok-tepi-landscape (poin yang gagal 3x sebelumnya). **0
+ * diverifikasi CI/device Batch 468** — 0 env Android nyata/device fisik/compiler Kotlin di sesi
+ * ini. Perlu dari user: install APK baru, ulangi Method A/B + tes khusus landscape-edge-clip,
+ * kirim hasil/log lagi.
+ *
+ * **Batch 469 [REGRESI BARU pasca-468 — instrumentasi, BUKAN fix lagi]**: user laporkan bubble
+ * MENGHILANG TOTAL saat di-drag ke tepi landscape yang berbeda (sisi nav-bar-bottom), balik
+ * normal HANYA kalau device dirotasi ke portrait lagi. Ini gejala BARU, lebih parah dari sebelum
+ * Batch 468 (dulu cuma "kurang ter-klip", sekarang bisa hilang total/unreachable). Dugaan kuat:
+ * [screenBounds] diisi dari 2 API BERBEDA tergantung KAPAN — `onCreate` pakai
+ * `currentWindowMetrics.bounds` (baris ~401), `onConfigurationChanged` pakai
+ * `newConfig.screenWidthDp/HeightDp * density` (Batch 461, demi alasan freshness/timing yang
+ * TERBUKTI valid saat itu) — 2 API ini TIDAK dijamin identik secara SEMANTIK (area yang diukur
+ * bisa beda: device-level Configuration vs WindowMetrics). Sebelum Batch 468 (posisi
+ * content-area-relative), potensi selisih ini "aman" karena WindowManager & clamp SAMA-SAMA
+ * relatif ke area yang lebih kecil; sejak Batch 468 (posisi full-screen-absolute), selisih itu
+ * bisa mendorong posisi hasil clamp ke [screenBounds] versi `newConfig` keluar dari layar NYATA
+ * yang sekarang dipakai WindowManager. **BELUM DIPASTIKAN** — teori, bukan bukti. SOP eksplisit
+ * ("PELAJARAN PROSES Batch 461->462"): JANGAN ganti-ganti sumber API lagi tanpa data, apalagi ini
+ * regresi ke-2 di file yang sama minggu ini. **0 formula/clamp/posisi diubah SAMA SEKALI** —
+ * batch ini MURNI 2 titik log baru: (1) [onConfigurationChanged] sekarang JUGA log
+ * `currentWindowMetrics.bounds` (read-only, cuma pembanding) di sebelah [screenBounds] yang
+ * BENAR-BENAR dipakai — kalau 2 angka itu beda, itu BUKTI LANGSUNG teori di atas; (2)
+ * [setupDrag] `ACTION_UP` (drag manual, path yang SEBELUMNYA 0 instrumentasi sama sekali, beda
+ * dari [snapMinimizedToNearestEdge] yang sudah ada sejak Batch 463) sekarang log target akhir +
+ * [screenBounds] yang dipakai clamp + readback `getLocationOnScreen()` +250ms — kalau readback
+ * keluar dari rentang [0, screenBounds] atau beda drastis dari target, itu bukti bubble memang
+ * dirender di luar layar nyata. Sesi berikutnya: WAJIB baca log HASIL reproduksi persis skenario
+ * ini (landscape, drag ke tepi nav-bottom, JANGAN rotasi balik dulu sebelum ekspor Log
+ * Diagnostik — rotasi ke portrait "memperbaiki" gejala tapi JUGA menghapus jendela diagnostik)
+ * SEBELUM coding fix apa pun — bukan tebakan ke-5.
  */
 class FloatingBubbleService : Service() {
 
@@ -370,6 +438,24 @@ class FloatingBubbleService : Service() {
             "FloatingBubbleService",
             "Batch463 onConfigurationChanged: orientation=${newConfig.orientation} " +
                 "screenBounds=$screenBounds isMinimized=$isMinimized"
+        )
+        // Batch 469 — instrumentasi MURNI (0 formula diubah): user laporkan bubble MENGHILANG
+        // total saat di-drag ke tepi landscape berbeda (nav bottom), balik normal cuma kalau
+        // rotasi ke portrait lagi — BARU muncul setelah Batch 468 (FLAG_LAYOUT_IN_SCREEN).
+        // Hipotesis: [screenBounds] di atas (dari `newConfig.screenWidthDp/HeightDp`, API BEDA
+        // dari `currentWindowMetrics.bounds` yang dipakai `onCreate` baris ~383) mungkin TIDAK
+        // sama dengan bounds full-screen NYATA yang sekarang dipakai WindowManager buat render
+        // (sejak Batch 468) — kalau bounds dari `newConfig` LEBIH BESAR dari layar asli, params
+        // hasil clamp ke bounds itu bisa jatuh DI LUAR layar yang sungguhan attributable.
+        // JANGAN ganti sumber [screenBounds] lagi tanpa data (pola terlarang, lihat KDoc kelas
+        // "PELAJARAN PROSES Batch 461->462") — baris ini CUMA baca+log pembanding, 0 mengubah
+        // nilai [screenBounds] yang benar-benar dipakai formula di bawah.
+        val liveBounds = runCatching { windowManager.currentWindowMetrics.bounds }.getOrNull()
+        AppLogger.w(
+            "FloatingBubbleService",
+            "Batch469 bounds-compare: newConfigBounds=$screenBounds vs " +
+                "currentWindowMetricsBounds=$liveBounds density=${resources.displayMetrics.density} " +
+                "orientation=${newConfig.orientation}"
         )
         val view = bubbleView ?: run {
             AppLogger.w("FloatingBubbleService", "Batch463 onConfigurationChanged: bubbleView NULL, skip re-snap")
@@ -501,7 +587,8 @@ class FloatingBubbleService : Service() {
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             overlayType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -607,6 +694,34 @@ class FloatingBubbleService : Service() {
                 MotionEvent.ACTION_UP -> {
                     if (totalMovement > TOUCH_SLOP) {
                         bubbleStore.savePosition(params.x, params.y)
+                        // Batch 469 — instrumentasi MURNI (0 formula diubah, lihat KDoc kelas
+                        // "Batch 469"): user laporkan bubble MENGHILANG saat di-drag ke tepi
+                        // landscape berbeda (nav bottom), pola BARU muncul setelah Batch 468
+                        // (FLAG_LAYOUT_IN_SCREEN). Log target akhir drag + [screenBounds] yang
+                        // dipakai clamp DI SINI (baris ~657-660), PLUS readback posisi NYATA di
+                        // layar 250ms kemudian (`getLocationOnScreen`, pola sama
+                        // [snapMinimizedToNearestEdge] Batch 463) — kalau readback keluar dari
+                        // rentang [0, screenBounds] atau beda dari target, itu bukti langsung
+                        // bubble memang dirender di luar layar nyata saat drag biasa (BUKAN cuma
+                        // lewat [snapMinimizedToNearestEdge]).
+                        val dragTargetX = params.x
+                        val dragTargetY = params.y
+                        val dragBounds = Rect(screenBounds)
+                        AppLogger.w(
+                            "FloatingBubbleService",
+                            "Batch469 drag release target: x=$dragTargetX y=$dragTargetY " +
+                                "screenBounds=$dragBounds isMinimized=$isMinimized"
+                        )
+                        v.postDelayed({
+                            val loc = IntArray(2)
+                            v.getLocationOnScreen(loc)
+                            AppLogger.w(
+                                "FloatingBubbleService",
+                                "Batch469 drag readback (+250ms): posisi layar nyata x=${loc[0]} " +
+                                    "y=${loc[1]} (target x=$dragTargetX y=$dragTargetY, " +
+                                    "screenBounds=$dragBounds)"
+                            )
+                        }, 250L)
                         // Batch 100 — mode minimized SELALU "nempel" tepi terdekat begitu jari
                         // dilepas, tidak boleh mengambang bebas di tengah layar seperti pill
                         // penuh (itu yang membedakan visual "minimized" dari "expanded biasa").
