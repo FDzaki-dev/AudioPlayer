@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import com.rudi.audioplayer.data.FloatingBubbleStore
+import com.rudi.audioplayer.util.AppLogger
 
 /**
  * Batch 98 — sebelum ini, bubble cuma restart lagi kalau user MEMBUKA app-nya secara manual
@@ -26,6 +27,16 @@ class BubbleBootReceiver : BroadcastReceiver() {
         if (!Settings.canDrawOverlays(context)) return
 
         val serviceIntent = Intent(context, FloatingBubbleService::class.java)
-        context.startForegroundService(serviceIntent)
+        // BOOT_COMPLETED is nominally exempt from Android 12+'s background foreground-service
+        // start restriction, but real device data (log_20260915_133616, 07:50:11) shows some
+        // OEM/App-Standby states still refuse it with ForegroundServiceStartNotAllowedException,
+        // which crashed the whole app on launch. A missed auto-restart of the bubble is a minor
+        // regression (same fallback already documented above: user opens the app manually); a
+        // crash on every boot is not. Never let this receiver take the app down.
+        runCatching {
+            context.startForegroundService(serviceIntent)
+        }.onFailure { e ->
+            AppLogger.e("BubbleBootReceiver", "startForegroundService ditolak saat BOOT_COMPLETED", e)
+        }
     }
 }

@@ -12,6 +12,61 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 466 [FIX FATAL crash boot + data pertama investigasi bubble snap, branch C
+terkonfirmasi]**: user kirim ekspor Log Diagnostik pertama (`log_20260915_133616...txt`, 1130
+baris) — sekaligus KONFIRMASI IMPLISIT fix Batch 465 (file ADA, utuh, tidak korup/kepotong →
+sheet Log Diagnostik terbukti tidak freeze/force-close lagi saat diekspor). 0 sektor DITUTUP
+disentuh.
+
+**Temuan 1 [FATAL, P0 STABILITY, prioritas di atas investigasi bubble]**: log berisi 1 crash
+FATAL nyata (07:50:11) — `BubbleBootReceiver` → `context.startForegroundService()` saat
+`BOOT_COMPLETED` dilempar `ForegroundServiceStartNotAllowedException` (`mAllowStartForeground
+false`), app force-close total tiap boot (toggle bubble ON). `BOOT_COMPLETED` nominal exempt
+dari restriksi Android 12+ ini per dok resmi, TAPI device nyata user MEMBUKTIKAN exemption itu
+tidak selalu berlaku (kemungkinan OEM App Standby Bucket/battery restriction) — bukti device
+menang atas asumsi dokumentasi, sama seperti pelajaran Batch 463.
+
+**1 file diubah** (dalam batas 3 file/tugas): `BubbleBootReceiver.kt`.
+1. `context.startForegroundService(serviceIntent)` dibungkus `runCatching` (pola identik
+   `FloatingBubbleService.kt`) + `AppLogger.e` kalau gagal — 0 lagi propagate ke uncaught
+   handler/force-close. Gagal-senyap jatuh ke fallback yang SUDAH ADA (`MainActivity`'s
+   `LaunchedEffect(Unit)`, user buka app manual), bukan crash total.
+2. 0 formula/logic lain diubah. Manifest dicek ulang (`RECEIVE_BOOT_COMPLETED`,
+   `FOREGROUND_SERVICE_SPECIAL_USE`, `exported=false`) — semua sudah benar, 0 disentuh.
+
+**Temuan 2 [investigasi Roadmap #11, BUKAN fix — decision tree Batch 464 resmi terjawab data]**:
+330 baris `WARN [FloatingBubbleService]` di log sama = readback instrumentasi Batch 463/464
+pertama dari device fisik NYATA (log Log Diagnostik penuh, bukan potongan logcat lagi).
+108 pasang readback +250ms & 27 pasang +800ms dianalisis:
+- **Ukuran (w/h) real vs target: 0/27 mismatch** → teori "window WRAP_CONTENT belum tuntas
+  resize" (branch a, dugaan utama Batch 464) **GUGUR, dibuktikan data.**
+- **+800ms MASIH offset dari target, besarnya SAMA PERSIS dgn +250ms** (0 mengecil seiring
+  waktu) → teori "murni delay/settling" (branch b) **GUGUR juga.**
+- Pola delta (ΔX,ΔY) TERKUANTISASI (bukan noise acak): (0,99)×46, (99,66)×21, (99,0)×22,
+  (0,66)×9 — **branch (c) resmi terkonfirmasi**: root cause BUKAN resize, BUKAN timing.
+
+**HIPOTESIS BARU (BELUM di-fix, WAJIB validasi lanjut — pola tebak-tanpa-data Batch 460-462
+JANGAN diulang)**: `addBubbleView()` pasang `FLAG_LAYOUT_NO_LIMITS` TANPA
+`FLAG_LAYOUT_IN_SCREEN` (baris ~504). Tanpa `FLAG_LAYOUT_IN_SCREEN`, per dok resmi
+`WindowManager.LayoutParams` dgn `Gravity.TOP|START` diposisikan relatif ke content area
+(exclude status bar/nav bar), sedangkan `getLocationOnScreen()` (dipakai readback) SELALU
+absolut ke layar fisik (include status bar/nav bar) — origin 2 sistem koordinat beda, selisih
+= inset sistem saat itu (status bar ≈99px di sebagian kasus, nav bar sisi landscape ≈66px di
+kasus lain — cocok kenapa offset beda per orientasi, TIDAK pernah 0). Delta 99/66 MENGUATKAN
+hipotesis ini tapi BELUM 100% dikonfirmasi (0 device fisik/compiler sesi ini). Fix kandidat
+(BELUM diterapkan): tambah `WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN` ke flags baris
+~504 (combo `NO_LIMITS+IN_SCREEN` = pola standar overlay bubble absolut, gaya Messenger
+chat-head). **RISIKO kalau diterapkan**: flag ini bisa geser SEMUA posisi X/Y existing
+(minimize/expand/drag/auto-minimize), bukan cuma snap-to-edge — WAJIB regression-test manual
+penuh ke Batch 98-100/453-458/460-463. TIDAK auto-diterapkan batch ini (STABILITY WINS; 3 fix
+tebakan sebelumnya sudah gagal — jangan tambah yang ke-4 tanpa keputusan eksplisit user).
+
+**0 diverifikasi CI/device Batch 466** — review manual (baca kode + cek balance brace/paren:
+`{}` 4/4, `()` 18/18, `[]` 2/2 di `BubbleBootReceiver.kt`), 0 env Android nyata/device
+fisik/compiler Kotlin di sesi ini. Perlu dari user: (1) install APK baru, restart HP, konfirmasi
+0 force-close lagi saat boot; (2) putuskan lanjut/tidak ke hipotesis `FLAG_LAYOUT_IN_SCREEN` di
+atas sebelum batch depan coding fix bubble (lihat RESUME POINT).
+
 **Catatan Batch 465 [FIX BLOCKER: Log Diagnostik force-close/freeze]**: user laporkan sheet
 Settings > Log Diagnostik sendiri force-close/freeze saat dibuka — ini BLOCKER kritis karena
 Log Diagnostik justru alat yang diminta Batch 464 untuk ambil log instrumentasi bubble. Root
@@ -1128,15 +1183,24 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 465. ZIP terakhir: `SONIX_v465.zip`. **1 file diubah** (dalam batas 3
-  file/tugas): `DiagnosticLogSheet.kt` — FIX blocker force-close/freeze saat sheet Log
-  Diagnostik dibuka (root cause: 1 `Text` mentah render `logText` s.d. ~200_000 char → LAYOUT
-  Main thread ANR; fix: `LazyColumn` per baris). Sektor bubble (Roadmap #11) TIDAK disentuh
-  batch ini. **BELUM diverifikasi device** — item WAJIB paling prioritas sesi berikutnya:
-  konfirmasi Log Diagnostik terbuka normal dulu (0 freeze/force-close, isi log lengkap/bisa
-  scroll/ekspor) SEBELUM lanjut ke permintaan Batch 464 di bawah (masih berlaku persis, belum
-  terpenuhi — instrumentasi bubble Batch 463/464 juga TIDAK disentuh/direset batch ini, jadi
-  log yang sudah terkumpul di HP user seharusnya tetap ada begitu sheet ini bisa dibuka lagi).
+- Batch terakhir: 466. ZIP terakhir: `SONIX_v466.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `BubbleBootReceiver.kt` — FIX FATAL crash (`startForegroundService()` saat
+  `BOOT_COMPLETED` dilempar `ForegroundServiceStartNotAllowedException` di device nyata user →
+  dibungkus `runCatching`+`AppLogger.e`). **BELUM diverifikasi device** — item WAJIB paling
+  prioritas sesi berikutnya: (1) install APK baru, restart HP dgn toggle bubble ON, konfirmasi
+  0 force-close lagi saat boot.
+- **KEPUTUSAN TERTUNDA dari user (item 2, prioritas setelah 1)**: hipotesis root cause bubble
+  snap-mismatch (Roadmap #11, lihat "Catatan Batch 466" di atas untuk detail lengkap) SEKARANG
+  branch (c) resmi terkonfirmasi DATA (0/27 size mismatch buang teori resize Batch 464; delta
+  +800ms sama persis dgn +250ms buang teori delay) — hipotesis baru: `addBubbleView()` (baris
+  ~504) kurang `WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN` (cuma ada `FLAG_LAYOUT_NO_LIMITS`),
+  origin koordinat target (exclude status/nav bar) vs `getLocationOnScreen()` readback (absolut
+  fisik) beda → selisih = inset sistem (99px/66px cocok pola data). **JANGAN langsung coding fix
+  ini tanpa konfirmasi user** — sudah 3 fix tebakan gagal (Batch 460/461/462) ke file yang sama,
+  dan flag ini berisiko geser SEMUA posisi X/Y existing (bukan cuma snap-to-edge), WAJIB
+  regression-test manual penuh ke Batch 98-100/453-458/460-463 kalau diterapkan. Tanyakan user:
+  lanjut coba `FLAG_LAYOUT_IN_SCREEN` (risiko dipahami) ATAU device-test lain dulu buat
+  validasi hipotesis tanpa ubah kode dulu.
 - Batch 464 (sebelum 465). ZIP: `SONIX_v464.zip`. **1 file diubah** (dalam batas 3
   file/tugas): `FloatingBubbleService.kt` — **masih instrumentasi, 0 fix formula/logic**. Log
   Batch 463 pertama dari user (device fisik) kasih DATA MENGEJUTKAN: mismatch besar (target

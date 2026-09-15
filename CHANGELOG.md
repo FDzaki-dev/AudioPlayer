@@ -1,5 +1,37 @@
 # Changelog
 
+## Batch 466 — FIX FATAL crash boot (BubbleBootReceiver) + data pertama investigasi bubble snap
+User kirim ekspor Log Diagnostik pertama (`log_20260915_133616...txt`, 1130 baris) — sekaligus
+konfirmasi implisit fix Batch 465 (file utuh/tidak korup → sheet Log Diagnostik terbukti tidak
+freeze/force-close lagi).
+
+**Temuan 1 [FATAL]**: log berisi 1 crash FATAL nyata (07:50:11) — `BubbleBootReceiver` →
+`startForegroundService()` saat `BOOT_COMPLETED` dilempar `ForegroundServiceStartNotAllowedException`,
+app force-close total tiap boot dgn bubble ON. `BOOT_COMPLETED` nominal exempt dari restriksi
+Android 12+ ini per dokumentasi resmi, tapi device nyata user membuktikan exemption itu tidak
+selalu berlaku.
+
+**1 file diubah** (dalam batas 3 file/tugas): `BubbleBootReceiver.kt`.
+1. `context.startForegroundService(serviceIntent)` dibungkus `runCatching` (pola sama
+   `FloatingBubbleService.kt`) + `AppLogger.e` kalau gagal — 0 lagi propagate ke crash. Gagal
+   jatuh ke fallback existing (`MainActivity`'s `LaunchedEffect(Unit)`, user buka app manual).
+2. 0 formula/logic/manifest lain diubah (permission & receiver declaration dicek ulang, sudah benar).
+
+**Temuan 2 [investigasi Roadmap #11, bukan fix]**: 330 baris `WARN [FloatingBubbleService]` di
+log sama = readback instrumentasi Batch 463/464 pertama dari device fisik nyata. 108 pasang
++250ms & 27 pasang +800ms dianalisis: ukuran w/h real vs target 0/27 mismatch (teori resize
+Batch 464 gugur); offset +800ms sama persis dgn +250ms (teori delay gugur); pola delta
+terkuantisasi (0,99)/(99,66)/(99,0)/(0,66) — decision-tree Batch 464 branch (c) terkonfirmasi:
+root cause bukan resize, bukan timing. Hipotesis baru (belum di-fix, lihat PROJECT_STATE.md
+untuk detail & risiko lengkap): `addBubbleView()` kurang `FLAG_LAYOUT_IN_SCREEN`, origin
+koordinat target vs `getLocationOnScreen()` readback beda sistem, selisih = inset status/nav
+bar. Menunggu keputusan user sebelum coding (3 fix tebakan sebelumnya ke file sama sudah gagal).
+
+**0 diverifikasi CI/device Batch 466** — review manual (baca kode + cek balance brace/paren:
+`{}` 4/4, `()` 18/18, `[]` 2/2 di `BubbleBootReceiver.kt`), 0 env Android nyata/device
+fisik/compiler Kotlin di sesi ini. Perlu dari user: install APK baru, restart HP, konfirmasi 0
+force-close lagi saat boot.
+
 ## Batch 465 — FIX: Log Diagnostik force-close/freeze saat dibuka
 User laporkan sheet Settings > Log Diagnostik force-close/freeze saat dibuka — blocker kritis
 karena ini justru alat yang diminta Batch 464 untuk ambil log bubble (Roadmap #11, masih
