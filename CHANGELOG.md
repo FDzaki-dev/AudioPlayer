@@ -1,5 +1,35 @@
 # Changelog
 
+## Batch 464 — Data device fisik pertama mengejutkan: mismatch terjadi saat minimize biasa, bukan cuma rotasi
+User kirim 2 potongan logcat hasil instrumentasi Batch 463. Log pertama (rotasi) terpotong sebelum
+baris readback muncul. Log kedua (ditunggu lebih lama) berhasil menangkap readback pertama —
+**bukan dari rotasi**, tapi dari event `minimize()` biasa tepat sebelum user merotasi: target
+`x=1011 y=469`, posisi nyata di layar 250ms kemudian `x=551 y=568` (selisih 460px di X). Sinyal
+ini menggeser dugaan dari "animasi transisi rotasi" (fokus Batch 462/463) ke kemungkinan baru:
+window overlay ini `WRAP_CONTENT` (resize fisik tiap toggle expanded↔minimized), dan `width` yang
+dibaca `snapMinimizedToNearestEdge()` mungkin representasi View yang sudah di-measure tapi window
+WindowManager-nya sendiri belum tuntas resize saat `updateViewLayout` dipanggil. Rotasi mungkin
+cuma kebetulan memicu fungsi snap yang sama, kena race yang sama.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+
+1. **0 formula/logic diubah** — masih murni instrumentasi.
+2. **Readback diperluas**: sekarang juga log `container.width`/`container.height` nyata di momen
+   readback, dibanding ukuran saat target dihitung (`targetWidth`/`targetHeight`) — kalau beda,
+   itu bukti langsung window/view masih resize saat snap di-apply.
+3. **Readback kedua di +800ms** (selain +250ms Batch 463, sekarang lewat 1 fungsi lokal
+   `logReadback(label)` supaya 0 duplikasi) — +800ms cocok ke target berarti soal settling/
+   animasi (fix: perpanjang delay); +800ms masih meleset sama berarti salah permanen (fix:
+   re-urutan resize-dulu-baru-posisikan).
+4. 0 breaking change ke minimize/expand/fade/auto-minimize/rotasi Batch 98-100/453-458/460-463,
+   0 import/dependency baru, 0 sektor DITUTUP disentuh.
+
+**0 diverifikasi CI/device Batch 464** — review manual (baca kode + cek balance brace/paren:
+`{}` 90/90, `()` 515/515, `[]` 86/86), 0 env Android nyata/device fisik/compiler Kotlin di sesi
+ini. Perlu dari user: reproduksi lagi, diamkan HP minimal 1 detik penuh sebelum ambil log (readback
+terjauh sekarang +800ms), lalu kirim balik. Fix diputuskan dari perbandingan 250ms-vs-800ms +
+ukuran nyata vs target — 2 hasil berbeda mengarah ke 2 kelas fix berbeda (lihat PROJECT_STATE.md).
+
 ## Batch 463 — Pivot ke instrumentasi: Batch 462 gagal lagi, logcat user 0 sinyal app-level
 Konfirmasi device fisik user: Batch 462 (safety-net re-assert 2x delay) **GAGAL LAGI** — "masih
 nongol/gak ke kliping" saat rotate, sama seperti Batch 460/461. User membawa `bubble_log.txt`

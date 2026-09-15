@@ -12,6 +12,41 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 464 [DATA DEVICE FISIK PERTAMA — MENGEJUTKAN, ganti arah dugaan]**: user kirim 2
+potongan logcat hasil instrumentasi Batch 463. Log ke-1 (rotasi) terpotong sebelum baris readback
+sempat muncul (0 kesimpulan bisa ditarik). Log ke-2 (rotasi lagi, ditunggu lebih lama) BERHASIL
+menangkap readback pertama — hasilnya JUSTRU dari event **minimize() BIASA SEBELUM rotasi terjadi**
+(screenWidth=1080, portrait, 0 rotasi terlibat): target `x=1011 y=469` TAPI posisi nyata di layar
+250ms kemudian `x=551 y=568` — **selisih 460px di X**. Ini sinyal kuat BARU: mismatch mungkin BUKAN
+soal animasi transisi ROTASI (fokus Batch 462 & 463), melainkan window overlay ini `WRAP_CONTENT`
+(resize fisik tiap toggle expanded↔minimized) dan `width`/`height` yang dibaca
+`snapMinimizedToNearestEdge()` via `container.post{}` mungkin representasi View yang sudah
+di-measure TAPI window WindowManager-nya sendiri belum tuntas resize saat `updateViewLayout`
+dipanggil — teori KE-4, belum pernah diuji batch mana pun sebelumnya. Rotasi mungkin cuma
+kebetulan JUGA memicu fungsi snap yang SAMA, kena race yang SAMA — bukan soal rotasi itu sendiri.
+0 sektor DITUTUP disentuh.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+1. **0 formula/logic diubah lagi** — masih PERSIS instrumentasi, bukan fix.
+2. **Readback diperluas**: sekarang JUGA log `container.width`/`container.height` NYATA di momen
+   readback, dibandingkan ke `width`/`container.height` yang dipakai saat target dihitung
+   (`targetWidth`/`targetHeight`, snapshot lokal) — kalau beda, itu BUKTI LANGSUNG window/view
+   masih resize saat snap kita apply (bukan dugaan lagi).
+3. **Readback KEDUA ditambah di +800ms** (selain +250ms yang sudah ada dari Batch 463, keduanya
+   sekarang pakai 1 fungsi lokal `logReadback(label)` supaya 0 duplikasi kode) — kalau +800ms
+   SUDAH cocok ke target (beda dari +250ms yang meleset), itu bukti murni SETTLING/animasi
+   sementara (fix: perpanjang delay saja); kalau +800ms MASIH meleset SAMA, itu salah PERMANEN
+   (fix: re-urutan resize-dulu-baru-posisikan, BUKAN soal delay).
+4. 0 breaking change ke minimize/expand/fade/auto-minimize/rotasi Batch 98-100/453-458/460-463,
+   0 import/dependency baru, 0 sektor DITUTUP disentuh.
+
+**0 diverifikasi CI/device Batch 464** — review manual (baca kode + cek balance brace/paren:
+`{}` 90/90, `()` 515/515, `[]` 86/86), 0 env Android nyata/device fisik/compiler Kotlin di sesi
+ini. Perlu dari user: reproduksi SEKALI LAGI (minimize → rotasi → **diamkan HP minimal 1 detik
+penuh**, karena readback terjauh sekarang +800ms), lalu kirim log/ekspor Log Diagnostik. Baca
+PERBANDINGAN 250ms vs 800ms + ukuran nyata vs target sebelum putuskan fix apa pun — 2 hasil
+berbeda mengarah ke 2 kelas fix yang sama sekali berbeda (lihat poin 3 di atas).
+
 **Catatan Batch 463 [PIVOT KE INSTRUMENTASI]**: user konfirmasi device fisik Batch 462 — "masih
 nongol/gak ke kliping" (GAGAL, sama seperti Batch 460/461). User membawa `bubble_log.txt` (logcat
 `-iE "floatingbubble|configurationchanged|windowmanager"`) sesuai permintaan eksplisit
@@ -1066,34 +1101,37 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 463. ZIP terakhir: `SONIX_v463.zip`. **1 file diubah** (dalam batas 3
-  file/tugas): `FloatingBubbleService.kt` — **PIVOT KE INSTRUMENTASI, 0 fix formula/logic baru**.
-  Batch 462 dikonfirmasi GAGAL LAGI oleh user ("masih nongol/gak ke kliping"), DAN `bubble_log.txt`
-  yang dibawa user TERBUKTI (dicek baris-per-baris) 0 baris dari `FloatingBubbleService` sama
-  sekali — service ini tidak pernah menulis logcat, jadi Batch 460/461/462 semua tebakan buta.
-  Batch ini menambah `AppLogger.w()` di 4 titik (entry rotasi, 2 guard null, callback delay,
-  target X/Y + outcome apply) + readback posisi NYATA di layar +250ms setelah tiap snap — supaya
-  SESI BERIKUTNYA punya data asli, bukan teori lagi. Detail penuh: "Catatan Batch 463" di atas &
+- Batch terakhir: 464. ZIP terakhir: `SONIX_v464.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `FloatingBubbleService.kt` — **masih instrumentasi, 0 fix formula/logic**. Log
+  Batch 463 pertama dari user (device fisik) kasih DATA MENGEJUTKAN: mismatch besar (target
+  x=1011 vs nyata x=551, selisih 460px) terjadi saat `minimize()` BIASA — **0 rotasi terlibat**.
+  Ini menggeser dugaan dari "animasi transisi rotasi" (fokus Batch 462) ke "window `WRAP_CONTENT`
+  belum tuntas resize saat kita baca `width`/apply posisi" — teori BARU, belum pernah diuji. Batch
+  464 memperluas readback: (1) log ukuran nyata (`container.width/height`) juga, dibanding ukuran
+  saat target dihitung; (2) tambah readback KEDUA di +800ms (selain +250ms) untuk bedakan
+  "settling sementara" vs "salah permanen". Detail penuh: "Catatan Batch 464" di atas &
   `CHANGELOG.md`. Sektor bubble (Roadmap #11) masih terbuka, TIDAK ada sektor DITUTUP disentuh.
 - **WAJIB DILAKUKAN sebelum lanjut fix apa pun ke file ini (PALING PRIORITAS)**: minta user (1)
-  buka bubble → minimize → rotasi ke landscape sekali; (2) ambil salah satu — logcat Termux
-  (command SAMA persis yang menghasilkan `bubble_log.txt`, sekarang HARUS ada baris "Batch463...")
-  ATAU buka app → Settings → Lanjutan → Log Diagnostik → salin/ekspor; (3) kirim hasilnya balik ke
-  sesi ini. **JANGAN eksekusi fix ke-4 ke formula/logic sebelum log ini ada di tangan** — itu akan
-  mengulang pola tebak-buta Batch 460-462 persis yang baru saja terbukti gagal 3x.
+  buka bubble → minimize → (boleh) rotasi lagi kalau mau; (2) **diamkan HP minimal 1 detik penuh**
+  sebelum ambil log (readback terjauh sekarang +800ms, bukan +250ms lagi); (3) ambil logcat ATAU
+  ekspor Settings → Lanjutan → Log Diagnostik; (4) kirim balik. **JANGAN eksekusi fix apa pun ke
+  formula/logic sebelum perbandingan 250ms-vs-800ms & ukuran-nyata-vs-target ada di tangan** —
+  2 hasil berbeda (lihat "Catatan Batch 464") mengarah ke 2 kelas fix yang sama sekali berbeda.
 - **HISTORI KEGAGALAN item (3) — WAJIB dibaca sebelum lanjut**: Batch 460
-  (`resources.displayMetrics`→`currentWindowMetrics.bounds`) ❌ "masih nongol" (belum spesifik).
-  Batch 461 (`currentWindowMetrics`→`screenBounds` dari `newConfig`) ❌ SAMA PERSIS "masih nongol",
-  diklarifikasi tap: **100% kelihatan, gak keclip sama sekali**. Batch 462 (safety-net re-assert 2x
-  delay, TIDAK ganti formula/sumber data) ❌ GAGAL LAGI ("masih nongol/gak ke kliping", konfirmasi
-  user sesi ini). Batch 463: **BUKAN fix ke-4** — logcat yang dibawa user Batch 462 TERBUKTI 0
-  sinyal (service tidak pernah logcat), jadi pivot ke instrumentasi murni (lihat "Catatan Batch
-  463" di atas) supaya fix ke-4 (kalau perlu) diputuskan dari DATA, bukan teori. **Begitu log hasil
-  Batch 463 masuk**: baca urutan snap-target vs readback +250ms tiap 3 titik (immediate/150ms/
-  400ms) — kalau readback SELALU cocok dgn target di SEMUA titik, bug bukan soal window
-  kita ditimpa (kemungkinan lain: `visualWidth`/`touchPad` salah baca ukuran view, atau
-  bug ada di layer render/tema, bukan posisi window sama sekali); kalau readback beda dari
-  target di titik tertentu, itu bukti langsung SIAPA/KAPAN menimpanya — putuskan fix dari situ.
+  (`resources.displayMetrics`→`currentWindowMetrics.bounds`) ❌. Batch 461 (`screenBounds` dari
+  `newConfig`) ❌ "100% kelihatan, gak keclip sama sekali". Batch 462 (safety-net re-assert 2x
+  delay) ❌ GAGAL LAGI. Batch 463 (pivot instrumentasi, logcat lama TERBUKTI 0 sinyal) → readback
+  pertama JUSTRU dari event minimize BIASA (bukan rotasi), mismatch 460px. Batch 464 (perluas
+  readback: ukuran nyata + titik +800ms) — hasil BELUM diketahui. **BACA logika keputusan
+  berikut begitu log Batch 464 masuk**: (a) kalau `container.width/height` di readback BEDA dari
+  target width/height → window memang masih resize saat snap di-apply, fix arahnya: tunda
+  `updateViewLayout` sampai window BENAR tuntas resize (bukan cuma `container.post{}` 1x), atau
+  hitung target dari ukuran yang SUDAH pasti final (mis. dimensi XML tab minimized langsung,
+  bukan `container.width` runtime); (b) kalau ukuran SAMA tapi posisi +250ms meleset namun +800ms
+  SUDAH benar → murni soal delay re-assert kurang lama, cukup naikkan
+  `ROTATION_RESNAP_DELAYS_MS`/tambah 1 titik lagi; (c) kalau +800ms MASIH meleset SAMA dengan
+  ukuran yang SUDAH match target → root cause lain sama sekali (bukan resize, bukan timing) —
+  WAJIB investigasi baru, jangan asumsikan salah satu dari (a)/(b) tanpa cek datanya.
 - **DIKONFIRMASI device fisik user (Batch 460)**: (1) mini trigger lebih gampang di-tap ✅; (2)
   bagian timbul ~10% ✅; (4) drag tab minimized 100% kelihatan/terkontrol penuh selagi digeser ✅;
   (5) 0 regresi ke minimize/expand/fade/auto-minimize Batch 98-100/453/454 ✅. **(3) mentok tepi

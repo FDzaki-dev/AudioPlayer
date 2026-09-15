@@ -259,6 +259,23 @@ import kotlin.math.abs
  * Diagnostik (0 perlu Termux/adb kalau salah satu kanal gagal lagi, lihat `AppLogger.kt`).
  * Sesi berikutnya: baca log HASIL rotasi nyata dulu (logcat ATAU ekspor Log Diagnostik), BARU
  * putuskan fix ke-4 dari situ — bukan dari teori baru tanpa bukti (lihat PROJECT_STATE.md).
+ *
+ * **Batch 464 [DATA BARU MENGEJUTKAN — perluas instrumentasi]**: readback +250ms Batch 463
+ * (device fisik pertama) menunjukkan mismatch BESAR (target x=1011 vs nyata x=551) SAAT
+ * [minimize] BIASA — 0 rotasi terlibat sama sekali (screenWidth tetap 1080/portrait). Ini
+ * mengubah arah dugaan: mismatch mungkin BUKAN soal animasi transisi ROTASI (fokus Batch 462),
+ * tapi soal window overlay `WRAP_CONTENT` ini resize FISIK tiap toggle expanded↔minimized, dan
+ * `width` yang dibaca [snapMinimizedToNearestEdge] via `container.post{}` mungkin representasi
+ * View yang sudah di-measure tapi window WindowManager-nya sendiri belum tuntas resize saat
+ * `updateViewLayout` dipanggil — teori BARU, belum pernah diuji Batch 460-462. **0 formula/logic
+ * diubah lagi** — 2 tambahan MURNI observasi: (1) readback sekarang JUGA log `container.width`/
+ * `container.height` NYATA, dibanding ke ukuran saat target dihitung — kalau beda, itu bukti
+ * langsung window/view masih resize saat snap di-apply; (2) readback KEDUA ditambah di +800ms
+ * (selain +250ms yang sudah ada) — kalau +800ms sudah cocok ke target (beda dari +250ms yang
+ * meleset), itu soal SETTLING/animasi sementara; kalau +800ms MASIH meleset sama, itu salah
+ * PERMANEN, bukan soal waktu tunggu. Sesi berikutnya: baca PERBANDINGAN kedua readback (250ms vs
+ * 800ms) + ukuran nyata vs target SEBELUM memutuskan fix apa pun — 2 hasil berbeda mengarah ke 2
+ * kelas fix yang sama sekali berbeda (delay lebih panjang vs re-urutan resize-lalu-posisikan).
  */
 class FloatingBubbleService : Service() {
 
@@ -752,14 +769,35 @@ class FloatingBubbleService : Service() {
             // berikutnya, bukan lagi nilai yang di-apply oleh panggilan INI.
             val targetX = params.x
             val targetY = params.y
-            container.postDelayed({
+            // Batch 464 — hasil readback Batch 463 (data device fisik pertama, MENGEJUTKAN):
+            // mismatch BESAR terjadi bahkan saat minimize() BIASA (0 rotasi sama sekali, screenWidth
+            // 1080 tetap portrait) — target x=1011 vs nyata x=551 (selisih 460px). Ini menggeser
+            // dugaan: mungkin BUKAN soal animasi transisi ROTASI (teori Batch 462) — window overlay
+            // ini `WRAP_CONTENT` (resize fisik tiap toggle expanded<->minimized), dan `width` yang
+            // dibaca di `container.post{}` BISA JADI representasi ukuran View yang sudah di-measure
+            // tapi window WindowManager-nya sendiri belum tuntas resize saat `updateViewLayout`
+            // dipanggil (race lain, beda dari 3 teori Batch 460-462, TIDAK PERNAH diuji sebelum ini).
+            // 2 tambahan MURNI observasi (0 masih formula/logic diubah): (1) log `container.width`/
+            // `container.height` DI READBACK juga — kalau beda dari `width`/`container.height` saat
+            // target dihitung di atas, itu BUKTI LANGSUNG window/view masih resize saat kita apply;
+            // (2) 1 readback TAMBAHAN di +800ms (bukan cuma +250ms) — kalau posisi di +800ms SUDAH
+            // sama dengan target (beda dari +250ms yang meleset), itu bukti ini soal SETTLING/
+            // ANIMASI (sementara), bukan salah permanen; kalau +800ms MASIH meleset sama, itu bukti
+            // salahnya permanen (bukan soal waktu tunggu sama sekali).
+            val targetWidth = width
+            val targetHeight = container.height
+            fun logReadback(label: String) {
                 val loc = IntArray(2)
                 container.getLocationOnScreen(loc)
                 AppLogger.w(
                     "FloatingBubbleService",
-                    "Batch463 readback (+250ms): posisi layar nyata x=${loc[0]} y=${loc[1]} (target x=$targetX y=$targetY)"
+                    "Batch464 readback ($label): posisi layar nyata x=${loc[0]} y=${loc[1]} " +
+                        "(target x=$targetX y=$targetY) | ukuran nyata w=${container.width} " +
+                        "h=${container.height} (target w=$targetWidth h=$targetHeight)"
                 )
-            }, 250L)
+            }
+            container.postDelayed({ logReadback("+250ms") }, 250L)
+            container.postDelayed({ logReadback("+800ms") }, 800L)
         }
     }
 
