@@ -1,5 +1,31 @@
 # Changelog
 
+## Batch 465 — FIX: Log Diagnostik force-close/freeze saat dibuka
+User laporkan sheet Settings > Log Diagnostik force-close/freeze saat dibuka — blocker kritis
+karena ini justru alat yang diminta Batch 464 untuk ambil log bubble (Roadmap #11, masih
+terbuka, TIDAK disentuh batch ini). Root cause: `DiagnosticLogSheet.kt` render `logText` (bisa
+sampai ~200_000 char, `MAX_LOG_BYTES` di `AppLogger.kt`) sebagai 1 Text mentah dalam
+`Column`+`verticalScroll`. Baca file sudah async sejak Batch 431, tapi LAYOUT teks sepanjang itu
+di 1 node Compose tetap kerja Main thread saat sheet pertama tampil — instrumentasi padat
+`FloatingBubbleService.kt` Batch 463/464 (log tiap konfigurasi/callback/readback) bikin file
+lebih cepat mendekati cap 200KB, cukup memicu ANR/freeze.
+
+**1 file diubah** (dalam batas 3 file/tugas): `DiagnosticLogSheet.kt`.
+
+1. Render log diganti dari 1 `Text` mentah ke `LazyColumn` + 1 `Text` per baris (pola sama
+   `LyricsSheet.kt`/`DuplicateFinderSheet.kt`) — Compose cuma measure/layout baris yang KELIHATAN
+   di layar, bukan seluruh log sekaligus.
+2. 0 baris log dibuang/ditruncate — `logText` tetap dibaca & disimpan utuh dari `AppLogger`, cuma
+   cara render yang beda. "Repack ke Dokumen" tetap ekspor `readLog()` utuh, tidak disentuh.
+3. Import tak terpakai (`rememberScrollState`/`verticalScroll`) dibuang, ganti
+   `LazyColumn`/`items`. 0 formula/state lain diubah, 0 import/dependency baru di luar yang sudah
+   dipakai file lain, 0 sektor DITUTUP disentuh.
+
+**0 diverifikasi CI/device Batch 465** — review manual (baca kode + cek balance brace/paren:
+`{}` 27/27, `()` 101/101, `[]` 0/0 di `DiagnosticLogSheet.kt`), 0 env Android nyata/device
+fisik/compiler Kotlin di sesi ini. Perlu dari user: buka Settings > Log Diagnostik lagi, konfirmasi
+sheet terbuka normal (tidak freeze/force-close) dan isi log masih lengkap/bisa di-scroll/di-ekspor.
+
 ## Batch 464 — Data device fisik pertama mengejutkan: mismatch terjadi saat minimize biasa, bukan cuma rotasi
 User kirim 2 potongan logcat hasil instrumentasi Batch 463. Log pertama (rotasi) terpotong sebelum
 baris readback muncul. Log kedua (ditunggu lebih lama) berhasil menangkap readback pertama —

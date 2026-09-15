@@ -1,8 +1,8 @@
 package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CheckCircle
@@ -103,17 +103,30 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                     color = MaterialTheme.colorScheme.secondary
                 )
             } else {
-                Column(
+                // Batch 465 — FIX force-close/freeze: sebelumnya seluruh `logText` (bisa sampai
+                // ~200_000 char, MAX_LOG_BYTES AppLogger.kt) dirender via 1 Text mentah dalam
+                // Column+verticalScroll. Baca file sudah async sejak Batch 431, tapi LAYOUT teks
+                // sepanjang itu di 1 node tetap kerja Main thread saat sheet ini pertama tampil —
+                // sejak Batch 463/464 nambah instrumentasi padat FloatingBubbleService (log tiap
+                // konfigurasi/callback/readback), file lebih cepat mendekati cap, cukup bikin
+                // ANR/freeze pas dibuka. Fix: split per baris, render via LazyColumn (1 Text per
+                // baris, pola sama LyricsSheet.kt/DuplicateFinderSheet.kt) — Compose cuma
+                // measure/layout baris yang KELIHATAN di layar. 0 baris log dibuang (`logText`
+                // tetap dibaca utuh), "Repack ke Dokumen" tetap ekspor `readLog()` utuh, tidak
+                // disentuh.
+                val logLines = remember(logText) { logText.split("\n") }
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState())
                 ) {
-                    Text(
-                        logText,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    items(logLines) { line ->
+                        Text(
+                            line,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                 }
             }
 

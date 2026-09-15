@@ -12,6 +12,33 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 465 [FIX BLOCKER: Log Diagnostik force-close/freeze]**: user laporkan sheet
+Settings > Log Diagnostik sendiri force-close/freeze saat dibuka — ini BLOCKER kritis karena
+Log Diagnostik justru alat yang diminta Batch 464 untuk ambil log instrumentasi bubble. Root
+cause: `DiagnosticLogSheet.kt` render `logText` (bisa sampai ~200_000 char, `MAX_LOG_BYTES` di
+`AppLogger.kt`) sebagai 1 `Text` mentah dalam `Column`+`verticalScroll` — baca file sudah async
+sejak Batch 431, tapi LAYOUT teks sepanjang itu di 1 node Compose tetap kerja Main thread saat
+sheet pertama tampil; instrumentasi padat `FloatingBubbleService.kt` Batch 463/464 bikin file
+log lebih cepat mendekati cap 200KB, cukup memicu ANR/freeze. Sektor bubble (Roadmap #11) TIDAK
+disentuh batch ini — murni fix sheet Log Diagnostik. 0 sektor DITUTUP disentuh.
+
+**1 file diubah** (dalam batas 3 file/tugas): `DiagnosticLogSheet.kt`.
+1. Render log diganti dari 1 `Text` mentah → `LazyColumn` + 1 `Text` per baris (pola sama
+   `LyricsSheet.kt`/`DuplicateFinderSheet.kt`) — Compose cuma measure/layout baris yang
+   KELIHATAN di layar, bukan seluruh log sekaligus.
+2. 0 baris log dibuang/ditruncate — `logText` tetap dibaca & disimpan utuh dari `AppLogger`.
+   "Repack ke Dokumen" tetap ekspor `readLog()` utuh, tidak disentuh.
+3. Import tak terpakai (`rememberScrollState`/`verticalScroll`) dibuang, ganti
+   `LazyColumn`/`items` (sudah dipakai pola sama di file lain, 0 dependency baru). 0
+   formula/state lain diubah.
+
+**0 diverifikasi CI/device Batch 465** — review manual (baca kode + cek balance brace/paren:
+`{}` 27/27, `()` 101/101, `[]` 0/0 di `DiagnosticLogSheet.kt`), 0 env Android nyata/device
+fisik/compiler Kotlin di sesi ini. Perlu dari user: buka Settings > Log Diagnostik, konfirmasi
+sheet terbuka normal (0 freeze/force-close), isi log lengkap/bisa di-scroll/di-ekspor — BARU
+setelah itu lanjutkan permintaan Batch 464 (WAJIB DILAKUKAN di RESUME POINT di bawah, masih
+berlaku persis, belum terpenuhi).
+
 **Catatan Batch 464 [DATA DEVICE FISIK PERTAMA — MENGEJUTKAN, ganti arah dugaan]**: user kirim 2
 potongan logcat hasil instrumentasi Batch 463. Log ke-1 (rotasi) terpotong sebelum baris readback
 sempat muncul (0 kesimpulan bisa ditarik). Log ke-2 (rotasi lagi, ditunggu lebih lama) BERHASIL
@@ -1101,7 +1128,16 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 464. ZIP terakhir: `SONIX_v464.zip`. **1 file diubah** (dalam batas 3
+- Batch terakhir: 465. ZIP terakhir: `SONIX_v465.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `DiagnosticLogSheet.kt` — FIX blocker force-close/freeze saat sheet Log
+  Diagnostik dibuka (root cause: 1 `Text` mentah render `logText` s.d. ~200_000 char → LAYOUT
+  Main thread ANR; fix: `LazyColumn` per baris). Sektor bubble (Roadmap #11) TIDAK disentuh
+  batch ini. **BELUM diverifikasi device** — item WAJIB paling prioritas sesi berikutnya:
+  konfirmasi Log Diagnostik terbuka normal dulu (0 freeze/force-close, isi log lengkap/bisa
+  scroll/ekspor) SEBELUM lanjut ke permintaan Batch 464 di bawah (masih berlaku persis, belum
+  terpenuhi — instrumentasi bubble Batch 463/464 juga TIDAK disentuh/direset batch ini, jadi
+  log yang sudah terkumpul di HP user seharusnya tetap ada begitu sheet ini bisa dibuka lagi).
+- Batch 464 (sebelum 465). ZIP: `SONIX_v464.zip`. **1 file diubah** (dalam batas 3
   file/tugas): `FloatingBubbleService.kt` — **masih instrumentasi, 0 fix formula/logic**. Log
   Batch 463 pertama dari user (device fisik) kasih DATA MENGEJUTKAN: mismatch besar (target
   x=1011 vs nyata x=551, selisih 460px) terjadi saat `minimize()` BIASA — **0 rotasi terlibat**.
