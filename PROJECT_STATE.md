@@ -12,6 +12,62 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 474 [jawaban user: tutup (a) survive app-kill + fitur baru (b) drag vs tap
+tombol]**: user jawab 2 poin WAJIB Batch 471/472 sekaligus.
+
+(a) **Survive app-kill — DITUTUP atas permintaan eksplisit user**: "ya. lupakan, sudah bisa
+dipicu pakai pemutar SONIX eksternal/malas nunggu bermenit-menit jadi shut up". Ini konfirmasi
+INFORMAL (bukan protokol lengkap swipe-Recents-lalu-tunggu-beberapa-menit yang diminta Batch 471)
+— user eksplisit menolak lanjut test formal itu (verifikasi lewat trigger-play-dari-sumber-luar
+dianggap cukup olehnya) dan **eksplisit minta topik ini TIDAK ditanyakan lagi**. Sesuai instruksi
+eksplisit user: item ini DITUTUP di sini, **JANGAN munculkan lagi permintaan test survive-Recents
+formal kecuali user sendiri yang buka ulang topiknya**. 0 kode diubah untuk poin ini (murni
+perubahan status dokumentasi — tidak ada fix baru yang diminta/diperlukan).
+
+(b) **Drag vs tap tombol kontrol — FITUR BARU eksplisit user**: "bisa gak drag nya diutamakan
+dibanding akses tap nya?!!" — user TIDAK menjawab pertanyaan sempit Batch 472 (konfirmasi sisi
+kanan lega sampai tombol minimize) secara langsung, malah lanjut ke permintaan lebih luas: drag
+yang dimulai PERSIS di atas salah satu dari 4 tombol kontrol (play/pause/prev/next/minimize)
+sebelumnya 0 pernah ikut memindah bubble sama sekali (bukan cuma "kalah prioritas" — dispatch
+touch Android baku memegang SELURUH sequence 1 pointer ke SATU view yang menangkap `ACTION_DOWN`,
+jadi drag yang dimulai di tombol 100% milik tombol itu, tidak pernah "diteruskan" ke mana pun).
+**Pertanyaan sempit Batch 472 dianggap TIDAK TERJAWAB EKSPLISIT** (bukan ditolak, bukan
+dikonfirmasi) — SOP larang asumsi tanpa data, jadi status "sisi kanan lega sampai minimize"
+TETAP "belum dikonfirmasi user" (lihat RESUME POINT), meski implisit konsisten (kalau area dead-
+space itu masih terasa sempit, permintaan (b) besar kemungkinan akan menyebut itu duluan).
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+1. **`setupDrag()` digeneralisasi**: param baru `onTap: () -> Unit` (default = perilaku LAMA
+   persis `if (isMinimized) expand() else openApp()`) — 0 breaking change ke 2 pemanggil lama
+   (album art, tab minimized), argumen mereka TIDAK perlu diubah sama sekali karena default
+   identik. Logic drag (TOUCH_SLOP, clamp screenBounds, readback Batch 469, snap-tepi Batch 100)
+   TIDAK disentuh SAMA SEKALI — cuma cabang tap di `ACTION_UP` yang sekarang manggil `onTap()`
+   alih-alih hardcode.
+2. **`setupControls()` dipasangi `setupDrag()` juga**: ke-4 `ImageButton` (play_pause/prev/next/
+   minimize) sekarang JUGA jadi `touchSource` untuk `setupDrag()` (param `onTap` di-override
+   manggil `performClick()` milik tombol itu sendiri) — `setOnClickListener` yang SUDAH ADA
+   (dengan body `keepAwakeAndScheduleFade()` + `sendPlaybackAction`/`minimize()`) **TIDAK
+   disentuh/dipindah sama sekali**, cuma sekarang dipicu lewat `performClick()` bukan lewat
+   `View.onTouchEvent` bawaan — 1 satu-satunya sumber kebenaran aksi tombol tetap listener yang
+   sama, 0 duplikasi logic. Signature `setupControls()` berubah (`view` saja → `view, windowView,
+   params`) supaya bisa meneruskan `container`/`params` yang sama ke `setupDrag()` — 1 titik
+   panggil (`addBubbleView()`) ikut diupdate.
+3. **Efek samping jujur, disengaja**: bunyi klik sistem Android bawaan (dipicu `View.
+   onTouchEvent` default, bukan `performClick()`) tidak lagi terdengar saat tap ke-4 tombol itu —
+   konsisten filosofi iOS-look proyek ini (ripple Android sudah dimatikan di bottom nav, Batch
+   439), BUKAN regresi. 0 drawable/style tombol disentuh (background statis, 0 `state_pressed`
+   yang hilang).
+4. 0 formula clamp/posisi/`screenBounds` disentuh (di luar cakupan guard Batch 469), 0 sektor
+   DITUTUP disentuh.
+
+**0 diverifikasi CI/device Batch 474** — review manual (baca kode + cek balance brace/paren/
+bracket: `{}` 106/106, `()` 725/725, `[]` 202/202 di `FloatingBubbleService.kt`), 0 env Android
+nyata/device fisik/compiler Kotlin di sesi ini. **WAJIB dari user** (lihat RESUME POINT untuk
+daftar lengkap): (1) drag dimulai dari salah satu 4 tombol kontrol sekarang memindah bubble; (2)
+tap biasa (tanpa gerak) di ke-4 tombol itu masih berfungsi 100% normal (0 regresi fungsi
+play/pause/prev/next/minimize); (3) drag dari album art & tab minimized (2 titik lama, TIDAK
+disentuh batch ini) tetap seperti Batch 472.
+
 **Catatan Batch 473 [0 file diubah — klarifikasi murni, tutup poin 3 Batch 472]**: user jawab tap
 pilihan eksplisit untuk klarifikasi "bubble tetap muncul saat player eksternal dimainkan" (dibuka
 Batch 472 poin 3) — **maksud (a) DIKONFIRMASI**: bubble SONIX tetap tampil walau lagu dipicu main
@@ -1371,22 +1427,36 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 473. ZIP terakhir: `SONIX_v473.zip`. **0 file kode diubah** (klarifikasi murni,
-  lihat "Catatan Batch 473" di atas) — poin 3 Batch 472 ("bubble tetap muncul saat player
-  eksternal dimainkan") RESMI DITUTUP: dikonfirmasi PERILAKU YANG DIHARAPKAN (bubble ikut
-  trigger play dari luar UI app — headset/Bluetooth/Android Auto/widget), BUKAN bug lintas-app.
-  0 kandidat bug baru di sektor bubble dari klarifikasi ini.
-- **WAJIB DIJAWAB/ditest user dulu sebelum lanjut fitur baru lain** (sisa dari Batch 471/472,
-  BELUM ada satu pun yang masuk sejak Batch 471):
-  (a) **Survive app-kill (masih tertunda sejak Batch 471)**: install APK terbaru, toggle bubble
-      OFF lalu ON lagi dari Settings (dialog battery-optimization SUDAH dikonfirmasi muncul di
-      sini, grant izinnya) → LALU test: buka app lain, swipe SONIX dari Recents (jangan Force
-      Stop manual — itu memang TIDAK BISA disurvive kode apa pun, batasan OS by design) → cek
-      apakah bubble/notifikasi masih ada beberapa menit kemudian. Kirim hasil test balik —
-      **JANGAN asumsikan "sudah pasti survive"** tanpa konfirmasi device fisik (pola sama
-      pelajaran Batch 460-467: device nyata menang atas asumsi kode).
-  (b) **Drag (Batch 472)**: install APK terbaru, konfirmasi sisi kanan SEKARANG lega sampai ke
-      tombol minimize (bukan cuma sampai gap sebelum Previous seperti Batch 471).
+- Batch terakhir: 474. ZIP terakhir: `SONIX_v474.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `FloatingBubbleService.kt` — lihat "Catatan Batch 474" di atas untuk detail penuh.
+  (a) Survive app-kill (Batch 471) **DITUTUP atas permintaan eksplisit user** — konfirmasi
+  informal + user eksplisit minta topik ini TIDAK ditanyakan lagi. **JANGAN munculkan lagi
+  permintaan test survive-Recents formal kecuali user sendiri buka ulang topiknya.** (b) FITUR
+  BARU: `setupDrag()` digeneralisasi (param `onTap`, default identik lama, 0 breaking change ke
+  pemanggil lama) lalu dipasang JUGA ke ke-4 tombol kontrol lewat `setupControls()` — drag yang
+  dimulai di atas tombol sekarang ikut memindah bubble, tap biasa tetap jalan lewat
+  `performClick()` ke listener asli yang tidak disentuh.
+- **Status pertanyaan sempit Batch 472 (sisi kanan lega sampai tombol minimize)**: user TIDAK
+  menjawab eksplisit — langsung minta fitur (b) di atas. **TETAP status "belum dikonfirmasi
+  user"**, SOP larang asumsi — kalau area dead-space `bubble_album_art`→tombol MASIH terasa
+  sempit di device fisik, itu kandidat regresi TERPISAH dari fitur (b) batch ini (fitur (b) HANYA
+  menambah drag DI ATAS badan tombol itu sendiri, TIDAK mengubah `applyAlbumArtTouchDelegate()`
+  Batch 472 sama sekali).
+- **WAJIB DITEST user sebelum lanjut fitur baru lain**:
+  (1) drag dimulai PERSIS di atas salah satu dari 4 tombol kontrol (coba tiap satu: play/pause,
+      prev, next, minimize) sekarang ikut MEMINDAHKAN bubble — sebelumnya 0 efek sama sekali;
+  (2) TAP biasa (tanpa gerak jari) di ke-4 tombol itu MASIH berfungsi 100% normal — play/pause
+      toggle, skip prev/next, minimize ke tepi layar — 0 regresi fungsi;
+  (3) drag dari album art (state expanded) & drag dari tab minimized (2 titik LAMA, TIDAK
+      disentuh batch ini) tetap seperti Batch 472 — sisi kanan masih lega sampai tombol minimize,
+      jangkauan gerak masih bebas penuh ke seluruh layar.
+  Catatan yang TIDAK PERLU dilaporkan sebagai bug: bunyi klik sistem Android saat tap ke-4 tombol
+  itu sengaja hilang (lihat "Catatan Batch 474" — konsisten filosofi iOS-look proyek, ripple
+  Android juga sudah dimatikan di bottom nav Batch 439). Laporkan HANYA kalau ada regresi FUNGSI.
+- Batch 473 (sebelum 474). ZIP: `SONIX_v473.zip`. **0 file kode diubah** (klarifikasi murni) —
+  poin 3 Batch 472 ("bubble tetap muncul saat player eksternal dimainkan") RESMI DITUTUP:
+  dikonfirmasi PERILAKU YANG DIHARAPKAN (bubble ikut trigger play dari luar UI app —
+  headset/Bluetooth/Android Auto/widget), BUKAN bug lintas-app.
 - Batch 470 (sebelum 471). ZIP: `SONIX_v470.zip`. **1 file diubah** (dalam batas 3
   file/tugas): `FloatingBubbleService.kt`. 2 fitur baru dari user (lihat "Catatan Batch 470" di
   atas untuk detail): (1) cold-start fix `sendPlaybackAction`/`setupControls` (tap kontrol bubble

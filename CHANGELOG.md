@@ -1,5 +1,29 @@
 # Changelog
 
+## Batch 474 — Drag diutamakan di atas tap di 4 tombol kontrol + tutup survive app-kill
+Jawaban user atas 2 poin WAJIB Batch 471/472: (a) survive app-kill ditutup atas permintaan
+eksplisit user (konfirmasi informal, minta tidak ditanyakan lagi); (b) fitur baru — drag yang
+dimulai di atas tombol play/pause/prev/next/minimize diutamakan dibanding tap.
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+
+1. **`setupDrag()` digeneralisasi**: param baru `onTap: () -> Unit` (default identik perilaku
+   lama, `if (isMinimized) expand() else openApp()`) — 0 breaking change ke 2 pemanggil lama
+   (album art, tab minimized). Logic drag (TOUCH_SLOP/clamp/readback/snap-tepi) tidak disentuh.
+2. **`setupControls()` dipasangi `setupDrag()` juga** ke ke-4 `ImageButton` — `onTap` manggil
+   `performClick()` tombol itu sendiri, `setOnClickListener` yang sudah ada TIDAK dipindah/
+   diubah sama sekali (1 satu-satunya sumber kebenaran aksi tombol, 0 duplikasi logic). Drag yang
+   dimulai di atas tombol sekarang memindah bubble (`windowView`/`container` yang sama seperti
+   drag dari album art); tap tanpa gerak tetap memicu aksi tombol seperti biasa.
+3. Efek samping disengaja: bunyi klik sistem Android bawaan tidak lagi terdengar saat tap ke-4
+   tombol itu (dipicu `View.onTouchEvent` default yang sekarang di-bypass demi drag) — konsisten
+   filosofi iOS-look proyek (ripple Android sudah dimatikan di bottom nav, Batch 439).
+
+**0 diverifikasi CI/device Batch 474** — review manual (cek balance brace/paren/bracket: `{}`
+106/106, `()` 725/725, `[]` 202/202 di `FloatingBubbleService.kt`). Perlu dari user: (1) drag
+dari salah satu 4 tombol kontrol memindah bubble; (2) tap biasa di ke-4 tombol itu masih 100%
+normal; (3) drag album art/tab minimized (tidak disentuh batch ini) tetap seperti Batch 472.
+
 ## Batch 473 — Klarifikasi poin 3 Batch 472: DITUTUP, bukan bug
 User konfirmasi via tap pilihan eksplisit: "bubble tetap muncul saat player eksternal dimainkan"
 maksudnya bubble SONIX tetap tampil walau lagu dipicu main dari LUAR UI app (headset/Bluetooth/

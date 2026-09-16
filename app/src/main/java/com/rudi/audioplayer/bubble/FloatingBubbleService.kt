@@ -422,8 +422,21 @@ import kotlin.math.abs
  *    SOP larang tebak fix tanpa data — 0 kode disentuh, klarifikasi diminta balik ke user (lihat
  *    PROJECT_STATE.md RESUME POINT).
  *
- * **File diubah**: `FloatingBubbleService.kt` (1 file, dalam batas 3 file/tugas — poin 2/3 di atas
- * murni dokumentasi/klarifikasi, 0 kode lain disentuh batch ini).
+ * **Batch 474 [instruksi eksplisit user: drag diutamakan di atas tap di 4 tombol kontrol]**:
+ * lanjutan langsung sektor drag yang sama (Batch 469-472), user jawab pertanyaan survive
+ * app-kill (Batch 471/472, RESMI DITUTUP via konfirmasi informal — lihat PROJECT_STATE.md) lalu
+ * minta 1 hal baru: tombol play/pause/prev/next/minimize sebelumnya CUMA clickable, jadi drag
+ * yang dimulai persis di atas salah satunya 0 pernah ikut memindah bubble (dispatch touch
+ * Android baku memegang SELURUH sequence sentuhan ke 1 view yang menangkap `ACTION_DOWN`, lihat
+ * KDoc [setupDrag] "Batch 474"). Fix: [setupDrag] digeneralisasi (param baru `onTap`, default
+ * IDENTIK perilaku lama — 0 breaking change ke 2 pemanggil lama album-art/minimized) lalu
+ * dipasang JUGA ke ke-4 tombol lewat [setupControls] (lihat KDoc di sana) — `onTap` untuk tombol
+ * manggil `performClick()` milik tombol itu sendiri, jadi [setOnClickListener] yang SUDAH ADA
+ * tetap 1 satu-satunya sumber kebenaran aksi tombol, 0 duplikasi logic. 0 formula
+ * clamp/posisi/[screenBounds] disentuh (di luar cakupan guard Batch 469), 0 sektor DITUTUP
+ * disentuh.
+ *
+ * **File diubah**: `FloatingBubbleService.kt` (1 file, dalam batas 3 file/tugas).
  */
 class FloatingBubbleService : Service() {
 
@@ -722,7 +735,7 @@ class FloatingBubbleService : Service() {
         // lewat TouchDelegate di [applyAlbumArtTouchDelegate] biar tetap gampang disentuh.
         setupDrag(minimized, container, params)
         setupDrag(expanded.findViewById<ImageView>(R.id.bubble_album_art), container, params)
-        setupControls(expanded)
+        setupControls(expanded, container, params) // Batch 474 — drag diutamakan di 4 tombol kontrol, lihat KDoc setupControls
 
         runCatching { windowManager.addView(container, params) }
             .onSuccess { container.post { applyAlbumArtTouchDelegate() } }
@@ -770,15 +783,12 @@ class FloatingBubbleService : Service() {
         }
     }
 
-    /** Drag-untuk-pindah + tap-untuk-buka-app, dibedakan lewat TOTAL jarak gerak (bukan cuma
-     * delta awal-akhir, supaya jari gemetar kecil tidak salah dianggap drag). Tombol
-     * play/pause/prev/next tetap dapat event klik normal — ImageButton clickable mengonsumsi
-     * ACTION_DOWN duluan sebelum sempat ke OnTouchListener [touchSource] ini, jadi drag/tap di
-     * sini otomatis cuma aktif di luar area ke-3 tombol tanpa perlu logic pemisah manual.
-     * Batch 98: metrics dibaca ULANG tiap ACTION_MOVE (bukan di-cache sekali di awal seperti
-     * sebelumnya) — device bisa saja rotasi PAS lagi di-drag, metrics yang di-cache di awal akan
-     * basi. Batch 460: sumbernya `windowManager.currentWindowMetrics` (bukan lagi
-     * `resources.displayMetrics`, lihat KDoc kelas "Batch 460").
+    /** Drag-untuk-pindah + tap, dibedakan lewat TOTAL jarak gerak (bukan cuma delta awal-akhir,
+     * supaya jari gemetar kecil tidak salah dianggap drag). Batch 98: metrics dibaca ULANG tiap
+     * ACTION_MOVE (bukan di-cache sekali di awal seperti sebelumnya) — device bisa saja rotasi
+     * PAS lagi di-drag, metrics yang di-cache di awal akan basi. Batch 460: sumbernya
+     * `windowManager.currentWindowMetrics` (bukan lagi `resources.displayMetrics`, lihat KDoc
+     * kelas "Batch 460").
      *
      * **Batch 470**: [touchSource] (view yang menerima sentuhan) DIPISAH dari [windowView] (view
      * jendela WindowManager yang SEBENARNYA dipindah/di-resize/di-baca ukurannya) — sebelumnya 1
@@ -786,8 +796,26 @@ class FloatingBubbleService : Service() {
      * supaya pemanggil bisa memasang listener di child spesifik (mis. `bubble_album_art`, lihat
      * pemanggil di [addBubbleView]) SEMENTARA clamp/`updateViewLayout`/readback tetap konsisten
      * memakai ukuran & identitas [windowView] (`container`) seperti sebelumnya — 0 formula clamp,
-     * 0 nilai posisi, 0 logic drag/tap yang berubah, cuma sumber event-nya. */
-    private fun setupDrag(touchSource: View, windowView: View, params: WindowManager.LayoutParams) {
+     * 0 nilai posisi, 0 logic drag/tap yang berubah, cuma sumber event-nya.
+     *
+     * **Batch 474**: param baru [onTap] (default = perilaku lama album-art/minimized: `if
+     * (isMinimized) expand() else openApp()`) — TIDAK ada pemanggil lama yang perlu ubah argumen
+     * (default IDENTIK). Ini yang memungkinkan [setupControls] memasang fungsi ini JUGA ke 4
+     * tombol kontrol (lihat KDoc di sana & KDoc kelas "Batch 474") — sebelumnya ImageButton
+     * clickable SELALU menang bounds sendiri (dispatch Android baku), jadi drag yang DIMULAI
+     * persis di atas tombol 0 pernah tertangkap fungsi ini sama sekali (bukan cuma "tap
+     * duluan" — API touch Android men-dispatch SELURUH sequence DOWN→MOVE→UP dari 1 pointer ke
+     * SATU view yang menangkap DOWN, jadi drag yang dimulai di tombol dulu ya 100% milik tombol
+     * itu, tidak pernah "diteruskan"). Kalimat KDoc lama di paragraf ini yang menjelaskan
+     * "ImageButton otomatis aman lepas dari logic pemisah manual" SUDAH TIDAK BERLAKU sejak
+     * tombol sendiri kini jadi [touchSource]-nya sendiri, dihapus supaya tidak jadi dokumentasi
+     * basi. */
+    private fun setupDrag(
+        touchSource: View,
+        windowView: View,
+        params: WindowManager.LayoutParams,
+        onTap: () -> Unit = { if (isMinimized) expand() else openApp() }
+    ) {
         var initialX = 0
         var initialY = 0
         var initialTouchX = 0f
@@ -855,10 +883,12 @@ class FloatingBubbleService : Service() {
                         // dilepas, tidak boleh mengambang bebas di tengah layar seperti pill
                         // penuh (itu yang membedakan visual "minimized" dari "expanded biasa").
                         if (isMinimized) snapMinimizedToNearestEdge()
-                    } else if (isMinimized) {
-                        expand()
                     } else {
-                        openApp()
+                        // Batch 474 — dulu `if (isMinimized) expand() else openApp()` hardcode di
+                        // sini, sekarang dipindah jadi default param [onTap] (lihat KDoc fungsi)
+                        // supaya pemanggil lain (tombol kontrol) bisa override aksi tap-nya
+                        // sendiri tanpa duplikasi logic drag di atas.
+                        onTap()
                     }
                     true
                 }
@@ -919,32 +949,60 @@ class FloatingBubbleService : Service() {
         expanded.touchDelegate = TouchDelegate(rect, albumArt)
     }
 
-    private fun setupControls(view: View) {
-        // Batch 453 — 4 tombol ini clickable, jadi mengonsumsi ACTION_DOWN SEBELUM sempat ke
-        // OnTouchListener root di setupDrag (lihat KDoc di sana) — reset idle-fade dipanggil
-        // ulang eksplisit di sini supaya tap tombol kontrol juga dihitung "sedang dipakai".
+    /** **Batch 474 [drag diutamakan di atas tap di ke-4 tombol kontrol]**: sebelumnya tombol
+     * play/pause/prev/next/minimize CUMA punya [View.setOnClickListener] — per dispatch touch
+     * Android baku, tombol yang menangkap `ACTION_DOWN` memegang SELURUH sequence sentuhan itu
+     * sampai `ACTION_UP`/`CANCEL` (lihat KDoc [setupDrag] "Batch 474"), jadi drag yang DIMULAI
+     * persis di atas salah satu tombol ini TIDAK PERNAH ikut memindah bubble sama sekali —
+     * user melaporkan ini terasa seperti tap "menang" atas drag di area situ. Fix: [setupDrag]
+     * (fungsi yang SAMA PERSIS dipakai album art & tab minimized, 0 duplikasi logic drag) kini
+     * DIPASANG JUGA ke ke-4 `ImageButton` ini, `onTap` di-override manggil `performClick()` milik
+     * tombol itu sendiri — [setOnClickListener] di bawah TIDAK disentuh/dipindah sama sekali,
+     * cuma sekarang dipicu lewat `performClick()` (bukan lagi lewat `View.onTouchEvent` bawaan)
+     * saat gerakan MASIH di bawah [TOUCH_SLOP], sehingga 1 satu-satunya sumber kebenaran aksi
+     * tombol tetap listener yang sama, aksesibilitas (TalkBack dkk yang manggil `performClick()`
+     * sendiri) & event klik tetap konsisten. Kalau gerakan MELEWATI [TOUCH_SLOP], [setupDrag]
+     * memindah `windowView` (`container`, SAMA seperti drag dari album art) alih-alih memicu tap
+     * apa pun — persis yang diminta user. **Efek samping jujur, disengaja**: bunyi klik sistem
+     * Android bawaan (dipicu `View.onTouchEvent` default, BUKAN oleh `performClick()`) tidak lagi
+     * terdengar saat tap tombol ini — konsisten filosofi iOS-look proyek ini (ripple Android juga
+     * sudah dimatikan di nav bar, lihat Batch 439), bukan regresi yang perlu di-fix balik. 0
+     * warna/style/drawable/background tombol disentuh — ketiganya (`widget_play_button_bg[_light]`
+     * dkk) statis TANPA `state_pressed`, jadi 0 feedback visual pressed yang hilang. */
+    private fun setupControls(view: View, windowView: View, params: WindowManager.LayoutParams) {
         // Batch 470 — 0 lagi gerbang [hasQueue] di sini (dulu: `if (hasQueue) ... else openApp()`).
         // [hasQueue] cuma snapshot terakhir kali `refreshBubbleContent` jalan — pada cold start
         // snapshot itu SAH-SAH SAJA `false` (antrean session memang masih 0 SAAT itu) tapi TIDAK
         // BERARTI selamanya kosong (lihat KDoc kelas "Batch 470" & [sendPlaybackAction]). Selalu
         // dispatch; [sendPlaybackAction] yang memutuskan controller-langsung vs fallback Intent
         // cold-start-capable pakai state FRESH detik itu juga, bukan snapshot ini.
-        view.findViewById<ImageButton>(R.id.bubble_play_pause).setOnClickListener {
+        val playPause = view.findViewById<ImageButton>(R.id.bubble_play_pause)
+        playPause.setOnClickListener {
             keepAwakeAndScheduleFade()
             sendPlaybackAction(WidgetUpdater.ACTION_TOGGLE_PLAY)
         }
-        view.findViewById<ImageButton>(R.id.bubble_prev).setOnClickListener {
+        val prev = view.findViewById<ImageButton>(R.id.bubble_prev)
+        prev.setOnClickListener {
             keepAwakeAndScheduleFade()
             sendPlaybackAction(WidgetUpdater.ACTION_PREVIOUS)
         }
-        view.findViewById<ImageButton>(R.id.bubble_next).setOnClickListener {
+        val next = view.findViewById<ImageButton>(R.id.bubble_next)
+        next.setOnClickListener {
             keepAwakeAndScheduleFade()
             sendPlaybackAction(WidgetUpdater.ACTION_NEXT)
         }
-        view.findViewById<ImageButton>(R.id.bubble_minimize).setOnClickListener {
+        val minimizeButton = view.findViewById<ImageButton>(R.id.bubble_minimize)
+        minimizeButton.setOnClickListener {
             keepAwakeAndScheduleFade()
             minimize()
         }
+
+        // Batch 474 — lihat KDoc fungsi ini: drag di atas tombol kini diutamakan, tap tetap
+        // jalan lewat performClick() ke listener yang SAMA persis di atas.
+        setupDrag(playPause, windowView, params) { playPause.performClick() }
+        setupDrag(prev, windowView, params) { prev.performClick() }
+        setupDrag(next, windowView, params) { next.performClick() }
+        setupDrag(minimizeButton, windowView, params) { minimizeButton.performClick() }
     }
 
     /** Ciutkan pill penuh jadi tab 48dp nempel tepi layar. Service/notifikasi foreground TIDAK
