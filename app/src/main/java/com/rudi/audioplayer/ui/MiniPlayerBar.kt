@@ -7,10 +7,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -21,19 +25,24 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rudi.audioplayer.playback.PlaybackProgress
 import com.rudi.audioplayer.playback.PlaybackUiState
@@ -57,7 +66,13 @@ fun MiniPlayerBar(
     playbackProgress: StateFlow<PlaybackProgress>,
     accentColor: Color?,
     onPlayPause: () -> Unit,
-    onExpand: () -> Unit
+    onExpand: () -> Unit,
+    // Batch 476 — "mini player bisa dicancel". Swipe horizontal (kiri/ATAU kanan, pola sama
+    // dengan notifikasi Android) melewati threshold memanggil ini; pemanggil (MainActivity.kt)
+    // meneruskan ke PlayerViewModel.dismissMiniPlayer() yang menghentikan playback + membersihkan
+    // state tersimpan — bar sendiri lenyap lewat AnimatedVisibility pemanggil begitu
+    // uiState.currentSong balik null, bukan diurus manual di sini.
+    onDismiss: () -> Unit
 ) {
     val song = uiState.currentSong ?: return
     val haptic = LocalHapticFeedback.current
@@ -86,8 +101,20 @@ fun MiniPlayerBar(
     val accentContentColor = if (animatedAccent.luminance() > 0.55f) Color.Black else Color.White
     val miniPlayPauseShape = if (isTactile || isSkeu) MaterialTheme.shapes.medium else CircleShape
 
+    // Batch 476 — swipe-to-dismiss. Pola SAMA PERSIS dengan swipe next/prev album art
+    // (NowPlayingScreen.kt: Animatable snapback, threshold 120px, spring dampingRatio
+    // MediumBouncy/stiffness Low) supaya "rasa" gesture konsisten 1 sistem di seluruh app,
+    // bukan 2 karakter drag berbeda. Beda dari swipe album art: offset TIDAK di-clamp ke
+    // maxOffsetPx (48dp) — bar ini SELEBAR LAYAR, swipe-dismiss wajar mengikuti jari penuh
+    // (pola sama seperti swipe-dismiss notifikasi Android), bukan nudge kecil.
+    val dismissOffsetPx = remember { mutableFloatStateOf(0f) }
+    val dismissOffset = remember { Animatable(0f) }
+    val totalDismissDragPx = remember { mutableFloatStateOf(0f) }
+    val dismissScope = rememberCoroutineScope()
+
     Box(
         modifier = Modifier
+            .graphicsLayer { translationX = dismissOffsetPx.floatValue }
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .then(
@@ -115,6 +142,40 @@ fun MiniPlayerBar(
             // Tactile only), and Apple has no background of its own before this — frostedGlass() is
             // the only fill it gets.
             .then(if (isSkeu) Modifier else Modifier.frostedGlass())
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        totalDismissDragPx.floatValue = 0f
+                        dismissScope.launch { dismissOffset.stop() }
+                    },
+                    onDragEnd = {
+                        if (totalDismissDragPx.floatValue > 120f || totalDismissDragPx.floatValue < -120f) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onDismiss()
+                        } else {
+                            dismissScope.launch {
+                                dismissOffset.snapTo(dismissOffsetPx.floatValue)
+                                dismissOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) {
+                                    dismissOffsetPx.floatValue = value
+                                }
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        dismissScope.launch {
+                            dismissOffset.snapTo(dismissOffsetPx.floatValue)
+                            dismissOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) {
+                                dismissOffsetPx.floatValue = value
+                            }
+                        }
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        totalDismissDragPx.floatValue += dragAmount
+                        change.consume()
+                        dismissOffsetPx.floatValue = totalDismissDragPx.floatValue
+                    }
+                )
+            }
             .clickable(onClick = onExpand)
     ) {
         // Batch 397 — `MiniPlayerBar`'s badan composable ini SENGAJA membaca `playbackProgress`

@@ -1461,7 +1461,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         onPlayPause = { playerViewModel.togglePlayPause() },
                         onExpand = {
                             navController.navigate("now_playing") { launchSingleTop = true }
-                        }
+                        },
+                        onDismiss = { playerViewModel.dismissMiniPlayer() }
                     )
                 }
                 if (widthClass == AppWidthClass.COMPACT &&

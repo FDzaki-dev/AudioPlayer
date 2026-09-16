@@ -530,6 +530,15 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private var libraryRefreshGeneration = 0L
     private val musicRepository = MusicRepository(appContext)
 
+    // Batch 476 — beda dari `libraryLoadedOnce` di atas (itu diset TRUE sinkron begitu sebuah
+    // scan DIMULAI, bukan selesai — sinyal "jangan scan dobel", bukan "data sudah ada"). Flag
+    // ini murni penanda "_librarySongs sudah pernah diisi hasil scan asli minimal 1x", satu-
+    // satunya prasyarat data yang valid untuk `maybeSyncMiniPlayerOnColdStart()` memetakan
+    // mediaId → Song. `coldStartSyncDone` mengunci fungsi itu supaya jalan PERSIS 1x per proses
+    // (refresh library berikutnya dari ContentObserver tidak mengulang sync ini).
+    private var librarySnapshotLoadedOnce = false
+    private var coldStartSyncDone = false
+
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
@@ -723,6 +732,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             controller?.addListener(playerListener)
             restoreSavedSpeed()
             startPositionLoop()
+            // Batch 476 — dipanggil di SINI JUGA (bukan cuma di refreshLibrary()): kedua titik
+            // sama-sama no-op aman lewat guard di dalam fungsi kalau prasyarat lain (library
+            // snapshot) belum siap — menutup race urutan connect() vs scan library, mana pun
+            // yang selesai lebih dulu.
+            maybeSyncMiniPlayerOnColdStart()
         }, Executor { it.run() }) // same-thread executor — Guava's directExecutor() had no special behavior beyond this
         ensureLibraryLoaded()
         registerLibraryContentObserver()
@@ -840,6 +854,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 // older, slower scan overwrite the newer result.
                 if (generation == libraryRefreshGeneration) {
                     _librarySongs.value = songs
+                    librarySnapshotLoadedOnce = true
+                    maybeSyncMiniPlayerOnColdStart()
                     // Gap List #9 — orphan cleanup: favorites/ratings/playlist entries pointing
                     // at a song no longer in the freshly-scanned library are dead weight (file
                     // deleted/moved/permission revoked). Deliberately NOT applied to
@@ -1114,6 +1130,99 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         controller?.repeatMode = saved.repeatMode
         controller?.shuffleModeEnabled = saved.shuffleEnabled
         playQueue(resolvedSongs, newIndex, saved.positionMs, autoPlay)
+    }
+
+    /** Batch 476 — reopen sync fix ("mini player reset saat app dibuka kembali"). Sebelum ini,
+     * `_uiState.currentSong` HANYA pernah diisi lewat `onMediaItemTransition` (Player.Listener,
+     * cuma terpanggil saat item BERGANTI) atau aksi eksplisit (`playQueue` dkk) — tidak pernah
+     * dari status controller yang SUDAH berjalan di titik connect(). 2 skenario nyata:
+     * (a) PlaybackService TETAP hidup (Activity/proses UI yang mati, kasus umum app-kill/
+     *     backgrounding, ATAU playback dimulai dari luar UI app — bubble/widget/headset/lock
+     *     screen) — controller baru connect() sudah punya media item aktif. State disinkronkan
+     *     LANGSUNG dari controller (posisi/isPlaying/queue sebenarnya), 0 interupsi ke audio
+     *     yang sedang berjalan (tidak ada play()/pause()/seekTo() dipanggil sama sekali).
+     * (b) PlaybackService ikut mati total (proses baru, fresh cold start) — controller kosong
+     *     (`mediaItemCount == 0`). Reuse `resumeFromSaved(autoPlay = false)` yang SUDAH dipakai
+     *     jalur shortcut "Continue Listening"/tombol Resume HomeScreen — queue terakhir termuat
+     *     & mini player muncul (paused, siap dilanjutkan) TANPA auto-play mengejutkan.
+     * Dijaga `coldStartSyncDone` (dikunci begitu prasyarat controller+library snapshot lengkap,
+     * apa pun hasilnya) supaya PERSIS jalan 1x per proses — refresh library berikutnya dari
+     * ContentObserver (perubahan file di background) tidak boleh mengulang/menimpa state yang
+     * sudah berjalan wajar sejak itu. Skip total kalau `currentSong` sudah terisi lebih dulu
+     * (event transisi/aksi user/shortcut sudah menang duluan) — TIDAK PERNAH menimpa state yang
+     * sudah benar. */
+    private fun maybeSyncMiniPlayerOnColdStart() {
+        if (coldStartSyncDone) return
+        val c = controller ?: return
+        if (!librarySnapshotLoadedOnce) return
+        coldStartSyncDone = true
+        if (_uiState.value.currentSong != null) return
+
+        val allSongs = _librarySongs.value
+        if (c.mediaItemCount > 0) {
+            val songMap = allSongs.associateBy { it.id }
+            val rawIndex = c.currentMediaItemIndex.coerceIn(0, c.mediaItemCount - 1)
+            val currentSongResolved = c.getMediaItemAt(rawIndex).mediaId.toLongOrNull()?.let { songMap[it] }
+                ?: return
+            // mapNotNull, bukan map: sebuah lagu di queue eksternal bisa saja sudah dihapus dari
+            // disk sejak terakhir dimuat — slot itu di-drop, indexOf di bawah cari ulang posisi
+            // currentSongResolved di list yang SUDAH terfilter (bukan percaya index mentah
+            // controller yang mungkin sudah geser akibat drop itu).
+            val items = (0 until c.mediaItemCount).mapNotNull { i ->
+                c.getMediaItemAt(i).mediaId.toLongOrNull()?.let { songMap[it] }
+            }
+            val newIndex = items.indexOf(currentSongResolved).takeIf { it >= 0 } ?: 0
+            currentQueue = items
+            currentQueueSlotIds = newSlotIds(items.size)
+            _uiState.value = _uiState.value.copy(
+                currentSong = currentSongResolved,
+                currentIndex = newIndex,
+                isPlaying = c.isPlaying,
+                shuffleEnabled = c.shuffleModeEnabled,
+                repeatMode = c.repeatMode,
+                playbackSpeed = c.playbackParameters.speed,
+                volume = c.volume,
+                queue = items,
+                queueSlotIds = currentQueueSlotIds
+            )
+            _playbackProgress.value = PlaybackProgress(
+                position = c.currentPosition.coerceAtLeast(0L),
+                duration = c.duration.coerceAtLeast(0L)
+            )
+            updateAccentColor(currentSongResolved)
+            _currentRating.value = ratingStore.getRating(currentSongResolved.id)
+        } else {
+            resumeFromSaved(allSongs, autoPlay = false)
+        }
+    }
+
+    /** Batch 476 — "mini player bisa dicancel". Swipe-dismiss di [MiniPlayerBar] memanggil ini:
+     * hentikan playback SEPENUHNYA (bukan cuma sembunyikan bar) dan kosongkan antrean session —
+     * mempertahankan playback di belakang layar padahal bar-nya sendiri sudah "dibuang" pengguna
+     * akan terasa seperti bug (kontrol hilang, notifikasi/bubble masih ada tanpa cara balik yang
+     * jelas selain buka Now Playing lewat jalur lain). Turut menyimpan state kosong lewat
+     * `playbackStateStore.save()` yang SUDAH ADA (bukan API baru) dengan `songIds` kosong — dibaca
+     * `PlaybackStateStore.load()`: string kosong di-split lalu `ids.isEmpty()` balik null, PERSIS
+     * kondisi "0 saved state" yang sudah ditangani `resumeFromSaved()`/`peekSavedSong()`. Ini
+     * WAJIB supaya dismiss eksplisit user tidak dibangkitkan lagi oleh sync cold-start (b) di atas
+     * pada proses berikutnya. */
+    fun dismissMiniPlayer() {
+        controller?.stop()
+        controller?.clearMediaItems()
+        currentQueue = emptyList()
+        currentQueueSlotIds = emptyList()
+        _uiState.value = PlaybackUiState()
+        _playbackProgress.value = PlaybackProgress()
+        _accentColor.value = null
+        _currentRating.value = 0
+        playbackStateStore.save(
+            songIds = emptyList(),
+            index = 0,
+            positionMs = 0L,
+            repeatMode = Player.REPEAT_MODE_OFF,
+            shuffleEnabled = false,
+            speed = 1f
+        )
     }
 
     fun playQueue(songs: List<Song>, startIndex: Int, startPositionMs: Long = 0L, autoPlay: Boolean = true) {

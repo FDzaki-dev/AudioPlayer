@@ -152,12 +152,12 @@ memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 - Tab **Lagu** (semua lagu, urut judul) dan **Folder** (dikelompokkan per folder, folder = playlist)
 - Playback background via foreground service (Media3 `MediaLibraryService`, mendukung Playback Resumption resmi) + kontrol di notification/lock screen
 - Now Playing: album art, seek bar, shuffle, repeat (off/all/one), play/pause/next/prev
-- Mini player persisten di bagian bawah layar
+- Mini player persisten di bagian bawah layar — bisa **di-swipe (kiri/kanan) untuk dibatalkan** (Batch 476): playback berhenti total & antrean dikosongkan, bukan cuma bar-nya yang hilang
 - Dark mode default
 - Pencarian (search) judul/artis di Perpustakaan
 - Sleep timer (10/15/30/45/60 menit)
 - Kecepatan putar (0.5x–2x), tersimpan otomatis lintas sesi (dipulihkan tiap app dibuka ulang)
-- Resume otomatis dari posisi terakhir setelah app ditutup
+- Resume otomatis dari posisi terakhir setelah app ditutup — **mini player ikut sinkron begitu app dibuka kembali** (Batch 476), baik saat PlaybackService masih hidup di belakang layar (musik jalan dari widget/headset/bubble/lock screen) maupun saat proses ikut mati total, alih-alih tampil kosong/reset sampai lagu berikutnya diputar
 - Favorit lagu
 - **Antrean putar (Queue)**: lihat antrean, naik/turunkan urutan, hapus dari antrean, lompat langsung ke lagu manapun, plus aksi "Putar Berikutnya" / "Tambah ke Antrean" via tekan-lama pada lagu di Perpustakaan
 - **Beranda pintar**: bagian "Baru Diputar" dan "Paling Sering Diputar" otomatis terisi dari riwayat dengar, tanpa perlu aksi manual dari user

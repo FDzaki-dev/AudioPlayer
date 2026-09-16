@@ -12,6 +12,42 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 476 [instruksi baru user: mini player bisa dicancel + sinkronisasi eksternal/
+cold-start ke Mini Player Bar]**: 2 permintaan baru user, DI LUAR sektor bubble Batch 475 (target
+sekarang `MiniPlayerBar.kt`/`PlayerViewModel.kt` — UI dalam-app, bukan floating bubble luar-app).
+
+**3 file diubah** (dalam batas 3 file/tugas): `PlayerViewModel.kt`, `MiniPlayerBar.kt`,
+`MainActivity.kt`. Detail lengkap: `CHANGELOG.md` § Batch 476.
+- **(1) Mini player bisa dicancel**: swipe horizontal (kiri/kanan, threshold 120px — konstanta &
+  pola gesture SAMA PERSIS dgn swipe next/prev album art `NowPlayingScreen.kt`: Animatable
+  snapback, spring dampingRatio MediumBouncy/stiffness Low, 0 API baru diperkenalkan) pada
+  `MiniPlayerBar` memanggil `onDismiss` → `PlayerViewModel.dismissMiniPlayer()`: `controller.stop()`
+  + `clearMediaItems()`, `_uiState`/`_playbackProgress` direset ke default, DAN
+  `playbackStateStore.save(songIds = emptyList(), ...)` (fungsi `save()` yang SUDAH ADA, bukan
+  method baru) — `load()` balik null utk `songIds` kosong (string kosong → 0 id tervalidasi),
+  PERSIS kondisi "0 saved state" yang sudah ditangani `resumeFromSaved()`/`peekSavedSong()`. Tanpa
+  langkah ini, sync (2) di bawah akan membangkitkan lagi lagu yang baru saja di-cancel user pada
+  proses berikutnya.
+- **(2) Sinkron eksternal/cold-start ke Mini Player Bar**: root cause — `_uiState.currentSong`
+  SEBELUMNYA cuma pernah diisi lewat `onMediaItemTransition` (event, hanya nyala saat item
+  BERGANTI) atau aksi eksplisit (`playQueue` dkk), TIDAK PERNAH dari status controller yang SUDAH
+  berjalan tepat di titik `connect()` — begitu Activity/proses baru muncul sementara
+  PlaybackService (session) sudah/masih punya media item aktif, mini bar tetap kosong ("reset")
+  sampai ada transisi lagu berikutnya. Fix: `maybeSyncMiniPlayerOnColdStart()` (dipanggil dari 2
+  titik — `connect()` & tail sukses `refreshLibrary()` — menutup race urutan mana pun yang selesai
+  duluan; dikunci `coldStartSyncDone` supaya PERSIS 1x per proses). 2 cabang: (a)
+  `controller.mediaItemCount > 0` (Service tetap hidup — app-kill/backgrounding biasa, ATAU
+  playback dimulai dari luar UI app: widget/headset/bubble/lock screen) → state disinkronkan
+  LANGSUNG dari controller (mediaId → Song lewat `_librarySongs`), 0 `play()`/`pause()`/`seekTo()`
+  dipanggil sama sekali — 0 interupsi ke audio yang sedang berjalan; (b) `mediaItemCount == 0`
+  (Service ikut mati total) → reuse `resumeFromSaved(autoPlay = false)` yang SUDAH dipakai jalur
+  shortcut "Continue Listening"/tombol Resume HomeScreen — mini player muncul (paused) TANPA
+  auto-play mengejutkan.
+- **0 diverifikasi CI/device Batch 476** — review manual (balance brace/paren/bracket: lihat
+  `CHANGELOG.md` § Batch 476 untuk angka persis tiap file), 0 env Android nyata/device fisik/
+  compiler Kotlin di sesi ini. **WAJIB DITEST user** (lihat `[RESUME POINT]` di bawah untuk daftar
+  lengkap) sebelum sektor ini dianggap tuntas.
+
 **Catatan Batch 475 [reopen eksplisit user: sinkronisasi cold-start/persistent bubble <-> player
 setelah app-kill]**: user eksplisit buka ulang sektor "survive app-kill" (DITUTUP informal Batch
 474) dengan instruksi spesifik: "lakukan sinkronisasi mekanisme cold-start/persistent antara
@@ -1455,7 +1491,34 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 475. ZIP terakhir: `SONIX_v475.zip`. **2 file diubah** (dalam batas 3
+- Batch terakhir: 476. ZIP terakhir: `SONIX_v476.zip`. **3 file diubah** (dalam batas 3
+  file/tugas): `PlayerViewModel.kt`, `MiniPlayerBar.kt`, `MainActivity.kt` — lihat "Catatan Batch
+  476" di atas untuk detail penuh. Ringkas: (1) swipe mini player = cancel (stop total + queue
+  kosong + saved state dikosongkan, bukan cuma sembunyikan bar); (2) `_uiState` mini player kini
+  disinkronkan dari controller/saved-state begitu app dibuka kembali (baik Service masih hidup
+  maupun ikut mati total), bukan reset kosong sampai transisi lagu berikutnya.
+  **0 diverifikasi CI/device sesi ini** — 0 env Android nyata/compiler Kotlin/device fisik.
+  **WAJIB DITEST user sebelum lanjut fitur baru lain**:
+  (a) swipe mini player kiri ATAU kanan sampai lewat threshold → bar hilang, musik BERHENTI
+      TOTAL (bukan cuma UI-nya hilang sementara musik tetap main di notifikasi/bubble);
+  (b) swipe pelan/tidak sampai threshold → bar pegas balik ke posisi semula, TIDAK cancel,
+      musik/tap-untuk-expand tetap normal;
+  (c) tap biasa (tanpa geser) di mini player MASIH membuka Now Playing seperti biasa — 0 regresi
+      ke `onExpand`, drag detector tidak boleh "mencuri" tap;
+  (d) putar lagu, tekan tombol Home (bukan swipe-away Recents) supaya app background tapi proses
+      TIDAK dibunuh OS, buka lagi app dari launcher → mini player harus tetap tampil benar
+      (lagu/isPlaying/progress sama), TIDAK reset;
+  (e) putar lagu dari WIDGET/headset/Bluetooth SAAT app dalam kondisi force-close total (App
+      Info → Force Stop, atau swipe dari Recents lalu tunggu OS recycle), lalu BUKA APP dari
+      launcher (bukan dari notifikasi) → mini player harus langsung sinkron menampilkan lagu yang
+      sedang main itu (bukan kosong);
+  (f) force-close total app SAAT ada lagu tersimpan (habis diputar lalu di-pause, proses lalu
+      dibunuh total via App Info → Force Stop) → buka app dari launcher → mini player muncul
+      PAUSED di lagu terakhir (siap lanjut), TANPA auto-play sendiri;
+  (g) setelah (a) swipe-cancel, force-close total app lalu buka lagi dari launcher → mini player
+      TIDAK boleh muncul lagi (lagu yang di-cancel tidak dibangkitkan oleh sync (e)/(f) di atas).
+  Kirim hasil ketujuh test ini balik sebelum sektor mini player/cold-start disentuh lagi.
+- Batch 475 (sebelum 476). ZIP: `SONIX_v475.zip`. **2 file diubah** (dalam batas 3
   file/tugas): `PlaybackService.kt`, `FloatingBubbleService.kt` — lihat "Catatan Batch 475" di
   atas untuk detail penuh. Ringkas: 2 titik `startForegroundService()` (bubble<->PlaybackService,
   arah cold-start-eksternal & tap-bubble-cold-start) disamakan ke pola `runCatching` yang sudah

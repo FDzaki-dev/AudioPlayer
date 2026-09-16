@@ -1,5 +1,74 @@
 # Changelog
 
+## Batch 476 — Mini player bisa dicancel + sinkronisasi eksternal/cold-start ke Mini Player Bar
+Instruksi baru user, di luar sektor bubble Batch 475 (target sekarang UI dalam-app:
+`MiniPlayerBar`/`PlayerViewModel`, bukan floating bubble luar-app).
+
+**3 file diubah** (dalam batas 3 file/tugas): `PlayerViewModel.kt`, `MiniPlayerBar.kt`,
+`MainActivity.kt`.
+
+**(1) Mini player bisa dicancel**: `MiniPlayerBar` menerima parameter baru `onDismiss`. Swipe
+horizontal (kiri ATAU kanan) di badan bar memicunya lewat `detectHorizontalDragGestures` — pola
+gesture SAMA PERSIS dengan swipe next/prev album art (`NowPlayingScreen.kt`): `Animatable`
+snapback kalau tidak lewat threshold, threshold 120px, spring `dampingRatio` MediumBouncy /
+`stiffness` Low, haptic `LongPress` saat threshold terlampaui — dipilih justru KARENA sudah
+terbukti dipakai & bekerja di file lain, bukan pola gesture baru. Tap biasa (tanpa geser
+berarti) tetap membuka Now Playing seperti biasa — `clickable(onExpand)` menang lewat arbitrase
+touch-slop Compose bawaan begitu `change.consume()` di `onHorizontalDrag` belum sempat terpanggil
+(gerakan di bawah slop).
+`onDismiss` diteruskan ke `PlayerViewModel.dismissMiniPlayer()` (fungsi baru): `controller.stop()`
++ `clearMediaItems()`, `currentQueue`/`currentQueueSlotIds` dikosongkan, `_uiState` &
+`_playbackProgress` direset ke default (`PlaybackUiState()`/`PlaybackProgress()`), accent color +
+rating direset, DAN `playbackStateStore.save(songIds = emptyList(), ...)` dipanggil — method
+`save()` yang SUDAH ADA, bukan API baru. Dibaca `PlaybackStateStore.load()`: `songIds` kosong →
+`joinToString(",")` jadi string kosong → di-split balik jadi `listOf("")` → `toLongOrNull()` semua
+null → `ids.isEmpty()` → `load()` balik `null`, PERSIS kondisi "0 saved state" yang sudah ditangani
+`resumeFromSaved()`/`peekSavedSong()`. Langkah simpan-kosong ini WAJIB — tanpanya, fix (2) di bawah
+akan membangkitkan lagi lagu yang baru saja di-cancel user pada proses berikutnya.
+
+**(2) Sinkron eksternal/cold-start ke Mini Player Bar**: root cause dikonfirmasi baca-kode —
+`_uiState.currentSong` (`PlayerViewModel`) SEBELUMNYA cuma pernah diisi lewat
+`onMediaItemTransition` (`Player.Listener`, hanya terpanggil saat item BERGANTI) atau aksi
+eksplisit (`playQueue`/`playFromQueueIndex`/dkk). Tidak ada satu pun jalur yang membaca status
+controller yang SUDAH berjalan tepat di titik `connect()` — begitu Activity/proses baru muncul
+sementara `PlaybackService` (MediaSession-nya) sudah/masih punya media item aktif (Service
+survive app-kill/backgrounding biasa, ATAU playback dimulai dari luar UI app sama sekali —
+widget/headset/Bluetooth/bubble/lock screen), mini player tetap tampil kosong ("reset") sampai
+ada transisi lagu berikutnya yang kebetulan terjadi.
+
+Fix: fungsi baru `maybeSyncMiniPlayerOnColdStart()`, dipanggil dari 2 titik — akhir blok
+`future.addListener` di `connect()`, dan tail sukses `refreshLibrary()` (setelah
+`_librarySongs.value = songs`) — menutup race kondisi: mana pun dari (controller connect) vs
+(scan library selesai) yang terjadi lebih dulu, titik yang belakangan tetap berhasil memicu sync.
+Dikunci flag baru `coldStartSyncDone` (di-set begitu prasyarat controller+library snapshot
+lengkap, apa pun hasil sync-nya) supaya PERSIS jalan 1x per proses — refresh library berikutnya
+dari `ContentObserver` (perubahan file MediaStore di background) tidak mengulang/menimpa state
+yang sudah berjalan wajar sejak itu. Skip total kalau `_uiState.value.currentSong` sudah terisi
+lebih dulu (event transisi/aksi user/shortcut sudah menang duluan) — tidak pernah menimpa state
+yang sudah benar.
+
+2 cabang di dalam fungsi itu:
+- **`controller.mediaItemCount > 0`** (Service tetap hidup): mediaId tiap item di timeline
+  controller dipetakan balik ke `Song` lewat `_librarySongs.value` (mediaId = `song.id.toString()`,
+  sudah konvensi lama di `mediaItemFor()`). Lagu yang sudah terhapus dari disk sejak terakhir
+  dimuat di-drop lewat `mapNotNull` (bukan `map`) — index lagu berjalan dicari ulang lewat
+  `indexOf` di list yang SUDAH terfilter, bukan percaya index mentah controller yang bisa geser
+  akibat drop itu. `_uiState`/`_playbackProgress`/`currentQueue` disinkronkan LANGSUNG dari nilai
+  controller (posisi, isPlaying, shuffle, repeat, speed, volume) — **0 `play()`/`pause()`/
+  `seekTo()` dipanggil sama sekali**, 0 interupsi ke audio yang sedang berjalan.
+- **`controller.mediaItemCount == 0`** (Service ikut mati total): reuse `resumeFromSaved(allSongs,
+  autoPlay = false)` — fungsi yang SUDAH ADA & SUDAH dipakai jalur shortcut "Continue
+  Listening"/tombol Resume di HomeScreen, bukan logic baru. Queue terakhir termuat & mini player
+  muncul (paused, siap dilanjutkan user) TANPA auto-play yang mengejutkan.
+
+**0 diverifikasi CI/device Batch 476** — review manual (balance brace/paren/bracket: sudah
+diverifikasi sama untuk `PlayerViewModel.kt`, `MiniPlayerBar.kt`, `MainActivity.kt`), 0 env
+Android nyata/device fisik/compiler Kotlin di sesi ini. Daftar test wajib sebelum lanjut fitur
+baru lain: lihat `[RESUME POINT]` di `PROJECT_STATE.md` (7 skenario: swipe-cancel lewat/tidak
+lewat threshold, tap masih normal, app-kill-tapi-Service-hidup, app-kill-total-plus-playback-
+eksternal, app-kill-total-tanpa-eksternal/paused, dan swipe-cancel tidak dibangkitkan lagi oleh
+sync).
+
 ## Batch 475 — Sinkronisasi cold-start/persistent bubble <-> PlaybackService setelah app di-kill
 Reopen eksplisit user atas sektor "survive app-kill" (ditutup informal Batch 474): "lakukan
 sinkronisasi mekanisme cold-start/persistent antara fitur bubble dan eksternal SONIX player
