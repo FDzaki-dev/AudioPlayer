@@ -258,7 +258,23 @@ class PlaybackService : MediaLibraryService() {
      * [FloatingBubbleStore.isEnabled] preferensi user, DAN `Settings.canDrawOverlays` — izin
      * overlay bisa dicabut user dari Pengaturan sistem kapan saja tanpa lewat toggle app ini
      * sama sekali, device settings selalu menang atas preferensi in-app (pola sama persis
-     * BubbleBootReceiver.kt). */
+     * BubbleBootReceiver.kt).
+     *
+     * **Batch 475 [sinkronisasi cold-start/persistent bubble <-> PlaybackService setelah app
+     * di-kill]**: titik ini adalah SATU-SATUNYA jalur yang menyalakan bubble balik ketika
+     * `isPlaying` jadi true murni dari trigger EKSTERNAL (Bluetooth/headset/Android Auto/lock
+     * screen media resumption) SETELAH proses app sebelumnya benar-benar mati total — skenario
+     * PERSIS yang dikonfirmasi user sendiri sebagai jalur andalan survive-app-kill (PROJECT_STATE.md
+     * Batch 474: "sudah bisa dipicu pakai pemutar SONIX eksternal"). Sebelum batch ini,
+     * `startForegroundService()` di bawah TIDAK dibungkus `runCatching` — beda dari 2 titik lain
+     * yang memanggil API SAMA PERSIS untuk menyalakan [FloatingBubbleService] (`BubbleBootReceiver.kt`
+     * Batch 466, `FloatingBubbleService.onTaskRemoved` Batch 471), yang keduanya SUDAH dibungkus
+     * setelah device nyata user MEMBUKTIKAN `ForegroundServiceStartNotAllowedException` bisa
+     * terjadi walau semua API resmi sudah benar (log_20260915_133616, PROJECT_STATE.md Batch 466).
+     * Titik INI justru lebih kritis dari keduanya: exception yang tidak tertangkap di sini
+     * terjadi DI DALAM listener [Player] milik [PlaybackService] SENDIRI — kalau propagate,
+     * berisiko menjatuhkan proses playback yang justru SEDANG berhasil dipicu ulang lewat
+     * trigger eksternal, bukan cuma gagal menampilkan bubble. */
     /** Batch 389 — builds overlapPlayer (ExoPlayer KEDUA, lihat dokumentasi lengkap di
      * CrossfadeEngine.kt) + CrossfadeEngine sekali, hanya saat Crossfade genuinely diaktifkan
      * (dipanggil dari onCreate kalau sudah ON sejak sebelum cold start, atau dari onCustomCommand
@@ -357,7 +373,11 @@ class PlaybackService : MediaLibraryService() {
         if (!FloatingBubbleStore(this).isEnabled()) return
         if (!Settings.canDrawOverlays(this)) return
         val intent = Intent(this, FloatingBubbleService::class.java)
-        startForegroundService(intent)
+        // Batch 475 — lihat KDoc fungsi ini di atas untuk alasan lengkap. runCatching mengisolasi
+        // kegagalan start-bubble supaya TIDAK PERNAH bisa menjatuhkan playback yang sedang
+        // berjalan/baru saja dipicu ulang (pola identik BubbleBootReceiver.kt/onTaskRemoved).
+        runCatching { startForegroundService(intent) }
+            .onFailure { AppLogger.e("PlaybackService", "Gagal start FloatingBubbleService dari maybeStartFloatingBubble", it) }
     }
 
     private fun pushWidgetUpdate(player: Player) {

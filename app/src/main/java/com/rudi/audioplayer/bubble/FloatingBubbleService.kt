@@ -1188,8 +1188,18 @@ class FloatingBubbleService : Service() {
                 // Fallback: controller belum konek ATAU antrean sesi ini masih kosong (cold-start,
                 // lihat KDoc fungsi) — pakai kontrak Intent yang sama widget pakai, memicu jalur
                 // cold-start restore PlaybackService.onStartCommand.
+                // Batch 475 [sinkronisasi cold-start/persistent bubble <-> PlaybackService] — arah
+                // KEBALIKAN dari PlaybackService.maybeStartFloatingBubble() (lihat KDoc fungsi itu):
+                // di sana PlaybackService menyalakan bubble balik pasca-trigger eksternal, di sini
+                // bubble MEMICU cold-start PlaybackService pasca-tap user. `runCatching` disamakan
+                // ke pola yang SUDAH ada di [onTaskRemoved] kelas ini (Batch 471) & BubbleBootReceiver.kt
+                // (Batch 466) untuk API startForegroundService yang SAMA persis — sebelum ini titik
+                // panggil KETIGA yang belum ikut terlindungi, exception tak tertangkap di sini bisa
+                // menjatuhkan Service bubble yang sedang aktif hanya karena start player ditolak OS,
+                // padahal bubble seharusnya tetap hidup & bisa dicoba lagi di tap berikutnya.
                 val intent = Intent(this, PlaybackService::class.java).setAction(action)
-                startForegroundService(intent)
+                runCatching { startForegroundService(intent) }
+                    .onFailure { AppLogger.e("FloatingBubbleService", "Gagal trigger cold-start PlaybackService dari sendPlaybackAction", it) }
             }
         }
     }

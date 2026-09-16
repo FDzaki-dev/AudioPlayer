@@ -12,6 +12,34 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 475 [reopen eksplisit user: sinkronisasi cold-start/persistent bubble <-> player
+setelah app-kill]**: user eksplisit buka ulang sektor "survive app-kill" (DITUTUP informal Batch
+474) dengan instruksi spesifik: "lakukan sinkronisasi mekanisme cold-start/persistent antara
+fitur bubble dan eksternal SONIX player after kill the app". Diizinkan per "Aturan sesi aktif" #6
+(instruksi eksplisit spesifik minta sektor dibuka lagi, BUKAN instruksi generik "next"/"lanjut").
+
+**2 file diubah** (dalam batas 3 file/tugas): `PlaybackService.kt`, `FloatingBubbleService.kt`.
+Detail lengkap: `CHANGELOG.md` § Batch 475. Ringkas: grep seluruh project menemukan 5 titik
+`startForegroundService()` yang menyalakan bubble/PlaybackService — cuma 2 (`BubbleBootReceiver.kt`
+Batch 466, `FloatingBubbleService.onTaskRemoved` Batch 471) yang dibungkus `runCatching` setelah
+device nyata user MEMBUKTIKAN `ForegroundServiceStartNotAllowedException` bisa terjadi walau API
+resmi sudah benar. 2 titik LAIN — justru paling relevan ke sinkronisasi bubble<->player pasca
+app-kill (`PlaybackService.maybeStartFloatingBubble()`, dipanggil `onIsPlayingChanged(true)` =
+funnel bubble menyala balik saat playback resumption eksternal berhasil pasca app-kill total; &
+`FloatingBubbleService.sendPlaybackAction()` fallback, arah kebalikan — bubble memicu cold-start
+PlaybackService saat tap tombol dalam keadaan cold) — TIDAK ikut terlindungi. Fix: kedua titik
+disamakan ke pola `runCatching` yang sama, 0 logic/formula/state lain diubah. Titik ke-5
+(`BubbleTileService.kt`) SENGAJA tidak disentuh — tap QS tile user-initiated, exempt dari
+background-start restriction, beda kelas risiko.
+
+**0 diverifikasi CI/device Batch 475** — review manual (cek balance brace/paren/bracket:
+`PlaybackService.kt` `{}` 80/80 `()` 427/427 `[]` 19/19; `FloatingBubbleService.kt` `{}` 108/108
+`()` 730/730 `[]` 204/204), 0 env Android nyata/device fisik/compiler Kotlin di sesi ini. Kondisi
+ini SULIT direproduksi sengaja (butuh device dengan restriksi OEM aktif tepat di momen resumption
+eksternal) — validasi utama dari user: pastikan 0 regresi ke perilaku normal (bubble tetap nyala
+saat playback dipicu widget/headset/Bluetooth/lock-screen seperti Batch 473, tap tombol bubble
+cold-start tetap memicu restore seperti Batch 470).
+
 **Catatan Batch 474 [jawaban user: tutup (a) survive app-kill + fitur baru (b) drag vs tap
 tombol]**: user jawab 2 poin WAJIB Batch 471/472 sekaligus.
 
@@ -1427,7 +1455,16 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 474. ZIP terakhir: `SONIX_v474.zip`. **1 file diubah** (dalam batas 3
+- Batch terakhir: 475. ZIP terakhir: `SONIX_v475.zip`. **2 file diubah** (dalam batas 3
+  file/tugas): `PlaybackService.kt`, `FloatingBubbleService.kt` — lihat "Catatan Batch 475" di
+  atas untuk detail penuh. Ringkas: 2 titik `startForegroundService()` (bubble<->PlaybackService,
+  arah cold-start-eksternal & tap-bubble-cold-start) disamakan ke pola `runCatching` yang sudah
+  terbukti di `BubbleBootReceiver.kt`/`onTaskRemoved`. 0 behavior/logic lain diubah, murni
+  error-handling. **Sulit direproduksi sengaja** (butuh device dgn restriksi OEM aktif tepat di
+  momen resumption eksternal) — validasi dari user CUKUP: pastikan 0 regresi ke perilaku normal
+  (bubble tetap nyala saat playback dipicu widget/headset/Bluetooth/lock-screen, tap tombol
+  bubble cold-start tetap memicu restore seperti sebelumnya).
+- Batch 474 (sebelum 475). ZIP: `SONIX_v474.zip`. **1 file diubah** (dalam batas 3
   file/tugas): `FloatingBubbleService.kt` — lihat "Catatan Batch 474" di atas untuk detail penuh.
   (a) Survive app-kill (Batch 471) **DITUTUP atas permintaan eksplisit user** — konfirmasi
   informal + user eksplisit minta topik ini TIDAK ditanyakan lagi. **JANGAN munculkan lagi

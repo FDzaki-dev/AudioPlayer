@@ -1,5 +1,47 @@
 # Changelog
 
+## Batch 475 — Sinkronisasi cold-start/persistent bubble <-> PlaybackService setelah app di-kill
+Reopen eksplisit user atas sektor "survive app-kill" (ditutup informal Batch 474): "lakukan
+sinkronisasi mekanisme cold-start/persistent antara fitur bubble dan eksternal SONIX player
+after kill the app". Diizinkan per aturan sesi aktif #6 (instruksi eksplisit spesifik).
+
+**2 file diubah** (dalam batas 3 file/tugas): `PlaybackService.kt`, `FloatingBubbleService.kt`.
+
+**Temuan (baca-kode, bukan tebakan)**: 5 titik panggil `startForegroundService()` menyalakan
+`FloatingBubbleService`/`PlaybackService` di seluruh project — hanya 1 (`BubbleBootReceiver.kt`,
+Batch 466) dan 1 lagi (`FloatingBubbleService.onTaskRemoved`, Batch 471) yang dibungkus
+`runCatching` setelah device nyata user MEMBUKTIKAN `ForegroundServiceStartNotAllowedException`
+bisa terjadi walau API resmi sudah benar. 2 titik LAIN — justru yang paling relevan ke
+"cold-start/persistent setelah app-kill" karena keduanya adalah jalur bubble<->PlaybackService
+saling memicu ulang satu sama lain via trigger eksternal — TIDAK ikut terlindungi:
+1. `PlaybackService.maybeStartFloatingBubble()` — dipanggil dari `onIsPlayingChanged(true)`,
+   funnel TUNGGAL yang menyalakan bubble balik saat playback resumption Bluetooth/headset/
+   Android Auto/lock-screen berhasil memicu ulang PlaybackService pasca app-kill total. Exception
+   tak tertangkap di sini propagate ke listener `Player` MILIK PlaybackService sendiri — resiko
+   menjatuhkan proses playback yang justru baru saja berhasil dipicu ulang, bukan cuma gagal
+   menampilkan bubble.
+2. `FloatingBubbleService.sendPlaybackAction()` fallback — arah kebalikan: bubble memicu
+   cold-start `PlaybackService` saat user tap tombol bubble dalam keadaan cold (antrean kosong).
+   Exception tak tertangkap bisa menjatuhkan Service bubble yang sedang aktif.
+
+**Fix**: kedua titik dibungkus `runCatching { startForegroundService(...) }.onFailure {
+AppLogger.e(...) }` — pola IDENTIK yang sudah terbukti di 2 titik lain, disamakan (disinkronkan)
+ke seluruh 4 titik startForegroundService yang relevan ke jalur cold-start/persistent bubble<->
+player (titik ke-5, `BubbleTileService.kt`, SENGAJA tidak disentuh — tap QS tile adalah trigger
+user-initiated yang exempt dari background-start restriction Android, beda kelas risiko dari 4
+titik lain yang bisa terpicu murni otomatis tanpa interaksi user). 0 logic/formula/state lain
+diubah, 0 behavior baru — murni menutup celah error-handling yang sudah terbukti perlu di 2 titik
+sejenis lain, konsisten "PELAJARAN PROSES Batch 466".
+
+**0 diverifikasi CI/device Batch 475** — review manual (cek balance brace/paren/bracket:
+`PlaybackService.kt` `{}` 80/80 `()` 427/427 `[]` 19/19; `FloatingBubbleService.kt` `{}` 108/108
+`()` 730/730 `[]` 204/204), 0 env Android nyata/device fisik/compiler Kotlin di sesi ini. Perlu
+dari user: kondisi ini SULIT direproduksi sengaja (butuh device dengan restriksi OEM aktif tepat
+di momen resumption eksternal) — tidak ada test manual spesifik yang bisa diminta selain
+memastikan 0 regresi ke perilaku normal (bubble tetap nyala normal saat playback dipicu dari
+widget/headset/Bluetooth/lock-screen seperti Batch 473, tap tombol bubble cold-start tetap
+memicu restore seperti Batch 470).
+
 ## Batch 474 — Drag diutamakan di atas tap di 4 tombol kontrol + tutup survive app-kill
 Jawaban user atas 2 poin WAJIB Batch 471/472: (a) survive app-kill ditutup atas permintaan
 eksplisit user (konfirmasi informal, minta tidak ditanyakan lagi); (b) fitur baru — drag yang
