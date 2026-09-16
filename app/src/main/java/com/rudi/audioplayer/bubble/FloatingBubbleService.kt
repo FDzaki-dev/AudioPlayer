@@ -402,8 +402,28 @@ import kotlin.math.abs
  *    BATAS JUJUR eksplisit didokumentasikan di [onTaskRemoved]: "100%" TIDAK bisa dijanjikan dari
  *    kode manapun (OEM autostart/protected-apps proprietary di luar API Android resmi).
  *
- * **File diubah**: `FloatingBubbleService.kt`, `AndroidManifest.xml`, `MainActivity.kt` (3 file,
- * pas batas 3 file/tugas — `bubble_mini_player.xml` SENGAJA tidak disentuh batch ini, lihat poin 1).
+ *
+ * **Batch 472 [1 laporan user: drag masih "sempit" pasca-471 + 2 klarifikasi survive app-kill]**:
+ * 0 tumpang tindih investigasi Batch 469 (screenBounds/clamp/posisi 0 disentuh sama sekali).
+ * 1. **Drag area mentok penuh ke tepi kanan**: lihat KDoc "Koreksi Batch 472" di
+ *    [applyAlbumArtTouchDelegate] — `rect.right` sekarang dinamis = `expanded.width` (tepi kanan
+ *    `bubble_root` sesungguhnya, melewati seluruh badan 4 tombol kontrol), gantikan konstanta
+ *    pad tetap Batch 470/471 (`ALBUM_ART_TOUCH_PAD_RIGHT_DP`, dicabut — cuma sampai gap sebelum
+ *    `bubble_prev`) yang terbukti belum cukup lega. Aman krn alasan yang SAMA sudah dibuktikan
+ *    Batch 471: tombol selalu menang bounds sendiri di dispatch Android baku, lepas dari overlap
+ *    rect delegate induk.
+ * 2. **Dialog battery-optimization (Batch 471) DIKONFIRMASI user**: muncul PERSIS sesuai desain —
+ *    hanya terpicu begitu user toggle bubble OFF→ON manual (0 nge-nag di luar alur itu). 0 kode
+ *    disentuh, murni sinkronisasi status ke PROJECT_STATE.md.
+ * 3. **Survive app-kill (swipe dari Recents) BELUM ditest user** — laporan user malah 1 observasi
+ *    DI LUAR protokol yang diminta ("bubble tetap muncul saat player eksternal dimainkan"), makna
+ *    AMBIGU (arsitektur [controller] HANYA konek ke [PlaybackService] app ini sendiri lewat
+ *    [SessionToken] — 0 jalur kode yang menampilkan sesi app lain, lihat "Kontrol/state" di atas).
+ *    SOP larang tebak fix tanpa data — 0 kode disentuh, klarifikasi diminta balik ke user (lihat
+ *    PROJECT_STATE.md RESUME POINT).
+ *
+ * **File diubah**: `FloatingBubbleService.kt` (1 file, dalam batas 3 file/tugas — poin 2/3 di atas
+ * murni dokumentasi/klarifikasi, 0 kode lain disentuh batch ini).
  */
 class FloatingBubbleService : Service() {
 
@@ -864,29 +884,38 @@ class FloatingBubbleService : Service() {
      * dead-space") sudah membuktikan margin ekstra itu tidak perlu — overlap rect delegate ke
      * bounds tombol TIDAK PERNAH bisa mencuri sentuhan dari tombol (dispatch Android baku
      * memprioritaskan child match PERSIS duluan, lepas dari apa pun isi rect TouchDelegate induk).
-     * Sisi kanan sekarang ambil FULL 6dp gap asli (0 lagi sisa dead-zone 3dp yang tidak
-     * terjangkau). Sisi kiri/atas/bawah TETAP di [ALBUM_ART_TOUCH_PAD_DP] lama — nilai itu SUDAH
-     * melebihi padding riil `bubble_root` (8dp, lihat XML), jadi sudah maksimal secara fisik untuk
+     * Sisi kiri/atas/bawah TETAP di [ALBUM_ART_TOUCH_PAD_DP] lama — nilai itu SUDAH melebihi
+     * padding riil `bubble_root` (8dp, lihat XML), jadi sudah maksimal secara fisik untuk
      * arsitektur "0 dp baru di XML" saat ini; menaikkannya lebih lanjut 0 efek (window WRAP_CONTENT
      * pas di tepi child yang visible, tidak ada ruang sentuh lagi di luar itu — sentuhan di sana
-     * sudah tembus ke app di bawah, bukan lagi milik window ini). Kalau MASIH terasa kurang lega
-     * setelah ini: opsi berikutnya adalah menaikkan `android:padding` riil `bubble_root` di XML
-     * (breathing room fisik lebih besar, 1 file tambahan `bubble_mini_player.xml`, BELUM dilakukan
-     * batch ini — WAJIB konfirmasi user dulu, bukan tebakan, lihat RESUME POINT). 0 formula
-     * clamp/posisi/[screenBounds] disentuh (di luar cakupan guard Batch 469). */
+     * sudah tembus ke app di bawah, bukan lagi milik window ini). 0 formula
+     * clamp/posisi/[screenBounds] disentuh (di luar cakupan guard Batch 469).
+     *
+     * **Koreksi Batch 472 [masih "sempit" pasca-471]**: sisi kanan Batch 471 (fixed +6dp, cuma
+     * sampai gap `bubble_album_art`→`bubble_prev`) TERNYATA belum cukup — user eksplisit minta
+     * area sentuh mentok sampai ke ujung kanan `bubble_root` (melewati SELURUH badan 4 tombol
+     * kontrol, bukan cuma gap sebelum tombol pertama). Aman krn 2 alasan yang SAMA dibuktikan
+     * sendiri Batch 471 di atas: (1) child match PERSIS bounds-nya sendiri SELALU menang duluan
+     * di dispatch Android baku, lepas dari seberapa jauh rect [TouchDelegate] induk meng-overlap
+     * bounds ke-4 tombol itu — tap tombol play/pause/prev/next/minimize 0 terganggu; (2) window
+     * ini sendiri `WRAP_CONTENT` pas di tepi `bubble_root`, jadi `rect.right` tidak bisa melewati
+     * `expanded.width` (window ini SATU-SATUNYA yang bisa nangkap sentuhan, di luar itu sudah
+     * milik app lain di bawah) — `rect.right = expanded.width` sudah maksimal fisik yang mungkin,
+     * bukan angka dp ditebak lagi. [ALBUM_ART_TOUCH_PAD_RIGHT_DP] (Batch 470/471) jadi tidak
+     * terpakai lagi, dicabut. */
     private fun applyAlbumArtTouchDelegate() {
         val expanded = expandedView ?: return
         val albumArt = expanded.findViewById<ImageView>(R.id.bubble_album_art) ?: return
         if (albumArt.width <= 0 || albumArt.height <= 0) return // belum ter-measure; pemanggil lain akan re-apply
+        if (expanded.width <= 0) return // container induk belum ter-measure; pemanggil lain akan re-apply
         val density = resources.displayMetrics.density
         val padSidePx = (ALBUM_ART_TOUCH_PAD_DP * density).toInt()
-        val padRightPx = (ALBUM_ART_TOUCH_PAD_RIGHT_DP * density).toInt()
         val rect = Rect()
         albumArt.getHitRect(rect)
         rect.left -= padSidePx
         rect.top -= padSidePx
         rect.bottom += padSidePx
-        rect.right += padRightPx
+        rect.right = expanded.width // Batch 472 — mentok penuh ke tepi kanan container (bukan lagi pad tetap)
         expanded.touchDelegate = TouchDelegate(rect, albumArt)
     }
 
@@ -1195,11 +1224,9 @@ class FloatingBubbleService : Service() {
         // sistem SETELAH snap pertama (immediate) tapi SEBELUM animasi rotasi selesai settle.
         private val ROTATION_RESNAP_DELAYS_MS = longArrayOf(150L, 400L)
         // Batch 470 — padding TouchDelegate `bubble_album_art` (hit-test saja, lihat KDoc
-        // [applyAlbumArtTouchDelegate]). Sisi kanan lebih kecil karena gap asli ke `bubble_prev`
-        // cuma 6dp (lihat bubble_mini_player.xml) — nilai konservatif SENGAJA, bukan batas teori.
+        // [applyAlbumArtTouchDelegate]). Cuma sisi kiri/atas/bawah lagi sejak Batch 472 — sisi
+        // kanan sekarang dihitung dinamis mentok ke `expanded.width` (lihat KDoc "Koreksi Batch
+        // 472"), bukan lagi konstanta dp tetap.
         private const val ALBUM_ART_TOUCH_PAD_DP = 10f
-        // Batch 471 — dinaikkan dari 3f ke FULL 6dp (gap asli bubble_album_art→bubble_prev di
-        // bubble_mini_player.xml), lihat KDoc "Koreksi Batch 471" di applyAlbumArtTouchDelegate().
-        private const val ALBUM_ART_TOUCH_PAD_RIGHT_DP = 6f
     }
 }

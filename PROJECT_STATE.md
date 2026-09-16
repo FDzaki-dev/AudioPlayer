@@ -12,6 +12,52 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 473 [0 file diubah — klarifikasi murni, tutup poin 3 Batch 472]**: user jawab tap
+pilihan eksplisit untuk klarifikasi "bubble tetap muncul saat player eksternal dimainkan" (dibuka
+Batch 472 poin 3) — **maksud (a) DIKONFIRMASI**: bubble SONIX tetap tampil walau lagu dipicu main
+dari LUAR UI app (headset/Bluetooth/Android Auto/widget home-screen), BUKAN (b) bubble
+menampilkan sesi app lain. Ini **PERILAKU YANG DIHARAPKAN, BUKAN bug** — `PlaybackService`
+(`MediaLibraryService`) merespons trigger play dari sumber mana pun (tombol fisik headset,
+Bluetooth AVRCP, Android Auto, widget home-screen) via jalur session/Intent yang SAMA, bubble
+cuma mencerminkan state `PlaybackService` itu sendiri lepas dari APA yang memicunya — konsisten
+dengan `SessionToken` yang HANYA konek ke `PlaybackService` app ini sendiri (lihat "Kontrol/state"
+KDoc kelas `FloatingBubbleService.kt`). **0 kode diubah** — poin 3 Batch 472 RESMI DITUTUP, 0
+kandidat bug lagi di sektor ini. Sektor bubble (Roadmap #11) masih terbuka untuk item lain
+(investigasi Batch 469 & test survive-Recents Batch 471/472 di bawah, keduanya BELUM tersentuh
+batch ini).
+
+**Catatan Batch 472 [1 laporan user: drag masih "sempit" pasca-471 + 2 klarifikasi survive
+app-kill]**: 0 tumpang tindih investigasi Batch 469 (screenBounds/clamp/posisi 0 disentuh). **1
+file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+1. **Drag mentok penuh ke tepi kanan**: `rect.right` TouchDelegate `bubble_album_art` sekarang
+   dinamis = `expanded.width` (tepi kanan `bubble_root` sesungguhnya, melewati SELURUH badan 4
+   tombol kontrol) — gantikan `ALBUM_ART_TOUCH_PAD_RIGHT_DP` (Batch 470/471, dicabut, cuma sampai
+   gap sebelum `bubble_prev`) yang terbukti belum cukup lega. Aman krn alasan yang SAMA dibuktikan
+   Batch 471: tombol selalu menang bounds sendiri di dispatch Android baku, lepas dari overlap
+   rect delegate. Kiri/atas/bawah TIDAK disentuh (sudah maksimal fisik sejak Batch 471).
+2. **Dialog battery-optimization (pertanyaan Batch 471) DIKONFIRMASI user**: muncul PERSIS sesuai
+   desain — hanya terpicu saat user toggle bubble OFF→ON manual, 0 nge-nag di luar alur itu. 0
+   kode diubah — murni sinkronisasi status dokumentasi.
+3. **Survive app-kill (swipe Recents, pertanyaan Batch 471) BELUM ditest user** — user melaporkan
+   1 observasi DI LUAR protokol diminta: "bubble tetap muncul saat player eksternal dimainkan".
+   Makna AMBIGU — arsitektur [MediaController] bubble HANYA konek ke `PlaybackService` app ini
+   sendiri lewat `SessionToken(ComponentName(this, PlaybackService::class.java))`, 0 jalur kode
+   yang bisa menampilkan sesi/metadata app lain. Kandidat makna: (a) bubble tetap tampil walau
+   pemicu play datang dari luar UI app (Bluetooth/headset/Android Auto/widget) — WAJAR & sesuai
+   desain kalau ini maksudnya; (b) bubble justru menampilkan kontrol/metadata App LAIN (bug nyata
+   kalau ini maksudnya, tapi TIDAK didukung baca-kode manapun saat ini). **SOP larang tebak fix
+   tanpa data** — 0 kode disentuh, WAJIB klarifikasi dulu dari user (lihat RESUME POINT) SEBELUM
+   coding apa pun ke sektor ini, dan test swipe-dari-Recents (yang belum pernah dilakukan) tetap
+   WAJIB dari user terlepas dari klarifikasi ini.
+
+**0 diverifikasi CI/device Batch 472** — review manual (baca kode + cek balance brace/paren:
+`{}` 102/102, `()` 683/683, `[]` 184/184 di `FloatingBubbleService.kt`), 0 env Android nyata/
+device fisik/compiler Kotlin di sesi ini. Perlu dari user: (1) install APK baru, test drag dari
+album art lagi — sisi kanan sekarang harus lega sampai ke tombol minimize; (2) jawab klarifikasi
+poin 3 di atas; (3) LANJUTKAN test survive app-kill yang masih tertunda (swipe SONIX dari Recents,
+BUKAN Force Stop manual, setelah dialog battery-optimization di-grant) — cek bubble/notifikasi
+masih ada beberapa menit kemudian.
+
 **Catatan Batch 471 [2 laporan user: drag "sulit/terbatas" + "bubble survive 100%?"]**: 0
 tumpang tindih investigasi Batch 469 (screenBounds/clamp/posisi 0 disentuh). **3 file diubah**
 (pas batas 3 file/tugas): `FloatingBubbleService.kt`, `AndroidManifest.xml`, `MainActivity.kt`.
@@ -1325,26 +1371,22 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 471. ZIP terakhir: `SONIX_v471.zip`. **3 file diubah** (pas batas 3
-  file/tugas): `FloatingBubbleService.kt`, `AndroidManifest.xml`, `MainActivity.kt`. Respons ke 2
-  laporan user (lihat "Catatan Batch 471" di atas untuk detail teknis): (1) drag touch-area sisi
-  kanan diperlebar 3f→6f dp (full gap asli); (2) `onTaskRemoved` re-assert defensif +
-  `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` on-demand saat toggle ON. **0 pernah menyentuh
-  [screenBounds]/formula clamp/posisi** — 0 tumpang tindih investigasi Batch 469 (masih terbuka
-  di bawah).
-- **WAJIB dari user sebelum lanjut fitur baru lain**:
-  (a) **Drag**: install APK baru, test drag dari album art lagi — apakah sekarang "cukup lega"
-      atau MASIH terasa sempit? Kalau MASIH sempit: opsi lanjutan adalah naikkan `android:padding`
-      riil `bubble_root` di `bubble_mini_player.xml` (1 file baru, breathing room fisik lebih
-      besar dari sekadar hit-test) — WAJIB user konfirmasi eksplisit mau opsi ini sebelum
-      dieksekusi (bukan tebakan), karena sedikit membesarkan ukuran visual pill.
-  (b) **Survive app-kill**: install APK baru, toggle bubble OFF lalu ON lagi dari Settings →
-      dialog sistem "Izinkan aktivitas di latar belakang?" WAJIB muncul (kalau device belum pernah
-      exempt) — user grant, LALU test: buka app lain, swipe SONIX dari Recents (jangan Force Stop
-      manual — itu memang TIDAK BISA disurvive kode apa pun, batasan OS by design) → cek apakah
-      bubble/notifikasi masih ada beberapa menit kemudian. Kirim hasil test (dialog muncul/tidak,
-      bubble survive/tidak) balik — **JANGAN asumsikan "sudah pasti survive"** tanpa konfirmasi
-      device fisik (pola sama pelajaran Batch 460-467: device nyata menang atas asumsi kode).
+- Batch terakhir: 473. ZIP terakhir: `SONIX_v473.zip`. **0 file kode diubah** (klarifikasi murni,
+  lihat "Catatan Batch 473" di atas) — poin 3 Batch 472 ("bubble tetap muncul saat player
+  eksternal dimainkan") RESMI DITUTUP: dikonfirmasi PERILAKU YANG DIHARAPKAN (bubble ikut
+  trigger play dari luar UI app — headset/Bluetooth/Android Auto/widget), BUKAN bug lintas-app.
+  0 kandidat bug baru di sektor bubble dari klarifikasi ini.
+- **WAJIB DIJAWAB/ditest user dulu sebelum lanjut fitur baru lain** (sisa dari Batch 471/472,
+  BELUM ada satu pun yang masuk sejak Batch 471):
+  (a) **Survive app-kill (masih tertunda sejak Batch 471)**: install APK terbaru, toggle bubble
+      OFF lalu ON lagi dari Settings (dialog battery-optimization SUDAH dikonfirmasi muncul di
+      sini, grant izinnya) → LALU test: buka app lain, swipe SONIX dari Recents (jangan Force
+      Stop manual — itu memang TIDAK BISA disurvive kode apa pun, batasan OS by design) → cek
+      apakah bubble/notifikasi masih ada beberapa menit kemudian. Kirim hasil test balik —
+      **JANGAN asumsikan "sudah pasti survive"** tanpa konfirmasi device fisik (pola sama
+      pelajaran Batch 460-467: device nyata menang atas asumsi kode).
+  (b) **Drag (Batch 472)**: install APK terbaru, konfirmasi sisi kanan SEKARANG lega sampai ke
+      tombol minimize (bukan cuma sampai gap sebelum Previous seperti Batch 471).
 - Batch 470 (sebelum 471). ZIP: `SONIX_v470.zip`. **1 file diubah** (dalam batas 3
   file/tugas): `FloatingBubbleService.kt`. 2 fitur baru dari user (lihat "Catatan Batch 470" di
   atas untuk detail): (1) cold-start fix `sendPlaybackAction`/`setupControls` (tap kontrol bubble

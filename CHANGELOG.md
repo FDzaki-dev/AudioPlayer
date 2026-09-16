@@ -1,5 +1,42 @@
 # Changelog
 
+## Batch 473 — Klarifikasi poin 3 Batch 472: DITUTUP, bukan bug
+User konfirmasi via tap pilihan eksplisit: "bubble tetap muncul saat player eksternal dimainkan"
+maksudnya bubble SONIX tetap tampil walau lagu dipicu main dari LUAR UI app (headset/Bluetooth/
+Android Auto/widget home-screen) — BUKAN bubble menampilkan sesi app lain.
+
+**0 file diubah** — ini PERILAKU YANG DIHARAPKAN, konsisten dengan arsitektur `SessionToken`
+yang HANYA konek ke `PlaybackService` app ini sendiri: `PlaybackService` merespons trigger play
+dari sumber apa pun lewat jalur session/Intent yang sama, bubble cuma mencerminkan state
+`PlaybackService` itu sendiri lepas dari apa yang memicunya. 0 kandidat bug baru ditemukan.
+
+Sisa item terbuka TIDAK berubah: survive app-kill (swipe Recents, Batch 471) masih belum ditest
+user; investigasi regresi Batch 469 masih terbuka.
+
+## Batch 472 — Drag touch-area mentok penuh ke tepi kanan + 2 klarifikasi survive app-kill
+1 laporan user: drag masih terasa "sempit" pasca-Batch 471, + 2 tanggapan atas pertanyaan
+device-test Batch 471 (dialog battery-optimization, survive swipe-Recents).
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+
+1. **Drag**: `rect.right` TouchDelegate `bubble_album_art` sekarang dinamis = lebar penuh
+   `bubble_root` (`expanded.width`) — mentok ke tepi kanan container sesungguhnya, melewati
+   SELURUH badan 4 tombol kontrol (bukan cuma gap sebelum Previous seperti Batch 471). Konstanta
+   pad tetap `ALBUM_ART_TOUCH_PAD_RIGHT_DP` (Batch 470/471) dicabut, tidak terpakai lagi. Aman
+   dengan alasan yang sama dibuktikan Batch 471: tombol kontrol SELALU menang duluan di bounds
+   mereka sendiri lepas dari overlap rect delegate induk.
+2. **Dialog battery-optimization DIKONFIRMASI user**: muncul persis sesuai desain — hanya
+   terpicu saat user toggle bubble OFF→ON manual. 0 kode diubah.
+3. **Survive app-kill (swipe Recents) BELUM ditest user** — user melaporkan observasi lain di
+   luar protokol diminta ("bubble tetap muncul saat player eksternal dimainkan"), maknanya
+   ambigu. 0 kode diubah, SOP larang menebak fix tanpa data — klarifikasi diminta balik ke user.
+
+**0 diverifikasi CI/device Batch 472** — review manual (cek balance brace/paren/bracket:
+`{}` 102/102, `()` 683/683, `[]` 184/184 di `FloatingBubbleService.kt`). Perlu dari user: (1)
+test drag ulang — sekarang cukup lega di sisi kanan sampai ke tepi tombol minimize?; (2)
+klarifikasi maksud "player eksternal" di poin 3, lalu lanjutkan test swipe-dari-Recents yang
+masih belum pernah dilakukan.
+
 ## Batch 471 — Drag touch-area diperlebar (sisi kanan) + bubble survive app-kill (best-effort)
 2 laporan user: (1) drag mulai terasa sulit/terbatas setelah scoping album-art-only Batch 470;
 (2) tanya cara agar bubble tidak hilang saat app di-kill/swipe dari Recents.
