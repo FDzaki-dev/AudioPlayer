@@ -1,5 +1,52 @@
 # Changelog
 
+## Batch 471 — Drag touch-area diperlebar (sisi kanan) + bubble survive app-kill (best-effort)
+2 laporan user: (1) drag mulai terasa sulit/terbatas setelah scoping album-art-only Batch 470;
+(2) tanya cara agar bubble tidak hilang saat app di-kill/swipe dari Recents.
+
+**3 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`, `AndroidManifest.xml`,
+`MainActivity.kt`.
+
+1. **Drag**: `ALBUM_ART_TOUCH_PAD_RIGHT_DP` (TouchDelegate hit-test area di sekitar album art)
+   dinaikkan 3dp→6dp (full gap visual asli ke tombol Previous) — aman karena tombol kontrol SELALU
+   menang duluan di bounds mereka sendiri lepas dari overlap rect delegate. Sisi kiri/atas/bawah
+   TIDAK berubah (sudah maksimal secara fisik untuk padding container saat ini, 8dp).
+2. **Survive app-kill**: ditambah `onTaskRemoved()` (re-assert status foreground begitu app
+   di-swipe dari Recents) + dialog sistem "Izinkan aktivitas di latar belakang?"
+   (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`), diminta HANYA saat user aktif menyalakan
+   toggle bubble (bukan tiap buka app). **Catatan jujur**: ini menambah keandalan, TAPI "100%
+   tidak pernah hilang" tidak bisa dijamin kode apa pun — pembatasan latar-belakang khusus
+   pabrikan HP (di luar Xiaomi/Oppo/Vivo/dll., contoh: Xiaomi App Standby) tetap bisa mematikan
+   app di luar kendali kode, perlu di-whitelist manual lewat pengaturan baterai/autostart HP
+   masing-masing kalau masih terjadi setelah update ini.
+
+**0 diverifikasi CI/device Batch 471** — review manual (cek balance brace/paren/bracket ketiga
+file). Perlu dari user: (1) test drag — cukup lega atau masih sempit; (2) toggle bubble OFF→ON,
+konfirmasi dialog izin baterai muncul & di-grant, lalu test swipe dari Recents.
+
+## Batch 470 — Cold-start bubble fix + drag/tap-buka-app discoped ke album art saja
+2 permintaan baru dari user, 0 pernah menyentuh `screenBounds`/formula clamp/posisi (0 tumpang
+tindih dengan investigasi regresi Batch 469 yang masih terbuka).
+
+**1 file diubah** (dalam batas 3 file/tugas): `FloatingBubbleService.kt`.
+
+1. **Cold-start fix**: `sendPlaybackAction()` sebelumnya langsung pakai `MediaController` lokal
+   begitu `controller != null`, tanpa cek `mediaItemCount` — di boot murni (bubble auto-start
+   lewat `BubbleBootReceiver`, user belum buka app/widget), controller bisa konek duluan dengan
+   antrean masih kosong, membuat `hasQueue` nge-latch `false` selamanya dan setiap tap
+   play/prev/next jatuh ke `openApp()` alih-alih memutar. Fix: syarat `mediaItemCount > 0` sebelum
+   pakai controller langsung, kalau tidak selalu fallback ke Intent yang sama seperti widget
+   home-screen (jalur ini yang benar-benar men-trigger restore antrean cold-start).
+2. **Drag & tap-buka-app discoped ke album art saja**: sebelumnya area sentuh drag/tap-buka-app
+   mencakup seluruh badan pill (termasuk padding kosong di sekitarnya). Sekarang hanya
+   `bubble_album_art` (state expanded) yang jadi pemicu — diperluas sedikit lewat `TouchDelegate`
+   (hit-test saja, 0 perubahan layout/ukuran view nyata) supaya tetap gampang disentuh. Tab
+   minimized (chat-head) tidak berubah — tetap area sentuh luas seperti sebelumnya.
+
+**0 diverifikasi CI/device Batch 470** — review manual. Perlu dari user: (1) test cold-start
+setelah reboot HP tanpa buka app/widget dulu; (2) test area sentuh drag baru (album art vs
+padding kosong pill).
+
 ## Batch 469 — REGRESI BARU pasca-468: bubble hilang saat drag landscape (instrumentasi, bukan fix)
 User laporkan bubble minimized MENGHILANG TOTAL saat di-drag ke tepi landscape berbeda (sisi
 nav-bar-bottom), balik normal cuma kalau device dirotasi ke portrait lagi. Gejala baru, lebih

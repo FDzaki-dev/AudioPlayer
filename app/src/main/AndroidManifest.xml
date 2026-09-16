@@ -35,6 +35,20 @@
          ON, tanpa user harus buka app dulu. Lihat BubbleBootReceiver.kt. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Batch 471 — device nyata user (Batch 466/467) MEMBUKTIKAN OEM App Standby/battery
+         restriction bisa memblokir foreground service bubble WALAU startForeground() sudah
+         benar & START_STICKY/specialUse sudah terpasang (bukan cuma teori, lihat PROJECT_STATE.md
+         Batch 466). Foreground service + START_STICKY + boot-restart TIDAK CUKUP di device
+         seagresif itu — satu-satunya API resmi Android untuk minta dikecualikan dari Doze/App
+         Standby adalah dialog ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, diminta eksplisit HANYA
+         saat user menyalakan toggle bubble sendiri (pola sama SYSTEM_ALERT_WINDOW Batch 91/
+         RECORD_AUDIO Batch 92 di atas, 0 diminta diam-diam). Lihat MainActivity.kt's
+         requestIgnoreBatteryOptimizationsIfNeeded(). JUJUR: ini TIDAK menjamin 100% (OEM
+         proprietary "autostart"/"protected apps" list di luar API Android resmi, tidak bisa
+         disentuh dari kode) — cuma lapisan resmi Android yang tersedia, ditambahkan di atas yang
+         sudah ada, bukan pengganti. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <!-- Release Downloader Spec — satu-satunya alasan INTERNET ada di app ini: cek & unduh APK
          rilis terbaru dari GitHub Releases (Settings → Lanjutan → Cek Update). Tidak dipakai
          untuk apa pun lain (tidak ada analytics/telemetry/ads) — lihat komentar AppLogger.kt

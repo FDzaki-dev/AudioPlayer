@@ -390,7 +390,20 @@ import kotlin.math.abs
  *    SATUNYA yang berubah adalah TITIK AWAL sentuhan yang sah, bukan jangkauan gerak. 0 formula
  *    clamp/posisi/[screenBounds] disentuh sama sekali (lihat guard Batch 469 di atas).
  *
- * **File diubah**: HANYA `FloatingBubbleService.kt` (dalam batas 3 file/tugas).
+ * **Batch 471 [2 laporan user: drag "sulit/terbatas" + "bubble survive 100%?"]**: 0 tumpang
+ * tindih investigasi Batch 469 (screenBounds/clamp/posisi 0 disentuh sama sekali).
+ * 1. **Drag area diperlebar sisi kanan**: lihat KDoc "Koreksi Batch 471" di
+ *    [applyAlbumArtTouchDelegate] — [ALBUM_ART_TOUCH_PAD_RIGHT_DP] 3f→6f (full gap asli),
+ *    terbukti aman krn anak/tombol selalu menang bounds sendiri. Kiri/atas/bawah SUDAH maksimal
+ *    secara fisik (padding riil `bubble_root` cuma 8dp) — kalau masih kurang, opsi lanjutan
+ *    (naikkan padding XML) WAJIB konfirmasi user dulu, belum diterapkan batch ini.
+ * 2. **Bubble survive app-kill**: lihat KDoc [onTaskRemoved] (baru) — re-assert foreground
+ *    defensif + `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (AndroidManifest.xml + MainActivity.kt).
+ *    BATAS JUJUR eksplisit didokumentasikan di [onTaskRemoved]: "100%" TIDAK bisa dijanjikan dari
+ *    kode manapun (OEM autostart/protected-apps proprietary di luar API Android resmi).
+ *
+ * **File diubah**: `FloatingBubbleService.kt`, `AndroidManifest.xml`, `MainActivity.kt` (3 file,
+ * pas batas 3 file/tugas — `bubble_mini_player.xml` SENGAJA tidak disentuh batch ini, lihat poin 1).
  */
 class FloatingBubbleService : Service() {
 
@@ -547,6 +560,40 @@ class FloatingBubbleService : Service() {
             runCatching { windowManager.updateViewLayout(view, params) }
             bubbleStore.savePosition(params.x, params.y)
         }
+    }
+
+    /** Batch 471 — user tanya "bagaimana caranya bubble survive 100% / tidak hilang saat app
+     * di-kill". **Baseline SEBELUM batch ini**: class ini 0 pernah override [onTaskRemoved] sama
+     * sekali — default [Service] TIDAK auto-stop diri sendiri saat task di-swipe dari Recents
+     * (beda dari [PlaybackService.onTaskRemoved] yang JUSTRU eksplisit `stopSelf()` kalau antrean
+     * kosong) — jadi bubble SEHARUSNYA sudah bertahan lewat swipe-Recents biasa sejak Batch 98
+     * (foreground+specialUse). Ditambah di sini murni sebagai lapisan re-assert defensif: kalau
+     * task removal memicu sistem menurunkan importance proses SESAAT sebelum benar-benar
+     * membunuhnya, panggil ulang [startForegroundWithNotification] (idempotent — sama seperti di
+     * [onCreate]) supaya notifikasi+status foreground ditegaskan ulang selagi proses MASIH hidup.
+     * `runCatching` (pola sama [BubbleBootReceiver], Batch 466) — ini dipanggil dari proses yang
+     * sudah punya Service hidup, BUKAN `startForegroundService()` dari luar, jadi seharusnya tidak
+     * kena `ForegroundServiceStartNotAllowedException`, tapi dibungkus tetap untuk jaga-jaga.
+     *
+     * **BATAS JUJUR (WAJIB dibaca sebelum lapor "masih hilang")**: log Batch 466 SUDAH
+     * MEMBUKTIKAN device user kena OEM App Standby/battery restriction yang bisa memblokir
+     * foreground service WALAU semua API resmi (foreground+specialUse+START_STICKY+boot-restart)
+     * sudah benar — lihat PROJECT_STATE.md Batch 466. Kalau OS/OEM membunuh PROSES secara
+     * langsung (bukan cuma task removal), callback [onTaskRemoved] ini TIDAK PERNAH sempat
+     * terpanggil sama sekali — TIDAK ADA kode aplikasi yang bisa mencegat itu, ini batasan
+     * arsitektur Android, bukan bug. Lapisan tambahan yang benar-benar menyentuh root cause itu:
+     * `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (lihat AndroidManifest.xml & MainActivity.kt's
+     * requestIgnoreBatteryOptimizationsIfNeeded, batch ini juga) — WAJIB user grant manual lewat
+     * dialog sistem, TIDAK bisa dipaksa dari kode. Sisanya (OEM "autostart"/"protected apps" list
+     * proprietary di luar API Android resmi) di luar jangkauan kode sama sekali — kalau device user
+     * masih agresif setelah ini, satu-satunya jalan tersisa adalah user whitelist manual lewat
+     * pengaturan baterai/autostart OEM masing-masing. **"100%" secara teknis TIDAK bisa dijanjikan
+     * dari kode manapun** — ini batas jujur, bukan batas usaha. */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        AppLogger.w("FloatingBubbleService", "onTaskRemoved — app di-swipe dari Recents, re-assert foreground")
+        runCatching { startForegroundWithNotification() }
+            .onFailure { AppLogger.e("FloatingBubbleService", "Re-assert foreground gagal di onTaskRemoved", it) }
     }
 
     override fun onDestroy() {
@@ -807,11 +854,26 @@ class FloatingBubbleService : Service() {
      * kena listener [setupDrag] yang terpasang di `bubble_album_art`; sentuhan di LUAR delegate
      * (termasuk seluruh area ke-4 tombol kontrol) 0 terpengaruh — anak/tombol SELALU menang
      * duluan untuk hit PERSIS di bounds-nya sendiri (dispatch Android baku), [TouchDelegate] cuma
-     * fallback untuk dead-space yang sebelumnya tidak diklaim siapa pun. Sisi kanan (arah tombol
-     * `bubble_prev`) sengaja dapat padding LEBIH KECIL dari sisi lain — gap asli cuma 6dp (lihat
-     * `bubble_mini_player.xml`), nilai konservatif dipilih SENGAJA biar tidak pernah mepet ke
-     * tombol, bukan cuma karena "toh aman secara teori". Dipanggil setelah layout pass (album art
-     * harus sudah ter-measure) — lihat pemanggil di [addBubbleView] & [expand]. */
+     * fallback untuk dead-space yang sebelumnya tidak diklaim siapa pun. Dipanggil setelah layout
+     * pass (album art harus sudah ter-measure) — lihat pemanggil di [addBubbleView] & [expand].
+     *
+     * **Koreksi Batch 471 [drag terasa "sulit/terbatas" pasca-scoping Batch 470]**: sisi kanan
+     * (arah tombol [bubble_prev]) sebelumnya cuma dapat +3dp dari gap asli 6dp (lihat
+     * `bubble_mini_player.xml`), dipilih "konservatif" waktu itu TAPI klaim sendiri di paragraf
+     * atas ("anak/tombol SELALU menang duluan di bounds-nya sendiri, TouchDelegate cuma fallback
+     * dead-space") sudah membuktikan margin ekstra itu tidak perlu — overlap rect delegate ke
+     * bounds tombol TIDAK PERNAH bisa mencuri sentuhan dari tombol (dispatch Android baku
+     * memprioritaskan child match PERSIS duluan, lepas dari apa pun isi rect TouchDelegate induk).
+     * Sisi kanan sekarang ambil FULL 6dp gap asli (0 lagi sisa dead-zone 3dp yang tidak
+     * terjangkau). Sisi kiri/atas/bawah TETAP di [ALBUM_ART_TOUCH_PAD_DP] lama — nilai itu SUDAH
+     * melebihi padding riil `bubble_root` (8dp, lihat XML), jadi sudah maksimal secara fisik untuk
+     * arsitektur "0 dp baru di XML" saat ini; menaikkannya lebih lanjut 0 efek (window WRAP_CONTENT
+     * pas di tepi child yang visible, tidak ada ruang sentuh lagi di luar itu — sentuhan di sana
+     * sudah tembus ke app di bawah, bukan lagi milik window ini). Kalau MASIH terasa kurang lega
+     * setelah ini: opsi berikutnya adalah menaikkan `android:padding` riil `bubble_root` di XML
+     * (breathing room fisik lebih besar, 1 file tambahan `bubble_mini_player.xml`, BELUM dilakukan
+     * batch ini — WAJIB konfirmasi user dulu, bukan tebakan, lihat RESUME POINT). 0 formula
+     * clamp/posisi/[screenBounds] disentuh (di luar cakupan guard Batch 469). */
     private fun applyAlbumArtTouchDelegate() {
         val expanded = expandedView ?: return
         val albumArt = expanded.findViewById<ImageView>(R.id.bubble_album_art) ?: return
@@ -1136,6 +1198,8 @@ class FloatingBubbleService : Service() {
         // [applyAlbumArtTouchDelegate]). Sisi kanan lebih kecil karena gap asli ke `bubble_prev`
         // cuma 6dp (lihat bubble_mini_player.xml) — nilai konservatif SENGAJA, bukan batas teori.
         private const val ALBUM_ART_TOUCH_PAD_DP = 10f
-        private const val ALBUM_ART_TOUCH_PAD_RIGHT_DP = 3f
+        // Batch 471 — dinaikkan dari 3f ke FULL 6dp (gap asli bubble_album_art→bubble_prev di
+        // bubble_mini_player.xml), lihat KDoc "Koreksi Batch 471" di applyAlbumArtTouchDelegate().
+        private const val ALBUM_ART_TOUCH_PAD_RIGHT_DP = 6f
     }
 }

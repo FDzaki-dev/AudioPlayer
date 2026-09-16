@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1111,12 +1112,36 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         context.startForegroundService(intent)
     }
 
+    // Batch 471 — lihat KDoc permission REQUEST_IGNORE_BATTERY_OPTIMIZATIONS di AndroidManifest.xml
+    // utk root cause (OEM App Standby/battery restriction, bukti Batch 466/467). Dipanggil HANYA
+    // dari 2 titik user AKTIF menyalakan toggle (bawah) — SENGAJA TIDAK dipanggil dari
+    // LaunchedEffect(Unit) auto-restart di bawah (itu jalan tiap app dibuka tanpa aksi user
+    // langsung; minta dialog sistem di situ = nge-nag tiap buka app kalau user pernah menolak,
+    // pola anti-pattern). isIgnoringBatteryOptimizations() dicek dulu supaya dialog sistem 0
+    // pernah muncul kalau sudah dikecualikan — bukan diminta ulang tiap toggle ON.
+    fun requestIgnoreBatteryOptimizationsIfNeeded(context: android.content.Context) {
+        val powerManager = context.getSystemService(PowerManager::class.java) ?: return
+        if (powerManager.isIgnoringBatteryOptimizations(context.packageName)) return
+        runCatching {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:${context.packageName}")
+                )
+            )
+        }
+        // Gagal (mis. OEM blokir action ini) = diam-diam skip, bubble TETAP nyala lewat
+        // startBubbleService() yang sudah dipanggil di pemanggil — dialog ini murni penambah
+        // keandalan, bukan syarat bubble bisa jalan sama sekali.
+    }
+
     val overlayPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
         if (Settings.canDrawOverlays(overlayPermissionContext)) {
             playerViewModel.setFloatingBubbleEnabled(true)
             startBubbleService(overlayPermissionContext)
+            requestIgnoreBatteryOptimizationsIfNeeded(overlayPermissionContext)
         }
         // Ditolak/dibatalkan: toggle di SettingsScreen tetap OFF (floatingBubbleEnabled tidak
         // pernah diset true di sini), tidak perlu penanganan tambahan.
@@ -1131,6 +1156,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         if (Settings.canDrawOverlays(overlayPermissionContext)) {
             playerViewModel.setFloatingBubbleEnabled(true)
             startBubbleService(overlayPermissionContext)
+            requestIgnoreBatteryOptimizationsIfNeeded(overlayPermissionContext)
         } else {
             overlayPermissionLauncher.launch(
                 Intent(

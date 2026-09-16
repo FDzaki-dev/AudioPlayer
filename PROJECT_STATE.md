@@ -12,6 +12,23 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 471 [2 laporan user: drag "sulit/terbatas" + "bubble survive 100%?"]**: 0
+tumpang tindih investigasi Batch 469 (screenBounds/clamp/posisi 0 disentuh). **3 file diubah**
+(pas batas 3 file/tugas): `FloatingBubbleService.kt`, `AndroidManifest.xml`, `MainActivity.kt`.
+1. **Drag diperlebar sisi kanan saja**: `ALBUM_ART_TOUCH_PAD_RIGHT_DP` 3f→6f (full gap asli ke
+   `bubble_prev`, terbukti aman krn tombol selalu menang bounds sendiri lepas dari overlap rect
+   delegate). Kiri/atas/bawah SUDAH maksimal secara fisik (padding riil `bubble_root` cuma 8dp,
+   `ALBUM_ART_TOUCH_PAD_DP`=10f sudah melebihi itu) — perbaikan lanjutan (naikkan padding XML
+   `bubble_mini_player.xml`) BELUM diterapkan, WAJIB tunggu konfirmasi user dulu apakah perbaikan
+   sisi-kanan-saja ini sudah cukup atau masih perlu breathing room lebih besar.
+2. **Bubble survive app-kill**: ditambah `onTaskRemoved` (re-assert foreground defensif, pola
+   `runCatching` sama `BubbleBootReceiver`) + `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
+   (diminta HANYA saat user aktif toggle ON, 0 nge-nag tiap buka app). **BATAS JUJUR eksplisit
+   ke user**: "100%" TIDAK bisa dijanjikan kode manapun — bukti Batch 466 (device user KENA OEM
+   App Standby/battery restriction walau API resmi sudah benar). Kalau OEM masih agresif setelah
+   grant dialog battery-optimization ini, sisanya (autostart/protected-apps proprietary OEM) di
+   luar jangkauan kode sama sekali, WAJIB user whitelist manual di pengaturan HP masing-masing.
+
 **Catatan Batch 470 [2 fitur baru dari user, 0 tumpang tindih investigasi Batch 469]**: user
 konfirmasi kliping landscape SEKARANG bekerja ("sudah bisa kliping dalam mode landscape
 sekalipun") — konfirmasi UMUM, BUKAN reproduksi protokol spesifik Batch 469 (drag ke tepi
@@ -1308,7 +1325,27 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 470. ZIP terakhir: `SONIX_v470.zip`. **1 file diubah** (dalam batas 3
+- Batch terakhir: 471. ZIP terakhir: `SONIX_v471.zip`. **3 file diubah** (pas batas 3
+  file/tugas): `FloatingBubbleService.kt`, `AndroidManifest.xml`, `MainActivity.kt`. Respons ke 2
+  laporan user (lihat "Catatan Batch 471" di atas untuk detail teknis): (1) drag touch-area sisi
+  kanan diperlebar 3f→6f dp (full gap asli); (2) `onTaskRemoved` re-assert defensif +
+  `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` on-demand saat toggle ON. **0 pernah menyentuh
+  [screenBounds]/formula clamp/posisi** — 0 tumpang tindih investigasi Batch 469 (masih terbuka
+  di bawah).
+- **WAJIB dari user sebelum lanjut fitur baru lain**:
+  (a) **Drag**: install APK baru, test drag dari album art lagi — apakah sekarang "cukup lega"
+      atau MASIH terasa sempit? Kalau MASIH sempit: opsi lanjutan adalah naikkan `android:padding`
+      riil `bubble_root` di `bubble_mini_player.xml` (1 file baru, breathing room fisik lebih
+      besar dari sekadar hit-test) — WAJIB user konfirmasi eksplisit mau opsi ini sebelum
+      dieksekusi (bukan tebakan), karena sedikit membesarkan ukuran visual pill.
+  (b) **Survive app-kill**: install APK baru, toggle bubble OFF lalu ON lagi dari Settings →
+      dialog sistem "Izinkan aktivitas di latar belakang?" WAJIB muncul (kalau device belum pernah
+      exempt) — user grant, LALU test: buka app lain, swipe SONIX dari Recents (jangan Force Stop
+      manual — itu memang TIDAK BISA disurvive kode apa pun, batasan OS by design) → cek apakah
+      bubble/notifikasi masih ada beberapa menit kemudian. Kirim hasil test (dialog muncul/tidak,
+      bubble survive/tidak) balik — **JANGAN asumsikan "sudah pasti survive"** tanpa konfirmasi
+      device fisik (pola sama pelajaran Batch 460-467: device nyata menang atas asumsi kode).
+- Batch 470 (sebelum 471). ZIP: `SONIX_v470.zip`. **1 file diubah** (dalam batas 3
   file/tugas): `FloatingBubbleService.kt`. 2 fitur baru dari user (lihat "Catatan Batch 470" di
   atas untuk detail): (1) cold-start fix `sendPlaybackAction`/`setupControls` (tap kontrol bubble
   segera setelah reboot, sebelum app/widget pernah dibuka, sekarang tetap bisa trigger restore
