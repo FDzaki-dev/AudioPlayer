@@ -1207,6 +1207,22 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
      * WAJIB supaya dismiss eksplisit user tidak dibangkitkan lagi oleh sync cold-start (b) di atas
      * pada proses berikutnya. */
     fun dismissMiniPlayer() {
+        // Batch 480 — "konfirmasi user" utk dismiss (sebelumnya destruktif, 0 jalan balik sama
+        // sekali). Snapshot dibaca DULU dari controller/uiState di main thread (pola SAMA PERSIS
+        // persistPlaybackState(): repeat/shuffle langsung dari controller SEBELUM apa pun
+        // diubah) — dipakai UndoableAction di bawah SAJA, BUKAN playbackStateStore (baris di
+        // bawah ini sendiri akan menulisnya kosong). Blok clear asli (9 baris) di bawah 0
+        // disentuh sama sekali.
+        val c = controller
+        val dismissedQueue = currentQueue
+        val dismissedIndex = c?.currentMediaItemIndex ?: _uiState.value.currentIndex
+        val dismissedPositionMs = c?.currentPosition?.coerceAtLeast(0L) ?: 0L
+        val dismissedRepeatMode = c?.repeatMode ?: Player.REPEAT_MODE_OFF
+        val dismissedShuffle = c?.shuffleModeEnabled ?: false
+        val dismissedSpeed = _uiState.value.playbackSpeed
+        val dismissedWasPlaying = c?.isPlaying ?: false
+        val dismissedTitle = _uiState.value.currentSong?.title
+
         controller?.stop()
         controller?.clearMediaItems()
         currentQueue = emptyList()
@@ -1223,6 +1239,42 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             shuffleEnabled = false,
             speed = 1f
         )
+
+        if (dismissedQueue.isNotEmpty()) {
+            val message = if (dismissedTitle != null) "\"$dismissedTitle\" dihentikan" else "Pemutaran dihentikan"
+            _undoableAction.value = UndoableAction(message) {
+                restoreDismissedPlayback(
+                    songs = dismissedQueue,
+                    index = dismissedIndex,
+                    positionMs = dismissedPositionMs,
+                    repeatMode = dismissedRepeatMode,
+                    shuffleEnabled = dismissedShuffle,
+                    speed = dismissedSpeed,
+                    wasPlaying = dismissedWasPlaying
+                )
+            }
+        }
+    }
+
+    /** Undo-half of [dismissMiniPlayer] (Batch 480) — pola SAMA PERSIS [reinsertIntoQueue]/
+     * [resumeFromSaved]: pulihkan queue+index+posisi+repeat/shuffle/speed dari snapshot in-memory
+     * yang diambil SEBELUM dismiss (bukan dari playbackStateStore, yang sudah ditulis kosong oleh
+     * dismissMiniPlayer() itu sendiri) lewat playQueue() yang SUDAH ADA — 0 API baru. Shuffle/
+     * repeat diset SEBELUM playQueue() (alasan sama persis komentar resumeFromSaved di atas).*/
+    private fun restoreDismissedPlayback(
+        songs: List<Song>,
+        index: Int,
+        positionMs: Long,
+        repeatMode: Int,
+        shuffleEnabled: Boolean,
+        speed: Float,
+        wasPlaying: Boolean
+    ) {
+        if (songs.isEmpty()) return
+        controller?.repeatMode = repeatMode
+        controller?.shuffleModeEnabled = shuffleEnabled
+        playQueue(songs, index.coerceIn(0, songs.size - 1), positionMs, autoPlay = wasPlaying)
+        controller?.setPlaybackSpeed(speed)
     }
 
     fun playQueue(songs: List<Song>, startIndex: Int, startPositionMs: Long = 0L, autoPlay: Boolean = true) {

@@ -12,6 +12,55 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 480 [instruksi eksplisit user: "sempurnakan mekanisme drag mini player (feedback,
+konfirmasi user, dll)"]**: sektor mini player disentuh SESUAI instruksi eksplisit user batch ini
+(bukan tebakan) — item WAJIB DITEST Batch 477 utk sektor ini ("swipe threshold → musik BERHENTI
+TOTAL") belum ada laporan device balik dari user, tapi TIDAK diasumsikan gagal (tidak ada laporan
+gagal juga) — dianggap baseline aktif-stabil sesuai kaidah "0 laporan gagal = lanjutkan" yang
+sudah dipakai project ini utk sektor lain (mis. bottom nav Batch 448 di bawah), fix Batch 477 itu
+sendiri 0 disentuh.
+
+**2 file diubah** (dalam batas 3 file/tugas): `MiniPlayerBar.kt`, `PlayerViewModel.kt`.
+1. **Feedback visual drag** (`MiniPlayerBar.kt`): `graphicsLayer` yang sudah membaca
+   `dismissOffsetPx` utk `translationX` (sejak Batch 476) diperluas baca nilai yang SAMA utk
+   `alpha`/`scaleX`/`scaleY` (progress 0→1 di 0→120px, dikapkan di 1 persis di titik threshold —
+   drag lebih jauh dari situ TIDAK di-clamp posisinya per desain Batch 476, tapi visual feedback
+   berhenti menambah di titik itu) — bar meredup+mengecil halus mengikuti jari, sinyal "akan
+   hilang" SELAMA drag, bukan cuma snap di akhir. Dibaca LANGSUNG di lambda `graphicsLayer` (pola
+   SAMA PERSIS `translationX` yang sudah ada + rasional Batch 397), jadi 0 recomposition
+   tambahan tiap frame drag, cuma invalidasi layer.
+2. **Haptic 2-tahap** (`MiniPlayerBar.kt`): tick `TextHandleMove` (beda dari `LongPress` yang
+   sudah ada) ditambah SEKALI persis saat `dismissOffsetPx` melewati threshold 120px SELAGI masih
+   digeser (flag `thresholdHapticFired` per-gesture) — real-time sinyal "lepas sekarang = batal
+   terjadi", terpisah dari `LongPress` yang sudah ada di `!change.pressed` (itu tetap konfirmasi
+   dismiss BENERAN terjadi saat jari diangkat, 0 disentuh). 0 threshold/formula/spring gesture yg
+   sudah ada (120px, damping, dsb, Batch 476/477) disentuh sama sekali.
+3. **Konfirmasi user via Undo** (`PlayerViewModel.kt`): `dismissMiniPlayer()` sebelumnya
+   destruktif permanen (stop total + queue+state dikosongkan, 0 jalan balik — lihat komentar
+   Batch 476 di fungsi itu). Sekarang snapshot (queue, index, posisi, repeat, shuffle, speed,
+   isPlaying) diambil DULU dari controller/uiState di main thread SEBELUM 9 baris clear asli
+   (0 diubah sama sekali), lalu dipasang lewat `UndoableAction` — infra yg SUDAH ADA & dipakai
+   `removeFromQueue()`/`removeSongFromPlaylist()`/`removeAutoPlaylist()` (0 API baru, 0 pola
+   baru), otomatis muncul sbg Snackbar "Urungkan" lewat `LaunchedEffect(undoableAction)` yang
+   SUDAH ADA di `MainActivity.kt` — **0 baris `MainActivity.kt` diubah sama sekali** (di luar
+   hitungan 2 file di atas, bukan salah satu dari 3 file/tugas). Fungsi baru
+   `restoreDismissedPlayback()` (private) pulihkan lewat `playQueue()` yang sudah ada, pola sama
+   persis `resumeFromSaved()` (shuffle/repeat diset SEBELUM `playQueue()`, alasan sama).
+
+**0 diverifikasi CI/device Batch 480** — 0 env Android nyata/device fisik/compiler Kotlin di sesi
+ini (balance brace/paren/bracket kedua file: `MiniPlayerBar.kt` `{}` 32/32 `()` 180/180, tanpa
+`[]`; `PlayerViewModel.kt` `{}` 240/240 `()` 971/971 `[]` 37/37). **WAJIB DITEST user**:
+1. Swipe mini player kiri/kanan PELAN (belum lepas jari) → bar meredup+mengecil halus mengikuti
+   jari; tick getar HALUS terasa SEKALI persis saat lewat titik ~120px (sebelum lepas jari).
+2. Lepas jari SETELAH tick itu → bar hilang seperti biasa (getar `LongPress` seperti sebelumnya)
+   DAN Snackbar "\"<judul lagu>\" dihentikan" + tombol "Urungkan" muncul di bawah.
+3. Tap "Urungkan" pada Snackbar itu → lagu yang sama main lagi persis dari posisi/repeat/
+   shuffle/kecepatan sebelum di-dismiss (bukan dari awal lagu / posisi 0).
+4. Swipe PELAN tidak sampai threshold, lepas jari → bar pegas balik ke posisi semula seperti
+   biasa (regresi Batch 476/477), 0 tick/Snackbar muncul (tick HANYA saat threshold terlampaui).
+5. Tap biasa (0 geser) di mini player MASIH buka Now Playing seperti biasa — 0 regresi.
+Kirim hasil test ini balik sebelum sektor mini player disentuh lagi.
+
 **Catatan Batch 479 [user kirim log Diagnostik sesuai WAJIB RESUME POINT Batch 478]**: root cause
 bug (2) Batch 477 ("drag lintas tab, bottom nav diam") KETEMU dari data log (bukan tebakan) — 4/4
 baris `TabSwipe` WAJIB (content Box composed, pointerInput coroutine mulai, onDragStart,
@@ -1587,7 +1636,21 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 479. ZIP terakhir: `SONIX_v479.zip`. **1 file diubah** (dalam batas 3
+- Batch terakhir: 480. ZIP terakhir: `SONIX_v480.zip`. **2 file diubah** (dalam batas 3
+  file/tugas): `MiniPlayerBar.kt`, `PlayerViewModel.kt` — instruksi eksplisit user "sempurnakan
+  mekanisme drag mini player (feedback, konfirmasi user, dll)", lihat "Catatan Batch 480" di atas
+  untuk detail penuh. Ringkas: (1) feedback visual (alpha+scale mengikuti drag) + haptic 2-tahap
+  (tick real-time di threshold, terpisah dari `LongPress` konfirmasi dismiss); (2) dismiss kini
+  bisa di-"Urungkan" lewat Snackbar (infra `UndoableAction` yang sudah ada, `MainActivity.kt` 0
+  disentuh). 0 threshold/formula/spring gesture yang sudah ada (120px, damping, dsb) disentuh.
+  **0 diverifikasi CI/device Batch 480** — 0 env Android nyata/device fisik/compiler Kotlin di
+  sesi ini (balance brace/paren/bracket: lihat "Catatan Batch 480" di atas untuk angka lengkap).
+  **WAJIB DITEST user sebelum sektor mini player disentuh lagi** (daftar lengkap 5 poin di
+  "Catatan Batch 480" di atas): swipe pelan → bar meredup+mengecil + tick getar di ~120px →
+  lepas jari → bar hilang + Snackbar "Urungkan" muncul → tap "Urungkan" → lagu main lagi persis
+  dari posisi semula (bukan dari awal). Kirim hasil test ini balik sebelum sektor mini player
+  disentuh lagi.
+- Batch 479 (sebelum 480). ZIP: `SONIX_v479.zip`. **1 file diubah** (dalam batas 3
   file/tugas): `MainActivity.kt` — FIX root cause bug (2) Batch 477 ("drag lintas tab, bottom nav
   diam"), lihat "Catatan Batch 479" di atas untuk detail penuh. Ringkas: `navPillIndexAnim`
   di-hoist ke scope `AppNavHost` + disinkronkan juga dari `onDragEnd` swipe KONTEN (sebelumnya

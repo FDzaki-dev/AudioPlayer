@@ -152,7 +152,7 @@ memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 - Tab **Lagu** (semua lagu, urut judul) dan **Folder** (dikelompokkan per folder, folder = playlist)
 - Playback background via foreground service (Media3 `MediaLibraryService`, mendukung Playback Resumption resmi) + kontrol di notification/lock screen
 - Now Playing: album art, seek bar, shuffle, repeat (off/all/one), play/pause/next/prev
-- Mini player persisten di bagian bawah layar — bisa **di-swipe (kiri/kanan) untuk dibatalkan** (Batch 476): playback berhenti total & antrean dikosongkan, bukan cuma bar-nya yang hilang
+- Mini player persisten di bagian bawah layar — bisa **di-swipe (kiri/kanan) untuk dibatalkan** (Batch 476): playback berhenti total & antrean dikosongkan, bukan cuma bar-nya yang hilang. **Batch 480**: bar meredup+mengecil halus mengikuti jari selama digeser, tick getar halus tepat saat melewati titik pembatalan, dan aksi ini kini bisa **diurungkan** lewat tombol "Urungkan" di Snackbar setelahnya (memulihkan lagu, posisi, repeat/shuffle/kecepatan persis seperti sebelumnya)
 - Dark mode default
 - Pencarian (search) judul/artis di Perpustakaan
 - Sleep timer (10/15/30/45/60 menit)

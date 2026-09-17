@@ -117,7 +117,22 @@ fun MiniPlayerBar(
 
     Box(
         modifier = Modifier
-            .graphicsLayer { translationX = dismissOffsetPx.floatValue }
+            .graphicsLayer {
+                // Batch 480 — feedback visual drag (murni tambahan, 0 threshold/formula gesture
+                // di bawah disentuh): alpha+scale dibaca LANGSUNG dari dismissOffsetPx di sini
+                // (pola SAMA PERSIS translationX di baris ini sejak awal, rasional Batch 397 di
+                // atas) — cuma invalidasi layer, 0 recomposition tambahan tiap frame drag.
+                // Dikapkan di progress 1f (nilai di titik threshold 120px) supaya drag jauh
+                // melebihi threshold (sengaja 0 di-clamp, lihat komentar Batch 476) tidak bikin
+                // bar nyaris tak terlihat/mengecil drastis selagi masih digeser.
+                val offset = dismissOffsetPx.floatValue
+                translationX = offset
+                val dragProgress = (abs(offset) / 120f).coerceIn(0f, 1f)
+                alpha = 1f - dragProgress * 0.55f
+                val scale = 1f - dragProgress * 0.06f
+                scaleX = scale
+                scaleY = scale
+            }
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .then(
@@ -173,6 +188,7 @@ fun MiniPlayerBar(
                     totalDismissDragPx.floatValue = 0f
                     dismissScope.launch { dismissOffset.stop() }
                     var dragging = false
+                    var thresholdHapticFired = false
                     while (true) {
                         val event = awaitPointerEvent(pass = PointerEventPass.Initial)
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
@@ -184,6 +200,17 @@ fun MiniPlayerBar(
                             change.consume()
                             totalDismissDragPx.floatValue += dragAmount
                             dismissOffsetPx.floatValue = totalDismissDragPx.floatValue
+                            // Batch 480 — tick HALUS real-time SEKALI persis saat melewati
+                            // threshold 120px yang SAMA dgn pengecekan di !change.pressed di
+                            // bawah (0 angka baru): sinyal "lepas sekarang = dismiss" SELAGI
+                            // masih menggeser, terpisah dari haptic LongPress yg sudah ada di
+                            // bawah (itu konfirmasi dismiss BENERAN terjadi saat jari diangkat).
+                            if (!thresholdHapticFired &&
+                                (dismissOffsetPx.floatValue > 120f || dismissOffsetPx.floatValue < -120f)
+                            ) {
+                                thresholdHapticFired = true
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
                         }
                         if (!change.pressed) {
                             if (dragging) {

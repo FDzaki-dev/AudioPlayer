@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 480 — Mini player: feedback visual+haptic drag lebih kaya, dismiss bisa di-"Urungkan"
+Instruksi eksplisit user: sempurnakan mekanisme drag mini player (feedback, konfirmasi user, dll).
+
+Fix/tambahan (`MiniPlayerBar.kt`, `PlayerViewModel.kt`, 2 file):
+- Bar kini meredup (alpha) & mengecil halus (scale) mengikuti jari selama drag swipe-dismiss,
+  progress 0→1 di rentang 0→120px yang sama dengan threshold dismiss yang sudah ada (Batch 476),
+  dikapkan di titik itu supaya drag lebih jauh (sengaja tidak di-clamp posisinya) tidak membuat
+  bar nyaris tak terlihat selagi masih dipegang. Dibaca langsung di `graphicsLayer` yang sudah ada
+  (pola sama `translationX`), jadi tanpa recomposition tambahan tiap frame drag.
+- Getar (haptic) kini 2 tahap: tick halus `TextHandleMove` sekali persis saat melewati threshold
+  120px SELAGI masih digeser (sinyal real-time "lepas sekarang = batal"), terpisah dari getar
+  `LongPress` yang sudah ada saat dismiss benar-benar terjadi di pelepasan jari.
+- Dismiss mini player (sebelumnya permanen tanpa jalan balik) kini menampilkan Snackbar
+  "\"<judul lagu>\" dihentikan" dengan tombol "Urungkan" — memulihkan queue, posisi, repeat,
+  shuffle, dan kecepatan putar persis seperti sebelum dismiss. Memakai infrastruktur
+  `UndoableAction` yang sudah dipakai fitur hapus-dari-antrean/hapus-playlist (0 API/pola baru,
+  0 baris `MainActivity.kt` diubah — Snackbar-nya sudah otomatis tertangani di sana).
+- 0 threshold/formula/spring gesture yang sudah ada (120px, spring MediumBouncy/Low, dsb — Batch
+  476/477) disentuh sama sekali; 0 diverifikasi CI/device sesi ini (0 env Android nyata/compiler
+  Kotlin). Wajib ditest user sebelum sektor mini player disentuh lagi — lihat `PROJECT_STATE.md`.
+
 ## Batch 479 — FIX: root cause "drag lintas tab, bottom nav diam" (Batch 477 bug 2) ketemu dari log
 User kirim log Diagnostik `TabSwipe` sesuai WAJIB RESUME POINT Batch 478 (drag berulang di tab
 Pengaturan). Semua 4 baris instrumentasi wajib ADA dan `onDragEnd` menghitung `targetRoute` benar
