@@ -1,5 +1,90 @@
 # Changelog
 
+## Batch 477 — Fix: swipe-cancel mini player (Batch 476) & drag-lintas-tab (Batch 435) 0 berefek
+Bug report user: screenshot mini player (0 tanda drag/cancel) + screen recording (drag konten
+lintas tab, bottom nav diam total). Ditemukan lewat review kode, root cause KEDUANYA sudah
+didokumentasikan sebagai pola bahaya di file yang sama tapi belum diterapkan ke titik yang kena.
+
+**2 file diubah** (dalam batas 3 file/tugas): `MiniPlayerBar.kt`, `MainActivity.kt`.
+
+**(1) `MiniPlayerBar.kt` — swipe-cancel 0 berefek sama sekali**: root cause — `Box` yang sama
+punya DUA gesture recognizer independen: `pointerInput(Unit){detectHorizontalDragGestures(...)}`
+(Batch 476, swipe-dismiss) DIDAFTAR SEBELUM `.clickable(onClick=onExpand)` di modifier chain.
+Keduanya sama-sama listen di `PointerEventPass.Main` (default). Main pass berjalan child→parent;
+`.clickable()` ("lebih dalam"/belakangan di chain) memproses tiap `PointerInputChange` LEBIH DULU
+daripada drag detector ("lebih luar"), SEBELUM drag detector sempat `change.consume()` di
+gilirannya sendiri pada pass yang SAMA — akibatnya `.clickable()` TIDAK PERNAH melihat perubahan
+yang sudah ter-consume walau user sudah menggeser jauh melewati threshold 120px: tap-nya menang
+mutlak, `onExpand()` selalu terpanggil, `onDismiss()` efeknya 0 kelihatan (baik gerakan visual
+maupun hasil akhir). Root cause identik dengan bug yang sudah pernah diperbaiki di
+`NowPlayingScreen.kt` Batch 350 (vinyl album art: swipe vertikal brightness/volume vs swipe
+horizontal next/prev, 2 gesture recognizer bersaing di 1 titik sentuh).
+
+Fix: `detectHorizontalDragGestures(...)` diganti loop manual (`awaitEachGesture` +
+`awaitFirstDown(pass = PointerEventPass.Initial)` + `awaitPointerEvent(pass =
+PointerEventPass.Initial)`), pola IDENTIK dengan arbitrase Batch 350. `PointerEventPass.Initial`
+berjalan top-down, SEBELUM pass Main manapun (termasuk punya `.clickable()`) — jadi blok ini
+selalu dapat giliran duluan. Selama akumulasi gerak horizontal < `viewConfiguration.touchSlop`:
+0 `change.consume()` sama sekali (event lewat apa adanya ke `.clickable()` di Main pass — tap
+plain + ripple bawaan tetap 100% normal, 0 regresi ke item (c) resume point Batch 476: "tap biasa
+masih membuka Now Playing"). Begitu akumulasi > touchSlop: barulah tiap `change` di-`consume()`
+DI SINI (Initial pass) — `.clickable()`'s internal tap detector (Main pass, jalan belakangan)
+otomatis melihat change yang sudah consumed dan cancel sendiri (mekanisme baku Compose gesture
+system, sama seperti auto-cancel vinyl di Batch 350), termasuk ripple-nya ikut batal otomatis
+tanpa kode tambahan. Threshold 120px, `spring(dampingRatio = MediumBouncy, stiffness = Low)`
+snapback, dan haptic `LongPress` saat dismiss — SEMUA formula Batch 476 dipertahankan 1:1, 0
+diubah, hanya "wasit" gesture-nya yang dipindah. Import disesuaikan: `detectHorizontalDragGestures`
+(sudah tidak dipakai) diganti `awaitEachGesture`/`awaitFirstDown` (`androidx.compose.foundation.
+gestures`) + `PointerEventPass` (`androidx.compose.ui.input.pointer`) + `kotlin.math.abs`.
+
+**(2) `MainActivity.kt` — drag-lintas-tab-konten 0 gerakkan bottom nav sama sekali**: root cause —
+`Modifier.pointerInput(currentRoute) { detectHorizontalDragGestures(...) }` (Batch 435, drag YANG
+DIMULAI DI KONTEN layar/NavHost, bukan Batch 442's drag-di-atas-bar-tab yang sudah pakai key
+`Unit` dengan benar) di-key pakai `currentRoute` — sebuah `String` yang BERUBAH tepat di dalam
+`onDragEnd`-nya sendiri (`navController.navigate(targetRoute)` mengubah `currentBackStackEntry`).
+Begitu key berubah, Compose men-cancel coroutine gesture lama dan membuat instance baru di
+komposisi berikutnya. Untuk drag SATU gesture yang berpindah PALING BANYAK 1 tab: 0 kelihatan
+(restart terjadi SETELAH `onDragEnd` selesai, gesture sudah tuntas). Tapi untuk **drag kontinu
+yang melintasi LEBIH dari 1 batas tab tanpa mengangkat jari** — kasus yang secara harfiah
+dilaporkan user ("drag langsung lintas tab") — begitu batas tab PERTAMA terlewati dan `navigate()`
+pertama terpicu, `currentRoute` berubah → instance coroutine lama (yang masih di tengah menerima
+event `ACTION_MOVE` dari jari yang SAMA, belum terangkat) di-cancel, instance BARU cuma
+menjalankan `awaitFirstDown()` — padahal `ACTION_DOWN` untuk sentuhan itu sudah lewat sejak awal
+gesture, tidak akan pernah datang lagi selama sisa gesture yang sama. Akibatnya: `onHorizontalDrag`
+tidak pernah terpanggil lagi untuk SISA drag itu — `tabDragOffsetPx` (yang men-drive baik nudge
+visual konten Batch 435 MAUPUN magnify label bottom-nav `tabMagnifyFocus()` Batch 437) beku total,
+dan navigasi tab berikutnya TIDAK terjadi lagi walau jari terus bergerak melewati batas tab
+kedua/ketiga — persis gejala "bottom nav 0 bergerak sama sekali" yang dilaporkan. Root cause ini
+SUDAH didokumentasikan sebagai pola bahaya eksplisit di file yang sama (komentar panjang dekat
+deklarasi `currentRouteState`/`homeTabInteraction`, ditulis saat Batch 442 sengaja memilih key
+`Unit` + `rememberUpdatedState` untuk drag-di-atas-bar-tab) — namun belum pernah diterapkan balik
+ke titik Batch 435 yang lebih lama.
+
+Fix: key `pointerInput` diganti `Unit` (coroutine gesture hidup terus lintas tab, tidak lagi
+restart di tengah drag). `currentRoute` yang dibaca langsung di dalam closure (di `onDragEnd`,
+untuk menghitung `fromIdx`) diganti baca dari `rememberUpdatedState(currentRoute)` — WAJIB, sebab
+closure key-`Unit` cuma dibuat sekali, baca `currentRoute` polos di dalamnya akan beku ke nilai
+komposisi pertama (persis alasan yang sama yang mendasari `currentRouteState` Batch 442). `State`
+Batch 442 yang sudah ada TIDAK dipakai ulang — scope-nya di dalam lambda `bottomBar =` milik
+`Scaffold` (dekat `NavigationBar`), sudah di luar jangkauan lambda `content = { ... }` tempat Box
+NavHost/drag-konten ini berada — jadi instance BARU `contentSwipeRouteState` dideklarasikan
+lokal, scope-nya sendiri, 0 menyentuh/mengganti yang lama. 0 formula/threshold 120px/damping
+0.3f/clamp ±40px Batch 435/437 diubah — murni pola sinkronisasi state yang dipindah.
+
+**Belum diverifikasi/teori sekunder (0 dikerjakan batch ini)**: video bukti user tidak 100% pasti
+menunjukkan drag dimulai di area kosong konten vs di atas row horizontal-scrollable (`Mix`/
+`Favorit` di Beranda, chip filter Library) — kalau titik sentuh persis di atas row itu, LazyRow
+miliknya sendiri (descendant, Main pass duluan) bisa menelan drag horizontal SEBELUM sampai ke
+pointerInput ancestor manapun, independen total dari fix keying di atas. Ini soal ARBITRASE
+gesture terpisah (butuh `PointerEventPass.Initial` juga di titik lain / exclusion zone), BUKAN
+root cause yang sama — sengaja TIDAK ditebak/dikerjakan tanpa konfirmasi titik sentuh persis dari
+user (pola "JANGAN tebak tanpa data" konsisten sepanjang project, lihat riwayat Batch 461-464).
+Lihat `PROJECT_STATE.md` § `[RESUME POINT]` untuk protokol test lengkap.
+
+**0 diverifikasi CI/device Batch 477** — review manual: balance brace/paren/bracket `Mini-
+PlayerBar.kt` `{}` 31/31 `()` 168/168; `MainActivity.kt` `{}` 337/337 `()` 1229/1229 `[]` 3/3.
+0 env Android nyata/device fisik/compiler Kotlin di sesi ini.
+
 ## Batch 476 — Mini player bisa dicancel + sinkronisasi eksternal/cold-start ke Mini Player Bar
 Instruksi baru user, di luar sektor bubble Batch 475 (target sekarang UI dalam-app:
 `MiniPlayerBar`/`PlayerViewModel`, bukan floating bubble luar-app).

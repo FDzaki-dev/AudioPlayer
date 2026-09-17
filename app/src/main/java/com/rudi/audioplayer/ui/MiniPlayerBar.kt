@@ -14,7 +14,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,6 +57,7 @@ import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.Radius
+import kotlin.math.abs
 
 @Composable
 fun MiniPlayerBar(
@@ -143,38 +146,63 @@ fun MiniPlayerBar(
             // the only fill it gets.
             .then(if (isSkeu) Modifier else Modifier.frostedGlass())
             .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragStart = {
-                        totalDismissDragPx.floatValue = 0f
-                        dismissScope.launch { dismissOffset.stop() }
-                    },
-                    onDragEnd = {
-                        if (totalDismissDragPx.floatValue > 120f || totalDismissDragPx.floatValue < -120f) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onDismiss()
+                // Batch 477 — FIX BUG (laporan user: "mini player nya gak ada drag/button cancel
+                // sama sekali"): root cause SAMA PERSIS dgn Batch 350 (NowPlayingScreen.kt, vinyl
+                // vertikal-vs-horizontal) — 2 gesture recognizer terpisah (drag-dismiss di sini vs
+                // tap-expand milik .clickable() di bawah) bersaing di 1 titik sentuh yang sama, 0
+                // wasit tunggal. `detectHorizontalDragGestures` (lama) & `.clickable()` SAMA-SAMA
+                // jalan di pass Main (default) — Main pass urut child→parent, `.clickable()`
+                // (posisi lebih "dalam"/belakangan di modifier chain) SELALU lihat tiap change
+                // LEBIH DULU sebelum drag detector (lebih "luar") sempat consume() di gilirannya
+                // sendiri — akibatnya `.clickable()` TIDAK PERNAH melihat change yang sudah
+                // di-consume, tap-nya menang mutlak, swipe kelihatan 0 efek sama sekali.
+                // Fix: pola IDENTIK Batch 350 — wasit dipindah ke `PointerEventPass.Initial` (jalan
+                // LEBIH DULU, top-down, SEBELUM pass Main manapun termasuk punya `.clickable()`).
+                // Selama akumulasi gerak < touchSlop: 0 consume sama sekali (tap plain lolos utuh
+                // ke `.clickable()` di bawah — onExpand+ripple normal, 0 regresi item (c) resume
+                // point Batch 476). Begitu > touchSlop: barulah tiap change di-consume() DI SINI —
+                // `.clickable()` otomatis cancel sendiri begitu lihat change yang sudah consumed
+                // (mekanisme baku Compose, SAMA seperti vinyl auto-cancel Batch 350), ripple ikut
+                // batal otomatis tanpa kode tambahan. Formula/threshold 120px/spring MediumBouncy-
+                // Low/haptic Batch 476 0 disentuh sama sekali, murni pindah wasit gesture-nya —
+                // `detectHorizontalDragGestures` diganti loop manual krn API bawaan itu 0 overload
+                // yang terima `pass=`.
+                val slop = viewConfiguration.touchSlop
+                awaitEachGesture {
+                    val down = awaitFirstDown(pass = PointerEventPass.Initial)
+                    totalDismissDragPx.floatValue = 0f
+                    dismissScope.launch { dismissOffset.stop() }
+                    var dragging = false
+                    while (true) {
+                        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        val dragAmount = change.position.x - change.previousPosition.x
+                        if (!dragging) {
+                            totalDismissDragPx.floatValue += dragAmount
+                            if (abs(totalDismissDragPx.floatValue) > slop) dragging = true
                         } else {
-                            dismissScope.launch {
-                                dismissOffset.snapTo(dismissOffsetPx.floatValue)
-                                dismissOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) {
-                                    dismissOffsetPx.floatValue = value
+                            change.consume()
+                            totalDismissDragPx.floatValue += dragAmount
+                            dismissOffsetPx.floatValue = totalDismissDragPx.floatValue
+                        }
+                        if (!change.pressed) {
+                            if (dragging) {
+                                if (totalDismissDragPx.floatValue > 120f || totalDismissDragPx.floatValue < -120f) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onDismiss()
+                                } else {
+                                    dismissScope.launch {
+                                        dismissOffset.snapTo(dismissOffsetPx.floatValue)
+                                        dismissOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) {
+                                            dismissOffsetPx.floatValue = value
+                                        }
+                                    }
                                 }
                             }
+                            break
                         }
-                    },
-                    onDragCancel = {
-                        dismissScope.launch {
-                            dismissOffset.snapTo(dismissOffsetPx.floatValue)
-                            dismissOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) {
-                                dismissOffsetPx.floatValue = value
-                            }
-                        }
-                    },
-                    onHorizontalDrag = { change, dragAmount ->
-                        totalDismissDragPx.floatValue += dragAmount
-                        change.consume()
-                        dismissOffsetPx.floatValue = totalDismissDragPx.floatValue
                     }
-                )
+                }
             }
             .clickable(onClick = onExpand)
     ) {

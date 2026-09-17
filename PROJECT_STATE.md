@@ -12,6 +12,49 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 477 [bug report user (screenshot mini player + screen recording): (1) swipe-cancel
+mini player Batch 476 0 berefek sama sekali; (2) drag lintas-tab konten 0 gerakkan bottom nav]**:
+2 bug DI LUAR sektor mana pun yang tertutup, ditemukan lewat REVIEW KODE (bukan tebakan) — root
+cause KEDUANYA sudah pernah didokumentasikan sebagai pola bahaya di file yang sama, tapi belum
+diterapkan ke titik yang kena batch ini.
+
+**2 file diubah** (dalam batas 3 file/tugas): `MiniPlayerBar.kt`, `MainActivity.kt`.
+- **(1) Mini player swipe-cancel 0 berefek**: root cause SAMA PERSIS Batch 350
+  (NowPlayingScreen.kt) — `pointerInput{detectHorizontalDragGestures}` (Batch 476) & `.clickable
+  (onExpand)` 2 gesture recognizer terpisah bersaing 1 titik sentuh tanpa wasit, SAMA-SAMA pass
+  Main (default) → `.clickable()` (lebih dalam di chain) SELALU proses change LEBIH DULU sebelum
+  drag detector (lebih luar) sempat consume() gilirannya — clickable TIDAK PERNAH lihat change
+  ter-consume, tap menang mutlak, swipe 0 efek visual sama sekali. Fix: `detectHorizontalDrag-
+  Gestures` diganti loop manual (`awaitEachGesture`/`awaitFirstDown`/`awaitPointerEvent`) didaftar
+  di `PointerEventPass.Initial` (jalan sebelum Main manapun) — pola IDENTIK Batch 350, 0 teori
+  baru. Sebelum touchSlop terlampaui 0 consume (tap+ripple `.clickable()` tetap utuh, 0 regresi
+  item (c) resume point Batch 476); begitu terlampaui baru consume di sini, `.clickable()` auto-
+  cancel sendiri (mekanisme baku Compose). Formula threshold 120px/spring MediumBouncy-Low/haptic
+  Batch 476 0 disentuh.
+- **(2) Drag lintas-tab 0 gerakkan bottom nav**: root cause — `pointerInput(currentRoute)` (Batch
+  435, drag DI KONTEN layar, BUKAN drag-di-atas-bar-tab Batch 442 yang terpisah/sudah benar) di-key
+  string yang BERUBAH begitu `navigate()` jalan di `onDragEnd` → Compose cancel+restart coroutine
+  gesture di komposisi berikutnya. Utk drag 1 gesture yang cuma lompat 1 tab: 0 kelihatan (restart
+  terjadi SETELAH gesture kelar). Utk **drag kontinu yang lintas >1 batas tab tanpa angkat jari**:
+  begitu batas tab pertama terlewati, instance lama mati, instance baru cuma `awaitFirstDown()` —
+  down utk jari yang SUDAH menekan sejak awal TIDAK PERNAH datang lagi, SISA drag itu 0 diproses
+  (tabDragOffsetPx/tabMagnifyFocus/nudge konten beku total, pill/label bottom nav 0 gerak lagi) —
+  PERSIS bug class yang sudah didokumentasikan sbg alasan `currentRouteState`/key-`Unit` di
+  `pointerInput` drag-di-atas-bar Batch 442 (komentar di dekat deklarasi `homeTabInteraction`),
+  tapi belum diterapkan ke titik Batch 435 ini. Fix: key diganti `Unit` + instance BARU
+  `rememberUpdatedState(currentRoute)` scope-lokal (`currentRouteState` Batch 442 TIDAK bisa dipakai
+  ulang — scope-nya di lambda `bottomBar=` Scaffold, di luar jangkauan lambda `content=` ini). 0
+  formula/threshold 120px/damping 0.3f/clamp ±40px Batch 435/437 disentuh.
+- **CATATAN BELUM DIVERIFIKASI (teori sekunder, item (2))**: video bukti user menunjukkan titik
+  sentuh kemungkinan di ATAS row horizontal (`Mix`/`Favorit` Beranda, atau chip filter Library) —
+  row itu LazyRow yang scrollable sendiri, bisa "menelan" drag horizontal duluan (child menang
+  Main-pass) SEBELUM sampai ke pointerInput ancestor manapun, independen dari fix keying di atas.
+  Fix batch ini TIDAK menyentuh soal ini (butuh konfirmasi user dulu titik sentuh persis — pola
+  "JANGAN tebak tanpa data" konsisten sepanjang project). Lihat `[RESUME POINT]`.
+- **0 diverifikasi CI/device Batch 477** — review manual (balance brace/paren/bracket: lihat
+  `CHANGELOG.md` § Batch 477 untuk angka persis tiap file), 0 env Android nyata/device fisik/
+  compiler Kotlin di sesi ini. **WAJIB DITEST user** (lihat `[RESUME POINT]` di bawah).
+
 **Catatan Batch 476 [instruksi baru user: mini player bisa dicancel + sinkronisasi eksternal/
 cold-start ke Mini Player Bar]**: 2 permintaan baru user, DI LUAR sektor bubble Batch 475 (target
 sekarang `MiniPlayerBar.kt`/`PlayerViewModel.kt` — UI dalam-app, bukan floating bubble luar-app).
@@ -1491,7 +1534,30 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 476. ZIP terakhir: `SONIX_v476.zip`. **3 file diubah** (dalam batas 3
+- Batch terakhir: 477. ZIP terakhir: `SONIX_v477.zip`. **2 file diubah** (dalam batas 3
+  file/tugas): `MiniPlayerBar.kt`, `MainActivity.kt` — lihat "Catatan Batch 477" di atas. Ringkas:
+  (1) swipe-cancel mini player Batch 476 diperbaiki (wasit gesture dipindah ke
+  `PointerEventPass.Initial`, pola sama Batch 350); (2) drag-lintas-tab-konten Batch 435 diperbaiki
+  (`pointerInput` key `currentRoute`→`Unit` + `rememberUpdatedState`, pola sama Batch 442).
+  **0 diverifikasi CI/device sesi ini.**
+  **WAJIB DITEST user sebelum lanjut fitur baru lain**:
+  (a) swipe mini player kiri/kanan lewat threshold → bar hilang + musik BERHENTI TOTAL (regresi
+      test Batch 476 (a)/(b)/(c) — WAJIB re-test, belum pernah dikonfirmasi user sama sekali);
+  (b) tap biasa (0 geser) di mini player MASIH buka Now Playing + ripple normal — 0 regresi;
+  (c) di Beranda/Perpustakaan/Pengaturan: swipe horizontal PELAN dimulai dari area KOSONG (bukan di
+      atas row/carousel/chip manapun) → label tab tujuan harus MEMBESAR bertahap mengikuti jari
+      (efek magnify, Batch 437) SELAMA drag, bukan cuma snap di akhir;
+  (d) drag horizontal PANJANG dalam 1 gesture (jari 0 terangkat) yang lintas LEBIH dari 1 batas
+      tab (mis. Beranda→Pengaturan lewat Perpustakaan) → magnify/nudge harus tetap hidup terus di
+      SELURUH drag, bottom nav ikut berpindah tiap batas tab terlewati, 0 macet di tab kedua;
+  (e) ULANGI (c)/(d) tapi mulai drag PERSIS DI ATAS row "Mix"/"Favorit" (Beranda) atau chip
+      filter (Library) → kalau MASIH 0 efek di sini walau (c)/(d) sudah benar, LAPORKAN balik
+      (lihat "CATATAN BELUM DIVERIFIKASI" Batch 477 di atas — teori sekunder LazyRow-menelan-
+      drag, fix TERPISAH belum dikerjakan, prioritas sesi berikutnya kalau dikonfirmasi);
+  (f) drag di ATAS bar tab itu sendiri (Batch 442, bukan konten) — pastikan 0 regresi, masih
+      jalan seperti biasa (0 disentuh batch ini).
+  Kirim hasil test ini balik sebelum sektor mini player/tab-navigation disentuh lagi.
+- Batch 476 (sebelum 477). ZIP: `SONIX_v476.zip`. **3 file diubah** (dalam batas 3
   file/tugas): `PlayerViewModel.kt`, `MiniPlayerBar.kt`, `MainActivity.kt` — lihat "Catatan Batch
   476" di atas untuk detail penuh. Ringkas: (1) swipe mini player = cancel (stop total + queue
   kosong + saved state dikosongkan, bukan cuma sembunyikan bar); (2) `_uiState` mini player kini

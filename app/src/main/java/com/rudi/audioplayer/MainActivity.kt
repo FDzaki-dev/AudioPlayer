@@ -1996,6 +1996,24 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     )
                 }
             }
+        // Batch 477 — FIX BUG (laporan user: "video drag langsung lintas tab ternyata tidak
+        // berefek pada pergerakan bilah bottom nav sama sekali"): root cause — pointerInput di
+        // bawah (Batch 435, content-area swipe) di-key `currentRoute`. Persis pola bahaya yang
+        // SUDAH didokumentasikan di `currentRouteState`/Batch 442 (dekat NavigationBar di atas):
+        // begitu `navigate()` di `onDragEnd` mengubah `currentRoute`, key berubah → Compose
+        // cancel+restart coroutine gesture ini di komposisi berikutnya. Untuk drag SATU tab tetap
+        // 0 kelihatan (restart terjadi SETELAH gesture selesai), tapi utk swipe LANGSUNG LINTAS
+        // >1 tab dalam 1 gesture kontinu (jari belum terangkat): begitu batas tab pertama
+        // terlewati, instance lama mati, instance baru cuma `awaitFirstDown()` — down utk jari
+        // yg SUDAH menekan sejak awal TIDAK PERNAH datang lagi, sisa drag itu 0 diproses sama
+        // sekali (tabDragOffsetPx/tabMagnifyFocus/nudge konten beku, pill/label bottom nav 0
+        // bergerak lagi). `currentRouteState` yang sudah ada (Batch 442, dekat deklarasi
+        // `homeTabInteraction`) TIDAK bisa dipakai ulang di sini — scope-nya di dalam lambda
+        // `bottomBar =` milik `Scaffold`, sudah di luar jangkauan di lambda `content =` ini. Fix:
+        // instance BARU (scope lokal di sini saja, 0 mengubah yang lama sama sekali) + key
+        // `pointerInput` diganti `Unit` di bawah — 0 formula/threshold 120px/damping 0.3f/clamp
+        // ±40px Batch 435/437 disentuh, murni pindah pola sinkronisasi state yg SUDAH terbukti.
+        val contentSwipeRouteState = rememberUpdatedState(currentRoute)
         val isOnTabRoute = TAB_ROUTES.any { it == currentRoute }
         Box(
             modifier = Modifier
@@ -2015,7 +2033,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 .graphicsLayer { translationX = tabDragOffsetPx.floatValue }
                 .then(
                     if (isOnTabRoute) {
-                        Modifier.pointerInput(currentRoute) {
+                        Modifier.pointerInput(Unit) {
                             var totalTabDrag = 0f
                             detectHorizontalDragGestures(
                                 onDragStart = {
@@ -2025,7 +2043,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     tabSwipeScope.launch { tabDragOffset.stop() }
                                 },
                                 onDragEnd = {
-                                    val fromIdx = TAB_ROUTES.indexOfFirst { it == currentRoute }
+                                    val fromIdx = TAB_ROUTES.indexOfFirst { it == contentSwipeRouteState.value }
                                     val targetRoute = when {
                                         totalTabDrag < -120f -> TAB_ROUTES.getOrNull(fromIdx + 1)
                                         totalTabDrag > 120f -> TAB_ROUTES.getOrNull(fromIdx - 1)
