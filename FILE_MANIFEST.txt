@@ -13,7 +13,9 @@
 # Housekeeping dokumentasi: 6 dokumen arsip + PROJECT_STATE_ARCHIVE.md dipindah root ->
 # docs/archive/ (path baru, isi tidak diubah kecuali PROJECT_STATE.md/README.md dipangkas dari
 # narasi batch usang). Total path tidak berubah — 190 file.
-# Total: 190 file
+# Batch 481: app/src/main/java/com/rudi/audioplayer/ui/theme/Motion.kt (file baru, token
+# easing/durasi iOS) ditambahkan — 190->191.
+# Total: 191 file
 
 .github/workflows/build.yml
 .gitignore
@@ -126,6 +128,7 @@ app/src/main/java/com/rudi/audioplayer/ui/adaptive/WindowAdaptive.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/BlurUtils.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Color.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/IosScrollPhysics.kt
+app/src/main/java/com/rudi/audioplayer/ui/theme/Motion.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Spacing.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/TactileDepth.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Theme.kt

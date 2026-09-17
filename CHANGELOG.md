@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 481 — Kurva easing gaya iOS untuk semua transisi level-NavHost (micro-task 1/3)
+Instruksi eksplisit user: polish semua efek animasi/transisi biar mulus like iOS, landai, tanpa
+peralihan instant yang mengganggu. Target "semua" di-micro-task (AUTO-HALT) — bagian ini fokus
+transisi paling universal (kena tiap tab switch + tiap push/pop layar).
+
+Fix/tambahan (`Motion.kt` baru, `MainActivity.kt`, 2 file):
+- File token gerak baru `ui/theme/Motion.kt`: `Motion.IosEasing` (cubic-bezier 0.42/0/0.58/1,
+  S-curve simetris ala iOS `easeInEaseOut`) + 5 konstanta durasi yang murni alias angka yang
+  sudah dipakai app-wide (150/200/220/300/350ms) — bukan angka baru.
+- 9 pemanggilan `tween(...)` di 3 blok transisi `MainActivity.kt` (NavHost root fade tab bawah,
+  push Statistik, push Now Playing) diganti dari kurva default Compose (`FastOutSlowInEasing`,
+  gaya Material) ke `Motion.IosEasing`. Durasi masing-masing 0 berubah sama sekali, murni ganti
+  kurva interpolasi.
+- Sengaja BELUM disentuh (lihat `PROJECT_STATE.md` utk daftar lengkap + urutan resume): sinkron
+  pill/tab bottom nav (risiko desync antar-Animatable), gesture-drag custom mini player/queue
+  (riwayat regresi terpanjang di project ini), beberapa sheet sekunder yang belum pakai
+  `.animateItem()`. 0 diverifikasi CI/device sesi ini — wajib ditest user, lihat
+  `PROJECT_STATE.md`.
+
 ## Batch 480 — Mini player: feedback visual+haptic drag lebih kaya, dismiss bisa di-"Urungkan"
 Instruksi eksplisit user: sempurnakan mekanisme drag mini player (feedback, konfirmasi user, dll).
 

@@ -12,6 +12,62 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 481 [instruksi eksplisit user: "polish semua effect animasi, transisi, dll. agar
+mulus like iOS, landai tanpa peralihan instant yang mengganggu"]**: target "semua" terlalu masif
+utk 1 batch (>12 file punya `tween(...)` app-wide, lihat audit di bawah) — AUTO-HALT/
+MICRO-TASKING dipakai: eksekusi bagian teraman+paling universal dulu (transisi level-NavHost,
+kena SETIAP tab switch + setiap push/pop, bukan sektor gesture custom yang rawan desync), sisanya
+ke `[RESUME POINT]`.
+
+**2 file diubah** (dalam batas 3 file/tugas): `Motion.kt` (BARU), `MainActivity.kt`.
+1. **Token gerak bersama** (`Motion.kt`, file baru — 0 file lama disentuh oleh keberadaannya
+   sendiri): `Motion.IosEasing` = `CubicBezierEasing(0.42f, 0f, 0.58f, 1f)`, mendekati kurva
+   bawaan iOS `easeInEaseOut` (S-curve simetris) — beda dari default `tween()` Compose
+   (`FastOutSlowInEasing`, kurva Material deselerasi-berat, "gaya Android"). Plus 5 konstanta
+   durasi (`DURATION_QUICK=150/STANDARD=200/TAB=220/EMPHASIZED=300/SCREEN=350`) — SEMUA alias
+   angka yang SUDAH dipakai app-wide (audit `tween()` app-wide Batch 481, bukan angka baru).
+2. **Transisi level-NavHost** (`MainActivity.kt`): 9 pemanggilan `tween(...)` di 3 blok —
+   (a) NavHost root (fade home/library/settings, `enterTransition`/`exitTransition`/
+   `popEnterTransition`/`popExitTransition`, Batch 330), (b) push "stats_dashboard"
+   (slide+fade, Batch 331), (c) push "now_playing" (slide+fade, existing) — SEMUA diganti dari
+   `tween(N)` polos jadi `tween(Motion.DURATION_X, easing = Motion.IosEasing)`. **0 angka durasi
+   diubah** (200→DURATION_STANDARD, 150→DURATION_QUICK, 300→DURATION_EMPHASIZED,
+   350→DURATION_SCREEN, murni alias) — **HANYA kurva easing** yang berubah (default
+   FastOutSlowIn → IosEasing). Non-breaking murni di lapisan interpolasi, 0 threshold/gesture/
+   state logic disentuh.
+
+**SENGAJA TIDAK disentuh batch ini (bagian dari micro-task, BUKAN diabaikan)**: `tween(220)`
+sinkron pill/tab (`navPillIndexAnim` + `glassAlphaAnim` + `tabBarDragFocus`, dekat
+`CustomNavBarTabItem`/`GlassTabIcon`) — comment kode eksplisit bilang durasi ini "SAMA PERSIS"
+antar ≥2 Animatable supaya tiba bersamaan (lihat histori desync Batch 479, root cause beda tapi
+gejala sama: pill vs konten kehilangan sync). Ganti easing salah satu tanpa yang lain BERISIKO
+desync baru (kurva beda = laju tengah beda meski durasi sama) — butuh audit semua Animatable
+tersinkron sekaligus, di luar tunnel-vision batch ini. Juga belum disentuh: kurva easing di
+`MiniPlayerBar.kt`/`NowPlayingScreen.kt`/`QueueSheet.kt` (gesture-drag, physics-based, punya
+resiko regresi sendiri per histori panjang project ini) dan beberapa sheet sekunder yang belum
+pakai `.animateItem()` (`SmartPlaylistScreen`, `VaultSheet`, `BackupRestoreSheet`,
+`SongPickerSheet`, `LyricsSheet`, `ABRepeatBookmarkSheet`, `EqualizerSheet`, `DuplicateFinderSheet`,
+`RingtoneCutterSheet`).
+
+**0 diverifikasi CI/device Batch 481** — 0 env Android nyata/device fisik/compiler Kotlin di sesi
+ini (balance brace/paren/bracket `MainActivity.kt`: `{}` 339/339, `()` 1260/1260, `[]` 3/3;
+`Motion.kt` file baru: `{}` 1/1, `()` 15/15). **WAJIB DITEST user**:
+1. Buka app → pindah tab Beranda↔Perpustakaan↔Pengaturan → fade transisi harus tetap terasa mulus
+   (visual: kurva lebih "landai" di ujung awal/akhir dibanding sebelumnya, bukan langsung tancap
+   gas) — 0 regresi durasi/urutan/flicker.
+2. Pengaturan → buka Statistik (stats_dashboard) → slide dari kanan, lalu tombol back → slide balik
+   ke kanan — harus tetap mulus, 0 patah/lompat di tengah animasi.
+3. Tap lagu apapun → Now Playing naik dari bawah (slide+fade) → tombol back / swipe-down → turun
+   lagi — harus tetap mulus, 0 regresi ke gesture drag-dismiss (Batch 476/477/480, TIDAK disentuh
+   batch ini).
+4. Pastikan 0 crash/force-close saat build (import `Motion` baru di `MainActivity.kt`).
+**[RESUME POINT Batch 482]**: kalau test di atas ✅, lanjut micro-task berikutnya sesuai urutan
+risiko naik: (a) audit SEKALIGUS 3 Animatable tersinkron pill/tab (`navPillIndexAnim`/
+`glassAlphaAnim`/`tabBarDragFocus`) lalu upgrade easing bertiga BERSAMAAN (bukan 1-1) kalau aman;
+(b) `.animateItem()` utk sheet sekunder yang masih polos (daftar di atas); (c) baru pertimbangkan
+gesture-drag custom (`MiniPlayerBar`/`QueueSheet`) — PALING TERAKHIR krn riwayat regresi
+terpanjang di sektor ini. Jangan mulai dari (c).
+
 **Catatan Batch 480 [instruksi eksplisit user: "sempurnakan mekanisme drag mini player (feedback,
 konfirmasi user, dll)"]**: sektor mini player disentuh SESUAI instruksi eksplisit user batch ini
 (bukan tebakan) — item WAJIB DITEST Batch 477 utk sektor ini ("swipe threshold → musik BERHENTI

@@ -171,6 +171,7 @@ import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
 import com.rudi.audioplayer.ui.theme.calmGrain
 import com.rudi.audioplayer.ui.theme.auroraGlow
 import com.rudi.audioplayer.ui.theme.LocalHazeState
+import com.rudi.audioplayer.ui.theme.Motion
 import dev.chrisbanes.haze.rememberHazeState
 // Batch 435 — swipe-lintas-3-tab (Beranda/Perpustakaan/Pengaturan). Semua import di bawah
 // disalin persis dari path yang SUDAH terbukti compile di ui/NowPlayingScreen.kt
@@ -2148,10 +2149,16 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             // sudah ada (tween(200) exitTransition "now_playing" bawah, tween(150) fadeIn
             // NowPlayingScreen.kt) — bukan angka baru. Simetris maju/mundur (pop = sama
             // dgn forward) karena tab switch bukan hierarki push/pop searah.
-            enterTransition = { fadeIn(animationSpec = tween(200)) },
-            exitTransition = { fadeOut(animationSpec = tween(150)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(200)) },
-            popExitTransition = { fadeOut(animationSpec = tween(150)) }
+            // Batch 481 — durasi 200/150 di bawah 0 diubah (masih Motion.DURATION_STANDARD/
+            // DURATION_QUICK, alias angka yang sama persis), yang diubah HANYA easing:
+            // default `tween()` bawaan (FastOutSlowInEasing, kurva Material) diganti
+            // `Motion.IosEasing` (S-curve iOS) sesuai instruksi eksplisit user batch ini
+            // ("polish animasi/transisi biar mulus like iOS"). Non-breaking murni di
+            // lapisan kurva, 0 formula/threshold gesture lain disentuh.
+            enterTransition = { fadeIn(animationSpec = tween(Motion.DURATION_STANDARD, easing = Motion.IosEasing)) },
+            exitTransition = { fadeOut(animationSpec = tween(Motion.DURATION_QUICK, easing = Motion.IosEasing)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(Motion.DURATION_STANDARD, easing = Motion.IosEasing)) },
+            popExitTransition = { fadeOut(animationSpec = tween(Motion.DURATION_QUICK, easing = Motion.IosEasing)) }
         ) {
             composable("home") {
                 HomeScreen(
@@ -2262,16 +2269,19 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 // target saat pop) pakai default NavHost Batch 330 (fadeOut 150 / fadeIn 200)
                 // buat sisi dia, tidak perlu override tambahan.
                 enterTransition = {
+                    // Batch 481 — angka 300 0 diubah (Motion.DURATION_EMPHASIZED, alias
+                    // persis), easing diganti Motion.IosEasing (lihat catatan Batch 481 di
+                    // NavHost atas untuk rasional lengkap).
                     slideInHorizontally(
                         initialOffsetX = { fullWidth -> fullWidth },
-                        animationSpec = tween(300)
-                    ) + fadeIn(tween(300))
+                        animationSpec = tween(Motion.DURATION_EMPHASIZED, easing = Motion.IosEasing)
+                    ) + fadeIn(tween(Motion.DURATION_EMPHASIZED, easing = Motion.IosEasing))
                 },
                 popExitTransition = {
                     slideOutHorizontally(
                         targetOffsetX = { fullWidth -> fullWidth },
-                        animationSpec = tween(300)
-                    ) + fadeOut(tween(300))
+                        animationSpec = tween(Motion.DURATION_EMPHASIZED, easing = Motion.IosEasing)
+                    ) + fadeOut(tween(Motion.DURATION_EMPHASIZED, easing = Motion.IosEasing))
                 }
             ) {
                 val statsSnapshot = remember(librarySongs, statsVersion) {
@@ -2284,20 +2294,23 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             }
             composable(
                 route = "now_playing",
+                // Batch 481 — angka 350/200/300 0 diubah (Motion.DURATION_SCREEN/QUICK/
+                // EMPHASIZED, alias persis), easing diganti Motion.IosEasing (rasional
+                // lengkap di catatan Batch 481, NavHost atas).
                 enterTransition = {
                     slideInVertically(
                         initialOffsetY = { fullHeight -> fullHeight },
-                        animationSpec = tween(350)
-                    ) + fadeIn(tween(350))
+                        animationSpec = tween(Motion.DURATION_SCREEN, easing = Motion.IosEasing)
+                    ) + fadeIn(tween(Motion.DURATION_SCREEN, easing = Motion.IosEasing))
                 },
                 exitTransition = {
-                    fadeOut(tween(200))
+                    fadeOut(tween(Motion.DURATION_QUICK, easing = Motion.IosEasing))
                 },
                 popExitTransition = {
                     slideOutVertically(
                         targetOffsetY = { fullHeight -> fullHeight },
-                        animationSpec = tween(300)
-                    ) + fadeOut(tween(300))
+                        animationSpec = tween(Motion.DURATION_EMPHASIZED, easing = Motion.IosEasing)
+                    ) + fadeOut(tween(Motion.DURATION_EMPHASIZED, easing = Motion.IosEasing))
                 }
             ) {
                 nowPlayingContent { navController.popBackStack() }
