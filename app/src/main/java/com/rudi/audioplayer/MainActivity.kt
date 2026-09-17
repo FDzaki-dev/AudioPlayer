@@ -171,6 +171,7 @@ import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
 import com.rudi.audioplayer.ui.theme.calmGrain
 import com.rudi.audioplayer.ui.theme.auroraGlow
 import com.rudi.audioplayer.ui.theme.LocalHazeState
+import com.rudi.audioplayer.util.AppLogger
 import dev.chrisbanes.haze.rememberHazeState
 // Batch 435 — swipe-lintas-3-tab (Beranda/Perpustakaan/Pengaturan). Semua import di bawah
 // disalin persis dari path yang SUDAH terbukti compile di ui/NowPlayingScreen.kt
@@ -2015,6 +2016,14 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         // ±40px Batch 435/437 disentuh, murni pindah pola sinkronisasi state yg SUDAH terbukti.
         val contentSwipeRouteState = rememberUpdatedState(currentRoute)
         val isOnTabRoute = TAB_ROUTES.any { it == currentRoute }
+        // Batch 478 — instrumentasi (lihat komentar panjang di pointerInput di bawah untuk
+        // rasionalisasi lengkap): log ini jalan LEPAS dari isOnTabRoute (di luar `if`), jadi
+        // absennya baris ini di Log Diagnostik SENDIRI sudah jadi sinyal — kalau composable ini
+        // sendiri 0 pernah ke-invoke utk currentRoute yang diuji, root cause-nya BUKAN di gesture
+        // sama sekali, tapi di layer navigasi/composition di atasnya.
+        LaunchedEffect(currentRoute) {
+            AppLogger.w("TabSwipe", "Batch478 content Box composed, currentRoute=$currentRoute, isOnTabRoute=$isOnTabRoute")
+        }
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -2034,10 +2043,23 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 .then(
                     if (isOnTabRoute) {
                         Modifier.pointerInput(Unit) {
+                            // Batch 478 — instrumentasi (BUKAN fix baru): user konfirmasi drag
+                            // lintas-tab MASIH 0 efek walau sudah dites di tab Pengaturan (nyaris
+                            // 0 elemen horizontal-scrollable di sana) — menyingkirkan teori
+                            // LazyRow-menelan-drag (Mix/Favorit/chip) sebagai penjelasan TUNGGAL.
+                            // Pola SAMA PERSIS Batch 463 (FloatingBubbleService.kt): 0 tebak fix
+                            // lagi tanpa data, log ini adalah data itu. `AppLogger.w()` dipilih
+                            // (bukan `Log.d` polos) — kebaca via Settings → Lanjutan → Log
+                            // Diagnostik, 0 perlu ADB/ device fisik ter-root. WAJIB DICABUT lagi
+                            // begitu root cause ketemu (bukan instrumentasi permanen).
+                            AppLogger.w("TabSwipe", "Batch478 pointerInput coroutine mulai, isOnTabRoute=$isOnTabRoute, currentRoute=$currentRoute, boxSize=$size")
                             var totalTabDrag = 0f
+                            var firstDragLogged = false
                             detectHorizontalDragGestures(
                                 onDragStart = {
                                     totalTabDrag = 0f
+                                    firstDragLogged = false
+                                    AppLogger.w("TabSwipe", "Batch478 onDragStart terpanggil, route=${contentSwipeRouteState.value}")
                                     // jaring pengaman sama seperti AlbumArtHero: hentikan
                                     // springback lama supaya tidak menimpa drag baru.
                                     tabSwipeScope.launch { tabDragOffset.stop() }
@@ -2049,6 +2071,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                         totalTabDrag > 120f -> TAB_ROUTES.getOrNull(fromIdx - 1)
                                         else -> null
                                     }
+                                    AppLogger.w("TabSwipe", "Batch478 onDragEnd totalTabDrag=$totalTabDrag targetRoute=$targetRoute")
                                     if (targetRoute != null) {
                                         tabSwipeHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         // Pola navigate IDENTIK dgn onClick NavigationBarItem/
@@ -2074,6 +2097,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     }
                                 },
                                 onDragCancel = {
+                                    AppLogger.w("TabSwipe", "Batch478 onDragCancel terpanggil, totalTabDrag=$totalTabDrag")
                                     tabSwipeScope.launch {
                                         tabDragOffset.snapTo(tabDragOffsetPx.floatValue)
                                         tabDragOffset.animateTo(
@@ -2088,6 +2112,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     }
                                 },
                                 onHorizontalDrag = { change, dragAmount ->
+                                    if (!firstDragLogged) {
+                                        firstDragLogged = true
+                                        AppLogger.w("TabSwipe", "Batch478 onHorizontalDrag PERTAMA terpanggil, dragAmount=$dragAmount")
+                                    }
                                     totalTabDrag += dragAmount
                                     change.consume()
                                     tabDragOffsetPx.floatValue = (totalTabDrag * 0.3f).coerceIn(-40f, 40f)

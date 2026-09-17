@@ -1,5 +1,55 @@
 # Changelog
 
+## Batch 478 — Instrumentasi: bug (2) Batch 477 dikonfirmasi user MASIH terjadi (0 fix, log dulu)
+User konfirmasi via 2 pertanyaan lanjutan: bug "drag lintas tab, bottom nav diam" (Batch 477 bug 2)
+MASIH terjadi setelah fix keying `pointerInput(currentRoute)`→`Unit`, bahkan sudah dites SPESIFIK
+di tab Pengaturan (layar dengan nyaris 0 elemen horizontal-scrollable — chip/carousel Beranda &
+Library sengaja dihindari sebagai variabel). Ini menyingkirkan teori sekunder "LazyRow menelan
+drag duluan" (dicatat di Batch 477) sebagai penjelasan TUNGGAL — kalau LazyRow satu-satunya
+penyebab, Pengaturan (nyaris 0 LazyRow horizontal) seharusnya bekerja normal. Karena tidak, root
+cause SEBENARNYA belum diketahui.
+
+Pola PROSES yang diikuti: SAMA PERSIS Batch 463 (`FloatingBubbleService.kt`) — setelah 1 teori
+terbukti salah/tidak cukup, JANGAN lanjut tebak teori ke-2/ke-3 tanpa data baru. Tulis instrumentasi
+dulu, minta user reproduksi + ekspor Log Diagnostik, baca hasilnya, BARU putuskan arah fix
+berikutnya dari situ.
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt`. Import `com.rudi.audioplayer.
+util.AppLogger` ditambah. 6 titik `AppLogger.w("TabSwipe", ...)`:
+1. `LaunchedEffect(currentRoute)` tepat sebelum `Box` konten (di luar percabangan `isOnTabRoute`)
+   — log "content Box composed, currentRoute=..., isOnTabRoute=...". Sengaja LEPAS dari kondisi
+   `isOnTabRoute` supaya ABSEN-nya baris ini sendiri di log sudah informatif: kalau composable
+   Box ini sendiri tidak pernah ke-invoke untuk route yang sedang diuji user, root cause ada di
+   layer navigasi/composition (di ATAS titik ini), bukan di gesture detector sama sekali.
+2. Baris pertama badan `pointerInput(Unit) { ... }` — log "pointerInput coroutine mulai,
+   isOnTabRoute=..., currentRoute=..., boxSize=...". Kalau baris (1) ADA tapi baris (2) TIDAK:
+   `isOnTabRoute` false padahal composable ke-invoke (kemungkinan `TAB_ROUTES`/route-string
+   mismatch, atau kondisi lain yang belum kepikiran).
+3. `onDragStart` — log "onDragStart terpanggil, route=...". Kalau (2) ADA tapi (3) TIDAK: modifier
+   ter-attach tapi `detectHorizontalDragGestures` tidak pernah mendeteksi touch DOWN sama sekali
+   (kemungkinan ada consumer LAIN, bukan LazyRow, yang menelan duluan — atau touch tidak pernah
+   sampai ke Box ini).
+4. `onHorizontalDrag` — log HANYA SEKALI per gesture (flag lokal `firstDragLogged`, bukan tiap
+   event pointer, supaya tidak membanjiri log 200KB) — "onHorizontalDrag PERTAMA terpanggil,
+   dragAmount=...". Kalau (3) ADA tapi (4) TIDAK: `onDragStart` terpanggil tapi gerakan horizontal
+   tidak pernah lolos ke callback (kemungkinan axis/slop internal `detectHorizontalDragGestures`
+   sendiri, atau consume() dari sumber lain SETELAH down tapi SEBELUM slop terlampaui).
+5. `onDragEnd` — log "onDragEnd totalTabDrag=... targetRoute=...". Kalau (4) ADA (gerakan
+   terdeteksi) tapi tab tetap tidak berpindah/bottom nav tetap diam: bug ada di SISI VISUAL
+   (state `tabDragOffsetPx` ter-update tapi `drawWithContent` pill/`graphicsLayer` nudge di
+   `MainActivity.kt` tidak ikut redraw) — kelas fix yang SAMA SEKALI BEDA dari gesture detection.
+6. `onDragCancel` — log "onDragCancel terpanggil, totalTabDrag=...".
+
+**0 logic/formula gesture (threshold 120px, damping 0.3f, clamp ±40px, spring MediumBouncy/Low)
+disentuh sama sekali** — murni breadcrumb `AppLogger.w()` (bukan `Log.d` polos, supaya kebaca user
+lewat Settings → Lanjutan → Log Diagnostik tanpa ADB/device root, pola identik Batch 463/464/469).
+**WAJIB DICABUT lagi setelah root cause ketemu** — bukan instrumentasi permanen.
+
+**0 diverifikasi CI/device Batch 478** — review manual: balance brace/paren/bracket
+`MainActivity.kt` `{}` 340/340 `()` 1246/1246 `[]` 3/3. 0 env Android nyata/device fisik/compiler
+Kotlin di sesi ini. Lihat `PROJECT_STATE.md` § `[RESUME POINT]` untuk protokol pengambilan log
+lengkap yang WAJIB dilakukan user sebelum sesi berikutnya coding fix apa pun ke sektor ini.
+
 ## Batch 477 — Fix: swipe-cancel mini player (Batch 476) & drag-lintas-tab (Batch 435) 0 berefek
 Bug report user: screenshot mini player (0 tanda drag/cancel) + screen recording (drag konten
 lintas tab, bottom nav diam total). Ditemukan lewat review kode, root cause KEDUANYA sudah

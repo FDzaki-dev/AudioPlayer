@@ -12,7 +12,26 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
-**Catatan Batch 477 [bug report user (screenshot mini player + screen recording): (1) swipe-cancel
+**Catatan Batch 478 [user konfirmasi Batch 477 fix (2) BELUM menyelesaikan masalah: "drag lintas
+tab, bottom nav masih diam" — dikonfirmasi ULANG bahkan di tab Pengaturan (nyaris 0 elemen
+horizontal-scrollable di sana, jadi teori LazyRow-menelan-drag Batch 477 TERSINGKIR sebagai
+penjelasan tunggal)]**: 0 fix baru dikerjakan batch ini — pola PERSIS Batch 463 (0 tebak fix lagi
+tanpa data, instrumentasi dulu). **1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt`.
+6 titik `AppLogger.w("TabSwipe", ...)` ditambah (import `AppLogger` baru): (1) `LaunchedEffect
+(currentRoute)` tepat sebelum Box konten — LEPAS dari `isOnTabRoute`, jadi ABSENnya baris ini
+sendiri di Log Diagnostik sudah sinyal (composable ini sendiri 0 ke-invoke); (2) baris pertama
+badan `pointerInput(Unit)` — konfirmasi coroutine gesture BENAR mulai + `isOnTabRoute`/`boxSize`
+saat itu; (3) `onDragStart`; (4) `onHorizontalDrag` (SEKALI per gesture via flag `firstDragLogged`
+— bukan tiap event, supaya 0 membanjiri log); (5) `onDragEnd` (totalTabDrag + targetRoute
+terhitung); (6) `onDragCancel`. **0 formula/logic gesture diubah sama sekali** — WAJIB DICABUT
+lagi begitu root cause ketemu, bukan instrumentasi permanen.
+**WAJIB DARI USER SEBELUM CODING FIX APA PUN LAGI** (lihat `[RESUME POINT]`): reproduksi PERSIS
+di tab Pengaturan (drag horizontal apa saja di situ), lalu Settings → Lanjutan → Log Diagnostik →
+cari baris `TabSwipe` → kirim balik PERSIS baris mana yang muncul (atau konfirmasi 0 ada sama
+sekali). **JANGAN tebak fix lagi tanpa log ini** (pola terlarang eksplisit, sama seperti "PELAJARAN
+PROSES Batch 461→462→463").
+
+
 mini player Batch 476 0 berefek sama sekali; (2) drag lintas-tab konten 0 gerakkan bottom nav]**:
 2 bug DI LUAR sektor mana pun yang tertutup, ditemukan lewat REVIEW KODE (bukan tebakan) — root
 cause KEDUANYA sudah pernah didokumentasikan sebagai pola bahaya di file yang sama, tapi belum
@@ -1534,7 +1553,28 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 477. ZIP terakhir: `SONIX_v477.zip`. **2 file diubah** (dalam batas 3
+- Batch terakhir: 478. ZIP terakhir: `SONIX_v478.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `MainActivity.kt` — INSTRUMENTASI SAJA (0 fix logic), lihat "Catatan Batch 478" di
+  atas. Bug (2) Batch 477 ("drag lintas tab, bottom nav diam") DIKONFIRMASI user MASIH terjadi
+  bahkan di tab Pengaturan — teori LazyRow-menelan-drag TERSINGKIR, root cause SEBENARNYA BELUM
+  diketahui, butuh data log sebelum lanjut coding fix apa pun.
+  **LANGKAH WAJIB USER (SATU-SATUNYA prioritas sebelum sektor tab-swipe disentuh lagi)**:
+  1. Install ulang dari `SONIX_v478.zip` (via Termux DAILY UPDATE script).
+  2. Buka app, ke tab Pengaturan.
+  3. Coba drag horizontal (swipe kiri/kanan) beberapa kali di layar Pengaturan.
+  4. Settings (dalam app) → Lanjutan → Log Diagnostik.
+  5. Cari baris bertag `TabSwipe`. Kirim balik PERSIS:
+     - Ada baris "Batch478 content Box composed..." atau TIDAK SAMA SEKALI?
+     - Ada baris "Batch478 pointerInput coroutine mulai..." atau TIDAK?
+     - Ada baris "Batch478 onDragStart terpanggil..." atau TIDAK?
+     - Ada baris "Batch478 onHorizontalDrag PERTAMA terpanggil..." atau TIDAK?
+     - Kalau 0 ada baris `TabSwipe` SAMA SEKALI: screenshot halaman Log Diagnostik itu sendiri
+       (mungkin kosong total/fitur lain yang bermasalah, bukan soal gesture).
+  6. (Opsional tapi membantu) ulangi di Beranda/Library juga, kirim baris `TabSwipe`-nya juga.
+  **JANGAN coding fix baru untuk bug (2) ini tanpa log di atas** — pola "JANGAN tebak tanpa data"
+  WAJIB diikuti (riwayat Batch 461-464 di bawah: 3x tebakan berturut-turut gagal sebelum akhirnya
+  instrumentasi dulu baru ketemu).
+- Batch 477 (sebelum 478). ZIP: `SONIX_v477.zip`. **2 file diubah** (dalam batas 3
   file/tugas): `MiniPlayerBar.kt`, `MainActivity.kt` — lihat "Catatan Batch 477" di atas. Ringkas:
   (1) swipe-cancel mini player Batch 476 diperbaiki (wasit gesture dipindah ke
   `PointerEventPass.Initial`, pola sama Batch 350); (2) drag-lintas-tab-konten Batch 435 diperbaiki
