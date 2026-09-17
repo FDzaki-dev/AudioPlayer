@@ -12,6 +12,55 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 482 [lanjutan instruksi eksplisit user Batch 481: "polish semua effect animasi,
+transisi, dll. agar mulus like iOS" — user konfirmasi "mantap, move"]**: micro-task 2/3.
+Rencana resume Batch 481 sempat menaruh "(a) audit pill/tab" sbg prioritas pertama — SETELAH
+digali datanya (grep app-wide), (a) ternyata BUKAN sektor terpisah dari gesture-drag custom
+(sama-sama 1 web `navPillIndexAnim`+`glassAlphaAnim`+`tabDragOffset`+`tabBarOverscrollAnim`+
+drag-physics), jadi risikonya SAMA dengan item (c) yang sudah ditandai "PALING TERAKHIR" — bukan
+diagnosis baru, cuma info yang belum lengkap saat resume ditulis. Urutan disusun ulang
+berdasarkan data ini (bukan tebakan): (a) DILEWATI dulu, lanjut ke (b) yang independen dari
+drag-physics.
+
+**2 file diubah** (dalam batas 3 file/tugas): `DuplicateFinderSheet.kt`, `VaultSheet.kt`.
+1. **`.animateItem()` pada list hapus-lagu** (kedua file, list sudah punya `key` stabil sejak
+   awal — prasyarat animateItem sudah terpenuhi, cuma modifier belum pernah dipasang, pola
+   PERSIS SAMA `LibraryScreen.kt`/`QueueSheet.kt` yang sudah ada, 0 pola baru): dipilih krn
+   KEDUA sheet ini murni delete-list (0 drag-reorder, diverifikasi grep `isDragging`/`draggable`/
+   `reorder` = 0 hit di kedua file — aman dari resiko `.animateItem()` "berebut" dgn gesture
+   drag seperti kasus `QueueSheet`/`PlaylistScreen`) dan interaksi hapusnya sering berulang
+   (cocok literal dgn keluhan "peralihan instant yang mengganggu" user).
+   - `DuplicateFinderSheet.kt`: `DuplicateSongRow` (private, 2 titik panggil: grup library +
+     grup fisik) dapat parameter baru `modifier: Modifier = Modifier` (default aman, 0 breaking)
+     diteruskan ke root `Row`; 2 titik panggil diberi `modifier = Modifier.animateItem()`.
+   - `VaultSheet.kt`: 2 `Row` inline di dalam `items{}` (`vaultedSongs` & `candidates`) langsung
+     ditambah `.animateItem()` di awal modifier chain — 0 perlu ubah signature apa pun (Row-nya
+     sudah inline, bukan composable terpisah).
+2. **0 disentuh**: pill/tab sync (dilewati, lihat rasional di atas), gesture-drag mini
+   player/queue, easing NavHost (sudah Batch 481), checkbox/toggle/select/hapus logic kedua
+   file (0 baris logic berubah, murni tambahan modifier animasi).
+
+**0 diverifikasi CI/device Batch 482** — 0 env Android nyata/device fisik/compiler Kotlin sesi
+ini (balance brace/paren `DuplicateFinderSheet.kt`: `{}` 62/62, `()` 131/131; `VaultSheet.kt`:
+`{}` 101/101, `()` 222/222). **WAJIB DITEST user**:
+1. Vault → tandai/hapus beberapa lagu dari daftar vault → tiap baris yang hilang harus slide+
+   fade keluar halus (bukan pop instan), sisa baris di bawahnya geser naik halus mengisi celah.
+2. Vault → dialog "Tambah" → tambah lagu dari daftar kandidat → baris yang baru ditambah
+   masuk halus, baris lain di daftar kandidat geser mengisi celah yang ditinggalkan.
+3. Pengaturan → Cari Duplikat → centang beberapa lagu (grup Library maupun grup File Fisik) →
+   hapus → baris yang dihapus slide+fade keluar halus, 0 pop instan, 0 regresi ke centang/
+   hapus/pilih-semua yang sudah ada.
+4. Pastikan 0 crash/force-close saat build (parameter baru `modifier` di `DuplicateSongRow`,
+   default value jadi 0 breaking di titik panggil manapun yang mungkin terlewat).
+**[RESUME POINT Batch 483]**: kalau test di atas ✅, lanjut micro-task 3/3: `.animateItem()` ke
+sisa sheet sekunder yang masih polos & TERKONFIRMASI 0 drag-reorder — cek dulu satu-satu sebelum
+sentuh (`SmartPlaylistScreen.kt`, `SongPickerSheet.kt`, `ABRepeatBookmarkSheet.kt`,
+`EqualizerSheet.kt`, `LyricsSheet.kt` — LyricsSheet prioritas RENDAH krn list-nya statis 0 pernah
+insert/remove runtime, `.animateItem()` disana 0 banyak berguna). Sektor pill/tab-sync +
+gesture-drag custom (mini player/queue) TETAP paling akhir, butuh audit KHUSUS 1 batch penuh
+(bukan diselipkan) krn riwayat regresi (Batch 448/477/479) — jangan mulai dari situ tanpa
+instruksi eksplisit user utk sektor itu spesifik.
+
 **Catatan Batch 481 [instruksi eksplisit user: "polish semua effect animasi, transisi, dll. agar
 mulus like iOS, landai tanpa peralihan instant yang mengganggu"]**: target "semua" terlalu masif
 utk 1 batch (>12 file punya `tween(...)` app-wide, lihat audit di bawah) — AUTO-HALT/

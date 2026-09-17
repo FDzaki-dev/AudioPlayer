@@ -1,5 +1,22 @@
 # Changelog
 
+## Batch 482 — `.animateItem()` untuk list hapus-lagu di Vault & Cari Duplikat (micro-task 2/3)
+Lanjutan instruksi eksplisit user Batch 481, dikonfirmasi lanjut ("mantap, move").
+
+Fix/tambahan (`DuplicateFinderSheet.kt`, `VaultSheet.kt`, 2 file):
+- Kedua list (`DuplicateSongRow` di Cari Duplikat; 2 list di Vault — daftar tervault & daftar
+  kandidat tambah) diberi `.animateItem()`, pola sama persis `LibraryScreen.kt`/`QueueSheet.kt`
+  yang sudah ada. List sudah punya `key` stabil sejak awal, jadi murni pasang modifier, 0 logic
+  select/toggle/hapus berubah.
+- Efeknya: hapus/tambah lagu di Vault, dan centang-hapus di Cari Duplikat, sekarang baris
+  slide+fade keluar/masuk halus + baris lain geser mengisi celah — bukan pop instan.
+- Dipilih drag-reorder-free (diverifikasi 0 ada) supaya 0 risiko konflik animateItem vs gesture
+  drag seperti sektor lain (`QueueSheet`/`PlaylistScreen`, sengaja BELUM disentuh batch ini).
+- Rencana resume Batch 481 sempat taruh "audit sinkron pill/tab" duluan — ternyata sektor itu
+  1 web yang sama dengan gesture-drag custom (bukan terpisah), jadi urutan ditukar ke item yang
+  independen dulu. 0 diverifikasi CI/device sesi ini — wajib ditest user, lihat
+  `PROJECT_STATE.md`.
+
 ## Batch 481 — Kurva easing gaya iOS untuk semua transisi level-NavHost (micro-task 1/3)
 Instruksi eksplisit user: polish semua efek animasi/transisi biar mulus like iOS, landai, tanpa
 peralihan instant yang mengganggu. Target "semua" di-micro-task (AUTO-HALT) — bagian ini fokus

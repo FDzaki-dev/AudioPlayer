@@ -120,7 +120,12 @@ fun DuplicateFinderSheet(
                         }
                         libraryGroups.forEach { group ->
                             items(group.songs, key = { "lib_${it.id}" }) { song ->
-                                DuplicateSongRow(song = song, checked = song.id in selectedIds, onToggle = { toggle(song.id) })
+                                DuplicateSongRow(
+                                    song = song,
+                                    checked = song.id in selectedIds,
+                                    onToggle = { toggle(song.id) },
+                                    modifier = Modifier.animateItem()
+                                )
                             }
                             item { HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(vertical = 8.dp)) }
                         }
@@ -135,7 +140,12 @@ fun DuplicateFinderSheet(
                         }
                         physicalGroups.forEach { group ->
                             items(group.songs, key = { "phys_${it.id}" }) { song ->
-                                DuplicateSongRow(song = song, checked = song.id in selectedIds, onToggle = { toggle(song.id) })
+                                DuplicateSongRow(
+                                    song = song,
+                                    checked = song.id in selectedIds,
+                                    onToggle = { toggle(song.id) },
+                                    modifier = Modifier.animateItem()
+                                )
                             }
                             item { HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(vertical = 8.dp)) }
                         }
@@ -197,9 +207,15 @@ private fun DuplicateSectionHeader(
 }
 
 @Composable
-private fun DuplicateSongRow(song: Song, checked: Boolean, onToggle: () -> Unit) {
+private fun DuplicateSongRow(song: Song, checked: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier
+        // Batch 482 — parameter `modifier` baru (default `Modifier`, 0 breaking di 2 titik
+        // panggil yang sudah ada) supaya caller bisa suntik `.animateItem()` dari dalam
+        // `items {}` (LazyItemScope) — list ini sudah punya key stabil ("lib_"/"phys_" + id)
+        // sejak awal, prasyarat animateItem sudah terpenuhi. Parameter `modifier` jadi AWAL
+        // chain (pola sama `LibraryScreen.kt`) supaya animasi placement bekerja di root
+        // layout node item, bukan di child. 0 logic checkbox/toggle disentuh.
+        modifier = modifier
             .fillMaxWidth()
             .clickable { onToggle() }
             .padding(vertical = 6.dp),

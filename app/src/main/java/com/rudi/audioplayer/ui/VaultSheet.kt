@@ -292,7 +292,14 @@ private fun VaultContentSection(
             ) {
                 items(vaultedSongs, key = { it.id }) { song ->
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        // Batch 482 — `.animateItem()` ditambah (posisi TERTENTU di awal chain,
+                        // pola sama persis `LibraryScreen.kt`/ListItem riwayat pencarian): list
+                        // ini sudah punya `key` stabil (`it.id`) sejak awal, prasyarat animateItem
+                        // sudah terpenuhi, cuma modifier-nya belum pernah dipasang. Micro-task
+                        // instruksi eksplisit user "polish transisi biar mulus like iOS" — hapus
+                        // lagu dari vault sekarang slide+fade keluar, bukan pop instan. 0 logic
+                        // toggle/hapus/state lain disentuh.
+                        modifier = Modifier.animateItem().fillMaxWidth().padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -372,7 +379,11 @@ private fun VaultAddPickerDialog(
                     ) {
                         items(candidates, key = { it.id }) { song ->
                             Row(
+                                // Batch 482 — `.animateItem()` ditambah, pola sama persis blok
+                                // `vaultedSongs` di atas & `LibraryScreen.kt` (list ini sudah
+                                // punya key stabil `it.id`). 0 logic `onAdd`/state lain disentuh.
                                 modifier = Modifier
+                                    .animateItem()
                                     .fillMaxWidth()
                                     .clickable { onAdd(song.id) }
                                     .padding(vertical = 8.dp),
