@@ -12,6 +12,47 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 483 [BUG FIX regresi/gap dilaporkan user: "background glass tembus pandang pada
+tab vault, fix it dan audit yang gejalanya serupa"]**: root cause TERKONFIRMASI dari perbandingan
+kode app-wide (bukan tebakan) — BUKAN regresi dari Batch 481/482 (2 batch itu 0 pernah menyentuh
+`ModalBottomSheet`/`Column` root VaultSheet). Gap asli: `containerColor = Color.Transparent`
+(pola app-wide, dipasang Batch 322/323 sbg fix "blur lintas-window") WAJIB dipasangkan dgn
+`.frostedGlass()` di Column konten supaya panel tetap solid — tanpanya, panel benar-benar
+tembus pandang (bukan efek estetika, literal 0 alpha). Audit `.frostedGlass()` Batch 340
+("lanjutan antrean Audit tambahan Batch 339") menyisir BackupRestoreSheet/DiagnosticLogSheet/
+UpdateCheckSheet/DuplicateFinderSheet dkk, TAPI tidak mencakup 3 file. Audit ulang app-wide batch
+ini (grep SEMUA 16 file `ModalBottomSheet`+`containerColor=Transparent` vs SEMUA yang punya
+`.frostedGlass()`): tepat 3 file bolong — `VaultSheet.kt` (dilaporkan user), `SmartPlaylistScreen.kt`,
+`SignatureMatcherSheet.kt`. 13 file lain sudah benar (0 disentuh).
+
+**3 file diubah** (dalam batas 3 file/tugas — pas): `VaultSheet.kt`, `SmartPlaylistScreen.kt`,
+`SignatureMatcherSheet.kt`.
+1. Ketiganya: `.frostedGlass()` ditambah ke Column konten (posisi setelah `.fillMaxWidth()`,
+   pola PERSIS 13 file lain yang sudah benar), dipanggil TANPA argumen (pola sama 12/12 call
+   site existing, 0 parameter/angka baru) + import `com.rudi.audioplayer.ui.theme.frostedGlass`
+   ditambah di ketiganya (2 file lain belum pernah import ini sama sekali).
+2. `SmartPlaylistScreen.kt`: comment historis Batch 263 (rationale `LocalOverscrollConfiguration
+   provides null`) SEMPAT tidak sengaja terhapus draft awal — dikembalikan utuh sebelum commit,
+   digabung berurutan dgn comment baru Batch 483 (0 histori hilang).
+3. 0 logic lain disentuh di ketiga file (PIN gate, filter draft, ApkSignatureChecker, dsb) — 100%
+   scope ini murni 1 modifier tambahan x3 titik yang identik.
+
+**0 diverifikasi CI/device Batch 483** — 0 env Android nyata/compiler Kotlin sesi ini (balance
+brace/paren: `VaultSheet.kt` `{}` 101/101 `()` 238/238; `SmartPlaylistScreen.kt` `{}` 106/106
+`()` 273/273; `SignatureMatcherSheet.kt` `{}` 58/58 `()` 145/145). **WAJIB DITEST user**:
+1. Buka tab Vault (Pengaturan → Vault) → panel harus terlihat solid/tinted (bukan tembus pandang
+   ke layar di belakangnya), sama seperti sheet lain (mis. Cari Duplikat).
+2. Pengaturan → Perpustakaan → "Buat Playlist Otomatis" → panel solid, DAN scroll masih halus
+   0 regresi ke fix Batch 262/263 (bouncy-scroll) yang TIDAK disentuh batch ini.
+3. Pengaturan → menu update/signature checker (Pencocok Signature APK) → panel solid.
+4. Pastikan 0 crash/force-close saat build (3 import baru, 3 pemanggilan modifier tanpa
+   argumen — pola identik 12 call site lain yang sudah lama jalan aman).
+**[RESUME POINT Batch 484]**: kalau test di atas ✅, kembali ke antrean micro-task polish animasi
+Batch 481/482 (lihat resume Batch 482 di atas — masih valid, tidak berubah oleh fix bug ini):
+lanjut `.animateItem()` ke `SongPickerSheet.kt`/`ABRepeatBookmarkSheet.kt`/`EqualizerSheet.kt`
+(cek drag-reorder dulu sebelum sentuh, sama seperti Batch 482). Sektor pill/tab-sync +
+gesture-drag custom TETAP paling akhir.
+
 **Catatan Batch 482 [lanjutan instruksi eksplisit user Batch 481: "polish semua effect animasi,
 transisi, dll. agar mulus like iOS" — user konfirmasi "mantap, move"]**: micro-task 2/3.
 Rencana resume Batch 481 sempat menaruh "(a) audit pill/tab" sbg prioritas pertama — SETELAH

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.data.VaultStore
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import kotlinx.coroutines.delay
 
@@ -64,9 +65,23 @@ fun VaultSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+        // Batch 483 — FIX regresi dilaporkan user ("background glass tembus pandang pada tab
+        // vault") + audit gejala serupa. Root cause TERKONFIRMASI dari perbandingan kode (bukan
+        // tebakan): `containerColor = Color.Transparent` (di atas) butuh `.frostedGlass()` di
+        // Column konten supaya panel tetap terlihat solid — 13/16 sheet lain di app ini SUDAH
+        // punya pasangan ini (grep `.frostedGlass()` app-wide), literally 0 punya
+        // `containerColor = Transparent` TANPA `.frostedGlass()` KECUALI 3 file: `VaultSheet.kt`
+        // (ini), `SmartPlaylistScreen.kt`, `SignatureMatcherSheet.kt` (2 file lain kena fix sama
+        // persis batch ini juga). BUKAN regresi dari Batch 481/482 (0 disentuh sebelumnya) —
+        // sudah bolong sejak `containerColor = Transparent` pertama dipasang (Batch 322/323,
+        // lihat komentar historis 2 file lain), audit `.frostedGlass()` Batch 340 ("lanjutan
+        // antrean Audit tambahan Batch 339") ternyata TIDAK mencakup 3 file ini — gap lama,
+        // baru ketahuan sekarang. `.frostedGlass()` dipanggil TANPA argumen (pola sama 12/12
+        // call site existing lain, 0 parameter baru/angka baru).
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 .fillMaxHeight(0.9f)
                 .padding(horizontal = 20.dp)
         ) {

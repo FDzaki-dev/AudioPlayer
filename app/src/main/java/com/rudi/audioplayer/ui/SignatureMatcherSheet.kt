@@ -24,6 +24,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.util.ApkSignatureChecker
 import com.rudi.audioplayer.util.ApkSignatureResult
 import kotlinx.coroutines.Dispatchers
@@ -87,9 +88,14 @@ fun SignatureMatcherSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit
     // rasionalisasi penuh di PROJECT_STATE.md Batch 321/322): tambah `containerColor =
     // Color.Transparent` yang kelewat sejak sheet ini dibuat.
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+        // Batch 483 — FIX audit gejala serupa "background glass tembus pandang" (laporan user
+        // di `VaultSheet.kt`, rasional lengkap identik di sana): `.frostedGlass()` yang kelewat
+        // sejak `containerColor = Transparent` dipasang (Batch 323 di file ini, lihat komentar
+        // historis di atas) — audit `.frostedGlass()` Batch 340 tidak mencakup file ini.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp)
         ) {

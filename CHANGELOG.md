@@ -1,5 +1,19 @@
 # Changelog
 
+## Batch 483 — FIX: panel glass tembus pandang di Vault/Playlist Otomatis/Pencocok Signature
+Bug report user: "background glass tembus pandang pada tab vault, fix it dan audit yang
+gejalanya serupa".
+
+Fix (`VaultSheet.kt`, `SmartPlaylistScreen.kt`, `SignatureMatcherSheet.kt`, 3 file):
+- Root cause: `containerColor = Color.Transparent` (pola app-wide sejak Batch 322/323) butuh
+  `.frostedGlass()` di Column konten supaya panel tetap solid — 3 file ini kelewat saat audit
+  `.frostedGlass()` Batch 340 (yang menyisir file lain). BUKAN regresi Batch 481/482 (2 batch
+  itu 0 pernah menyentuh area ini) — gap lama yang baru ketahuan sekarang.
+- Audit app-wide (16 file `ModalBottomSheet` + `containerColor=Transparent`): tepat 3 file
+  bolong, 13 lainnya sudah benar. Ketiganya diberi `.frostedGlass()` tanpa argumen, pola identik
+  13 file lain, 0 logic lain disentuh.
+- 0 diverifikasi CI/device sesi ini — wajib ditest user, lihat `PROJECT_STATE.md`.
+
 ## Batch 482 — `.animateItem()` untuk list hapus-lagu di Vault & Cari Duplikat (micro-task 2/3)
 Lanjutan instruksi eksplisit user Batch 481, dikonfirmasi lanjut ("mantap, move").
 

@@ -33,6 +33,7 @@ import com.rudi.audioplayer.data.SmartPlaylist
 import com.rudi.audioplayer.data.SmartPlaylistEngine
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.ui.theme.Radius
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
 import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
@@ -269,6 +270,12 @@ private fun SmartPlaylistBuilderSheet(
     // PROJECT_STATE.md Batch 321/322): tambah `containerColor = Color.Transparent` yang kelewat
     // sejak sheet ini dibuat. `Color` sudah diimpor sebelumnya (dipakai fungsi lain file ini).
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+        // Batch 483 — FIX audit gejala serupa "background glass tembus pandang" (laporan user
+        // di `VaultSheet.kt`, rasional lengkap identik di sana): `.frostedGlass()` yang kelewat
+        // sejak `containerColor = Transparent` dipasang (Batch 323 di file ini, lihat komentar
+        // historis di atas) — audit `.frostedGlass()` Batch 340 tidak mencakup file ini. Dipasang
+        // di Column TERLUAR (dalam `CompositionLocalProvider`, sebelum `verticalScroll`) sesuai
+        // posisi yang sama di sheet lain yang sudah benar (setelah `.fillMaxWidth()`).
         // Batch 263 — user feedback langsung setelah Batch 262 (verticalScroll fix): scroll
         // terasa "bouncy". Root cause: verticalScroll baru otomatis ikut overscroll
         // stretch-glow bawaan Android 12+/Compose Foundation — di dalam ModalBottomSheet yang
@@ -281,6 +288,7 @@ private fun SmartPlaylistBuilderSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 // Bug report user: "Buat Playlist Otomatis" TRUNCATED, 0 bisa discroll —
                 // Column ini isinya banyak (nama+folder chips+genre chips+durasi+tahun+rating+
                 // tombol Batal/Simpan di paling bawah) TANPA verticalScroll sama sekali,
