@@ -1,5 +1,39 @@
 # Changelog
 
+## Batch 479 — FIX: root cause "drag lintas tab, bottom nav diam" (Batch 477 bug 2) ketemu dari log
+User kirim log Diagnostik `TabSwipe` sesuai WAJIB RESUME POINT Batch 478 (drag berulang di tab
+Pengaturan). Semua 4 baris instrumentasi wajib ADA dan `onDragEnd` menghitung `targetRoute` benar
+di 4 gesture berturut-turut (Pengaturan→Perpustakaan→Beranda→Perpustakaan→Pengaturan) — gesture
+detection dan `navController.navigate()` TERBUKTI 100% normal, jadi root cause BUKAN di situ.
+
+Root cause sebenarnya: `navPillIndexAnim` (Animatable posisi "rest" pill bottom nav, diperkenalkan
+Batch 448) sebelumnya cuma disinkronkan dari 2 jalur — onClick 3 `NavigationBarItem` dan selesai
+drag LANGSUNG di atas tab-bar (Batch 444). Blok swipe KONTEN (Batch 435, diperbaiki keying-nya di
+Batch 477) memanggil `navController.navigate()` langsung dari lambda `content =` milik `Scaffold`
+tanpa pernah menyentuh `navPillIndexAnim` sama sekali — variabel itu dideklarasikan di scope lokal
+lambda `bottomBar =`, di luar jangkauan `content =`. Akibatnya: currentRoute & konten layar
+berpindah benar, tapi pill visual di bottom nav tetap diam di posisi lama.
+
+Fix (`MainActivity.kt`, 1 file):
+- Instrumentasi log Batch 478 (6 titik `AppLogger.w` + import) DICABUT TOTAL — root cause sudah
+  ketemu, sesuai mandat "WAJIB DICABUT lagi begitu root cause ketemu" yang tercatat saat log itu
+  ditambahkan.
+- `navPillIndexAnim` DIPINDAH (hoisted) dari scope lokal `bottomBar =` ke scope fungsi `AppNavHost`
+  (sejajar `tabSwipeScope`/`tabDragOffsetPx`/`tabDragOffset` yang sudah lebih dulu di-hoist ke
+  sana persis untuk alasan yang sama) — sekarang bisa dibaca/ditulis dari lambda `content =` dan
+  `bottomBar =` sekaligus.
+- Blok `onDragEnd` swipe konten, tepat setelah `navController.navigate(targetRoute)` sukses,
+  ditambah 1 panggilan `navPillIndexAnim.animateTo(targetIndex + 0.5f, tween(220))` — pola
+  tween(220) identik 3 onClick `NavigationBarItem` yang sudah ada, 0 formula/angka baru. Sengaja
+  TIDAK memakai `LaunchedEffect(currentRoute)` generik (dihindari sejak Batch 448 untuk mencegah
+  race start-animasi ganda dengan 2 jalur sync lain yang sudah ada).
+- 0 formula/threshold gesture (120px, damping 0.3f, clamp ±40px, spring MediumBouncy/Low) dan 0
+  logic drag-langsung-di-tab-bar (Batch 442/444/448) disentuh sama sekali.
+
+0 diverifikasi CI/device sesi ini (balance brace/paren/bracket file penuh: `{}` 339/339, `()`
+1251/1251, `[]` 3/3). Wajib ditest user: swipe di konten (bukan di atas tab-bar) di ketiga tab
+harus menggerakkan pill bottom nav, termasuk untuk drag kontinu lintas >1 tab.
+
 ## Batch 478 — Instrumentasi: bug (2) Batch 477 dikonfirmasi user MASIH terjadi (0 fix, log dulu)
 User konfirmasi via 2 pertanyaan lanjutan: bug "drag lintas tab, bottom nav diam" (Batch 477 bug 2)
 MASIH terjadi setelah fix keying `pointerInput(currentRoute)`→`Unit`, bahkan sudah dites SPESIFIK

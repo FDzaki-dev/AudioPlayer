@@ -12,6 +12,40 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 479 [user kirim log Diagnostik sesuai WAJIB RESUME POINT Batch 478]**: root cause
+bug (2) Batch 477 ("drag lintas tab, bottom nav diam") KETEMU dari data log (bukan tebakan) — 4/4
+baris `TabSwipe` WAJIB (content Box composed, pointerInput coroutine mulai, onDragStart,
+onHorizontalDrag PERTAMA) ADA, `onDragEnd` konsisten hitung `targetRoute` benar tiap gesture (4x
+drag berturut Pengaturan→Perpustakaan→Beranda→Perpustakaan→Pengaturan, semua sukses) —
+MEMBUKTIKAN gesture+navigate() jalan 100% normal, root cause BUKAN di situ. Sebenarnya:
+`navPillIndexAnim` (Animatable posisi "rest" pill bottom nav, Batch 448) sebelumnya HANYA
+disinkronkan dari 2 jalur — onClick 3 `NavigationBarItem` & selesai-drag-LANGSUNG-di-tab-bar
+(Batch 444) — swipe KONTEN (Batch 435/477, blok terpisah di luar `bottomBar=`) manggil
+`navController.navigate()` LANGSUNG tanpa pernah menyentuh `navPillIndexAnim`, jadi
+currentRoute+konten berpindah benar tapi pill visual TIDAK PERNAH ikut.
+
+**1 file diubah** (dalam batas 3 file/tugas): `MainActivity.kt`.
+1. Instrumentasi Batch 478 (6 `AppLogger.w` + import) DICABUT TOTAL sesuai mandat WAJIB DICABUT
+   begitu root cause ketemu — 0 log/instrumentasi tersisa.
+2. `navPillIndexAnim` DIPINDAH (hoisted) dari scope lokal `bottomBar=` ke scope `AppNavHost`
+   (sejajar `tabSwipeScope`/`tabDragOffsetPx`/`tabDragOffset`) supaya lambda `content=` (Scaffold)
+   bisa ikut baca/tulis — pola hoist SAMA PERSIS `currentRouteState`/Batch 442 & `tabSwipeScope`
+   yang sudah ada, 0 pola baru.
+3. `onDragEnd` blok swipe KONTEN (setelah `navController.navigate(targetRoute)` sukses) ditambah 1
+   panggilan `navPillIndexAnim.animateTo(index+0.5f, tween(220))` — pola tween(220) IDENTIK 3
+   onClick `NavigationBarItem`, 0 formula/angka baru. 0 `LaunchedEffect(currentRoute)` generik
+   ditambah (tetap dihindari sesuai rasionalisasi asli Batch 448 — cegah race start-animasi ganda
+   antar 3 jalur sync).
+4. 0 formula/threshold 120px/damping 0.3f/clamp ±40px/spring MediumBouncy-Low Batch 435/437/477
+   disentuh. 0 logic tab-bar-drag (Batch 442/444/448) disentuh.
+
+**0 diverifikasi CI/device Batch 479** — 0 env Android nyata/device fisik/compiler Kotlin di sesi
+ini (balance brace/paren/bracket file penuh: `{}` 339/339, `()` 1251/1251, `[]` 3/3). **WAJIB
+DITEST user**: swipe horizontal di KONTEN (bukan di atas tab-bar) di Beranda/Perpustakaan/
+Pengaturan → pill bottom nav HARUS ikut berpindah ke tab tujuan setelah gesture selesai (bukan
+cuma konten yang berganti) — baik utk 1 tab loncat maupun drag kontinu lintas >1 tab. Kirim hasil
+balik sebelum sektor tab-swipe/bottom-nav disentuh lagi.
+
 **Catatan Batch 478 [user konfirmasi Batch 477 fix (2) BELUM menyelesaikan masalah: "drag lintas
 tab, bottom nav masih diam" — dikonfirmasi ULANG bahkan di tab Pengaturan (nyaris 0 elemen
 horizontal-scrollable di sana, jadi teori LazyRow-menelan-drag Batch 477 TERSINGKIR sebagai
@@ -1553,27 +1587,28 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 478. ZIP terakhir: `SONIX_v478.zip`. **1 file diubah** (dalam batas 3
-  file/tugas): `MainActivity.kt` — INSTRUMENTASI SAJA (0 fix logic), lihat "Catatan Batch 478" di
-  atas. Bug (2) Batch 477 ("drag lintas tab, bottom nav diam") DIKONFIRMASI user MASIH terjadi
-  bahkan di tab Pengaturan — teori LazyRow-menelan-drag TERSINGKIR, root cause SEBENARNYA BELUM
-  diketahui, butuh data log sebelum lanjut coding fix apa pun.
-  **LANGKAH WAJIB USER (SATU-SATUNYA prioritas sebelum sektor tab-swipe disentuh lagi)**:
-  1. Install ulang dari `SONIX_v478.zip` (via Termux DAILY UPDATE script).
-  2. Buka app, ke tab Pengaturan.
-  3. Coba drag horizontal (swipe kiri/kanan) beberapa kali di layar Pengaturan.
-  4. Settings (dalam app) → Lanjutan → Log Diagnostik.
-  5. Cari baris bertag `TabSwipe`. Kirim balik PERSIS:
-     - Ada baris "Batch478 content Box composed..." atau TIDAK SAMA SEKALI?
-     - Ada baris "Batch478 pointerInput coroutine mulai..." atau TIDAK?
-     - Ada baris "Batch478 onDragStart terpanggil..." atau TIDAK?
-     - Ada baris "Batch478 onHorizontalDrag PERTAMA terpanggil..." atau TIDAK?
-     - Kalau 0 ada baris `TabSwipe` SAMA SEKALI: screenshot halaman Log Diagnostik itu sendiri
-       (mungkin kosong total/fitur lain yang bermasalah, bukan soal gesture).
-  6. (Opsional tapi membantu) ulangi di Beranda/Library juga, kirim baris `TabSwipe`-nya juga.
-  **JANGAN coding fix baru untuk bug (2) ini tanpa log di atas** — pola "JANGAN tebak tanpa data"
-  WAJIB diikuti (riwayat Batch 461-464 di bawah: 3x tebakan berturut-turut gagal sebelum akhirnya
-  instrumentasi dulu baru ketemu).
+- Batch terakhir: 479. ZIP terakhir: `SONIX_v479.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `MainActivity.kt` — FIX root cause bug (2) Batch 477 ("drag lintas tab, bottom nav
+  diam"), lihat "Catatan Batch 479" di atas untuk detail penuh. Ringkas: `navPillIndexAnim`
+  di-hoist ke scope `AppNavHost` + disinkronkan juga dari `onDragEnd` swipe KONTEN (sebelumnya
+  cuma dari onClick tab & drag-langsung-di-tab-bar). Instrumentasi log Batch 478 DICABUT TOTAL.
+  **0 diverifikasi CI/device Batch 479** — 0 env Android nyata/device fisik/compiler Kotlin di
+  sesi ini (balance brace/paren/bracket file penuh: `{}` 339/339, `()` 1251/1251, `[]` 3/3).
+  **WAJIB DITEST user sebelum sektor tab-swipe/bottom-nav dianggap tuntas**:
+  1. Install ulang dari `SONIX_v479.zip` (via Termux DAILY UPDATE script).
+  2. Di Beranda/Perpustakaan/Pengaturan: swipe horizontal di KONTEN (area kosong, bukan di atas
+     tab-bar itu sendiri) → pill/label bottom nav HARUS ikut berpindah ke tab tujuan begitu
+     gesture selesai (bukan cuma konten yang berganti seperti sebelumnya).
+  3. Ulangi dengan drag kontinu (jari 0 terangkat) yang lintas >1 batas tab (mis. Beranda→
+     Pengaturan lewat Perpustakaan) → pill harus ikut berpindah tiap batas terlewati, 0 macet.
+  4. Pastikan 0 regresi: tap biasa di tab & drag LANGSUNG di atas tab-bar (Batch 442/444/448)
+     masih berfungsi identik seperti sebelumnya.
+  Kirim hasil test ini balik sebelum sektor tab-swipe/bottom-nav disentuh lagi.
+- Batch 478 (sebelum 479). ZIP: `SONIX_v478.zip`. **1 file diubah**: `MainActivity.kt` —
+  INSTRUMENTASI SAJA (0 fix logic, lihat "Catatan Batch 478" di atas) — data log dari langkah ini
+  adalah yang mengungkap root cause Batch 479 di atas. Instrumentasinya sendiri sudah DICABUT
+  TOTAL di Batch 479, jadi langkah WAJIB USER versi Batch 478 (reproduksi + kirim log) SUDAH
+  SELESAI/TERPAKAI — jangan diulang.
 - Batch 477 (sebelum 478). ZIP: `SONIX_v477.zip`. **2 file diubah** (dalam batas 3
   file/tugas): `MiniPlayerBar.kt`, `MainActivity.kt` — lihat "Catatan Batch 477" di atas. Ringkas:
   (1) swipe-cancel mini player Batch 476 diperbaiki (wasit gesture dipindah ke

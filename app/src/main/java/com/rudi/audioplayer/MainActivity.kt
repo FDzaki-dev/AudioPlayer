@@ -171,7 +171,6 @@ import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
 import com.rudi.audioplayer.ui.theme.calmGrain
 import com.rudi.audioplayer.ui.theme.auroraGlow
 import com.rudi.audioplayer.ui.theme.LocalHazeState
-import com.rudi.audioplayer.util.AppLogger
 import dev.chrisbanes.haze.rememberHazeState
 // Batch 435 — swipe-lintas-3-tab (Beranda/Perpustakaan/Pengaturan). Semua import di bawah
 // disalin persis dari path yang SUDAH terbukti compile di ui/NowPlayingScreen.kt
@@ -1256,6 +1255,20 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val tabSwipeScope = rememberCoroutineScope()
     val tabDragOffsetPx = remember { mutableFloatStateOf(0f) }
     val tabDragOffset = remember { Animatable(0f) }
+    // Batch 479 — HOISTED dari dalam lambda `bottomBar =` (posisi lama, lihat komentar penuh di
+    // titik pemakaian `NavigationBar` di bawah) ke scope `AppNavHost` di sini — pola sinkronisasi
+    // yang SAMA PERSIS dgn `tabSwipeScope`/`tabDragOffsetPx`/`tabDragOffset` di atas (semua di
+    // scope ini justru SUPAYA bisa dibaca lintas lambda `content =` & `bottomBar =` milik
+    // `Scaffold`, 2 lambda terpisah yg 0 saling lihat state satu sama lain). Root cause bug "drag
+    // lintas tab, bottom nav diam" (lihat RESUME POINT Batch 478 di PROJECT_STATE.md): sebelum
+    // hoist ini, `navPillIndexAnim` cuma bisa disentuh dari DALAM `bottomBar =` (tab-bar-drag-end
+    // & 3 onClick `NavigationBarItem`) — swipe KONTEN (`content =`, blok pointerInput di bawah
+    // NavHost) 0 pernah bisa menyentuhnya sama sekali walau navigate()-nya sendiri berhasil.
+    val navPillIndexAnim = remember {
+        Animatable(
+            (TAB_ROUTES.indexOfFirst { it == currentRoute }.coerceAtLeast(0) + 0.5f)
+        )
+    }
 
     // Batch 437 — request eksplisit user: efek "kaca pembesar" ala iOS di label bawah, bereaksi
     // kontinu mengikuti gesture drag yang SAMA PERSIS dgn Batch 435 (0 gesture/state baru) —
@@ -1560,17 +1573,18 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // drag langsung di tab-bar (idle/nudge-konten/baru selesai drag). Selama drag
                     // LANGSUNG di tab-bar, posisi dibaca live dari `tabBarDragIndexPx` (mentah,
                     // 1:1 jari, pola sinkron yang sama persis dipertahankan dari Batch 444/445) —
-                    // `navPillIndexAnim` di-snapTo+animateTo HANYA di titik SELESAI drag (di bawah,
-                    // dekat `tabBarDragIndexPx.floatValue = Float.NaN`) & di 3 onClick tap biasa
-                    // (dekat tiap `NavigationBarItem`) — 0 LaunchedEffect(currentRoute) terpisah
-                    // supaya 0 race kondisi start-animasi ganda. Nilai awal = index tab aktif SAAT
+                    // disinkronkan via snapTo+animateTo eksplisit di 3 jalur: selesai drag LANGSUNG
+                    // di tab-bar (di bawah, dekat `tabBarDragIndexPx.floatValue = Float.NaN`), 3
+                    // onClick tap biasa (dekat tiap `NavigationBarItem`), DAN (Batch 479) selesai
+                    // drag swipe KONTEN (`content =`, blok pointerInput di luar `Scaffold` ini) —
+                    // 0 LaunchedEffect(currentRoute) generik dipasang di titik mana pun supaya 0
+                    // race kondisi start-animasi ganda antar 3 jalur di atas. Batch 479 — deklarasi
+                    // DIPINDAH (hoisted) ke scope `AppNavHost` atas (dekat `tabDragOffsetPx`) supaya
+                    // jalur ke-3 di atas (`content =`, scope terpisah dari `bottomBar =` ini) bisa
+                    // ikut menyentuhnya — lihat komentar lengkap di titik deklarasi barunya untuk
+                    // root cause penuh. Nilai awal (di titik deklarasi) = index tab aktif SAAT
                     // AppNavHost pertama komposisi (bukan hardcode 0/tengah), 0 lompatan visual
                     // pas start app di tab mana pun.
-                    val navPillIndexAnim = remember {
-                        Animatable(
-                            (TAB_ROUTES.indexOfFirst { it == currentRoute }.coerceAtLeast(0) + 0.5f)
-                        )
-                    }
                     val navBarIsSkeu = isSkeuTheme()
                     val navBarAccentTint = MaterialTheme.colorScheme.primary
                     NavigationBar(
@@ -2016,14 +2030,6 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         // ±40px Batch 435/437 disentuh, murni pindah pola sinkronisasi state yg SUDAH terbukti.
         val contentSwipeRouteState = rememberUpdatedState(currentRoute)
         val isOnTabRoute = TAB_ROUTES.any { it == currentRoute }
-        // Batch 478 — instrumentasi (lihat komentar panjang di pointerInput di bawah untuk
-        // rasionalisasi lengkap): log ini jalan LEPAS dari isOnTabRoute (di luar `if`), jadi
-        // absennya baris ini di Log Diagnostik SENDIRI sudah jadi sinyal — kalau composable ini
-        // sendiri 0 pernah ke-invoke utk currentRoute yang diuji, root cause-nya BUKAN di gesture
-        // sama sekali, tapi di layer navigasi/composition di atasnya.
-        LaunchedEffect(currentRoute) {
-            AppLogger.w("TabSwipe", "Batch478 content Box composed, currentRoute=$currentRoute, isOnTabRoute=$isOnTabRoute")
-        }
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -2043,23 +2049,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 .then(
                     if (isOnTabRoute) {
                         Modifier.pointerInput(Unit) {
-                            // Batch 478 — instrumentasi (BUKAN fix baru): user konfirmasi drag
-                            // lintas-tab MASIH 0 efek walau sudah dites di tab Pengaturan (nyaris
-                            // 0 elemen horizontal-scrollable di sana) — menyingkirkan teori
-                            // LazyRow-menelan-drag (Mix/Favorit/chip) sebagai penjelasan TUNGGAL.
-                            // Pola SAMA PERSIS Batch 463 (FloatingBubbleService.kt): 0 tebak fix
-                            // lagi tanpa data, log ini adalah data itu. `AppLogger.w()` dipilih
-                            // (bukan `Log.d` polos) — kebaca via Settings → Lanjutan → Log
-                            // Diagnostik, 0 perlu ADB/ device fisik ter-root. WAJIB DICABUT lagi
-                            // begitu root cause ketemu (bukan instrumentasi permanen).
-                            AppLogger.w("TabSwipe", "Batch478 pointerInput coroutine mulai, isOnTabRoute=$isOnTabRoute, currentRoute=$currentRoute, boxSize=$size")
                             var totalTabDrag = 0f
-                            var firstDragLogged = false
                             detectHorizontalDragGestures(
                                 onDragStart = {
                                     totalTabDrag = 0f
-                                    firstDragLogged = false
-                                    AppLogger.w("TabSwipe", "Batch478 onDragStart terpanggil, route=${contentSwipeRouteState.value}")
                                     // jaring pengaman sama seperti AlbumArtHero: hentikan
                                     // springback lama supaya tidak menimpa drag baru.
                                     tabSwipeScope.launch { tabDragOffset.stop() }
@@ -2071,7 +2064,6 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                         totalTabDrag > 120f -> TAB_ROUTES.getOrNull(fromIdx - 1)
                                         else -> null
                                     }
-                                    AppLogger.w("TabSwipe", "Batch478 onDragEnd totalTabDrag=$totalTabDrag targetRoute=$targetRoute")
                                     if (targetRoute != null) {
                                         tabSwipeHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         // Pola navigate IDENTIK dgn onClick NavigationBarItem/
@@ -2081,6 +2073,30 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                             popUpTo("home") { saveState = true }
                                             launchSingleTop = true
                                             restoreState = true
+                                        }
+                                        // Batch 479 — FIX root cause (data log instrumentasi Batch
+                                        // 478 dikonfirmasi user: drag/navigate di atas TERBUKTI
+                                        // jalan normal, currentRoute berubah sesuai target — tapi
+                                        // pill bottom nav tetap diam). Penyebab sebenarnya:
+                                        // `navPillIndexAnim` (deklarasi di-hoist ke scope
+                                        // AppNavHost atas, lihat komentar di titik deklarasinya)
+                                        // SEBELUMNYA cuma disinkronkan dari 2 jalur — selesai drag
+                                        // LANGSUNG di tab-bar (Batch 444/448) & onClick 3
+                                        // `NavigationBarItem` (Batch 448) — blok swipe KONTEN ini
+                                        // manggil navController.navigate() langsung TANPA PERNAH
+                                        // menyentuh navPillIndexAnim, jadi pill kehilangan sinyal
+                                        // pindah tab walau navigasi & konten sudah benar
+                                        // berpindah. Fix: 1 panggilan eksplisit tambahan HANYA di
+                                        // jalur ini (bukan LaunchedEffect(currentRoute) generik —
+                                        // sengaja dihindari, lihat rasionalisasi asli di titik
+                                        // deklarasi navPillIndexAnim, supaya 0 race start-animasi
+                                        // ganda dgn 2 jalur lain) — pola tween(220) IDENTIK dgn 3
+                                        // onClick NavigationBarItem, 0 angka/formula baru.
+                                        tabSwipeScope.launch {
+                                            navPillIndexAnim.animateTo(
+                                                TAB_ROUTES.indexOfFirst { it == targetRoute } + 0.5f,
+                                                tween(220)
+                                            )
                                         }
                                     }
                                     tabSwipeScope.launch {
@@ -2097,7 +2113,6 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     }
                                 },
                                 onDragCancel = {
-                                    AppLogger.w("TabSwipe", "Batch478 onDragCancel terpanggil, totalTabDrag=$totalTabDrag")
                                     tabSwipeScope.launch {
                                         tabDragOffset.snapTo(tabDragOffsetPx.floatValue)
                                         tabDragOffset.animateTo(
@@ -2112,10 +2127,6 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     }
                                 },
                                 onHorizontalDrag = { change, dragAmount ->
-                                    if (!firstDragLogged) {
-                                        firstDragLogged = true
-                                        AppLogger.w("TabSwipe", "Batch478 onHorizontalDrag PERTAMA terpanggil, dragAmount=$dragAmount")
-                                    }
                                     totalTabDrag += dragAmount
                                     change.consume()
                                     tabDragOffsetPx.floatValue = (totalTabDrag * 0.3f).coerceIn(-40f, 40f)
