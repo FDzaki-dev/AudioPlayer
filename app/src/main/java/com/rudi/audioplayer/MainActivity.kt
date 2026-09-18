@@ -224,6 +224,18 @@ class MainActivity : FragmentActivity() {
     // reacts immediately without needing a process restart.
     private var isUnlocked by mutableStateOf(false)
 
+    // BiometricPrompt.authenticate() called before the window actually has input focus
+    // (e.g. straight from onCreate/first composition, especially with installSplashScreen()
+    // still holding the splash content) can fail to show at all, silently — showBiometricPrompt()
+    // below only overrides onAuthenticationSucceeded, so that failure has no visible effect.
+    // Gating the auto-trigger on real window focus is what makes it reliably pop up on its own.
+    private var hasWindowFocus by mutableStateOf(false)
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        hasWindowFocus = hasFocus
+    }
+
     override fun onStop() {
         super.onStop()
         isUnlocked = false
@@ -354,8 +366,8 @@ class MainActivity : FragmentActivity() {
                 val biometricEnabled by playerViewModel.biometricEnabled.collectAsStateWithLifecycle()
                 val needsUnlock = lockEnabled && !isUnlocked
 
-                LaunchedEffect(needsUnlock, biometricEnabled) {
-                    if (needsUnlock && biometricEnabled && isBiometricAvailable()) {
+                LaunchedEffect(needsUnlock, biometricEnabled, hasWindowFocus) {
+                    if (needsUnlock && biometricEnabled && hasWindowFocus && isBiometricAvailable()) {
                         showBiometricPrompt { isUnlocked = true }
                     }
                 }
