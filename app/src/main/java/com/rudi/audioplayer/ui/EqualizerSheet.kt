@@ -133,7 +133,10 @@ fun EqualizerSheet(
                                 onBoldPresetSelect(preset)
                             },
                             interactionSource = chipInteraction,
-                            modifier = Modifier.bouncyPress(chipInteraction, pressedScale = 0.92f),
+                            // Batch 485 — `.animateItem()` di awal chain (pola sama LibraryScreen/
+                            // VaultSheet). Key stabil (`preset.name`) sudah ada. Grep app-wide file
+                            // ini: 0 hit `isDragging`/`draggable`/`reorder`.
+                            modifier = Modifier.animateItem().bouncyPress(chipInteraction, pressedScale = 0.92f),
                             shape = chipLiquidShape,
                             label = { Text(label) }
                         )
@@ -162,7 +165,9 @@ fun EqualizerSheet(
                                 },
                                 enabled = state.enabled,
                                 interactionSource = chipInteraction,
-                                modifier = Modifier.bouncyPress(chipInteraction, pressedScale = 0.92f),
+                                // Batch 485 — `.animateItem()`, sama alasan blok Preset Kuat di
+                                // atas. Key stabil (`state.presets[index]`) sudah ada.
+                                modifier = Modifier.animateItem().bouncyPress(chipInteraction, pressedScale = 0.92f),
                                 shape = chipLiquidShape,
                                 label = { Text(state.presets[index]) }
                             )

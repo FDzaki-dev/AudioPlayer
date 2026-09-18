@@ -1,5 +1,29 @@
 # Changelog
 
+## Batch 485 — POLISH: `.animateItem()` untuk SongPickerSheet, ABRepeatBookmarkSheet, EqualizerSheet
+Lanjutan micro-task polish animasi (Batch 481→482→483→484, resume point tidak berubah).
+User konfirmasi fix biometrik Batch 484 ✅, lanjut ke antrean berikut.
+
+3 file diubah (dalam batas 3 file/tugas):
+- `SongPickerSheet.kt`: `.animateItem()` pada row lagu (`itemsIndexed`, key `song.id` sudah ada).
+  Diverifikasi 0 hit `isDragging`/`draggable`/`reorder`; gesture sweep-select (`isSweeping`) bukan
+  drag-reorder, aman berdampingan.
+- `ABRepeatBookmarkSheet.kt`: `BookmarkRow` dapat parameter `modifier` baru (default aman, pola
+  sama `DuplicateSongRow` Batch 482), dipanggil dgn `.animateItem()` dari `items{}`.
+- `EqualizerSheet.kt`: `.animateItem()` pada 2 `LazyRow` chip preset (Preset Kuat + Preset Bawaan
+  Perangkat), key sudah stabil di keduanya.
+
+0 logic filter/checkbox/sweep/preset-select disentuh — murni modifier animasi tambahan.
+0 diverifikasi CI/device (0 env Android/compiler Kotlin sesi ini; balance brace/paren dicek per
+file: semua match). **WAJIB DITEST user**: search di Song Picker (filter berubah → baris
+masuk/keluar halus, geser mengisi celah); hapus bookmark di AB Repeat (baris hilang halus); ganti
+preset EQ (visual chip re-layout halus, 0 regresi ke selection/enabled state).
+
+Resume selanjutnya (kalau test ✅): sektor pill/tab-sync + gesture-drag custom (mini
+player/queue) — PALING TERAKHIR per keputusan Batch 483, butuh audit 1 batch penuh krn riwayat
+regresi (448/477/479). `SmartPlaylistScreen.kt`/`LyricsSheet.kt` animateItem belum dikerjakan,
+masih di antrean kalau user minta lanjut ke situ.
+
 ## Batch 484 — FIX: toggle/tombol sidik jari hilang di Kunci Aplikasi + label visual; biometrik baru di Vault
 2 instruksi eksplisit user dalam 1 pesan: (1) "regresi lain di bagian keamanan yaitu absennya
 biometrik fingerprint beserta label sidik jari diujung bawah", (2) "sekalian tanamkan biometrik

@@ -222,7 +222,16 @@ fun SongPickerSheet(
                         }
                         val isSelected = song.id in selected
                         Row(
+                            // Batch 485 — `.animateItem()` ditambah (posisi awal chain, pola sama
+                            // DuplicateFinderSheet/VaultSheet Batch 482/483). List ini sudah punya
+                            // `key` stabil (`song.id`) sejak awal. Diverifikasi grep app-wide file
+                            // ini: 0 hit `isDragging`/`draggable`/`reorder` — gesture "sweep-select"
+                            // (`isSweeping`/`rowBoundsInRoot`) BUKAN drag-reorder (tidak memindah
+                            // posisi item, cuma menandai rentang checkbox), jadi aman dari resiko
+                            // "berebut" dgn animateItem seperti kasus QueueSheet/PlaylistScreen.
+                            // 0 logic filter/checkbox/sweep disentuh.
                             modifier = Modifier
+                                .animateItem()
                                 .fillMaxWidth()
                                 .onGloballyPositioned { coords ->
                                     val top = coords.positionInRoot().y

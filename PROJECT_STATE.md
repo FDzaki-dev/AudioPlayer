@@ -12,6 +12,54 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 485 [user konfirmasi fix biometrik Batch 484 ✅ ("applause"), instruksi: "lanjut
+kerjakan Polish yang masih tertunda"]**: lanjut resume point Batch 484 (masih valid, 0 berubah
+sejak ditulis) — micro-task polish animasi antrean Batch 481/482/483.
+
+**3 file diubah** (dalam batas 3 file/tugas): `SongPickerSheet.kt`, `ABRepeatBookmarkSheet.kt`,
+`EqualizerSheet.kt`.
+1. Ketiganya dicek dulu (pola sama Batch 482/483): grep `isDragging`/`draggable`/`reorder` di
+   masing-masing file = 0 hit → aman dari resiko `.animateItem()` "berebut" dgn gesture drag.
+   `SongPickerSheet.kt` punya gesture custom "sweep-select" (`isSweeping`/`rowBoundsInRoot`,
+   long-press+drag utk tandai rentang checkbox) — DIPERIKSA MANUAL, ini BUKAN drag-reorder (0
+   memindah posisi item, cuma menandai rentang), jadi tetap aman ditambah `.animateItem()`.
+2. `SongPickerSheet.kt`: `.animateItem()` di awal modifier chain row lagu (`itemsIndexed`, key
+   `song.id` sudah ada sejak awal — prasyarat terpenuhi).
+3. `ABRepeatBookmarkSheet.kt`: `BookmarkRow` (private, 1 titik panggil) dapat parameter baru
+   `modifier: Modifier = Modifier` (default aman, 0 breaking, pola PERSIS `DuplicateSongRow`
+   Batch 482) diteruskan ke root `Row`; titik panggil diberi `modifier = Modifier.animateItem()`.
+4. `EqualizerSheet.kt`: 2 `FilterChip` inline di dalam masing-masing `LazyRow` (Preset Kuat +
+   Preset Bawaan Perangkat) langsung ditambah `.animateItem()` di awal modifier chain — 0 perlu
+   ubah signature (FilterChip sudah terima `modifier` langsung), key masing-masing sudah stabil
+   (`preset.name` / `state.presets[index]`).
+5. **0 disentuh**: `SmartPlaylistScreen.kt`/`LyricsSheet.kt` (di luar 3 file resume point batch
+   ini — tetap di antrean kalau user minta lanjut), logic filter/sweep-select/checkbox
+   (SongPicker), logic jump/delete bookmark (ABRepeat), logic select/enabled preset (Equalizer)
+   — 0 baris logic berubah, murni tambahan modifier animasi. Sektor pill/tab-sync +
+   gesture-drag custom (mini player/queue) TETAP tidak disentuh (keputusan Batch 483 masih
+   berlaku).
+
+**0 diverifikasi CI/device Batch 485** — 0 env Android nyata/compiler Kotlin sesi ini (balance
+brace/paren dicek per file, semua match: `SongPickerSheet.kt` `{}` cocok, `()` cocok;
+`ABRepeatBookmarkSheet.kt` `{}` cocok, `()` cocok; `EqualizerSheet.kt` `{}` cocok, `()` cocok).
+**WAJIB DITEST user**:
+1. Song Picker (mis. tambah lagu ke playlist/queue) → ketik di search box supaya daftar
+   terfilter naik-turun → baris yang muncul/hilang harus slide+fade halus (bukan pop instan),
+   sisa baris geser mengisi celah; sweep-select (long-press lalu geser utk centang banyak
+   sekaligus) harus tetap akurat 100% (0 regresi ke rentang yang ditandai).
+2. AB Repeat → tambah beberapa bookmark lalu hapus salah satu → baris yang dihapus slide+fade
+   keluar halus, sisa baris geser naik mengisi celah, 0 regresi ke jump-to-position/rename.
+3. Equalizer → ganti-ganti preset (Kuat maupun Bawaan Perangkat) → transisi visual chip
+   (selected state, layout) tetap mulus, 0 regresi ke enabled/disabled state atau band slider.
+4. Pastikan 0 crash/force-close saat build (parameter baru `modifier` di `BookmarkRow`, default
+   value jadi 0 breaking di satu-satunya titik panggil).
+**[RESUME POINT Batch 486]**: kalau test di atas ✅, `SmartPlaylistScreen.kt`/`LyricsSheet.kt`
+masih di antrean `.animateItem()` kalau user minta lanjut ke situ (LyricsSheet prioritas RENDAH,
+lihat rasional Batch 483 — list statis 0 pernah insert/remove runtime). Kalau tidak, lanjut ke
+sektor pill/tab-sync + gesture-drag custom (mini player/queue) — PALING TERAKHIR per keputusan
+Batch 483/484, butuh audit 1 batch penuh (bukan diselipkan) krn riwayat regresi (Batch
+448/477/479) — jangan mulai dari situ tanpa instruksi eksplisit user utk sektor itu spesifik.
+
 **Catatan Batch 484 [2 instruksi eksplisit user dalam 1 pesan: (1) "regresi lain di bagian
 keamanan yaitu absennya biometrik fingerprint beserta label sidik jari diujung bawah" (Kunci
 Aplikasi/LockScreen), (2) "sekalian tanamkan biometrik juga pada vault"]**:
