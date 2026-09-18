@@ -15,7 +15,9 @@
 # narasi batch usang). Total path tidak berubah — 190 file.
 # Batch 481: app/src/main/java/com/rudi/audioplayer/ui/theme/Motion.kt (file baru, token
 # easing/durasi iOS) ditambahkan — 190->191.
-# Total: 191 file
+# Batch 488: app/src/main/java/com/rudi/audioplayer/data/LibraryCacheStore.kt (file baru, cache
+# disk snapshot library utk cold-start instan) ditambahkan — 191->192.
+# Total: 192 file
 
 .github/workflows/build.yml
 .gitignore
@@ -49,6 +51,7 @@ app/src/main/java/com/rudi/audioplayer/data/FavoritesStore.kt
 app/src/main/java/com/rudi/audioplayer/data/FloatingBubbleStore.kt
 app/src/main/java/com/rudi/audioplayer/data/HourlyListenStore.kt
 app/src/main/java/com/rudi/audioplayer/data/Id3TagWriter.kt
+app/src/main/java/com/rudi/audioplayer/data/LibraryCacheStore.kt
 app/src/main/java/com/rudi/audioplayer/data/LibraryFilterStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ListeningHistoryStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ListeningStatsEngine.kt

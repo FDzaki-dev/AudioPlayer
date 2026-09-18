@@ -12,6 +12,70 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 488 [laporan urgent user: "app tidak load berulang kali setiap aplikasi baru
+dibuka kembali pasca app di kill!!"]**: laporan BARU, BUKAN reopen sektor DITUTUP manapun,
+TERPISAH dari antrean `.animateItem()` (Batch 481-487 di bawah — TIDAK disentuh/TIDAK berubah
+oleh batch ini, resume chain itu tetap berlaku persis seperti tercatat).
+
+**Root cause TERKONFIRMASI dari pembacaan kode (bukan tebakan)**: `PlayerViewModel.
+ensureLibraryLoaded()` — `libraryLoadedOnce` murni in-memory `var`, SELALU `false` lagi di
+proses baru (app-kill lalu dibuka lagi) → `refreshLibrary()` (full scan MediaStore+SAF) dipicu
+ulang dari nol TIAP KALI, `_libraryLoading=true` (shimmer skeleton `HomeScreen`/`LibraryScreen`)
+menutupi list SETIAP app dibuka lagi walau library 0 berubah sejak sesi lalu. Sudah
+didokumentasikan sendiri Batch 386 ("jalur paling panas cold-start") & Batch 436 (investigasi
+laporan user "nunggu buffer ±20 detik") — Batch 436 waktu itu MENYIMPULKAN ini "expected
+behavior" (bukan bug), TIDAK di-fix. Batch ini merevisi kesimpulan itu jadi di-fix, sesuai
+laporan urgent user.
+
+**2 file diubah** (dalam batas 3 file/tugas, 1 di antaranya file baru): `LibraryCacheStore.kt`
+(BARU), `PlayerViewModel.kt`.
+1. `LibraryCacheStore.kt` (baru, `data/`): snapshot `List<Song>` hasil scan terakhir disimpan ke
+   disk (`context.filesDir`, JSON via `org.json` — bagian Android SDK, 0 dependency baru
+   ditambah `build.gradle.kts`) lewat temp-file-lalu-rename (proses di-kill di tengah `save()`
+   tidak pernah menyisakan file cache korup). `save()`/`load()` murni sinkron — caller
+   (`PlayerViewModel`) yang wajib dispatch ke `Dispatchers.IO`, pola sama persis Store lain
+   (`PlaybackStateStore` dkk) di package ini.
+2. `PlayerViewModel.kt`:
+   - `ensureLibraryLoaded()`: sebelum `refreshLibrary()`, muat cache disk dulu (IO) — kalau ada
+     & tidak kosong, `_librarySongs`/`_libraryLoading` diisi LANGSUNG dari situ (list asli
+     tampil seketika, 0 shimmer) + `maybeSyncMiniPlayerOnColdStart()` ikut dipanggil (3 titik
+     panggil sekarang, pola sama Batch 476 "menutup race mana pun selesai duluan"), LALU
+     `refreshLibrary(silent = true)` TETAP jalan di background (menangkap perubahan lagu asli
+     sejak sesi lalu — scan asli 0 dihapus/dilewati, cuma tidak lagi memicu shimmer). Kalau
+     cache tidak ada/korup/kosong (mis. install baru) → turun ke `refreshLibrary()` biasa
+     (`silent=false`), 0 berubah dari sebelum batch ini.
+   - `refreshLibrary()`: param baru `silent: Boolean = false` — `_libraryLoading=true` HANYA
+     kalau `!silent`. **0 titik panggil LAMA berubah** (pull-to-refresh & tombol "Pindai Ulang"
+     `MainActivity.kt`, content-observer, dkk — SEMUA masih panggil tanpa argumen = default
+     `false`, shimmer/loading feedback rescan manual TETAP tampil PERSIS seperti sebelumnya).
+   - Setelah scan sukses (`_librarySongs.value = songs`): `libraryCacheStore.save(songs)`
+     dipanggil fire-and-forget di `Dispatchers.IO` terpisah — gagal/lambatnya cache write TIDAK
+     PERNAH menunda update UI (`_librarySongs` sudah di-assign duluan di baris sebelumnya).
+
+**0 diverifikasi CI/device Batch 488** — 0 env Android nyata/compiler Kotlin sesi ini (balance
+brace/paren/bracket: `PlayerViewModel.kt` `{}` 246/246 `()` 1003/1003 `[]` 38/38;
+`LibraryCacheStore.kt` baru `{}` 11/11 `()` 109/109 `[]` 1/1). **WAJIB DITEST user**:
+1. Buka app, tunggu library selesai dimuat sekali (boleh shimmer). Force-close TOTAL (App Info →
+   Force Stop, ATAU swipe dari Recents lalu tunggu OS recycle proses). Buka app lagi dari
+   launcher → Home/Library HARUS langsung tampil isi (0 shimmer/layar kosong), bukan nunggu scan
+   ulang seperti sebelumnya.
+2. Ulangi test #1 sekali lagi (buka→force-close→buka) → tetap instan & konsisten.
+3. Tambah/hapus 1 lagu (file manager/app lain) SAAT app dalam kondisi force-close, lalu buka app
+   lagi → list tetap tampil INSTAN dari cache dulu (boleh sesaat belum mencerminkan perubahan
+   itu), lalu dalam beberapa detik berikutnya (scan senyap background selesai) list ikut update
+   mencerminkan lagu yang ditambah/dihapus — TANPA shimmer muncul di tengah proses ini.
+4. Tombol "Pindai Ulang" (Library screen) DAN pull-to-refresh: pastikan shimmer/loading feedback
+   SAAT DITEKAN MANUAL tetap muncul seperti biasa (0 regresi — SENGAJA tidak diubah, beda dari
+   cold-start otomatis di atas).
+5. Install baru / clear app data (skenario 0 cache) → shimmer pertama kali TETAP muncul seperti
+   biasa (0 regresi ke kondisi ini — cuma kondisi cold-start BERIKUTNYA yang berubah).
+6. Pastikan 0 crash/force-close saat build (1 import baru `LibraryCacheStore` di
+   `PlayerViewModel.kt`, 0 dependency baru di `build.gradle.kts`).
+
+Lanjutan: sektor ini dianggap TUNTAS menunggu konfirmasi device 6 poin di atas. Antrean
+`.animateItem()` (Batch 481-487) & seluruh investigasi lain (bubble/tab-nav/mini-player) TIDAK
+terpengaruh/TIDAK berubah oleh batch ini — lanjutkan sesuai instruksi eksplisit user berikutnya.
+
 **Catatan Batch 486 [instruksi user: "lanjutkan progress yang tertunda!!" — TANPA konfirmasi
 eksplisit hasil test Batch 485 (Song Picker/AB Repeat/Equalizer)]**: hasil test Batch 485 BELUM
 dikonfirmasi user di sesi ini — dicatat di sini supaya sesi berikutnya 0 salah asumsi ("AI DILARANG

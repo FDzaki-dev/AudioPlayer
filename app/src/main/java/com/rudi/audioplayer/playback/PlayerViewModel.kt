@@ -30,6 +30,7 @@ import com.rudi.audioplayer.data.CrossfadeStore
 import com.rudi.audioplayer.data.CustomFolderInfo
 import com.rudi.audioplayer.data.CustomFolderScanner
 import com.rudi.audioplayer.data.CustomFolderStore
+import com.rudi.audioplayer.data.LibraryCacheStore
 import com.rudi.audioplayer.data.FavoritesStore
 import com.rudi.audioplayer.data.LyricsStore
 import com.rudi.audioplayer.data.MusicRepository
@@ -529,6 +530,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private var libraryRefreshJob: Job? = null
     private var libraryRefreshGeneration = 0L
     private val musicRepository = MusicRepository(appContext)
+    // Batch 488 — lihat KDoc `LibraryCacheStore` & `ensureLibraryLoaded()`/`refreshLibrary()`
+    // di bawah untuk root cause + rasional penuh ("app reload setiap dibuka lagi pasca kill").
+    private val libraryCacheStore = LibraryCacheStore(appContext)
 
     // Batch 476 — beda dari `libraryLoadedOnce` di atas (itu diset TRUE sinkron begitu sebuah
     // scan DIMULAI, bukan selesai — sinyal "jangan scan dobel", bukan "data sudah ada"). Flag
@@ -785,19 +789,61 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         libraryContentObserver = observer
     }
 
-    /** Scans MediaStore once and caches the result so Home/Library/Playlist don't each scan independently. */
+    /** Scans MediaStore once and caches the result so Home/Library/Playlist don't each scan
+     *  independently.
+     *
+     *  Batch 488 [laporan urgent user: "app tidak load berulang kali setiap dibuka kembali
+     *  pasca app di kill!!"] — root cause CONFIRMED via pembacaan kode (bukan tebakan):
+     *  `libraryLoadedOnce` di bawah murni in-memory `var`, jadi SETIAP proses baru (app-kill
+     *  lalu dibuka lagi) selalu `false` di sini lagi → full scan MediaStore+SAF dipicu ulang
+     *  dari nol, `_libraryLoading=true` (shimmer skeleton, `HomeScreen`/`LibraryScreen`)
+     *  menutupi list SETIAP app dibuka lagi walau library 0 berubah sejak sesi lalu — sudah
+     *  didokumentasikan sendiri Batch 386/436 sbg "jalur paling panas cold-start"; Batch 436
+     *  waktu itu menyimpulkan ini "expected behavior" & TIDAK di-fix. Batch ini merevisi
+     *  kesimpulan itu.
+     *
+     *  Fix: `LibraryCacheStore` (file baru, lihat KDoc kelasnya) memuat snapshot hasil scan
+     *  TERAKHIR dari disk duluan — kalau ada & tidak kosong, `_librarySongs`/`_libraryLoading`
+     *  diisi LANGSUNG dari situ (list asli tampil seketika, 0 shimmer), lalu
+     *  `refreshLibrary(silent = true)` TETAP jalan seperti biasa di background (menangkap lagu
+     *  baru/dihapus sejak sesi lalu) TANPA memicu shimmer lagi (lihat parameter `silent` &
+     *  KDoc `refreshLibrary()` di bawah). Kalau cache tidak ada/korup/kosong (mis. install
+     *  baru) — turun apa adanya ke `refreshLibrary()` (silent=false, default lama): shimmer
+     *  tetap tampil PERSIS seperti sebelum batch ini, 0 regresi ke satu-satunya kondisi lama
+     *  yang masih berlaku sama persis. */
     fun ensureLibraryLoaded() {
         if (libraryLoadedOnce) return
-        refreshLibrary()
+        libraryLoadedOnce = true
+        viewModelScope.launch {
+            val cached = withContext(Dispatchers.IO) { libraryCacheStore.load() }
+            if (cached != null && cached.isNotEmpty()) {
+                _librarySongs.value = cached
+                _libraryLoading.value = false
+                librarySnapshotLoadedOnce = true
+                maybeSyncMiniPlayerOnColdStart()
+                refreshLibrary(silent = true)
+            } else {
+                refreshLibrary()
+            }
+        }
     }
 
-    /** Forces a fresh MediaStore scan (used by the Library screen's "Pindai Ulang" button). */
-    fun refreshLibrary() {
+    /** Forces a fresh MediaStore scan (used by the Library screen's "Pindai Ulang" button).
+     *  @param silent Batch 488 — true HANYA untuk revalidasi background otomatis yang dipicu
+     *  `ensureLibraryLoaded()` persis setelah cache-hit (lihat di atas): UI SUDAH menampilkan
+     *  list dari cache, jadi menyalakan `_libraryLoading` lagi di sini cuma mengedipkan shimmer
+     *  di atas data yang sudah kelihatan, tanpa guna. Setiap titik panggil LAMA (pull-to-refresh,
+     *  tombol "Pindai Ulang") TETAP memanggil ini TANPA argumen (default `false`) — 0 perubahan
+     *  perilaku ke keduanya, shimmer/loading feedback saat rescan manual tetap tampil PERSIS
+     *  seperti sebelum batch ini. */
+    fun refreshLibrary(silent: Boolean = false) {
         libraryLoadedOnce = true
         libraryRefreshJob?.cancel()
         val generation = ++libraryRefreshGeneration
         libraryRefreshJob = viewModelScope.launch {
-            _libraryLoading.value = true
+            if (!silent) {
+                _libraryLoading.value = true
+            }
             // Gap List #5: refresh the permission-status badge every scan, not just right
             // after add/remove — a grant can be revoked from outside the app at any time
             // with no callback, so "was true last time we checked" can go stale silently.
@@ -856,6 +902,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                     _librarySongs.value = songs
                     librarySnapshotLoadedOnce = true
                     maybeSyncMiniPlayerOnColdStart()
+                    // Batch 488 — simpan snapshot ini utk cold-start BERIKUTNYA (lihat KDoc
+                    // `ensureLibraryLoaded()`/`LibraryCacheStore`). Dispatch ke IO terpisah,
+                    // fire-and-forget: gagal/lambatnya penulisan cache TIDAK BOLEH menunda
+                    // assignment `_librarySongs` di atas (UI thread SUDAH update duluan).
+                    viewModelScope.launch(Dispatchers.IO) { libraryCacheStore.save(songs) }
                     // Gap List #9 — orphan cleanup: favorites/ratings/playlist entries pointing
                     // at a song no longer in the freshly-scanned library are dead weight (file
                     // deleted/moved/permission revoked). Deliberately NOT applied to

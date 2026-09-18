@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 488 — FIX: app tidak lagi "reload"/shimmer tiap dibuka kembali pasca di-kill
+Laporan urgent user: app selalu terasa "load ulang" (shimmer skeleton menutupi library) setiap
+kali dibuka lagi setelah proses di-kill, walau isi library tidak berubah sejak sesi terakhir.
+
+Root cause terkonfirmasi (bukan tebakan): scan library penuh (MediaStore + folder custom) selalu
+dipicu ulang dari nol di setiap proses baru — sudah dicatat sejak Batch 386/436, sebelumnya
+dianggap "wajar", sekarang diperbaiki.
+
+2 file diubah (1 file baru): `LibraryCacheStore.kt` (baru), `PlayerViewModel.kt`.
+- Hasil scan terakhir sekarang disimpan ke penyimpanan privat app (JSON, tanpa dependency baru).
+- Saat app dibuka lagi, isi library dari cache ini ditampilkan LANGSUNG (instan, 0 shimmer),
+  sementara scan asli tetap berjalan senyap di background untuk menangkap lagu yang
+  ditambah/dihapus sejak sesi lalu — begitu selesai, list diperbarui otomatis tanpa shimmer.
+- Tombol "Pindai Ulang" & pull-to-refresh manual TIDAK berubah — shimmer/loading feedback saat
+  ditekan sendiri oleh user tetap tampil seperti biasa.
+- Install baru / cache belum ada: perilaku loading pertama kali tetap sama seperti sebelumnya.
+
+0 diverifikasi CI/device sesi ini. **WAJIB DITEST user**: buka app → tunggu library termuat →
+force-close total → buka lagi → library harus langsung tampil isi (0 shimmer). Detail lengkap +
+skenario test lain: `PROJECT_STATE.md` § Batch 488.
+
 ## Batch 486 — POLISH: `.animateItem()` untuk SmartPlaylistScreen, LyricsSheet
 Lanjutan micro-task polish animasi (Batch 481→…→485). Instruksi user generik ("lanjutkan progress
 yang tertunda") tanpa konfirmasi eksplisit hasil test Batch 485 — dicatat di `PROJECT_STATE.md`
