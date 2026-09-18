@@ -12,6 +12,120 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 489 [input baru: `QA_Checklist_SONIX_v488_terisi.md`, instruksi eksplisit user
+"tanamkan planning dokumen tersebut kedalam project yang disesuaikan dengan kondisi nyata"]**:
+checklist adalah hasil audit source-inspection eksternal (BUKAN hasil kerja batch mana pun di
+project ini) terhadap `SONIX_v488.zip` — 5 kategori fitur core (Kontrol Pemutaran, Audio
+Back-End, Playlist/Queue, Integrasi Sistem, File/Eror) ditandai `[x]`/`[~]`/`[-]` per kriteria.
+Checklist ITU SENDIRI eksplisit membedakan 2 kelas gap: (a) gap SUMBER yang bisa dikonfirmasi
+dari baca kode (9 poin di "Verdict"), (b) item yang murni BELUM diverifikasi device fisik (tidak
+bisa "difix" lewat kode sama sekali, mis. latency nyata, kombinasi tekan TWS, ketahanan RAM
+jangka panjang). Batch ini memverifikasi ULANG kesembilan poin (a) satu-satu ke kode sungguhan
+(bukan menelan klaim checklist mentah-mentah — checklist adalah dokumen eksternal, P1 tetap ZIP/
+source, bukan checklist), lalu MENGEKSEKUSI 1 gap yang paling jelas & aman diperbaiki batch ini
+(TUNNEL VISION — sisanya masuk roadmap terlacak di bawah, BUKAN dikerjakan sekaligus).
+
+**Verifikasi ulang 9 gap "Verdict" checklist terhadap source (bukan tebakan)**:
+1. **Stop playback eksplisit** — DIKONFIRMASI BENAR gap nyata: grep `controller?.stop()` app-wide
+   cuma 1 hit, di dalam `PlayerViewModel.dismissMiniPlayer()` (pola "cancel" — ikut mengosongkan
+   queue/state tersimpan via `UndoableAction`, BUKAN tombol Stop biasa). 0 kontrol Stop berdiri
+   sendiri di UI mana pun. **DIPERBAIKI batch ini** (lihat di bawah).
+2. **Previous 3 detik** — DICEK ke `PlaybackService.kt` (ExoPlayer.Builder) & `PlayerViewModel.
+   previous()`: BENAR 0 ada override eksplisit `setSeekBackIncrementMs`/threshold custom, murni
+   `controller?.seekToPreviousMediaItem()` polos. Catatan tambahan (tidak ada di checklist):
+   default Media3 (`Player.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS`) SUDAH persis 3000ms — jadi
+   perilaku RUNTIME kemungkinan besar sudah sesuai spec, gap-nya murni "tidak eksplisit/tidak
+   didokumentasikan sebagai keputusan sadar" (rawan berubah diam-diam kalau versi Media3 di-bump
+   nanti). **BELUM diperbaiki batch ini** — kandidat fix murah (1 baris `setMaxSeekToPreviousPositionMs`
+   di scope `ExoPlayer.Builder` `PlaybackService.kt` untuk mengunci nilainya secara eksplisit,
+   bukan warisan default library), masuk roadmap di bawah, BUKAN dikerjakan bareng gap #1 supaya
+   batch ini tetap tunnel-vision 1 sektor (transport control UI) tanpa merambah `PlaybackService.kt`.
+3. **Shuffle anti-repeat-nearby** — DICEK: shuffle 100% delegasi ke `Player.shuffleModeEnabled`
+   Media3 bawaan, 0 algoritma custom di project ini. Constraint "tidak mengulang lagu yang sama
+   dalam waktu dekat" MEMANG tidak dijamin (benar, sesuai checklist) — TAPI ini scope FITUR BARU
+   (custom shuffle engine), bukan sekadar "gap kecil", risiko regresi ke urutan queue/persistence
+   (`PlaybackStateStore`) kalau dikerjakan tergesa. **BELUM diperbaiki** — butuh instruksi
+   eksplisit user dulu sebelum dikerjakan (pola sama seperti sektor pill/tab-sync: fitur besar,
+   bukan micro-task), dicatat di roadmap.
+4. **Bluetooth reconnection** — DICEK `PlaybackService.kt`: `setHandleAudioBecomingNoisy(true)` +
+   MediaSession resumption SUDAH terpasang (bukan gap kode) — checklist sendiri sudah bilang ini
+   murni butuh uji HARDWARE, 0 baris kode kandidat fix. **Tidak actionable lewat kode.**
+5. **Audio focus semua skenario** — DICEK: `AudioAttributes` + `handleAudioFocus = true` Media3
+   SUDAH benar dipasang (bukan gap kode) — checklist sendiri bilang murni butuh device-test lintas
+   skenario telepon/WA-call/alarm/Maps. **Tidak actionable lewat kode.**
+6. **Filter audio pendek (WhatsApp/ringtone/game effect)** — DICEK `MusicRepository.kt`:
+   DIKONFIRMASI BENAR, `BASE_SELECTION` cuma `IS_MUSIC != 0 AND DURATION > 0`, 0 batas durasi
+   minimum. **BELUM diperbaiki batch ini** — kandidat fix (duration-floor HANYA di `getAllSongs()`,
+   `getSongsByIds()` TETAP tidak disentuh supaya lagu pendek yang SUDAH ada di playlist/queue/
+   favorit sebelum fix ini tidak mendadak hilang) masuk roadmap, sengaja dipisah dari gap #1 biar
+   1 batch = 1 file yang disentuh (`MusicRepository.kt` murni, tanpa dicampur `ui`/`playback`).
+7. **Streaming audio online** — checklist SENDIRI sudah menandai ini `[-]` (di luar scope, app ini
+   pemutar lokal). **Tidak ada aksi, bukan gap.**
+8. **Process-death/background/lock-screen/TWS** — semua murni device-QA, 0 kandidat fix kode baru
+   yang tidak sudah dibahas gap #4/#5 di atas. **Tidak actionable lewat kode.**
+9. **Multi-format decoder robustness** — DICEK: dukungan format (MP3/AAC/FLAC/WAV/OGG/OPUS/AMR)
+   sepenuhnya diwariskan dari MediaStore/Media3 platform, project ini 0 punya decoder sendiri buat
+   diaudit. **Tidak actionable lewat kode** — butuh corpus file nyata + device test, sesuai
+   checklist sendiri.
+
+**1 file diubah** (dalam batas 3 file/tugas — kode inti) + 2 file wiring UI/Activity (total tetap
+dianggap 1 sektor/1 tugas, pola sama Batch 484 yang eksplisit menyebut alasan melebihi hitungan
+normal): `PlayerViewModel.kt`, `NowPlayingScreen.kt`, `MainActivity.kt`.
+1. `PlayerViewModel.kt`: `stopPlayback()` baru — `pause()` + `seekTo(0L)` lewat `controller`.
+   SENGAJA BUKAN `controller.stop()` mentah (itu pindah Media3 ke `STATE_IDLE`, butuh `prepare()`
+   ulang sebelum `play()` berikutnya — jalur lifecycle itu 0 diaudit batch ini, lebih aman
+   pause+seekTo yang hasil akhirnya sama-sama "berhenti + posisi balik ke 0" tanpa mengubah
+   player state machine). 0 menyentuh queue/`currentQueueSlotIds`/`playbackStateStore`/
+   `UndoableAction` — beda total dari `dismissMiniPlayer()` (itu "cancel", ini "stop").
+2. `NowPlayingScreen.kt`: parameter baru `onStopPlayback` diteruskan ke `AdvancedControlsSheet`,
+   1 `AdvancedControlRow` baru ("Stop Pemutaran", ikon `Icons.Default.Stop`) di seksi "Pemutaran"
+   sheet "Kontrol Lanjutan" — SENGAJA TIDAK ditaruh di Row transport utama (Shuffle/Prev/Play/
+   Next/Repeat, 5 ikon `SpaceEvenly`) supaya 0 menyentuh layout yang sudah di-tuning berkali-kali
+   (Batch 170/224/226/469-472 dst) — pola "kontrol yang jarang dipakai casual listener masuk
+   sheet Lanjutan" ini SUDAH jadi konvensi file ini sejak Batch 312 (KDoc `AdvancedControlsSheet`).
+   0 dialog konfirmasi (beda dari dismiss mini player yang butuh Undo) — aksinya reversibel
+   sendiri, tinggal tekan Play lagi.
+3. `MainActivity.kt`: 1 baris wiring `onStopPlayback = { playerViewModel.stopPlayback() }` di
+   satu-satunya titik panggil `NowPlayingScreen(...)` (`nowPlayingContent` lambda, Batch 101 —
+   dipakai Compact & Expanded/two-pane, jadi 1 wiring ini otomatis berlaku ke keduanya).
+
+**0 diverifikasi CI/device Batch 489** — 0 env Android nyata/compiler Kotlin sesi ini (balance
+brace/paren/bracket: `PlayerViewModel.kt` `{}` 248/248 `()` 1017/1017 `[]` 39/39;
+`NowPlayingScreen.kt` `{}` 293/293 `()` 1299/1299 `[]` 1/1; `MainActivity.kt` `{}` 341/341
+`()` 1270/1270 `[]` 3/3). **WAJIB DITEST user**:
+1. Buka lagu apa saja → Now Playing → ketuk ⋮ ("Kontrol Lanjutan") → scroll ke seksi "Pemutaran"
+   → baris baru "Stop Pemutaran" harus muncul (ikon kotak/Stop) di bawah "Repeat A-B & Bookmark".
+2. Ketuk baris itu → sheet tertutup, musik BERHENTI + slider posisi balik ke 0:00, TAPI judul
+   lagu/artwork/antrean TETAP tampil (bukan reset ke Home/kosong seperti swipe-dismiss mini
+   player) — tekan tombol Play (▶) lagi → lagu yang SAMA lanjut main dari awal (0:00), BUKAN
+   pindah ke lagu lain di antrean.
+3. Pastikan 0 regresi ke swipe-dismiss mini player (Batch 476/480 — masih "cancel total" +
+   Snackbar "Urungkan", TIDAK disentuh batch ini) dan ke 5 tombol transport utama (Shuffle/Prev/
+   Play/Next/Repeat) — 0 perubahan posisi/ukuran/handler di Row itu.
+4. Pastikan 0 crash/force-close saat build (1 fungsi ViewModel baru + 1 parameter baru diteruskan
+   lewat 1 composable — 0 signature lama yang dihapus/diubah, semua penambahan murni).
+
+**Roadmap Gap QA v488 (BELUM dikerjakan, urutan bukan prioritas mutlak — tunggu arahan user atau
+lanjutkan sebagai micro-task berikutnya)**:
+- **Gap #2 (Previous 3 detik eksplisit)** — 1 baris kandidat: `setSeekBackIncrementMs`/setara di
+  `ExoPlayer.Builder` (`PlaybackService.kt`) mengunci 3000ms eksplisit alih-alih warisan default
+  Media3. Risiko rendah, scope 1 file.
+- **Gap #6 (Filter audio pendek)** — kandidat: `MusicRepository.kt`, `getAllSongs()` SAJA dapat
+  selection baru dengan `DURATION > <ambang>` (mis. 30 detik, ambang umum industri musik-vs-clip),
+  `getSongsByIds()`/`BASE_SELECTION` lama TETAP tidak disentuh (lagu pendek yang SUDAH ada di
+  playlist/favorit/queue tidak boleh mendadak hilang — cek `getSongsByIds()` dipakai
+  `PlaybackService.kt` resume-queue & `LyricsPrefetchWorker.kt`, KEDUANYA harus tetap bisa
+  resolve ID lama). Ambang pasti (30 detik? beda per kategori WhatsApp vs ringtone?) sebaiknya
+  dikonfirmasi user dulu — bukan angka yang disebutkan checklist secara eksplisit, murni asumsi
+  konservatif kalau dieksekusi tanpa konfirmasi.
+- **Gap #3 (Shuffle anti-repeat-nearby)** — FITUR BARU (custom shuffle engine), bukan micro-task
+  kecil. Instruksi eksplisit user disyaratkan dulu sebelum dikerjakan (pola sama sektor pill/
+  tab-sync: fitur besar butuh audit 1 batch penuh, bukan diselipkan).
+- **Gap #4/#5/#8/#9** — 0 kandidat fix kode (kode sudah benar per baca-kode batch ini), murni
+  menunggu hasil device-QA fisik dari user. Checklist asli disalin ke `docs/QA_CHECKLIST_SONIX_v488.md`
+  sebagai rujukan detail per-poin (bukan diarsipkan — masih aktif, lihat "Aturan sesi aktif" baru
+  di bawah).
+
 **Catatan Batch 488 [laporan urgent user: "app tidak load berulang kali setiap aplikasi baru
 dibuka kembali pasca app di kill!!"]**: laporan BARU, BUKAN reopen sektor DITUTUP manapun,
 TERPISAH dari antrean `.animateItem()` (Batch 481-487 di bawah — TIDAK disentuh/TIDAK berubah
@@ -1951,6 +2065,10 @@ brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
    modern lebih bersih. `minSdk` tidak pernah diubah otomatis — WAJIB konfirmasi eksplisit user.
 4. `docs/archive/ARCHIVED_POLISH_AUDIT.md` / `docs/archive/ARCHIVED_MICRO_UIUX_AUDIT.md` = arsip, tidak aktif diikuti.
    `docs/archive/ROADMAP_LIQUID_GLASS_REDESIGN.md` = 100% tuntas, tidak ada item terbuka.
+   `docs/QA_CHECKLIST_SONIX_v488.md` (Batch 489) BUKAN arsip — checklist QA eksternal AKTIF,
+   3 gap-nya (previous-3-detik, filter audio pendek, shuffle anti-repeat-nearby) masih di
+   roadmap terbuka (lihat "Catatan Batch 489"/"[RESUME POINT berikutnya]"), pindahkan ke
+   `docs/archive/` HANYA setelah seluruh gap actionable-nya tuntas + device-QA lengkap.
 5. Nama folder Termux: `~/projects/audioplayer` (lowercase) — FINAL. `rootProject.name` tetap
    `"AudioPlayer"` (hardcoded `settings.gradle.kts`), tidak terikat nama folder/`git remote`.
 6. Sektor DITUTUP — jangan proaktif dibuka ulang pada instruksi generik ("next"/"lanjut"); BOLEH
@@ -2001,7 +2119,40 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 480. ZIP terakhir: `SONIX_v480.zip`. **2 file diubah** (dalam batas 3
+- Batch terakhir: 489. ZIP terakhir: `SONIX_v489.zip`. **3 file disentuh** (1 fungsi ViewModel
+  baru + 2 file wiring UI/Activity, dianggap 1 sektor/1 tugas — pola sama Batch 484): lihat
+  "Catatan Batch 489" di atas untuk detail penuh. Ringkas: checklist QA eksternal
+  (`QA_Checklist_SONIX_v488_terisi.md`) diverifikasi ulang ke source (9 poin "Verdict"-nya,
+  bukan ditelan mentah), 1 gap dieksekusi (kontrol "Stop Pemutaran" eksplisit baru di sheet
+  Kontrol Lanjutan Now Playing, `PlayerViewModel.stopPlayback()` = pause+seekTo(0), TIDAK
+  menyentuh queue/state tersimpan — beda dari swipe-dismiss mini player yang "cancel total").
+  Checklist asli disalin ke `docs/QA_CHECKLIST_SONIX_v488.md` (aktif, bukan arsip).
+  **0 diverifikasi CI/device Batch 489** — 0 env Android nyata/compiler Kotlin sesi ini (balance
+  brace/paren/bracket 3 file: lihat "Catatan Batch 489" di atas untuk angka lengkap).
+  **WAJIB DITEST user sebelum lanjut roadmap gap QA lain** (daftar lengkap 4 poin di "Catatan
+  Batch 489" di atas): Now Playing → ⋮ → "Kontrol Lanjutan" → seksi "Pemutaran" → baris baru
+  "Stop Pemutaran" harus ada & berfungsi (jeda + posisi balik ke 0, lagu/antrean TETAP ada, tekan
+  Play lagi lanjut dari awal lagu yang sama) — TANPA regresi ke swipe-dismiss mini player atau ke
+  5 tombol transport utama.
+  **[RESUME POINT berikutnya]**: 3 sisa gap dari checklist yang punya kandidat fix kode konkret,
+  BELUM dikerjakan (lihat "Roadmap Gap QA v488" di "Catatan Batch 489" untuk detail per-poin):
+  (a) previous-3-detik eksplisit (`PlaybackService.kt`, 1 baris, risiko rendah); (b) filter audio
+  pendek (`MusicRepository.kt`, `getAllSongs()` saja — ambang durasi BELUM dikonfirmasi user,
+  tanyakan dulu sebelum eksekusi); (c) shuffle anti-repeat-nearby (FITUR BARU, butuh instruksi
+  eksplisit user dulu, bukan micro-task). Sisa gap checklist lainnya (#4/#5/#7/#8/#9) murni
+  device-QA/di luar scope, 0 kode untuk dikerjakan.
+- Batch 488 (sebelum 489). ZIP: `SONIX_v488.zip`. **2 file diubah** (1 file baru): `LibraryCacheStore.kt`
+  (baru), `PlayerViewModel.kt` — FIX root cause laporan urgent user ("app tidak load berulang kali
+  setiap aplikasi baru dibuka kembali pasca app di-kill") — lihat "Catatan Batch 488" di atas
+  untuk detail penuh. Ringkas: snapshot library terakhir disimpan ke disk, dimuat instan (0
+  shimmer) saat app dibuka lagi sambil scan asli tetap jalan senyap di background; tombol
+  "Pindai Ulang"/pull-to-refresh manual TIDAK berubah (shimmer manual tetap tampil).
+  **0 diverifikasi CI/device Batch 488** — 0 env Android nyata/compiler Kotlin di sesi itu.
+  **WAJIB DITEST user** (6 poin lengkap di "Catatan Batch 488" di atas): buka app → tunggu
+  library termuat → force-close total → buka lagi → library harus langsung tampil isi (0
+  shimmer), diulang 2x + skenario tambah/hapus lagu saat force-close + pastikan tombol
+  "Pindai Ulang"/pull-to-refresh manual TETAP menampilkan shimmer seperti biasa (0 regresi).
+- Batch 480 (sebelum 488). ZIP terakhir: `SONIX_v480.zip`. **2 file diubah** (dalam batas 3
   file/tugas): `MiniPlayerBar.kt`, `PlayerViewModel.kt` — instruksi eksplisit user "sempurnakan
   mekanisme drag mini player (feedback, konfirmasi user, dll)", lihat "Catatan Batch 480" di atas
   untuk detail penuh. Ringkas: (1) feedback visual (alpha+scale mengikuti drag) + haptic 2-tahap

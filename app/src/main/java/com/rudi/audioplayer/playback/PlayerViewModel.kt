@@ -1710,6 +1710,24 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         controller?.let { if (it.isPlaying) it.pause() else it.play() }
     }
 
+    /** Batch 489 — QA checklist SONIX v488 gap #1: "tidak ditemukan kontrol Stop musik eksplisit
+     * di UI; terdapat pemanggilan stop() lain yang bukan kontrol playback utama" — merujuk
+     * `controller?.stop()` di dalam [dismissMiniPlayer], yang MEMANG bukan tombol Stop biasa
+     * (fungsi itu juga mengosongkan queue/currentQueueSlotIds/playbackStateStore + menyalakan
+     * UndoableAction — pola "cancel/dismiss", bukan "stop"). Fungsi ini BEDA total: 0 menyentuh
+     * queue/state tersimpan/UndoableAction sama sekali — murni jeda + kembali ke posisi awal,
+     * lagu & antrean tetap utuh, siap diputar lagi dari 0 kapan saja (perilaku "Stop" klasik
+     * pemutar musik). Sengaja pause()+seekTo(0) (BUKAN controller.stop() mentah): stop() Media3
+     * memindahkan player ke STATE_IDLE yang mensyaratkan prepare() ulang sebelum play()
+     * berikutnya — jalur lifecycle itu tidak diaudit batch ini, risiko regresi ke resume/play
+     * lain lebih besar daripada manfaatnya untuk sekadar tombol Stop. */
+    fun stopPlayback() {
+        controller?.let {
+            it.pause()
+            it.seekTo(0L)
+        }
+    }
+
     fun next() = controller?.seekToNextMediaItem() ?: Unit
     fun previous() = controller?.seekToPreviousMediaItem() ?: Unit
     fun seekTo(positionMs: Long) = controller?.seekTo(positionMs) ?: Unit

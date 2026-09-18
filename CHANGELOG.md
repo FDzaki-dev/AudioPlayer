@@ -1,5 +1,25 @@
 # Changelog
 
+## Batch 489 — FITUR: kontrol "Stop Pemutaran" eksplisit (QA checklist gap #1)
+Input baru: `QA_Checklist_SONIX_v488_terisi.md` (audit source-inspection eksternal). Checklist
+diverifikasi ulang ke source (9 poin "Verdict"-nya) — 1 gap dieksekusi batch ini, sisanya masuk
+roadmap terlacak (`PROJECT_STATE.md` § Batch 489/Roadmap Gap QA v488). Checklist asli disalin ke
+`docs/QA_CHECKLIST_SONIX_v488.md`.
+
+3 file disentuh (1 fungsi ViewModel baru + 2 wiring UI/Activity): `PlayerViewModel.kt`,
+`NowPlayingScreen.kt`, `MainActivity.kt`.
+- `PlayerViewModel.stopPlayback()` baru: `pause()` + `seekTo(0L)` — BEDA dari swipe-dismiss mini
+  player (`dismissMiniPlayer()`, Batch 476/480, itu "cancel total": queue+state tersimpan ikut
+  dikosongkan, bisa di-Urungkan). Stop di sini murni jeda + posisi balik ke awal, antrean/lagu
+  tetap utuh, siap lanjut kapan saja lewat tombol Play biasa.
+- Baris baru "Stop Pemutaran" (ikon Stop) ditambah di seksi "Pemutaran" sheet "Kontrol Lanjutan"
+  Now Playing (⋮) — SENGAJA tidak masuk Row transport utama (Shuffle/Prev/Play/Next/Repeat) supaya
+  0 mengubah layout 5-ikon yang sudah di-tuning berkali-kali.
+
+0 diverifikasi CI/device sesi ini. **WAJIB DITEST user**: Now Playing → ⋮ → "Stop Pemutaran" →
+musik berhenti + posisi balik 0:00, lagu/antrean tetap ada → tekan Play → lanjut dari awal lagu
+yang sama. Detail lengkap + skenario test lain: `PROJECT_STATE.md` § Batch 489.
+
 ## Batch 488 — FIX: app tidak lagi "reload"/shimmer tiap dibuka kembali pasca di-kill
 Laporan urgent user: app selalu terasa "load ulang" (shimmer skeleton menutupi library) setiap
 kali dibuka lagi setelah proses di-kill, walau isi library tidak berubah sejak sesi terakhir.

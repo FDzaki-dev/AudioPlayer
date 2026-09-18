@@ -60,6 +60,7 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeOff
@@ -164,6 +165,11 @@ fun NowPlayingScreen(
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
+    // Batch 489 — QA checklist gap #1 (kontrol Stop eksplisit), lihat komentar
+    // PlayerViewModel.stopPlayback(). Diletakkan di sheet "Kontrol Lanjutan" (bukan Row transport
+    // utama Shuffle/Prev/Play/Next/Repeat) supaya 0 mengubah layout 5-ikon yang sudah di-tuning
+    // (SpaceEvenly, hierarki ukuran, dst — lihat komentar Batch 170/224/226 di Row itu).
+    onStopPlayback: () -> Unit,
     onSeek: (Long) -> Unit,
     onShuffle: () -> Unit,
     onRepeat: () -> Unit,
@@ -1497,6 +1503,10 @@ fun NowPlayingScreen(
                 showAdvancedSheet = false
                 showAbRepeatBookmarkSheet = true
             },
+            onStopPlayback = {
+                showAdvancedSheet = false
+                onStopPlayback()
+            },
             onOpenVisualizer = {
                 showAdvancedSheet = false
                 onOpenVisualizer()
@@ -1642,7 +1652,9 @@ private fun AdvancedControlsSheet(
     onOpenAbRepeatBookmark: () -> Unit,
     onOpenVisualizer: () -> Unit,
     onOpenSongInfoEdit: () -> Unit,
-    onOpenRingtoneCutter: () -> Unit
+    onOpenRingtoneCutter: () -> Unit,
+    // Batch 489 — lihat komentar parameter `onStopPlayback` di NowPlayingScreen (pemanggil).
+    onStopPlayback: () -> Unit
 ) {
     // Batch 354 — collect lokal di sini (sheet ini sendiri sudah jadi batas scope yang pas,
     // sama pola MiniPlayerBar.kt Batch 353 — tidak perlu extract composable baru lagi). Tick
@@ -1707,6 +1719,18 @@ private fun AdvancedControlsSheet(
                 label = "Repeat A-B & Bookmark",
                 value = null,
                 onClick = onOpenAbRepeatBookmark
+            )
+            // Batch 489 — kontrol Stop eksplisit (QA checklist gap #1). Beda dari swipe-dismiss
+            // mini player (MiniPlayerBar, Batch 476/480 — itu "cancel" total: musik berhenti +
+            // queue dikosongkan + bisa di-Urungkan): baris ini murni jeda + kembali ke posisi
+            // awal lagu yang sama, antrean tetap utuh. 0 dialog konfirmasi — aksinya reversibel
+            // sendiri (tinggal tekan Play lagi), beda kelas risiko dari dismiss yang menghapus
+            // queue makanya dismiss butuh Undo.
+            AdvancedControlRow(
+                icon = Icons.Default.Stop,
+                label = "Stop Pemutaran",
+                value = null,
+                onClick = onStopPlayback
             )
 
             HorizontalDivider(

@@ -1388,6 +1388,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             onPlayPause = { playerViewModel.togglePlayPause() },
             onNext = { playerViewModel.next() },
             onPrevious = { playerViewModel.previous() },
+            // Batch 489 — QA checklist gap #1 (kontrol Stop eksplisit), lihat komentar
+            // PlayerViewModel.stopPlayback().
+            onStopPlayback = { playerViewModel.stopPlayback() },
             onSeek = { playerViewModel.seekTo(it) },
             onShuffle = { playerViewModel.toggleShuffle() },
             onRepeat = { playerViewModel.cycleRepeatMode() },

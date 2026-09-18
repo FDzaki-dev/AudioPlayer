@@ -17,7 +17,9 @@
 # easing/durasi iOS) ditambahkan — 190->191.
 # Batch 488: app/src/main/java/com/rudi/audioplayer/data/LibraryCacheStore.kt (file baru, cache
 # disk snapshot library utk cold-start instan) ditambahkan — 191->192.
-# Total: 192 file
+# Batch 489: docs/QA_CHECKLIST_SONIX_v488.md (salinan checklist QA eksternal, aktif — lihat
+# PROJECT_STATE.md § Aturan sesi aktif #4) ditambahkan — 192->193.
+# Total: 193 file
 
 .github/workflows/build.yml
 .gitignore
@@ -202,6 +204,7 @@ app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
 build.gradle.kts
+docs/QA_CHECKLIST_SONIX_v488.md
 docs/archive/ARCHIVED_MICRO_UIUX_AUDIT.md
 docs/archive/ARCHIVED_POLISH_AUDIT.md
 docs/archive/ARCHIVED_ROADMAP_15_FITUR_OFFLINE.md
