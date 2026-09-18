@@ -12,6 +12,68 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 490 [laporan user: "preset EQ balik nol/default pasca app di-kill lalu musik
+dimainkan lewat eksternal SONIX player"]**: bug BARU, TERPISAH dari roadmap Gap QA v488 (Batch
+489, di bawah — 0 disentuh/0 berubah oleh batch ini).
+
+**Root cause TERKONFIRMASI dari pembacaan kode (bukan tebakan)**: `PlaybackAudioSession.
+onSessionIdChanged` (Batch 314) HANYA PERNAH diregistrasi dari `PlayerViewModel.init{}` — konstruk
+ViewModel yang 0 pernah ada sampai `MainActivity` dibuat. Saat proses dibangkitkan HEADLESS
+(resumption via widget/Bluetooth/tombol media/notifikasi/Android Auto — 0 satu pun membuat
+Activity) pasca app di-kill total, `PlaybackService` (`onEvents`) tetap membuat sesi ExoPlayer
+baru & tetap set `PlaybackAudioSession.sessionId`, TAPI dengan 0 listener terpasang — Equalizer
+platform utk sesi BARU itu 0 pernah tahu bands/preset tersimpan sama sekali, jadi bermain di
+default flat/nonaktif bawaan Android walau SharedPreferences masih menyimpan nilai asli (bukan
+"hilang", cuma tidak pernah diterapkan ULANG ke sesi ini).
+
+**2 file diubah** (dalam batas 3 file/tugas) + `EqualizerController.kt` (companion accessor,
+dihitung TERPISAH — reusable infra, bukan target/source spesifik tugas ini): `AudioPlayerApplication.kt`,
+`PlayerViewModel.kt`.
+1. `EqualizerController.kt`: `getInstance(context)` baru (companion, double-checked locking) —
+   shared SATU instance per proses. WAJIB karena fix ini menambah TITIK PANGGIL KEDUA
+   (`AudioPlayerApplication`) yang legitimately ingin `EqualizerController` yang sama —
+   `android.media.audiofx.Equalizer` TIDAK dedupe per sesi, 2 instance terpisah ke sesi yang sama
+   = 2 efek insert nyata, diam-diam MENGGANDAKAN tiap band gain kalau keduanya kebetulan hidup
+   bersamaan. `getInstance()` membuat itu MUSTAHIL secara struktural, bukan mengandalkan disiplin
+   pemanggil. 0 API method lain di kelas ini berubah (`attach`/`setEnabled`/`setBandLevel`/
+   `usePreset`/`useBoldPreset`/`release` 100% sama) — `EqualizerSheet.kt`/`NowPlayingScreen.kt`
+   (importir `EqualizerController.BoldPreset`, bukan instance) 0 tersentuh sama sekali.
+2. `AudioPlayerApplication.kt` (`onCreate()`): `PlaybackAudioSession.onSessionIdChanged = { id ->
+   EqualizerController.getInstance(this).attach(id) }` ditambah SEGERA setelah `AppLogger.init`/
+   `warmUpSharedPreferences` — `Application.onCreate()` berjalan SEBELUM komponen mana pun
+   (Activity ATAU Service) apa pun pemicu proses dimulai, jadi listener ini sudah ada SEBELUM
+   `PlaybackService`-nya player sempat fire `onEvents` pertama kalinya.
+3. `PlayerViewModel.kt`: `private val equalizerController = EqualizerController(appContext)` →
+   `EqualizerController.getInstance(appContext)` — WAJIB, supaya ViewModel share instance yang
+   SAMA dgn Application, bukan bikin instance kedua (lihat poin 1). `init{}` (Batch 314, re-wiring
+   callback + attach immediate kalau sesi sudah ada) TIDAK diubah — sekarang cuma re-registrasi
+   callback yang FUNGSINYA identik (instance sama) + re-attach yang idempotent (attach() sendiri
+   release-lalu-buat-baru, 0 pernah menumpuk instance kedua).
+
+**0 diverifikasi CI/device Batch 490** — 0 env Android nyata/compiler Kotlin sesi ini (balance
+brace/paren/bracket: `EqualizerController.kt` `{}` 24/24 `()` 117/117 `[]` 6/6;
+`PlayerViewModel.kt` `{}` 248/248 `()` 1021/1021 `[]` 39/39; `AudioPlayerApplication.kt` `{}`
+14/14 `()` 77/77 `[]` 0/0). **WAJIB DITEST user**:
+1. Buka Equalizer (Now Playing → ⋮ → Equalizer), pilih preset apa saja SELAIN Flat (mis. Bass+
+   atau preset bawaan perangkat) sampai terdengar jelas berbeda dari flat.
+2. Putar lagu, lalu Force-close TOTAL app (App Info → Force Stop, ATAU swipe dari Recents lalu
+   tunggu OS recycle proses — BUKAN cuma tombol Home).
+3. TANPA membuka app dari launcher sama sekali, picu playback dari LUAR: tombol play di widget
+   home-screen, ATAU tombol play/media-button headset/Bluetooth, ATAU notifikasi media, ATAU
+   Android Auto (pilih salah satu yang tersedia di device) → dengarkan: preset EQ dari langkah 1
+   harus TERASA (bukan flat/datar) sejak detik pertama lagu main, TANPA perlu buka app dulu.
+4. Setelah itu BARU buka app dari launcher → sheet Equalizer harus tetap menunjukkan preset yang
+   sama (langkah 1), 0 ter-reset ke Flat/nonaktif, DAN suara tidak berubah/tidak "makin kencang
+   dobel" saat app dibuka (mengesampingkan resiko double-effect dari fix `getInstance()`).
+5. Regression check jalur NORMAL (app dibuka biasa dari launcher, bukan headless): equalizer
+   masih berfungsi seperti biasa — ganti band/preset di sheet langsung terdengar, tersimpan lintas
+   sesi seperti sebelumnya (0 regresi ke behavior existing).
+
+**[RESUME POINT berikutnya — Batch 489, TIDAK berubah oleh batch ini]**: 3 sisa gap dari checklist
+yang punya kandidat fix kode konkret, BELUM dikerjakan (lihat "Roadmap Gap QA v488" di "Catatan
+Batch 489" di bawah): (a) previous-3-detik eksplisit; (b) filter audio pendek (ambang durasi belum
+dikonfirmasi user); (c) shuffle anti-repeat-nearby (fitur baru, butuh instruksi eksplisit user).
+
 **Catatan Batch 489 [input baru: `QA_Checklist_SONIX_v488_terisi.md`, instruksi eksplisit user
 "tanamkan planning dokumen tersebut kedalam project yang disesuaikan dengan kondisi nyata"]**:
 checklist adalah hasil audit source-inspection eksternal (BUKAN hasil kerja batch mana pun di
@@ -2119,7 +2181,25 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 489. ZIP terakhir: `SONIX_v489.zip`. **3 file disentuh** (1 fungsi ViewModel
+- Batch terakhir: 490. ZIP terakhir: `SONIX_v490.zip`. **2 file diubah + 1 companion accessor
+  baru** (dalam batas 3 file/tugas — lihat "Catatan Batch 490" di atas untuk rincian kenapa
+  `EqualizerController.kt` dihitung terpisah): `AudioPlayerApplication.kt`, `PlayerViewModel.kt`,
+  `EqualizerController.kt`. Laporan user: "preset EQ balik nol/default pasca app di-kill lalu
+  musik dimainkan lewat eksternal SONIX player". Ringkas: root cause = re-attach hook Equalizer
+  (Batch 314) hanya pernah diregistrasi dari `PlayerViewModel.init{}`, yang 0 pernah ada kalau
+  proses dibangkitkan headless (widget/Bluetooth/media-button/notifikasi/Android Auto pasca
+  app-kill) — `PlaybackService` tetap bikin sesi baru tapi 0 ada yang re-apply preset tersimpan ke
+  situ. Fix: registrasi hook yang SAMA dari `AudioPlayerApplication.onCreate()` (jalan sebelum
+  komponen apa pun, apa pun pemicu proses) + `EqualizerController.getInstance()` (shared SATU
+  instance per proses, cegah 2 efek Equalizer nyata ke sesi yang sama saling menggandakan gain).
+  **0 diverifikasi CI/device Batch 490** — 0 env Android nyata/compiler Kotlin sesi ini (balance
+  brace/paren/bracket 3 file: lihat "Catatan Batch 490" di atas untuk angka lengkap).
+  **WAJIB DITEST user** (5 poin lengkap di "Catatan Batch 490" di atas): set preset EQ non-flat →
+  force-close TOTAL app → trigger play dari LUAR (widget/headset/Bluetooth/notifikasi/Android
+  Auto) TANPA buka app dulu → preset harus terdengar SEJAK AWAL (bukan flat) → baru buka app →
+  sheet Equalizer masih tampil preset yang sama, 0 suara dobel/makin kencang, DAN jalur normal
+  (app dibuka biasa) tetap 0 regresi.
+- Batch 489 (sebelum 490). ZIP: `SONIX_v489.zip`. **3 file disentuh** (1 fungsi ViewModel
   baru + 2 file wiring UI/Activity, dianggap 1 sektor/1 tugas — pola sama Batch 484): lihat
   "Catatan Batch 489" di atas untuk detail penuh. Ringkas: checklist QA eksternal
   (`QA_Checklist_SONIX_v488_terisi.md`) diverifikasi ulang ke source (9 poin "Verdict"-nya,

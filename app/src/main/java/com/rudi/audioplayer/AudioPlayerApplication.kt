@@ -5,6 +5,8 @@ import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.request.crossfade
+import com.rudi.audioplayer.playback.EqualizerController
+import com.rudi.audioplayer.playback.PlaybackAudioSession
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.AudioArtFetcher
 
@@ -34,6 +36,24 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory, Conf
         super.onCreate()
         AppLogger.init(this)
         warmUpSharedPreferences()
+
+        // Batch 490 — fix: "preset EQ balik ke nol/default pasca app di-kill lalu musik dimainkan
+        // lewat eksternal player". PlaybackAudioSession.onSessionIdChanged (Batch 314) was only
+        // ever registered from PlayerViewModel's init{} — i.e. only once MainActivity/UI exists.
+        // When the process is instead resurrected headlessly for playback resumption (widget tap,
+        // Bluetooth/media-button, notification action, Android Auto — none of which create an
+        // Activity) after a full app-kill, PlaybackService still creates a brand-new ExoPlayer
+        // session (its onEvents listener still sets PlaybackAudioSession.sessionId) — but with 0
+        // listener registered, that new platform Equalizer effect never learns the saved
+        // bands/preset, so it plays at Android's own flat/disabled default despite
+        // SharedPreferences holding the real values. Registering the same re-attach hook here
+        // instead closes the gap: Application.onCreate() runs before ANY component (Activity or
+        // Service) regardless of what triggered process start, so this listener now exists before
+        // PlaybackService's player can ever fire its first onEvents. PlayerViewModel's own init{}
+        // still runs later and still re-registers/re-attaches once the UI does open — both now
+        // route through EqualizerController.getInstance() (see its own Batch 490 doc) so this is a
+        // genuinely earlier hook onto the SAME shared instance, not a second competing one.
+        PlaybackAudioSession.onSessionIdChanged = { id -> EqualizerController.getInstance(this).attach(id) }
     }
 
     /**

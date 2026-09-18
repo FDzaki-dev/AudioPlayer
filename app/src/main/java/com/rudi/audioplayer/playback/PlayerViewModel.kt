@@ -233,7 +233,12 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     /** Whether the CURRENT song (whatever's playing/loaded right now) has Roadmap #12 opted in —
      * recomputed on every song transition, not a per-song lookup table exposed to the UI. */
     val audiobookModeEnabled: StateFlow<Boolean> = _audiobookModeEnabled.asStateFlow()
-    private val equalizerController = EqualizerController(appContext)
+    // Batch 490 — EqualizerController.getInstance() (shared per-process instance, see its own
+    // Batch 490 doc) instead of a private `EqualizerController(appContext)`. AudioPlayerApplication
+    // now ALSO re-attaches the equalizer this early (fixes EQ resetting to flat when playback
+    // resumes headlessly post app-kill), so this ViewModel must share that SAME instance rather
+    // than construct a second one, or the platform effect would end up double-applied.
+    private val equalizerController = EqualizerController.getInstance(appContext)
     val equalizerState: StateFlow<EqualizerUiState> = equalizerController.state
 
     // --- Visualizer Audio (Roadmap #9, Batch 92) ---

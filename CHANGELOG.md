@@ -1,5 +1,33 @@
 # Changelog
 
+## Batch 490 — FIX: preset EQ balik flat/default pasca app di-kill + playback eksternal
+Laporan user: preset Equalizer balik ke nol/default begitu app di-kill total lalu musik dimainkan
+lagi lewat pemicu eksternal (widget/Bluetooth/media-button/notifikasi/Android Auto).
+
+Root cause terkonfirmasi (bukan tebakan): hook re-attach Equalizer (Batch 314) hanya pernah
+diregistrasi dari `PlayerViewModel.init{}` — konstruk yang 0 pernah ada kalau proses dibangkitkan
+headless (tanpa Activity/UI pernah dibuka). `PlaybackService` tetap membuat sesi audio baru di
+skenario itu, tapi 0 ada yang meng-apply ulang preset tersimpan ke sesi itu — Equalizer platform
+bermain di default flat bawaan Android walau SharedPreferences masih benar.
+
+2 file diubah + 1 companion accessor baru: `AudioPlayerApplication.kt`, `PlayerViewModel.kt`,
+`EqualizerController.kt`.
+- `EqualizerController.getInstance()` baru — SATU instance shared per proses (dulu tiap pemanggil
+  bikin instance sendiri-sendiri). Perlu supaya titik-panggil BARU (Application) & titik-panggil
+  LAMA (ViewModel) tidak sama-sama attach Equalizer terpisah ke sesi yang sama — dua efek nyata ke
+  sesi yang sama akan diam-diam menggandakan tiap band gain.
+- `AudioPlayerApplication.onCreate()` sekarang JUGA registrasi hook re-attach ini, sejak proses
+  baru mulai — sebelum Activity ATAU Service manapun, apa pun yang memicu proses berjalan.
+- `PlayerViewModel` diubah pakai `getInstance()` yang sama, bukan bikin instance privat sendiri.
+
+0 API `EqualizerController` lain berubah (`attach`/`setEnabled`/`setBandLevel`/`usePreset`/
+`useBoldPreset`/`release` identik) — `EqualizerSheet.kt`/`NowPlayingScreen.kt` 0 tersentuh.
+
+0 diverifikasi CI/device sesi ini. **WAJIB DITEST user**: set preset EQ non-flat → force-close
+total app → trigger play dari luar (widget/headset/Bluetooth/notifikasi) TANPA buka app dulu →
+preset harus terdengar sejak awal (bukan flat) → baru buka app → sheet Equalizer masih tampil
+preset yang sama, 0 suara dobel. Detail lengkap: `PROJECT_STATE.md` § Batch 490.
+
 ## Batch 489 — FITUR: kontrol "Stop Pemutaran" eksplisit (QA checklist gap #1)
 Input baru: `QA_Checklist_SONIX_v488_terisi.md` (audit source-inspection eksternal). Checklist
 diverifikasi ulang ke source (9 poin "Verdict"-nya) — 1 gap dieksekusi batch ini, sisanya masuk

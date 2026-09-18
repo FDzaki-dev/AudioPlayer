@@ -185,5 +185,35 @@ class EqualizerController(private val context: Context) {
         private const val KEY_PRESET = "eq_preset"
         private const val KEY_BOLD_PRESET = "eq_bold_preset"
         private const val KEY_BAND_PREFIX = "eq_band_"
+
+        @Volatile
+        private var sharedInstance: EqualizerController? = null
+
+        /**
+         * Batch 490 — shared per-process instance. Root cause of "preset EQ balik ke
+         * nol/default pasca app di-kill lalu musik dimainkan lewat eksternal player": the only
+         * place that ever re-attached this controller to a new audio session was
+         * [PlayerViewModel]'s `init{}` (Batch 314) — a ViewModel construct that simply does not
+         * exist until MainActivity is created. When the process is instead resurrected headlessly
+         * (widget/Bluetooth/media-button/notification/Android Auto after a full app-kill),
+         * [PlaybackService] still creates a brand-new ExoPlayer session with 0 listener
+         * registered, so the platform Equalizer for THAT session never learns the saved
+         * bands/preset at all — it just sits at Android's own flat/disabled default even though
+         * SharedPreferences still holds the real values.
+         *
+         * Fix (see [com.rudi.audioplayer.AudioPlayerApplication.onCreate], also Batch 490): the
+         * re-attach hook is now ALSO registered there, which runs before any component regardless
+         * of what started the process. That means two independent call sites can now legitimately
+         * want an [EqualizerController] for the same process. android.media.audiofx.Equalizer
+         * does not dedupe by session — two SEPARATE instances attached to the same session would
+         * be two real inserted effects, silently double-applying every band gain the moment both
+         * happened to be alive together. getInstance() makes that structurally impossible: every
+         * caller in this process shares the ONE underlying platform Equalizer object, so attach()
+         * only ever recreates it (release-then-new), never stacks a second one alongside it.
+         */
+        fun getInstance(context: Context): EqualizerController =
+            sharedInstance ?: synchronized(this) {
+                sharedInstance ?: EqualizerController(context.applicationContext).also { sharedInstance = it }
+            }
     }
 }
