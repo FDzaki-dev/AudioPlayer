@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 484 — FIX: toggle/tombol sidik jari hilang di Kunci Aplikasi + label visual; biometrik baru di Vault
+2 instruksi eksplisit user dalam 1 pesan: (1) "regresi lain di bagian keamanan yaitu absennya
+biometrik fingerprint beserta label sidik jari diujung bawah", (2) "sekalian tanamkan biometrik
+juga pada vault".
+
+Fix regresi (`AndroidManifest.xml`, `LockScreen.kt`, 2 file):
+- Root cause: `AndroidManifest.xml` tidak pernah mendeklarasikan `android.permission.USE_BIOMETRIC`
+  — dokumentasi resmi `BiometricManager.canAuthenticate()` mensyaratkan permission ini; tanpanya
+  `isBiometricAvailable()` selalu `false` app-wide, menyembunyikan toggle Settings DAN tombol
+  LockScreen sekaligus. Semua wiring Kotlin sudah benar sejak awal — gap murni 1 baris manifest.
+- `LockScreen.kt`: tombol sidik jari sebelumnya cuma punya `contentDescription` (teks
+  accessibility, tak pernah tampil) — tambah `Text("Sidik Jari")` visual di bawah ikon.
+
+Fitur baru (`VaultStore.kt`, `VaultSheet.kt`, 2 file):
+- Vault sekarang punya opsi buka pakai sidik jari, terpisah dari Kunci Aplikasi (own prefs key,
+  own toggle) — konsisten dengan filosofi lama "vault sengaja independen dari AppLockStore".
+- Auto-prompt biometrik begitu gerbang PIN vault tampil (pola sama Kunci Aplikasi) + tombol
+  manual fallback + toggle switch baru di panel Vault (tampil hanya kalau device punya biometrik
+  terdaftar).
+- 0 diverifikasi CI/device sesi ini — wajib ditest user, lihat `PROJECT_STATE.md`.
+
 ## Batch 483 — FIX: panel glass tembus pandang di Vault/Playlist Otomatis/Pencocok Signature
 Bug report user: "background glass tembus pandang pada tab vault, fix it dan audit yang
 gejalanya serupa".

@@ -12,6 +12,64 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 484 [2 instruksi eksplisit user dalam 1 pesan: (1) "regresi lain di bagian
+keamanan yaitu absennya biometrik fingerprint beserta label sidik jari diujung bawah" (Kunci
+Aplikasi/LockScreen), (2) "sekalian tanamkan biometrik juga pada vault"]**:
+
+**(1) BUG FIX — root cause TERKONFIRMASI dari dokumentasi platform (bukan tebakan)**:
+`AndroidManifest.xml` TIDAK PERNAH mendeklarasikan `android.permission.USE_BIOMETRIC`
+(grep app-wide: 0 hasil sebelum batch ini). Dokumentasi resmi `BiometricManager.canAuthenticate()`
+eksplisit "Requires android.Manifest.permission#USE_BIOMETRIC" — tanpa deklarasi ini,
+`canAuthenticate()` tidak pernah balas `BIOMETRIC_SUCCESS`, jadi `isBiometricAvailable()` di
+`MainActivity.kt` SELALU false app-wide, meng-gate HILANG toggle "Buka dengan Sidik Jari" di
+Settings DAN tombol sidik jari di `LockScreen.kt` — cocok persis gejala di screenshot user
+(numpad PIN tanpa apa-apa di kiri-bawah). Kotlin `LockScreen.kt`/`MainActivity.kt`/
+`PlayerViewModel.kt`/`AppLockStore.kt` DIPERIKSA SATU-SATU, wiring-nya sudah 100% benar sejak
+awal — 0 bug logic di sana, gap murni 1 baris permission yang hilang.
+1. `AndroidManifest.xml`: tambah `<uses-permission android:name="android.permission.USE_BIOMETRIC" />`.
+2. `LockScreen.kt`: sebelumnya tombol sidik jari HANYA punya `contentDescription` (teks
+   accessibility, tidak pernah kelihatan di layar) — 0 label visual di UI sungguhan. Tambah
+   `Text("Sidik Jari")` di bawah ikon (dibungkus `Column`), sesuai instruksi eksplisit user
+   ("...beserta label sidik jari").
+
+**(2) FITUR BARU — biometrik Vault** (sebelumnya 0 ada sama sekali, Vault cuma PIN manual):
+1. `VaultStore.kt`: `isBiometricEnabled()`/`setBiometricEnabled()` ditambah (pola identik
+   `AppLockStore`, prefs KEY baru `vault_biometric_enabled`, own prefs file — TETAP independen
+   dari `AppLockStore` sesuai KDoc lama, 0 reuse silang). `disableVault()` ikut clear flag ini.
+2. `VaultSheet.kt`: helper privat `isVaultBiometricAvailable()`/`showVaultBiometricPrompt()`
+   ditambah LOKAL di file ini (bukan reuse `MainActivity`, sengaja — sheet ini sudah dari awal
+   "self-contained, no dependency on AppLockStore", pola sama dipertahankan utk fitur baru).
+   Auto-prompt begitu gerbang PIN vault tampil (persis pola `LaunchedEffect` Kunci Aplikasi di
+   `MainActivity.kt`) + tombol manual "Sidik Jari" di `VaultUnlockSection` (fallback kalau
+   prompt di-cancel) + toggle Switch "Buka dengan Sidik Jari" baru di `VaultContentSection`
+   (tampil hanya kalau `biometricAvailable`, sama syarat dgn toggle Kunci Aplikasi di Settings).
+
+**4 file diubah** (di atas batas normal 3 file/tugas — sengaja dilanggar krn user eksplisit minta
+2 hal terpisah [fix regresi + fitur baru] dalam 1 pesan yang sama; masing-masing perubahan tetap
+minimal & 1 file [`AndroidManifest.xml`] cuma 1 baris tambahan): `AndroidManifest.xml`,
+`LockScreen.kt`, `VaultStore.kt`, `VaultSheet.kt`.
+
+**0 diverifikasi CI/device Batch 484** — 0 env Android nyata/compiler Kotlin sesi ini (balance
+brace/paren: `VaultSheet.kt` `{}` 119/119 `()` 292/292; `LockScreen.kt` `{}` 49/49 `()` 132/132;
+`VaultStore.kt` `{}` 26/26 `()` 116/116; manifest XML divalidasi `xmllint --noout` ✅). **WAJIB
+DITEST user**:
+1. Settings → Kunci Aplikasi → toggle "Buka dengan Sidik Jari" harus MUNCUL (sebelumnya hilang
+   total) di device yang punya sidik jari terdaftar; nyalakan lalu buka app dari cold-start →
+   ikon sidik jari + teks "Sidik Jari" harus tampil di pojok kiri-bawah numpad PIN.
+2. Settings → Vault (buka pakai PIN vault dulu) → scroll ke bawah panel → toggle "Buka dengan
+   Sidik Jari" baru harus muncul, nyalakan → tutup & buka lagi tab Vault → prompt sidik jari
+   harus auto-muncul; tombol "Sidik Jari" manual di bawah tombol "Buka" jadi fallback kalau
+   prompt itu di-cancel.
+3. Device TANPA sidik jari terdaftar: toggle biometrik di Settings maupun di Vault harus TETAP
+   sembunyi (bukan crash) — perilaku `biometricAvailable`/`canAuthenticate()` gate, 0 diubah.
+4. Pastikan 0 crash/force-close saat build (semua import baru sudah ada dependency-nya:
+   `androidx.biometric:biometric:1.1.0` sudah lama ada di `app/build.gradle.kts`, 0 dependency
+   baru ditambah).
+**[RESUME POINT Batch 485]**: kalau test di atas ✅, kembali ke antrean micro-task polish animasi
+Batch 481/482 (resume Batch 483 di bawah — masih valid, 0 berubah oleh batch ini): lanjut
+`.animateItem()` ke `SongPickerSheet.kt`/`ABRepeatBookmarkSheet.kt`/`EqualizerSheet.kt` (cek
+drag-reorder dulu sebelum sentuh). Sektor pill/tab-sync + gesture-drag custom TETAP paling akhir.
+
 **Catatan Batch 483 [BUG FIX regresi/gap dilaporkan user: "background glass tembus pandang pada
 tab vault, fix it dan audit yang gejalanya serupa"]**: root cause TERKONFIRMASI dari perbandingan
 kode app-wide (bukan tebakan) — BUKAN regresi dari Batch 481/482 (2 batch itu 0 pernah menyentuh

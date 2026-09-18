@@ -9,6 +9,18 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
+    <!-- Batch 484 — FIX regresi dilaporkan user ("absennya biometrik fingerprint + label di
+         Kunci Aplikasi"). Root cause TERKONFIRMASI dari dokumentasi platform (bukan tebakan):
+         BiometricManager.canAuthenticate() "Requires android.Manifest.permission#USE_BIOMETRIC"
+         (developer.android.com/reference/androidx/biometric/BiometricManager) — tanpa izin ini
+         dideklarasikan, canAuthenticate() tidak pernah balas BIOMETRIC_SUCCESS, jadi
+         isBiometricAvailable() di MainActivity.kt SELALU false app-wide: toggle "Buka dengan
+         Sidik Jari" di Settings ikut hilang (digated biometricAvailable) DAN tombol sidik jari
+         di LockScreen ikut hilang (digated biometricEnabled && isBiometricAvailable()) — cocok
+         persis dengan gejala di screenshot user (0 disentuh di Kotlin, keduanya sudah wired
+         benar sejak awal, cuma permission manifest-nya yang bolong). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
     <!-- Batch 92 (Roadmap #9, Visualizer Audio) — required by android.media.audiofx.Visualizer
          for ANY audio session, including this app's own playback (there is no exception for
          visualizing your own audio, confirmed against the platform's own class docs). Nothing is

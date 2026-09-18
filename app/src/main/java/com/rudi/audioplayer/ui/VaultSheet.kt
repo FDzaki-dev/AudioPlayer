@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.RemoveCircleOutline
@@ -42,6 +43,37 @@ import kotlinx.coroutines.delay
  * bisa jadi batch lanjutan kalau diminta; menahannya di sini menjaga sheet ini tidak perlu
  * disambungkan ke seluruh permukaan `MediaController`/`PlayerViewModel` di batch pertamanya.
  */
+/** Batch 484 — sama persis pola [com.rudi.audioplayer.MainActivity.isBiometricAvailable]: minta
+ *  BIOMETRIC_STRONG saja (bukan WEAK/DEVICE_CREDENTIAL), biar konsisten dgn Kunci Aplikasi.
+ *  Duplikat kecil (bukan reuse MainActivity) sengaja — sheet ini sudah dari awal "self-contained,
+ *  no dependency on AppLockStore" (lihat KDoc atas), fungsi privat 2 baris ini menjaga itu tetap
+ *  benar utk fitur baru juga, bukan cuma utk store PIN-nya. */
+private fun isVaultBiometricAvailable(context: android.content.Context): Boolean {
+    val manager = androidx.biometric.BiometricManager.from(context)
+    return manager.canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+        androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
+}
+
+/** Sama persis pola [com.rudi.audioplayer.MainActivity.showBiometricPrompt]. Butuh
+ *  [androidx.fragment.app.FragmentActivity] sbg host — aman dipaksa non-null di call site karena
+ *  [com.rudi.audioplayer.MainActivity] (satu-satunya activity di app ini) sudah FragmentActivity. */
+private fun showVaultBiometricPrompt(activity: androidx.fragment.app.FragmentActivity, onSuccess: () -> Unit) {
+    val executor = androidx.core.content.ContextCompat.getMainExecutor(activity)
+    val prompt = androidx.biometric.BiometricPrompt(
+        activity, executor,
+        object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) {
+                onSuccess()
+            }
+        }
+    )
+    val info = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+        .setTitle("Buka Vault")
+        .setNegativeButtonText("Pakai PIN")
+        .build()
+    prompt.authenticate(info)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VaultSheet(
@@ -49,6 +81,7 @@ fun VaultSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val activity = context as? androidx.fragment.app.FragmentActivity
     val vaultStore = remember { VaultStore(context) }
     val haptic = LocalHapticFeedback.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -58,6 +91,26 @@ fun VaultSheet(
     var vaultedIdsVersion by remember { mutableStateOf(0) }
     var showDisableConfirm by remember { mutableStateOf(false) }
     var showAddPicker by remember { mutableStateOf(false) }
+
+    // Batch 484 — biometrik vault: sengaja QUERY ULANG tiap kali sheet ini dibuka (bukan
+    // remember sekali di atas activity, atau ditaruh di ViewModel) karena BIOMETRIC_STRONG bisa
+    // berubah antar-buka (enrollment sidik jari baru/dihapus user di System Settings di luar
+    // app ini) — pola sama persis `isBiometricAvailable()` MainActivity yang juga dipanggil
+    // ulang tiap kali dibutuhkan, bukan disimpan sekali di init.
+    val biometricAvailable = remember { isVaultBiometricAvailable(context) }
+    var vaultBiometricEnabled by remember { mutableStateOf(vaultStore.isBiometricEnabled()) }
+
+    // Auto-tawarkan sidik jari begitu gerbang PIN vault tampil, pola sama persis
+    // `LaunchedEffect(needsUnlock, biometricEnabled)` di MainActivity.kt utk Kunci Aplikasi —
+    // tetap ada tombol manual di VaultUnlockSection sbg fallback kalau prompt ini di-cancel user.
+    LaunchedEffect(vaultEnabled, unlocked, vaultBiometricEnabled, activity) {
+        if (vaultEnabled && !unlocked && vaultBiometricEnabled && biometricAvailable && activity != null) {
+            showVaultBiometricPrompt(activity) {
+                unlocked = true
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+        }
+    }
 
     val vaultedSongs = remember(songs, vaultedIdsVersion) {
         val ids = vaultStore.getVaultedSongIds()
@@ -104,10 +157,25 @@ fun VaultSheet(
                 )
                 !unlocked -> VaultUnlockSection(
                     vaultStore = vaultStore,
-                    onUnlocked = { unlocked = true; haptic.performHapticFeedback(HapticFeedbackType.LongPress) }
+                    onUnlocked = { unlocked = true; haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                    biometricAvailable = biometricAvailable && vaultBiometricEnabled,
+                    onRequestBiometric = {
+                        activity?.let { a ->
+                            showVaultBiometricPrompt(a) {
+                                unlocked = true
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                        }
+                    }
                 )
                 else -> VaultContentSection(
                     vaultedSongs = vaultedSongs,
+                    biometricAvailable = biometricAvailable,
+                    biometricEnabled = vaultBiometricEnabled,
+                    onToggleBiometric = { enabled ->
+                        vaultStore.setBiometricEnabled(enabled)
+                        vaultBiometricEnabled = enabled
+                    },
                     onRemove = { id ->
                         vaultStore.setSongVaulted(id, false)
                         vaultedIdsVersion++
@@ -209,7 +277,12 @@ private fun VaultSetupSection(onPinSet: (String) -> Unit) {
 }
 
 @Composable
-private fun VaultUnlockSection(vaultStore: VaultStore, onUnlocked: () -> Unit) {
+private fun VaultUnlockSection(
+    vaultStore: VaultStore,
+    onUnlocked: () -> Unit,
+    biometricAvailable: Boolean,
+    onRequestBiometric: () -> Unit
+) {
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var lockedUntil by remember { mutableStateOf(vaultStore.lockedOutUntil()) }
@@ -268,12 +341,30 @@ private fun VaultUnlockSection(vaultStore: VaultStore, onUnlocked: () -> Unit) {
             interactionSource = unlockInteraction,
             modifier = Modifier.fillMaxWidth().bouncyPress(unlockInteraction)
         ) { Text("Buka") }
+
+        if (biometricAvailable) {
+            Spacer(modifier = Modifier.height(8.dp))
+            val biometricInteraction = remember { MutableInteractionSource() }
+            OutlinedButton(
+                onClick = onRequestBiometric,
+                enabled = lockedUntil == null,
+                interactionSource = biometricInteraction,
+                modifier = Modifier.fillMaxWidth().bouncyPress(biometricInteraction)
+            ) {
+                Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Sidik Jari")
+            }
+        }
     }
 }
 
 @Composable
 private fun VaultContentSection(
     vaultedSongs: List<Song>,
+    biometricAvailable: Boolean,
+    biometricEnabled: Boolean,
+    onToggleBiometric: (Boolean) -> Unit,
     onRemove: (Long) -> Unit,
     onAddClick: () -> Unit,
     onDisableClick: () -> Unit
@@ -337,6 +428,14 @@ private fun VaultContentSection(
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
+            }
+        }
+
+        if (biometricAvailable) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+                Text("Buka dengan Sidik Jari", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Switch(checked = biometricEnabled, onCheckedChange = onToggleBiometric)
             }
         }
 

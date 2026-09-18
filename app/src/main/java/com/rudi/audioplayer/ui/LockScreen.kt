@@ -183,13 +183,21 @@ fun LockScreen(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             if (biometricEnabled) {
-                RoundGlyphButton(
-                    enabled = !locked,
-                    isTactile = isTactile,
-                    isSkeu = isSkeu,
-                    onClick = onRequestBiometric
-                ) {
-                    Icon(Icons.Default.Fingerprint, contentDescription = "Buka dengan sidik jari", modifier = Modifier.size(24.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    RoundGlyphButton(
+                        enabled = !locked,
+                        isTactile = isTactile,
+                        isSkeu = isSkeu,
+                        onClick = onRequestBiometric
+                    ) {
+                        Icon(Icons.Default.Fingerprint, contentDescription = "Buka dengan sidik jari", modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Sidik Jari",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
                 }
             } else {
                 Spacer(modifier = Modifier.size(64.dp))

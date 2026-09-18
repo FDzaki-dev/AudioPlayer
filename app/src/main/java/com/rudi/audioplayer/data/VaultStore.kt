@@ -36,6 +36,16 @@ class VaultStore(context: Context) {
 
     fun isVaultEnabled(): Boolean = prefs.getString(KEY_PIN_HASH, null) != null
 
+    /** Batch 484 — Vault punya sensor sidik jari sendiri, terpisah dari AppLockStore, mengikuti
+     *  filosofi "deliberately independent" di KDoc atas: PIN app dan PIN vault dua state yang
+     *  berbeda, jadi toggle biometrik-nya pun dua state berbeda (user bisa nyalakan salah satu
+     *  tanpa yang lain). */
+    fun isBiometricEnabled(): Boolean = prefs.getBoolean(KEY_BIOMETRIC, false)
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC, enabled).apply()
+    }
+
     fun setPin(pin: String) {
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
         prefs.edit()
@@ -91,6 +101,7 @@ class VaultStore(context: Context) {
             .putInt(KEY_FAIL_COUNT, 0)
             .remove(KEY_LOCKOUT_UNTIL)
             .remove(KEY_VAULTED_SONGS)
+            .putBoolean(KEY_BIOMETRIC, false)
             .apply()
     }
 
@@ -145,6 +156,7 @@ class VaultStore(context: Context) {
         private const val PREFS_NAME = "vault"
         private const val KEY_PIN_HASH = "vault_pin_hash"
         private const val KEY_SALT = "vault_pin_salt"
+        private const val KEY_BIOMETRIC = "vault_biometric_enabled"
         private const val KEY_FAIL_COUNT = "vault_fail_count"
         private const val KEY_LOCKOUT_UNTIL = "vault_lockout_until"
         private const val KEY_VAULTED_SONGS = "vaulted_song_ids"
