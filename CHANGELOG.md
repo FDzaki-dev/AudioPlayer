@@ -1,5 +1,29 @@
 # Changelog
 
+## Batch 486 — POLISH: `.animateItem()` untuk SmartPlaylistScreen, LyricsSheet
+Lanjutan micro-task polish animasi (Batch 481→…→485). Instruksi user generik ("lanjutkan progress
+yang tertunda") tanpa konfirmasi eksplisit hasil test Batch 485 — dicatat di `PROJECT_STATE.md`
+supaya sesi depan tidak salah asumsi. Sektor pill/tab-sync + gesture-drag TETAP tidak dimulai
+(butuh instruksi eksplisit khusus sektor itu, belum ada).
+
+2 file diubah (dalam batas 3 file/tugas):
+- `SmartPlaylistScreen.kt`: `.animateItem()` pada list playlist otomatis (key `p.id`), list lagu
+  cocok aturan (key `song.id`), chip filter folder & genre di builder sheet (key = string itu
+  sendiri). 0 hit `isDragging`/`draggable`/`reorder`.
+- `LyricsSheet.kt`: `.animateItem()` pada baris lirik (`itemsIndexed`, key index — prioritas
+  RENDAH, list statis, dampak nyata hanya di alur edit-lirik-lalu-simpan).
+
+0 logic filter/aturan/parse-lirik/sync-highlight disentuh — murni modifier animasi tambahan.
+0 diverifikasi CI/device (0 env Android/compiler Kotlin sesi ini; balance brace/paren dicek per
+file: semua match). **WAJIB DITEST user** (digabung dgn test Batch 485 yang masih pending): list
+Playlist Otomatis & lagu cocok tetap smooth saat berubah; chip Folder/Genre di builder transisi
+mulus; Lyrics sync/auto-scroll 0 regresi.
+
+Resume selanjutnya (kalau SEMUA test Batch 485+486 ✅): antrean polish `.animateItem()` HABIS,
+baru boleh ke sektor pill/tab-sync + gesture-drag (mini player/queue) — TETAP wajib instruksi
+eksplisit khusus sektor itu, PALING TERAKHIR per keputusan Batch 483, krn riwayat regresi
+(448/477/479).
+
 ## Batch 485 — POLISH: `.animateItem()` untuk SongPickerSheet, ABRepeatBookmarkSheet, EqualizerSheet
 Lanjutan micro-task polish animasi (Batch 481→482→483→484, resume point tidak berubah).
 User konfirmasi fix biometrik Batch 484 ✅, lanjut ke antrean berikut.

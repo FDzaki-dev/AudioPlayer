@@ -88,7 +88,10 @@ fun SmartPlaylistTabView(
                             supportingContent = { Text("$matchCount lagu cocok") },
                             leadingContent = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            modifier = Modifier.clickable { selectedId = playlist.id }
+                            // Batch 486 — `.animateItem()` di awal chain (pola sama LibraryScreen/
+                            // VaultSheet/SongPickerSheet Batch 482/485). Key `p.id` sudah stabil sejak
+                            // awal, 0 gesture drag-reorder di list ini (grep app-wide: 0 hit).
+                            modifier = Modifier.animateItem().clickable { selectedId = playlist.id }
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                     }
@@ -174,7 +177,10 @@ fun SmartPlaylistTabView(
                                     )
                                 },
                                 colors = ListItemDefaults.colors(containerColor = background),
-                                modifier = Modifier.clickable { onSongClick(matchedSongs, index) }
+                                // Batch 486 — `.animateItem()`, alasan sama blok playlist di atas.
+                                // List ini brubah isi tiap ganti aturan (search/filter aturan smart
+                                // playlist), key `song.id` stabil, 0 drag-reorder di sini.
+                                modifier = Modifier.animateItem().clickable { onSongClick(matchedSongs, index) }
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                         }
@@ -334,7 +340,10 @@ private fun SmartPlaylistBuilderSheet(
                                     else selectedFolders + folder
                             },
                             shape = chipLiquidShape,
-                            label = { Text(folder) }
+                            label = { Text(folder) },
+                            // Batch 486 — `.animateItem()`, pola sama chip preset EqualizerSheet
+                            // Batch 485. Key = string folder itu sendiri, stabil.
+                            modifier = Modifier.animateItem()
                         )
                     }
                 }
@@ -362,7 +371,9 @@ private fun SmartPlaylistBuilderSheet(
                                 selectedGenre = if (genreOption == selectedGenre) null else genreOption
                             },
                             shape = chipLiquidShape,
-                            label = { Text(genreOption) }
+                            label = { Text(genreOption) },
+                            // Batch 486 — `.animateItem()`, alasan sama blok folder di atas.
+                            modifier = Modifier.animateItem()
                         )
                     }
                 }

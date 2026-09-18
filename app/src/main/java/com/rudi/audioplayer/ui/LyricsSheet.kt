@@ -278,7 +278,15 @@ fun LyricsSheet(
                                     synced -> MaterialTheme.colorScheme.secondary
                                     else -> MaterialTheme.colorScheme.onSurface
                                 },
+                                // Batch 486 — `.animateItem()` ditambah di awal chain (pola sama
+                                // list lain). Prioritas RENDAH krn list ini statis (dibangun ulang
+                                // via `remember(rawLyrics)`, 0 pernah insert/remove saat playback
+                                // normal, key = index bukan id konten) — animateItem cuma kepakai
+                                // kalau user edit lirik lalu simpan (jumlah baris berubah), 0
+                                // berpengaruh ke sync highlight/auto-scroll (logic activeIndex/
+                                // LaunchedEffect di atas 0 disentuh).
                                 modifier = Modifier
+                                    .animateItem()
                                     .fillMaxWidth()
                                     .padding(vertical = 6.dp)
                             )

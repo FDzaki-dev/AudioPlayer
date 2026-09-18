@@ -12,6 +12,55 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 486 [instruksi user: "lanjutkan progress yang tertunda!!" — TANPA konfirmasi
+eksplisit hasil test Batch 485 (Song Picker/AB Repeat/Equalizer)]**: hasil test Batch 485 BELUM
+dikonfirmasi user di sesi ini — dicatat di sini supaya sesi berikutnya 0 salah asumsi ("AI DILARANG
+menebak histori"). Resume point Batch 486 memberi 2 cabang: (a) kalau test 485 ✅ → lanjut
+`.animateItem()` ke `SmartPlaylistScreen.kt`/`LyricsSheet.kt`; (b) kalau tidak → sektor
+pill/tab-sync + gesture-drag, TAPI cabang (b) eksplisit butuh "instruksi eksplisit user utk sektor
+itu spesifik" yang TIDAK ada di pesan ini. Karena cabang (b) terkunci tanpa instruksi spesifik,
+satu-satunya lanjutan valid dari instruksi generik "lanjutkan" adalah cabang (a) — dieksekusi di
+bawah. Sektor pill/tab-sync TETAP 0 disentuh.
+
+**2 file diubah** (dalam batas 3 file/tugas): `SmartPlaylistScreen.kt`, `LyricsSheet.kt`.
+1. Kedua file dicek dulu (pola sama Batch 482-485): grep `isDragging`/`draggable`/`reorder` = 0
+   hit di keduanya → aman dari resiko `.animateItem()` berebut dgn gesture drag.
+2. `SmartPlaylistScreen.kt` (4 titik, semua key sudah stabil sejak awal): (i) list playlist
+   otomatis (`itemsIndexed`, key `p.id`); (ii) list lagu cocok aturan (`itemsIndexed`, key
+   `song.id`); (iii) chip filter folder di builder sheet (`items`, key = string folder itu
+   sendiri); (iv) chip filter genre di builder sheet (`items`, key = string genre itu sendiri) —
+   (iii)/(iv) pola sama chip preset `EqualizerSheet.kt` Batch 485 (chip statis, animasi hanya utk
+   transisi selected-state/layout, bukan insert/remove).
+3. `LyricsSheet.kt` (1 titik, prioritas RENDAH per rasional Batch 483): list baris lirik
+   (`itemsIndexed`, key = INDEX bukan id konten — list dibangun ulang via `remember(rawLyrics)`,
+   0 pernah insert/remove saat playback normal). Ditambah tetap demi konsistensi antrean; dampak
+   nyata cuma muncul di alur edit-lirik-lalu-simpan (jumlah baris berubah) — logic sync
+   highlight/auto-scroll (`activeIndex`/`LaunchedEffect`) 0 disentuh.
+4. **0 disentuh**: logic filter/aturan smart playlist, logic parse/sync lirik, sektor
+   pill/tab-sync + gesture-drag custom (mini player/queue) — keputusan Batch 483 masih berlaku,
+   TIDAK dimulai tanpa instruksi eksplisit user utk sektor itu.
+
+**0 diverifikasi CI/device Batch 486** — 0 env Android nyata/compiler Kotlin sesi ini (balance
+brace/paren dicek per file: `SmartPlaylistScreen.kt` `{}` 106/106 `()` 284/284;
+`LyricsSheet.kt` `{}` 65/65 `()` 191/191, keduanya match). **WAJIB DITEST user (gabung dgn test
+Batch 485 yang masih pending)**:
+1. Smart Playlist → buka list "Playlist Otomatis" (kalau >1 playlist) → transisi tetap mulus saat
+   playlist dihapus (FAB ikon sama, 0 regresi); buka salah satu playlist → list "lagu cocok" harus
+   tetap smooth kalau aturan diubah lewat pensil (jumlah lagu cocok berubah).
+2. Smart Playlist Builder (tombol pensil/buat baru) → toggle chip Folder & Genre → transisi
+   visual chip (selected state) tetap mulus, 0 regresi ke pemilihan folder/genre atau simpan
+   aturan.
+3. Lyrics (buka lirik lagu apa saja) → scroll/auto-scroll sync tetap presisi, 0 regresi; kalau
+   sempat edit lirik lalu simpan → transisi baris baru/hilang boleh terlihat (bukan bug).
+4. Pastikan 0 crash/force-close saat build (0 signature/parameter baru, murni modifier tambahan).
+**[RESUME POINT Batch 487]**: kalau SEMUA test Batch 485 + 486 di atas ✅ (Song Picker, AB Repeat,
+Equalizer, Smart Playlist, Lyrics), antrean micro-task polish `.animateItem()` HABIS — baru boleh
+lanjut ke sektor pill/tab-sync + gesture-drag custom (mini player/queue), TAPI TETAP WAJIB
+instruksi eksplisit user utk sektor itu spesifik (bukan otomatis dari "lanjutkan" generik) krn
+riwayat regresi (Batch 448/477/479) butuh audit 1 batch penuh, bukan diselipkan. Kalau ada test
+di atas ❌, laporkan detail kegagalannya dulu — jangan lanjut sektor manapun sebelum root cause
+jelas.
+
 **Catatan Batch 485 [user konfirmasi fix biometrik Batch 484 ✅ ("applause"), instruksi: "lanjut
 kerjakan Polish yang masih tertunda"]**: lanjut resume point Batch 484 (masih valid, 0 berubah
 sejak ditulis) — micro-task polish animasi antrean Batch 481/482/483.
