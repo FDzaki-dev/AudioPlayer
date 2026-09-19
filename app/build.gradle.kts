@@ -302,9 +302,14 @@ dependencies {
     // LiquidGlassAccent yang SUDAH ADA di frostedGlass(), bukan style bawaan Haze.
     implementation("dev.chrisbanes.haze:haze:1.7.2")
 
-    implementation("androidx.media3:media3-exoplayer:1.3.1")
-    implementation("androidx.media3:media3-session:1.3.1")
-    implementation("androidx.media3:media3-common:1.3.1")
+    // Batch 494: bump 1.3.1 -> 1.10.1 (latest stable per developer.android.com, dicek
+    // web_search; 1.11.0-alpha01 di alpha channel, TIDAK dipakai — kebijakan project stable-only).
+    // Instruksi eksplisit user: unlock Gap #2 (previous-3-detik, setMaxSeekToPreviousPositionMs,
+    // reverted Batch 493 krn Unresolved reference di 1.3.1). Scope MURNI version string, 0 source
+    // Kotlin disentuh batch ini (re-add API Gap #2 BELUM dieksekusi — tunggu instruksi terpisah).
+    implementation("androidx.media3:media3-exoplayer:1.10.1")
+    implementation("androidx.media3:media3-session:1.10.1")
+    implementation("androidx.media3:media3-common:1.10.1")
 
     // Batch 426 (correction, was 3.6.2 in Batch 425): CI build FAILED — checkDebugAarMetadata,
     // 3.4.0+ transitively requires Compose Foundation/Animation/UI 1.12.0 -> compileSdk 37 +

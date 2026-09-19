@@ -1,5 +1,19 @@
 # Changelog
 
+## Batch 494 — Bump androidx.media3 1.3.1 → 1.10.1 (instruksi eksplisit user)
+1 file diubah: `app/build.gradle.kts`.
+- 3 artifact di-bump: `media3-exoplayer`, `media3-session`, `media3-common` (1.3.1 → 1.10.1,
+  latest stable per developer.android.com, dicek web_search — 1.11.0-alpha01 di alpha channel,
+  TIDAK dipakai, kebijakan project stable-only).
+- Scope MURNI version string dependency. 0 source Kotlin disentuh. Gap #2 (previous-3-detik,
+  `setMaxSeekToPreviousPositionMs`, direvert Batch 493 krn `Unresolved reference` di 1.3.1)
+  SEKARANG API-nya tersedia di 1.10.1, TAPI re-add pemanggilan API itu BELUM dieksekusi batch
+  ini — user hanya instruksikan bump, bukan re-add fitur. Menunggu instruksi terpisah.
+- compileSdk 36 / minSdk 31 / targetSdk 36 / AGP 8.13.0 / Kotlin 2.4.10 — 0 diubah, sudah
+  kompatibel dengan Media3 1.10.1 (tidak ada requirement compileSdk lebih tinggi dari itu).
+- **0 diverifikasi CI ulang sesi ini** (0 akses jalankan CI dari sandbox). User WAJIB `git push`
+  & cek run GitHub Actions berikutnya HIJAU.
+
 ## Batch 493 — REVERT: Batch 492 gagal CI (Unresolved reference, Media3 versi pin tidak cocok)
 User kirim `log_fail_473.zip` (`build-output.log`): `compileReleaseKotlin`/`compileDebugKotlin`
 FAILED — `PlaybackService.kt:107:14 Unresolved reference 'setMaxSeekToPreviousPositionMs'`.
