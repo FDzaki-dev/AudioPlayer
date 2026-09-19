@@ -12,6 +12,28 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 498 [klarifikasi eksplisit user, 3 pertanyaan dijawab satu per satu sebelum
+coding]**: Gap #3 (shuffle anti-repeat-nearby) — spesifikasi FINAL dari user: (1) "anti-repeat-
+nearby" = KEDUA makna (lagu sama persis 0 boleh bersebelahan langsung, DAN lagu baru-baru
+diputar 0 boleh muncul lagi terlalu cepat); (2) ukuran window "baru-baru diputar" diserahkan ke
+penilaian terbaik ("idk, sesuai preferensi terbaik aja") — dipilih: skala ¼ ukuran antrean,
+dibatasi 5..25, 0 kalau antrean ≤8 lagu; (3) berlaku di KEDUA jalur shuffle yang ada (tombol
+Shuffle player + "Shuffle All" Home). **2 file disentuh** (dalam batas 3 file/tugas): file BARU
+`AntiRepeatShuffleOrder.kt` (custom `ShuffleOrder` Media3 + fungsi murni
+`buildAntiRepeatNearbyOrder()`), dan `PlaybackService.kt` (1 listener baru
+`onShuffleModeEnabledChanged` ditambah ke `Player.Listener` yang sudah ada — reaktif ke KEDUA
+jalur shuffle sekaligus dari 1 titik, **0 perubahan di `PlayerViewModel.kt`**). Detail teknis
+penuh + alasan kenapa custom `ShuffleOrder` (bukan cuma acak ulang list) + urutan test manual
+WAJIB: `CHANGELOG.md` § Batch 498. Balance brace/paren/bracket kedua file: konsisten (lihat
+CHANGELOG). **NOT VERIFIED** — 0 CI/device fisik sesi ini, terutama titik paling kritis:
+tambah/hapus/reorder queue SELAGI shuffle aktif (ExoPlayer memanggil `cloneAndInsert`/
+`cloneAndRemove` custom kita otomatis di titik itu) — **WAJIB DITEST user** sebelum Gap #3
+dianggap tuntas, lihat CHANGELOG.md § Batch 498 utk 5 langkah test lengkap.
+
+**Catatan Batch 497 [user: "it works heck yeah!!"]**: fix Batch 496 (`seekToPrevious()` di 3 titik
+tombol Previous) DIKONFIRMASI device fisik user — BEKERJA. Gap #2 (previous 3 detik eksplisit)
+BENAR-BENAR TUNTAS, status "NOT VERIFIED" Batch 496 DICABUT, 0 gap tersisa untuk fitur ini.
+
 **Catatan Batch 496 [user laporkan: "kenapa langsung ke lagu sebelumnya nya woy!!" — Gap #2 TIDAK
 jalan]**: **Root cause TERKONFIRMASI dari pembacaan kode langsung** (`grep` semua call site tombol
 Previous, bukan sample): `maxSeekToPreviousPositionMs` (Batch 492/495) HANYA berefek pada
@@ -2290,21 +2312,23 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 496. ZIP terakhir: `SONIX_v496.zip`. **3 file diubah** (dalam batas 3
-  file/tugas, PAS limit): `PlaybackService.kt`, `PlayerViewModel.kt`, `FloatingBubbleService.kt` —
-  FIX ROOT CAUSE Gap #2: `seekToPreviousMediaItem()` (unconditional, threshold TIDAK berefek) →
-  `seekToPrevious()` (threshold-aware) di 3 titik tombol Previous (app/widget/bubble).
-  MediaSession default (hardware/Bluetooth) TIDAK diubah, sudah benar dari awal. Detail lengkap:
-  "Catatan Batch 496" di atas / `CHANGELOG.md` § Batch 496.
-  **WAJIB user**: `git push` (skrip Termux di bawah) → cek run GitHub Actions berikutnya HIJAU.
-  **LALU test manual device, 3 jalur terpisah** (tombol app, widget home-screen, floating bubble):
-  putar lagu, lewat 3 detik, tekan Previous → lagu SAAT INI restart dari 0:00; tekan Previous lagi
-  < 3 detik sejak restart → BARU pindah ke lagu sebelumnya.
-  **[RESUME POINT berikutnya]**: kalau test 3 jalur di atas ✅ SEMUA, Gap #2 BENAR-BENAR tuntas
-  (bukan cuma klaim Batch 495 yang ternyata belum kepakai). Kalau ADA yang ❌, laporkan jalur mana
-  spesifik (app/widget/bubble) — JANGAN asumsikan ketiganya identik, tiap jalur dites Batch 496
-  hanya lewat pembacaan kode, belum device fisik. Sisa roadmap tidak berubah: Gap #6 (filter audio
-  pendek) & Gap #3 (shuffle anti-repeat-nearby), KEDUA masih butuh instruksi eksplisit user dulu.
+- Batch terakhir: 498. ZIP terakhir: `SONIX_v498.zip`. **2 file disentuh** (dalam batas 3
+  file/tugas): file BARU `AntiRepeatShuffleOrder.kt` + `PlaybackService.kt` diubah (1 listener
+  baru). **Gap #3 (shuffle anti-repeat-nearby) SEKARANG PUNYA IMPLEMENTASI KONKRET** — spesifikasi
+  final & detail teknis: lihat "Catatan Batch 498" di atas + `CHANGELOG.md` § Batch 498. **NOT
+  VERIFIED** — 0 CI/device fisik sesi ini. **WAJIB DITEST user** (5 langkah, § Batch 498
+  CHANGELOG) sebelum Gap #3 dianggap tuntas penuh — terutama titik paling kritis: tambah/hapus/
+  reorder queue SELAGI shuffle aktif, 0 boleh crash.
+  **[RESUME POINT berikutnya]**: Sisa roadmap Gap QA v488, masih butuh keputusan/instruksi
+  eksplisit user dulu (0 diasumsikan, 0 dieksekusi tanpa tanya):
+  (a) **Gap #6 (filter audio pendek)** — filter `getAllSongs()` SAJA (`MusicRepository.kt`) dgn
+  `DURATION > <ambang>`, `getSongsByIds()`/`BASE_SELECTION` TETAP tidak disentuh (lagu pendek yang
+  SUDAH ada di playlist/favorit/queue tidak boleh mendadak hilang). **Ambang durasi BELUM
+  dikonfirmasi user** (kandidat umum industri: 30 detik, TAPI ini asumsi, bukan angka eksplisit
+  dari user/checklist — WAJIB tanya dulu sebelum eksekusi).
+  (b) Gap #3 di atas: kalau hasil test user Batch 498 GAGAL di salah satu dari 5 langkah
+  (terutama add/remove/reorder queue selagi shuffle aktif), root cause paling mungkin ada di
+  `AntiRepeatShuffleOrder.cloneAndInsert`/`cloneAndRemove` — cek di situ dulu sebelum teori lain.
 - Batch 492 (sebelum 493, GAGAL CI — lihat Batch 493 di atas). ZIP: `SONIX_v492.zip`. **1 file
   diubah**: `PlaybackService.kt` — Gap #2 Roadmap QA v488 (`setMaxSeekToPreviousPositionMs
   (3000L)` eksplisit di `ExoPlayer.Builder` player sesi utama). User konfirmasi device terpisah:

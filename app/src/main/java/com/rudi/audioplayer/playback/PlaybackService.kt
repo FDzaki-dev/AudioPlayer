@@ -31,6 +31,7 @@ import com.rudi.audioplayer.data.CrossfadeStore
 import com.rudi.audioplayer.data.FloatingBubbleStore
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
+import com.rudi.audioplayer.data.PlayStatsStore
 import com.rudi.audioplayer.data.ShakeSettingsStore
 import com.rudi.audioplayer.data.SilenceSkipStore
 import com.rudi.audioplayer.data.lyrics.LyricsPrefetchStore
@@ -217,6 +218,30 @@ class PlaybackService : MediaLibraryService() {
                 if (coldStartNotificationActive) {
                     updateColdStartNotification()
                 }
+            }
+
+            // Batch 498 — Gap #3 (shuffle anti-repeat-nearby). Fires from BOTH existing shuffle
+            // entry points at once (PlayerViewModel.toggleShuffle() dan .shuffleAll() sama-sama
+            // cuma flip flag ini di controller yang sama) — 0 perubahan diperlukan di
+            // PlayerViewModel.kt. Hanya jalan saat shuffle BARU dinyalakan (false->true), bukan
+            // tiap event lain; re-apply diam-diam selagi sudah ON tidak pernah terjadi. Detail
+            // lengkap + jawaban klarifikasi user: lihat KDoc AntiRepeatShuffleOrder.kt.
+            override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                if (!shuffleModeEnabled) return
+                // `player` di sini adalah val ExoPlayer yang sama persis dibangun di atas
+                // (closure, pola sama dgn pushWidgetUpdate(player) di onIsPlayingChanged) — 0
+                // cast diperlukan, sudah konkret ExoPlayer sejak awal.
+                val count = player.mediaItemCount
+                if (count <= 1) return
+                val songIds = (0 until count).map { i -> player.getMediaItemAt(i).mediaId.toLongOrNull() ?: -1L }
+                val windowSize = AntiRepeatShuffleOrder.windowSizeFor(count)
+                val recentIds = if (windowSize > 0) {
+                    PlayStatsStore(this@PlaybackService).getRecentIds(windowSize).toHashSet()
+                } else {
+                    emptySet()
+                }
+                val order = buildAntiRepeatNearbyOrder(songIds, recentIds)
+                player.setShuffleOrder(AntiRepeatShuffleOrder(order))
             }
         })
 

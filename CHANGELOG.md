@@ -1,5 +1,73 @@
 # Changelog
 
+## Batch 498 — Gap #3 (shuffle anti-repeat-nearby) — FITUR BARU, custom shuffle engine
+User klarifikasi eksplisit sebelum coding (3 pertanyaan, dijawab satu per satu, 0 diasumsikan):
+1. "Anti-repeat-nearby" maksudnya yang mana → **Keduanya**: (a) lagu SAMA PERSIS tidak boleh
+   bersebelahan langsung, DAN (b) lagu yang baru saja diputar tidak boleh muncul lagi terlalu
+   cepat.
+2. Ukuran window "baru-baru diputar" → **diserahkan ke penilaian terbaik** ("idk, sesuai
+   preferensi terbaik aja"). Diputuskan: skala mengikuti ukuran antrean saat itu (seperempat
+   ukuran antrean, dibatasi 5..25 lagu; antrean ≤8 lagu dapat window 0 = fitur otomatis no-op
+   murni, bukan bug — lihat `AntiRepeatShuffleOrder.windowSizeFor()`).
+3. Berlaku di jalur shuffle mana → **Keduanya** (tombol Shuffle di player, "Shuffle All" dari
+   Home).
+
+2 file disentuh (dalam batas 3 file/tugas):
+- **BARU**: `AntiRepeatShuffleOrder.kt` — custom `androidx.media3.exoplayer.source.ShuffleOrder`
+  (permutasi TETAP, dihitung sekali per aktivasi shuffle) + fungsi murni
+  `buildAntiRepeatNearbyOrder()`: lagu non-recent diprioritaskan di depan urutan, lagu recent
+  (dari `PlayStatsStore.getRecentIds()`) ditaruh belakang, plus guard adjacency lagu sama
+  persis (best-effort, aman kalau tidak ada solusi — mis. antrean isinya 1 lagu diulang terus).
+  `cloneAndInsert`/`cloneAndRemove`/`cloneAndClear` diimplementasi penuh (item baru masuk EKOR
+  urutan, bukan disisip acak seperti `DefaultShuffleOrder` asli) — WAJIB benar karena ExoPlayer
+  memanggilnya OTOMATIS tiap `addMediaItem`/`removeMediaItem`/`moveMediaItem` selagi shuffle
+  aktif (dipakai luas di `PlayerViewModel.kt`: Play Next, Tambah ke Antrean, reorder Queue
+  manual — SEMUA jalur itu harus tetap jalan tanpa crash; 0 disentuh langsung, cuma harus tetap
+  kompatibel dengan ShuffleOrder custom ini).
+- **DIUBAH**: `PlaybackService.kt` — 1 listener baru (`onShuffleModeEnabledChanged`) ditambah
+  ke `Player.Listener` yang SUDAH ADA di `onCreate()` (bukan listener terpisah baru). Fires
+  setiap flag `shuffleModeEnabled` berubah ke `true` — dari MANA PUN sumbernya, termasuk KEDUA
+  jalur yang diminta user (keduanya sama-sama cuma flip flag ini di controller yang sama) —
+  membangun urutan anti-repeat-nearby dari queue saat itu + window recency, lalu memanggil
+  `ExoPlayer.setShuffleOrder()`. **0 perubahan di `PlayerViewModel.kt`** — `toggleShuffle()` dan
+  `shuffleAll()` yang sudah ada otomatis ikut ter-cover tanpa disentuh sama sekali sama sekali
+  (Tunnel Vision: 1 titik reaktif, bukan 2 tempat terpisah).
+
+**Kenapa custom ShuffleOrder (bukan cuma acak ulang `List<Song>` lalu `setMediaItems()`)**:
+Media3 sendiri, begitu `shuffleModeEnabled=true`, SELALU memutuskan next/previous/auto-advance
+lewat `ShuffleOrder` internalnya sendiri (`DefaultShuffleOrder`, murni acak, 0 memori riwayat)
+— urutan `MediaItem` yang di-set lewat `setMediaItems()` TIDAK dipakai untuk traversal selama
+shuffle ON. `ExoPlayer.setShuffleOrder()` adalah API inti ExoPlayer yang JAUH lebih tua & stabil
+dibanding `setMaxSeekToPreviousPositionMs` (baru ada sejak media3 1.4.0, sempat gagal kompilasi
+Batch 493) — sudah ada sejak sebelum project ini pin versi media3 berapa pun, 0 risiko
+"Unresolved reference" sekelas itu.
+
+Balance brace/paren/bracket:
+- `AntiRepeatShuffleOrder.kt` (baru): `{}` 24/24 `()` 91/91 `[]` 33/33
+- `PlaybackService.kt`: `{}` 84/84 `()` 461/461 `[]` 19/19
+
+**NOT VERIFIED** — 0 CI/device fisik sesi ini (0 akses compiler Kotlin/emulator/device dari
+sandbox ini). **WAJIB DITEST user** sebelum Gap #3 dianggap tuntas:
+1. `git push` → cek run GitHub Actions berikutnya HIJAU (compile-success ≠ behavior-verified,
+   tapi tetap prasyarat minimum).
+2. Nyalakan Shuffle (tombol player) di antrean berisi lagu yang belum lama ini diputar (cek
+   Home § "Baru Diputar") → lagu itu seharusnya cenderung muncul BELAKANGAN, bukan di awal.
+3. "Shuffle All" dari Home dengan skenario serupa → hasil senada.
+4. **Paling kritis** (risiko regresi tertinggi dari perubahan ini): selagi shuffle aktif, coba
+   "Tambah ke Antrean" / "Putar Berikutnya" / hapus 1 lagu dari Queue / reorder manual di Queue
+   → WAJIB 0 crash, antrean tetap konsisten.
+5. Matikan lalu nyalakan lagi Shuffle beberapa kali berturut-turut di antrean yang sama →
+   urutan boleh beda tiap kali (memang diacak ulang), tapi 0 crash/freeze.
+
+Gap #3 kini punya implementasi konkret (sebelumnya "FITUR BARU, custom shuffle engine, 0
+spesifikasi" di RESUME POINT Batch 497) — status pending WAJIB DITEST user di atas sebelum
+dianggap tuntas penuh, pola sama persis dengan semua batch fitur lain di project ini.
+
+## Batch 497 — DIKONFIRMASI device fisik user: fix Gap #2 (Batch 496) BEKERJA
+User: "it works heck yeah!!" — fix `seekToPrevious()` (Batch 496) TERVERIFIKASI device fisik.
+Gap #2 (previous 3 detik eksplisit) BENAR-BENAR TUNTAS, 0 gap tersisa. 0 file source diubah batch
+ini (murni update status verifikasi di dokumentasi).
+
 ## Batch 496 — FIX ROOT CAUSE: Gap #2 tidak jalan (Previous langsung ke lagu sebelumnya)
 User laporkan: "kenapa langsung ke lagu sebelumnya" — threshold 3 detik (`maxSeekToPreviousPositionMs`,
 Batch 492/495) TIDAK berefek sama sekali.
