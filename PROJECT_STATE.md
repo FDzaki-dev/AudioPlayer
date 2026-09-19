@@ -2356,12 +2356,13 @@ brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
 4. `docs/archive/ARCHIVED_POLISH_AUDIT.md` / `docs/archive/ARCHIVED_MICRO_UIUX_AUDIT.md` = arsip, tidak aktif diikuti.
    `docs/archive/ROADMAP_LIQUID_GLASS_REDESIGN.md` = 100% tuntas, tidak ada item terbuka.
    `docs/QA_CHECKLIST_SONIX_v488.md` (Batch 489) BUKAN arsip — checklist QA eksternal AKTIF.
-   Gap previous-3-detik: percobaan Batch 492 GAGAL CI (revert Batch 493, lihat "Catatan Batch
-   493") — BUTUH bump `media3` 1.3.1→1.4.0+ utk fix beneran, konfirmasi user dulu. Gap #3
-   (shuffle anti-repeat-nearby) TUNTAS Batch 498/499/500. Gap #6 (filter audio pendek) TUNTAS
-   Batch 501/502. **1 gap tersisa BELUM actionable tanpa keputusan user**: previous-3-detik
-   (butuh keputusan bump dependency). Pindahkan ke `docs/archive/` HANYA setelah seluruh gap
-   actionable-nya tuntas + device-QA lengkap.
+   Gap previous-3-detik: percobaan Batch 492 GAGAL CI (revert Batch 493), TAPI bump media3
+   1.10.1 (Batch 494) + re-add setter (Batch 495) + fix bug lanjutan (Batch 496) **TUNTAS &
+   dikonfirmasi device user Batch 497** [koreksi stale Batch 503 — baris ini sempat salah
+   mengklaim "masih butuh bump"]. Gap #3 (shuffle anti-repeat-nearby) TUNTAS Batch 498/499/500.
+   Gap #6 (filter audio pendek) TUNTAS Batch 501/502. **0 gap kode tersisa** dari roadmap Gap QA
+   v488; #4/#5/#7/#8/#9 murni device-QA. Pindahkan ke `docs/archive/` HANYA setelah device-QA
+   #4/#5/#7/#8/#9 dikonfirmasi user, ATAU user instruksikan eksplisit tutup sisanya.
 5. Nama folder Termux: `~/projects/audioplayer` (lowercase) — FINAL. `rootProject.name` tetap
    `"AudioPlayer"` (hardcoded `settings.gradle.kts`), tidak terikat nama folder/`git remote`.
 6. Sektor DITUTUP — jangan proaktif dibuka ulang pada instruksi generik ("next"/"lanjut"); BOLEH
