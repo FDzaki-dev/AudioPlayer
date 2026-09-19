@@ -1,5 +1,22 @@
 # Changelog
 
+## Batch 499 — Hotfix build error dari Batch 498 (`log_fail_478.zip`)
+- CI Batch 498 GAGAL: `compileDebugKotlin`/`compileReleaseKotlin` FAILED — `AntiRepeatShuffleOrder.kt`
+  tidak lengkap mengimplementasi `ShuffleOrder` (`getNextIndex`/`getPreviousIndex` "overrides
+  nothing")
+- Root cause: interface `androidx.media3.exoplayer.source.ShuffleOrder` di media3 1.10.1 (versi
+  pin project) mendeklarasikan `getNextIndex(index: Int)`/`getPreviousIndex(index: Int)` dengan
+  **1 parameter**, bukti langsung dari pesan compiler sendiri — Batch 498 menulis versi 2
+  parameter (`index`, `repeatMode`), asumsi API yang salah, tidak pernah match interface asli
+- Fix: signature dikembalikan ke 1 parameter, cabang `repeatMode == Player.REPEAT_MODE_ALL`
+  dihapus (bukan tanggung jawab `ShuffleOrder` — wrap-around repeat-all sudah ditangani ExoPlayer
+  sendiri lewat `getFirstIndex()`/`getLastIndex()`, 0 diubah). Import `Player` ikut dicabut (0
+  pemakaian kode tersisa)
+- 1 file diubah (`AntiRepeatShuffleOrder.kt`), 0 file lain tersentuh — 0 call site lain
+  memanggil kedua fungsi ini langsung (murni dipanggil internal oleh ExoPlayer)
+- **NOT VERIFIED** — 0 compiler Kotlin di sandbox ini. WAJIB `git push` & cek CI HIJAU, baru
+  lanjut 5 langkah test manual Gap #3 (§ Batch 498 di bawah, belum berubah)
+
 ## Batch 498 — Gap #3 (shuffle anti-repeat-nearby) — FITUR BARU, custom shuffle engine
 User klarifikasi eksplisit sebelum coding (3 pertanyaan, dijawab satu per satu, 0 diasumsikan):
 1. "Anti-repeat-nearby" maksudnya yang mana → **Keduanya**: (a) lagu SAMA PERSIS tidak boleh

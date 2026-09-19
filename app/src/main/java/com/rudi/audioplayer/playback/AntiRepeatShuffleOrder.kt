@@ -1,7 +1,6 @@
 package com.rudi.audioplayer.playback
 
 import androidx.media3.common.C
-import androidx.media3.common.Player
 import androidx.media3.exoplayer.source.ShuffleOrder
 
 /**
@@ -53,24 +52,22 @@ class AntiRepeatShuffleOrder(private val shuffled: IntArray) : ShuffleOrder {
 
     override fun getLength(): Int = shuffled.size
 
-    override fun getNextIndex(index: Int, repeatMode: Int): Int {
+    // FIX log_fail_478: interface ShuffleOrder media3 1.10.1 HANYA 1 parameter (index) — 0
+    // repeatMode di signature ini (wrap REPEAT_MODE_ALL ditangani ExoPlayer sendiri lewat
+    // getFirstIndex()/getLastIndex() saat traversal kena INDEX_UNSET, bukan tanggung jawab
+    // ShuffleOrder). Signature lama (index, repeatMode) = asumsi salah, 0 pernah match interface
+    // asli -> "overrides nothing". Behavior WRAP tetap sama persis (getFirstIndex/getLastIndex
+    // sudah benar di bawah, ExoPlayer yang panggil itu saat REPEAT_MODE_ALL aktif).
+    override fun getNextIndex(index: Int): Int {
         if (index < 0 || index >= positionOf.size) return C.INDEX_UNSET
         val position = positionOf[index]
-        return when {
-            position + 1 < shuffled.size -> shuffled[position + 1]
-            repeatMode == Player.REPEAT_MODE_ALL -> shuffled[0]
-            else -> C.INDEX_UNSET
-        }
+        return if (position + 1 < shuffled.size) shuffled[position + 1] else C.INDEX_UNSET
     }
 
-    override fun getPreviousIndex(index: Int, repeatMode: Int): Int {
+    override fun getPreviousIndex(index: Int): Int {
         if (index < 0 || index >= positionOf.size) return C.INDEX_UNSET
         val position = positionOf[index]
-        return when {
-            position - 1 >= 0 -> shuffled[position - 1]
-            repeatMode == Player.REPEAT_MODE_ALL -> shuffled[shuffled.size - 1]
-            else -> C.INDEX_UNSET
-        }
+        return if (position - 1 >= 0) shuffled[position - 1] else C.INDEX_UNSET
     }
 
     override fun getLastIndex(): Int = if (shuffled.isEmpty()) C.INDEX_UNSET else shuffled[shuffled.size - 1]

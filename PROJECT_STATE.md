@@ -12,6 +12,46 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 499 [user kirim `log_fail_478.zip` (`build-output.log`) — CI Batch 498 GAGAL]**:
+`Task :app:compileReleaseKotlin`/`compileDebugKotlin` FAILED, `AntiRepeatShuffleOrder.kt:46:1`
+"Class 'AntiRepeatShuffleOrder' is not abstract and does not implement abstract members:
+`getNextIndex(p0: Int): Int`/`getPreviousIndex(p0: Int): Int`", + 2 error "'getNextIndex'/
+'getPreviousIndex' overrides nothing".
+
+**Root cause TERKONFIRMASI dari log (bukan tebakan)**: interface `androidx.media3.exoplayer.
+source.ShuffleOrder` (media3 1.10.1, versi pin project sejak Batch 494) mendeklarasikan
+`getNextIndex`/`getPreviousIndex` dengan **1 parameter** (`index: Int`) SAJA — bukti LANGSUNG
+dari pesan compiler sendiri ("Potential signatures for overriding: fun getNextIndex(p0: Int):
+Int"). Batch 498 menulis kedua fungsi dengan **2 parameter** (`index: Int, repeatMode: Int`),
+asumsi API yang TIDAK PERNAH match interface asli — Kotlin anggap ini 2 fungsi baru yang 0
+nyambung ke `override` manapun ("overrides nothing"), SEKALIGUS kontrak abstrak asli jadi tidak
+terpenuhi (class tidak lengkap). Wrap-around `REPEAT_MODE_ALL` BUKAN tanggung jawab
+`ShuffleOrder` — ExoPlayer sendiri yang memanggil `getFirstIndex()`/`getLastIndex()` (2 fungsi
+ini SUDAH benar sejak Batch 498, 0 diubah) saat traversal kena `INDEX_UNSET` di kondisi
+repeat-all, jadi behavior wrap tetap identik tanpa parameter `repeatMode` eksplisit di sini.
+
+**Fix Batch 499 (P0 stability > lanjut Gap #3)**: **1 file diubah** (dalam batas 3 file/tugas):
+`AntiRepeatShuffleOrder.kt` — signature `getNextIndex(index: Int, repeatMode: Int)`/
+`getPreviousIndex(index: Int, repeatMode: Int)` → `getNextIndex(index: Int)`/`getPreviousIndex
+(index: Int)`, cabang `repeatMode == Player.REPEAT_MODE_ALL` di badan fungsi DIHAPUS (redundant/
+salah, bukan bagian kontrak interface), fallback `C.INDEX_UNSET` di posisi batas TETAP sama.
+Import `androidx.media3.common.Player` ikut dicabut (0 pemakaian kode lagi, cuma disebut di
+KDoc). **0 fungsi/logic lain disentuh** — `getLength`/`getLastIndex`/`getFirstIndex`/
+`cloneAndInsert`/`cloneAndRemove`/`cloneAndClear`/`windowSizeFor`/`buildAntiRepeatNearbyOrder`
+PERSIS Batch 498, 0 perubahan. **0 call site lain terdampak** — grep `PlaybackService.kt`
+konfirmasi cuma memanggil constructor + `windowSizeFor()`/`buildAntiRepeatNearbyOrder()`, TIDAK
+PERNAH memanggil `getNextIndex`/`getPreviousIndex` langsung (2 fungsi itu murni dipanggil
+INTERNAL oleh ExoPlayer sendiri saat traversal shuffle). Balance brace/paren/bracket
+`AntiRepeatShuffleOrder.kt`: `{}` 22/22 `()` 99/99 `[]` 31/31 (turun dari 24/91/33 Batch 498 —
+murni penyederhanaan `when{...}` jadi `if`, 0 struktur lain berubah).
+
+**NOT VERIFIED** — 0 CI/device fisik sesi ini (0 akses compiler Kotlin dari sandbox ini, fix
+murni dari pembacaan langsung pesan error + signature yang PERSIS ditunjukkan log itu sendiri).
+**WAJIB DITEST user**: (1) `git push` → cek run GitHub Actions berikutnya HIJAU (resiko regresi
+RENDAH — signature-only, 0 logic baru); (2) begitu CI hijau, LANJUTKAN 5 langkah test manual
+Gap #3 yang SUDAH tercatat `CHANGELOG.md` § Batch 498 (belum berubah, masih berlaku persis) —
+TERUTAMA titik paling kritis: tambah/hapus/reorder queue SELAGI shuffle aktif.
+
 **Catatan Batch 498 [klarifikasi eksplisit user, 3 pertanyaan dijawab satu per satu sebelum
 coding]**: Gap #3 (shuffle anti-repeat-nearby) — spesifikasi FINAL dari user: (1) "anti-repeat-
 nearby" = KEDUA makna (lagu sama persis 0 boleh bersebelahan langsung, DAN lagu baru-baru
@@ -2312,13 +2352,21 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 498. ZIP terakhir: `SONIX_v498.zip`. **2 file disentuh** (dalam batas 3
-  file/tugas): file BARU `AntiRepeatShuffleOrder.kt` + `PlaybackService.kt` diubah (1 listener
-  baru). **Gap #3 (shuffle anti-repeat-nearby) SEKARANG PUNYA IMPLEMENTASI KONKRET** — spesifikasi
-  final & detail teknis: lihat "Catatan Batch 498" di atas + `CHANGELOG.md` § Batch 498. **NOT
-  VERIFIED** — 0 CI/device fisik sesi ini. **WAJIB DITEST user** (5 langkah, § Batch 498
-  CHANGELOG) sebelum Gap #3 dianggap tuntas penuh — terutama titik paling kritis: tambah/hapus/
-  reorder queue SELAGI shuffle aktif, 0 boleh crash.
+- Batch terakhir: 499. ZIP terakhir: `SONIX_v499.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `AntiRepeatShuffleOrder.kt` — FIX CI compile fail dari `log_fail_478.zip`
+  (`getNextIndex`/`getPreviousIndex` signature disamakan ke interface asli media3 1.10.1: 1
+  parameter, bukan 2). Detail penuh: "Catatan Batch 499" di atas. **Gap #3 masih BELUM diklaim
+  tuntas** — ini fix compile, BUKAN konfirmasi behavior. **NOT VERIFIED** — 0 CI/device fisik
+  sesi ini. **WAJIB DITEST user**: (1) `git push` → CI harus HIJAU sekarang (sebelumnya GAGAL di
+  fix ini); (2) begitu hijau, lanjutkan 5 langkah test manual Gap #3 di `CHANGELOG.md` § Batch
+  498 (belum berubah) — terutama tambah/hapus/reorder queue SELAGI shuffle aktif, 0 boleh crash.
+- Batch 498 (sebelum 499, GAGAL CI — lihat "Catatan Batch 499" di atas). ZIP: `SONIX_v498.zip`.
+  **2 file disentuh** (dalam batas 3 file/tugas): file BARU `AntiRepeatShuffleOrder.kt` +
+  `PlaybackService.kt` diubah (1 listener baru). **Gap #3 (shuffle anti-repeat-nearby) SEKARANG
+  PUNYA IMPLEMENTASI KONKRET** — spesifikasi final & detail teknis: lihat "Catatan Batch 498" di
+  atas + `CHANGELOG.md` § Batch 498. **WAJIB DITEST user: SUPERSEDED oleh Batch 499 di atas —
+  install ZIP terbaru dulu (Batch 498 GAGAL compile, tidak pernah jadi APK), baru lanjut 5
+  langkah test Gap #3.**
   **[RESUME POINT berikutnya]**: Sisa roadmap Gap QA v488, masih butuh keputusan/instruksi
   eksplisit user dulu (0 diasumsikan, 0 dieksekusi tanpa tanya):
   (a) **Gap #6 (filter audio pendek)** — filter `getAllSongs()` SAJA (`MusicRepository.kt`) dgn
