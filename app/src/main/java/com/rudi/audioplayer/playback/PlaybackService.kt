@@ -99,6 +99,12 @@ class PlaybackService : MediaLibraryService() {
             // instead of blasting through the speaker unannounced — table stakes in every
             // major music app.
             .setHandleAudioBecomingNoisy(true)
+            // Gap #2 (Roadmap QA v488) — locks the "Previous restarts current track if played
+            // past N ms, else skips to prior track" threshold explicitly at 3000ms instead of
+            // inheriting Media3's Player.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS. Runtime
+            // behavior is unchanged today (the default already is 3000ms) — this only stops a
+            // future Media3 version bump from silently changing it out from under this app.
+            .setMaxSeekToPreviousPositionMs(3000L)
             .build()
 
         // Roadmap #8, Trim Keheningan Otomatis — dibaca sekali di sini untuk proses BARU (mis.

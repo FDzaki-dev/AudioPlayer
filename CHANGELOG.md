@@ -1,5 +1,28 @@
 # Changelog
 
+## Batch 492 — Gap #2 Roadmap QA v488: kunci threshold Previous 3 detik secara eksplisit
+User konfirmasi device: checklist WAJIB DITEST Batch 491 (6 poin, gabungan Batch 490+491) 100%
+LOLOS — bug "EQ balik flat/default" (headless resume + release salah-scope saat swipe-Recents)
+DITUTUP, 0 gap tersisa.
+
+Lanjut roadmap Gap QA v488 yang diparkir selama saga bug EQ: Gap #2 (Previous 3 detik eksplisit).
+1 file diubah: `PlaybackService.kt`.
+- `ExoPlayer.Builder` player sesi utama: `.setMaxSeekToPreviousPositionMs(3000L)` ditambah,
+  mengunci threshold "restart lagu ini vs pindah ke lagu sebelumnya" secara eksplisit alih-alih
+  warisan default Media3 (`C.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS` = 3000ms, nilai identik).
+  0 perubahan behavior runtime hari ini — murni proteksi terhadap perubahan default diam-diam di
+  versi Media3 mendatang. `overlapPlayer` (crossfade privat, tidak pernah terhubung ke tombol
+  Previous UI) tidak disentuh.
+
+0 diverifikasi CI/device sesi ini. **WAJIB DITEST user**: putar lagu, lewat 3 detik, tekan
+Previous → lagu SAAT INI restart dari 0:00 (bukan pindah lagu); tekan Previous lagi < 3 detik
+sejak restart → baru pindah ke lagu sebelumnya di antrean; pastikan 0 regresi ke Next/Shuffle/
+Repeat dan ke 2 skenario EQ Batch 490/491 (sudah lolos, cek ulang cukup sepintas). Detail lengkap:
+`PROJECT_STATE.md` § Catatan Batch 492 / `[RESUME POINT]`.
+
+Sisa roadmap Gap QA v488 (belum dikerjakan, tunggu arahan user): filter audio pendek (ambang
+durasi belum dikonfirmasi), shuffle anti-repeat-nearby (fitur baru, butuh instruksi eksplisit).
+
 ## Batch 491 — FIX #2: EQ masih balik flat/default (root cause KEDUA, Batch 490 belum tuntas)
 Laporan user ULANG, gejala identik Batch 490 — Batch 490 terbukti belum menutup celahnya.
 

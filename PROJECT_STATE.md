@@ -12,6 +12,42 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 492 [user konfirmasi device: checklist WAJIB DITEST Batch 491 — 6 poin gabungan
+Batch 490+491 — 100% LOLOS]**: bug "EQ balik flat/default" (2 root cause terpisah: headless
+resume Batch 490, `release()` salah-scope saat swipe-Recents Batch 491) DITUTUP, terverifikasi
+device fisik user, 0 gap tersisa. **Koreksi staleness ditemukan sesi ini**: bagian "Catatan Batch
+490" di bawah TIDAK PERNAH diperbarui menyebut Batch 491 (root cause kedua) walau CHANGELOG.md &
+`[RESUME POINT]` (akhir file) sudah benar — dicek ke SOURCE langsung (`PlayerViewModel.
+onCleared()`/`PlaybackService.onDestroy()`) utk pastikan fix 491 memang ada di kode, bukan cuma
+klaim dokumen, SEBELUM tulis catatan ini. Body "Catatan Batch 490" di bawah dibiarkan apa adanya
+sbg log historis (bukan diedit) — rujuk `[RESUME POINT]` di akhir file utk detail lengkap Batch
+491.
+
+Lanjut **[RESUME POINT berikutnya — Batch 489]** (parkir selama saga bug EQ 490-491, roadmap
+sendiri 0 berubah): Gap #2 dieksekusi (kandidat "risiko rendah, scope 1 file", 0 butuh konfirmasi
+user lebih lanjut, beda dari Gap #6/#3 di bawah). **1 file diubah** (dalam batas 3 file/tugas):
+`PlaybackService.kt`.
+1. `ExoPlayer.Builder` player sesi utama (BUKAN `overlapPlayer` privat crossfade — itu tidak
+   pernah terhubung ke transport UI/`seekToPreviousMediaItem()`): `.setMaxSeekToPreviousPositionMs
+   (3000L)` ditambah. Mengunci threshold "Previous restart lagu ini vs pindah ke lagu sebelumnya"
+   secara eksplisit alih-alih warisan default Media3 (`C.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS`
+   = 3000ms, PERSIS sama — koreksi nama konstanta dari catatan Batch 489, nama benarnya `C.`
+   bukan `Player.`). **0 perubahan behavior runtime hari ini** (nilai identik) — murni proteksi
+   kalau versi Media3 di-bump nanti (default lib bisa berubah diam-diam, override eksplisit ini
+   tidak ikut berubah).
+
+**0 diverifikasi CI/device Batch 492** — 0 env Android nyata/compiler Kotlin sesi ini (balance
+brace/paren/bracket `PlaybackService.kt`: `{}` 80/80 `()` 438/438 `[]` 19/19). **WAJIB DITEST
+user**: (1) putar lagu, biarkan lewat 3 detik, tekan tombol Previous → lagu SAAT INI restart dari
+0:00 (BUKAN pindah ke lagu sebelumnya di antrean); (2) tekan Previous lagi < 3 detik sejak lagu
+mulai/restart → BARU pindah ke lagu sebelumnya; (3) regresi: tombol Next, Shuffle, Repeat, 4
+skenario EQ Batch 490/491 di atas — 0 berubah.
+
+**Sisa Roadmap Gap QA v488 (BELUM dikerjakan, tunggu arahan user)**: (b) filter audio pendek
+(`MusicRepository.kt`, `getAllSongs()` saja) — ambang durasi BELUM dikonfirmasi user, tanyakan
+dulu sebelum eksekusi, JANGAN asumsi angka; (c) shuffle anti-repeat-nearby — FITUR BARU (custom
+shuffle engine), butuh instruksi eksplisit user dulu, bukan micro-task.
+
 **Catatan Batch 490 [laporan user: "preset EQ balik nol/default pasca app di-kill lalu musik
 dimainkan lewat eksternal SONIX player"]**: bug BARU, TERPISAH dari roadmap Gap QA v488 (Batch
 489, di bawah — 0 disentuh/0 berubah oleh batch ini).
@@ -2127,10 +2163,11 @@ brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
    modern lebih bersih. `minSdk` tidak pernah diubah otomatis — WAJIB konfirmasi eksplisit user.
 4. `docs/archive/ARCHIVED_POLISH_AUDIT.md` / `docs/archive/ARCHIVED_MICRO_UIUX_AUDIT.md` = arsip, tidak aktif diikuti.
    `docs/archive/ROADMAP_LIQUID_GLASS_REDESIGN.md` = 100% tuntas, tidak ada item terbuka.
-   `docs/QA_CHECKLIST_SONIX_v488.md` (Batch 489) BUKAN arsip — checklist QA eksternal AKTIF,
-   3 gap-nya (previous-3-detik, filter audio pendek, shuffle anti-repeat-nearby) masih di
-   roadmap terbuka (lihat "Catatan Batch 489"/"[RESUME POINT berikutnya]"), pindahkan ke
-   `docs/archive/` HANYA setelah seluruh gap actionable-nya tuntas + device-QA lengkap.
+   `docs/QA_CHECKLIST_SONIX_v488.md` (Batch 489) BUKAN arsip — checklist QA eksternal AKTIF.
+   Gap previous-3-detik DITUTUP kode Batch 492 (WAJIB DITEST user, lihat "Catatan Batch 492"),
+   2 gap masih di roadmap terbuka: filter audio pendek, shuffle anti-repeat-nearby. Pindahkan ke
+   `docs/archive/` HANYA setelah seluruh gap actionable-nya tuntas + device-QA lengkap (termasuk
+   konfirmasi device Batch 492 di atas).
 5. Nama folder Termux: `~/projects/audioplayer` (lowercase) — FINAL. `rootProject.name` tetap
    `"AudioPlayer"` (hardcoded `settings.gradle.kts`), tidak terikat nama folder/`git remote`.
 6. Sektor DITUTUP — jangan proaktif dibuka ulang pada instruksi generik ("next"/"lanjut"); BOLEH
@@ -2181,7 +2218,19 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 491. ZIP terakhir: `SONIX_v491.zip`. **2 file diubah** (dalam batas 3
+- Batch terakhir: 492. ZIP terakhir: `SONIX_v492.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `PlaybackService.kt` — Gap #2 Roadmap QA v488 (`setMaxSeekToPreviousPositionMs
+  (3000L)` eksplisit di `ExoPlayer.Builder` player sesi utama, 0 perubahan behavior runtime,
+  murni mengunci nilai dari warisan default Media3). User konfirmasi device: checklist WAJIB
+  DITEST Batch 491 (6 poin gabungan Batch 490+491, bug EQ balik flat/default) 100% LOLOS — saga
+  bug itu DITUTUP. Detail lengkap Batch 492: "Catatan Batch 492" di atas.
+  **WAJIB DITEST user**: tekan Previous setelah lagu lewat 3 detik → restart lagu SAAT INI dari
+  0:00; tekan Previous lagi < 3 detik sejak restart → BARU pindah ke lagu sebelumnya; 0 regresi
+  ke Next/Shuffle/Repeat/EQ.
+  **[RESUME POINT berikutnya]**: 2 sisa gap Roadmap QA v488 — (b) filter audio pendek
+  (`MusicRepository.kt`, ambang durasi BELUM dikonfirmasi user, tanyakan dulu); (c) shuffle
+  anti-repeat-nearby (fitur baru, instruksi eksplisit user dulu). Tidak ada mandat lain terbuka.
+- Batch 491 (sebelum 492). ZIP: `SONIX_v491.zip`. **2 file diubah** (dalam batas 3
   file/tugas): `PlayerViewModel.kt`, `PlaybackService.kt`. Laporan user (ULANG, identik gejala
   Batch 490 — Batch 490 TERBUKTI BELUM TUNTAS): "EQ aktif hanya saat tab dibuka, pasca app-kill
   balik flat/default". **Root cause KEDUA, TERKONFIRMASI dari pembacaan kode (baru ditemukan,
