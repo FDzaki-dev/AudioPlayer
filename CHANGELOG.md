@@ -1,5 +1,33 @@
 # Changelog
 
+## Batch 496 — FIX ROOT CAUSE: Gap #2 tidak jalan (Previous langsung ke lagu sebelumnya)
+User laporkan: "kenapa langsung ke lagu sebelumnya" — threshold 3 detik (`maxSeekToPreviousPositionMs`,
+Batch 492/495) TIDAK berefek sama sekali.
+
+**Root cause TERKONFIRMASI dari pembacaan kode (bukan tebakan)**: `maxSeekToPreviousPositionMs`
+HANYA memengaruhi `Player.seekToPrevious()` (API resmi Media3: restart lagu berjalan kalau posisi
+> threshold, baru pindah ke lagu sebelumnya kalau posisi <= threshold). SEMUA 3 titik tombol
+Previous di project ini (`grep` dicek langsung, bukan 1-2 sample) ternyata sejak awal manggil
+`seekToPreviousMediaItem()` — API BEDA, TANPA logika posisi sama sekali, SELALU pindah ke lagu
+sebelumnya unconditionally, independen dari `maxSeekToPreviousPositionMs`. Batch 492/495 menset
+threshold yang benar tapi TIDAK PERNAH mengecek call site mana yang sebenarnya dipakai — kesalahan
+proses baru, beda dari root cause Batch 493 (Unresolved reference/versi pin).
+
+3 file diubah (dalam batas 3 file/tugas — pas limit):
+- `PlaybackService.kt` — `applyWidgetAction`: `ACTION_PREVIOUS` → `player.seekToPrevious()`.
+- `PlayerViewModel.kt` — `previous()`: `controller?.seekToPrevious() ?: Unit`.
+- `FloatingBubbleService.kt` — `sendPlaybackAction`: `ACTION_PREVIOUS` → `c.seekToPrevious()`.
+
+Ketiganya menggantikan `seekToPreviousMediaItem()` 1-untuk-1, 0 logika lain disentuh. MediaSession
+default (hardware/Bluetooth previous button) TIDAK diubah — Media3 MediaSession sudah default ke
+`seekToPrevious()` utk perintah sistem, jalur itu SUDAH benar dari awal (konsisten dgn kenapa cuma
+UI/widget/bubble yang bermasalah, bukan tombol hardware).
+
+**NOT VERIFIED** — 0 CI/device sesi ini. **WAJIB DITEST user** (3 jalur terpisah: tombol Previous
+di app, widget home-screen, floating bubble): putar lagu, lewat 3 detik, tekan Previous → lagu
+SAAT INI restart dari 0:00; tekan Previous lagi < 3 detik sejak restart → BARU pindah ke lagu
+sebelumnya. **WAJIB `git push`** & cek CI HIJAU.
+
 ## Batch 495 — Gap #2 (previous 3 detik eksplisit) di-re-add post bump media3 1.10.1
 Instruksi eksplisit user: tuntaskan, bukan cuma bump dependency setengah-setengah.
 

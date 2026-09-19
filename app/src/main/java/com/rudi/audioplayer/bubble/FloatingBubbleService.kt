@@ -1183,7 +1183,7 @@ class FloatingBubbleService : Service() {
             c != null && c.mediaItemCount > 0 && action == WidgetUpdater.ACTION_TOGGLE_PLAY ->
                 if (c.isPlaying) c.pause() else c.play()
             c != null && c.mediaItemCount > 0 && action == WidgetUpdater.ACTION_NEXT -> c.seekToNextMediaItem()
-            c != null && c.mediaItemCount > 0 && action == WidgetUpdater.ACTION_PREVIOUS -> c.seekToPreviousMediaItem()
+            c != null && c.mediaItemCount > 0 && action == WidgetUpdater.ACTION_PREVIOUS -> c.seekToPrevious()
             else -> {
                 // Fallback: controller belum konek ATAU antrean sesi ini masih kosong (cold-start,
                 // lihat KDoc fungsi) — pakai kontrak Intent yang sama widget pakai, memicu jalur

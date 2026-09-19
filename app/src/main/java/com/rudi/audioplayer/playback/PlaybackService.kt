@@ -547,7 +547,7 @@ class PlaybackService : MediaLibraryService() {
         when (action) {
             WidgetUpdater.ACTION_TOGGLE_PLAY -> if (player.isPlaying) player.pause() else player.play()
             WidgetUpdater.ACTION_NEXT -> player.seekToNextMediaItem()
-            WidgetUpdater.ACTION_PREVIOUS -> player.seekToPreviousMediaItem()
+            WidgetUpdater.ACTION_PREVIOUS -> player.seekToPrevious()
         }
     }
 

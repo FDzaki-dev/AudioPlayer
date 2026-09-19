@@ -1734,7 +1734,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     }
 
     fun next() = controller?.seekToNextMediaItem() ?: Unit
-    fun previous() = controller?.seekToPreviousMediaItem() ?: Unit
+    fun previous() = controller?.seekToPrevious() ?: Unit
     fun seekTo(positionMs: Long) = controller?.seekTo(positionMs) ?: Unit
 
     fun toggleShuffle() {

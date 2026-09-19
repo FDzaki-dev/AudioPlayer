@@ -12,6 +12,20 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 496 [user laporkan: "kenapa langsung ke lagu sebelumnya nya woy!!" — Gap #2 TIDAK
+jalan]**: **Root cause TERKONFIRMASI dari pembacaan kode langsung** (`grep` semua call site tombol
+Previous, bukan sample): `maxSeekToPreviousPositionMs` (Batch 492/495) HANYA berefek pada
+`Player.seekToPrevious()`. Ketiga call site tombol Previous project ini (`PlayerViewModel.previous()`,
+`PlaybackService.applyWidgetAction` widget, `FloatingBubbleService.sendPlaybackAction` bubble)
+ternyata manggil `seekToPreviousMediaItem()` — API lain, SELALU pindah lagu unconditionally,
+threshold TIDAK PERNAH kepakai. **3 file diubah** (dalam batas 3 file/tugas, PAS limit):
+`PlaybackService.kt`, `PlayerViewModel.kt`, `FloatingBubbleService.kt` — `seekToPreviousMediaItem()`
+→ `seekToPrevious()` di ketiga titik, 1-untuk-1, 0 logika lain disentuh. MediaSession default
+(tombol hardware/Bluetooth) TIDAK diubah — sudah pakai `seekToPrevious()` bawaan Media3 dari awal,
+konsisten dgn kenapa cuma jalur UI/widget/bubble yang bermasalah. **NOT VERIFIED** — 0 CI/device
+sesi ini. **WAJIB DITEST user 3 jalur** (tombol app, widget, bubble): lihat CHANGELOG.md § Batch
+496 utk langkah test lengkap. Detail lengkap: CHANGELOG.md § Batch 496.
+
 **Catatan Batch 495 [instruksi eksplisit user: "jangan kerjakan setengah-setengah, langsung
 tuntaskan"]**: Gap #2 dituntaskan penuh. **1 file diubah** (dalam batas 3 file/tugas):
 `PlaybackService.kt` — `.setMaxSeekToPreviousPositionMs(3000L)` di-re-add ke `ExoPlayer.Builder`
@@ -2276,20 +2290,21 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 495. ZIP terakhir: `SONIX_v495.zip`. **1 file diubah** (dalam batas 3
-  file/tugas): `PlaybackService.kt` — Gap #2 (previous-3-detik) DITUNTASKAN:
-  `.setMaxSeekToPreviousPositionMs(3000L)` di-re-add ke `ExoPlayer.Builder` player sesi utama
-  (identik Batch 492, kini lolos kompilasi krn bump media3 1.10.1 Batch 494). `overlapPlayer`
-  tidak disentuh. Balance brace/paren/bracket `{}` 80/80 `()` 439/439 `[]` 19/19. Detail lengkap:
-  "Catatan Batch 495" di atas / `CHANGELOG.md` § Batch 495.
-  **WAJIB user**: `git push` (skrip Termux di bawah) → cek run GitHub Actions berikutnya HIJAU
-  (kombinasi media3 1.10.1 + API ini belum diverifikasi CI nyata). **LALU test manual device**:
-  putar lagu, lewat 3 detik, tekan Previous → lagu SAAT INI restart dari 0:00 (bukan pindah lagu);
-  tekan Previous lagi < 3 detik sejak restart → BARU pindah ke lagu sebelumnya.
-  **[RESUME POINT berikutnya]**: Gap #2 TUNTAS, 0 sisa. Sisa roadmap: Gap #6 (filter audio pendek
-  — ambang durasi belum dikonfirmasi) dan Gap #3 (shuffle anti-repeat-nearby — fitur baru), KEDUA
-  masih butuh keputusan/instruksi eksplisit user dulu sebelum dieksekusi. 0 roadmap "risiko
-  rendah, siap eksekusi tanpa tanya" tersisa saat ini.
+- Batch terakhir: 496. ZIP terakhir: `SONIX_v496.zip`. **3 file diubah** (dalam batas 3
+  file/tugas, PAS limit): `PlaybackService.kt`, `PlayerViewModel.kt`, `FloatingBubbleService.kt` —
+  FIX ROOT CAUSE Gap #2: `seekToPreviousMediaItem()` (unconditional, threshold TIDAK berefek) →
+  `seekToPrevious()` (threshold-aware) di 3 titik tombol Previous (app/widget/bubble).
+  MediaSession default (hardware/Bluetooth) TIDAK diubah, sudah benar dari awal. Detail lengkap:
+  "Catatan Batch 496" di atas / `CHANGELOG.md` § Batch 496.
+  **WAJIB user**: `git push` (skrip Termux di bawah) → cek run GitHub Actions berikutnya HIJAU.
+  **LALU test manual device, 3 jalur terpisah** (tombol app, widget home-screen, floating bubble):
+  putar lagu, lewat 3 detik, tekan Previous → lagu SAAT INI restart dari 0:00; tekan Previous lagi
+  < 3 detik sejak restart → BARU pindah ke lagu sebelumnya.
+  **[RESUME POINT berikutnya]**: kalau test 3 jalur di atas ✅ SEMUA, Gap #2 BENAR-BENAR tuntas
+  (bukan cuma klaim Batch 495 yang ternyata belum kepakai). Kalau ADA yang ❌, laporkan jalur mana
+  spesifik (app/widget/bubble) — JANGAN asumsikan ketiganya identik, tiap jalur dites Batch 496
+  hanya lewat pembacaan kode, belum device fisik. Sisa roadmap tidak berubah: Gap #6 (filter audio
+  pendek) & Gap #3 (shuffle anti-repeat-nearby), KEDUA masih butuh instruksi eksplisit user dulu.
 - Batch 492 (sebelum 493, GAGAL CI — lihat Batch 493 di atas). ZIP: `SONIX_v492.zip`. **1 file
   diubah**: `PlaybackService.kt` — Gap #2 Roadmap QA v488 (`setMaxSeekToPreviousPositionMs
   (3000L)` eksplisit di `ExoPlayer.Builder` player sesi utama). User konfirmasi device terpisah:
