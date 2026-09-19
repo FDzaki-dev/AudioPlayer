@@ -1,5 +1,29 @@
 # Changelog
 
+## Batch 503 — Koreksi dokumentasi basi: Gap #2 SUDAH tuntas sejak Batch 497 (bukan pending)
+- Jawaban user re: keputusan bump media3 utk Gap #2 ("hanya jika ada high values, siapa yang
+  larang?!!") memicu cross-check ke source ZIP v502 + histori batch, BUKAN eksekusi bump
+- **Temuan**: klaim "Gap #2 masih butuh keputusan bump media3 1.3.1→1.4.0+" (tercatat di
+  `[RESUME POINT]` tail `PROJECT_STATE.md` & entri Batch 502 di atas) sudah BASI — Gap #2
+  sebenarnya SUDAH TUNTAS sejak Batch 497: media3 di-bump ke 1.10.1 (Batch 494), setter
+  `setMaxSeekToPreviousPositionMs(3000L)` di-re-add (Batch 495), bug lanjutan
+  `seekToPreviousMediaItem()`→`seekToPrevious()` di 3 titik (app/widget/bubble) diperbaiki
+  (Batch 496), **DIKONFIRMASI device fisik user "it works heck yeah!!" (Batch 497)**
+- 0 file kode diubah — source sudah benar sejak Batch 497, tidak disentuh lagi
+- 1 file diubah (VIP, di luar batas 3 file): `PROJECT_STATE.md` — `[RESUME POINT]` tail dikoreksi
+- Sisa roadmap Gap QA v488: **0 gap actionable kode tersisa**. #4/#5/#7/#8/#9 murni device-QA,
+  belum ada konfirmasi user → `docs/QA_CHECKLIST_SONIX_v488.md` BELUM dipindah ke archive
+
+## Batch 502 — Konfirmasi device: Gap #6 TUNTAS
+- User konfirmasi device-test — lagu <30 detik yang SUDAH ada di playlist/favorit/queue lama
+  **tetap muncul** (poin paling kritis, `getSongsByIds()`/`BASE_SELECTION` terbukti tidak kena
+  filter durasi)
+- Gap #6 (filter audio pendek, ambang 30 detik, Batch 501) resmi TUNTAS, status NOT VERIFIED
+  dicabut
+- 0 file kode diubah — murni sinkronisasi status ke `PROJECT_STATE.md`/`CHANGELOG.md`
+- Sisa roadmap Gap QA v488 yang masih actionable: **previous-3-detik** (Gap #2) — butuh
+  keputusan eksplisit user (bump `media3` 1.3.1→1.4.0+, lihat Batch 493)
+
 ## Batch 501 — Gap #6 (filter audio pendek) — ambang 30 detik, konfirmasi eksplisit user
 - Jawaban user: ambang durasi = **30 detik ("umum industri")**, dari pilihan yang diajukan
 - 1 file diubah: `MusicRepository.kt` — konstanta `MIN_SONG_DURATION_MS = 30_000L` (MediaStore

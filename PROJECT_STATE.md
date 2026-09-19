@@ -12,6 +12,28 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 503 [jawaban user re: keputusan bump media3 Gap #2, "hanya jika ada high values,
+siapa yang larang?!!"]**: Sebelum eksekusi keputusan, cross-check WAJIB ke source ZIP v502 +
+histori batch di bawah (bukan cuma baca [RESUME POINT] tail) menemukan **[RESUME POINT] LAMA
+BASI/SALAH**: Gap #2 SUDAH TUNTAS sejak Batch 497 (bump media3 1.10.1 Batch 494 + re-add setter
+Batch 495 + fix bug lanjutan Batch 496 + konfirmasi device user "it works heck yeah!!" Batch
+497) — 0 "high value" tersisa utk dipertimbangkan, 0 keputusan bump-atau-implisit yang perlu
+dibuat, pertanyaannya sendiri sudah usang. **0 kode diubah batch ini** — source (`PlaybackService.
+kt` line 105, `app/build.gradle.kts` media3 1.10.1) sudah benar & terkonfirmasi sejak Batch 497,
+TIDAK disentuh lagi. **1 file diubah (VIP, dikecualikan batas 3 file)**: `PROJECT_STATE.md` —
+`[RESUME POINT]` tail dikoreksi (lihat "[KOREKSI STALE — Batch 503]" di akhir file) supaya sesi
+berikutnya tidak tertipu status basi yang sama. Pelajaran proses: `[RESUME POINT]` tail WAJIB
+di-cross-check ke catatan batch detail + source tiap kali dibaca, bukan ditelan mentah sebagai
+kebenaran tunggal terbaru (kelas kegagalan sama seperti "PELAJARAN PROSES" staleness Batch 492
+soal "Catatan Batch 490" yang telat update).
+
+**Catatan Batch 502 [konfirmasi user: "verified, termasuk yang dibawah 30s masih masuk daftar
+yang sudah ada"]**: Device-test Gap #6 DIKONFIRMASI user — poin PALING KRITIS eksplisit
+disebut: lagu <30 detik yang SUDAH ada di playlist/favorit/queue **TETAP muncul** (BASE_SELECTION
+polos di `getSongsByIds()` terbukti tidak kena filter, sesuai rencana). **Gap #6 (filter audio
+pendek) RESMI TUNTAS** — status "NOT VERIFIED" Batch 501 DICABUT. 0 kode diubah batch ini (murni
+sinkronisasi status, pola sama Batch 451/473/492/500).
+
 **Catatan Batch 501 [jawaban eksplisit user: ambang durasi Gap #6 = "30 detik (umum industri)"]**:
 Gap #6 (filter audio pendek — WhatsApp voice note/ringtone/game effect) dieksekusi sesuai
 keputusan user, TIDAK diasumsikan (WAJIB tanya dulu, sesuai catatan roadmap Batch 489/500).
@@ -2336,10 +2358,10 @@ brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
    `docs/QA_CHECKLIST_SONIX_v488.md` (Batch 489) BUKAN arsip — checklist QA eksternal AKTIF.
    Gap previous-3-detik: percobaan Batch 492 GAGAL CI (revert Batch 493, lihat "Catatan Batch
    493") — BUTUH bump `media3` 1.3.1→1.4.0+ utk fix beneran, konfirmasi user dulu. Gap #3
-   (shuffle anti-repeat-nearby) TUNTAS Batch 498/499/500. Gap #6 (filter audio pendek, ambang 30
-   detik) dieksekusi Batch 501, NOT VERIFIED sampai device-QA. **1 gap tersisa BELUM actionable
-   tanpa keputusan user**: previous-3-detik (butuh keputusan bump dependency). Pindahkan ke
-   `docs/archive/` HANYA setelah seluruh gap actionable-nya tuntas + device-QA lengkap.
+   (shuffle anti-repeat-nearby) TUNTAS Batch 498/499/500. Gap #6 (filter audio pendek) TUNTAS
+   Batch 501/502. **1 gap tersisa BELUM actionable tanpa keputusan user**: previous-3-detik
+   (butuh keputusan bump dependency). Pindahkan ke `docs/archive/` HANYA setelah seluruh gap
+   actionable-nya tuntas + device-QA lengkap.
 5. Nama folder Termux: `~/projects/audioplayer` (lowercase) — FINAL. `rootProject.name` tetap
    `"AudioPlayer"` (hardcoded `settings.gradle.kts`), tidak terikat nama folder/`git remote`.
 6. Sektor DITUTUP — jangan proaktif dibuka ulang pada instruksi generik ("next"/"lanjut"); BOLEH
@@ -2390,19 +2412,32 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 501. ZIP terakhir: `SONIX_v501.zip`. **1 file diubah** (dalam batas 3
-  file/tugas): `MusicRepository.kt` — Gap #6 (filter audio pendek) dieksekusi, ambang 30 detik
+- Batch terakhir: 502. ZIP terakhir: `SONIX_v502.zip`. **0 file kode diubah** (klarifikasi/
+  sinkronisasi status murni) — user konfirmasi device-test Gap #6, TERMASUK poin paling kritis:
+  lagu <30 detik yang sudah ada di playlist/favorit/queue TETAP muncul. **Gap #6 RESMI TUNTAS.**
+  **[KOREKSI STALE — Batch 503]**: Baris resume point ini (versi sebelum koreksi) SALAH/BASI —
+  mengklaim Gap #2 masih butuh keputusan bump media3 1.3.1→1.4.0+. **FAKTA dari source ZIP
+  v502 + histori Batch 494-497 di atas (tidak dibaca ulang saat resume point ini terakhir
+  ditulis)**: media3 SUDAH di-bump ke **1.10.1 sejak Batch 494** (instruksi eksplisit user),
+  `.setMaxSeekToPreviousPositionMs(3000L)` SUDAH ter-pasang di `PlaybackService.kt` (player sesi
+  utama, Batch 495) DAN bug lanjutannya (`seekToPreviousMediaItem()` vs `seekToPrevious()` di 3
+  titik: app/widget/bubble) SUDAH DIPERBAIKI (Batch 496) serta **DIKONFIRMASI device fisik user:
+  "it works heck yeah!!" (Batch 497)**. **Gap #2 RESMI TUNTAS sejak Batch 497 — 0 keputusan
+  tersisa, 0 kode untuk diubah.** 0 file source disentuh batch ini (murni koreksi dokumentasi
+  basi, pola sama sinkronisasi status Batch 451/473/492/500/502).
+  **[RESUME POINT berikutnya]**: **0 gap actionable tersisa dari roadmap Gap QA v488** — Gap #1
+  (Batch 489), #2 (Batch 497), #3 (Batch 500), #6 (Batch 502) RESMI TUNTAS; sisa #4/#5/#7/#8/#9
+  murni device-QA/di luar scope kode, BELUM ada konfirmasi device eksplisit dari user untuk
+  item-item tsb di sesi mana pun sejauh ini. Karena "device-QA lengkap" (syarat kedua utk
+  archive) BELUM terpenuhi, `docs/QA_CHECKLIST_SONIX_v488.md` TETAP di lokasi aktif (BELUM
+  dipindah ke `docs/archive/`) — JANGAN pindah tanpa konfirmasi eksplisit user per item
+  #4/#5/#7/#8/#9, atau instruksi eksplisit user utk menutup sisanya sebagai "di luar scope,
+  arsipkan saja".
+- Batch 501 (sebelum 502). ZIP: `SONIX_v501.zip`. **1 file diubah** (dalam batas 3 file/tugas):
+  `MusicRepository.kt` — Gap #6 (filter audio pendek) dieksekusi, ambang 30 detik
   (`MIN_SONG_DURATION_MS`) sesuai jawaban eksplisit user, HANYA di `getAllSongs()`
-  (`ALL_SONGS_SELECTION`) — `getSongsByIds()`/`BASE_SELECTION` TETAP tidak disentuh. Detail
-  penuh: "Catatan Batch 501" di atas. **NOT VERIFIED** — 0 CI/device fisik sesi ini. **WAJIB
-  DITEST user** (4 poin di "Catatan Batch 501" di atas) — TERUTAMA poin 3: lagu <30 detik yang
-  SUDAH ada di playlist/favorit/queue tersimpan TIDAK BOLEH hilang.
-  **[RESUME POINT berikutnya]**: Setelah Gap #6 dikonfirmasi device, SATU-SATUNYA sisa gap
-  actionable roadmap Gap QA v488 tinggal **previous-3-detik** — butuh keputusan eksplisit user
-  dulu (bump `media3` 1.3.1→1.4.0+, lihat "Catatan Batch 493"). Sisa gap checklist lain
-  (#4/#5/#7/#8/#9) murni device-QA/di luar scope, 0 kode untuk dikerjakan. Kalau SEMUA gap
-  actionable (previous-3-detik + Gap #6 + Gap #3, sudah tuntas Batch 500) selesai + device-QA
-  lengkap, `docs/QA_CHECKLIST_SONIX_v488.md` baru boleh dipindah ke `docs/archive/`.
+  (`ALL_SONGS_SELECTION`) — `getSongsByIds()`/`BASE_SELECTION` TETAP tidak disentuh. **DIKONFIRMASI
+  Batch 502 di atas — device-test 0 masalah.**
 - Batch 500 (sebelum 501). ZIP: `SONIX_v500.zip`. **0 file kode diubah** (klarifikasi/
   sinkronisasi status murni) — user konfirmasi CI Batch 499 hijau + device-test Gap #3 kritis
   (add/remove/reorder queue selagi shuffle) **0 crash**. **Gap #3 (shuffle anti-repeat-nearby)
