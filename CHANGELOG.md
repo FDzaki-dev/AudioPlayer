@@ -1,5 +1,28 @@
 # Changelog
 
+## Batch 491 — FIX #2: EQ masih balik flat/default (root cause KEDUA, Batch 490 belum tuntas)
+Laporan user ULANG, gejala identik Batch 490 — Batch 490 terbukti belum menutup celahnya.
+
+Root cause terkonfirmasi (baru, terpisah dari Batch 490): `PlayerViewModel.onCleared()` sudah
+lama memanggil `equalizerController.release()`. Sejak Batch 490 mengubah `equalizerController`
+jadi shared per-process singleton, baris ini keliru me-release INSTANCE BERSAMA itu, bukan cuma
+milik ViewModel ini. `onCleared()` terpanggil begitu Activity benar-benar di-finish — termasuk
+skenario UMUM app di-swipe dari Recents SELAGI `PlaybackService` sengaja tetap hidup di
+background (`onTaskRemoved`: sesi dgn antrean/paused tidak ikut mati). Efek Equalizer asli ikut
+lenyap dari sesi yang MASIH main, walau musik terus lanjut — flat sampai re-attach manual (buka
+tab Equalizer) atau `onEvents` lain kebetulan refire callback-nya sendiri.
+
+2 file diubah: `PlayerViewModel.kt`, `PlaybackService.kt`.
+- `PlayerViewModel.onCleared()`: baris `equalizerController.release()` dihapus. `audioVisualizer
+  Controller.release()` (instance privat ViewModel, bukan singleton) tetap ada.
+- `PlaybackService.onDestroy()`: `EqualizerController.getInstance(this).release()` ditambah —
+  release yang benar sekarang diikat ke akhir SESI (Service destroy), bukan akhir UI.
+
+0 diverifikasi CI/device sesi ini. **WAJIB DITEST user**: skenario BARU (swipe dari Recents,
+BUKAN force-close, lagu tetap main/paused di notifikasi) → EQ preset harus TETAP terasa TANPA
+buka app lagi. Digabung dgn 5 poin test Batch 490 yang masih pending (belum pernah lolos).
+Detail lengkap: `PROJECT_STATE.md` § Batch 491.
+
 ## Batch 490 — FIX: preset EQ balik flat/default pasca app di-kill + playback eksternal
 Laporan user: preset Equalizer balik ke nol/default begitu app di-kill total lalu musik dimainkan
 lagi lewat pemicu eksternal (widget/Bluetooth/media-button/notifikasi/Android Auto).

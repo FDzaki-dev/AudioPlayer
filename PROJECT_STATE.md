@@ -2181,7 +2181,45 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 490. ZIP terakhir: `SONIX_v490.zip`. **2 file diubah + 1 companion accessor
+- Batch terakhir: 491. ZIP terakhir: `SONIX_v491.zip`. **2 file diubah** (dalam batas 3
+  file/tugas): `PlayerViewModel.kt`, `PlaybackService.kt`. Laporan user (ULANG, identik gejala
+  Batch 490 — Batch 490 TERBUKTI BELUM TUNTAS): "EQ aktif hanya saat tab dibuka, pasca app-kill
+  balik flat/default". **Root cause KEDUA, TERKONFIRMASI dari pembacaan kode (baru ditemukan,
+  BUKAN yang sudah dicatat Batch 490)**: `PlayerViewModel.onCleared()` — baris `equalizerController
+  .release()` sudah ada SEBELUM Batch 490, tapi sejak Batch 490 mengubah `equalizerController`
+  jadi SHARED per-process singleton (`EqualizerController.getInstance()`), baris ini keliru
+  me-release INSTANCE BERSAMA itu, bukan cuma milik ViewModel ini lagi. `onCleared()` terpanggil
+  begitu Activity benar-benar di-finish (bukan sekadar rotasi) — termasuk skenario UMUM app
+  di-swipe dari Recents SELAGI `PlaybackService` sengaja TETAP hidup di background (lihat
+  `onTaskRemoved`: sesi dgn antrean/paused tidak ikut mati). Efek Equalizer asli ikut lenyap dari
+  sesi yang MASIH main, walau musik terus lanjut — flat sampai re-attach manual (buka tab
+  Equalizer) atau `onEvents` lain kebetulan refire callback. Ini root cause TAMBAHAN yang Batch
+  490 tidak cakup sama sekali (490 cuma menutup celah proses headless baru; bug ini soal siklus
+  hidup UI vs siklus hidup sesi audio, kelas masalah berbeda).
+  1. `PlayerViewModel.kt` (`onCleared()`): baris `equalizerController.release()` DIHAPUS. `audio
+     VisualizerController.release()` (baris sesudahnya, TIDAK shared/singleton — grep konfirmasi
+     0 `companion object getInstance()` di kelas itu, murni instance privat ViewModel) TETAP ada,
+     0 disentuh.
+  2. `PlaybackService.kt` (`onDestroy()`): `EqualizerController.getInstance(this).release()`
+     ditambah — release yang benar sekarang diikat ke AKHIR SESI (Service benar-benar destroy),
+     bukan akhir UI. 1 paket yang sama (`com.rudi.audioplayer.playback`), 0 import baru
+     diperlukan. 0 baris lain di `onDestroy()`/`onTaskRemoved()` disentuh.
+  **0 diverifikasi CI/device Batch 491** — 0 env Android nyata/compiler Kotlin sesi ini (balance
+  brace/paren/bracket kedua file: `PlayerViewModel.kt` `{}` 248/248 `()` 1032/1032 `[]` 39/39;
+  `PlaybackService.kt` `{}` 80/80 `()` 435/435 `[]` 19/19).
+  **WAJIB DITEST user (gabung dgn 5 poin Batch 490 yang masih pending, BELUM pernah lolos)**:
+  1. Set preset EQ non-flat (Now Playing → ⋮ → Equalizer) sampai jelas beda dari flat.
+  2. **Skenario BARU khusus Batch 491** (app TIDAK di-force-close, cuma di-swipe dari Recents,
+     proses TETAP hidup di notifikasi/lock-screen): swipe SONIX dari Recents (bukan Force Stop)
+     selagi lagu masih main/paused dgn antrean tidak kosong → dengarkan LANJUT dari notifikasi/
+     lock-screen/widget → preset EQ langkah 1 harus TETAP terasa (bukan tiba-tiba flat) TANPA
+     perlu buka app lagi sama sekali.
+  3. Baru buka app lagi dari launcher → sheet Equalizer masih tampil preset yang sama.
+  4. Skenario Batch 490 (force-close TOTAL + trigger dari luar) — ulangi 5 poin lengkap di
+     "Catatan Batch 490" di bawah, BELUM pernah dikonfirmasi lolos oleh user.
+  5. Regression jalur normal: app dibuka biasa, ganti band/preset di sheet masih langsung
+     terdengar & tersimpan lintas sesi seperti sebelumnya.
+- Batch 490 (sebelum 491). ZIP: `SONIX_v490.zip`. **2 file diubah + 1 companion accessor
   baru** (dalam batas 3 file/tugas — lihat "Catatan Batch 490" di atas untuk rincian kenapa
   `EqualizerController.kt` dihitung terpisah): `AudioPlayerApplication.kt`, `PlayerViewModel.kt`,
   `EqualizerController.kt`. Laporan user: "preset EQ balik nol/default pasca app di-kill lalu

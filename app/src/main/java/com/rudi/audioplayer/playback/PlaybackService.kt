@@ -751,6 +751,13 @@ class PlaybackService : MediaLibraryService() {
         // oleh `player.release()` di bawah kalau tidak dilepas eksplisit di sini dulu.
         crossfadeEngine?.release()
         crossfadeEngine = null
+        // Batch 491 — pasangan yang benar utk EqualizerController.getInstance() (shared
+        // per-process, Batch 490): dilepas DI SINI (akhir sesi audio sungguhan), BUKAN lagi di
+        // PlayerViewModel.onCleared() (akhir UI, lihat komentar di sana utk root cause bug yang
+        // ini perbaiki). Service ini bisa TETAP hidup lama setelah ViewModel/Activity dibuang
+        // (onTaskRemoved di atas sengaja membiarkan sesi dgn antrean tetap jalan) — effect asli
+        // sekarang cuma lenyap begitu sesi itu SENDIRI benar-benar berakhir.
+        EqualizerController.getInstance(this).release()
         serviceScope.cancel()
         mediaSession?.run {
             player.release()

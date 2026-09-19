@@ -1828,7 +1828,20 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         libraryRefreshJob?.cancel()
         libraryAutoRefreshJob?.cancel()
         libraryContentObserver?.let { runCatching { appContext.contentResolver.unregisterContentObserver(it) } }
-        equalizerController.release()
+        // Batch 491 — FIX: root cause of "EQ aktif cuma pas tab dibuka, pasca app-kill balik
+        // flat/default", tepat gejala yang Batch 490 masih belum tuntas. equalizerController
+        // sudah jadi shared per-process singleton sejak Batch 490 (EqualizerController.
+        // getInstance()) — TAPI baris ini (sudah ada sejak sebelum 490) masih me-release()
+        // instance SHARED itu tiap kali ViewModel ini dibuang, bukan cuma milik ViewModel
+        // sendiri lagi. onCleared() terpanggil begitu Activity di-finish (bukan cuma
+        // dikonfigurasi ulang) — termasuk skenario UMUM app di-swipe dari Recents SELAGI
+        // PlaybackService/sesi audio TETAP hidup di background (lihat onTaskRemoved di
+        // PlaybackService.kt: sesi dgn antrean/paused TIDAK ikut mati). Efek Equalizer asli
+        // pun ikut lenyap dari sesi yang MASIH main itu, walau musik terus lanjut — flat sampai
+        // ada re-attach (buka tab Equalizer manual = ensureEqualizerAttached(), ATAU kebetulan
+        // ada onEvents lain yg refire callback). 0 dihapus sekadar dibiarkan tanpa pasangan:
+        // release() yang benar (diikat ke akhir SESI, bukan akhir UI) sekarang di
+        // PlaybackService.onDestroy() — lihat komentar di sana.
         audioVisualizerController.release()
         // Batch 78 — MediaController.releaseFuture() handles BOTH cases correctly: cancels the
         // future if the async connect() handshake hasn't resolved yet, or releases the resolved
