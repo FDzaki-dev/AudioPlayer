@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 493 — REVERT: Batch 492 gagal CI (Unresolved reference, Media3 versi pin tidak cocok)
+User kirim `log_fail_473.zip` (`build-output.log`): `compileReleaseKotlin`/`compileDebugKotlin`
+FAILED — `PlaybackService.kt:107:14 Unresolved reference 'setMaxSeekToPreviousPositionMs'`.
+
+Root cause: `ExoPlayer.Builder.setMaxSeekToPreviousPositionMs()` baru tersedia sejak Media3 1.4.0
+(changelog resmi androidx/media). Project ini pin `androidx.media3:media3-exoplayer:1.3.1` —
+0 ada API itu sama sekali di versi ini. Batch 492 cek dokumentasi API Media3 generik tanpa
+cross-check ke versi pin aktual project — kesalahan proses, bukan salah baca kode.
+
+1 file diubah: `PlaybackService.kt`.
+- Baris `.setMaxSeekToPreviousPositionMs(3000L)` + komentar Batch 492 DIHAPUS (revert bersih).
+  `.setHandleAudioBecomingNoisy(true).build()` balik persis seperti sebelum Batch 492. Balance
+  brace/paren/bracket balik ke angka Batch 491 (`{}` 80/80 `()` 435/435 `[]` 19/19).
+
+0 perubahan behavior runtime (kode balik ke state yang sebelumnya sudah lolos CI). **WAJIB user**:
+`git push` lalu cek run GitHub Actions berikutnya HIJAU — 0 test manual device diperlukan.
+
+Gap #2 (previous 3 detik eksplisit) direklasifikasi: fix beneran butuh bump `media3` 1.3.1→1.4.0+
+(dependency app-wide), BUKAN lagi "1 baris risiko rendah" — gabung Gap #6/#3, semua tunggu
+keputusan eksplisit user. Detail lengkap: `PROJECT_STATE.md` § Catatan Batch 493 / `[RESUME
+POINT]`.
+
 ## Batch 492 — Gap #2 Roadmap QA v488: kunci threshold Previous 3 detik secara eksplisit
 User konfirmasi device: checklist WAJIB DITEST Batch 491 (6 poin, gabungan Batch 490+491) 100%
 LOLOS — bug "EQ balik flat/default" (headless resume + release salah-scope saat swipe-Recents)

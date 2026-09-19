@@ -12,6 +12,37 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 493 [user kirim `log_fail_473.zip` (`build-output.log`) — CI Batch 492 GAGAL]**:
+`Task :app:compileReleaseKotlin`/`compileDebugKotlin` FAILED, `PlaybackService.kt:107:14
+Unresolved reference 'setMaxSeekToPreviousPositionMs'`.
+
+**Root cause TERKONFIRMASI dari log + verifikasi dependency (bukan tebakan)**: `app/build.gradle.
+kts` pin `androidx.media3:media3-exoplayer:1.3.1` (juga `media3-session`/`media3-common`).
+`ExoPlayer.Builder.setMaxSeekToPreviousPositionMs()` baru ADA sejak Media3 **1.4.0** (changelog
+resmi androidx/media, rilis setelah 1.3.1) — 0 ada di 1.3.1 sama sekali, BUKAN masalah `@OptIn`/
+`@UnstableApi` (itu akan gagal beda: "must be annotated", bukan "Unresolved reference"). Kesalahan
+Batch 492: web-search API Media3 tanpa cross-check ke versi PIN AKTUAL project (1.3.1) — pelajaran
+proses, dicatat supaya tidak terulang (pola sama kelas "PELAJARAN PROSES" batch2 floating bubble
+di bawah: JANGAN percaya dokumentasi API generik tanpa cek versi pin nyata dulu).
+
+**Fix Batch 493 (P0 stability > selesai fitur)**: **1 file diubah** (dalam batas 3 file/tugas):
+`PlaybackService.kt` — baris `.setMaxSeekToPreviousPositionMs(3000L)` + komentarnya DIHAPUS
+PERSIS (revert), `.setHandleAudioBecomingNoisy(true).build()` balik seperti SEBELUM Batch 492 kata
+per kata. Balance brace/paren/bracket balik PERSIS ke angka tercatat Batch 491 (`{}` 80/80 `()`
+435/435 `[]` 19/19) — bukti tekstual revert bersih, 0 sisa. **TIDAK mencoba API pengganti di
+1.3.1** — cek changelog 1.3.1→1.4.0 konfirmasi 0 ada setter setara di 1.3.1 (fitur ini genuinely
+baru di 1.4.0, bukan cuma rename/pindah kelas). Bump `media3` ke ≥1.4.0 BISA menyelesaikan Gap #2
+scara teknis, TAPI itu perubahan dependency version app-wide (bukan 1 baris lokal) — di luar scope
+micro-task ini, WAJIB konfirmasi eksplisit user dulu sebelum dieksekusi (pola sama "Aturan sesi
+aktif" soal dependency/versi).
+
+**0 diverifikasi CI ulang sesi ini** (0 akses jalankan CI dari sandbox ini — user WAJIB push &
+cek run berikutnya HIJAU). **Gap #2 direklasifikasi**: BUKAN LAGI "risiko rendah, 1 file" (asumsi
+Batch 489 SALAH, sudah terbukti gagal kompilasi) — sekarang 1 kelompok dengan Gap #6/#3, SEMUA
+butuh keputusan/konfirmasi eksplisit user dulu (di sini: mau bump Media3 1.3.1→1.4.0+ demi Gap #2,
+atau biarkan implisit selamanya — behavior runtime SAMA PERSIS di kedua kasus, 0 bug nyata,
+murni soal eksplisit-vs-implisit).
+
 **Catatan Batch 492 [user konfirmasi device: checklist WAJIB DITEST Batch 491 — 6 poin gabungan
 Batch 490+491 — 100% LOLOS]**: bug "EQ balik flat/default" (2 root cause terpisah: headless
 resume Batch 490, `release()` salah-scope saat swipe-Recents Batch 491) DITUTUP, terverifikasi
@@ -2164,10 +2195,11 @@ brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
 4. `docs/archive/ARCHIVED_POLISH_AUDIT.md` / `docs/archive/ARCHIVED_MICRO_UIUX_AUDIT.md` = arsip, tidak aktif diikuti.
    `docs/archive/ROADMAP_LIQUID_GLASS_REDESIGN.md` = 100% tuntas, tidak ada item terbuka.
    `docs/QA_CHECKLIST_SONIX_v488.md` (Batch 489) BUKAN arsip — checklist QA eksternal AKTIF.
-   Gap previous-3-detik DITUTUP kode Batch 492 (WAJIB DITEST user, lihat "Catatan Batch 492"),
-   2 gap masih di roadmap terbuka: filter audio pendek, shuffle anti-repeat-nearby. Pindahkan ke
-   `docs/archive/` HANYA setelah seluruh gap actionable-nya tuntas + device-QA lengkap (termasuk
-   konfirmasi device Batch 492 di atas).
+   Gap previous-3-detik: percobaan Batch 492 GAGAL CI (revert Batch 493, lihat "Catatan Batch
+   493") — BUTUH bump `media3` 1.3.1→1.4.0+ utk fix beneran, konfirmasi user dulu. 3 gap masih
+   di roadmap terbuka: previous-3-detik (butuh keputusan bump dependency), filter audio pendek,
+   shuffle anti-repeat-nearby. Pindahkan ke `docs/archive/` HANYA setelah seluruh gap
+   actionable-nya tuntas + device-QA lengkap.
 5. Nama folder Termux: `~/projects/audioplayer` (lowercase) — FINAL. `rootProject.name` tetap
    `"AudioPlayer"` (hardcoded `settings.gradle.kts`), tidak terikat nama folder/`git remote`.
 6. Sektor DITUTUP — jangan proaktif dibuka ulang pada instruksi generik ("next"/"lanjut"); BOLEH
@@ -2218,18 +2250,28 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 492. ZIP terakhir: `SONIX_v492.zip`. **1 file diubah** (dalam batas 3
-  file/tugas): `PlaybackService.kt` — Gap #2 Roadmap QA v488 (`setMaxSeekToPreviousPositionMs
-  (3000L)` eksplisit di `ExoPlayer.Builder` player sesi utama, 0 perubahan behavior runtime,
-  murni mengunci nilai dari warisan default Media3). User konfirmasi device: checklist WAJIB
-  DITEST Batch 491 (6 poin gabungan Batch 490+491, bug EQ balik flat/default) 100% LOLOS — saga
-  bug itu DITUTUP. Detail lengkap Batch 492: "Catatan Batch 492" di atas.
-  **WAJIB DITEST user**: tekan Previous setelah lagu lewat 3 detik → restart lagu SAAT INI dari
-  0:00; tekan Previous lagi < 3 detik sejak restart → BARU pindah ke lagu sebelumnya; 0 regresi
-  ke Next/Shuffle/Repeat/EQ.
-  **[RESUME POINT berikutnya]**: 2 sisa gap Roadmap QA v488 — (b) filter audio pendek
-  (`MusicRepository.kt`, ambang durasi BELUM dikonfirmasi user, tanyakan dulu); (c) shuffle
-  anti-repeat-nearby (fitur baru, instruksi eksplisit user dulu). Tidak ada mandat lain terbuka.
+- Batch terakhir: 493. ZIP terakhir: `SONIX_v493.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `PlaybackService.kt` — REVERT bersih baris `setMaxSeekToPreviousPositionMs(3000L)`
+  Batch 492. User kirim `log_fail_473.zip`: CI GAGAL, `Unresolved reference` — API itu baru ADA di
+  Media3 1.4.0+, project pin `1.3.1` (Batch 492 cek dokumentasi API tanpa cross-check versi pin
+  nyata). Balance brace/paren/bracket balik PERSIS ke angka Batch 491 (`{}` 80/80 `()` 435/435
+  `[]` 19/19) — revert bersih, 0 sisa. Detail lengkap: "Catatan Batch 493" di atas.
+  **WAJIB user**: cukup `git push` (skrip Termux di bawah) lalu cek run GitHub Actions berikutnya
+  HIJAU — 0 behavior runtime berubah, 0 perlu test manual device (murni revert ke kode yang
+  sebelumnya sudah lolos compile).
+  **[RESUME POINT berikutnya]**: Gap #2 (previous-3-detik) DIREKLASIFIKASI — gabung Gap #6/#3,
+  SEMUA butuh keputusan eksplisit user dulu: (a) previous-3-detik BUTUH bump `media3` 1.3.1→1.4.0+
+  (dependency app-wide, bukan 1 baris — tanyakan dulu apa user mau); (b) filter audio pendek —
+  ambang durasi belum dikonfirmasi; (c) shuffle anti-repeat-nearby — fitur baru, instruksi
+  eksplisit dulu. 0 roadmap "risiko rendah, siap eksekusi tanpa tanya" tersisa saat ini.
+- Batch 492 (sebelum 493, GAGAL CI — lihat Batch 493 di atas). ZIP: `SONIX_v492.zip`. **1 file
+  diubah**: `PlaybackService.kt` — Gap #2 Roadmap QA v488 (`setMaxSeekToPreviousPositionMs
+  (3000L)` eksplisit di `ExoPlayer.Builder` player sesi utama). User konfirmasi device terpisah:
+  checklist WAJIB DITEST Batch 491 (6 poin gabungan Batch 490+491, bug EQ balik flat/default) 100%
+  LOLOS — saga bug EQ itu DITUTUP (valid, TIDAK terpengaruh revert Batch 493 — beda file/fitur).
+  Detail lengkap Batch 492: "Catatan Batch 492" di atas.
+  **WAJIB DITEST user: SUPERSEDED oleh Batch 493 (REVERT) — kode Previous-3-detik eksplisit
+  SUDAH TIDAK ADA lagi di ZIP, jangan test poin ini, lihat Batch 493 di atas.**
 - Batch 491 (sebelum 492). ZIP: `SONIX_v491.zip`. **2 file diubah** (dalam batas 3
   file/tugas): `PlayerViewModel.kt`, `PlaybackService.kt`. Laporan user (ULANG, identik gejala
   Batch 490 — Batch 490 TERBUKTI BELUM TUNTAS): "EQ aktif hanya saat tab dibuka, pasca app-kill
