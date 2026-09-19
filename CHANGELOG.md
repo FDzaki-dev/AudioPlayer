@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 501 — Gap #6 (filter audio pendek) — ambang 30 detik, konfirmasi eksplisit user
+- Jawaban user: ambang durasi = **30 detik ("umum industri")**, dari pilihan yang diajukan
+- 1 file diubah: `MusicRepository.kt` — konstanta `MIN_SONG_DURATION_MS = 30_000L` (MediaStore
+  `DURATION` dalam milidetik) + selection baru `ALL_SONGS_SELECTION`, dipakai **HANYA** di
+  `getAllSongs()` (scan library baru)
+- `getSongsByIds()`/`BASE_SELECTION` polos TETAP TIDAK DISENTUH — lagu <30 detik yang SUDAH ada
+  di playlist/favorit/queue tersimpan (resolve lewat `getSongsByIds()`, dipakai
+  `PlaybackService.kt` resume-queue & `LyricsPrefetchWorker.kt`) tidak mendadak hilang
+- **NOT VERIFIED** — WAJIB device-test: lagu <30 detik hilang dari scan BARU, tapi lagu <30
+  detik yang sudah ada di playlist/favorit/queue lama TETAP ada & bisa diputar (lihat 4 poin
+  test § Batch 501 di `PROJECT_STATE.md`)
+
+## Batch 500 — Konfirmasi device: Gap #3 TUNTAS
+- User konfirmasi CI Batch 499 hijau + device-test kritis (tambah/hapus/reorder queue selagi
+  shuffle aktif) — **0 crash**
+- Gap #3 (shuffle anti-repeat-nearby, custom `ShuffleOrder` Batch 498, fix signature Batch 499)
+  resmi TUNTAS, status NOT VERIFIED dicabut
+- 0 file kode diubah — murni sinkronisasi status ke `PROJECT_STATE.md`/`CHANGELOG.md`
+- Sisa roadmap Gap QA v488 yang masih actionable: Gap #6 (filter audio pendek, ambang durasi
+  belum dikonfirmasi user) dan previous-3-detik (butuh keputusan bump media3, lihat Batch 493)
+
 ## Batch 499 — Hotfix build error dari Batch 498 (`log_fail_478.zip`)
 - CI Batch 498 GAGAL: `compileDebugKotlin`/`compileReleaseKotlin` FAILED — `AntiRepeatShuffleOrder.kt`
   tidak lengkap mengimplementasi `ShuffleOrder` (`getNextIndex`/`getPreviousIndex` "overrides

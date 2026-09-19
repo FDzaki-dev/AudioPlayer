@@ -12,6 +12,43 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 501 [jawaban eksplisit user: ambang durasi Gap #6 = "30 detik (umum industri)"]**:
+Gap #6 (filter audio pendek — WhatsApp voice note/ringtone/game effect) dieksekusi sesuai
+keputusan user, TIDAK diasumsikan (WAJIB tanya dulu, sesuai catatan roadmap Batch 489/500).
+
+**1 file diubah** (dalam batas 3 file/tugas): `MusicRepository.kt`.
+1. Konstanta baru `MIN_SONG_DURATION_MS = 30_000L` (companion object, `DURATION` MediaStore
+   dalam MILIDETIK — 30 detik = 30_000, bukan 30) + `ALL_SONGS_SELECTION = "$BASE_SELECTION AND
+   DURATION > $MIN_SONG_DURATION_MS"`.
+2. `getAllSongs()` (SATU-SATUNYA titik disentuh secara behavior): selection `BASE_SELECTION` →
+   `ALL_SONGS_SELECTION`.
+3. **`getSongsByIds()`/`BASE_SELECTION` polos TETAP TIDAK DISENTUH** (sesuai rencana roadmap
+   sejak Batch 489) — grep konfirmasi `getSongsByIds()` dipakai `PlaybackService.kt` (resume
+   queue tersimpan) & `LyricsPrefetchWorker.kt`, KEDUANYA harus tetap bisa resolve ID lagu
+   pendek yang SUDAH ada di playlist/favorit/queue sebelum fix ini — 0 risiko lagu itu mendadak
+   hilang dari koleksi user yang sudah ada. Lagu <30 detik hanya berhenti muncul di scan
+   **library baru** (`getAllSongs()`, dipakai `PlayerViewModel.kt` `refreshLibrary()`).
+4. 0 grep call site lain ke `getAllSongs()`/`BASE_SELECTION` di luar 2 fungsi ini — 0 file lain
+   perlu disentuh.
+
+Balance brace/paren/bracket `MusicRepository.kt`: `{}` 34/34 `()` 124/124 `[]` 3/3.
+
+**NOT VERIFIED** — 0 CI/device fisik sesi ini. **WAJIB DITEST user**:
+1. `git push` → cek CI HIJAU (perubahan murni string SQL selection, risiko compile RENDAH).
+2. Tombol "Pindai Ulang" (Library) ATAU install ulang (force scan baru) → file audio pendek
+   (<30 detik — voice note WhatsApp, ringtone, game effect) TIDAK LAGI muncul di Home/Library.
+3. **Paling kritis** (regresi yang WAJIB 0 terjadi): lagu apa pun yang SUDAH ada sebelumnya di
+   Playlist/Favorit/Queue tersimpan yang kebetulan <30 detik → HARUS TETAP ada & bisa diputar
+   normal (resume-queue app-kill, buka playlist lama, dst) — TIDAK boleh mendadak hilang hanya
+   krn scan library baru memfilternya.
+4. Lagu ≥30 detik: 0 regresi, tetap muncul seperti biasa.
+
+**Catatan Batch 500 [konfirmasi user: "verified sebagaimana mestinya, non crash"]**: CI Batch 499
+HIJAU (fix signature `ShuffleOrder` valid) + device-test Gap #3 DIKONFIRMASI user — eksplisit
+menyebut poin PALING KRITIS (tambah/hapus/reorder queue selagi shuffle aktif) **0 crash**. **Gap
+#3 (shuffle anti-repeat-nearby) RESMI TUNTAS** — status "NOT VERIFIED" Batch 498/499 DICABUT.
+0 kode diubah batch ini (murni sinkronisasi status verifikasi, pola sama Batch 451/473/492).
+
 **Catatan Batch 499 [user kirim `log_fail_478.zip` (`build-output.log`) — CI Batch 498 GAGAL]**:
 `Task :app:compileReleaseKotlin`/`compileDebugKotlin` FAILED, `AntiRepeatShuffleOrder.kt:46:1`
 "Class 'AntiRepeatShuffleOrder' is not abstract and does not implement abstract members:
@@ -2298,10 +2335,11 @@ brace/paren). Item belum-terverifikasi bertambah 2 (lihat daftar di bawah).
    `docs/archive/ROADMAP_LIQUID_GLASS_REDESIGN.md` = 100% tuntas, tidak ada item terbuka.
    `docs/QA_CHECKLIST_SONIX_v488.md` (Batch 489) BUKAN arsip — checklist QA eksternal AKTIF.
    Gap previous-3-detik: percobaan Batch 492 GAGAL CI (revert Batch 493, lihat "Catatan Batch
-   493") — BUTUH bump `media3` 1.3.1→1.4.0+ utk fix beneran, konfirmasi user dulu. 3 gap masih
-   di roadmap terbuka: previous-3-detik (butuh keputusan bump dependency), filter audio pendek,
-   shuffle anti-repeat-nearby. Pindahkan ke `docs/archive/` HANYA setelah seluruh gap
-   actionable-nya tuntas + device-QA lengkap.
+   493") — BUTUH bump `media3` 1.3.1→1.4.0+ utk fix beneran, konfirmasi user dulu. Gap #3
+   (shuffle anti-repeat-nearby) TUNTAS Batch 498/499/500. Gap #6 (filter audio pendek, ambang 30
+   detik) dieksekusi Batch 501, NOT VERIFIED sampai device-QA. **1 gap tersisa BELUM actionable
+   tanpa keputusan user**: previous-3-detik (butuh keputusan bump dependency). Pindahkan ke
+   `docs/archive/` HANYA setelah seluruh gap actionable-nya tuntas + device-QA lengkap.
 5. Nama folder Termux: `~/projects/audioplayer` (lowercase) — FINAL. `rootProject.name` tetap
    `"AudioPlayer"` (hardcoded `settings.gradle.kts`), tidak terikat nama folder/`git remote`.
 6. Sektor DITUTUP — jangan proaktif dibuka ulang pada instruksi generik ("next"/"lanjut"); BOLEH
@@ -2352,14 +2390,28 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 499. ZIP terakhir: `SONIX_v499.zip`. **1 file diubah** (dalam batas 3
-  file/tugas): `AntiRepeatShuffleOrder.kt` — FIX CI compile fail dari `log_fail_478.zip`
-  (`getNextIndex`/`getPreviousIndex` signature disamakan ke interface asli media3 1.10.1: 1
-  parameter, bukan 2). Detail penuh: "Catatan Batch 499" di atas. **Gap #3 masih BELUM diklaim
-  tuntas** — ini fix compile, BUKAN konfirmasi behavior. **NOT VERIFIED** — 0 CI/device fisik
-  sesi ini. **WAJIB DITEST user**: (1) `git push` → CI harus HIJAU sekarang (sebelumnya GAGAL di
-  fix ini); (2) begitu hijau, lanjutkan 5 langkah test manual Gap #3 di `CHANGELOG.md` § Batch
-  498 (belum berubah) — terutama tambah/hapus/reorder queue SELAGI shuffle aktif, 0 boleh crash.
+- Batch terakhir: 501. ZIP terakhir: `SONIX_v501.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `MusicRepository.kt` — Gap #6 (filter audio pendek) dieksekusi, ambang 30 detik
+  (`MIN_SONG_DURATION_MS`) sesuai jawaban eksplisit user, HANYA di `getAllSongs()`
+  (`ALL_SONGS_SELECTION`) — `getSongsByIds()`/`BASE_SELECTION` TETAP tidak disentuh. Detail
+  penuh: "Catatan Batch 501" di atas. **NOT VERIFIED** — 0 CI/device fisik sesi ini. **WAJIB
+  DITEST user** (4 poin di "Catatan Batch 501" di atas) — TERUTAMA poin 3: lagu <30 detik yang
+  SUDAH ada di playlist/favorit/queue tersimpan TIDAK BOLEH hilang.
+  **[RESUME POINT berikutnya]**: Setelah Gap #6 dikonfirmasi device, SATU-SATUNYA sisa gap
+  actionable roadmap Gap QA v488 tinggal **previous-3-detik** — butuh keputusan eksplisit user
+  dulu (bump `media3` 1.3.1→1.4.0+, lihat "Catatan Batch 493"). Sisa gap checklist lain
+  (#4/#5/#7/#8/#9) murni device-QA/di luar scope, 0 kode untuk dikerjakan. Kalau SEMUA gap
+  actionable (previous-3-detik + Gap #6 + Gap #3, sudah tuntas Batch 500) selesai + device-QA
+  lengkap, `docs/QA_CHECKLIST_SONIX_v488.md` baru boleh dipindah ke `docs/archive/`.
+- Batch 500 (sebelum 501). ZIP: `SONIX_v500.zip`. **0 file kode diubah** (klarifikasi/
+  sinkronisasi status murni) — user konfirmasi CI Batch 499 hijau + device-test Gap #3 kritis
+  (add/remove/reorder queue selagi shuffle) **0 crash**. **Gap #3 (shuffle anti-repeat-nearby)
+  RESMI TUNTAS, 0 gap tersisa untuk fitur ini.**
+- Batch 499 (sebelum 500, fix compile — lihat "Catatan Batch 499" di atas). ZIP:
+  `SONIX_v499.zip`. **1 file diubah** (dalam batas 3 file/tugas): `AntiRepeatShuffleOrder.kt` —
+  FIX CI compile fail dari `log_fail_478.zip` (`getNextIndex`/`getPreviousIndex` signature
+  disamakan ke interface asli media3 1.10.1: 1 parameter, bukan 2). **DIKONFIRMASI Batch 500 di
+  atas — CI hijau, device-test 0 crash.**
 - Batch 498 (sebelum 499, GAGAL CI — lihat "Catatan Batch 499" di atas). ZIP: `SONIX_v498.zip`.
   **2 file disentuh** (dalam batas 3 file/tugas): file BARU `AntiRepeatShuffleOrder.kt` +
   `PlaybackService.kt` diubah (1 listener baru). **Gap #3 (shuffle anti-repeat-nearby) SEKARANG

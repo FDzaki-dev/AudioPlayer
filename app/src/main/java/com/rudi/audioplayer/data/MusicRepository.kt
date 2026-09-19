@@ -13,7 +13,7 @@ import java.io.File
  */
 class MusicRepository(private val context: Context) {
 
-    fun getAllSongs(): List<Song> = querySongs(selection = BASE_SELECTION, selectionArgs = null)
+    fun getAllSongs(): List<Song> = querySongs(selection = ALL_SONGS_SELECTION, selectionArgs = null)
 
     /**
      * Gap List #11 — genre has no plain column on the main Media row (unlike track/disc/
@@ -175,6 +175,17 @@ class MusicRepository(private val context: Context) {
 
     companion object {
         private val BASE_SELECTION = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} > 0"
+
+        // Gap #6 (filter audio pendek — WhatsApp voice note/ringtone/game effect). Ambang
+        // dikonfirmasi eksplisit user: 30 detik (kandidat umum industri musik-vs-clip).
+        // MediaStore.Audio.Media.DURATION dalam MILIDETIK, jadi 30_000L bukan 30L. SENGAJA
+        // HANYA dipakai [ALL_SONGS_SELECTION]/getAllSongs() — BASE_SELECTION polos (dipakai
+        // getSongsByIds()) TETAP tidak disentuh, supaya lagu pendek yang SUDAH ada di
+        // playlist/favorit/queue (resume-queue PlaybackService.kt & LyricsPrefetchWorker.kt,
+        // keduanya resolve lewat getSongsByIds()) tidak mendadak hilang begitu batch ini masuk.
+        private const val MIN_SONG_DURATION_MS = 30_000L
+        private val ALL_SONGS_SELECTION =
+            "$BASE_SELECTION AND ${MediaStore.Audio.Media.DURATION} > $MIN_SONG_DURATION_MS"
 
         // Referenced by string literal (not MediaStore.Audio.AudioColumns.CD_TRACK_NUMBER/
         // DISC_NUMBER constants) so this file still compiles against older compileSdk stubs —
