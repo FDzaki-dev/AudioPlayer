@@ -95,6 +95,13 @@ class PlaybackService : MediaLibraryService() {
             // true = ExoPlayer requests/abandons audio focus automatically, ducking or
             // pausing when a call, notification sound, or another app needs the output.
             .setAudioAttributes(audioAttributes, true)
+            // Gap #2 (Batch 495, re-added post media3 1.10.1 bump Batch 494): kunci threshold
+            // "restart lagu ini vs pindah ke lagu sebelumnya" secara eksplisit alih-alih warisan
+            // default Media3 (C.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS = 3000ms, nilai identik).
+            // 0 perubahan behavior runtime — murni proteksi terhadap perubahan default diam-diam
+            // di versi Media3 mendatang. Hanya player sesi utama; overlapPlayer (crossfade
+            // privat, tidak pernah terhubung ke tombol Previous UI) SENGAJA tidak disentuh.
+            .setMaxSeekToPreviousPositionMs(3000L)
             // Auto-pauses when headphones are unplugged or a Bluetooth device disconnects,
             // instead of blasting through the speaker unannounced — table stakes in every
             // major music app.

@@ -12,6 +12,18 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 495 [instruksi eksplisit user: "jangan kerjakan setengah-setengah, langsung
+tuntaskan"]**: Gap #2 dituntaskan penuh. **1 file diubah** (dalam batas 3 file/tugas):
+`PlaybackService.kt` — `.setMaxSeekToPreviousPositionMs(3000L)` di-re-add ke `ExoPlayer.Builder`
+player sesi utama (identik Batch 492, kini lolos kompilasi krn media3 1.10.1 dari Batch 494 sudah
+punya API-nya). `overlapPlayer` (crossfade privat) tidak disentuh. Balance brace/paren/bracket
+`{}` 80/80 `()` 439/439 `[]` 19/19 — konsisten. **Gap #2 SEKARANG TUNTAS** (bump + re-add API, 2
+batch beruntun). **0 diverifikasi CI/device sesi ini** — user WAJIB `git push` cek CI HIJAU, lalu
+test manual device (lihat CHANGELOG.md § Batch 495 utk langkah test). Gap #6/#3 (filter audio
+pendek, shuffle anti-repeat-nearby) TIDAK ikut tersentuh — masih butuh keputusan eksplisit user
+terpisah, TIDAK termasuk dalam cakupan "tuntaskan" batch ini (scope tunnel-vision: hanya Gap #2
+yang sudah dalam progress aktif Batch 493→494→495).
+
 **Catatan Batch 494 [instruksi eksplisit user: "lakukan bump media3 ke 1.4.0+"]**: konfirmasi yang
 diminta Batch 493 ("WAJIB konfirmasi eksplisit user dulu sebelum dieksekusi") SUDAH masuk. **1 file
 diubah** (dalam batas 3 file/tugas): `app/build.gradle.kts` — 3 artifact (`media3-exoplayer`/
@@ -2264,19 +2276,20 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 494. ZIP terakhir: `SONIX_v494.zip`. **1 file diubah** (dalam batas 3
-  file/tugas): `app/build.gradle.kts` — bump `androidx.media3` (`media3-exoplayer`/
-  `media3-session`/`media3-common`) `1.3.1` → `1.10.1` (latest stable, dicek web_search, memenuhi
-  instruksi eksplisit user "bump media3 ke 1.4.0+"). Scope MURNI version string, 0 source Kotlin
-  disentuh. Detail lengkap: "Catatan Batch 494" di atas.
-  **WAJIB user**: `git push` (skrip Termux di bawah) lalu cek run GitHub Actions berikutnya HIJAU —
-  bump dependency BELUM diverifikasi CI nyata di sesi ini.
-  **[RESUME POINT berikutnya]**: media3 sekarang 1.10.1, API `setMaxSeekToPreviousPositionMs`
-  TERSEDIA tapi pemanggilannya (Gap #2, previous-3-detik) BELUM di-re-add ke `PlaybackService.kt`
-  — TUNGGU instruksi eksplisit user apa mau di-re-add sekarang atau tidak (0 diasumsikan). Gap
-  #6 (filter audio pendek — ambang durasi belum dikonfirmasi) dan Gap #3 (shuffle anti-repeat-
-  nearby — fitur baru) MASIH butuh keputusan eksplisit user dulu, sama seperti sebelumnya. 0
-  roadmap "risiko rendah, siap eksekusi tanpa tanya" tersisa saat ini.
+- Batch terakhir: 495. ZIP terakhir: `SONIX_v495.zip`. **1 file diubah** (dalam batas 3
+  file/tugas): `PlaybackService.kt` — Gap #2 (previous-3-detik) DITUNTASKAN:
+  `.setMaxSeekToPreviousPositionMs(3000L)` di-re-add ke `ExoPlayer.Builder` player sesi utama
+  (identik Batch 492, kini lolos kompilasi krn bump media3 1.10.1 Batch 494). `overlapPlayer`
+  tidak disentuh. Balance brace/paren/bracket `{}` 80/80 `()` 439/439 `[]` 19/19. Detail lengkap:
+  "Catatan Batch 495" di atas / `CHANGELOG.md` § Batch 495.
+  **WAJIB user**: `git push` (skrip Termux di bawah) → cek run GitHub Actions berikutnya HIJAU
+  (kombinasi media3 1.10.1 + API ini belum diverifikasi CI nyata). **LALU test manual device**:
+  putar lagu, lewat 3 detik, tekan Previous → lagu SAAT INI restart dari 0:00 (bukan pindah lagu);
+  tekan Previous lagi < 3 detik sejak restart → BARU pindah ke lagu sebelumnya.
+  **[RESUME POINT berikutnya]**: Gap #2 TUNTAS, 0 sisa. Sisa roadmap: Gap #6 (filter audio pendek
+  — ambang durasi belum dikonfirmasi) dan Gap #3 (shuffle anti-repeat-nearby — fitur baru), KEDUA
+  masih butuh keputusan/instruksi eksplisit user dulu sebelum dieksekusi. 0 roadmap "risiko
+  rendah, siap eksekusi tanpa tanya" tersisa saat ini.
 - Batch 492 (sebelum 493, GAGAL CI — lihat Batch 493 di atas). ZIP: `SONIX_v492.zip`. **1 file
   diubah**: `PlaybackService.kt` — Gap #2 Roadmap QA v488 (`setMaxSeekToPreviousPositionMs
   (3000L)` eksplisit di `ExoPlayer.Builder` player sesi utama). User konfirmasi device terpisah:

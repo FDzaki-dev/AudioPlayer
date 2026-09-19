@@ -1,5 +1,25 @@
 # Changelog
 
+## Batch 495 — Gap #2 (previous 3 detik eksplisit) di-re-add post bump media3 1.10.1
+Instruksi eksplisit user: tuntaskan, bukan cuma bump dependency setengah-setengah.
+
+1 file diubah: `app/src/main/java/com/rudi/audioplayer/playback/PlaybackService.kt`.
+- `ExoPlayer.Builder` player sesi utama: `.setMaxSeekToPreviousPositionMs(3000L)` ditambah lagi
+  (identik Batch 492, sebelum revert Batch 493) — SEKARANG lolos kompilasi krn media3 1.10.1
+  (Batch 494) sudah punya API-nya. Mengunci threshold "restart lagu ini vs pindah ke lagu
+  sebelumnya" secara eksplisit alih-alih warisan default Media3
+  (`C.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS` = 3000ms, nilai identik — 0 perubahan behavior
+  runtime hari ini, murni proteksi dari perubahan default diam-diam di versi Media3 mendatang).
+  `overlapPlayer` (crossfade privat, tidak pernah terhubung ke tombol Previous UI) TIDAK disentuh.
+- Balance brace/paren/bracket: `{}` 80/80 `()` 439/439 `[]` 19/19 — konsisten, 0 sisa.
+
+**Gap #2 SEKARANG TUNTAS** (bump dependency Batch 494 + re-add API Batch 495, 2 batch beruntun,
+1 keputusan user). **0 diverifikasi CI/device sesi ini**. **WAJIB DITEST user** (device fisik):
+putar lagu, lewat 3 detik, tekan Previous → lagu SAAT INI restart dari 0:00 (bukan pindah lagu);
+tekan Previous lagi < 3 detik sejak restart → BARU pindah ke lagu sebelumnya. **WAJIB `git push`**
+& cek run GitHub Actions berikutnya HIJAU (kompilasi belum diverifikasi CI nyata untuk kombinasi
+media3 1.10.1 + API ini).
+
 ## Batch 494 — Bump androidx.media3 1.3.1 → 1.10.1 (instruksi eksplisit user)
 1 file diubah: `app/build.gradle.kts`.
 - 3 artifact di-bump: `media3-exoplayer`, `media3-session`, `media3-common` (1.3.1 → 1.10.1,
