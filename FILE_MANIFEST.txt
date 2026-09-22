@@ -21,7 +21,13 @@
 # PROJECT_STATE.md § Aturan sesi aktif #4) ditambahkan — 192->193.
 # Batch 498: app/src/main/java/com/rudi/audioplayer/playback/AntiRepeatShuffleOrder.kt (file
 # baru, custom ShuffleOrder Gap #3 shuffle anti-repeat-nearby) ditambahkan — 193->194.
-# Total: 194 file
+# Batch 504: docs/PLANNING.md (roadmap + audit teknis baru) ditambahkan — 194->195. VERIFIKASI
+# INTEGRITAS sesi ini (diff manifest vs isi ZIP, pola sama Batch 390): 7 file docs/archive/ di
+# bawah (baris "docs/archive/*") TERCATAT di manifest TAPI TIDAK ADA di ZIP
+# AudioPlayer-1.7.20-run482.zip (187 file nyata vs 194 klaim manifest sebelum batch ini — selisih
+# PERSIS 7 file itu). Detail + risiko: docs/PLANNING.md § 1. Baris path di bawah TETAP
+# dipertahankan (pola sama .github/build.yml — dicatat sesuai konvensi, bukan bukti file ada).
+# Total: 195 file
 
 .github/workflows/build.yml
 .gitignore
@@ -207,6 +213,7 @@ app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
 build.gradle.kts
+docs/PLANNING.md
 docs/QA_CHECKLIST_SONIX_v488.md
 docs/archive/ARCHIVED_MICRO_UIUX_AUDIT.md
 docs/archive/ARCHIVED_POLISH_AUDIT.md

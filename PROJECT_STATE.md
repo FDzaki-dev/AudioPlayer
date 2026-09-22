@@ -2413,7 +2413,26 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 502. ZIP terakhir: `SONIX_v502.zip`. **0 file kode diubah** (klarifikasi/
+- Batch terakhir: 504. ZIP: `SONIX_v504.zip`. **0 file source diubah** — dokumentasi baru murni:
+  `docs/PLANNING.md` (roadmap + audit teknis, dipicu instruksi eksplisit user "tanamkan planning
+  dokumentasi"). **TEMUAN P0 (baca sebelum jalankan [DAILY UPDATE] dgn ZIP ini)**: 7 file
+  `docs/archive/` (tercatat `FILE_MANIFEST.txt`, direferensikan berkali-kali di file ini/
+  README.md) TIDAK ADA di ZIP sumber sesi ini (`AudioPlayer-1.7.20-run482.zip`, 187 file nyata
+  vs 194 klaim manifest lama) — risiko terhapus permanen kalau ZIP berikutnya juga bolong (skrip
+  [DAILY UPDATE] hapus-lalu-unzip). **Detail lengkap + langkah verifikasi: `docs/PLANNING.md` §
+  1.** Audit teknis tambahan (CI instrumentation-test sempit, rasio test file, Room DAO
+  `LyricsDao.kt` — item "belum dicek eksplisit" Aturan sesi aktif #6 DIVERIFIKASI beres, Gradle
+  Wrapper belum ada): `docs/PLANNING.md` § 2. Kandidat roadmap (PROPOSAL, tunggu instruksi
+  eksplisit user per sektor sebelum eksekusi): `docs/PLANNING.md` § 3. **0 diverifikasi CI/device
+  batch ini** — murni file dokumentasi baru + 2 edit kecil VIP (`FILE_MANIFEST.txt`, blok ini),
+  0 risiko regresi kode (0 source Kotlin/Gradle disentuh).
+  **[RESUME POINT berikutnya]**: sama seperti sebelum batch ini (lihat "Batch 502" di bawah) —
+  **0 gap actionable KODE tersisa** dari roadmap Gap QA v488, sisa #4/#5/#7/#8/#9 murni
+  device-QA. Prioritas baru dari batch ini (belum dieksekusi, PROPOSAL murni): (a) verifikasi
+  `docs/archive/` di Termux SEBELUM `[DAILY UPDATE]` berikutnya (lihat TEMUAN P0 di atas —
+  paling mendesak, P0 stability dokumentasi); (b) 4 kandidat roadmap `docs/PLANNING.md` § 3,
+  TIDAK ada yang dieksekusi otomatis — tunggu user pilih sektor mana yang mau dilanjutkan.
+- Batch 502 (sebelum 503/504). ZIP: `SONIX_v502.zip`. **0 file kode diubah** (klarifikasi/
   sinkronisasi status murni) — user konfirmasi device-test Gap #6, TERMASUK poin paling kritis:
   lagu <30 detik yang sudah ada di playlist/favorit/queue TETAP muncul. **Gap #6 RESMI TUNTAS.**
   **[KOREKSI STALE — Batch 503]**: Baris resume point ini (versi sebelum koreksi) SALAH/BASI —

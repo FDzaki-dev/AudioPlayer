@@ -1,5 +1,31 @@
 # Changelog
 
+## Batch 504 — Planning dokumentasi baru + temuan P0 integritas `docs/archive/`
+- Instruksi eksplisit user: "tanamkan planning dokumentasi agar project ini semakin powerfull"
+- **File baru**: `docs/PLANNING.md` — roadmap + audit teknis, isi: (1) temuan integritas P0,
+  (2) audit teknis baru digroundkan ke source asli, (3) 4 kandidat roadmap (PROPOSAL, bukan
+  eksekusi), (4) pointer konsolidasi backlog device-QA (anti-duplikasi ke PROJECT_STATE.md)
+- **TEMUAN P0**: 7 file `docs/archive/` (`PROJECT_STATE_ARCHIVE.md`, `MANUAL_QA_CHECKLIST.md`,
+  `ARCHIVED_POLISH_AUDIT.md`, `ARCHIVED_MICRO_UIUX_AUDIT.md`,
+  `ARCHIVED_ROADMAP_15_FITUR_OFFLINE.md`, `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md`,
+  `ROADMAP_LIQUID_GLASS_REDESIGN.md`) tercatat `FILE_MANIFEST.txt` (194 file) TAPI TIDAK ADA di
+  ZIP sumber sesi ini — diverifikasi lewat count file nyata (187) vs klaim manifest, selisih
+  PERSIS 7. Isi asli TIDAK direkonstruksi (0 akses histori Batch 1-424 archive, zero-hallucination)
+  — user WAJIB cek manual `~/projects/audioplayer/docs/archive/` di Termux sebelum jalankan
+  `[DAILY UPDATE]` dengan ZIP ini (risiko terhapus permanen kalau ZIP tetap bolong). Detail:
+  `docs/PLANNING.md` § 1
+- **Audit teknis (grounded, bukan asumsi)**: CI instrumentation-test ADA (`build.yml`, emulator
+  API 31) tapi cakupan cuma 2 file androidTest (transport playback saja) — akar backlog
+  "belum dikonfirmasi device" yang menumpuk 500+ batch; rasio 113 file source vs 16 unit test;
+  0 TODO/FIXME di source; `LyricsDao.kt` (item "belum dicek eksplisit" Aturan sesi aktif #6)
+  DIVERIFIKASI beres (suspend/Flow proper); Gradle Wrapper belum ada di repo (gap self-catatan
+  `build.yml`). Detail: `docs/PLANNING.md` § 2
+- **2 file VIP diedit** (di luar batas 3 file, dokumentasi): `FILE_MANIFEST.txt` (+1 baris path,
+  194->195, catatan verifikasi integritas), `PROJECT_STATE.md` (`[RESUME POINT]` — entri baru +
+  relabel entri lama "Batch terakhir: 502" jadi "Batch 502" biasa dalam daftar riwayat)
+- **0 file source (Kotlin/Gradle/XML) disentuh** — 0 risiko regresi kode. 0 diverifikasi
+  CI/device (tidak relevan, murni dokumentasi)
+
 ## Batch 503 — Koreksi dokumentasi basi: Gap #2 SUDAH tuntas sejak Batch 497 (bukan pending)
 - Jawaban user re: keputusan bump media3 utk Gap #2 ("hanya jika ada high values, siapa yang
   larang?!!") memicu cross-check ke source ZIP v502 + histori batch, BUKAN eksekusi bump
