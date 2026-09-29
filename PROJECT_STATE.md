@@ -12,6 +12,15 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 512 [laporan user atas v511: "gak merasakan ada nya perbaikan haptic feedback nyata selain dari
+getaran musik yang dimainkan!!"]**: Akar masalah BELUM terbukti — wiring benar secara statis (1 root `setContent`
+di bawah `AudioPlayerTheme`, 75 call site via `LocalHapticFeedback`, `minSdk` 31), sisa 3 kandidat: denyut
+terlalu pendek utk motor lemah / wrapper tak terpanggil / sistem HP mengabaikan `vibrate()`. **1 file source
+diubah** (`AppHaptics.kt`): denyut one-shot 30/55 -> 50/100ms (TEBAKAN), baris status Log Diagnostik diperkaya
+(info HP + setelan getar sistem), 6 panggilan haptic pertama dicatat, bug v511 (kegagalan `vibrate()` tak pernah
+tercatat) diperbaiki. Ganti usage/atribut getar SENGAJA ditunda sampai ada data log. **NOT VERIFIED** — 0
+build/test sesi ini; CI + device BELUM. Detail: `CHANGELOG.md` Batch 512.
+
 **Catatan Batch 503 [jawaban user re: keputusan bump media3 Gap #2, "hanya jika ada high values,
 siapa yang larang?!!"]**: Sebelum eksekusi keputusan, cross-check WAJIB ke source ZIP v502 +
 histori batch di bawah (bukan cuma baca [RESUME POINT] tail) menemukan **[RESUME POINT] LAMA
@@ -2413,7 +2422,20 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 511. ZIP: `SONIX_v511.zip`. **3 file source/target diubah** (`ui/theme/AppHaptics.kt` BARU,
+- Batch terakhir: 512. ZIP: `SONIX_v512.zip`. **1 file source diubah** (`ui/theme/AppHaptics.kt`) — FIX lanjutan
+  haptic (perilaku SENGAJA berubah: denyut lebih kuat). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: laporan user v511 "haptic gak terasa nyata" (denyut 50/100ms + diagnostik + fix flag log) ->
+  Status: KODE SELESAI, akar masalah BELUM terbukti (3 kandidat, lihat "Catatan Batch 512"). **0 build/test
+  dijalankan** (sandbox tanpa Gradle/Kotlin/jaringan) -> CI BELUM dikonfirmasi, device BELUM diuji, JANGAN klaim
+  verified ->
+  Remaining: CI hijau di commit batch ini + device: rasa getar (Now Playing, Library tekan-tahan, swipe art,
+  reorder antrean), lalu baca Log Diagnostik: baris "Haptic aktif: ..." (mode, dukungan efek, `getar_sentuh`,
+  `vibrate_on`, `intensitas_sentuh`, `intensitas_media`) + baris "panggilan #1..#6" ->
+  Next Action: tunggu log/rasa user. Tak ada baris "panggilan" -> masalah wiring/APK (cek versi terpasang);
+  "panggilan ... dikirim tanpa exception" tapi tak terasa + intensitas 0 -> sistem menolak, putuskan fix usage
+  getar dari DATA itu (jangan tebak); intensitas normal tapi lemah -> naikkan 2 konstanta `AppHaptics.kt`;
+  crash/regresi -> kembali ke `SONIX_v511.zip`. Wave 2 T7-T10 tetap DITAHAN sampai haptic beres.
+- Batch 511 (sebelum 512). ZIP: `SONIX_v511.zip`. **3 file source/target diubah** (`ui/theme/AppHaptics.kt` BARU,
   `ui/theme/Theme.kt`, `AndroidManifest.xml`) — FIX haptic lemah, perilaku SENGAJA berubah, di luar daftar T
   (instruksi eksplisit user: haptic dieksekusi DULU sebelum lanjut milestone). **[RESUME POINT: Task -> Status ->
   Remaining -> Next Action]**:

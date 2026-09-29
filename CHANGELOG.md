@@ -1,5 +1,38 @@
 # Changelog
 
+## Batch 512 — FIX lanjutan haptic v511 "gak terasa": denyut diperkuat + diagnostik haptic (BELUM verified)
+- Laporan user atas v511: "saya gak merasakan ada nya perbaikan haptic feedback nyata selain dari getaran
+  musik yang dimainkan!!" — dicatat apa adanya. Rincian TIDAK dirinci user (CI v511 hijau atau tidak, APK v511
+  benar terpasang atau tidak, tipe HP/versi Android, baris "Haptic aktif: ..." di Log Diagnostik)
+- **Catatan akar masalah (jujur)**: BELUM terbukti. Audit source Batch 512: wiring benar secara statis —
+  `AudioPlayerTheme` dipanggil dari satu-satunya `setContent` (`MainActivity`), 0 `ComposeView` lain,
+  `FloatingBubbleService` = plain View tanpa haptic, 75 call site `performHapticFeedback` semuanya lewat
+  `LocalHapticFeedback`, 0 `HapticFeedbackConstants`/`view.performHapticFeedback` di luar Compose, `minSdk`
+  31 (jadi `VibratorManager` selalu ada). Tiga kandidat yang TIDAK bisa dibedakan dari source: (1) denyut
+  one-shot 30/55ms terlalu pendek utk motor lemah; (2) wrapper tidak terpanggil / APK bukan v511; (3) sistem
+  HP mengabaikan `vibrate()` (setelan intensitas getar). "Getaran musik" yg dirasakan user bukan dari kode
+  app (0 `Vibrator`/`HapticGenerator` lain di source) — kemungkinan getaran fisik speaker/fitur sistem HP
+- **Perubahan (1 file source: `ui/theme/AppHaptics.kt`)**:
+  1. `TAP_ONE_SHOT_MS` 30 -> 50, `HEAVY_ONE_SHOT_MS` 55 -> 100 (tetap TEBAKAN, bukan hasil ukur; hanya
+     berlaku di mode one-shot, bukan `hardware-effects`)
+  2. Baris status "Haptic aktif: mode=..." kini memuat kode dukungan efek (CLICK/HEAVY: 0 unknown, 1 yes,
+     2 no) + foto setelan sistem: `sdk`, `hp` (merek/model), `getar_sentuh`, `vibrate_on`, `intensitas_sentuh`,
+     `intensitas_media`, `ringer` (kunci selain `getar_sentuh` = setelan tersembunyi, dibaca defensif, gagal -> `n/a`)
+  3. 6 panggilan haptic PERTAMA per proses dicatat (`panggilan #n tier=... : vibrate() dikirim tanpa exception`)
+     — membuktikan wrapper terpanggil (kandidat 2) dan membedakannya dari sistem yang mengabaikan getar (kandidat 3)
+  4. **Bug v511 diperbaiki**: kegagalan `vibrate()` dulu TIDAK PERNAH tercatat (flag "sekali" dipakai bersama
+     baris status awal, jatahnya habis di `init`) -> flag dipisah
+- **Sengaja TIDAK dilakukan**: ganti usage/atribut getar (API `VibrationAttributes` tidak bisa diverifikasi tanpa
+  compiler/jaringan; efek ke setelan sistem tidak pasti) — menunggu data log. 0 call site disentuh, 0 dependency baru
+- **File source disentuh: 1** (`AppHaptics.kt`). Doc: `README.md` (1 baris), `CHANGELOG.md`, `PROJECT_STATE.md`.
+  `FILE_MANIFEST.txt` tidak berubah (0 file baru)
+- **Validasi jujur**: cek statis saja (kurung `AppHaptics.kt` `{}` 25/25 `()` 64/64; semua import terpakai; API
+  yg dipakai semuanya publik <= API 31). **0 build/test dijalankan** — sandbox tanpa Gradle/Kotlin/jaringan.
+  **CI BELUM dikonfirmasi, device BELUM diuji** -> belum "verified"
+- **Uji device yang dibutuhkan**: (1) pastikan CI hijau & yang terpasang benar v512; (2) rasa getar di Now Playing,
+  Library (tekan-tahan), swipe art, reorder antrean; (3) kalau tetap tidak terasa: kirim baris "Haptic aktif: ..."
+  dan baris "panggilan #1..#6" dari Settings -> Lanjutan -> Log Diagnostik
+
 ## Batch 511 — FIX haptic feedback lemah: haptic terpusat + permission VIBRATE (perilaku SENGAJA berubah)
 - Instruksi eksplisit user: "v510 sudah Saya cek juga dan emang yang benar-benar regression nyata cuma
   sektor haptic feedback. fokus eksekusi itu sebelum melanjutkan pengerjaan milestone!!" (lanjutan

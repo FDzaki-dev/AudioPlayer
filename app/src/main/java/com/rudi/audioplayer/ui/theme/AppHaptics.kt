@@ -1,9 +1,12 @@
 package com.rudi.audioplayer.ui.theme
 
 import android.content.Context
+import android.media.AudioManager
+import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.hapticfeedback.HapticFeedback
@@ -11,6 +14,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.rudi.audioplayer.util.AppLogger
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -44,14 +48,34 @@ import kotlinx.coroutines.launch
 // **Belum ditest di device asli** (sandbox tanpa Gradle/Android/device). Angka durasi di bawah
 // ADALAH TEBAKAN AWAL yang wajar, bukan hasil ukur — kalau masih kurang/kebablasan, cukup ubah 2
 // konstanta ini (1 baris) tanpa menyentuh call site.
+
+// Batch 512 — laporan user atas v511: "gak merasakan ada nya perbaikan haptic feedback nyata selain dari
+// getaran musik yang dimainkan". Akar masalah BELUM terbukti (0 log/0 device di sandbox) — ada 3 kandidat
+// yang tidak bisa dibedakan dari source saja: (1) denyut one-shot 30/55ms terlalu pendek utk motor
+// lemah (ERM) sehingga nyaris tak terasa; (2) wrapper ini tidak pernah terpanggil; (3) sistem HP MENGABAIKAN
+// vibrate() (setelan intensitas getar sistem). Maka batch ini: (a) denyut diperkuat (50/100ms) — tetap
+// TEBAKAN, 2 konstanta di bawah; (b) diagnostik DITAMBAH supaya kandidat (2) & (3) terbedakan dari
+// Log Diagnostik: baris status kini memuat info HP + setelan getar sistem, dan 6 panggilan haptic PERTAMA
+// per proses dicatat (membuktikan wrapper terpanggil); (c) bug v511 diperbaiki: kegagalan vibrate()
+// dulu TIDAK PERNAH tercatat karena flag "sekali" sudah terpakai oleh baris status awal.
+
 private const val HAPTIC_TAG = "AppHaptics"
-private const val TAP_ONE_SHOT_MS = 30L
-private const val HEAVY_ONE_SHOT_MS = 55L
+private const val TAP_ONE_SHOT_MS = 50L
+private const val HEAVY_ONE_SHOT_MS = 100L
+
+// Jumlah panggilan haptic PERTAMA per proses yang dicatat ke Log Diagnostik (bukti wrapper terpanggil);
+// dibatasi supaya log tidak banjir saat drag/scroll memicu tick berulang.
+private const val HAPTIC_TRACE_LIMIT = 6
 
 private val hapticLogScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 @Volatile
 private var hapticStatusLogged = false
+
+@Volatile
+private var hapticFailureLogged = false
+
+private val hapticCallCount = AtomicInteger(0)
 
 internal class HapticEffects(
     val tap: VibrationEffect,
@@ -60,25 +84,46 @@ internal class HapticEffects(
 )
 
 private fun buildHapticEffects(vibrator: Vibrator): HapticEffects {
-    val hardwareEffectsOk = runCatching {
+    // Kode dukungan platform: 0 = UNKNOWN, 1 = YES, 2 = NO (urutan: CLICK/HEAVY_CLICK).
+    val support: IntArray? = runCatching {
         vibrator.areEffectsSupported(
             VibrationEffect.EFFECT_CLICK,
             VibrationEffect.EFFECT_HEAVY_CLICK
-        ).all { it == Vibrator.VIBRATION_EFFECT_SUPPORT_YES }
-    }.getOrDefault(false)
+        )
+    }.getOrNull()
+    val supportLabel = support?.joinToString("/") ?: "n/a"
+    val hardwareEffectsOk = support != null && support.isNotEmpty() &&
+        support.all { it == Vibrator.VIBRATION_EFFECT_SUPPORT_YES }
     if (hardwareEffectsOk) {
         return HapticEffects(
             tap = VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK),
             heavy = VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK),
-            mode = "hardware-effects"
+            mode = "hardware-effects(dukungan CLICK/HEAVY=$supportLabel)"
         )
     }
     val amplitude = if (vibrator.hasAmplitudeControl()) 255 else VibrationEffect.DEFAULT_AMPLITUDE
     return HapticEffects(
         tap = VibrationEffect.createOneShot(TAP_ONE_SHOT_MS, amplitude),
         heavy = VibrationEffect.createOneShot(HEAVY_ONE_SHOT_MS, amplitude),
-        mode = "one-shot(${TAP_ONE_SHOT_MS}ms/${HEAVY_ONE_SHOT_MS}ms, amp=$amplitude)"
+        mode = "one-shot(${TAP_ONE_SHOT_MS}ms/${HEAVY_ONE_SHOT_MS}ms, amp=$amplitude, " +
+            "dukungan CLICK/HEAVY=$supportLabel)"
     )
+}
+
+// Foto setelan getar sistem SAAT tema dibuat (bukan realtime). Kunci selain HAPTIC_FEEDBACK_ENABLED adalah
+// setelan tersembunyi (hidden) — tidak ada di semua ROM, jadi dibaca defensif: gagal/tak ada -> "n/a".
+// Nilai intensitas umumnya 0 = mati, 1 = rendah, 2 = sedang, 3 = tinggi.
+private fun systemHapticSnapshot(context: Context): String {
+    fun setting(key: String): String =
+        runCatching { Settings.System.getInt(context.contentResolver, key).toString() }
+            .getOrDefault("n/a")
+    val ringer = runCatching { context.getSystemService(AudioManager::class.java)?.ringerMode?.toString() }
+        .getOrNull() ?: "n/a"
+    return "sdk=${Build.VERSION.SDK_INT} hp=${Build.MANUFACTURER}/${Build.MODEL} " +
+        "getar_sentuh=${setting(Settings.System.HAPTIC_FEEDBACK_ENABLED)} " +
+        "vibrate_on=${setting("vibrate_on")} " +
+        "intensitas_sentuh=${setting("haptic_feedback_intensity")} " +
+        "intensitas_media=${setting("media_vibration_intensity")} ringer=$ringer"
 }
 
 // Sekali per proses supaya Log Diagnostik tidak banjir; I/O file di IO dispatcher (bukan Main).
@@ -88,37 +133,55 @@ private fun logHapticStatusOnce(message: String) {
     hapticLogScope.launch { AppLogger.w(HAPTIC_TAG, message) }
 }
 
+// Terpisah dari flag status di atas (bug v511: flag yang sama dipakai keduanya, jadi kegagalan vibrate()
+// tidak pernah tercatat karena baris status awal sudah menghabiskan "jatah sekali").
+private fun logHapticFailureOnce(message: String) {
+    if (hapticFailureLogged) return
+    hapticFailureLogged = true
+    hapticLogScope.launch { AppLogger.w(HAPTIC_TAG, message) }
+}
+
+private fun traceHaptic(message: String) {
+    hapticLogScope.launch { AppLogger.w(HAPTIC_TAG, message) }
+}
+
 private fun obtainVibrator(context: Context): Vibrator? = runCatching {
     context.getSystemService(VibratorManager::class.java)?.defaultVibrator?.takeIf { it.hasVibrator() }
 }.getOrNull()
 
 internal class StrongHapticFeedback(
     private val platform: HapticFeedback,
-    private val vibrator: Vibrator?
+    private val vibrator: Vibrator?,
+    systemInfo: String
 ) : HapticFeedback by platform {
 
     private val effects: HapticEffects? = vibrator?.let { buildHapticEffects(it) }
 
     init {
         logHapticStatusOnce(
-            if (effects != null) "Haptic aktif: mode=${effects.mode}"
-            else "Haptic: tidak ada Vibrator/tidak mendukung getar, pakai haptic bawaan Compose"
+            if (effects != null) "Haptic aktif: mode=${effects.mode} | $systemInfo"
+            else "Haptic: tidak ada Vibrator/tidak mendukung getar, pakai haptic bawaan Compose | $systemInfo"
         )
     }
 
     override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) {
-        val effect = when (hapticFeedbackType) {
-            HapticFeedbackType.LongPress -> effects?.heavy
-            HapticFeedbackType.TextHandleMove -> effects?.tap
-            else -> null
-        }
+        val isHeavy = hapticFeedbackType == HapticFeedbackType.LongPress
+        val isTap = hapticFeedbackType == HapticFeedbackType.TextHandleMove
+        val tier = if (isHeavy) "kuat" else if (isTap) "ketuk" else "delegasi"
+        val effect = if (isHeavy) effects?.heavy else if (isTap) effects?.tap else null
+        val n = hapticCallCount.incrementAndGet()
+        val trace = n <= HAPTIC_TRACE_LIMIT
         if (effect != null && vibrator != null) {
             try {
                 vibrator.vibrate(effect)
+                if (trace) traceHaptic("panggilan #$n tier=$tier: vibrate() dikirim tanpa exception")
                 return
             } catch (e: Exception) {
-                logHapticStatusOnce("Haptic: vibrate() gagal (${e.javaClass.simpleName}), jatuh ke haptic bawaan Compose")
+                logHapticFailureOnce("Haptic: vibrate() gagal (${e.javaClass.simpleName}), jatuh ke haptic bawaan Compose")
+                if (trace) traceHaptic("panggilan #$n tier=$tier: vibrate() gagal (${e.javaClass.simpleName})")
             }
+        } else if (trace) {
+            traceHaptic("panggilan #$n tier=$tier: diteruskan ke haptic bawaan Compose")
         }
         platform.performHapticFeedback(hapticFeedbackType)
     }
@@ -132,6 +195,6 @@ internal fun rememberStrongHapticFeedback(): HapticFeedback {
     val platform = LocalHapticFeedback.current
     val context = LocalContext.current
     return remember(platform, context) {
-        StrongHapticFeedback(platform, obtainVibrator(context))
+        StrongHapticFeedback(platform, obtainVibrator(context), systemHapticSnapshot(context))
     }
 }
