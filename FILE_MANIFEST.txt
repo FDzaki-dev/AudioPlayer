@@ -27,7 +27,10 @@
 # AudioPlayer-1.7.20-run482.zip (187 file nyata vs 194 klaim manifest sebelum batch ini — selisih
 # PERSIS 7 file itu). Detail + risiko: docs/PLANNING.md § 1. Baris path di bawah TETAP
 # dipertahankan (pola sama .github/build.yml — dicatat sesuai konvensi, bukan bukti file ada).
-# Total: 195 file
+# Batch 505: docs/PENDING_CodeTidyPlan.md (planning perapihan kode berbasis konstitusi, PROPOSAL)
+# ditambahkan — 195->196. Temuan P0 docs/archive/ Batch 504 TIDAK berubah (7 path archive di bawah
+# tetap tercatat tapi tidak ada di ZIP sumber).
+# Total: 196 file
 
 .github/workflows/build.yml
 .gitignore
@@ -213,6 +216,7 @@ app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
 build.gradle.kts
+docs/PENDING_CodeTidyPlan.md
 docs/PLANNING.md
 docs/QA_CHECKLIST_SONIX_v488.md
 docs/archive/ARCHIVED_MICRO_UIUX_AUDIT.md

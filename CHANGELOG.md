@@ -1,5 +1,30 @@
 # Changelog
 
+## Batch 505 — Planning perapihan kode berbasis konstitusi (dokumentasi baru, 0 kode diubah)
+- Instruksi eksplisit user: "buatkan dan tanamkan file berisi planning doc yang bertujuan
+  merapikan code project berdasarkan konstitusi yang berlaku"
+- **File baru**: `docs/PENDING_CodeTidyPlan.md` — (1) baseline terverifikasi dari source ZIP
+  (ukuran/konsentrasi kode, kepatuhan guard konstitusi, 7 kandidat celah dengan status
+  verifikasi masing-masing), (2) batas keras (move-only, maks 3–5 file/batch, daftar file &
+  sektor dikecualikan), (3) rencana Wave 0–5 (T1–T13, D1–D3, G1–G3) dengan risiko R1–R3 +
+  validasi per item, (4) catatan observasi tak dijadwalkan (`startPositionLoop`), (5) protokol
+  & definisi selesai per batch. **PROPOSAL — 0 item dieksekusi**, tunggu user pilih ID item
+- **Temuan (grep/wc/baca source, bukan runtime)**: 7 file >800 baris = ≈42% kode
+  (`NowPlayingScreen.kt` 2530, `MainActivity.kt` 2402, `PlayerViewModel.kt` 1853, dst.);
+  `rememberSaveable` 0 pemakaian sementara `MainActivity` tanpa `configChanges` (perilaku
+  rotasi BELUM diuji device); sleep-timer countdown duplikat di `PlayerViewModel.kt`; 2 parser
+  LRC (`parseLRC` vs `LyricsParser`) dipakai bersamaan di `LyricsSheet.kt`; `EmptyState`/
+  `Shimmer*` didefinisikan di `LibraryScreen.kt` tapi dipakai 8 file lain. Guard yang sudah
+  bersih: 0 `runBlocking`/`Thread.sleep`/`GlobalScope`, 0 `collectAsState` non-lifecycle, 0
+  secret literal, hanya 2 `!!` nyata
+- **TEMUAN P0 Batch 504 (`docs/archive/` hilang dari ZIP) MASIH berlaku** — ZIP sumber sesi ini
+  juga tidak memuat 7 file itu; isinya tidak dikarang ulang
+- **2 file VIP diedit** (dokumentasi): `FILE_MANIFEST.txt` (+1 path, 195->196), `PROJECT_STATE.md`
+  (`[RESUME POINT]` — entri baru format Task->Status->Remaining->Next Action + relabel entri
+  Batch 504)
+- **0 file source (Kotlin/Gradle/XML) disentuh** — 0 risiko regresi kode. 0 build/test dijalankan
+  (tidak relevan, murni dokumentasi)
+
 ## Batch 504 — Planning dokumentasi baru + temuan P0 integritas `docs/archive/`
 - Instruksi eksplisit user: "tanamkan planning dokumentasi agar project ini semakin powerfull"
 - **File baru**: `docs/PLANNING.md` — roadmap + audit teknis, isi: (1) temuan integritas P0,

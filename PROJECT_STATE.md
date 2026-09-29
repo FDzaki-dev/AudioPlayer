@@ -2413,7 +2413,24 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 504. ZIP: `SONIX_v504.zip`. **0 file source diubah** — dokumentasi baru murni:
+- Batch terakhir: 505. ZIP: `SONIX_v505.zip`. **0 file source diubah** — dokumentasi baru murni:
+  `docs/PENDING_CodeTidyPlan.md` (planning perapihan kode berbasis konstitusi pipeline; dipicu
+  instruksi eksplisit user "buatkan dan tanamkan file planning doc… merapikan code project").
+  **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: perapihan kode sesuai konstitusi (`docs/PENDING_CodeTidyPlan.md`) ->
+  Status: PLANNING SAJA — 0 item dieksekusi, 0 build/test dijalankan, angka dokumen = hasil
+  grep/wc/baca source ZIP (snapshot Batch 504) ->
+  Remaining: Wave 0 gerbang (G1 P0 `docs/archive/` dari `docs/PLANNING.md` §1, G2 CI baseline
+  hijau, G3 user pilih item) + Wave 1–5 (T1–T13, D1–D3) semua BELUM ->
+  Next Action: tunggu user memilih ID item (mis. T1/T2, risiko terendah) — JANGAN eksekusi
+  otomatis; sektor DITUTUP & file dikecualikan (`PlaybackService.kt`, `AppLockStore.kt`,
+  `app/build.gradle.kts`, `FloatingBubbleService.kt`, bottom nav) tetap tidak disentuh (lihat §2
+  dokumen). Temuan utama: 7 file >800 baris = ≈42% kode; `rememberSaveable` 0 pemakaian sementara
+  `MainActivity` tanpa `configChanges` (perilaku rotasi BELUM diuji device); sleep-timer loop
+  duplikat di `PlayerViewModel.kt`; 2 parser LRC dalam 1 layar (`LyricsSheet.kt`); `EmptyState`/
+  `Shimmer*` salah rumah di `LibraryScreen.kt`. **P0 `docs/archive/` dari Batch 504 MASIH
+  BERLAKU** — ZIP sumber sesi ini tetap tidak memuat 7 file itu (tidak dikarang ulang).
+- Batch 504 (sebelum 505). ZIP: `SONIX_v504.zip`. **0 file source diubah** — dokumentasi baru murni:
   `docs/PLANNING.md` (roadmap + audit teknis, dipicu instruksi eksplisit user "tanamkan planning
   dokumentasi"). **TEMUAN P0 (baca sebelum jalankan [DAILY UPDATE] dgn ZIP ini)**: 7 file
   `docs/archive/` (tercatat `FILE_MANIFEST.txt`, direferensikan berkali-kali di file ini/
