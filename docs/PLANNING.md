@@ -5,7 +5,13 @@ aktif) atau `CHANGELOG.md` (histori lengkap). Isi di sini: (1) temuan integritas
 teknis baru bersumber source asli, (3) kandidat roadmap (PROPOSAL, bukan eksekusi). Update
 manual tiap ada temuan/keputusan arah baru — bukan log per-batch.
 
-## 1. TEMUAN P0 — `docs/archive/` hilang dari ZIP ini
+## 1. TEMUAN P0 — `docs/archive/` hilang dari ZIP ini — **[TUNTAS Batch 506]**
+**STATUS Batch 506: TUNTAS.** 7 file dipulihkan dari riwayat git (sumber `a69c346^`; commit restore
+di-push user, `6d02a4d..96c3768`) lalu disertakan di `SONIX_v506.zip`. Terverifikasi dari
+`docs_archive.zip` yang diunggah user: 7 file, 0 error ZIP, 0 pola secret, `MANUAL_QA_CHECKLIST.md`
+= 19 item / 0 dicentang (cocok catatan §4). Teks di bawah = catatan historis Batch 504, dibiarkan
+apa adanya. **Belum dikonfirmasi**: kenapa ZIP sebelumnya tidak memuat folder ini (sisa Roadmap D).
+
 `FILE_MANIFEST.txt` mencatat 194 file termasuk 7 file di `docs/archive/`
 (`PROJECT_STATE_ARCHIVE.md`, `MANUAL_QA_CHECKLIST.md`, `ARCHIVED_POLISH_AUDIT.md`,
 `ARCHIVED_MICRO_UIUX_AUDIT.md`, `ARCHIVED_ROADMAP_15_FITUR_OFFLINE.md`,
@@ -61,7 +67,8 @@ konsisten pola project ini soal fitur besar/keputusan arsitektur)
   eksplisit "di luar scope" di 6+ batch berturut (437-452) sementara `NavigationBarItem` ponsel
   sudah banyak berubah (pill unified, drag, easing iOS) — risiko drift visual/fungsional makin
   lebar antara 2 layout kalau dibiarkan terus.
-- **D. Pulihkan `docs/archive/`** + audit proses build/export ZIP milik user — lihat §1.
+- **D. Pulihkan `docs/archive/`** — **TUNTAS Batch 506**. SISA: audit proses build/export ZIP milik
+  user (akar masalah kenapa folder ini tidak ikut ZIP belum dikonfirmasi) — lihat §1.
 
 ## 4. Backlog Device-QA (pointer, bukan duplikat)
 Daftar lengkap per-item (>15 entri individual: overscroll bounce, mini-player drag, bottom-nav
@@ -70,5 +77,5 @@ dan blockquote atas `README.md` — sengaja tidak disalin ulang di sini (anti-du
 Ringkas per sumber:
 - `docs/QA_CHECKLIST_SONIX_v488.md` (aktif): item #4/#5/#7/#8/#9 — murni device-QA, 0 kandidat
   kode.
-- `docs/archive/MANUAL_QA_CHECKLIST.md` (HILANG, lihat §1): 19 item, 0/19 pernah dicentang.
+- `docs/archive/MANUAL_QA_CHECKLIST.md` (DIPULIHKAN Batch 506, lihat §1): 19 item, 0/19 pernah dicentang.
 - Puluhan item UI/animasi/gesture Batch 433-503 — lihat §2.1, kandidat solusi = Roadmap A.

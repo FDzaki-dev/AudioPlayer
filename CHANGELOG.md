@@ -1,5 +1,22 @@
 # Changelog
 
+## Batch 506 — `docs/archive/` dipulihkan dari riwayat git & disertakan di ZIP (dokumentasi, 0 kode diubah)
+- Instruksi eksplisit user: menjalankan langkah pemulihan (restore dari riwayat git, push
+  `6d02a4d..96c3768`) lalu mengunggah `docs_archive.zip` supaya arsip ikut ZIP berikutnya
+- **7 file dipulihkan**: `ARCHIVED_MICRO_UIUX_AUDIT.md`, `ARCHIVED_POLISH_AUDIT.md`,
+  `ARCHIVED_ROADMAP_15_FITUR_OFFLINE.md`, `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md`,
+  `MANUAL_QA_CHECKLIST.md`, `PROJECT_STATE_ARCHIVE.md`, `ROADMAP_LIQUID_GLASS_REDESIGN.md`. Isi
+  TIDAK diedit/direkonstruksi — disalin apa adanya dari `docs_archive.zip` unggahan user
+- **Verifikasi**: ZIP unggahan 8 entri (folder + 7 file), 0 error, 0 path di luar `docs/archive/`,
+  0 pola secret; `MANUAL_QA_CHECKLIST.md` = 19 item / 0 dicentang (cocok catatan PLANNING §4)
+- **TEMUAN P0 Batch 504/505 TUNTAS** — baris "MASIH berlaku" di entri 505/504 di bawah sudah
+  usang (dibiarkan sbg log historis). SISA: akar masalah kenapa ZIP sebelumnya tidak memuat folder
+  ini BELUM dikonfirmasi
+- **Doc diedit** (dokumentasi): `docs/PLANNING.md` §1/§3-D/§4 (status TUNTAS),
+  `docs/PENDING_CodeTidyPlan.md` (G1 SELESAI, Wave 4 tidak lagi diblokir), `PROJECT_STATE.md`
+  (`[RESUME POINT]` Batch 506 + koreksi stale), `FILE_MANIFEST.txt` (catatan; total tetap 196)
+- **0 file source (Kotlin/Gradle/XML) disentuh** — 0 risiko regresi kode. 0 build/test dijalankan
+
 ## Batch 505 — Planning perapihan kode berbasis konstitusi (dokumentasi baru, 0 kode diubah)
 - Instruksi eksplisit user: "buatkan dan tanamkan file berisi planning doc yang bertujuan
   merapikan code project berdasarkan konstitusi yang berlaku"

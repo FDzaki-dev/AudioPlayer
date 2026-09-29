@@ -9,7 +9,7 @@ Pelengkap `docs/PLANNING.md` (roadmap + audit Batch 504: cakupan test, Gradle Wr
 `docs/archive/`) — isi di sini TIDAK menduplikasi itu. Fokus dokumen ini: **merapikan struktur
 kode tanpa mengubah perilaku**, tiap item selaras P0 konstitusi (STABILITY + ZERO-REGRESSION).
 Arsipkan dokumen ini ke `docs/archive/` HANYA setelah semua item DONE/dibatalkan eksplisit oleh user
-(aturan Proactive Archiving) — dan hanya setelah P0 `docs/archive/` beres.
+(aturan Proactive Archiving) — P0 `docs/archive/` sudah beres (Batch 506).
 
 ## 1. Baseline Terverifikasi (Batch 505)
 
@@ -83,7 +83,7 @@ Status: `BELUM` = belum dikerjakan. Risiko: R1 rendah, R2 sedang, R3 tinggi.
 ### Wave 0 — Gerbang (tanpa kode)
 | ID | Aksi | Pemilik | Status |
 |----|------|---------|--------|
-| G1 | Selesaikan P0 `docs/archive/` (`docs/PLANNING.md` §1) sebelum `[DAILY UPDATE]` berikutnya | User | BELUM |
+| G1 | Selesaikan P0 `docs/archive/` (`docs/PLANNING.md` §1) sebelum `[DAILY UPDATE]` berikutnya | User | **SELESAI Batch 506** (dipulihkan dari git, ikut ZIP v506) |
 | G2 | Konfirmasi CI baseline hijau di commit terakhir sebelum wave pertama | User | BELUM |
 | G3 | Pilih wave/item yang dieksekusi (dokumen ini tidak jalan otomatis) | User | BELUM |
 
@@ -118,10 +118,10 @@ lengkap di `PROJECT_STATE.md` sektor bottom nav).
 | T12 | Audit IME/insets di 9 file TextField (§1.5) — **baca saja dulu**, perbaikan hanya jika terbukti bermasalah | Uji keyboard terbuka + font scale besar + landscape |
 | T13 | Bandingkan semantik `parseLRC` vs `LyricsParser` (format timestamp, multi-timestamp, offset); gabung HANYA jika identik, kalau beda dokumentasikan & biarkan | Analisis dulu, 0 kode sampai hasilnya jelas |
 
-### Wave 4 — Dokumen (DIBLOKIR sampai G1 beres)
+### Wave 4 — Dokumen (G1 SELESAI Batch 506; tetap butuh pilihan user, tidak jalan otomatis)
 | ID | Item | Catatan |
 |----|------|---------|
-| D1 | Pangkas `PROJECT_STATE.md` ke rule aktif; pindahkan detail batch ≤503 ke `docs/archive/PROJECT_STATE_ARCHIVE.md` | JANGAN buat arsip baru yang menimpa arsip asli yang mungkin masih ada di device |
+| D1 | Pangkas `PROJECT_STATE.md` ke rule aktif; pindahkan detail batch ≤503 ke `docs/archive/PROJECT_STATE_ARCHIVE.md` | Arsip asli sudah dipulihkan (Batch 506) — TAMBAHKAN ke file itu, jangan timpa |
 | D2 | Selaraskan `FILE_MANIFEST.txt` dengan isi ZIP nyata tiap batch | Catat file baru + selisih hitungan |
 | D3 | Rujukan komentar ke `PENDING_*.md` yatim (§1.7): cukup catat pointer di README/PLANNING — jangan edit 23 komentar di ~17 file (scope creep) | |
 

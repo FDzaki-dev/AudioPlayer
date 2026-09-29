@@ -2413,7 +2413,20 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 505. ZIP: `SONIX_v505.zip`. **0 file source diubah** — dokumentasi baru murni:
+- Batch terakhir: 506. ZIP: `SONIX_v506.zip`. **0 file source diubah** — dokumentasi murni: 7 file
+  `docs/archive/` DIPULIHKAN dari riwayat git (commit restore di-push user, `6d02a4d..96c3768`) dan
+  disertakan di ZIP ini. **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: G1 (P0 `docs/archive/`, `docs/PLANNING.md` §1) ->
+  Status: TUNTAS — 7 file terverifikasi utuh dari `docs_archive.zip` unggahan user (0 error ZIP,
+  0 pola secret, `MANUAL_QA_CHECKLIST.md` 19 item/0 dicentang, cocok catatan PLANNING §4) ->
+  Remaining: G2 (CI baseline hijau, dicek user di tab Actions) + G3 (user pilih ID item di
+  `docs/PENDING_CodeTidyPlan.md`, saran mulai T1/T2) + Wave 1–5 semua BELUM; akar masalah kenapa ZIP
+  sebelumnya tidak memuat `docs/archive/` BELUM dikonfirmasi ->
+  Next Action: tunggu user pilih ID item, JANGAN eksekusi otomatis. Jalankan [DAILY UPDATE] HANYA
+  dgn ZIP yang memuat `docs/archive/` (v506+), kalau tidak folder itu terhapus lagi dari tip git.
+  **[KOREKSI STALE — Batch 506]**: baris "TEMUAN P0 ... MASIH BERLAKU" di entri Batch 505 & 504 di
+  bawah SUDAH USANG (arsip sudah dipulihkan & ada di ZIP ini) — entri itu dibiarkan sbg log historis.
+- Batch 505 (sebelum 506). ZIP: `SONIX_v505.zip`. **0 file source diubah** — dokumentasi baru murni:
   `docs/PENDING_CodeTidyPlan.md` (planning perapihan kode berbasis konstitusi pipeline; dipicu
   instruksi eksplisit user "buatkan dan tanamkan file planning doc… merapikan code project").
   **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:

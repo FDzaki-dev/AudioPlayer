@@ -30,6 +30,10 @@
 # Batch 505: docs/PENDING_CodeTidyPlan.md (planning perapihan kode berbasis konstitusi, PROPOSAL)
 # ditambahkan — 195->196. Temuan P0 docs/archive/ Batch 504 TIDAK berubah (7 path archive di bawah
 # tetap tercatat tapi tidak ada di ZIP sumber).
+# Batch 506: 7 file docs/archive/ (dipulihkan dari riwayat git, disalin dari docs_archive.zip
+# unggahan user) KINI ADA di ZIP — catatan "tercatat tapi tidak ada di ZIP" Batch 504/505 di atas
+# sudah usang. Daftar path tidak berubah; total tetap 196 (194 di ZIP + 2 dotfile .github/.gitignore
+# yang sengaja tidak dikirim, lihat catatan Batch 390).
 # Total: 196 file
 
 .github/workflows/build.yml
