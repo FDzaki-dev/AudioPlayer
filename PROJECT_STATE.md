@@ -2413,7 +2413,24 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 508. ZIP: `SONIX_v508.zip`. **2 file source diubah** (`NowPlayingScreen.kt`, + baru
+- Batch terakhir: 509. ZIP: `SONIX_v509.zip`. **2 file source diubah** (`NowPlayingScreen.kt`, + baru
+  `ui/AdvancedControlsSheet.kt`) — Wave 2 `docs/PENDING_CodeTidyPlan.md` T5 (R2, move-only, perilaku
+  TIDAK berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: Wave 2 pecah file besar, T5 (`AdvancedControlsSheet`/`AdvancedControlsSectionHeader`/
+  `AdvancedControlRow` -> `AdvancedControlsSheet.kt`) ->
+  Status: KODE SELESAI — 208 baris blok identik (diff programatik), hanya `private`->`internal` di
+  `AdvancedControlsSheet` (dipanggil `NowPlayingScreen()`); 8 import ikon yatim dihapus. Hasil T4
+  DILAPORKAN user nol regresi (Batch 509, "wave 2 nol regression nyata"; rincian CI vs device tidak
+  dirinci; ditafsirkan = T4). **0 build/test dijalankan** (sandbox tanpa Gradle/Kotlin/jaringan) ->
+  CI BELUM dikonfirmasi untuk T5, device BELUM diuji, JANGAN klaim verified ->
+  Remaining: CI hijau di commit batch ini + device smoke test T5 (sheet "Kontrol Lanjutan": 3 seksi,
+  tiap baris membuka tujuan benar, status Sleep Timer & nilai Kecepatan, slider peredam, scroll di
+  layar pendek/font besar); T6–T10 BELUM (T6 periksa dulu gesture/brightness/volume, T10 R3
+  terakhir); T3 (opsional) BELUM; Wave 3–5 BELUM ->
+  Next Action: tunggu hasil CI + device T5 dari user. Hijau/OK -> lanjut T6 (`AlbumArtHero`, periksa
+  dulu gesture/brightness/volume; kalau ada turun ke R3; 1 target per batch); merah/regresi -> kembali
+  ke `SONIX_v508.zip`, hentikan wave.
+- Batch 508 (sebelum 509). ZIP: `SONIX_v508.zip`. **2 file source diubah** (`NowPlayingScreen.kt`, + baru
   `ui/NowPlayingDialogs.kt`) — Wave 2 `docs/PENDING_CodeTidyPlan.md` T4 (R2, move-only, perilaku TIDAK
   berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
   Task: Wave 2 pecah file besar, T4 (`SleepTimerDialog`/`SpeedDialog`/`RatingDialog`/

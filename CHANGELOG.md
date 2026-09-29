@@ -1,5 +1,33 @@
 # Changelog
 
+## Batch 509 — Wave 2 T5: `AdvancedControlsSheet` dipindah ke `AdvancedControlsSheet.kt` (R2, move-only, perilaku tidak berubah)
+- Instruksi eksplisit user: "wave 2 nol regression nyata. langsung kerjakan next target!!" →
+  `docs/PENDING_CodeTidyPlan.md` Wave 2 (R2), item berikutnya **T5**. Hasil T4 DILAPORKAN user nol
+  regresi (rincian CI vs device tidak dirinci; ditafsirkan = T4, satu-satunya item Wave 2 yang sudah
+  dikerjakan). T6–T10 TIDAK dikerjakan (1 batch = 1 target)
+- **T5**: `AdvancedControlsSheet`, `AdvancedControlsSectionHeader`, `AdvancedControlRow` dipindah dari
+  `NowPlayingScreen.kt` (baris 1634–1841, termasuk doc-comment) ke file baru
+  `ui/AdvancedControlsSheet.kt` (paket sama `ui`). Move-only: 208 baris blok identik
+  karakter-per-karakter (diff programatik); satu-satunya perubahan = `private`→`internal` pada
+  `AdvancedControlsSheet` (dipanggil `NowPlayingScreen()`). 2 fungsi pendamping tetap `private`
+  (hanya dipakai sheet ini). `NowPlayingScreen.kt` 2246→2029 baris
+- 8 import ikon yang jadi tak terpakai HANYA karena pemindahan dihapus dari `NowPlayingScreen.kt`
+  (`QueueMusic`, `Speed`, `GraphicEq`, `Edit`, `ContentCut`, `Timer`, `Stop`, `Equalizer`; 0 pemakaian
+  kode tersisa, cek `Icons.*.<nama>`). Import lain (`Repeat`, `Article`, `VolumeOff/Down/Up`, `Add`,
+  `ImageVector`, `frostedGlass`, dst) TETAP karena masih dipakai di luar blok
+- **File source disentuh: 2** (`NowPlayingScreen.kt`, `ui/AdvancedControlsSheet.kt` baru).
+  Doc: `FILE_MANIFEST.txt` (198→199), `docs/PENDING_CodeTidyPlan.md` (status), `PROJECT_STATE.md`
+- **Validasi jujur**: cek statis saja (diff move-only: 0 baris ditambah di `NowPlayingScreen.kt`, 217
+  dihapus = 208 blok + 1 kosong + 8 import; kurung seimbang: `{}` 244 = 233+11, `()` 1152 = 1062+90
+  (angka file asli); tak ada deklarasi ganda di `src/`; semua identifier blok tercakup
+  import/wildcard/FQN). **0 build/test dijalankan** — sandbox tanpa Gradle/Kotlin/jaringan.
+  **CI BELUM dikonfirmasi, device BELUM diuji** → belum "verified"
+- **Uji device yang dibutuhkan**: Now Playing → ⋮ → sheet "Kontrol Lanjutan": 3 seksi tampil (Pemutaran,
+  Audio, Lagu); tiap baris membuka tujuan yang benar (Antrean, Sleep Timer [status Aktif/Nonaktif
+  berubah], Kecepatan [nilai "…x"], Repeat A-B & Bookmark, Stop Pemutaran, Equalizer, Visualizer,
+  Lirik, Edit Info Lagu, Potong Nada Dering); slider peredam (ikon berganti off/down/up, haptik saat
+  lepas); konten bisa digeser di layar pendek/font besar
+
 ## Batch 508 — Wave 2 T4: dialog NowPlaying dipindah ke `NowPlayingDialogs.kt` (R2, move-only, perilaku tidak berubah)
 - Instruksi eksplisit user: "wave 1 sudah berhasil. lanjut ke target milestone selanjutnya" →
   `docs/PENDING_CodeTidyPlan.md` Wave 2 (R2), item R2 terendah **T4**. Wave 1 dicatat DILAPORKAN
