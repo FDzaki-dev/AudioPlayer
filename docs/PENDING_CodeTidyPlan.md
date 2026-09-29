@@ -85,7 +85,7 @@ Status: `BELUM` = belum dikerjakan. Risiko: R1 rendah, R2 sedang, R3 tinggi.
 |----|------|---------|--------|
 | G1 | Selesaikan P0 `docs/archive/` (`docs/PLANNING.md` §1) sebelum `[DAILY UPDATE]` berikutnya | User | **SELESAI Batch 506** (dipulihkan dari git, ikut ZIP v506) |
 | G2 | Konfirmasi CI baseline hijau di commit terakhir sebelum wave pertama | User | BELUM |
-| G3 | Pilih wave/item yang dieksekusi (dokumen ini tidak jalan otomatis) | User | BELUM |
+| G3 | Pilih wave/item yang dieksekusi (dokumen ini tidak jalan otomatis) | User | **SELESAI Batch 507** (user: mulai dari yang low-risk → Wave 1 T1+T2) |
 
 ### Wave 1 — Rapikan kecil (R1)
 | ID | Item | File | Validasi |
@@ -93,6 +93,10 @@ Status: `BELUM` = belum dikerjakan. Risiko: R1 rendah, R2 sedang, R3 tinggi.
 | T1 | Pindah `EmptyState`/`ShimmerBrush`/`ShimmerRow`/`ShimmerList` ke `ui/SharedComponents.kt` (paket sama → 0 ubah import di paket `ui`; cek `ui/theme/TactileDepth.kt` yang paketnya beda) | `LibraryScreen.kt` + baru | CI compile; buka Library kosong/loading + 2 layar lain pemakai |
 | T2 | Ekstrak helper privat `startSleepTimerCountdown(endAt)` menggantikan 2 loop identik | `PlayerViewModel.kt` | CI; set timer → hitung mundur → batal; restart app saat timer aktif → hitungan pulih |
 | T3 | (Opsional) arahkan 3 `Log.w` ke `AppLogger` — perhatian: kegagalan yang tadinya senyap kini masuk log diagnostik | `PlaybackStateStore.kt`, `LibraryCacheStore.kt` | CI; Log Diagnostik tidak banjir saat start normal |
+
+**Status Wave 1 (Batch 507)**: T1 KODE SELESAI, T2 KODE SELESAI — keduanya belum diverifikasi
+CI/device (0 build dijalankan saat pengerjaan; G2 CI baseline juga belum dikonfirmasi user).
+T3 BELUM (opsional, mengubah perilaku log — tunggu persetujuan terpisah).
 
 ### Wave 2 — Pecah file besar, move-only (R2)
 Estimasi kasar pengurangan (bukan janji): NowPlayingScreen ≈2530→≈1730, MainActivity ≈2402→≈1860,

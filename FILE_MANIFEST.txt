@@ -34,7 +34,10 @@
 # unggahan user) KINI ADA di ZIP — catatan "tercatat tapi tidak ada di ZIP" Batch 504/505 di atas
 # sudah usang. Daftar path tidak berubah; total tetap 196 (194 di ZIP + 2 dotfile .github/.gitignore
 # yang sengaja tidak dikirim, lihat catatan Batch 390).
-# Total: 196 file
+# Batch 507: app/src/main/java/com/rudi/audioplayer/ui/SharedComponents.kt (file baru, T1 Wave 1
+# docs/PENDING_CodeTidyPlan.md — EmptyState/Shimmer* dipindah dari LibraryScreen.kt) ditambahkan —
+# 196->197 (195 di ZIP + 2 dotfile .github/.gitignore yang sengaja tidak dikirim).
+# Total: 197 file
 
 .github/workflows/build.yml
 .gitignore
@@ -136,6 +139,7 @@ app/src/main/java/com/rudi/audioplayer/ui/PlaylistScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/QueueSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/RingtoneCutterSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SettingsScreen.kt
+app/src/main/java/com/rudi/audioplayer/ui/SharedComponents.kt
 app/src/main/java/com/rudi/audioplayer/ui/SignatureMatcherSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SmartPlaylistScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/SongInfoEditSheet.kt

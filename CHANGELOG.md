@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 507 — Wave 1 perapihan kode: T1 (komponen bersama) + T2 (sleep-timer) (R1, perilaku tidak berubah)
+- Instruksi eksplisit user: "mulai pengerjaan milestone dari yang low-risk" → `docs/PENDING_CodeTidyPlan.md`
+  Wave 1 (semua R1). Dikerjakan **T1 + T2**; **T3 (opsional) TIDAK dikerjakan** — mengubah perilaku
+  log diagnostik (kegagalan senyap kini masuk log), butuh persetujuan terpisah
+- **T1**: `EmptyState`, `ShimmerBrush`, `ShimmerRow`, `ShimmerList` dipindah dari `LibraryScreen.kt`
+  ke file baru `ui/SharedComponents.kt` (paket sama `ui` → 0 ubah import di pemakai). Move-only:
+  blok 107 baris identik karakter-per-karakter (diff programatik), satu-satunya perubahan
+  `ShimmerList` `private`→`internal` (masih dipanggil `LibraryScreen.kt`). 11 import yang jadi tak
+  terpakai di `LibraryScreen.kt` dihapus (dicek 0 pemakaian tersisa via grep)
+- **T2**: helper privat `startSleepTimerCountdown(endAt)` di `PlayerViewModel.kt` menggantikan 2 loop
+  hitung-mundur identik (di `init` dan `setSleepTimer`). Isi loop & komentar dipindah apa adanya
+- **File source disentuh: 3** (`LibraryScreen.kt`, `PlayerViewModel.kt`, `ui/SharedComponents.kt` baru).
+  Doc: `FILE_MANIFEST.txt` (196→197), `docs/PENDING_CodeTidyPlan.md` (status), `PROJECT_STATE.md`
+- **Validasi jujur**: cek statis saja (diff move-only, kurung seimbang, grep pemakai simbol lintas
+  `main`/`test`/`androidTest` = 0 referensi rusak). **0 build/test dijalankan** — sandbox tanpa
+  Gradle/Kotlin/jaringan. **CI BELUM dikonfirmasi, device BELUM diuji** → belum "verified"
+- **Uji device yang dibutuhkan**: T1 = Library kosong & loading + layar pemakai `EmptyState` lain;
+  T2 = set timer → hitung mundur → batal; restart app saat timer aktif → hitungan pulih
+
 ## Batch 506 — `docs/archive/` dipulihkan dari riwayat git & disertakan di ZIP (dokumentasi, 0 kode diubah)
 - Instruksi eksplisit user: menjalankan langkah pemulihan (restore dari riwayat git, push
   `6d02a4d..96c3768`) lalu mengunggah `docs_archive.zip` supaya arsip ikut ZIP berikutnya

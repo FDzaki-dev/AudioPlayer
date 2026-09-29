@@ -2413,7 +2413,20 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 506. ZIP: `SONIX_v506.zip`. **0 file source diubah** — dokumentasi murni: 7 file
+- Batch terakhir: 507. ZIP: `SONIX_v507.zip`. **3 file source diubah** (`LibraryScreen.kt`,
+  `PlayerViewModel.kt`, + baru `ui/SharedComponents.kt`) — Wave 1 `docs/PENDING_CodeTidyPlan.md` T1 + T2
+  (R1, perilaku TIDAK berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: Wave 1 perapihan kode (T1 komponen bersama, T2 sleep-timer) ->
+  Status: KODE SELESAI — T1 move-only (blok 107 baris identik, `ShimmerList` private->internal, 11 import
+  tak terpakai dihapus dari `LibraryScreen.kt`); T2 ekstrak `startSleepTimerCountdown(endAt)` menggantikan
+  2 loop identik. **0 build/test dijalankan** (sandbox tanpa Gradle/Kotlin/jaringan) → CI BELUM
+  dikonfirmasi, device BELUM diuji, JANGAN klaim verified ->
+  Remaining: G2 (CI hijau di commit batch ini) + device smoke test T1 (Library kosong/loading, layar
+  pemakai `EmptyState` lain) & T2 (set timer -> hitung mundur -> batal; restart app saat timer aktif);
+  T3 (opsional, ubah perilaku log) BELUM; Wave 2–5 BELUM ->
+  Next Action: tunggu hasil CI + device dari user. Hijau/OK -> lanjut Wave 2 (mulai R2 terendah, mis. T4)
+  HANYA atas pilihan user; merah/regresi -> kembali ke `SONIX_v506.zip`, hentikan wave.
+- Batch 506 (sebelum 507). ZIP: `SONIX_v506.zip`. **0 file source diubah** — dokumentasi murni: 7 file
   `docs/archive/` DIPULIHKAN dari riwayat git (commit restore di-push user, `6d02a4d..96c3768`) dan
   disertakan di ZIP ini. **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
   Task: G1 (P0 `docs/archive/`, `docs/PLANNING.md` §1) ->

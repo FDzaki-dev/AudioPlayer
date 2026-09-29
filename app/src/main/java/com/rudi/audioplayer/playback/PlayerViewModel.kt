@@ -332,15 +332,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val endAt = sleepTimerStore.getEndAt()
         if (endAt != null && endAt > System.currentTimeMillis()) {
             _sleepTimerRemaining.value = endAt - System.currentTimeMillis()
-            sleepTimerJob = viewModelScope.launch {
-                while (true) {
-                    val remaining = endAt - System.currentTimeMillis()
-                    if (remaining <= 0) break
-                    _sleepTimerRemaining.value = remaining
-                    delay(1000)
-                }
-                _sleepTimerRemaining.value = null
-            }
+            startSleepTimerCountdown(endAt)
         }
 
         // Batch 314 — EqualizerController already persists bands/preset/enabled to
@@ -1779,6 +1771,23 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private fun loadFavoriteIds(): ImmutableSet<Long> =
         favoritesStore.getFavorites().mapNotNull { it.toLongOrNull() }.toPersistentSet()
 
+    // Batch 507 (T2) — loop hitung mundur kosmetik yang sebelumnya duplikat di `init` dan
+    // `setSleepTimer`. Isi loop identik dengan versi lama; hanya dipindah ke satu tempat.
+    private fun startSleepTimerCountdown(endAt: Long) {
+        sleepTimerJob = viewModelScope.launch {
+            while (true) {
+                // Dihitung ulang dari endAt - now() tiap tick (bukan sekadar decrement lokal)
+                // supaya angka yang ditampilkan tidak drift dari deadline sungguhan yang
+                // dipegang Service, walau app sempat di-throttle di background.
+                val remaining = endAt - System.currentTimeMillis()
+                if (remaining <= 0) break
+                _sleepTimerRemaining.value = remaining
+                delay(1000)
+            }
+            _sleepTimerRemaining.value = null
+        }
+    }
+
     fun setSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()
         val endAt = System.currentTimeMillis() + minutes * 60_000L
@@ -1798,18 +1807,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // Tapi secara praktis sleep timer cuma bisa dipicu dari UI Now Playing yang mensyaratkan
         // playback sudah berjalan, jadi MediaController.connect() sudah pasti selesai di titik
         // ini.
-        sleepTimerJob = viewModelScope.launch {
-            while (true) {
-                // Dihitung ulang dari endAt - now() tiap tick (bukan sekadar decrement lokal)
-                // supaya angka yang ditampilkan tidak drift dari deadline sungguhan yang
-                // dipegang Service, walau app sempat di-throttle di background.
-                val remaining = endAt - System.currentTimeMillis()
-                if (remaining <= 0) break
-                _sleepTimerRemaining.value = remaining
-                delay(1000)
-            }
-            _sleepTimerRemaining.value = null
-        }
+        startSleepTimerCountdown(endAt)
     }
 
     fun cancelSleepTimer() {
