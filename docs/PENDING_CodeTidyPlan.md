@@ -118,6 +118,11 @@ SettingsScreen ≈951→≈650, LibraryScreen ≈1571→≈1020.
 regression nyata" (rincian CI vs device tidak dirinci; ditafsirkan = T4).
 **Status Wave 2 (Batch 509)**: T5 KODE SELESAI (2 file: `NowPlayingScreen.kt` + baru
 `AdvancedControlsSheet.kt`, 208 baris move-only) — belum diverifikasi CI/device. T6–T10 BELUM.
+**Update Batch 510**: user melaporkan T5 "nol regression (I guess)" — tentatif, rincian CI vs device
+tidak dirinci.
+**Status Wave 2 (Batch 510)**: T6 KODE SELESAI, diturunkan ke **R3** (blok berisi gesture swipe
+horizontal; brightness/volume TIDAK di blok) — 2 file: `NowPlayingScreen.kt` + baru `AlbumArtHero.kt`,
+315 baris move-only byte-identik (hanya `private`→`internal`). Belum diverifikasi CI/device. T7–T10 BELUM.
 Tiap T: 2 file disentuh, diff move-only, CI hijau, lalu device smoke test layar terkait (T10:
 seret tab-bar, tap tab, label tidak ellipsis, font besar, 0 regresi minimize/expand — daftar
 lengkap di `PROJECT_STATE.md` sektor bottom nav).

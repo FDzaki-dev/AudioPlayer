@@ -2413,7 +2413,28 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 509. ZIP: `SONIX_v509.zip`. **2 file source diubah** (`NowPlayingScreen.kt`, + baru
+- Batch terakhir: 510. ZIP: `SONIX_v510.zip`. **2 file source diubah** (`NowPlayingScreen.kt`, + baru
+  `ui/AlbumArtHero.kt`) — Wave 2 `docs/PENDING_CodeTidyPlan.md` T6 (diturunkan ke **R3**: blok berisi gesture
+  swipe horizontal next/previous; brightness/volume BUKAN di blok; move-only byte-identik, perilaku TIDAK
+  berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: Wave 2 pecah file besar, T6 (`AlbumArtHero` -> `AlbumArtHero.kt`) ->
+  Status: KODE SELESAI — 315 baris blok identik (diff programatik, tepat 1 baris beda: `private`->`internal`
+  karena dipanggil `NowPlayingScreen()`); 25 import yatim dihapus dari `NowPlayingScreen.kt`. Hasil T5
+  DILAPORKAN user nol regresi TAPI tentatif ("I guess", Batch 510; rincian CI vs device tidak dirinci) ->
+  BELUM verified. **0 build/test dijalankan** (sandbox tanpa Gradle/Kotlin/jaringan) -> CI BELUM
+  dikonfirmasi untuk T6, device BELUM diuji, JANGAN klaim verified ->
+  Remaining: CI hijau di commit batch ini + device smoke test T6 (swipe kiri/kanan di art = next/prev + haptik,
+  art ikut jari + springback, drag cepat berulang, swipe brightness/volume tetap jalan & tidak bentrok, tampilan
+  hero di tema default/Tactile/Skeu/Calm Retro terang+gelap, layar kecil/font besar/landscape/rotasi); T7–T10
+  BELUM (T10 R3 terakhir, byte-identik); T3 (opsional) BELUM; Wave 3–5 BELUM. **Observasi terbuka (0 kode
+  diubah, penyebab belum diketahui)**: screenshot user sheet "Kontrol Lanjutan" — baris "Edit Info Lagu"
+  terlihat terpotong tepi bawah panel dan "Potong Nada Dering" tergambar di bawah batas panel; belum bisa
+  dibedakan perilaku lama (Batch 314 `frostedGlass()`+`verticalScroll`) vs regresi T5 -> tanya user apakah
+  sama di v508 sebelum menyimpulkan apa pun ->
+  Next Action: tunggu hasil CI + device T6 dari user (+ jawaban soal tampilan sheet v508 vs v509+). Hijau/OK ->
+  lanjut T7 (`SettingsSections.kt`, 1 target per batch); merah/regresi -> kembali ke `SONIX_v509.zip`,
+  hentikan wave.
+- Batch 509 (sebelum 510). ZIP: `SONIX_v509.zip`. **2 file source diubah** (`NowPlayingScreen.kt`, + baru
   `ui/AdvancedControlsSheet.kt`) — Wave 2 `docs/PENDING_CodeTidyPlan.md` T5 (R2, move-only, perilaku
   TIDAK berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
   Task: Wave 2 pecah file besar, T5 (`AdvancedControlsSheet`/`AdvancedControlsSectionHeader`/

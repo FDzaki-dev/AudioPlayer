@@ -1,5 +1,49 @@
 # Changelog
 
+## Batch 510 — Wave 2 T6: `AlbumArtHero` dipindah ke `AlbumArtHero.kt` (R3, move-only, perilaku tidak berubah)
+- Instruksi eksplisit user: "T5 Wave 2 behavior nol regression (I guess). lanjutkan progress milestone!!"
+  + screenshot sheet "Kontrol Lanjutan" (device user). Hasil T5 DILAPORKAN user nol regresi, TAPI
+  tentatif ("I guess"; rincian CI vs device tidak dirinci) → dicatat sebagai laporan user, BUKAN
+  verified. Lanjut ke `docs/PENDING_CodeTidyPlan.md` Wave 2, item berikutnya **T6**. T7–T10 TIDAK
+  dikerjakan (1 batch = 1 target)
+- **Cek prasyarat T6 (gesture/brightness/volume)**: `AlbumArtHero` BERISI gesture — swipe horizontal
+  next/previous (`detectHorizontalDragGestures`, ambang 120px, haptik LongPress, art ikut bergeser
+  ±48dp + springback; Batch 178/256/434). Gesture brightness/volume BUKAN di sini (ada di Box induk
+  `NowPlayingScreen()`; `GestureIndicatorBadge` tetap di file asal). Sesuai rencana → T6 diturunkan
+  ke **R3**: pemindahan wajib byte-identik
+- **T6**: `AlbumArtHero` dipindah dari `NowPlayingScreen.kt` (baris 1715–2029, termasuk KDoc) ke file
+  baru `ui/AlbumArtHero.kt` (paket sama `ui`). Move-only: 315 baris blok identik
+  karakter-per-karakter (diff programatik: tepat 1 baris beda, `private fun`→`internal fun` karena
+  dipanggil `NowPlayingScreen()`, baris 749 di v509 / 724 setelah 25 import dihapus). `AlbumArt` (Utils.kt) sepaket → 0 import. Tidak ada
+  simbol `private` lain dari file asal yang dipakai blok. `NowPlayingScreen.kt` 2029→1688 baris
+- 25 import yang jadi yatim HANYA karena pemindahan dihapus dari `NowPlayingScreen.kt` (nama tak
+  muncul lagi di sisa file, komentar/string pun): `android.net.Uri`, `BorderStroke`, `draw.clip`,
+  `draw.drawBehind`, `graphics.Path`, `graphics.addOutline`, `drawscope.clipRect`,
+  `drawscope.translate`, `unit.Dp`, `calmScanlines`, 5 token `Tactile*`/`Skeu*` gelap+terang
+  (`TactileHighlight/Shadow`, `TactileLightHighlight/Shadow`, `SkeuAmbientOcclusion/Highlight/Shadow/
+  Specular/Emerald`, `SkeuLightEmerald/AmbientOcclusion/Highlight/Shadow/Specular`),
+  `LocalIsDarkTheme`. Import yang masih dipakai di luar blok TETAP. File baru: 50 import eksplisit
+  + 3 wildcard; TIDAK diimpor: `lerp`, `tactileEmboss`, `skeuEmboss`, `Modifier.alpha` (hanya muncul
+  di komentar / argumen bernama / properti `Color.alpha`)
+- **File source disentuh: 2** (`NowPlayingScreen.kt`, `ui/AlbumArtHero.kt` baru). Doc:
+  `FILE_MANIFEST.txt` (199→200), `docs/PENDING_CodeTidyPlan.md` (status), `PROJECT_STATE.md`
+- **Validasi jujur**: cek statis saja (diff move-only; sisa `NowPlayingScreen.kt` = file asli − blok −
+  25 import, dicek programatik; selisih hitungan kurung file asli vs baru = persis blok: `{}` 33/33,
+  `()` 119/119; identifier kapital blok tercakup import/wildcard/paket sama). **0 build/test
+  dijalankan** — sandbox tanpa Gradle/Kotlin/jaringan. **CI BELUM dikonfirmasi, device BELUM diuji**
+  → belum "verified"
+- **Observasi screenshot (0 kode diubah, belum diketahui penyebab)**: di sheet "Kontrol Lanjutan"
+  baris "Edit Info Lagu" terlihat terpotong garis bawah panel, lalu "Potong Nada Dering" tergambar
+  DI BAWAH batas panel. Tidak bisa dipastikan dari gambar statis apakah ini perilaku lama atau
+  regresi T5 (isi sheet T5 move-only identik; modifier `frostedGlass()` + `verticalScroll` berasal dari
+  Batch 314). Perlu dicek user: apakah tampilan sama di v508
+- **Uji device yang dibutuhkan (R3, gesture)**: Now Playing → geser art ke kiri = lagu berikutnya,
+  ke kanan = sebelumnya (haptik saat lolos ambang); art ikut bergeser mengikuti jari lalu springback
+  mulus saat dilepas/dibatalkan; drag cepat berulang & drag baru menyusul sebelum springback selesai;
+  swipe brightness/volume di Box induk tetap jalan (badge tampil) & tidak bentrok dengan swipe
+  horizontal; tampilan hero (glow, bayangan, sudut) di tema default, Tactile, Skeu, Calm Retro
+  (scanline), mode terang & gelap; ukuran art di layar kecil/font besar/landscape; rotasi layar
+
 ## Batch 509 — Wave 2 T5: `AdvancedControlsSheet` dipindah ke `AdvancedControlsSheet.kt` (R2, move-only, perilaku tidak berubah)
 - Instruksi eksplisit user: "wave 2 nol regression nyata. langsung kerjakan next target!!" →
   `docs/PENDING_CodeTidyPlan.md` Wave 2 (R2), item berikutnya **T5**. Hasil T4 DILAPORKAN user nol
