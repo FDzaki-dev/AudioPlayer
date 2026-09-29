@@ -2413,7 +2413,22 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 507. ZIP: `SONIX_v507.zip`. **3 file source diubah** (`LibraryScreen.kt`,
+- Batch terakhir: 508. ZIP: `SONIX_v508.zip`. **2 file source diubah** (`NowPlayingScreen.kt`, + baru
+  `ui/NowPlayingDialogs.kt`) — Wave 2 `docs/PENDING_CodeTidyPlan.md` T4 (R2, move-only, perilaku TIDAK
+  berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: Wave 2 pecah file besar, T4 (`SleepTimerDialog`/`SpeedDialog`/`RatingDialog`/
+  `TransitionModeOption` -> `NowPlayingDialogs.kt`) ->
+  Status: KODE SELESAI — 281 baris blok identik (diff programatik), hanya `private`->`internal` di 3 fungsi
+  yang dipanggil `NowPlayingScreen()`; 2 import yatim (`selectable`, `Role`) dihapus. Wave 1 (T1+T2)
+  DILAPORKAN berhasil oleh user (Batch 508, rincian CI vs device tidak dirinci). **0 build/test
+  dijalankan** (sandbox tanpa Gradle/Kotlin/jaringan) -> CI BELUM dikonfirmasi, device BELUM diuji,
+  JANGAN klaim verified ->
+  Remaining: CI hijau di commit batch ini + device smoke test T4 (Sleep Timer, Pengaturan Putar, Beri
+  Rating); T5–T10 BELUM (T6 periksa dulu gesture/brightness/volume, T10 R3 terakhir); T3 (opsional) BELUM;
+  Wave 3–5 BELUM ->
+  Next Action: tunggu hasil CI + device T4 dari user. Hijau/OK -> lanjut T5 (`AdvancedControlsSheet`,
+  1 target per batch); merah/regresi -> kembali ke `SONIX_v507.zip`, hentikan wave.
+- Batch 507 (sebelum 508). ZIP: `SONIX_v507.zip`. **3 file source diubah** (`LibraryScreen.kt`,
   `PlayerViewModel.kt`, + baru `ui/SharedComponents.kt`) — Wave 1 `docs/PENDING_CodeTidyPlan.md` T1 + T2
   (R1, perilaku TIDAK berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
   Task: Wave 1 perapihan kode (T1 komponen bersama, T2 sleep-timer) ->

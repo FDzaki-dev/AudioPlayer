@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 508 — Wave 2 T4: dialog NowPlaying dipindah ke `NowPlayingDialogs.kt` (R2, move-only, perilaku tidak berubah)
+- Instruksi eksplisit user: "wave 1 sudah berhasil. lanjut ke target milestone selanjutnya" →
+  `docs/PENDING_CodeTidyPlan.md` Wave 2 (R2), item R2 terendah **T4**. Wave 1 dicatat DILAPORKAN
+  berhasil oleh user (rincian CI vs device tidak dirinci user). T5–T10 TIDAK dikerjakan (1 batch = 1 target)
+- **T4**: `SleepTimerDialog`, `SpeedDialog`, `RatingDialog`, `TransitionModeOption` dipindah dari
+  `NowPlayingScreen.kt` (baris 2250–2530) ke file baru `ui/NowPlayingDialogs.kt` (paket sama `ui`).
+  Move-only: 281 baris blok identik karakter-per-karakter (diff programatik); satu-satunya perubahan =
+  `private`→`internal` pada 3 fungsi yang dipanggil `NowPlayingScreen()`. `TransitionModeOption` tetap
+  `private` (hanya dipakai `SpeedDialog` di file yang sama). `NowPlayingScreen.kt` 2530→2246 baris
+- 2 import yang jadi tak terpakai HANYA karena pemindahan dihapus dari `NowPlayingScreen.kt`
+  (`selection.selectable`, `semantics.Role`; 0 pemakaian tersisa). Tidak ada import lain disentuh
+- **File source disentuh: 2** (`NowPlayingScreen.kt`, `ui/NowPlayingDialogs.kt` baru).
+  Doc: `FILE_MANIFEST.txt` (197→198), `docs/PENDING_CodeTidyPlan.md` (status), `PROJECT_STATE.md`
+- **Validasi jujur**: cek statis saja (diff move-only, kurung seimbang: `{}` 239+47=286, `()` 687+117=804
+  = angka file asli, grep pemakai simbol = hanya 3 call site di `NowPlayingScreen.kt`, tak ada nama
+  bentrok di paket `ui`, semua identifier blok tercakup import/wildcard). **0 build/test dijalankan** —
+  sandbox tanpa Gradle/Kotlin/jaringan. **CI BELUM dikonfirmasi, device BELUM diuji** → belum "verified"
+- **Uji device yang dibutuhkan**: Now Playing → Sleep Timer (pilih durasi, hitung mundur tampil, Matikan
+  Timer); Pengaturan Putar (kecepatan, toggle Audiobook, Gapless vs Fade Halus, konten bisa digeser);
+  Beri Rating (tap bintang, tap bintang sama = hapus)
+
 ## Batch 507 — Wave 1 perapihan kode: T1 (komponen bersama) + T2 (sleep-timer) (R1, perilaku tidak berubah)
 - Instruksi eksplisit user: "mulai pengerjaan milestone dari yang low-risk" → `docs/PENDING_CodeTidyPlan.md`
   Wave 1 (semua R1). Dikerjakan **T1 + T2**; **T3 (opsional) TIDAK dikerjakan** — mengubah perilaku

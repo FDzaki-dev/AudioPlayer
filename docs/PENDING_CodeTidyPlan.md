@@ -97,6 +97,8 @@ Status: `BELUM` = belum dikerjakan. Risiko: R1 rendah, R2 sedang, R3 tinggi.
 **Status Wave 1 (Batch 507)**: T1 KODE SELESAI, T2 KODE SELESAI — keduanya belum diverifikasi
 CI/device (0 build dijalankan saat pengerjaan; G2 CI baseline juga belum dikonfirmasi user).
 T3 BELUM (opsional, mengubah perilaku log — tunggu persetujuan terpisah).
+**Update Batch 508**: user melaporkan "wave 1 sudah berhasil" (rincian CI vs device tidak dirinci).
+T3 tetap BELUM.
 
 ### Wave 2 — Pecah file besar, move-only (R2)
 Estimasi kasar pengurangan (bukan janji): NowPlayingScreen ≈2530→≈1730, MainActivity ≈2402→≈1860,
@@ -111,6 +113,8 @@ SettingsScreen ≈951→≈650, LibraryScreen ≈1571→≈1020.
 | T8b | `LibraryHeader`, `LibrarySearchField`, `LibraryFilterChips`, `SearchHistoryView`, `SearchSectionLabel`, `SearchResultsView` → `LibrarySearch.kt` | 745–1044 |
 | T9 | `WelcomeScreen`, `WelcomeHighlight`, `PermissionRationale` → `OnboardingScreens.kt` | 540–677, 2358–2402 |
 | T10 | **(R3, terakhir)** `MagnifyingTabLabel`, `GlassTabIcon`, `NoRippleIndication`, `CustomNavBarTabItem` → `BottomNavBar.kt`. Wajib byte-identik; `AppNavHost` TIDAK dipecah | 678–1033 |
+**Status Wave 2 (Batch 508)**: T4 KODE SELESAI (2 file: `NowPlayingScreen.kt` + baru
+`NowPlayingDialogs.kt`, 281 baris move-only) — belum diverifikasi CI/device. T5–T10 BELUM.
 Tiap T: 2 file disentuh, diff move-only, CI hijau, lalu device smoke test layar terkait (T10:
 seret tab-bar, tap tab, label tidak ellipsis, font besar, 0 regresi minimize/expand — daftar
 lengkap di `PROJECT_STATE.md` sektor bottom nav).
