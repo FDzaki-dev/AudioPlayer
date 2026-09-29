@@ -48,7 +48,10 @@
 # Batch 510: app/src/main/java/com/rudi/audioplayer/ui/AlbumArtHero.kt (file baru, T6 Wave 2
 # docs/PENDING_CodeTidyPlan.md — AlbumArtHero dipindah dari NowPlayingScreen.kt) ditambahkan —
 # 199->200 (198 di ZIP + 2 dotfile .github/.gitignore yang sengaja tidak dikirim).
-# Total: 200 file
+# Batch 511: app/src/main/java/com/rudi/audioplayer/ui/theme/AppHaptics.kt (file baru, haptic terpusat
+# pengganti LocalHapticFeedback bawaan Compose) ditambahkan — 200->201 (199 di ZIP + 2 dotfile
+# .github/.gitignore yang sengaja tidak dikirim).
+# Total: 201 file
 
 .github/workflows/build.yml
 .gitignore
@@ -164,6 +167,7 @@ app/src/main/java/com/rudi/audioplayer/ui/Utils.kt
 app/src/main/java/com/rudi/audioplayer/ui/VaultSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/VisualizerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/adaptive/WindowAdaptive.kt
+app/src/main/java/com/rudi/audioplayer/ui/theme/AppHaptics.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/BlurUtils.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Color.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/IosScrollPhysics.kt

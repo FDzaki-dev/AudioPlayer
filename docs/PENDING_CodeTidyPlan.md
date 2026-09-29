@@ -123,6 +123,10 @@ tidak dirinci.
 **Status Wave 2 (Batch 510)**: T6 KODE SELESAI, diturunkan ke **R3** (blok berisi gesture swipe
 horizontal; brightness/volume TIDAK di blok) — 2 file: `NowPlayingScreen.kt` + baru `AlbumArtHero.kt`,
 315 baris move-only byte-identik (hanya `private`→`internal`). Belum diverifikasi CI/device. T7–T10 BELUM.
+**Update Batch 511**: user melaporkan v510 (T6) — satu-satunya regresi nyata = sektor haptic feedback (sistemik,
+BUKAN akibat pemindahan T6; call site identik v509). Wave 2 DITAHAN; Batch 511 = perbaikan haptic terpusat di luar
+daftar T (3 file: `AppHaptics.kt` baru, `Theme.kt`, `AndroidManifest.xml`). T7 dilanjutkan setelah user
+memutuskan hasil haptic.
 Tiap T: 2 file disentuh, diff move-only, CI hijau, lalu device smoke test layar terkait (T10:
 seret tab-bar, tap tab, label tidak ellipsis, font besar, 0 regresi minimize/expand — daftar
 lengkap di `PROJECT_STATE.md` sektor bottom nav).

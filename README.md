@@ -228,6 +228,7 @@ permukaan kaca lainnya.
 - **Status bar & navigation bar** ikut mode terang/gelap tema aktif (ikon gelap di tema terang, ikon terang di tema gelap/Tactile) — bukan dipaksa satu arah
 - **Shimmer skeleton loading** kini konsisten di Beranda (bentuknya persis kartu asli), bukan cuma spinner generik
 - **Haptic diperluas**: reorder antrean, hapus dari antrean, dan berhasil tambah ke playlist masing-masing punya pola getar berbeda
+- **Haptic terpusat & lebih kuat** (Batch 511): semua getar di app kini lewat satu titik (`ui/theme/AppHaptics.kt`, dipasang di `AudioPlayerTheme`) dan dikirim langsung ke motor getar (permission `VIBRATE`, tanpa dialog) — bukan lagi tick bawaan Compose yang nyaris tak terasa; tingkat "ketuk" vs "kuat" tetap dibedakan
 - **Search dikelompokkan**: hasil pencarian dipisah per Artis / Album / Lagu (bukan satu list rata), plus riwayat pencarian terbaru saat kolom pencarian masih kosong
 - **Transisi Now Playing**: piringan hitam "tumbuh" masuk dengan animasi scale-spring saat layar dibuka, alih-alih muncul instan penuh
 - **Audio focus & "becoming noisy"**: auto-pause saat headset/Bluetooth dicabut, auto-duck saat ada notifikasi/telepon masuk

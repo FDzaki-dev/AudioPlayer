@@ -1,5 +1,55 @@
 # Changelog
 
+## Batch 511 — FIX haptic feedback lemah: haptic terpusat + permission VIBRATE (perilaku SENGAJA berubah)
+- Instruksi eksplisit user: "v510 sudah Saya cek juga dan emang yang benar-benar regression nyata cuma
+  sektor haptic feedback. fokus eksekusi itu sebelum melanjutkan pengerjaan milestone!!" (lanjutan
+  pengingat user: haptic di semua proyek "gak pernah terasa nyata terpasang"). Milestone Wave 2 (T7 dst.)
+  DITAHAN sampai batch ini selesai. Laporan user soal v510 dicatat apa adanya (selain haptic dianggap
+  nol regresi; rincian CI vs device tidak dirinci) — BUKAN verified
+- **Catatan akar masalah (jujur)**: ini BUKAN akibat pemindahan T6 — panggilan haptic di `AlbumArtHero`
+  identik dgn v509 (move-only byte-identik). Kelemahannya sistemik & sudah ada sebelumnya, terlihat dari
+  audit source Batch 510: 75 titik `performHapticFeedback`, semuanya lewat `LocalHapticFeedback` bawaan
+  Compose, cuma 2 jenis (`TextHandleMove` 43x = tick paling halus, `LongPress` 35x), 0 `Vibrator`/
+  `VibrationEffect`, 0 permission `VIBRATE`, 0 helper terpusat. Bawaan Compose -> `View.performHapticFeedback`
+  yang mengikuti toggle "getar sentuh" sistem & kekuatannya bergantung tuning motor tiap HP
+- **Perubahan (3 file: dalam batas 3–5)**:
+  1. BARU `ui/theme/AppHaptics.kt`: `StrongHapticFeedback` (implements `HapticFeedback by platform`) —
+     `LongPress` -> tier KUAT, `TextHandleMove` -> tier KETUK, jenis lain diteruskan ke implementasi
+     bawaan (delegasi). Getaran via `Vibrator.vibrate(VibrationEffect)` dari `VibratorManager.defaultVibrator`.
+     Efek hardware `EFFECT_CLICK`/`EFFECT_HEAVY_CLICK` HANYA kalau `areEffectsSupported` = YES utk keduanya;
+     selain itu `createOneShot` 30ms (ketuk) / 55ms (kuat), amplitudo 255 kalau `hasAmplitudeControl()`
+     (angka = TEBAKAN AWAL, 2 konstanta di file, bukan hasil ukur). `vibrate()` gagal (mis.
+     SecurityException) -> jatuh ke haptic bawaan Compose = perilaku lama. Status mode ditulis SEKALI per
+     proses ke Log Diagnostik (`AppHaptics`, `AppLogger.w` di IO dispatcher, bukan Main)
+  2. `ui/theme/Theme.kt`: 1 import + 1 entri `LocalHapticFeedback provides rememberStrongHapticFeedback()` di
+     `CompositionLocalProvider` `AudioPlayerTheme` (pola sama `LocalOverscrollFactory` Batch 364) -> ke-75 call
+     site otomatis ikut, 0 call site disentuh
+  3. `AndroidManifest.xml`: `uses-permission android.permission.VIBRATE` (permission normal, otomatis
+     diberikan saat install, tanpa dialog; disebut di penawaran user sebelum eksekusi)
+- **Keputusan yang SENGAJA diambil**: jalur getar baru TIDAK mengikuti toggle "getar sentuh" sistem (sesuai
+  permintaan "haptic harus terasa nyata"). Kalau user ingin bisa dimatikan, itu fitur terpisah (mis. toggle di
+  Settings) — TIDAK dibuat batch ini (scope)
+- **Risiko yang diketahui / WAJIB dicek device**: (a) jika Compose foundation masih memakai `TextHandleMove`
+  saat menggeser handle seleksi teks, TextField (pencarian, dll.) bisa ikut bergetar tier ketuk tiap langkah
+  handle — belum diverifikasi; (b) pola beda per aksi (README: reorder/hapus antrean/tambah playlist) tetap
+  dibedakan lewat kombinasi ketuk vs kuat, tapi bunyi/rasanya berubah; (c) angka durasi one-shot & apakah HP
+  user melapor efek hardware YES belum diketahui — lihat baris "Haptic aktif: mode=..." di Settings -> Lanjutan
+  -> Log Diagnostik
+- **File source disentuh: 3** (`ui/theme/AppHaptics.kt` baru, `ui/theme/Theme.kt`, `AndroidManifest.xml`). Doc:
+  `README.md` (1 baris), `FILE_MANIFEST.txt` (200->201), `docs/PENDING_CodeTidyPlan.md` (status), `PROJECT_STATE.md`
+- **Validasi jujur**: cek statis saja (manifest XML well-formed; kurung `AppHaptics.kt` `{}` 18/18 `()` 37/37; semua
+  import terpakai; tak ada nama bentrok di `src/`; delegasi `by platform` sengaja dipilih supaya tetap kompilasi
+  bila interface `HapticFeedback` versi BOM 2026.04.01 punya anggota tambahan). **0 build/test dijalankan** —
+  sandbox tanpa Gradle/Kotlin/jaringan (API dicek dari pengetahuan platform, bukan compiler). **CI BELUM
+  dikonfirmasi, device BELUM diuji** -> belum "verified"
+- **Uji device yang dibutuhkan**: (1) getar terasa saat: play/pause & tombol Now Playing (ketuk), swipe art
+  next/prev lolos ambang (kuat), tekan-tahan/multi-select di Library & Playlist (kuat), reorder/hapus antrean,
+  Pengaturan (ketuk); (2) baca Log Diagnostik: baris "Haptic aktif: mode=hardware-effects" ATAU "one-shot(...)"
+  ATAU pesan gagal; (3) TextField: geser handle seleksi teks, ketik di pencarian — tidak menyiksa; (4) HP dgn
+  "getar sentuh" sistem MATI: haptic app tetap terasa (memang disengaja); (5) 0 crash saat buka Now Playing,
+  Library, Settings, sheet/dialog (semua di bawah `AudioPlayerTheme`); kalau kurang kuat/kebablasan -> kirim
+  rasanya, angka di `AppHaptics.kt` tinggal disetel
+
 ## Batch 510 — Wave 2 T6: `AlbumArtHero` dipindah ke `AlbumArtHero.kt` (R3, move-only, perilaku tidak berubah)
 - Instruksi eksplisit user: "T5 Wave 2 behavior nol regression (I guess). lanjutkan progress milestone!!"
   + screenshot sheet "Kontrol Lanjutan" (device user). Hasil T5 DILAPORKAN user nol regresi, TAPI

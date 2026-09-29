@@ -10,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
@@ -478,9 +479,14 @@ fun AudioPlayerTheme(
     // rubber-band overscroll ala iOS (lihat IosScrollPhysics.kt), tanpa perlu disentuh 1-per-1 —
     // komponen level-tinggi seperti LazyColumn otomatis konsumsi CompositionLocal ini lewat
     // rememberOverscrollEffect() (perilaku resmi Compose Foundation, bukan hack).
+    // Batch 511 — LocalHapticFeedback diganti implementasi terpusat (lihat AppHaptics.kt): satu baris
+    // ini menguatkan SEMUA 75 titik haptic di app tanpa menyentuh call site-nya satu-satu (pola
+    // sama LocalOverscrollFactory di atas). Jenis haptic selain LongPress/TextHandleMove tetap
+    // diteruskan ke implementasi bawaan Compose.
     CompositionLocalProvider(
         LocalIsDarkTheme provides isDark,
         LocalOverscrollFactory provides IosOverscrollFactory,
+        LocalHapticFeedback provides rememberStrongHapticFeedback(),
     ) {
         MaterialTheme(
             colorScheme = colorsFor(identity, isDark),

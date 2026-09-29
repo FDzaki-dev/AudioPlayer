@@ -9,6 +9,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
+    <!-- Batch 511 — haptic terpusat (ui/theme/AppHaptics.kt) memanggil Vibrator.vibrate() langsung
+         supaya getaran terasa nyata; tanpa izin ini vibrate() melempar SecurityException (lalu
+         jatuh ke haptic bawaan Compose yang lemah). Permission NORMAL: otomatis diberikan saat
+         install, TANPA dialog izin. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <!-- Batch 484 — FIX regresi dilaporkan user ("absennya biometrik fingerprint + label di
          Kunci Aplikasi"). Root cause TERKONFIRMASI dari dokumentasi platform (bukan tebakan):
          BiometricManager.canAuthenticate() "Requires android.Manifest.permission#USE_BIOMETRIC"

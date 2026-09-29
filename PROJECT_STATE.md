@@ -2413,7 +2413,27 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 510. ZIP: `SONIX_v510.zip`. **2 file source diubah** (`NowPlayingScreen.kt`, + baru
+- Batch terakhir: 511. ZIP: `SONIX_v511.zip`. **3 file source/target diubah** (`ui/theme/AppHaptics.kt` BARU,
+  `ui/theme/Theme.kt`, `AndroidManifest.xml`) — FIX haptic lemah, perilaku SENGAJA berubah, di luar daftar T
+  (instruksi eksplisit user: haptic dieksekusi DULU sebelum lanjut milestone). **[RESUME POINT: Task -> Status ->
+  Remaining -> Next Action]**:
+  Task: haptic terpusat & lebih kuat (`LocalHapticFeedback` diganti `StrongHapticFeedback` di `AudioPlayerTheme`;
+  `LongPress`->tier kuat, `TextHandleMove`->tier ketuk; `Vibrator.vibrate` langsung; permission `VIBRATE`) ->
+  Status: KODE SELESAI — ke-75 call site TIDAK disentuh; jenis haptic lain didelegasikan ke bawaan Compose;
+  `vibrate()` gagal -> fallback ke bawaan. Laporan user soal v510: selain haptic dianggap nol regresi (tentatif,
+  rincian CI vs device tidak dirinci). Akar masalah = sistemik, BUKAN akibat T6. **0 build/test dijalankan**
+  (sandbox tanpa Gradle/Kotlin/jaringan) -> CI BELUM dikonfirmasi, device BELUM diuji, JANGAN klaim verified ->
+  Remaining: CI hijau di commit batch ini + device: getar terasa (play/pause, swipe art, multi-select, reorder,
+  Settings), baca baris "Haptic aktif: mode=..." di Log Diagnostik, TextField (geser handle seleksi) tidak
+  menyiksa, HP dgn getar sentuh sistem mati tetap terasa, 0 crash. Angka `TAP_ONE_SHOT_MS`/`HEAVY_ONE_SHOT_MS`
+  (30/55ms) = TEBAKAN AWAL -> setel dari laporan rasa user. Toggle haptic di Settings BELUM ada (fitur terpisah,
+  hanya jika user minta). Wave 2 T7–T10 BELUM (T10 R3 terakhir); T3 (opsional) BELUM; Wave 3–5 BELUM.
+  **Observasi terbuka Batch 510 MASIH terbuka**: tampilan sheet "Kontrol Lanjutan" (baris terpotong tepi panel) —
+  belum ada jawaban user apakah sama di v508 ->
+  Next Action: tunggu hasil CI + device haptic dari user. Hijau/OK -> lanjut T7 (`SettingsSections.kt`, 1 target per
+  batch); kurang kuat/kebablasan -> setel 2 konstanta di `AppHaptics.kt`; crash/regresi -> kembali ke
+  `SONIX_v510.zip`, hentikan.
+- Batch 510 (sebelum 511). ZIP: `SONIX_v510.zip`. **2 file source diubah** (`NowPlayingScreen.kt`, + baru
   `ui/AlbumArtHero.kt`) — Wave 2 `docs/PENDING_CodeTidyPlan.md` T6 (diturunkan ke **R3**: blok berisi gesture
   swipe horizontal next/previous; brightness/volume BUKAN di blok; move-only byte-identik, perilaku TIDAK
   berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
