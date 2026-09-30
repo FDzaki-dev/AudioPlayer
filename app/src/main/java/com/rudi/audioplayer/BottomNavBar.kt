@@ -36,11 +36,12 @@ import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.ui.bouncyPress
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 
-// Batch 520 — Wave 2 T10 (MOVE-ONLY, R3): MagnifyingTabLabel/GlassTabIcon/NoRippleIndication/CustomNavBarTabItem dipindah
+// Batch 522 — Wave 2 T10 (MOVE-ONLY, R3; eksekusi ulang — percobaan pertama Batch 520 ditarik Batch 521 karena laporan performa
+// turun, lalu user menduga penyebabnya HP overheat): MagnifyingTabLabel/GlassTabIcon/NoRippleIndication/CustomNavBarTabItem dipindah
 // dari MainActivity.kt (paket sama `com.rudi.audioplayer`, jadi 0 import baru di MainActivity). Badan + komentar identik
 // karakter-per-karakter; satu-satunya beda = `private` -> `internal` pada 2 fungsi yang dipanggil dari AppNavHost
 // (GlassTabIcon, CustomNavBarTabItem). MagnifyingTabLabel (dipakai GlassTabIcon di file ini) dan NoRippleIndication
-// (0 pemakai di seluruh source sejak Batch 449) SENGAJA tetap private. AppNavHost TIDAK dipecah. Lihat CHANGELOG Batch 520.
+// (0 pemakai di seluruh source sejak Batch 449) SENGAJA tetap private. AppNavHost TIDAK dipecah. Lihat CHANGELOG Batch 522.
 
 // Batch 437 — request eksplisit user: label NavigationBarItem bawah (Beranda/Perpustakaan/
 // Pengaturan) diganti dari `Text("Beranda")` polos jadi composable ini — efek "kaca pembesar"

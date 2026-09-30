@@ -73,9 +73,20 @@ konsisten pola project ini soal fitur besar/keputusan arsitektur)
 ## 4. Backlog Device-QA (pointer, bukan duplikat)
 Daftar lengkap per-item (>15 entri individual: overscroll bounce, mini-player drag, bottom-nav
 pill sync, floating bubble landscape-clip, dll) TETAP di `PROJECT_STATE.md` §`[RESUME POINT]`
-dan blockquote atas `README.md` — sengaja tidak disalin ulang di sini (anti-duplikasi/ZERO-FLUFF).
+dan blockquote atas `README.md` (detail Batch <=503 dipindah Batch 523 ke
+`docs/archive/PROJECT_STATE_ARCHIVE.md` § "Arsip Batch 425-503") — sengaja tidak disalin ulang di sini (anti-duplikasi/ZERO-FLUFF).
 Ringkas per sumber:
 - `docs/QA_CHECKLIST_SONIX_v488.md` (aktif): item #4/#5/#7/#8/#9 — murni device-QA, 0 kandidat
   kode.
 - `docs/archive/MANUAL_QA_CHECKLIST.md` (DIPULIHKAN Batch 506, lihat §1): 19 item, 0/19 pernah dicentang.
 - Puluhan item UI/animasi/gesture Batch 433-503 — lihat §2.1, kandidat solusi = Roadmap A.
+
+## 5. Rujukan Komentar Source ke Dokumen yang Sudah Tidak Ada (D3 — pointer saja, Batch 523)
+23 rujukan di 14 file source (grep `app/`, Batch 523) menyebut 3 dokumen `PENDING_*.md` yang SENGAJA dihapus saat topiknya tuntas — bukan dokumen hilang.
+Komentar source TIDAK diedit (scope creep; rujukan = jejak historis). Riwayat lengkap: `grep -n "PENDING_<Nama>" CHANGELOG.md`.
+| Dokumen | Rujukan | Nasib (bukti: `CHANGELOG.md`) |
+|---------|---------|-------------------------------|
+| `PENDING_IosFlingBehavior.md` | 16 | 14/14 layar tuntas, dokumen dihapus — Batch 380 |
+| `PENDING_FixGlobalLagRecomposition.md` | 5 | Opsi A & B tuntas, file dihapus, riwayat dipindah ke PROJECT_STATE/README/changelog — Batch 353 |
+| `PENDING_RatingEntryPoint.md` | 2 | pertanyaan terjawab & dieksekusi, dokumen dihapus — Batch 360 |
+Catatan: `PENDING_CodeTidyPlan.md` (5 rujukan di source) BUKAN yatim — ada di `docs/` dan aktif.

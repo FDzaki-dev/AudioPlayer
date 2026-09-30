@@ -1,6 +1,83 @@
 # Changelog
 
-## Batch 520 — Wave 2 T10 (MOVE-ONLY, R3): `MagnifyingTabLabel`/`GlassTabIcon`/`NoRippleIndication`/`CustomNavBarTabItem` dipindah dari `MainActivity.kt` ke `BottomNavBar.kt` (BELUM verified)
+## Batch 523 — Wave 4 D1+D2+D3 (DOKUMEN SAJA, 0 source): `PROJECT_STATE.md` dipangkas, `FILE_MANIFEST.txt` diselaraskan, pointer rujukan yatim (BELUM verified)
+- Laporan user atas v522: "another zero diff, berikan saya opsi pilihan untuk kesinambungan milestone!!" -> v522 (T10 eksekusi ulang) dianggap nol regresi
+  (rincian CI vs device tidak dirinci); **Wave 2 T4-T10 selesai**. Opsi disodorkan (T11/T12/T13/D1-D3); user memilih **D1/D2/D3**. Jawaban sekunder soal sheet
+  berat (Equalizer/Visualizer) pasca-rotasi = "putuskan sendiri yang paling aman" — hanya relevan bila T11 dipilih kelak
+- **0 file source diubah**: `diff -r app/` vs `SONIX_v522.zip` = IDENTIK. File dokumen disentuh: `PROJECT_STATE.md`, `docs/archive/PROJECT_STATE_ARCHIVE.md`,
+  `FILE_MANIFEST.txt`, `docs/PLANNING.md` (non-VIP, 3 file) + `docs/PENDING_CodeTidyPlan.md`, `CHANGELOG.md` (VIP)
+- **D1 (`PROJECT_STATE.md` 3148 -> 461 baris, 257 -> 44 KB)**: dipindah VERBATIM ke `docs/archive/PROJECT_STATE_ARCHIVE.md` (blok baru "Arsip Batch 425-503" di bagian
+  teratas, urutan descending dijaga): (A) Catatan Batch 503 -> 425 + daftar "belum-terverifikasi saat penutupan" (asli baris 90-2421, 2332 baris), (B) entri
+  `[RESUME POINT]` Batch <=502 (asli baris 2757-3148, 392 baris). Dicek `cmp`: kedua blok byte-identik dengan asalnya; badan arsip lama (Batch 219 ke bawah) utuh
+  byte-identik. TETAP di `PROJECT_STATE.md`: header, Catatan Batch 523-512, aturan sesi aktif, keputusan arsitektur, struktur package, konvensi ZIP, entri
+  `[RESUME POINT]` Batch 523-504 (batas rencana = <=503). Dipertahankan agar tidak hilang: 4 item terbuka warisan (bagian baru "Item terbuka warisan") + 4 pelajaran
+  proses yang masih berlaku (aturan #7). 1 pointer dangling di entri Batch 504 ("lihat Batch 502 di bawah") diarahkan ke arsip. Header "Arsip batch lama (1-424)"
+  DIKOREKSI: arsip TIDAK memuat Batch 220-424 (0 heading di rentang itu; hanya di `CHANGELOG.md`)
+- **D2 (`FILE_MANIFEST.txt`)**: diff manifest vs isi ZIP v522 = 206 path vs 204 file nyata, selisih PERSIS 2 dotfile sengaja (`.github/workflows/build.yml`,
+  `.gitignore`); 0 path hilang, 0 path liar, 0 duplikat. 0 file baru/dihapus -> 206 tetap; catatan verifikasi ditambahkan
+- **D3 (`docs/PLANNING.md` §5 baru + koreksi pointer §4)**: 23 rujukan di 14 file source (rencana menyebut ~17 file — nyata 14) ke 3 dokumen `PENDING_*.md` yatim
+  dicatat sebagai pointer: `PENDING_IosFlingBehavior.md` (16) dihapus Batch 380, `PENDING_FixGlobalLagRecomposition.md` (5) dihapus Batch 353, `PENDING_RatingEntryPoint.md`
+  (2) dihapus Batch 360 — semuanya SENGAJA saat tuntas (bukti di changelog ini). 0 komentar source diedit. §4 PLANNING (pointer ke daftar device-QA) diperbarui ke arsip
+- **NOT VERIFIED** — 0 build/test dijalankan (0 source berubah, CI tidak terdampak); status CI/device T10 (v522) hanya laporan user, tidak diverifikasi di sini.
+  Belum dipilih: T3 (opsional), G2 (CI baseline), Wave 3 (T11-T13), Wave 5 — butuh pilihan eksplisit user
+
+## Batch 522 — Wave 2 T10 (MOVE-ONLY, R3) DIEKSEKUSI ULANG: `MagnifyingTabLabel`/`GlassTabIcon`/`NoRippleIndication`/`CustomNavBarTabItem` dipindah ke `BottomNavBar.kt` (BELUM verified)
+- Laporan user atas v521: "itu mungkin hanya masalah hardware device saya yang over heat. lanjutkan milestone!!" -> regresi performa v520
+  ditafsirkan user sebagai efek suhu HP, BUKAN akibat T10; penahanan T10 (Batch 521) dicabut oleh user. **Dugaan overheat = pernyataan
+  user, TIDAK terverifikasi di sini** (0 data suhu/pengukuran); analisis statis Batch 521 (0 mekanisme performa jelas) tidak berubah
+- **Perubahan (2 file source)**: basis = `SONIX_v521.zip` (`app/` == v519, dicek `diff -r` = IDENTIK). `MainActivity.kt` (2272 -> 1873 baris) + baru
+  `BottomNavBar.kt` (443 baris = 45 baris header package/import/komentar + 398 baris blok pindahan). Paket TETAP `com.rudi.audioplayer`
+  (root), 0 import baru di `MainActivity.kt`, 0 call site diubah, 0 perilaku berubah. `AppNavHost` TIDAK dipecah
+- **Blok pindahan** (asli baris 551-948, kontigu, komentar panjang tiap fungsi ikut utuh): `MagnifyingTabLabel`, `GlassTabIcon`,
+  `NoRippleIndication` (kode mati, 0 pemakai — dipindah apa adanya), `CustomNavBarTabItem`. `TAB_ROUTES` tidak dipakai blok -> tetap
+- **Bukti move-only (byte-identik)**: (1) diff `MainActivity.kt` v521 vs baru = HANYA penghapusan 399 baris (551-949), 0 baris tambah/ubah;
+  (2) rekonstruksi programatik (2 kata `internal` dikembalikan ke `private`) = `MainActivity.kt` v519/v521 asli, IDENTIK 2272 baris (`True`);
+  (3) `MainActivity.kt` hasil ini identik byte-per-byte dengan `MainActivity.kt` v520, dan `BottomNavBar.kt` beda dari v520 HANYA di blok
+  komentar header (Batch 520 -> 522). Beda visibilitas = `private`->`internal` pada `GlassTabIcon` + `CustomNavBarTabItem`
+  (dipanggil `AppNavHost`); `MagnifyingTabLabel` + `NoRippleIndication` tetap `private`
+- Import file baru: 35, 0 tak terpakai (komentar/string diabaikan); blok tak memakai delegasi `by`; 0 wildcard/alias di `MainActivity.kt`.
+  Import lama di `MainActivity.kt` TIDAK disentuh (paling banyak warning IDE)
+- Tidak disentuh: `AppLockStore.kt`, `PlaybackService.kt`, `app/build.gradle.kts`, `FloatingBubbleService.kt`, `AppHaptics.kt`, isi
+  `AppNavHost`, sektor DITUTUP. README tidak diubah
+- **File source disentuh: 2**. Doc: `CHANGELOG.md`, `PROJECT_STATE.md`, `FILE_MANIFEST.txt` (205 -> 206), `docs/PENDING_CodeTidyPlan.md`
+- **Validasi jujur**: cek statis saja — kurung `{}` `MainActivity.kt` 321/321 = 302/302 + 19/19; `()` 597/597 = 547/547 + 50/50 (komentar & string
+  diabaikan). **0 build/test dijalankan** — sandbox tanpa kotlinc/Gradle. **CI BELUM dikonfirmasi, device BELUM diuji**
+- **Uji device v522** (bottom nav, di semua layar tab; R3): daftar SAMA dengan "Uji device v520" (Batch 520): tap tab, drag tab-bar
+  (berhenti TEPAT di tab tujuan), label 0 ellipsis, 0 kilatan/ripple, minimize/expand, font besar, landscape/rotasi. **TAMBAHAN
+  untuk performa**: bandingkan v522 vs v521 di HP yang sama pada suhu yang sama (mis. HP dingin, baru diistirahatkan, tanpa mengisi daya
+  berat) — kalau turun lagi pada kondisi setara, JANGAN lanjut wave lain dan kirim data (layar/gejala, Log Diagnostik)
+
+## Batch 521 — ROLLBACK T10: source `app/` dikembalikan ke v519 (BottomNavBar.kt dihapus) — regresi performa dilaporkan user pada v520 (DIBALIK Batch 522: user menduga HP overheat)
+- **Update Batch 522**: user menduga penurunan performa v520 = "masalah hardware device yang over heat" -> T10 dieksekusi ulang. Penyebab
+  TETAP tidak terverifikasi (dugaan user, belum ada pengukuran v519/v521 vs v520 pada suhu sama); catatan analisis di bawah tetap berlaku
+- Laporan user atas v520: "regression nyata Kali ini cuman performance yang downgrade!!" -> satu-satunya regresi nyata = performa;
+  gejala spesifik (layar mana / startup / scroll / drag tab / seberapa parah) TIDAK dirinci. Sesuai `docs/PENDING_CodeTidyPlan.md` §5.6
+  ("regresi device -> kembali ke ZIP batch sebelumnya, hentikan wave") dan RESUME POINT Batch 520: **T10 dibatalkan, Wave 2 dihentikan**
+- **Perubahan (2 file source, mengembalikan)**: `MainActivity.kt` 1873 -> 2272 baris (= v519 utuh) + `BottomNavBar.kt` DIHAPUS. Dicek
+  programatik: `diff -r` seluruh `app/` vs `SONIX_v519.zip` = IDENTIK (0 beda). Docs saja yang berbeda dari v519
+- **Akar masalah: BELUM diketahui, TIDAK diklaim.** Analisis statis atas diff v519->v520 (hanya 2 file itu; byte-identik selain 2 kata
+  `private`->`internal`) TIDAK menemukan mekanisme performa yang jelas: 0 baseline profile/`profileinstaller`/`*.prof` di proyek (jadi
+  bukan hilangnya profil karena ganti nama class `MainActivityKt`); 0 rujukan nama class file di XML/Gradle/R8 (`proguard-rules.pro`
+  hanya 2 baris komentar); stabilitas Compose lintas-file 1 modul TIDAK berubah (`compose_stability_config.conf` tak disentuh). Yang
+  secara teori berubah cuma tingkat build: (1) `private`->`internal` = fungsi jadi public di bytecode -> Kotlin menambah cek param non-null
+  (`Intrinsics.checkNotNullParameter`) — biayanya nanosekon, terlalu kecil untuk 'downgrade' terlihat; (2) tata letak class/DEX & keputusan
+  inlining R8 berubah (release: `isMinifyEnabled = true` + `proguard-android-optimize.txt`) — efek riil TIDAK terukur di sini. Ini
+  HIPOTESIS, bukan temuan
+- **Faktor pengganggu yang TIDAK bisa disingkirkan dari sini**: tiap instal APK baru mereset kode terkompilasi ART -> beberapa
+  penggunaan awal pakai interpreter/JIT sampai dexopt latar (idle+charging) — tanpa baseline profile, v520 baru-instal bisa terasa lebih
+  lambat dari v519 yang sudah 'hangat' di HP, padahal kodenya setara. Juga variasi suhu/beban HP. Karena itu v521 SENGAJA dipakai
+  sebagai eksperimen pembeda: kodenya = v519
+- **Cara membaca hasil v521** (instal, pakai beberapa saat, idealnya setelah HP sempat idle-charging): (a) performa pulih -> T10 (atau
+  build-nya) memang penyebab -> T10 tetap DITAHAN, tidak diulang tanpa data pengukuran; (b) tetap lambat -> BUKAN T10 (kode = v519) ->
+  cari penyebab lain (instal-baru/'cold', suhu, atau regresi lama) — WAJIB data: layar/gejala, Log Diagnostik, atau perbandingan v519 vs v521
+  di HP yang sama
+- Tidak disentuh: semua source selain 2 file itu; `AppLockStore.kt`, `PlaybackService.kt`, `app/build.gradle.kts`, README (0 fitur berubah)
+- **File source disentuh: 2** (dikembalikan). Doc: `CHANGELOG.md`, `PROJECT_STATE.md`, `FILE_MANIFEST.txt` (206 -> 205), `docs/PENDING_CodeTidyPlan.md`
+- **Validasi jujur**: cek statis — `diff -r app/` == v519 (0 beda), manifest vs tree cocok (205 = 203 di ZIP + 2 dotfile). **0 build/test
+  dijalankan**; CI + device BELUM. Kode = v519 yang sudah dilaporkan "zero diff" oleh user, tapi build v521 tetap harus dikonfirmasi CI
+
+## Batch 520 — Wave 2 T10 (MOVE-ONLY, R3): `MagnifyingTabLabel`/`GlassTabIcon`/`NoRippleIndication`/`CustomNavBarTabItem` dipindah dari `MainActivity.kt` ke `BottomNavBar.kt` (DITARIK KEMBALI Batch 521 — regresi performa dilaporkan user)
+- **STATUS: DITARIK KEMBALI di Batch 521** (`SONIX_v521.zip` = source `app/` v519 utuh). Isi entri di bawah = catatan historis
 - Laporan user atas v519: "another zero diff, lanjut T10!!" -> T9 dianggap nol regresi (rincian CI vs device tidak dirinci; jalur
   onboarding diuji atau tidak, tidak dinyatakan); milestone berikutnya = T10 (Next Action Batch 519 + `docs/PENDING_CodeTidyPlan.md`).
   Tidak ada ZIP baru diunggah — basis = `SONIX_v519.zip` hasil Batch 519 (dicek identik dengan work tree sebelum mulai)

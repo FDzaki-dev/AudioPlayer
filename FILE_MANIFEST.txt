@@ -71,6 +71,16 @@
 # docs/PENDING_CodeTidyPlan.md — MagnifyingTabLabel/GlassTabIcon/NoRippleIndication/CustomNavBarTabItem
 # dipindah dari MainActivity.kt; paket root `com.rudi.audioplayer`) ditambahkan — 205->206 (204 di ZIP + 2
 # dotfile .github/.gitignore yang sengaja tidak dikirim).
+# Batch 521: app/src/main/java/com/rudi/audioplayer/BottomNavBar.kt DIHAPUS (rollback T10 —
+# regresi performa dilaporkan user pada v520; source app/ = v519) — 206->205 (203 di ZIP + 2 dotfile
+# .github/.gitignore yang sengaja tidak dikirim).
+# Batch 522: app/src/main/java/com/rudi/audioplayer/BottomNavBar.kt ditambahkan lagi (T10 dieksekusi ulang
+# setelah rollback Batch 521; paket root) — 205->206 (204 di ZIP + 2 dotfile .github/.gitignore yang
+# sengaja tidak dikirim).
+# Batch 523: 0 file baru/dihapus (dokumen saja) — 206 tetap. VERIFIKASI INTEGRITAS (diff manifest vs isi ZIP v522, pola Batch 390/504): 206 path manifest
+# vs 204 file nyata di ZIP; selisih PERSIS 2 dotfile (.github/workflows/build.yml, .gitignore) yang sengaja tidak dikirim di ZIP (lihat catatan Batch 390) —
+# 0 path hilang, 0 path liar di ZIP, 0 duplikat. Path sama, ISI berubah di 4 dokumen: PROJECT_STATE.md, docs/archive/PROJECT_STATE_ARCHIVE.md,
+# docs/PLANNING.md, docs/PENDING_CodeTidyPlan.md.
 # Total: 206 file
 
 .github/workflows/build.yml

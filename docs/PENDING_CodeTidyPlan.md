@@ -153,6 +153,19 @@ CI/device (0 build dijalankan). T10 BELUM (R3, terakhir).
 `MagnifyingTabLabel` + `NoRippleIndication` tetap private; `NoRippleIndication` = kode mati, 0 pemakai). `AppNavHost` TIDAK dipecah.
 Blok nyata = 551-948 (nomor tabel di atas sudah bergeser). Belum diverifikasi CI/device (0 build dijalankan). **Semua T4-T10 Wave 2
 KODE SELESAI**; sisa Wave 2 = verifikasi CI/device T10. Belum diarsipkan: Wave 3-5, T3, G2 masih BELUM.
+**Update Batch 521**: user melaporkan v520 (T10) "regression nyata ... cuman performance yang downgrade" (gejala tidak dirinci) ->
+**T10 DITARIK KEMBALI**, source `app/` = v519 utuh (`BottomNavBar.kt` dihapus), **Wave 2 DIHENTIKAN** (plan §5.6). Akar masalah BELUM
+diketahui (analisis statis: 0 mekanisme jelas; kandidat: dampak build R8/DEX, atau efek instal-baru tanpa baseline profile — HIPOTESIS).
+v521 = eksperimen pembeda (kode = v519). **Status akhir Wave 2: T4-T9 KODE SELESAI; T10 DIBATALKAN/DITAHAN** — tidak diulang tanpa
+data pengukuran performa. Konsekuensi: blok bottom nav tetap di `MainActivity.kt` (AppNavHost + 4 simbol), tidak ada pemecahan lagi.
+**Update Batch 522**: user atas v521: performa turun v520 "mungkin hanya ... hardware device saya yang over heat" (dugaan user, tidak
+terverifikasi) -> penahanan T10 DICABUT, **T10 dieksekusi ulang**. **Status Wave 2 (Batch 522)**: T10 KODE SELESAI (R3, eksekusi ke-2) — 2 file:
+`MainActivity.kt` (2272->1873 baris) + baru `BottomNavBar.kt` (paket ROOT), 398 baris move-only byte-identik (hanya `private`->`internal`
+pada `GlassTabIcon` + `CustomNavBarTabItem`; hasil `MainActivity.kt` identik dengan v520). `AppNavHost` TIDAK dipecah. Belum diverifikasi
+CI/device (0 build dijalankan). **Semua T4-T10 Wave 2 KODE SELESAI**; sisa Wave 2 = verifikasi CI/device T10 (+ bandingkan performa pada suhu
+setara). Wave 3-5, T3, G2 BELUM.
+**Update Batch 523**: user melaporkan v522 "another zero diff" (rincian CI vs device tidak dirinci) -> T10 dianggap nol regresi; **Wave 2 T4-T10 SELESAI**.
+Verifikasi CI/device rinci T10 tetap di tangan user (G2 belum). User memilih Wave 4 D1-D3 (bukan Wave 3) -> dikerjakan Batch 523 (dokumen saja, 0 source).
 Tiap T: 2 file disentuh, diff move-only, CI hijau, lalu device smoke test layar terkait (T10:
 seret tab-bar, tap tab, label tidak ellipsis, font besar, 0 regresi minimize/expand — daftar
 lengkap di `PROJECT_STATE.md` sektor bottom nav).
@@ -164,12 +177,12 @@ lengkap di `PROJECT_STATE.md` sektor bottom nav).
 | T12 | Audit IME/insets di 9 file TextField (§1.5) — **baca saja dulu**, perbaikan hanya jika terbukti bermasalah | Uji keyboard terbuka + font scale besar + landscape |
 | T13 | Bandingkan semantik `parseLRC` vs `LyricsParser` (format timestamp, multi-timestamp, offset); gabung HANYA jika identik, kalau beda dokumentasikan & biarkan | Analisis dulu, 0 kode sampai hasilnya jelas |
 
-### Wave 4 — Dokumen (G1 SELESAI Batch 506; tetap butuh pilihan user, tidak jalan otomatis)
+### Wave 4 — Dokumen (G1 SELESAI Batch 506; **D1-D3 SELESAI Batch 523**; tetap butuh pilihan user, tidak jalan otomatis)
 | ID | Item | Catatan |
 |----|------|---------|
-| D1 | Pangkas `PROJECT_STATE.md` ke rule aktif; pindahkan detail batch ≤503 ke `docs/archive/PROJECT_STATE_ARCHIVE.md` | Arsip asli sudah dipulihkan (Batch 506) — TAMBAHKAN ke file itu, jangan timpa |
-| D2 | Selaraskan `FILE_MANIFEST.txt` dengan isi ZIP nyata tiap batch | Catat file baru + selisih hitungan |
-| D3 | Rujukan komentar ke `PENDING_*.md` yatim (§1.7): cukup catat pointer di README/PLANNING — jangan edit 23 komentar di ~17 file (scope creep) | |
+| D1 | Pangkas `PROJECT_STATE.md` ke rule aktif; pindahkan detail batch ≤503 ke `docs/archive/PROJECT_STATE_ARCHIVE.md` | Arsip asli sudah dipulihkan (Batch 506) — TAMBAHKAN ke file itu, jangan timpa — **SELESAI Batch 523**: Catatan Batch 425-503 + entri RESUME <=502 dipindah VERBATIM (byte-identik, dicek `cmp`); `PROJECT_STATE.md` 3148 -> 461 baris; batch 504-522 tetap; arsip lama utuh. Batch 220-424 tidak ada di arsip (hanya `CHANGELOG.md`) |
+| D2 | Selaraskan `FILE_MANIFEST.txt` dengan isi ZIP nyata tiap batch | Catat file baru + selisih hitungan — **SELESAI Batch 523**: 206 path = 204 file ZIP + 2 dotfile sengaja, 0 drift |
+| D3 | Rujukan komentar ke `PENDING_*.md` yatim (§1.7): cukup catat pointer di README/PLANNING — jangan edit 23 komentar di ~17 file (scope creep) | **SELESAI Batch 523**: pointer di `docs/PLANNING.md` §5; nyata 23 rujukan di 14 file (bukan ~17), 0 komentar diedit |
 
 ### Wave 5 — Opsional & berisiko tinggi (R3, HANYA dengan instruksi eksplisit)
 Pecah badan `NowPlayingScreen()` / `AppNavHost()` menjadi sub-composable. Menyentuh closure
