@@ -1,5 +1,41 @@
 # Changelog
 
+## Batch 516 — FIX v515: prompt sidik jari tidak lagi muncul berulang + gesture pilih-lagu (scroll dimatikan saat sweep, refresh otomatis tanpa shimmer) (BELUM verified)
+- Laporan user atas v515: "semua aman terkendali, except: (1) tab biometric fingerprint yang maksa nampilin dialog berkali-kali,
+  sedangkan bagaimana dengan user yang mau buka via PIN; (2) fitur drag to select music yang gak ikut jari dan malah scrolling
+  normal, kalau belum benar-benar di press lalu muncul effect Shimmer". Catatan: "aman terkendali" = penilaian user atas
+  v515/T7 (Settings); rincian CI vs device tidak dirinci. Batch ini BUKAN lanjutan T8a (Wave 2 ditahan 1 batch untuk 2 bug ini)
+- **Bug 1 — root cause (pembacaan kode, keyakinan tinggi)**: `LaunchedEffect(needsUnlock, biometricEnabled, hasWindowFocus)` di
+  `MainActivity.kt` memicu `showBiometricPrompt()` tiap kali `hasWindowFocus` true. BiometricPrompt mengambil fokus jendela saat
+  tampil dan mengembalikannya saat ditutup (tombol "Pakai PIN", tap luar, back) -> false->true -> effect jalan ULANG -> dialog
+  muncul lagi. Fix: penanda `biometricAutoPrompted` (plain `var`, bukan state) — auto-prompt HANYA 1x per sesi kunci, di-reset di
+  `onStop()` (app benar-benar ditinggalkan = sesi kunci baru). Tombol "Sidik Jari" manual di `LockScreen` TIDAK berubah (retry
+  kapan saja). Perilaku SENGAJA berubah: setelah dialog ditutup, prompt tidak muncul sendiri lagi sampai app ditinggalkan+dibuka
+- **Bug 2a — Shimmer (mekanisme terbukti dari kode; PEMICU persisnya BELUM)**: `ContentObserver` MediaStore audio
+  (`PlayerViewModel.registerLibraryContentObserver`) memanggil `refreshLibrary()` NON-silent -> `_libraryLoading=true` ->
+  `LibraryScreen` `when { loading -> ShimmerList() }` mengganti SELURUH daftar lagu -> `SongListView` hilang dari composition,
+  gesture sweep yang sedang jalan ikut putus. Jalur ini luput dari Batch 488 (yang menambah `silent` utk revalidasi background).
+  Fix: `refreshLibrary(silent = _librarySongs.value.isNotEmpty())` — list sudah berisi -> data lama tetap tampil; kosong -> perilaku
+  lama. Yang TIDAK bisa dibuktikan dari kode: apa yang memicu perubahan MediaStore persis saat user menyentuh list
+- **Bug 2b — "gak ikut jari, malah scroll" (DUGAAN, BELUM terbukti)**: setelah long-press, scroll bawaan `LazyColumn` dan detektor
+  `detectDragGesturesAfterLongPress` berebut gerakan jari yang sama. Fix defensif: `userScrollEnabled = sweepAnchorIndex == null`
+  di `SongListView` — scroll user dimatikan hanya selama sweep aktif (onDragStart sampai onDragEnd/onDragCancel). Scroll normal
+  (geser tanpa long-press) tidak berubah. Batasan jujur: kalau penyebab sebenarnya lain (mis. long-press tidak terkenali sama sekali),
+  fix ini tidak menolong — jangan ulangi tebakan; langkah berikutnya = instrumentasi (pola Batch 463), bukan fix ke-3 tanpa data.
+  Catatan: `AppLogger` menulis file sinkron di thread pemanggil, jadi TIDAK dipasang di callback gesture (guard Thread Safety)
+- **File source disentuh: 3** — `MainActivity.kt`, `playback/PlayerViewModel.kt` (1 baris logika), `ui/LibraryScreen.kt` (1 parameter).
+  Tidak disentuh: `AppLockStore.kt`, `LockScreen.kt`, `SongPickerSheet.kt` (detektor sweep serupa — BELUM dicek apakah bergejala
+  sama; laporan user tidak menyebut layar), `PlaybackService.kt`, `app/build.gradle.kts`, `FloatingBubbleService.kt`. README tidak
+  diubah (tidak ada baris yang menyebut perilaku prompt otomatis)
+- **Validasi jujur**: cek statis saja — anchor edit unik (1 kecocokan tiap titik), diff hanya baris yang dimaksud, kurung `{}`
+  341/341 + 247/247 + 340/340 (sama dgn v515), `()` seimbang di 3 file. **0 build/test dijalankan** — sandbox tanpa
+  kotlinc/Gradle. **CI BELUM dikonfirmasi, device BELUM diuji**
+- **Uji device v516**: (1) kunci app + biometrik aktif: buka app -> prompt muncul 1x -> tekan "Pakai PIN" -> prompt TIDAK muncul
+  lagi, keypad PIN bisa dipakai sampai selesai; tombol "Sidik Jari" manual masih memunculkan prompt; keluar app lalu buka lagi ->
+  prompt 1x lagi; (2) tab Lagu: tekan-tahan 1 lagu lalu geser -> pilihan MENGIKUTI jari, list tidak ikut ter-scroll; lepas jari ->
+  scroll normal jalan lagi; (3) geser cepat tanpa tahan tetap scroll biasa; (4) tidak ada kedipan Shimmer di atas list yang sudah
+  tampil; kalau masih muncul, catat kapan persisnya (habis apa) + ekspor Log Diagnostik
+
 ## Batch 515 — Wave 2 T7 (MOVE-ONLY): `ThemeModeToggleSection`/`ThemeOptionCard`/`AppLockSection`/`SetPinDialog` dipindah dari `SettingsScreen.kt` ke `SettingsSections.kt` (BELUM verified)
 - Laporan user: "haptic feedback udah bagus, lanjut kerjakan milestone yang tertunda" -> penahanan Wave 2 (sejak Batch 511)
   dicabut; milestone tertunda = T7 (Next Action Batch 514 + `docs/PENDING_CodeTidyPlan.md`). Catatan: "udah bagus" = penilaian

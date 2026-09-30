@@ -231,6 +231,16 @@ class MainActivity : FragmentActivity() {
     // Gating the auto-trigger on real window focus is what makes it reliably pop up on its own.
     private var hasWindowFocus by mutableStateOf(false)
 
+    // Batch 516 [laporan user v515: "tab biometric fingerprint yang maksa nampilin dialog berkali-kali,
+    // bagaimana dengan user yang mau buka via PIN"] — root cause (pembacaan kode): LaunchedEffect
+    // auto-prompt di bawah di-key ke `hasWindowFocus`. BiometricPrompt sendiri MENGAMBIL fokus jendela
+    // saat tampil dan MENGEMBALIKANNYA saat ditutup (tombol "Pakai PIN", tap luar, back) -> hasWindowFocus
+    // false->true -> effect jalan ULANG -> dialog muncul lagi, tiap kali ditutup. User yang memilih PIN
+    // tidak pernah bisa menyentuh keypad dengan tenang. Penanda ini membuat auto-prompt HANYA 1x per sesi
+    // kunci; di-reset di onStop() (saat app benar-benar ditinggalkan = sesi kunci baru). Tombol "Sidik
+    // Jari" manual di LockScreen tetap bisa dipakai kapan saja untuk memanggil prompt lagi.
+    private var biometricAutoPrompted = false
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         hasWindowFocus = hasFocus
@@ -239,6 +249,7 @@ class MainActivity : FragmentActivity() {
     override fun onStop() {
         super.onStop()
         isUnlocked = false
+        biometricAutoPrompted = false
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -367,7 +378,8 @@ class MainActivity : FragmentActivity() {
                 val needsUnlock = lockEnabled && !isUnlocked
 
                 LaunchedEffect(needsUnlock, biometricEnabled, hasWindowFocus) {
-                    if (needsUnlock && biometricEnabled && hasWindowFocus && isBiometricAvailable()) {
+                    if (needsUnlock && biometricEnabled && hasWindowFocus && !biometricAutoPrompted && isBiometricAvailable()) {
+                        biometricAutoPrompted = true
                         showBiometricPrompt { isUnlocked = true }
                     }
                 }

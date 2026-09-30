@@ -1156,7 +1156,15 @@ private fun SongListView(
         // IosScrollPhysics.kt). Rubber-band overscroll-nya sendiri sudah otomatis app-wide lewat
         // LocalOverscrollFactory (Theme.kt), tidak perlu disentuh di sini. Layar ini duluan krn
         // paling sering di-scroll user (daftar lagu utama) — sisanya di PENDING_IosFlingBehavior.md.
-        flingBehavior = rememberIosFlingBehavior()
+        flingBehavior = rememberIosFlingBehavior(),
+        // Batch 516 [laporan user v515: "drag to select ... gak ikut jari dan malah scrolling normal"] —
+        // scroll bawaan LazyColumn dan detektor sweep di atas berebut gerakan jari yang SAMA setelah
+        // long-press; kalau scroll yang menang, jari "menyeret list", bukan menyapu pilihan. Selama sweep
+        // aktif (`sweepAnchorIndex` != null: dari onDragStart sampai onDragEnd/onDragCancel), scroll user
+        // dimatikan supaya gerakan jari cuma dibaca detektor sweep. DUGAAN penyebab (dari pembacaan kode,
+        // BELUM dibuktikan di device) — lihat CHANGELOG Batch 516. Scroll normal (geser cepat tanpa
+        // long-press) tidak tersentuh: `sweepAnchorIndex` baru terisi SETELAH long-press terkonfirmasi.
+        userScrollEnabled = sweepAnchorIndex == null
     ) {
         itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
             // Batch 78 — fix: rowBoundsInRoot only ever got entries WRITTEN (onGloballyPositioned),

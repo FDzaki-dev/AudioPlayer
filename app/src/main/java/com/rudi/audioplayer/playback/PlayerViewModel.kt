@@ -772,7 +772,15 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 libraryAutoRefreshJob?.cancel()
                 libraryAutoRefreshJob = viewModelScope.launch {
                     delay(1500)
-                    refreshLibrary()
+                    // Batch 516 [laporan user v515: gesture pilih-lagu "gak ikut jari" + "muncul effect
+                    // Shimmer"] — refresh OTOMATIS ini dulu selalu `refreshLibrary()` non-silent, jadi tiap
+                    // perubahan MediaStore audio (yang tidak dipicu user) menyalakan `_libraryLoading` dan
+                    // `LibraryScreen` mengganti SELURUH daftar lagu dgn ShimmerList — daftar yang sedang
+                    // disentuh/di-sweep hilang dari composition dan gesture-nya putus. Persis alasan Batch 488
+                    // membuat parameter `silent` utk revalidasi background; jalur ini luput. Kalau list SUDAH
+                    // berisi -> silent (data lama tetap tampil, diganti diam-diam saat scan selesai); kalau
+                    // masih kosong -> perilaku lama (shimmer sah, belum ada yang bisa ditampilkan).
+                    refreshLibrary(silent = _librarySongs.value.isNotEmpty())
                 }
             }
         }

@@ -12,6 +12,13 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 516 [user atas v515: "semua aman terkendali, except" 2 bug]**: T7 (Settings) dinilai aman (tentatif). **3 file source**:
+(1) prompt sidik jari otomatis muncul berulang (`MainActivity.kt`, `LaunchedEffect` di-key `hasWindowFocus` yg ikut toggle saat dialog
+ditutup) -> penanda `biometricAutoPrompted`, 1x per sesi kunci, reset di `onStop()`; (2a) shimmer = refresh otomatis `ContentObserver`
+non-silent menutup list (`PlayerViewModel.kt`) -> `silent` bila list sudah berisi; (2b) sweep-select "gak ikut jari" =
+`userScrollEnabled = sweepAnchorIndex == null` di `SongListView` (`LibraryScreen.kt`) — **DUGAAN, belum terbukti**. **NOT VERIFIED** — 0
+build/test; CI + device BELUM. Detail: `CHANGELOG.md` Batch 516.
+
 **Catatan Batch 515 [user: "haptic feedback udah bagus, lanjut kerjakan milestone yang tertunda"]**: Haptic dianggap beres user ->
 penahanan Wave 2 dicabut; milestone tertunda = T7. **2 file source** (`SettingsScreen.kt` 951->642 baris + baru
 `SettingsSections.kt`): `ThemeModeToggleSection`/`ThemeOptionCard`/`AppLockSection`/`SetPinDialog` dipindah MOVE-ONLY (diff = 4
@@ -2443,7 +2450,21 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 515. ZIP: `SONIX_v515.zip`. **2 file source diubah** (`ui/SettingsScreen.kt`, + baru `ui/SettingsSections.kt`) — Wave 2
+- Batch terakhir: 516. ZIP: `SONIX_v516.zip`. **3 file source diubah** (`MainActivity.kt`, `playback/PlayerViewModel.kt`,
+  `ui/LibraryScreen.kt`) — fix 2 bug laporan user atas v515 (perilaku SENGAJA berubah: prompt biometrik otomatis 1x per sesi kunci;
+  refresh otomatis MediaStore tanpa shimmer bila list sudah berisi; scroll list mati selama sweep-select).
+  **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: user "v515 aman terkendali, except" (1) prompt sidik jari berulang, (2) drag-select tidak ikut jari + shimmer ->
+  Status: KODE SELESAI. Bug 1 root cause dari kode (keyakinan tinggi); Bug 2a mekanisme terbukti dari kode tapi pemicu
+  perubahan MediaStore BELUM; Bug 2b DUGAAN. **0 build/test dijalankan** -> CI BELUM dikonfirmasi, device BELUM diuji, JANGAN klaim
+  verified ->
+  Remaining: CI hijau di commit batch ini + device (daftar "Uji device v516" di `CHANGELOG.md` Batch 516). `SongPickerSheet.kt`
+  punya detektor sweep serupa — BELUM dicek/disentuh. T8a/T8b/T9/T10 BELUM; T3 (opsional) + G2 (CI baseline) masih BELUM ->
+  Next Action: tunggu hasil CI/device user. Prompt biometrik beres -> selesai. Sweep masih tidak ikut jari -> JANGAN fix ke-3 dari
+  tebakan: minta user sebut layar persis (tab Lagu / Favorit / sheet pilih lagu) lalu pasang instrumentasi (pola Batch 463, tidak
+  lewat `AppLogger` di thread Main). Semua beres -> lanjut T8a (`LibraryLists.kt`, 1 target/batch); crash/regresi -> kembali ke
+  `SONIX_v515.zip`. T10 = R3, dikerjakan terakhir.
+- Batch 515 (sebelum 516). ZIP: `SONIX_v515.zip`. **2 file source diubah** (`ui/SettingsScreen.kt`, + baru `ui/SettingsSections.kt`) — Wave 2
   T7 move-only (0 perilaku berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
   Task: user "haptic feedback udah bagus, lanjut milestone yang tertunda" -> T7 Wave 2 ->
   Status: KODE SELESAI — 4 composable dipindah, diff 4 baris `private`->`internal`. **0 build/test dijalankan** -> CI BELUM
