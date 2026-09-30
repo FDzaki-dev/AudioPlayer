@@ -92,13 +92,15 @@ Status: `BELUM` = belum dikerjakan. Risiko: R1 rendah, R2 sedang, R3 tinggi.
 |----|------|------|----------|
 | T1 | Pindah `EmptyState`/`ShimmerBrush`/`ShimmerRow`/`ShimmerList` ke `ui/SharedComponents.kt` (paket sama → 0 ubah import di paket `ui`; cek `ui/theme/TactileDepth.kt` yang paketnya beda) | `LibraryScreen.kt` + baru | CI compile; buka Library kosong/loading + 2 layar lain pemakai |
 | T2 | Ekstrak helper privat `startSleepTimerCountdown(endAt)` menggantikan 2 loop identik | `PlayerViewModel.kt` | CI; set timer → hitung mundur → batal; restart app saat timer aktif → hitungan pulih |
-| T3 | (Opsional) arahkan 3 `Log.w` ke `AppLogger` — perhatian: kegagalan yang tadinya senyap kini masuk log diagnostik | `PlaybackStateStore.kt`, `LibraryCacheStore.kt` | CI; Log Diagnostik tidak banjir saat start normal |
+| T3 | (Opsional) arahkan 3 `Log.w` ke `AppLogger` — perhatian: kegagalan yang tadinya senyap kini masuk log diagnostik | `PlaybackStateStore.kt`, `LibraryCacheStore.kt` | CI; Log Diagnostik tidak banjir saat start normal — **KODE SELESAI Batch 524** (pakai `AppLogger.e` agar stack trace terjaga; belum diverifikasi CI/device) |
 
 **Status Wave 1 (Batch 507)**: T1 KODE SELESAI, T2 KODE SELESAI — keduanya belum diverifikasi
 CI/device (0 build dijalankan saat pengerjaan; G2 CI baseline juga belum dikonfirmasi user).
 T3 BELUM (opsional, mengubah perilaku log — tunggu persetujuan terpisah).
 **Update Batch 508**: user melaporkan "wave 1 sudah berhasil" (rincian CI vs device tidak dirinci).
 T3 tetap BELUM.
+**Update Batch 524**: user minta "next kandidat low-risk" -> **T3 KODE SELESAI** (2 file: `PlaybackStateStore.kt`, `LibraryCacheStore.kt`; `AppLogger.e` dipilih
+karena `AppLogger.w` tanpa Throwable). Belum diverifikasi CI/device (0 build dijalankan). **Wave 1 T1-T3 semuanya KODE SELESAI.**
 
 ### Wave 2 — Pecah file besar, move-only (R2)
 Estimasi kasar pengurangan (bukan janji): NowPlayingScreen ≈2530→≈1730, MainActivity ≈2402→≈1860,

@@ -1,5 +1,20 @@
 # Changelog
 
+## Batch 524 — Wave 1 T3 (R1): 3 `Log.w` di `PlaybackStateStore.kt` + `LibraryCacheStore.kt` diarahkan ke `AppLogger.e` (BELUM verified)
+- Instruksi user atas v523: "fokus kerjakan next kandidat low-risk!!" -> satu-satunya sisa kandidat R1 = T3 (T11 = R2-R3 ubah perilaku rotasi; T12/T13 bukan
+  perubahan kode; Wave 5 = R3 + prasyarat Compose UI Test belum ada). T3 dulu "tunggu persetujuan terpisah" -> dianggap disetujui lewat instruksi ini.
+- **2 file source diubah**: `data/PlaybackStateStore.kt` (1 call) + `data/LibraryCacheStore.kt` (2 call). Tiap call `Log.w(TAG, msg, e)` -> `AppLogger.e(TAG, msg, e)`; `import android.util.Log`
+  -> `import com.rudi.audioplayer.util.AppLogger` (0 `Log.` tersisa di kedua file, dicek `grep`). Pesan/TAG/alur `catch` + `return null` TIDAK berubah. `AppLogger.kt` TIDAK disentuh.
+- **Kenapa `.e` bukan `.w`**: `AppLogger.w(tag, message)` TIDAK punya parameter `Throwable` -> memakainya membuang stack trace (kehilangan info dibanding `Log.w(..., e)` lama).
+  `AppLogger.e(tag, msg, throwable)` menjaga stack trace di logcat + `diagnostic_log.txt`. Konsekuensi: entri berlabel ERROR (bukan WARN) — sesuai pola codebase
+  (31 pemakaian `.e` untuk exception tertangkap-tertelan). Kalau user lebih suka WARN: perlu tambah parameter opsional `throwable` di `AppLogger.w` (file ke-3, tidak dilakukan).
+- **Perubahan perilaku (disengaja, sesuai catatan T3)**: kegagalan yang tadinya hanya di logcat kini juga tertulis ke Log Diagnostik (Settings > Lanjutan). Hanya di jalur `catch`;
+  jalur normal (cache belum ada, skema beda, state kosong) `return null` tanpa exception -> tidak ikut log (analisis kode, BELUM diuji device). `AppLogger.appendEntry` no-op aman
+  bila logger belum init. Thread pemanggil `load()`/`save()` TIDAK diubah; sektor Thread Safety tetap DITUTUP.
+- **Validasi**: diff dibaca (hanya baris import + 3 call); simbol `AppLogger.e` ada (`object` di paket `util`). **0 build/test dijalankan** (sandbox tanpa Gradle) -> CI BELUM, device BELUM.
+  Uji device: buka app dingin 2-3x lalu cek Settings > Lanjutan > Log Diagnostik — tidak boleh ada entri ERROR baru "Gagal load/simpan ..." pada start normal.
+- Rollback bila CI merah/log banjir: kembali ke `SONIX_v523.zip`. Dokumen disentuh: `PROJECT_STATE.md`, `docs/PENDING_CodeTidyPlan.md`, `CHANGELOG.md`. `FILE_MANIFEST.txt` tidak berubah (0 file baru).
+
 ## Batch 523 — Wave 4 D1+D2+D3 (DOKUMEN SAJA, 0 source): `PROJECT_STATE.md` dipangkas, `FILE_MANIFEST.txt` diselaraskan, pointer rujukan yatim (BELUM verified)
 - Laporan user atas v522: "another zero diff, berikan saya opsi pilihan untuk kesinambungan milestone!!" -> v522 (T10 eksekusi ulang) dianggap nol regresi
   (rincian CI vs device tidak dirinci); **Wave 2 T4-T10 selesai**. Opsi disodorkan (T11/T12/T13/D1-D3); user memilih **D1/D2/D3**. Jawaban sekunder soal sheet

@@ -2,7 +2,7 @@ package com.rudi.audioplayer.data
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
+import com.rudi.audioplayer.util.AppLogger
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -79,7 +79,7 @@ class LibraryCacheStore(context: Context) {
             // Gagal simpan cache TIDAK BOLEH menjegal/meng-crash scan asli yang sudah sukses
             // memanggil ini — cold start berikutnya cuma jatuh balik ke "0 cache", 0 regresi
             // lain, murni kehilangan win kecepatan untuk 1 sesi berikutnya.
-            Log.w(TAG, "Gagal simpan cache library, diabaikan", e)
+            AppLogger.e(TAG, "Gagal simpan cache library, diabaikan", e)
         }
     }
 
@@ -124,7 +124,7 @@ class LibraryCacheStore(context: Context) {
             // Cache korup/tidak kompatibel TIDAK BOLEH menjegal cold start — dianggap saja
             // "tidak ada cache", pola fail-safe identik PlaybackStateStore.load() di file
             // sebelah (Batch 108).
-            Log.w(TAG, "Gagal load cache library, dianggap tidak ada", e)
+            AppLogger.e(TAG, "Gagal load cache library, dianggap tidak ada", e)
             null
         }
     }

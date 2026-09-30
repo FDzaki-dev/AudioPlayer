@@ -1,7 +1,7 @@
 package com.rudi.audioplayer.data
 
 import android.content.Context
-import android.util.Log
+import com.rudi.audioplayer.util.AppLogger
 
 data class SavedPlaybackState(
     val songIds: List<Long>,
@@ -77,7 +77,7 @@ class PlaybackStateStore(context: Context) {
         } catch (e: Exception) {
             // Corrupt/incompatible state tidak boleh menjegal resume seluruh app — anggap saja
             // tidak ada state tersimpan, mulai dari kosong seperti install baru.
-            Log.w(TAG, "Gagal load playback state tersimpan, dianggap tidak ada", e)
+            AppLogger.e(TAG, "Gagal load playback state tersimpan, dianggap tidak ada", e)
             null
         }
     }

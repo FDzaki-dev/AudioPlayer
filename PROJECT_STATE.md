@@ -12,6 +12,12 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 524 [user atas v523: "fokus kerjakan next kandidat low-risk!!"]**: satu-satunya sisa kandidat R1 = **T3** (Wave 1). **2 file source**:
+`data/PlaybackStateStore.kt` (1 call) + `data/LibraryCacheStore.kt` (2 call): `Log.w(TAG, msg, e)` -> `AppLogger.e(TAG, msg, e)` + tukar import (`android.util.Log` ->
+`util.AppLogger`); 0 `Log.` tersisa di kedua file. Dipilih `.e` (bukan `.w`) karena `AppLogger.w` tak punya parameter Throwable -> stack trace akan hilang; `AppLogger.kt`
+TIDAK diubah. Efek: kegagalan load/simpan yang tadinya hanya di logcat kini masuk Log Diagnostik (label ERROR); jalur normal `return null` tanpa exception tidak ikut log.
+**NOT VERIFIED** — 0 build/test (sandbox tanpa Gradle); CI + device BELUM. Detail: `CHANGELOG.md` Batch 524.
+
 **Catatan Batch 523 [user atas v522: "another zero diff, berikan saya opsi pilihan untuk kesinambungan milestone!!" -> dipilih D1/D2/D3; T11 tidak dipilih]**:
 v522 (T10 eksekusi ulang) dianggap nol regresi (rincian CI vs device tidak dirinci) -> **Wave 2 T4-T10 selesai**. **0 file source diubah** (`diff -r app/`
 vs `SONIX_v522.zip` = IDENTIK); Wave 4 = dokumen saja. **D1**: `PROJECT_STATE.md` 3148 -> 461 baris (257 -> 44 KB): Catatan Batch 425-503,
@@ -183,7 +189,15 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 523. ZIP: `SONIX_v523.zip`. **0 file source diubah** — Wave 4 D1+D2+D3 (dokumen saja). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+- Batch terakhir: 524. ZIP: `SONIX_v524.zip`. **2 file source diubah** (`PlaybackStateStore.kt`, `LibraryCacheStore.kt`) — Wave 1 T3 (R1). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: user "fokus kerjakan next kandidat low-risk!!" -> T3 (3 `Log.w` -> `AppLogger`) ->
+  Status: KODE SELESAI — 3 call `Log.w(TAG, msg, e)` -> `AppLogger.e(TAG, msg, e)` (PlaybackStateStore.kt `load()` catch; LibraryCacheStore.kt `save()` + `load()` catch), import
+  ditukar, diff dibaca, 0 `Log.` tersisa. `AppLogger.kt` utuh (w() tanpa Throwable = alasan pakai e()). **0 build/test dijalankan** -> CI BELUM, device BELUM, JANGAN klaim verified ->
+  Remaining: CI hijau di commit batch ini + cek Log Diagnostik tidak banjir ERROR "Gagal load/simpan" pada start dingin normal (2-3x). Wave 1 T1-T3 semuanya KODE SELESAI;
+  Wave 2 T4-T10 KODE SELESAI (T10 dilaporkan zero diff); G2 (CI baseline), Wave 3 (T11-T13), Wave 5 BELUM ->
+  Next Action: tunggu hasil CI/device user. Log banjir/CI merah -> kembali ke `SONIX_v523.zip`. JANGAN lanjut otomatis; opsi berikut: T13 (analisis `parseLRC` vs `LyricsParser`, 0 kode),
+  T12 (audit IME/insets, baca saja), T11 (R2-R3), G2. Wave 5 tetap butuh Compose UI Test dulu.
+- Batch 523 (sebelum 524). ZIP: `SONIX_v523.zip`. **0 file source diubah** — Wave 4 D1+D2+D3 (dokumen saja). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
   Task: user "v522 another zero diff, berikan opsi pilihan milestone" -> dipilih D1/D2/D3 (T11 tidak dipilih) ->
   Status: SELESAI (dokumen) — D1 `PROJECT_STATE.md` 3148 -> 461 baris, Catatan Batch 425-503 + entri RESUME <=502 dipindah VERBATIM ke arsip; D2 manifest
   == isi ZIP (204 + 2 dotfile = 206, 0 drift); D3 pointer rujukan yatim di `docs/PLANNING.md` §5. `diff -r app/` == v522 (0 beda). **0 build/test dijalankan**;
