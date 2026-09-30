@@ -1,5 +1,63 @@
 # Changelog
 
+## Batch 514 — haptic "terlalu lemah, setara Gboard": getaran custom amplitudo PENUH kalau motor punya kontrol amplitudo (BELUM verified)
+- Laporan user (+ 2 screenshot setelan sistem "Umpan Balik Haptic", Aktif, slider "Tinggi"): (1) **akar masalah
+  "haptic tidak terasa" = opsi Umpan Balik Haptic di setelan sistem HP belum diaktifkan** (lupa; sekarang aktif) —
+  cocok dgn Log Diagnostik Batch 513 (`getar_sentuh=0`); (2) setelah aktif, getaran app "cuma setara getaran Gboard,
+  geli geli kuku" = terlalu lemah. Catatan: tidak diketahui apakah user menguji v512 atau v513 setelah menyalakan
+  opsi itu; kategori MEDIA Batch 513 DIPERTAHANKAN (aman, dan app tidak bergantung saklar getar sentuh sistem)
+- **Penyebab teknis (dugaan, belum diukur)**: `EFFECT_CLICK`/`EFFECT_HEAVY_CLICK` = klik prabuat pendek yang kekuatannya
+  ditentukan tuning pabrikan (lembut utk UI/keyboard), bukan kontrol app. HP ini melapor `hardware-effects` YES ->
+  kode Batch 511-513 SELALU memilih efek prabuat itu -> mentok di kekuatan "Gboard"
+- **Perubahan (1 file source: `ui/theme/AppHaptics.kt`)**: `buildHapticEffects()` kini memprioritaskan
+  `hasAmplitudeControl()` = true -> `createOneShot(TAP 50ms / HEAVY 100ms, amplitudo 255)` (batas kekuatan tertinggi
+  yang bisa diminta app). Tanpa kontrol amplitudo -> efek prabuat kalau didukung (perilaku Batch 511-513 tetap), selain
+  itu one-shot amplitudo default. Baris status Log Diagnostik kini memuat `mode=one-shot-kuat(...)` +
+  `kontrol_amplitudo=true/false`. 0 call site disentuh, 0 file lain, 0 dependency baru
+- **Angka 50/100ms = TEBAKAN** (dipertahankan dari Batch 512, belum pernah terpakai di HP user krn mode hardware
+  menang dulu). Kalau kurang kuat -> naikkan; kalau kebablasan (terutama tier ketuk, dipakai 43x: tab, toggle,
+  tick geser) -> turunkan `TAP_ONE_SHOT_MS`. Cukup ubah 2 konstanta
+- **Risiko / batasan**: (a) durasi lebih panjang = terasa "bzzt" bukan "tik" tajam — trade-off sengaja demi
+  kekuatan; (b) TextField: geser handle seleksi memakai `TextHandleMove` (tier ketuk) -> bisa terasa lebih ramai
+  (risiko Batch 511 (a) makin relevan, BELUM dicek); (c) sistem tetap boleh menurunkan skala kalau intensitas getar
+  media/sentuh sistem diturunkan; (d) tidak ada toggle/slider kekuatan di Settings (fitur terpisah, hanya kalau user minta)
+- **File source disentuh: 1** (`AppHaptics.kt`). Doc: `README.md` (1 baris), `CHANGELOG.md`, `PROJECT_STATE.md`
+- **Validasi jujur**: cek statis saja (kurung `{}` 30/30 `()` 72/72; `VibrationEffect.createOneShot` API 26, aman utk
+  minSdk 31). **0 build/test dijalankan** — sandbox tanpa Gradle/Kotlin. **CI BELUM dikonfirmasi, device BELUM diuji**
+- **Uji device v514**: rasa getar di Now Playing (play/pause), Library tekan-tahan, swipe art, reorder antrean,
+  toggle Settings; ketik di pencarian & geser handle seleksi (tidak menyiksa); kirim rasanya (kurang/pas/kebablasan)
+  per tier ketuk vs kuat + baris "Haptic aktif: mode=..." dari Log Diagnostik
+
+## Batch 513 — FIX haptic "masih sama aja": getaran dikirim dgn kategori MEDIA (API 33+), berdasar Log Diagnostik user (BELUM verified)
+- Laporan user atas v512: "masih sama aja!!" + Log Diagnostik (`log_20260930_062040_...txt`). Data log (bukan tebakan):
+  HP Infinix X6850, sdk 36; `mode=hardware-effects` dukungan CLICK/HEAVY=1/1; `getar_sentuh=0` (getar sentuh SISTEM
+  mati); `ringer=2`; 6 panggilan pertama semuanya `tier=kuat: vibrate() dikirim tanpa exception`. Baris lama v511
+  (05:54) juga `hardware-effects`. Kesimpulan yg ditopang data: wrapper TERPANGGIL & tidak crash (kandidat 2 Batch 512
+  gugur), konstanta one-shot 50/100ms Batch 512 TIDAK terpakai di HP ini (mode hardware, kandidat 1 gugur utk HP ini)
+- **Dugaan akar masalah (BELUM dibuktikan di HP ini)**: `vibrate(effect)` tanpa `VibrationAttributes` (usage UNKNOWN) utk
+  efek CLICK/HEAVY_CLICK diubah framework jadi USAGE_TOUCH (`VibratorManagerService.fixupVibrationAttributes`); saat getar
+  sentuh sistem mati, USAGE_TOUCH intensitasnya OFF -> getaran dibuang diam-diam tanpa exception. Sumber: PR GitHub yg
+  membaca perilaku framework (sumber sekunder) + dokumen Android "haptic feedback respects touch feedback settings".
+  Ini juga menjelaskan v510 (jalur bawaan Compose/View juga ikut saklar itu) dan keluhan lama "haptic gak pernah terasa"
+- **Perubahan (1 file source: `ui/theme/AppHaptics.kt`)**: API 33+ -> `vibrator.vibrate(effect,
+  VibrationAttributes.createForUsage(USAGE_MEDIA))` (kategori getaran media, dipisah dari touch); API 31-32 tetap
+  `vibrate(effect)`. Baris status Log Diagnostik + 6 trace pertama kini memuat `usage=MEDIA` / `usage=default(api<33)`.
+  Guard `SDK_INT >= TIRAMISU` eksplisit (minSdk 31). `VibrationAttributes`/`USAGE_MEDIA`/`vibrate(effect, attrs)` = API 33
+  (dicek ke dokumentasi Android, bukan compiler)
+- **Sengaja TIDAK dilakukan**: usage ALARM/ACCESSIBILITY atau flag bypass sbg jalan pintas (semantik salah utk tick UI;
+  flag bypass @hide & dibuang diam-diam utk app biasa). 0 call site disentuh, 0 dependency baru
+- **Risiko / batasan diketahui**: (a) USAGE_MEDIA mengikuti setelan getar MEDIA sistem — kalau itu juga mati, tetap
+  tidak terasa (user melaporkan getaran musik terasa -> kemungkinan aktif, BELUM dipastikan); (b) getaran app kini tidak
+  ikut saklar getar sentuh sistem (sudah keputusan Batch 511); (c) kunci setelan tersembunyi di baris status
+  (`vibrate_on`, `intensitas_*`) = `n/a` di HP ini -> tidak informatif, nama kunci ROM Infinix mungkin beda
+- **File source disentuh: 1** (`AppHaptics.kt`). Doc: `README.md` (1 baris), `CHANGELOG.md`, `PROJECT_STATE.md`
+- **Validasi jujur**: cek statis saja (kurung `{}` 29/29 `()` 69/69; import terpakai; urutan inisialisasi property vs `init`
+  benar). **0 build/test dijalankan** — sandbox tanpa Gradle/Kotlin. **CI BELUM dikonfirmasi, device BELUM diuji**
+- **Uji cepat tanpa update**: nyalakan "getar sentuh/haptic feedback" di setelan sistem HP -> kalau haptic v510/v511/v512
+  mendadak terasa, diagnosis di atas terbukti. **Uji device v513**: rasa getar di Now Playing, Library (tekan-tahan),
+  swipe art, reorder antrean; kalau masih tidak terasa kirim baris "Haptic aktif: ... usage=..." + "panggilan #" dan
+  cek setelan getar media sistem
+
 ## Batch 512 — FIX lanjutan haptic v511 "gak terasa": denyut diperkuat + diagnostik haptic (BELUM verified)
 - Laporan user atas v511: "saya gak merasakan ada nya perbaikan haptic feedback nyata selain dari getaran
   musik yang dimainkan!!" — dicatat apa adanya. Rincian TIDAK dirinci user (CI v511 hijau atau tidak, APK v511

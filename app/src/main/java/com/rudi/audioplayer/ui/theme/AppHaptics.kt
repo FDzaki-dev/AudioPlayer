@@ -3,6 +3,7 @@ package com.rudi.audioplayer.ui.theme
 import android.content.Context
 import android.media.AudioManager
 import android.os.Build
+import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -58,6 +59,29 @@ import kotlinx.coroutines.launch
 // Log Diagnostik: baris status kini memuat info HP + setelan getar sistem, dan 6 panggilan haptic PERTAMA
 // per proses dicatat (membuktikan wrapper terpanggil); (c) bug v511 diperbaiki: kegagalan vibrate()
 // dulu TIDAK PERNAH tercatat karena flag "sekali" sudah terpakai oleh baris status awal.
+//
+// Batch 513 — laporan user atas v512: "masih sama aja!!" + Log Diagnostik. DATA log (Infinix X6850, sdk 36):
+// mode=hardware-effects (dukungan CLICK/HEAVY=1/1, jadi konstanta 50/100ms Batch 512 TIDAK terpakai di HP ini),
+// `getar_sentuh=0` (getar sentuh SISTEM mati), 6 panggilan tier=kuat "vibrate() dikirim tanpa exception".
+// Artinya wrapper terpanggil & tidak crash, tapi tak terasa -> kandidat (3) Batch 512. Penyebab paling mungkin:
+// `vibrate(effect)` TANPA VibrationAttributes (usage UNKNOWN) utk efek CLICK/HEAVY_CLICK oleh framework
+// (`VibratorManagerService.fixupVibrationAttributes`) diubah jadi USAGE_TOUCH; saat getar sentuh sistem mati,
+// USAGE_TOUCH intensitasnya OFF -> getaran dibuang diam-diam (`IGNORED_FOR_SETTINGS`, tanpa exception).
+// (Sumber: PR di GitHub yg membaca perilaku framework; BELUM dibuktikan di HP ini.) Fix: API 33+ getaran
+// dikirim dgn `VibrationAttributes.USAGE_MEDIA` (kategori getaran media, dipisah dari touch-feedback) — bukan
+// dihitung sbg touch, jadi tidak ikut saklar getar sentuh. Butuh setelan getar MEDIA sistem tidak mati
+// (user melaporkan getaran musik terasa -> kemungkinan besar aktif). API 31-32: tetap `vibrate(effect)`.
+// Tidak memakai usage ALARM/ACCESSIBILITY dsb. sbg jalan pintas: semantiknya salah utk tick UI.
+//
+// Batch 514 — user melaporkan AKAR MASALAH sebenarnya: opsi "Umpan Balik Haptic" di setelan sistem HP (Infinix
+// X-Haptics) belum diaktifkan (sudah dinyalakan, slider "Tinggi"). Setelah aktif, getaran app dirasa "cuma
+// setara Gboard, geli geli kuku" = terlalu lemah. Sebab teknis: efek prabuat `EFFECT_CLICK`/`EFFECT_HEAVY_CLICK`
+// = klik pendek (puluhan ms) yang KEKUATANNYA ditentukan pabrikan (tuning halus utk keyboard/UI), bukan kita.
+// Fix: kalau motor punya kontrol amplitudo (`hasAmplitudeControl()`), pakai getaran custom (one-shot) amplitudo
+// PENUH 255 dgn durasi lebih panjang (TAP/HEAVY_ONE_SHOT_MS) — batas kekuatan tertinggi yg bisa diminta app;
+// efek prabuat cuma dipakai kalau tanpa kontrol amplitudo. Angka durasi TETAP TEBAKAN (belum diuji di HP),
+// 2 konstanta di bawah = satu-satunya yang perlu disetel. Sistem masih boleh menurunkan skala bila user
+// menurunkan intensitas getar di setelan HP.
 
 private const val HAPTIC_TAG = "AppHaptics"
 private const val TAP_ONE_SHOT_MS = 50L
@@ -94,18 +118,30 @@ private fun buildHapticEffects(vibrator: Vibrator): HapticEffects {
     val supportLabel = support?.joinToString("/") ?: "n/a"
     val hardwareEffectsOk = support != null && support.isNotEmpty() &&
         support.all { it == Vibrator.VIBRATION_EFFECT_SUPPORT_YES }
+    val hasAmplitudeControl = vibrator.hasAmplitudeControl()
+    // Batch 514 — kontrol amplitudo tersedia -> getaran custom amplitudo PENUH (lebih kuat dari klik prabuat
+    // pabrikan, yang dilaporkan user cuma "setara Gboard"). Tanpa kontrol amplitudo -> efek prabuat kalau
+    // didukung (perilaku Batch 511-513), selain itu one-shot amplitudo default.
+    if (hasAmplitudeControl) {
+        return HapticEffects(
+            tap = VibrationEffect.createOneShot(TAP_ONE_SHOT_MS, 255),
+            heavy = VibrationEffect.createOneShot(HEAVY_ONE_SHOT_MS, 255),
+            mode = "one-shot-kuat(${TAP_ONE_SHOT_MS}ms/${HEAVY_ONE_SHOT_MS}ms, amp=255, kontrol_amplitudo=true, " +
+                "dukungan CLICK/HEAVY=$supportLabel)"
+        )
+    }
     if (hardwareEffectsOk) {
         return HapticEffects(
             tap = VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK),
             heavy = VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK),
-            mode = "hardware-effects(dukungan CLICK/HEAVY=$supportLabel)"
+            mode = "hardware-effects(kontrol_amplitudo=false, dukungan CLICK/HEAVY=$supportLabel)"
         )
     }
-    val amplitude = if (vibrator.hasAmplitudeControl()) 255 else VibrationEffect.DEFAULT_AMPLITUDE
+    val amplitude = VibrationEffect.DEFAULT_AMPLITUDE
     return HapticEffects(
         tap = VibrationEffect.createOneShot(TAP_ONE_SHOT_MS, amplitude),
         heavy = VibrationEffect.createOneShot(HEAVY_ONE_SHOT_MS, amplitude),
-        mode = "one-shot(${TAP_ONE_SHOT_MS}ms/${HEAVY_ONE_SHOT_MS}ms, amp=$amplitude, " +
+        mode = "one-shot(${TAP_ONE_SHOT_MS}ms/${HEAVY_ONE_SHOT_MS}ms, amp=default, kontrol_amplitudo=false, " +
             "dukungan CLICK/HEAVY=$supportLabel)"
     )
 }
@@ -157,9 +193,19 @@ internal class StrongHapticFeedback(
 
     private val effects: HapticEffects? = vibrator?.let { buildHapticEffects(it) }
 
+    // API 33+: kategori getaran MEDIA (lihat komentar Batch 513). Di bawah 33 -> null, `vibrate(effect)` biasa.
+    private val mediaAttributes: VibrationAttributes? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            VibrationAttributes.createForUsage(VibrationAttributes.USAGE_MEDIA)
+        } else {
+            null
+        }
+
+    private val usageLabel: String = if (mediaAttributes != null) "MEDIA" else "default(api<33)"
+
     init {
         logHapticStatusOnce(
-            if (effects != null) "Haptic aktif: mode=${effects.mode} | $systemInfo"
+            if (effects != null) "Haptic aktif: mode=${effects.mode} usage=$usageLabel | $systemInfo"
             else "Haptic: tidak ada Vibrator/tidak mendukung getar, pakai haptic bawaan Compose | $systemInfo"
         )
     }
@@ -173,8 +219,13 @@ internal class StrongHapticFeedback(
         val trace = n <= HAPTIC_TRACE_LIMIT
         if (effect != null && vibrator != null) {
             try {
-                vibrator.vibrate(effect)
-                if (trace) traceHaptic("panggilan #$n tier=$tier: vibrate() dikirim tanpa exception")
+                val attrs = mediaAttributes
+                if (attrs != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    vibrator.vibrate(effect, attrs)
+                } else {
+                    vibrator.vibrate(effect)
+                }
+                if (trace) traceHaptic("panggilan #$n tier=$tier usage=$usageLabel: vibrate() dikirim tanpa exception")
                 return
             } catch (e: Exception) {
                 logHapticFailureOnce("Haptic: vibrate() gagal (${e.javaClass.simpleName}), jatuh ke haptic bawaan Compose")
