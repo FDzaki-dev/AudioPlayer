@@ -12,6 +12,14 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 520 [user atas v519: "another zero diff, lanjut T10!!"]**: T9 dianggap nol regresi (rincian CI vs device tidak dirinci; user
+sempat menyatakan jalur onboarding sulit diuji — dijawab: layar muncul tiap launch tanpa izin audio, bukan cuma install pertama) -> T10
+dikerjakan (R3). **2 file source** (`MainActivity.kt` 2272->1873 baris + baru `BottomNavBar.kt`, paket ROOT `com.rudi.audioplayer`):
+`MagnifyingTabLabel`/`GlassTabIcon`/`NoRippleIndication`/`CustomNavBarTabItem` dipindah MOVE-ONLY byte-identik (diff = 2 baris
+`private`->`internal` pada `GlassTabIcon` + `CustomNavBarTabItem`; 0 perilaku berubah; rekonstruksi programatik == `MainActivity.kt` v519
+asli). `AppNavHost` TIDAK dipecah. `NoRippleIndication` = kode mati (0 pemakai), dipindah apa adanya. **NOT VERIFIED** — 0 build/test;
+CI + device BELUM. Detail: `CHANGELOG.md` Batch 520.
+
 **Catatan Batch 519 [user atas v518: "v518 tetap zero diff. lanjutkan milestone!!"]**: T8b dianggap nol regresi (rincian CI vs device tidak
 dirinci) -> T9 dikerjakan. **2 file source** (`MainActivity.kt` 2414->2272 baris + baru `OnboardingScreens.kt`, paket ROOT
 `com.rudi.audioplayer`): `WelcomeScreen`/`WelcomeHighlight`/`PermissionRationale` dipindah MOVE-ONLY (diff = 2 baris `private`->`internal`,
@@ -2466,7 +2474,20 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 519. ZIP: `SONIX_v519.zip`. **2 file source diubah** (`MainActivity.kt`, + baru `OnboardingScreens.kt`) — Wave 2
+- Batch terakhir: 520. ZIP: `SONIX_v520.zip`. **2 file source diubah** (`MainActivity.kt`, + baru `BottomNavBar.kt`) — Wave 2
+  T10 (R3) move-only byte-identik (0 perilaku berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: user "v519 another zero diff, lanjut T10" -> T10 Wave 2 ->
+  Status: KODE SELESAI — 4 simbol dipindah (paket root, 0 import baru di `MainActivity.kt`), diff 2 baris `private`->`internal`,
+  `MainActivity.kt` baru = v519 dikurangi 399 baris (dicek programatik). `AppNavHost` utuh. **0 build/test dijalankan** -> CI BELUM
+  dikonfirmasi, device BELUM diuji, JANGAN klaim verified ->
+  Remaining: CI hijau di commit batch ini + device smoke test bottom nav (daftar "Uji device v520" di `CHANGELOG.md` Batch 520: tap,
+  drag tab-bar, label tak ellipsis, font besar, minimize/expand, 0 kilatan/ripple). **Wave 2 T4-T10 semuanya KODE SELESAI**; T3
+  (opsional) + G2 (CI baseline) masih BELUM; Wave 3 (T11-T13), Wave 4 (D1-D3), Wave 5 BELUM. Temuan: `NoRippleIndication` kode mati
+  (0 pemakai, tidak dihapus). `SongPickerSheet.kt` punya detektor sweep serupa — BELUM dicek ->
+  Next Action: tunggu hasil CI/device user. Hijau/nol regresi -> Wave 2 selesai; JANGAN lanjut otomatis — Wave 3-5, T3, dan D1-D3
+  butuh pilihan eksplisit user (lihat `docs/PENDING_CodeTidyPlan.md` §3; Wave 3 mengubah perilaku terlihat, Wave 5 syaratnya Compose UI
+  Test belum ada). Crash/regresi bottom nav -> kembali ke `SONIX_v519.zip`, hentikan wave.
+- Batch 519 (sebelum 520). ZIP: `SONIX_v519.zip`. **2 file source diubah** (`MainActivity.kt`, + baru `OnboardingScreens.kt`) — Wave 2
   T9 move-only (0 perilaku berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
   Task: user "v518 tetap zero diff, lanjutkan milestone" -> T9 Wave 2 ->
   Status: KODE SELESAI — 3 composable dipindah (paket root, 0 import baru di `MainActivity.kt`), diff 2 baris `private`->`internal`,

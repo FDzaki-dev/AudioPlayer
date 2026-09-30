@@ -1,5 +1,45 @@
 # Changelog
 
+## Batch 520 — Wave 2 T10 (MOVE-ONLY, R3): `MagnifyingTabLabel`/`GlassTabIcon`/`NoRippleIndication`/`CustomNavBarTabItem` dipindah dari `MainActivity.kt` ke `BottomNavBar.kt` (BELUM verified)
+- Laporan user atas v519: "another zero diff, lanjut T10!!" -> T9 dianggap nol regresi (rincian CI vs device tidak dirinci; jalur
+  onboarding diuji atau tidak, tidak dinyatakan); milestone berikutnya = T10 (Next Action Batch 519 + `docs/PENDING_CodeTidyPlan.md`).
+  Tidak ada ZIP baru diunggah — basis = `SONIX_v519.zip` hasil Batch 519 (dicek identik dengan work tree sebelum mulai)
+- **Perubahan (2 file source)**: `MainActivity.kt` (2272 -> 1873 baris) + baru `BottomNavBar.kt` (442 baris = 44 baris
+  header package/import/komentar + 398 baris blok pindahan). Paket TETAP `com.rudi.audioplayer` (root, sejajar `MainActivity.kt`),
+  jadi 0 import baru di `MainActivity.kt`. 0 call site diubah, 0 perilaku berubah. **`AppNavHost` TIDAK dipecah** dan tetap utuh
+  di `MainActivity.kt` (syarat rencana T10)
+- **Blok pindahan** (asli baris 551-948, kontigu, komentar panjang tiap fungsi ikut pindah utuh): `MagnifyingTabLabel` (Batch 437/442/447),
+  `GlassTabIcon`, `NoRippleIndication` (Batch 439/440), `CustomNavBarTabItem` (Batch 449/450). Tidak ada deklarasi top-level lain di
+  antaranya. `TAB_ROUTES` (`MainActivity.kt` 205) TIDAK dipakai blok -> tetap di tempat
+- **Bukti move-only (byte-identik)**: (1) diff `MainActivity.kt` v519 vs baru = HANYA penghapusan 399 baris (551-949), 0 baris
+  tambah/ubah; (2) rekonstruksi programatik — `MainActivity.kt` baru + blok di `BottomNavBar.kt` (2 kata `internal` dikembalikan ke
+  `private`) = `MainActivity.kt` v519 asli, IDENTIK 2272 baris (`True`). Satu-satunya beda blok = `private fun` -> `internal fun` pada
+  `GlassTabIcon` dan `RowScope.CustomNavBarTabItem` (keduanya dipanggil dari `AppNavHost`, 3x tiap fungsi). `MagnifyingTabLabel`
+  (dipakai `GlassTabIcon` di file yang sama) dan `NoRippleIndication` tetap `private`
+- **Temuan (TIDAK diubah)**: `NoRippleIndication` = kode mati — 0 pemakai di seluruh source (hanya definisinya sendiri); titik
+  `CompositionLocalProvider(LocalIndication provides NoRippleIndication)` hilang sejak `NavigationBarItem` dihapus Batch 449. Dipindah
+  apa adanya sesuai rencana (move-only, bukan tempat menghapus kode); menghapusnya = item terpisah kalau user mau
+- Import file baru: 35, hanya yang dipakai blok (komentar & literal string diabaikan saat menyaring). Dicek programatik: 0 import tak
+  terpakai; blok TIDAK memakai delegasi `by` -> `getValue`/`setValue` tak perlu dibawa; 0 wildcard/alias import di `MainActivity.kt`;
+  0 identifier kapital blok yang tak terselesaikan (sisanya builtin Kotlin/anggota berkualifikasi seperti `Alignment.Center`,
+  `TextOverflow.Ellipsis`, `Role.Tab`). Import lama di `MainActivity.kt` TIDAK disentuh (sebagian kini tak terpakai -> paling banyak
+  warning IDE, bukan error kompilasi; merapikannya = item terpisah)
+- 0 bentrok nama: tiap dari 4 simbol didefinisikan tepat 1x di seluruh source. `internal` tidak membocorkan tipe `private`
+  (parameter `GlassTabIcon`/`CustomNavBarTabItem` semuanya tipe Compose/Kotlin publik)
+- Tidak disentuh: `AppLockStore.kt`, `PlaybackService.kt`, `app/build.gradle.kts`, `FloatingBubbleService.kt`, `AppHaptics.kt`,
+  isi `AppNavHost` (gesture drag tab, `navPillIndexAnim`, `tabMagnifyFocus`, bottomBar), sektor DITUTUP. README tidak diubah
+  (refactor internal, 0 fitur/perilaku berubah)
+- **File source disentuh: 2**. Doc: `CHANGELOG.md`, `PROJECT_STATE.md`, `FILE_MANIFEST.txt` (205 -> 206), `docs/PENDING_CodeTidyPlan.md`
+- **Validasi jujur**: cek statis saja — kurung `{}` `MainActivity.kt` 321/321 sebelum = 302/302 sesudah + 19/19 (blok pindahan);
+  `()` 597/597 = 547/547 + 50/50; `[]` 3/3 = 3/3 + 0/0 (komentar & string diabaikan). **0 build/test dijalankan** — sandbox tanpa
+  kotlinc/Gradle. **CI BELUM dikonfirmasi, device BELUM diuji**. Risiko utama = kompilasi (visibilitas/import), bukan perilaku
+- **Uji device v520** (bottom nav — di SEMUA layar tab; ini R3): (1) 3 tab Beranda/Perpustakaan/Pengaturan tampil, pill + ikon + label
+  sama seperti v519 di tema default, Skeu, Liquid Glass, Tactile; label 0 ellipsis di font normal; (2) tap tab pindah layar, pill ikut;
+  0 kilatan kotak abu-abu di tab yang ditinggalkan, 0 ripple; (3) seret tab-bar (drag) — pill/label ikut jari kontinu, lepas jari berhenti
+  TEPAT di tab tujuan (0 mundur 1 kolom), drag lintas tab konten menggerakkan bottom nav; (4) minimize/expand/fade/auto-minimize
+  bottom nav + mini player 0 regresi; (5) font besar (skala aksesibilitas) + landscape + rotasi sama dengan v519; tab bisa
+  ditekan dengan touch target normal (0 area sentuh menyempit)
+
 ## Batch 519 — Wave 2 T9 (MOVE-ONLY): `WelcomeScreen`/`WelcomeHighlight`/`PermissionRationale` dipindah dari `MainActivity.kt` ke `OnboardingScreens.kt` (BELUM verified)
 - Laporan user atas v518: "v518 tetap zero diff. lanjutkan milestone!!" -> T8b dianggap nol regresi (rincian CI vs device tidak
   dirinci); milestone berikutnya = T9 (Next Action Batch 518 + `docs/PENDING_CodeTidyPlan.md`)

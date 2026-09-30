@@ -67,7 +67,11 @@
 # docs/PENDING_CodeTidyPlan.md — WelcomeScreen/WelcomeHighlight/PermissionRationale dipindah dari
 # MainActivity.kt; paket root `com.rudi.audioplayer`) ditambahkan — 204->205 (203 di ZIP + 2 dotfile
 # .github/.gitignore yang sengaja tidak dikirim).
-# Total: 205 file
+# Batch 520: app/src/main/java/com/rudi/audioplayer/BottomNavBar.kt (file baru, T10 Wave 2
+# docs/PENDING_CodeTidyPlan.md — MagnifyingTabLabel/GlassTabIcon/NoRippleIndication/CustomNavBarTabItem
+# dipindah dari MainActivity.kt; paket root `com.rudi.audioplayer`) ditambahkan — 205->206 (204 di ZIP + 2
+# dotfile .github/.gitignore yang sengaja tidak dikirim).
+# Total: 206 file
 
 .github/workflows/build.yml
 .gitignore
@@ -84,6 +88,7 @@ app/src/androidTest/java/com/rudi/audioplayer/playback/PlaybackServiceTestHelper
 app/src/androidTest/java/com/rudi/audioplayer/playback/PlaybackTransportTest.kt
 app/src/main/AndroidManifest.xml
 app/src/main/java/com/rudi/audioplayer/AudioPlayerApplication.kt
+app/src/main/java/com/rudi/audioplayer/BottomNavBar.kt
 app/src/main/java/com/rudi/audioplayer/MainActivity.kt
 app/src/main/java/com/rudi/audioplayer/OnboardingScreens.kt
 app/src/main/java/com/rudi/audioplayer/bubble/BubbleBootReceiver.kt

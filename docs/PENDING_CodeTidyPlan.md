@@ -147,6 +147,12 @@ TIDAK termasuk T8b dan tetap di `LibraryScreen.kt`). Belum diverifikasi CI/devic
 `com.rudi.audioplayer`, bukan `ui`), 140 baris move-only (hanya `private`->`internal` pada `WelcomeScreen` + `PermissionRationale`;
 `WelcomeHighlight` tetap private). Blok nyata = 551-644 & 2369-2414 (nomor tabel di atas sudah bergeser). Belum diverifikasi
 CI/device (0 build dijalankan). T10 BELUM (R3, terakhir).
+**Update Batch 520**: user melaporkan v519 "another zero diff" (rincian CI vs device tidak dirinci) -> T10 dilanjutkan.
+**Status Wave 2 (Batch 520)**: T10 KODE SELESAI (R3) — 2 file: `MainActivity.kt` (2272->1873 baris) + baru `BottomNavBar.kt` (paket ROOT
+`com.rudi.audioplayer`), 398 baris move-only byte-identik (hanya `private`->`internal` pada `GlassTabIcon` + `CustomNavBarTabItem`;
+`MagnifyingTabLabel` + `NoRippleIndication` tetap private; `NoRippleIndication` = kode mati, 0 pemakai). `AppNavHost` TIDAK dipecah.
+Blok nyata = 551-948 (nomor tabel di atas sudah bergeser). Belum diverifikasi CI/device (0 build dijalankan). **Semua T4-T10 Wave 2
+KODE SELESAI**; sisa Wave 2 = verifikasi CI/device T10. Belum diarsipkan: Wave 3-5, T3, G2 masih BELUM.
 Tiap T: 2 file disentuh, diff move-only, CI hijau, lalu device smoke test layar terkait (T10:
 seret tab-bar, tap tab, label tidak ellipsis, font besar, 0 regresi minimize/expand — daftar
 lengkap di `PROJECT_STATE.md` sektor bottom nav).
