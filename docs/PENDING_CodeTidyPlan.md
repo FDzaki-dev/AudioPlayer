@@ -127,6 +127,10 @@ horizontal; brightness/volume TIDAK di blok) — 2 file: `NowPlayingScreen.kt` +
 BUKAN akibat pemindahan T6; call site identik v509). Wave 2 DITAHAN; Batch 511 = perbaikan haptic terpusat di luar
 daftar T (3 file: `AppHaptics.kt` baru, `Theme.kt`, `AndroidManifest.xml`). T7 dilanjutkan setelah user
 memutuskan hasil haptic.
+**Update Batch 515**: user memutuskan haptic v514 "udah bagus" -> penahanan Wave 2 dicabut.
+**Status Wave 2 (Batch 515)**: T7 KODE SELESAI — 2 file: `SettingsScreen.kt` (951->642 baris) + baru `SettingsSections.kt`,
+308 baris move-only (hanya `private`->`internal` pada 4 fungsi). Belum diverifikasi CI/device (0 build dijalankan).
+T8a-T10 BELUM.
 Tiap T: 2 file disentuh, diff move-only, CI hijau, lalu device smoke test layar terkait (T10:
 seret tab-bar, tap tab, label tidak ellipsis, font besar, 0 regresi minimize/expand — daftar
 lengkap di `PROJECT_STATE.md` sektor bottom nav).

@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 515 — Wave 2 T7 (MOVE-ONLY): `ThemeModeToggleSection`/`ThemeOptionCard`/`AppLockSection`/`SetPinDialog` dipindah dari `SettingsScreen.kt` ke `SettingsSections.kt` (BELUM verified)
+- Laporan user: "haptic feedback udah bagus, lanjut kerjakan milestone yang tertunda" -> penahanan Wave 2 (sejak Batch 511)
+  dicabut; milestone tertunda = T7 (Next Action Batch 514 + `docs/PENDING_CodeTidyPlan.md`). Catatan: "udah bagus" = penilaian
+  user atas rasa getar v514; rincian CI vs device tidak dirinci
+- **Perubahan (2 file source)**: `ui/SettingsScreen.kt` (951 -> 642 baris) + baru `ui/SettingsSections.kt` (349 baris = header
+  package/import/komentar + 308 baris blok pindahan). Paket TETAP `com.rudi.audioplayer.ui`. 0 call site diubah, 0 perilaku berubah
+- **Bukti move-only**: blok baris 644-951 asli (komentar Batch 61 + 4 fungsi) vs blok di file baru -> diff = TEPAT 4 baris
+  (`private fun` -> `internal fun` pada keempat fungsi, supaya `SettingsScreen()` di file lain tetap bisa memanggilnya), 0 baris lain.
+  `SettingsScreen.kt` baru = 642 baris pertama file asli, identik
+- Import file baru: hanya yang dipakai blok + `getValue`/`setValue` (delegasi `by remember`). Import lama di `SettingsScreen.kt`
+  TIDAK disentuh (sebagian kini tak terpakai -> paling banyak warning IDE, bukan error kompilasi; merapikannya = item terpisah)
+- Tidak disentuh: `AppLockStore.kt`, `PlaybackService.kt`, `app/build.gradle.kts`, `FloatingBubbleService.kt`, sektor bottom nav,
+  `AppHaptics.kt`, sektor DITUTUP. README tidak diubah (refactor internal, 0 fitur/perilaku berubah)
+- **File source disentuh: 2**. Doc: `CHANGELOG.md`, `PROJECT_STATE.md`, `FILE_MANIFEST.txt` (201 -> 202), `docs/PENDING_CodeTidyPlan.md`
+- **Validasi jujur**: cek statis saja — diff move-only (4 baris beda), kurung `{}` 92/92 + 65/65, `()` 312/312 + 173/173, tiap fungsi
+  didefinisikan tepat 1x di seluruh source, `SmartPlaylistScreen.kt` hanya menyebut `[SetPinDialog]` di komentar KDoc. **0 build/test
+  dijalankan** — sandbox tanpa kotlinc/Gradle. **CI BELUM dikonfirmasi, device BELUM diuji**
+- **Uji device v515** (Settings): (1) kartu pilihan tema tampil, dipilih, preview live benar di 3 identitas; toggle Mode Gelap/Ikuti Sistem;
+  (2) Kunci Aplikasi: aktifkan -> dialog PIN muncul, PIN + konfirmasi (salah -> pesan error), simpan; toggle biometrik; nonaktifkan
+  -> dialog konfirmasi; (3) rotasi/font besar 0 beda dari v514
+
 ## Batch 514 — haptic "terlalu lemah, setara Gboard": getaran custom amplitudo PENUH kalau motor punya kontrol amplitudo (BELUM verified)
 - Laporan user (+ 2 screenshot setelan sistem "Umpan Balik Haptic", Aktif, slider "Tinggi"): (1) **akar masalah
   "haptic tidak terasa" = opsi Umpan Balik Haptic di setelan sistem HP belum diaktifkan** (lupa; sekarang aktif) —

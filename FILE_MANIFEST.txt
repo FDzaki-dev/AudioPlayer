@@ -51,7 +51,11 @@
 # Batch 511: app/src/main/java/com/rudi/audioplayer/ui/theme/AppHaptics.kt (file baru, haptic terpusat
 # pengganti LocalHapticFeedback bawaan Compose) ditambahkan — 200->201 (199 di ZIP + 2 dotfile
 # .github/.gitignore yang sengaja tidak dikirim).
-# Total: 201 file
+# Batch 515: app/src/main/java/com/rudi/audioplayer/ui/SettingsSections.kt (file baru, T7 Wave 2
+# docs/PENDING_CodeTidyPlan.md — ThemeModeToggleSection/ThemeOptionCard/AppLockSection/SetPinDialog
+# dipindah dari SettingsScreen.kt) ditambahkan — 201->202 (200 di ZIP + 2 dotfile
+# .github/.gitignore yang sengaja tidak dikirim).
+# Total: 202 file
 
 .github/workflows/build.yml
 .gitignore
@@ -156,6 +160,7 @@ app/src/main/java/com/rudi/audioplayer/ui/PlaylistScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/QueueSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/RingtoneCutterSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SettingsScreen.kt
+app/src/main/java/com/rudi/audioplayer/ui/SettingsSections.kt
 app/src/main/java/com/rudi/audioplayer/ui/SharedComponents.kt
 app/src/main/java/com/rudi/audioplayer/ui/SignatureMatcherSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SmartPlaylistScreen.kt

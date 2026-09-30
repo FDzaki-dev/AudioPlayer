@@ -12,6 +12,11 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 515 [user: "haptic feedback udah bagus, lanjut kerjakan milestone yang tertunda"]**: Haptic dianggap beres user ->
+penahanan Wave 2 dicabut; milestone tertunda = T7. **2 file source** (`SettingsScreen.kt` 951->642 baris + baru
+`SettingsSections.kt`): `ThemeModeToggleSection`/`ThemeOptionCard`/`AppLockSection`/`SetPinDialog` dipindah MOVE-ONLY (diff = 4
+baris `private`->`internal`, 0 perilaku berubah). **NOT VERIFIED** — 0 build/test; CI + device BELUM. Detail: `CHANGELOG.md` Batch 515.
+
 **Catatan Batch 514 [laporan user + 2 screenshot: "root cause: lupa aktifkan haptic feedback ... sekarang getarannya cuma
 setara Gboard, geli geli kuku"]**: Akar masalah "tidak terasa" TERKONFIRMASI user = opsi Umpan Balik Haptic sistem HP
 (Infinix X-Haptics) belum aktif (kini aktif, slider Tinggi), BUKAN bug kode wrapper. Masalah baru = terlalu lemah: efek
@@ -2438,7 +2443,16 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 514. ZIP: `SONIX_v514.zip`. **1 file source diubah** (`ui/theme/AppHaptics.kt`) — haptic terlalu lemah
+- Batch terakhir: 515. ZIP: `SONIX_v515.zip`. **2 file source diubah** (`ui/SettingsScreen.kt`, + baru `ui/SettingsSections.kt`) — Wave 2
+  T7 move-only (0 perilaku berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: user "haptic feedback udah bagus, lanjut milestone yang tertunda" -> T7 Wave 2 ->
+  Status: KODE SELESAI — 4 composable dipindah, diff 4 baris `private`->`internal`. **0 build/test dijalankan** -> CI BELUM
+  dikonfirmasi, device BELUM diuji, JANGAN klaim verified ->
+  Remaining: CI hijau di commit batch ini + device smoke test Settings (kartu tema + toggle mode; Kunci Aplikasi: set PIN,
+  biometrik, nonaktifkan). T8a/T8b/T9/T10 BELUM; T3 (opsional) + G2 (CI baseline) masih BELUM ->
+  Next Action: tunggu hasil CI/device user. Hijau/nol regresi -> lanjut T8a (`LibraryLists.kt`, 1 target/batch); crash/regresi
+  Settings -> kembali ke `SONIX_v514.zip`. T10 = R3, dikerjakan terakhir.
+- Batch 514 (sebelum 515). ZIP: `SONIX_v514.zip`. **1 file source diubah** (`ui/theme/AppHaptics.kt`) — haptic terlalu lemah
   (perilaku SENGAJA berubah: getaran amplitudo penuh). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
   Task: user melapor akar masalah = setelan haptic sistem belum aktif (kini aktif), lalu getaran app "setara Gboard" (lemah)
   -> Status: KODE SELESAI — one-shot amplitudo 255 (TAP 50ms / HEAVY 100ms, TEBAKAN) bila `hasAmplitudeControl()`; tanpa itu
@@ -2447,8 +2461,8 @@ Detail lengkap: README.md § "Standar Penomoran Versi".
   handle seleksi) tidak menyiksa, baris Log Diagnostik "Haptic aktif: mode=one-shot-kuat(...) kontrol_amplitudo=true" ->
   Next Action: tunggu rasa user. Kurang kuat -> naikkan 2 konstanta `AppHaptics.kt`; kebablasan -> turunkan (tier ketuk
   dulu); pas -> lanjut T7 (`SettingsSections.kt`, 1 target/batch); crash/regresi -> kembali ke `SONIX_v513.zip`.
-  Toggle/slider kekuatan haptic di Settings BELUM ada (fitur terpisah, hanya kalau user minta). Wave 2 T7-T10 tetap DITAHAN
-  sampai user bilang haptic beres.
+  Toggle/slider kekuatan haptic di Settings BELUM ada (fitur terpisah, hanya kalau user minta). **Hasil (Batch 515)**: user menilai
+  haptic v514 "udah bagus" -> penahanan Wave 2 dicabut, T7 dikerjakan.
 - Batch 513 (sebelum 514). ZIP: `SONIX_v513.zip`. **1 file source diubah** (`ui/theme/AppHaptics.kt`) — FIX haptic ke-3
   (perilaku SENGAJA berubah: getaran kategori MEDIA di API 33+). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
   Task: laporan user v512 "masih sama aja" + Log Diagnostik (getar_sentuh=0, wrapper terpanggil, hardware-effects) ->
