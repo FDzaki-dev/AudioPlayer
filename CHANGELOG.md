@@ -1,5 +1,37 @@
 # Changelog
 
+## Batch 517 — Wave 2 T8a (MOVE-ONLY): `AlbumGridView`/`SongListView`/`GroupedListView`/`SongRow` dipindah dari `LibraryScreen.kt` ke `LibraryLists.kt` (BELUM verified)
+- Laporan user: "baik, 2 bug telah teratasi. lanjutkan milestone!!" -> 2 bug v516 (prompt sidik jari berulang; drag-select/shimmer)
+  dianggap beres oleh user; penahanan T8a dicabut, milestone berikutnya = T8a (Next Action Batch 516 + `docs/PENDING_CodeTidyPlan.md`).
+  Catatan: rincian CI vs device tidak dirinci user; fix Batch 516 (termasuk `userScrollEnabled = sweepAnchorIndex == null`) ikut
+  terpindah UTUH bersama `SongListView`
+- **Perubahan (2 file source)**: `ui/LibraryScreen.kt` (1460 -> 970 baris) + baru `ui/LibraryLists.kt` (544 baris = 55 baris
+  header package/import/komentar + 489 baris blok pindahan). Paket TETAP `com.rudi.audioplayer.ui`. 0 call site diubah, 0 perilaku berubah
+- **Bukti move-only**: blok pindahan (asli baris 631-690 `AlbumGridView` + 1033-1460 `SongListView`/`GroupedListView`/`SongRow`, 489
+  baris) vs blok di file baru -> diff = TEPAT 4 baris (`private fun` -> `internal fun` pada keempat fungsi, supaya `LibraryScreen()`
+  dan `SearchResultsView()` di `LibraryScreen.kt` tetap bisa memanggilnya), 0 baris lain. `LibraryScreen.kt` baru = file asli
+  dikurangi dua blok itu, identik baris-per-baris (dicek programatik)
+- Import file baru: hanya yang dipakai blok (komentar & string literal diabaikan saat menyaring; `Icons.filled.Album` dan
+  `data.Playlist` sempat lolos karena cocok teks string "Album"/"Playlist" -> dibuang, dicek 0 pemakaian di kode). Import lama di
+  `LibraryScreen.kt` TIDAK disentuh (sebagian kini tak terpakai -> paling banyak warning IDE, bukan error kompilasi; merapikannya =
+  item terpisah)
+- Ketergantungan: 4 fungsi tidak merujuk simbol `private` lain di `LibraryScreen.kt` (dicek 9 simbol private top-level, 0 rujukan di
+  kode; 2 sebutan `SearchResultsView` hanya di komentar). `AlbumArt`/`formatDuration` publik di `Utils.kt`, `isCalmRetroTheme` di
+  `theme/Theme.kt` -> tak perlu diubah
+- Tidak disentuh: `AppLockStore.kt`, `PlaybackService.kt`, `app/build.gradle.kts`, `FloatingBubbleService.kt`, sektor bottom nav,
+  `AppHaptics.kt`, `SongPickerSheet.kt`, sektor DITUTUP. README tidak diubah (refactor internal, 0 fitur/perilaku berubah; README tidak
+  menyebut 4 fungsi ini)
+- **File source disentuh: 2**. Doc: `CHANGELOG.md`, `PROJECT_STATE.md`, `FILE_MANIFEST.txt` (202 -> 203), `docs/PENDING_CodeTidyPlan.md`
+- **Validasi jujur**: cek statis saja — diff move-only (4 baris beda), kurung `{}` 340/340 sebelum = 223/223 (`LibraryScreen.kt`) +
+  117/117 (blok pindahan), `()` 751/751 = 466/466 + 285/285; tiap fungsi didefinisikan tepat 1x di seluruh source (0 duplikat/konflik
+  nama di paket `ui`, termasuk folder test). **0 build/test dijalankan** — sandbox tanpa kotlinc/Gradle. **CI BELUM dikonfirmasi,
+  device BELUM diuji**
+- **Uji device v517** (tab Library): (1) tab Lagu: daftar tampil, scroll normal, tap lagu memutar, baris "sedang diputar" ter-highlight;
+  (2) tekan-tahan lalu geser -> pilihan MENGIKUTI jari, list tidak ikut ter-scroll, lepas jari -> scroll normal (fix v516 harus tetap
+  utuh); (3) tombol favorit + menu titik tiga (Putar Berikutnya, Tambah ke Antrean, Tambah ke Playlist, Sembunyikan, Pilih, Hapus dari
+  Perangkat); (4) tab Album: grid -> masuk album -> Kembali; (5) tab Artis/Folder (GroupedListView): masuk grup -> daftar lagu -> kembali;
+  (6) pencarian: hasil lagu tampil dengan baris yang sama; (7) rotasi/font besar 0 beda dari v516
+
 ## Batch 516 — FIX v515: prompt sidik jari tidak lagi muncul berulang + gesture pilih-lagu (scroll dimatikan saat sweep, refresh otomatis tanpa shimmer) (BELUM verified)
 - Laporan user atas v515: "semua aman terkendali, except: (1) tab biometric fingerprint yang maksa nampilin dialog berkali-kali,
   sedangkan bagaimana dengan user yang mau buka via PIN; (2) fitur drag to select music yang gak ikut jari dan malah scrolling

@@ -55,7 +55,11 @@
 # docs/PENDING_CodeTidyPlan.md — ThemeModeToggleSection/ThemeOptionCard/AppLockSection/SetPinDialog
 # dipindah dari SettingsScreen.kt) ditambahkan — 201->202 (200 di ZIP + 2 dotfile
 # .github/.gitignore yang sengaja tidak dikirim).
-# Total: 202 file
+# Batch 517: app/src/main/java/com/rudi/audioplayer/ui/LibraryLists.kt (file baru, T8a Wave 2
+# docs/PENDING_CodeTidyPlan.md — AlbumGridView/SongListView/GroupedListView/SongRow dipindah dari
+# LibraryScreen.kt) ditambahkan — 202->203 (201 di ZIP + 2 dotfile .github/.gitignore yang sengaja
+# tidak dikirim).
+# Total: 203 file
 
 .github/workflows/build.yml
 .gitignore
@@ -147,6 +151,7 @@ app/src/main/java/com/rudi/audioplayer/ui/EqualizerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/FeatureHintBanner.kt
 app/src/main/java/com/rudi/audioplayer/ui/FolderManagerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/HomeScreen.kt
+app/src/main/java/com/rudi/audioplayer/ui/LibraryLists.kt
 app/src/main/java/com/rudi/audioplayer/ui/LibraryScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/LibrarySearchIndex.kt
 app/src/main/java/com/rudi/audioplayer/ui/LockScreen.kt

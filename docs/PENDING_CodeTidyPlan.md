@@ -134,6 +134,10 @@ T8a-T10 BELUM.
 **Update Batch 516**: user melaporkan v515 (T7) "aman terkendali" (tentatif; rincian CI vs device tidak dirinci), dengan 2 bug di
 luar T7 (prompt sidik jari berulang; gesture pilih-lagu) — bukan akibat pemindahan T7. Batch 516 = fix 2 bug itu (3 file, di luar
 daftar T); T8a dilanjutkan setelah hasilnya dikonfirmasi user.
+**Update Batch 517**: user melaporkan v516 "2 bug telah teratasi" (rincian CI vs device tidak dirinci) -> T8a dilanjutkan.
+**Status Wave 2 (Batch 517)**: T8a KODE SELESAI — 2 file: `LibraryScreen.kt` (1460->970 baris) + baru `LibraryLists.kt`, 489 baris
+move-only (hanya `private`->`internal` pada 4 fungsi; nomor baris tabel di atas sudah bergeser sejak T1, blok nyata = 631-690 &
+1033-1460). Belum diverifikasi CI/device (0 build dijalankan). T8b-T10 BELUM.
 Tiap T: 2 file disentuh, diff move-only, CI hijau, lalu device smoke test layar terkait (T10:
 seret tab-bar, tap tab, label tidak ellipsis, font besar, 0 regresi minimize/expand — daftar
 lengkap di `PROJECT_STATE.md` sektor bottom nav).
