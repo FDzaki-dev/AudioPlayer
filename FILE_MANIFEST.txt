@@ -63,7 +63,11 @@
 # docs/PENDING_CodeTidyPlan.md — LibraryHeader/LibrarySearchField/LibraryFilterChips/SearchHistoryView/
 # SearchSectionLabel/SearchResultsView dipindah dari LibraryScreen.kt) ditambahkan — 203->204 (202 di
 # ZIP + 2 dotfile .github/.gitignore yang sengaja tidak dikirim).
-# Total: 204 file
+# Batch 519: app/src/main/java/com/rudi/audioplayer/OnboardingScreens.kt (file baru, T9 Wave 2
+# docs/PENDING_CodeTidyPlan.md — WelcomeScreen/WelcomeHighlight/PermissionRationale dipindah dari
+# MainActivity.kt; paket root `com.rudi.audioplayer`) ditambahkan — 204->205 (203 di ZIP + 2 dotfile
+# .github/.gitignore yang sengaja tidak dikirim).
+# Total: 205 file
 
 .github/workflows/build.yml
 .gitignore
@@ -81,6 +85,7 @@ app/src/androidTest/java/com/rudi/audioplayer/playback/PlaybackTransportTest.kt
 app/src/main/AndroidManifest.xml
 app/src/main/java/com/rudi/audioplayer/AudioPlayerApplication.kt
 app/src/main/java/com/rudi/audioplayer/MainActivity.kt
+app/src/main/java/com/rudi/audioplayer/OnboardingScreens.kt
 app/src/main/java/com/rudi/audioplayer/bubble/BubbleBootReceiver.kt
 app/src/main/java/com/rudi/audioplayer/bubble/BubbleTileService.kt
 app/src/main/java/com/rudi/audioplayer/bubble/FloatingBubbleService.kt

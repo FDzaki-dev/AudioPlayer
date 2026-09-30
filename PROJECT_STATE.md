@@ -12,6 +12,12 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 519 [user atas v518: "v518 tetap zero diff. lanjutkan milestone!!"]**: T8b dianggap nol regresi (rincian CI vs device tidak
+dirinci) -> T9 dikerjakan. **2 file source** (`MainActivity.kt` 2414->2272 baris + baru `OnboardingScreens.kt`, paket ROOT
+`com.rudi.audioplayer`): `WelcomeScreen`/`WelcomeHighlight`/`PermissionRationale` dipindah MOVE-ONLY (diff = 2 baris `private`->`internal`,
+`WelcomeHighlight` tetap private; 0 perilaku berubah; rekonstruksi programatik == `MainActivity.kt` v518 asli). **NOT VERIFIED** — 0
+build/test; CI + device BELUM. Detail: `CHANGELOG.md` Batch 519.
+
 **Catatan Batch 518 [user atas v517: "v517 zero diff. lanjut"]**: T8a dianggap nol regresi (rincian CI vs device tidak dirinci) -> T8b
 dikerjakan. **2 file source** (`LibraryScreen.kt` 970->670 baris + baru `LibrarySearch.kt`): `LibraryHeader`/`LibrarySearchField`/
 `LibraryFilterChips`/`SearchHistoryView`/`SearchSectionLabel`/`SearchResultsView` + 2 `val` label tab dipindah MOVE-ONLY (diff = 5 baris
@@ -2460,7 +2466,21 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 518. ZIP: `SONIX_v518.zip`. **2 file source diubah** (`ui/LibraryScreen.kt`, + baru `ui/LibrarySearch.kt`) — Wave 2
+- Batch terakhir: 519. ZIP: `SONIX_v519.zip`. **2 file source diubah** (`MainActivity.kt`, + baru `OnboardingScreens.kt`) — Wave 2
+  T9 move-only (0 perilaku berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: user "v518 tetap zero diff, lanjutkan milestone" -> T9 Wave 2 ->
+  Status: KODE SELESAI — 3 composable dipindah (paket root, 0 import baru di `MainActivity.kt`), diff 2 baris `private`->`internal`,
+  `MainActivity.kt` baru = v518 dikurangi 142 baris (dicek programatik). **0 build/test dijalankan** -> CI BELUM dikonfirmasi, device
+  BELUM diuji, JANGAN klaim verified ->
+  Remaining: CI hijau di commit batch ini + device smoke test jalur onboarding (daftar "Uji device v519" di `CHANGELOG.md` Batch 519;
+  hanya muncul bila izin audio belum diberikan). T10 BELUM; T3 (opsional) + G2 (CI baseline) masih BELUM. Observasi (BUKAN bug
+  terbukti): kedua layar onboarding pakai `Column` tanpa scroll -> potensi terpotong di layar pendek/landscape/font besar, belum diuji.
+  `SongPickerSheet.kt` punya detektor sweep serupa — BELUM dicek ->
+  Next Action: tunggu hasil CI/device user. Hijau/nol regresi -> lanjut T10 (`BottomNavBar.kt`, R3, TERAKHIR: WAJIB byte-identik,
+  `AppNavHost` TIDAK dipecah; baca dulu sektor bottom nav di file ini + verifikasi ulang nomor baris/pemakai 4 simbol sebelum memindah;
+  daftar uji = seret tab-bar, tap tab, label tidak ellipsis, font besar, 0 regresi minimize/expand); crash/regresi onboarding ->
+  kembali ke `SONIX_v518.zip`.
+- Batch 518 (sebelum 519). ZIP: `SONIX_v518.zip`. **2 file source diubah** (`ui/LibraryScreen.kt`, + baru `ui/LibrarySearch.kt`) — Wave 2
   T8b move-only (0 perilaku berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
   Task: user "v517 zero diff, lanjut" -> T8b Wave 2 ->
   Status: KODE SELESAI — 6 composable + 2 val dipindah, diff 5 baris `private`->`internal`, `LibraryScreen.kt` = 670 baris pertama asli

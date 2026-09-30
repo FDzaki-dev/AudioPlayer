@@ -1,5 +1,46 @@
 # Changelog
 
+## Batch 519 — Wave 2 T9 (MOVE-ONLY): `WelcomeScreen`/`WelcomeHighlight`/`PermissionRationale` dipindah dari `MainActivity.kt` ke `OnboardingScreens.kt` (BELUM verified)
+- Laporan user atas v518: "v518 tetap zero diff. lanjutkan milestone!!" -> T8b dianggap nol regresi (rincian CI vs device tidak
+  dirinci); milestone berikutnya = T9 (Next Action Batch 518 + `docs/PENDING_CodeTidyPlan.md`)
+- **Perubahan (2 file source)**: `MainActivity.kt` (2414 -> 2272 baris) + baru `OnboardingScreens.kt` (188 baris = 47 baris
+  header package/import/komentar + 141 baris isi = 140 baris blok pindahan + 1 baris kosong pemisah). Paket TETAP `com.rudi.audioplayer`
+  (paket ROOT, bukan `ui` — `MainActivity.kt` memang di root; file baru diletakkan di sebelahnya), jadi 0 import baru di
+  `MainActivity.kt`. 0 call site diubah, 0 perilaku berubah
+- **Pemeriksaan isi sebelum memindah** (syarat rencana T9): ketiga fungsi hanya `Column`/`Row`/`Box`/`Text`/`Icon`/`Button`/`TextButton`;
+  0 state, 0 gesture, 0 ViewModel, 0 `remember`. `PermissionRationale` memanggil `startActivity(Intent(ACTION_APPLICATION_DETAILS_SETTINGS))`
+  langsung dari lambda `onClick` — ikut pindah utuh. Dipanggil HANYA dari cabang `when` di `setContent` (`MainActivity.kt` 533 & 539),
+  tidak berubah. Komentar Batch 111 (insets manual `safeDrawing`, layar render di luar Scaffold) ikut pindah utuh. Nomor baris di
+  tabel rencana sudah bergeser; blok nyata = 551-644 (`WelcomeScreen` + `WelcomeHighlight`) dan 2369-2414 (`PermissionRationale`)
+- **Bukti move-only**: (1) diff `MainActivity.kt` v518 vs baru = HANYA penghapusan 142 baris (551-645 dan 2368-2414), 0 baris tambah/ubah;
+  (2) rekonstruksi programatik — `MainActivity.kt` baru + blok di `OnboardingScreens.kt` (2 kata `internal` dikembalikan ke `private`) =
+  `MainActivity.kt` v518 asli, IDENTIK 2414 baris (`True`). Satu-satunya beda blok = `private fun` -> `internal fun` pada
+  `WelcomeScreen` dan `PermissionRationale` (dipanggil dari `MainActivity`). `WelcomeHighlight` SENGAJA tetap `private` (hanya dipakai
+  `WelcomeScreen` di file yang sama)
+- Import file baru: hanya yang dipakai blok (komentar & literal string diabaikan saat menyaring). Dicek programatik: 0 import
+  tak terpakai, 12 ekstensi/modifier (`clip`/`background`/`border`/`padding`/`size`/`width`/`height`/`fillMaxSize`/`fillMaxWidth`/
+  `windowInsetsPadding`/`safeDrawing`/`dp`) semuanya ter-import. Import lama di `MainActivity.kt` TIDAK disentuh (sebagian kemungkinan
+  kini tak terpakai -> paling banyak warning IDE, bukan error kompilasi; merapikannya = item terpisah)
+- 0 bentrok nama: `WelcomeScreen`/`WelcomeHighlight`/`PermissionRationale` didefinisikan tepat 1x di seluruh source; paket root hanya
+  berisi `AudioPlayerApplication.kt`, `MainActivity.kt`, dan file baru
+- Tidak disentuh: `AppLockStore.kt`, `PlaybackService.kt`, `app/build.gradle.kts`, `FloatingBubbleService.kt`, `AppHaptics.kt`,
+  sektor bottom nav (`MagnifyingTabLabel`/`GlassTabIcon`/`NoRippleIndication`/`CustomNavBarTabItem`/`AppNavHost` tetap di
+  `MainActivity.kt` — itu T10, R3), `LockScreen.kt` (hanya menyebut nama kedua layar di komentar; tetap akurat), sektor DITUTUP.
+  README tidak diubah (refactor internal, 0 fitur/perilaku berubah; README tidak menyebut fungsi-fungsi ini)
+- **File source disentuh: 2**. Doc: `CHANGELOG.md`, `PROJECT_STATE.md`, `FILE_MANIFEST.txt` (204 -> 205), `docs/PENDING_CodeTidyPlan.md`
+- **Validasi jujur**: cek statis saja — kurung `{}` `MainActivity.kt` 333/333 sebelum = 321/321 sesudah + 12/12 (blok pindahan);
+  `()` 670/670 = 597/597 + 73/73 (komentar & string diabaikan). **0 build/test dijalankan** — sandbox tanpa kotlinc/Gradle.
+  **CI BELUM dikonfirmasi, device BELUM diuji**
+- **Catatan observasi (TIDAK diubah, di luar lingkup move-only)**: `WelcomeScreen`/`PermissionRationale` memakai `Column` TANPA
+  scroll dan `padding(32.dp)` tetap; di layar pendek/landscape/font besar kontennya berpotensi terpotong. Perilaku ini sudah ada sejak
+  sebelum v519 dan belum pernah diuji — kandidat item terpisah kalau user melaporkannya, BUKAN klaim bug
+- **Uji device v519** (jalur onboarding — hanya muncul bila izin audio belum diberikan; uji dengan data app dihapus atau izin dicabut
+  lewat Pengaturan Aplikasi): (1) layar Selamat Datang: ikon nada dalam lingkaran, "SELAMAT DATANG / SONIX", 3 sorotan (tanpa internet /
+  atur folder / equalizer), tombol Lanjutkan — tidak tertutup status bar/nav bar, di gesture-nav maupun 3-button-nav; (2) Lanjutkan ->
+  dialog izin sistem muncul; Izinkan -> masuk aplikasi; (3) Tolak -> layar "Izin akses musik dibutuhkan": Coba Lagi memunculkan dialog
+  izin (atau tidak, bila sudah ditolak permanen — sesuai teks di layar), "Buka Pengaturan Aplikasi" membuka detail app; beri izin lalu
+  kembali -> masuk aplikasi; (4) rotasi + font besar di kedua layar sama dengan v518 (kalau terpotong = pra-ada, lihat catatan observasi)
+
 ## Batch 518 — Wave 2 T8b (MOVE-ONLY): `LibraryHeader`/`LibrarySearchField`/`LibraryFilterChips`/`SearchHistoryView`/`SearchSectionLabel`/`SearchResultsView` dipindah dari `LibraryScreen.kt` ke `LibrarySearch.kt` (BELUM verified)
 - Laporan user atas v517: "v517 zero diff. lanjut" -> T8a dianggap nol regresi (rincian CI vs device tidak dirinci); milestone
   berikutnya = T8b (Next Action Batch 517 + `docs/PENDING_CodeTidyPlan.md`)

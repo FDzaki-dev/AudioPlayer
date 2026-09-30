@@ -142,6 +142,11 @@ move-only (hanya `private`->`internal` pada 4 fungsi; nomor baris tabel di atas 
 **Status Wave 2 (Batch 518)**: T8b KODE SELESAI — 2 file: `LibraryScreen.kt` (970->670 baris) + baru `LibrarySearch.kt`, 299 baris
 move-only (hanya `private`->`internal` pada 5 fungsi; `SearchSectionLabel` + 2 `val` label tab tetap private; `SelectionActionBar`
 TIDAK termasuk T8b dan tetap di `LibraryScreen.kt`). Belum diverifikasi CI/device (0 build dijalankan). T9-T10 BELUM.
+**Update Batch 519**: user melaporkan v518 "tetap zero diff" (rincian CI vs device tidak dirinci) -> T9 dilanjutkan.
+**Status Wave 2 (Batch 519)**: T9 KODE SELESAI — 2 file: `MainActivity.kt` (2414->2272 baris) + baru `OnboardingScreens.kt` (paket ROOT
+`com.rudi.audioplayer`, bukan `ui`), 140 baris move-only (hanya `private`->`internal` pada `WelcomeScreen` + `PermissionRationale`;
+`WelcomeHighlight` tetap private). Blok nyata = 551-644 & 2369-2414 (nomor tabel di atas sudah bergeser). Belum diverifikasi
+CI/device (0 build dijalankan). T10 BELUM (R3, terakhir).
 Tiap T: 2 file disentuh, diff move-only, CI hijau, lalu device smoke test layar terkait (T10:
 seret tab-bar, tap tab, label tidak ellipsis, font besar, 0 regresi minimize/expand — daftar
 lengkap di `PROJECT_STATE.md` sektor bottom nav).
