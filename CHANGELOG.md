@@ -1,5 +1,40 @@
 # Changelog
 
+## Batch 518 — Wave 2 T8b (MOVE-ONLY): `LibraryHeader`/`LibrarySearchField`/`LibraryFilterChips`/`SearchHistoryView`/`SearchSectionLabel`/`SearchResultsView` dipindah dari `LibraryScreen.kt` ke `LibrarySearch.kt` (BELUM verified)
+- Laporan user atas v517: "v517 zero diff. lanjut" -> T8a dianggap nol regresi (rincian CI vs device tidak dirinci); milestone
+  berikutnya = T8b (Next Action Batch 517 + `docs/PENDING_CodeTidyPlan.md`)
+- **Perubahan (2 file source)**: `ui/LibraryScreen.kt` (970 -> 670 baris) + baru `ui/LibrarySearch.kt` (340 baris = 41 baris
+  header package/import/komentar + 299 baris blok pindahan). Paket TETAP `com.rudi.audioplayer.ui`. 0 call site diubah, 0 perilaku berubah
+- **Blok pindahan** (asli baris 672-970): 6 composable + 2 `val` label tab (`LIBRARY_PRIMARY_TAB_LABELS`/`LIBRARY_MORE_TAB_LABELS`, ikut
+  pindah karena hanya dipakai `LibraryFilterChips`). `SelectionActionBar` (asli 631-670) TIDAK termasuk daftar T8b -> tetap di
+  `LibraryScreen.kt`
+- **Bukti move-only**: blok di file baru vs asli baris 672-970 -> diff = TEPAT 5 baris (`private fun` -> `internal fun` pada
+  `LibraryHeader`, `LibrarySearchField`, `LibraryFilterChips`, `SearchHistoryView`, `SearchResultsView` — kelimanya dipanggil dari
+  `LibraryScreen()`), 0 baris lain. `SearchSectionLabel` dan 2 `val` label SENGAJA tetap `private` (hanya dipakai di file baru).
+  `LibraryScreen.kt` baru = 670 baris pertama file asli, identik baris-per-baris (dicek programatik)
+- Import file baru: hanya yang dipakai blok (komentar & literal string diabaikan saat menyaring — pelajaran Batch 517). Import
+  `lazy.grid.items` sengaja tidak dibawa (0 pemakaian grid di blok; `items(...)` di blok = `LazyListScope.items` dari `lazy.items`).
+  Import lama di `LibraryScreen.kt` TIDAK disentuh (sebagian kini tak terpakai -> paling banyak warning IDE, bukan error kompilasi;
+  merapikannya = item terpisah)
+- Ketergantungan: blok merujuk `EmptyState` (`SharedComponents.kt`, publik) dan `SongRow` (`LibraryLists.kt`, `internal` sejak
+  Batch 517) — keduanya paket `ui` yang sama, tak perlu diubah. Blok TIDAK merujuk simbol `private` lain di `LibraryScreen.kt`
+  (`SelectionActionBar` 0 rujukan). 0 bentrok nama: tiap fungsi/val didefinisikan tepat 1x di seluruh source (`LibrarySearchIndex.kt`
+  = file lain, nama beda)
+- Tidak disentuh: `AppLockStore.kt`, `PlaybackService.kt`, `app/build.gradle.kts`, `FloatingBubbleService.kt`, sektor bottom nav,
+  `AppHaptics.kt`, `SongPickerSheet.kt`, `LibraryLists.kt`, sektor DITUTUP. README tidak diubah (refactor internal, 0 fitur/perilaku
+  berubah; README tidak menyebut fungsi-fungsi ini)
+- **File source disentuh: 2**. Doc: `CHANGELOG.md`, `PROJECT_STATE.md`, `FILE_MANIFEST.txt` (203 -> 204), `docs/PENDING_CodeTidyPlan.md`
+- **Validasi jujur**: cek statis saja — diff move-only (5 baris beda), kurung `{}` 223/223 sebelum = 149/149 (`LibraryScreen.kt`) +
+  74/74 (blok pindahan), `()` 466/466 = 293/293 + 173/173; 8 ikon `Icons.Default.*` di blok semuanya ter-import (0 kurang, 0 lebih);
+  identifier kapital di blok terselesaikan oleh wildcard `layout.*`/`material3.*`/`runtime.*`, import eksplisit, atau paket `ui`.
+  **0 build/test dijalankan** — sandbox tanpa kotlinc/Gradle. **CI BELUM dikonfirmasi, device BELUM diuji**
+- **Uji device v518** (tab Library): (1) header "LIBRARY / Musik Saya" + 3 ikon (cari, kelola folder, pindai ulang) berfungsi;
+  (2) chip Lagu/Album/Artis pindah tab; chip "Lainnya" -> menu Folder/Favorit/Playlist/Otomatis, label chip berubah sesuai pilihan
+  dan kembali "Lainnya" saat pindah ke tab utama; tema Liquid Glass: chip tetap stadium penuh; (3) ikon cari -> field muncul,
+  tombol Search keyboard menutup keyboard, ikon X menutup pencarian; riwayat kosong -> "Cari lagu, album, atau artis", riwayat ada
+  -> daftar + tombol Hapus + tap riwayat mengisi kueri; (4) ketik kueri -> seksi Artis/Album/Lagu, tap artis/album -> masuk grup,
+  baris lagu (favorit, menu titik tiga) sama seperti tab Lagu; kueri ngawur -> "Tidak ditemukan"; (5) rotasi/font besar 0 beda dari v517
+
 ## Batch 517 — Wave 2 T8a (MOVE-ONLY): `AlbumGridView`/`SongListView`/`GroupedListView`/`SongRow` dipindah dari `LibraryScreen.kt` ke `LibraryLists.kt` (BELUM verified)
 - Laporan user: "baik, 2 bug telah teratasi. lanjutkan milestone!!" -> 2 bug v516 (prompt sidik jari berulang; drag-select/shimmer)
   dianggap beres oleh user; penahanan T8a dicabut, milestone berikutnya = T8a (Next Action Batch 516 + `docs/PENDING_CodeTidyPlan.md`).

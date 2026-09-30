@@ -138,6 +138,10 @@ daftar T); T8a dilanjutkan setelah hasilnya dikonfirmasi user.
 **Status Wave 2 (Batch 517)**: T8a KODE SELESAI — 2 file: `LibraryScreen.kt` (1460->970 baris) + baru `LibraryLists.kt`, 489 baris
 move-only (hanya `private`->`internal` pada 4 fungsi; nomor baris tabel di atas sudah bergeser sejak T1, blok nyata = 631-690 &
 1033-1460). Belum diverifikasi CI/device (0 build dijalankan). T8b-T10 BELUM.
+**Update Batch 518**: user melaporkan v517 "zero diff" (rincian CI vs device tidak dirinci) -> T8b dilanjutkan.
+**Status Wave 2 (Batch 518)**: T8b KODE SELESAI — 2 file: `LibraryScreen.kt` (970->670 baris) + baru `LibrarySearch.kt`, 299 baris
+move-only (hanya `private`->`internal` pada 5 fungsi; `SearchSectionLabel` + 2 `val` label tab tetap private; `SelectionActionBar`
+TIDAK termasuk T8b dan tetap di `LibraryScreen.kt`). Belum diverifikasi CI/device (0 build dijalankan). T9-T10 BELUM.
 Tiap T: 2 file disentuh, diff move-only, CI hijau, lalu device smoke test layar terkait (T10:
 seret tab-bar, tap tab, label tidak ellipsis, font besar, 0 regresi minimize/expand — daftar
 lengkap di `PROJECT_STATE.md` sektor bottom nav).

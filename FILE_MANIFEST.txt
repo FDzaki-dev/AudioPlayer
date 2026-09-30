@@ -59,7 +59,11 @@
 # docs/PENDING_CodeTidyPlan.md — AlbumGridView/SongListView/GroupedListView/SongRow dipindah dari
 # LibraryScreen.kt) ditambahkan — 202->203 (201 di ZIP + 2 dotfile .github/.gitignore yang sengaja
 # tidak dikirim).
-# Total: 203 file
+# Batch 518: app/src/main/java/com/rudi/audioplayer/ui/LibrarySearch.kt (file baru, T8b Wave 2
+# docs/PENDING_CodeTidyPlan.md — LibraryHeader/LibrarySearchField/LibraryFilterChips/SearchHistoryView/
+# SearchSectionLabel/SearchResultsView dipindah dari LibraryScreen.kt) ditambahkan — 203->204 (202 di
+# ZIP + 2 dotfile .github/.gitignore yang sengaja tidak dikirim).
+# Total: 204 file
 
 .github/workflows/build.yml
 .gitignore
@@ -153,6 +157,7 @@ app/src/main/java/com/rudi/audioplayer/ui/FolderManagerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/HomeScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/LibraryLists.kt
 app/src/main/java/com/rudi/audioplayer/ui/LibraryScreen.kt
+app/src/main/java/com/rudi/audioplayer/ui/LibrarySearch.kt
 app/src/main/java/com/rudi/audioplayer/ui/LibrarySearchIndex.kt
 app/src/main/java/com/rudi/audioplayer/ui/LockScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/LyricsSheet.kt

@@ -12,6 +12,11 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 518 [user atas v517: "v517 zero diff. lanjut"]**: T8a dianggap nol regresi (rincian CI vs device tidak dirinci) -> T8b
+dikerjakan. **2 file source** (`LibraryScreen.kt` 970->670 baris + baru `LibrarySearch.kt`): `LibraryHeader`/`LibrarySearchField`/
+`LibraryFilterChips`/`SearchHistoryView`/`SearchSectionLabel`/`SearchResultsView` + 2 `val` label tab dipindah MOVE-ONLY (diff = 5 baris
+`private`->`internal`, 0 perilaku berubah). **NOT VERIFIED** — 0 build/test; CI + device BELUM. Detail: `CHANGELOG.md` Batch 518.
+
 **Catatan Batch 517 [user atas v516: "baik, 2 bug telah teratasi. lanjutkan milestone!!"]**: 2 bug v516 dianggap beres user (rincian CI vs
 device tidak dirinci) -> penahanan T8a dicabut. **2 file source** (`LibraryScreen.kt` 1460->970 baris + baru `LibraryLists.kt`): `AlbumGridView`/
 `SongListView`/`GroupedListView`/`SongRow` dipindah MOVE-ONLY (diff = 4 baris `private`->`internal`, 0 perilaku berubah; fix Batch 516 ikut
@@ -2455,7 +2460,18 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 517. ZIP: `SONIX_v517.zip`. **2 file source diubah** (`ui/LibraryScreen.kt`, + baru `ui/LibraryLists.kt`) — Wave 2
+- Batch terakhir: 518. ZIP: `SONIX_v518.zip`. **2 file source diubah** (`ui/LibraryScreen.kt`, + baru `ui/LibrarySearch.kt`) — Wave 2
+  T8b move-only (0 perilaku berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+  Task: user "v517 zero diff, lanjut" -> T8b Wave 2 ->
+  Status: KODE SELESAI — 6 composable + 2 val dipindah, diff 5 baris `private`->`internal`, `LibraryScreen.kt` = 670 baris pertama asli
+  (identik). **0 build/test dijalankan** -> CI BELUM dikonfirmasi, device BELUM diuji, JANGAN klaim verified ->
+  Remaining: CI hijau di commit batch ini + device smoke test tab Library/pencarian (daftar "Uji device v518" di `CHANGELOG.md`
+  Batch 518). T9/T10 BELUM; T3 (opsional) + G2 (CI baseline) masih BELUM. `SongPickerSheet.kt` punya detektor sweep serupa — BELUM
+  dicek ->
+  Next Action: tunggu hasil CI/device user. Hijau/nol regresi -> lanjut T9 (`OnboardingScreens.kt`, 1 target/batch; periksa dulu
+  isi `WelcomeScreen`/`PermissionRationale` sebelum memindah); crash/regresi Library -> kembali ke `SONIX_v517.zip`. T10 = R3,
+  dikerjakan terakhir.
+- Batch 517 (sebelum 518). ZIP: `SONIX_v517.zip`. **2 file source diubah** (`ui/LibraryScreen.kt`, + baru `ui/LibraryLists.kt`) — Wave 2
   T8a move-only (0 perilaku berubah). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
   Task: user "2 bug telah teratasi, lanjutkan milestone" -> T8a Wave 2 ->
   Status: KODE SELESAI — 4 composable dipindah, diff 4 baris `private`->`internal`, `LibraryScreen.kt` = asli minus blok (identik).
@@ -2463,7 +2479,8 @@ Detail lengkap: README.md § "Standar Penomoran Versi".
   Remaining: CI hijau di commit batch ini + device smoke test tab Library (daftar "Uji device v517" di `CHANGELOG.md` Batch 517).
   T8b/T9/T10 BELUM; T3 (opsional) + G2 (CI baseline) masih BELUM. `SongPickerSheet.kt` punya detektor sweep serupa — BELUM dicek ->
   Next Action: tunggu hasil CI/device user. Hijau/nol regresi -> lanjut T8b (`LibrarySearch.kt`, 1 target/batch); crash/regresi
-  Library -> kembali ke `SONIX_v516.zip`. T10 = R3, dikerjakan terakhir.
+  Library -> kembali ke `SONIX_v516.zip`. T10 = R3, dikerjakan terakhir. **Hasil (Batch 518)**: user melaporkan "v517 zero diff"
+  (rincian CI vs device tidak dirinci) -> T8b dikerjakan.
 - Batch 516 (sebelum 517). ZIP: `SONIX_v516.zip`. **3 file source diubah** (`MainActivity.kt`, `playback/PlayerViewModel.kt`,
   `ui/LibraryScreen.kt`) — fix 2 bug laporan user atas v515 (perilaku SENGAJA berubah: prompt biometrik otomatis 1x per sesi kunci;
   refresh otomatis MediaStore tanpa shimmer bila list sudah berisi; scroll list mati selama sweep-select).
