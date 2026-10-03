@@ -122,12 +122,12 @@ fun LibraryScreen(
     var showLibraryHint by remember { mutableStateOf(!hintStore.hasSeenLibraryHint()) }
     val searchHistoryStore = remember { SearchHistoryStore(context) }
     var searchHistory by remember { mutableStateOf(searchHistoryStore.getHistory()) }
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var songForPlaylistDialog by remember { mutableStateOf<Song?>(null) }
     var showFolderManager by remember { mutableStateOf(false) }
-    var filterVersion by remember { mutableStateOf(0) }
+    var filterVersion by remember { mutableIntStateOf(0) }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(persistentSetOf<Long>()) }
     var songForBulkPlaylistDialog by remember { mutableStateOf(false) }
@@ -208,7 +208,7 @@ fun LibraryScreen(
     }
     val addToPlaylist: (Song) -> Unit = { songForPlaylistDialog = it }
     var undoHideIds by remember { mutableStateOf<List<Long>>(emptyList()) }
-    var undoBarKey by remember { mutableStateOf(0) }
+    var undoBarKey by remember { mutableIntStateOf(0) }
     val hideSong: (Song) -> Unit = {
         filterStore.setSongHidden(it.id, true)
         filterVersion++

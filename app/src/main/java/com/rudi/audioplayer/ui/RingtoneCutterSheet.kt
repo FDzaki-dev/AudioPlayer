@@ -46,7 +46,7 @@ fun RingtoneCutterSheet(
     val haptic = LocalHapticFeedback.current
     val duration = song.duration.coerceAtLeast(1L)
 
-    var startMs by remember(song.id) { mutableStateOf(0L) }
+    var startMs by remember(song.id) { mutableLongStateOf(0L) }
     var endMs by remember(song.id) {
         mutableStateOf((duration).coerceAtMost(RingtoneCutter.MAX_DURATION_MS))
     }

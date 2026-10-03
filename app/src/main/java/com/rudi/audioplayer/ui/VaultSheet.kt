@@ -88,7 +88,7 @@ fun VaultSheet(
 
     var vaultEnabled by remember { mutableStateOf(vaultStore.isVaultEnabled()) }
     var unlocked by remember { mutableStateOf(false) }
-    var vaultedIdsVersion by remember { mutableStateOf(0) }
+    var vaultedIdsVersion by remember { mutableIntStateOf(0) }
     var showDisableConfirm by remember { mutableStateOf(false) }
     var showAddPicker by remember { mutableStateOf(false) }
 

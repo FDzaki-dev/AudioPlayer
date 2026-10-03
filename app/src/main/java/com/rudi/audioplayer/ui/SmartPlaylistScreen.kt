@@ -247,7 +247,7 @@ private fun SmartPlaylistBuilderSheet(
     var selectedFolders by remember { mutableStateOf(initial?.folderNames ?: emptySet()) }
     var minMinutes by remember { mutableStateOf(initial?.minDurationMs?.let { (it / 60_000L).toString() } ?: "") }
     var maxMinutes by remember { mutableStateOf(initial?.maxDurationMs?.let { (it / 60_000L).toString() } ?: "") }
-    var minRating by remember { mutableStateOf(initial?.minRating ?: 0) }
+    var minRating by remember { mutableIntStateOf(initial?.minRating ?: 0) }
     var minYear by remember { mutableStateOf(initial?.minYear?.toString() ?: "") }
     var maxYear by remember { mutableStateOf(initial?.maxYear?.toString() ?: "") }
     var keyword by remember { mutableStateOf(initial?.keyword ?: "") }

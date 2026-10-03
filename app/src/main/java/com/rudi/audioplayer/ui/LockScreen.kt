@@ -43,7 +43,7 @@ fun LockScreen(
     var entered by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
     var lockedOutUntil by remember { mutableStateOf(initialLockedOutUntil) }
-    var remainingSeconds by remember { mutableStateOf(0) }
+    var remainingSeconds by remember { mutableIntStateOf(0) }
     val haptic = LocalHapticFeedback.current
     // Sebelumnya layar paling "tactile" di app ini (dipencet berkali-kali tiap buka app)
     // justru satu-satunya yang nol haptic — termasuk saat PIN salah, yang cuma keliatan dari
