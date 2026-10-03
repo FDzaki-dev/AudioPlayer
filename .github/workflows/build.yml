@@ -315,7 +315,8 @@ jobs:
   # abortOnError/warningsAsErrors). Job TERPISAH tanpa `needs:`, pola sama `instrumentation-tests`:
   # temuan baru/lama di sini membuat job INI merah, tapi publish APK di job `build` tidak pernah
   # ikut terblokir. Merah di run pertama WAJAR kalau ada temuan lama (belum ada baseline) —
-  # unduh artifact static_analysis_report_<run> untuk daftar lengkapnya.
+  # unduh artifact ci_report_<run> (gabungan sejak Batch 526; laporan ini ada di folder
+  # static_analysis_report_<run>/ di dalamnya) untuk daftar lengkapnya.
   static-analysis:
     runs-on: ubuntu-latest
     steps:
@@ -341,7 +342,10 @@ jobs:
       - name: Run detekt + lintDebug
         # `gradle` (bukan `./gradlew`) — proyek belum punya Gradle Wrapper (gap list #19),
         # sama seperti job `build` & `instrumentation-tests`.
-        run: gradle detekt lintDebug --no-daemon --console=plain
+        # Batch 526 — `--continue`: tanpa ini detekt merah (run #503: 4279 temuan) menghentikan
+        # Gradle SEBELUM lintDebug sempat jalan -> laporan lint tidak pernah ada. Dengan flag ini
+        # kedua task selalu jalan; status job TETAP merah kalau salah satunya gagal.
+        run: gradle detekt lintDebug --no-daemon --console=plain --continue
 
       - name: Upload static analysis reports
         if: always()
@@ -353,3 +357,93 @@ jobs:
             app/build/reports/lint-results-debug.*
           if-no-files-found: ignore
           retention-days: 14
+
+  # Batch 526 — log failure/laporan CI yang terpisah (log_fail_<run>, instrumentation_test_report_<run>,
+  # static_analysis_report_<run>) bikin unduhan menumpuk. Job ini jalan SETELAH ketiga job di atas
+  # selesai (apa pun hasilnya), menggabungkan semua artifact run ini jadi SATU artifact
+  # `ci_report_<run>` (INDEX.txt + 1 folder per laporan asal), lalu menghapus artifact terpisahnya.
+  # Murni aditif: `needs:` hanya mengarah dari job ini KE tiga job lain (bukan sebaliknya) ->
+  # publish APK di job `build` tidak pernah menunggu/terblokir. Aman-gagal: artifact terpisah baru
+  # dihapus kalau `ci_report_<run>` terbukti sudah terdaftar di run ini; selain itu semuanya
+  # dibiarkan utuh (fallback = perilaku lama).
+  collect-reports:
+    needs: [build, instrumentation-tests, static-analysis]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write   # hanya utk DELETE artifact terpisah lewat REST API; tanpa checkout/contents
+    steps:
+      - name: Download semua artifact run ini
+        # Tanpa `name`/`pattern` = semua artifact run ini, tiap artifact di sub-folder bernama
+        # sama. Run tanpa artifact sama sekali (semua job gagal sebelum upload) tidak boleh
+        # membuat job ini merah.
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          path: parts
+
+      - name: Susun laporan gabungan
+        run: |
+          mkdir -p ci_report parts
+          cp -r parts/. ci_report/
+          {
+            echo "CI REPORT GABUNGAN — run #${{ github.run_number }} — commit ${GITHUB_SHA::7}"
+            echo ""
+            echo "Hasil job:"
+            echo "  build              : ${{ needs.build.result }}"
+            echo "  instrumentation    : ${{ needs.instrumentation-tests.result }}"
+            echo "  static-analysis    : ${{ needs.static-analysis.result }}"
+            echo ""
+            echo "Isi (1 folder per laporan asal):"
+            for d in ci_report/*/; do
+              if [ -d "$d" ]; then
+                echo "  ${d#ci_report/} — $(find "$d" -type f | wc -l) file"
+              fi
+            done
+            DETEKT_XML=$(find ci_report -name detekt.xml | head -n 1)
+            if [ -n "$DETEKT_XML" ]; then
+              echo ""
+              echo "detekt: $(grep -c '<error ' "$DETEKT_XML" || true) temuan di $(grep -c '<file ' "$DETEKT_XML" || true) file. 15 rule teratas:"
+              grep -o 'source="detekt\.[^"]*"' "$DETEKT_XML" | sort | uniq -c | sort -rn | head -n 15 | sed 's/source="detekt\./  /; s/"$//'
+            fi
+            LINT_XML=$(find ci_report -name lint-results-debug.xml | head -n 1)
+            echo ""
+            if [ -n "$LINT_XML" ]; then
+              echo "lint: $(grep -cE '^[[:space:]]*<issue([[:space:]]|$)' "$LINT_XML" || true) issue (lint-results-debug.xml)"
+            else
+              echo "lint: lint-results-debug.xml TIDAK ada (lintDebug tidak sampai jalan / tidak menulis laporan)"
+            fi
+          } > ci_report/INDEX.txt
+          cat ci_report/INDEX.txt
+
+      - name: Upload laporan gabungan
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci_report_${{ github.run_number }}
+          path: ci_report/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Hapus artifact terpisah (sudah termuat di ci_report)
+        # Default `if: success()` -> terlewati otomatis kalau upload di atas gagal, jadi artifact
+        # terpisah tidak pernah terhapus tanpa pengganti.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LISTING=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" --jq '.artifacts[] | "\(.id) \(.name)"')
+          if ! echo "$LISTING" | grep -q " ci_report_${{ github.run_number }}$"; then
+            echo "ci_report_${{ github.run_number }} belum terdaftar -> artifact terpisah DIPERTAHANKAN"
+            exit 0
+          fi
+          echo "$LISTING" | while read -r ID NAME; do
+            case "$NAME" in
+              log_fail_*|instrumentation_test_report_*|static_analysis_report_*)
+                if gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$ID"; then
+                  echo "dihapus: $NAME"
+                else
+                  echo "gagal hapus: $NAME (dibiarkan)"
+                fi
+                ;;
+            esac
+          done

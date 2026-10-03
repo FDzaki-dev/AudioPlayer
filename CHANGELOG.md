@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 526 — CI: log failure + laporan dikompilasi jadi 1 artifact `ci_report_<run>` (BELUM verified)
+- Instruksi user (ZIP `SONIX_v525.zip` + `static_analysis_report_503.zip`): "tolong juga untuk semua yang berhubungan dengan backlog/log failure dikompilasi jadi 1 kesatuan biar gak
+  bikin unduhan menumpuk!!". Diartikan = artifact CI per run yang tadinya 3 zip terpisah (`log_fail_<run>`, `instrumentation_test_report_<run>`, `static_analysis_report_<run>`)
+  jadi 1. (Interpretasi; dokumen `docs/PENDING_*.md` tidak disentuh.)
+- **1 file CI** (`.github/workflows/build.yml`) + 2 dokumen (`PROJECT_STATE.md`, `CHANGELOG.md`); 0 source Kotlin, 0 file Gradle, FILE_MANIFEST tetap (0 file baru).
+- **Job baru `collect-reports`** (`needs: [build, instrumentation-tests, static-analysis]`, `if: always()`, `permissions: actions: write`): download semua artifact run ini -> susun
+  `ci_report/` = `INDEX.txt` + 1 folder per laporan asal -> upload jadi 1 artifact `ci_report_<run>` (retensi 14 hari) -> hapus 3 artifact terpisah lewat REST API (`gh api -X DELETE`),
+  HANYA setelah `ci_report_<run>` terbukti terdaftar di run itu. `INDEX.txt` memuat hasil tiap job, isi per folder, total temuan detekt + 15 rule teratas, jumlah issue lint.
+  `needs` hanya mengarah dari job ini KE 3 job lain -> publish APK di job `build` tidak pernah menunggu/terblokir. Gagal di mana pun -> artifact terpisah tetap utuh (fallback = perilaku lama).
+- **`static-analysis`: `--continue`** pada `gradle detekt lintDebug`. Run #503 hanya menghasilkan folder `detekt/` (tanpa laporan lint): detekt merah menghentikan Gradle sebelum `lintDebug`
+  jalan, jadi backlog lint tidak pernah terlihat. Status job tetap merah kalau salah satu task gagal. Konsekuensi: run berikutnya BARU akan memunculkan temuan lint pertama kali.
+- **Fakta laporan `static_analysis_report_503.zip`** (belum ditindak — bukan task ini): 4279 temuan detekt di 97 dari 139 file `.kt`; teratas Indentation 2580, MagicNumber 429,
+  ArgumentListWrapping 294, Wrapping 121, NoUnusedImports 100. 5 format (html/sarif/md/txt/xml) = isi sama, 12,3 MB mentah / 809 KB zip.
+- **Validasi**: `build.yml` di-parse YAML OK (4 job; `needs` hanya di `collect-reports`; job `build`/`instrumentation-tests`/`static-analysis` tidak berubah selain `--continue`); `bash -n`
+  semua blok `run` job baru OK; skrip penyusun DISIMULASIKAN lokal terhadap `detekt.xml` run 503 asli (4279 temuan / 97 file = cocok ringkasan `detekt.md`) + skenario tanpa artifact (exit 0).
+  TIDAK bisa diuji di sini: perilaku `download-artifact@v4` tanpa `name`/`pattern`, upload, izin `actions: write`, penghapusan artifact (butuh GitHub Actions) -> **NOT VERIFIED**; CI BELUM.
+- **Risiko**: bila `gh api` ditolak (izin) -> step hapus merah, 3 artifact terpisah TETAP ada; `ci_report_<run>` selalu dibuat walau semua hijau (instrumentation & static-analysis memang
+  selalu upload sebelumnya).
+
 ## Batch 525 — detekt + lintDebug ketat sesuai konstitusi v3.1 (BELUM verified)
 - Instruksi user (ZIP sumber `AudioPlayer-main.zip`, state = Batch 524): "terapkan konfigurasi lintdebug/detect yang ketat sesuai standar konstitusi!!".
 - **5 file target** (0 file source Kotlin app diubah): `build.gradle.kts` root (plugin detekt 1.23.8, `apply false`), `app/build.gradle.kts` (plugin, blok `detekt {}`,

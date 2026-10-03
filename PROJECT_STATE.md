@@ -12,6 +12,12 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 526 [user atas v525 + `static_analysis_report_503.zip`: "tolong juga untuk semua yang berhubungan dengan backlog/log failure dikompilasi jadi 1 kesatuan biar gak bikin unduhan menumpuk!!"]**:
+**1 file CI** (`.github/workflows/build.yml`), 0 source Kotlin, 0 file Gradle. Job baru `collect-reports` (jalan setelah `build`/`instrumentation-tests`/`static-analysis`, apa pun hasilnya) menggabungkan
+`log_fail_<run>` + `instrumentation_test_report_<run>` + `static_analysis_report_<run>` jadi 1 artifact `ci_report_<run>` (`INDEX.txt` + 1 folder per laporan), lalu menghapus artifact terpisahnya
+(hanya kalau `ci_report_<run>` sudah terdaftar). `static-analysis` kini `--continue` (run #503 tidak sempat menjalankan lintDebug). Laporan 503: 4279 temuan detekt / 97 file (BELUM ditindak).
+Jalur rilis `build` tidak berubah. **NOT VERIFIED** — YAML/`bash -n`/simulasi lokal skrip INDEX OK; download/upload/hapus artifact + izin `actions: write` belum dijalankan; CI BELUM. Detail: `CHANGELOG.md` Batch 526.
+
 **Catatan Batch 525 [user: "terapkan konfigurasi lintdebug/detect yang ketat sesuai standar konstitusi!!"]**: **5 file target, 0 source Kotlin app diubah** — detekt 1.23.8 (stabil;
 2.0.0 masih alpha) + lintDebug `abortOnError`/`warningsAsErrors`; `config/detekt/detekt.yml` (maxIssues 0, autoCorrect, complexity ketat), job CI terpisah `static-analysis`, hook
 `.githooks/pre-commit` OPT-IN (skip kalau tanpa Gradle/SDK). `checkReleaseBuilds=false` tetap -> jalur rilis utuh. `build.yml` kini ikut ZIP (menimpa salinan device).
@@ -194,10 +200,15 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 525. ZIP: `SONIX_v525.zip`. **5 file target** (`build.gradle.kts`, `app/build.gradle.kts`, `config/detekt/detekt.yml` baru, `.github/workflows/build.yml`, `.githooks/pre-commit` baru); 0 source Kotlin app. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+- Batch terakhir: 526. ZIP: `SONIX_v526.zip`. **1 file target** (`.github/workflows/build.yml`); 0 source Kotlin, 0 file Gradle. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+  CI: log failure + laporan digabung jadi 1 artifact `ci_report_<run>` (job `collect-reports`; `static-analysis` + `--continue`) -> KONFIG SELESAI, 0 dijalankan di CI; backlog 503 (4279 temuan detekt/97 file; lint belum pernah jalan) belum ditindak ->
+  (1) push, cek run: job `collect-reports` hijau DAN tab Artifacts hanya memuat `ci_report_<run>` (3 artifact terpisah terhapus). (2) `collect-reports` merah / artifact terpisah masih ada -> betulkan HANYA job itu
+  (kandidat: perilaku `download-artifact@v4` tanpa name/pattern; izin `actions: write`); jangan sentuh `build`. (3) Backlog detekt/lint (baseline vs perbaikan) = LANGKAH TERPISAH, tunggu keputusan user — langkah 525 (3) di bawah
+  tetap berlaku, tapi ambil laporan dari `ci_report_<run>` (folder `static_analysis_report_<run>/` di dalamnya); JANGAN longgarkan threshold. JANGAN sentuh source Kotlin app untuk task ini. Gagal parah -> kembali `SONIX_v525.zip`.
+- Batch 525 (sebelum 526). ZIP: `SONIX_v525.zip`. **5 file target** (`build.gradle.kts`, `app/build.gradle.kts`, `config/detekt/detekt.yml` baru, `.github/workflows/build.yml`, `.githooks/pre-commit` baru); 0 source Kotlin app. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
   detekt 1.23.8 + lintDebug ketat (konstitusi v3.1) -> KONFIG SELESAI, 0 dijalankan; job `static-analysis` belum pernah jalan, hook belum aktif, baseline belum ada ->
   (1) push, baca job `static-analysis` (TERPISAH dari `build`; "CI baseline hijau" G2 = job `build`). (2) Merah karena CONFIG/PLUGIN (bukan temuan) — mis. "Property ... is misspelled" atau "compiled with Kotlin" —
-  betulkan HANYA `config/detekt/detekt.yml` / blok `detekt {}` + pin 2.0.21 di `app/build.gradle.kts`. (3) Merah karena TEMUAN LAMA (diharapkan): ambil artifact `static_analysis_report_<run>`, generate `gradle detektBaseline`
+  betulkan HANYA `config/detekt/detekt.yml` / blok `detekt {}` + pin 2.0.21 di `app/build.gradle.kts`. (3) Merah karena TEMUAN LAMA (diharapkan): ambil artifact `ci_report_<run>` (folder `static_analysis_report_<run>/`; sejak Batch 526), generate `gradle detektBaseline`
   + baseline lint -> `app/detekt-baseline.xml` & `app/lint-baseline.xml` (otomatis terbaca bila ada); JANGAN longgarkan threshold. (4) Baru aktifkan hook: `chmod +x .githooks/pre-commit && git config core.hooksPath .githooks`.
   JANGAN sentuh source Kotlin app untuk task ini. Gagal parah -> kembali `SONIX_v524.zip`.
 - Batch 524 (sebelum 525). ZIP: `SONIX_v524.zip`. **2 file source diubah** (`PlaybackStateStore.kt`, `LibraryCacheStore.kt`) — Wave 1 T3 (R1). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
