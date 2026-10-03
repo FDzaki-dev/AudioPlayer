@@ -222,19 +222,20 @@ android {
         // (gaya), GradleDependency/NewerVersionAvailable (nag versi), HardcodedText/ContentDescription/
         // ModifierParameter/ComposableNaming (gaya/i18n), UnsafeOptInUsageError (24, stabilitas API
         // media3), ikon launcher, serta kebijakan/false positive (BatteryLife, ExportedService, StaticFieldLeak).
+        // Batch 533 — juga dikeluarkan (terlihat di laporan tapi false positive, tak ada perbaikan nyata):
+        // Recycle (10; semua kursor/stream sudah `?.use { }`, lint tak mengenalinya) dan
+        // StartActivityAndCollapseDeprecated (1; cabang API<34 BubbleTileService sudah dijaga).
         // Baseline TIDAK dipakai: baseline menyembunyikan temuan, bertentangan dengan "bisa diamati".
         checkOnly.addAll(
             listOf(
                 "WrongConstant",
-                "Recycle",
                 "NewApi",
                 "MissingPermission",
                 "AutoboxingStateCreation",
                 "UseOfNonLambdaOffsetOverload",
                 "ConfigurationScreenWidthHeight",
                 "ConstantLocale",
-                "NonObservableLocale",
-                "StartActivityAndCollapseDeprecated"
+                "NonObservableLocale"
             )
         )
     }

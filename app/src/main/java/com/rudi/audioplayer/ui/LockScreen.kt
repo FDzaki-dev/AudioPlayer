@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.AppLockStore
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
@@ -135,7 +136,9 @@ fun LockScreen(
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.offset(x = shakeOffset.value.dp)
+            // Batch 533 — overload lambda: `shakeOffset.value` dibaca di fase layout, bukan komposisi
+            // (animasi getar tidak me-recompose Row tiap frame). Hasil visual sama.
+            modifier = Modifier.offset { IntOffset(shakeOffset.value.dp.roundToPx(), 0) }
         ) {
             repeat(6) { index ->
                 val filled = index < entered.length

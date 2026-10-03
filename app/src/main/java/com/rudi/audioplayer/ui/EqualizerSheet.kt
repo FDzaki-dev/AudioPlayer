@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,6 +49,9 @@ fun EqualizerSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val haptic = LocalHapticFeedback.current
+    // Batch 533 — locale dibaca lewat LocalConfiguration (observable: berubah saat ganti bahasa)
+    // menggantikan Locale.getDefault() di composable (lint NonObservableLocale).
+    val locale = LocalConfiguration.current.locales[0]
     // v3 upgrade lanjutan (Batch 134 -> 135) — spread Pilar A (CRT scanlines) dari
     // AlbumArtHero/SongRow ke "panel kontrol" yang spec sebut eksplisit sebagai target lain.
     // Equalizer = panel kontrol paling literal di app ini (slider band + preset), jadi kandidat
@@ -187,7 +191,7 @@ fun EqualizerSheet(
                                 color = MaterialTheme.colorScheme.secondary
                             )
                             Text(
-                                String.format(Locale.getDefault(), "%+.1f dB", dbValue),
+                                String.format(locale, "%+.1f dB", dbValue),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.secondary
                             )

@@ -127,7 +127,16 @@ class RingtoneEncoder(private val context: Context) {
                 // dari 0, bukan dari offset lagu asli (pemutar mana pun butuh timestamp mulai
                 // dari 0 di file baru yang berdiri sendiri).
                 bufferInfo.presentationTimeUs = (sampleTimeUs - startUs).coerceAtLeast(0)
-                bufferInfo.flags = extractor.sampleFlags
+                // Batch 533 — SAMPLE_FLAG_* (MediaExtractor) dan BUFFER_FLAG_* (MediaCodec.BufferInfo) =
+                // dua rumpun konstanta berbeda; menyalin nilainya langsung ditandai lint WrongConstant
+                // (bit 2/4 SAMPLE_FLAG_* = CODEC_CONFIG/END_OF_STREAM di BUFFER_FLAG_*). Mapping
+                // eksplisit: hanya sampel sync -> KEY_FRAME. Hasil SAMA utk sampel audio biasa
+                // (flags 0/1); file lokal di sini tidak terenkripsi/partial.
+                bufferInfo.flags = if ((extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) {
+                    android.media.MediaCodec.BUFFER_FLAG_KEY_FRAME
+                } else {
+                    0
+                }
 
                 muxer.writeSampleData(muxerTrackIndex, buffer, bufferInfo)
                 extractor.advance()
