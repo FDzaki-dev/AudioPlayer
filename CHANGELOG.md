@@ -1,5 +1,28 @@
 # Changelog
 
+## Batch 527 — Triage `ci_report_504.zip` (run #504): dokumen saja, 0 file kode (BELUM ada tindakan atas backlog)
+- Instruksi user: upload `ci_report_504.zip` TANPA teks tambahan (preseden Batch 29/378: diperlakukan sebagai laporan implisit -> dicatat + dianalisis, TIDAK ditindak).
+- **2 file dokumen** (`PROJECT_STATE.md`, `CHANGELOG.md`); 0 source Kotlin, 0 file Gradle, 0 CI; FILE_MANIFEST tetap. Isi laporan: run #504, commit `f7d70c5`; `build` = success,
+  `instrumentation-tests` = success (7 tes, 0 gagal, `PlaybackTransportTest`, emulator-5554), `static-analysis` = failure (diharapkan, tanpa baseline).
+- **Batch 526 terverifikasi SEBAGIAN**: artifact gabungan `ci_report_504` benar-benar terbentuk (download-artifact tanpa name/pattern + susun + upload jalan; `INDEX.txt` terisi: hasil job, isi per
+  folder, detekt 4300/97 file, lint 194 issue). `--continue` berhasil: `lintDebug` kini ikut jalan (`lint-results-debug.{html,txt,xml}` ada; run #503 tidak punya). TIDAK terverifikasi dari ZIP ini:
+  penghapusan artifact terpisah (`instrumentation_test_report_504`, `static_analysis_report_504`) + izin `actions: write` -> cek tab Artifacts run #504. `log_fail_<run>` tidak ada (build sukses, wajar).
+- **detekt 4300 temuan / 97 dari 139 file** (run 503: 4279). Kelompok aturan format ala ktlint ~3600 (84%), sisanya ~700. Terbanyak: Indentation 2589, MagicNumber 429, ArgumentListWrapping 306,
+  Wrapping 123, NoUnusedImports 100, WildcardImport/NoWildcardImports 88+88. File terpadat: `MainActivity.kt` 1235, `ui/NowPlayingScreen.kt` 865, `ui/LibraryScreen.kt` 271, `ui/SmartPlaylistScreen.kt` 244.
+- **Selisih 503 -> 504 tidak berasal dari kode**: `app/` v525 == v526 (diff 0), tapi dicocokkan per (rule, file, baris) ada 342 entri hanya di 504 dan 321 hanya di 503 (mayoritas Indentation/Wrapping/
+  ArgumentListWrapping/MultiLineIfElse/NoUnusedImports). Posisi temuan format bergeser antar-run pada source sama (asumsi: repo CI == ZIP). Penyebab BELUM ditentukan; hipotesis (TIDAK diuji): `autoCorrect: true`
+  + `parallel = true` membuat rule format saling memengaruhi urutan.
+- **Implikasi baseline (dari data laporan, formatnya dari pengetahuan, BELUM dijalankan)**: ID baseline detekt = `Rule:Signature`; 4300 temuan hanya = 1216 ID unik, `Indentation` 2589 temuan = 23 ID,
+  Signature format tanpa nomor baris (mis. `MainActivity.kt$MainActivity$ `). Baseline akan meloloskan pelanggaran BARU dengan rule+Signature sama -> jauh lebih longgar untuk rule format daripada untuk rule logika.
+- **lint 194 issue = 178 error + 16 hint** (error semua karena `warningsAsErrors`). Terbanyak: UseKtx 61, UnsafeOptInUsageError 24, GradleDependency 20, AutoboxingStateCreation 15 (hint),
+  HardcodedText 15, Recycle 10, NewerVersionAvailable 8, ModifierParameter 7, IconLauncherShape 5. 28 issue = "versi lebih baru" (GradleDependency + NewerVersionAvailable) — bukan cacat kode.
+  `OldTargetApi` (`app/build.gradle.kts:114`, targetSdk 36) selaras catatan: API 37 tertahan migrasi AGP 9.x.
+- **`StartActivityAndCollapseDeprecated` (`bubble/BubbleTileService.kt:80`) = bukan bug**: pemanggilan Intent-nya hanya di cabang `SDK_INT < UPSIDE_DOWN_CAKE` (+ `@Suppress("DEPRECATION")`); cabang API 34+
+  sudah pakai `PendingIntent` (baris 71-78). Lint tidak mengenali guard itu. Temuan lint lain yang BELUM dicek ke source (kandidat nyata, urutkan saat ditindak): `RingtoneEncoder.kt:130` WrongConstant,
+  `EqualizerController.kt:189` StaticFieldLeak, `AndroidManifest.xml:106` ExportedService, `MainActivity.kt:635` BatteryLife, 10x Recycle.
+- **Validasi**: laporan dibaca langsung (INDEX, detekt.txt/xml, lint xml/txt, laporan instrumentation); hitungan dicocokkan ke `INDEX.txt` (4300/97, 194). 0 build/detekt/lint dijalankan di sini. NOT VERIFIED:
+  semua yang tidak ada di ZIP (status hapus artifact, penyebab pergeseran temuan).
+
 ## Batch 526 — CI: log failure + laporan dikompilasi jadi 1 artifact `ci_report_<run>` (BELUM verified)
 - Instruksi user (ZIP `SONIX_v525.zip` + `static_analysis_report_503.zip`): "tolong juga untuk semua yang berhubungan dengan backlog/log failure dikompilasi jadi 1 kesatuan biar gak
   bikin unduhan menumpuk!!". Diartikan = artifact CI per run yang tadinya 3 zip terpisah (`log_fail_<run>`, `instrumentation_test_report_<run>`, `static_analysis_report_<run>`)

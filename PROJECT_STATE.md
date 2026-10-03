@@ -12,6 +12,11 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 527 [user: upload `ci_report_504.zip` tanpa teks]**: **2 file dokumen**, 0 kode. Run #504 (commit `f7d70c5`): `build` sukses, `instrumentation-tests` sukses (7/7), `static-analysis` merah
+(diharapkan). `ci_report_504` terbentuk -> Batch 526 terverifikasi sebagian (hapus artifact terpisah + izin `actions: write` BELUM terkonfirmasi). Backlog: detekt 4300 temuan/97 file (~84% aturan format),
+lint 194 issue (178 error + 16 hint; 28 = "versi lebih baru"). Temuan format bergeser antar-run pada source sama (503: 4279 vs 504: 4300; sebab belum diketahui) dan ID baseline detekt kasar
+(4300 temuan = 1216 ID; Indentation 2589 = 23 ID). `BubbleTileService.kt:80` = false positive (sudah ada guard API 34+). Backlog BELUM ditindak, menunggu keputusan user. Detail: `CHANGELOG.md` Batch 527.
+
 **Catatan Batch 526 [user atas v525 + `static_analysis_report_503.zip`: "tolong juga untuk semua yang berhubungan dengan backlog/log failure dikompilasi jadi 1 kesatuan biar gak bikin unduhan menumpuk!!"]**:
 **1 file CI** (`.github/workflows/build.yml`), 0 source Kotlin, 0 file Gradle. Job baru `collect-reports` (jalan setelah `build`/`instrumentation-tests`/`static-analysis`, apa pun hasilnya) menggabungkan
 `log_fail_<run>` + `instrumentation_test_report_<run>` + `static_analysis_report_<run>` jadi 1 artifact `ci_report_<run>` (`INDEX.txt` + 1 folder per laporan), lalu menghapus artifact terpisahnya
@@ -200,7 +205,16 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 526. ZIP: `SONIX_v526.zip`. **1 file target** (`.github/workflows/build.yml`); 0 source Kotlin, 0 file Gradle. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+- Batch terakhir: 527. ZIP: `SONIX_v527.zip`. **2 file dokumen** (`PROJECT_STATE.md`, `CHANGELOG.md`); 0 kode. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+  Triage `ci_report_504` (backlog detekt 4300 + lint 194) -> SELESAI DICATAT, BELUM DITINDAK; artifact gabungan terbukti terbentuk, status hapus artifact terpisah belum terkonfirmasi ->
+  (1) Tanya/cek user: tab Artifacts run #504 hanya `ci_report_504`? Kalau `instrumentation_test_report_504`/`static_analysis_report_504` masih ada -> betulkan HANYA step "Hapus artifact terpisah" di job `collect-reports`
+  (`.github/workflows/build.yml`; kandidat: izin `actions: write`, respons `gh api`); jangan sentuh `build`. (2) Backlog = KEPUTUSAN USER, jangan pilih sendiri: A) baseline detekt+lint (hijau cepat; baseline format kasar,
+  pelanggaran baru ber-Signature sama ikut lolos), B) bersihkan bertahap per rule (low-risk dulu: NoUnusedImports 100, WildcardImport 88; batas 3-5 file/task -> banyak batch; `MainActivity.kt` 1235 & `NowPlayingScreen.kt` 865
+  paling padat), C) biarkan merah sampai diputuskan (APK tetap terbit). Baseline WAJIB dibuat lewat `gradle detektBaseline` + baseline lint dari toolchain asli (sandbox tanpa Gradle) — JANGAN ditulis tangan,
+  JANGAN longgarkan threshold. (3) Kalau pergeseran temuan format mengganggu (baseline/diff antar-run): uji dulu `autoCorrect`+`parallel` di `detekt {}` sebagai penyebab; belum terbukti. (4) Lint yang layak dicek ke source
+  lebih dulu (bukan false positive terkonfirmasi): `RingtoneEncoder.kt:130` WrongConstant, `EqualizerController.kt:189` StaticFieldLeak, `AndroidManifest.xml:106` ExportedService, `MainActivity.kt:635` BatteryLife.
+  Jangan buang waktu di `BubbleTileService.kt:80` (sudah ada guard). JANGAN sentuh source Kotlin tanpa instruksi. Gagal parah -> kembali `SONIX_v526.zip`.
+- Batch 526 (sebelum 527). ZIP: `SONIX_v526.zip`. **1 file target** (`.github/workflows/build.yml`); 0 source Kotlin, 0 file Gradle. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
   CI: log failure + laporan digabung jadi 1 artifact `ci_report_<run>` (job `collect-reports`; `static-analysis` + `--continue`) -> KONFIG SELESAI, 0 dijalankan di CI; backlog 503 (4279 temuan detekt/97 file; lint belum pernah jalan) belum ditindak ->
   (1) push, cek run: job `collect-reports` hijau DAN tab Artifacts hanya memuat `ci_report_<run>` (3 artifact terpisah terhapus). (2) `collect-reports` merah / artifact terpisah masih ada -> betulkan HANYA job itu
   (kandidat: perilaku `download-artifact@v4` tanpa name/pattern; izin `actions: write`); jangan sentuh `build`. (3) Backlog detekt/lint (baseline vs perbaikan) = LANGKAH TERPISAH, tunggu keputusan user — langkah 525 (3) di bawah
