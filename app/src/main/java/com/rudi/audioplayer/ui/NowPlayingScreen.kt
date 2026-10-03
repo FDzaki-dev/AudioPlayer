@@ -300,9 +300,9 @@ fun NowPlayingScreen(
     // sekali (masih valid persis sebagai fallback layar-pendek), murni PERAN-nya yang berubah.
     // `contentGroupHeightPx` — hasil ukur Column pembungkus grup konten (hint s/d baris waktu,
     // lihat komentar `onGloballyPositioned` di sana) dalam pixel, 0 = belum pernah terukur.
-    var contentGroupHeightPx by remember { mutableStateOf(0) }
+    var contentGroupHeightPx by remember { mutableIntStateOf(0) }
     var brightnessLevel by remember {
-        mutableStateOf(
+        mutableFloatStateOf(
             activity?.window?.attributes?.screenBrightness
                 ?.takeIf { it in 0f..1f } ?: 0.5f
         )
@@ -1527,7 +1527,7 @@ private fun PlaybackProgressRow(
     onSeek: (Long) -> Unit
 ) {
     val progress by playbackProgress.collectAsStateWithLifecycle()
-    var sliderPosition by remember(progress.position) { mutableStateOf(progress.position.toFloat()) }
+    var sliderPosition by remember(progress.position) { mutableFloatStateOf(progress.position.toFloat()) }
     val progressFraction = (sliderPosition / progress.duration.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
 
     Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
