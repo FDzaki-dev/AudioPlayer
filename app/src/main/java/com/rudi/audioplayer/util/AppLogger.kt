@@ -46,8 +46,8 @@ object AppLogger {
     private var logFile: File? = null
     private var appContext: Context? = null
     private var previousHandler: Thread.UncaughtExceptionHandler? = null
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-    private val fileStampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+    private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT)
+    private val fileStampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT)
 
     /** Call once from Application.onCreate(). Safe to call more than once (no-ops after the first). */
     @Synchronized

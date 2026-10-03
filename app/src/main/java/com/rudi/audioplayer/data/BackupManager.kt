@@ -39,7 +39,7 @@ object BackupManager {
 
     private val BACKUP_RELATIVE_PATH = "${Environment.DIRECTORY_DOCUMENTS}/AudioPlayer/backups"
     private const val MAX_BACKUPS = 20
-    private val fileStampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+    private val fileStampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT)
 
     /** prefsName -> label manusiawi dipakai di ringkasan konfirmasi restore. Urutan di sini juga
      * urutan tampil ringkasan. */

@@ -76,7 +76,7 @@ internal fun AlbumArtHero(
     onSwipePrevious: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    var totalDrag by remember { mutableStateOf(0f) }
+    var totalDrag by remember { mutableFloatStateOf(0f) }
     // Batch 178 — Now Playing item 10/11 fix: swipe-to-skip di sini sebelumnya 0 feedback
     // visual selama drag berlangsung (cuma haptic SEKALI di dragEnd kalau lolos threshold
     // 120px) — beda dari gesture brightness/volume di Box induk (GestureIndicatorBadge

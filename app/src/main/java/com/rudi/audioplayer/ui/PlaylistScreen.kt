@@ -104,8 +104,8 @@ fun PlaylistTabView(
             val currentOnMoveSongInPlaylist by rememberUpdatedState(onMoveSongInPlaylist)
             val currentPlaylistId by rememberUpdatedState(selectedPlaylist.id)
             var draggingSongId by remember { mutableStateOf<Long?>(null) }
-            var dragOffsetPx by remember { mutableStateOf(0f) }
-            var rowHeightPx by remember { mutableStateOf(0f) }
+            var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+            var rowHeightPx by remember { mutableFloatStateOf(0f) }
 
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
