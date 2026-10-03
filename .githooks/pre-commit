@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Batch 525 — pre-commit konstitusi: blokir commit cacat via detekt + lintDebug.
+# Batch 531 — pre-commit ADVISORY (NON-BLOCKING): jalankan detekt + lintDebug fokus dan TAMPILKAN
+# temuannya, tetapi TIDAK PERNAH membatalkan commit (selalu exit 0). Menggantikan hook pemblokir
+# Batch 525. Rule yang aktif dibatasi ke yang bisa diamati + diperbaiki (config/detekt/detekt.yml,
+# blok `lint { checkOnly }` di app/build.gradle.kts).
 # OPT-IN (tidak aktif sendiri): aktifkan sekali per clone ->
 #   chmod +x .githooks/pre-commit && git config core.hooksPath .githooks
-# Aman utk device tanpa toolchain: kalau Gradle atau Android SDK tidak ada, hook SKIP
-# (exit 0) dan penegaknya job CI `static-analysis` — supaya commit Termux tidak macet.
-# Kalau toolchain ada: gagal = commit DIBLOKIR.
+# Aman utk device tanpa toolchain: kalau Gradle atau Android SDK tidak ada, hook SKIP — penegak/
+# pelapor utamanya job CI `static-analysis`.
 
-ROOT="$(git rev-parse --show-toplevel)" || exit 1
-cd "$ROOT" || exit 1
+ROOT="$(git rev-parse --show-toplevel)" || exit 0
+cd "$ROOT" || exit 0
 
 if [ -x ./gradlew ]; then
   GRADLE="./gradlew"
@@ -15,28 +17,17 @@ elif command -v gradle >/dev/null 2>&1; then
   # Proyek belum punya Gradle Wrapper (gap list #19) -> fallback ke `gradle` di PATH.
   GRADLE="gradle"
 else
-  echo "[pre-commit] SKIP: gradle/gradlew tidak ditemukan — penegak = job CI static-analysis." >&2
+  echo "[pre-commit] SKIP: gradle/gradlew tidak ditemukan — pelapor = job CI static-analysis." >&2
   exit 0
 fi
 
 if [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_SDK_ROOT:-}" ] && [ ! -f local.properties ]; then
-  echo "[pre-commit] SKIP: Android SDK tidak terdeteksi — penegak = job CI static-analysis." >&2
+  echo "[pre-commit] SKIP: Android SDK tidak terdeteksi — pelapor = job CI static-analysis." >&2
   exit 0
 fi
 
-BEFORE="$(git diff | md5sum)"
-
-"$GRADLE" detekt lintDebug --console=plain || {
-  echo "[pre-commit] DIBLOKIR: detekt/lintDebug gagal — commit dibatalkan." >&2
-  exit 1
+"$GRADLE" detekt lintDebug --console=plain --continue || {
+  echo "[pre-commit] PERINGATAN (tidak memblokir): detekt/lintDebug melaporkan masalah — lihat output di atas." >&2
 }
-
-# detekt autoCorrect:true menulis perbaikan ke working tree. Perbaikan itu BELUM ada di index
-# commit ini -> blokir supaya user me-review `git diff` dan stage ulang, bukan commit diam-diam.
-AFTER="$(git diff | md5sum)"
-if [ "$BEFORE" != "$AFTER" ]; then
-  echo "[pre-commit] DIBLOKIR: detekt autoCorrect mengubah file. Review git diff, git add ulang, commit lagi." >&2
-  exit 1
-fi
 
 exit 0

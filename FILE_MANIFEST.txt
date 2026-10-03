@@ -86,10 +86,13 @@
 # tetap berlaku utk .gitignore dan utk batch lain.
 # Batch 528: .github/workflows/baseline.yml (file baru, workflow manual pembuat baseline detekt+lint) ditambahkan — 208->209 (208 di ZIP + 1 dotfile .gitignore yang
 # sengaja tidak dikirim). Seperti Batch 525, file di .github/ IKUT dikirim di ZIP (menimpa/menambah salinan device); catatan Batch 390 tetap berlaku utk .gitignore.
-# Total: 209 file
+# Batch 530: app/detekt-baseline.xml + app/lint-baseline.xml (file baru, baseline detekt+lint dari artifact `baseline_1` workflow "Generate Baselines", byte-identik, TIDAK ditulis tangan)
+# ditambahkan — 209->211 (211 di ZIP, termasuk .gitignore yang memang ada di ZIP v528/v529; diff manifest vs isi ZIP: 0 path hilang, 0 path liar). Catatan Batch 390 soal .gitignore tidak diubah.
+# Batch 531: .github/workflows/baseline.yml + app/detekt-baseline.xml + app/lint-baseline.xml DIHAPUS (rencana baseline A/B/C dibatalkan user: static analysis fokus & non-blocking, tanpa baseline) — 211->208
+# (208 di ZIP, termasuk .gitignore). Tidak ada file baru. Catatan Batch 390 soal .gitignore tidak diubah.
+# Total: 208 file
 
 .githooks/pre-commit
-.github/workflows/baseline.yml
 .github/workflows/build.yml
 .gitignore
 CHANGELOG.md

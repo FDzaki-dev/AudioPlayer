@@ -12,6 +12,16 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 531 [user: "ubah rencana: 1) lintdebug/detekt difokuskan hanya untuk yang benar-benar bisa diamati dan diperbaiki, jangan masukkan yang tidak perlu!! [non blocking]" + upload `SONIX_v530.zip`]**: **4 file target diubah** (`config/detekt/detekt.yml`,
+`app/build.gradle.kts`, `.github/workflows/build.yml` [komentar saja], `.githooks/pre-commit`) + **dihapus** `.github/workflows/baseline.yml`, `app/detekt-baseline.xml`, `app/lint-baseline.xml`; 0 source Kotlin. Rencana baseline A/B/C (Batch 528-530) DIBATALKAN.
+detekt = hanya potential-bugs/exceptions/empty-blocks/performance/coroutines (tanpa ktlint/complexity/style/naming/comments; `ignoreFailures = true`, `autoCorrect = false`); lint = whitelist `checkOnly` 10 ID, `abortOnError`/`warningsAsErrors` = false; tanpa baseline.
+**NOT VERIFIED** (sandbox tanpa Gradle/SDK): config baru belum dijalankan. Prediksi OFFLINE: detekt ~9 temuan, lint ~35. Detail: `CHANGELOG.md` Batch 531.
+
+**Catatan Batch 530 [user: upload `baseline_1.zip` + `ci_report_507.zip` tanpa teks (setelah menjalankan "Generate Baselines")]**: **2 file baseline baru** (`app/detekt-baseline.xml` 1189 ID, `app/lint-baseline.xml` 194 issue; byte-identik dari artifact) + docs; 0 kode/Gradle/CI.
+`baseline.yml` (Batch 528) TERBUKTI jalan: `detektBaseline` + `lintDebug` BUILD SUCCESSFUL, artifact terbentuk (run #1, commit `a02d5ac`). `ci_report_507` = commit SAMA `a02d5ac` (dibuat SEBELUM baseline ada): build + instrumentation sukses, static-analysis merah (detekt 4288/97 file, lint 194).
+**PREDIKSI OFFLINE (bukan hasil CI)**: lint 194/194 tertutup baseline; detekt MASIH merah — 345 dari 4288 temuan #507 (150 ID) tidak ada di baseline (format: ArgumentListWrapping, Wrapping, MaxLineLength, Indentation, ...; + 1 `LongMethod` `PlaybackService.onCreate`).
+Temuan antar-run goyang pada source sama (#506 vs #507: 19 vs 23 ID beda). Dugaan penyebab (BELUM terbukti): baseline dibuat `autoCorrect=false`, gate jalan `autoCorrect: true`. Threshold TIDAK dilonggarkan. Detail: `CHANGELOG.md` Batch 530.
+
 **Catatan Batch 529 [user: "lanjutkan progress!!" + upload `SONIX_v528.zip` & `ci_report_506.zip`]**: **2 file dokumen**, 0 kode. Artifact `baseline_<run>` BELUM diunggah — `ci_report_506` = laporan `build.yml` biasa, bukan keluaran
 "Generate Baselines"; langkah itu tetap tindakan user. Run #506 (commit `914cac1`): `build` sukses, `instrumentation` sukses (7 tes, 0 gagal), `static-analysis` merah (diharapkan; detekt 4281/97 file, lint 194 = 178 error + 16 hint).
 4 kandidat lint dicek ke source (0 diubah): 3 bukan cacat nyata/disengaja; `RingtoneEncoder.kt:130` WrongConstant = satu-satunya yang nyata. Nomor baris laporan != ZIP (dugaan `autoCorrect`, belum terbukti). Detail: `CHANGELOG.md` Batch 529.
@@ -183,6 +193,8 @@ build/test sesi ini; CI + device BELUM. Detail: `CHANGELOG.md` Batch 512.
    - (Batch 456-458) Permintaan ubah angka "timbul"/persentase tab minimized tanpa kata eksplisit "sembunyi/klip" vs "timbul/kelihatan" -> WAJIB klarifikasi
      arah dulu, jangan tebak ("timbul" = bagian KELIHATAN tab, bukan fraksi klip `EDGE_CLIP_FRACTION`).
    - (Batch 503) Entri `[RESUME POINT]` WAJIB di-cross-check ke catatan batch detail + source, bukan ditelan mentah (pernah basi).
+8. Static analysis (Batch 531, instruksi eksplisit user) = FOKUS & NON-BLOCKING: detekt/lintDebug hanya untuk temuan yang bisa diamati + diperbaiki, tidak memblokir apa pun (CI maupun hook), tanpa baseline, `autoCorrect` mati. Whitelist ada di
+   `config/detekt/detekt.yml` + `lint { checkOnly }` (`app/build.gradle.kts`); menambah rule = harus bisa dijelaskan "terlihat di laporan DAN punya perbaikan lokal". Mengembalikan gate ketat butuh instruksi eksplisit user.
 
 ## Keputusan arsitektur utama
 Ringkasan penuh + alasan: README.md § "Keputusan Arsitektur". Poin paling kritis:
@@ -214,7 +226,20 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 529. ZIP: `SONIX_v529.zip`. **2 file dokumen** (`PROJECT_STATE.md`, `CHANGELOG.md`); 0 kode. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+- Batch terakhir: 531. ZIP: `SONIX_v531.zip`. **4 file target diubah** (`config/detekt/detekt.yml`, `app/build.gradle.kts` [blok `lint {}`/`detekt {}` + dependency `detekt-formatting`], `.github/workflows/build.yml` [komentar], `.githooks/pre-commit`) + **3 file dihapus** (`.github/workflows/baseline.yml`, `app/detekt-baseline.xml`, `app/lint-baseline.xml`) + docs (`PROJECT_STATE.md`, `CHANGELOG.md`, `FILE_MANIFEST.txt`, `README.md`); 0 source Kotlin. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+  Static analysis FOKUS & NON-BLOCKING (rencana baseline A/B/C DIBATALKAN user) -> SUDAH di config, BELUM dijalankan di CI/Gradle ->
+  (1) USER: push (Box DAILY UPDATE) lalu unggah `ci_report_<run>` hasil push ini. (2) Akun berikutnya: job `static-analysis` HARUS hijau; merah = tool/config gagal (bukan temuan) -> betulkan HANYA file config terkait: `checkOnly.addAll(...)` di `app/build.gradle.kts` blok `lint {}` (DSL/ID), atau
+  `config/detekt/detekt.yml` (nama ruleset/rule; validasi `warningsAsErrors` aktif). Bandingkan dengan prediksi OFFLINE (bukan hasil CI): detekt ~9 (SwallowedException ~8, SpreadOperator ~1); lint ~35 (Recycle 10, AutoboxingStateCreation 15, ConstantLocale 3, ConfigurationScreenWidthHeight 3, WrongConstant 1,
+  NonObservableLocale 1, UseOfNonLambdaOffsetOverload 1, StartActivityAndCollapseDeprecated 1; NewApi/MissingPermission 0 = tripwire). (3) Perbaikan temuan = HANYA atas instruksi user, 1 rule/1 file per batch; cari lewat nama simbol/Signature, bukan nomor baris. `RingtoneEncoder.kt:130` WrongConstant (`bufferInfo.flags = extractor.sampleFlags`) = satu-satunya yang diketahui nyata.
+  (4) JANGAN menyalakan lagi ktlint-formatting/complexity/style, baseline, `abortOnError`/`ignoreFailures=false`, atau `autoCorrect` tanpa instruksi eksplisit user (lihat Aturan sesi #8). Gagal parah -> kembali `SONIX_v530.zip` (perilaku app identik; gate ketat + baseline).
+- Batch 530 (sebelum 531; rencana baseline di entri ini DIGANTIKAN Batch 531, jangan dijalankan). ZIP: `SONIX_v530.zip`. **2 file baseline baru** (`app/detekt-baseline.xml`, `app/lint-baseline.xml`) + docs (`PROJECT_STATE.md`, `CHANGELOG.md`, `FILE_MANIFEST.txt`); 0 kode, 0 Gradle, 0 CI. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+  Opsi A (baseline detekt+lint) -> BASELINE SUDAH MASUK ZIP (dari toolchain asli), CI BELUM dijalankan atasnya; prediksi OFFLINE dari `ci_report_507`: lint 194/194 tertutup, detekt MASIH merah (345 temuan/150 ID belum tertutup + ~20 ID goyang antar-run) ->
+  (1) USER: push (Box DAILY UPDATE) lalu unggah `ci_report_<run>` hasil push ini. (2) Akun berikutnya: cocokkan dengan prediksi — lint harus 0 temuan; detekt: hitung temuan di luar baseline (ID = `Rule:Signature` dari `detekt.txt`); prediksi benar kalau sisanya ~150 ID format
+  (ArgumentListWrapping, Wrapping, MaxLineLength, Indentation, ImportOrdering, NoSemicolons, MultiLineIfElse) + 1 `LongMethod` `PlaybackService.kt$PlaybackService$@UnstableApi override fun onCreate()`. Jangan edit baseline tangan; jangan longgarkan threshold.
+  (3) Dugaan penyebab (BELUM terbukti): `baseline.yml` sengaja `autoCorrect = false`, gate jalan `autoCorrect: true` -> temuan/signature format beda. Pilihan = KEPUTUSAN USER, jangan pilih sendiri: A) ubah HANYA `baseline.yml` (jangan matikan autoCorrect) + jalankan ulang "Generate Baselines"
+  — hijau stabil tetap tak terjamin (~20 ID goyang/run); B) telusuri sumber goyang (`autoCorrect`+`parallel` di `detekt {}` -> menyentuh `app/build.gradle.kts`, butuh instruksi eksplisit); C) terima merah (APK tetap terbit).
+  (4) Masih terbuka: artifact terpisah run #504/#506/#507 terhapus? (tab Artifacts, cek user); `RingtoneEncoder.kt:130` WrongConstant = satu-satunya lint nyata (perbaikan hanya kalau user minta). Gagal parah -> kembali `SONIX_v529.zip` (perilaku app identik, tanpa baseline).
+- Batch 529 (sebelum 530). ZIP: `SONIX_v529.zip`. **2 file dokumen** (`PROJECT_STATE.md`, `CHANGELOG.md`); 0 kode. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
   Opsi A (baseline detekt+lint) -> `baseline.yml` SIAP tapi BELUM dijalankan; baseline BELUM ada (unggahan Batch 529 = `ci_report_506` biasa, bukan `baseline_<run>`); run #506: build + instrumentation hijau, static-analysis merah (diharapkan) ->
   (1) USER: push (Box DAILY UPDATE) -> Actions -> "Generate Baselines" (branch main) -> unduh `baseline_<run>` -> upload ke chat. Tanpa artifact itu, jangan buat batch baru atas baseline kecuali user memberi instruksi lain.
   (2) Akun berikutnya setelah artifact datang: langkah (2)-(4) Batch 528 di bawah TETAP berlaku (HANYA `app/detekt-baseline.xml` + `app/lint-baseline.xml` ke ZIP, tanpa edit tangan, tanpa melonggarkan threshold; job merah -> betulkan HANYA `baseline.yml`).

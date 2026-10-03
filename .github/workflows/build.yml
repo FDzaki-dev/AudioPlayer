@@ -311,12 +311,13 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # Batch 525 — static analysis ketat sesuai konstitusi (detekt maxIssues:0 + lintDebug
-  # abortOnError/warningsAsErrors). Job TERPISAH tanpa `needs:`, pola sama `instrumentation-tests`:
-  # temuan baru/lama di sini membuat job INI merah, tapi publish APK di job `build` tidak pernah
-  # ikut terblokir. Merah di run pertama WAJAR kalau ada temuan lama (belum ada baseline) —
-  # unduh artifact ci_report_<run> (gabungan sejak Batch 526; laporan ini ada di folder
-  # static_analysis_report_<run>/ di dalamnya) untuk daftar lengkapnya.
+  # Batch 525 — static analysis (detekt + lintDebug). Job TERPISAH tanpa `needs:`, pola sama
+  # `instrumentation-tests`, publish APK di job `build` tidak pernah ikut terblokir.
+  # Batch 531 — FOKUS & NON-BLOCKING: hanya aturan yang temuannya bisa diamati + diperbaiki
+  # (config/detekt/detekt.yml + `lint { checkOnly }` di app/build.gradle.kts), `ignoreFailures`
+  # detekt = true, lint `abortOnError` = false -> temuan TIDAK membuat job merah; job merah berarti
+  # tool-nya sendiri gagal jalan (mis. config detekt salah). Daftar temuan: artifact ci_report_<run>
+  # (gabungan sejak Batch 526; laporan ini ada di folder static_analysis_report_<run>/ di dalamnya).
   static-analysis:
     runs-on: ubuntu-latest
     steps:
@@ -344,7 +345,8 @@ jobs:
         # sama seperti job `build` & `instrumentation-tests`.
         # Batch 526 — `--continue`: tanpa ini detekt merah (run #503: 4279 temuan) menghentikan
         # Gradle SEBELUM lintDebug sempat jalan -> laporan lint tidak pernah ada. Dengan flag ini
-        # kedua task selalu jalan; status job TETAP merah kalau salah satunya gagal.
+        # kedua task selalu jalan (sejak Batch 531 temuan tidak lagi menggagalkan task; hanya
+        # kegagalan tool/config yang membuat job merah).
         run: gradle detekt lintDebug --no-daemon --console=plain --continue
 
       - name: Upload static analysis reports

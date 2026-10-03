@@ -1,46 +1,44 @@
-# Batch 525 — detekt ketat sesuai konstitusi pipeline v3.1 (maxIssues:0, autoCorrect:true,
-# strict complexity). Dipakai bersama buildUponDefaultConfig=true (app/build.gradle.kts):
-# file ini HANYA menimpa nilai default yang perlu diubah — rule lain ikut default detekt 1.23.8.
-# Sengaja HANYA properti yang pasti valid di 1.23.8 (validasi config aktif: properti salah
-# eja = detekt gagal sebelum menganalisis apa pun).
+# Batch 531 — detekt FOKUS & NON-BLOCKING (menggantikan rancangan ketat Batch 525).
+# Prinsip (instruksi user): hanya aturan yang temuannya BISA DIAMATI di laporan dan BISA
+# DIPERBAIKI di source; yang lain dimatikan. Dipakai bersama buildUponDefaultConfig=true
+# (app/build.gradle.kts): file ini hanya menimpa default detekt 1.23.8.
+# Sengaja HANYA properti/rule yang pasti valid di 1.23.8 (validasi config aktif: salah eja =
+# detekt gagal sebelum menganalisis apa pun).
+#
+# AKTIF (default detekt): potential-bugs, exceptions, empty-blocks, performance, coroutines.
+# DIMATIKAN dan alasannya:
+#  - formatting (ktlint): gaya, bukan cacat; autoCorrect menulis ulang source di runner CI
+#    sehingga perbaikannya tidak pernah masuk repo (sumber ~84% temuan #503-#507 + goyang antar-run).
+#  - complexity/style/naming/comments: perbaikannya refactor besar (Compose = fungsi panjang,
+#    angka dp/alpha dianggap MagicNumber) -> melanggar "tanpa structural rewrite", tidak actionable.
+#  - TooGenericExceptionCaught: 28 temuan, mayoritas fallback Android yang disengaja.
+# Tidak memblokir: `ignoreFailures = true` di app/build.gradle.kts (bukan di sini).
 
 build:
   maxIssues: 0
-  # false = temuan yang ter-autoCorrect TETAP dihitung (tidak lolos diam-diam di CI/hook).
-  excludeCorrectable: false
 
 config:
   validation: true
   warningsAsErrors: true
 
 complexity:
-  CyclomaticComplexMethod:
-    active: true
-    threshold: 10
-  LongMethod:
-    active: true
-    threshold: 40
-  LongParameterList:
-    active: true
-    functionThreshold: 5
-    constructorThreshold: 6
-    ignoreDefaultParameters: true
-    ignoreDataClasses: true
-  LargeClass:
-    active: true
-    threshold: 400
+  active: false
+
+style:
+  active: false
+
+naming:
+  active: false
+
+comments:
+  active: false
+
+exceptions:
+  # SwallowedException TETAP aktif (default): catch yang menelan error = bug tersembunyi.
+  TooGenericExceptionCaught:
+    active: false
 
 coroutines:
   # Guard "Battery & Background": jangan GlobalScope — pakai viewModelScope/lifecycleScope/WorkManager.
   GlobalCoroutineUsage:
     active: true
-
-naming:
-  # @Composable wajib PascalCase — konvensi Compose, bukan pelanggaran penamaan.
-  FunctionNaming:
-    active: true
-    ignoreAnnotated: ['Composable']
-
-formatting:
-  active: true
-  autoCorrect: true
