@@ -310,3 +310,46 @@ jobs:
           path: app/build/reports/androidTests/connected/
           if-no-files-found: ignore
           retention-days: 14
+
+  # Batch 525 — static analysis ketat sesuai konstitusi (detekt maxIssues:0 + lintDebug
+  # abortOnError/warningsAsErrors). Job TERPISAH tanpa `needs:`, pola sama `instrumentation-tests`:
+  # temuan baru/lama di sini membuat job INI merah, tapi publish APK di job `build` tidak pernah
+  # ikut terblokir. Merah di run pertama WAJAR kalau ada temuan lama (belum ada baseline) —
+  # unduh artifact static_analysis_report_<run> untuk daftar lengkapnya.
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      # ═══════════════════════ 1. SETUP ═══════════════════════
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.14.3
+
+      # ═══════════════════════ 2. DETEKT + LINT ═══════════════════════
+      - name: Run detekt + lintDebug
+        # `gradle` (bukan `./gradlew`) — proyek belum punya Gradle Wrapper (gap list #19),
+        # sama seperti job `build` & `instrumentation-tests`.
+        run: gradle detekt lintDebug --no-daemon --console=plain
+
+      - name: Upload static analysis reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static_analysis_report_${{ github.run_number }}
+          path: |
+            app/build/reports/detekt/
+            app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
+          retention-days: 14

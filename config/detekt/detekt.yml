@@ -1,0 +1,46 @@
+# Batch 525 — detekt ketat sesuai konstitusi pipeline v3.1 (maxIssues:0, autoCorrect:true,
+# strict complexity). Dipakai bersama buildUponDefaultConfig=true (app/build.gradle.kts):
+# file ini HANYA menimpa nilai default yang perlu diubah — rule lain ikut default detekt 1.23.8.
+# Sengaja HANYA properti yang pasti valid di 1.23.8 (validasi config aktif: properti salah
+# eja = detekt gagal sebelum menganalisis apa pun).
+
+build:
+  maxIssues: 0
+  # false = temuan yang ter-autoCorrect TETAP dihitung (tidak lolos diam-diam di CI/hook).
+  excludeCorrectable: false
+
+config:
+  validation: true
+  warningsAsErrors: true
+
+complexity:
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 10
+  LongMethod:
+    active: true
+    threshold: 40
+  LongParameterList:
+    active: true
+    functionThreshold: 5
+    constructorThreshold: 6
+    ignoreDefaultParameters: true
+    ignoreDataClasses: true
+  LargeClass:
+    active: true
+    threshold: 400
+
+coroutines:
+  # Guard "Battery & Background": jangan GlobalScope — pakai viewModelScope/lifecycleScope/WorkManager.
+  GlobalCoroutineUsage:
+    active: true
+
+naming:
+  # @Composable wajib PascalCase — konvensi Compose, bukan pelanggaran penamaan.
+  FunctionNaming:
+    active: true
+    ignoreAnnotated: ['Composable']
+
+formatting:
+  active: true
+  autoCorrect: true

@@ -8,6 +8,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     // Batch 243 — Room (Lyrics cache). Lihat root build.gradle.kts utk versi.
     id("com.google.devtools.ksp")
+    // Batch 525 — static analysis ketat. Lihat root build.gradle.kts utk versi + alasan.
+    id("io.gitlab.arturbosch.detekt")
 }
 
 // A hardcoded versionCode has to be remembered and manually bumped on every single
@@ -209,6 +211,15 @@ android {
     // ini cuma melepas pengait OTOMATISnya dari tiap assembleRelease di CI.
     lint {
         checkReleaseBuilds = false
+        // Batch 525 — standar konstitusi: lintDebug ketat. checkReleaseBuilds=false (Batch 76)
+        // TIDAK diubah -> lintVitalRelease tetap lepas dari assembleRelease, jalur rilis utuh;
+        // lintDebug hanya jalan lewat `gradle lintDebug` (job CI static-analysis + pre-commit).
+        abortOnError = true
+        warningsAsErrors = true
+        // Baseline temuan lama (opsional, di-generate dari run CI pertama). Hanya dipakai kalau
+        // file-nya ada — tanpa file ini lint tetap penuh ketat (tidak ada yang di-grandfather).
+        val lintBaselineFile = file("lint-baseline.xml")
+        if (lintBaselineFile.exists()) baseline = lintBaselineFile
     }
 
     // The unit tests under src/test are plain JVM tests (no Robolectric, no emulator) — any
@@ -234,6 +245,35 @@ kotlin {
             "plugin:androidx.compose.compiler.plugins.kotlin:stabilityConfigurationPath=" +
                 "${project.projectDir}/compose_stability_config.conf"
         )
+    }
+}
+
+// Batch 525 — detekt sesuai konstitusi: maxIssues:0 (config/detekt/detekt.yml), autoCorrect:true,
+// complexity ketat. Task `detekt` polos (TANPA type resolution): detektDebug/detektMain akan
+// membaca classpath Kotlin 2.4.10 dgn compiler 2.0.21 milik detekt 1.23.8 -> tidak dipakai.
+// `check` otomatis ikut menjalankan detekt, tapi CI rilis (`testDebugUnitTest assembleRelease`)
+// TIDAK bergantung ke `check` -> jalur rilis tidak tersentuh.
+detekt {
+    toolVersion = "1.23.8"
+    buildUponDefaultConfig = true
+    allRules = false
+    parallel = true
+    ignoreFailures = false
+    autoCorrect = true
+    config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+    // Baseline temuan lama (opsional) — sama prinsip dgn lint-baseline.xml di atas.
+    val detektBaselineFile = file("detekt-baseline.xml")
+    if (detektBaselineFile.exists()) baseline = detektBaselineFile
+}
+
+// Resep resmi detekt (docs "Gradle > Dependencies"): detekt erat dgn versi compiler Kotlin-nya.
+// Pin HANYA konfigurasi detekt/detektPlugins ke 2.0.21 (versi build detekt 1.23.8); compile app
+// tetap Kotlin 2.4.10 — konfigurasi compileClasspath/kotlin plugin TIDAK disentuh.
+configurations.matching { it.name == "detekt" || it.name == "detektPlugins" }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlin") {
+            useVersion("2.0.21")
+        }
     }
 }
 
@@ -377,4 +417,8 @@ dependencies {
     // (dicek langsung, bukan diasumsikan dari training data — versi WorkManager sering
     // berubah shape antar rilis).
     implementation("androidx.work:work-runtime-ktx:2.11.2")
+
+    // Batch 525 — aturan format ktlint utk detekt (autoCorrect). Hanya classpath tool detekt,
+    // BUKAN dependency app/APK.
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
 }

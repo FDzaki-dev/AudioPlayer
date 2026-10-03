@@ -12,6 +12,11 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 525 [user: "terapkan konfigurasi lintdebug/detect yang ketat sesuai standar konstitusi!!"]**: **5 file target, 0 source Kotlin app diubah** — detekt 1.23.8 (stabil;
+2.0.0 masih alpha) + lintDebug `abortOnError`/`warningsAsErrors`; `config/detekt/detekt.yml` (maxIssues 0, autoCorrect, complexity ketat), job CI terpisah `static-analysis`, hook
+`.githooks/pre-commit` OPT-IN (skip kalau tanpa Gradle/SDK). `checkReleaseBuilds=false` tetap -> jalur rilis utuh. `build.yml` kini ikut ZIP (menimpa salinan device).
+Tanpa baseline -> run pertama `static-analysis` kemungkinan merah karena temuan lama. **NOT VERIFIED** — 0 build/detekt/lint dijalankan (sandbox tanpa Gradle/SDK/jaringan). Detail: `CHANGELOG.md` Batch 525.
+
 **Catatan Batch 524 [user atas v523: "fokus kerjakan next kandidat low-risk!!"]**: satu-satunya sisa kandidat R1 = **T3** (Wave 1). **2 file source**:
 `data/PlaybackStateStore.kt` (1 call) + `data/LibraryCacheStore.kt` (2 call): `Log.w(TAG, msg, e)` -> `AppLogger.e(TAG, msg, e)` + tukar import (`android.util.Log` ->
 `util.AppLogger`); 0 `Log.` tersisa di kedua file. Dipilih `.e` (bukan `.w`) karena `AppLogger.w` tak punya parameter Throwable -> stack trace akan hilang; `AppLogger.kt`
@@ -189,7 +194,13 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 524. ZIP: `SONIX_v524.zip`. **2 file source diubah** (`PlaybackStateStore.kt`, `LibraryCacheStore.kt`) — Wave 1 T3 (R1). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
+- Batch terakhir: 525. ZIP: `SONIX_v525.zip`. **5 file target** (`build.gradle.kts`, `app/build.gradle.kts`, `config/detekt/detekt.yml` baru, `.github/workflows/build.yml`, `.githooks/pre-commit` baru); 0 source Kotlin app. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+  detekt 1.23.8 + lintDebug ketat (konstitusi v3.1) -> KONFIG SELESAI, 0 dijalankan; job `static-analysis` belum pernah jalan, hook belum aktif, baseline belum ada ->
+  (1) push, baca job `static-analysis` (TERPISAH dari `build`; "CI baseline hijau" G2 = job `build`). (2) Merah karena CONFIG/PLUGIN (bukan temuan) — mis. "Property ... is misspelled" atau "compiled with Kotlin" —
+  betulkan HANYA `config/detekt/detekt.yml` / blok `detekt {}` + pin 2.0.21 di `app/build.gradle.kts`. (3) Merah karena TEMUAN LAMA (diharapkan): ambil artifact `static_analysis_report_<run>`, generate `gradle detektBaseline`
+  + baseline lint -> `app/detekt-baseline.xml` & `app/lint-baseline.xml` (otomatis terbaca bila ada); JANGAN longgarkan threshold. (4) Baru aktifkan hook: `chmod +x .githooks/pre-commit && git config core.hooksPath .githooks`.
+  JANGAN sentuh source Kotlin app untuk task ini. Gagal parah -> kembali `SONIX_v524.zip`.
+- Batch 524 (sebelum 525). ZIP: `SONIX_v524.zip`. **2 file source diubah** (`PlaybackStateStore.kt`, `LibraryCacheStore.kt`) — Wave 1 T3 (R1). **[RESUME POINT: Task -> Status -> Remaining -> Next Action]**:
   Task: user "fokus kerjakan next kandidat low-risk!!" -> T3 (3 `Log.w` -> `AppLogger`) ->
   Status: KODE SELESAI — 3 call `Log.w(TAG, msg, e)` -> `AppLogger.e(TAG, msg, e)` (PlaybackStateStore.kt `load()` catch; LibraryCacheStore.kt `save()` + `load()` catch), import
   ditukar, diff dibaca, 0 `Log.` tersisa. `AppLogger.kt` utuh (w() tanpa Throwable = alasan pakai e()). **0 build/test dijalankan** -> CI BELUM, device BELUM, JANGAN klaim verified ->

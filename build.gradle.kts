@@ -17,4 +17,10 @@ plugins {
     // Batch 250 — 2.3.10 (BUKAN 2.4.10, KSP versioning sudah decoupled dari Kotlin sejak KSP
     // 2.3.0, dicek web_search: pairing resmi kotlinlang.org docs Kotlin 2.4.10 + KSP 2.3.10).
     id("com.google.devtools.ksp") version "2.3.10" apply false
+    // Batch 525 — detekt ketat sesuai konstitusi (maxIssues:0). 1.23.8 = rilis STABIL terbaru
+    // (dicek web_search Okt 2026; 2.0.0 masih alpha.6 -> TIDAK dipakai, kebijakan project
+    // stable-only + butuh Gradle 9.6/AGP 9.3 sedangkan project di Gradle 8.14.3/AGP 8.13).
+    // Dikompilasi thd Kotlin 2.0.21 (project 2.4.10) -> classpath detekt dipin di
+    // app/build.gradle.kts supaya tidak kena "detekt was compiled with Kotlin ...".
+    id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
 }

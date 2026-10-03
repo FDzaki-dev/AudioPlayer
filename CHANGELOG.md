@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 525 — detekt + lintDebug ketat sesuai konstitusi v3.1 (BELUM verified)
+- Instruksi user (ZIP sumber `AudioPlayer-main.zip`, state = Batch 524): "terapkan konfigurasi lintdebug/detect yang ketat sesuai standar konstitusi!!".
+- **5 file target** (0 file source Kotlin app diubah): `build.gradle.kts` root (plugin detekt 1.23.8, `apply false`), `app/build.gradle.kts` (plugin, blok `detekt {}`,
+  `detektPlugins(detekt-formatting:1.23.8)`, pin Kotlin 2.0.21 khusus konfigurasi `detekt`/`detektPlugins`, blok `lint {}` + `abortOnError=true` + `warningsAsErrors=true`,
+  baseline opsional), `config/detekt/detekt.yml` (BARU), `.github/workflows/build.yml` (+job `static-analysis`), `.githooks/pre-commit` (BARU).
+- **Versi detekt**: 1.23.8 = rilis STABIL terbaru (dicek web_search Okt 2026). 2.0.0 masih alpha.6 (dibuild vs Gradle 9.6.1/AGP 9.3.1; project di Gradle 8.14.3/AGP 8.13)
+  -> TIDAK dipakai, konsisten kebijakan stable-only. Konsekuensi yang diketahui: 1.23.8 dibuild vs Kotlin 2.0.21 sedangkan project Kotlin 2.4.10 -> classpath detekt dipin
+  2.0.21 (resep docs detekt), hanya task `detekt` polos (tanpa type resolution), dan sintaks Kotlin > 2.0 (kalau ada di source — BELUM dicek) akan gagal di-parse.
+- **Konfigurasi ketat**: `maxIssues: 0`, `excludeCorrectable: false` (temuan ter-autoCorrect tetap dihitung), `autoCorrect: true` + ruleset formatting, validasi config aktif +
+  `warningsAsErrors`; CyclomaticComplexMethod 10 (default 15), LongMethod 40 (60), LongParameterList 5/6 (6/7, abaikan param default & data class), LargeClass 400 (600),
+  GlobalCoroutineUsage aktif, FunctionNaming mengabaikan `@Composable`. Rule lain = default detekt. Hanya properti yang diyakini valid di 1.23.8 yang ditulis.
+- **Jalur rilis TIDAK tersentuh**: `checkReleaseBuilds=false` (Batch 76) tetap -> `assembleRelease` tidak menjalankan lint; `check` (yang kini memuat detekt) tidak dipakai CI `build`.
+  Job `static-analysis` TERPISAH tanpa `needs:` (pola `instrumentation-tests`) -> merah di sana tidak memblokir publish APK di job `build`.
+- **Hook** `.githooks/pre-commit`: OPT-IN (tidak aktif sendiri). Gradle/Android SDK tidak ada -> SKIP (exit 0, aman utk commit Termux). Toolchain ada -> detekt/lintDebug gagal ATAU
+  autoCorrect mengubah file = commit DIBLOKIR. Pakai `./gradlew` kalau ada, fallback `gradle` (proyek belum punya wrapper, gap list #19; konstitusi menulis `./gradlew`).
+- **Box Termux tidak diubah.** `.github/workflows/build.yml` KINI ikut ZIP (biasanya tidak, lihat FILE_MANIFEST Batch 390) supaya job baru mendarat; `unzip -o` menimpa salinan di device.
+- **BELUM / risiko**: tidak ada baseline (tak bisa di-generate: sandbox tanpa Gradle/SDK/jaringan) -> run pertama job `static-analysis` KEMUNGKINAN BESAR merah karena temuan lama
+  (detekt strict + lint `warningsAsErrors`, mis. GradleDependency "versi lebih baru") — itu bukan regresi kode. Nama properti `detekt.yml` divalidasi dari pengetahuan, BUKAN dijalankan.
+- **Validasi**: `detekt.yml` & `build.yml` di-parse YAML OK (3 job: build, instrumentation-tests, static-analysis; `needs` kosong); `bash -n` hook OK; keseimbangan kurung DSL
+  kedua file Gradle OK. **0 build/detekt/lint/test dijalankan** -> NOT VERIFIED; CI BELUM, device tidak relevan.
+
 ## Batch 524 — Wave 1 T3 (R1): 3 `Log.w` di `PlaybackStateStore.kt` + `LibraryCacheStore.kt` diarahkan ke `AppLogger.e` (BELUM verified)
 - Instruksi user atas v523: "fokus kerjakan next kandidat low-risk!!" -> satu-satunya sisa kandidat R1 = T3 (T11 = R2-R3 ubah perilaku rotasi; T12/T13 bukan
   perubahan kode; Wave 5 = R3 + prasyarat Compose UI Test belum ada). T3 dulu "tunggu persetujuan terpisah" -> dianggap disetujui lewat instruksi ini.

@@ -81,8 +81,12 @@
 # vs 204 file nyata di ZIP; selisih PERSIS 2 dotfile (.github/workflows/build.yml, .gitignore) yang sengaja tidak dikirim di ZIP (lihat catatan Batch 390) —
 # 0 path hilang, 0 path liar di ZIP, 0 duplikat. Path sama, ISI berubah di 4 dokumen: PROJECT_STATE.md, docs/archive/PROJECT_STATE_ARCHIVE.md,
 # docs/PLANNING.md, docs/PENDING_CodeTidyPlan.md.
-# Total: 206 file
+# Batch 525: config/detekt/detekt.yml + .githooks/pre-commit (file baru, detekt+lintDebug ketat) ditambahkan — 206->208 (207 di ZIP + 1 dotfile .gitignore yang
+# sengaja tidak dikirim). PENGECUALIAN batch ini: .github/workflows/build.yml IKUT dikirim di ZIP (job static-analysis baru; menimpa salinan device) — catatan Batch 390
+# tetap berlaku utk .gitignore dan utk batch lain.
+# Total: 208 file
 
+.githooks/pre-commit
 .github/workflows/build.yml
 .gitignore
 CHANGELOG.md
@@ -277,6 +281,7 @@ app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
 build.gradle.kts
+config/detekt/detekt.yml
 docs/PENDING_CodeTidyPlan.md
 docs/PLANNING.md
 docs/QA_CHECKLIST_SONIX_v488.md
