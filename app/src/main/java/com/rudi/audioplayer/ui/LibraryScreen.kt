@@ -41,6 +41,8 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,8 +79,15 @@ import com.rudi.audioplayer.data.SmartPlaylist
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.data.VaultStore
 import kotlinx.collections.immutable.ImmutableSet
+import kotlinx.collections.immutable.PersistentSet
 import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toPersistentSet
+
+// Batch 538 (T11) — `selectedIds` bertipe `PersistentSet<Long>` (bukan tipe Bundle) -> disimpan sbg LongArray.
+private val SelectedIdsSaver: Saver<PersistentSet<Long>, LongArray> = Saver(
+    save = { it.toLongArray() },
+    restore = { it.asList().toPersistentSet() }
+)
 
 @Composable
 fun LibraryScreen(
@@ -119,22 +128,27 @@ fun LibraryScreen(
     val vaultStore = remember { VaultStore(context) }
     val ratingStore = remember { RatingStore(context) }
     val hintStore = remember(context) { OnboardingHintStore(context) }
+    // Batch 538 (T11) — state tab/pencarian/seleksi/flag sheet RINGAN pakai `rememberSaveable` (tahan
+    // rotasi). Efek samping tercatat: tab bottom-nav memakai `saveState`/`restoreState`, jadi state ini
+    // juga bertahan saat pindah tab Home/Library/Settings. SENGAJA tetap `remember`: `songsPendingDelete`
+    // (konfirmasi hapus destruktif), `songForPlaylistDialog` (`Song?` tak saveable), `searchHistory`/
+    // `showLibraryHint` (turunan store), `filterVersion`, `undoHideIds`, `undoBarKey`.
     var showLibraryHint by remember { mutableStateOf(!hintStore.hasSeenLibraryHint()) }
     val searchHistoryStore = remember { SearchHistoryStore(context) }
     var searchHistory by remember { mutableStateOf(searchHistoryStore.getHistory()) }
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var searchActive by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     var songForPlaylistDialog by remember { mutableStateOf<Song?>(null) }
-    var showFolderManager by remember { mutableStateOf(false) }
+    var showFolderManager by rememberSaveable { mutableStateOf(false) }
     var filterVersion by remember { mutableIntStateOf(0) }
-    var selectionMode by remember { mutableStateOf(false) }
-    var selectedIds by remember { mutableStateOf(persistentSetOf<Long>()) }
-    var songForBulkPlaylistDialog by remember { mutableStateOf(false) }
+    var selectionMode by rememberSaveable { mutableStateOf(false) }
+    var selectedIds by rememberSaveable(stateSaver = SelectedIdsSaver) { mutableStateOf(persistentSetOf<Long>()) }
+    var songForBulkPlaylistDialog by rememberSaveable { mutableStateOf(false) }
     var songsPendingDelete by remember { mutableStateOf<List<Song>>(emptyList()) }
     // Shortcut FAB Batch 266 — laporan user (screenshot tab Favorit kosong): satu-satunya cara
     // sebelumnya WAJIB muter ke tab Lagu dulu buat nambah favorit manual.
-    var showFavoritePicker by remember { mutableStateOf(false) }
+    var showFavoritePicker by rememberSaveable { mutableStateOf(false) }
 
     fun exitSelectionMode() {
         selectionMode = false
