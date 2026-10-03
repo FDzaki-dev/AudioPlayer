@@ -60,12 +60,14 @@ import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.Executor
 
 data class PlaybackUiState(
@@ -101,6 +103,8 @@ data class PlaybackProgress(
 class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
     companion object {
+        private const val POSITION_TICK_ACTIVE_MS = 1000L // Batch 537
+        private const val POSITION_TICK_RELAXED_MS = 5000L // Batch 537
         // Gap List #8 — batas berapa kali auto-skip boleh mental beruntun dari error ke error
         // sebelum berhenti total, bukan angka sembarang: cukup toleran untuk beberapa file
         // rusak/hilang tersebar di tengah queue (kasus normal), tapi tetap memutus loop kalau
@@ -293,6 +297,12 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     val customFolders: StateFlow<List<CustomFolderInfo>> = _customFolders.asStateFlow()
     private var userTargetVolume = 1f
     private var positionTick = 0
+    // Batch 537 (baterai) — kadensi loop posisi ADAPTIF. `uiVisible` default true = perilaku lama
+    // persis bila hook ON_START/ON_STOP (MainActivity) tak pernah dipanggil. `positionWake`
+    // (CONFLATED) membangunkan loop seketika saat play/pause/seek/ganti lagu/UI tampil lagi, jadi
+    // tick lambat (5 dtk) tak pernah terlihat sebagai progress bar beku.
+    @Volatile private var uiVisible = true
+    private val positionWake = Channel<Unit>(Channel.CONFLATED)
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
@@ -544,6 +554,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
             if (!isPlaying) persistPlaybackState()
+            positionWake.trySend(Unit) // Batch 537: loop posisi cek ulang kadensi + publish segera
             // Gap List #8 — sinyal paling jujur bahwa playback beneran pulih (bukan cuma
             // pindah index): reset counter error beruntun di sini, bukan di
             // onMediaItemTransition (yang juga terpanggil untuk track yang UJUNG-UJUNGNYA error
@@ -551,7 +562,17 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             if (isPlaying) consecutiveErrorCount = 0
         }
 
+        // Batch 537 (baterai) — seek/skip saat JEDA tak lagi menunggu tick: loop dibangunkan.
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int
+        ) {
+            positionWake.trySend(Unit)
+        }
+
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            positionWake.trySend(Unit) // Batch 537
             val index = controller?.currentMediaItemIndex ?: 0
             val song = currentQueue.getOrNull(index)
             _uiState.value = _uiState.value.copy(
@@ -1062,10 +1083,19 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private fun folderLabelFor(treeUri: Uri): String =
         DocumentFile.fromTreeUri(appContext, treeUri)?.name ?: "Folder Tambahan"
 
+    /** Batch 537 (baterai) — dipanggil MainActivity (ON_START/ON_STOP). Saat UI tak terlihat dan
+     * tak ada A-B repeat aktif, loop posisi turun ke tick 5 dtk (dulu 1 dtk TANPA HENTI, termasuk
+     * saat layar mati/dijeda -> CPU dibangunkan 1x/dtk tanpa ada yang melihat). */
+    fun setUiVisible(visible: Boolean) {
+        uiVisible = visible
+        if (visible) positionWake.trySend(Unit)
+    }
+
     private fun startPositionLoop() {
         viewModelScope.launch {
             while (true) {
                 val c = controller
+                var tickMs = POSITION_TICK_ACTIVE_MS
                 if (c != null) {
                     val position = c.currentPosition.coerceAtLeast(0)
                     val duration = c.duration.coerceAtLeast(0)
@@ -1083,12 +1113,19 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                     }
 
                     positionTick++
-                    // Batch 352: tick moved 500ms->1000ms (mitigation, see
-                    // PENDING_FixGlobalLagRecomposition.md Opsi B), so modulo halved
-                    // 10->5 to keep the persisted-state cadence at ~5s (unchanged from before).
-                    if (c.isPlaying && positionTick % 5 == 0) persistPlaybackState()
+                    // Batch 537: tick 1 dtk HANYA saat musik main + (UI terlihat ATAU A-B repeat aktif),
+                    // atau A-B aktif (loop-back butuh presisi). Selain itu tick 5 dtk. Kadensi simpan
+                    // state ~5 dtk dipertahankan: tick 5 dtk -> simpan tiap tick; tick 1 dtk -> tiap 5 tick
+                    // (Batch 352: modulo 5). Dijeda -> tak ada simpan periodik (sudah disimpan di
+                    // onIsPlayingChanged(false)), sama seperti sebelumnya.
+                    val playing = c.isPlaying
+                    val abActive = AbRepeatLogic.isActive(_abRepeatPointA.value, _abRepeatPointB.value)
+                    val relaxed = !abActive && (!playing || !uiVisible)
+                    if (relaxed) tickMs = POSITION_TICK_RELAXED_MS
+                    if (playing && (relaxed || positionTick % 5 == 0)) persistPlaybackState()
                 }
-                delay(1000)
+                // Tidur sampai timeout ATAU dibangunkan event (play/pause/seek/transisi/UI tampil).
+                withTimeoutOrNull(tickMs) { positionWake.receive() }
             }
         }
     }

@@ -720,8 +720,12 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                playerViewModel.refreshFloatingBubbleEnabled()
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> playerViewModel.refreshFloatingBubbleEnabled()
+                // Batch 537 (baterai) — loop posisi di ViewModel melambat saat UI tak terlihat.
+                Lifecycle.Event.ON_START -> playerViewModel.setUiVisible(true)
+                Lifecycle.Event.ON_STOP -> playerViewModel.setUiVisible(false)
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

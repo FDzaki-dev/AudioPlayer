@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -76,6 +77,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.hapticfeedback.HapticFeedback
@@ -214,16 +218,20 @@ fun NowPlayingScreen(
     // Batch 129 — hoist sama alasan isTactile/isSkeu di atas: tombol play/pause ini persis
     // "tombol utama"/`.calm-play-button` yang ditarget spec markdown user.
     val isCalmRetro = isCalmRetroTheme()
-    var showSleepTimerDialog by remember { mutableStateOf(false) }
-    var showSpeedDialog by remember { mutableStateOf(false) }
-    var showQueueSheet by remember { mutableStateOf(false) }
-    var showLyricsSheet by remember { mutableStateOf(false) }
-    var showAddToPlaylistDialog by remember { mutableStateOf(false) } // Batch 358
-    var showRatingDialog by remember { mutableStateOf(false) } // Batch 360
+    // Batch 537 (T11) — flag dialog/sheet RINGAN pakai `rememberSaveable` supaya tidak hilang saat
+    // rotasi (Activity di-recreate; manifest tanpa `configChanges`). SENGAJA tetap `remember`:
+    // Equalizer, Visualizer (capture OS ~15fps), SongInfoEdit (state form), RingtoneCutter (decode
+    // audio) — sheet berat/ber-efek-samping tidak dibuka ulang otomatis (keputusan user: paling aman).
+    var showSleepTimerDialog by rememberSaveable { mutableStateOf(false) }
+    var showSpeedDialog by rememberSaveable { mutableStateOf(false) }
+    var showQueueSheet by rememberSaveable { mutableStateOf(false) }
+    var showLyricsSheet by rememberSaveable { mutableStateOf(false) }
+    var showAddToPlaylistDialog by rememberSaveable { mutableStateOf(false) } // Batch 358
+    var showRatingDialog by rememberSaveable { mutableStateOf(false) } // Batch 360
     var showEqualizerSheet by remember { mutableStateOf(false) }
     var showVisualizerSheet by remember { mutableStateOf(false) }
-    var showAdvancedSheet by remember { mutableStateOf(false) }
-    var showAbRepeatBookmarkSheet by remember { mutableStateOf(false) }
+    var showAdvancedSheet by rememberSaveable { mutableStateOf(false) }
+    var showAbRepeatBookmarkSheet by rememberSaveable { mutableStateOf(false) }
     var showSongInfoEditSheet by remember { mutableStateOf(false) }
     var showRingtoneCutterSheet by remember { mutableStateOf(false) }
 
@@ -254,7 +262,7 @@ fun NowPlayingScreen(
     // cabang `showNowPlayingHint -> 260.dp` di `albumArtBoxHeight` bawah) TIDAK relevan lagi —
     // dihapus di titik itu (lihat komentar di sana). Cabang layar pendek (`screenHeightDp <
     // 640.dp`, Batch 336) TETAP ada — itu fix legitimate terpisah, tidak terkait hint sama sekali.
-    var showNowPlayingHint by remember { mutableStateOf(false) }
+    var showNowPlayingHint by rememberSaveable { mutableStateOf(false) }
     val activity = remember(context) { context.findActivity() }
     // Full 0-100% swing over a fixed 140dp of drag, regardless of how tall the gesture zone
     // itself renders — the old version divided by the zone's full 300dp height, so a normal
@@ -1415,6 +1423,33 @@ fun NowPlayingScreen(
     }
 
     if (showVisualizerSheet) {
+        // Batch 537 (baterai) — capture Visualizer OS (~15fps + FFT) dulu HANYA berhenti lewat
+        // `onDismiss`. Dua celah bocor: (1) rotasi/komposisi lepas -> flag `remember` hilang TANPA
+        // onDismiss, capture jalan terus tanpa sheet; (2) app ke background dgn sheet terbuka -> capture
+        // jalan terus saat layar mati. Sekarang: ON_STOP -> lepas, ON_START (setelah STOP) -> pasang
+        // lagi, onDispose -> lepas (idempoten: `release()` aman dipanggil berulang).
+        val vizLifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(vizLifecycleOwner) {
+            var stoppedInBackground = false
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_STOP -> {
+                        stoppedInBackground = true
+                        onCloseVisualizer()
+                    }
+                    Lifecycle.Event.ON_START -> if (stoppedInBackground) {
+                        stoppedInBackground = false
+                        onOpenVisualizer()
+                    }
+                    else -> Unit
+                }
+            }
+            vizLifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                vizLifecycleOwner.lifecycle.removeObserver(observer)
+                onCloseVisualizer()
+            }
+        }
         VisualizerSheet(
             enabled = visualizerEnabled,
             supported = visualizerSupported,
