@@ -12,6 +12,11 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 528 [user atas v527: "A: baseline dibuat lewat gradle detektBaseline dan baseline lint dari toolchain asli, bukan ditulis tangan."]**: **1 file CI baru** `.github/workflows/baseline.yml`
+(+ docs); 0 kode, `build.yml` tidak berubah. Workflow manual TERPISAH "Generate Baselines": init script Gradle mengarahkan baseline ke `app/detekt-baseline.xml` + `app/lint-baseline.xml`, jalankan `gradle detektBaseline`
+(autoCorrect dimatikan khusus job ini) + `gradle lintDebug`, upload 1 artifact `baseline_<run>` (+ `INDEX.txt` + log). Baseline BELUM ada/BELUM dijalankan; threshold TIDAK dilonggarkan. **NOT VERIFIED** — YAML/`bash -n`/simulasi
+lokal OK; init script Groovy belum dikompilasi/dijalankan (sandbox tanpa Gradle/SDK). Detail: `CHANGELOG.md` Batch 528.
+
 **Catatan Batch 527 [user: upload `ci_report_504.zip` tanpa teks]**: **2 file dokumen**, 0 kode. Run #504 (commit `f7d70c5`): `build` sukses, `instrumentation-tests` sukses (7/7), `static-analysis` merah
 (diharapkan). `ci_report_504` terbentuk -> Batch 526 terverifikasi sebagian (hapus artifact terpisah + izin `actions: write` BELUM terkonfirmasi). Backlog: detekt 4300 temuan/97 file (~84% aturan format),
 lint 194 issue (178 error + 16 hint; 28 = "versi lebih baru"). Temuan format bergeser antar-run pada source sama (503: 4279 vs 504: 4300; sebab belum diketahui) dan ID baseline detekt kasar
@@ -205,7 +210,15 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 527. ZIP: `SONIX_v527.zip`. **2 file dokumen** (`PROJECT_STATE.md`, `CHANGELOG.md`); 0 kode. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+- Batch terakhir: 528. ZIP: `SONIX_v528.zip`. **1 file CI baru** (`.github/workflows/baseline.yml`) + docs (`PROJECT_STATE.md`, `CHANGELOG.md`, `FILE_MANIFEST.txt`, `README.md`); 0 kode. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+  Opsi A (baseline detekt+lint dari toolchain asli) -> WORKFLOW SIAP, 0 dijalankan, baseline BELUM ada ->
+  (1) User push (Box DAILY UPDATE) lalu jalankan manual Actions -> "Generate Baselines" -> unduh artifact `baseline_<run>` -> upload ke chat. (2) Akun berikutnya (setelah artifact datang): baca `INDEX.txt` (jumlah ID detekt ~1216 & issue lint ~194 sebagai
+  patokan kasar dari run #504, bukan syarat), taruh HANYA `app/detekt-baseline.xml` + `app/lint-baseline.xml` ke ZIP (`app/build.gradle.kts` membacanya otomatis); WAJIB masuk ZIP — Box DAILY UPDATE menghapus `app/` sebelum unzip, file yang tak ikut ZIP hilang.
+  Jangan tulis/edit isi baseline tangan; jangan longgarkan threshold. (3) Job baseline merah -> baca `logs/*.log` + `INDEX.txt` di artifact (tetap diunggah) dan betulkan HANYA `baseline.yml`; kandidat penyebab: init script
+  (`plugins.withId` vs blok `lint {}`; tipe `autoCorrect`/`baseline` detekt), `-Dlint.baselines.continue`. JANGAN ubah `app/build.gradle.kts` untuk ini. (4) Setelah baseline masuk: cek `static-analysis` hijau; kalau masih merah, ambil `ci_report_<run>` baru dan telaah
+  temuan yang lolos dari baseline (mis. pesan lint berbeda) — jangan longgarkan threshold. (5) Masih terbuka dari Batch 527: konfirmasi artifact terpisah run #504 terhapus (step "Hapus artifact terpisah" di `collect-reports`) + kandidat lint nyata
+  (`RingtoneEncoder.kt:130` WrongConstant, `EqualizerController.kt:189` StaticFieldLeak, `AndroidManifest.xml:106` ExportedService, `MainActivity.kt:635` BatteryLife); `BubbleTileService.kt:80` = false positive (sudah ada guard). Gagal parah -> kembali `SONIX_v527.zip`.
+- Batch 527 (sebelum 528). ZIP: `SONIX_v527.zip`. **2 file dokumen** (`PROJECT_STATE.md`, `CHANGELOG.md`); 0 kode. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
   Triage `ci_report_504` (backlog detekt 4300 + lint 194) -> SELESAI DICATAT, BELUM DITINDAK; artifact gabungan terbukti terbentuk, status hapus artifact terpisah belum terkonfirmasi ->
   (1) Tanya/cek user: tab Artifacts run #504 hanya `ci_report_504`? Kalau `instrumentation_test_report_504`/`static_analysis_report_504` masih ada -> betulkan HANYA step "Hapus artifact terpisah" di job `collect-reports`
   (`.github/workflows/build.yml`; kandidat: izin `actions: write`, respons `gh api`); jangan sentuh `build`. (2) Backlog = KEPUTUSAN USER, jangan pilih sendiri: A) baseline detekt+lint (hijau cepat; baseline format kasar,

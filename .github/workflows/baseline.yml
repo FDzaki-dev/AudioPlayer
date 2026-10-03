@@ -1,0 +1,126 @@
+name: Generate Baselines
+
+# Batch 528 — opsi A (pilihan user): baseline detekt + lint dibuat lewat Gradle di toolchain asli
+# (runner GitHub: JDK 17 + Android SDK + Gradle 8.14.3), BUKAN ditulis tangan. Workflow TERPISAH dari
+# build.yml: hanya manual (workflow_dispatch), tidak menyentuh job build/rilis APK/collect-reports.
+# Cara pakai: GitHub -> Actions -> "Generate Baselines" -> Run workflow (branch main) -> unduh
+# artifact `baseline_<run>` -> letakkan `app/detekt-baseline.xml` + `app/lint-baseline.xml` di ZIP
+# (app/build.gradle.kts membacanya otomatis kalau file-nya ada; tanpa file = tetap ketat penuh).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-baselines:
+    runs-on: ubuntu-latest
+    steps:
+      # ═══════════════════════ 1. SETUP ═══════════════════════
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.14.3
+
+      - name: Tulis init script (arahkan path baseline ke app/)
+        # Init script (-I) dipakai supaya app/build.gradle.kts TIDAK perlu diubah (file paling
+        # berisiko, jalur rilis). Isinya hanya berlaku di workflow ini:
+        # - lint.baseline di-set SAAT plugin Android di-apply (lebih awal dari blok `lint {}` di
+        #   build script, yang hanya menyentuh baseline kalau file-nya sudah ada -> nilai ini bertahan;
+        #   DSL AGP terkunci setelah evaluasi, jadi tidak boleh di-set lewat afterEvaluate).
+        # - detekt.baseline + autoCorrect=false di-set di afterEvaluate (setelah blok `detekt {}`
+        #   yang mengisi autoCorrect=true). autoCorrect dimatikan KHUSUS pembuatan baseline supaya
+        #   rule format tidak mengubah file selagi dianalisis -> daftar temuan = isi source apa adanya.
+        run: |
+          cat > "$RUNNER_TEMP/baseline-init.gradle" <<'EOF'
+          gradle.allprojects { p ->
+              p.plugins.withId('com.android.application') {
+                  p.extensions.getByName('android').lint.baseline = p.file('lint-baseline.xml')
+              }
+              p.afterEvaluate {
+                  def d = p.extensions.findByName('detekt')
+                  if (d != null) {
+                      d.baseline = p.file('detekt-baseline.xml')
+                      d.autoCorrect = false
+                  }
+              }
+          }
+          EOF
+          cat "$RUNNER_TEMP/baseline-init.gradle"
+
+      # ═══════════════════════ 2. GENERATE ═══════════════════════
+      - name: Generate detekt baseline (gradle detektBaseline)
+        # Exit non-nol TIDAK menggagalkan step ini: log tetap diunggah, kegagalan dinilai di step
+        # "Verifikasi" (berdasarkan ada/tidaknya file baseline), supaya satu run cukup utk diagnosis.
+        run: |
+          mkdir -p logs
+          gradle detektBaseline -I "$RUNNER_TEMP/baseline-init.gradle" --no-daemon --console=plain > logs/detekt-baseline-output.log 2>&1 || echo "detektBaseline exit non-nol - lihat log"
+          tail -n 25 logs/detekt-baseline-output.log
+
+      - name: Generate lint baseline (gradle lintDebug)
+        # Lint yang membuat baseline baru biasanya gagal setelahnya ("Created baseline file");
+        # -Dlint.baselines.continue=true meminta lanjut, dan exit non-nol di sini tetap ditoleransi.
+        run: |
+          mkdir -p logs
+          gradle lintDebug -I "$RUNNER_TEMP/baseline-init.gradle" -Dlint.baselines.continue=true --no-daemon --console=plain > logs/lint-baseline-output.log 2>&1 || echo "lintDebug exit non-nol (wajar saat baseline baru dibuat) - lihat log"
+          tail -n 25 logs/lint-baseline-output.log
+
+      # ═══════════════════════ 3. PACKAGE ═══════════════════════
+      - name: Susun artifact baseline
+        if: always()
+        run: |
+          mkdir -p baseline_out/app baseline_out/logs logs
+          if [ -f app/detekt-baseline.xml ]; then cp app/detekt-baseline.xml baseline_out/app/; fi
+          if [ -f app/lint-baseline.xml ]; then cp app/lint-baseline.xml baseline_out/app/; fi
+          cp -r logs/. baseline_out/logs/
+          {
+            echo "BASELINE GENERATOR - run #${{ github.run_number }} - commit ${GITHUB_SHA::7}"
+            echo ""
+            if [ -f app/detekt-baseline.xml ]; then
+              echo "detekt-baseline.xml: $(grep -c '<ID>' app/detekt-baseline.xml || true) ID, $(wc -c < app/detekt-baseline.xml) byte"
+            else
+              echo "detekt-baseline.xml: TIDAK terbentuk (lihat logs/detekt-baseline-output.log)"
+            fi
+            if [ -f app/lint-baseline.xml ]; then
+              echo "lint-baseline.xml: $(grep -cE '^[[:space:]]*<issue([[:space:]]|$)' app/lint-baseline.xml || true) issue, $(wc -c < app/lint-baseline.xml) byte"
+            else
+              echo "lint-baseline.xml: TIDAK terbentuk (lihat logs/lint-baseline-output.log)"
+            fi
+            echo ""
+            echo "Letakkan di ZIP proyek: app/detekt-baseline.xml dan app/lint-baseline.xml."
+            echo "app/build.gradle.kts membacanya otomatis bila file ada; ambang (maxIssues 0, warningsAsErrors) TIDAK berubah."
+          } > baseline_out/INDEX.txt
+          cat baseline_out/INDEX.txt
+
+      - name: Upload baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline_${{ github.run_number }}
+          path: baseline_out/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Verifikasi (merah bila baseline tidak terbentuk)
+        if: always()
+        run: |
+          missing=0
+          for f in app/detekt-baseline.xml app/lint-baseline.xml; do
+            if [ ! -s "$f" ]; then
+              echo "TIDAK terbentuk: $f"
+              missing=1
+            fi
+          done
+          exit $missing

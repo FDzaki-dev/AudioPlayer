@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 528 — Opsi A: workflow `baseline.yml` untuk membuat baseline detekt + lint via Gradle di CI (BELUM verified)
+- Instruksi user atas v527 (pilihan opsi A dari 3 opsi backlog): "baseline dibuat lewat gradle detektBaseline dan baseline lint dari toolchain asli, bukan ditulis tangan".
+- **1 file CI baru** (`.github/workflows/baseline.yml`) + 4 dokumen (`PROJECT_STATE.md`, `CHANGELOG.md`, `FILE_MANIFEST.txt`, `README.md`); 0 source Kotlin, 0 file Gradle, `build.yml` TIDAK berubah.
+  Workflow TERPISAH + hanya `workflow_dispatch` (manual) -> tidak ikut tiap push, tidak menyentuh job `build`/rilis APK/`collect-reports`, tidak membuat GitHub Release.
+- **Isi job `generate-baselines`**: init script Gradle (`-I`, ditulis di step pertama) mengarahkan `lint.baseline` -> `app/lint-baseline.xml` (di-set saat plugin Android di-apply, lebih awal dari blok `lint {}`)
+  dan `detekt.baseline` -> `app/detekt-baseline.xml` + `detekt.autoCorrect = false` (afterEvaluate, setelah blok `detekt {}`). Lalu `gradle detektBaseline` dan `gradle lintDebug -Dlint.baselines.continue=true`
+  (exit non-nol ditoleransi; log tetap diunggah), susun `baseline_out/` (`app/detekt-baseline.xml`, `app/lint-baseline.xml`, `INDEX.txt` berisi jumlah ID/issue, `logs/*.log`), upload 1 artifact `baseline_<run>`
+  (retensi 14 hari), step terakhir "Verifikasi" merah bila salah satu file baseline tidak terbentuk. `app/build.gradle.kts` TIDAK diubah (file paling berisiko) — init script dipilih supaya jalur rilis nol risiko.
+- **Alasan `autoCorrect=false` khusus pembuatan baseline**: temuan format bergeser antar-run pada source sama (lihat Batch 527; penyebab belum terbukti). Mematikan autoCorrect hanya di job ini membuat daftar temuan
+  = isi source apa adanya, tanpa rule format yang mengubah file selagi dianalisis. Run `static-analysis` biasa TIDAK berubah (tetap autoCorrect true).
+- **Cara pakai**: GitHub -> Actions -> "Generate Baselines" -> Run workflow (main) -> unduh artifact `baseline_<run>` -> upload ke chat -> batch berikutnya menaruh kedua file di ZIP (`app/`). WAJIB ikut ZIP:
+  Box DAILY UPDATE menghapus `app/` sebelum unzip, jadi baseline yang tidak ada di ZIP hilang pada commit berikutnya. `app/build.gradle.kts` membacanya otomatis bila ada (`exists()`); ambang TIDAK dilonggarkan.
+- **Validasi**: YAML di-parse OK (1 job, 9 step, `permissions: contents: read`); `bash -n` semua blok `run` OK; keseimbangan kurung init script OK; step "Susun artifact" + "Verifikasi" DISIMULASIKAN lokal dengan
+  file baseline contoh (skenario lengkap -> exit 0, `INDEX.txt` benar; lint baseline hilang -> `TIDAK terbentuk`, exit 1). Groovy init script TIDAK dikompilasi di sini (sandbox tanpa Groovy/Gradle/SDK/jaringan).
+  **NOT VERIFIED**: perilaku init script terhadap AGP 8.13 + detekt 1.23.8 (urutan `plugins.withId` vs blok `lint {}`; `d.autoCorrect`/`d.baseline` bertipe sesuai), nama task, perilaku `lint.baselines.continue`.
+  Workflow dispatch baru muncul di tab Actions setelah file ada di `main` (push dulu).
+- **Risiko**: bila init script salah -> HANYA job ini merah (log + `INDEX.txt` tetap terunggah untuk diagnosis); release/`build.yml` tidak terpengaruh. Baseline detekt rule format kasar (ID `Rule:Signature` tanpa nomor baris,
+  lihat Batch 527) -> pelanggaran baru ber-Signature sama ikut lolos; ini sifat baseline, bukan cacat workflow. Poin Batch 527 (cek artifact terpisah run #504, kandidat lint nyata) masih terbuka.
+
 ## Batch 527 — Triage `ci_report_504.zip` (run #504): dokumen saja, 0 file kode (BELUM ada tindakan atas backlog)
 - Instruksi user: upload `ci_report_504.zip` TANPA teks tambahan (preseden Batch 29/378: diperlakukan sebagai laporan implisit -> dicatat + dianalisis, TIDAK ditindak).
 - **2 file dokumen** (`PROJECT_STATE.md`, `CHANGELOG.md`); 0 source Kotlin, 0 file Gradle, 0 CI; FILE_MANIFEST tetap. Isi laporan: run #504, commit `f7d70c5`; `build` = success,

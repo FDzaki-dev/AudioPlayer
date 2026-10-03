@@ -84,9 +84,12 @@
 # Batch 525: config/detekt/detekt.yml + .githooks/pre-commit (file baru, detekt+lintDebug ketat) ditambahkan — 206->208 (207 di ZIP + 1 dotfile .gitignore yang
 # sengaja tidak dikirim). PENGECUALIAN batch ini: .github/workflows/build.yml IKUT dikirim di ZIP (job static-analysis baru; menimpa salinan device) — catatan Batch 390
 # tetap berlaku utk .gitignore dan utk batch lain.
-# Total: 208 file
+# Batch 528: .github/workflows/baseline.yml (file baru, workflow manual pembuat baseline detekt+lint) ditambahkan — 208->209 (208 di ZIP + 1 dotfile .gitignore yang
+# sengaja tidak dikirim). Seperti Batch 525, file di .github/ IKUT dikirim di ZIP (menimpa/menambah salinan device); catatan Batch 390 tetap berlaku utk .gitignore.
+# Total: 209 file
 
 .githooks/pre-commit
+.github/workflows/baseline.yml
 .github/workflows/build.yml
 .gitignore
 CHANGELOG.md
