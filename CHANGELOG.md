@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 529 — Triage `ci_report_506.zip` (run #506) + 4 kandidat lint dibaca ke source: dokumen saja, 0 file kode (baseline BELUM ada)
+- Instruksi user: "lanjutkan progress!!" + upload `SONIX_v528.zip` & `ci_report_506.zip`. Artifact `baseline_<run>` (langkah (1) RESUME POINT Batch 528) BELUM ada: `ci_report_506` = laporan `build.yml` biasa, BUKAN keluaran
+  workflow "Generate Baselines". Menjalankannya tetap tindakan user (Actions -> "Generate Baselines" -> unduh artifact -> upload); tidak ada yang bisa dikerjakan atas baseline sebelum itu.
+- **2 file dokumen** (`PROJECT_STATE.md`, `CHANGELOG.md`); 0 source Kotlin, 0 file Gradle, 0 CI; FILE_MANIFEST tetap. Isi laporan: run #506, commit `914cac1`; `build` = success, `instrumentation` = success
+  (7 tes, 0 gagal, `PlaybackTransportTest`), `static-analysis` = failure (diharapkan, baseline belum ada). Pemetaan commit `914cac1` -> nomor batch TIDAK bisa diverifikasi dari ZIP (tanpa metadata git).
+- **Backlog setara run #503/#504**: detekt 4281 temuan/97 file (503: 4279, 504: 4300), lint 194 issue (178 error + 16 hint; dihitung ulang dari `lint-results-debug.xml`). Catatan Batch 526-528: `app/` tidak berubah sejak v525 (0 kode),
+  jadi selisih detekt antar-run = pergeseran temuan format yang sudah dicatat Batch 527, bukan regresi. Daftar 15 rule teratas di `INDEX.txt` sama pola dengan #504 (Indentation 2584, MagicNumber 429, ArgumentListWrapping 304, ...).
+- **Artifact**: hanya `ci_report_506` yang diunggah; status penghapusan artifact terpisah (`instrumentation_test_report_506`, `static_analysis_report_506`) TETAP tidak terkonfirmasi dari ZIP (cek tab Artifacts run #506/#504).
+- **Nomor baris laporan != source ZIP v528**: `MainActivity.kt` laporan: `onCreate` 254, `AppNavHost` 535, BatteryLife 635 | ZIP: 287, 552, ~659 (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` baris 659-660). Yang cocok persis:
+  `RingtoneEncoder.kt:130`, `AndroidManifest.xml:106`. Himpunan file ber-wildcard-import identik (32 file di ZIP == 32 di laporan) -> source CI ~ ZIP. Dugaan: `autoCorrect: true` di `detekt {}` menulis ulang source di runner sebelum
+  `lintDebug` jalan (cocok dengan pergeseran 503->504 di Batch 527) — TIDAK terbukti. Praktis: jangan navigasi source pakai nomor baris laporan; cari lewat nama simbol/Signature.
+- **4 kandidat lint dibaca di source v528 (0 diubah)**:
+  1. `WrongConstant` `RingtoneEncoder.kt:130` (`bufferInfo.flags = extractor.sampleFlags`): NYATA menurut tipe — flag `MediaExtractor.SAMPLE_FLAG_*` diberikan ke field `MediaCodec.BUFFER_FLAG_*`. Setahu saya hanya SYNC<->KEY_FRAME yang nilainya sama
+     (konstanta TIDAK diverifikasi di sandbox); untuk ekstraksi audio dampak praktis kecil. Perbaikan (mapping flag eksplisit) = 1 file di jalur ekspor ringtone -> keputusan user, tidak dikerjakan.
+  2. `StaticFieldLeak` `EqualizerController` (`sharedInstance`): FALSE POSITIVE — `getInstance()` menyimpan `EqualizerController(context.applicationContext)` (baris 214-216), tidak menahan Activity/Context UI siapa pun pemanggilnya.
+  3. `ExportedService` `PlaybackService` (`AndroidManifest.xml:106`, `exported="true"`, filter MediaSessionService + MediaBrowserService, tanpa `android:permission`): kemungkinan SENGAJA (kontroler eksternal perlu bind). Jangan tambah permission
+     tanpa uji device; validasi controller di `onGetSession` BELUM dibaca.
+  4. `BatteryLife` (`MainActivity.kt` ~659 + permission di manifest baris 68): hanya soal kebijakan Play Store; sudah ada KDoc Batch 471 di manifest. Tidak ditindak.
+  Dampak baseline: keempatnya (dan 194 lint lain) akan disembunyikan dari gate begitu baseline masuk; perbaikan tetap bisa kapan saja.
+- **Validasi**: laporan dibaca langsung (INDEX, detekt.txt, lint xml, laporan instrumentation); hitungan dicocokkan ke `INDEX.txt` (4281, 194); 4 kandidat dibaca langsung di source ZIP. 0 build/detekt/lint dijalankan di sini.
+  NOT VERIFIED: nilai konstanta MediaCodec/MediaExtractor (ingatan), penyebab pergeseran baris, status hapus artifact.
+
 ## Batch 528 — Opsi A: workflow `baseline.yml` untuk membuat baseline detekt + lint via Gradle di CI (BELUM verified)
 - Instruksi user atas v527 (pilihan opsi A dari 3 opsi backlog): "baseline dibuat lewat gradle detektBaseline dan baseline lint dari toolchain asli, bukan ditulis tangan".
 - **1 file CI baru** (`.github/workflows/baseline.yml`) + 4 dokumen (`PROJECT_STATE.md`, `CHANGELOG.md`, `FILE_MANIFEST.txt`, `README.md`); 0 source Kotlin, 0 file Gradle, `build.yml` TIDAK berubah.

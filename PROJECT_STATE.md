@@ -12,6 +12,10 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 529 [user: "lanjutkan progress!!" + upload `SONIX_v528.zip` & `ci_report_506.zip`]**: **2 file dokumen**, 0 kode. Artifact `baseline_<run>` BELUM diunggah — `ci_report_506` = laporan `build.yml` biasa, bukan keluaran
+"Generate Baselines"; langkah itu tetap tindakan user. Run #506 (commit `914cac1`): `build` sukses, `instrumentation` sukses (7 tes, 0 gagal), `static-analysis` merah (diharapkan; detekt 4281/97 file, lint 194 = 178 error + 16 hint).
+4 kandidat lint dicek ke source (0 diubah): 3 bukan cacat nyata/disengaja; `RingtoneEncoder.kt:130` WrongConstant = satu-satunya yang nyata. Nomor baris laporan != ZIP (dugaan `autoCorrect`, belum terbukti). Detail: `CHANGELOG.md` Batch 529.
+
 **Catatan Batch 528 [user atas v527: "A: baseline dibuat lewat gradle detektBaseline dan baseline lint dari toolchain asli, bukan ditulis tangan."]**: **1 file CI baru** `.github/workflows/baseline.yml`
 (+ docs); 0 kode, `build.yml` tidak berubah. Workflow manual TERPISAH "Generate Baselines": init script Gradle mengarahkan baseline ke `app/detekt-baseline.xml` + `app/lint-baseline.xml`, jalankan `gradle detektBaseline`
 (autoCorrect dimatikan khusus job ini) + `gradle lintDebug`, upload 1 artifact `baseline_<run>` (+ `INDEX.txt` + log). Baseline BELUM ada/BELUM dijalankan; threshold TIDAK dilonggarkan. **NOT VERIFIED** — YAML/`bash -n`/simulasi
@@ -210,7 +214,16 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 528. ZIP: `SONIX_v528.zip`. **1 file CI baru** (`.github/workflows/baseline.yml`) + docs (`PROJECT_STATE.md`, `CHANGELOG.md`, `FILE_MANIFEST.txt`, `README.md`); 0 kode. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+- Batch terakhir: 529. ZIP: `SONIX_v529.zip`. **2 file dokumen** (`PROJECT_STATE.md`, `CHANGELOG.md`); 0 kode. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+  Opsi A (baseline detekt+lint) -> `baseline.yml` SIAP tapi BELUM dijalankan; baseline BELUM ada (unggahan Batch 529 = `ci_report_506` biasa, bukan `baseline_<run>`); run #506: build + instrumentation hijau, static-analysis merah (diharapkan) ->
+  (1) USER: push (Box DAILY UPDATE) -> Actions -> "Generate Baselines" (branch main) -> unduh `baseline_<run>` -> upload ke chat. Tanpa artifact itu, jangan buat batch baru atas baseline kecuali user memberi instruksi lain.
+  (2) Akun berikutnya setelah artifact datang: langkah (2)-(4) Batch 528 di bawah TETAP berlaku (HANYA `app/detekt-baseline.xml` + `app/lint-baseline.xml` ke ZIP, tanpa edit tangan, tanpa melonggarkan threshold; job merah -> betulkan HANYA `baseline.yml`).
+  (3) Kandidat lint sudah dibaca di source (Batch 529, 0 diubah): `EqualizerController` StaticFieldLeak = false positive (`getInstance()` menyimpan `applicationContext`); `MainActivity` BatteryLife = kebijakan Play Store (ada KDoc Batch 471 di manifest);
+  `PlaybackService` ExportedService = kemungkinan sengaja (jangan tambah `android:permission` tanpa uji device); `RingtoneEncoder.kt:130` WrongConstant (`bufferInfo.flags = extractor.sampleFlags`) = satu-satunya yang nyata -> perbaikan (mapping flag eksplisit, 1 file)
+  HANYA kalau user minta; baseline akan menyembunyikannya dari gate, perbaikan tetap bisa kapan saja.
+  (4) Nomor baris di laporan CI != ZIP (`MainActivity.kt`: `onCreate` 254 vs 287, `AppNavHost` 535 vs 552) -> cari lewat nama simbol/Signature, bukan nomor baris; dugaan `autoCorrect: true` menulis ulang source di runner, BELUM terbukti.
+  (5) Masih terbuka: konfirmasi artifact terpisah run #504/#506 terhapus (cek tab Artifacts oleh user). Gagal parah -> kembali `SONIX_v528.zip`.
+- Batch 528 (sebelum 529). ZIP: `SONIX_v528.zip`. **1 file CI baru** (`.github/workflows/baseline.yml`) + docs (`PROJECT_STATE.md`, `CHANGELOG.md`, `FILE_MANIFEST.txt`, `README.md`); 0 kode. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
   Opsi A (baseline detekt+lint dari toolchain asli) -> WORKFLOW SIAP, 0 dijalankan, baseline BELUM ada ->
   (1) User push (Box DAILY UPDATE) lalu jalankan manual Actions -> "Generate Baselines" -> unduh artifact `baseline_<run>` -> upload ke chat. (2) Akun berikutnya (setelah artifact datang): baca `INDEX.txt` (jumlah ID detekt ~1216 & issue lint ~194 sebagai
   patokan kasar dari run #504, bukan syarat), taruh HANYA `app/detekt-baseline.xml` + `app/lint-baseline.xml` ke ZIP (`app/build.gradle.kts` membacanya otomatis); WAJIB masuk ZIP — Box DAILY UPDATE menghapus `app/` sebelum unzip, file yang tak ikut ZIP hilang.
