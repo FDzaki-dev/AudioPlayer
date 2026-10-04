@@ -43,22 +43,13 @@ jobs:
           # antar-run lewat actions/cache di balik layar action ini. Tidak perlu setup
           # actions/cache manual terpisah — action ini sudah menanganinya sejak v3.
 
-      - name: Cache Gradle configuration cache
-        # Batch 76 — configuration cache (gradle.properties) disimpan project-local di
-        # <repo>/.gradle/configuration-cache, BUKAN di Gradle User Home (~/.gradle) — jadi
-        # TIDAK ikut ter-cache otomatis oleh setup-gradle@v3 di atas (yang cuma menyasar
-        # ~/.gradle) walau flag-nya sudah aktif. Tanpa step ini, config cache tetap valid
-        # tapi selalu "cold" (fresh) setiap run, kehilangan sebagian besar manfaatnya.
-        # Key berbasis hash file build script — otomatis invalid (cache miss, bukan error)
-        # kalau build.gradle.kts/gradle.properties berubah; Gradle sendiri JUGA
-        # memvalidasi fingerprint input di dalam entry cache-nya, jadi key yang meleset pun
-        # cuma berakhir cache-miss aman, tidak pernah dipakai kalau sudah stale/salah.
-        uses: actions/cache@v4
-        with:
-          path: .gradle/configuration-cache
-          key: config-cache-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle.properties') }}
-          restore-keys: |
-            config-cache-${{ runner.os }}-
+      # Batch 540 — step `actions/cache` untuk `.gradle/configuration-cache` (Batch 76) DIHAPUS bersama
+      # `--configuration-cache` + `org.gradle.configuration-cache` (gradle.properties). Alasan: (1) dokumentasi
+      # setup-gradle: data configuration-cache bisa memuat secret, jadi hanya di-cache bila dienkripsi
+      # (`cache-encryption-key`); step lama menyimpannya TANPA enkripsi dan job ini membawa SIGNING_*.
+      # (2) Manfaatnya tak pernah terbukti: tak ada catatan "Reusing configuration cache" di CHANGELOG, dan
+      # `gitCommitCount()` (app/build.gradle.kts) memanggil `git rev-list` saat configuration (Batch 528:
+      # peringatan CC) -> input yang berubah tiap push. Balik: pulihkan step + flag dari Batch 76.
 
       - name: Decode signing keystore
         run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > ${{ github.workspace }}/app/release.keystore
@@ -130,9 +121,12 @@ jobs:
         # version determination (keduanya tidak butuh Gradle sama sekali) selesai LEBIH
         # DULU sebelum satu-satunya invocation Gradle ini, jadi env var SIGNING_* di bawah
         # sudah siap sejak awal invocation seperti sebelumnya.
-        # Batch 76 — `--configuration-cache` ditambah eksplisit di CLI (sama alasan dgn
-        # `--build-cache`: redundant-safe dgn gradle.properties, tapi eksplisit memastikan
-        # aktif walau properties file entah kenapa tidak terbaca).
+        # Batch 540 — `testDebugUnitTest` -> `testReleaseUnitTest`: tes unit JVM murni dijalankan
+        # terhadap kelas varian RELEASE yang SAMA dengan yang dikompilasi `assembleRelease`, jadi varian
+        # debug (KSP debug + kompilasi Kotlin debug + resource debug) tidak lagi dikompilasi di job ini
+        # (job `instrumentation-tests` tetap menyusun varian debug). Tes tak bergantung ke BuildConfig/
+        # varian (cek: app/src/test hanya menyebut Robolectric di komentar) dan tes unit TIDAK lewat R8.
+        # `--configuration-cache` dihapus (lihat catatan di atas step Decode signing keystore).
         env:
           SIGNING_KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
@@ -140,7 +134,7 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           set -o pipefail
-          gradle testDebugUnitTest assembleRelease --no-daemon --build-cache --configuration-cache 2>&1 | tee build-output.log
+          gradle testReleaseUnitTest assembleRelease --no-daemon --build-cache 2>&1 | tee build-output.log
 
       # ═══════════════════════ 4. PACKAGE & RELEASE ═══════════════════════
       - name: Rename APK to match version
@@ -233,8 +227,8 @@ jobs:
           name: log_fail_${{ github.run_number }}
           path: |
             build-output.log
-            app/build/reports/tests/testDebugUnitTest/
-            app/build/test-results/testDebugUnitTest/
+            app/build/reports/tests/testReleaseUnitTest/
+            app/build/test-results/testReleaseUnitTest/
           if-no-files-found: ignore
           retention-days: 14
 
@@ -417,6 +411,45 @@ jobs:
             fi
           } > ci_report/INDEX.txt
           cat ci_report/INDEX.txt
+
+      - name: Ukur durasi job + step (INDEX.txt)
+        # Batch 540 — pemangkasan waktu CI harus TERUKUR, bukan tebakan: durasi tiap job + 5 step terlama
+        # per job dari GitHub Actions API ditambahkan ke INDEX.txt (ikut terunggah di ci_report_<run>).
+        # python3 (bawaan ubuntu-latest) dipakai, bukan jq: skrip ini bisa dieksekusi + diuji di luar CI.
+        # Aditif + aman-gagal (continue-on-error): kalau API/skrip gagal, laporan lama tetap terbit utuh.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" > jobs.json
+          python3 - <<'PY' >> ci_report/INDEX.txt
+          import json
+          from datetime import datetime
+
+          def ts(x):
+              return datetime.fromisoformat(x.replace("Z", "+00:00"))
+
+          def secs(a, b):
+              return int((ts(b) - ts(a)).total_seconds())
+
+          jobs = [j for j in json.load(open("jobs.json"))["jobs"]
+                  if j.get("started_at") and j.get("completed_at") and j["name"] != "collect-reports"]
+          print("")
+          print("DURASI CI (detik, dari GitHub Actions API; collect-reports sendiri tidak dihitung):")
+          if not jobs:
+              print("  (belum ada job selesai)")
+          else:
+              first = min(j["started_at"] for j in jobs)
+              last = max(j["completed_at"] for j in jobs)
+              print(f"  TOTAL wall-clock job paralel: {secs(first, last)}s")
+              for j in jobs:
+                  print(f"  {j['name']}: {j['conclusion']} - {secs(j['started_at'], j['completed_at'])}s")
+                  steps = [(secs(s["started_at"], s["completed_at"]), s["name"]) for s in j.get("steps", [])
+                           if s.get("started_at") and s.get("completed_at")]
+                  for dur, name in sorted(steps, reverse=True)[:5]:
+                      print(f"      {dur}s  {name}")
+          PY
+          tail -n 30 ci_report/INDEX.txt
 
       - name: Upload laporan gabungan
         id: upload
