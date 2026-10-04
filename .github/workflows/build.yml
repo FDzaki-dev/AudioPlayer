@@ -413,8 +413,13 @@ jobs:
           cat ci_report/INDEX.txt
 
       - name: Ukur durasi job + step (INDEX.txt)
-        # Batch 540 — pemangkasan waktu CI harus TERUKUR, bukan tebakan: durasi tiap job + 5 step terlama
-        # per job dari GitHub Actions API ditambahkan ke INDEX.txt (ikut terunggah di ci_report_<run>).
+        # Batch 540 — pemangkasan waktu CI harus TERUKUR, bukan tebakan. Batch 541 — DIPISAH jadi 2 bagian
+        # (koreksi user: angka gabungan run #517 "TOTAL 432s" itu waktu job emulator, BUKAN waktu build):
+        #  (A) BUILD NYATA = job `build` (jalur APK rilis; tak punya `needs`, tak menunggu job lain) -> durasi
+        #      job, durasi step Gradle (tes unit + kompilasi + R8 + paket), sisa non-compile, dan waktu sampai
+        #      APK terbit di Release.
+        #  (B) JALUR LAPORAN = `instrumentation-tests` + `static-analysis` (+ collect-reports) -> hanya menentukan
+        #      kapan `ci_report_<run>` terbit; TIDAK memengaruhi APK. Tak pernah dijumlahkan dengan (A).
         # python3 (bawaan ubuntu-latest) dipakai, bukan jq: skrip ini bisa dieksekusi + diuji di luar CI.
         # Aditif + aman-gagal (continue-on-error): kalau API/skrip gagal, laporan lama tetap terbit utuh.
         continue-on-error: true
@@ -426,30 +431,65 @@ jobs:
           import json
           from datetime import datetime
 
+          GRADLE_STEP = "Test + Build Release APK"
+          RELEASE_STEP = "Create GitHub Release with signed APK"
+
           def ts(x):
               return datetime.fromisoformat(x.replace("Z", "+00:00"))
 
           def secs(a, b):
               return int((ts(b) - ts(a)).total_seconds())
 
-          jobs = [j for j in json.load(open("jobs.json"))["jobs"]
-                  if j.get("started_at") and j.get("completed_at") and j["name"] != "collect-reports"]
+          def done(x):
+              return bool(x.get("started_at") and x.get("completed_at"))
+
+          def top_steps(j, n):
+              steps = [(secs(s["started_at"], s["completed_at"]), s["name"]) for s in j.get("steps", []) if done(s)]
+              for dur, name in sorted(steps, reverse=True)[:n]:
+                  print(f"      {dur}s  {name}")
+
+          all_jobs = [j for j in json.load(open("jobs.json"))["jobs"] if j["name"] != "collect-reports"]
+          build = [j for j in all_jobs if j["name"] == "build"]
+          report = [j for j in all_jobs if j["name"] != "build" and done(j)]
+
           print("")
-          print("DURASI CI (detik, dari GitHub Actions API; collect-reports sendiri tidak dihitung):")
-          if not jobs:
-              print("  (belum ada job selesai)")
+          print("WAKTU BUILD NYATA (jalur APK rilis = job `build`; detik, dari GitHub Actions API):")
+          if not build or not done(build[0]):
+              print("  (job build belum selesai / tidak ada)")
           else:
-              first = min(j["started_at"] for j in jobs)
-              last = max(j["completed_at"] for j in jobs)
-              print(f"  TOTAL wall-clock job paralel: {secs(first, last)}s")
-              for j in jobs:
+              j = build[0]
+              total = secs(j["started_at"], j["completed_at"])
+              print(f"  job build: {j['conclusion']} - {total}s")
+              g = [s for s in j.get("steps", []) if s["name"] == GRADLE_STEP and done(s)]
+              if g:
+                  gs = secs(g[0]["started_at"], g[0]["completed_at"])
+                  print(f"    Gradle (tes unit + kompilasi + R8 + paket APK): {gs}s  [step \"{GRADLE_STEP}\"]")
+                  print(f"    di luar Gradle (setup, versi, release, post): {total - gs}s")
+              else:
+                  print(f"    step \"{GRADLE_STEP}\" tidak selesai (gagal / dilewati)")
+              r = [s for s in j.get("steps", []) if s["name"] == RELEASE_STEP and done(s) and s.get("conclusion") == "success"]
+              if r:
+                  print(f"    APK terbit di Release: {secs(j['started_at'], r[0]['completed_at'])}s sejak job mulai")
+              else:
+                  print("    APK TIDAK terbit di Release (step release tidak sukses)")
+              print("    step terlama:")
+              top_steps(j, 5)
+
+          print("")
+          print("JALUR LAPORAN (BUKAN waktu build; tak memengaruhi APK, hanya menentukan kapan ci_report terbit):")
+          if not report:
+              print("  (belum ada job laporan selesai)")
+          else:
+              for j in report:
                   print(f"  {j['name']}: {j['conclusion']} - {secs(j['started_at'], j['completed_at'])}s")
-                  steps = [(secs(s["started_at"], s["completed_at"]), s["name"]) for s in j.get("steps", [])
-                           if s.get("started_at") and s.get("completed_at")]
-                  for dur, name in sorted(steps, reverse=True)[:5]:
-                      print(f"      {dur}s  {name}")
+                  top_steps(j, 3)
+              first = min(j["started_at"] for j in report)
+              last = max(j["completed_at"] for j in report)
+              slow = max(report, key=lambda j: secs(j["started_at"], j["completed_at"]))
+              print(f"  job laporan terlama = penentu waktu ci_report: {slow['name']} ({secs(slow['started_at'], slow['completed_at'])}s; "
+                    f"rentang job laporan {secs(first, last)}s; collect-reports belum dihitung)")
           PY
-          tail -n 30 ci_report/INDEX.txt
+          tail -n 32 ci_report/INDEX.txt
 
       - name: Upload laporan gabungan
         id: upload
