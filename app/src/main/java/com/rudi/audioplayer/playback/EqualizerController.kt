@@ -6,6 +6,9 @@ import com.rudi.audioplayer.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
 
 data class EqualizerBand(
     val index: Int,
@@ -21,7 +24,17 @@ data class EqualizerUiState(
     val bands: List<EqualizerBand> = emptyList(),
     val presets: List<String> = emptyList(),
     val selectedPreset: Int = -1,
-    val boldPreset: String = ""
+    val boldPreset: String = "",
+    // Batch 542 — preset EQ buatan pengguna (hanya yang jumlah band-nya cocok dgn perangkat ini).
+    val userPresets: List<String> = emptyList(),
+    val selectedUserPreset: String = ""
+)
+
+/** Batch 542 — hasil impor profil AutoEq. [usedFilters] = filter yang berhasil di-parse. */
+data class EqImportResult(
+    val applied: Boolean,
+    val usedFilters: Int,
+    val ignoredFilters: Int
 )
 
 /**
@@ -76,7 +89,9 @@ class EqualizerController(private val context: Context) {
                 bands = bands,
                 presets = presetNames,
                 selectedPreset = prefs.getInt(KEY_PRESET, -1),
-                boldPreset = prefs.getString(KEY_BOLD_PRESET, "") ?: ""
+                boldPreset = prefs.getString(KEY_BOLD_PRESET, "") ?: "",
+                userPresets = visibleUserPresetNames(bandCount),
+                selectedUserPreset = prefs.getString(KEY_USER_PRESET, "") ?: ""
             )
         } catch (e: Exception) {
             // UI menampilkan ini persis sama dengan "device memang tidak mendukung equalizer" —
@@ -105,12 +120,19 @@ class EqualizerController(private val context: Context) {
             .putInt(KEY_BAND_PREFIX + band, level.toInt())
             .putInt(KEY_PRESET, -1)
             .putString(KEY_BOLD_PRESET, "")
+            .putString(KEY_USER_PRESET, "")
             .putBoolean(KEY_ENABLED, true)
             .apply()
         val updatedBands = _state.value.bands.map {
             if (it.index == band) it.copy(levelMillibel = level) else it
         }
-        _state.value = _state.value.copy(bands = updatedBands, selectedPreset = -1, enabled = true, boldPreset = "")
+        _state.value = _state.value.copy(
+            bands = updatedBands,
+            selectedPreset = -1,
+            enabled = true,
+            boldPreset = "",
+            selectedUserPreset = ""
+        )
     }
 
     fun usePreset(presetIndex: Int) {
@@ -121,6 +143,7 @@ class EqualizerController(private val context: Context) {
         val editor = prefs.edit()
             .putInt(KEY_PRESET, presetIndex)
             .putString(KEY_BOLD_PRESET, "")
+            .putString(KEY_USER_PRESET, "")
             .putBoolean(KEY_ENABLED, true)
         val updatedBands = _state.value.bands.map { band ->
             val newLevel = eq.getBandLevel(band.index.toShort())
@@ -129,7 +152,13 @@ class EqualizerController(private val context: Context) {
         }
         editor.apply()
 
-        _state.value = _state.value.copy(bands = updatedBands, selectedPreset = presetIndex, enabled = true, boldPreset = "")
+        _state.value = _state.value.copy(
+            bands = updatedBands,
+            selectedPreset = presetIndex,
+            enabled = true,
+            boldPreset = "",
+            selectedUserPreset = ""
+        )
     }
 
     /**
@@ -146,6 +175,7 @@ class EqualizerController(private val context: Context) {
         val editor = prefs.edit()
             .putInt(KEY_PRESET, -1)
             .putString(KEY_BOLD_PRESET, preset.name)
+            .putString(KEY_USER_PRESET, "")
             .putBoolean(KEY_ENABLED, true)
 
         val updatedBands = bands.mapIndexed { i, band ->
@@ -168,8 +198,136 @@ class EqualizerController(private val context: Context) {
             bands = updatedBands,
             selectedPreset = -1,
             enabled = true,
-            boldPreset = preset.name
+            boldPreset = preset.name,
+            selectedUserPreset = ""
         )
+    }
+
+    /**
+     * Batch 542 — menerapkan level band (millibel) langsung, satu per band perangkat. Dipakai preset
+     * pengguna + impor profil AutoEq. Ukuran [levels] HARUS = jumlah band; kalau tidak -> false, 0 efek.
+     */
+    fun applyBandLevels(levels: List<Short>, userPreset: String = ""): Boolean {
+        val eq = equalizer ?: return false
+        val bands = _state.value.bands
+        if (bands.isEmpty() || levels.size != bands.size) return false
+
+        val minLevel = _state.value.minLevel
+        val maxLevel = _state.value.maxLevel
+        val editor = prefs.edit()
+            .putInt(KEY_PRESET, -1)
+            .putString(KEY_BOLD_PRESET, "")
+            .putString(KEY_USER_PRESET, userPreset)
+            .putBoolean(KEY_ENABLED, true)
+
+        val updatedBands = bands.mapIndexed { i, band ->
+            val level = levels[i].coerceIn(minLevel, maxLevel)
+            eq.setBandLevel(i.toShort(), level)
+            editor.putInt(KEY_BAND_PREFIX + i, level.toInt())
+            band.copy(levelMillibel = level)
+        }
+        eq.setEnabled(true)
+        editor.apply()
+
+        _state.value = _state.value.copy(
+            bands = updatedBands,
+            selectedPreset = -1,
+            enabled = true,
+            boldPreset = "",
+            selectedUserPreset = userPreset
+        )
+        return true
+    }
+
+    /** Menyimpan level band SAAT INI sebagai preset bernama (nama sama = ditimpa). */
+    fun saveUserPreset(rawName: String): Boolean {
+        val bands = _state.value.bands
+        if (equalizer == null || bands.isEmpty()) return false
+        val name = rawName.trim().take(MAX_PRESET_NAME_LENGTH)
+        if (name.isEmpty()) return false
+
+        val others = readUserPresets().filter { it.name != name }
+        if (others.size >= MAX_USER_PRESETS) return false
+
+        writeUserPresets(others + StoredUserPreset(name, bands.map { it.levelMillibel }))
+        prefs.edit().putString(KEY_USER_PRESET, name).apply()
+        _state.value = _state.value.copy(
+            userPresets = visibleUserPresetNames(bands.size),
+            selectedUserPreset = name
+        )
+        return true
+    }
+
+    fun useUserPreset(name: String): Boolean {
+        val bandCount = _state.value.bands.size
+        val preset = readUserPresets().firstOrNull { it.name == name && it.levels.size == bandCount }
+            ?: return false
+        return applyBandLevels(preset.levels, name)
+    }
+
+    fun deleteUserPreset(name: String) {
+        val bandCount = _state.value.bands.size
+        writeUserPresets(readUserPresets().filter { it.name != name })
+        val wasSelected = _state.value.selectedUserPreset == name
+        if (wasSelected) prefs.edit().putString(KEY_USER_PRESET, "").apply()
+        _state.value = _state.value.copy(
+            userPresets = visibleUserPresetNames(bandCount),
+            selectedUserPreset = if (wasSelected) "" else _state.value.selectedUserPreset
+        )
+    }
+
+    /**
+     * Batch 542 — impor profil AutoEq/EqualizerAPO (`ParametricEQ.txt`) lalu terapkan sebagai
+     * perkiraan ke band perangkat (lihat batas jujur di [EqProfileImport]).
+     */
+    fun importProfile(text: String): EqImportResult {
+        val profile = EqProfileImport.parse(text) ?: return EqImportResult(false, 0, 0)
+        val bands = _state.value.bands
+        if (equalizer == null || bands.isEmpty()) {
+            return EqImportResult(false, profile.filters.size, profile.ignoredFilters)
+        }
+        val levels = EqProfileImport.toBandLevels(
+            profile = profile,
+            centerFreqsHz = bands.map { it.frequencyHz },
+            minMillibel = _state.value.minLevel.toInt(),
+            maxMillibel = _state.value.maxLevel.toInt()
+        )
+        return EqImportResult(applyBandLevels(levels), profile.filters.size, profile.ignoredFilters)
+    }
+
+    private data class StoredUserPreset(val name: String, val levels: List<Short>)
+
+    private fun visibleUserPresetNames(bandCount: Int): List<String> =
+        readUserPresets().filter { it.levels.size == bandCount }.map { it.name }
+
+    private fun readUserPresets(): List<StoredUserPreset> {
+        val raw = prefs.getString(KEY_USER_PRESETS, null) ?: return emptyList()
+        return try {
+            val array = JSONArray(raw)
+            (0 until array.length()).mapNotNull { i ->
+                val obj = array.optJSONObject(i) ?: return@mapNotNull null
+                val name = obj.optString("n")
+                val levelArray = obj.optJSONArray("l") ?: return@mapNotNull null
+                if (name.isBlank()) return@mapNotNull null
+                StoredUserPreset(name, (0 until levelArray.length()).map { levelArray.getInt(it).toShort() })
+            }
+        } catch (e: JSONException) {
+            // Data rusak = anggap tidak ada preset; band aktif TIDAK tersentuh.
+            AppLogger.e("EqualizerController", "Daftar preset EQ pengguna korup, diabaikan", e)
+            emptyList()
+        }
+    }
+
+    private fun writeUserPresets(presets: List<StoredUserPreset>) {
+        val array = JSONArray()
+        presets.forEach { preset ->
+            array.put(
+                JSONObject()
+                    .put("n", preset.name)
+                    .put("l", JSONArray(preset.levels.map { it.toInt() }))
+            )
+        }
+        prefs.edit().putString(KEY_USER_PRESETS, array.toString()).apply()
     }
 
     enum class BoldPreset { FLAT, BASS_BOOST, TREBLE_BOOST, VOCAL_BOOST }
@@ -184,6 +342,10 @@ class EqualizerController(private val context: Context) {
         private const val KEY_ENABLED = "eq_enabled"
         private const val KEY_PRESET = "eq_preset"
         private const val KEY_BOLD_PRESET = "eq_bold_preset"
+        private const val KEY_USER_PRESET = "eq_user_preset"
+        private const val KEY_USER_PRESETS = "eq_user_presets"
+        private const val MAX_USER_PRESETS = 20
+        private const val MAX_PRESET_NAME_LENGTH = 24
         private const val KEY_BAND_PREFIX = "eq_band_"
 
         @Volatile

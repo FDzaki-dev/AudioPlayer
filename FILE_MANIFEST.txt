@@ -90,7 +90,8 @@
 # ditambahkan — 209->211 (211 di ZIP, termasuk .gitignore yang memang ada di ZIP v528/v529; diff manifest vs isi ZIP: 0 path hilang, 0 path liar). Catatan Batch 390 soal .gitignore tidak diubah.
 # Batch 531: .github/workflows/baseline.yml + app/detekt-baseline.xml + app/lint-baseline.xml DIHAPUS (rencana baseline A/B/C dibatalkan user: static analysis fokus & non-blocking, tanpa baseline) — 211->208
 # (208 di ZIP, termasuk .gitignore). Tidak ada file baru. Catatan Batch 390 soal .gitignore tidak diubah.
-# Total: 208 file
+# Batch 542: app/src/main/java/com/rudi/audioplayer/playback/EqProfileImport.kt (file baru, parser profil AutoEq + pemetaan ke band Equalizer) ditambahkan — 208->209.
+# Total: 209 file
 
 .githooks/pre-commit
 .github/workflows/build.yml
@@ -169,6 +170,7 @@ app/src/main/java/com/rudi/audioplayer/playback/AccentColorExtractor.kt
 app/src/main/java/com/rudi/audioplayer/playback/AntiRepeatShuffleOrder.kt
 app/src/main/java/com/rudi/audioplayer/playback/AudioVisualizerController.kt
 app/src/main/java/com/rudi/audioplayer/playback/CrossfadeEngine.kt
+app/src/main/java/com/rudi/audioplayer/playback/EqProfileImport.kt
 app/src/main/java/com/rudi/audioplayer/playback/EqualizerController.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlaybackAudioSession.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlaybackService.kt
