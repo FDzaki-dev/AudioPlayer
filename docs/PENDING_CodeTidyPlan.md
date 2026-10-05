@@ -1,4 +1,4 @@
-# PENDING_CodeTidyPlan.md — Rencana Perapihan Kode SONIX (berbasis Konstitusi Pipeline v2.9)
+# PENDING_CodeTidyPlan.md — Rencana Perapihan Kode SONIX (berbasis Konstitusi Pipeline v4.0 LOCKED)
 
 Dibuat Batch 505. **PROPOSAL — 0 item dieksekusi.** Tidak ada source Kotlin/Gradle/XML yang diubah
 saat dokumen ini dibuat, dan tidak ada build/test yang dijalankan; semua angka di bawah hasil
@@ -10,6 +10,26 @@ Pelengkap `docs/PLANNING.md` (roadmap + audit Batch 504: cakupan test, Gradle Wr
 kode tanpa mengubah perilaku**, tiap item selaras P0 konstitusi (STABILITY + ZERO-REGRESSION).
 Arsipkan dokumen ini ke `docs/archive/` HANYA setelah semua item DONE/dibatalkan eksplisit oleh user
 (aturan Proactive Archiving) — P0 `docs/archive/` sudah beres (Batch 506).
+
+**Diselaraskan ke Konstitusi v4.0 LOCKED di Batch 543** (sebelumnya v2.9; aturan batas file, validasi,
+estafet, dan definisi selesai berubah — lihat §0). Status per-item diperbarui s/d Batch 543. Paragraf
+"PROPOSAL — 0 item dieksekusi" di atas = keadaan Batch 505 (historis); status terkini ada di tabel Wave.
+
+## 0. Selaras Konstitusi v4.0 (Batch 543)
+
+Prioritas: **P0 = STABILITAS + ZERO-REGRESSION > INTENT USER + ZIP/SOURCE > PROJECT_STATE > GUARDS > OUTPUT.**
+ZIP/source terbaru = sumber kebenaran (menimpa state Git; GitHub = mirror).
+
+| Aturan v4.0 | Penerapan pada milestone ini |
+|-------------|------------------------------|
+| NO SCOPE CREEP | Maks 3-5 file source/target per batch; dokumen VIP (`PROJECT_STATE.md`, `README.md`, `CHANGELOG.md`, `.cursorrules`, `PENDING_*.md`) tak dihitung. Boleh sampai 8 file HANYA bila perubahan signature interface/kontrak arsitektur di lapisan data/domain — WAJIB 1 kalimat pembenaran di bagian atas `PROJECT_STATE.md` SEBELUM eksekusi. Menggantikan aturan v2.9 "maks 3-5" tanpa celah |
+| NO STRUCTURAL REWRITE | File stabil tidak ditulis ulang; ubah hanya yang langsung diperlukan task/resume point; fitur baru boleh asal tak mengganggu perilaku stabil. Wave 5 tetap R3 + instruksi eksplisit |
+| BUG ISOLATION | Batch debugging menyebut baris/fungsi cacat di `[RESUME POINT]` supaya akun berikutnya tak blind-debug ke komponen lain |
+| ESTAFET SEEDING | Tiap batch memperbarui `[RESUME POINT]` skema `[FITUR_BARU / BUG_TARGET] -> [STATUS TERAKHIR] -> [LANGKAH SPESIFIK AKUN BERIKUTNYA]` (menggantikan "Task -> Status -> Remaining -> Next Action" di batch <=524) |
+| AUTO-HALT | Sisa token <20%, error loop buntu setelah 3 iterasi, atau ancaman OOM -> simpan state, update docs, repack ZIP, handoff |
+| Validation chain | Syntax -> Build -> Perilaku terdampak -> Static Validation -> Regresi -> Integritas paket -> Docs. **Alat tak tersedia / gagal = BUKAN lulus** -> catat `NOT VERIFIED` di `PROJECT_STATE.md`. Spotless, ArchUnit, SAST/SARIF TIDAK ada di proyek ini (tak ada `gradlew`/plugin) dan ktlint-formatting detekt sengaja dimatikan (`detekt.yml`) -> `NOT VERIFIED`; detekt + lintDebug jalan NON-BLOCKING di workflow "CI Report" (Aturan sesi #8) — menyalakan rule/gate baru butuh instruksi eksplisit user |
+| Android Vital Guards | UI State & Lifecycle = T11 (`rememberSaveable`/`Saver`); UI Truncation/`imePadding`/insets = T12; Battery & Background = §4 (loop posisi adaptif sejak Batch 537, JANGAN diubah tanpa bukti); Thread Safety & Compose Performance = sektor DITUTUP; Security (tanpa secret) dan Streaming/OOM (Okio/buffer) = sudah bersih, jangan diusik |
+| GIT / CI / R8 | Git mengikuti ZIP; tanpa force push; `git commit -m` 1 baris quoted. Dilarang mematikan R8/`isShrinkResources`, mengubah signing/Release step. Sejak Batch 543 CI = 2 workflow: "Build APK" (`build.yml`, hanya job `build`) + "CI Report" (`ci-report.yml`, dipicu setelah build selesai) |
 
 ## 1. Baseline Terverifikasi (Batch 505)
 
@@ -39,7 +59,8 @@ Arsipkan dokumen ini ke `docs/archive/` HANYA setelah semua item DONE/dibatalkan
    flag dialog/sheet di `NowPlayingScreen.kt` 252–263 dan `selectedTab`/`selectedIds`/dialog di
    `LibraryScreen.kt` 133–148. Secara struktural tidak bertahan rotasi (guard "UI State &
    Lifecycle"). **Perilaku nyata BELUM diuji di device.** Perhatian: `selectedIds` bertipe
-   `persistentSetOf<Long>()` → butuh `Saver` kustom.
+   `persistentSetOf<Long>()` → butuh `Saver` kustom. **[STATUS Batch 543: BASI]** — `grep rememberSaveable`
+   kini: `NowPlayingScreen.kt` 11 baris, `LibraryScreen.kt` 10, `EqualizerSheet.kt` 5 (lihat T11).
 2. **Kode duplikat — sleep-timer countdown** identik di `PlayerViewModel.kt` ≈336–342 (`init`)
    dan ≈1802–1808 (`startSleepTimer`).
 3. **Dua parser LRC hidup berdampingan dalam satu layar**: `LyricsSheet.kt` memakai
@@ -53,7 +74,7 @@ Arsipkan dokumen ini ke `docs/archive/` HANYA setelah semua item DONE/dibatalkan
    `ModalBottomSheet` — **belum diaudit**, jadi bukan klaim bug.
 6. 3 `Log.w` langsung melewati `AppLogger` (`PlaybackStateStore.kt:80`, `LibraryCacheStore.kt:82,127`;
    2 sisanya adalah pembungkus `AppLogger.kt` sendiri — wajar).
-7. **Dokumen membengkak vs tujuannya**: `PROJECT_STATE.md` 2.826 baris/230 KB padahal headernya
+7. **Dokumen membengkak vs tujuannya** [STATUS Batch 543: `PROJECT_STATE.md` kini 638 baris/≈99 KB setelah D1]: `PROJECT_STATE.md` 2.826 baris/230 KB padahal headernya
    menyatakan "RAM instan… tanpa histori"; `CHANGELOG.md` 1,3 MB/17.359 baris. Komentar source
    merujuk 23× ke 3 dokumen `PENDING_*.md` (IosFlingBehavior 16, FixGlobalLagRecomposition 5,
    RatingEntryPoint 2) yang **tidak ditemukan di ZIP ini** (lokasi asli tidak bisa diverifikasi).
@@ -63,7 +84,7 @@ Arsipkan dokumen ini ke `docs/archive/` HANYA setelah semua item DONE/dibatalkan
 - **Move-only untuk pemecahan file**: badan fungsi dipindah identik karakter-per-karakter. Yang
   boleh berubah hanya `private`→`internal`, import, dan lokasi file (package TETAP sama). Bukti
   wajib: diff yang menunjukkan blok pindahan sama persis.
-- **1 batch = 1 target logis, maks 3–5 file source** (pemindahan = file sumber + 1 file baru = 2).
+- **1 batch = 1 target logis, maks 3–5 file source/target** (pemindahan = file sumber + 1 file baru = 2); dokumen VIP tak dihitung; sampai 8 file HANYA untuk perubahan signature interface/kontrak arsitektur di lapisan data/domain + pembenaran 1 kalimat di atas `PROJECT_STATE.md` (Konstitusi v4.0, §0).
 - **Dikecualikan — JANGAN disentuh tanpa instruksi eksplisit user**: `PlaybackService.kt`,
   `AppLockStore.kt`, `app/build.gradle.kts` (dicatat "paling berisiko" di `PROJECT_STATE.md`);
   `FloatingBubbleService.kt` (sektor bubble/Roadmap #11, riwayat item landscape-clip Batch
@@ -71,8 +92,8 @@ Arsipkan dokumen ini ke `docs/archive/` HANYA setelah semua item DONE/dibatalkan
   (stabil, riwayat regresi berulang) kecuali T10 dengan syarat ketat; sektor DITUTUP (Thread
   Safety I/O, compileSdk/targetSdk, Compose optimization) — tidak dibuka ulang oleh dokumen ini.
 - Tidak ada refactor logika, ganti dependency, redesign, atau migrasi. Tidak ada perubahan
-  minSdk/versionName/versionCode/signing/R8.
-- **Build hijau ≠ behavior verified.** CI (`testDebugUnitTest assembleRelease`) = gerbang
+  minSdk/versionName/versionCode/signing/R8 (v4.0: R8/`isShrinkResources` tak dimatikan tanpa alasan; Release step tak diubah).
+- **Build hijau ≠ behavior verified.** CI job `build` workflow "Build APK" (`testReleaseUnitTest assembleRelease`, sejak Batch 540) = gerbang
   kompilasi; perilaku diverifikasi device oleh user per checklist wave. Jangan klaim "100%
   verified" tanpa itu.
 
@@ -84,7 +105,7 @@ Status: `BELUM` = belum dikerjakan. Risiko: R1 rendah, R2 sedang, R3 tinggi.
 | ID | Aksi | Pemilik | Status |
 |----|------|---------|--------|
 | G1 | Selesaikan P0 `docs/archive/` (`docs/PLANNING.md` §1) sebelum `[DAILY UPDATE]` berikutnya | User | **SELESAI Batch 506** (dipulihkan dari git, ikut ZIP v506) |
-| G2 | Konfirmasi CI baseline hijau di commit terakhir sebelum wave pertama | User | BELUM |
+| G2 | Konfirmasi CI baseline hijau di commit terakhir sebelum wave pertama | User | **SELESAI** (bukti: CI #513/#514/#517 hijau, detekt 0, lint 2-3). Batch 542 sempat MERAH di CI #519 (import `rememberSaveable` salah di `EqualizerSheet.kt`:19) -> diperbaiki Batch 543, hijau BELUM dikonfirmasi |
 | G3 | Pilih wave/item yang dieksekusi (dokumen ini tidak jalan otomatis) | User | **SELESAI Batch 507** (user: mulai dari yang low-risk → Wave 1 T1+T2) |
 
 ### Wave 1 — Rapikan kecil (R1)
@@ -179,6 +200,12 @@ lengkap di `PROJECT_STATE.md` sektor bottom nav).
 | T12 | Audit IME/insets di 9 file TextField (§1.5) — **baca saja dulu**, perbaikan hanya jika terbukti bermasalah | Uji keyboard terbuka + font scale besar + landscape |
 | T13 | Bandingkan semantik `parseLRC` vs `LyricsParser` (format timestamp, multi-timestamp, offset); gabung HANYA jika identik, kalau beda dokumentasikan & biarkan | Analisis dulu, 0 kode sampai hasilnya jelas |
 
+**Status Wave 3 (Batch 543)**: **T11 SEBAGIAN** — `NowPlayingScreen.kt` (Batch 537: 9 flag ringan; `showEqualizerSheet`/`showVisualizerSheet`/`showSongInfoEditSheet`/`showRingtoneCutterSheet`
+SENGAJA tetap `remember`) dan `LibraryScreen.kt` (Batch 538: 8 state + `SelectedIdsSaver`; `songsPendingDelete` tetap `remember`) KODE SELESAI; 537 terverifikasi CI #514,
+538 terverifikasi CI #517 (kompilasi); perilaku device BELUM dilaporkan user. Di luar daftar T: Batch 542 menambah 3 `rememberSaveable` (dialog "Simpan preset") di
+`EqualizerSheet.kt` — kompilasi gagal di CI #519, diperbaiki Batch 543 (impor `androidx.compose.runtime.saveable.rememberSaveable`). Layar lain (`HomeScreen`/`SettingsScreen`) BELUM
+diaudit. **T12 BELUM, T13 BELUM** (keduanya 0 kode, analisis dulu). Wave 3 tetap butuh persetujuan per item.
+
 ### Wave 4 — Dokumen (G1 SELESAI Batch 506; **D1-D3 SELESAI Batch 523**; tetap butuh pilihan user, tidak jalan otomatis)
 | ID | Item | Catatan |
 |----|------|---------|
@@ -205,13 +232,17 @@ sudah ada. Tanpa itu, jangan dijalankan.
 1. Cold start: `PROJECT_STATE.md` → `[RESUME POINT]`; ZIP terbaru = source of truth.
 2. Verifikasi ulang nomor baris & pemakai simbol (`grep`) sebelum memindah apa pun.
 3. Edit minimum sesuai ID; catat file yang disentuh (maks 3–5; dokumen VIP tak dihitung).
-4. Validasi berurutan: syntax/references → CI compile+unit test → behavior device → regresi →
-   integritas ZIP (hitung file vs `FILE_MANIFEST.txt`) → docs.
-5. Perbarui `FILE_MANIFEST.txt` (file baru), `CHANGELOG.md`, `PROJECT_STATE.md`; ubah status di
-   tabel dokumen ini.
-6. CI merah / regresi device → kembali ke ZIP batch sebelumnya, hentikan wave, jangan lanjut.
+4. Validasi berurutan (v4.0): syntax/references → build (CI job `build`) → perilaku terdampak (device) →
+   static validation (detekt/lint non-blocking di "CI Report") → regresi → integritas ZIP (hitung file vs
+   `FILE_MANIFEST.txt`) → docs. Alat tak tersedia/gagal = `NOT VERIFIED` di `PROJECT_STATE.md`, bukan lulus.
+5. Perbarui `FILE_MANIFEST.txt` (file baru), `CHANGELOG.md` (descending: terbaru di atas), `PROJECT_STATE.md`
+   (`[RESUME POINT]` skema ESTAFET; batch debug = sebut baris/fungsi cacat); ubah status di tabel dokumen ini.
+6. CI merah / regresi device → BUG ISOLATION: perbaikan minimum di akar masalah bila penyebab jelas & kecil
+   (contoh Batch 543: 1 baris import). Penyebab tak jelas atau 3 iterasi buntu → AUTO-HALT: kembali ke ZIP
+   batch terakhir yang hijau, hentikan wave, jangan lanjut.
 
 ## 6. Definisi Selesai (per item)
-Intent terimplementasi + 0 scope creep + CI hijau + perilaku terdampak dicek device (atau
-ditandai jujur "belum diverifikasi device") + docs/manifest terbarui + ZIP terkemas + 0 secret
-bocor + kontinuitas git terjaga.
+Konstitusi v4.0: `Intent implemented + No scope creep + Validation checked + Behavior checked + Docs updated +
+ZIP packaged + No secret leakage + Git continuity preserved`. Penjabaran per item: CI hijau + perilaku
+terdampak dicek device (atau ditandai jujur "belum diverifikasi device" / `NOT VERIFIED`) + docs/manifest
+terbarui + ZIP terkemas + 0 secret bocor + kontinuitas git terjaga.

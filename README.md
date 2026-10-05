@@ -300,6 +300,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 543** — CI dipisah jadi 2 workflow supaya build hijau duluan: `build.yml` ("Build APK") hanya berisi job `build` (`testReleaseUnitTest assembleRelease` + Release APK); `ci-report.yml` ("CI Report", dipicu `workflow_run` SETELAH build selesai) menjalankan instrumentation + detekt/lintDebug lalu menggabungkan semuanya jadi `ci_report_<run>` (artifact ada di run "CI Report", bukan di run "Build APK"; nomor `<run>` = nomor run build).
+
 `android.net.Uri` tidak bisa dikonstruksi aman di unit test JVM tanpa Robolectric —
 `Uri.parse(...)` dkk mengembalikan `null` di bawah `isReturnDefaultValues = true`, bukan
 placeholder aman. Dua pola dipakai tergantung situasi: (1) kalau fungsi pure-nya kita yang
