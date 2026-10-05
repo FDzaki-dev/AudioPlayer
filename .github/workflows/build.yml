@@ -1,11 +1,14 @@
 name: Build APK
 
-# Batch 543 — workflow ini HANYA berisi job `build` (jalur APK rilis). Job `instrumentation-tests`,
-# `static-analysis` dan `collect-reports` dipindah ke `.github/workflows/ci-report.yml` (workflow
-# "CI Report", dipicu `workflow_run` SETELAH workflow ini selesai) supaya build hijau duluan dan tidak
-# berbagi waktu/runner dengan jalur laporan. `log_fail_<run>` di bawah tetap diunggah dari sini dan
-# dikumpulkan ke `ci_report_<run>` oleh workflow itu. Nama workflow ("Build APK") dirujuk persis oleh
-# `workflow_run` di sana — JANGAN diganti tanpa mengubah ci-report.yml.
+# Batch 545 — 1 workflow, 1 run, 2 job PARALEL di runner terpisah (tak berbagi waktu/compiler):
+#   `build`           = jalur APK rilis (tes unit + assembleRelease + Release). TIDAK diubah.
+#   `static-analysis` = detekt + lintDebug dengan GATE ketat, TANPA instrumentation/emulator, TANPA
+#                       job collect-reports, TANPA workflow terpisah. Langsung menerbitkan 1 artifact
+#                       `ci_report_<run>_<branding>` (+ log failure di dalamnya bila gate gagal).
+# Instrumentation (emulator `connectedDebugAndroidTest`) DIHAPUS dari CI: boros waktu + tak selalu
+# kompatibel. Sumber app/src/androidTest sengaja tetap ada (bisa dijalankan manual di device).
+# `ci-report.yml` (workflow_run, Batch 543) DIHAPUS. `log_fail_<run>` (build gagal) tetap diunggah
+# job `build` apa adanya. Nama workflow ("Build APK") tetap.
 
 on:
   push:
@@ -238,3 +241,157 @@ jobs:
             app/build/test-results/testReleaseUnitTest/
           if-no-files-found: ignore
           retention-days: 14
+
+  # Batch 545 — static analysis KETAT (gate), 1 run, tanpa instrumentation, tanpa collect.
+  # Job TERPISAH tanpa `needs:` -> berjalan paralel dengan `build` di runner lain: publish APK tidak
+  # pernah ikut tertahan/terblokir, merah di sini TIDAK membatalkan Release APK.
+  # Gate (dievaluasi dari LAPORAN, bukan dari exit code Gradle, supaya artifact selalu terbit dulu):
+  #   - Gradle detekt/lintDebug gagal jalan, atau laporan tak ada  -> GAGAL (tool unavailable/fail != pass)
+  #   - detekt temuan > 0                                          -> GAGAL
+  #   - lint error/fatal > 0                                       -> GAGAL
+  #   - lint warning > LINT_WARNING_MAX (ratchet)                  -> GAGAL
+  # LINT_WARNING_MAX = 2 = kondisi terverifikasi CI #517-#521 (`ConfigurationScreenWidthHeight`
+  # NowPlayingScreen.kt 285 & 568, ditahan sengaja). Warning BARU membuat job merah; kalau kedua
+  # situs itu kelak diperbaiki, turunkan angka ini ke 0. Bukan baseline: temuan tetap tampil di laporan.
+  # Whitelist rule (config/detekt/detekt.yml + `lint { checkOnly }`) TIDAK diubah.
+  static-analysis:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      BRANDING: SONIX
+      LINT_WARNING_MAX: '2'
+      RUN_NUMBER: ${{ github.run_number }}
+    steps:
+      # ═══════════════════════ 1. SETUP ═══════════════════════
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Sama dengan job `build`: app/build.gradle.kts membaca `git rev-list` saat configuration.
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.14.3
+
+      # ═══════════════════════ 2. DETEKT + LINT ═══════════════════════
+      - name: Run detekt + lintDebug
+        id: analysis
+        # continue-on-error: kegagalan Gradle TIDAK menghentikan job di sini — langkah laporan di
+        # bawah selalu jalan, memasukkan log ke artifact, lalu gate yang menentukan merah/hijau.
+        # `--continue`: detekt + lintDebug selalu keduanya jalan. `gradle` (bukan `./gradlew`):
+        # proyek belum punya Gradle Wrapper.
+        continue-on-error: true
+        run: |
+          RC=0
+          SECONDS=0
+          set -o pipefail
+          gradle detekt lintDebug --no-daemon --console=plain --continue 2>&1 | tee static-analysis.log || RC=$?
+          echo "gradle_secs=$SECONDS" >> "$GITHUB_OUTPUT"
+          exit "$RC"
+
+      # ═══════════════════════ 3. LAPORAN + GATE ═══════════════════════
+      - name: Susun ci_report + evaluasi gate
+        id: report
+        if: always()
+        env:
+          ANALYSIS_OUTCOME: ${{ steps.analysis.outcome }}
+          GRADLE_SECS: ${{ steps.analysis.outputs.gradle_secs }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p ci_report
+          if [ -d app/build/reports/detekt ]; then cp -r app/build/reports/detekt ci_report/detekt; fi
+          cp app/build/reports/lint-results-debug.* ci_report/ 2>/dev/null || true
+
+          DETEKT_XML=ci_report/detekt/detekt.xml
+          LINT_XML=ci_report/lint-results-debug.xml
+          FAIL=()
+
+          if [ "$ANALYSIS_OUTCOME" != "success" ]; then
+            FAIL+=("Gradle detekt/lintDebug GAGAL jalan (tool/config, bukan temuan) — lihat log_fail di artifact")
+          fi
+
+          DETEKT_N=NA; DETEKT_F=NA
+          if [ -f "$DETEKT_XML" ]; then
+            DETEKT_N=$(grep -c '<error ' "$DETEKT_XML" || true)
+            DETEKT_F=$(grep -c '<file ' "$DETEKT_XML" || true)
+            if [ "$DETEKT_N" -gt 0 ]; then FAIL+=("detekt: $DETEKT_N temuan (batas 0)"); fi
+          else
+            FAIL+=("detekt.xml TIDAK ada -> NOT VERIFIED (tool unavailable/fail != pass)")
+          fi
+
+          LINT_ERR=NA; LINT_WARN=NA
+          if [ -f "$LINT_XML" ]; then
+            LINT_ERR=$(grep -cE 'severity="(Error|Fatal)"' "$LINT_XML" || true)
+            LINT_WARN=$(grep -cE 'severity="Warning"' "$LINT_XML" || true)
+            if [ "$LINT_ERR" -gt 0 ]; then FAIL+=("lint: $LINT_ERR error/fatal (batas 0)"); fi
+            if [ "$LINT_WARN" -gt "$LINT_WARNING_MAX" ]; then FAIL+=("lint: $LINT_WARN warning > batas $LINT_WARNING_MAX (ada warning BARU)"); fi
+          else
+            FAIL+=("lint-results-debug.xml TIDAK ada -> NOT VERIFIED (tool unavailable/fail != pass)")
+          fi
+
+          {
+            echo "CI REPORT — run #${RUN_NUMBER} — ${BRANDING} — commit ${COMMIT_SHA::7}"
+            echo "(workflow \"Build APK\", job static-analysis: 1 run, tanpa instrumentation, tanpa collect)"
+            echo ""
+            if [ "${#FAIL[@]}" -eq 0 ]; then
+              echo "GATE: LULUS"
+            else
+              echo "GATE: GAGAL"
+              for f in "${FAIL[@]}"; do echo "  - $f"; done
+            fi
+            echo ""
+            echo "Gradle detekt + lintDebug: ${ANALYSIS_OUTCOME} — ${GRADLE_SECS:-?}s"
+            echo ""
+            echo "detekt: ${DETEKT_N} temuan di ${DETEKT_F} file (batas 0). 15 rule teratas:"
+            if [ -f "$DETEKT_XML" ]; then
+              grep -o 'source="detekt\.[^"]*"' "$DETEKT_XML" | sort | uniq -c | sort -rn | head -n 15 | sed 's/source="detekt\./  /; s/"$//' || true
+            fi
+            echo ""
+            echo "lint: ${LINT_ERR} error, ${LINT_WARN} warning (batas warning ${LINT_WARNING_MAX}):"
+            if [ -f "$LINT_XML" ]; then
+              grep -oE '^[[:space:]]*id="[^"]+"' "$LINT_XML" | sed -E 's/^[[:space:]]*id="//; s/"$//' | sort | uniq -c | sort -rn | sed 's/^/  /' || true
+            fi
+            echo ""
+            echo "Isi (hanya laporan static analysis):"
+            find ci_report -type f ! -name INDEX.txt | sed 's|^ci_report/|  |' | sort
+          } > ci_report/INDEX.txt
+
+          if [ "${#FAIL[@]}" -gt 0 ]; then
+            echo "gate_fail=true" >> "$GITHUB_OUTPUT"
+            # log failure: HANYA ada bila gate gagal
+            if [ -f static-analysis.log ]; then
+              cp static-analysis.log "ci_report/log_fail_${RUN_NUMBER}_${BRANDING}.log"
+              echo "" >> ci_report/INDEX.txt
+              echo "log failure: log_fail_${RUN_NUMBER}_${BRANDING}.log (output Gradle penuh)" >> ci_report/INDEX.txt
+            fi
+          else
+            echo "gate_fail=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          cat ci_report/INDEX.txt
+          { echo '```'; cat ci_report/INDEX.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload ci_report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci_report_${{ github.run_number }}_${{ env.BRANDING }}
+          path: ci_report/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Gate static analysis
+        # Sengaja SETELAH upload: artifact (laporan + log failure) selalu terbit sebelum job merah.
+        if: steps.report.outputs.gate_fail == 'true'
+        run: |
+          echo "GATE GAGAL — detail di INDEX.txt (artifact ci_report_${RUN_NUMBER}_${BRANDING})"
+          exit 1

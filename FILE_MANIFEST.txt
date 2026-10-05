@@ -92,11 +92,11 @@
 # (208 di ZIP, termasuk .gitignore). Tidak ada file baru. Catatan Batch 390 soal .gitignore tidak diubah.
 # Batch 542: app/src/main/java/com/rudi/audioplayer/playback/EqProfileImport.kt (file baru, parser profil AutoEq + pemetaan ke band Equalizer) ditambahkan — 208->209.
 # Batch 543: .github/workflows/ci-report.yml (file baru, workflow "CI Report" dipicu workflow_run setelah "Build APK"; ikut dikirim di ZIP seperti build.yml) ditambahkan — 209->210.
-# Total: 210 file
+# Batch 545: .github/workflows/ci-report.yml DIHAPUS (CI disatukan ke build.yml: job `build` + `static-analysis`, tanpa instrumentation/collect) — 210->209. Tidak ada file baru.
+# Total: 209 file
 
 .githooks/pre-commit
 .github/workflows/build.yml
-.github/workflows/ci-report.yml
 .gitignore
 CHANGELOG.md
 FILE_MANIFEST.txt
