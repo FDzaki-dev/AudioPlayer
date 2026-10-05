@@ -75,9 +75,9 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -282,7 +282,12 @@ fun NowPlayingScreen(
     // transport row selalu kejangkau. (Update Batch 338 di bawah: layar normal SEKARANG BISA
     // ikut menyusut juga, tapi HANYA sementara selama hint banner tampil — bukan lagi 100%
     // tetap 300dp seperti klaim awal batch ini.)
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    // Batch 546 — lint `ConfigurationScreenWidthHeight`: sumber ukuran jendela dipindah dari
+    // `LocalConfiguration.current.screen{Width,Height}Dp` ke `LocalWindowInfo.current.containerDpSize`
+    // (pengganti yang disarankan lint; targetSdk 36 -> kedua sumber sama-sama ukuran jendela PENUH,
+    // jadi hitungan di bawah tak bergeser selain pembulatan dp). Nama/pemakaian variabel TETAP.
+    val windowSizeDp = LocalWindowInfo.current.containerDpSize
+    val screenHeightDp = windowSizeDp.height
     // Batch 338 — BUG FIX lanjutan (laporan user + konfirmasi: hint banner MASIH nongol, belum
     // pernah di-dismiss): sebelumnya cuma layar pendek (<640dp) yang dapet art box lebih kecil.
     // Tapi di layar NORMAL sekalipun, jumlah tinggi fixed (art 300dp + header + hint banner
@@ -565,7 +570,7 @@ fun NowPlayingScreen(
         // ikon-atas (48dp, default IconButton) & Row transport (68dp, FilledIconButton eksplisit
         // .size(68.dp) adalah child tertinggi) keduanya deterministik dari kode sendiri, 0
         // bergantung ke song/font-scale — 1 measurement loop lebih sedikit = risiko lebih rendah.
-        val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+        val screenWidthDp = windowSizeDp.width
         val fixedChromeHeight = 48.dp + 12.dp + 16.dp + 68.dp
         // Piringan persegi TIDAK BOLEH lebih lebar dari layar. 80dp = 2×40dp margin yang sudah
         // dipakai default lama (280dp piringan di layar 360dp lebar = 320dp konten setelah

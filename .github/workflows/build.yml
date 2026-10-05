@@ -250,9 +250,9 @@ jobs:
   #   - detekt temuan > 0                                          -> GAGAL
   #   - lint error/fatal > 0                                       -> GAGAL
   #   - lint warning > LINT_WARNING_MAX (ratchet)                  -> GAGAL
-  # LINT_WARNING_MAX = 2 = kondisi terverifikasi CI #517-#521 (`ConfigurationScreenWidthHeight`
-  # NowPlayingScreen.kt 285 & 568, ditahan sengaja). Warning BARU membuat job merah; kalau kedua
-  # situs itu kelak diperbaiki, turunkan angka ini ke 0. Bukan baseline: temuan tetap tampil di laporan.
+  # Batch 546 — LINT_WARNING_MAX 2 -> 0: kedua warning `ConfigurationScreenWidthHeight`
+  # (NowPlayingScreen.kt 285 & 568; kondisi CI #517-#522) diperbaiki -> SEMUA warning lint kini
+  # membuat job merah. Bukan baseline: tak ada temuan yang disembunyikan.
   # Whitelist rule (config/detekt/detekt.yml + `lint { checkOnly }`) TIDAK diubah.
   static-analysis:
     runs-on: ubuntu-latest
@@ -260,7 +260,7 @@ jobs:
       contents: read
     env:
       BRANDING: SONIX
-      LINT_WARNING_MAX: '2'
+      LINT_WARNING_MAX: '0'
       RUN_NUMBER: ${{ github.run_number }}
     steps:
       # ═══════════════════════ 1. SETUP ═══════════════════════
@@ -333,7 +333,7 @@ jobs:
             LINT_ERR=$(grep -cE 'severity="(Error|Fatal)"' "$LINT_XML" || true)
             LINT_WARN=$(grep -cE 'severity="Warning"' "$LINT_XML" || true)
             if [ "$LINT_ERR" -gt 0 ]; then FAIL+=("lint: $LINT_ERR error/fatal (batas 0)"); fi
-            if [ "$LINT_WARN" -gt "$LINT_WARNING_MAX" ]; then FAIL+=("lint: $LINT_WARN warning > batas $LINT_WARNING_MAX (ada warning BARU)"); fi
+            if [ "$LINT_WARN" -gt "$LINT_WARNING_MAX" ]; then FAIL+=("lint: $LINT_WARN warning > batas $LINT_WARNING_MAX"); fi
           else
             FAIL+=("lint-results-debug.xml TIDAK ada -> NOT VERIFIED (tool unavailable/fail != pass)")
           fi

@@ -300,6 +300,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 546** — lint bersih: 2 warning terakhir (`ConfigurationScreenWidthHeight` di `NowPlayingScreen.kt`) diperbaiki dengan memakai `LocalWindowInfo.current.containerDpSize` (bukan `LocalConfiguration`), dan gate `static-analysis` diketatkan: batas warning lint 2 -> 0. Belum diverifikasi CI.
+
 **Batch 545** — CI disederhanakan: instrumentation (emulator) dihapus dari CI dan workflow `ci-report.yml` dihapus. `build.yml` ("Build APK") kini 1 run dengan 2 job paralel: `build` (tes unit + `assembleRelease` + Release APK, tidak berubah) dan `static-analysis` (detekt + `lintDebug`, gate: merah bila detekt > 0, lint error > 0, lint warning > 2, atau Gradle/laporan gagal). Job itu langsung menerbitkan 1 artifact `ci_report_<run>_SONIX` (`INDEX.txt` + laporan; plus log failure Gradle hanya bila gate gagal), tanpa proses collect. Sumber `app/src/androidTest` tetap ada untuk dijalankan manual di device. Belum diverifikasi CI.
 
 **Batch 543** — CI dipisah jadi 2 workflow supaya build hijau duluan: `build.yml` ("Build APK") hanya berisi job `build` (`testReleaseUnitTest assembleRelease` + Release APK); `ci-report.yml` ("CI Report", dipicu `workflow_run` SETELAH build selesai) menjalankan instrumentation + detekt/lintDebug lalu menggabungkan semuanya jadi `ci_report_<run>` (artifact ada di run "CI Report", bukan di run "Build APK"; nomor `<run>` = nomor run build).
