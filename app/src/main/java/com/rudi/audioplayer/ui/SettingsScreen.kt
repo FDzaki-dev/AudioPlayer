@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -84,12 +85,16 @@ fun SettingsScreen(
     songs: List<Song> = emptyList(),
     onDeleteSongs: (List<Song>) -> Unit = {}
 ) {
+    // Batch 544 — T11 (layar ke-3): HANYA flag ringan yang tahan rotasi (`rememberSaveable`): log
+    // diagnostik (read-only), seksi Lanjutan, konfirmasi hapus cache lirik. SENGAJA tetap `remember`:
+    // Vault (konten aman), DuplicateFinder (scan berat), UpdateCheck (cek jaringan saat masuk),
+    // BackupRestore + SignatureMatcher (state hasil SAF/payload ikut hilang bila sheet dibuka ulang).
     var showSignatureMatcher by remember { mutableStateOf(false) }
-    var showDiagnosticLog by remember { mutableStateOf(false) }
+    var showDiagnosticLog by rememberSaveable { mutableStateOf(false) }
     var showBackupRestore by remember { mutableStateOf(false) }
     var showDuplicateFinder by remember { mutableStateOf(false) }
     var showVault by remember { mutableStateOf(false) }
-    var showAdvancedSettings by remember { mutableStateOf(false) }
+    var showAdvancedSettings by rememberSaveable { mutableStateOf(false) }
     var showUpdateCheck by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     // Batch 247 — Lyrics offline-first 4/4b. Pola sama Vault/Duplicate/Backup di file ini:
@@ -99,7 +104,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var lyricsPrefetchEnabled by remember { mutableStateOf(LyricsPrefetchStore(context).isEnabled()) }
-    var showClearLyricsCacheConfirm by remember { mutableStateOf(false) }
+    var showClearLyricsCacheConfirm by rememberSaveable { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),

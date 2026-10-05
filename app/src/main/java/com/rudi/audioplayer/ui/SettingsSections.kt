@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -215,8 +216,10 @@ internal fun AppLockSection(
     onDisableLock: () -> Unit,
     onToggleBiometric: (Boolean) -> Unit
 ) {
+    // Batch 544 — T11: hanya konfirmasi nonaktifkan kunci yang tahan rotasi. `showSetPinDialog` + field
+    // PIN (`SetPinDialog`) SENGAJA tetap `remember`: PIN tak boleh masuk Bundle state instance.
     var showSetPinDialog by remember { mutableStateOf(false) }
-    var showDisableLockConfirm by remember { mutableStateOf(false) }
+    var showDisableLockConfirm by rememberSaveable { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     Column(modifier = Modifier.padding(horizontal = 20.dp)) {

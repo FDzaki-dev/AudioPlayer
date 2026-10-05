@@ -105,7 +105,7 @@ Status: `BELUM` = belum dikerjakan. Risiko: R1 rendah, R2 sedang, R3 tinggi.
 | ID | Aksi | Pemilik | Status |
 |----|------|---------|--------|
 | G1 | Selesaikan P0 `docs/archive/` (`docs/PLANNING.md` §1) sebelum `[DAILY UPDATE]` berikutnya | User | **SELESAI Batch 506** (dipulihkan dari git, ikut ZIP v506) |
-| G2 | Konfirmasi CI baseline hijau di commit terakhir sebelum wave pertama | User | **SELESAI** (bukti: CI #513/#514/#517 hijau, detekt 0, lint 2-3). Batch 542 sempat MERAH di CI #519 (import `rememberSaveable` salah di `EqualizerSheet.kt`:19) -> diperbaiki Batch 543, hijau BELUM dikonfirmasi |
+| G2 | Konfirmasi CI baseline hijau di commit terakhir sebelum wave pertama | User | **SELESAI** (bukti: CI #513/#514/#517 hijau, detekt 0, lint 2-3). Batch 542 sempat MERAH di CI #519 (import `rememberSaveable` salah di `EqualizerSheet.kt`:19) -> diperbaiki Batch 543, hijau TERKONFIRMASI CI #520 (3 job sukses, detekt 0, lint 2, instrumentation 7/0) |
 | G3 | Pilih wave/item yang dieksekusi (dokumen ini tidak jalan otomatis) | User | **SELESAI Batch 507** (user: mulai dari yang low-risk → Wave 1 T1+T2) |
 
 ### Wave 1 — Rapikan kecil (R1)
@@ -203,8 +203,10 @@ lengkap di `PROJECT_STATE.md` sektor bottom nav).
 **Status Wave 3 (Batch 543)**: **T11 SEBAGIAN** — `NowPlayingScreen.kt` (Batch 537: 9 flag ringan; `showEqualizerSheet`/`showVisualizerSheet`/`showSongInfoEditSheet`/`showRingtoneCutterSheet`
 SENGAJA tetap `remember`) dan `LibraryScreen.kt` (Batch 538: 8 state + `SelectedIdsSaver`; `songsPendingDelete` tetap `remember`) KODE SELESAI; 537 terverifikasi CI #514,
 538 terverifikasi CI #517 (kompilasi); perilaku device BELUM dilaporkan user. Di luar daftar T: Batch 542 menambah 3 `rememberSaveable` (dialog "Simpan preset") di
-`EqualizerSheet.kt` — kompilasi gagal di CI #519, diperbaiki Batch 543 (impor `androidx.compose.runtime.saveable.rememberSaveable`). Layar lain (`HomeScreen`/`SettingsScreen`) BELUM
-diaudit. **T12 BELUM, T13 BELUM** (keduanya 0 kode, analisis dulu). Wave 3 tetap butuh persetujuan per item.
+`EqualizerSheet.kt` — kompilasi gagal di CI #519, diperbaiki Batch 543 (impor `androidx.compose.runtime.saveable.rememberSaveable`; hijau CI #520). **Batch 544**: `HomeScreen.kt`
+diaudit = 0 state transien (tak ada yang diubah); `SettingsScreen.kt` + `SettingsSections.kt` = 4 flag ringan KODE SELESAI (log diagnostik, seksi Lanjutan, konfirmasi hapus cache lirik,
+konfirmasi nonaktifkan kunci); Vault/DuplicateFinder/UpdateCheck/BackupRestore/SignatureMatcher + `showSetPinDialog` & field PIN SENGAJA tetap `remember` (aman/berat/state SAF; PIN tak boleh masuk
+Bundle). Kandidat tersisa BELUM diaudit: `PlaylistScreen.kt`, `SmartPlaylistScreen.kt`, `SongPickerSheet.kt` (`VaultSheet.kt`/`LockScreen.kt` sensitif -> tidak). **T12 BELUM, T13 BELUM** (keduanya 0 kode, analisis dulu). Wave 3 tetap butuh persetujuan per item.
 
 ### Wave 4 — Dokumen (G1 SELESAI Batch 506; **D1-D3 SELESAI Batch 523**; tetap butuh pilihan user, tidak jalan otomatis)
 | ID | Item | Catatan |
