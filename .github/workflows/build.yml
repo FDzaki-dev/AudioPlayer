@@ -1,11 +1,12 @@
 name: Build APK
 
-# Batch 545/547 — 1 workflow, 1 run, 2 job PARALEL di runner terpisah (tak berbagi waktu/compiler):
+# Batch 545/548 — 1 workflow, 1 run, 2 job PARALEL di runner terpisah (tak berbagi waktu/compiler):
 #   `build`           = jalur APK rilis (tes unit + assembleRelease + Release). TIDAK diubah.
 #   `static-analysis` = detekt + lintDebug dengan GATE ketat, TANPA instrumentation/emulator, TANPA
-#                       job collect-reports, TANPA workflow terpisah, TANPA step yang merakit/membungkus
-#                       laporan (Batch 547): file laporan MENTAH diunggah langsung dari lokasi asli
-#                       sebagai artifact `ci_report_<run>_<branding>`.
+#                       job collect-reports, TANPA workflow terpisah, TANPA step perakit/pembungkus
+#                       laporan. Artifact-nya BERDIRI SENDIRI, terpisah dari build aplikasi, mengikuti
+#                       contoh workflow user (Batch 548): `static_analysis_<run>_<branding>` = marker
+#                       proyek + log Gradle + file laporan mentah. BUKAN lagi zip `ci_report`.
 # Instrumentation (emulator `connectedDebugAndroidTest`) DIHAPUS dari CI: boros waktu + tak selalu
 # kompatibel. Sumber app/src/androidTest sengaja tetap ada (bisa dijalankan manual di device).
 # `ci-report.yml` (workflow_run, Batch 543) DIHAPUS. `log_fail_<run>` (build gagal) tetap diunggah
@@ -243,19 +244,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # Batch 545/547 — static analysis KETAT (gate), 1 run, tanpa instrumentation, tanpa collect,
-  # TANPA langkah pembungkus laporan di akhir (Batch 547, contoh workflow dari user: upload mentah
-  # langsung + anotasi Actions; tidak ada folder rakitan, tidak ada INDEX.txt).
-  # Job TERPISAH tanpa `needs:` -> berjalan paralel dengan `build` di runner lain: publish APK tidak
-  # pernah ikut tertahan/terblokir, merah di sini TIDAK membatalkan Release APK.
-  # Urutan: Gradle (continue-on-error) -> upload laporan mentah (always) -> gate (anotasi + exit 1)
-  # -> upload log failure (hanya bila job gagal). Gate dihitung dari LAPORAN, bukan dari exit code Gradle:
+  # Batch 545/548 — static analysis KETAT (gate), tanpa instrumentation, tanpa collect, tanpa step
+  # perakit/pembungkus laporan. Pola artifact = contoh workflow user (Batch 548): artifact static
+  # analysis BERDIRI SENDIRI (marker proyek + log Gradle + laporan mentah), terpisah dari build aplikasi
+  # — BUKAN zip `ci_report`. Job TERPISAH tanpa `needs:` -> berjalan paralel dengan `build` di runner
+  # lain: publish APK tidak pernah ikut tertahan/terblokir, merah di sini TIDAK membatalkan Release APK.
+  # Urutan: Gradle (continue-on-error) -> marker -> upload artifact (always) -> gate (anotasi + exit 1).
+  # Gate dihitung dari LAPORAN mentah, bukan dari exit code Gradle:
   #   - Gradle detekt/lintDebug gagal jalan, atau laporan tak ada  -> GAGAL (tool unavailable/fail != pass)
   #   - detekt temuan > 0                                          -> GAGAL
   #   - lint error/fatal > 0                                       -> GAGAL
   #   - lint warning > LINT_WARNING_MAX                            -> GAGAL
-  # LINT_WARNING_MAX = 0 (Batch 546): SEMUA warning lint membuat job merah. Bukan baseline: tak ada
-  # temuan yang disembunyikan. Whitelist rule (config/detekt/detekt.yml + `lint { checkOnly }`) TIDAK diubah.
+  # LINT_WARNING_MAX = 0 (Batch 546; terverifikasi CI #524: detekt 0, lint "No issues found").
+  # Whitelist rule (config/detekt/detekt.yml + `lint { checkOnly }`) TIDAK diubah.
   static-analysis:
     runs-on: ubuntu-latest
     permissions:
@@ -286,8 +287,8 @@ jobs:
       # ═══════════════════════ 2. DETEKT + LINT ═══════════════════════
       - name: Run detekt + lintDebug
         id: analysis
-        # continue-on-error: kegagalan Gradle TIDAK menghentikan job di sini — upload laporan di bawah
-        # selalu jalan, lalu gate yang menentukan merah/hijau.
+        # continue-on-error: kegagalan Gradle TIDAK menghentikan job di sini — upload di bawah selalu
+        # jalan (log ikut di artifact), lalu gate yang menentukan merah/hijau.
         # `--continue`: detekt + lintDebug selalu keduanya jalan. `gradle` (bukan `./gradlew`):
         # proyek belum punya Gradle Wrapper.
         continue-on-error: true
@@ -299,23 +300,47 @@ jobs:
           echo "gradle_secs=$SECONDS" >> "$GITHUB_OUTPUT"
           exit "$RC"
 
-      # ═══════════════════════ 3. UPLOAD LAPORAN MENTAH ═══════════════════════
-      # Langsung dari lokasi asli (tanpa salin/rakit/INDEX). Dua path ini berinduk sama
-      # (app/build/reports) -> isi artifact datar: detekt/* + lint-results-debug.*.
-      - name: Upload ci_report
+      # ═══════════════════════ 3. MARKER + UPLOAD ═══════════════════════
+      # Penanda identitas proyek (pola contoh user: supaya artifact static analysis tak ketukar dengan
+      # proyek lain). Nilai diambil DINAMIS dari repo; `continue-on-error` -> tak pernah menggagalkan job.
+      - name: Write static analysis marker (identitas proyek)
+        if: always()
+        continue-on-error: true
+        run: |
+          {
+            echo "PROJECT=${{ github.event.repository.name }}"
+            echo "BRANDING=${BRANDING}"
+            echo "APP_NAME=$(grep -m1 'name="app_name"' app/src/main/res/values/strings.xml | sed -E 's/.*>([^<]*)<.*/\1/')"
+            echo "APPLICATION_ID=$(grep -m1 'applicationId' app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')"
+            echo "GRADLE_ROOT_PROJECT=$(grep -m1 'rootProject.name' settings.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')"
+            echo "BATCH_PROJECT_STATE=$(grep -o -m1 'Batch terakhir: [0-9]*' PROJECT_STATE.md | grep -o '[0-9]*$')"
+            echo "RUN_NUMBER=${{ github.run_number }}"
+            echo "RUN_ID=${{ github.run_id }}"
+            echo "COMMIT=${{ github.sha }}"
+            echo "BRANCH=${{ github.ref_name }}"
+            echo "STEP_DETEKT_LINT=${{ steps.analysis.outcome }}"
+            echo "GENERATED_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > STATIC_ANALYSIS_MARKER.txt
+          cat STATIC_ANALYSIS_MARKER.txt
+
+      # Artifact static analysis BERDIRI SENDIRI (bukan `ci_report`), file mentah apa adanya dari
+      # lokasi asli — sama dengan contoh user. Log Gradle SELALU ikut (log failure ada di sini bila gagal).
+      - name: Upload static analysis reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ci_report_${{ github.run_number }}_${{ env.BRANDING }}
+          name: static_analysis_${{ github.run_number }}_${{ env.BRANDING }}
           path: |
+            STATIC_ANALYSIS_MARKER.txt
+            gradle-static-analysis.log
             app/build/reports/detekt/**
             app/build/reports/lint-results-debug.*
           retention-days: 14
           if-no-files-found: warn
 
       # ═══════════════════════ 4. GATE ═══════════════════════
-      # SETELAH upload: laporan selalu terbit dulu sebelum job merah. Hanya anotasi Actions (notice/error)
-      # + exit 1; TIDAK menulis file laporan apa pun.
+      # SETELAH upload: artifact selalu terbit dulu sebelum job merah. Hanya anotasi Actions
+      # (notice/error) + exit 1; TIDAK menulis file laporan apa pun.
       - name: Gate static analysis
         if: always()
         env:
@@ -324,17 +349,18 @@ jobs:
         run: |
           DET_XML=app/build/reports/detekt/detekt.xml
           LINT_XML=app/build/reports/lint-results-debug.xml
+          ART="static_analysis_${{ github.run_number }}_${BRANDING}"
           FAIL=0
 
           if [ "$ANALYSIS_OUTCOME" != "success" ]; then
-            echo "::error::Gradle detekt/lintDebug GAGAL jalan (tool/config, bukan temuan) — lihat artifact log_fail_static_${{ github.run_number }}_${BRANDING}"
+            echo "::error::Gradle detekt/lintDebug GAGAL jalan (tool/config, bukan temuan) — lihat gradle-static-analysis.log di artifact ${ART}"
             FAIL=1
           fi
 
           DET=n/a
           if [ -f "$DET_XML" ]; then
             DET=$(grep -c '<error ' "$DET_XML" || true)
-            if [ "$DET" -gt 0 ]; then echo "::error::detekt: $DET temuan (batas 0) — baca artifact ci_report, detekt/detekt.md"; FAIL=1; fi
+            if [ "$DET" -gt 0 ]; then echo "::error::detekt: $DET temuan (batas 0) — baca artifact ${ART}"; FAIL=1; fi
           else
             echo "::error::detekt.xml TIDAK ada -> NOT VERIFIED (tool unavailable/fail != pass)"
             FAIL=1
@@ -344,8 +370,8 @@ jobs:
           if [ -f "$LINT_XML" ]; then
             LNE=$(grep -cE 'severity="(Error|Fatal)"' "$LINT_XML" || true)
             LNW=$(grep -cE 'severity="Warning"' "$LINT_XML" || true)
-            if [ "$LNE" -gt 0 ]; then echo "::error::lint: $LNE error/fatal (batas 0) — baca artifact ci_report, lint-results-debug.txt"; FAIL=1; fi
-            if [ "$LNW" -gt "$LINT_WARNING_MAX" ]; then echo "::error::lint: $LNW warning > batas $LINT_WARNING_MAX — baca artifact ci_report, lint-results-debug.txt"; FAIL=1; fi
+            if [ "$LNE" -gt 0 ]; then echo "::error::lint: $LNE error/fatal (batas 0) — baca artifact ${ART}"; FAIL=1; fi
+            if [ "$LNW" -gt "$LINT_WARNING_MAX" ]; then echo "::error::lint: $LNW warning > batas $LINT_WARNING_MAX — baca artifact ${ART}"; FAIL=1; fi
           else
             echo "::error::lint-results-debug.xml TIDAK ada -> NOT VERIFIED (tool unavailable/fail != pass)"
             FAIL=1
@@ -353,14 +379,3 @@ jobs:
 
           echo "::notice::Static analysis — detekt: ${DET} temuan · lintDebug: ${LNE} error / ${LNW} warning (batas warning ${LINT_WARNING_MAX}) · Gradle: ${ANALYSIS_OUTCOME} ${GRADLE_SECS:-?}s"
           if [ "$FAIL" -ne 0 ]; then exit 1; fi
-
-      # ═══════════════════════ 5. LOG FAILURE ═══════════════════════
-      # Hanya bila job gagal (Gradle gagal jalan ATAU gate merah) — pola `log_fail_*` seperti job `build`.
-      - name: Upload failure log (static analysis)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: log_fail_static_${{ github.run_number }}_${{ env.BRANDING }}
-          path: gradle-static-analysis.log
-          retention-days: 14
-          if-no-files-found: warn
