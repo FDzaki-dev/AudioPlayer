@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 550 — CI: netralkan `ci-report.yml` lama yang MASIH terpicu ("run 2x") — stub nonaktif menimpa berkasnya (BELUM verified CI)
+- Instruksi user: "Kenapa hanya ada static analysis, mana build apk nya. Dan kenapa masih run 2x yaitu ci report?!!"
+- **Akar masalah (terbukti dgn simulasi logika Box)**: Box DAILY UPDATE menghapus hanya entri non-hidden (`find . -mindepth 1 -maxdepth 1 ! -name '.*' ... rm -rf`) lalu `unzip -o` (menimpa saja). File di direktori tersembunyi (`.github/`) yang HILANG dari ZIP tidak pernah ikut terhapus. Batch 545 "menghapus" `.github/workflows/ci-report.yml` hanya dari ZIP -> berkas lama (`workflow_run` setelah "Build APK": instrumentation + static analysis + collect) tetap hidup di repo dan terus terpicu = run kedua "CI Report". Run kedua itu hanya berisi static analysis/instrumentation (bukan build APK), jadi tampak "hanya ada static analysis". Klaim "ci-report.yml DIHAPUS" di Batch 545-549 hanya benar di ZIP, TIDAK di repo.
+- **`.github/workflows/ci-report.yml`**: DITIMPA stub NONAKTIF (`name: CI Report (NONAKTIF)`, `on: workflow_dispatch` saja, 1 job `noop` berisi `echo`) — `unzip -o` menimpa isi lama sehingga pemicu `workflow_run` hilang. `FILE_MANIFEST.txt` 209 -> 210.
+- **Tidak berubah**: `build.yml` (job `build` identik dgn v547, diverifikasi diff), Kotlin, Gradle-DSL, `detekt.yml`. Release APK = asset Release (bukan artifact; aturan "APK dilarang dibungkus .zip"), jadi tab Artifacts memang tidak berisi APK.
+- **Cara hapus total (opsional, sekali, Termux)**: `git rm .github/workflows/ci-report.yml` + commit + push. JANGAN lewat ZIP.
+- **Verifikasi**: **NOT VERIFIED** di runner (sandbox tanpa Actions). YAML stub valid; simulasi logika Box: file di `.github/` tidak terhapus (penyebab terbukti), `unzip -o` menimpa berkas yang ada. Prediksi: 1 run "Build APK" per push, tanpa run "CI Report".
+
 ## Batch 549 — CI: SALIN template user `build_yml.txt` — 1 job, static analysis langkah TERAKHIR non-blocking, artifact `SONIX_static_analysis_v<versi>-run<run>` (BELUM verified CI)
 - Instruksi user: "Ngeyel banget. Copas aja template nya kalau kamu sulit memahami instruksi saya!!" (sebelumnya: "file static analysis dipisah dari build aplikasi, bukannya malah digabung jadi zip ci_report diakhir macam buatan mu ini!!").
 - **Penafsiran**: struktur CI = salinan template: 1 job; APK + Release terbit dulu; static analysis = langkah paling akhir, NON-BLOCKING, artifact `static_analysis` sendiri. Bukan job paralel terpisah + gate merah + zip `ci_report` (Batch 545-548).
