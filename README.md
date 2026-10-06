@@ -300,6 +300,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 549** — struktur CI disalin dari template workflow user: 1 job `build`; APK + Release terbit dulu, lalu analisis statis (detekt + lint) jadi langkah paling akhir, non-blocking, dengan ringkasan anotasi dan artifact sendiri `SONIX_static_analysis_v<versi>-run<run>` (marker + log + laporan mentah). Job `static-analysis` terpisah, gate merah, dan zip `ci_report` dicabut. Belum diverifikasi CI.
+
 **Batch 548** — artifact static analysis kini berdiri sendiri dan terpisah dari build aplikasi, mengikuti contoh workflow dari user: `static_analysis_<run>_SONIX` berisi `STATIC_ANALYSIS_MARKER.txt` (identitas proyek), `gradle-static-analysis.log`, dan laporan detekt + lint mentah. Tidak ada lagi zip bernama `ci_report` maupun artifact `log_fail_static_*` terpisah. Kriteria gate sama. Belum diverifikasi CI.
 
 **Batch 547** — job `static-analysis` disederhanakan mengikuti contoh workflow dari user: tidak ada lagi langkah yang merakit/membungkus laporan di akhir (tanpa folder `ci_report/` rakitan dan `INDEX.txt`). Laporan detekt + lint diunggah mentah langsung sebagai artifact `ci_report_<run>_SONIX`; hasil gate tampil sebagai anotasi di halaman run; log Gradle hanya diunggah (`log_fail_static_<run>_SONIX`) bila job gagal. Kriteria gate sama. Belum diverifikasi CI.
