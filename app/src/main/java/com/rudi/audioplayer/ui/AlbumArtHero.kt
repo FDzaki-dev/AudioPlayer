@@ -51,6 +51,7 @@ import com.rudi.audioplayer.ui.theme.SkeuLightHighlight
 import com.rudi.audioplayer.ui.theme.SkeuLightShadow
 import com.rudi.audioplayer.ui.theme.SkeuLightSpecular
 import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
+import com.rudi.audioplayer.ui.theme.neuCastOnly
 import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.coroutines.launch
 
@@ -271,93 +272,18 @@ internal fun AlbumArtHero(
                                 .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
                         }
                         isSkeu -> {
-                            // Batch 79 — NEUMORPHISM upgrade: sama arsitektur dual-shadow dgn
-                            // skeuEmboss() (TactileDepth.kt, Batch 79) — sisi gelap kanan-bawah
-                            // (AO dekat + shadow jauh, 3 layer offset+alpha bertingkat), sisi
-                            // terang kiri-atas (specular dekat + highlight jauh, 2 layer) — TIDAK
-                            // ADA lagi border/inner-groove sama sekali (neumorphism generik tidak
-                            // punya garis batas, kedalaman murni dari bayangan). Manual draw di
-                            // sini (bukan lewat skeuEmboss() langsung) tetap dipertahankan karena
-                            // Box ini juga membawa .shadow() accent glow per-lagu di bawah, yang
-                            // perlu tetap jadi layer terpisah/paling akhir.
-                            // Batch 81 — fix 2 hal: (1) sisi TERANG dulu ada di drawBehind TERPISAH
-                            // SETELAH .clip(heroShape) (beda dari sisi gelap yg SEBELUM .clip()) —
-                            // artinya sisi terang selama ini kepotong tepat di tepi shape, tidak
-                            // pernah benar-benar "meluber ke luar" sebagai bayangan lembut kayak
-                            // sisi gelap, beda arsitektur dari skeuEmboss() sendiri yg gambar KEDUA
-                            // sisi dalam 1 drawBehind sebelum .clip(). Disatukan di bawah, sama
-                            // pola dgn skeuEmboss(). (2) clipRect() halo ditambahkan (fix "Ambient
-                            // Light gak bocor", instruksi user yg belum tersentuh Batch 79/80) —
-                            // hero art ini panel TERBESAR di app, jadi juga yg paling berisiko
-                            // numpang-nimpa MiniPlayerBar/tombol kontrol di bawahnya kalau tidak
-                            // dibatasi.
-                            val heroAo = if (isDark) SkeuAmbientOcclusion else SkeuLightAmbientOcclusion
-                            val heroShadow = if (isDark) SkeuShadow else SkeuLightShadow
-                            val heroSpecular = if (isDark) SkeuSpecular else SkeuLightSpecular
-                            val heroHighlight = if (isDark) SkeuHighlight else SkeuLightHighlight
+                            // Batch 552 — dual-shadow manual 5 layer (Batch 79-81: AO/shadow/
+                            // specular/highlight + clipRect halo 18dp) DIGANTIKAN `neuCastOnly()`
+                            // (mesin kedalaman Neumorphism Boomly, TactileDepth.kt) supaya hero art
+                            // sepadan dgn `skeuEmboss()` Batch 551. Glint Zamrud permanen
+                            // (0.35f/0.42f, Batch 80) dan accent `.shadow()` per-lagu dipertahankan.
                             val emerald = if (isDark) SkeuEmerald else SkeuLightEmerald
-                            // Batch 80 — fix: Batch 79's emerald di hero art cuma lerp-blend 14%
-                            // ke arah heroSpecular (putih/perak nyaris opaque) — di layar HP nyaris
-                            // tak berubah dari putih polos (user: "yang kelihatan cuman Titanium
-                            // dominan, mana zamrudnya??"). Sekarang jadi radial glint TERPISAH
-                            // (warna emerald murni, bukan campuran) di pojok kiri-atas, alpha tetap
-                            // & jauh lebih tinggi (0.35f/0.42f) — permanen (hero art statis, tidak
-                            // ada state pressed spt skeuEmboss()), genuinely kebaca sebagai titik
-                            // hijau di logam titanium, bukan cuma teknis-ada-di-kode.
                             val heroEmeraldAlpha = if (isDark) 0.35f else 0.42f
                             Modifier
-                                .drawBehind {
-                                    val outline = heroShape.createOutline(size, layoutDirection, this)
-                                    val outlinePath = Path().apply { addOutline(outline) }
-                                    // Halo tetap (18.dp) — offset terjauh yg dipakai di bawah cuma
-                                    // 14.dp (literal, bukan proporsional ke param elevation kayak
-                                    // skeuEmboss()). Batch 346 — hero art ini TIDAK LAGI selalu
-                                    // 280.dp (sekarang `artSize` dinamis, lihat definisi fungsi) —
-                                    // TAPI margin halo 18dp SENGAJA tetap literal, bukan diikutkan
-                                    // skala: ini jarak bayangan-ke-tepi-shape yang wajar konstan
-                                    // di seluruh rentang ukuran (140dp s/d lebar layar), bukan
-                                    // proporsi visual yang perlu ikut membesar/mengecil bareng art.
-                                    // 18dp tetap cukup longgar utk tidak memotong bentuk bayangan
-                                    // sendiri di ukuran manapun, sekaligus batas tegas yg dijamin
-                                    // tidak dilewati.
-                                    val haloPx = 18.dp.toPx()
-                                    clipRect(
-                                        left = -haloPx,
-                                        top = -haloPx,
-                                        right = size.width + haloPx,
-                                        bottom = size.height + haloPx
-                                    ) {
-                                        // Sisi GELAP — kanan-bawah, 3 layer offset makin jauh +
-                                        // alpha makin tipis (faux-blur bertingkat, sama teknik
-                                        // skeuEmboss()).
-                                        translate(left = 3.dp.toPx(), top = 3.dp.toPx()) {
-                                            drawPath(outlinePath, color = heroAo)
-                                        }
-                                        translate(left = 8.dp.toPx(), top = 8.dp.toPx()) {
-                                            drawPath(outlinePath, color = heroShadow.copy(alpha = (if (isDark) 0.40f else heroShadow.alpha) * 0.75f))
-                                        }
-                                        translate(left = 14.dp.toPx(), top = 14.dp.toPx()) {
-                                            drawPath(outlinePath, color = heroShadow.copy(alpha = (if (isDark) 0.40f else heroShadow.alpha) * 0.35f))
-                                        }
-                                        // Sisi TERANG — kiri-atas, 2 layer, murni Titanium/Silver.
-                                        // Batch 81: dipindah ke sini (sebelum .clip()), sisi gelap
-                                        // di atas — dulu di drawBehind terpisah SETELAH .clip(),
-                                        // jadi tak pernah bisa meluber sama sekali (lihat komentar
-                                        // Batch 81 di atas).
-                                        translate(left = -3.dp.toPx(), top = -3.dp.toPx()) {
-                                            drawPath(outlinePath, color = heroSpecular.copy(alpha = if (isDark) 0.35f else heroSpecular.alpha * 0.6f))
-                                        }
-                                        translate(left = -8.dp.toPx(), top = -8.dp.toPx()) {
-                                            drawPath(outlinePath, color = heroHighlight.copy(alpha = (if (isDark) 0.16f else heroHighlight.alpha) * 0.7f))
-                                        }
-                                    }
-                                }
+                                .neuCastOnly(shape = heroShape, elevation = 14.dp, isDark = isDark)
                                 .clip(heroShape)
                                 .drawBehind {
-                                    // Zamrud — glint bulat kecil terpisah, pojok kiri-atas, warna
-                                    // murni (bukan blend) supaya genuinely kebaca hijau. Sengaja
-                                    // tetap SETELAH .clip() (beda dari dual-shadow di atas) — ini
-                                    // permata di PERMUKAAN panel, bukan bayangan yg perlu meluber.
+                                    // Zamrud — glint bulat kecil di PERMUKAAN panel (setelah .clip()).
                                     drawRect(
                                         brush = Brush.radialGradient(
                                             colors = listOf(emerald.copy(alpha = heroEmeraldAlpha), Color.Transparent),
@@ -368,7 +294,11 @@ internal fun AlbumArtHero(
                                 }
                                 .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
                         }
-                        else -> Modifier.shadow(elevation = 28.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.45f))
+                        // Batch 552 — Apple/Calm Retro/Liquid Glass/Aurora: bayangan Gaussian Boomly
+                        // di belakang art, accent `.shadow()` lama tetap di atasnya.
+                        else -> Modifier
+                            .neuCastOnly(shape = heroShape, elevation = 16.dp, isDark = isDark)
+                            .shadow(elevation = 28.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.45f))
                     }
                 )
                 .clip(heroShape)

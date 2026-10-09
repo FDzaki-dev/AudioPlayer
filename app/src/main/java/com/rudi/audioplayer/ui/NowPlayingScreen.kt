@@ -101,6 +101,7 @@ import com.rudi.audioplayer.playback.EqualizerUiState
 import com.rudi.audioplayer.playback.PlaybackProgress
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.neuSurface
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
@@ -1688,19 +1689,20 @@ private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: 
     // literal glassmorphism cue) for Skeu; now gets the same opaque + embossed treatment Tactile
     // already had, consistent with the rest of this batch's frostedGlass()/skeuEmboss() fixes.
     val isSkeu = isSkeuTheme()
-    val isPanelTheme = isTactile || isSkeu
+    // Batch 552 — Apple/Calm Retro/Liquid Glass/Aurora: `neuSurface()` (kedalaman Neumorphism
+    // Boomly); fill kini digambar mesin itu (opak), bukan Surface surface@0.9f; Surface transparan.
     Surface(
         modifier = when {
             isTactile -> Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xl), elevation = 8.dp)
             isSkeu -> Modifier.skeuEmboss(shape = RoundedCornerShape(Radius.xl), elevation = 8.dp)
-            else -> Modifier
+            else -> Modifier.neuSurface(shape = RoundedCornerShape(Radius.xl), elevation = 8.dp)
         },
         shape = RoundedCornerShape(Radius.xl),
-        color = if (isPanelTheme) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        color = Color.Transparent,
         // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent fallback.
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = if (isPanelTheme) 0.dp else 6.dp,
-        shadowElevation = if (isPanelTheme) 0.dp else 4.dp
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),

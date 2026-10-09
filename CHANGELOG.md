@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 552 — Polish kedalaman Neumorphism: 3 titik datar tersisa ikut mesin Boomly (BELUM verified compile/CI/device)
+- Instruksi user: "Lanjutkan polishing!!" (lanjutan Batch 551; titik datar yang dicatat di `[RESUME POINT]`).
+- `TactileDepth.kt`: helper baru `neuCastOnly()` (bayangan Gaussian SAJA untuk konten opak yang menggambar dirinya sendiri; tanpa clip/bevel).
+- `AlbumArtHero.kt`: hero art Apple/Calm Retro/Liquid Glass/Aurora -> `neuCastOnly(16.dp)` + accent `.shadow()` lama tetap; hero Neumorphism: dual-shadow manual 5 layer (Batch 79-81) diganti `neuCastOnly(14.dp)`, glint Zamrud + accent shadow dipertahankan; Tactile TIDAK disentuh (hand-drawn sendiri).
+- `LibraryScreen.kt` (snackbar urungkan) + `NowPlayingScreen.kt` (`GestureIndicatorBadge`): cabang `else` -> `neuSurface()`; Surface selalu transparan (badge dulu surface@0.9f translusen, kini fill opak mesin).
+- 4 file source (dalam batas) + docs; `FILE_MANIFEST.txt` tak berubah; 0 Gradle/CI.
+- **NOT VERIFIED**: tanpa compiler di sandbox (hanya cek keseimbangan kurung); belum dituning di device.
+
 ## Batch 551 — Kedalaman Neumorphism Boomly diterapkan ke SEMUA 6 tema SONIX (BELUM verified compile/CI/device)
 - Instruksi user: "Terapkan effect kedalaman Neumorphism punya project `Boomly` ke semua theme yang ada di project `SONIX`!!" (referensi: `Boomly_v197.zip`, mesin kedalaman fisik B180-B190 di `SkeuomorphicComponents.kt`; Boomly B187 melakukan hal yang sama untuk semua temanya).
 - **Mesin** `neuDepth()` (+ `neuSurface()`, `neuHollowShadow()`, `neuBevelOnly()`) ditambahkan di akhir `ui/theme/TactileDepth.kt` (bukan file baru: batas 5 file target). 3 sumber kedalaman port Boomly: (1) luminansi — pelat diangkat lebih terang dari kanvas, lantai sumur gelap; (2) bevel facet per-sisi menurut cahaya kiri-atas (alpha ~ cos sudut); (3) bayangan jatuh Gaussian 3 lapis (kontak/tengah/ambient) di bitmap software (`BlurMaskFilter`) ber-cache global LRU 48. Pressed = sumur cekung (lantai + bayangan dalam + bibir), crossfade 110ms. Tanpa butiran/alur ukir/9-slice (disederhanakan).

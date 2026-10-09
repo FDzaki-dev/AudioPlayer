@@ -949,6 +949,21 @@ fun Modifier.neuSurface(shape: Shape, elevation: Dp = 8.dp): Modifier {
     return this.neuDepth(shape = shape, elevation = elevation, faceTop = surface, faceBottom = surface)
 }
 
+/** Bayangan jatuh SAJA untuk konten OPAK yang menggambar dirinya sendiri (hero album art): tanpa
+ *  permukaan/bevel (art menutupi bagian belakang), tanpa `.clip()` — pasang SEBELUM `.clip(shape)`
+ *  milik pemanggil. Warna bayangan diturunkan dari `colorScheme.background` (hue tema). */
+@Composable
+fun Modifier.neuCastOnly(
+    shape: Shape,
+    elevation: Dp = 8.dp,
+    isDark: Boolean = LocalIsDarkTheme.current
+): Modifier {
+    val canvas = MaterialTheme.colorScheme.background
+    val style = remember(canvas, isDark) { neuStyle(canvas, canvas, isDark) }
+    val spec = remember(elevation, style.shadowStrength) { neuShadowSpec(elevation, style.shadowStrength) }
+    return this.neuCastShadow(shape, style, spec, null, false)
+}
+
 /** Bayangan jatuh untuk panel KACA (tint di atasnya tembus pandang) — dipakai `frostedGlass()`
  *  SEBELUM `.background(tint)`. Area dalam bentuk dikecualikan (lihat [neuCastShadow]). */
 @Composable

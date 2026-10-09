@@ -57,6 +57,7 @@ import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
+import com.rudi.audioplayer.ui.theme.neuSurface
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.ui.theme.Radius
@@ -579,7 +580,6 @@ fun LibraryScreen(
             // StatSectionCard Batch 300 — isLiquidGlass -> .frostedGlass(), Surface color jadi
             // Transparent lewat isPanelTheme di bawah.
             val isLiquidGlass = isLiquidGlassTheme()
-            val isPanelTheme = isTactile || isSkeu || isLiquidGlass
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -590,17 +590,19 @@ fun LibraryScreen(
                             isTactile -> Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xxl), elevation = 10.dp)
                             isSkeu -> Modifier.skeuEmboss(shape = RoundedCornerShape(Radius.xxl), elevation = 10.dp)
                             isLiquidGlass -> Modifier.frostedGlass()
-                            else -> Modifier
+                            // Batch 552 — Apple/Calm Retro/Aurora: kedalaman Neumorphism Boomly
+                            // (`neuSurface()`), Surface selalu transparan.
+                            else -> Modifier.neuSurface(shape = RoundedCornerShape(Radius.xxl), elevation = 10.dp)
                         }
                     ),
                 shape = RoundedCornerShape(Radius.xxl),
-                color = if (isPanelTheme) Color.Transparent else MaterialTheme.colorScheme.surface,
+                color = Color.Transparent,
                 // Batch 48/49 lesson: don't rely on Surface's own contentColor-from-color
                 // fallback when color is Transparent — set it explicitly so this never
                 // regresses into invisible text like the LockScreen bug did.
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                tonalElevation = if (isPanelTheme) 0.dp else 6.dp,
-                shadowElevation = if (isPanelTheme) 0.dp else 6.dp
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
