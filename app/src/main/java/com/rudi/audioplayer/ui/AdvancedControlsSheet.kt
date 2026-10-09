@@ -84,7 +84,9 @@ internal fun AdvancedControlsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .frostedGlass()
+                // Batch 553 — di dalam ModalBottomSheet bayangan luar tak terlihat (di-clip Surface
+                // sheet): dilewati supaya tak ada gambar tambahan per frame saat sheet bergerak.
+                .frostedGlass(outerShadow = false)
                 .verticalScroll(rememberScrollState())
         ) {
             Text(

@@ -60,7 +60,11 @@ fun Modifier.frostedGlass(
     // lever performa, dan user kali ini tidak melaporkan masalah visibilitas. Kalau stutter
     // masih terasa di 24dp, lever berikutnya yang harus dicoba adalah radius lebih rendah lagi
     // atau meninjau frekuensi re-render MiniPlayerBar saat progress lagu jalan — BUKAN tint.
-    blurRadius: Dp = 24.dp
+    blurRadius: Dp = 24.dp,
+    // Batch 553 — false = lewati bayangan jatuh luar (`neuHollowShadow()`). Untuk konten DI DALAM
+    // `ModalBottomSheet`: Surface sheet meng-clip ke bentuknya sendiri, jadi bayangan di luar batas
+    // panel tak pernah terlihat — hanya biaya gambar per frame selama sheet beranimasi/ditarik.
+    outerShadow: Boolean = true
 ): Modifier {
     // Batch 296 — blurRadius was "kept for source compatibility, unused" since Batch 53; now
     // wired to real Haze blur (see `requestedBlurRadius` below) for Liquid Glass specifically.
@@ -305,7 +309,7 @@ fun Modifier.frostedGlass(
     val glassDepth = !(isTactile || isSkeu)
     val glassBase = this
     val base = glassBase
-        .then(if (glassDepth) Modifier.neuHollowShadow(shape = shape, tint = tint, isDark = isDark) else Modifier)
+        .then(if (glassDepth && outerShadow) Modifier.neuHollowShadow(shape = shape, tint = tint, isDark = isDark) else Modifier)
         .background(tint.copy(alpha = effectiveAlpha), shape)
         .then(if (glassDepth) Modifier.neuBevelOnly(shape = shape, tint = tint, isDark = isDark) else Modifier)
     // Batch 79 — NEUMORPHISM: Skeu no longer draws ANY edge/border here at all (was a

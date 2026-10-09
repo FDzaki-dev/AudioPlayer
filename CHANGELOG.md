@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 553 — Debug: kedalaman panel kaca di seluruh permukaan + pangkas gambar glass saat sheet bergerak (BELUM verified compile/CI/device)
+- Instruksi user: "Debugging: 1) depth effect yang hanya nampak di sebahagian kecil kartu 2) fix bug motion yang nge glitch!!" (+ screen recording sheet "Kontrol Lanjutan").
+- **(1) Depth**: `frostedGlass()` memasang `neuBevelOnly()` = bevel facet 1.5dp saja, jadi panel kaca (sheet, MiniPlayerBar, kartu kaca) hanya berkedalaman di garis tepi. `TactileDepth.kt`: `renderNeuGlassWash()` baru — 1 bitmap kecil ber-cache (kind 5, skala 0.75/0.33/0.2 menurut ukuran) berisi wash diagonal (sorot kiri-atas -> bening -> teduh kanan-bawah) + 4 pita tepi-dalam ~14dp (atas/kiri terang, bawah/kanan gelap) dipotong ke bentuk (`DstOut`); `neuFace` (`paintFace=false`) menggambarnya 1x `drawImage` sebelum facet. Alpha mengikuti `NeuStyle` x `bevelScale` (0.7) sehingga palet tiap tema tetap turunan warna permukaannya.
+- **(2) Motion**: video memperlihatkan judul sheet berosilasi periodik (~0,6-0,75 dtk, y 122->151->128->102->94->91 lalu ulang; background stabil). Akar osilasi BELUM terbukti dari source statis. Jalur gambar tambahan Batch 551 di panel kaca dipangkas: (a) `clipPath(ClipOp.Difference)` per frame di `neuCastShadow` diganti interior bayangan dibakar ke bitmap (`renderNeuCastShadow(..., hollow)`, `DstOut`, kunci cache memuat `hollow`); import `ClipOp`/`clipPath` dihapus; (b) `frostedGlass(outerShadow: Boolean = true)` (BlurUtils.kt) + `AdvancedControlsSheet` memakai `outerShadow = false` (Surface `ModalBottomSheet` meng-clip bentuknya, bayangan luar tak pernah terlihat). Default `true` = perilaku call site lain tak berubah.
+- 3 file source (dalam batas) + docs; `FILE_MANIFEST.txt` tak berubah; 0 Gradle/CI.
+- **NOT VERIFIED**: sandbox tanpa kotlinc/Gradle (hanya cek keseimbangan kurung + grep pemanggil); Spotless/ArchUnit/SARIF tidak dijalankan; belum dilihat di device. Risiko: halo gelap tipis di dalam tepi panel kaca (interior hollow dipotong pada resolusi bitmap bayangan); alpha wash belum dituning.
+- Bila sheet tetap berosilasi: instrumentasi dulu (log offset sheet + ukuran Column), jangan tebak lagi (Aturan sesi #7).
+
 ## Batch 552 — Polish kedalaman Neumorphism: 3 titik datar tersisa ikut mesin Boomly (BELUM verified compile/CI/device)
 - Instruksi user: "Lanjutkan polishing!!" (lanjutan Batch 551; titik datar yang dicatat di `[RESUME POINT]`).
 - `TactileDepth.kt`: helper baru `neuCastOnly()` (bayangan Gaussian SAJA untuk konten opak yang menggambar dirinya sendiri; tanpa clip/bevel).

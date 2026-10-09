@@ -29,7 +29,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas as GfxCanvas
-import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
@@ -43,7 +42,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -549,7 +547,8 @@ private fun Outline.toNeuPath(): Path {
     }
 }
 
-/** Kunci cache global. [kind]: 2 bayangan jatuh per-ukuran, 3 bayangan dalam sumur, 4 permukaan. */
+/** Kunci cache global. [kind]: 2 bayangan jatuh per-ukuran (hollow ikut di `extra`), 3 bayangan dalam sumur,
+ *  4 permukaan, 5 lapisan cahaya panel kaca (seluruh permukaan, Batch 553). */
 private data class NeuStoreKey(
     val kind: Int,
     val w: Int,
@@ -642,7 +641,8 @@ private fun renderNeuCastShadow(
     density: Float,
     style: NeuStyle,
     spec: NeuShadowSpec,
-    scale: Float
+    scale: Float,
+    hollow: Boolean
 ): ImageBitmap {
     val k = density * scale
     val m = spec.bleedDp
@@ -660,6 +660,17 @@ private fun renderNeuCastShadow(
         paint.asFrameworkPaint().maskFilter =
             BlurMaskFilter(neuBlurRadius(layer.blur * 0.5f * k), BlurMaskFilter.Blur.NORMAL)
         canvas.drawPath(path, paint)
+    }
+    if (hollow) {
+        // Batch 553 — panel kaca: area DALAM bentuk dikecualikan dibakar ke bitmap (DstOut), bukan
+        // lagi `clipPath(ClipOp.Difference)` tiap frame gambar (clip path-AA per frame saat sheet/
+        // panel beranimasi). Bayangan tak lagi menggelapkan isi kaca, tanpa biaya clip saat gambar.
+        val cut = Paint().apply {
+            isAntiAlias = true
+            color = Color.Black
+            blendMode = BlendMode.DstOut
+        }
+        canvas.drawPath(Path().apply { addPath(base, Offset(m * k, m * k)) }, cut)
     }
     return bmp
 }
@@ -704,6 +715,81 @@ private fun renderNeuWellInner(shape: Shape, wPx: Float, hPx: Float, density: Fl
         blendMode = BlendMode.DstOut
     }
     canvas.drawPath(outside(0f, 0f), cut)
+    return bmp
+}
+
+/** Batch 553 — lapisan cahaya SELURUH permukaan panel kaca (bevel 1.5dp saja = kedalaman cuma tampak
+ *  di garis tepi). Satu bitmap kecil ber-cache: wash diagonal sorot kiri-atas -> teduh kanan-bawah +
+ *  4 pita tepi-dalam (atas/kiri terang, bawah/kanan gelap, lebar ~14dp, memudar ke dalam), dipotong ke
+ *  bentuk (`DstOut` pada area luar). [bevelScale] = pengali alpha seperti bevel. */
+private fun renderNeuGlassWash(
+    shape: Shape,
+    wPx: Float,
+    hPx: Float,
+    density: Float,
+    style: NeuStyle,
+    bevelScale: Float
+): ImageBitmap {
+    val scale = when {
+        wPx * hPx > (480f * density) * (480f * density) -> NeuHugeScale
+        max(wPx, hPx) > 160f * density -> NeuBigScale
+        else -> NeuSmallScale
+    }
+    val bw = (wPx * scale).roundToInt().coerceAtLeast(2)
+    val bh = (hPx * scale).roundToInt().coerceAtLeast(2)
+    val k = density * scale
+    val bmp = ImageBitmap(bw, bh, ImageBitmapConfig.Argb8888)
+    val canvas = GfxCanvas(bmp)
+    val wf = bw.toFloat()
+    val hf = bh.toFloat()
+    val lightA = style.rimLightAlpha * bevelScale
+    val shadeA = style.rimShadeAlpha * bevelScale
+    val lightClear = style.rimLight.copy(alpha = 0f).toArgb()
+    val shadeClear = style.rimShade.copy(alpha = 0f).toArgb()
+    fun gradientPaint(x0: Float, y0: Float, x1: Float, y1: Float, from: Int, to: Int): Paint =
+        Paint().apply {
+            asFrameworkPaint().shader = android.graphics.LinearGradient(
+                x0, y0, x1, y1, from, to, android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+    // Wash diagonal: sorot (kiri-atas) -> bening (tengah) -> teduh (kanan-bawah).
+    val diag = Paint().apply {
+        asFrameworkPaint().shader = android.graphics.LinearGradient(
+            0f, 0f, wf, hf,
+            intArrayOf(
+                style.rimLight.copy(alpha = lightA * 0.40f).toArgb(),
+                lightClear,
+                style.rimShade.copy(alpha = shadeA * 0.45f).toArgb()
+            ),
+            floatArrayOf(0f, 0.5f, 1f),
+            android.graphics.Shader.TileMode.CLAMP
+        )
+    }
+    canvas.drawRect(0f, 0f, wf, hf, diag)
+    // Pita tepi-dalam: tebal 14dp (maks 1/4 sisi terpendek), memudar ke dalam panel.
+    val band = min(14f * k, min(wf, hf) * 0.25f).coerceAtLeast(1f)
+    val top = gradientPaint(0f, 0f, 0f, band, style.rimLight.copy(alpha = lightA * 0.90f).toArgb(), lightClear)
+    canvas.drawRect(0f, 0f, wf, band, top)
+    val left = gradientPaint(0f, 0f, band, 0f, style.rimLight.copy(alpha = lightA * 0.60f).toArgb(), lightClear)
+    canvas.drawRect(0f, 0f, band, hf, left)
+    val bottom = gradientPaint(0f, hf - band, 0f, hf, shadeClear, style.rimShade.copy(alpha = shadeA * 0.80f).toArgb())
+    canvas.drawRect(0f, hf - band, wf, hf, bottom)
+    val right = gradientPaint(wf - band, 0f, wf, 0f, shadeClear, style.rimShade.copy(alpha = shadeA * 0.60f).toArgb())
+    canvas.drawRect(wf - band, 0f, wf, hf, right)
+    // Potong ke bentuk: area luar dihapus (tepi tetap mulus, sudut membulat ikut bentuk).
+    val shapePath = shape.createOutline(Size(wf, hf), LayoutDirection.Ltr, Density(k)).toNeuPath()
+    val pad = 48f * k
+    val outside = Path().apply {
+        fillType = PathFillType.EvenOdd
+        addRect(Rect(-pad, -pad, wf + pad, hf + pad))
+        addPath(shapePath)
+    }
+    val cut = Paint().apply {
+        isAntiAlias = true
+        color = Color.Black
+        blendMode = BlendMode.DstOut
+    }
+    canvas.drawPath(outside, cut)
     return bmp
 }
 
@@ -790,7 +876,7 @@ private fun neuRoundFacets(
 /** Bayangan jatuh (digambar DI BELAKANG, boleh keluar batas — jangan di-clip di atasnya).
  *  [press] = progres tekan 0..1 (null = tak pernah ditekan): bayangan memudar saat pressed, bibir
  *  sumur (garis terang tipis di tepi kanan-bawah LUAR) muncul. [hollow] = permukaan di atasnya
- *  tembus pandang (panel kaca): area DALAM bentuk dikecualikan lewat `ClipOp.Difference` supaya
+ *  tembus pandang (panel kaca): area DALAM bentuk dikecualikan (dibakar ke bitmap, Batch 553) supaya
  *  bayangan tak menggelapkan isi kaca. */
 private fun Modifier.neuCastShadow(
     shape: Shape,
@@ -814,8 +900,8 @@ private fun Modifier.neuCastShadow(
             max(w, h) > 160f * d -> NeuBigScale
             else -> NeuSmallScale
         }
-        val bmp = NeuBitmapStore.get(NeuStoreKey(2, wi, hi, d, shape, style, spec)) {
-            renderNeuCastShadow(shape, w, h, d, style, spec, scale)
+        val bmp = NeuBitmapStore.get(NeuStoreKey(2, wi, hi, d, shape, style, Pair(spec, hollow))) {
+            renderNeuCastShadow(shape, w, h, d, style, spec, scale, hollow)
         }
         val base = shape.createOutline(size, layoutDirection, this).toNeuPath()
         val lip: Path? = if (!hollow && press != null) {
@@ -827,13 +913,7 @@ private fun Modifier.neuCastShadow(
             val t = press?.value ?: 0f
             val raisedAlpha = 1f - t
             if (raisedAlpha > 0.01f) {
-                if (hollow) {
-                    clipPath(base, ClipOp.Difference) {
-                        drawNeuShadow(bmp, d, scale, spec.bleedDp, raisedAlpha)
-                    }
-                } else {
-                    drawNeuShadow(bmp, d, scale, spec.bleedDp, raisedAlpha)
-                }
+                drawNeuShadow(bmp, d, scale, spec.bleedDp, raisedAlpha)
             }
             if (t > 0.01f && lip != null) {
                 drawPath(lip, style.rimLight.copy(alpha = 0.22f * t))
@@ -870,6 +950,15 @@ private fun Modifier.neuFace(
             } else {
                 null
             }
+        // Batch 553 — panel kaca (paintFace=false): cahaya seluruh permukaan, bukan cuma garis bevel.
+        val wash: ImageBitmap? =
+            if (!paintFace) {
+                NeuBitmapStore.get(NeuStoreKey(5, wi, hi, d, shape, style, bevelScale)) {
+                    renderNeuGlassWash(shape, wi.toFloat(), hi.toFloat(), d, style, bevelScale)
+                }
+            } else {
+                null
+            }
         val b = style.bevelWidth.toPx()
         val outline = shape.createOutline(size, layoutDirection, this)
         val radius: Float = when (outline) {
@@ -890,6 +979,7 @@ private fun Modifier.neuFace(
         onDrawBehind {
             val t = press?.value ?: 0f
             if (face != null) drawImage(face, dstSize = IntSize(wi, hi))
+            if (wash != null) drawImage(wash, dstSize = IntSize(wi, hi))
             if (t > 0.01f) {
                 drawRect(style.wellFloor.copy(alpha = t))
                 if (well != null) drawImage(well, dstSize = IntSize(wi, hi), alpha = t)
