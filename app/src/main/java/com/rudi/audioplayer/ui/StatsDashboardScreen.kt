@@ -27,6 +27,7 @@ import com.rudi.audioplayer.ui.theme.Radius
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
+import com.rudi.audioplayer.ui.theme.neuSurface
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.tactileEmboss
@@ -214,7 +215,9 @@ private fun StatSectionCard(modifier: Modifier = Modifier, content: @Composable 
     val isTactile = isTactileTheme()
     val isSkeu = isSkeuTheme()
     val isLiquidGlass = isLiquidGlassTheme()
-    val isPanelTheme = isTactile || isSkeu || isLiquidGlass
+    // Batch 551 — sama pola ContinueListeningCard (HomeScreen.kt): `else` (Apple/Calm Retro/
+    // Aurora) -> `neuSurface()` dgn bentuk lama `RoundedCornerShape(Radius.xl)`; Surface selalu
+    // transparan karena fill digambar mesin kedalaman.
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -223,12 +226,12 @@ private fun StatSectionCard(modifier: Modifier = Modifier, content: @Composable 
                     isTactile -> Modifier.tactileEmboss(shape = MaterialTheme.shapes.medium, elevation = 6.dp)
                     isSkeu -> Modifier.skeuEmboss(shape = MaterialTheme.shapes.medium, elevation = 6.dp)
                     isLiquidGlass -> Modifier.frostedGlass()
-                    else -> Modifier.clip(RoundedCornerShape(Radius.xl))
+                    else -> Modifier.neuSurface(shape = RoundedCornerShape(Radius.xl), elevation = 6.dp)
                 }
             ),
-        color = if (isPanelTheme) Color.Transparent else MaterialTheme.colorScheme.surface,
+        color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = if (isPanelTheme) 0.dp else 2.dp
+        tonalElevation = 0.dp
     ) {
         Column(modifier = Modifier.padding(16.dp), content = content)
     }

@@ -294,8 +294,20 @@ fun Modifier.frostedGlass(
     // "kept for source compatibility, unused" persis pra-Batch-296 — tidak dihapus dari
     // signature (0 call site di app ini pernah pass eksplisit, grep masih 17/17 tanpa argumen),
     // supaya tidak mengubah kontrak publik fungsi ini tanpa perlu.
+    // Batch 551 — kedalaman Neumorphism Boomly (`neuHollowShadow()`/`neuBevelOnly()`,
+    // TactileDepth.kt) untuk panel kaca identitas NON-emboss: Apple, Calm Retro, Liquid Glass,
+    // Aurora. Tactile & Neumorphism sengaja dilewati: panel padat mereka sudah dapat mesin yang
+    // sama lewat `tactileEmboss()`/`skeuEmboss()`, dan MiniPlayerBar menumpuk `tactileEmboss()` +
+    // `frostedGlass()` untuk Tactile — menambah di sini = bayangan/bevel ganda. Urutan WAJIB:
+    // bayangan jatuh (hollow: area dalam bentuk dikecualikan supaya tint tembus pandang tak
+    // menggelap) -> background tint -> bevel (di atas tint, bukan tertimbun) -> border tema.
+    // Tanpa `.clip()` (alasan sama komentar LyricsSheet: frostedGlass() tidak boleh memotong anak).
+    val glassDepth = !(isTactile || isSkeu)
     val glassBase = this
-    val base = glassBase.background(tint.copy(alpha = effectiveAlpha), shape)
+    val base = glassBase
+        .then(if (glassDepth) Modifier.neuHollowShadow(shape = shape, tint = tint, isDark = isDark) else Modifier)
+        .background(tint.copy(alpha = effectiveAlpha), shape)
+        .then(if (glassDepth) Modifier.neuBevelOnly(shape = shape, tint = tint, isDark = isDark) else Modifier)
     // Batch 79 — NEUMORPHISM: Skeu no longer draws ANY edge/border here at all (was a
     // brushed-metal repeating-stripe rim, Batch 73's isSkeu branch above — deleted along with
     // every other border in this identity's redesign, see TactileDepth.kt's skeuEmboss()).

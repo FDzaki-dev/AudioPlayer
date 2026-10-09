@@ -29,6 +29,7 @@ import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
+import com.rudi.audioplayer.ui.theme.neuSurface
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.Radius
 import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
@@ -267,7 +268,10 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
     // cabang isLiquidGlass sendiri, pola identik isTactile/isSkeu (opaque Surface color diganti
     // Transparent, .frostedGlass() yang menggambar tint+blur+edge-nya sendiri).
     val isLiquidGlass = isLiquidGlassTheme()
-    val isPanelTheme = isTactile || isSkeu || isLiquidGlass
+    // Batch 551 — cabang `else` (Apple/Calm Retro/Aurora) dulu = clip + Surface warna solid
+    // datar; sekarang `neuSurface()` (kedalaman Neumorphism Boomly, TactileDepth.kt) dgn bentuk
+    // SAMA (`RoundedCornerShape(Radius.xl)`). Karena fill digambar mesin itu, Surface JADI
+    // transparan untuk SEMUA identitas (`isPanelTheme` lama dihapus: selalu true sekarang).
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -277,14 +281,14 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
                     isTactile -> Modifier.tactileEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
                     isSkeu -> Modifier.skeuEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
                     isLiquidGlass -> Modifier.frostedGlass()
-                    else -> Modifier.clip(RoundedCornerShape(Radius.xl))
+                    else -> Modifier.neuSurface(shape = RoundedCornerShape(Radius.xl), elevation = 8.dp)
                 }
             )
             .clickable(onClick = onClick),
-        color = if (isPanelTheme) Color.Transparent else MaterialTheme.colorScheme.surface,
+        color = Color.Transparent,
         // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent fallback.
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = if (isPanelTheme) 0.dp else 4.dp
+        tonalElevation = 0.dp
     ) {
         Row(
             modifier = Modifier.padding(14.dp),

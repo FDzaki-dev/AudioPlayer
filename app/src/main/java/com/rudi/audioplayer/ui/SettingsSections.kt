@@ -33,6 +33,7 @@ import com.rudi.audioplayer.ui.theme.ThemeIdentity
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.colorsFor
+import com.rudi.audioplayer.ui.theme.neuDepth
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 
@@ -122,7 +123,6 @@ internal fun ThemeOptionCard(identity: ThemeIdentity, isDark: Boolean, selected:
     // skeuEmboss() primitive — both custom "physical panel" identities now demo themselves.
     val isTactilePreview = identity == ThemeIdentity.TACTILE
     val isSkeuPreview = identity == ThemeIdentity.SKEU_DARK_LITE
-    val isEmbossPreview = isTactilePreview || isSkeuPreview
     // Batch 131 — gap terakhir dari audit cakupan Calm Retro: Tactile/Skeu sudah live-showcase
     // di baris preview masing-masing (emboss di seluruh Surface), tapi identitas Calm Retro
     // sengaja TIDAK ikut pola itu (Surface-nya tetap flat/opaque, sesuai identitas — lihat Batch
@@ -138,16 +138,25 @@ internal fun ThemeOptionCard(identity: ThemeIdentity, isDark: Boolean, selected:
                 when {
                     isTactilePreview -> Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xl), elevation = if (selected) 12.dp else 8.dp)
                     isSkeuPreview -> Modifier.skeuEmboss(shape = RoundedCornerShape(Radius.xl), elevation = if (selected) 12.dp else 8.dp)
-                    else -> Modifier.clip(RoundedCornerShape(Radius.xl))
+                    // Batch 551 — preview identitas non-emboss (Apple/Calm Retro/Liquid Glass/
+                    // Aurora) ikut kedalaman Neumorphism: warna permukaan & mode = milik
+                    // IDENTITAS yang dipratinjau (`previewColors`/`isDark`), bukan tema aktif.
+                    else -> Modifier.neuDepth(
+                        shape = RoundedCornerShape(Radius.xl),
+                        elevation = if (selected) 12.dp else 8.dp,
+                        faceTop = previewColors.surface,
+                        faceBottom = previewColors.surface,
+                        isDark = isDark
+                    )
                 }
             )
             .selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
-        color = if (isEmbossPreview) Color.Transparent else previewColors.surface,
+        color = Color.Transparent,
         // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent-color
         // fallback chain (that's exactly what caused the invisible-text LockScreen bug).
         contentColor = previewColors.onSurface,
-        tonalElevation = if (isEmbossPreview) 0.dp else 4.dp,
-        shadowElevation = if (isEmbossPreview) 0.dp else if (selected) 6.dp else 0.dp,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
         border = if (selected) BorderStroke(2.dp, previewColors.primary) else null,
         shape = RoundedCornerShape(Radius.xl)
     ) {
