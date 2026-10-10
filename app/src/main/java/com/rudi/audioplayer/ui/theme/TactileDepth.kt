@@ -42,6 +42,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -457,6 +459,8 @@ fun Modifier.auroraGlow(): Modifier {
 // Beda dari port Boomly (sengaja, scope lebih ramping): TANPA tekstur butiran, alur ukir bingkai,
 // kubah knob/rim pil/tab, dan TANPA template 9-slice (bitmap per-ukuran saja — kartu SONIX tidak
 // beranimasi ukuran). Alpha/warna = simulasi statis, BELUM dituning di device.
+// Batch 555: bilah tab bawah = `neuTrough()` (palung cekung permanen) + `neuSlidingKey()` (kunci timbul yang
+// meluncur, referensi `SkeuTabBar` Boomly B191) — SEMUA 6 tema; mesin/cache bitmap sama dgn `neuDepth()`.
 // ============================================================================
 
 private const val NeuLightX = -0.5522f
@@ -1078,4 +1082,121 @@ internal fun Modifier.neuBevelOnly(
 ): Modifier {
     val style = remember(tint, isDark) { neuStyle(tint, tint, isDark) }
     return this.neuFace(shape, style, null, false, 0.7f)
+}
+
+/**
+ * Batch 555 — PALUNG CEKUNG permanen untuk bilah tab bawah (referensi `SkeuTabBar` Boomly B191:
+ * palung cekung + SATU kunci timbul yang meluncur). Sama dengan keadaan `pressed = true` milik
+ * [neuDepth] (lantai sumur gelap + bayangan dalam + bibir terang di tepi kanan-bawah luar) tetapi TETAP:
+ * tanpa bevel luar, tanpa bayangan jatuh. [base] = warna permukaan bilah tema aktif (lantai sumur
+ * diturunkan darinya, palet/identitas tema tidak diganti). Sudah mengandung `.clip(shape)` — modifier
+ * sesudahnya ter-clip ke bentuk palung.
+ */
+@Composable
+fun Modifier.neuTrough(
+    shape: Shape,
+    base: Color,
+    isDark: Boolean = LocalIsDarkTheme.current
+): Modifier = this.neuDepth(
+    shape = shape,
+    elevation = 8.dp,
+    faceTop = base,
+    faceBottom = base,
+    pressed = true,
+    isDark = isDark
+)
+
+/**
+ * Batch 555 — KUNCI TIMBUL (pill) yang meluncur di dalam [neuTrough]: bayangan jatuh Gaussian 3 lapis +
+ * permukaan pelat ter-angkat + bevel facet, semuanya dari cache bitmap global yang sama dengan
+ * [neuDepth] (0 render blur per frame). Digambar DI BELAKANG konten node (`onDrawBehind`) sehingga ikon/label
+ * tetap di atas kunci; syarat: node yang dipasangi modifier ini tidak boleh punya latar opak sendiri.
+ * [count] = jumlah tab; [widthFraction] = lebar kunci relatif terhadap SATU slot tab; [heightFraction] =
+ * tinggi kunci relatif terhadap tinggi node; [position] = posisi PUSAT kunci dalam satuan tab (0.5f =
+ * tengah tab pertama), dibaca di fase GAMBAR (0 rekomposisi per frame; di-clamp ke tepi node).
+ * [base] = warna permukaan kunci (mesin mengangkat luminansinya).
+ */
+@Composable
+fun Modifier.neuSlidingKey(
+    shape: Shape,
+    base: Color,
+    count: Int,
+    widthFraction: Float,
+    heightFraction: Float,
+    elevation: Dp = 4.dp,
+    isDark: Boolean = LocalIsDarkTheme.current,
+    position: () -> Float
+): Modifier {
+    // Mode gelap: [neuStyle] mengangkat permukaan 9%/4% ke putih (kunci akan lebih terang dari warna [base] dan
+    // menurunkan kontras label berwarna di atasnya, mis. primary di tema gelap ~3.6:1 -> ~2.9:1 hitungan offline).
+    // Basis dibalik-angkat dulu supaya warna permukaan kunci TETAP = [base]; kedalaman tetap datang dari
+    // vignette/sorot, bevel facet, dan bayangan jatuh. Mode terang: angkat ke putih dibiarkan (kontras naik).
+    val style = remember(base, isDark) {
+        if (isDark) neuStyle(neuUnlift(base, 0.09f), neuUnlift(base, 0.04f), true) else neuStyle(base, base, false)
+    }
+    val spec = remember(elevation, style.shadowStrength) { neuShadowSpec(elevation, style.shadowStrength) }
+    return this.neuKeyDraw(shape, style, spec, count, widthFraction, heightFraction, position)
+}
+
+/** Kebalikan `lerp(c, Color.White, t)` per kanal (hasil dijepit 0..1; alpha 1). */
+private fun neuUnlift(c: Color, t: Float): Color = Color(
+    red = ((c.red - t) / (1f - t)).coerceIn(0f, 1f),
+    green = ((c.green - t) / (1f - t)).coerceIn(0f, 1f),
+    blue = ((c.blue - t) / (1f - t)).coerceIn(0f, 1f),
+    alpha = 1f
+)
+
+/** Isi [neuSlidingKey]. Kunci cache = SEMUA parameter selain [position] (lambda dibaca di fase gambar dan
+ *  hanya menutup state yang stabil — pola Boomly B190). */
+private fun Modifier.neuKeyDraw(
+    shape: Shape,
+    style: NeuStyle,
+    spec: NeuShadowSpec,
+    count: Int,
+    widthFraction: Float,
+    heightFraction: Float,
+    position: () -> Float
+): Modifier = neuDraw("neuKey", shape, style, spec, count, widthFraction, heightFraction) {
+    val d = density
+    val slotW = size.width / count.coerceAtLeast(1)
+    val kw = slotW * widthFraction
+    val kh = size.height * heightFraction
+    if (kw < 4f || kh < 4f) {
+        onDrawBehind { }
+    } else {
+        val wi = kw.roundToInt()
+        val hi = kh.roundToInt()
+        val scale = when {
+            kw * kh > (480f * d) * (480f * d) -> NeuHugeScale
+            max(kw, kh) > 160f * d -> NeuBigScale
+            else -> NeuSmallScale
+        }
+        val shadow = NeuBitmapStore.get(NeuStoreKey(2, wi, hi, d, shape, style, Pair(spec, false))) {
+            renderNeuCastShadow(shape, kw, kh, d, style, spec, scale, false)
+        }
+        val face = NeuBitmapStore.get(NeuStoreKey(4, 0, 0, 1f, null, style, null)) { renderNeuFace(style) }
+        val outline = shape.createOutline(Size(kw, kh), layoutDirection, this)
+        val keyPath = outline.toNeuPath()
+        val radius: Float = when (outline) {
+            is Outline.Rounded -> min(outline.roundRect.topLeftCornerRadius.x, min(kw, kh) / 2f)
+            is Outline.Rectangle -> 0f
+            is Outline.Generic -> -1f
+        }
+        val facets = ArrayList<Pair<Path, Color>>(4 + 4 * NeuCornerSteps)
+        if (radius >= 0f) neuRoundFacets(facets, kw, kh, radius, style.bevelWidth.toPx(), style, 1f)
+        val bleedDp = spec.bleedDp
+        onDrawBehind {
+            val x = (position() * slotW - kw / 2f).coerceIn(0f, max(0f, size.width - kw))
+            val y = (size.height - kh) / 2f
+            translate(left = x, top = y) {
+                drawNeuShadow(shadow, d, scale, bleedDp, 1f)
+                clipPath(keyPath) {
+                    drawImage(face, dstSize = IntSize(wi, hi))
+                    for (f in facets) {
+                        drawPath(f.first, f.second)
+                    }
+                }
+            }
+        }
+    }
 }

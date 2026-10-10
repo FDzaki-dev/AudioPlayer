@@ -3,7 +3,6 @@ package com.rudi.audioplayer
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.IndicationNodeFactory
-import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -236,7 +234,6 @@ internal fun GlassTabIcon(
         }
     }
     val glassAlpha = glassAlphaAnim.value
-    val pillShape = RoundedCornerShape(16.dp)
     val tint = MaterialTheme.colorScheme.primary
     // Batch 448 — ROMBAK TOTAL mekanisme drag bottom nav (instruksi eksplisit user + video
     // referensi iOS Jam asli). Root cause bug "gak bagus sama sekali" (2 kotak pill
@@ -256,20 +253,10 @@ internal fun GlassTabIcon(
     Column(
         modifier = Modifier
             .widthIn(min = 64.dp)
-            .then(
-                if (isSkeu) {
-                    // Skeu: 0 kaca, replikasi manual solid pill M3 default (indicatorColor
-                    // dimatikan/transparent di titik pemakaian supaya 1 composable ini jadi
-                    // SATU-SATUNYA penggambar indicator, konsisten lintas identitas).
-                    if (selected) Modifier.background(MaterialTheme.colorScheme.secondaryContainer, pillShape)
-                    else Modifier
-                } else {
-                    // Batch 448 — 0 background/border digambar di sini lagi (lihat komentar
-                    // panjang di atas fungsi ini). Pill glass tunggal kini digambar 1x di
-                    // `NavigationBar` (AppNavHost), bebas lintas kolom, 0 duplikasi.
-                    Modifier
-                }
-            )
+            // Batch 555 — latar `secondaryContainer` statis khusus Skeu (pill diskrit per-tab) DIHAPUS: SEMUA 6 tema kini
+            // memakai SATU kunci timbul yang meluncur di dalam palung cekung, digambar `NavigationBar` (MainActivity.kt,
+            // `neuSlidingKey()`); untuk Skeu warna kuncinya = `secondaryContainer` sehingga `selectedIconColor`/`selectedTextColor`
+            // di bawah tetap terbaca. Komentar Batch 448/58/61/79 di atas = riwayat ("Skeu pill diskrit" tak berlaku lagi).
             .bouncyPress(interactionSource, pressedScale = 0.9f)
             // Batch 452 — user: label nav bawah masih kepotong ellipsis ("Perpustakaan"/
             // "Pengaturan") di kondisi normal (bukan cuma font-scale aksesibilitas besar spt

@@ -106,15 +106,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-// Batch 446 — `drawWithContent` (gambar SESUDAH content; `drawBehind` di atas cuma bisa SEBELUM)
-// dipakai NavigationBar di AppNavHost. Batch 448 — titik pemakaian ini diperluas jadi SATU-SATUNYA
-// penggambar pill tab-bar (gantikan bridge Batch 446 + 3 pill lama `GlassTabIcon`, lihat
-// `navPillIndexAnim`), aktif di semua state bukan cuma saat drag. Offset/Size/CornerRadius/Stroke
-// sengaja fully-qualified inline di situ (pola sama persis `Offset(0f,0f)` yang sudah ada di file
-// ini) — 0 import baru selain ini.
-import androidx.compose.ui.draw.drawWithContent
+// Batch 555 — impor `drawWithContent`/`drawBehind` DIHAPUS: pill tab-bar (Batch 446/448) dan garis catch-light
+// (Batch 40) tak lagi digambar di sini; depth bilah tab = `neuTrough()` + `neuSlidingKey()` (ui/theme/TactileDepth.kt).
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -156,9 +149,7 @@ import com.rudi.audioplayer.ui.theme.MidnightBlue
 import com.rudi.audioplayer.ui.theme.MidnightBlueAmbientAlpha
 import com.rudi.audioplayer.ui.theme.MidnightBlueLightAmbientAlpha
 import com.rudi.audioplayer.ui.theme.AmoledSurface
-import com.rudi.audioplayer.ui.theme.TactileHighlight
 import com.rudi.audioplayer.ui.theme.TactileLightSurfaceVariant
-import com.rudi.audioplayer.ui.theme.SkeuHighlight
 import com.rudi.audioplayer.ui.theme.SkeuAccent
 import com.rudi.audioplayer.ui.theme.TitaniumDark
 import com.rudi.audioplayer.ui.theme.SilverHighlight
@@ -169,6 +160,8 @@ import com.rudi.audioplayer.ui.theme.SkeuAmbientAlphaLight
 import com.rudi.audioplayer.ui.theme.SkeuEmerald
 import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
 import com.rudi.audioplayer.ui.theme.calmGrain
+import com.rudi.audioplayer.ui.theme.neuSlidingKey
+import com.rudi.audioplayer.ui.theme.neuTrough
 import com.rudi.audioplayer.ui.theme.auroraGlow
 import com.rudi.audioplayer.ui.theme.LocalHazeState
 import com.rudi.audioplayer.ui.theme.Motion
@@ -1020,26 +1013,6 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 if (widthClass == AppWidthClass.COMPACT &&
                     (currentRoute == "home" || currentRoute == "library" || currentRoute == "settings")
                 ) {
-                    // Batch 40: tonalElevation alone still reads flat (no directional light) —
-                    // a 1-2px catch-light line along the top edge is the same border cue
-                    // tactileEmboss() uses elsewhere, applied here without restructuring
-                    // NavigationBar's own internals (it's a whole M3 component, not a bare
-                    // Surface tactileEmboss() could wrap directly).
-                    // Batch 53 — spec §15 "Navigation should be calm... Do not turn every
-                    // navigation item into a glowing glass capsule" + §5 GlassHighlight is now
-                    // 0.065f (was 0.055f pre-Batch-53), so the catch-light line's own alphas are
-                    // re-matched to that new base (0.13f/0.03f) to keep the same relative
-                    // brightness step it always had.
-                    // Batch 57: the catch-light line + raised tonalElevation is a "physical
-                    // panel" cue, not Tactile-specific — Skeuomorphism Dark Lite is the same
-                    // kind of identity (raised surface catching light from top-left) just with
-                    // its own warmer highlight token, so it gets the same treatment here with
-                    // SkeuHighlight instead of TactileHighlight. Apple/Light/Dark stay untouched.
-                    val navCatchLightColor = when (appThemeIdentity) {
-                        ThemeIdentity.TACTILE -> TactileHighlight
-                        ThemeIdentity.SKEU_DARK_LITE -> SkeuHighlight
-                        else -> null
-                    }
                     // Batch 438 — 1 interactionSource per tab, dibagi ke NavigationBarItem (klik)
                     // dan GlassTabIcon (bouncyPress) supaya keduanya sepakat kapan "pressed" true,
                     // pola identik `PinKey`/`RoundGlyphButton` (LockScreen.kt).
@@ -1123,8 +1096,18 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // root cause penuh. Nilai awal (di titik deklarasi) = index tab aktif SAAT
                     // AppNavHost pertama komposisi (bukan hardcode 0/tengah), 0 lompatan visual
                     // pas start app di tab mana pun.
-                    val navBarIsSkeu = isSkeuTheme()
-                    val navBarAccentTint = MaterialTheme.colorScheme.primary
+                    // Batch 555 — depth bilah tab (referensi `SkeuTabBar` Boomly B191: palung CEKUNG + SATU kunci TIMBUL
+                    // yang meluncur), SEMUA 6 tema. `navBarBase` = warna permukaan bar yang SUDAH tampil sebelumnya
+                    // (default `NavigationBar`) -> lantai palung diturunkan darinya, palet tema tidak diganti. Warna
+                    // kunci: Skeu = `secondaryContainer` (identik latar tab terpilih lama, `selectedIconColor` M3 tetap
+                    // terbaca); tema lain = primary 16% di atas bar (identik pill alpha-0.16 lama).
+                    val navBarBase = NavigationBarDefaults.containerColor
+                    val navBarKeyBase = if (isSkeuTheme()) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        androidx.compose.ui.graphics.lerp(navBarBase, MaterialTheme.colorScheme.primary, 0.16f)
+                    }
+                    val navBarContentColor = MaterialTheme.colorScheme.onSurface
                     NavigationBar(
                         // Batch 439 — referensi iOS Jam: bar bawah bukan persegi nempel penuh
                         // ke tepi layar, tapi kapsul rounded yang "mengambang" dengan jarak dari
@@ -1140,24 +1123,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         // ketutup gesture bar.
                         modifier = Modifier
                             .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
-                            .clip(RoundedCornerShape(28.dp))
-                            .then(
-                                if (navCatchLightColor != null)
-                                    Modifier.drawBehind {
-                                        drawLine(
-                                            brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                                listOf(
-                                                    navCatchLightColor.copy(alpha = 0.13f),
-                                                    navCatchLightColor.copy(alpha = 0.03f)
-                                                )
-                                            ),
-                                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                                            end = androidx.compose.ui.geometry.Offset(size.width, 0f),
-                                            strokeWidth = 2f
-                                        )
-                                    }
-                                else Modifier
-                            )
+                            // Batch 555 — `.clip(RoundedCornerShape(28.dp))` + garis catch-light atas (Tactile/Skeu) DIGANTI palung
+                            // cekung `neuTrough()` (sudah mengandung clip yang sama persis; garis sorot di tepi ATAS bertentangan dgn
+                            // cahaya kiri-atas pada permukaan cekung). TETAP SETELAH `.padding(...)` (margin di luar palung).
+                            .neuTrough(RoundedCornerShape(28.dp), navBarBase)
                             // Batch 442 — permintaan eksplisit user: "tambahkan fitur drag pada
                             // tab, bukan hanya tap-tab doang" (screenshot bottom nav bar). Beda
                             // dari swipe Batch 435 (drag di KONTEN layar, Box pembungkus NavHost
@@ -1300,77 +1269,40 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 }
                             }
                             .graphicsLayer { translationX = tabBarOverscrollPx.floatValue }
-                            // Batch 448 — SATU-SATUNYA pill yang pernah digambar utk identitas
-                            // kaca (gantikan bridge Batch 446 + 3 pill lama `GlassTabIcon` yang
-                            // SUDAH dihapus, lihat komentar panjang di situ). Digambar SESUDAH
-                            // `drawContent()` (di atas ikon/label — `drawBehind` cuma bisa SEBELUM,
-                            // akan tertutup total oleh Surface+Row NavigationBar sendiri) — alpha
-                            // rendah (0.16f/0.14f, IDENTIK pill lama) jadi tetap tidak mengganggu
-                            // keterbacaan ikon/label. AKTIF SETIAP SAAT (bukan cuma saat drag spt
-                            // bridge lama) — pill kini SELALU ada di bawah tab aktif idle, bukan
-                            // cuma nongol pas jari nyentuh bar.
-                            .drawWithContent {
-                                drawContent()
-                                if (!navBarIsSkeu) {
-                                    // Batch 448 — 1 sumber posisi, urut prioritas: (1) drag
-                                    // LANGSUNG di tab-bar (`tabBarDragIndexPx` bukan NaN, mentah
-                                    // 1:1 jari — pola sinkron sama persis Batch 444/445, 0 lag);
-                                    // (2) nudge dari swipe KONTEN (`tabDragOffsetPx` != 0, geser
-                                    // kecil ±0.5 kolom dari titik rest `navPillIndexAnim`, pola
-                                    // pecahan SAMA PERSIS `tabMagnifyFocus` di atas — 0 hitungan
-                                    // baru, cuma dipetakan ke satuan index alih-alih 0f..1f);
-                                    // (3) rest — `navPillIndexAnim.value`, di-animate-kan tween
-                                    // 220ms di titik SELESAI drag & di 3 onClick tap (lihat
-                                    // deklarasinya di atas).
-                                    val liveBarDrag = tabBarDragIndexPx.floatValue
-                                    val nudge = tabDragOffsetPx.floatValue
-                                    val idxPos = when {
-                                        !liveBarDrag.isNaN() -> liveBarDrag
-                                        nudge != 0f -> {
-                                            val towardNext = (-nudge / 40f).coerceIn(0f, 1f)
-                                            val towardPrev = (nudge / 40f).coerceIn(0f, 1f)
-                                            navPillIndexAnim.value + (towardNext - towardPrev) * 0.5f
-                                        }
-                                        else -> navPillIndexAnim.value
+                            // Batch 555 — KUNCI TIMBUL (depth) di dalam palung `neuTrough()`; menggantikan pill alpha-0.16/stroke putih
+                            // lama (Batch 448, digambar DI ATAS ikon lewat `drawWithContent`) dan latar `secondaryContainer` statis Skeu di
+                            // `GlassTabIcon` -> SATU kunci untuk 6 tema, digambar DI BELAKANG ikon/label (Surface NavigationBar transparan,
+                            // lihat `containerColor` di bawah). Geometri IDENTIK pill lama: 74% lebar kolom, 62% tinggi bar, sudut 16.dp,
+                            // pusat = `idxPos` (satuan tab) di-clamp ke tepi bar. Sumber posisi 3 tingkat TIDAK berubah (Batch 448): (1) drag
+                            // LANGSUNG di bar (`tabBarDragIndexPx`), (2) nudge swipe-konten (`tabDragOffsetPx`), (3) rest `navPillIndexAnim`.
+                            // Lambda dibaca di fase GAMBAR (0 rekomposisi per frame); hanya menutup 3 state stabil hasil `remember`.
+                            .neuSlidingKey(
+                                shape = RoundedCornerShape(16.dp),
+                                base = navBarKeyBase,
+                                count = TAB_ROUTES.size,
+                                widthFraction = 0.74f,
+                                heightFraction = 0.62f
+                            ) {
+                                val liveBarDrag = tabBarDragIndexPx.floatValue
+                                val nudge = tabDragOffsetPx.floatValue
+                                when {
+                                    !liveBarDrag.isNaN() -> liveBarDrag
+                                    nudge != 0f -> {
+                                        val towardNext = (-nudge / 40f).coerceIn(0f, 1f)
+                                        val towardPrev = (nudge / 40f).coerceIn(0f, 1f)
+                                        navPillIndexAnim.value + (towardNext - towardPrev) * 0.5f
                                     }
-                                    val columnWidthPx = size.width / TAB_ROUTES.size
-                                    val pillWidthPx = columnWidthPx * 0.74f
-                                    val pillHeightPx = size.height * 0.62f
-                                    val centerX = (idxPos * columnWidthPx)
-                                        .coerceIn(pillWidthPx / 2f, size.width - pillWidthPx / 2f)
-                                    val topLeft = androidx.compose.ui.geometry.Offset(
-                                        centerX - pillWidthPx / 2f,
-                                        (size.height - pillHeightPx) / 2f
-                                    )
-                                    val pillSize = androidx.compose.ui.geometry.Size(pillWidthPx, pillHeightPx)
-                                    val corner = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
-                                    drawRoundRect(
-                                        color = navBarAccentTint,
-                                        topLeft = topLeft,
-                                        size = pillSize,
-                                        cornerRadius = corner,
-                                        alpha = 0.16f
-                                    )
-                                    drawRoundRect(
-                                        color = Color.White,
-                                        topLeft = topLeft,
-                                        size = pillSize,
-                                        cornerRadius = corner,
-                                        alpha = 0.14f,
-                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
-                                    )
+                                    else -> navPillIndexAnim.value
                                 }
                             },
-                        // Batch 53: lowered from 12.dp — spec §15 keeps navigation "calm and
-                        // immediately understandable" and explicitly warns against every item (or
-                        // in this case, the whole bar) reading as an accent-tinted glow. M3's
-                        // tonalElevation overlay scales with elevation and this app's
-                        // surfaceTint is the accent color (Theme.kt), so 12.dp let the bar itself
-                        // read as "blue" before "glass" — 6.dp keeps a legible elevated-glass lift
-                        // (Level 2, spec §4) without the accent wash dominating the one piece of
-                        // chrome that's always on screen. Batch 57: Skeu shares this same 6.dp —
-                        // same reasoning (SkeuAccent as surfaceTint would otherwise dominate).
-                        tonalElevation = if (navCatchLightColor != null) 6.dp else NavigationBarDefaults.Elevation,
+                        // Batch 555 — Surface NavigationBar TRANSPARAN + tonalElevation 0: lantai palung (`neuTrough()`) dan kunci
+                        // timbul digambar di modifier di atas, di BELAKANG ikon/label; container opak default akan menutupinya.
+                        // `contentColor` dikunci = `onSurface` (nilai default sebelumnya utk container `surfaceContainer`) karena
+                        // `contentColorFor(Transparent)` = Unspecified. Catatan lama Batch 53/57 (tonalElevation 6.dp utk Tactile/Skeu
+                        // agar accent surfaceTint tak mendominasi) tidak berlaku lagi: tanpa overlay tonal sama sekali.
+                        containerColor = Color.Transparent,
+                        contentColor = navBarContentColor,
+                        tonalElevation = 0.dp,
                         // Batch 444 — user: "border tab nav terluar kebesaran". Root cause:
                         // `windowInsets` DEFAULT NavigationBar (`NavigationBarDefaults.windowInsets`)
                         // masih mereservasi tinggi system-nav-bar DI DALAM capsule (Batch 439 0
