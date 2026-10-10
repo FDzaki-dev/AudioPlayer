@@ -162,6 +162,12 @@ internal fun SongListView(
     // dragging back-and-forth within one continuous gesture still behaves like a plain range
     // select (shrinking the range removes rows again) rather than only ever growing.
     var sweepBaseSelection by remember { mutableStateOf(persistentSetOf<Long>()) }
+    // Batch 562 — user: "drag to select tidak bisa men cancel music yang sudah ter centang". Akar:
+    // tiap update sweep SELALU `base.add/addAll(...)` (union) -> menyapu baris yang sudah tercentang
+    // tak pernah bisa mencabut centangnya. Fix (pola iOS/Foto): mode sapuan ditentukan SEKALI di
+    // `onDragStart` — baris awal sudah terpilih -> mode BATAL (`remove/removeAll`), belum -> mode PILIH
+    // (union, perilaku lama). Mengecilkan sapuan tetap memulihkan baris (base disimpan, bukan diakumulasi).
+    var sweepDeselect by remember { mutableStateOf(false) }
     // Root cause (user report): a stationary long-press (held, then released with ZERO
     // movement) looked like it did nothing — worse, felt like it actively CANCELLED itself.
     // Sequence: onDragStart below fires normally (Batch 72 already fixed the earlier "long
@@ -204,8 +210,12 @@ internal fun SongListView(
                         sweepAnchorIndex = idx
                         sweepLastIndex = idx
                         sweepBaseSelection = currentSelectedIds.toPersistentSet()
+                        sweepDeselect = sweepBaseSelection.contains(songs[idx].id)
                         suppressClickForId = songs[idx].id
-                        onSweepSelectRange(sweepBaseSelection.add(songs[idx].id))
+                        onSweepSelectRange(
+                            if (sweepDeselect) sweepBaseSelection.remove(songs[idx].id)
+                            else sweepBaseSelection.add(songs[idx].id)
+                        )
                     },
                     onDrag = { change, _ ->
                         val anchor = sweepAnchorIndex ?: return@detectDragGesturesAfterLongPress
@@ -229,7 +239,10 @@ internal fun SongListView(
                         sweepLastIndex = idx
                         val range = minOf(anchor, idx)..maxOf(anchor, idx)
                         val sweptIds = range.map { songs[it].id }
-                        onSweepSelectRange(sweepBaseSelection.addAll(sweptIds))
+                        onSweepSelectRange(
+                            if (sweepDeselect) sweepBaseSelection.removeAll(sweptIds)
+                            else sweepBaseSelection.addAll(sweptIds)
+                        )
                     },
                     onDragEnd = { sweepAnchorIndex = null; sweepLastIndex = null },
                     // Defensive cleanup only — the stationary-press case is expected to clear

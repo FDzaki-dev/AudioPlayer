@@ -198,6 +198,33 @@ jobs:
           body_path: release_notes.txt
           files: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk
 
+      # Batch 562 — user: "output ci kosong saat build hijau [seharusnya ada artifact aplikasi dan hasil
+      # lintdebug/detekt]". Sebelumnya APK HANYA jadi asset Release -> tab Artifacts tak pernah memuat
+      # aplikasi. Kini APK juga jadi ARTIFACT (SETELAH Release terbit, jadi tak menunda/menggagalkan rilis).
+      # `archive: false` (upload-artifact v7) = APK diunggah APA ADANYA (tanpa dibungkus zip; nama artifact =
+      # nama berkas). `continue-on-error` + langkah cadangan v4 (zip, nama `SONIX_app_...`) di bawah: kalau
+      # v7 gagal, artifact aplikasi TETAP ada. `hashFiles` -> hanya bila APK memang terbentuk.
+      - name: Upload APK artifact (tanpa zip)
+        id: apk_artifact
+        if: always() && hashFiles('renamed/*.apk') != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          path: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk
+          archive: false
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload APK artifact (cadangan, zip)
+        if: always() && steps.apk_artifact.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SONIX_app_v${{ steps.version.outputs.name }}-run${{ github.run_number }}
+          path: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+
       # ═══════════════════════ 5. DIAGNOSTICS & SUMMARY ═══════════════════════
       - name: Publish build summary
         # Batch 276 — user minta workflow lebih informatif. Sebelum ini, satu-satunya cara
@@ -273,6 +300,23 @@ jobs:
           case "${DET}" in ''|n/a|0) ;; *) echo "::warning::detekt melaporkan ${DET} temuan — baca artifact static_analysis." ;; esac
           case "${LNE}" in ''|0) ;; *) echo "::warning::lintDebug melaporkan ${LNE} error/fatal — baca artifact static_analysis." ;; esac
           case "${LNW}" in ''|0) ;; *) echo "::warning::lintDebug melaporkan ${LNW} warning — baca artifact static_analysis." ;; esac
+          # Batch 562 — laporan yang TIDAK terbentuk = tampak "kosong" di artifact: kini jadi peringatan
+          # eksplisit (bukan diam). Tetap tidak menggagalkan step/job.
+          [ -f app/build/reports/detekt/detekt.xml ] || echo "::warning::Laporan detekt (app/build/reports/detekt/detekt.xml) TIDAK terbentuk — cek gradle-static-analysis.log di artifact."
+          [ -f app/build/reports/lint-results-debug.xml ] || echo "::warning::Laporan lintDebug (app/build/reports/lint-results-debug.xml) TIDAK terbentuk — cek gradle-static-analysis.log di artifact."
+          # Batch 562 — halaman ringkasan run tak lagi kosong: hasil static analysis + daftar artifact.
+          {
+            echo ""
+            echo "### 🔎 Static analysis (non-blocking)"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| **detekt** | ${DET:-n/a} temuan |"
+            echo "| **lintDebug** | ${LNT:-n/a} isu (${LNE:-n/a} error, ${LNW:-n/a} warning) |"
+            echo "| **Outcome step** | ${{ steps.static_analysis.outcome }} |"
+            echo "| **Artifact laporan** | \`SONIX_static_analysis_v${{ steps.version.outputs.name }}-run${{ github.run_number }}\` |"
+            echo "| **Artifact aplikasi** | \`AudioPlayer-${{ steps.version.outputs.tag }}.apk\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # Penanda identitas proyek supaya artifact static analysis tak ketukar dengan proyek lain (pola
       # template, Batch 162 proyek asal). Diambil DINAMIS dari repo/gradle/strings, bukan literal.

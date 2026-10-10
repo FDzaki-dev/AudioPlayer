@@ -105,6 +105,9 @@ fun SongPickerSheet(
     var sweepLastIndex by remember { mutableStateOf<Int?>(null) }
     val currentSelected by rememberUpdatedState(selected)
     var sweepBaseSelection by remember { mutableStateOf(setOf<Long>()) }
+    // Batch 562 — sama dgn `SongListView` (LibraryLists.kt): sapuan yang DIMULAI di baris yang sudah
+    // tercentang = mode BATAL (cabut centang), selain itu mode PILIH (union, perilaku lama).
+    var sweepDeselect by remember { mutableStateOf(false) }
     // Batch 273 — user laporan: sheet ini ("Tambah ke Favorit"/"Tambah ke Playlist") MASIH
     // kena "select → instant self-deselect" pas long-press diam tanpa gerak — bug PERSIS yang
     // sama yang baru dibetulkan Batch 271 di `SongListView` (`LibraryScreen.kt`), tapi FIX
@@ -177,8 +180,10 @@ fun SongPickerSheet(
                                     sweepAnchorIndex = idx
                                     sweepLastIndex = idx
                                     sweepBaseSelection = currentSelected
+                                    sweepDeselect = filtered[idx].id in sweepBaseSelection
                                     suppressClickForId = filtered[idx].id
-                                    selected = sweepBaseSelection + filtered[idx].id
+                                    selected = if (sweepDeselect) sweepBaseSelection - filtered[idx].id
+                                    else sweepBaseSelection + filtered[idx].id
                                 },
                                 onDrag = { change, _ ->
                                     val anchor = sweepAnchorIndex ?: return@detectDragGesturesAfterLongPress
@@ -202,7 +207,8 @@ fun SongPickerSheet(
                                     sweepLastIndex = idx
                                     val range = minOf(anchor, idx)..maxOf(anchor, idx)
                                     val sweptIds = range.map { filtered[it].id }
-                                    selected = sweepBaseSelection + sweptIds
+                                    selected = if (sweepDeselect) sweepBaseSelection - sweptIds.toSet()
+                                    else sweepBaseSelection + sweptIds
                                 },
                                 onDragEnd = { isSweeping = false; sweepAnchorIndex = null; sweepLastIndex = null },
                                 // Defensive cleanup saja — kasus tekan-diam SEHARUSNYA sudah

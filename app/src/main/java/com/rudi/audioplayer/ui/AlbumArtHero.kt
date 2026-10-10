@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
@@ -34,7 +35,9 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.withTransform
 import com.rudi.audioplayer.ui.theme.neuRowTile
+import kotlin.math.max
 
 // Batch 510 — Wave 2 T6 (docs/PENDING_CodeTidyPlan.md): AlbumArtHero dipindah MOVE-ONLY dari
 // NowPlayingScreen.kt (baris 1715-2029 termasuk KDoc, snapshot v509). Badan fungsi & KDoc identik
@@ -182,11 +185,51 @@ internal fun AlbumArtHero(
                 .blur(90.dp, BlurredEdgeTreatment.Unbounded)
                 .background(accentColor.copy(alpha = 0.38f), CircleShape)
         )
+        // Batch 562 — user: "Album hero masih kurang berasa realistic depth nya saat idle". Statis (0
+        // animasi/sensor/loop: aman baterai), 4 petunjuk kedalaman TAMBAHAN di atas Batch 560:
+        // (1) bayangan LANTAI = elips gelap tepat di bawah pelat (benda tampak melayang, bukan menempel);
+        // (2) pelat naik 14 -> 16dp (skala bayangan mesin maks 2x) + cahaya pantul warna aksen di bingkai;
+        // (3) art ditutup "kaca": kilau diagonal + catchlight tepi atas + vignette sudut (lengkung cembung);
+        // (4) bayangan bibir bingkai pada art dipertebal (band 10 -> 14dp). Revert = `SONIX_v561.zip`.
+        Box(
+            modifier = Modifier
+                .size(artSize)
+                .drawBehind {
+                    val cx = size.width / 2f
+                    val cy = size.height + 10.dp.toPx()
+                    val r = size.width * 0.50f
+                    withTransform({ scale(1f, 0.13f, pivot = Offset(cx, cy)) }) {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                0f to Color.Black.copy(alpha = if (isDark) 0.70f else 0.34f),
+                                0.55f to Color.Black.copy(alpha = if (isDark) 0.32f else 0.14f),
+                                1f to Color.Black.copy(alpha = 0f),
+                                center = Offset(cx, cy),
+                                radius = r
+                            ),
+                            radius = r,
+                            center = Offset(cx, cy)
+                        )
+                    }
+                }
+        )
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(artSize)
-                .neuRowTile(shape = heroShape, elevation = 14.dp)
+                .neuRowTile(shape = heroShape, elevation = 16.dp)
+                // Cahaya pantul aksen pada bingkai (ter-clip ke bentuk pelat; art menutupi tengah).
+                .clip(heroShape)
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            0.70f to accentColor.copy(alpha = 0f),
+                            1f to accentColor.copy(alpha = if (isDark) 0.34f else 0.24f),
+                            center = center,
+                            radius = size.width * 0.55f
+                        )
+                    )
+                }
         ) {
             AlbumArt(
                 artworkUri = artworkUri,
@@ -196,9 +239,21 @@ internal fun AlbumArtHero(
                     .then(if (isCalmRetroHero) Modifier.calmScanlines() else Modifier)
                     .drawWithContent {
                         drawContent()
-                        // Sumur cekung di tepi art: gelap kiri-atas, terang kanan-bawah.
-                        val band = 10.dp.toPx()
-                        val dark = Color.Black.copy(alpha = if (isDark) 0.45f else 0.26f)
+                        val w = size.width
+                        val h = size.height
+                        // Batch 562 — vignette sudut (lengkung cembung kaca): terang di sisi cahaya
+                        // kiri-atas, menggelap ke sudut kanan-bawah.
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                0.60f to Color.Black.copy(alpha = 0f),
+                                1f to Color.Black.copy(alpha = if (isDark) 0.34f else 0.20f),
+                                center = Offset(w * 0.42f, h * 0.38f),
+                                radius = max(w, h) * 0.85f
+                            )
+                        )
+                        // Sumur cekung di tepi art (bibir bingkai): gelap kiri-atas, terang kanan-bawah.
+                        val band = 14.dp.toPx()
+                        val dark = Color.Black.copy(alpha = if (isDark) 0.52f else 0.32f)
                         val light = Color.White.copy(alpha = if (isDark) 0.12f else 0.30f)
                         drawRect(
                             brush = Brush.verticalGradient(
@@ -233,6 +288,26 @@ internal fun AlbumArtHero(
                             ),
                             topLeft = Offset(size.width - band, 0f),
                             size = Size(band, size.height)
+                        )
+                        // Batch 562 — kilau kaca: sapuan diagonal dari sudut kiri-atas (searah sumber cahaya).
+                        drawRect(
+                            brush = Brush.linearGradient(
+                                0f to Color.White.copy(alpha = if (isDark) 0.16f else 0.26f),
+                                0.34f to Color.White.copy(alpha = 0.05f),
+                                0.52f to Color.White.copy(alpha = 0f),
+                                start = Offset(0f, 0f),
+                                end = Offset(w, h)
+                            )
+                        )
+                        // Batch 562 — catchlight: garis terang tipis di tepi atas kaca.
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                0f to Color.White.copy(alpha = 0f),
+                                0.20f to Color.White.copy(alpha = 0.55f),
+                                0.80f to Color.White.copy(alpha = 0.30f),
+                                1f to Color.White.copy(alpha = 0f)
+                            ),
+                            size = Size(w, 1.5.dp.toPx())
                         )
                     }
             )

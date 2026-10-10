@@ -300,6 +300,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 562** — drag-select di daftar lagu dan sheet pilih-lagu kini bisa MEMBATALKAN centang (sapuan yang dimulai di baris tercentang = mode batal); hero album Now Playing diberi kedalaman statis tambahan (bayangan lantai, kilau kaca, pantulan warna aksen); CI kini juga mengunggah APK sebagai artifact tanpa zip dan menulis hasil detekt/lint ke ringkasan run. Belum diverifikasi compile/CI/device.
+
 **Batch 549** — struktur CI disalin dari template workflow user: 1 job `build`; APK + Release terbit dulu, lalu analisis statis (detekt + lint) jadi langkah paling akhir, non-blocking, dengan ringkasan anotasi dan artifact sendiri `SONIX_static_analysis_v<versi>-run<run>` (marker + log + laporan mentah). Job `static-analysis` terpisah, gate merah, dan zip `ci_report` dicabut. Belum diverifikasi CI.
 
 **Batch 548** — artifact static analysis kini berdiri sendiri dan terpisah dari build aplikasi, mengikuti contoh workflow dari user: `static_analysis_<run>_SONIX` berisi `STATIC_ANALYSIS_MARKER.txt` (identitas proyek), `gradle-static-analysis.log`, dan laporan detekt + lint mentah. Tidak ada lagi zip bernama `ci_report` maupun artifact `log_fail_static_*` terpisah. Kriteria gate sama. Belum diverifikasi CI.
@@ -348,7 +350,7 @@ Untuk file **FLAC/WAV** (lossless), jalur "Gapless (Murni)" menjamin sambungan s
 Untuk **MP3/AAC** (lossy), gapless yang benar-benar sample-accurate juga bergantung pada metadata encoder di file itu sendiri (LAME tag / iTunSMPB) dan seberapa tepat decoder ExoPlayer memangkas padding-nya — ini terjadi di level library, bukan sesuatu yang bisa "ditambahkan" lewat kode aplikasi ini, dan saya belum bisa memverifikasinya dengan telinga di device fisik. Kalau setelah dicoba masih kerasa ada jeda halus khusus di file MP3/AAC tertentu, itu petunjuk berharga — kabari, biar bisa ditelusuri lebih spesifik ke file/formatnya.
 
 ## Build
-Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai **GitHub Release** bertag `v<versi>-release` (bukan CI artifact — release asset di-serve GitHub apa adanya, tanpa dibungkus `.zip`, dan bisa diunduh publik tanpa login). Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
+Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai **GitHub Release** bertag `v<versi>-release` (release asset di-serve GitHub apa adanya, tanpa dibungkus `.zip`, dan bisa diunduh publik tanpa login; sejak Batch 562 APK yang sama juga muncul di tab Artifacts run sebagai berkas `.apk` tanpa zip). Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
 
 ## Rencana v2 (belum dibuat)
 - **Redesign identitas visual terinspirasi CONVX ("Liquid Glass")** — arah baru sejak Batch 278,
