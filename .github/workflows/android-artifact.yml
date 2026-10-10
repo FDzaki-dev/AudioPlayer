@@ -2,6 +2,11 @@ name: Android CI Artifact for Claude
 
 # Batch 570 — adaptasi `github-claude-artifact.md` (user) ke SONIX. Menghasilkan SATU berkas teks ringkas
 # `laporan-untuk-claude.txt` (ArchUnit + SpotBugs SARIF) sebagai artifact resmi GitHub (upload-artifact@v4).
+# Batch 571 — run #1 (commit 316eb57): exit=1, 58s, KEDUA laporan tak terbentuk, akar masalah TIDAK terbaca
+# (ekor log = 80 baris stack frame Gradle karena `--stacktrace`). Perbaikan: ArchUnit dan SpotBugs dijalankan di
+# 2 invocation Gradle TERPISAH (SpotBugs gagal tak lagi menjatuhkan ArchUnit) dengan log masing-masing, tanpa
+# `--stacktrace`, dan laporan memuat kutipan AKAR MASALAH (blok FAILURE/"What went wrong", baris `e:`, task FAILED)
+# + ekor log tanpa baris stack frame.
 #
 # Workflow TERPISAH dari `build.yml` ("Build APK", 1 job, TIDAK diubah): runner sendiri dan berjalan paralel,
 # jadi tidak mengambil jatah waktu build/rilis, dan kegagalan di sini TIDAK memengaruhi APK/Release.
@@ -14,7 +19,7 @@ name: Android CI Artifact for Claude
 #    dibuat lewat config/spotbugs/spotbugs.gradle.kts (aktif hanya dgn -Psonix.spotbugs=true).
 #  - ArchUnit = tes `ArchitectureTest` (report-only, aktif hanya dgn env SONIX_ARCH_REPORT=1); status dibaca dari
 #    laporan tesnya, BUKAN grep nama kelas di log (grep itu memberi "lulus" palsu bila tes tak sempat jalan).
-#  - Varian release (bukan debug): satu kali kompilasi dipakai tes + SpotBugs.
+#  - Varian release (bukan debug): kompilasi dipakai bersama (invocation kedua memakai hasil up-to-date).
 #  - upload-artifact@v4 (contoh memakai `actions/allowed-actions/upload-artifact`, yang tidak ada).
 #  - Pemicu: push `main` + manual (selaras build.yml); `cache-read-only`: cache Gradle hanya ditulis build.yml.
 
@@ -50,9 +55,8 @@ jobs:
           gradle-version: 8.14.3
           cache-read-only: true
 
-      # 1. ArchUnit (tes ArchitectureTest saja) + SpotBugs (SARIF) dalam SATU invocation Gradle: configuration +
-      #    kompilasi release sekali. `--continue`: SpotBugs tetap jalan walau tes gagal. Exit code Gradle disimpan
-      #    ke berkas, langkah ini SELALU sukses.
+      # 1. Dua invocation Gradle TERPISAH (kegagalan satu tak menjatuhkan yang lain). Exit code disimpan ke
+      #    berkas; langkah ini SELALU sukses.
       - name: ArchUnit + SpotBugs (NON-BLOCKING)
         id: analysis
         continue-on-error: true
@@ -61,11 +65,11 @@ jobs:
           SONIX_ARCH_REPORT: "1"
         run: |
           set +e
-          gradle testReleaseUnitTest --tests "com.rudi.audioplayer.ArchitectureTest" spotbugsRelease -Psonix.spotbugs=true --continue --stacktrace --no-daemon --build-cache > gradle-report.log 2>&1
-          GRADLE_EXIT=$?
-          echo "GRADLE_EXIT=$GRADLE_EXIT" > gradle-exit.txt
-          echo "Gradle exit=$GRADLE_EXIT"
-          tail -n 25 gradle-report.log
+          gradle testReleaseUnitTest --tests "com.rudi.audioplayer.ArchitectureTest" --no-daemon --build-cache > gradle-arch.log 2>&1
+          echo "ARCH_EXIT=$?" > gradle-exit.txt
+          gradle spotbugsRelease -Psonix.spotbugs=true --no-daemon --build-cache > gradle-spotbugs.log 2>&1
+          echo "SPOTBUGS_EXIT=$?" >> gradle-exit.txt
+          cat gradle-exit.txt
           exit 0
 
       # 2. Rakit laporan ringkas. Status ArchUnit/SpotBugs HANYA dari berkas laporan yang benar-benar ada.
@@ -75,12 +79,26 @@ jobs:
           set +e
           ARCH=app/build/reports/archunit/archunit-report.txt
           SARIF=app/build/reports/spotbugs/spotbugs.sarif
-          GRADLE_EXIT=$(sed -n 's/^GRADLE_EXIT=//p' gradle-exit.txt 2>/dev/null | head -n 1)
-          GRADLE_EXIT=${GRADLE_EXIT:-n/a}
+          ARCH_EXIT=$(sed -n 's/^ARCH_EXIT=//p' gradle-exit.txt 2>/dev/null | head -n 1)
+          SPOTBUGS_EXIT=$(sed -n 's/^SPOTBUGS_EXIT=//p' gradle-exit.txt 2>/dev/null | head -n 1)
+          ARCH_EXIT=${ARCH_EXIT:-n/a}
+          SPOTBUGS_EXIT=${SPOTBUGS_EXIT:-n/a}
           : > report-arch.tmp
           : > report-sarif.tmp
 
+          # Kutipan akar masalah dari log Gradle (tanpa baris stack frame): blok FAILURE/"What went wrong",
+          # baris kompilasi `e:`, task FAILED, lalu ekor log.
+          excerpt() {
+            [ -f "$1" ] || { echo "(log $1 tidak ada)"; return; }
+            echo "-- AKAR MASALAH (kutipan $1) --"
+            sed -n '/^FAILURE:/,/^\* Try:/p' "$1" | grep -v -E '^\s+at ' | head -n 60
+            grep -E '^e: |^> Task .* FAILED|Script compilation error|Could not resolve|Unresolved reference' "$1" | head -n 30
+            echo "-- EKOR LOG $1 (40 baris terakhir, tanpa stack frame) --"
+            grep -v -E '^\s+at ' "$1" | tail -n 40
+          }
+
           # --- ArchUnit ---
+          NEED_ARCH_LOG=0
           if [ -s "$ARCH" ]; then
             A_STATUS=$(sed -n 's/^ARCHUNIT_STATUS=//p' "$ARCH" | head -n 1)
             if [ "$A_STATUS" = "OK" ]; then
@@ -92,14 +110,20 @@ jobs:
               fi
             else
               ARCH_SUMMARY="ArchUnit: NOT VERIFIED (alat gagal jalan)"
+              NEED_ARCH_LOG=1
             fi
             cat "$ARCH" > report-arch.tmp
           else
-            ARCH_SUMMARY="ArchUnit: NOT VERIFIED (laporan tidak terbentuk: tes dilewati/gagal; lihat ekor log di bawah)"
+            ARCH_SUMMARY="ArchUnit: NOT VERIFIED (laporan tidak terbentuk: tes dilewati/gagal; lihat kutipan log)"
             echo "Berkas $ARCH tidak ada." > report-arch.tmp
+            NEED_ARCH_LOG=1
+          fi
+          if [ "$NEED_ARCH_LOG" = "1" ] || [ "$ARCH_EXIT" != "0" ]; then
+            { echo ""; excerpt gradle-arch.log; } >> report-arch.tmp
           fi
 
           # --- SpotBugs (SARIF) ---
+          NEED_SB_LOG=0
           if [ -s "$SARIF" ] && jq -e '.runs' "$SARIF" > /dev/null 2>&1 && S_COUNT=$(jq '[.runs[].results[]?] | length' "$SARIF" 2>/dev/null) && [ -n "$S_COUNT" ]; then
             SARIF_SUMMARY="SpotBugs: $S_COUNT temuan"
             {
@@ -117,15 +141,19 @@ jobs:
               fi
             } > report-sarif.tmp
           else
-            SARIF_SUMMARY="SpotBugs: NOT VERIFIED (SARIF tidak terbentuk / tidak valid / jq gagal; lihat ekor log di bawah)"
+            SARIF_SUMMARY="SpotBugs: NOT VERIFIED (SARIF tidak terbentuk / tidak valid / jq gagal; lihat kutipan log)"
             echo "Berkas $SARIF tidak ada atau tidak bisa dibaca." > report-sarif.tmp
+            NEED_SB_LOG=1
+          fi
+          if [ "$NEED_SB_LOG" = "1" ] || [ "$SPOTBUGS_EXIT" != "0" ]; then
+            { echo ""; excerpt gradle-spotbugs.log; } >> report-sarif.tmp
           fi
 
           {
             echo "=== LAPORAN EVALUASI UNTUK CLAUDE ==="
             echo "Proyek: ${{ github.event.repository.name }} · Commit: ${{ github.sha }} · Run: #${{ github.run_number }} · Cabang: ${{ github.ref_name }}"
             echo "Dibuat (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "Gradle: testReleaseUnitTest --tests ArchitectureTest + spotbugsRelease · exit=$GRADLE_EXIT"
+            echo "Gradle: [1] testReleaseUnitTest --tests ArchitectureTest · exit=$ARCH_EXIT | [2] spotbugsRelease -Psonix.spotbugs=true · exit=$SPOTBUGS_EXIT"
             echo ""
             echo "--- RINGKASAN ---"
             echo "$ARCH_SUMMARY"
@@ -137,11 +165,6 @@ jobs:
             echo ""
             echo "--- KUALITAS KODE (SPOTBUGS · SARIF) ---"
             cat report-sarif.tmp
-            if { [ "$GRADLE_EXIT" != "0" ] || echo "$ARCH_SUMMARY$SARIF_SUMMARY" | grep -q "NOT VERIFIED"; } && [ -f gradle-report.log ]; then
-              echo ""
-              echo "--- EKOR LOG GRADLE (exit=$GRADLE_EXIT; 80 baris terakhir) ---"
-              tail -n 80 gradle-report.log
-            fi
           } > laporan-untuk-claude.txt
 
           echo "::notice::$ARCH_SUMMARY · $SARIF_SUMMARY"
