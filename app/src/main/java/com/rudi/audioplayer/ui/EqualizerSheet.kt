@@ -298,7 +298,7 @@ fun EqualizerSheet(
                                 color = MaterialTheme.colorScheme.secondary
                             )
                         }
-                        Slider(
+                        NeuSlider(
                             value = band.levelMillibel.toFloat(),
                             onValueChange = { newValue ->
                                 onBandChange(band.index, newValue.roundToInt().toShort())

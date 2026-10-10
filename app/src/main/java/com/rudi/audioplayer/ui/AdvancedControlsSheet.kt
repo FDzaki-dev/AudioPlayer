@@ -215,7 +215,7 @@ internal fun AdvancedControlsSheet(
                 }
                 Icon(volumeIcon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Slider(
+                NeuSlider(
                     value = volume,
                     onValueChange = onSetVolume,
                     onValueChangeFinished = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },

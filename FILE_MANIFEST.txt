@@ -95,7 +95,8 @@
 # Batch 545: .github/workflows/ci-report.yml DIHAPUS (CI disatukan ke build.yml: job `build` + `static-analysis`, tanpa instrumentation/collect) — 210->209. Tidak ada file baru.
 # Batch 550: .github/workflows/ci-report.yml DIKEMBALIKAN sbg STUB NONAKTIF (hanya workflow_dispatch) — Box DAILY UPDATE tak menghapus file di `.github/` yang hilang dari ZIP, jadi berkas lama (workflow_run) terus terpicu; stub menimpanya — 209->210.
 # Batch 563: app/src/main/java/com/rudi/audioplayer/ui/NeuSwitch.kt (file baru, saklar berkedalaman; `Switch` package `ui` menaungi `Switch` M3) ditambahkan — 210->211.
-# Total: 211 file
+# Batch 568: app/src/main/java/com/rudi/audioplayer/ui/NeuSlider.kt (file baru, slider Neumorphism; fungsi `NeuSlider` TIDAK menaungi `Slider` M3) ditambahkan — 211->212.
+# Total: 212 file
 
 .githooks/pre-commit
 .github/workflows/build.yml
@@ -201,6 +202,7 @@ app/src/main/java/com/rudi/audioplayer/ui/LyricsSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/lyrics/LyricsView.kt
 app/src/main/java/com/rudi/audioplayer/ui/lyrics/LyricsViewModel.kt
 app/src/main/java/com/rudi/audioplayer/ui/MiniPlayerBar.kt
+app/src/main/java/com/rudi/audioplayer/ui/NeuSlider.kt
 app/src/main/java/com/rudi/audioplayer/ui/NeuSwitch.kt
 app/src/main/java/com/rudi/audioplayer/ui/NowPlayingDialogs.kt
 app/src/main/java/com/rudi/audioplayer/ui/NowPlayingScreen.kt
