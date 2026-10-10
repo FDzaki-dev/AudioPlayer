@@ -1,5 +1,11 @@
 # Changelog
 
+## Batch 554 — Probe diagnostik + tinggi tetap sheet "Kontrol Lanjutan" (BELUM verified compile/CI/device)
+- Instruksi user: "2 gejalanya masih sama woi!!" (setelah Batch 553).
+- Analisis piksel `Screen_Recording_20261009_194422.mp4`: rim, handle, dan judul sheet bergerak kaku bersama (selisih konstan), siklus identik ~250 ms (skala 812px: 122->151->128->102->94->91); background & status bar stabil; tema = Calm Retro. Itu translasi offset `ModalBottomSheet` yang terpicu mesin. Penyebab belum terbukti dari source statis; polling 250 ms `PlaybackService` (`maybeStartCrossfade`) diperiksa = no-op, bukan pemicu.
+- `AdvancedControlsSheet.kt`: (1) probe 0-visual ke Log Diagnostik, tag `SheetProbe` (offset sheet tiap perubahan >= 12px + target/current value, ukuran Column, insets status/nav/IME; I/O di `Dispatchers.IO`); (2) `.fillMaxHeight()` pada Column panel agar tinggi sheet tak bergantung tinggi konten/insets (konten sudah melebihi maksimum, tampilan sama di HP ini; di layar tinggi panel jadi penuh).
+- 1 file source + docs; 0 Gradle/CI. **NOT VERIFIED**: tanpa compiler; belum di device. Probe WAJIB dihapus setelah akar ketemu.
+
 ## Batch 553 — Debug: kedalaman panel kaca di seluruh permukaan + pangkas gambar glass saat sheet bergerak (BELUM verified compile/CI/device)
 - Instruksi user: "Debugging: 1) depth effect yang hanya nampak di sebahagian kecil kartu 2) fix bug motion yang nge glitch!!" (+ screen recording sheet "Kontrol Lanjutan").
 - **(1) Depth**: `frostedGlass()` memasang `neuBevelOnly()` = bevel facet 1.5dp saja, jadi panel kaca (sheet, MiniPlayerBar, kartu kaca) hanya berkedalaman di garis tepi. `TactileDepth.kt`: `renderNeuGlassWash()` baru — 1 bitmap kecil ber-cache (kind 5, skala 0.75/0.33/0.2 menurut ukuran) berisi wash diagonal (sorot kiri-atas -> bening -> teduh kanan-bawah) + 4 pita tepi-dalam ~14dp (atas/kiri terang, bawah/kanan gelap) dipotong ke bentuk (`DstOut`); `neuFace` (`paintFace=false`) menggambarnya 1x `drawImage` sebelum facet. Alpha mengikuti `NeuStyle` x `bevelScale` (0.7) sehingga palet tiap tema tetap turunan warna permukaannya.

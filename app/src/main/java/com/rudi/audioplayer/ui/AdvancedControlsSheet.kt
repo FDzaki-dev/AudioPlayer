@@ -25,11 +25,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.util.AppLogger
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // Batch 509 — Wave 2 T5 (docs/PENDING_CodeTidyPlan.md): AdvancedControlsSheet,
 // AdvancedControlsSectionHeader, AdvancedControlRow dipindah MOVE-ONLY dari NowPlayingScreen.kt
@@ -69,6 +77,33 @@ internal fun AdvancedControlsSheet(
     val sleepTimerRemainingMs by sleepTimerRemaining.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val haptic = LocalHapticFeedback.current
+    // Batch 554 — PROBE diagnostik (0 perubahan visual): sheet ini terlihat berosilasi naik-turun
+    // periodik di screen recording user (rim+handle+judul bergerak kaku bersama, ~250 ms/siklus,
+    // amplitudo ~24dp & ~48dp). Akar belum terbukti (Batch 553 gagal menghilangkannya) -> catat
+    // ke Log Diagnostik (tag `SheetProbe`): offset sheet (tiap perubahan >= 12px), ukuran Column,
+    // dan insets status/nav/IME. Dibaca dari Pengaturan > Log Diagnostik setelah sheet dibuka ~10 dtk.
+    val probeDensity = LocalDensity.current
+    val probeNavBottom = WindowInsets.navigationBars.getBottom(probeDensity)
+    val probeTop = WindowInsets.statusBars.getTop(probeDensity)
+    val probeIme = WindowInsets.ime.getBottom(probeDensity)
+    var probeColumnSize by remember { mutableStateOf(IntSize.Zero) }
+    LaunchedEffect(probeNavBottom, probeTop, probeIme, probeColumnSize) {
+        val msg = "insets nav=$probeNavBottom top=$probeTop ime=$probeIme " +
+            "column=${probeColumnSize.width}x${probeColumnSize.height}"
+        withContext(Dispatchers.IO) { AppLogger.w("SheetProbe", msg) }
+    }
+    LaunchedEffect(sheetState) {
+        var lastOffset = Float.NaN
+        snapshotFlow { runCatching { sheetState.requireOffset() }.getOrDefault(Float.NaN) }
+            .collect { off ->
+                if (!off.isNaN() && (lastOffset.isNaN() || abs(off - lastOffset) >= 12f)) {
+                    lastOffset = off
+                    val msg = "offset=${off.roundToInt()} target=${sheetState.targetValue} " +
+                        "current=${sheetState.currentValue}"
+                    withContext(Dispatchers.IO) { AppLogger.w("SheetProbe", msg) }
+                }
+            }
+    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -84,6 +119,11 @@ internal fun AdvancedControlsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Batch 554 — tinggi panel dibuat TETAP (= tinggi maksimum yang diberikan sheet; konten
+                // sheet ini memang sudah melebihinya, jadi tampilan sama) agar tinggi sheet — dan
+                // anchor Expanded `ModalBottomSheet` — tak lagi bergantung pada tinggi konten/insets.
+                .fillMaxHeight()
+                .onSizeChanged { probeColumnSize = it }
                 // Batch 553 — di dalam ModalBottomSheet bayangan luar tak terlihat (di-clip Surface
                 // sheet): dilewati supaya tak ada gambar tambahan per frame saat sheet bergerak.
                 .frostedGlass(outerShadow = false)
