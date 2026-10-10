@@ -1,7 +1,9 @@
 package com.rudi.audioplayer.ui
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,11 +21,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.AppLockStore
+import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
+import com.rudi.audioplayer.ui.theme.SkeuGilt
+import com.rudi.audioplayer.ui.theme.SkeuGiltDeep
+import com.rudi.audioplayer.ui.theme.SkeuRubyHi
+import com.rudi.audioplayer.ui.theme.SkeuRubyLo
+import com.rudi.audioplayer.ui.theme.SkeuWineDeep
+import com.rudi.audioplayer.ui.theme.SkeuWineLit
+import com.rudi.audioplayer.ui.theme.drawSkeuGem
+import com.rudi.audioplayer.ui.theme.drawSkeuSocket
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.skeuEmboss
@@ -124,12 +141,74 @@ fun LockScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            Icons.Default.Lock,
-            contentDescription = null,
-            modifier = Modifier.size(40.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
+        if (isSkeu) {
+            // Batch 566 — Neumorphism: gembok = MEDALI enamel burgundy (cakram anggur diagonal + sorot kaca + cincin gilt
+            // + fillet dalam tipis + bayangan jatuh), glyph ivory champagne. Tema lain: ikon `primary` polos seperti dulu.
+            val medalDark = LocalIsDarkTheme.current
+            val medalRim = if (medalDark) SkeuGilt else SkeuGiltDeep
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(64.dp)
+                    .drawBehind {
+                        val c = Offset(size.width / 2f, size.height / 2f)
+                        val r = size.minDimension / 2f - 3.dp.toPx()
+                        drawCircle(
+                            color = Color.Black.copy(alpha = 0.40f),
+                            radius = r + 1.dp.toPx(),
+                            center = Offset(c.x, c.y + 2.dp.toPx())
+                        )
+                        drawCircle(
+                            brush = Brush.linearGradient(
+                                listOf(SkeuWineLit, SkeuWineDeep),
+                                start = Offset(c.x - r, c.y - r),
+                                end = Offset(c.x + r, c.y + r)
+                            ),
+                            radius = r,
+                            center = c
+                        )
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0f)),
+                                center = Offset(c.x - 0.30f * r, c.y - 0.38f * r),
+                                radius = r * 0.9f
+                            ),
+                            radius = r,
+                            center = c
+                        )
+                        drawCircle(
+                            brush = Brush.linearGradient(
+                                listOf(medalRim.copy(alpha = 0.95f), medalRim.copy(alpha = 0.25f)),
+                                start = Offset(c.x - r, c.y - r),
+                                end = Offset(c.x + r, c.y + r)
+                            ),
+                            radius = r - 0.75.dp.toPx(),
+                            center = c,
+                            style = Stroke(width = 1.5.dp.toPx())
+                        )
+                        drawCircle(
+                            color = medalRim.copy(alpha = 0.35f),
+                            radius = r - 5.dp.toPx(),
+                            center = c,
+                            style = Stroke(width = 0.75.dp.toPx())
+                        )
+                    }
+            ) {
+                Icon(
+                    Icons.Default.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = Color(0xFFF6E9CF)
+                )
+            }
+        } else {
+            Icon(
+                Icons.Default.Lock,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
         Text("Masukkan PIN", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(24.dp))
@@ -142,18 +221,45 @@ fun LockScreen(
         ) {
             repeat(6) { index ->
                 val filled = index < entered.length
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (filled) {
-                                if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant
+                if (isSkeu) {
+                    // Batch 566 — Neumorphism: titik PIN = SUMUR kecil (kosong) yang terisi PERMATA ruby bergilt (muncul
+                    // membesar 140ms); salah = permata merah `error`. Digambar di fase gambar (0 rekomposisi per frame).
+                    val gemT by animateFloatAsState(
+                        targetValue = if (filled) 1f else 0f,
+                        animationSpec = tween(durationMillis = 140),
+                        label = "pinGem"
+                    )
+                    val socketDark = LocalIsDarkTheme.current
+                    val errorTone = MaterialTheme.colorScheme.error
+                    val gemRim = if (socketDark) SkeuGilt else SkeuGiltDeep
+                    val gemHi = if (error) lerp(errorTone, Color.White, 0.35f) else SkeuRubyHi
+                    val gemLo = if (error) lerp(errorTone, Color.Black, 0.35f) else SkeuRubyLo
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .drawBehind {
+                                val c = Offset(size.width / 2f, size.height / 2f)
+                                val r = 6.dp.toPx()
+                                drawSkeuSocket(c, r, socketDark)
+                                if (gemT > 0.02f) {
+                                    drawSkeuGem(c, r * (0.45f + 0.55f * gemT), gemRim, gemHi, gemLo, gemT)
+                                }
                             }
-                        )
-                )
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(14.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (filled) {
+                                    if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                }
+                            )
+                    )
+                }
             }
         }
 

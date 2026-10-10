@@ -112,6 +112,7 @@ import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
 import com.rudi.audioplayer.ui.theme.SkeuGilt
 import com.rudi.audioplayer.ui.theme.SkeuGiltDeep
+import com.rudi.audioplayer.ui.theme.drawSkeuGem
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.Radius
@@ -1569,6 +1570,9 @@ private fun PlaybackProgressRow(
     val progress by playbackProgress.collectAsStateWithLifecycle()
     var sliderPosition by remember(progress.position) { mutableFloatStateOf(progress.position.toFloat()) }
     val progressFraction = (sliderPosition / progress.duration.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
+    // Batch 566 — Neumorphism: thumb bulat M3 DITRANSPARANKAN, diganti permata gilt yang digambar `WaveformSeekBar`.
+    val isSkeuSeek = isSkeuTheme()
+    val seekGemRim = if (isSkeuSeek) (if (LocalIsDarkTheme.current) SkeuGilt else SkeuGiltDeep) else null
 
     Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
         WaveformSeekBar(
@@ -1576,7 +1580,8 @@ private fun PlaybackProgressRow(
             progress = progressFraction,
             playedColor = lerp(animatedAccent, Color.White, 0.2f),
             unplayedColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-            modifier = Modifier.fillMaxWidth().height(32.dp)
+            modifier = Modifier.fillMaxWidth().height(32.dp),
+            gemRim = seekGemRim
         )
         Slider(
             value = sliderPosition,
@@ -1587,7 +1592,7 @@ private fun PlaybackProgressRow(
             },
             valueRange = 0f..(progress.duration.coerceAtLeast(1L).toFloat()),
             colors = SliderDefaults.colors(
-                thumbColor = animatedAccent,
+                thumbColor = if (isSkeuSeek) Color.Transparent else animatedAccent,
                 activeTrackColor = Color.Transparent,
                 inactiveTrackColor = Color.Transparent
             )
@@ -1652,7 +1657,8 @@ private fun WaveformSeekBar(
     progress: Float,
     playedColor: Color,
     unplayedColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    gemRim: Color? = null
 ) {
     val barHeights = remember(seed) {
         val random = kotlin.random.Random(seed)
@@ -1674,6 +1680,22 @@ private fun WaveformSeekBar(
                 ),
                 size = androidx.compose.ui.geometry.Size(barWidth - gap, barHeightPx),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
+            )
+        }
+        // Batch 566 — Neumorphism: permata geser (cincin gilt + badan turunan `playedColor`) di batas bar terputar; menggantikan
+        // thumb bulat M3 yang ditransparankan di pemanggil. Posisi = `progress * lebar` (sama dgn batas bar terputar), digambar
+        // di fase gambar. null = tanpa permata (tema lain, perilaku lama).
+        if (gemRim != null) {
+            val gemR = 7.dp.toPx()
+            drawSkeuGem(
+                center = androidx.compose.ui.geometry.Offset(
+                    x = (progress * size.width).coerceIn(gemR, size.width - gemR),
+                    y = size.height / 2f
+                ),
+                radius = gemR,
+                rim = gemRim,
+                hi = lerp(playedColor, Color.White, 0.40f),
+                lo = lerp(playedColor, Color.Black, 0.45f)
             )
         }
     }

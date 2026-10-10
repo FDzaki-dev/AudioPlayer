@@ -330,6 +330,88 @@ private fun DrawScope.drawSkeuWine(shape: Shape, isDark: Boolean, press: Float, 
 }
 
 /**
+ * Batch 566 — PERMATA bersorot (keluarga sama dgn permata kenop saklar Batch 564), digambar LANGSUNG tanpa bitmap:
+ * bayangan jatuh + pendar luar + cincin [rim] (gilt) + badan radial [hi] -> [lo] bercahaya dari kiri-atas + sorot
+ * spekular. [radius] = jari-jari badan (px); cincin = radius + 1.1dp. [halo] 0..1 = kekuatan pendar luar. Dipakai titik
+ * PIN terisi (`LockScreen`) dan permata geser waveform Now Playing; warna dikirim pemanggil (ruby, atau turunan aksen).
+ */
+internal fun DrawScope.drawSkeuGem(
+    center: Offset,
+    radius: Float,
+    rim: Color,
+    hi: Color,
+    lo: Color,
+    halo: Float = 1f
+) {
+    if (radius < 1f) return
+    val d = 1.dp.toPx()
+    drawCircle(
+        color = Color.Black.copy(alpha = 0.40f),
+        radius = radius + 1.4f * d,
+        center = Offset(center.x, center.y + 1.2f * d)
+    )
+    if (halo > 0.01f) {
+        drawCircle(color = hi.copy(alpha = 0.28f * halo), radius = radius + 3.2f * d, center = center)
+    }
+    drawCircle(
+        brush = Brush.linearGradient(
+            0.0f to rim.copy(alpha = 0.95f),
+            1.0f to rim.copy(alpha = 0.35f),
+            start = Offset(center.x - radius, center.y - radius),
+            end = Offset(center.x + radius, center.y + radius)
+        ),
+        radius = radius + 1.1f * d,
+        center = center
+    )
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(hi, lo),
+            center = Offset(center.x - 0.28f * radius, center.y - 0.32f * radius),
+            radius = radius * 1.5f
+        ),
+        radius = radius,
+        center = center
+    )
+    drawCircle(
+        color = Color.White.copy(alpha = 0.75f),
+        radius = (0.16f * radius).coerceAtLeast(0.6f * d),
+        center = Offset(center.x - 0.30f * radius, center.y - 0.34f * radius)
+    )
+}
+
+/** Batch 566 — SUMUR bulat kecil (dudukan permata / titik kosong): bibir luar gelap kiri-atas -> terang kanan-bawah,
+ *  lantai gelap, bayangan dinding menguat ke tepi. Pasangan [drawSkeuGem]; tanpa bitmap. */
+internal fun DrawScope.drawSkeuSocket(center: Offset, radius: Float, isDark: Boolean) {
+    if (radius < 1f) return
+    val d = 1.dp.toPx()
+    drawCircle(
+        brush = Brush.linearGradient(
+            0.0f to Color.Black.copy(alpha = 0.55f),
+            1.0f to Color.White.copy(alpha = if (isDark) 0.22f else 0.60f),
+            start = Offset(center.x - radius, center.y - radius),
+            end = Offset(center.x + radius, center.y + radius)
+        ),
+        radius = radius + 1.1f * d,
+        center = center
+    )
+    drawCircle(
+        color = if (isDark) Color(0xFF120B0E) else Color(0xFFD9CCC0),
+        radius = radius,
+        center = center
+    )
+    drawCircle(
+        brush = Brush.radialGradient(
+            0.45f to Color.Transparent,
+            1.00f to Color.Black.copy(alpha = if (isDark) 0.55f else 0.22f),
+            center = Offset(center.x + 0.35f * radius, center.y + 0.40f * radius),
+            radius = radius * 1.6f
+        ),
+        radius = radius,
+        center = center
+    )
+}
+
+/**
  * Batch 563 — pembungkus bentuk Neumorphism "old money": sudut membulat yang radiusnya > [capDp] dipangkas
  * ke [capDp] (default 12dp); pil/lingkaran (radius >= setengah sisi terpendek) TIDAK disentuh. Idempoten
  * (memangkas ulang bentuk yang sudah <= batas = tak berubah) sehingga aman bagi pemanggil yang sudah memakai

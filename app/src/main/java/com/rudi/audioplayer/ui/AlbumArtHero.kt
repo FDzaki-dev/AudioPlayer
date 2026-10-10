@@ -30,6 +30,9 @@ import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
+import com.rudi.audioplayer.ui.theme.SkeuGilt
+import com.rudi.audioplayer.ui.theme.SkeuGiltDeep
+import androidx.compose.ui.graphics.drawscope.Stroke
 import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.BlurredEdgeTreatment
@@ -309,6 +312,23 @@ internal fun AlbumArtHero(
                             ),
                             size = Size(w, 1.5.dp.toPx())
                         )
+                        // Batch 566 — Neumorphism: FILLET gilt tipis di tepi art (seperti bingkai lukisan): garis emas diagonal
+                        // terang -> redup -> terang, 2.5dp berpusat di tepi (separuh luar ter-clip `innerShape` = 1.25dp tampak),
+                        // digambar PALING ATAS di atas kaca. Tema lain 0 perubahan.
+                        if (isSkeu) {
+                            val filletGilt = if (isDark) SkeuGilt else SkeuGiltDeep
+                            drawOutline(
+                                outline = innerShape.createOutline(size, layoutDirection, this),
+                                brush = Brush.linearGradient(
+                                    0.0f to filletGilt.copy(alpha = 0.90f),
+                                    0.5f to filletGilt.copy(alpha = 0.18f),
+                                    1.0f to filletGilt.copy(alpha = 0.60f),
+                                    start = Offset(0f, 0f),
+                                    end = Offset(w, h)
+                                ),
+                                style = Stroke(width = 2.5.dp.toPx())
+                            )
+                        }
                     }
             )
         }
