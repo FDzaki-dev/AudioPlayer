@@ -37,7 +37,7 @@ import androidx.compose.material3.LocalRippleConfiguration
 enum class ThemeIdentity(val storageKey: String, val displayName: String, val description: String) {
     APPLE("apple", "Apple", "Tampilan bersih khas iOS, mengikuti mode terang/gelap yang dipilih"),
     TACTILE("tactile_lite", "Tactile", "Kaca premium dengan sentuhan Midnight Blue tipis dan kontrol taktil — kini otonom di mode terang maupun gelap"),
-    SKEU_DARK_LITE("skeu_dark_lite", "Neumorphism", "Panel lembut menyatu dgn kanvas, dual soft-shadow ultra realistic, aksen Titanium dominan dgn sentuhan Zamrud — otonom di mode terang maupun gelap"),
+    SKEU_DARK_LITE("skeu_dark_lite", "Neumorphism", "Panel lembut menyatu dgn kanvas, dual soft-shadow ultra realistic, aksen Burgundy dominan dgn sekunder Champagne yang tenang — kesan old money, otonom di mode terang maupun gelap"),
     CALM_RETRO("calm_retro", "Calm Retro", "Lo-Fi Sci-Fi teduh, aksen Muted Sage — selalu gelap, tidak mengikuti toggle Mode"),
     // Batch 279/280 — ROADMAP_LIQUID_GLASS_REDESIGN.md, §3 dikonfirmasi user: TAMBAH sebagai
     // opsi ke-5 (bukan ganti/konsolidasi 4 di atas), Opsi B (shape+typography+palet statis,
@@ -180,45 +180,90 @@ private val TactileLightColors = lightColorScheme(
 
 // Batch 57 — Skeuomorphism's own color role mapping (DARK expression). Batch 61: renamed
 // SkeuDarkColors kept as-is (name already had "Dark" — now explicitly paired with SkeuLightColors
-// below instead of being the only variant). onPrimary picked by the same luminance rule used
-// elsewhere (>0.55 luminance -> black text): SkeuAccent (0xFFB6BAC0, Titanium+Silver metalik
-// sejak Batch 63 — dulu tembaga 0xFFCB8B4B) simple luma ≈0.73, tetap jauh di atas
-// the threshold, so onPrimary is Color.Black in BOTH variants (accent shared across light/dark).
+// below instead of being the only variant).
+// Batch 563 — ROMBAK "OLD MONEY": primary = BURGUNDY (mode gelap = claret terang `SkeuAccent`, mode
+// terang = burgundy pekat `SkeuAccentLight` — 1 nilai tak bisa lolos kontras di kedua kanvas, lihat
+// Color.kt), sekunder = champagne/sand calm. `onPrimary` kini IVORY (dulu Black di atas titanium
+// terang). Role container/surfaceContainer*/inverse*/outlineVariant yang dulu DIBIARKAN default M3
+// (baseline ungu — mis. `secondaryContainer` = kunci tab bawah, `surfaceContainer` = lantai bilah tab)
+// kini diisi eksplisit supaya tak ada warna ungu bawaan yang menyelinap ke tema ini. Semua pasangan
+// teks/latar dihitung >= 4.5:1 (hitungan WCAG offline, BELUM dilihat di device).
+private val SkeuOnAccent = Color(0xFFFBF3E6) // ivory di atas burgundy
+private val SkeuLightSuccess = Color(0xFF4E6B47) // sage pekat utk kanvas terang (sage gelap 2:1 di sana)
+
 private val SkeuDarkColors = darkColorScheme(
     primary = SkeuAccent,
-    onPrimary = Color.Black,
+    onPrimary = SkeuOnAccent,
+    primaryContainer = Color(0xFF5B1F2F),
+    onPrimaryContainer = Color(0xFFF3D5D0),
+    inversePrimary = SkeuAccentLight,
     secondary = SkeuDarkSecondaryText,
     onSecondary = SkeuDarkBackground,
+    secondaryContainer = Color(0xFF4A2A33),
+    onSecondaryContainer = Color(0xFFF0D9C4),
     tertiary = SkeuDarkSuccess,
     onTertiary = Color.Black,
+    tertiaryContainer = Color(0xFF2F3B2B),
+    onTertiaryContainer = Color(0xFFD5E4C8),
     background = SkeuDarkBackground,
     onBackground = SkeuDarkText,
     surface = SkeuDarkSurface,
     onSurface = SkeuDarkText,
     surfaceVariant = SkeuDarkSurfaceVariant,
     onSurfaceVariant = SkeuDarkSecondaryText,
+    surfaceDim = SkeuDarkBackground,
+    surfaceBright = Color(0xFF3A2D32),
+    surfaceContainerLowest = Color(0xFF0F0B0D),
+    surfaceContainerLow = Color(0xFF1A1316),
+    surfaceContainer = Color(0xFF1F181B),
+    surfaceContainerHigh = Color(0xFF271E22),
+    surfaceContainerHighest = Color(0xFF31262B),
+    inverseSurface = Color(0xFFEDE4D6),
+    inverseOnSurface = Color(0xFF2A2024),
     outline = SkeuDarkSurfaceVariant,
+    outlineVariant = Color(0xFF4A3A40),
     surfaceTint = SkeuAccent,
-    error = SkeuDarkError
+    error = SkeuDarkError,
+    errorContainer = Color(0xFF5C2620),
+    onErrorContainer = Color(0xFFFFDAD4)
 )
 
 // Batch 61 — Skeuomorphism's own LIGHT expression (Color.kt "SKEUOMORPHISM — LIGHT VARIANT").
 private val SkeuLightColors = lightColorScheme(
-    primary = SkeuAccent,
-    onPrimary = Color.Black,
+    primary = SkeuAccentLight,
+    onPrimary = SkeuOnAccent,
+    primaryContainer = Color(0xFFEBCFCF),
+    onPrimaryContainer = Color(0xFF4A0E1F),
+    inversePrimary = SkeuAccent,
     secondary = SkeuLightSecondaryText,
     onSecondary = SkeuLightBackground,
-    tertiary = SkeuDarkSuccess,
-    onTertiary = Color.Black,
+    secondaryContainer = Color(0xFFE3CFC3),
+    onSecondaryContainer = Color(0xFF5A1626),
+    tertiary = SkeuLightSuccess,
+    onTertiary = SkeuOnAccent,
+    tertiaryContainer = Color(0xFFD7E4CB),
+    onTertiaryContainer = Color(0xFF1F2E1A),
     background = SkeuLightBackground,
     onBackground = SkeuLightText,
     surface = SkeuLightSurface,
     onSurface = SkeuLightText,
     surfaceVariant = SkeuLightSurfaceVariant,
     onSurfaceVariant = SkeuLightSecondaryText,
+    surfaceDim = Color(0xFFDDD5CA),
+    surfaceBright = SkeuLightSurfaceVariant,
+    surfaceContainerLowest = Color(0xFFFAF6EF),
+    surfaceContainerLow = Color(0xFFF4EEE5),
+    surfaceContainer = Color(0xFFEFE8DE),
+    surfaceContainerHigh = Color(0xFFE9E1D6),
+    surfaceContainerHighest = Color(0xFFE2D9CD),
+    inverseSurface = Color(0xFF2A2024),
+    inverseOnSurface = Color(0xFFEFE6D8),
     outline = SkeuLightSurfaceVariant,
-    surfaceTint = SkeuAccent,
-    error = SkeuDarkError
+    outlineVariant = Color(0xFFCDBFB0),
+    surfaceTint = SkeuAccentLight,
+    error = SkeuDarkError,
+    errorContainer = Color(0xFFF5D6D1),
+    onErrorContainer = Color(0xFF5C1A12)
 )
 
 // Calm Retro — 1 colorScheme saja (bukan pasangan Dark/Light seperti Tactile/Skeu), karena
@@ -341,10 +386,17 @@ val TactileShapes = Shapes(
 // Batch 57 — Skeuomorphism's shape language: one notch more rounded than Tactile at every step
 // (md/lg/xxl vs Tactile's sm/md/lg), reading as soft physical buttons/panels. Shared by both
 // light & dark expressions (same Batch 61 principle as TactileShapes above).
+// Batch 563 — ROMBAK TOTAL BENTUK "old money": sudut dirapatkan jadi "tailored" (kabinet/kulit,
+// bukan gelembung): extraSmall 4 / small 6 / medium 10 / large 12 / extraLarge 16 dp (dulu small 12,
+// medium 16, large 20; extraSmall/extraLarge dulu default M3 4/28). Panel/tile berkedalaman yang
+// radiusnya hardcode `Radius.*` dipangkas ke maksimum 12dp di `skeuEmboss()` (`SkeuCappedShape`,
+// TactileDepth.kt) — bukan lewat tabel ini.
 val SkeuDarkShapes = Shapes(
-    small = RoundedCornerShape(Radius.md),
-    medium = RoundedCornerShape(Radius.lg),
-    large = RoundedCornerShape(Radius.xxl)
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(6.dp),
+    medium = RoundedCornerShape(10.dp),
+    large = RoundedCornerShape(12.dp),
+    extraLarge = RoundedCornerShape(16.dp)
 )
 
 // Batch 130 — pemurnian visual: dulu Calm Retro jatuh ke branch `else` di AudioPlayerTheme()
@@ -435,7 +487,11 @@ fun resolveIsDark(mode: ThemeMode): Boolean = when (mode) {
 fun isTactileTheme(): Boolean = MaterialTheme.colorScheme.primary == TactileAccent
 
 @Composable
-fun isSkeuTheme(): Boolean = MaterialTheme.colorScheme.primary == SkeuAccent
+fun isSkeuTheme(): Boolean {
+    // Batch 563 — burgundy punya 2 nilai (gelap/terang), keduanya identitas Neumorphism.
+    val primary = MaterialTheme.colorScheme.primary
+    return primary == SkeuAccent || primary == SkeuAccentLight
+}
 
 @Composable
 fun isCalmRetroTheme(): Boolean = MaterialTheme.colorScheme.primary == CalmRetroAccent

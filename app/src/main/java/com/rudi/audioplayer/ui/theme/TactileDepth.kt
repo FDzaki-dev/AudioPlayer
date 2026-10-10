@@ -30,8 +30,10 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -236,11 +238,14 @@ fun Modifier.skeuEmboss(
     // Posisi glint ikut sisi terang: kiri-atas normal, kanan-bawah saat pressed (sumur cekung
     // memantulkan cahaya dari dinding seberang).
     val dir = if (pressed) -1f else 1f
+    // Batch 563 — bentuk "old money": radius dp hardcode pemanggil (`Radius.xl/xxl`, `shapes.*`) dipangkas
+    // ke <= 12dp; pil/lingkaran dibiarkan. `remember(shape)` + data class = kunci cache bitmap tetap stabil.
+    val tailored = remember(shape) { SkeuCappedShape(shape) }
 
     return this
         .scale(scale)
         .neuDepth(
-            shape = shape,
+            shape = tailored,
             elevation = elevation,
             faceTop = panelFill,
             faceBottom = panelFill,
@@ -257,6 +262,37 @@ fun Modifier.skeuEmboss(
                 )
             )
         }
+}
+
+/**
+ * Batch 563 — pembungkus bentuk Neumorphism "old money": sudut membulat yang radiusnya > [capDp] dipangkas
+ * ke [capDp] (default 12dp); pil/lingkaran (radius >= setengah sisi terpendek) TIDAK disentuh. Idempoten
+ * (memangkas ulang bentuk yang sudah <= batas = tak berubah) sehingga aman bagi pemanggil yang sudah memakai
+ * `MaterialTheme.shapes.*` baru. Bentuk non-membulat (Rectangle/Generic) diteruskan apa adanya. Data class:
+ * `equals` mengikuti [base] (RoundedCornerShape punya equals) -> aman sebagai kunci `NeuBitmapStore`.
+ */
+internal data class SkeuCappedShape(val base: Shape, val capDp: Float = 12f) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val outline = base.createOutline(size, layoutDirection, density)
+        if (outline !is Outline.Rounded) return outline
+        val rr = outline.roundRect
+        val capPx = capDp * density.density
+        val pill = min(rr.width, rr.height) / 2f
+        fun cap(r: CornerRadius): CornerRadius =
+            if (r.x >= pill - 0.5f || r.y >= pill - 0.5f) r else CornerRadius(min(r.x, capPx), min(r.y, capPx))
+        return Outline.Rounded(
+            RoundRect(
+                left = rr.left,
+                top = rr.top,
+                right = rr.right,
+                bottom = rr.bottom,
+                topLeftCornerRadius = cap(rr.topLeftCornerRadius),
+                topRightCornerRadius = cap(rr.topRightCornerRadius),
+                bottomRightCornerRadius = cap(rr.bottomRightCornerRadius),
+                bottomLeftCornerRadius = cap(rr.bottomLeftCornerRadius)
+            )
+        )
+    }
 }
 
 // ============================================================================

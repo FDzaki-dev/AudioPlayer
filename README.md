@@ -189,7 +189,7 @@ sering dilihat — sekarang punya bentuk rounded-square + emboss taktil sendiri,
 flat Apple; border hero art album disamakan ke arah bevel diagonal yang sama seperti seluruh
 permukaan kaca lainnya.
 
-  **Neumorphism — Titanium & Emerald** (Batch 57, redesain total Batch 73, upgrade identitas dari
+  **Neumorphism — Burgundy & Champagne (Old Money)** (Batch 57, redesain total Batch 73, upgrade identitas dari
   Skeuomorphism ke Neumorphism Batch 79-81) — identitas custom kedua, otonom penuh dari Tactile
   (tidak berbagi mekanisme bevel `embossSurface()` maupun struktur border). Panel dibaca "dipahat
   dari material yang sama dengan kanvas" — bukan lagi panel logam bertekstur seperti sebelumnya —
@@ -198,11 +198,12 @@ permukaan kaca lainnya.
   ganda ala neumorphism klasik, dibatasi `clipRect()` supaya bayangannya tidak pernah meluber ke
   komponen lain di sekitarnya. **0 border, 0 tekstur grain** — ciri khas neumorphism, kedalaman
   murni dari bayangan. Tertekan (pressed) = *concave*, sisi terang/gelap terbalik total (bukan
-  cuma mengecil), kesan permukaan masuk ke kanvas. Fondasi tetap charcoal/platinum netral dengan
-  aksen Titanium+Silver metalik dingin yang dominan (satu-satunya token di role warna utama), plus
-  sentuhan Zamrud/Emerald kecil & disengaja (glint permata kecil saat panel ditekan, satu vena
-  tipis di ambient wash layar utama, dan titik permanen di piringan album) — bukan aksen yang
-  bersaing dengan Titanium. Wajib gelap-mode-independen (punya ekspresi terang sendiri sejak
+  cuma mengecil), kesan permukaan masuk ke kanvas. Palet (Batch 563, rombak total): aksen primer
+  **Burgundy** (claret di mode gelap, burgundy pekat di mode terang — dikenali `isSkeuTheme()`), sekunder
+  **Champagne/sand** yang tenang, kanvas arang berundertone anggur (gelap) / perkamen hangat (terang), teks ivory,
+  status sukses sage; glint tekan tile kini ruby. Bentuk "tailored": radius panel/tile dipangkas ke
+  <= 12dp (`SkeuCappedShape`), skala bentuk M3 4/6/10/12/16dp. **Saklar** (`ui/NeuSwitch.kt`) = palung cekung +
+  kunci timbul meluncur di SEMUA tema (lantai palung bertinta primary saat ON). Wajib gelap-mode-independen (punya ekspresi terang sendiri sejak
   Batch 61). Dipasang di mini player, tombol play/pause (mini & Now Playing), piringan album hero,
   kartu "Lanjutkan Mendengarkan", banner undo-sembunyikan-lagu, badge indikator gesture, dan baris
   pemilih tema. **Typography sendiri** (Batch 305, murni 100% — bukan pinjaman Apple lagi):

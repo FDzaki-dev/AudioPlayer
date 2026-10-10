@@ -150,24 +150,31 @@ val TactileLightShadow = Color(0xFF1B2436).copy(alpha = 0.18f)
 // nama, supaya blast-radius edit tetap terkendali dalam 1 batch atomic.
 // ============================================================================
 
+// Batch 563 — ROMBAK PALET NEUMORPHISM "OLD MONEY" (instruksi eksplisit user: primary burgundy,
+// sekunder warna calm + estetik). NAMA TOKEN `Skeu*`/`Titanium*`/`SilverHighlight`/`SkeuEmerald`
+// SENGAJA dipertahankan (dirujuk MainActivity.kt/TactileDepth.kt/Theme.kt; pola blast-radius-terkendali
+// yang sama dgn Batch 63/79) — HANYA nilainya berganti: Titanium -> wine, SilverHighlight -> champagne,
+// SkeuEmerald -> ruby (glint tekan tile + titik streak ambient). Keluarga baru: BURGUNDY (primary) +
+// CHAMPAGNE/SAND hangat (sekunder, calm) + sage redam (status sukses); kanvas gelap = arang berundertone
+// anggur, kanvas terang = perkamen/greige hangat.
 // --- Foundation --------------------------------------------------------------
 // Charcoal netral, kontras dinaikkan sedikit dari versi Dark Lite lama supaya
 // bevel timbul yang jauh lebih dalam (lihat TactileDepth.kt skeuEmboss()) tetap
 // punya "ruang" kontras yang jelas antara kanvas & permukaan panel.
-val SkeuDarkBackground = Color(0xFF121417)
-val SkeuDarkSurface = Color(0xFF23262B) // panel timbul level 1
-val SkeuDarkSurfaceVariant = Color(0xFF2E3238) // panel timbul level 2 (lebih terangkat)
+val SkeuDarkBackground = Color(0xFF130F11) // arang undertone anggur
+val SkeuDarkSurface = Color(0xFF251C1F) // panel timbul level 1
+val SkeuDarkSurfaceVariant = Color(0xFF30252A) // panel timbul level 2 (lebih terangkat)
 
 // --- Typography ----------------------------------------------------------------
 // Batch 63 — undertone digeser dari krem hangat ("kertas/kulit") ke abu-perak dingin,
 // supaya koheren dgn pergantian aksen tembaga -> Titanium+Silver metalik di bawah
 // (metal dingin di atas typography hangat akan terasa nabrak/tidak otonom).
-val SkeuDarkText = Color(0xFFEDEFF2) // hampir-putih dingin, nuansa "logam disikat"
-val SkeuDarkSecondaryText = Color(0xFFA6ABB2) // abu dingin sekunder
+val SkeuDarkText = Color(0xFFEFE6D8) // ivory hangat (kontras 14.5:1 di atas tile)
+val SkeuDarkSecondaryText = Color(0xFFC2B49C) // champagne/sand calm (8.8:1 di atas tile)
 
 // --- Semantic status -------------------------------------------------------------
 val SkeuDarkError = Color(0xFFE5675A)
-val SkeuDarkSuccess = Color(0xFF7FB86B)
+val SkeuDarkSuccess = Color(0xFF9DB58A) // sage redam
 
 // --- Accent ------------------------------------------------------------------
 // Batch 63 — GANTI TOTAL atas instruksi eksplisit user: tembaga/amber hangat
@@ -180,10 +187,15 @@ val SkeuDarkSuccess = Color(0xFF7FB86B)
 // (biru-ungu) — sekarang murni dibedakan lewat TEMPERATUR (dingin vs dingin lain)
 // bukan lagi lewat hue hangat-vs-dingin seperti sebelumnya; pembeda utama Skeu kini
 // ada di STRUKTUR (bevel timbul + brushed-metal streak), bukan lagi warna hangat.
-val SkeuAccent = Color(0xFFB6BAC0)
-val TitaniumDark = Color(0xFF6B6F75)
-val TitaniumLight = Color(0xFFCDD1D6)
-val SilverHighlight = Color(0xFFF2F3F5)
+// Batch 563 — BURGUNDY. Dua nilai karena 1 warna tak bisa lolos kontras di kanvas gelap DAN terang:
+// SkeuAccent = claret terang (mode gelap; 3.7:1 thd kanvas, ivory di atasnya 4.7:1); SkeuAccentLight =
+// burgundy pekat (mode terang; 8.3:1 thd kanvas, ivory di atasnya 9.8:1). `isSkeuTheme()` (Theme.kt)
+// mengenali KEDUANYA.
+val SkeuAccent = Color(0xFFB5495F)
+val SkeuAccentLight = Color(0xFF741C32)
+val TitaniumDark = Color(0xFF6A2A3B) // wine (streak ambient)
+val TitaniumLight = Color(0xFFD9B8AE) // rose-sand (tak dipakai, nilai selaras palet)
+val SilverHighlight = Color(0xFFF2DDCB) // champagne (kilau streak ambient)
 
 // --- Bevel tokens (dipakai skeuEmboss() & frostedGlass()'s Skeu branch) ------
 // Batch 73 — Hyper-Realism: highlight & shadow dinaikkan lebih jauh lagi dari
@@ -231,8 +243,8 @@ val SkeuSpecularPressed = Color.White.copy(alpha = 0.10f)
 // blast radius perubahan ini tetap murni di dalam skeuEmboss() sendiri). Prinsip inti
 // neumorphism: panel terbaca "dipahat dari material yang sama dengan kanvas", bukan lagi
 // panel logam 4-stop yang jelas beda warna dari kanvas seperti Hyper-Realism lama.
-val SkeuNeuSurfaceDark = Color(0xFF191C21)
-val SkeuNeuSurfaceLight = Color(0xFFE8EAED)
+val SkeuNeuSurfaceDark = Color(0xFF1C1517)
+val SkeuNeuSurfaceLight = Color(0xFFEFE8DE)
 
 // --- Aksen Zamrud (Batch 79, BARU) — "aksen Titanium yang dominan dengan sedikit sentuhan
 // zamrud" per instruksi eksplisit user. SkeuAccent (Titanium+Silver) TIDAK diganti/disentuh —
@@ -242,8 +254,8 @@ val SkeuNeuSurfaceLight = Color(0xFFE8EAED)
 // mustahil "menyebar" tanpa sengaja ke tempat lain): (1) inti glow skeuEmboss() saat DITEKAN
 // saja (tidak pernah terlihat di state normal), (2) satu color-stop sempit tambahan di root
 // ambient streak (MainActivity.kt, protected/parsial).
-val SkeuEmerald = Color(0xFF2FA37C)
-val SkeuLightEmerald = Color(0xFF1E7A5C)
+val SkeuEmerald = Color(0xFFB03A55) // Batch 563: kini RUBY (nama lama dipertahankan)
+val SkeuLightEmerald = Color(0xFF8E2440) // Batch 563: kini RUBY pekat
 
 // ============================================================================
 // SKEUOMORPHISM — LIGHT VARIANT — Batch 61. Sama alasan dengan TACTILE LIGHT di
@@ -254,11 +266,11 @@ val SkeuLightEmerald = Color(0xFF1E7A5C)
 // warnanya yang dibalik total supaya identitasnya tetap 1 kesatuan koheren, bukan
 // aksen dingin di atas kanvas hangat yang terasa "nabrak".
 // ============================================================================
-val SkeuLightBackground = Color(0xFFE4E6E9) // platinum/silver netral
-val SkeuLightSurface = Color(0xFFF2F3F5) // panel timbul level 1
-val SkeuLightSurfaceVariant = Color(0xFFFAFBFC) // panel timbul level 2 (lebih terangkat)
-val SkeuLightText = Color(0xFF212327)
-val SkeuLightSecondaryText = Color(0xFF63676D)
+val SkeuLightBackground = Color(0xFFE9E1D6) // perkamen/greige hangat
+val SkeuLightSurface = Color(0xFFF4EEE5) // panel timbul level 1
+val SkeuLightSurfaceVariant = Color(0xFFFAF6EF) // panel timbul level 2 (lebih terangkat)
+val SkeuLightText = Color(0xFF2A2024) // near-black undertone anggur (13:1)
+val SkeuLightSecondaryText = Color(0xFF62524A) // umber calm (6.1:1 di atas tile)
 // Batch 74 — bug sama persis dengan TactileLightHighlight di atas (opaque penuh sejak
 // Batch 61, tidak pernah dikasih alpha). Dipakai langsung di frostedGlass()'s Skeu edge
 // (BlurUtils.kt) DAN di skeuEmboss()'s outer bevel border (TactileDepth.kt, Batch 73 —
@@ -268,7 +280,7 @@ val SkeuLightSecondaryText = Color(0xFF63676D)
 // dark (0.16f) yang juga lebih kuat dari TactileHighlight dark (0.065f), sesuai identitas
 // bevel Skeu yang memang lebih tegas/"hyper-realism".
 val SkeuLightHighlight = Color.White.copy(alpha = 0.65f)
-val SkeuLightShadow = Color(0xFF23262B).copy(alpha = 0.38f)
+val SkeuLightShadow = Color(0xFF2A2024).copy(alpha = 0.38f)
 
 // --- NEUMORPHISM layer set — LIGHT (Batch 79, supersedes Batch 73's Hyper-Realism light
 // set) — kontras tetap dibalik dari versi gelap seperti sebelumnya (spec/AO harus tetap legibel
@@ -276,7 +288,7 @@ val SkeuLightShadow = Color(0xFF23262B).copy(alpha = 0.38f)
 // SkeuLightInnerGroovePressed DIHAPUS TOTAL sama seperti versi gelap (lihat komentar di atas —
 // grep-confirmed 0 caller lain setelah redesign).
 val SkeuLightSpecular = Color.White
-val SkeuLightAmbientOcclusion = Color(0xFF23262B).copy(alpha = 0.22f)
+val SkeuLightAmbientOcclusion = Color(0xFF2A2024).copy(alpha = 0.22f)
 val SkeuLightSpecularPressed = Color.White.copy(alpha = 0.25f)
 
 // ============================================================================
