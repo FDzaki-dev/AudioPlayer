@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 567 — Fix CI #543: impor `drawOutline` hilang di `AlbumArtHero.kt` (BELUM verified compile/CI/device)
+- Permintaan user: "Fix it!!" + `log_fail_543.zip` (`build-output.log`).
+- Akar (dari log): `:app:compileReleaseKotlin` FAILED, satu-satunya `e:` = `AlbumArtHero.kt:320:29 Unresolved reference 'drawOutline'`. Fillet gilt Batch 566 memanggil `drawOutline(outline, brush, style)` (extension `DrawScope` top-level di paket `androidx.compose.ui.graphics`) tetapi impornya tidak ditulis.
+- Fix: +1 baris `import androidx.compose.ui.graphics.drawOutline` di `ui/AlbumArtHero.kt`. 0 logika, visual, atau tema lain berubah; argumen pemanggilan tidak disentuh.
+- **1 file source** (`ui/AlbumArtHero.kt`) + docs (`PROJECT_STATE.md`, `CHANGELOG.md`); 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah (0 file baru); README tak berubah (0 perubahan fitur).
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK; nama paket impor = pengetahuan API Compose (selaras `TactileDepth.kt` yang mengimpor `androidx.compose.ui.graphics.Outline`), belum dikompilasi; warning di log (`resourceConfigurations`, versi Gradle 8.14.3) bukan penyebab dan tidak disentuh; Spotless/ArchUnit/SARIF tak dijalankan.
+
 ## Batch 566 — Sistem anggur/ruby/gilt: layar kunci (medali + permata PIN), permata geser seek bar Now Playing, fillet gilt hero album art (BELUM verified compile/CI/device)
 - Permintaan user: "Lumayan, next" -> lanjut item "belum disentuh" `[RESUME POINT]` Batch 565 langkah (3). Hanya Neumorphism; tema lain 0 perubahan.
 - **Helper bersama** (`ui/theme/TactileDepth.kt`): `drawSkeuGem(center, radius, rim, hi, lo, halo)` = permata bersorot (bayangan jatuh, pendar luar, cincin gilt, badan radial dari kiri-atas, sorot spekular; keluarga kenop saklar Batch 564) dan `drawSkeuSocket(center, radius, isDark)` = sumur bulat kecil (bibir gelap kiri-atas / terang kanan-bawah, lantai gelap, bayangan dinding). `internal`, digambar langsung (0 bitmap/blur).

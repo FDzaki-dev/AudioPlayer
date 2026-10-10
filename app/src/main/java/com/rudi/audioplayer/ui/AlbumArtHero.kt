@@ -32,6 +32,7 @@ import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
 import com.rudi.audioplayer.ui.theme.SkeuGilt
 import com.rudi.audioplayer.ui.theme.SkeuGiltDeep
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.coroutines.launch
