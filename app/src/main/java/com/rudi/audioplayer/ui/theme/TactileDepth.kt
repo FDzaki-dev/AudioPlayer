@@ -10,6 +10,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -1041,6 +1042,24 @@ fun Modifier.neuDepth(
 fun Modifier.neuSurface(shape: Shape, elevation: Dp = 8.dp): Modifier {
     val surface = MaterialTheme.colorScheme.surface
     return this.neuDepth(shape = shape, elevation = elevation, faceTop = surface, faceBottom = surface)
+}
+
+/**
+ * Batch 557 — TILE baris (baris Pengaturan + baris daftar lagu): satu pintu untuk semua identitas.
+ * Tactile -> [tactileEmboss], Neumorphism -> [skeuEmboss], Apple/Calm Retro/Liquid Glass/Aurora ->
+ * [neuSurface]. Liquid Glass SENGAJA `neuSurface()` (bukan `frostedGlass()`): blur Haze per baris
+ * yang ikut di-scroll terlalu mahal (lihat catatan performa `BlurUtils.kt`). Fill digambar mesin
+ * kedalaman, jadi node ini TIDAK boleh punya `.background()` permukaan lagi; pasang `.clickable`
+ * SESUDAH modifier ini supaya ripple ter-clip ke bentuk tile.
+ */
+@Composable
+fun Modifier.neuRowTile(
+    shape: Shape = RoundedCornerShape(Radius.xl),
+    elevation: Dp = 4.dp
+): Modifier = when {
+    isTactileTheme() -> this.tactileEmboss(shape = shape, elevation = elevation)
+    isSkeuTheme() -> this.skeuEmboss(shape = shape, elevation = elevation)
+    else -> this.neuSurface(shape = shape, elevation = elevation)
 }
 
 /** Bayangan jatuh SAJA untuk konten OPAK yang menggambar dirinya sendiri (hero album art): tanpa

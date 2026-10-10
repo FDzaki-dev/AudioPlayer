@@ -34,6 +34,7 @@ import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.colorsFor
 import com.rudi.audioplayer.ui.theme.neuDepth
+import com.rudi.audioplayer.ui.theme.neuRowTile
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 
@@ -231,7 +232,15 @@ internal fun AppLockSection(
     var showDisableLockConfirm by rememberSaveable { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
-    Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+    // Batch 557 — grup Keamanan = 1 kartu berkedalaman (`neuRowTile()`); margin 12dp + padding
+    // dalam 8dp = 20dp lama, posisi teks tidak bergeser.
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .neuRowTile()
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Kunci Aplikasi (PIN)", style = MaterialTheme.typography.bodyMedium)

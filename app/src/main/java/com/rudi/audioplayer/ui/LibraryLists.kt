@@ -38,6 +38,7 @@ import androidx.compose.ui.layout.positionInRoot
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.ui.theme.Radius
+import com.rudi.audioplayer.ui.theme.neuRowTile
 import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -398,6 +399,12 @@ internal fun SongRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                // Batch 557 — baris = tile berkedalaman (`neuRowTile()`, semua tema). Margin 12/3dp +
+                // padding dalam 8/5dp = total 20/8dp SAMA dgn padding lama: posisi teks/art/durasi
+                // dan tinggi baris (64dp) TIDAK berubah. Highlight "sedang diputar" di bawah kini
+                // ter-clip ke bentuk tile.
+                .padding(horizontal = 12.dp, vertical = 3.dp)
+                .neuRowTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp)
                 // Batch 163 pending-item fix: samakan pola highlight "sedang diputar" dengan
                 // `QueueRow` (primary 12% alpha bg) — background dipasang SEBELUM clickable,
                 // urutan modifier sama persis QueueRow, supaya ripple clickable tetap kelihatan
@@ -417,7 +424,7 @@ internal fun SongRow(
                 // menu (search onEnterSelectionMode() below) remains as the explicit-tap entry
                 // point into selection mode.
                 .clickable(onClick = { if (selectionMode) onToggleSelect() else onClick() })
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (selectionMode) {

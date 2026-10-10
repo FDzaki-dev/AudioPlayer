@@ -49,6 +49,7 @@ import com.rudi.audioplayer.data.lyrics.LyricsRepository
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.colorsFor
+import com.rudi.audioplayer.ui.theme.neuRowTile
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.calmAberration
@@ -185,8 +186,15 @@ fun SettingsScreen(
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
+            // Batch 557 — tiap baris pengaturan (switch & navigasi) = tile berkedalaman lewat
+            // `neuRowTile()` (semua tema). Margin 12dp + padding dalam 8dp = 20dp lama: posisi teks
+            // tidak bergeser. Spacer antar tile nav 4dp -> 8dp supaya bayangan tak menimpa tetangga.
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -207,7 +215,11 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -228,7 +240,11 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -251,7 +267,11 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -275,7 +295,11 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -323,8 +347,10 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile()
                     .clickable { onOpenStats() }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(Icons.Default.QueryStats, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
@@ -341,12 +367,14 @@ fun SettingsScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile()
                     .clickable { showBackupRestore = true }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(Icons.Default.SettingsBackupRestore, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
@@ -363,12 +391,14 @@ fun SettingsScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile()
                     .clickable { showDuplicateFinder = true }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(Icons.Default.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
@@ -385,12 +415,14 @@ fun SettingsScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile()
                     .clickable { showVault = true }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
@@ -409,12 +441,14 @@ fun SettingsScreen(
         item {
             // Batch 247 — Lyrics offline-first 4/4b. Item ke-5 grup "Alat & Utilitas", pola
             // identik 4 lainnya (Spacer 4dp, icon+title+subtitle, row seluruhnya .clickable).
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile()
                     .clickable { showClearLyricsCacheConfirm = true }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
@@ -493,8 +527,10 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .neuRowTile()
                         .clickable { showSignatureMatcher = true }
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -505,12 +541,14 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Cek Signature APK", style = MaterialTheme.typography.bodyMedium)
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .neuRowTile()
                         .clickable { showDiagnosticLog = true }
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -558,8 +596,10 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile()
                     .clickable { showUpdateCheck = true }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(

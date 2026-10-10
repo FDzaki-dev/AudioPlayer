@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 557 — Depth tile baris Pengaturan + baris daftar lagu, semua tema (BELUM verified compile/CI/device)
+- Instruksi user: memilih opsi "Depth: kartu Settings + baris list" (kandidat "belum diaudit depth" di `[RESUME POINT]` Batch 556).
+- `ui/theme/TactileDepth.kt`: `neuRowTile(shape = RoundedCornerShape(Radius.xl), elevation = 4.dp)` — satu pintu semua identitas: Tactile -> `tactileEmboss`, Neumorphism -> `skeuEmboss`, Apple/Calm Retro/Liquid Glass/Aurora -> `neuSurface`. Liquid Glass sengaja `neuSurface()` (bukan `frostedGlass()`: blur Haze per baris yg di-scroll mahal). Impor `RoundedCornerShape` ditambah.
+- `ui/SettingsScreen.kt`: 5 baris switch (Perilaku Pemutaran) + 8 baris navigasi (Statistik, Backup, Duplikat, Vault, Hapus Cache Lirik, Cek Signature APK, Log Diagnostik, Cek Update) = tile. Margin 12dp + padding dalam 8dp (= 20dp lama). Spacer antar tile navigasi 4 -> 8dp (5 titik). Header "Lanjutan" tetap datar.
+- `ui/SettingsSections.kt`: `AppLockSection` (Kunci PIN, Ubah PIN, sidik jari) = 1 kartu berkedalaman.
+- `ui/LibraryLists.kt`: `SongRow` = tile (`neuRowTile`, elevasi 3dp). Margin 12/3dp + padding dalam 8/5dp = 20/8dp lama -> posisi teks/art/durasi & tinggi baris 64dp TIDAK berubah. `.background` highlight "sedang diputar" kini ter-clip tile; `clickable`/menu/seleksi tak diubah.
+- TIDAK diubah: logika, navigasi, gesture sweep-select/long-press, `PlaylistSongRow` (drag-reorder), `QueueRow`, `DuplicateSongRow`, `ThemeModeToggleSection`, `BlurUtils.kt`. `FILE_MANIFEST.txt` tak berubah (0 path baru/hilang).
+- **NOT VERIFIED**: tak ada compiler (hanya cek kurung seimbang + diff terhadap v556); Spotless/ArchUnit/SARIF tak dijalankan; belum dilihat di device. Perubahan perilaku disengaja: halaman Pengaturan lebih tinggi (padding vertikal tile + spacer 8dp); Skeu/Tactile memakai `pressed = false` per baris (bitmap sumur ikut dibuat, ter-cache global) — risiko jank belum diukur.
+
 ## Repack Batch 556 — mode direktori ZIP 0755 (packaging; BELUM verified di Termux user)
 - Keluhan user: `find: './config/detekt' / './app/src' / './docs/archive': Permission denied` saat Box DAILY UPDATE. Akar: 54 entri direktori di `SONIX_v556.zip` bermode `0600` (tanpa `x`) -> direktori hasil `unzip` tak bisa ditelusuri -> `find` exit 1 memutus rantai `&&` sebelum commit/push.
 - Perbaikan: hanya atribut entri direktori ZIP -> `0755`. 0 source/Gradle/CI diubah; `FILE_MANIFEST.txt` tak berubah; isi & mode file identik (CRC dicek). Satu kali di Termux: `chmod -R u+rwX ~/projects/audioplayer` sebelum Box DAILY UPDATE.
