@@ -1268,7 +1268,8 @@ fun Modifier.neuAccentKey(
     accent: Color,
     elevation: Dp = 10.dp,
     pressed: Boolean,
-    isDark: Boolean = LocalIsDarkTheme.current
+    isDark: Boolean = LocalIsDarkTheme.current,
+    bezel: Color? = null
 ): Modifier {
     val canvas = MaterialTheme.colorScheme.background
     val style = remember(canvas, isDark) { neuStyle(canvas, canvas, isDark) }
@@ -1281,10 +1282,13 @@ fun Modifier.neuAccentKey(
     return this
         .neuCastShadow(shape, style, spec, press, false)
         .clip(shape)
-        .drawBehind { drawNeuAccentFace(shape, accent, isDark, press.value) }
+        .drawBehind { drawNeuAccentFace(shape, accent, isDark, press.value, bezel) }
 }
 
-private fun DrawScope.drawNeuAccentFace(shape: Shape, accent: Color, isDark: Boolean, t: Float) {
+// Batch 565 — [bezel] (opsional, dipakai HANYA Neumorphism = gilt): cincin tipis 1.25dp di dalam bevel, menjadikan tombol
+// aksi utama "medali" (bingkai emas di atas permukaan aksen dinamis per-lagu; warna aksen TIDAK diganti). Memudar
+// setengah saat ditekan. null = perilaku Batch 561 persis.
+private fun DrawScope.drawNeuAccentFace(shape: Shape, accent: Color, isDark: Boolean, t: Float, bezel: Color? = null) {
     val w = size.width
     val h = size.height
     if (w < 4f || h < 4f) return
@@ -1324,6 +1328,29 @@ private fun DrawScope.drawNeuAccentFace(shape: Shape, accent: Color, isDark: Boo
             ),
             style = Stroke(width = 2f * b)
         )
+    }
+    // 2b. bezel gilt (Batch 565): cincin diagonal terang -> redup -> terang, inset 5dp dari tepi.
+    if (bezel != null) {
+        val inset = 5.dp.toPx()
+        val rw = w - 2f * inset
+        val rh = h - 2f * inset
+        if (rw > 8f && rh > 8f) {
+            val ringA = 1f - 0.5f * t
+            val ring = shape.createOutline(Size(rw, rh), layoutDirection, this).toNeuPath()
+            translate(left = inset, top = inset) {
+                drawPath(
+                    path = ring,
+                    brush = Brush.linearGradient(
+                        0.00f to bezel.copy(alpha = 0.85f * ringA),
+                        0.50f to bezel.copy(alpha = 0.22f * ringA),
+                        1.00f to bezel.copy(alpha = 0.60f * ringA),
+                        start = Offset(0f, 0f),
+                        end = Offset(rw, rh)
+                    ),
+                    style = Stroke(width = 1.25.dp.toPx())
+                )
+            }
+        }
     }
     // 3. sumur cekung saat ditekan.
     if (t > 0.01f) {
@@ -1438,6 +1465,11 @@ fun Modifier.neuTrough(
  * tinggi kunci relatif terhadap tinggi node; [position] = posisi PUSAT kunci dalam satuan tab (0.5f =
  * tengah tab pertama), dibaca di fase GAMBAR (0 rekomposisi per frame; di-clamp ke tepi node).
  * [base] = warna permukaan kunci (mesin mengangkat luminansinya).
+ * Batch 565 — [wine] = true (HANYA Neumorphism): kunci diberi lapisan aksen burgundy yang sama dgn tile Pengaturan
+ * ([drawSkeuKeyWine]: wash anggur diagonal + hairline gilt tepi atas + pendar ruby di belakang ikon). Lapisan
+ * digambar DI ATAS permukaan kunci, di dalam clip-nya, di BELAKANG ikon/label; alpha dijaga rendah supaya kontras
+ * `onSecondaryContainer` di atas kunci tetap >= 4.5:1 (hitungan offline, wash + pendar ditumpuk = kasus terburuk:
+ * 6.7:1 gelap / 6.1:1 terang). Default false = perilaku Batch 555 persis.
  */
 @Composable
 fun Modifier.neuSlidingKey(
@@ -1448,6 +1480,7 @@ fun Modifier.neuSlidingKey(
     heightFraction: Float,
     elevation: Dp = 4.dp,
     isDark: Boolean = LocalIsDarkTheme.current,
+    wine: Boolean = false,
     position: () -> Float
 ): Modifier {
     // Mode gelap: [neuStyle] mengangkat permukaan 9%/4% ke putih (kunci akan lebih terang dari warna [base] dan
@@ -1458,7 +1491,7 @@ fun Modifier.neuSlidingKey(
         if (isDark) neuStyle(neuUnlift(base, 0.09f), neuUnlift(base, 0.04f), true) else neuStyle(base, base, false)
     }
     val spec = remember(elevation, style.shadowStrength) { neuShadowSpec(elevation, style.shadowStrength) }
-    return this.neuKeyDraw(shape, style, spec, count, widthFraction, heightFraction, position)
+    return this.neuKeyDraw(shape, style, spec, count, widthFraction, heightFraction, wine, isDark, position)
 }
 
 /** Kebalikan `lerp(c, Color.White, t)` per kanal (hasil dijepit 0..1; alpha 1). */
@@ -1478,8 +1511,10 @@ private fun Modifier.neuKeyDraw(
     count: Int,
     widthFraction: Float,
     heightFraction: Float,
+    wine: Boolean,
+    isDark: Boolean,
     position: () -> Float
-): Modifier = neuDraw("neuKey", shape, style, spec, count, widthFraction, heightFraction) {
+): Modifier = neuDraw("neuKey", shape, style, spec, count, widthFraction, heightFraction, wine, isDark) {
     val d = density
     val slotW = size.width / count.coerceAtLeast(1)
     val kw = slotW * widthFraction
@@ -1518,10 +1553,54 @@ private fun Modifier.neuKeyDraw(
                     for (f in facets) {
                         drawPath(f.first, f.second)
                     }
+                    if (wine) drawSkeuKeyWine(kw, kh, isDark)
                 }
             }
         }
     }
+}
+
+/** Batch 565 — lapisan aksen burgundy kunci geser bilah tab Neumorphism (lihat KDoc [neuSlidingKey]). [kw]/[kh] =
+ *  ukuran KUNCI (bukan node); dipanggil di dalam `translate` + `clipPath(keyPath)`, jadi koordinat (0,0) = pojok
+ *  kiri-atas kunci. Tanpa bitmap/BlurMaskFilter: 3 gradien langsung. */
+private fun DrawScope.drawSkeuKeyWine(kw: Float, kh: Float, isDark: Boolean) {
+    if (kw < 8f || kh < 8f) return
+    val wine = if (isDark) SkeuWine else SkeuAccentLight
+    val gilt = if (isDark) SkeuGilt else SkeuGiltDeep
+    val ruby = if (isDark) SkeuRubyHi else SkeuWineLit
+    // 1. WASH anggur diagonal (arah cahaya tema): pekat kiri-atas, habis di kanan-bawah.
+    drawRect(
+        brush = Brush.linearGradient(
+            0.00f to wine.copy(alpha = if (isDark) 0.46f else 0.16f),
+            0.65f to wine.copy(alpha = if (isDark) 0.14f else 0.05f),
+            1.00f to wine.copy(alpha = 0f),
+            start = Offset(0f, 0f),
+            end = Offset(kw, kh)
+        ),
+        size = Size(kw, kh)
+    )
+    // 2. PENDAR ruby di belakang ikon (pusat sedikit di atas tengah, tempat ikon duduk): permata menyala dari dalam.
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(ruby.copy(alpha = if (isDark) 0.20f else 0.09f), ruby.copy(alpha = 0f)),
+            center = Offset(kw / 2f, kh * 0.40f),
+            radius = kw * 0.46f
+        ),
+        size = Size(kw, kh)
+    )
+    // 3. HAIRLINE gilt tepi atas, tepat di bawah bevel (memudar di kedua ujung) — keluarga sama dgn `drawSkeuWine`.
+    val inset = kw * 0.14f
+    drawRect(
+        brush = Brush.horizontalGradient(
+            0.0f to gilt.copy(alpha = 0f),
+            0.5f to gilt.copy(alpha = if (isDark) 0.55f else 0.42f),
+            1.0f to gilt.copy(alpha = 0f),
+            startX = inset,
+            endX = kw - inset
+        ),
+        topLeft = Offset(inset, 1.5.dp.toPx()),
+        size = Size(kw - 2f * inset, 0.75.dp.toPx())
+    )
 }
 
 /**

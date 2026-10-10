@@ -1115,6 +1115,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         androidx.compose.ui.graphics.lerp(navBarBase, MaterialTheme.colorScheme.primary, 0.16f)
                     }
                     val navBarContentColor = MaterialTheme.colorScheme.onSurface
+                    // Batch 565 — kunci geser Neumorphism ikut sistem anggur/ruby/gilt (`neuSlidingKey(wine = true)`): wash anggur +
+                    // pendar ruby di belakang ikon + hairline gilt atas. Warna dasar kunci TETAP `secondaryContainer` (pasangan
+                    // kontras `selectedIconColor`/`selectedTextColor` tak berubah); tema lain 0 perubahan.
+                    val navBarKeyWine = isSkeuTheme()
                     NavigationBar(
                         // Batch 439 — referensi iOS Jam: bar bawah bukan persegi nempel penuh
                         // ke tepi layar, tapi kapsul rounded yang "mengambang" dengan jarak dari
@@ -1288,7 +1292,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 base = navBarKeyBase,
                                 count = TAB_ROUTES.size,
                                 widthFraction = 0.74f,
-                                heightFraction = 0.62f
+                                heightFraction = 0.62f,
+                                wine = navBarKeyWine
                             ) {
                                 val liveBarDrag = tabBarDragIndexPx.floatValue
                                 val nudge = tabDragOffsetPx.floatValue

@@ -109,6 +109,9 @@ import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
+import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
+import com.rudi.audioplayer.ui.theme.SkeuGilt
+import com.rudi.audioplayer.ui.theme.SkeuGiltDeep
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.Radius
@@ -1170,7 +1173,9 @@ fun NowPlayingScreen(
                         shape = playPauseShape,
                         accent = animatedAccent,
                         elevation = 10.dp,
-                        pressed = playPauseTouching.value
+                        pressed = playPauseTouching.value,
+                        // Batch 565 — Neumorphism: bingkai gilt "medali" di permukaan aksen (warna aksen per-lagu TIDAK diganti).
+                        bezel = if (isSkeu) (if (LocalIsDarkTheme.current) SkeuGilt else SkeuGiltDeep) else null
                     )
                     .neuInstantPress(playPauseTouching, pass = PointerEventPass.Initial, requireUnconsumed = false)
                     .clickable(

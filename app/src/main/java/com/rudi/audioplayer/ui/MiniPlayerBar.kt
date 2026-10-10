@@ -32,7 +32,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -54,6 +57,13 @@ import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
+import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
+import com.rudi.audioplayer.ui.theme.SkeuGilt
+import com.rudi.audioplayer.ui.theme.SkeuGiltDeep
+import com.rudi.audioplayer.ui.theme.SkeuRubyHi
+import com.rudi.audioplayer.ui.theme.SkeuWine
+import com.rudi.audioplayer.ui.theme.SkeuWineLit
+import com.rudi.audioplayer.ui.theme.SkeuAccentLight
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.Radius
@@ -339,15 +349,51 @@ fun MiniPlayerBar(
         val progressFraction = if (progress.duration > 0) {
             (progress.position.toFloat() / progress.duration.toFloat()).coerceIn(0f, 1f)
         } else 0f
-        LinearProgressIndicator(
-            progress = { progressFraction },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(2.dp)
-                .align(Alignment.BottomStart),
-            color = animatedAccent,
-            trackColor = animatedAccent.copy(alpha = 0.15f),
-            strokeCap = StrokeCap.Butt
-        )
+        if (isSkeu) {
+            // Batch 565 — Neumorphism: garis progres ikut sistem anggur/ruby/gilt (bukan lagi `animatedAccent` per-lagu):
+            // alur = anggur gelap redup, isi = gradien anggur -> ruby, ujung = titik gilt. Tipis (3dp) & tetap glanceable
+            // (tanpa target sentuh baru). Digambar di fase gambar dari `progressFraction` yang sama (0 layout baru).
+            val miniDark = LocalIsDarkTheme.current
+            val wineTone = if (miniDark) SkeuWine else SkeuAccentLight
+            val rubyTone = if (miniDark) SkeuRubyHi else SkeuWineLit
+            val giltTone = if (miniDark) SkeuGilt else SkeuGiltDeep
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .align(Alignment.BottomStart)
+                    .drawBehind {
+                        drawRect(wineTone.copy(alpha = if (miniDark) 0.30f else 0.16f))
+                        val fillW = size.width * progressFraction
+                        if (fillW > 0.5f) {
+                            drawRect(
+                                brush = Brush.horizontalGradient(
+                                    0f to wineTone,
+                                    1f to rubyTone,
+                                    startX = 0f,
+                                    endX = fillW
+                                ),
+                                size = Size(fillW, size.height)
+                            )
+                            drawCircle(
+                                color = giltTone,
+                                radius = size.height * 0.85f,
+                                center = Offset(fillW, size.height / 2f)
+                            )
+                        }
+                    }
+            )
+        } else {
+            LinearProgressIndicator(
+                progress = { progressFraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .align(Alignment.BottomStart),
+                color = animatedAccent,
+                trackColor = animatedAccent.copy(alpha = 0.15f),
+                strokeCap = StrokeCap.Butt
+            )
+        }
     }
 }

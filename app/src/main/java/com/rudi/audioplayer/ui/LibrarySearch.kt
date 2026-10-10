@@ -26,10 +26,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
+import com.rudi.audioplayer.ui.theme.isSkeuTheme
+import com.rudi.audioplayer.ui.theme.neuRowTile
+import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
+import com.rudi.audioplayer.ui.theme.SkeuAccentLight
+import com.rudi.audioplayer.ui.theme.SkeuGilt
 import com.rudi.audioplayer.ui.theme.Radius
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.Song
 import kotlinx.collections.immutable.ImmutableSet
@@ -120,6 +126,34 @@ internal fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, 
 private val LIBRARY_PRIMARY_TAB_LABELS = listOf("Lagu", "Album", "Artis")
 private val LIBRARY_MORE_TAB_LABELS = listOf("Folder", "Favorit", "Playlist", "Otomatis") // indices 3, 4, 5, 6
 
+// Batch 565 — chip filter Neumorphism ikut sistem anggur/ruby/gilt (dulu datar: `primary` polos vs `surface` polos, tanpa
+// depth sama sekali). Neumorphism: chip = tile timbul `neuRowTile` (permukaan anggur-arang + wash anggur + hairline gilt;
+// bevel + bayangan jatuh), TERPILIH = sumur cekung + wash menguat (`pressed = active = selected`, pola tab aktif), label
+// terpilih = gilt (gelap) / burgundy tua (terang) — kontras dihitung offline >= 4.5:1 (terburuk 8.7:1 gelap / 4.6:1
+// terang; wash maksimum, uji sensitivitas latar 15% lebih gelap utk sumur); bentuk persegi membulat 10dp (bukan
+// pil) sesuai identitas Batch 563. Tema lain: `clip + background` PERSIS seperti sebelumnya (0 perubahan).
+@Composable
+private fun Modifier.libraryChipSurface(selected: Boolean, chipRadius: Dp): Modifier =
+    if (isSkeuTheme()) {
+        this.neuRowTile(
+            shape = RoundedCornerShape(10.dp),
+            elevation = 3.dp,
+            pressed = selected,
+            active = selected
+        )
+    } else {
+        this
+            .clip(RoundedCornerShape(chipRadius))
+            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
+    }
+
+@Composable
+private fun libraryChipLabelColor(selected: Boolean): Color = when {
+    selected && isSkeuTheme() -> if (LocalIsDarkTheme.current) SkeuGilt else SkeuAccentLight
+    selected -> MaterialTheme.colorScheme.onPrimary
+    else -> MaterialTheme.colorScheme.onSurface
+}
+
 @Composable
 internal fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
     var showMoreMenu by remember { mutableStateOf(false) }
@@ -144,15 +178,14 @@ internal fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
             val selected = selectedTab == index
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(chipRadius))
-                    .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
+                    .libraryChipSurface(selected, chipRadius)
                     .clickable { onSelect(index) }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Text(
                     label,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                    color = libraryChipLabelColor(selected)
                 )
             }
         }
@@ -160,22 +193,22 @@ internal fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
             Box {
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(chipRadius))
-                        .background(if (moreSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
+                        .libraryChipSurface(moreSelected, chipRadius)
                         .clickable { showMoreMenu = true }
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val moreLabelColor = libraryChipLabelColor(moreSelected)
                     Text(
                         moreChipLabel,
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (moreSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                        color = moreLabelColor
                     )
                     Icon(
                         Icons.Default.ExpandMore,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
-                        tint = if (moreSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                        tint = moreLabelColor
                     )
                 }
                 DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
