@@ -1,0 +1,165 @@
+name: Android CI Artifact for Claude
+
+# Batch 570 — adaptasi `github-claude-artifact.md` (user) ke SONIX. Menghasilkan SATU berkas teks ringkas
+# `laporan-untuk-claude.txt` (ArchUnit + SpotBugs SARIF) sebagai artifact resmi GitHub (upload-artifact@v4).
+#
+# Workflow TERPISAH dari `build.yml` ("Build APK", 1 job, TIDAK diubah): runner sendiri dan berjalan paralel,
+# jadi tidak mengambil jatah waktu build/rilis, dan kegagalan di sini TIDAK memengaruhi APK/Release.
+# Semua langkah analisis NON-BLOCKING; alat yang tak jalan / laporan yang tak terbentuk dicatat
+# `NOT VERIFIED` (alat gagal != lulus) — TIDAK PERNAH "bersih".
+#
+# Beda dari berkas contoh (alasan):
+#  - `gradle` (setup-gradle 8.14.3, sama dgn build.yml) bukan `./gradlew`: proyek belum punya Gradle Wrapper.
+#  - Task `spotbugsRelease` TIDAK ada di proyek Android bila plugin `com.github.spotbugs` dipakai langsung;
+#    dibuat lewat config/spotbugs/spotbugs.gradle.kts (aktif hanya dgn -Psonix.spotbugs=true).
+#  - ArchUnit = tes `ArchitectureTest` (report-only, aktif hanya dgn env SONIX_ARCH_REPORT=1); status dibaca dari
+#    laporan tesnya, BUKAN grep nama kelas di log (grep itu memberi "lulus" palsu bila tes tak sempat jalan).
+#  - Varian release (bukan debug): satu kali kompilasi dipakai tes + SpotBugs.
+#  - upload-artifact@v4 (contoh memakai `actions/allowed-actions/upload-artifact`, yang tidak ada).
+#  - Pemicu: push `main` + manual (selaras build.yml); `cache-read-only`: cache Gradle hanya ditulis build.yml.
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: android-artifact-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.14.3
+          cache-read-only: true
+
+      # 1. ArchUnit (tes ArchitectureTest saja) + SpotBugs (SARIF) dalam SATU invocation Gradle: configuration +
+      #    kompilasi release sekali. `--continue`: SpotBugs tetap jalan walau tes gagal. Exit code Gradle disimpan
+      #    ke berkas, langkah ini SELALU sukses.
+      - name: ArchUnit + SpotBugs (NON-BLOCKING)
+        id: analysis
+        continue-on-error: true
+        timeout-minutes: 30
+        env:
+          SONIX_ARCH_REPORT: "1"
+        run: |
+          set +e
+          gradle testReleaseUnitTest --tests "com.rudi.audioplayer.ArchitectureTest" spotbugsRelease -Psonix.spotbugs=true --continue --stacktrace --no-daemon --build-cache > gradle-report.log 2>&1
+          GRADLE_EXIT=$?
+          echo "GRADLE_EXIT=$GRADLE_EXIT" > gradle-exit.txt
+          echo "Gradle exit=$GRADLE_EXIT"
+          tail -n 25 gradle-report.log
+          exit 0
+
+      # 2. Rakit laporan ringkas. Status ArchUnit/SpotBugs HANYA dari berkas laporan yang benar-benar ada.
+      - name: Create Compact Report for Claude
+        if: always()
+        run: |
+          set +e
+          ARCH=app/build/reports/archunit/archunit-report.txt
+          SARIF=app/build/reports/spotbugs/spotbugs.sarif
+          GRADLE_EXIT=$(sed -n 's/^GRADLE_EXIT=//p' gradle-exit.txt 2>/dev/null | head -n 1)
+          GRADLE_EXIT=${GRADLE_EXIT:-n/a}
+          : > report-arch.tmp
+          : > report-sarif.tmp
+
+          # --- ArchUnit ---
+          if [ -s "$ARCH" ]; then
+            A_STATUS=$(sed -n 's/^ARCHUNIT_STATUS=//p' "$ARCH" | head -n 1)
+            if [ "$A_STATUS" = "OK" ]; then
+              A_VIOL=$(sed -n 's/^VIOLATIONS=//p' "$ARCH" | head -n 1)
+              if [ "$A_VIOL" = "0" ]; then
+                ARCH_SUMMARY="ArchUnit: LULUS (0 pelanggaran)"
+              else
+                ARCH_SUMMARY="ArchUnit: ${A_VIOL:-?} PELANGGARAN"
+              fi
+            else
+              ARCH_SUMMARY="ArchUnit: NOT VERIFIED (alat gagal jalan)"
+            fi
+            cat "$ARCH" > report-arch.tmp
+          else
+            ARCH_SUMMARY="ArchUnit: NOT VERIFIED (laporan tidak terbentuk: tes dilewati/gagal; lihat ekor log di bawah)"
+            echo "Berkas $ARCH tidak ada." > report-arch.tmp
+          fi
+
+          # --- SpotBugs (SARIF) ---
+          if [ -s "$SARIF" ] && jq -e '.runs' "$SARIF" > /dev/null 2>&1 && S_COUNT=$(jq '[.runs[].results[]?] | length' "$SARIF" 2>/dev/null) && [ -n "$S_COUNT" ]; then
+            SARIF_SUMMARY="SpotBugs: $S_COUNT temuan"
+            {
+              echo "Jumlah temuan: $S_COUNT"
+              if [ "$S_COUNT" -gt 0 ]; then
+                echo ""
+                echo "Per aturan (terbanyak dulu):"
+                jq -r '[.runs[].results[]?] | group_by(.ruleId) | map({r: .[0].ruleId, n: length}) | sort_by(-.n)[] | "  \(.n)x \(.r)"' "$SARIF" 2>/dev/null | head -n 40
+                echo ""
+                echo "Temuan (maks 40 pertama):"
+                jq -r '[.runs[].results[]?][:40][] | "- \(.ruleId) @ \(.locations[0].physicalLocation.artifactLocation.uri // "?"):\(.locations[0].physicalLocation.region.startLine // 0)\n  \(.message.text)"' "$SARIF" 2>/dev/null
+                if [ "$S_COUNT" -gt 40 ]; then
+                  echo "... (+$((S_COUNT - 40)) temuan lain disingkat)"
+                fi
+              fi
+            } > report-sarif.tmp
+          else
+            SARIF_SUMMARY="SpotBugs: NOT VERIFIED (SARIF tidak terbentuk / tidak valid / jq gagal; lihat ekor log di bawah)"
+            echo "Berkas $SARIF tidak ada atau tidak bisa dibaca." > report-sarif.tmp
+          fi
+
+          {
+            echo "=== LAPORAN EVALUASI UNTUK CLAUDE ==="
+            echo "Proyek: ${{ github.event.repository.name }} · Commit: ${{ github.sha }} · Run: #${{ github.run_number }} · Cabang: ${{ github.ref_name }}"
+            echo "Dibuat (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Gradle: testReleaseUnitTest --tests ArchitectureTest + spotbugsRelease · exit=$GRADLE_EXIT"
+            echo ""
+            echo "--- RINGKASAN ---"
+            echo "$ARCH_SUMMARY"
+            echo "$SARIF_SUMMARY"
+            echo "Catatan: NOT VERIFIED = alat tidak jalan / laporan tidak ada; BUKAN berarti bersih."
+            echo ""
+            echo "--- ARSITEKTUR (ARCHUNIT) ---"
+            cat report-arch.tmp
+            echo ""
+            echo "--- KUALITAS KODE (SPOTBUGS · SARIF) ---"
+            cat report-sarif.tmp
+            if { [ "$GRADLE_EXIT" != "0" ] || echo "$ARCH_SUMMARY$SARIF_SUMMARY" | grep -q "NOT VERIFIED"; } && [ -f gradle-report.log ]; then
+              echo ""
+              echo "--- EKOR LOG GRADLE (exit=$GRADLE_EXIT; 80 baris terakhir) ---"
+              tail -n 80 gradle-report.log
+            fi
+          } > laporan-untuk-claude.txt
+
+          echo "::notice::$ARCH_SUMMARY · $SARIF_SUMMARY"
+          {
+            echo "### 🔎 Laporan untuk Claude (non-blocking)"
+            echo ""
+            echo "- $ARCH_SUMMARY"
+            echo "- $SARIF_SUMMARY"
+            echo "- Artifact: \`SONIX_laporan-untuk-claude_run${{ github.run_number }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat laporan-untuk-claude.txt
+
+      # 3. Artifact resmi GitHub (berkas tunggal .txt; mudah diunduh di HP lalu diunggah ke Claude).
+      - name: Upload Report for Claude
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SONIX_laporan-untuk-claude_run${{ github.run_number }}
+          path: laporan-untuk-claude.txt
+          retention-days: 14
+          if-no-files-found: warn

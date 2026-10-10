@@ -295,6 +295,13 @@ configurations.matching { it.name == "detekt" || it.name == "detektPlugins" }.co
     }
 }
 
+// Batch 570 — SpotBugs (laporan SARIF) OPT-IN utk `.github/workflows/android-artifact.yml`: hanya aktif
+// bila `-Psonix.spotbugs=true`. Tanpa flag itu, plugin/dependency/task SpotBugs TIDAK dimuat sama sekali ->
+// `build.yml` (`testReleaseUnitTest assembleRelease`) tak tersentuh. Isi + alasan: config/spotbugs/spotbugs.gradle.kts.
+if (providers.gradleProperty("sonix.spotbugs").isPresent) {
+    apply(from = rootProject.file("config/spotbugs/spotbugs.gradle.kts"))
+}
+
 // NOTE: output APK renaming is handled in .github/workflows/build.yml (the "Rename APK to
 // match version" step), not here — doing it in both places would make the workflow's `cp`
 // step fail looking for a file this block already renamed out from under it.
@@ -397,6 +404,11 @@ dependencies {
     // instance via bytecode proxying instead of calling into the stubbed platform class, so
     // test fixtures that need *a* Uri (without caring what it resolves to) can get one safely.
     testImplementation("org.mockito:mockito-core:5.12.0")
+    // Batch 570 — ArchUnit (aturan arsitektur) utk app/src/test/.../ArchitectureTest.kt. `archunit` inti, BUKAN
+    // `archunit-junit5`: tes proyek ini JUnit 4 (junit:junit di atas). 1.4.2 = rilis stabil terbaru
+    // (18 Apr 2026; dicek web_search Okt 2026). Tes-nya dilewati kecuali env SONIX_ARCH_REPORT=1 (hanya
+    // android-artifact.yml) -> `build.yml` hanya menanggung resolusi dependency ini, tanpa analisis.
+    testImplementation("com.tngtech.archunit:archunit:1.4.2")
 
     // Batch 103 (Gap List #2) — src/androidTest, BEDA dari src/test di atas: ini jalan di
     // device/emulator sungguhan (bukan pure-JVM), lewat `./gradlew connectedAndroidTest` atau

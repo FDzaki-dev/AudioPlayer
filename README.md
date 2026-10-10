@@ -302,6 +302,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 570** — laporan CI untuk Claude: workflow terpisah `.github/workflows/android-artifact.yml` ("Android CI Artifact for Claude", berdampingan dgn `build.yml` yang tak berubah) menjalankan ArchUnit (`ArchitectureTest`, report-only, 7 aturan dependensi antar-package) + SpotBugs (SARIF, opt-in `-Psonix.spotbugs=true` via `config/spotbugs/spotbugs.gradle.kts`), lalu mengunggah `laporan-untuk-claude.txt` sebagai artifact `SONIX_laporan-untuk-claude_run<N>`. Non-blocking; alat yang tak jalan dicatat `NOT VERIFIED`, bukan "bersih". Belum pernah dijalankan di CI.
+
 **Batch 562** — drag-select di daftar lagu dan sheet pilih-lagu kini bisa MEMBATALKAN centang (sapuan yang dimulai di baris tercentang = mode batal); hero album Now Playing diberi kedalaman statis tambahan (bayangan lantai, kilau kaca, pantulan warna aksen); CI kini juga mengunggah APK sebagai artifact tanpa zip dan menulis hasil detekt/lint ke ringkasan run. Belum diverifikasi compile/CI/device.
 
 **Batch 549** — struktur CI disalin dari template workflow user: 1 job `build`; APK + Release terbit dulu, lalu analisis statis (detekt + lint) jadi langkah paling akhir, non-blocking, dengan ringkasan anotasi dan artifact sendiri `SONIX_static_analysis_v<versi>-run<run>` (marker + log + laporan mentah). Job `static-analysis` terpisah, gate merah, dan zip `ci_report` dicabut. Belum diverifikasi CI.

@@ -96,9 +96,11 @@
 # Batch 550: .github/workflows/ci-report.yml DIKEMBALIKAN sbg STUB NONAKTIF (hanya workflow_dispatch) — Box DAILY UPDATE tak menghapus file di `.github/` yang hilang dari ZIP, jadi berkas lama (workflow_run) terus terpicu; stub menimpanya — 209->210.
 # Batch 563: app/src/main/java/com/rudi/audioplayer/ui/NeuSwitch.kt (file baru, saklar berkedalaman; `Switch` package `ui` menaungi `Switch` M3) ditambahkan — 210->211.
 # Batch 568: app/src/main/java/com/rudi/audioplayer/ui/NeuSlider.kt (file baru, slider Neumorphism; fungsi `NeuSlider` TIDAK menaungi `Slider` M3) ditambahkan — 211->212.
-# Total: 212 file
+# Batch 570: .github/workflows/android-artifact.yml + config/spotbugs/spotbugs.gradle.kts + app/src/test/java/com/rudi/audioplayer/ArchitectureTest.kt (file baru, laporan ArchUnit + SpotBugs SARIF utk Claude; workflow ikut dikirim di ZIP seperti build.yml) ditambahkan — 212->215.
+# Total: 215 file
 
 .githooks/pre-commit
+.github/workflows/android-artifact.yml
 .github/workflows/build.yml
 .github/workflows/ci-report.yml
 .gitignore
@@ -280,6 +282,7 @@ app/src/main/res/xml/data_extraction_rules.xml
 app/src/main/res/xml/file_paths.xml
 app/src/main/res/xml/shortcuts.xml
 app/src/main/res/xml/widget_player_info.xml
+app/src/test/java/com/rudi/audioplayer/ArchitectureTest.kt
 app/src/test/java/com/rudi/audioplayer/data/CustomFolderScannerStableIdTest.kt
 app/src/test/java/com/rudi/audioplayer/data/DuplicateDetectorTest.kt
 app/src/test/java/com/rudi/audioplayer/data/Id3TagWriterTest.kt
@@ -298,6 +301,7 @@ app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
 build.gradle.kts
 config/detekt/detekt.yml
+config/spotbugs/spotbugs.gradle.kts
 docs/PENDING_CodeTidyPlan.md
 docs/PLANNING.md
 docs/QA_CHECKLIST_SONIX_v488.md
