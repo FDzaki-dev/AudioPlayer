@@ -172,6 +172,7 @@ import dev.chrisbanes.haze.rememberHazeState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -196,6 +197,17 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 // di AppNavHost bawah: Beranda, Perpustakaan, Pengaturan). Dipakai gesture swipe untuk hitung
 // tab tujuan (index±1) — SATU sumber kebenaran urutan, bukan didup di 2 tempat.
 private val TAB_ROUTES = listOf("home", "library", "settings")
+
+// Batch 556 — gerak KUNCI bilah tab mengikuti `SkeuTabBar` Boomly (B192/B193): ease-out tanpa overshoot (langsung bergerak
+// cepat di frame pertama), durasi sebanding jarak tempuh dlm satuan tab: 1 tab = 380 ms, 2 tab = 460 ms, jarak kecil min
+// 300 ms. Sebelumnya `tween(220)` FastOutSlowIn (mulai pelan = terasa delay saat tap). Komentar lama "tween 220ms" di titik
+// pemakaian = riwayat. Tuning = HANYA angka 300 / 80 / 540.
+private val NavKeyEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+
+private fun navKeyGlideSpec(from: Float, to: Float) = tween<Float>(
+    durationMillis = (300f + 80f * kotlin.math.abs(to - from)).toInt().coerceIn(300, 540),
+    easing = NavKeyEasing
+)
 
 class MainActivity : FragmentActivity() {
 
@@ -806,18 +818,16 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     // pointerInput/Animatable kedua. Dipanggil di titik pemakaian (dalam tiap `label = { ... }`
     // NavigationBarItem, bukan di-hoist ke NavigationBar) SENGAJA — scope recomposition tetap
     // sekecil mungkin (hanya Text label yang berubah tiap frame drag, bukan seluruh NavigationBar).
-    fun tabMagnifyFocus(tabIndex: Int): Float {
-        val fromIdx = TAB_ROUTES.indexOfFirst { it == currentRoute }
-        if (fromIdx < 0) return 0f
+    // Batch 556 — `tabMagnifyFocus` (berbasis `currentRoute`, biner 1f/0f saat diam) DIGANTI `navPillFocus`: fokus = fungsi
+    // tenda jarak PUSAT KUNCI yang meluncur (`navPillIndexAnim` + geseran nudge swipe-konten) ke pusat kolom tab. Warna/
+    // skala ikon+label kini berganti TEPAT di tepi kunci (termasuk tab yang cuma dilewati saat lompat 2 tab), persis
+    // `SkeuTabBar` Boomly B191, dan tetap serasi dgn durasi gerak kunci berapa pun. Diam = 1f/0f (identik lama); nudge =
+    // identik `tabMagnifyFocus` lama (geser penuh = 1f -> 0f).
+    fun navPillFocus(tabIndex: Int): Float {
         val offset = tabDragOffsetPx.floatValue // -40f..40f; negatif = geser ke arah tab BERIKUTNYA
-        val towardNext = (-offset / 40f).coerceIn(0f, 1f)
-        val towardPrev = (offset / 40f).coerceIn(0f, 1f)
-        return when (tabIndex) {
-            fromIdx -> 1f - maxOf(towardNext, towardPrev)
-            fromIdx + 1 -> towardNext
-            fromIdx - 1 -> towardPrev
-            else -> 0f
-        }
+        val shift = (-offset / 40f).coerceIn(0f, 1f) - (offset / 40f).coerceIn(0f, 1f)
+        val dist = kotlin.math.abs(navPillIndexAnim.value + shift - (tabIndex + 0.5f))
+        return (1f - dist).coerceIn(0f, 1f)
     }
 
     // Batch 101 — Adaptive (multi-device). widthClass dihitung dari LocalConfiguration, jadi
@@ -1024,6 +1034,13 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // `currentRoute` polos di dalamnya akan BEKU ke nilai komposisi pertama
                     // (stale), tidak ikut update tiap kali tab berpindah selama drag berlangsung.
                     val currentRouteState = rememberUpdatedState(currentRoute)
+                    // Batch 556 — label/ikon kini mengikuti posisi KUNCI (`navPillFocus`), jadi kunci WAJIB sama dgn route aktif
+                    // begitu bilah muncul (mis. setelah navigasi lewat NavigationRail di layar lebar lalu kembali compact, atau
+                    // balik dari Now Playing). Hanya saat masuk komposisi (bukan tiap pindah tab) -> 0 tabrakan dgn glide tap/drag.
+                    LaunchedEffect(Unit) {
+                        val idx = TAB_ROUTES.indexOfFirst { it == currentRouteState.value }
+                        if (idx >= 0) navPillIndexAnim.snapTo(idx + 0.5f)
+                    }
                     val homeTabInteraction = remember { MutableInteractionSource() }
                     val libraryTabInteraction = remember { MutableInteractionSource() }
                     val settingsTabInteraction = remember { MutableInteractionSource() }
@@ -1055,21 +1072,11 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // navigate() commit index-crossing dulu spt sebelumnya.
                     fun tabBarDragFocus(tabIndex: Int): Float {
                         val idxPos = tabBarDragIndexPx.floatValue
-                        if (idxPos.isNaN()) return tabMagnifyFocus(tabIndex)
+                        if (idxPos.isNaN()) return navPillFocus(tabIndex)
                         val dist = kotlin.math.abs(idxPos - (tabIndex + 0.5f))
                         return (1f - dist).coerceIn(0f, 1f)
                     }
-                    // Batch 445 — dibaca `GlassTabIcon` (param `isDragging` baru, lihat 3 titik
-                    // pemakaian di bawah) supaya glassAlpha snap 1:1 real-time HANYA selama drag
-                    // sungguhan berlangsung — 2 sumber `focus` kontinu yang masuk
-                    // `tabBarDragFocus` di atas SAMA-SAMA dicek: drag LANGSUNG di tab-bar
-                    // (`tabBarDragIndexPx` bukan NaN) ATAU nudge dari swipe KONTEN (`tabDragOffsetPx`
-                    // != 0, termasuk saat masih springback menuju 0 pasca lepas jari — begitu
-                    // benar-benar 0 lagi, `tabMagnifyFocus` sudah balik ke nilai stabil 0f/1f,
-                    // handoff ke tween(220) di GlassTabIcon 0 lompatan). Tap biasa (0 drag
-                    // manapun aktif) = false, tetap dapat cross-fade tween(220) lama.
-                    val isTabBarDragging = !tabBarDragIndexPx.floatValue.isNaN() ||
-                        tabDragOffsetPx.floatValue != 0f
+                    // Batch 556 — `isTabBarDragging` DIHAPUS: `GlassTabIcon` tak lagi punya animasi sendiri (fokus = posisi kunci).
                     // Batch 448 — ROMBAK TOTAL (gantikan pendekatan "bridge" Batch 446). Root
                     // cause seam/double-pill yang dilaporkan user (dikonfirmasi frame-by-frame
                     // dari video referensi): Batch 446 menambah 1 pill BARU via `drawWithContent`
@@ -1252,7 +1259,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     tabBarDragIndexPx.floatValue = Float.NaN
                                     tabSwipeScope.launch {
                                         navPillIndexAnim.snapTo(lastLiveIdxPos)
-                                        navPillIndexAnim.animateTo(hoveredIndex + 0.5f, tween(220))
+                                        navPillIndexAnim.animateTo(hoveredIndex + 0.5f, navKeyGlideSpec(lastLiveIdxPos, hoveredIndex + 0.5f))
                                     }
                                     tabSwipeScope.launch {
                                         tabBarOverscrollAnim.snapTo(tabBarOverscrollPx.floatValue)
@@ -1356,7 +1363,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 // supaya tiba bersamaan. Animatable.animateTo mulai otomatis dari
                                 // posisi TERKINI (kalau lagi mid-animasi tap sebelumnya, pola sama
                                 // `glassAlphaAnim`) — 0 penanganan spesial dibutuhkan.
-                                tabSwipeScope.launch { navPillIndexAnim.animateTo(0.5f, tween(220)) }
+                                tabSwipeScope.launch { navPillIndexAnim.animateTo(0.5f, navKeyGlideSpec(navPillIndexAnim.value, 0.5f)) }
                             },
                             interactionSource = homeTabInteraction
                         ) {
@@ -1369,9 +1376,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 icon = Icons.Default.Home,
                                 label = "Beranda",
                                 focus = tabBarDragFocus(0),
-                                selected = currentRoute == "home",
-                                interactionSource = homeTabInteraction,
-                                isDragging = isTabBarDragging
+                                interactionSource = homeTabInteraction
                             )
                         }
                         CustomNavBarTabItem(
@@ -1384,7 +1389,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     restoreState = true
                                 }
                                 // Batch 448 — sama seperti onClick "home" di atas.
-                                tabSwipeScope.launch { navPillIndexAnim.animateTo(1.5f, tween(220)) }
+                                tabSwipeScope.launch { navPillIndexAnim.animateTo(1.5f, navKeyGlideSpec(navPillIndexAnim.value, 1.5f)) }
                             },
                             interactionSource = libraryTabInteraction
                         ) {
@@ -1393,9 +1398,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 icon = Icons.Default.LibraryMusic,
                                 label = "Perpustakaan",
                                 focus = tabBarDragFocus(1),
-                                selected = currentRoute == "library",
-                                interactionSource = libraryTabInteraction,
-                                isDragging = isTabBarDragging
+                                interactionSource = libraryTabInteraction
                             )
                         }
                         CustomNavBarTabItem(
@@ -1408,7 +1411,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     restoreState = true
                                 }
                                 // Batch 448 — sama seperti onClick "home" di atas.
-                                tabSwipeScope.launch { navPillIndexAnim.animateTo(2.5f, tween(220)) }
+                                tabSwipeScope.launch { navPillIndexAnim.animateTo(2.5f, navKeyGlideSpec(navPillIndexAnim.value, 2.5f)) }
                             },
                             interactionSource = settingsTabInteraction
                         ) {
@@ -1417,9 +1420,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 icon = Icons.Default.Settings,
                                 label = "Pengaturan",
                                 focus = tabBarDragFocus(2),
-                                selected = currentRoute == "settings",
-                                interactionSource = settingsTabInteraction,
-                                isDragging = isTabBarDragging
+                                interactionSource = settingsTabInteraction
                             )
                         }
                     }
@@ -1563,10 +1564,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                         // ganda dgn 2 jalur lain) — pola tween(220) IDENTIK dgn 3
                                         // onClick NavigationBarItem, 0 angka/formula baru.
                                         tabSwipeScope.launch {
-                                            navPillIndexAnim.animateTo(
-                                                TAB_ROUTES.indexOfFirst { it == targetRoute } + 0.5f,
-                                                tween(220)
-                                            )
+                                            val keyTo = TAB_ROUTES.indexOfFirst { it == targetRoute } + 0.5f
+                                            navPillIndexAnim.animateTo(keyTo, navKeyGlideSpec(navPillIndexAnim.value, keyTo))
                                         }
                                     }
                                     tabSwipeScope.launch {

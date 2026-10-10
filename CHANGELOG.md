@@ -1,5 +1,18 @@
 # Changelog
 
+## Repack Batch 556 — mode direktori ZIP 0755 (packaging; BELUM verified di Termux user)
+- Keluhan user: `find: './config/detekt' / './app/src' / './docs/archive': Permission denied` saat Box DAILY UPDATE. Akar: 54 entri direktori di `SONIX_v556.zip` bermode `0600` (tanpa `x`) -> direktori hasil `unzip` tak bisa ditelusuri -> `find` exit 1 memutus rantai `&&` sebelum commit/push.
+- Perbaikan: hanya atribut entri direktori ZIP -> `0755`. 0 source/Gradle/CI diubah; `FILE_MANIFEST.txt` tak berubah; isi & mode file identik (CRC dicek). Satu kali di Termux: `chmod -R u+rwX ~/projects/audioplayer` sebelum Box DAILY UPDATE.
+
+## Batch 556 — Polish bilah tab bawah ala Boomly: gerak kunci ease-out per jarak + warna ikon/label di tepi kunci (BELUM verified compile/CI/device)
+- Instruksi user: "Lanjut polishing tab nav sesuai preferensi project `Boomly`!!" (+ `SONIX_v555.zip`, `Boomly_v197.zip` sebagai referensi). Boomly = acuan preferensi; Boomly TIDAK diubah.
+- Referensi Boomly `SkeuTabBar` (B191-B193): tween ease-out tanpa overshoot (`CubicBezierEasing(0.05, 0.7, 0.1, 1)`), durasi sebanding jarak (300 + 80 x jarak-tab, 300..540 ms), warna label berganti di tepi pill yang bergerak. Ditolak di Boomly dan TIDAK dibawa: efek tekan/skala pill, RTL.
+- `MainActivity.kt`: helper top-level `NavKeyEasing` + `navKeyGlideSpec(from, to)`; 5 titik `navPillIndexAnim.animateTo` (selesai drag di bar, 3 onClick tab, selesai swipe-konten) dari `tween(220)` -> `navKeyGlideSpec`. `tabMagnifyFocus` -> `navPillFocus`: fokus = fungsi tenda jarak pusat kunci (`navPillIndexAnim` + geseran nudge swipe-konten) ke pusat kolom tab; diam = 1f/0f (identik lama), nudge = identik lama. `LaunchedEffect(Unit)` di blok bilah: `snapTo` kunci ke route aktif saat bilah masuk komposisi. `isTabBarDragging` dan argumen `selected`/`isDragging` di 3 pemanggil `GlassTabIcon` dihapus.
+- `BottomNavBar.kt` (`GlassTabIcon`): `glassAlphaAnim` (Animatable + tween 220 ms + `isDragging`) dihapus, `glassAlpha = focus` langsung (focus sudah kontinu & mengikuti kunci; animasi kedua = lag mengejar target bergerak, akar keluhan Batch 445). Skeu: ikon & label `lerp(unselected, selected, glassAlpha)` (dulu biner `selected`). Param `selected`, `isDragging` dan 4 impor tak terpakai (`Animatable`, `tween`, `LaunchedEffect`, `remember`) dihapus.
+- TIDAK diubah: drag 1:1 jari, overscroll rubber-band, haptic (`StrongHapticFeedback` global), navigasi/`popUpTo`, geometri & warna kunci/palung (Batch 555), `TactileDepth.kt`.
+- Perubahan perilaku disengaja: durasi pindah tab 220 ms -> 380 ms (1 tab) / 460 ms (2 tab) dgn kurva ease-out; warna ikon/label mengikuti kunci (tab tengah menyala sebentar saat dilewati lompat 2 tab); Skeu tidak lagi snap biner.
+- **NOT VERIFIED**: tak ada compiler (hanya cek kurung seimbang + diff terhadap v555); Spotless/ArchUnit/SARIF tak dijalankan; belum dilihat di device. Revert = `SONIX_v555.zip`.
+
 ## Batch 555 — Depth bilah tab navigasi bawah (palung cekung + kunci timbul) di semua tema (BELUM verified compile/CI/device)
 - Instruksi user: "Glitch nya hilang sendiri, entah kenapa. Lanjutkan terapkan effect depth pada bilah tab navigasi pada semua theme sesuai contoh pada project `Boomly`!!" (+ `Boomly_v197.zip` sebagai referensi).
 - Glitch sheet "Kontrol Lanjutan" (Batch 553/554) dilaporkan hilang sendiri, penyebab tidak diketahui. Probe `SheetProbe` + `.fillMaxHeight()` Batch 554 (`AdvancedControlsSheet.kt`) TIDAK disentuh batch ini.

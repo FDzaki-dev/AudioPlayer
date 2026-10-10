@@ -1,7 +1,5 @@
 package com.rudi.audioplayer
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -17,8 +15,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -184,9 +180,7 @@ internal fun GlassTabIcon(
     icon: ImageVector,
     label: String,
     focus: Float,
-    selected: Boolean,
-    interactionSource: MutableInteractionSource,
-    isDragging: Boolean
+    interactionSource: MutableInteractionSource
 ) {
     val isSkeu = isSkeuTheme()
     // Cross-fade kontinu (bukan snap ON/OFF) — pill kaca menyala/meredup halus mengikuti
@@ -225,15 +219,12 @@ internal fun GlassTabIcon(
     // `animateTo(focus, tween(220))` dari titik SINKRON terakhir itu — nyambung mulus ke posisi
     // commit final (0f/1f) TANPA lompatan mundur. Tap biasa (0 drag aktif sama sekali) tetap
     // dapat cross-fade tween(220) yang SAMA PERSIS seperti sebelumnya (Batch 440) — 0 regresi.
-    val glassAlphaAnim = remember { Animatable(focus) }
-    LaunchedEffect(focus, isDragging) {
-        if (isDragging) {
-            glassAlphaAnim.snapTo(focus)
-        } else {
-            glassAlphaAnim.animateTo(focus, tween(220))
-        }
-    }
-    val glassAlpha = glassAlphaAnim.value
+    // Batch 556 — `glassAlphaAnim` (Animatable + tween 220 ms, dikontrol `isDragging`) DIHAPUS: `focus` dari pemanggil kini
+    // = fungsi tenda posisi KUNCI yang meluncur (`navPillFocus`, MainActivity.kt) — sudah kontinu & sudah dianimasikan oleh
+    // gerak kunci, jadi dipakai LANGSUNG (animasi kedua di atasnya = lag mengejar target bergerak, akar keluhan Batch 445).
+    // Warna/skala ikon+label berganti persis di tepi kunci (referensi `SkeuTabBar` Boomly B191). Param `selected` &
+    // `isDragging` ikut dihapus (tak terpakai lagi).
+    val glassAlpha = focus
     val tint = MaterialTheme.colorScheme.primary
     // Batch 448 — ROMBAK TOTAL mekanisme drag bottom nav (instruksi eksplisit user + video
     // referensi iOS Jam asli). Root cause bug "gak bagus sama sekali" (2 kotak pill
@@ -289,8 +280,13 @@ internal fun GlassTabIcon(
             // STATIS 1 warna (kehilangan beda selected/unselected sama sekali, bukan cuma soal
             // gray-flash). Snap biner (0 lerp, aturan solid Batch 58/61/79 tidak disentuh), token
             // M3 resmi PERSIS yang dulu dipakai NavigationBarItem secara default.
-            val skeuIconColor = if (selected) NavigationBarItemDefaults.colors().selectedIconColor
-                else NavigationBarItemDefaults.colors().unselectedIconColor
+            // Batch 556 — lerp mengikuti kunci (dulu biner `selected`): ikon berwarna `selectedIconColor` hanya saat berada di
+            // atas kunci `secondaryContainer`, bukan lebih dulu saat kunci masih meluncur menuju tab ini.
+            val skeuIconColor = lerp(
+                NavigationBarItemDefaults.colors().unselectedIconColor,
+                NavigationBarItemDefaults.colors().selectedIconColor,
+                glassAlpha
+            )
             Icon(icon, contentDescription = null, tint = skeuIconColor)
         } else {
             val unselectedIconColor = NavigationBarItemDefaults.colors().unselectedIconColor
@@ -309,8 +305,11 @@ internal fun GlassTabIcon(
         // Batch 449 — sama alasan `skeuIconColor` di atas: dulu implisit `LocalContentColor`
         // `NavigationBarItem` (DIHAPUS), kini eksplisit token resmi selected/unselectedTextColor.
         val labelColor = if (isSkeu) {
-            if (selected) NavigationBarItemDefaults.colors().selectedTextColor
-            else NavigationBarItemDefaults.colors().unselectedTextColor
+            lerp(
+                NavigationBarItemDefaults.colors().unselectedTextColor,
+                NavigationBarItemDefaults.colors().selectedTextColor,
+                glassAlpha
+            )
         } else lerp(NavigationBarItemDefaults.colors().unselectedTextColor, tint, glassAlpha)
         MagnifyingTabLabel(label, glassAlpha, labelColor)
     }
