@@ -4,9 +4,7 @@ import android.net.Uri
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -17,15 +15,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.addOutline
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -36,24 +28,13 @@ import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
-import com.rudi.audioplayer.ui.theme.TactileHighlight
-import com.rudi.audioplayer.ui.theme.TactileShadow
-import com.rudi.audioplayer.ui.theme.TactileLightHighlight
-import com.rudi.audioplayer.ui.theme.TactileLightShadow
-import com.rudi.audioplayer.ui.theme.SkeuAmbientOcclusion
-import com.rudi.audioplayer.ui.theme.SkeuHighlight
-import com.rudi.audioplayer.ui.theme.SkeuShadow
-import com.rudi.audioplayer.ui.theme.SkeuSpecular
-import com.rudi.audioplayer.ui.theme.SkeuEmerald
-import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
-import com.rudi.audioplayer.ui.theme.SkeuLightAmbientOcclusion
-import com.rudi.audioplayer.ui.theme.SkeuLightHighlight
-import com.rudi.audioplayer.ui.theme.SkeuLightShadow
-import com.rudi.audioplayer.ui.theme.SkeuLightSpecular
 import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
-import com.rudi.audioplayer.ui.theme.neuCastOnly
 import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.coroutines.launch
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Size
+import com.rudi.audioplayer.ui.theme.neuRowTile
 
 // Batch 510 — Wave 2 T6 (docs/PENDING_CodeTidyPlan.md): AlbumArtHero dipindah MOVE-ONLY dari
 // NowPlayingScreen.kt (baris 1715-2029 termasuk KDoc, snapshot v509). Badan fungsi & KDoc identik
@@ -173,136 +154,88 @@ internal fun AlbumArtHero(
         }
     ) {
         val isTactile = isTactileTheme()
-        // Batch 59 — same gap as HomeScreen/LibraryScreen/MiniPlayerBar: this hero art (the
-        // single largest, most-looked-at surface on the whole screen) was Tactile-only, Skeu
-        // fell into the generic Apple shadow-only branch below with no bevel of its own at all.
         val isSkeu = isSkeuTheme()
         val isPanelTheme = isTactile || isSkeu
-        // v3 upgrade — Pilar A spec palet_warna_calm_retro_v3.md (CRT scanlines), dipasang di
-        // bawah lewat .calmScanlines() SETELAH .clip(heroShape) (bukan sebelum, beda dari
-        // teknik shadow Tactile/Skeu di atas yang sengaja bocor sebelum clip) — scanline harus
-        // terkurung rapi di dalam bentuk album art, tidak boleh meluber ke luar shape.
+        // CRT scanlines Calm Retro tetap dipasang SETELAH clip (terkurung di dalam bentuk art).
         val isCalmRetroHero = isCalmRetroTheme()
-        // Batch 74 — fix: this manual draw (unlike skeuEmboss()/tactileEmboss(), which both
-        // already branch on LocalIsDarkTheme) hardcoded dark-only tokens (TactileHighlight/
-        // TactileShadow, SkeuHighlight/SkeuShadow/SkeuAmbientOcclusion/SkeuSpecular/
-        // SkeuInnerGroove) with no light-mode branch at all — since Batch 61 made Tactile/Skeu
-        // fully autonomous per light/dark mode, this hero art (the single largest surface on
-        // the whole screen) has been silently drawing dark bevel colors over a light-mode panel
-        // this whole time. Fixed below via isDark + light-token fallback, matching the pattern
-        // skeuEmboss()/tactileEmboss() already use.
         val isDark = LocalIsDarkTheme.current
-        // Batch 52: recolored again for the literal Midnight Blue spec
-        // (compose-skeuomorphism-lite-midnight-blue.md) — same drawn top-down shadow +
-        // vertical-gradient bevel border technique kept from Batch 45/46/49-51, no code changes
-        // here at all; TactileHighlight/TactileShadow are plain white/black-based again this
-        // batch (see Color.kt), so this hero art picks up the new palette automatically through
-        // those same two token references.
-        // Batch 347 — user pilih lanjut sempurnakan trade-off yang sengaja ditunda Batch 346
-        // ("Radius.hero ikut skala"). Baseline referensi TETAP 280dp (konsisten dgn konvensi
-        // `dynamicArtSize` Batch 346 yang sengaja balik ke 280dp persis di layar 360dp lebar) —
-        // rasio artSize aktual thd baseline ini dikalikan ke `Radius.hero` (28dp, Spacing.kt)
-        // supaya sudut piringan tetap PROPORSIONAL secara visual di ukuran manapun (piringan
-        // besar = sudut ikut besar, piringan kecil = sudut ikut kecil), bukan radius absolut
-        // tetap yang terlihat makin "tajam"/kurang membulat relatif saat piringan membesar (atau
-        // sebaliknya berlebihan membulat saat mengecil). `Dp.div(Dp): Float` & `Dp.times(Float):
-        // Dp` — dicek ulang lewat dokumentasi resmi Compose sebelum dipakai (operator baku kelas
-        // `Dp`, bukan API custom) — `Dp * Float` sendiri sudah ada presedennya di file ini
-        // (`screenHeightDp * 0.28f`, baris `albumArtBoxHeight`).
-        // Token `Radius.hero` GLOBAL ITU SENDIRI (Spacing.kt) TIDAK disentuh — dipakai HANYA sbg
-        // nilai baseline di sini, bukan diubah jadi dinamis (token itu dipakai juga di Theme.kt
-        // utk `MaterialTheme.shapes.large`, dampak globalnya jauh di luar 1 layar ini).
-        // Cabang Tactile/Skeu (`isPanelTheme -> MaterialTheme.shapes.large`) SENGAJA TIDAK ikut
-        // diskalakan — 2 identitas itu memang didesain pakai bahasa sudut SERAGAM lintas berbagai
-        // ukuran permukaan (panel/sheet/kartu lain di app ini semua pakai radius theme yang sama,
-        // bukan proporsional per-objek); mengikutkan hero art di sini justru bikin hero beda
-        // sendiri dari permukaan besar lain di identitas yang sama — kebalikan dari konsistensi
-        // yang justru diinginkan bahasa desain panel itu. Scope PERSIS sesuai literal yang
-        // dikonfirmasi user: "Radius.hero ikut skala" — token itu spesifik cuma dipakai di cabang
-        // non-panel (Apple/default) ini.
+        // Batch 347 — sudut piringan proporsional thd ukuran art (baseline 280dp; `Radius.hero`
+        // global TIDAK diubah). Cabang Tactile/Skeu tetap `MaterialTheme.shapes.large`.
         val heroCornerRadius = Radius.hero * (artSize / 280.dp)
         val heroShape = if (isPanelTheme) MaterialTheme.shapes.large else RoundedCornerShape(heroCornerRadius)
+        // Batch 560 — user (screenshot): "album tidak menampilkan effect depth sama sekali saat
+        // tidak ada kontak". Dulu hero hanya bayangan jatuh tipis (neuCastOnly + .shadow) -> datar
+        // saat diam. Kini SEMUA tema: PELAT TIMBUL (`neuRowTile`: Tactile -> tactileEmboss,
+        // Neumorphism -> skeuEmboss, lainnya -> neuSurface; permukaan + bevel + bayangan Gaussian
+        // 3 lapis) berisi ART CEKUNG (bingkai `frameInset`, bayangan dalam kiri-atas gelap /
+        // kanan-bawah terang). Ukuran luar pelat = `artSize` (layout NowPlaying tak berubah); art
+        // di dalam mengecil sebesar 2x bingkai.
+        val frameInset = (artSize * 0.045f).coerceIn(8.dp, 14.dp)
+        val innerShape = if (isPanelTheme) MaterialTheme.shapes.medium
+        else RoundedCornerShape((heroCornerRadius - frameInset).coerceAtLeast(8.dp))
+        // Glow aksen di belakang. Batch 560 — fix: `blur()` default `BlurredEdgeTreatment.Rectangle`
+        // memotong glow keras di tepi Box -> tampak KOTAK lebih terang di belakang art (terlihat
+        // di screenshot user). `Unbounded` membiarkan blur meluruh halus keluar tepi.
         Box(
             modifier = Modifier
                 .size(artSize + 20.dp)
-                .blur(90.dp)
+                .blur(90.dp, BlurredEdgeTreatment.Unbounded)
                 .background(accentColor.copy(alpha = 0.38f), CircleShape)
         )
-        AlbumArt(
-            artworkUri = artworkUri,
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(artSize)
-                .then(
-                    when {
-                        isTactile -> {
-                            val heroHighlight = if (isDark) TactileHighlight else TactileLightHighlight
-                            val heroShadow = if (isDark) TactileShadow else TactileLightShadow
-                            Modifier
-                                .drawBehind {
-                                    val outline = heroShape.createOutline(size, layoutDirection, this)
-                                    val outlinePath = Path().apply { addOutline(outline) }
-                                    translate(top = 9.dp.toPx()) {
-                                        drawPath(outlinePath, color = heroShadow.copy(alpha = if (isDark) 0.55f else 0.30f))
-                                    }
-                                }
-                                .clip(heroShape)
-                                .border(
-                                    BorderStroke(
-                                        1.5.dp,
-                                        // Batch 55 — was verticalGradient, the one remaining spot in the
-                                        // whole Tactile identity still drawing top-down light instead of
-                                        // spec §9's diagonal top-left -> bottom-right (BlurUtils.kt's
-                                        // edgeBrush and TactileDepth.kt's tactileEmboss() border both
-                                        // already use linearGradient's default diagonal — this hero art
-                                        // border was the one inconsistent leftover from Batch 45/46,
-                                        // predating the diagonal rule adopted in Batch 53).
-                                        Brush.linearGradient(
-                                            listOf(
-                                                heroHighlight.copy(alpha = if (isDark) 0.12f else heroHighlight.alpha),
-                                                heroShadow.copy(alpha = if (isDark) 0.32f else heroShadow.alpha)
-                                            )
-                                        )
-                                    ),
-                                    heroShape
-                                )
-                                // Localized accent glow on the hero art is spec-sanctioned (§9: "Use
-                                // [glow] for… selected states… important tactile edges") since this
-                                // is the one always-active/selected surface on the whole screen —
-                                // alpha trimmed from the old 0.5f for restraint per §9/§13.
-                                .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
-                        }
-                        isSkeu -> {
-                            // Batch 552 — dual-shadow manual 5 layer (Batch 79-81: AO/shadow/
-                            // specular/highlight + clipRect halo 18dp) DIGANTIKAN `neuCastOnly()`
-                            // (mesin kedalaman Neumorphism Boomly, TactileDepth.kt) supaya hero art
-                            // sepadan dgn `skeuEmboss()` Batch 551. Glint Zamrud permanen
-                            // (0.35f/0.42f, Batch 80) dan accent `.shadow()` per-lagu dipertahankan.
-                            val emerald = if (isDark) SkeuEmerald else SkeuLightEmerald
-                            val heroEmeraldAlpha = if (isDark) 0.35f else 0.42f
-                            Modifier
-                                .neuCastOnly(shape = heroShape, elevation = 14.dp, isDark = isDark)
-                                .clip(heroShape)
-                                .drawBehind {
-                                    // Zamrud — glint bulat kecil di PERMUKAAN panel (setelah .clip()).
-                                    drawRect(
-                                        brush = Brush.radialGradient(
-                                            colors = listOf(emerald.copy(alpha = heroEmeraldAlpha), Color.Transparent),
-                                            center = Offset(size.width * 0.16f, size.height * 0.14f),
-                                            radius = size.minDimension.coerceAtLeast(1f) * 0.28f
-                                        )
-                                    )
-                                }
-                                .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
-                        }
-                        // Batch 552 — Apple/Calm Retro/Liquid Glass/Aurora: bayangan Gaussian Boomly
-                        // di belakang art, accent `.shadow()` lama tetap di atasnya.
-                        else -> Modifier
-                            .neuCastOnly(shape = heroShape, elevation = 16.dp, isDark = isDark)
-                            .shadow(elevation = 28.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.45f))
+                .neuRowTile(shape = heroShape, elevation = 14.dp)
+        ) {
+            AlbumArt(
+                artworkUri = artworkUri,
+                modifier = Modifier
+                    .size(artSize - frameInset * 2)
+                    .clip(innerShape)
+                    .then(if (isCalmRetroHero) Modifier.calmScanlines() else Modifier)
+                    .drawWithContent {
+                        drawContent()
+                        // Sumur cekung di tepi art: gelap kiri-atas, terang kanan-bawah.
+                        val band = 10.dp.toPx()
+                        val dark = Color.Black.copy(alpha = if (isDark) 0.45f else 0.26f)
+                        val light = Color.White.copy(alpha = if (isDark) 0.12f else 0.30f)
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(dark, Color.Transparent),
+                                startY = 0f,
+                                endY = band
+                            ),
+                            size = Size(size.width, band)
+                        )
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(dark, Color.Transparent),
+                                startX = 0f,
+                                endX = band
+                            ),
+                            size = Size(band, size.height)
+                        )
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, light),
+                                startY = size.height - band,
+                                endY = size.height
+                            ),
+                            topLeft = Offset(0f, size.height - band),
+                            size = Size(size.width, band)
+                        )
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(Color.Transparent, light),
+                                startX = size.width - band,
+                                endX = size.width
+                            ),
+                            topLeft = Offset(size.width - band, 0f),
+                            size = Size(band, size.height)
+                        )
                     }
-                )
-                .clip(heroShape)
-                .then(if (isCalmRetroHero) Modifier.calmScanlines() else Modifier)
-        )
+            )
+        }
     }
 }

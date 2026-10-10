@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 560 — Ripple diganti efek depth (global) + hero album timbul saat diam + fix kotak glow (BELUM verified compile/CI/device)
+- Instruksi user (screenshot NowPlaying): "refactor total ripple ke effect depth" dan "album tidak menampilkan effect depth sama sekali saat tidak ada kontak dari user langsung".
+- `TactileDepth.kt`: `NeuDepthIndication` + `NeuDepthIndicationNode` (`IndicationNodeFactory`/`DrawModifierNode`): saat Press area terbenam (redam 8%, bayangan dalam kiri-atas 28%, pantulan terang kanan-bawah 10%, animasi 90ms masuk / 240ms keluar; Release/Cancel kembali). `neuPressTile()` -> `indication = null` (sumur tile sendiri, tanpa dobel).
+- `Theme.kt`: di dalam `MaterialTheme(content = {...})`: `LocalIndication provides NeuDepthIndication` dan `LocalRippleConfiguration provides null` (ripple M3 hardcode mati; override di luar MaterialTheme tertimpa).
+- `AlbumArtHero.kt`: hero semua tema = pelat timbul `neuRowTile(elevation 14dp)` (ukuran luar = `artSize`) berisi art cekung (bingkai 4,5% `artSize`, 8-14dp; bayangan dalam 10dp). Tactile/Skeu/Apple/Calm Retro/Liquid Glass/Aurora lewat satu pintu. Border/bayangan/`.shadow()` aksen lama dibuang; scanline Calm Retro tetap di art. Glow `blur(90.dp)` -> `BlurredEdgeTreatment.Unbounded` (kotak lebih terang di belakang art hilang).
+- TIDAK diubah: tab bawah, `LockScreen.kt`, logika/gesture swipe hero, ukuran layout NowPlaying. `FILE_MANIFEST.txt` tak berubah.
+- **NOT VERIFIED**: tak ada compiler (hanya cek kurung seimbang + diff terhadap v559); Spotless/ArchUnit/SARIF tak dijalankan; belum dilihat di device. Perilaku berubah disengaja: `IconButton` kehilangan ripple (ripple M3 dimatikan); art hero ~9% lebih kecil (bingkai). Revert = `SONIX_v559.zip`.
+
 ## Batch 559 — Bayangan art kartu Home/Album + efek tekan (sumur cekung) pada tile klik (BELUM verified compile/CI/device)
 - Instruksi user: "1+3" dari opsi: (1) Kartu: HomeSongCard + album grid, (3) Efek tekan tile.
 - (1) `HomeScreen.kt` `HomeSongCard` (art 120dp) dan `LibraryLists.kt` `AlbumGridView` (kartu album 2 kolom): `neuCastOnly(RoundedCornerShape(r), elevation 6dp/8dp)` SEBELUM `.clip` — bayangan jatuh saja untuk art opak (pola AlbumArtHero, Batch 552). Ukuran/geometri/teks kartu tak berubah.

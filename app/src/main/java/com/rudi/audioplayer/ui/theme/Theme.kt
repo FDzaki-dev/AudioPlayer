@@ -14,6 +14,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.material3.LocalRippleConfiguration
 
 // Batch 61 — REARSITEKTUR: identitas tema (Apple/Tactile/Skeuomorphism) dan mode
 // terang/gelap dulunya digabung jadi satu enum AppTheme (SYSTEM/LIGHT/DARK/TACTILE/
@@ -523,7 +525,18 @@ fun AudioPlayerTheme(
                 ThemeIdentity.AURORA -> AuroraShapes
                 else -> AppleShapes
             },
-            content = content
+            content = {
+                // Batch 560 — "refactor total ripple ke effect depth": di DALAM MaterialTheme
+                // (MaterialTheme sendiri menyuntik ripple ke LocalIndication untuk content-nya, jadi
+                // override di luar tertimpa). `LocalIndication` = `NeuDepthIndication` utk semua
+                // clickable/selectable/Surface(onClick); `LocalRippleConfiguration = null` mematikan
+                // ripple M3 yang di-hardcode (IconButton dst). Tab bawah tetap `indication = null`.
+                CompositionLocalProvider(
+                    LocalIndication provides NeuDepthIndication,
+                    LocalRippleConfiguration provides null,
+                    content = content
+                )
+            }
         )
     }
 }

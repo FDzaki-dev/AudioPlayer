@@ -9,7 +9,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -66,6 +65,14 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.IndicationNodeFactory
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.node.DelegatableNode
+import androidx.compose.ui.node.DrawModifierNode
+import kotlinx.coroutines.launch
 
 /**
  * Batch 53 — repainted again for the user-supplied compose-amoled-hybrid-glass-final.md spec,
@@ -1070,7 +1077,7 @@ fun Modifier.neuRowTile(
 /**
  * Batch 559 — tile baris yang bisa DITEKAN: [neuRowTile] + sumur cekung selama jari menekan
  * (Tactile/Neumorphism ikut skala emboss 0.985/0.978). Pola sama dgn tombol keypad `LockScreen`:
- * `interactionSource` bersama, ripple tetap (`LocalIndication`), clip dari mesin kedalaman. Press di
+ * `interactionSource` bersama, tanpa ripple/overlay (Batch 560), clip dari mesin kedalaman. Press di
  * dalam kontainer scroll baru terkirim setelah jeda tap bawaan Compose, jadi awal scroll tak
  * mengedipkan sumur. Pasang `.padding()` isi SESUDAH modifier ini; jangan tambah `.clickable` lagi.
  */
@@ -1086,7 +1093,9 @@ fun Modifier.neuPressTile(
         .neuRowTile(shape = shape, elevation = elevation, pressed = isPressed)
         .clickable(
             interactionSource = interactionSource,
-            indication = LocalIndication.current,
+            // Batch 560 — TANPA indication: sumur cekung milik tile sudah jadi feedback tekan;
+            // `NeuDepthIndication` (LocalIndication) di atasnya akan jadi dobel.
+            indication = null,
             onClick = onClick
         )
 }
@@ -1246,5 +1255,93 @@ private fun Modifier.neuKeyDraw(
                 }
             }
         }
+    }
+}
+
+/**
+ * Batch 560 — pengganti ripple SELURUH app ("refactor total ripple ke effect depth"): saat jari
+ * menekan, area klik TERBENAM — redaman tipis + bayangan dalam di tepi kiri-atas dan pantulan terang
+ * di tepi kanan-bawah (sumur cekung Neumorphism), masuk cepat (90ms) dan keluar lembut (240ms).
+ * Dipasang di `AudioPlayerTheme` lewat `LocalIndication` + `LocalRippleConfiguration = null` (yang
+ * kedua mematikan ripple M3 yang di-hardcode komponen, mis. `IconButton`). Bentuk mengikuti clip
+ * pemilik klik (persegi bila tak ada clip). Tile `neuPressTile()` memakai `indication = null`: sumur
+ * miliknya sendiri sudah jadi feedback tekan. Pola `IndicationNodeFactory` sama dgn
+ * `NoRippleIndication` (equals/hashCode WAJIB eksplisit, log_fail_425).
+ */
+object NeuDepthIndication : IndicationNodeFactory {
+    override fun create(interactionSource: InteractionSource): DelegatableNode =
+        NeuDepthIndicationNode(interactionSource)
+
+    override fun equals(other: Any?): Boolean = other === this
+
+    override fun hashCode(): Int = -2
+}
+
+private class NeuDepthIndicationNode(
+    private val interactionSource: InteractionSource
+) : Modifier.Node(), DrawModifierNode {
+    private val depth = Animatable(0f)
+
+    override fun onAttach() {
+        coroutineScope.launch {
+            var held = 0
+            interactionSource.interactions.collect { interaction ->
+                when (interaction) {
+                    is PressInteraction.Press -> {
+                        held++
+                        launch { depth.animateTo(1f, tween(durationMillis = 90)) }
+                    }
+                    is PressInteraction.Release, is PressInteraction.Cancel -> {
+                        held = (held - 1).coerceAtLeast(0)
+                        if (held == 0) launch { depth.animateTo(0f, tween(durationMillis = 240)) }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun ContentDrawScope.draw() {
+        drawContent()
+        val p = depth.value
+        if (p <= 0.001f) return
+        val w = size.width
+        val h = size.height
+        if (w <= 0f || h <= 0f) return
+        val band = 8.dp.toPx().coerceAtMost(minOf(w, h) / 2f)
+        drawRect(color = Color.Black.copy(alpha = 0.08f * p))
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color.Black.copy(alpha = 0.28f * p), Color.Transparent),
+                startY = 0f,
+                endY = band
+            ),
+            size = Size(w, band)
+        )
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Black.copy(alpha = 0.28f * p), Color.Transparent),
+                startX = 0f,
+                endX = band
+            ),
+            size = Size(band, h)
+        )
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.10f * p)),
+                startY = h - band,
+                endY = h
+            ),
+            topLeft = Offset(0f, h - band),
+            size = Size(w, band)
+        )
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.10f * p)),
+                startX = w - band,
+                endX = w
+            ),
+            topLeft = Offset(w - band, 0f),
+            size = Size(band, h)
+        )
     }
 }
