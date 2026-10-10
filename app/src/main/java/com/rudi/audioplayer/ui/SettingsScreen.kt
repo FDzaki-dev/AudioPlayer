@@ -50,6 +50,7 @@ import com.rudi.audioplayer.ui.theme.ThemeIdentity
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.colorsFor
 import com.rudi.audioplayer.ui.theme.neuRowTile
+import com.rudi.audioplayer.ui.theme.neuPressTile
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.calmAberration
@@ -348,8 +349,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
-                    .neuRowTile()
-                    .clickable { onOpenStats() }
+                    .neuPressTile { onOpenStats() }
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -372,8 +372,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
-                    .neuRowTile()
-                    .clickable { showBackupRestore = true }
+                    .neuPressTile { showBackupRestore = true }
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -396,8 +395,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
-                    .neuRowTile()
-                    .clickable { showDuplicateFinder = true }
+                    .neuPressTile { showDuplicateFinder = true }
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -420,8 +418,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
-                    .neuRowTile()
-                    .clickable { showVault = true }
+                    .neuPressTile { showVault = true }
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -446,8 +443,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
-                    .neuRowTile()
-                    .clickable { showClearLyricsCacheConfirm = true }
+                    .neuPressTile { showClearLyricsCacheConfirm = true }
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -528,8 +524,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
-                        .neuRowTile()
-                        .clickable { showSignatureMatcher = true }
+                        .neuPressTile { showSignatureMatcher = true }
                         .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -546,8 +541,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
-                        .neuRowTile()
-                        .clickable { showDiagnosticLog = true }
+                        .neuPressTile { showDiagnosticLog = true }
                         .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -597,8 +591,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
-                    .neuRowTile()
-                    .clickable { showUpdateCheck = true }
+                    .neuPressTile { showUpdateCheck = true }
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

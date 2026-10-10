@@ -38,7 +38,8 @@ import androidx.compose.ui.layout.positionInRoot
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.ui.theme.Radius
-import com.rudi.audioplayer.ui.theme.neuRowTile
+import com.rudi.audioplayer.ui.theme.neuCastOnly
+import com.rudi.audioplayer.ui.theme.neuPressTile
 import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -79,6 +80,9 @@ internal fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> 
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
+                            // Batch 559 — art OPAK: bayangan jatuh saja (`neuCastOnly`, pola
+                            // AlbumArtHero Batch 552), SEBELUM `.clip`; geometri kartu tak berubah.
+                            .neuCastOnly(RoundedCornerShape(Radius.xxxl), elevation = 8.dp)
                             .clip(RoundedCornerShape(Radius.xxxl))
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -335,8 +339,7 @@ internal fun GroupedListView(
                     modifier = Modifier
                         .animateItem()
                         .padding(horizontal = 12.dp, vertical = 3.dp)
-                        .neuRowTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp)
-                        .clickable { selectedGroup = group }
+                        .neuPressTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp) { selectedGroup = group }
                         .padding(horizontal = 8.dp)
                 )
             }
@@ -408,11 +411,16 @@ internal fun SongRow(
                 // dan tinggi baris (64dp) TIDAK berubah. Highlight "sedang diputar" di bawah kini
                 // ter-clip ke bentuk tile.
                 .padding(horizontal = 12.dp, vertical = 3.dp)
-                .neuRowTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp)
+                .neuPressTile(
+                    shape = RoundedCornerShape(Radius.xl),
+                    elevation = 3.dp,
+                    onClick = { if (selectionMode) onToggleSelect() else onClick() }
+                )
+                // Batch 559 — `.clickable` pindah ke dalam `neuPressTile` (sumur saat ditekan);
+                // highlight di bawah kini setelah tile, ripple tetap menimpanya.
                 // Batch 163 pending-item fix: samakan pola highlight "sedang diputar" dengan
-                // `QueueRow` (primary 12% alpha bg) — background dipasang SEBELUM clickable,
-                // urutan modifier sama persis QueueRow, supaya ripple clickable tetap kelihatan
-                // di atas warna latar ini, bukan ketutup.
+                // `QueueRow` (primary 12% alpha bg). Batch 559: background kini SESUDAH `neuPressTile`
+                // (clickable ada di dalamnya); ripple digambar di atas konten, jadi tetap kelihatan.
                 .background(if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent)
                 // Batch 72: this used to also carry onLongClick -> onEnterSelectionMode()
                 // (Batch 66) — a second, INDEPENDENT long-press recognizer on the exact same
@@ -427,7 +435,6 @@ internal fun SongRow(
                 // leaves it), so this isn't lost functionality — "Pilih" in the row's overflow
                 // menu (search onEnterSelectionMode() below) remains as the explicit-tap entry
                 // point into selection mode.
-                .clickable(onClick = { if (selectionMode) onToggleSelect() else onClick() })
                 .padding(horizontal = 8.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

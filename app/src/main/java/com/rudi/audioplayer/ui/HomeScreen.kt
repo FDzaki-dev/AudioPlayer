@@ -30,6 +30,7 @@ import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
 import com.rudi.audioplayer.ui.theme.neuSurface
+import com.rudi.audioplayer.ui.theme.neuCastOnly
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.Radius
 import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
@@ -376,6 +377,9 @@ private fun HomeSongCard(song: Song, onClick: () -> Unit) {
             artworkUri = song.uri,
             modifier = Modifier
                 .size(120.dp)
+                // Batch 559 — art OPAK: bayangan jatuh saja (`neuCastOnly`, pola AlbumArtHero
+                // Batch 552), SEBELUM `.clip`; ukuran/geometri kartu tak berubah.
+                .neuCastOnly(RoundedCornerShape(Radius.xxl), elevation = 6.dp)
                 .clip(RoundedCornerShape(Radius.xxl))
         )
         Spacer(modifier = Modifier.height(6.dp))

@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 559 — Bayangan art kartu Home/Album + efek tekan (sumur cekung) pada tile klik (BELUM verified compile/CI/device)
+- Instruksi user: "1+3" dari opsi: (1) Kartu: HomeSongCard + album grid, (3) Efek tekan tile.
+- (1) `HomeScreen.kt` `HomeSongCard` (art 120dp) dan `LibraryLists.kt` `AlbumGridView` (kartu album 2 kolom): `neuCastOnly(RoundedCornerShape(r), elevation 6dp/8dp)` SEBELUM `.clip` — bayangan jatuh saja untuk art opak (pola AlbumArtHero, Batch 552). Ukuran/geometri/teks kartu tak berubah.
+- (3) `TactileDepth.kt`: `neuSurface(shape, elevation, pressed: Boolean? = null)` dan `neuRowTile(shape, elevation, pressed: Boolean? = null)` (default = perilaku lama); helper baru `neuPressTile(shape, elevation, onClick)` = `neuRowTile(pressed)` + `clickable(interactionSource, LocalIndication.current)`. Tactile/Neumorphism: skala emboss 0.985/0.978 + sumur; tema lain: sumur `neuDepth(pressed)`.
+- Dipasang: `SongRow` + header grup `GroupedListView` (`LibraryLists.kt`), baris playlist + `PlaylistSongRow` (`PlaylistScreen.kt`), 8 baris navigasi (`SettingsScreen.kt`). `SongRow`/`PlaylistSongRow`: `.clickable` pindah ke dalam `neuPressTile`; `.background` highlight "sedang diputar" kini SESUDAHNYA. Komentar Batch 163 di `SongRow` disesuaikan.
+- TIDAK diubah: baris switch + grup Keamanan (statis), `QueueRow`/`DuplicateSongRow`/Vault (sheet kaca), baris lagu dialog album, logika/gesture. `FILE_MANIFEST.txt` tak berubah.
+- **NOT VERIFIED**: tak ada compiler (hanya cek kurung seimbang + diff terhadap v558); Spotless/ArchUnit/SARIF tak dijalankan; belum dilihat di device. Risiko diketahui: ripple + sumur bisa terasa ganda; `SongRow` kini recompose saat tekan/lepas (state `isPressed`). Revert = `SONIX_v558.zip`.
+
 ## Batch 558 — Depth tile lanjutan (header grup, baris playlist) + buang divider antar tile (BELUM verified compile/CI/device)
 - Instruksi user: "Next" setelah Batch 557; dibaca sebagai lanjut thread depth baris list (kandidat di `[RESUME POINT]` Batch 557).
 - MISS Batch 557 diperbaiki: `HorizontalDivider` tetap ada setelah `SongRow` di `SongListView` (`LibraryLists.kt`) dan `SearchResultsView` (`LibrarySearch.kt`) -> garis penuh di celah 6dp antar tile. Dibuang.

@@ -34,7 +34,7 @@ import androidx.compose.ui.zIndex
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.ui.theme.Radius
-import com.rudi.audioplayer.ui.theme.neuRowTile
+import com.rudi.audioplayer.ui.theme.neuPressTile
 import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
 /** Playlist tab content: list of playlists, or the detail view of a selected one. */
@@ -82,8 +82,7 @@ fun PlaylistTabView(
                             // tema); divider dibuang. Isi ListItem bergeser +12dp (margin tile).
                             modifier = Modifier
                                 .padding(horizontal = 12.dp, vertical = 3.dp)
-                                .neuRowTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp)
-                                .clickable { selectedPlaylistId = playlist.id }
+                                .neuPressTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp) { selectedPlaylistId = playlist.id }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -350,9 +349,8 @@ private fun PlaylistSongRow(
             // padding dalam 8/5dp = 20/8dp lama -> posisi isi & tinggi baris 64dp (dipakai hitungan
             // geser `rowHeightPx`) TIDAK berubah. Tile ikut `translationY` caller saat di-drag.
             .padding(horizontal = 12.dp, vertical = 3.dp)
-            .neuRowTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp)
+            .neuPressTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp, onClick = onClick)
             .background(background)
-            .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

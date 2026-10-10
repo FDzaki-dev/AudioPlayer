@@ -9,7 +9,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -1039,9 +1043,9 @@ fun Modifier.neuDepth(
  *  Pasangkan dengan `Surface(color = Color.Transparent, tonalElevation = 0.dp)` (pola yang sama
  *  dgn cabang Tactile/Neumorphism): fill digambar di sini, bukan oleh Surface. */
 @Composable
-fun Modifier.neuSurface(shape: Shape, elevation: Dp = 8.dp): Modifier {
+fun Modifier.neuSurface(shape: Shape, elevation: Dp = 8.dp, pressed: Boolean? = null): Modifier {
     val surface = MaterialTheme.colorScheme.surface
-    return this.neuDepth(shape = shape, elevation = elevation, faceTop = surface, faceBottom = surface)
+    return this.neuDepth(shape = shape, elevation = elevation, faceTop = surface, faceBottom = surface, pressed = pressed)
 }
 
 /**
@@ -1055,11 +1059,36 @@ fun Modifier.neuSurface(shape: Shape, elevation: Dp = 8.dp): Modifier {
 @Composable
 fun Modifier.neuRowTile(
     shape: Shape = RoundedCornerShape(Radius.xl),
-    elevation: Dp = 4.dp
+    elevation: Dp = 4.dp,
+    pressed: Boolean? = null
 ): Modifier = when {
-    isTactileTheme() -> this.tactileEmboss(shape = shape, elevation = elevation)
-    isSkeuTheme() -> this.skeuEmboss(shape = shape, elevation = elevation)
-    else -> this.neuSurface(shape = shape, elevation = elevation)
+    isTactileTheme() -> this.tactileEmboss(shape = shape, elevation = elevation, pressed = pressed == true)
+    isSkeuTheme() -> this.skeuEmboss(shape = shape, elevation = elevation, pressed = pressed == true)
+    else -> this.neuSurface(shape = shape, elevation = elevation, pressed = pressed)
+}
+
+/**
+ * Batch 559 — tile baris yang bisa DITEKAN: [neuRowTile] + sumur cekung selama jari menekan
+ * (Tactile/Neumorphism ikut skala emboss 0.985/0.978). Pola sama dgn tombol keypad `LockScreen`:
+ * `interactionSource` bersama, ripple tetap (`LocalIndication`), clip dari mesin kedalaman. Press di
+ * dalam kontainer scroll baru terkirim setelah jeda tap bawaan Compose, jadi awal scroll tak
+ * mengedipkan sumur. Pasang `.padding()` isi SESUDAH modifier ini; jangan tambah `.clickable` lagi.
+ */
+@Composable
+fun Modifier.neuPressTile(
+    shape: Shape = RoundedCornerShape(Radius.xl),
+    elevation: Dp = 4.dp,
+    onClick: () -> Unit
+): Modifier {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    return this
+        .neuRowTile(shape = shape, elevation = elevation, pressed = isPressed)
+        .clickable(
+            interactionSource = interactionSource,
+            indication = LocalIndication.current,
+            onClick = onClick
+        )
 }
 
 /** Bayangan jatuh SAJA untuk konten OPAK yang menggambar dirinya sendiri (hero album art): tanpa
