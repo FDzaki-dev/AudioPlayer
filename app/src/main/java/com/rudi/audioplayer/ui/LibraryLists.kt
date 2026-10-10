@@ -294,7 +294,8 @@ internal fun SongListView(
                 onEnterSelectionMode = { onEnterSelectionMode(song.id) },
                 isPlaying = song.id == currentSongId
             )
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            // Batch 558 — divider antar baris dibuang: baris = tile berkedalaman (Batch 557), celah
+            // 6dp + bayangan sudah jadi pemisah.
         }
     }
 }
@@ -329,12 +330,15 @@ internal fun GroupedListView(
                     headlineContent = { Text(group, style = MaterialTheme.typography.titleMedium) },
                     supportingContent = { Text("${grouped[group]?.size ?: 0} lagu") },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    // Batch 558 — header grup = tile berkedalaman (`neuRowTile()`). Margin 12dp +
+                    // padding dalam 8dp = 20dp lama -> posisi teks tidak bergeser; divider dibuang.
                     modifier = Modifier
                         .animateItem()
+                        .padding(horizontal = 12.dp, vertical = 3.dp)
+                        .neuRowTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp)
                         .clickable { selectedGroup = group }
-                        .padding(horizontal = 20.dp)
+                        .padding(horizontal = 8.dp)
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             }
         }
     } else {

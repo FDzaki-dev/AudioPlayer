@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 558 — Depth tile lanjutan (header grup, baris playlist) + buang divider antar tile (BELUM verified compile/CI/device)
+- Instruksi user: "Next" setelah Batch 557; dibaca sebagai lanjut thread depth baris list (kandidat di `[RESUME POINT]` Batch 557).
+- MISS Batch 557 diperbaiki: `HorizontalDivider` tetap ada setelah `SongRow` di `SongListView` (`LibraryLists.kt`) dan `SearchResultsView` (`LibrarySearch.kt`) -> garis penuh di celah 6dp antar tile. Dibuang.
+- `LibraryLists.kt` (`GroupedListView`): header grup (tab Artis/Folder dst.) = tile `neuRowTile()` elevasi 3dp; margin 12dp + padding dalam 8dp = 20dp lama (teks tak bergeser); divider dibuang.
+- `PlaylistScreen.kt`: baris daftar playlist (`ListItem`) = tile, divider dibuang, isi bergeser +12dp (margin tile; sebelumnya tanpa padding luar). `PlaylistSongRow` = tile: margin 12/3dp + padding dalam 8/5dp = 20/8dp lama -> tinggi baris 64dp (dasar `rowHeightPx` hitungan drag-reorder) tidak berubah; `translationY`/`zIndex` caller tetap membawa tile; divider setelah baris dibuang (celah antar baris kini tepat 64dp, dulu 65dp).
+- TIDAK diubah: `neuRowTile()`, logika/navigasi/gesture, `QueueRow`/`DuplicateSongRow`/baris Vault (di dalam sheet kaca; akar glitch sheet Batch 553/554 belum terbukti), baris lagu dialog album, `HomeSongCard`. `FILE_MANIFEST.txt` tak berubah.
+- **NOT VERIFIED**: tak ada compiler (hanya cek kurung seimbang + diff terhadap v557); Spotless/ArchUnit/SARIF tak dijalankan; belum dilihat di device. Revert = `SONIX_v557.zip`.
+
 ## Batch 557 — Depth tile baris Pengaturan + baris daftar lagu, semua tema (BELUM verified compile/CI/device)
 - Instruksi user: memilih opsi "Depth: kartu Settings + baris list" (kandidat "belum diaudit depth" di `[RESUME POINT]` Batch 556).
 - `ui/theme/TactileDepth.kt`: `neuRowTile(shape = RoundedCornerShape(Radius.xl), elevation = 4.dp)` — satu pintu semua identitas: Tactile -> `tactileEmboss`, Neumorphism -> `skeuEmboss`, Apple/Calm Retro/Liquid Glass/Aurora -> `neuSurface`. Liquid Glass sengaja `neuSurface()` (bukan `frostedGlass()`: blur Haze per baris yg di-scroll mahal). Impor `RoundedCornerShape` ditambah.

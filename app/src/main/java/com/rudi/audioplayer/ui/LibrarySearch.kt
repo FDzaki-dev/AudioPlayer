@@ -333,7 +333,7 @@ internal fun SearchResultsView(
                     onHideSong = { onHideSong(song) },
                     isPlaying = song.id == currentSongId
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                // Batch 558 — divider dibuang (baris = tile berkedalaman, Batch 557).
             }
         }
     }

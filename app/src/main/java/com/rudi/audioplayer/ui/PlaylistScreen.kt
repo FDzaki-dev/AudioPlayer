@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -32,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.ui.theme.Radius
+import com.rudi.audioplayer.ui.theme.neuRowTile
 import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
 /** Playlist tab content: list of playlists, or the detail view of a selected one. */
@@ -75,9 +78,13 @@ fun PlaylistTabView(
                             supportingContent = { Text("${playlist.songIds.size} lagu") },
                             leadingContent = { Icon(Icons.Default.QueueMusic, contentDescription = null) },
                             colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                            modifier = Modifier.clickable { selectedPlaylistId = playlist.id }
+                            // Batch 558 — baris playlist = tile berkedalaman (`neuRowTile()`, semua
+                            // tema); divider dibuang. Isi ListItem bergeser +12dp (margin tile).
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp, vertical = 3.dp)
+                                .neuRowTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp)
+                                .clickable { selectedPlaylistId = playlist.id }
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                     }
                     item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
@@ -212,7 +219,7 @@ fun PlaylistTabView(
                                     }
                                 )
                             )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                            // Batch 558 — divider dibuang (baris = tile berkedalaman).
                         }
                     }
                     FloatingActionButton(
@@ -339,9 +346,14 @@ private fun PlaylistSongRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            // Batch 558 — baris = tile berkedalaman (pola `SongRow` Batch 557). Margin 12/3dp +
+            // padding dalam 8/5dp = 20/8dp lama -> posisi isi & tinggi baris 64dp (dipakai hitungan
+            // geser `rowHeightPx`) TIDAK berubah. Tile ikut `translationY` caller saat di-drag.
+            .padding(horizontal = 12.dp, vertical = 3.dp)
+            .neuRowTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp)
             .background(background)
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
