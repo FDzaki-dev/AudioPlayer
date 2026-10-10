@@ -243,8 +243,11 @@ val SkeuSpecularPressed = Color.White.copy(alpha = 0.10f)
 // blast radius perubahan ini tetap murni di dalam skeuEmboss() sendiri). Prinsip inti
 // neumorphism: panel terbaca "dipahat dari material yang sama dengan kanvas", bukan lagi
 // panel logam 4-stop yang jelas beda warna dari kanvas seperti Hyper-Realism lama.
-val SkeuNeuSurfaceDark = Color(0xFF1C1517)
-val SkeuNeuSurfaceLight = Color(0xFFEFE8DE)
+// Batch 564 — panel kini membawa UNDERTONE ANGGUR yang terbaca (dulu 0xFF1C1517 / 0xFFEFE8DE nyaris netral,
+// aksen burgundy hanya hidup sebagai titik kilau). Setelah diangkat mesin kedalaman (+9% putih) tile gelap
+// ~0xFF382A2E = arang-anggur, bukan abu-abu cokelat. Kontras ivory/champagne di atasnya tetap > 11:1 (hitungan offline).
+val SkeuNeuSurfaceDark = Color(0xFF231619)
+val SkeuNeuSurfaceLight = Color(0xFFF1E8DF)
 
 // --- Aksen Zamrud (Batch 79, BARU) — "aksen Titanium yang dominan dengan sedikit sentuhan
 // zamrud" per instruksi eksplisit user. SkeuAccent (Titanium+Silver) TIDAK diganti/disentuh —
@@ -256,6 +259,20 @@ val SkeuNeuSurfaceLight = Color(0xFFEFE8DE)
 // ambient streak (MainActivity.kt, protected/parsial).
 val SkeuEmerald = Color(0xFFB03A55) // Batch 563: kini RUBY (nama lama dipertahankan)
 val SkeuLightEmerald = Color(0xFF8E2440) // Batch 563: kini RUBY pekat
+
+// --- Batch 564 — SISTEM AKSEN BURGUNDY (menggantikan bintik kilau "emerald" per-tile) --------------
+// Tiga keluarga, satu aturan pakai (komposisi 60-30-10 ala interior "old money"):
+//   ANGGUR (burgundy)  = permukaan/keadaan AKTIF: wash tile, rel penanda, lantai saklar ON, medali ikon.
+//   RUBY               = titik cahaya kecil: permata kenop saklar, ujung atas rel, kilau lantai ON.
+//   GILT (emas champagne) = DETAIL halus saja: hairline tepi atas tile, cincin medali, garis header, tanda "I".
+// Nama baru, tidak menimpa token lama (SkeuEmerald/SkeuLightEmerald tetap dipakai streak ambient MainActivity).
+val SkeuWineDeep = Color(0xFF40101E) // anggur tergelap (lantai saklar ON bagian atas, dasar medali)
+val SkeuWine = Color(0xFF6E1B30) // burgundy inti (wash tile, rel, lantai ON)
+val SkeuWineLit = Color(0xFFA33550) // anggur terang (dasar lantai ON, puncak medali, halo)
+val SkeuRubyHi = Color(0xFFEA6A83) // ruby terang (permata, ujung rel aktif)
+val SkeuRubyLo = Color(0xFF7E1830) // ruby gelap (tepi permata)
+val SkeuGilt = Color(0xFFDCC393) // emas champagne (mode gelap)
+val SkeuGiltDeep = Color(0xFF9C7E4E) // emas tua (mode terang — champagne terang hilang di perkamen)
 
 // ============================================================================
 // SKEUOMORPHISM — LIGHT VARIANT — Batch 61. Sama alasan dengan TACTILE LIGHT di

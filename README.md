@@ -201,9 +201,10 @@ permukaan kaca lainnya.
   cuma mengecil), kesan permukaan masuk ke kanvas. Palet (Batch 563, rombak total): aksen primer
   **Burgundy** (claret di mode gelap, burgundy pekat di mode terang — dikenali `isSkeuTheme()`), sekunder
   **Champagne/sand** yang tenang, kanvas arang berundertone anggur (gelap) / perkamen hangat (terang), teks ivory,
-  status sukses sage; glint tekan tile kini ruby. Bentuk "tailored": radius panel/tile dipangkas ke
-  <= 12dp (`SkeuCappedShape`), skala bentuk M3 4/6/10/12/16dp. **Saklar** (`ui/NeuSwitch.kt`) = palung cekung +
-  kunci timbul meluncur di SEMUA tema (lantai palung bertinta primary saat ON). Wajib gelap-mode-independen (punya ekspresi terang sendiri sejak
+  status sukses sage. Aksen burgundy dipakai sebagai SISTEM (Batch 564), bukan titik kilau: wash anggur diagonal + hairline gilt di tiap tile, rel penanda kiri (ruby terang saat tile aktif), medali enamel burgundy di ikon navigasi Pengaturan, kop section berpermata + garis gilt. Bentuk "tailored": radius panel/tile dipangkas ke
+  <= 12dp (`SkeuCappedShape`), skala bentuk M3 4/6/10/12/16dp. **Saklar** (`ui/NeuSwitch.kt`, Batch 564) = sumur
+  berdinding dalam (bayangan dinding, bibir luar, tanda pahat "I"/"O") + kenop kuningan berkubah yang meluncur di SEMUA
+  tema; ON = lantai burgundy berpendar + permata ruby di pusat kenop. Wajib gelap-mode-independen (punya ekspresi terang sendiri sejak
   Batch 61). Dipasang di mini player, tombol play/pause (mini & Now Playing), piringan album hero,
   kartu "Lanjutkan Mendengarkan", banner undo-sembunyikan-lagu, badge indikator gesture, dan baris
   pemilih tema. **Typography sendiri** (Batch 305, murni 100% — bukan pinjaman Apple lagi):

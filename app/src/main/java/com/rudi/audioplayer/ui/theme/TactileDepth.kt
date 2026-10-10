@@ -215,29 +215,37 @@ fun Modifier.tactileEmboss(
 // `SkeuNeuSurfaceDark/Light`, dan glint Zamrud (identitas Titanium + sentuhan Emerald) apa
 // adanya — tanda tangan publik tidak berubah. Token Skeu{Specular,AmbientOcclusion,Highlight,
 // Shadow} dkk. di Color.kt tidak lagi dibaca fungsi ini (tidak dihapus: dipakai AlbumArtHero.kt).
+// Batch 564 — AKSEN BURGUNDY = SISTEM, bukan bintik. Glint radial kecil (Batch 80/563) DIBUANG; gantinya 4 lapis
+// yang sama-sama dihitung di `drawSkeuWine()`: (1) WASH anggur diagonal di seluruh permukaan (tile terbaca
+// "kulit burgundy", bukan arang netral), (2) hairline GILT di tepi atas (kilau emas-champagne di bawah bevel),
+// (3) REL penanda di tepi kiri (pita pembatas buku; hanya tile pendek, bukan pil/lingkaran/panel besar) + pendar
+// ruby di sekitarnya, (4) tekan = anggur "membanjir" (wash + hairline menguat). [active] = keadaan tile AKTIF
+// (mis. baris saklar yang ON): rel jadi ruby terang + pendar + wash menguat — keadaan saklar terbaca dari
+// seluruh tile, bukan cuma dari kenopnya. Default false = perilaku tile biasa.
 @Composable
 fun Modifier.skeuEmboss(
     shape: Shape = MaterialTheme.shapes.medium,
     elevation: Dp = 8.dp,
-    pressed: Boolean = false
+    pressed: Boolean = false,
+    active: Boolean = false
 ): Modifier {
     val isDark = LocalIsDarkTheme.current
     val panelFill = if (isDark) SkeuNeuSurfaceDark else SkeuNeuSurfaceLight
-    val emerald = if (isDark) SkeuEmerald else SkeuLightEmerald
 
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.978f else 1f,
         label = "skeuEmbossScale"
     )
-    // Batch 80 — glint Zamrud: layer TERPISAH (radial kecil, warna murni SkeuEmerald), idle 0.20f
-    // naik 0.52f saat pressed (permata menyala redup di logam titanium).
-    val emeraldAlpha by animateFloatAsState(
-        targetValue = if (pressed) 0.52f else 0.20f,
-        label = "skeuEmbossEmeraldGlow"
+    val pressT by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = tween(durationMillis = if (pressed) 70 else 160),
+        label = "skeuEmbossWinePress"
     )
-    // Posisi glint ikut sisi terang: kiri-atas normal, kanan-bawah saat pressed (sumur cekung
-    // memantulkan cahaya dari dinding seberang).
-    val dir = if (pressed) -1f else 1f
+    val activeT by animateFloatAsState(
+        targetValue = if (active) 1f else 0f,
+        animationSpec = tween(durationMillis = 260),
+        label = "skeuEmbossWineActive"
+    )
     // Batch 563 — bentuk "old money": radius dp hardcode pemanggil (`Radius.xl/xxl`, `shapes.*`) dipangkas
     // ke <= 12dp; pil/lingkaran dibiarkan. `remember(shape)` + data class = kunci cache bitmap tetap stabil.
     val tailored = remember(shape) { SkeuCappedShape(shape) }
@@ -251,17 +259,74 @@ fun Modifier.skeuEmboss(
             faceBottom = panelFill,
             pressed = pressed
         )
-        .drawBehind {
-            val cx = if (dir > 0f) size.width * 0.18f else size.width * 0.82f
-            val cy = if (dir > 0f) size.height * 0.16f else size.height * 0.84f
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(emerald.copy(alpha = emeraldAlpha), Color.Transparent),
-                    center = Offset(cx, cy),
-                    radius = size.minDimension.coerceAtLeast(1f) * 0.32f
-                )
-            )
-        }
+        .drawBehind { drawSkeuWine(tailored, isDark, pressT, activeT) }
+}
+
+/** Batch 564 — lapisan aksen burgundy tile Neumorphism (lihat komentar [skeuEmboss]). Digambar DI ATAS permukaan
+ *  mesin kedalaman, di dalam `.clip(shape)`-nya, di BAWAH konten. [press]/[active] 0..1. */
+private fun DrawScope.drawSkeuWine(shape: Shape, isDark: Boolean, press: Float, active: Float) {
+    val w = size.width
+    val h = size.height
+    if (w < 8f || h < 8f) return
+    val lit = (active + press * 0.8f).coerceIn(0f, 1f)
+    val wine = if (isDark) SkeuWine else SkeuAccentLight
+    val gilt = if (isDark) SkeuGilt else SkeuGiltDeep
+    val ruby = if (isDark) SkeuRubyHi else SkeuWineLit
+
+    // 1. WASH anggur diagonal: pekat di kiri-atas, memudar ke kanan-bawah (arah cahaya tema).
+    val washA = (if (isDark) 0.30f else 0.12f) * (1f + 0.55f * lit)
+    drawRect(
+        brush = Brush.linearGradient(
+            0.00f to wine.copy(alpha = washA),
+            0.60f to wine.copy(alpha = washA * 0.22f),
+            1.00f to wine.copy(alpha = 0f),
+            start = Offset(0f, 0f),
+            end = Offset(w, h)
+        )
+    )
+
+    // 2. HAIRLINE gilt tepi atas, tepat di bawah bevel 1.5dp (memudar di kedua ujung).
+    val gx0 = w * 0.07f
+    val gx1 = w * 0.93f
+    val giltA = (if (isDark) 0.42f else 0.30f) * (1f + 0.5f * lit)
+    drawRect(
+        brush = Brush.horizontalGradient(
+            0.0f to gilt.copy(alpha = 0f),
+            0.5f to gilt.copy(alpha = giltA.coerceAtMost(0.7f)),
+            1.0f to gilt.copy(alpha = 0f),
+            startX = gx0,
+            endX = gx1
+        ),
+        topLeft = Offset(gx0, 1.5.dp.toPx()),
+        size = Size(gx1 - gx0, 0.75.dp.toPx())
+    )
+
+    // 3. REL penanda kiri: hanya tile berukuran baris (40-140dp tinggi) & bukan pil/lingkaran.
+    if (h < 40.dp.toPx() || h > 140.dp.toPx()) return
+    val outline = shape.createOutline(size, layoutDirection, this)
+    if (outline is Outline.Rounded && outline.roundRect.topLeftCornerRadius.x >= min(w, h) / 2f - 0.5f) return
+    val railW = 3.dp.toPx()
+    val railH = (h * 0.42f).coerceIn(14.dp.toPx(), 30.dp.toPx())
+    val railY = (h - railH) / 2f
+    val railA = 0.62f + 0.38f * lit
+    // pendar di sekitar rel (setengah lingkaran lebar, bukan titik): redup saat idle, terang saat aktif.
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(ruby.copy(alpha = 0.10f + 0.30f * lit), ruby.copy(alpha = 0f)),
+            center = Offset(0f, h / 2f),
+            radius = (h * 0.9f).coerceAtLeast(24.dp.toPx())
+        )
+    )
+    drawRoundRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(ruby.copy(alpha = railA), wine.copy(alpha = railA)),
+            startY = railY,
+            endY = railY + railH
+        ),
+        topLeft = Offset(-railW, railY),
+        size = Size(railW * 2f, railH),
+        cornerRadius = CornerRadius(railW)
+    )
 }
 
 /**
@@ -1105,15 +1170,18 @@ fun Modifier.neuSurface(shape: Shape, elevation: Dp = 8.dp, pressed: Boolean? = 
  * yang ikut di-scroll terlalu mahal (lihat catatan performa `BlurUtils.kt`). Fill digambar mesin
  * kedalaman, jadi node ini TIDAK boleh punya `.background()` permukaan lagi; pasang `.clickable`
  * SESUDAH modifier ini supaya ripple ter-clip ke bentuk tile.
+ * Batch 564 — [active]: keadaan tile aktif (mis. baris saklar ON); hanya Neumorphism yang
+ * menggambarnya (rel ruby + pendar + wash anggur menguat), tema lain mengabaikan.
  */
 @Composable
 fun Modifier.neuRowTile(
     shape: Shape = RoundedCornerShape(Radius.xl),
     elevation: Dp = 4.dp,
-    pressed: Boolean? = null
+    pressed: Boolean? = null,
+    active: Boolean = false
 ): Modifier = when {
     isTactileTheme() -> this.tactileEmboss(shape = shape, elevation = elevation, pressed = pressed == true)
-    isSkeuTheme() -> this.skeuEmboss(shape = shape, elevation = elevation, pressed = pressed == true)
+    isSkeuTheme() -> this.skeuEmboss(shape = shape, elevation = elevation, pressed = pressed == true, active = active)
     else -> this.neuSurface(shape = shape, elevation = elevation, pressed = pressed)
 }
 

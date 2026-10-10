@@ -46,6 +46,23 @@ import com.rudi.audioplayer.BuildConfig
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.data.lyrics.LyricsPrefetchStore
 import com.rudi.audioplayer.data.lyrics.LyricsRepository
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
+import com.rudi.audioplayer.ui.theme.SkeuAccentLight
+import com.rudi.audioplayer.ui.theme.SkeuGilt
+import com.rudi.audioplayer.ui.theme.SkeuGiltDeep
+import com.rudi.audioplayer.ui.theme.SkeuRubyHi
+import com.rudi.audioplayer.ui.theme.SkeuWine
+import com.rudi.audioplayer.ui.theme.SkeuWineDeep
+import com.rudi.audioplayer.ui.theme.SkeuWineLit
+import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.colorsFor
@@ -181,9 +198,8 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(modifier = Modifier.height(20.dp))
-            Text(
+            NeuSectionHeader(
                 "Perilaku Pemutaran",
-                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -194,7 +210,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
-                    .neuRowTile()
+                    .neuRowTile(active = shakeToSkipEnabled)
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -219,7 +235,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
-                    .neuRowTile()
+                    .neuRowTile(active = radioAutoContinueEnabled)
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -244,7 +260,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
-                    .neuRowTile()
+                    .neuRowTile(active = floatingBubbleEnabled)
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -271,7 +287,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
-                    .neuRowTile()
+                    .neuRowTile(active = silenceSkipEnabled)
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -299,7 +315,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)
-                    .neuRowTile()
+                    .neuRowTile(active = lyricsPrefetchEnabled)
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -339,9 +355,8 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(modifier = Modifier.height(20.dp))
-            Text(
+            NeuSectionHeader(
                 "Alat & Utilitas",
-                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -353,7 +368,7 @@ fun SettingsScreen(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.QueryStats, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                NeuNavIcon(Icons.Default.QueryStats)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Statistik Dengar", style = MaterialTheme.typography.bodyMedium)
@@ -376,7 +391,7 @@ fun SettingsScreen(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.SettingsBackupRestore, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                NeuNavIcon(Icons.Default.SettingsBackupRestore)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Cadangkan & Pulihkan", style = MaterialTheme.typography.bodyMedium)
@@ -399,7 +414,7 @@ fun SettingsScreen(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                NeuNavIcon(Icons.Default.ContentCopy)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Deteksi File Duplikat", style = MaterialTheme.typography.bodyMedium)
@@ -422,7 +437,7 @@ fun SettingsScreen(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                NeuNavIcon(Icons.Default.Lock)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Vault Lagu Privat", style = MaterialTheme.typography.bodyMedium)
@@ -447,7 +462,7 @@ fun SettingsScreen(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                NeuNavIcon(Icons.Default.DeleteSweep)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Hapus Cache Lirik", style = MaterialTheme.typography.bodyMedium)
@@ -528,11 +543,7 @@ fun SettingsScreen(
                         .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Default.Fingerprint,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary
-                    )
+                    NeuNavIcon(Icons.Default.Fingerprint)
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Cek Signature APK", style = MaterialTheme.typography.bodyMedium)
                 }
@@ -545,11 +556,7 @@ fun SettingsScreen(
                         .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Default.BugReport,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary
-                    )
+                    NeuNavIcon(Icons.Default.BugReport)
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Log Diagnostik", style = MaterialTheme.typography.bodyMedium)
                 }
@@ -560,9 +567,8 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(modifier = Modifier.height(20.dp))
-            Text(
+            NeuSectionHeader(
                 "Tentang Aplikasi",
-                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -595,11 +601,7 @@ fun SettingsScreen(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.SettingsBackupRestore,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary
-                )
+                NeuNavIcon(Icons.Default.SettingsBackupRestore)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Cek Update", style = MaterialTheme.typography.bodyMedium)
@@ -676,5 +678,121 @@ fun SettingsScreen(
                 TextButton(onClick = { showClearLyricsCacheConfirm = false }) { Text("Batal") }
             }
         )
+    }
+}
+
+// Batch 564 — judul section Neumorphism: judul + permata belah ketupat burgundy + hairline gilt yang memudar ke
+// kanan (kop bab buku bersampul kulit). Tema lain: Text titleMedium persis seperti sebelumnya. Judul tetap
+// rata kiri di 20dp (ornamen SESUDAH judul), jadi posisi teks tak bergeser.
+@Composable
+private fun NeuSectionHeader(text: String, modifier: Modifier = Modifier) {
+    if (!isSkeuTheme()) {
+        Text(text, style = MaterialTheme.typography.titleMedium, modifier = modifier)
+        return
+    }
+    val isDark = LocalIsDarkTheme.current
+    val gilt = if (isDark) SkeuGilt else SkeuGiltDeep
+    val gemHi = if (isDark) SkeuRubyHi else SkeuWineLit
+    val gemLo = if (isDark) SkeuWine else SkeuAccentLight
+    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(text, style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.width(10.dp))
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .drawBehind {
+                    val path = Path().apply {
+                        moveTo(size.width / 2f, 0f)
+                        lineTo(size.width, size.height / 2f)
+                        lineTo(size.width / 2f, size.height)
+                        lineTo(0f, size.height / 2f)
+                        close()
+                    }
+                    drawPath(
+                        path = path,
+                        brush = Brush.linearGradient(
+                            colors = listOf(gemHi, gemLo),
+                            start = Offset(0f, 0f),
+                            end = Offset(size.width, size.height)
+                        )
+                    )
+                    drawPath(path = path, color = gilt.copy(alpha = 0.75f), style = Stroke(width = 0.8.dp.toPx()))
+                }
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(gilt.copy(alpha = 0.55f), gilt.copy(alpha = 0f))
+                        )
+                    )
+                }
+        )
+    }
+}
+
+// Batch 564 — ikon baris navigasi Neumorphism = MEDALI enamel burgundy (gradasi anggur, kilau atas, cincin gilt
+// 1dp, bayangan jatuh kecil) berglif champagne. Medali digambar 34dp DI LUAR kotak ikon 24dp (tanpa layout
+// shift: ikon + Spacer 12dp tetap, teks tidak bergeser). Tema lain: ikon polos tint secondary seperti semula.
+@Composable
+private fun NeuNavIcon(icon: ImageVector) {
+    if (!isSkeuTheme()) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+        return
+    }
+    val isDark = LocalIsDarkTheme.current
+    val gilt = if (isDark) SkeuGilt else SkeuGiltDeep
+    Box(
+        modifier = Modifier
+            .size(24.dp)
+            .drawBehind {
+                val side = 34.dp.toPx()
+                val tl = Offset((size.width - side) / 2f, (size.height - side) / 2f)
+                val sz = Size(side, side)
+                val r = CornerRadius(9.dp.toPx())
+                val br = Offset(tl.x + side, tl.y + side)
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.35f),
+                    topLeft = Offset(tl.x, tl.y + 1.5.dp.toPx()),
+                    size = sz,
+                    cornerRadius = r
+                )
+                drawRoundRect(
+                    brush = Brush.linearGradient(listOf(SkeuWineLit, SkeuWineDeep), start = tl, end = br),
+                    topLeft = tl,
+                    size = sz,
+                    cornerRadius = r
+                )
+                drawRoundRect(
+                    brush = Brush.verticalGradient(
+                        0.00f to Color.White.copy(alpha = 0.20f),
+                        0.55f to Color.White.copy(alpha = 0f),
+                        1.00f to Color.White.copy(alpha = 0f),
+                        startY = tl.y,
+                        endY = tl.y + side
+                    ),
+                    topLeft = tl,
+                    size = sz,
+                    cornerRadius = r
+                )
+                drawRoundRect(
+                    brush = Brush.linearGradient(
+                        listOf(gilt.copy(alpha = 0.85f), gilt.copy(alpha = 0.25f)),
+                        start = tl,
+                        end = br
+                    ),
+                    topLeft = Offset(tl.x + 0.5.dp.toPx(), tl.y + 0.5.dp.toPx()),
+                    size = Size(side - 1.dp.toPx(), side - 1.dp.toPx()),
+                    cornerRadius = CornerRadius(8.5.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx())
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = Color(0xFFF6E9CF))
     }
 }
