@@ -31,6 +31,7 @@ import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
 import com.rudi.audioplayer.ui.theme.neuSurface
 import com.rudi.audioplayer.ui.theme.neuCastOnly
+import com.rudi.audioplayer.ui.theme.neuArtFillet
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.Radius
 import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
@@ -300,6 +301,8 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(Radius.xxl))
+                    // Batch 569 — fillet gilt Neumorphism (tema lain: no-op); setelah clip, bentuk SAMA.
+                    .neuArtFillet(RoundedCornerShape(Radius.xxl))
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -381,6 +384,8 @@ private fun HomeSongCard(song: Song, onClick: () -> Unit) {
                 // Batch 552), SEBELUM `.clip`; ukuran/geometri kartu tak berubah.
                 .neuCastOnly(RoundedCornerShape(Radius.xxl), elevation = 6.dp)
                 .clip(RoundedCornerShape(Radius.xxl))
+                // Batch 569 — fillet gilt Neumorphism (tema lain: no-op); setelah clip, bentuk SAMA.
+                .neuArtFillet(RoundedCornerShape(Radius.xxl))
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(

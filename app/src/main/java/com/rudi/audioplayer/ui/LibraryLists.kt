@@ -39,6 +39,7 @@ import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
 import com.rudi.audioplayer.ui.theme.Radius
 import com.rudi.audioplayer.ui.theme.neuCastOnly
+import com.rudi.audioplayer.ui.theme.neuArtFillet
 import com.rudi.audioplayer.ui.theme.neuPressTile
 import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -464,6 +465,8 @@ internal fun SongRow(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(Radius.xxl))
+                    // Batch 569 — fillet gilt Neumorphism (tema lain: no-op); setelah clip, bentuk SAMA.
+                    .neuArtFillet(RoundedCornerShape(Radius.xxl))
                     .then(if (isCalmRetro) Modifier.calmScanlines() else Modifier)
             )
             Spacer(modifier = Modifier.width(12.dp))

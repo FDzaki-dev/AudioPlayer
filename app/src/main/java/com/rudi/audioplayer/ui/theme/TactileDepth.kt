@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -1769,6 +1770,33 @@ private class NeuDepthIndicationNode(
             ),
             topLeft = Offset(w - band, 0f),
             size = Size(band, h)
+        )
+    }
+}
+
+/**
+ * Batch 569 — FILLET gilt tipis di tepi thumbnail art (keluarga fillet hero album art Batch 566): garis emas diagonal
+ * terang -> redup -> terang, `Stroke` 1.6dp berpusat di tepi (separuh luar ter-clip `.clip(shape)` pemanggil = 0.8dp
+ * tampak), digambar DI ATAS isi art. HANYA Neumorphism; tema lain mengembalikan `this` (0 perubahan). WAJIB dipanggil
+ * SETELAH `.clip(shape)` dengan [shape] yang SAMA, dan SEBELUM `AlbumArt` menambah `background` (urutan rantai = art
+ * tergambar dulu, fillet menimpanya).
+ */
+@Composable
+fun Modifier.neuArtFillet(shape: Shape): Modifier {
+    if (!isSkeuTheme()) return this
+    val gilt = if (LocalIsDarkTheme.current) SkeuGilt else SkeuGiltDeep
+    return this.drawWithContent {
+        drawContent()
+        drawOutline(
+            outline = shape.createOutline(size, layoutDirection, this),
+            brush = Brush.linearGradient(
+                0.0f to gilt.copy(alpha = 0.90f),
+                0.5f to gilt.copy(alpha = 0.18f),
+                1.0f to gilt.copy(alpha = 0.60f),
+                start = Offset(0f, 0f),
+                end = Offset(size.width, size.height)
+            ),
+            style = Stroke(width = 1.6.dp.toPx())
         )
     }
 }
