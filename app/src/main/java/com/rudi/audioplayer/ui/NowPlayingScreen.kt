@@ -76,6 +76,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.lifecycle.Lifecycle
@@ -101,6 +102,8 @@ import com.rudi.audioplayer.playback.EqualizerUiState
 import com.rudi.audioplayer.playback.PlaybackProgress
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.neuAccentKey
+import com.rudi.audioplayer.ui.theme.neuInstantPress
 import com.rudi.audioplayer.ui.theme.neuSurface
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
@@ -1147,78 +1150,69 @@ fun NowPlayingScreen(
                 Icon(Icons.Default.SkipPrevious, contentDescription = "Sebelumnya", modifier = Modifier.size(36.dp))
             }
             val playPauseInteraction = remember { MutableInteractionSource() }
-            // Batch 55 — Tactile gets its own shape language here too (moderate rounded-square,
-            // matching TactileShapes.medium, same "machined control" read as every other tactile
-            // surface) instead of silently inheriting Apple's circular filledShape default; wrapped
-            // in tactileEmboss() so the app's single most-used button reads as a lifted hardware
-            // key (diagonal bevel + drop shadow), not just a flat colored disc like Apple's.
+            // Batch 561 — tombol play/pause datar saat diam: akar = `FilledIconButton` mengecat
+            // `containerColor` OPAK di atas lapisan depth (`tactileEmboss`/`skeuEmboss` digambar
+            // `drawBehind`, tema lain tanpa depth sama sekali), jadi hanya feedback tekan global
+            // (`NeuDepthIndication`) yang terlihat. Kini `Box` + `neuAccentKey()` (semua tema): permukaan
+            // aksen timbul (bevel + vignette + bayangan jatuh) saat DIAM, sumur cekung saat jari
+            // menyentuh (`neuInstantPress`, tanpa jeda). Bentuk (persegi membulat Tactile/Neumorphism,
+            // lingkaran lainnya), ukuran 68dp, haptic, `bouncyPress` 0.85f, `calmAberration`, warna ikon,
+            // dan morph `AnimatedContent` TIDAK berubah.
             val playPauseShape = if (isTactile || isSkeu) MaterialTheme.shapes.medium else CircleShape
-            FilledIconButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onPlayPause()
-                },
-                interactionSource = playPauseInteraction,
-                shape = playPauseShape,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = animatedAccent,
-                    // Batch 69: dulu `MaterialTheme.colorScheme.background` — warna latar
-                    // HALAMAN, sama sekali tidak berkaitan dengan warna lingkaran tombol ini
-                    // sendiri (animatedAccent, aksen dinamis per lagu). Kalau kebetulan
-                    // keduanya senasib gelap (mode gelap + aksen gelap) atau senasib terang,
-                    // ikon menyatu sempurna dengan lingkarannya -> "gak kelihatan sama
-                    // sekali" / "box kosong". Fix: pola luminance yang sama persis dgn
-                    // MiniPlayerBar.kt (accentContentColor) — kontras terhadap animatedAccent
-                    // itu sendiri, bukan warna halaman.
-                    contentColor = if (animatedAccent.luminance() > 0.55f) Color.Black else Color.White
-                ),
+            val playPauseTouching = remember { mutableStateOf(false) }
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .size(68.dp)
-                    .then(
-                        when {
-                            isTactile -> Modifier.tactileEmboss(shape = playPauseShape, elevation = 10.dp)
-                            isSkeu -> Modifier.skeuEmboss(shape = playPauseShape, elevation = 10.dp)
-                            isCalmRetro -> Modifier.calmAberration()
-                            else -> Modifier
+                    .bouncyPress(playPauseInteraction, pressedScale = 0.85f)
+                    .then(if (isCalmRetro) Modifier.calmAberration() else Modifier)
+                    .neuAccentKey(
+                        shape = playPauseShape,
+                        accent = animatedAccent,
+                        elevation = 10.dp,
+                        pressed = playPauseTouching.value
+                    )
+                    .neuInstantPress(playPauseTouching, pass = PointerEventPass.Initial, requireUnconsumed = false)
+                    .clickable(
+                        interactionSource = playPauseInteraction,
+                        indication = null,
+                        role = Role.Button,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onPlayPause()
                         }
                     )
-                    .bouncyPress(playPauseInteraction, pressedScale = 0.85f)
             ) {
-                AnimatedContent(
-                    targetState = uiState.isPlaying,
-                    label = "playPause",
-                    // Batch 332 — Pending Queue item 1 (dari Batch 330): upgrade default
-                    // `AnimatedContent` (fade polos bawaan Compose kalau `transitionSpec` tidak
-                    // diisi) jadi morph scale+fade — ikon baru masuk membesar dari 0.6x sambil
-                    // fade in, ikon lama keluar mengecil ke 0.6x sambil fade out. Durasi REUSE
-                    // persis pola asimetris "masuk lebih pelan, keluar lebih cepat" yang sudah
-                    // divalidasi Batch 330 (200ms/150ms, dipakai NavHost tab transition) — bukan
-                    // angka baru. `togetherWith` (bukan `with` yang sudah deprecated).
-                    transitionSpec = {
-                        (scaleIn(initialScale = 0.6f, animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)))
-                            .togetherWith(scaleOut(targetScale = 0.6f, animationSpec = tween(150)) + fadeOut(animationSpec = tween(150)))
+                // Batch 69: dulu `MaterialTheme.colorScheme.background` — warna latar HALAMAN, sama sekali
+                // tidak berkaitan dengan warna tombol ini sendiri (animatedAccent, aksen dinamis per
+                // lagu); kalau kebetulan senasib gelap/terang, ikon menyatu -> "box kosong". Fix: pola
+                // luminance yang sama dgn MiniPlayerBar.kt (accentContentColor) — kontras terhadap
+                // animatedAccent itu sendiri. Batch 561: nilai sama, kini lewat `LocalContentColor`.
+                CompositionLocalProvider(
+                    LocalContentColor provides if (animatedAccent.luminance() > 0.55f) Color.Black else Color.White
+                ) {
+                    AnimatedContent(
+                        targetState = uiState.isPlaying,
+                        label = "playPause",
+                        // Batch 332 — morph scale+fade: ikon baru masuk membesar dari 0.6x sambil fade in,
+                        // ikon lama keluar mengecil ke 0.6x sambil fade out (200ms masuk / 150ms keluar,
+                        // pola asimetris Batch 330). `togetherWith` (bukan `with` yang deprecated).
+                        transitionSpec = {
+                            (scaleIn(initialScale = 0.6f, animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)))
+                                .togetherWith(scaleOut(targetScale = 0.6f, animationSpec = tween(150)) + fadeOut(animationSpec = tween(150)))
+                        }
+                    ) { playing ->
+                        Icon(
+                            if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (playing) "Jeda" else "Putar",
+                            // Batch 224 — glyph 40dp (> Skip 36dp > Shuffle/Repeat 24dp): aksi utama = glyph
+                            // TERBESAR. Batch 226 — PlayArrow condong kiri secara optik: offset +1dp ke
+                            // kanan HANYA saat PlayArrow.
+                            modifier = Modifier
+                                .size(40.dp)
+                                .then(if (!playing) Modifier.offset(x = 1.dp) else Modifier)
+                        )
                     }
-                ) { playing ->
-                    Icon(
-                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playing) "Jeda" else "Putar",
-                        // Batch 224 — Iconography 1/7 (audit ukuran icon). Sebelumnya 34dp: LEBIH
-                        // KECIL dari icon SkipPrevious/SkipNext yang mengapitnya (36dp), padahal
-                        // tombol ini kontainer PALING BESAR di row (68dp vs default ~48dp
-                        // IconButton) — hierarki visual kebalik (aksi utama harusnya glyph
-                        // TERBESAR, bukan terkecil). Baris Shuffle/Repeat (default 24dp, tanpa
-                        // override) < Skip (36dp) < Play/Pause sekarang 40dp — urutan bobot
-                        // visual 3-tingkat yang benar utuh dipulihkan.
-                        // Batch 226 — Iconography 2/7 (audit optical alignment). Glyph segitiga
-                        // PlayArrow punya bobot visual condong ke kiri dalam bounding box-nya
-                        // (beda dari Pause yang simetris) — kalau ukuran sama & posisi sama
-                        // persis pas AnimatedContent switch, mata lihat PlayArrow "kegeser kiri"
-                        // dari titik pusat lingkaran tombol. Fix: offset +1dp ke kanan HANYA
-                        // saat PlayArrow (bukan Pause) buat kompensasi bias optik tsb.
-                        modifier = Modifier
-                            .size(40.dp)
-                            .then(if (!playing) Modifier.offset(x = 1.dp) else Modifier)
-                    )
                 }
             }
             val nextInteraction = remember { MutableInteractionSource() }

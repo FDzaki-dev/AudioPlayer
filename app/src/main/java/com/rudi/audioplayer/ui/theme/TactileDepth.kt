@@ -11,13 +11,16 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
@@ -49,6 +52,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -1034,7 +1039,9 @@ fun Modifier.neuDepth(
     val press: State<Float>? = if (pressed != null) {
         animateFloatAsState(
             targetValue = if (pressed) 1f else 0f,
-            animationSpec = tween(durationMillis = 110),
+            // Batch 561 — masuk 70ms (terasa INSTAN saat jari menyentuh), keluar 160ms (lembut);
+            // dulu simetris 110ms: tap singkat (<110ms) tak sempat tenggelam penuh.
+            animationSpec = tween(durationMillis = if (pressed) 70 else 160),
             label = "neuDepthPress"
         )
     } else {
@@ -1076,21 +1083,27 @@ fun Modifier.neuRowTile(
 
 /**
  * Batch 559 — tile baris yang bisa DITEKAN: [neuRowTile] + sumur cekung selama jari menekan
- * (Tactile/Neumorphism ikut skala emboss 0.985/0.978). Pola sama dgn tombol keypad `LockScreen`:
- * `interactionSource` bersama, tanpa ripple/overlay (Batch 560), clip dari mesin kedalaman. Press di
- * dalam kontainer scroll baru terkirim setelah jeda tap bawaan Compose, jadi awal scroll tak
- * mengedipkan sumur. Pasang `.padding()` isi SESUDAH modifier ini; jangan tambah `.clickable` lagi.
+ * (Tactile/Neumorphism ikut skala emboss 0.985/0.978). Tanpa ripple/overlay (Batch 560), clip dari
+ * mesin kedalaman. Pasang `.padding()` isi SESUDAH modifier ini; jangan tambah `.clickable` lagi.
+ * Batch 561 — sumur TIDAK lagi dibaca dari `PressInteraction` milik `clickable`: di dalam kontainer
+ * scroll (LazyColumn) Compose menunda `Press` ~100ms (`tapIndicationDelay`) dan tap singkat baru
+ * mengirim Press+Release sekaligus saat jari diangkat -> sumur nyaris tak terlihat. Kini sumur
+ * dipicu [neuInstantPress] (saat jari MENYENTUH, tanpa jeda; batal bila jari bergeser > touch slop
+ * = mulai scroll, atau bila anak seperti tombol favorit sudah mengonsumsi sentuhan). [held] = tetap
+ * terbenam walau jari sudah lepas/bergeser (baris TERPILIH di mode pilih; sweep-select mengonsumsi
+ * gerakan jari sehingga tanpa ini sumur lenyap tepat saat drag-select dimulai).
  */
 @Composable
 fun Modifier.neuPressTile(
     shape: Shape = RoundedCornerShape(Radius.xl),
     elevation: Dp = 4.dp,
+    held: Boolean = false,
     onClick: () -> Unit
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
+    val touching = remember { mutableStateOf(false) }
     return this
-        .neuRowTile(shape = shape, elevation = elevation, pressed = isPressed)
+        .neuRowTile(shape = shape, elevation = elevation, pressed = touching.value || held)
         .clickable(
             interactionSource = interactionSource,
             // Batch 560 — TANPA indication: sumur cekung milik tile sudah jadi feedback tekan;
@@ -1098,6 +1111,155 @@ fun Modifier.neuPressTile(
             indication = null,
             onClick = onClick
         )
+        // Batch 561 — SESUDAH `.clickable` (= lebih dalam di rantai): pada pass Main node ini jalan
+        // SEBELUM `clickable` milik tile dan SESUDAH anak (IconButton favorit/menu, Checkbox), sehingga
+        // `requireUnconsumed = true` hanya lolos untuk sentuhan yang memang milik tile ini.
+        .neuInstantPress(touching)
+}
+
+/**
+ * Batch 561 — penanda "jari sedang menyentuh" TANPA jeda: [touching] jadi true pada event down
+ * pertama dan false saat jari diangkat / dibatalkan / bergeser lebih dari touch slop (gerakan itu
+ * = scroll atau drag, bukan tap). Tidak mengonsumsi apa pun, jadi `clickable`, scroll, dan
+ * `detectDragGesturesAfterLongPress` (sweep-select) tetap jalan persis seperti semula.
+ * [pass]/[requireUnconsumed]: default Main + true untuk node yang dipasang SESUDAH `clickable` tile;
+ * komponen tanpa anak yang mengonsumsi (tombol play/pause) memakai Initial + false.
+ */
+internal fun Modifier.neuInstantPress(
+    touching: MutableState<Boolean>,
+    pass: PointerEventPass = PointerEventPass.Main,
+    requireUnconsumed: Boolean = true
+): Modifier = this.pointerInput(touching, pass, requireUnconsumed) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = requireUnconsumed, pass = pass)
+        touching.value = true
+        try {
+            val slop = viewConfiguration.touchSlop
+            while (true) {
+                val change = awaitPointerEvent(pass).changes.firstOrNull { it.id == down.id } ?: break
+                if (!change.pressed || (change.position - down.position).getDistance() > slop) break
+            }
+        } finally {
+            touching.value = false
+        }
+    }
+}
+
+/**
+ * Batch 561 — KUNCI AKSEN timbul untuk tombol aksi utama (play/pause NowPlaying), SEMUA tema.
+ * Akar bug "tombol masih datar saat diam": `FilledIconButton` mengecat `containerColor` OPAK di atas
+ * lapisan permukaan/bevel `tactileEmboss()`/`skeuEmboss()` (yang digambar `drawBehind`) -> yang tersisa
+ * hanya bayangan jatuh; tema lain (Apple/Calm Retro/Liquid Glass/Aurora) bahkan tanpa modifier depth.
+ * Di sini permukaan = [accent] APA ADANYA (tanpa angkat luminansi `neuStyle`, ikon tetap kontras) +
+ * vignette/kilau lembut + bevel rim kiri-atas terang / kanan-bawah gelap; [pressed] = sumur cekung
+ * (lantai gelap + bayangan dalam kiri-atas + bibir terang kanan-bawah, bevel memudar). Bayangan jatuh
+ * dari mesin bersama dgn gaya NETRAL dari `colorScheme.background` (pola [neuCastOnly]).
+ * [accent] beranimasi per frame (`animateColorAsState` 700ms) -> permukaan/bevel digambar LANGSUNG
+ * (tanpa `NeuBitmapStore`): style berbasis accent akan merender ulang bitmap blur tiap frame dan
+ * menguras cache LRU 48 entri. Sudah mengandung `.clip(shape)`; konten digambar di atasnya.
+ */
+@Composable
+fun Modifier.neuAccentKey(
+    shape: Shape,
+    accent: Color,
+    elevation: Dp = 10.dp,
+    pressed: Boolean,
+    isDark: Boolean = LocalIsDarkTheme.current
+): Modifier {
+    val canvas = MaterialTheme.colorScheme.background
+    val style = remember(canvas, isDark) { neuStyle(canvas, canvas, isDark) }
+    val spec = remember(elevation, style.shadowStrength) { neuShadowSpec(elevation, style.shadowStrength) }
+    val press = animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = tween(durationMillis = if (pressed) 70 else 160),
+        label = "neuAccentKeyPress"
+    )
+    return this
+        .neuCastShadow(shape, style, spec, press, false)
+        .clip(shape)
+        .drawBehind { drawNeuAccentFace(shape, accent, isDark, press.value) }
+}
+
+private fun DrawScope.drawNeuAccentFace(shape: Shape, accent: Color, isDark: Boolean, t: Float) {
+    val w = size.width
+    val h = size.height
+    if (w < 4f || h < 4f) return
+    val base = accent.copy(alpha = 1f)
+    val shade = lerp(base, Color.Black, if (isDark) 0.92f else 0.55f)
+    val lit = if (isDark) lerp(base, Color.White, 0.88f) else Color.White
+    val edge = min(w, h)
+    val b = 1.5.dp.toPx()
+    // 1. permukaan + vignette (pusat 0.40/0.35) + kilau (pusat 0.20/0.05), angka = renderNeuFace().
+    drawRect(base)
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(shade.copy(alpha = 0f), shade.copy(alpha = 0.14f)),
+            center = Offset(0.40f * w, 0.35f * h),
+            radius = edge
+        )
+    )
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(lit.copy(alpha = 0.07f), lit.copy(alpha = 0f)),
+            center = Offset(0.20f * w, 0.05f * h),
+            radius = edge * 0.85f
+        )
+    )
+    // 2. bevel rim (memudar saat ditekan): Stroke 2b dipusatkan di tepi, separuh luarnya ter-clip.
+    val bevelAlpha = 1f - t
+    if (bevelAlpha > 0.01f) {
+        val rim = shape.createOutline(size, layoutDirection, this).toNeuPath()
+        drawPath(
+            path = rim,
+            brush = Brush.linearGradient(
+                0.00f to lit.copy(alpha = (if (isDark) 0.40f else 0.95f) * bevelAlpha),
+                0.50f to Color.Transparent,
+                1.00f to shade.copy(alpha = (if (isDark) 0.58f else 0.30f) * bevelAlpha),
+                start = Offset(0f, 0f),
+                end = Offset(w, h)
+            ),
+            style = Stroke(width = 2f * b)
+        )
+    }
+    // 3. sumur cekung saat ditekan.
+    if (t > 0.01f) {
+        val band = 8.dp.toPx().coerceAtMost(edge / 2f)
+        drawRect(Color.Black.copy(alpha = 0.18f * t))
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color.Black.copy(alpha = 0.34f * t), Color.Transparent),
+                startY = 0f,
+                endY = band
+            ),
+            size = Size(w, band)
+        )
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Black.copy(alpha = 0.34f * t), Color.Transparent),
+                startX = 0f,
+                endX = band
+            ),
+            size = Size(band, h)
+        )
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.14f * t)),
+                startY = h - band,
+                endY = h
+            ),
+            topLeft = Offset(0f, h - band),
+            size = Size(w, band)
+        )
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.14f * t)),
+                startX = w - band,
+                endX = w
+            ),
+            topLeft = Offset(w - band, 0f),
+            size = Size(band, h)
+        )
+    }
 }
 
 /** Bayangan jatuh SAJA untuk konten OPAK yang menggambar dirinya sendiri (hero album art): tanpa

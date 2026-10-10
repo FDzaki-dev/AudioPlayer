@@ -411,9 +411,13 @@ internal fun SongRow(
                 // dan tinggi baris (64dp) TIDAK berubah. Highlight "sedang diputar" di bawah kini
                 // ter-clip ke bentuk tile.
                 .padding(horizontal = 12.dp, vertical = 3.dp)
+                // Batch 561 — `held = isSelected`: baris TERPILIH tetap terbenam. Long-press -> sweep-select
+                // mengonsumsi gerakan jari (clickable dibatalkan), jadi tanpa ini sumur lenyap persis saat
+                // mode pilih/drag dimulai dan baris yang disapu tak berkedalaman sama sekali.
                 .neuPressTile(
                     shape = RoundedCornerShape(Radius.xl),
                     elevation = 3.dp,
+                    held = isSelected,
                     onClick = { if (selectionMode) onToggleSelect() else onClick() }
                 )
                 // Batch 559 — `.clickable` pindah ke dalam `neuPressTile` (sumur saat ditekan);
