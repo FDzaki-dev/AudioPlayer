@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 585 — Verifikasi CI run #13 untuk Batch 584 (docs saja)
+- Input user: upload `SONIX_laporan-untuk-claude_run13.zip` tanpa teks (hasil push Batch 584, diasumsikan; commit `470e6a2` tak ada di ZIP).
+- Fakta laporan (run #13, 2026-10-11 15:28 UTC): Gradle exit ArchUnit=0 / SpotBugs=0 / detekt+lintDebug=0; ArchUnit LULUS (7 aturan, 0 pelanggaran); SpotBugs 55 temuan; detekt 0; lintDebug 0; "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)".
+- Dicocokkan ke prediksi Batch 584: 11 deprecated / 0 lainnya COCOK persis; SpotBugs 55 "tetap" COCOK; detekt 0 / lintDebug 0 / ArchUnit LULUS COCOK. 11 deprecated = `app/build.gradle.kts:125` `resourceConfigurations`; `playback/PlaybackService.kt:728` override member deprecated; `ui/SignatureMatcherSheet.kt:199` `LocalClipboardManager`; `ui/SmartPlaylistScreen.kt:293` `LocalOverscrollConfiguration`; `ui/theme/AppHaptics.kt:159` `HAPTIC_FEEDBACK_ENABLED`; `ui/theme/TactileDepth.kt` `asFrameworkPaint()` x6 (865/903/909/915/956/962) (tak satu pun berasal dari file yang diubah Batch 583-584).
+- Belum terpenuhi: status "Build APK" tidak dilaporkan user -> NOT VERIFIED. Resource (aapt2) tidak dibaca dari log; hanya inferensi bahwa lolos karena compile Kotlin bergantung pada R. Asumsi: angka laporan tidak membedakan push v583 vs v584; run #12 tidak dilaporkan.
+- Perubahan: `PROJECT_STATE.md` (Catatan Batch 585 + `[RESUME POINT]` + klausa VERIFIED di Catatan Batch 584), `CHANGELOG.md` (entri ini), `README.md` (butir widget/bubble: "belum dikompilasi" -> lolos kompilasi di Actions, device belum). 0 source/resource/Gradle/CI; `FILE_MANIFEST.txt` tak berubah.
+- **NOT VERIFIED**: bentuk daun diagonal belum dilihat di device; `Outline.setPath` + outline elevasi `GradientDrawable` ber-radius per-sudut belum teruji runtime.
+
 ## Batch 584 — Bentuk "daun diagonal" menggantikan lingkaran di widget + bubble (BELUM verified CI/device)
 - Permintaan user: "Jangan circle monoton, Kasih shape yang refreshing lah!!" (setelah Batch 583).
 - Akar: Batch 583 memakai oval/lingkaran untuk medali play, kenop, bingkai sampul bubble, tab minimized, dan sampul widget (rounded-rect seragam) — repetitif.

@@ -4,8 +4,8 @@
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
 > - Rombak widget home-screen + bubble floating ke Neumorphism burgundy (Batch 583-584: panel bevel anggur + gilt,
 >   medali play, kenop prev/next berkedalaman, sampul berfillet gilt, ikon burgundy di mode terang; bentuk "daun diagonal"
->   sudut besar-kecil menggantikan lingkaran) belum dikompilasi dan belum dilihat di device asli; verifikasi resource
->   (aapt2) menunggu CI.
+>   sudut besar-kecil menggantikan lingkaran) sudah lolos kompilasi di GitHub Actions (run #13, Batch 585; status
+>   "Build APK" belum dilaporkan) tetapi belum dilihat di device asli.
 > - Seluruh **19 item** `docs/archive/MANUAL_QA_CHECKLIST.md` (audio focus, Bluetooth, kontrol lock-screen,
 >   headset kabel, process death, background playback) — **0/19 pernah dicentang**, karena tidak
 >   ada satu pun sesi kerja proyek ini yang punya akses ke device Android fisik.
