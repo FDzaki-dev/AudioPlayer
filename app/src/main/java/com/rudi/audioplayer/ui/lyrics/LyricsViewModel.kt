@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.rudi.audioplayer.data.lyrics.LyricsRepository
 import com.rudi.audioplayer.data.lyrics.LyricsResult
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +27,7 @@ sealed class LyricsUiState {
 // PlaybackService cukup panggil `loadLyrics()` polos tiap `onMetadataChanged`, ViewModel yg
 // jamin request bertubi-tubi (skip lagu / seek cepat / metadata event dobel dari Media3) tidak
 // nembak query cache/API berkali-kali dalam window 5 detik.
+@OptIn(FlowPreview::class)
 class LyricsViewModel(context: Context) : ViewModel() {
     private val repository = LyricsRepository(context.applicationContext)
 

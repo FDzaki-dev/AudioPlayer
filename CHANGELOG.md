@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 577 — 3 peringatan kompilator non-deprecated dibersihkan (BELUM verified CI)
+- Permintaan user: upload `SONIX_laporan-untuk-claude_run5.zip` + "Lanjutkan progress".
+- Fakta run #5 (commit `7a1c544`): ArchUnit LULUS, SpotBugs 56, detekt 0, lintDebug 0, "Peringatan kompilator Kotlin: 33 (30 deprecated, 3 lainnya)" -> baris kompilator Batch 576 TERVERIFIKASI di Actions.
+- **`data/lyrics/api/LyricsApi.kt`**: `chain.proceed(req) as Response` -> `chain.proceed(req)` ("No cast needed"); impor `okhttp3.Response` dibuang (tak terpakai lagi).
+- **`playback/PlaybackService.kt`** (`SongArtBitmapLoader.loadBitmap`): cek `bitmap != null` dibuang ("Condition is always true"; `loadThumbnail` @NonNull, gagal = IOException yang sudah ditangkap `catch`) -> `completer.set(bitmap)`.
+- **`ui/lyrics/LyricsViewModel.kt`**: `@OptIn(FlowPreview::class)` di kelas + impor `kotlinx.coroutines.FlowPreview` (`debounce` = API preview).
+- 0 perubahan perilaku runtime; 3 file source; 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. Prediksi: "Peringatan kompilator Kotlin: 30 (30 deprecated, 0 lainnya)". **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK di sandbox; hanya cek kurung seimbang (delta 0 di 3 file vs v576).
+
 ## Batch 576 — Peringatan kompilator Kotlin masuk laporan untuk Claude (BELUM verified CI)
 - Permintaan user: "Tambahkan maksudnya??" (jawaban atas tawaran Batch 575).
 - **`.github/workflows/android-artifact.yml`**: baris RINGKASAN ke-5 `Peringatan kompilator Kotlin: N (D deprecated, M lainnya)` + bagian "PERINGATAN KOMPILATOR KOTLIN" (non-deprecated dulu, lalu deprecated; maks 40 per kelompok; baris `w: file://...` dari log kompilasi release + debug, tanpa kode tes, dedupe, jalur dipendekkan). Invocation Gradle ke-1 dan ke-3 kini `--no-build-cache` (tugas kompilasi dari cache tidak mencetak peringatan -> "0" bisa palsu); tak ada tugas kompilasi dieksekusi = `NOT VERIFIED`. Konsekuensi: workflow laporan lebih lama (paralel, non-blocking).

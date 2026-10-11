@@ -857,9 +857,9 @@ private class SongArtBitmapLoader(
         CallbackToFutureAdapter.getFuture { completer ->
             scope.launch(Dispatchers.IO) {
                 try {
+                    // loadThumbnail() @NonNull — tak ada artwork = melempar IOException (ditangkap di bawah).
                     val bitmap = context.contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null)
-                    if (bitmap != null) completer.set(bitmap)
-                    else completer.setException(java.io.FileNotFoundException("Tidak ada artwork utk $uri"))
+                    completer.set(bitmap)
                 } catch (e: Exception) {
                     AppLogger.e("SongArtBitmapLoader", "Gagal muat artwork notifikasi", e)
                     completer.setException(e)

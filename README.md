@@ -302,6 +302,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 577** — 3 peringatan kompilator Kotlin non-deprecated dibersihkan (cast tak perlu di `LyricsApi.kt`, cabang mati `loadThumbnail` di `PlaybackService.kt`, `@OptIn(FlowPreview::class)` di `LyricsViewModel.kt`); tanpa perubahan perilaku. Laporan run #5 memverifikasi baris peringatan kompilator Batch 576 (33 = 30 deprecated + 3 lainnya); target berikutnya 30 + 0.
+
 **Batch 576** — peringatan kompilator Kotlin (API deprecated, "Condition is always true", dll.) kini ikut dilaporkan di `laporan-untuk-claude.txt` (baris ringkasan ke-5 + daftar). Workflow laporan memakai `--no-build-cache` untuk kompilasi supaya peringatan selalu tercetak. Belum diverifikasi CI.
 
 **Batch 575** — static analysis (detekt + lintDebug) dipindah dari `build.yml` ke workflow laporan Claude: artifact `SONIX_static_analysis_v<versi>-run<run>` tidak ada lagi; hasil detekt/lint kini masuk `laporan-untuk-claude.txt` bersama ArchUnit + SpotBugs (4 baris ringkasan, detail hanya bila ada temuan). `build.yml` kini hanya build + tes + Release + artifact APK. Belum diverifikasi CI.
