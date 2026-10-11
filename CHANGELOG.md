@@ -1,5 +1,20 @@
 # Changelog
 
+## Batch 574 — Laporan SpotBugs bebas noise: 334 dari 391 temuan disaring di sumber, sisanya dicantumkan utuh (BELUM verified CI)
+- Permintaan user: "Hilangkan semua noise, sisakan yang benar-benar berguna!!". Dasar = laporan run #3 + pembacaan kode di titik temuan yang terlihat.
+- **`config/spotbugs/exclude.xml` (BARU)**: filter SpotBugs. Disaring: EI_EXPOSE_REP / EI_EXPOSE_REP2 / EI_EXPOSE_STATIC_REP2 / MS_EXPOSE_REP (166; List/Array/data class Kotlin), BC_BAD_CAST_TO_ABSTRACT_COLLECTION (78), NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE (72), NM_METHOD_NAMING_CONVENTION (6; Composable PascalCase), NP_NULL_ON_SOME_PATH (9; semuanya `FloatingBubbleService`, properti `lateinit`), RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE (1; lateinit yang sama), DMI_RANDOM_USED_ONLY_ONCE (2; `SecureRandom` sekali per `setPin`), + kelas generate (ComposableSingletons, Room `_Impl`, `R`, `BuildConfig`). Alasan per rule ada di komentar XML.
+- **Sengaja TIDAK disaring (57 sisa)**: konkurensi (AT_*, SSD_*, ST_WRITE_*, STCAL_*), RV_*, OS_OPEN_STREAM, NP_NONNULL_PARAM_VIOLATION, SA_*, DLS, IP, UC, NP_LOAD — lokasinya belum terlihat (laporan lama hanya 40 temuan pertama); ditinjau satu per satu setelah laporan berikutnya.
+- **`config/spotbugs/spotbugs.gradle.kts`**: `excludeFilter.set(rootProject.file("config/spotbugs/exclude.xml"))` (`excludeFilter` = `RegularFileProperty`, dokumentasi resmi `SpotBugsTask`).
+- **`.github/workflows/android-artifact.yml`**: bagian "Temuan" memuat SEMUA temuan sisa (maks 120), urut ruleId lalu file:baris (sebelumnya 40 pertama urutan SARIF, habis oleh false positive).
+- 3 file target (1 baru) + `FILE_MANIFEST.txt` (215->216) + docs. `build.yml`, `app/build.gradle.kts`, `ArchitectureTest.kt` tak berubah.
+- **NOT VERIFIED**: belum jalan di Actions. Dicek: XML parse, YAML parse, `bash -n`. Belum dijalankan: sintaks jq `sort_by([...])`/`.[:120][]` (jq tak ada di sandbox) dan semantik filter SpotBugs.
+
+## Batch 573 — Laporan CI untuk Claude VERIFIED di Actions (run #3): ArchUnit LULUS, SpotBugs 391 temuan (DOCS SAJA)
+- Permintaan user: upload `SONIX_laporan-untuk-claude_run3.zip` tanpa teks (hasil push Batch 572). Isi (commit `276f2fe`): Gradle ArchUnit exit=0, SpotBugs exit=0; **ArchUnit LULUS** (689 kelas, 7 aturan, 0 pelanggaran); **SpotBugs 391 temuan** terbaca dari SARIF -> perbaikan `apply<SpotBugsBasePlugin>()` (Batch 572) terbukti; konfigurasi `github-claude-artifact.md` kini berjalan penuh di SONIX.
+- Rincian per `ruleId` + klasifikasi PERKIRAAN (316 dari 391 = EI_EXPOSE_REP/REP2, MS_EXPOSE_REP, EI_EXPOSE_STATIC_REP2, BC_BAD_CAST_TO_ABSTRACT_COLLECTION, NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE berpola bytecode Kotlin, kemungkinan false positive; sisa 75 = kandidat tinjauan, belum diperiksa satu per satu): lihat `PROJECT_STATE.md` catatan Batch 573.
+- `README.md`: kalimat "Belum pernah dijalankan di CI." (Batch 570) diganti status terverifikasi.
+- DOCS SAJA: 0 file source/target, 0 Kotlin/Gradle-DSL/YAML; `FILE_MANIFEST.txt` tak berubah. Status `Build APK` commit `276f2fe` tidak dilaporkan user.
+
 ## Batch 572 — SpotBugs: `apply(plugin = id)` -> `apply<SpotBugsBasePlugin>()` (BELUM verified CI)
 - Permintaan user: upload `SONIX_laporan-untuk-claude_run2.zip` + "Lanjutkan". Isi (commit `b6264bb`): **ArchUnit LULUS** (689 kelas, 7 aturan, 0 pelanggaran — alat terbukti jalan); **SpotBugs NOT VERIFIED**: `Script config/spotbugs/spotbugs.gradle.kts line: 25 — Plugin with id 'com.github.spotbugs-base' not found` (BUILD FAILED in 14s).
 - Diagnosis dari laporan: skrip lolos kompilasi dan classpath plugin 6.5.6 ter-resolve; yang gagal hanya pencarian id plugin (di scope proyek, bukan classpath `buildscript` skrip terapan).

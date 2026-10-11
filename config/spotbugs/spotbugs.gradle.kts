@@ -40,6 +40,8 @@ tasks.register<SpotBugsTask>("spotbugsRelease") {
     classes = fileTree(sonixKotlinClasses) { include("**/*.class") } +
         fileTree(sonixJavaClasses) { include("**/*.class") }
     sourceDirs.setFrom(file("src/main/java"))
+    // Batch 574 — saring NOISE bytecode Kotlin/Compose di sumber (alasan per rule: config/spotbugs/exclude.xml).
+    excludeFilter.set(rootProject.file("config/spotbugs/exclude.xml"))
     // Temuan tetap tercatat di laporan tapi task TIDAK gagal (selaras detekt: ignoreFailures = true).
     ignoreFailures = true
     reports.create("sarif") {

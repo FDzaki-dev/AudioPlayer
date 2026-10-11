@@ -97,7 +97,8 @@
 # Batch 563: app/src/main/java/com/rudi/audioplayer/ui/NeuSwitch.kt (file baru, saklar berkedalaman; `Switch` package `ui` menaungi `Switch` M3) ditambahkan — 210->211.
 # Batch 568: app/src/main/java/com/rudi/audioplayer/ui/NeuSlider.kt (file baru, slider Neumorphism; fungsi `NeuSlider` TIDAK menaungi `Slider` M3) ditambahkan — 211->212.
 # Batch 570: .github/workflows/android-artifact.yml + config/spotbugs/spotbugs.gradle.kts + app/src/test/java/com/rudi/audioplayer/ArchitectureTest.kt (file baru, laporan ArchUnit + SpotBugs SARIF utk Claude; workflow ikut dikirim di ZIP seperti build.yml) ditambahkan — 212->215.
-# Total: 215 file
+# Batch 574: config/spotbugs/exclude.xml (file baru, filter noise SpotBugs Kotlin) ditambahkan — 215->216.
+# Total: 216 file
 
 .githooks/pre-commit
 .github/workflows/android-artifact.yml
@@ -301,6 +302,7 @@ app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
 build.gradle.kts
 config/detekt/detekt.yml
+config/spotbugs/exclude.xml
 config/spotbugs/spotbugs.gradle.kts
 docs/PENDING_CodeTidyPlan.md
 docs/PLANNING.md

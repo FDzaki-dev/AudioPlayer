@@ -2,6 +2,8 @@ name: Android CI Artifact for Claude
 
 # Batch 570 — adaptasi `github-claude-artifact.md` (user) ke SONIX. Menghasilkan SATU berkas teks ringkas
 # `laporan-untuk-claude.txt` (ArchUnit + SpotBugs SARIF) sebagai artifact resmi GitHub (upload-artifact@v4).
+# Batch 574 — daftar temuan SpotBugs: noise disaring di sumber (exclude.xml), SEMUA sisa temuan dicantumkan (maks 120), urut
+# ruleId lalu file:baris (sebelumnya 40 pertama menurut urutan SARIF, habis oleh false positive).
 # Batch 571 — run #1 (commit 316eb57): exit=1, 58s, KEDUA laporan tak terbentuk, akar masalah TIDAK terbaca
 # (ekor log = 80 baris stack frame Gradle karena `--stacktrace`). Perbaikan: ArchUnit dan SpotBugs dijalankan di
 # 2 invocation Gradle TERPISAH (SpotBugs gagal tak lagi menjatuhkan ArchUnit) dengan log masing-masing, tanpa
@@ -133,10 +135,10 @@ jobs:
                 echo "Per aturan (terbanyak dulu):"
                 jq -r '[.runs[].results[]?] | group_by(.ruleId) | map({r: .[0].ruleId, n: length}) | sort_by(-.n)[] | "  \(.n)x \(.r)"' "$SARIF" 2>/dev/null | head -n 40
                 echo ""
-                echo "Temuan (maks 40 pertama):"
-                jq -r '[.runs[].results[]?][:40][] | "- \(.ruleId) @ \(.locations[0].physicalLocation.artifactLocation.uri // "?"):\(.locations[0].physicalLocation.region.startLine // 0)\n  \(.message.text)"' "$SARIF" 2>/dev/null
-                if [ "$S_COUNT" -gt 40 ]; then
-                  echo "... (+$((S_COUNT - 40)) temuan lain disingkat)"
+                echo "Temuan (noise Kotlin sudah disaring di sumber: config/spotbugs/exclude.xml); urut ruleId lalu file:baris; maks 120:"
+                jq -r '[.runs[].results[]?] | sort_by([.ruleId, (.locations[0].physicalLocation.artifactLocation.uri // ""), (.locations[0].physicalLocation.region.startLine // 0)]) | .[:120][] | "- \(.ruleId) @ \(.locations[0].physicalLocation.artifactLocation.uri // "?"):\(.locations[0].physicalLocation.region.startLine // 0)\n  \(.message.text)"' "$SARIF" 2>/dev/null
+                if [ "$S_COUNT" -gt 120 ]; then
+                  echo "... (+$((S_COUNT - 120)) temuan lain disingkat)"
                 fi
               fi
             } > report-sarif.tmp

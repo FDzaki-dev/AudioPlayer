@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Batch 574 — filter NOISE SpotBugs untuk SONIX (dipakai spotbugsRelease lewat spotbugs.gradle.kts).
+  SpotBugs membaca bytecode Java; Kotlin/Compose menghasilkan pola yang dilaporkan sebagai temuan padahal bukan bug.
+  Dasar tiap penyaringan = laporan CI run 3 (391 temuan) + pembacaan kode di titik temuan:
+  - EI_EXPOSE_REP, EI_EXPOSE_REP2, EI_EXPOSE_STATIC_REP2, MS_EXPOSE_REP: List/Array/data class Kotlin dianggap
+    "mengekspos representasi internal" (166 temuan).
+  - BC_BAD_CAST_TO_ABSTRACT_COLLECTION: cast koleksi hasil kompilasi Kotlin (78).
+  - NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE: parameter nullable/default Kotlin + Compose (72).
+  - NM_METHOD_NAMING_CONVENTION: fungsi Composable berawalan huruf besar (6).
+  - NP_NULL_ON_SOME_PATH: seluruh 9 temuan ada di FloatingBubbleService dan menunjuk properti lateinit
+    (windowManager, bubbleStore); null-check lateinit melempar UninitializedPropertyAccessException, bukan NPE.
+  - RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE: 1 temuan, sumbernya lateinit yang sama.
+  - DMI_RANDOM_USED_ONLY_ONCE: AppLockStore memakai SecureRandom sekali per setPin (memang benar).
+  Rule lain TIDAK disaring (konkurensi AT_*, SSD_*, ST_*, STCAL_*, RV_*, OS_OPEN_STREAM, NP_NONNULL_PARAM_VIOLATION,
+  SA_*, DLS, IP, UC, NP_LOAD) supaya tetap tampil di laporan sampai ditinjau satu per satu.
+  Kelas hasil generate (ComposableSingletons, Room _Impl, R, BuildConfig) juga dikecualikan.
+-->
+<FindBugsFilter>
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2,EI_EXPOSE_STATIC_REP2,MS_EXPOSE_REP,BC_BAD_CAST_TO_ABSTRACT_COLLECTION,NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE,NM_METHOD_NAMING_CONVENTION,NP_NULL_ON_SOME_PATH,RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE,DMI_RANDOM_USED_ONLY_ONCE"/>
+  </Match>
+  <Match>
+    <Class name="~.*ComposableSingletons.*"/>
+  </Match>
+  <Match>
+    <Class name="~.*_Impl(\$.*)?"/>
+  </Match>
+  <Match>
+    <Class name="~.*\.R(\$.*)?"/>
+  </Match>
+  <Match>
+    <Class name="~.*\.BuildConfig"/>
+  </Match>
+</FindBugsFilter>
