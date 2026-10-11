@@ -230,7 +230,8 @@ fun MiniPlayerBar(
                                 } else {
                                     dismissScope.launch {
                                         dismissOffset.snapTo(dismissOffsetPx.floatValue)
-                                        dismissOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) {
+                                        // Batch 581 — snap-back kembali ke spring default (tanpa pantulan).
+                                        dismissOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)) {
                                             dismissOffsetPx.floatValue = value
                                         }
                                     }

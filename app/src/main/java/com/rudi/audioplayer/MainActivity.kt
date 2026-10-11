@@ -1273,8 +1273,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                         tabBarOverscrollAnim.animateTo(
                                             0f,
                                             spring(
-                                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = Spring.StiffnessLow
+                                                // Batch 581 — default Compose, tanpa pantulan.
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = Spring.StiffnessMedium
                                             )
                                         ) {
                                             tabBarOverscrollPx.floatValue = value
@@ -1581,8 +1582,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                         tabDragOffset.animateTo(
                                             0f,
                                             spring(
-                                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = Spring.StiffnessLow
+                                                // Batch 581 — default Compose, tanpa pantulan.
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = Spring.StiffnessMedium
                                             )
                                         ) {
                                             tabDragOffsetPx.floatValue = value
@@ -1595,8 +1597,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                         tabDragOffset.animateTo(
                                             0f,
                                             spring(
-                                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = Spring.StiffnessLow
+                                                // Batch 581 — default Compose, tanpa pantulan.
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = Spring.StiffnessMedium
                                             )
                                         ) {
                                             tabDragOffsetPx.floatValue = value

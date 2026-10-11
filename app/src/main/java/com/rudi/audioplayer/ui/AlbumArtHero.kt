@@ -122,6 +122,9 @@ internal fun AlbumArtHero(
             // beda dari bouncyPress (Utils.kt) & entrance spring (baris ~410) yg sama-sama pakai
             // StiffnessLow eksplisit — biar swipe-snap terasa 1 sistem sama animasi bouncy lain
             // di screen ini, bukan 2 "rasa" beda. dampingRatio (MediumBouncy) tidak diubah.
+            // Batch 581 — User: efek bounce stuttering/buggy -> 2 spring snap-back di bawah kembali
+            // ke nilai default Compose (DampingRatioNoBouncy + StiffnessMedium = `spring()` polos):
+            // tanpa overshoot/pantulan. Threshold 120px/haptic/logika swipe TIDAK disentuh.
             detectHorizontalDragGestures(
                 onDragStart = {
                     totalDrag = 0f
@@ -139,7 +142,7 @@ internal fun AlbumArtHero(
                     }
                     dragScope.launch {
                         dragOffset.snapTo(dragOffsetPx.floatValue)
-                        dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) {
+                        dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)) {
                             dragOffsetPx.floatValue = value
                         }
                     }
@@ -147,7 +150,7 @@ internal fun AlbumArtHero(
                 onDragCancel = {
                     dragScope.launch {
                         dragOffset.snapTo(dragOffsetPx.floatValue)
-                        dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) {
+                        dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)) {
                             dragOffsetPx.floatValue = value
                         }
                     }

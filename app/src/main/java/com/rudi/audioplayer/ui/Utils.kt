@@ -165,9 +165,11 @@ fun Modifier.bouncyPress(
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (isPressed) pressedScale else 1f,
+        // Batch 581 — User: efek bounce stuttering/buggy -> spring default Compose (tanpa
+        // overshoot): scale-down saat tekan & kembali ke 1f tetap jalan, hanya pantulannya hilang.
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium
         ),
         label = "bouncyPress"
     )

@@ -1,6 +1,5 @@
 package com.rudi.audioplayer.ui.theme
 
-import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -532,18 +531,17 @@ fun AudioPlayerTheme(
     // Batch 61 — provides the mode signal to every descendant (tactileEmboss()/skeuEmboss()/
     // frostedGlass()) so their light/dark token branching stays centralized instead of each call
     // site re-deriving it.
-    // Batch 364 — LocalOverscrollFactory provides IosOverscrollFactory: satu baris ini membuat
-    // SEMUA LazyColumn/LazyRow/verticalScroll/horizontalScroll di seluruh app otomatis pakai
-    // rubber-band overscroll ala iOS (lihat IosScrollPhysics.kt), tanpa perlu disentuh 1-per-1 —
-    // komponen level-tinggi seperti LazyColumn otomatis konsumsi CompositionLocal ini lewat
-    // rememberOverscrollEffect() (perilaku resmi Compose Foundation, bukan hack).
+    // Batch 581 — User: "hilangkan atau balikkan seluruh effect bounce ke setelan default karena
+    // terasa stuttering dan buggy". Provider `LocalOverscrollFactory provides IosOverscrollFactory`
+    // (Batch 364, rubber-band overscroll ala iOS) DICABUT -> semua LazyColumn/LazyRow/verticalScroll/
+    // horizontalScroll kembali ke overscroll bawaan platform. `IosOverscrollFactory` (IosScrollPhysics.kt)
+    // sengaja TIDAK dihapus (tak terpakai); fling `rememberIosFlingBehavior` TIDAK disentuh.
     // Batch 511 — LocalHapticFeedback diganti implementasi terpusat (lihat AppHaptics.kt): satu baris
     // ini menguatkan SEMUA 75 titik haptic di app tanpa menyentuh call site-nya satu-satu (pola
-    // sama LocalOverscrollFactory di atas). Jenis haptic selain LongPress/TextHandleMove tetap
+    // sama CompositionLocal lain di blok ini). Jenis haptic selain LongPress/TextHandleMove tetap
     // diteruskan ke implementasi bawaan Compose.
     CompositionLocalProvider(
         LocalIsDarkTheme provides isDark,
-        LocalOverscrollFactory provides IosOverscrollFactory,
         LocalHapticFeedback provides rememberStrongHapticFeedback(),
     ) {
         MaterialTheme(

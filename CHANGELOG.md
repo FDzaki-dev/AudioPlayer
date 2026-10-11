@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 581 — Efek bounce dicabut: overscroll iOS + 7 spring MediumBouncy -> default (BELUM verified CI)
+- Permintaan user: upload `SONIX_v580.zip` + `SONIX_laporan-untuk-claude_run9.zip` — "hilangkan atau balikkan seluruh effect bounce ke setelan default karena terasa stuttering dan buggy!!".
+- Fakta run #9 (commit `723c4e6`): ArchUnit LULUS, SpotBugs 56, detekt 0, lintDebug 0, "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)" = prediksi Batch 580 cocok -> Batch 580 TERVERIFIKASI di Actions.
+- **`ui/theme/Theme.kt`**: `LocalOverscrollFactory provides IosOverscrollFactory` dicabut + impor `androidx.compose.foundation.LocalOverscrollFactory` dibuang -> overscroll bawaan platform. `IosOverscrollFactory` (`IosScrollPhysics.kt`) tak dihapus (tak terpakai); `rememberIosFlingBehavior` tak disentuh.
+- **`ui/AlbumArtHero.kt`** (2), **`ui/MiniPlayerBar.kt`** (1), **`MainActivity.kt`** (3), **`ui/Utils.kt`** `bouncyPress` (1): `spring(DampingRatioMediumBouncy, StiffnessLow)` -> `spring(DampingRatioNoBouncy, StiffnessMedium)` (= default `spring()` Compose, nol overshoot). Threshold/haptic/logika swipe + penulisan offset sinkron Batch 434 tak berubah; skala-turun saat tekan tetap, hanya pantulan hilang.
+- Sisa: `ui/NowPlayingScreen.kt:566` spring entrance `MediumBouncy` (batas 5 file/batch). Prediksi run berikutnya: 11 deprecated, 0 lainnya (tak berubah).
+- 5 file source; 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK di sandbox (hanya cek kurung seimbang + diff vs v580); rasa gerak belum dilihat di device.
+
 ## Batch 580 — `LocalLifecycleOwner` deprecated x3 -> `androidx.lifecycle.compose` (BELUM verified CI)
 - Permintaan user: upload `SONIX_laporan-untuk-claude_run8.zip` + "Lanjutkan".
 - Fakta run #8 (commit `8c1a7b5`): ArchUnit LULUS, SpotBugs 56, detekt 0, lintDebug 0, "Peringatan kompilator Kotlin: 14 (14 deprecated, 0 lainnya)" = prediksi Batch 579 cocok -> Batch 579 TERVERIFIKASI di Actions.
