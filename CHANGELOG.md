@@ -1,5 +1,15 @@
 # Changelog
 
+## Batch 584 — Bentuk "daun diagonal" menggantikan lingkaran di widget + bubble (BELUM verified CI/device)
+- Permintaan user: "Jangan circle monoton, Kasih shape yang refreshing lah!!" (setelah Batch 583).
+- Akar: Batch 583 memakai oval/lingkaran untuk medali play, kenop, bingkai sampul bubble, tab minimized, dan sampul widget (rounded-rect seragam) — repetitif.
+- Keluarga bentuk baru: sudut kiri-atas & kanan-bawah BESAR, kanan-atas & kiri-bawah KECIL (searah cahaya kiri-atas), dipakai konsisten: panel 28/12dp, medali play 16/7dp, kenop 13/6dp, sampul/clip = 0.36/0.16 x sisi.
+- **Drawable** (`widget_background.xml`/`_light`, `widget_play_button_bg.xml`, `widget_key_bg.xml`/`_light`): oval -> rectangle ber-`<corners>` per-sudut; tiap lapis memakai radius yang sama dikurangi inset; warna/bevel/pressed tak berubah.
+- **`WidgetUpdater.kt`**: `leafPath(size, inset)` BARU (`internal`); `buildArtPlate` (+`FILLET_COLOR_DARK`) `internal`; clip & fillet sampul memakai jalur daun.
+- **`FloatingBubbleService.kt`**: `applyOvalClip` -> `applyLeafClip` (`Outline.setPath`); sampul pill = `buildArtPlate` (dihitung di `Dispatchers.Default`), tab minimized tetap bitmap polos.
+- **`bubble_mini_player.xml`**: sampul tanpa background/padding/cropToPadding (trik cincin medali Batch 583 dibuang: menirus di sudut besar).
+- 8 file diubah, 0 baru/dihapus vs Batch 583; justifikasi >5 file diperbarui di atas `PROJECT_STATE.md`. 0 Gradle/CI. Prediksi: 11 deprecated, 0 lainnya. **NOT VERIFIED**: tak ada aapt2/kotlinc/Gradle/SDK (xmllint + daftar putih + simulasi statis buatan sendiri); belum dilihat di device. Batch 583 tak pernah dikompilasi sendiri.
+
 ## Batch 583 — Widget + bubble floating dirombak ke Neumorphism burgundy (BELUM verified CI/device)
 - Permintaan user: upload `SONIX_v582.zip` + `SONIX_laporan-untuk-claude_run11.zip` — "rombak design `widget` dan `bubble floating` agar mengikuti design dari Neumorphism burgundy yang high effort dan profesionalisme!!"; susulan "ASAP".
 - Fakta run #11 (commit `e87bf37`): ArchUnit LULUS (7 aturan), SpotBugs 55, detekt 0, lintDebug 0, "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)" = prediksi Batch 582 cocok -> Batch 582 TERVERIFIKASI di Actions.

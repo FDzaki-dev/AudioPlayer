@@ -11,6 +11,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.PorterDuffXfermode
@@ -80,17 +81,19 @@ object WidgetUpdater {
 
     // Batch 583 — fillet gilt di tepi sampul (pola Modifier.neuArtFillet Batch 569: gilt diagonal
     // alpha 0.90 -> 0.18 -> 0.60). Gelap = SkeuGilt, terang = SkeuGiltDeep (champagne terang hilang di perkamen).
-    private const val FILLET_COLOR_DARK = 0xFFDCC393.toInt() // SkeuGilt
+    internal const val FILLET_COLOR_DARK = 0xFFDCC393.toInt() // SkeuGilt
     private const val FILLET_COLOR_LIGHT = 0xFF9C7E4E.toInt() // SkeuGiltDeep
     private const val FILLET_ALPHA_START = 0.90f
     private const val FILLET_ALPHA_MID = 0.18f
     private const val FILLET_ALPHA_END = 0.60f
 
-    // Batch 583 — sudut sampul PROPORSIONAL (dulu radius tetap 24px pada bitmap ~200px = 12% sisi,
-    // nyaris kotak). 0.30 x sisi ~ 15.6dp pada sampul 52dp: mendekati rasio sudut art daftar lagu di app
-    // (Radius.xxl 20dp / 48dp = 0.42), tetap proporsional di layout compact (36dp). Tebal fillet 0.024 x sisi
-    // ~ 1.25dp pada 52dp.
-    private const val ART_CORNER_FRACTION = 0.30f
+    // Batch 583/584 — BENTUK "DAUN DIAGONAL" (Batch 584: user minta bentuk segar, bukan lingkaran): sudut kiri-atas &
+    // kanan-bawah besar (0.36 x sisi), kanan-atas & kiri-bawah kecil (0.16 x sisi) — sumbu besar searah sumber
+    // cahaya kiri-atas, keluarga yang sama dgn panel/medali/kenop (res/drawable/widget_*.xml). Proporsional:
+    // ~18.7/8.3dp pada sampul widget 52dp, ~14.4/6.4dp pada sampul bubble 40dp. Tebal fillet 0.024 x sisi ~ 1.25dp
+    // pada 52dp.
+    private const val LEAF_BIG_FRACTION = 0.36f
+    private const val LEAF_SMALL_FRACTION = 0.16f
     private const val ART_FILLET_STROKE_FRACTION = 0.024f
 
     const val ACTION_TOGGLE_PLAY = "com.rudi.audioplayer.widget.TOGGLE_PLAY"
@@ -232,29 +235,45 @@ object WidgetUpdater {
     }
 
     /**
-     * Center-crops to a square, rounds the corners (proporsional, [ART_CORNER_FRACTION]) and draws a thin
-     * diagonal gilt fillet on the edge — the widget counterpart of `Modifier.neuArtFillet` (Batch 569,
-     * TactileDepth.kt). Pengganti `roundBitmapCorners` (radius tetap 24px, tanpa fillet) — Batch 583.
-     * Fillet digambar DI DALAM batas bitmap (stroke diinset setengah lebarnya) supaya seluruh
-     * lebarnya terlihat; gradien 3-stop diagonal kiri-atas -> kanan-bawah = arah cahaya Neumorphism.
+     * Jalur "daun diagonal" persegi [size]: sudut kiri-atas & kanan-bawah besar, kanan-atas & kiri-bawah kecil.
+     * [inset] mengecilkan jalur ke dalam (radius ikut dikurangi) — dipakai fillet; `internal` karena bubble
+     * (FloatingBubbleService) memakai bentuk yang SAMA untuk clip sampul & tab minimized. Batch 584.
      */
-    private fun buildArtPlate(source: Bitmap, filletColor: Int): Bitmap {
+    internal fun leafPath(size: Float, inset: Float = 0f): Path {
+        val big = (size * LEAF_BIG_FRACTION - inset).coerceAtLeast(0f)
+        val small = (size * LEAF_SMALL_FRACTION - inset).coerceAtLeast(0f)
+        return Path().apply {
+            addRoundRect(
+                RectF(inset, inset, size - inset, size - inset),
+                floatArrayOf(big, big, small, small, big, big, small, small),
+                Path.Direction.CW
+            )
+        }
+    }
+
+    /**
+     * Center-crops to a square, clips it to the leaf shape ([leafPath]) and draws a thin diagonal gilt fillet on
+     * the edge — the widget counterpart of `Modifier.neuArtFillet` (Batch 569, TactileDepth.kt). Pengganti
+     * `roundBitmapCorners` (radius tetap 24px, tanpa fillet) — Batch 583; bentuk daun diagonal — Batch 584.
+     * Fillet digambar DI DALAM batas bitmap (jalur diinset setengah lebar stroke) supaya seluruh lebarnya terlihat;
+     * gradien 3-stop diagonal kiri-atas -> kanan-bawah = arah cahaya Neumorphism. `internal`: bubble memakainya
+     * untuk sampul pill (selalu gelap -> [FILLET_COLOR_DARK]).
+     */
+    internal fun buildArtPlate(source: Bitmap, filletColor: Int): Bitmap {
         val size = minOf(source.width, source.height)
         val x = (source.width - size) / 2
         val y = (source.height - size) / 2
         val squared = Bitmap.createBitmap(source, x, y, size, size)
 
         val sizeF = size.toFloat()
-        val radius = sizeF * ART_CORNER_FRACTION
         val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        canvas.drawRoundRect(RectF(0f, 0f, sizeF, sizeF), radius, radius, paint)
+        canvas.drawPath(leafPath(sizeF), paint)
         paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
         canvas.drawBitmap(squared, 0f, 0f, paint)
 
         val filletWidth = sizeF * ART_FILLET_STROKE_FRACTION
-        val half = filletWidth / 2f
         val fillet = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = filletWidth
@@ -269,7 +288,7 @@ object WidgetUpdater {
                 Shader.TileMode.CLAMP
             )
         }
-        canvas.drawRoundRect(RectF(half, half, sizeF - half, sizeF - half), radius - half, radius - half, fillet)
+        canvas.drawPath(leafPath(sizeF, inset = filletWidth / 2f), fillet)
         return output
     }
 

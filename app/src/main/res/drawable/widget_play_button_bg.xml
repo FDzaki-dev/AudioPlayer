@@ -1,32 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Batch 583 — MEDALI play/pause Neumorphism burgundy (pengganti disc zamrud `#2FA37C` Batch 84/85).
-    Meniru medali enamel layar kunci/tombol play Now Playing (Batch 565-566): cincin GILT metalik ->
-    alur ukir gelap -> cakram anggur radial (ruby terang kiri-atas -> burgundy -> anggur tergelap) ->
-    sorot kaca elips -> fillet gilt tipis. Hex = token Color.kt: SkeuGilt 0xFFDCC393 / SkeuGiltDeep
-    0xFF9C7E4E (ring), SkeuWineLit 0xFFA33550 / SkeuWine 0xFF6E1B30 / SkeuWineDeep 0xFF40101E (cakram).
-    SATU file untuk mode gelap DAN terang (dulu 2 file): medali bukan permukaan netral — identitasnya
-    anggur+gilt di kanvas apa pun, jadi pasangan `_light` dihapus (WidgetUpdater tak lagi menukar).
-    Dipakai juga: tombol play bubble, bingkai sampul bubble (padding 2dp menyisakan cincin gilt),
-    dan tab bubble minimized 48dp. Ukuran 36-48dp — semua inset/radius dp tetap, proporsional.
-    Keadaan DITEKAN = cekung (cahaya berbalik: sisi kiri-atas gelap, kanan-bawah terang), sorot kaca
-    hilang, cincin meredup — bahasa baku neumorphism. Lapis 1 gradien OPAK penuh: outline elevation
-    tab minimized (8dp) diturunkan dari lapis ini; wajib tetap opak. gradientRadius dp tetap (bukan %).
-    centerColor radial berada di posisi centerX (aturan GradientDrawable: stop tengah = centerX bila
-    != 0.5) -> centerX 0.32 menaruh burgundy inti di 32% radius, bukan 50%.
+    Batch 583/584 — MEDALI play/pause Neumorphism burgundy (pengganti disc zamrud `#2FA37C`). Cincin GILT
+    metalik -> alur ukir gelap -> cakram anggur radial (ruby terang kiri-atas -> burgundy -> anggur tergelap)
+    -> sorot kaca -> fillet gilt tipis. Hex = token Color.kt: SkeuGilt/SkeuGiltDeep (cincin), SkeuWineLit 0xFFA33550 /
+    SkeuWine 0xFF6E1B30 / SkeuWineDeep 0xFF40101E (cakram).
+
+    Batch 584 — BENTUK "DAUN DIAGONAL" (bukan lingkaran): sudut kiri-atas & kanan-bawah 16dp, kanan-atas &
+    kiri-bawah 7dp; keluarga radius sama (dikurangi inset) di setiap lapis. Radius dp tetap: pada 36dp (bubble)
+    -> 44dp (widget) -> 48dp (tab minimized) rasio sudutnya bergeser sedikit, tetap berbentuk daun.
+
+    SATU file untuk mode gelap DAN terang (pasangan `_light` Batch 84 dihapus): identitas medali anggur+gilt di
+    kanvas apa pun. Dipakai: tombol play widget & bubble, tab bubble minimized 48dp. Keadaan DITEKAN = cekung
+    (cahaya berbalik), sorot kaca hilang. Lapis 1 gradien OPAK penuh (outline elevation tab minimized 8dp).
+    centerColor radial berada di posisi centerX (aturan GradientDrawable: stop tengah = centerX bila != 0.5).
 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- DITEKAN: cekung. -->
     <item android:state_pressed="true">
         <layer-list>
             <item>
-                <shape android:shape="oval">
+                <shape android:shape="rectangle">
                     <gradient
                         android:type="linear"
                         android:angle="315"
                         android:startColor="#B39A68"
                         android:endColor="#6B5230" />
+                    <corners
+                        android:topLeftRadius="16dp"
+                        android:topRightRadius="7dp"
+                        android:bottomRightRadius="16dp"
+                        android:bottomLeftRadius="7dp" />
                 </shape>
             </item>
             <item
@@ -34,8 +37,13 @@
                 android:top="1.5dp"
                 android:right="1.5dp"
                 android:bottom="1.5dp">
-                <shape android:shape="oval">
+                <shape android:shape="rectangle">
                     <solid android:color="#1E070E" />
+                    <corners
+                        android:topLeftRadius="14.5dp"
+                        android:topRightRadius="5.5dp"
+                        android:bottomRightRadius="14.5dp"
+                        android:bottomLeftRadius="5.5dp" />
                 </shape>
             </item>
             <item
@@ -43,13 +51,18 @@
                 android:top="2.25dp"
                 android:right="2.25dp"
                 android:bottom="2.25dp">
-                <shape android:shape="oval">
+                <shape android:shape="rectangle">
                     <gradient
                         android:type="linear"
                         android:angle="315"
                         android:startColor="#3F0F1D"
                         android:centerColor="#5E1829"
                         android:endColor="#8A2A44" />
+                    <corners
+                        android:topLeftRadius="13.75dp"
+                        android:topRightRadius="4.75dp"
+                        android:bottomRightRadius="13.75dp"
+                        android:bottomLeftRadius="4.75dp" />
                 </shape>
             </item>
             <item
@@ -57,46 +70,57 @@
                 android:top="5dp"
                 android:right="5dp"
                 android:bottom="5dp">
-                <shape android:shape="oval">
+                <shape android:shape="rectangle">
                     <stroke
                         android:width="0.75dp"
                         android:color="#1FDCC393" />
+                    <corners
+                        android:topLeftRadius="11dp"
+                        android:topRightRadius="2dp"
+                        android:bottomRightRadius="11dp"
+                        android:bottomLeftRadius="2dp" />
                 </shape>
             </item>
         </layer-list>
     </item>
 
-    <!-- NORMAL: cembung. -->
     <item>
         <layer-list>
-            <!-- 1. Cincin gilt metalik (opak — lihat catatan elevation). -->
             <item>
-                <shape android:shape="oval">
+                <shape android:shape="rectangle">
                     <gradient
                         android:type="linear"
                         android:angle="315"
                         android:startColor="#F4E2B8"
                         android:centerColor="#C9A96F"
                         android:endColor="#8A6B3F" />
+                    <corners
+                        android:topLeftRadius="16dp"
+                        android:topRightRadius="7dp"
+                        android:bottomRightRadius="16dp"
+                        android:bottomLeftRadius="7dp" />
                 </shape>
             </item>
-            <!-- 2. Alur ukir gelap antara cincin dan cakram. -->
             <item
                 android:left="1.5dp"
                 android:top="1.5dp"
                 android:right="1.5dp"
                 android:bottom="1.5dp">
-                <shape android:shape="oval">
+                <shape android:shape="rectangle">
                     <solid android:color="#2B0B14" />
+                    <corners
+                        android:topLeftRadius="14.5dp"
+                        android:topRightRadius="5.5dp"
+                        android:bottomRightRadius="14.5dp"
+                        android:bottomLeftRadius="5.5dp" />
                 </shape>
             </item>
-            <!-- 3. Cakram anggur radial, sumber cahaya kiri-atas. -->
             <item
                 android:left="2.25dp"
                 android:top="2.25dp"
                 android:right="2.25dp"
                 android:bottom="2.25dp">
-                <shape android:shape="oval">
+                <shape android:shape="rectangle">
                     <gradient
                         android:type="radial"
                         android:centerX="0.32"
@@ -105,33 +129,46 @@
                         android:startColor="#BC4A64"
                         android:centerColor="#7A2036"
                         android:endColor="#3B0E1B" />
+                    <corners
+                        android:topLeftRadius="13.75dp"
+                        android:topRightRadius="4.75dp"
+                        android:bottomRightRadius="13.75dp"
+                        android:bottomLeftRadius="4.75dp" />
                 </shape>
             </item>
-            <!-- 4. Sorot kaca elips di separuh atas. -->
             <item
                 android:left="6dp"
                 android:top="3.5dp"
                 android:right="6dp"
                 android:height="15dp"
                 android:gravity="top|fill_horizontal">
-                <shape android:shape="oval">
+                <shape android:shape="rectangle">
                     <gradient
                         android:type="linear"
                         android:angle="270"
                         android:startColor="#4DFFFFFF"
                         android:endColor="#00FFFFFF" />
+                    <corners
+                        android:topLeftRadius="10dp"
+                        android:topRightRadius="4dp"
+                        android:bottomRightRadius="6dp"
+                        android:bottomLeftRadius="6dp" />
                 </shape>
             </item>
-            <!-- 5. Fillet gilt tipis di dalam cakram. -->
             <item
                 android:left="5dp"
                 android:top="5dp"
                 android:right="5dp"
                 android:bottom="5dp">
-                <shape android:shape="oval">
+                <shape android:shape="rectangle">
                     <stroke
                         android:width="0.75dp"
                         android:color="#2EDCC393" />
+                    <corners
+                        android:topLeftRadius="11dp"
+                        android:topRightRadius="2dp"
+                        android:bottomRightRadius="11dp"
+                        android:bottomLeftRadius="2dp" />
                 </shape>
             </item>
         </layer-list>

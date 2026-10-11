@@ -6,14 +6,14 @@
      bertema terang, jadi butuh 1 kontras yang konsisten & jelas terbaca di semua kondisi
      background, bukan ikut light/dark toggle in-app seperti widget.
 
-     Batch 583 — ROMBAK Neumorphism burgundy (kontrak drawable bersama dgn widget ikut berganti, lihat
-     widget_background.xml): panel = bevel anggur + hairline/border gilt; play = medali ruby bercincin
-     gilt; prev/next = kenop berkedalaman (widget_key_bg, varian gelap); sampul = bingkai medali yang
-     SAMA (widget_play_button_bg) dengan padding 2dp + cropToPadding sehingga cincin gilt terlihat di
-     sekeliling sampul tanpa mengubah hierarki — TouchDelegate album art (Batch 470-472) menghitung
-     dari `getHitRect()` view yang sama, jadi geometri sentuh tak terpengaruh. Chevron minimize
-     sengaja TANPA kenop + alpha 0.72: aksi sekunder, bukan kontrol putar. Margin/ukuran disesuaikan
-     agar kenop tidak berdesakan (lebar total naik ~14dp dari versi sebelumnya).
+     Batch 583/584 — ROMBAK Neumorphism burgundy (kontrak drawable bersama dgn widget ikut berganti, lihat
+     widget_background.xml): panel = bevel anggur + hairline/border gilt; play = medali ruby bercincin gilt;
+     prev/next = kenop berkedalaman (widget_key_bg, varian gelap). Batch 584 — BENTUK "daun diagonal" (bukan
+     lingkaran) di semua elemen: panel/medali/kenop lewat <corners> per-sudut di drawable; sampul di-clip
+     ke bentuk yang sama oleh FloatingBubbleService.applyLeafClip dan dibingkai fillet gilt yang di-bake ke bitmap
+     (WidgetUpdater.buildArtPlate). Hierarki ImageView TIDAK berubah (TouchDelegate album art Batch 470-472
+     memakai getHitRect() persegi yang sama). Chevron minimize sengaja TANPA kenop + alpha 0.72: aksi sekunder,
+     bukan kontrol putar. Margin/ukuran disesuaikan agar kenop tidak berdesakan (lebar total naik ~14dp).
      Catatan jujur: listener sentuh setupDrag (Batch 474) mengonsumsi event pada tombol/album art,
      jadi keadaan "ditekan" (cekung) dari drawable selector TIDAK tampil di bubble — hanya di widget. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -30,9 +30,6 @@
         android:id="@+id/bubble_album_art"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:background="@drawable/widget_play_button_bg"
-        android:padding="2dp"
-        android:cropToPadding="true"
         android:scaleType="centerCrop"
         android:contentDescription="Sampul album" />
 

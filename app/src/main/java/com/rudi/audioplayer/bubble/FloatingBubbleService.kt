@@ -701,8 +701,8 @@ class FloatingBubbleService : Service() {
         expandedView = expanded
         minimizedView = minimized
 
-        applyOvalClip(expanded.findViewById(R.id.bubble_album_art))
-        applyOvalClip(minimized.findViewById(R.id.bubble_minimized_art))
+        applyLeafClip(expanded.findViewById(R.id.bubble_album_art))
+        applyLeafClip(minimized.findViewById(R.id.bubble_minimized_art))
         expanded.findViewById<ImageView>(R.id.bubble_album_art).setImageResource(R.mipmap.ic_launcher)
         minimized.findViewById<ImageView>(R.id.bubble_minimized_art).setImageResource(R.mipmap.ic_launcher)
 
@@ -748,11 +748,16 @@ class FloatingBubbleService : Service() {
         keepAwakeAndScheduleFade() // Batch 453 — mulai idle timer dari saat bubble pertama tampil
     }
 
-    private fun applyOvalClip(imageView: ImageView) {
+    /** Batch 584 — pengganti `applyOvalClip` (lingkaran): sampul pill & tab minimized di-clip ke bentuk "daun diagonal"
+     * ([WidgetUpdater.leafPath], keluarga bentuk yang sama dgn panel/medali/kenop). Outline = Path konveks (setPath, API 30+;
+     * minSdk 31); `getOutline` dipanggil ulang otomatis saat ukuran view berubah. Hanya MEMBENTUK clip — logika
+     * sentuh/drag/TouchDelegate tak disentuh (memakai `getHitRect()` persegi, tak terpengaruh bentuk). */
+    private fun applyLeafClip(imageView: ImageView) {
         imageView.clipToOutline = true
         imageView.outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(v: View, outline: Outline) {
-                outline.setOval(0, 0, v.width, v.height)
+                val size = minOf(v.width, v.height)
+                if (size > 0) outline.setPath(WidgetUpdater.leafPath(size.toFloat()))
             }
         }
     }
@@ -1239,13 +1244,19 @@ class FloatingBubbleService : Service() {
         }
         bubbleArtJob = bubbleScope.launch {
             val bitmap = withContext(Dispatchers.IO) { loadAlbumArtBitmap(artworkUri) }
+            // Batch 584 — sampul pill = pelat daun diagonal + fillet gilt (sama dgn sampul widget, selalu varian gelap);
+            // tab minimized memakai bitmap polos (bingkainya sudah medali gilt di bubble_minimized.xml). Dihitung di
+            // Dispatchers.Default (CPU), bukan Main.
+            val plate = bitmap?.let {
+                withContext(Dispatchers.Default) { WidgetUpdater.buildArtPlate(it, WidgetUpdater.FILLET_COLOR_DARK) }
+            }
             // bubbleView bisa saja sudah null (Service di-destroy selagi decode jalan) — re-cek,
             // jangan pakai `view` closure lama yang mungkin sudah dilepas dari WindowManager.
             val root = bubbleView ?: return@launch
             val expandedArt = root.findViewById<ImageView>(R.id.bubble_album_art)
             val minimizedArt = root.findViewById<ImageView>(R.id.bubble_minimized_art)
-            if (bitmap != null) {
-                expandedArt.setImageBitmap(bitmap)
+            if (bitmap != null && plate != null) {
+                expandedArt.setImageBitmap(plate)
                 minimizedArt.setImageBitmap(bitmap)
             } else {
                 expandedArt.setImageResource(R.mipmap.ic_launcher)
