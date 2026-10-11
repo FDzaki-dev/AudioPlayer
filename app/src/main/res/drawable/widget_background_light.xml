@@ -1,46 +1,111 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Batch 85 — pasangan terang, lihat komentar lengkap di widget_background.xml. Highlight lebih
-     kuat lagi drpd sisi gelap (0.60 vs 0.35) — putih di atas kanvas terang butuh alpha jauh lebih
-     tinggi biar kebaca, pola sama seperti SkeuLightHighlight > SkeuHighlight di Color.kt. Shadow
-     pakai warna SkeuLightShadow (#23262B, bukan hitam murni), alpha lebih rendah dari sisi gelap
-     (0.40 vs 0.55) krn base sudah terang jadi shadow lebih mudah kebaca meski lebih redup. -->
+<!--
+    Batch 583 — pasangan TERANG panel Neumorphism burgundy; struktur lapis IDENTIK dengan
+    widget_background.xml (baca komentar di sana). Beda hanya nilai: kanvas perkamen hangat
+    (SkeuNeuSurfaceLight 0xFFF1E8DF; sisi terang +55% putih sesuai neuStyle() mode terang), rim
+    terang = putih hampir penuh, rim gelap = taupe hangat (bukan hitam: bayangan hitam pekat di
+    kanvas terang jadi noda kasar, shadowStrength 0.42 di TactileDepth.kt), wash = ruby pekat
+    SkeuLightEmerald 0xFF8E2440 alpha rendah, hairline = SkeuGiltDeep 0xFF9C7E4E (champagne terang
+    hilang di perkamen), border = burgundy SkeuAccentLight 0xFF741C32 alpha ~25% (pengganti border
+    hitam 15% Batch 207). Lapis 1 solid opak (outline elevation).
+-->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 1. Dasar rim gelap (strip kanan/bawah). -->
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#E8EAED" />
+            <solid android:color="#B8AA9C" />
             <corners android:radius="24dp" />
         </shape>
     </item>
-    <item>
+    <!-- 2. Rim terang kiri-atas. -->
+    <item android:right="2.5dp" android:bottom="2.5dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="315"
+                android:startColor="#FFFFFF"
+                android:centerColor="#F8F1E9"
+                android:endColor="#E2D7CB" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+    <!-- 3. Permukaan cembung. -->
+    <item
+        android:left="2.5dp"
+        android:top="2.5dp"
+        android:right="2.5dp"
+        android:bottom="2.5dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="315"
+                android:startColor="#FBF7F1"
+                android:centerColor="#F1E8DF"
+                android:endColor="#E6DACD" />
+            <corners android:radius="21.5dp" />
+        </shape>
+    </item>
+    <!-- 4a. Wash ruby di pojok sumber cahaya. -->
+    <item
+        android:left="2.5dp"
+        android:top="2.5dp"
+        android:right="2.5dp"
+        android:bottom="2.5dp">
         <shape android:shape="rectangle">
             <gradient
                 android:type="radial"
-                android:centerX="0.05"
-                android:centerY="0.08"
-                android:gradientRadius="140dp"
-                android:startColor="#99FFFFFF"
-                android:endColor="#00FFFFFF" />
-            <corners android:radius="24dp" />
+                android:centerX="0.04"
+                android:centerY="0.06"
+                android:gradientRadius="170dp"
+                android:startColor="#2E8E2440"
+                android:endColor="#008E2440" />
+            <corners android:radius="21.5dp" />
         </shape>
     </item>
-    <item>
+    <!-- 4b. Peredam kanan-bawah (warna umber, bukan hitam). -->
+    <item
+        android:left="2.5dp"
+        android:top="2.5dp"
+        android:right="2.5dp"
+        android:bottom="2.5dp">
         <shape android:shape="rectangle">
             <gradient
                 android:type="radial"
-                android:centerX="0.95"
-                android:centerY="0.92"
-                android:gradientRadius="140dp"
-                android:startColor="#6623262B"
-                android:endColor="#0023262B" />
-            <corners android:radius="24dp" />
+                android:centerX="0.96"
+                android:centerY="0.94"
+                android:gradientRadius="150dp"
+                android:startColor="#332A2024"
+                android:endColor="#002A2024" />
+            <corners android:radius="21.5dp" />
         </shape>
     </item>
-    <!-- Batch 207 — border tipis, sama alasan seperti widget_background.xml (dark). Warna
-         stroke lebih gelap krn kanvas terang (putih 33% di atas terang nyaris tak kelihatan). -->
-    <item>
+    <!-- 5. Hairline gilt tua di tepi atas. -->
+    <item
+        android:left="26dp"
+        android:top="2.5dp"
+        android:right="26dp"
+        android:height="1dp"
+        android:gravity="top|fill_horizontal">
         <shape android:shape="rectangle">
-            <stroke android:width="1dp" android:color="#26000000" />
-            <corners android:radius="24dp" />
+            <gradient
+                android:type="linear"
+                android:angle="0"
+                android:startColor="#009C7E4E"
+                android:centerColor="#B39C7E4E"
+                android:endColor="#009C7E4E" />
+        </shape>
+    </item>
+    <!-- 6. Border burgundy 1dp penuh terlihat (pembatas visual Batch 207). -->
+    <item
+        android:left="0.5dp"
+        android:top="0.5dp"
+        android:right="0.5dp"
+        android:bottom="0.5dp">
+        <shape android:shape="rectangle">
+            <stroke
+                android:width="1dp"
+                android:color="#40741C32" />
+            <corners android:radius="23.5dp" />
         </shape>
     </item>
 </layer-list>

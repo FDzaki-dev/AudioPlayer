@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Batch 583 — KENOP sekunder (sebelumnya/berikutnya) Neumorphism burgundy, varian GELAP (juga
+    dipakai bubble floating yang selalu gelap). BARU: dulu tombol ini transparan tanpa kedalaman.
+    Bevel oval 1.25dp: dasar rim gelap -> rim terang kiri-atas -> permukaan cembung -> sorot lembut.
+    Warna = keluarga panel widget_background.xml (permukaan SkeuNeuSurfaceDark, rim neuStyle()).
+    Keadaan DITEKAN = cekung + pendar anggur tipis (SkeuWineLit alpha ~25%) — isyarat "aktif" yang sama
+    dengan kunci tab bawah (neuSlidingKey wine). Catatan: di bubble, listener sentuh setupDrag
+    (Batch 474) mengonsumsi event sehingga keadaan ditekan tidak tampil di sana; di widget tampil.
+    Pasangan terang: widget_key_bg_light.xml (WidgetUpdater menukar lewat setBackgroundResource).
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <solid android:color="#4B3B40" />
+                </shape>
+            </item>
+            <item android:right="1.25dp" android:bottom="1.25dp">
+                <shape android:shape="oval">
+                    <gradient
+                        android:type="linear"
+                        android:angle="315"
+                        android:startColor="#0B0709"
+                        android:endColor="#2A1D21" />
+                </shape>
+            </item>
+            <item
+                android:left="1.25dp"
+                android:top="1.25dp"
+                android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="oval">
+                    <gradient
+                        android:type="linear"
+                        android:angle="315"
+                        android:startColor="#1A1114"
+                        android:endColor="#2B1F23" />
+                </shape>
+            </item>
+            <item
+                android:left="1.25dp"
+                android:top="1.25dp"
+                android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="oval">
+                    <gradient
+                        android:type="radial"
+                        android:centerX="0.5"
+                        android:centerY="0.5"
+                        android:gradientRadius="18dp"
+                        android:startColor="#40A33550"
+                        android:endColor="#00A33550" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <solid android:color="#0D090B" />
+                </shape>
+            </item>
+            <item android:right="1.25dp" android:bottom="1.25dp">
+                <shape android:shape="oval">
+                    <gradient
+                        android:type="linear"
+                        android:angle="315"
+                        android:startColor="#8A787C"
+                        android:endColor="#2A1D21" />
+                </shape>
+            </item>
+            <item
+                android:left="1.25dp"
+                android:top="1.25dp"
+                android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="oval">
+                    <gradient
+                        android:type="linear"
+                        android:angle="315"
+                        android:startColor="#3B2D32"
+                        android:endColor="#1F1519" />
+                </shape>
+            </item>
+            <item
+                android:left="1.25dp"
+                android:top="1.25dp"
+                android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="oval">
+                    <gradient
+                        android:type="radial"
+                        android:centerX="0.3"
+                        android:centerY="0.25"
+                        android:gradientRadius="20dp"
+                        android:startColor="#2EFFFFFF"
+                        android:endColor="#00FFFFFF" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

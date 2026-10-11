@@ -252,8 +252,9 @@ app/src/main/res/drawable/ic_widget_play.png
 app/src/main/res/drawable/ic_widget_previous.png
 app/src/main/res/drawable/widget_background.xml
 app/src/main/res/drawable/widget_background_light.xml
+app/src/main/res/drawable/widget_key_bg.xml
+app/src/main/res/drawable/widget_key_bg_light.xml
 app/src/main/res/drawable/widget_play_button_bg.xml
-app/src/main/res/drawable/widget_play_button_bg_light.xml
 app/src/main/res/layout/bubble_mini_player.xml
 app/src/main/res/layout/bubble_minimized.xml
 app/src/main/res/layout/widget_player.xml

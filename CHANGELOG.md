@@ -1,5 +1,16 @@
 # Changelog
 
+## Batch 583 — Widget + bubble floating dirombak ke Neumorphism burgundy (BELUM verified CI/device)
+- Permintaan user: upload `SONIX_v582.zip` + `SONIX_laporan-untuk-claude_run11.zip` — "rombak design `widget` dan `bubble floating` agar mengikuti design dari Neumorphism burgundy yang high effort dan profesionalisme!!"; susulan "ASAP".
+- Fakta run #11 (commit `e87bf37`): ArchUnit LULUS (7 aturan), SpotBugs 55, detekt 0, lintDebug 0, "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)" = prediksi Batch 582 cocok -> Batch 582 TERVERIFIKASI di Actions.
+- Akar: widget/bubble masih palet charcoal-biru + disc zamrud `#2FA37C` (Batch 84/85), tertinggal dari sistem anggur/ruby/gilt Batch 563-569; teks widget memakai hex token lama; ikon prev/next ivory hampir tak terbaca di mode terang.
+- **Panel** `widget_background.xml`/`_light.xml`: bevel anggur (rim gelap -> rim terang kiri-atas -> permukaan cembung -> wash `SkeuWineLit` + peredam kanan-bawah -> hairline gilt -> border gilt/burgundy 1dp pengganti border Batch 207). Lapis 1 solid opak (outline elevation bubble).
+- **Medali play** `widget_play_button_bg.xml`: cincin gilt metalik -> alur ukir -> cakram anggur radial -> sorot kaca -> fillet gilt; ditekan = cekung. Pasangan `_light` DIHAPUS (identik di kedua mode; 0 referensi tersisa).
+- **Kenop prev/next** `widget_key_bg.xml` + `_light` (BARU): bevel oval, ditekan = cekung + pendar anggur/burgundy.
+- **`WidgetUpdater.kt`**: warna teks = hex token Color.kt; kenop gelap/terang via `setBackgroundResource`; mode terang: ikon prev/next diwarnai burgundy (`tintedGlyph`); sampul `buildArtPlate` (sudut 0.30 x sisi, fillet gilt diagonal pola `neuArtFillet`), dihitung sekali di luar loop widget. `roundBitmapCorners` dihapus (0 pemakai lain).
+- **`bubble_mini_player.xml`**: aset sama; sampul berbingkai medali (padding 2dp + `cropToPadding`, hierarki & hit-rect TouchDelegate tak berubah); kenop 30dp, margin disesuaikan; chevron minimize alpha 0.72. `bubble_minimized.xml` otomatis memakai medali baru.
+- 8 operasi file (5 diubah, 2 baru, 1 dihapus) + `FILE_MANIFEST.txt` + docs; justifikasi kontrak drawable bersama di atas `PROJECT_STATE.md`. 0 Gradle/CI. Prediksi: 11 deprecated, 0 lainnya. **NOT VERIFIED**: tak ada aapt2/kotlinc/Gradle/SDK (xmllint + daftar putih atribut + simulasi statis buatan sendiri saja); belum dilihat di device. Tidak disentuh: `widget_player*.xml`, `bubble_minimized.xml`, `FloatingBubbleService.kt`, `ic_widget_*.png`.
+
 ## Batch 582 — Tab Library: kerja eager komposisi pertama dibuat lazy (BELUM verified CI; akar masalah TIDAK terbukti)
 - Permintaan user: upload `SONIX_laporan-untuk-claude_run10.zip` — "Tab Library agak stuttering tetapi hanya setiap awal buka aplikasi aja".
 - Fakta run #10 (commit `519c89c`): ArchUnit LULUS, SpotBugs 56, detekt 0, lintDebug 0, "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)" = prediksi Batch 581 cocok -> Batch 581 TERVERIFIKASI di Actions.

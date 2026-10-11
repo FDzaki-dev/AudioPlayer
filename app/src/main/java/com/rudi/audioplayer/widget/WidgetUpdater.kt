@@ -7,6 +7,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
+import android.graphics.PorterDuffXfermode
+import android.graphics.RectF
+import android.graphics.Shader
 import android.net.Uri
 import android.widget.RemoteViews
 import com.rudi.audioplayer.MainActivity
@@ -54,17 +63,35 @@ object WidgetUpdater {
     // path from PlayerViewModel.setThemeMode/setThemeIdentity to WidgetUpdater.updateAll —
     // added there — and (2) the layout itself had no light variant to switch to — added here.
     //
-    // Batch 84 — values swapped to the EXACT SkeuDarkText/SkeuDarkSecondaryText/SkeuLightText/
-    // SkeuLightSecondaryText hex from Color.kt (was a separate, slightly-off ad-hoc palette:
-    // pure #FFFFFF instead of the cooler near-white #EDEFF2, etc.) as part of "redesign widget
-    // theme -> Neumorphism, hardcode": this is isDark/light MODE, a different axis from the
-    // Tactile/Skeu/Apple theme picker, left untouched — but the actual color VALUES on both
-    // sides of that axis now come from the app's one canonical Neumorphism palette instead of
-    // an independent set that happened to look similar.
-    private const val TITLE_COLOR_DARK = 0xFFEDEFF2.toInt()
-    private const val ARTIST_COLOR_DARK = 0xFFA6ABB2.toInt()
-    private const val TITLE_COLOR_LIGHT = 0xFF212327.toInt()
-    private const val ARTIST_COLOR_LIGHT = 0xFF63676D.toInt()
+    // Batch 583 — ROMBAK Neumorphism burgundy: kelima warna di bawah = hex PERSIS token Color.kt
+    // (Batch 563), bukan salinan ad-hoc. Batch 84 dulu menyalin SkeuDark/LightText versi lama
+    // (abu-perak dingin); sejak Batch 563 token itu menjadi ivory/champagne (gelap) dan near-black
+    // anggur/umber (terang), tapi widget tertinggal di palet lama. Kontras (hitungan di komentar
+    // Color.kt): judul gelap 14.5:1, artis gelap 8.8:1, judul terang 13:1, artis terang 6.1:1.
+    private const val TITLE_COLOR_DARK = 0xFFEFE6D8.toInt() // SkeuDarkText
+    private const val ARTIST_COLOR_DARK = 0xFFC2B49C.toInt() // SkeuDarkSecondaryText
+    private const val TITLE_COLOR_LIGHT = 0xFF2A2024.toInt() // SkeuLightText
+    private const val ARTIST_COLOR_LIGHT = 0xFF62524A.toInt() // SkeuLightSecondaryText
+
+    // Batch 583 — ikon prev/next asli (ic_widget_previous/next.png) berwarna ivory 0xFFF5F1E8: terbaca
+    // di panel gelap, TAPI hampir hilang di perkamen mode terang. Mode terang memakai salinan
+    // berwarna burgundy SkeuAccentLight (kontras ~9.8:1 di atas permukaan kenop); mode gelap tetap PNG asli.
+    private const val GLYPH_COLOR_LIGHT = 0xFF741C32.toInt() // SkeuAccentLight
+
+    // Batch 583 — fillet gilt di tepi sampul (pola Modifier.neuArtFillet Batch 569: gilt diagonal
+    // alpha 0.90 -> 0.18 -> 0.60). Gelap = SkeuGilt, terang = SkeuGiltDeep (champagne terang hilang di perkamen).
+    private const val FILLET_COLOR_DARK = 0xFFDCC393.toInt() // SkeuGilt
+    private const val FILLET_COLOR_LIGHT = 0xFF9C7E4E.toInt() // SkeuGiltDeep
+    private const val FILLET_ALPHA_START = 0.90f
+    private const val FILLET_ALPHA_MID = 0.18f
+    private const val FILLET_ALPHA_END = 0.60f
+
+    // Batch 583 — sudut sampul PROPORSIONAL (dulu radius tetap 24px pada bitmap ~200px = 12% sisi,
+    // nyaris kotak). 0.30 x sisi ~ 15.6dp pada sampul 52dp: mendekati rasio sudut art daftar lagu di app
+    // (Radius.xxl 20dp / 48dp = 0.42), tetap proporsional di layout compact (36dp). Tebal fillet 0.024 x sisi
+    // ~ 1.25dp pada 52dp.
+    private const val ART_CORNER_FRACTION = 0.30f
+    private const val ART_FILLET_STROKE_FRACTION = 0.024f
 
     const val ACTION_TOGGLE_PLAY = "com.rudi.audioplayer.widget.TOGGLE_PLAY"
     const val ACTION_NEXT = "com.rudi.audioplayer.widget.NEXT"
@@ -93,6 +120,13 @@ object WidgetUpdater {
         val albumArt = artworkUriRaw?.let { loadAlbumArtBitmap(context, Uri.parse(it)) }
         val isDark = resolveIsDark(context, ThemeStore(context).getMode())
 
+        // Batch 583 — bahan visual yang SAMA untuk semua widget dibuat SEKALI di luar loop (dulu sampul
+        // dibulatkan ulang per widget): sampul berfillet gilt + (mode terang saja) ikon prev/next
+        // berwarna burgundy. Null = pakai bawaan layout (ikon PNG ivory / ic_launcher).
+        val artPlate = albumArt?.let { buildArtPlate(it, if (isDark) FILLET_COLOR_DARK else FILLET_COLOR_LIGHT) }
+        val prevGlyph = if (isDark) null else tintedGlyph(context, R.drawable.ic_widget_previous, GLYPH_COLOR_LIGHT)
+        val nextGlyph = if (isDark) null else tintedGlyph(context, R.drawable.ic_widget_next, GLYPH_COLOR_LIGHT)
+
         for (id in ids) {
             // Widgets can be resized independently by the user, so each one gets its own
             // layout choice — a widget shrunk down to just an icon shouldn't try to cram in
@@ -110,15 +144,16 @@ object WidgetUpdater {
                 if (isDark) R.drawable.widget_background else R.drawable.widget_background_light
             )
 
-            // Batch 84 — play/pause disc now also has a dark/light pair (was 1 file reused for
-            // both, fine back when it was a flat solid red that read okay either way; the new
-            // Neumorphism SkeuEmerald/SkeuLightEmerald pair genuinely needs to switch like the
-            // panel background above does, same reasoning).
-            views.setInt(
-                R.id.widget_play_pause,
-                "setBackgroundResource",
-                if (isDark) R.drawable.widget_play_button_bg else R.drawable.widget_play_button_bg_light
-            )
+            // Batch 583 — medali play/pause (burgundy + cincin gilt) SATU drawable untuk kedua mode:
+            // `widget_play_button_bg_light.xml` (pasangan Batch 84) DIHAPUS, jadi tak ada lagi penukaran
+            // di sini; `widget_player(.compact).xml` sudah menunjuk `widget_play_button_bg`. Kenop
+            // sekunder prev/next BARU berkedalaman dan punya pasangan gelap/terang (permukaan netral
+            // mengikuti panel), ditukar lewat setBackgroundResource — mekanisme yang sama persis dgn panel.
+            val keyBackground = if (isDark) R.drawable.widget_key_bg else R.drawable.widget_key_bg_light
+            views.setInt(R.id.widget_prev, "setBackgroundResource", keyBackground)
+            views.setInt(R.id.widget_next, "setBackgroundResource", keyBackground)
+            if (prevGlyph != null) views.setImageViewBitmap(R.id.widget_prev, prevGlyph)
+            if (nextGlyph != null) views.setImageViewBitmap(R.id.widget_next, nextGlyph)
 
             views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
             views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
@@ -134,8 +169,8 @@ object WidgetUpdater {
                 if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
             )
 
-            if (albumArt != null) {
-                views.setImageViewBitmap(R.id.widget_album_art, roundBitmapCorners(albumArt, radiusPx = 24f))
+            if (artPlate != null) {
+                views.setImageViewBitmap(R.id.widget_album_art, artPlate)
             } else {
                 views.setImageViewResource(R.id.widget_album_art, R.mipmap.ic_launcher)
             }
@@ -196,20 +231,70 @@ object WidgetUpdater {
         }
     }
 
-    /** Center-crops to a square and rounds the corners, so widget art matches the app's rounded look. */
-    private fun roundBitmapCorners(source: Bitmap, radiusPx: Float): Bitmap {
+    /**
+     * Center-crops to a square, rounds the corners (proporsional, [ART_CORNER_FRACTION]) and draws a thin
+     * diagonal gilt fillet on the edge — the widget counterpart of `Modifier.neuArtFillet` (Batch 569,
+     * TactileDepth.kt). Pengganti `roundBitmapCorners` (radius tetap 24px, tanpa fillet) — Batch 583.
+     * Fillet digambar DI DALAM batas bitmap (stroke diinset setengah lebarnya) supaya seluruh
+     * lebarnya terlihat; gradien 3-stop diagonal kiri-atas -> kanan-bawah = arah cahaya Neumorphism.
+     */
+    private fun buildArtPlate(source: Bitmap, filletColor: Int): Bitmap {
         val size = minOf(source.width, source.height)
         val x = (source.width - size) / 2
         val y = (source.height - size) / 2
         val squared = Bitmap.createBitmap(source, x, y, size, size)
 
+        val sizeF = size.toFloat()
+        val radius = sizeF * ART_CORNER_FRACTION
         val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = android.graphics.Canvas(output)
-        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-        val rect = android.graphics.RectF(0f, 0f, size.toFloat(), size.toFloat())
-        canvas.drawRoundRect(rect, radiusPx, radiusPx, paint)
-        paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+        val canvas = Canvas(output)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        canvas.drawRoundRect(RectF(0f, 0f, sizeF, sizeF), radius, radius, paint)
+        paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
         canvas.drawBitmap(squared, 0f, 0f, paint)
+
+        val filletWidth = sizeF * ART_FILLET_STROKE_FRACTION
+        val half = filletWidth / 2f
+        val fillet = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = filletWidth
+            shader = LinearGradient(
+                0f, 0f, sizeF, sizeF,
+                intArrayOf(
+                    withAlpha(filletColor, FILLET_ALPHA_START),
+                    withAlpha(filletColor, FILLET_ALPHA_MID),
+                    withAlpha(filletColor, FILLET_ALPHA_END)
+                ),
+                floatArrayOf(0f, 0.5f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRoundRect(RectF(half, half, sizeF - half, sizeF - half), radius - half, radius - half, fillet)
         return output
+    }
+
+    private fun withAlpha(color: Int, alpha: Float): Int =
+        (color and 0x00FFFFFF) or ((alpha * 255f).toInt() shl 24)
+
+    /**
+     * Salinan ikon [resId] (PNG ivory) yang diwarnai [color] (SRC_IN: alfa asli dipertahankan, RGB diganti).
+     * Dipakai ikon prev/next mode terang. Gagal = null -> layout tetap memakai PNG asli (tak terbaca di
+     * perkamen tapi widget tidak rusak). Bitmap kecil (72px basis, di-skala densitas), jauh di bawah batas RemoteViews.
+     */
+    private fun tintedGlyph(context: Context, resId: Int, color: Int): Bitmap? = try {
+        val source = BitmapFactory.decodeResource(context.resources, resId)
+        if (source == null) {
+            null
+        } else {
+            val output = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+                colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN)
+            }
+            Canvas(output).drawBitmap(source, 0f, 0f, paint)
+            output
+        }
+    } catch (e: Exception) {
+        AppLogger.e("WidgetUpdater", "Gagal mewarnai ikon widget", e)
+        null
     }
 }

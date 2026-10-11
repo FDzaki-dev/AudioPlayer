@@ -1,54 +1,122 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Batch 84/85 — Neumorphism widget (lihat Batch 84 utk konteks lengkap kenapa "di-hardcode").
-    Batch 85: user feedback dari screenshot device sungguhan — "kurang efek depth/3D" — 2 layer
-    gradient LINEAR diagonal Batch 84 nyebar rata ke SELURUH panel, di widget sebesar ini jadi
-    nyaris tak kelihatan (alpha far/lemah token asli ternyata terlalu halus utk bidang seluas
-    ini, beda konteks dari border tipis skeuEmboss()). Diganti gradient RADIAL dipusatkan PERSIS
-    di pojok (bukan nyebar diagonal merata) — cahaya/bayangan mengumpul di 1 titik pojok itu jauh
-    lebih kebaca sebagai "sumber cahaya" drpd wash tipis merata, dan alpha dinaikkan signifikan
-    (bukan lagi sisi "far" token asli — di widget ini falloff radial sendiri yang membuat area
-    tetap sempit, jadi aman pakai alpha lebih tinggi tanpa banjir 1 warna). `gradientRadius` fix
-    140dp (bukan persen — `%`/`%p` butuh API 29+, minSdk app ini 23), jadi proporsinya bisa
-    sedikit beda di widget yang di-resize sangat kecil/besar oleh user — trade-off diterima.
+    Batch 583 — ROMBAK Neumorphism BURGUNDY (sistem anggur/ruby/gilt Batch 563-569). Pengganti total
+    panel charcoal-biru `#191C21` + 2 sorot radial putih/hitam (Batch 84/85, palet "zamrud" lama).
+    Dipakai widget home-screen (mode gelap) DAN bubble floating (bubble_mini_player.xml, selalu
+    gelap) — SATU kontrak drawable bersama, jadi identitas keduanya tetap seragam.
+
+    Panel RemoteViews tidak bisa menggambar bayangan jatuh (batas widget meng-clip), jadi kedalaman
+    dibangun dari BEVEL di dalam batas: 1) dasar rim gelap (sisi kanan-bawah) -> 2) rim terang
+    (sisi kiri-atas, gradien memudar ke arah cahaya jauh) -> 3) permukaan cembung -> 4) wash anggur
+    kiri-atas + peredam kanan-bawah -> 5) hairline gilt di tepi atas -> 6) border gilt tipis.
+    Arah cahaya kiri-atas = NeuLightX/Y TactileDepth.kt. Hex = token Color.kt (dikutip, bukan angka baru):
+      permukaan  SkeuNeuSurfaceDark 0xFF231619 (+9% putih di sisi terang, spec neuStyle())
+      wash       SkeuWineLit 0xFFA33550
+      gilt       SkeuGilt 0xFFDCC393
+    Border gilt 1dp = pengganti border Batch 207 ("pembatas visual", permintaan user) — tetap ada
+    supaya batas widget terbaca di wallpaper apa pun, kini bernada champagne. Rim bevel 1.5dp
+    berada DI DALAM border (total strip 2.5dp). `gradientRadius` dp tetap (bukan %): proporsi bisa
+    sedikit beda di widget yang di-resize ekstrem — trade-off Batch 85, dipertahankan.
+    Lapis pertama SENGAJA solid opak: outline elevation bubble (8dp) diturunkan dari lapis ini.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 1. Dasar rim gelap: terlihat hanya sebagai strip kanan/bawah (sisi menjauhi cahaya). -->
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#191C21" />
+            <solid android:color="#0D090B" />
             <corners android:radius="24dp" />
         </shape>
     </item>
-    <item>
+    <!-- 2. Rim terang kiri-atas: terlihat sebagai strip atas/kiri; terang di pojok sumber cahaya,
+         meredup ke pojok lain (analog stroke gradien 3-stop neuAccentKey). -->
+    <item android:right="2.5dp" android:bottom="2.5dp">
         <shape android:shape="rectangle">
             <gradient
-                android:type="radial"
-                android:centerX="0.05"
-                android:centerY="0.08"
-                android:gradientRadius="140dp"
-                android:startColor="#59FFFFFF"
-                android:endColor="#00FFFFFF" />
+                android:type="linear"
+                android:angle="315"
+                android:startColor="#8A787C"
+                android:centerColor="#4A3C40"
+                android:endColor="#1E1417" />
             <corners android:radius="24dp" />
         </shape>
     </item>
-    <item>
+    <!-- 3. Permukaan cembung: terangkat di kiri-atas, menggelap ke kanan-bawah. -->
+    <item
+        android:left="2.5dp"
+        android:top="2.5dp"
+        android:right="2.5dp"
+        android:bottom="2.5dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="315"
+                android:startColor="#36292D"
+                android:centerColor="#291C20"
+                android:endColor="#1E1417" />
+            <corners android:radius="21.5dp" />
+        </shape>
+    </item>
+    <!-- 4a. Wash anggur di pojok sumber cahaya (di belakang sampul album). -->
+    <item
+        android:left="2.5dp"
+        android:top="2.5dp"
+        android:right="2.5dp"
+        android:bottom="2.5dp">
         <shape android:shape="rectangle">
             <gradient
                 android:type="radial"
-                android:centerX="0.95"
-                android:centerY="0.92"
-                android:gradientRadius="140dp"
-                android:startColor="#8C000000"
+                android:centerX="0.04"
+                android:centerY="0.06"
+                android:gradientRadius="170dp"
+                android:startColor="#3DA33550"
+                android:endColor="#00A33550" />
+            <corners android:radius="21.5dp" />
+        </shape>
+    </item>
+    <!-- 4b. Peredam kanan-bawah (lawan sumber cahaya) — kedalaman, bukan warna. -->
+    <item
+        android:left="2.5dp"
+        android:top="2.5dp"
+        android:right="2.5dp"
+        android:bottom="2.5dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.96"
+                android:centerY="0.94"
+                android:gradientRadius="150dp"
+                android:startColor="#73000000"
                 android:endColor="#00000000" />
-            <corners android:radius="24dp" />
+            <corners android:radius="21.5dp" />
         </shape>
     </item>
-    <!-- Batch 207 — border tipis, murni untuk batas visual widget selalu jelas (diminta user:
-         "pembatas/border visual") — bukan fungsional, tidak pengaruh ke layout/insets. -->
-    <item>
+    <!-- 5. Hairline gilt di tepi atas (memudar di kedua ujung) — penanda "old money". -->
+    <item
+        android:left="26dp"
+        android:top="2.5dp"
+        android:right="26dp"
+        android:height="1dp"
+        android:gravity="top|fill_horizontal">
         <shape android:shape="rectangle">
-            <stroke android:width="1dp" android:color="#33FFFFFF" />
-            <corners android:radius="24dp" />
+            <gradient
+                android:type="linear"
+                android:angle="0"
+                android:startColor="#00DCC393"
+                android:centerColor="#99DCC393"
+                android:endColor="#00DCC393" />
+        </shape>
+    </item>
+    <!-- 6. Border gilt 1dp penuh terlihat (inset 0.5dp), pembatas visual Batch 207. -->
+    <item
+        android:left="0.5dp"
+        android:top="0.5dp"
+        android:right="0.5dp"
+        android:bottom="0.5dp">
+        <shape android:shape="rectangle">
+            <stroke
+                android:width="1dp"
+                android:color="#38DCC393" />
+            <corners android:radius="23.5dp" />
         </shape>
     </item>
 </layer-list>
