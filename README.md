@@ -8,6 +8,8 @@
 > - Pencabutan efek bounce (Batch 581: overscroll bawaan platform + spring snap-back/tekan default
 >   tanpa pantulan; menggantikan overscroll iOS Batch 364 dan spring bouncy swipe album art Batch 434)
 >   belum dikonfirmasi user di device asli. Sisa pantulan: spring entrance Now Playing.
+> - Pengurangan stutter cold-start tab Library (Batch 582: indeks pencarian + daftar turunan dibuat lazy) belum
+>   dikonfirmasi user di device asli; akar masalahnya belum terbukti dengan pengukuran.
 > - Efek pembesar label tab bawah (Batch 437) belum dikonfirmasi user di device asli —
 >   khususnya kemulusan transisi fokus saat drag & 0 frame-drop tambahan. Komponen blur-nya
 >   sendiri sudah DICABUT (Batch 442, lihat di bawah), jadi bukan lagi "efek kaca".

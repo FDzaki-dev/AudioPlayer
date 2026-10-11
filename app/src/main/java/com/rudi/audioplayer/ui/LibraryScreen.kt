@@ -83,6 +83,8 @@ import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.PersistentSet
 import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toPersistentSet
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // Batch 538 (T11) — `selectedIds` bertipe `PersistentSet<Long>` (bukan tipe Bundle) -> disimpan sbg LongArray.
 private val SelectedIdsSaver: Saver<PersistentSet<Long>, LongArray> = Saver(
@@ -172,41 +174,58 @@ fun LibraryScreen(
     // project already accepts for other cross-screen store writes (see Backup/Restore, Batch 115).
     val songs = remember(rawSongs, filterVersion) { vaultStore.apply(filterStore.apply(rawSongs)) }
 
+    // Batch 582 — User: "Tab Library agak stuttering tetapi hanya setiap awal buka aplikasi".
+    // 4 nilai turunan di bawah (folderSummaries, hiddenSongsList, availableFolderNames,
+    // availableGenreNames) dulu dihitung EAGER di komposisi pertama tab Library (di Main, kode
+    // masih dingin), padahal HANYA dibaca di `if (showFolderManager)` (2 pertama) dan cabang
+    // `selectedTab == 6` (2 terakhir). Kini `lazy(NONE)` di dalam `remember` dgn KUNCI SAMA:
+    // dihitung hanya saat benar-benar dibaca (`.value`), hasil per kunci tetap sama persis.
     val folderSummaries = remember(rawSongs, filterVersion) {
-        val excluded = filterStore.getExcludedFolders()
-        rawSongs.groupBy { it.folderPath }
-            .map { (path, group) ->
-                FolderSummary(
-                    path = path,
-                    name = group.first().folderName,
-                    songCount = group.size,
-                    excluded = excluded.contains(path)
-                )
-            }
-            .sortedBy { it.name.lowercase() }
+        lazy(LazyThreadSafetyMode.NONE) {
+            val excluded = filterStore.getExcludedFolders()
+            rawSongs.groupBy { it.folderPath }
+                .map { (path, group) ->
+                    FolderSummary(
+                        path = path,
+                        name = group.first().folderName,
+                        songCount = group.size,
+                        excluded = excluded.contains(path)
+                    )
+                }
+                .sortedBy { it.name.lowercase() }
+        }
     }
 
     val hiddenSongsList = remember(rawSongs, filterVersion) {
-        val hiddenIds = filterStore.getHiddenSongIds()
-        rawSongs.filter { hiddenIds.contains(it.id) }
+        lazy(LazyThreadSafetyMode.NONE) {
+            val hiddenIds = filterStore.getHiddenSongIds()
+            rawSongs.filter { hiddenIds.contains(it.id) }
+        }
     }
 
     // Chip options for the Smart Playlist builder's folder filter — same source (folderName,
     // not folderPath) the Folder tab already groups by, so what the user picks here matches
     // what they see there.
     val availableFolderNames = remember(rawSongs) {
-        rawSongs.map { it.folderName }.distinct().sorted()
+        lazy(LazyThreadSafetyMode.NONE) { rawSongs.map { it.folderName }.distinct().sorted() }
     }
 
     // Gap List #11 — same precedent as availableFolderNames right above, for the Smart
     // Playlist builder's genre chip picker. mapNotNull drops songs with no genre tag.
     val availableGenreNames = remember(rawSongs) {
-        rawSongs.mapNotNull { it.genre }.distinct().sorted()
+        lazy(LazyThreadSafetyMode.NONE) { rawSongs.mapNotNull { it.genre }.distinct().sorted() }
     }
 
     // Normalize searchable fields once per visible-library change. This avoids repeating
     // case-insensitive string normalization for every song on every search keystroke.
     val searchIndex = remember(songs) { LibrarySearchIndex(songs) }
+    // Batch 582 — indeks pencarian kini lazy (lihat `LibrarySearchIndex`): bangun di thread latar
+    // begitu UI pencarian dibuka supaya ketikan pertama tidak menunggu.
+    LaunchedEffect(searchActive, searchIndex) {
+        if (searchActive) {
+            withContext(Dispatchers.Default) { searchIndex.warmUp() }
+        }
+    }
     val filteredSongs = remember(searchIndex, searchQuery) {
         searchIndex.search(searchQuery)
     }
@@ -397,8 +416,8 @@ fun LibraryScreen(
                 // (tab 5) — hidden/excluded-folder filtering is a Library-tab-only display
                 // concern, not applied to either playlist kind.
                 allSongs = rawSongs,
-                availableFolders = availableFolderNames,
-                availableGenres = availableGenreNames,
+                availableFolders = availableFolderNames.value,
+                availableGenres = availableGenreNames.value,
                 smartPlaylists = smartPlaylists,
                 ratingOf = { id -> ratingStore.getRating(id) },
                 onSongClick = onSongClick,
@@ -625,8 +644,8 @@ fun LibraryScreen(
         ) { uri -> if (uri != null) onAddCustomFolder(uri) }
 
         FolderManagerSheet(
-            folders = folderSummaries,
-            hiddenSongs = hiddenSongsList,
+            folders = folderSummaries.value,
+            hiddenSongs = hiddenSongsList.value,
             customFolders = customFolders,
             onDismiss = { showFolderManager = false },
             onToggleFolder = { path, excluded ->

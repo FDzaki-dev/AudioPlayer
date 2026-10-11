@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 582 — Tab Library: kerja eager komposisi pertama dibuat lazy (BELUM verified CI; akar masalah TIDAK terbukti)
+- Permintaan user: upload `SONIX_laporan-untuk-claude_run10.zip` — "Tab Library agak stuttering tetapi hanya setiap awal buka aplikasi aja".
+- Fakta run #10 (commit `519c89c`): ArchUnit LULUS, SpotBugs 56, detekt 0, lintDebug 0, "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)" = prediksi Batch 581 cocok -> Batch 581 TERVERIFIKASI di Actions.
+- Akar masalah **tidak terbukti** (tak ada profil/log durasi). Terbukti dari kode: komposisi pertama `LibraryScreen` menghitung EAGER di Main (kode dingin) hal yang tak dipakai saat tab terbuka: `LibrarySearchIndex(songs)`, `folderSummaries`, `hiddenSongsList` (dibaca hanya di `if (showFolderManager)`), `availableFolderNames`, `availableGenreNames` (hanya di `selectedTab == 6`).
+- **`ui/LibrarySearchIndex.kt`**: `entries` -> `by lazy` (thread-safe) + `warmUp(): Int`; hasil `search()` identik (query kosong tetap `allSongs`).
+- **`ui/LibraryScreen.kt`**: 4 nilai turunan dibungkus `lazy(NONE)` di dalam `remember` (kunci sama), dibaca via `.value`; `LaunchedEffect(searchActive, searchIndex)` -> `warmUp()` di `Dispatchers.Default` saat UI pencarian dibuka; +impor `Dispatchers`, `withContext`.
+- Tidak disentuh (kandidat bila masih stutter): ekor `PlayerViewModel.refreshLibrary()` di Main setelah scan (4x `pruneOrphans` + JSON playlist; pindah ke IO berisiko lost-update), bitmap Neumorphism sinkron di UI thread, 0 baseline profile, `rememberIosFlingBehavior`.
+- 2 file source; 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. Prediksi: 11 deprecated, 0 lainnya. **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK di sandbox (hanya cek kurung seimbang + diff vs v581); efek ke stutter belum diukur/dilihat di device.
+
 ## Batch 581 — Efek bounce dicabut: overscroll iOS + 7 spring MediumBouncy -> default (BELUM verified CI)
 - Permintaan user: upload `SONIX_v580.zip` + `SONIX_laporan-untuk-claude_run9.zip` — "hilangkan atau balikkan seluruh effect bounce ke setelan default karena terasa stuttering dan buggy!!".
 - Fakta run #9 (commit `723c4e6`): ArchUnit LULUS, SpotBugs 56, detekt 0, lintDebug 0, "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)" = prediksi Batch 580 cocok -> Batch 580 TERVERIFIKASI di Actions.
