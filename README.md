@@ -302,6 +302,10 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 576** — peringatan kompilator Kotlin (API deprecated, "Condition is always true", dll.) kini ikut dilaporkan di `laporan-untuk-claude.txt` (baris ringkasan ke-5 + daftar). Workflow laporan memakai `--no-build-cache` untuk kompilasi supaya peringatan selalu tercetak. Belum diverifikasi CI.
+
+**Batch 575** — static analysis (detekt + lintDebug) dipindah dari `build.yml` ke workflow laporan Claude: artifact `SONIX_static_analysis_v<versi>-run<run>` tidak ada lagi; hasil detekt/lint kini masuk `laporan-untuk-claude.txt` bersama ArchUnit + SpotBugs (4 baris ringkasan, detail hanya bila ada temuan). `build.yml` kini hanya build + tes + Release + artifact APK. Belum diverifikasi CI.
+
 **Batch 570** — laporan CI untuk Claude: workflow terpisah `.github/workflows/android-artifact.yml` ("Android CI Artifact for Claude", berdampingan dgn `build.yml` yang tak berubah) menjalankan ArchUnit (`ArchitectureTest`, report-only, 7 aturan dependensi antar-package) + SpotBugs (SARIF, opt-in `-Psonix.spotbugs=true` via `config/spotbugs/spotbugs.gradle.kts`), lalu mengunggah `laporan-untuk-claude.txt` sebagai artifact `SONIX_laporan-untuk-claude_run<N>`. Non-blocking; alat yang tak jalan dicatat `NOT VERIFIED`, bukan "bersih". Terverifikasi jalan di CI (run #3, Batch 573): ArchUnit LULUS (7 aturan, 0 pelanggaran), SpotBugs 391 temuan (mayoritas diperkirakan false positive bytecode Kotlin).
 
 **Batch 562** — drag-select di daftar lagu dan sheet pilih-lagu kini bisa MEMBATALKAN centang (sapuan yang dimulai di baris tercentang = mode batal); hero album Now Playing diberi kedalaman statis tambahan (bayangan lantai, kilau kaca, pantulan warna aksen); CI kini juga mengunggah APK sebagai artifact tanpa zip dan menulis hasil detekt/lint ke ringkasan run. Belum diverifikasi compile/CI/device.
