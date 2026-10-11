@@ -13,6 +13,7 @@
 //  - Tanpa `auxClassPaths`: classpath compile Android (AAR) tak bisa dipakai SpotBugs apa adanya;
 //    SpotBugs tetap jalan, hanya mencatat "classes needed for analysis were missing" (presisi turun).
 // Jalankan lokal: gradle spotbugsRelease -Psonix.spotbugs=true  ->  app/build/reports/spotbugs/spotbugs.sarif
+import com.github.spotbugs.snom.SpotBugsBasePlugin
 import com.github.spotbugs.snom.SpotBugsTask
 
 buildscript {
@@ -22,7 +23,10 @@ buildscript {
     }
 }
 
-apply(plugin = "com.github.spotbugs-base")
+// Batch 572: `apply(plugin = "com.github.spotbugs-base")` GAGAL di run #2 ("Plugin with id ... not found", baris 25):
+// id plugin dicari di scope proyek, bukan di classpath `buildscript` skrip terapan ini. Dipakai apply per KELAS
+// (SpotBugsBasePlugin = `Plugin<Project>` pada dokumentasi resmi plugin) -> tak lewat pencarian id.
+apply<SpotBugsBasePlugin>()
 
 // Kelas hasil kompilasi varian release (Kotlin = tmp/kotlin-classes, Java = intermediates/javac).
 val sonixKotlinClasses = layout.buildDirectory.dir("tmp/kotlin-classes/release").get().asFile

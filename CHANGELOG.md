@@ -1,5 +1,11 @@
 # Changelog
 
+## Batch 572 — SpotBugs: `apply(plugin = id)` -> `apply<SpotBugsBasePlugin>()` (BELUM verified CI)
+- Permintaan user: upload `SONIX_laporan-untuk-claude_run2.zip` + "Lanjutkan". Isi (commit `b6264bb`): **ArchUnit LULUS** (689 kelas, 7 aturan, 0 pelanggaran — alat terbukti jalan); **SpotBugs NOT VERIFIED**: `Script config/spotbugs/spotbugs.gradle.kts line: 25 — Plugin with id 'com.github.spotbugs-base' not found` (BUILD FAILED in 14s).
+- Diagnosis dari laporan: skrip lolos kompilasi dan classpath plugin 6.5.6 ter-resolve; yang gagal hanya pencarian id plugin (di scope proyek, bukan classpath `buildscript` skrip terapan).
+- **`config/spotbugs/spotbugs.gradle.kts`**: `apply(plugin = "com.github.spotbugs-base")` -> `apply<SpotBugsBasePlugin>()` + `import com.github.spotbugs.snom.SpotBugsBasePlugin` (kelas `Plugin<Project>` di dokumentasi resmi plugin). Tidak ada perubahan lain.
+- 1 file target; `FILE_MANIFEST.txt` tak berubah. **NOT VERIFIED**: belum jalan; sisa risiko = error runtime setelah plugin ter-apply, akan tampak di laporan berikutnya.
+
 ## Batch 571 — Laporan CI untuk Claude: akar masalah kini tertulis di laporan; ArchUnit dan SpotBugs dijalankan terpisah (BELUM verified CI)
 - Permintaan user: upload `SONIX_laporan-untuk-claude_run1.zip` tanpa teks (hasil push Batch 570). Isi: run #1, commit `316eb57`, Gradle exit=1, BUILD FAILED in 58s; ArchUnit NOT VERIFIED (laporan tak terbentuk); SpotBugs NOT VERIFIED (SARIF tak terbentuk).
 - **Akar masalah TIDAK terbaca**: bagian "EKOR LOG GRADLE" hanya berisi 80 baris stack frame internal Gradle (`--stacktrace`), tanpa blok "What went wrong". Penyebab gagal belum diketahui; tidak ada perbaikan tebakan pada `spotbugs.gradle.kts`/`ArchitectureTest.kt`/`app/build.gradle.kts` (aturan isolasi bug).
