@@ -302,6 +302,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 580** — 3 pemakaian `LocalLifecycleOwner` deprecated (`MainActivity.kt` x2, `NowPlayingScreen.kt` x1) dipindah ke `androidx.lifecycle.compose.LocalLifecycleOwner`; tanpa perubahan perilaku yang disengaja. Laporan run #8 memverifikasi Batch 579 (peringatan kompilator 14 = 14 deprecated + 0 lainnya); target berikutnya 11.
+
 **Batch 579** — 5 pemakaian ikon deprecated terakhir (`Icons.Default.Article/VolumeOff/VolumeDown/VolumeUp` di `NowPlayingScreen.kt`, `Backspace` di `LockScreen.kt`) dimigrasikan ke `Icons.AutoMirrored.Filled.*`; kelompok ikon tuntas, tampilan LTR identik. Laporan run #7 memverifikasi Batch 578 (peringatan kompilator 19 = 19 deprecated + 0 lainnya); target berikutnya 14.
 
 **Batch 578** — 11 pemakaian ikon deprecated (`Icons.Default.QueueMusic/VolumeUp/VolumeDown/VolumeOff/Article/PlaylistPlay/PlaylistAdd/ArrowBack`) dimigrasikan ke `Icons.AutoMirrored.Filled.*` di 5 layar (bagian 1 dari 2); tampilan LTR identik. Laporan run #6 memverifikasi Batch 577 (peringatan kompilator 30 = 30 deprecated + 0 lainnya); target berikutnya 19.

@@ -100,6 +100,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -113,7 +114,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.SideEffect
 import androidx.lifecycle.Lifecycle
@@ -309,8 +309,11 @@ class MainActivity : FragmentActivity() {
             // the old one on Compose UI 1.6.x — bumping lifecycle to 2.8.2 alone (Batch 23) did
             // not fix this crash in practice, despite upstream release notes claiming it should.
             // Explicitly providing it here removes the dependency on that fix entirely.
+            // Batch 580: sisi kanan diganti ke lokal baru (yang lama deprecated: "Moved to
+            // lifecycle-runtime-compose"). Di Compose UI baru blok ini kemungkinan identitas —
+            // kandidat dihapus, tapi HANYA atas instruksi user (bug asli Batch 24 = crash nyata).
             CompositionLocalProvider(
-                androidx.lifecycle.compose.LocalLifecycleOwner provides androidx.compose.ui.platform.LocalLifecycleOwner.current
+                androidx.lifecycle.compose.LocalLifecycleOwner provides androidx.lifecycle.compose.LocalLifecycleOwner.current
             ) {
             val appThemeIdentity by playerViewModel.themeIdentity.collectAsStateWithLifecycle()
             val appThemeMode by playerViewModel.themeMode.collectAsStateWithLifecycle()

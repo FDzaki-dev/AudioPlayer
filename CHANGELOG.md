@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 580 — `LocalLifecycleOwner` deprecated x3 -> `androidx.lifecycle.compose` (BELUM verified CI)
+- Permintaan user: upload `SONIX_laporan-untuk-claude_run8.zip` + "Lanjutkan".
+- Fakta run #8 (commit `8c1a7b5`): ArchUnit LULUS, SpotBugs 56, detekt 0, lintDebug 0, "Peringatan kompilator Kotlin: 14 (14 deprecated, 0 lainnya)" = prediksi Batch 579 cocok -> Batch 579 TERVERIFIKASI di Actions.
+- **`ui/NowPlayingScreen.kt`**: impor `androidx.compose.ui.platform.LocalLifecycleOwner` -> `androidx.lifecycle.compose.LocalLifecycleOwner` (pemakaian baris 1437 tak berubah).
+- **`MainActivity.kt`**: impor yang sama diganti (pemakaian baris 725 tak berubah) + bridge Batch 24 (baris 313) sisi kanan `...ui.platform.LocalLifecycleOwner.current` -> `...lifecycle.compose.LocalLifecycleOwner.current` + 3 baris komentar. Bridge SENGAJA tidak dihapus (asumsi: kini identitas di Compose UI baru; hapus hanya atas instruksi user).
+- 2 file source; 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. Prediksi: "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)". **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK di sandbox; identitas lokal lama/baru + perilaku runtime belum dibuktikan.
+
 ## Batch 579 — 5 ikon deprecated -> AutoMirrored, bagian 2/2; kelompok ikon tuntas (BELUM verified CI)
 - Permintaan user: upload `SONIX_laporan-untuk-claude_run7.zip` + "Lanjutkan".
 - Fakta run #7 (commit `2ae0130`): ArchUnit LULUS, SpotBugs 56, detekt 0, lintDebug 0, "Peringatan kompilator Kotlin: 19 (19 deprecated, 0 lainnya)" = prediksi Batch 578 cocok -> Batch 578 TERVERIFIKASI di Actions.
