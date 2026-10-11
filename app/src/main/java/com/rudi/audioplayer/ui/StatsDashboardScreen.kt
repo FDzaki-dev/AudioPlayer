@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Person
@@ -48,7 +48,7 @@ fun StatsDashboardScreen(snapshot: ListeningStatsEngine.Snapshot, onBack: () -> 
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
             }
             Spacer(modifier = Modifier.width(4.dp))
             Text("Statistik Dengar", style = MaterialTheme.typography.titleLarge)

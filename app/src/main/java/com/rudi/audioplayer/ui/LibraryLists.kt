@@ -15,15 +15,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -542,17 +542,17 @@ internal fun SongRow(
         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
             DropdownMenuItem(
                 text = { Text("Putar Berikutnya") },
-                leadingIcon = { Icon(Icons.Default.PlaylistPlay, contentDescription = null) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = null) },
                 onClick = { showMenu = false; onPlayNext() }
             )
             DropdownMenuItem(
                 text = { Text("Tambah ke Antrean") },
-                leadingIcon = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null) },
                 onClick = { showMenu = false; onAddToQueue() }
             )
             DropdownMenuItem(
                 text = { Text("Tambah ke Playlist") },
-                leadingIcon = { Icon(Icons.Default.QueueMusic, contentDescription = null) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null) },
                 onClick = { showMenu = false; onAddToPlaylist() }
             )
             DropdownMenuItem(

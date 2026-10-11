@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.Close
@@ -34,7 +35,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
@@ -674,7 +674,7 @@ private fun SelectionActionBar(
             modifier = Modifier.weight(1f)
         )
         IconButton(onClick = onAddToPlaylist, enabled = hasSelection) {
-            Icon(Icons.Default.QueueMusic, contentDescription = "Tambah ke Playlist")
+            Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = "Tambah ke Playlist")
         }
         IconButton(onClick = onHide, enabled = hasSelection) {
             Icon(Icons.Default.VisibilityOff, contentDescription = "Sembunyikan")

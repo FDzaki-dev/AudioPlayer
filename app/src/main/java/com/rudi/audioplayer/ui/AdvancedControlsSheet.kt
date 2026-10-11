@@ -5,19 +5,19 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.VolumeDown
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -144,7 +144,7 @@ internal fun AdvancedControlsSheet(
             // sinyal audio), "Lagu" (konten/metadata per-lagu, bukan soal pemutaran real-time).
             AdvancedControlsSectionHeader("Pemutaran")
             AdvancedControlRow(
-                icon = Icons.Default.QueueMusic,
+                icon = Icons.AutoMirrored.Filled.QueueMusic,
                 label = "Antrean Putar",
                 value = null,
                 onClick = onOpenQueue
@@ -209,9 +209,9 @@ internal fun AdvancedControlsSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val volumeIcon = when {
-                    volume <= 0f -> Icons.Default.VolumeOff
-                    volume < 0.5f -> Icons.Default.VolumeDown
-                    else -> Icons.Default.VolumeUp
+                    volume <= 0f -> Icons.AutoMirrored.Filled.VolumeOff
+                    volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
+                    else -> Icons.AutoMirrored.Filled.VolumeUp
                 }
                 Icon(volumeIcon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -235,7 +235,7 @@ internal fun AdvancedControlsSheet(
 
             AdvancedControlsSectionHeader("Lagu")
             AdvancedControlRow(
-                icon = Icons.Default.Article,
+                icon = Icons.AutoMirrored.Filled.Article,
                 label = "Lirik",
                 value = null,
                 onClick = onOpenLyrics
