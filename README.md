@@ -302,6 +302,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 579** — 5 pemakaian ikon deprecated terakhir (`Icons.Default.Article/VolumeOff/VolumeDown/VolumeUp` di `NowPlayingScreen.kt`, `Backspace` di `LockScreen.kt`) dimigrasikan ke `Icons.AutoMirrored.Filled.*`; kelompok ikon tuntas, tampilan LTR identik. Laporan run #7 memverifikasi Batch 578 (peringatan kompilator 19 = 19 deprecated + 0 lainnya); target berikutnya 14.
+
 **Batch 578** — 11 pemakaian ikon deprecated (`Icons.Default.QueueMusic/VolumeUp/VolumeDown/VolumeOff/Article/PlaylistPlay/PlaylistAdd/ArrowBack`) dimigrasikan ke `Icons.AutoMirrored.Filled.*` di 5 layar (bagian 1 dari 2); tampilan LTR identik. Laporan run #6 memverifikasi Batch 577 (peringatan kompilator 30 = 30 deprecated + 0 lainnya); target berikutnya 19.
 
 **Batch 577** — 3 peringatan kompilator Kotlin non-deprecated dibersihkan (cast tak perlu di `LyricsApi.kt`, cabang mati `loadThumbnail` di `PlaybackService.kt`, `@OptIn(FlowPreview::class)` di `LyricsViewModel.kt`); tanpa perubahan perilaku. Laporan run #5 memverifikasi baris peringatan kompilator Batch 576 (33 = 30 deprecated + 3 lainnya); target berikutnya 30 + 0.

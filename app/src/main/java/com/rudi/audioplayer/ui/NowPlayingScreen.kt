@@ -32,8 +32,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.BrightnessHigh
 import androidx.compose.material.icons.filled.BrightnessLow
 import androidx.compose.material.icons.filled.BrightnessMedium
@@ -51,9 +54,6 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.VolumeDown
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -1024,7 +1024,7 @@ fun NowPlayingScreen(
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
             ) {
                 Icon(
-                    Icons.Default.Article,
+                    Icons.AutoMirrored.Filled.Article,
                     contentDescription = null,
                     tint = animatedAccent,
                     modifier = Modifier.size(16.dp)
@@ -1283,9 +1283,9 @@ fun NowPlayingScreen(
         ) {
             GestureIndicatorBadge(
                 icon = when {
-                    systemVolumeFraction <= 0f -> Icons.Default.VolumeOff
-                    systemVolumeFraction < 0.5f -> Icons.Default.VolumeDown
-                    else -> Icons.Default.VolumeUp
+                    systemVolumeFraction <= 0f -> Icons.AutoMirrored.Filled.VolumeOff
+                    systemVolumeFraction < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
+                    else -> Icons.AutoMirrored.Filled.VolumeUp
                 },
                 value = systemVolumeFraction,
                 accentColor = animatedAccent,

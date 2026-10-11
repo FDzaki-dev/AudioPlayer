@@ -12,7 +12,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
@@ -322,7 +322,7 @@ fun LockScreen(
                     if (entered.isNotEmpty()) entered = entered.dropLast(1)
                 }
             ) {
-                Icon(Icons.Default.Backspace, contentDescription = "Hapus", modifier = Modifier.size(24.dp))
+                Icon(Icons.AutoMirrored.Filled.Backspace, contentDescription = "Hapus", modifier = Modifier.size(24.dp))
             }
         }
     }

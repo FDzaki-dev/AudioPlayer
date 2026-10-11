@@ -1,5 +1,11 @@
 # Changelog
 
+## Batch 579 — 5 ikon deprecated -> AutoMirrored, bagian 2/2; kelompok ikon tuntas (BELUM verified CI)
+- Permintaan user: upload `SONIX_laporan-untuk-claude_run7.zip` + "Lanjutkan".
+- Fakta run #7 (commit `2ae0130`): ArchUnit LULUS, SpotBugs 56, detekt 0, lintDebug 0, "Peringatan kompilator Kotlin: 19 (19 deprecated, 0 lainnya)" = prediksi Batch 578 cocok -> Batch 578 TERVERIFIKASI di Actions.
+- `Icons.Default.<X>` -> `Icons.AutoMirrored.Filled.<X>` + impor `...icons.automirrored.filled.<X>`: **`ui/NowPlayingScreen.kt`** (Article, VolumeOff, VolumeDown, VolumeUp), **`ui/LockScreen.kt`** (Backspace) = 5 titik. Dengan Batch 578: 16 titik / 7 file, kelompok ikon TUNTAS.
+- Tampilan identik pada LTR; 2 file source; 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. Prediksi: "Peringatan kompilator Kotlin: 14 (14 deprecated, 0 lainnya)". **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK di sandbox; hanya cek programatik (5 pemakaian = 5 impor, 0 sisa bentuk lama, delta kurung 0).
+
 ## Batch 578 — 11 ikon deprecated -> AutoMirrored, bagian 1/2 (BELUM verified CI)
 - Permintaan user: upload `SONIX_laporan-untuk-claude_run6.zip` + "Lanjutkan progress".
 - Fakta run #6 (commit `53be126`): ArchUnit LULUS, SpotBugs 56, detekt 0, lintDebug 0, "Peringatan kompilator Kotlin: 30 (30 deprecated, 0 lainnya)" = prediksi Batch 577 cocok -> Batch 577 TERVERIFIKASI di Actions.
