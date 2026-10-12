@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 589 — Inset sudut widget layar beranda (WidgetUpdater.applyCornerInset)
+- Input user: "Tambahkan window insets pada widget!!"; dijawab "Widget layar beranda: konten terpotong di sudut/tepi"; "ASAP".
+- Fakta: widget = RemoteViews dirender launcher, tanpa API WindowInsets; padanan = padding root >= jarak aman radius sudut. Padding XML tetap (penuh 14dp, compact 8dp).
+- `widget/WidgetUpdater.kt`: `applyCornerInset()` setelah `RemoteViews` dibuat: `inset = min(system_app_widget_background_radius * 0.2929, 16dp)`; bila > padding XML -> `setViewPadding(widget_root, ...)`, selain itu tak ada perubahan; try/catch -> `AppLogger.e`. Konstanta `FULL_PADDING_DP`/`COMPACT_PADDING_DP` harus sama dengan XML.
+- Jujur: NO-OP pada radius sistem <= ~27dp (compact) / ~47dp (penuh); hanya jaring pengaman. Bila masih terpotong butuh screenshot + ukuran widget + launcher.
+- 1 file source diubah; 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. Prediksi: 11 deprecated, 0 lainnya; SpotBugs 55.
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK; `android.R.dimen.system_app_widget_background_radius` dari ingatan dokumentasi Android 12 (bila CI merah "unresolved reference", ganti konstanta 16dp); efek visual belum dilihat.
+
 ## Batch 588 — Verifikasi CI run #16 untuk Batch 587 (docs saja)
 - Input user: upload `SONIX_laporan-untuk-claude_run16.zip` + "Lanjut" (hasil push Batch 587, diasumsikan; commit `6165c98` tak ada di ZIP).
 - Fakta laporan (run #16, 2026-10-12 11:22 UTC): Gradle exit 0/0/0; ArchUnit LULUS (7 aturan); SpotBugs 55 (per-aturan dan semua titik identik run #15; tak ada titik baru di `WidgetUpdater.kt`); detekt 0; lintDebug 0; "11 (11 deprecated, 0 lainnya)".

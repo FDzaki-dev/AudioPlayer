@@ -26,6 +26,7 @@ import com.rudi.audioplayer.playback.PlaybackService
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.util.AppLogger
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.ceil
 
 /**
  * Pushes the current playback state into any home-screen widgets. The service calls
@@ -57,6 +58,15 @@ object WidgetUpdater {
     // (dipaksa pendek) bikin judul+artis kepotong vertikal — persis kasus yang height-check
     // ini tangani, tanpa API baru/reflection apapun yang berisiko.
     private const val COMPACT_HEIGHT_THRESHOLD_DP = 70
+
+    // Batch 589 — inset sudut widget. Padding root di bawah HARUS sama dengan `android:padding` root
+    // `widget_player.xml` (14dp) dan `widget_player_compact.xml` (8dp). `CORNER_INSET_FRACTION` = 1 - 1/sqrt(2):
+    // jarak minimum dari tepi agar sudut siku isi tidak keluar dari busur sudut berradius R (launcher meng-clip
+    // widget ke radius sistem). `MAX_CORNER_INSET_DP` mencegah layout compact terdesak pada radius ekstrem.
+    private const val FULL_PADDING_DP = 14f
+    private const val COMPACT_PADDING_DP = 8f
+    private const val CORNER_INSET_FRACTION = 0.2929f
+    private const val MAX_CORNER_INSET_DP = 16f
 
     // Batch 68: fix "widget nggak pernah sinkron pas ganti tema" — widget_player(.compact).xml
     // used to hardcode the dark palette permanently (no light counterpart, and nothing ever
@@ -135,6 +145,27 @@ object WidgetUpdater {
         }
     }
 
+    // Batch 589 — "window insets" untuk widget layar beranda. RemoteViews dirender launcher dan TIDAK punya API
+    // WindowInsets, jadi padanannya: padding root minimal sebesar jarak aman terhadap radius sudut widget yang
+    // dipakai launcher (`android.R.dimen.system_app_widget_background_radius`, API 31 = minSdk). Padding XML
+    // dipertahankan bila sudah cukup (kasus umum: radius <= ~27dp untuk compact, <= ~47dp untuk penuh -> tak ada
+    // perubahan); hanya dinaikkan bila radius sistem perangkat lebih besar. Gagal = dilewati (padding XML tetap).
+    private fun applyCornerInset(context: Context, views: RemoteViews, isCompact: Boolean) {
+        try {
+            val resources = context.resources
+            val density = resources.displayMetrics.density
+            val xmlPadding = (if (isCompact) COMPACT_PADDING_DP else FULL_PADDING_DP) * density
+            val radius = resources.getDimension(android.R.dimen.system_app_widget_background_radius)
+            val inset = (radius * CORNER_INSET_FRACTION).coerceAtMost(MAX_CORNER_INSET_DP * density)
+            if (inset > xmlPadding) {
+                val pad = ceil(inset).toInt()
+                views.setViewPadding(R.id.widget_root, pad, pad, pad, pad)
+            }
+        } catch (e: Exception) {
+            AppLogger.e("WidgetUpdater", "Gagal menerapkan inset sudut widget", e)
+        }
+    }
+
     private fun performUpdate(context: Context) {
         val manager = AppWidgetManager.getInstance(context)
         val component = ComponentName(context, PlayerWidgetProvider::class.java)
@@ -166,6 +197,7 @@ object WidgetUpdater {
             val isCompact = minWidthDp < COMPACT_WIDTH_THRESHOLD_DP || minHeightDp < COMPACT_HEIGHT_THRESHOLD_DP
 
             val views = RemoteViews(context.packageName, if (isCompact) R.layout.widget_player_compact else R.layout.widget_player)
+            applyCornerInset(context, views, isCompact)
 
             views.setInt(
                 R.id.widget_root,
