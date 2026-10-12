@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 587 — Ketahanan WidgetUpdater.updateAll (serialisasi + penggabungan + exception tercatat); akar "hilang tanpa jejak" BELUM terbukti
+- Input user: upload `SONIX_laporan-untuk-claude_run15.zip` + "Entah kenapa hilang tanpa jejak. Lanjut kerjakan perbaikan yang tercantum!!" (konteks: gonta-ganti lagu via widget eksternal; tak ada log baru).
+- Fakta run #15 (commit `ca3f3af`, 2026-10-12 07:58 UTC, diasumsikan = push Batch 586): Gradle exit 0/0/0; ArchUnit LULUS; SpotBugs 55 (tanpa titik baru); detekt 0; lintDebug 0; "11 (11 deprecated, 0 lainnya)" = prediksi Batch 586 cocok. "Build APK" tak dilaporkan.
+- `widget/WidgetUpdater.kt`: `updateAll()` jadi pembungkus — `synchronized(updateLock)` (satu update per waktu), `AtomicInteger updateTicket` (permintaan basi yang menunggu giliran dilewati; yang terbaru membaca state terbaru), `catch Exception` + `catch OutOfMemoryError` -> `AppLogger.e("WidgetUpdater", ...)` dengan stacktrace mentah. Badan lama dipindah utuh ke `private fun performUpdate`. Melindungi keempat pemanggil: `PlaybackService.pushWidgetUpdate`, `PlayerViewModel` (2x), `PlayerWidgetProvider`.
+- Dasar (fakta source, bukan bukti penyebab): `widgetUpdateJob?.cancel()` tak menghentikan `updateAll` non-suspend -> update tumpang-tindih saat skip cepat; exception/OOM di `updateAll` lolos ke `launch` tanpa handler -> proses mati. Sengaja TIDAK diubah: `serviceScope` tanpa handler, jalur bubble, `loadAlbumArtBitmap`.
+- 1 file source diubah; 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. Prediksi: 11 deprecated, 0 lainnya; SpotBugs 55.
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK (hanya cek kurung seimbang, impor tak terpakai 0, diff terhadap v586); belum dikompilasi/dijalankan; apakah ini menghentikan "hilang tanpa jejak" tidak diketahui — bila penyebabnya bukan exception Java, perbaikan ini tak menyentuhnya. Langkah baca log: lihat `[RESUME POINT]`.
+
 ## Batch 586 — Pencatatan ApplicationExitInfo di Log Diagnostik (sarana diagnosis crash; akar crash BELUM terbukti)
 - Input user: upload log diagnostik tanpa teks; "Aplikasi tiba-tiba crash. Tolong diperbaiki sampai ke akarnya!!"; lalu "1) ApplicationExitInfo tolong ditambahkan 2) saat saya sedang gonta-ganti music via widget eksternal".
 - Fakta log: 1143 baris (10-12 Okt), 0 FATAL; ERROR = 9x artwork gagal (`loadThumbnail` DecodeException, jalur lama, ditangkap) + 2x attach equalizer gagal (ditangkap). Crash yang dilaporkan tidak ada di log (setelah ekspor 07:53:33 atau bukan exception Java). Akar TIDAK terbukti -> instrumentasi dulu (pelajaran Batch 461-463).

@@ -25,6 +25,7 @@ import com.rudi.audioplayer.data.ThemeStore
 import com.rudi.audioplayer.playback.PlaybackService
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.util.AppLogger
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Pushes the current playback state into any home-screen widgets. The service calls
@@ -109,7 +110,32 @@ object WidgetUpdater {
             .apply()
     }
 
+    // Batch 587 — `updateAll` dipanggil dari 4 tempat (PlaybackService.pushWidgetUpdate, PlayerViewModel x2,
+    // PlayerWidgetProvider) dan kodenya non-suspend: `widgetUpdateJob?.cancel()` tak menghentikan yang sedang
+    // jalan, jadi saat lagu diganti cepat lewat widget (next/prev berulang) belasan update memuat thumbnail +
+    // membuat bitmap + memanggil updateAppWidget SERENTAK di thread IO. Dan exception apa pun di sini
+    // (RuntimeException dari updateAppWidget, OutOfMemoryError) lolos ke `launch` tanpa handler -> seluruh
+    // proses (termasuk pemutaran) mati hanya gara-gara menyegarkan widget. Sekarang: (1) satu update dalam
+    // satu waktu; (2) permintaan yang basi dilewati karena yang terbaru membaca state terbaru saat berjalan;
+    // (3) kegagalan dicatat mentah ke log diagnostik dan tidak pernah menjatuhkan proses.
+    private val updateLock = Any()
+    private val updateTicket = AtomicInteger()
+
     fun updateAll(context: Context) {
+        val ticket = updateTicket.incrementAndGet()
+        synchronized(updateLock) {
+            if (ticket != updateTicket.get()) return
+            try {
+                performUpdate(context)
+            } catch (e: Exception) {
+                AppLogger.e("WidgetUpdater", "Gagal memperbarui widget", e)
+            } catch (e: OutOfMemoryError) {
+                AppLogger.e("WidgetUpdater", "Memori habis saat memperbarui widget", e)
+            }
+        }
+    }
+
+    private fun performUpdate(context: Context) {
         val manager = AppWidgetManager.getInstance(context)
         val component = ComponentName(context, PlayerWidgetProvider::class.java)
         val ids = manager.getAppWidgetIds(component)

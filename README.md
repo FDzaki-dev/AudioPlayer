@@ -307,6 +307,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 587** — Pembaruan widget layar beranda kini berjalan satu per satu: saat lagu diganti cepat lewat tombol widget, permintaan basi dilewati dan hanya yang terbaru diproses; kegagalan (termasuk kehabisan memori) saat menyegarkan widget dicatat ke Log Diagnostik dan tidak lagi mematikan aplikasi. Dibuat sebagai pengerasan karena aplikasi dilaporkan hilang tanpa jejak saat gonta-ganti lagu lewat widget; penyebab pastinya belum terbukti. Belum dikompilasi/diuji di device.
+
 **Batch 586** — Log Diagnostik kini ikut mencatat alasan kematian proses sebelumnya yang dilaporkan sistem (`ApplicationExitInfo`: ANR, native crash, dimatikan sistem karena memori/OEM, dll.), ditulis saat aplikasi dibuka berikutnya sebagai baris `[ApplicationExitInfo]` dengan nilai mentah (alasan, status, importance, pss/rss, deskripsi; ANR + awal trace). Dibuat karena crash yang dilaporkan tidak meninggalkan baris FATAL; handler crash Java dan berkas `crash_*.txt` tidak berubah. Belum dikompilasi/diuji di device.
 
 **Batch 580** — 3 pemakaian `LocalLifecycleOwner` deprecated (`MainActivity.kt` x2, `NowPlayingScreen.kt` x1) dipindah ke `androidx.lifecycle.compose.LocalLifecycleOwner`; tanpa perubahan perilaku yang disengaja. Laporan run #8 memverifikasi Batch 579 (peringatan kompilator 14 = 14 deprecated + 0 lainnya); target berikutnya 11.
