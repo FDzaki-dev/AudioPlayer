@@ -1,5 +1,7 @@
 package com.rudi.audioplayer.util
 
+import android.app.ActivityManager
+import android.app.ApplicationExitInfo
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
@@ -8,6 +10,9 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.content.pm.PackageInfoCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -43,6 +48,28 @@ object AppLogger {
     private const val MAX_CRASH_LOGS = 50
     private val CRASH_LOG_RELATIVE_PATH = "${Environment.DIRECTORY_DOCUMENTS}/AudioPlayer/logs"
 
+    // Batch 586 — ApplicationExitInfo (API 30+; minSdk 31). Handler FATAL di atas HANYA melihat exception
+    // Java; ANR, native crash, dan proses dimatikan sistem (memori/OEM) tidak melewatinya sehingga tak
+    // meninggalkan jejak apa pun. Sistem sendiri mencatat alasan tiap proses mati — dibaca saat proses
+    // berikutnya mulai. Riwayat bertahan antar proses; cap waktu terakhir yang sudah ditulis disimpan agar
+    // tiap kematian dicatat sekali saja.
+    private const val EXIT_PREFS_NAME = "exit_info_state"
+    private const val KEY_LAST_EXIT_TS = "last_exit_ts"
+    private const val EXIT_HISTORY_MAX = 10
+    private const val EXIT_TRACE_MAX_CHARS = 8000
+    private val ABNORMAL_EXIT_REASONS = setOf(
+        ApplicationExitInfo.REASON_UNKNOWN,
+        ApplicationExitInfo.REASON_SIGNALED,
+        ApplicationExitInfo.REASON_LOW_MEMORY,
+        ApplicationExitInfo.REASON_CRASH,
+        ApplicationExitInfo.REASON_CRASH_NATIVE,
+        ApplicationExitInfo.REASON_ANR,
+        ApplicationExitInfo.REASON_INITIALIZATION_FAILURE,
+        ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE,
+        ApplicationExitInfo.REASON_DEPENDENCY_DIED,
+        ApplicationExitInfo.REASON_OTHER
+    )
+
     private var logFile: File? = null
     private var appContext: Context? = null
     private var previousHandler: Thread.UncaughtExceptionHandler? = null
@@ -66,6 +93,8 @@ object AppLogger {
             // was none) — this logger only ever observes a crash, never changes how it's handled.
             previousHandler?.uncaughtException(thread, throwable) ?: Runtime.getRuntime().exit(2)
         }
+
+        logPreviousExits(context.applicationContext)
     }
 
     fun e(tag: String, message: String, throwable: Throwable? = null) {
@@ -147,6 +176,87 @@ object AppLogger {
             val kept = lines.takeLast(lines.size / 2)
             file.writeText(kept.joinToString("\n", postfix = "\n"))
         }
+    }
+
+    /** Batch 586 — menulis ke log diagnostik alasan kematian proses SEBELUMNYA yang belum pernah dicatat,
+     * persis seperti yang dilaporkan sistem (`ApplicationExitInfo`): alasan, status, importance, pss/rss,
+     * deskripsi mentah; untuk ANR ditambah awal berkas trace-nya (teks). Tanpa tafsir buatan. Dijalankan di
+     * Dispatchers.IO (panggilan ke ActivityManager + baca trace), dibungkus `runCatching` supaya kegagalan
+     * pencatat tak pernah menjatuhkan aplikasi. */
+    private fun logPreviousExits(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                    ?: return@runCatching
+                val prefs = context.getSharedPreferences(EXIT_PREFS_NAME, Context.MODE_PRIVATE)
+                val lastTs = prefs.getLong(KEY_LAST_EXIT_TS, 0L)
+                val fresh = manager.getHistoricalProcessExitReasons(context.packageName, 0, EXIT_HISTORY_MAX)
+                    .filter { it.timestamp > lastTs }
+                    .sortedBy { it.timestamp }
+                for (info in fresh) appendExitInfo(info)
+                fresh.maxOfOrNull { it.timestamp }?.let { prefs.edit().putLong(KEY_LAST_EXIT_TS, it).apply() }
+            }
+        }
+    }
+
+    private fun appendExitInfo(info: ApplicationExitInfo) {
+        val exitTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT).format(Date(info.timestamp))
+        val trace = if (info.reason == ApplicationExitInfo.REASON_ANR) readExitTrace(info) else null
+        val message = buildString {
+            append("[ApplicationExitInfo] waktu_mati=").append(exitTime)
+            append(" alasan=").append(exitReasonName(info.reason))
+            append(" status=").append(info.status)
+            append(" importance=").append(exitImportanceName(info.importance))
+            append(" pid=").append(info.pid)
+            append(" proses=").append(info.processName)
+            append(" pss_kb=").append(info.pss)
+            append(" rss_kb=").append(info.rss)
+            append(" deskripsi=").append(info.description ?: "-")
+            if (trace != null) append("\n--- trace ANR (awal, maks ").append(EXIT_TRACE_MAX_CHARS).append(" karakter) ---\n").append(trace)
+        }
+        appendEntry(if (info.reason in ABNORMAL_EXIT_REASONS) "ERROR" else "WARN", message)
+    }
+
+    private fun readExitTrace(info: ApplicationExitInfo): String? = runCatching {
+        info.traceInputStream?.bufferedReader()?.use { reader ->
+            val buffer = CharArray(EXIT_TRACE_MAX_CHARS)
+            var total = 0
+            while (total < EXIT_TRACE_MAX_CHARS) {
+                val n = reader.read(buffer, total, EXIT_TRACE_MAX_CHARS - total)
+                if (n < 0) break
+                total += n
+            }
+            if (total > 0) String(buffer, 0, total) else null
+        }
+    }.getOrNull()
+
+    private fun exitReasonName(reason: Int): String = when (reason) {
+        ApplicationExitInfo.REASON_UNKNOWN -> "UNKNOWN"
+        ApplicationExitInfo.REASON_EXIT_SELF -> "EXIT_SELF"
+        ApplicationExitInfo.REASON_SIGNALED -> "SIGNALED"
+        ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY"
+        ApplicationExitInfo.REASON_CRASH -> "CRASH"
+        ApplicationExitInfo.REASON_CRASH_NATIVE -> "CRASH_NATIVE"
+        ApplicationExitInfo.REASON_ANR -> "ANR"
+        ApplicationExitInfo.REASON_INITIALIZATION_FAILURE -> "INITIALIZATION_FAILURE"
+        ApplicationExitInfo.REASON_PERMISSION_CHANGE -> "PERMISSION_CHANGE"
+        ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "EXCESSIVE_RESOURCE_USAGE"
+        ApplicationExitInfo.REASON_USER_REQUESTED -> "USER_REQUESTED"
+        ApplicationExitInfo.REASON_USER_STOPPED -> "USER_STOPPED"
+        ApplicationExitInfo.REASON_DEPENDENCY_DIED -> "DEPENDENCY_DIED"
+        ApplicationExitInfo.REASON_OTHER -> "OTHER"
+        else -> "KODE_$reason"
+    }
+
+    private fun exitImportanceName(importance: Int): String = when (importance) {
+        ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND -> "FOREGROUND"
+        ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE -> "FOREGROUND_SERVICE"
+        ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE -> "VISIBLE"
+        ActivityManager.RunningAppProcessInfo.IMPORTANCE_PERCEPTIBLE -> "PERCEPTIBLE"
+        ActivityManager.RunningAppProcessInfo.IMPORTANCE_SERVICE -> "SERVICE"
+        ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHED -> "CACHED"
+        ActivityManager.RunningAppProcessInfo.IMPORTANCE_GONE -> "GONE"
+        else -> "KODE_$importance"
     }
 
     /** Writes a standalone crash report to the public Documents/AudioPlayer/logs folder so it's

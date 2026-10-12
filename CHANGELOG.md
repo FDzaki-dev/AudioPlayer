@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 586 — Pencatatan ApplicationExitInfo di Log Diagnostik (sarana diagnosis crash; akar crash BELUM terbukti)
+- Input user: upload log diagnostik tanpa teks; "Aplikasi tiba-tiba crash. Tolong diperbaiki sampai ke akarnya!!"; lalu "1) ApplicationExitInfo tolong ditambahkan 2) saat saya sedang gonta-ganti music via widget eksternal".
+- Fakta log: 1143 baris (10-12 Okt), 0 FATAL; ERROR = 9x artwork gagal (`loadThumbnail` DecodeException, jalur lama, ditangkap) + 2x attach equalizer gagal (ditangkap). Crash yang dilaporkan tidak ada di log (setelah ekspor 07:53:33 atau bukan exception Java). Akar TIDAK terbukti -> instrumentasi dulu (pelajaran Batch 461-463).
+- `util/AppLogger.kt`: `logPreviousExits()` dipanggil di akhir `init()`; `Dispatchers.IO` + `runCatching`; `ActivityManager.getHistoricalProcessExitReasons(packageName, 0, 10)`, hanya entri lebih baru dari cap terakhir (prefs `exit_info_state`/`last_exit_ts`); tiap entri ditulis `[ApplicationExitInfo] waktu_mati= alasan= status= importance= pid= proses= pss_kb= rss_kb= deskripsi=` (nilai mentah sistem, tanpa tafsir); ERROR untuk alasan tak normal, WARN untuk sisanya; ANR + awal berkas trace teks (maks 8000 karakter). Handler FATAL dan `crash_*.txt` tak diubah.
+- Catatan jalur widget (fakta source, BUKAN terbukti sebagai penyebab): `pushWidgetUpdate` meluncurkan `updateAll` di `serviceScope` tanpa `CoroutineExceptionHandler`; `widgetUpdateJob?.cancel()` tak menghentikan `updateAll` non-suspend yang sedang berjalan; `updateAll` tanpa try/catch. Detail + langkah di `PROJECT_STATE.md` `[RESUME POINT]`.
+- 1 file source diubah (`AppLogger.kt`); 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. Prediksi: 11 deprecated, 0 lainnya; SpotBugs 55 (titik baru di `AppLogger.kt` mungkin muncul).
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK (hanya cek kurung seimbang, impor tak terpakai 0, diff terhadap v585); API standar API 30+ belum dikompilasi/dijalankan; belum diketahui apakah perangkat (Infinix X6855) mengisi riwayat/deskripsi.
+
 ## Batch 585 — Verifikasi CI run #13 untuk Batch 584 (docs saja)
 - Input user: upload `SONIX_laporan-untuk-claude_run13.zip` tanpa teks (hasil push Batch 584, diasumsikan; commit `470e6a2` tak ada di ZIP).
 - Fakta laporan (run #13, 2026-10-11 15:28 UTC): Gradle exit ArchUnit=0 / SpotBugs=0 / detekt+lintDebug=0; ArchUnit LULUS (7 aturan, 0 pelanggaran); SpotBugs 55 temuan; detekt 0; lintDebug 0; "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)".

@@ -307,6 +307,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 586** — Log Diagnostik kini ikut mencatat alasan kematian proses sebelumnya yang dilaporkan sistem (`ApplicationExitInfo`: ANR, native crash, dimatikan sistem karena memori/OEM, dll.), ditulis saat aplikasi dibuka berikutnya sebagai baris `[ApplicationExitInfo]` dengan nilai mentah (alasan, status, importance, pss/rss, deskripsi; ANR + awal trace). Dibuat karena crash yang dilaporkan tidak meninggalkan baris FATAL; handler crash Java dan berkas `crash_*.txt` tidak berubah. Belum dikompilasi/diuji di device.
+
 **Batch 580** — 3 pemakaian `LocalLifecycleOwner` deprecated (`MainActivity.kt` x2, `NowPlayingScreen.kt` x1) dipindah ke `androidx.lifecycle.compose.LocalLifecycleOwner`; tanpa perubahan perilaku yang disengaja. Laporan run #8 memverifikasi Batch 579 (peringatan kompilator 14 = 14 deprecated + 0 lainnya); target berikutnya 11.
 
 **Batch 579** — 5 pemakaian ikon deprecated terakhir (`Icons.Default.Article/VolumeOff/VolumeDown/VolumeUp` di `NowPlayingScreen.kt`, `Backspace` di `LockScreen.kt`) dimigrasikan ke `Icons.AutoMirrored.Filled.*`; kelompok ikon tuntas, tampilan LTR identik. Laporan run #7 memverifikasi Batch 578 (peringatan kompilator 19 = 19 deprecated + 0 lainnya); target berikutnya 14.
