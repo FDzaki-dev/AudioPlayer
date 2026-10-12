@@ -307,6 +307,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 590** — Judul lagu di widget layar beranda kini memakai teks berjalan (marquee) untuk judul panjang, dengan cara murni layout agar kompatibel dengan widget; nama artis tetap dipotong titik-titik. Apakah teks bergerak bergantung pada launcher; bila tidak bergerak, tampilan sama seperti sebelumnya. Belum diuji di device.
+
 **Batch 589** — Widget layar beranda kini menjaga jarak isi dari sudut membulat launcher: bila radius sudut sistem perangkat besar, padding widget dinaikkan secukupnya agar konten tidak terpotong (widget tidak punya WindowInsets; ini padanannya). Pada perangkat berradius kecil/menengah tidak ada perubahan. Belum dikompilasi/diuji di device.
 
 **Batch 587** — Pembaruan widget layar beranda kini berjalan satu per satu: saat lagu diganti cepat lewat tombol widget, permintaan basi dilewati dan hanya yang terbaru diproses; kegagalan (termasuk kehabisan memori) saat menyegarkan widget dicatat ke Log Diagnostik dan tidak lagi mematikan aplikasi. Dibuat sebagai pengerasan karena aplikasi dilaporkan hilang tanpa jejak saat gonta-ganti lagu lewat widget; penyebab pastinya belum terbukti. Sudah lolos kompilasi di GitHub Actions (run #16, Batch 588; status "Build APK" belum dilaporkan), belum diuji di device.

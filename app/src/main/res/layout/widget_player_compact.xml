@@ -24,8 +24,14 @@
         android:textSize="13sp"
         android:textStyle="bold"
         android:maxLines="1"
-        android:ellipsize="end"
-        android:text="Tidak ada lagu" />
+        android:scrollHorizontally="true"
+        android:ellipsize="marquee"
+        android:marqueeRepeatLimit="marquee_forever"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:text="Tidak ada lagu">
+        <requestFocus />
+    </TextView>
 
     <ImageButton
         android:id="@+id/widget_prev"

@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 590 — Marquee judul widget layar beranda (XML murni, kompatibel RemoteViews)
+- Input user: "Bisa ditambahkan marquee tapi versi kompatibel??" (asumsi: judul lagu di widget; tak ditanya karena konteks sesi).
+- `res/layout/widget_player.xml` + `widget_player_compact.xml`: `widget_title` -> `ellipsize=marquee`, `marqueeRepeatLimit=marquee_forever`, `scrollHorizontally`, `focusable`, `focusableInTouchMode`, `<requestFocus />`. `widget_artist` tetap ellipsize end (satu fokus per layout). 0 kode Kotlin, 0 aksi RemoteViews baru (hindari `setSelected` yang remotable-nya tak terjamin; preseden Batch 201-206).
+- Jujur: bergerak-tidaknya bergantung launcher; gagal = judul tetap terpotong seperti sebelumnya, bukan error.
+- 2 file resource diubah; 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. Prediksi: 11 deprecated, 0 lainnya; SpotBugs 55; lintDebug 0.
+- **NOT VERIFIED**: tak ada aapt2/Gradle (hanya xmllint OK); belum dilihat di device.
+
 ## Batch 589 — Inset sudut widget layar beranda (WidgetUpdater.applyCornerInset)
 - Input user: "Tambahkan window insets pada widget!!"; dijawab "Widget layar beranda: konten terpotong di sudut/tepi"; "ASAP".
 - Fakta: widget = RemoteViews dirender launcher, tanpa API WindowInsets; padanan = padding root >= jarak aman radius sudut. Padding XML tetap (penuh 14dp, compact 8dp).
