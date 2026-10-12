@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 588 — Verifikasi CI run #16 untuk Batch 587 (docs saja)
+- Input user: upload `SONIX_laporan-untuk-claude_run16.zip` + "Lanjut" (hasil push Batch 587, diasumsikan; commit `6165c98` tak ada di ZIP).
+- Fakta laporan (run #16, 2026-10-12 11:22 UTC): Gradle exit 0/0/0; ArchUnit LULUS (7 aturan); SpotBugs 55 (per-aturan dan semua titik identik run #15; tak ada titik baru di `WidgetUpdater.kt`); detekt 0; lintDebug 0; "11 (11 deprecated, 0 lainnya)".
+- Dicocokkan ke prediksi Batch 587: 11/0 COCOK; SpotBugs 55 tetap COCOK; detekt/lintDebug/ArchUnit COCOK. Belum terpenuhi: status "Build APK" tak dilaporkan -> NOT VERIFIED.
+- Tak ada log ekspor baru: akar "hilang tanpa jejak" tetap tidak terbukti; tidak ada langkah source yang dibenarkan tanpa baris `[ApplicationExitInfo]` / `Gagal memperbarui widget`.
+- Perubahan: `PROJECT_STATE.md` (Catatan Batch 588 + `[RESUME POINT]` + klausa VERIFIED di Catatan Batch 587), `CHANGELOG.md` (entri ini), `README.md` (entri Batch 587: lolos kompilasi di Actions). 0 source/resource/Gradle/CI; `FILE_MANIFEST.txt` tak berubah.
+- **NOT VERIFIED**: runtime `ApplicationExitInfo` + serialisasi `WidgetUpdater.updateAll` di device; "Build APK"; bentuk daun diagonal Batch 584.
+
 ## Batch 587 — Ketahanan WidgetUpdater.updateAll (serialisasi + penggabungan + exception tercatat); akar "hilang tanpa jejak" BELUM terbukti
 - Input user: upload `SONIX_laporan-untuk-claude_run15.zip` + "Entah kenapa hilang tanpa jejak. Lanjut kerjakan perbaikan yang tercantum!!" (konteks: gonta-ganti lagu via widget eksternal; tak ada log baru).
 - Fakta run #15 (commit `ca3f3af`, 2026-10-12 07:58 UTC, diasumsikan = push Batch 586): Gradle exit 0/0/0; ArchUnit LULUS; SpotBugs 55 (tanpa titik baru); detekt 0; lintDebug 0; "11 (11 deprecated, 0 lainnya)" = prediksi Batch 586 cocok. "Build APK" tak dilaporkan.
