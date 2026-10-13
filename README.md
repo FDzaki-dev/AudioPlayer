@@ -307,6 +307,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 591** — Marquee judul widget: karena versi XML murni tidak bergerak, aplikasi kini mencoba menyalakan teks berjalan lewat mekanisme widget (`setSelected`) — hanya bila sistem perangkat mengizinkan, dan hasil pengecekannya dicatat di Log Diagnostik. Kelas teks berjalan buatan sendiri tidak bisa dipakai di widget (launcher tidak mengenalnya). Belum diuji di device.
+
 **Batch 590** — Judul lagu di widget layar beranda kini memakai teks berjalan (marquee) untuk judul panjang, dengan cara murni layout agar kompatibel dengan widget; nama artis tetap dipotong titik-titik. Apakah teks bergerak bergantung pada launcher; bila tidak bergerak, tampilan sama seperti sebelumnya. Belum diuji di device.
 
 **Batch 589** — Widget layar beranda kini menjaga jarak isi dari sudut membulat launcher: bila radius sudut sistem perangkat besar, padding widget dinaikkan secukupnya agar konten tidak terpotong (widget tidak punya WindowInsets; ini padanannya). Pada perangkat berradius kecil/menengah tidak ada perubahan. Belum dikompilasi/diuji di device.

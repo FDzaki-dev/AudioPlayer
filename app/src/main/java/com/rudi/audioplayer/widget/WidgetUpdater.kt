@@ -19,6 +19,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.net.Uri
 import android.widget.RemoteViews
+import android.widget.TextView
 import com.rudi.audioplayer.MainActivity
 import com.rudi.audioplayer.R
 import com.rudi.audioplayer.data.ThemeStore
@@ -67,6 +68,13 @@ object WidgetUpdater {
     private const val COMPACT_PADDING_DP = 8f
     private const val CORNER_INSET_FRACTION = 0.2929f
     private const val MAX_CORNER_INSET_DP = 16f
+
+    // Batch 591 — marquee judul. Marquee `TextView` hanya jalan bila view selected/fokus, dan XML saja ternyata tak
+    // cukup di launcher user. `RemoteViews` hanya boleh memanggil method ber-anotasi `@RemotableViewMethod`
+    // (kalau tidak, `apply` di launcher melempar ActionException -> widget error). Maka remotable-nya
+    // `TextView.setSelected` DIPERIKSA di perangkat (nama anotasi dibandingkan sebagai string: kelas
+    // anotasinya @hide) — dipanggil lewat RemoteViews hanya bila terbukti remotable, selain itu dilewati.
+    private const val REMOTABLE_ANNOTATION = "android.view.RemotableViewMethod"
 
     // Batch 68: fix "widget nggak pernah sinkron pas ganti tema" — widget_player(.compact).xml
     // used to hardcode the dark palette permanently (no light counterpart, and nothing ever
@@ -166,6 +174,25 @@ object WidgetUpdater {
         }
     }
 
+    private val titleMarqueeSelectable: Boolean by lazy {
+        val remotable = try {
+            TextView::class.java.getMethod("setSelected", Boolean::class.javaPrimitiveType)
+                .annotations.any { it.annotationClass.java.name == REMOTABLE_ANNOTATION }
+        } catch (e: Exception) {
+            false
+        }
+        AppLogger.w("WidgetUpdater", "Marquee judul: TextView.setSelected remotable=$remotable (true = dipanggil lewat RemoteViews)")
+        remotable
+    }
+
+    // Dipanggil SETELAH teks judul diset. `TextView.setSelected` hanya memulai marquee saat state BERUBAH, dan
+    // update ulang bisa memakai view lama yang sudah selected -> di-reset false lalu true agar selalu ada transisi.
+    private fun applyTitleMarquee(views: RemoteViews) {
+        if (!titleMarqueeSelectable) return
+        views.setBoolean(R.id.widget_title, "setSelected", false)
+        views.setBoolean(R.id.widget_title, "setSelected", true)
+    }
+
     private fun performUpdate(context: Context) {
         val manager = AppWidgetManager.getInstance(context)
         val component = ComponentName(context, PlayerWidgetProvider::class.java)
@@ -218,6 +245,7 @@ object WidgetUpdater {
 
             views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
             views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
+            applyTitleMarquee(views)
             views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
             views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))
             if (!isCompact) {

@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 591 — Marquee judul widget: setSelected via RemoteViews hanya bila terbukti remotable (custom view ditolak)
+- Input user: "Karena marquee tidak berjalan sama sekali pada widget, maka coba terapkan konfigurasi ini:" + XML `AntiBuggyMarqueeTextView` (custom TextView).
+- Ditolak apa adanya: layout widget di-inflate proses launcher lewat RemoteViews yang hanya mengizinkan view framework ber-anotasi @RemoteView; kelas custom milik aplikasi -> inflate gagal, widget error total. Semua atribut lain di XML itu sudah ada sejak Batch 590 (kecuali singleLine, diganti maxLines=1 + scrollHorizontally).
+- `widget/WidgetUpdater.kt`: `titleMarqueeSelectable` (lazy) memeriksa di perangkat apakah `TextView.setSelected(boolean)` ber-anotasi @RemotableViewMethod (nama anotasi sebagai string) dan mencatat `remotable=true|false` ke Log Diagnostik; `applyTitleMarquee()` setelah teks judul diset: bila remotable -> `setBoolean(widget_title, "setSelected", false)` lalu `true`; bila tidak -> dilewati (0 risiko ActionException).
+- Jujur: bergerak-tidaknya belum terbukti (butuh lebar view + perilaku launcher); remotable=false = marquee tak bisa dipaksa dari aplikasi di perangkat ini.
+- 1 file source diubah; 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. Prediksi: 11 deprecated, 0 lainnya; SpotBugs 55 (titik baru di `WidgetUpdater.kt` mungkin); lintDebug 0.
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK; belum dikompilasi/dijalankan; nilai remotable di perangkat user belum diketahui.
+
 ## Batch 590 — Marquee judul widget layar beranda (XML murni, kompatibel RemoteViews)
 - Input user: "Bisa ditambahkan marquee tapi versi kompatibel??" (asumsi: judul lagu di widget; tak ditanya karena konteks sesi).
 - `res/layout/widget_player.xml` + `widget_player_compact.xml`: `widget_title` -> `ellipsize=marquee`, `marqueeRepeatLimit=marquee_forever`, `scrollHorizontally`, `focusable`, `focusableInTouchMode`, `<requestFocus />`. `widget_artist` tetap ellipsize end (satu fokus per layout). 0 kode Kotlin, 0 aksi RemoteViews baru (hindari `setSelected` yang remotable-nya tak terjamin; preseden Batch 201-206).
