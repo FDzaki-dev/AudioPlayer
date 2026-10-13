@@ -307,6 +307,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 593** — Marquee judul widget: perbaikan Batch 592 tidak berhasil (judul lagu nyata masih diam), jadi batch ini hanya menambah pencatatan di Log Diagnostik (ukuran widget, selang antar-update, pemicu update, perkiraan lebar judul) supaya penyebabnya bisa ditentukan dari data, bukan tebakan. Perilaku widget tidak berubah. Belum diuji di device.
+
 **Batch 592** — Marquee judul widget: urutan aksi diperbaiki (matikan dulu, ganti teks, baru nyalakan) karena marquee hanya berjalan pada teks placeholder "Tidak ada lagu" dan mati saat judul lagu berganti. Ini perbaikan berdasarkan dugaan mekanisme, belum diuji di device.
 
 **Batch 591** — Marquee judul widget: karena versi XML murni tidak bergerak, aplikasi kini mencoba menyalakan teks berjalan lewat mekanisme widget (`setSelected`) — hanya bila sistem perangkat mengizinkan, dan hasil pengecekannya dicatat di Log Diagnostik. Kelas teks berjalan buatan sendiri tidak bisa dipakai di widget (launcher tidak mengenalnya). Belum diuji di device.

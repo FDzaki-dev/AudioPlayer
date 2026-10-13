@@ -3,6 +3,7 @@ package com.rudi.audioplayer.widget
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
+import com.rudi.audioplayer.util.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,7 +27,7 @@ class PlayerWidgetProvider : AppWidgetProvider() {
     private val providerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        updateAllAsync(context)
+        updateAllAsync(context, "onUpdate ids=${appWidgetIds.joinToString(",")}")
     }
 
     override fun onAppWidgetOptionsChanged(
@@ -37,13 +38,24 @@ class PlayerWidgetProvider : AppWidgetProvider() {
     ) {
         // Fires live as the user drags the widget's resize handles — re-picking the layout
         // immediately means it doesn't wait for the next natural update to adapt.
-        updateAllAsync(context)
+        // Batch 593 — pemicu dicatat (diagnostik marquee): launcher yang mengirim opsi berulang (mis. tiap
+        // halaman layar beranda tampil) akan memicu update beruntun -> marquee judul diulang dari awal.
+        updateAllAsync(
+            context,
+            "onAppWidgetOptionsChanged id=$appWidgetId " +
+                "min=${newOptions.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, -1)}x" +
+                "${newOptions.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, -1)}dp " +
+                "maks=${newOptions.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, -1)}x" +
+                "${newOptions.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, -1)}dp"
+        )
     }
 
-    private fun updateAllAsync(context: Context) {
+    private fun updateAllAsync(context: Context, trigger: String) {
         val pendingResult = goAsync()
         providerScope.launch(Dispatchers.IO) {
             try {
+                // Batch 593 — dicatat di thread IO (bukan Main): AppLogger menulis berkas secara sinkron.
+                AppLogger.w("PlayerWidgetProvider", "Pemicu update: $trigger")
                 WidgetUpdater.updateAll(context)
             } finally {
                 pendingResult.finish()

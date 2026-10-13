@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 593 — Instrumentasi marquee judul widget (perbaikan Batch 592 gagal; tanpa perubahan perilaku)
+- Input user: "Gejalanya masih sama kocak!!" (setelah Batch 592). Hipotesis Batch 592 (teks diganti saat marquee aktif merusak state) terbukti salah: marquee masih diam saat judul lagu nyata. Sesuai catatan Batch 592: tidak menebak lagi, instrumentasi dulu.
+- Fakta kode: pembaruan widget hanya digerakkan event (ganti lagu, play/pause, tema, provider onUpdate/onAppWidgetOptionsChanged); tak ada update berkala. Tiap update mengulang marquee dari awal (jeda mulai 1200 ms), jadi update beruntun bisa menahannya diam — kandidat, belum terbukti.
+- `widget/WidgetUpdater.kt`: `logMarqueeDiag` mencatat satu baris WARN `Marquee diag #N` per widget per update: selang dari update sebelumnya, jumlah permintaan basi yang digabung, id/mode/ukuran min-maks widget, font scale, panjang judul + berubah atau tidak + playing, ESTIMASI lebar teks vs lebar kolom judul minimum, status remotable. `widget/PlayerWidgetProvider.kt`: baris `Pemicu update:` (onUpdate / onAppWidgetOptionsChanged beserta ukuran) di thread IO sebelum `updateAll`.
+- Perilaku widget (XML, urutan aksi marquee, probe remotable) tidak diubah. 2 file source diubah; 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. Prediksi: 11 deprecated, 0 lainnya; SpotBugs 55; lintDebug 0; detekt 0.
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK; belum dikompilasi/dijalankan; penyebab marquee diam saat lagu nyata belum diketahui — menunggu log dari device.
+
 ## Batch 592 — Marquee judul widget: urutan setSelected(false) -> ganti teks -> setSelected(true)
 - Input user: "Marquee berjalan tetapi hanya dalam kondisi antrean widget kosong??"; dijawab: hanya saat tidak ada lagu (judul "Tidak ada lagu").
 - Fakta: marquee bergerak pada placeholder (jadi jalur setSelected via RemoteViews berfungsi) tapi tidak pada judul lagu nyata. Tak ada pembaruan berkala; bubble tak merebut fokus; beda mekanis hanya teks judul yang berganti saat view selected.

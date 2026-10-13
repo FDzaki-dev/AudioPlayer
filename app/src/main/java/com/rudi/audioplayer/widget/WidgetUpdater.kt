@@ -17,7 +17,10 @@ import android.graphics.PorterDuffColorFilter
 import android.graphics.PorterDuffXfermode
 import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.Typeface
 import android.net.Uri
+import android.os.SystemClock
+import android.util.TypedValue
 import android.widget.RemoteViews
 import android.widget.TextView
 import com.rudi.audioplayer.MainActivity
@@ -27,6 +30,8 @@ import com.rudi.audioplayer.playback.PlaybackService
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.util.AppLogger
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.ceil
 
 /**
@@ -75,6 +80,16 @@ object WidgetUpdater {
     // `TextView.setSelected` DIPERIKSA di perangkat (nama anotasi dibandingkan sebagai string: kelas
     // anotasinya @hide) — dipanggil lewat RemoteViews hanya bila terbukti remotable, selain itu dilewati.
     private const val REMOTABLE_ANNOTATION = "android.view.RemotableViewMethod"
+
+    // Batch 593 — INSTRUMENTASI marquee judul (BUKAN perbaikan; hipotesis Batch 592 terbukti salah: gejala sama).
+    // Lebar TETAP non-judul tiap layout (dp), dari XML, hanya untuk ESTIMASI lebar kolom judul di log:
+    // penuh = padding 14x2 + sampul 52 + margin kolom 14+8 + prev 34 + (6+44) + (6+34) = 226;
+    // compact = padding 8x2 + sampul 36 + margin judul 8 + (28+4) + (40+4) + (28+4) = 168.
+    // Harus sama dgn `widget_player.xml` / `widget_player_compact.xml` (hanya memengaruhi baris log).
+    private const val FULL_FIXED_WIDTH_DP = 226f
+    private const val COMPACT_FIXED_WIDTH_DP = 168f
+    private const val FULL_TITLE_SP = 14f
+    private const val COMPACT_TITLE_SP = 13f
 
     // Batch 68: fix "widget nggak pernah sinkron pas ganti tema" — widget_player(.compact).xml
     // used to hardcode the dark palette permanently (no light counterpart, and nothing ever
@@ -139,10 +154,21 @@ object WidgetUpdater {
     private val updateLock = Any()
     private val updateTicket = AtomicInteger()
 
+    // Batch 593 — penghitung diagnostik marquee (semua akses di dalam `synchronized(updateLock)`; atomik
+    // supaya aman tanpa @Volatile): nomor update, waktu update sebelumnya, judul terakhir, jumlah permintaan
+    // basi yang dilewati sejak baris log terakhir.
+    private val diagSeq = AtomicInteger()
+    private val diagLastAtMs = AtomicLong()
+    private val diagLastTitle = AtomicReference<String?>(null)
+    private val diagSkipped = AtomicInteger()
+
     fun updateAll(context: Context) {
         val ticket = updateTicket.incrementAndGet()
         synchronized(updateLock) {
-            if (ticket != updateTicket.get()) return
+            if (ticket != updateTicket.get()) {
+                diagSkipped.incrementAndGet()
+                return
+            }
             try {
                 performUpdate(context)
             } catch (e: Exception) {
@@ -194,6 +220,55 @@ object WidgetUpdater {
         if (titleMarqueeSelectable) views.setBoolean(R.id.widget_title, "setSelected", selected)
     }
 
+    // Batch 593 — SATU baris log per widget per update (level WARN, tag WidgetUpdater, awalan "Marquee diag"),
+    // supaya penyebab marquee mati saat lagu nyata bisa diputuskan dari DATA, bukan tebakan. Isi: nomor update +
+    // selang dari update sebelumnya (update beruntun <~1,2 dtk = marquee diulang sebelum sempat bergerak, jeda mulai
+    // marquee Android 1200 ms) + jumlah permintaan basi yang digabung; id widget, mode, ukuran min/maks yang
+    // dilaporkan launcher; panjang judul + apakah berubah + sedang main; ESTIMASI lebar teks (Paint bold, sp ikut
+    // font scale) vs lebar kolom MINIMUM (min width - lebar tetap layout; kolom asli >= angka ini) -> apakah teks
+    // memang lebih lebar dari kolom (kalau tidak, marquee wajar tidak jalan); status remotable. Gagal = dicatat,
+    // tak mengganggu update.
+    private fun logMarqueeDiag(
+        context: Context,
+        seq: Int,
+        sinceLastMs: Long,
+        skipped: Int,
+        title: String?,
+        titleChanged: Boolean,
+        isPlaying: Boolean,
+        widgetId: Int,
+        isCompact: Boolean,
+        options: android.os.Bundle
+    ) {
+        try {
+            val metrics = context.resources.displayMetrics
+            val minW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, -1)
+            val minH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, -1)
+            val maxW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, -1)
+            val maxH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, -1)
+            val shown = title ?: "Tidak ada lagu"
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+            paint.typeface = Typeface.DEFAULT_BOLD
+            paint.textSize = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_SP,
+                if (isCompact) COMPACT_TITLE_SP else FULL_TITLE_SP,
+                metrics
+            )
+            val textDp = paint.measureText(shown) / metrics.density
+            val columnMinDp = minW - (if (isCompact) COMPACT_FIXED_WIDTH_DP else FULL_FIXED_WIDTH_DP)
+            AppLogger.w(
+                "WidgetUpdater",
+                "Marquee diag #$seq +${sinceLastMs}ms digabung=$skipped | id=$widgetId mode=${if (isCompact) "compact" else "penuh"} " +
+                    "min=${minW}x${minH}dp maks=${maxW}x${maxH}dp fontScale=${context.resources.configuration.fontScale} | " +
+                    "judul=${shown.length}huruf berubah=$titleChanged playing=$isPlaying | " +
+                    "ESTIMASI teks=${textDp.toInt()}dp kolomMin=${columnMinDp.toInt()}dp teks>kolomMin=${textDp > columnMinDp} | " +
+                    "remotable=$titleMarqueeSelectable"
+            )
+        } catch (e: Exception) {
+            AppLogger.e("WidgetUpdater", "Gagal mencatat diagnostik marquee", e)
+        }
+    }
+
     private fun performUpdate(context: Context) {
         val manager = AppWidgetManager.getInstance(context)
         val component = ComponentName(context, PlayerWidgetProvider::class.java)
@@ -207,6 +282,14 @@ object WidgetUpdater {
         val isPlaying = prefs.getBoolean(KEY_IS_PLAYING, false)
         val albumArt = artworkUriRaw?.let { loadAlbumArtBitmap(context, Uri.parse(it)) }
         val isDark = resolveIsDark(context, ThemeStore(context).getMode())
+
+        // Batch 593 — diagnostik marquee: nomor + selang dari update sebelumnya + judul berubah atau tidak.
+        val diagNow = SystemClock.elapsedRealtime()
+        val diagPrevAt = diagLastAtMs.getAndSet(diagNow)
+        val diagSinceMs = if (diagPrevAt == 0L) -1L else diagNow - diagPrevAt
+        val diagSeqNo = diagSeq.incrementAndGet()
+        val diagSkippedNow = diagSkipped.getAndSet(0)
+        val diagTitleChanged = diagLastTitle.getAndSet(title) != title
 
         // Batch 583 — bahan visual yang SAMA untuk semua widget dibuat SEKALI di luar loop (dulu sampul
         // dibulatkan ulang per widget): sampul berfillet gilt + (mode terang saja) ikon prev/next
@@ -223,6 +306,7 @@ object WidgetUpdater {
             val minWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
             val minHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 250)
             val isCompact = minWidthDp < COMPACT_WIDTH_THRESHOLD_DP || minHeightDp < COMPACT_HEIGHT_THRESHOLD_DP
+            logMarqueeDiag(context, diagSeqNo, diagSinceMs, diagSkippedNow, title, diagTitleChanged, isPlaying, id, isCompact, options)
 
             val views = RemoteViews(context.packageName, if (isCompact) R.layout.widget_player_compact else R.layout.widget_player)
             applyCornerInset(context, views, isCompact)
