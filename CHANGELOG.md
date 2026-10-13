@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 592 — Marquee judul widget: urutan setSelected(false) -> ganti teks -> setSelected(true)
+- Input user: "Marquee berjalan tetapi hanya dalam kondisi antrean widget kosong??"; dijawab: hanya saat tidak ada lagu (judul "Tidak ada lagu").
+- Fakta: marquee bergerak pada placeholder (jadi jalur setSelected via RemoteViews berfungsi) tapi tidak pada judul lagu nyata. Tak ada pembaruan berkala; bubble tak merebut fokus; beda mekanis hanya teks judul yang berganti saat view selected.
+- Hipotesis (belum dibuktikan): mengganti teks TextView yang marquee-nya aktif merusak state marquee. `widget/WidgetUpdater.kt`: `applyTitleMarquee` -> `setTitleSelected(views, selected)`; urutan di `performUpdate`: `setSelected(false)` -> `setTextViewText(widget_title)` -> `setTextColor` -> `setSelected(true)`.
+- Efek samping disengaja: marquee mulai dari awal tiap update. Bila masih mati saat lagu nyata -> hipotesis salah, tambah instrumentasi dulu.
+- 1 file source diubah; 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. Prediksi: 11 deprecated, 0 lainnya; SpotBugs 55; lintDebug 0.
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK; belum dikompilasi/dijalankan; hipotesis belum teruji di device.
+
 ## Batch 591 — Marquee judul widget: setSelected via RemoteViews hanya bila terbukti remotable (custom view ditolak)
 - Input user: "Karena marquee tidak berjalan sama sekali pada widget, maka coba terapkan konfigurasi ini:" + XML `AntiBuggyMarqueeTextView` (custom TextView).
 - Ditolak apa adanya: layout widget di-inflate proses launcher lewat RemoteViews yang hanya mengizinkan view framework ber-anotasi @RemoteView; kelas custom milik aplikasi -> inflate gagal, widget error total. Semua atribut lain di XML itu sudah ada sejak Batch 590 (kecuali singleLine, diganti maxLines=1 + scrollHorizontally).

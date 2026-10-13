@@ -185,12 +185,13 @@ object WidgetUpdater {
         remotable
     }
 
-    // Dipanggil SETELAH teks judul diset. `TextView.setSelected` hanya memulai marquee saat state BERUBAH, dan
-    // update ulang bisa memakai view lama yang sudah selected -> di-reset false lalu true agar selalu ada transisi.
-    private fun applyTitleMarquee(views: RemoteViews) {
-        if (!titleMarqueeSelectable) return
-        views.setBoolean(R.id.widget_title, "setSelected", false)
-        views.setBoolean(R.id.widget_title, "setSelected", true)
+    // Batch 592 — urutan WAJIB: setSelected(false) SEBELUM teks judul diganti, setSelected(true) SESUDAHNYA.
+    // Mengganti teks `TextView` yang marquee-nya sedang berjalan (selected) merusak state marquee-nya
+    // (layout marquee/ellipsis tertukar), dan `setSelected` hanya memulai marquee saat state BERUBAH. Gejala
+    // yang dilaporkan: marquee jalan hanya saat judul placeholder "Tidak ada lagu" (teks tak pernah berganti)
+    // dan mati begitu judul lagu berganti. Dipanggil di setiap update, jadi marquee mulai dari awal tiap update.
+    private fun setTitleSelected(views: RemoteViews, selected: Boolean) {
+        if (titleMarqueeSelectable) views.setBoolean(R.id.widget_title, "setSelected", selected)
     }
 
     private fun performUpdate(context: Context) {
@@ -243,9 +244,10 @@ object WidgetUpdater {
             if (prevGlyph != null) views.setImageViewBitmap(R.id.widget_prev, prevGlyph)
             if (nextGlyph != null) views.setImageViewBitmap(R.id.widget_next, nextGlyph)
 
+            setTitleSelected(views, false)
             views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
             views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
-            applyTitleMarquee(views)
+            setTitleSelected(views, true)
             views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
             views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))
             if (!isCompact) {
