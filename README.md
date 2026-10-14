@@ -307,6 +307,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 594** — Aplikasi bisa tiba-tiba mati bila tombol widget (berikutnya/sebelumnya/putar) ditekan berulang saat pemutaran sedang dijeda; penyebabnya terbaca jelas di Log Diagnostik (sistem mematikan layanan pemutar karena tidak segera menandai dirinya sebagai layanan latar depan). Kini layanan langsung menandai diri lebih dulu, lalu melepasnya sendiri setelah beberapa detik. Soal teks judul berjalan di widget: tidak ditemukan kerusakan — judul pendek memang tidak bergerak di widget compact karena sudah muat. Belum diuji di device.
+
 **Batch 593** — Marquee judul widget: perbaikan Batch 592 tidak berhasil (judul lagu nyata masih diam), jadi batch ini hanya menambah pencatatan di Log Diagnostik (ukuran widget, selang antar-update, pemicu update, perkiraan lebar judul) supaya penyebabnya bisa ditentukan dari data, bukan tebakan. Perilaku widget tidak berubah. Belum diuji di device.
 
 **Batch 592** — Marquee judul widget: urutan aksi diperbaiki (matikan dulu, ganti teks, baru nyalakan) karena marquee hanya berjalan pada teks placeholder "Tidak ada lagu" dan mati saat judul lagu berganti. Ini perbaikan berdasarkan dugaan mekanisme, belum diuji di device.

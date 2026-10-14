@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 594 — Perbaikan ANR startForegroundService pada tombol widget saat jeda; kesimpulan log marquee
+- Input user: log Batch 593 + jawaban "beberapa jalan normal di compact, beberapa lain hanya di penuh" + launcher Smart Launcher 6.
+- Marquee (tanpa perubahan kode): log membuktikan `remotable=false` — `setSelected` lewat RemoteViews tak pernah jalan di perangkat ini, jadi kode Batch 591/592 itu mati (klaim Batch 592 "probe remotable = true" dikoreksi: salah). Marquee murni dari XML. Kolom judul minimum compact 142dp vs penuh 84dp: judul pendek muat di compact (diam), meluap di penuh (jalan) — cocok dengan laporan user; tak ada bug marquee terbukti.
+- Temuan di log yang sama = akar "aplikasi hilang tanpa jejak": 2x ApplicationExitInfo ANR (12 Okt 07:52, 13 Okt 08:45) "Context.startForegroundService() did not then call Service.startForeground()" dengan Debug Store `SvcStart act=widget.NEXT` berulang. Tombol widget = `PendingIntent.getForegroundService`; saat jeda Media3 tak foreground dan tak memanggil `startForeground()` untuk action kustom -> sistem mematikan proses.
+- `playback/PlaybackService.kt`: cabang baru di `onStartCommand` (`player?.playWhenReady != true`) -> `handleWidgetActionWhileNotPlaying`: `startForeground` placeholder cold-start DULU, lalu aksi widget, lalu pembongkaran oleh generasi terbaru (play: tunggu isPlaying maks 8 dtk lalu cancel placeholder; next/prev: 1,5 dtk lalu `stopForeground(REMOVE)` bila tetap jeda).
+- 1 file source diubah; 0 Gradle/CI; `FILE_MANIFEST.txt` tak berubah. Prediksi: 11 deprecated, 0 lainnya; SpotBugs 55 (mungkin +1); lintDebug 0; detekt 0.
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK; belum dikompilasi/dijalankan; hilangnya ANR dan interaksi dengan notifikasi Media3 belum dibuktikan di device.
+
 ## Batch 593 — Instrumentasi marquee judul widget (perbaikan Batch 592 gagal; tanpa perubahan perilaku)
 - Input user: "Gejalanya masih sama kocak!!" (setelah Batch 592). Hipotesis Batch 592 (teks diganti saat marquee aktif merusak state) terbukti salah: marquee masih diam saat judul lagu nyata. Sesuai catatan Batch 592: tidak menebak lagi, instrumentasi dulu.
 - Fakta kode: pembaruan widget hanya digerakkan event (ganti lagu, play/pause, tema, provider onUpdate/onAppWidgetOptionsChanged); tak ada update berkala. Tiap update mengulang marquee dari awal (jeda mulai 1200 ms), jadi update beruntun bisa menahannya diam — kandidat, belum terbukti.

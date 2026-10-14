@@ -71,6 +71,9 @@ class PlaybackService : MediaLibraryService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var shakeDetector: ShakeDetector? = null
     private var coldStartNotificationActive = false
+    // Batch 594 — generasi penanda jalur widget "service hidup tapi TIDAK sedang memutar" (lihat
+    // [handleWidgetActionWhileNotPlaying]); hanya yang terbaru boleh membongkar placeholder foreground.
+    private var widgetPausedHandoffGen = 0
     // Gap List #7 (Batch 109) — job eksekusi sleep timer, hidup di scope Service (bukan
     // ViewModel) supaya tidak ikut mati kalau Activity/ViewModel di-clear duluan.
     private var sleepTimerJob: Job? = null
@@ -479,12 +482,59 @@ class PlaybackService : MediaLibraryService() {
                         NotificationManagerCompat.from(this@PlaybackService).cancel(COLD_START_NOTIFICATION_ID)
                     }
                 }
+            } else if (player?.playWhenReady != true) {
+                // Batch 594 — AKAR "aplikasi hilang tanpa jejak" yang TERBUKTI di log (ApplicationExitInfo ANR 12 Okt
+                // 07:52 + 13 Okt 08:45; Debug Store: SvcStart act=...widget.NEXT): tombol widget memakai
+                // PendingIntent.getForegroundService -> sistem mewajibkan startForeground() dalam beberapa detik
+                // SETIAP kali. Saat pemutaran dijeda Media3 tidak berada di foreground dan tidak memanggil
+                // startForeground() untuk intent kustom ini -> "did not then call Service.startForeground()" -> ANR,
+                // proses dimatikan sistem (terpicu bila next/prev widget ditekan saat jeda).
+                handleWidgetActionWhileNotPlaying(action)
             } else {
                 applyWidgetAction(action)
             }
         }
 
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    /** Batch 594 — jalur widget saat service SUDAH punya antrean tetapi TIDAK sedang memutar (`playWhenReady` false).
+     * Memenuhi kontrak `startForegroundService()` dengan placeholder yang SAMA dengan jalur cold-start
+     * ([startForegroundColdStartNotification]) DULU, baru menjalankan aksi widget. Pembongkaran hanya oleh generasi
+     * terbaru (tekan beruntun = satu pembongkaran, tidak berkedip): aksi play dulu menunggu `isPlaying` (maks
+     * [MAX_HANDOFF_WAIT_MS], pola cold-start), aksi lain (next/prev) cukup [WIDGET_PAUSED_PLACEHOLDER_MS]. Setelah itu:
+     * bila pemutaran sudah berjalan (Media3 mengambil alih foreground) placeholder cukup di-cancel; bila tetap
+     * jeda -> `stopForeground(STOP_FOREGROUND_REMOVE)` supaya notifikasi "SONIX" tidak tertinggal. Jalur cold-start
+     * ([coldStartNotificationActive]) mengurus dirinya sendiri dan tidak disentuh. */
+    private fun handleWidgetActionWhileNotPlaying(action: String?) {
+        startForegroundColdStartNotification()
+        val gen = ++widgetPausedHandoffGen
+        applyWidgetAction(action)
+        serviceScope.launch {
+            try {
+                if (action == WidgetUpdater.ACTION_TOGGLE_PLAY) {
+                    var waited = 0L
+                    while (mediaSession?.player?.isPlaying != true && waited < MAX_HANDOFF_WAIT_MS) {
+                        delay(150)
+                        waited += 150
+                    }
+                } else {
+                    delay(WIDGET_PAUSED_PLACEHOLDER_MS)
+                }
+            } finally {
+                if (gen == widgetPausedHandoffGen && !coldStartNotificationActive) {
+                    try {
+                        if (mediaSession?.player?.playWhenReady == true) {
+                            NotificationManagerCompat.from(this@PlaybackService).cancel(COLD_START_NOTIFICATION_ID)
+                        } else {
+                            stopForeground(android.app.Service.STOP_FOREGROUND_REMOVE)
+                        }
+                    } catch (e: Exception) {
+                        AppLogger.e("PlaybackService", "Gagal membongkar placeholder foreground widget", e)
+                    }
+                }
+            }
+        }
     }
 
     /** Batch 319 (laporan user, screenshot kartu OEM "SONIX sekarang") — dibalik dari pendekatan
@@ -807,6 +857,10 @@ class PlaybackService : MediaLibraryService() {
         // forever in the rare case playback never actually starts (e.g. every saved song was
         // deleted from disk since it was last played).
         private const val MAX_HANDOFF_WAIT_MS = 8000L
+
+        // Batch 594 — lama placeholder foreground bertahan setelah aksi next/prev widget saat jeda (kontrak
+        // startForegroundService sudah terpenuhi sejak startForeground; ini hanya jeda sebelum dibongkar).
+        private const val WIDGET_PAUSED_PLACEHOLDER_MS = 1500L
 
         // Roadmap #8, Trim Keheningan Otomatis — nama custom SessionCommand + key Bundle-nya,
         // dipakai bareng PlayerViewModel.setSilenceSkipEnabled() lewat MediaController.
