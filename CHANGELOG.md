@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 595 — Log Diagnostik urutan terbaru di atas (descending)
+- Input user: "Ada yang lebih mendesak. Log aplikasi seharusnya descending agar masalah baru tidak menumpuk dibawah dan buang-buang waktu nge scroll!!"
+- Sebelumnya berkas log append-only (entri terlama di atas), sehingga masalah terbaru ada di dasar dan harus di-scroll. Semua pembaca (layar Log Diagnostik, salin, ekspor "Repack ke Dokumen") lewat `AppLogger.readLog()`.
+- `util/LogOrder.kt` (baru): `newestFirst` membalik per ENTRI (awal entri = `yyyy-MM-dd HH:mm:ss FATAL|ERROR|WARN`), bukan per baris — stack trace/trace ANR multi-baris tetap utuh dan terbaca atas-ke-bawah; sisa entri terpotong di awal berkas tampil paling bawah. `util/AppLogger.kt`: `readLog()` memakai `LogOrder.newestFirst`; berkas di disk, `appendEntry`, `trim`, `clearLog` tidak berubah. `util/LogOrderTest.kt` (baru): 5 tes JUnit4. `DiagnosticLogSheet.kt` tidak diubah.
+- Verifikasi yang ada: port Python algoritma lulus 5 kasus uji dan pada log asli user (296 entri) menghasilkan 296 entri, 0 hilang, urutan murni menurun.
+- 2 file source (1 baru) + 1 tes baru; 0 Gradle/CI; `FILE_MANIFEST.txt` 216->218. Prediksi: 11 deprecated, 0 lainnya; `testDebugUnitTest` lulus; ArchUnit lulus; SpotBugs 55.
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK; belum dikompilasi/dijalankan; Batch 594 (ANR widget) masih menunggu uji device.
+
 ## Batch 594 — Perbaikan ANR startForegroundService pada tombol widget saat jeda; kesimpulan log marquee
 - Input user: log Batch 593 + jawaban "beberapa jalan normal di compact, beberapa lain hanya di penuh" + launcher Smart Launcher 6.
 - Marquee (tanpa perubahan kode): log membuktikan `remotable=false` — `setSelected` lewat RemoteViews tak pernah jalan di perangkat ini, jadi kode Batch 591/592 itu mati (klaim Batch 592 "probe remotable = true" dikoreksi: salah). Marquee murni dari XML. Kolom judul minimum compact 142dp vs penuh 84dp: judul pendek muat di compact (diam), meluap di penuh (jalan) — cocok dengan laporan user; tak ada bug marquee terbukti.

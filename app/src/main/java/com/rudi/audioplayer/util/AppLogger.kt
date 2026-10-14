@@ -108,8 +108,15 @@ object AppLogger {
         appendEntry("WARN", "[$tag] $message")
     }
 
-    /** Full current log contents, or an empty string if nothing has been recorded yet. */
-    fun readLog(): String = logFile?.takeIf { it.exists() }?.let { runCatching { it.readText() }.getOrDefault("") } ?: ""
+    /** Full current log contents, or an empty string if nothing has been recorded yet.
+     *
+     * Batch 595 — urutan TERBARU DI ATAS (descending, per ENTRI; lihat [LogOrder]). Berkas di disk tetap
+     * append-only; satu-satunya pembaca (layar Log Diagnostik, salin, ekspor "Repack ke Dokumen") otomatis
+     * ikut karena semuanya lewat fungsi ini. */
+    fun readLog(): String {
+        val raw = logFile?.takeIf { it.exists() }?.let { runCatching { it.readText() }.getOrDefault("") } ?: ""
+        return LogOrder.newestFirst(raw)
+    }
 
     fun clearLog() {
         runCatching { logFile?.writeText("") }

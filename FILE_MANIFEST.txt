@@ -98,7 +98,8 @@
 # Batch 568: app/src/main/java/com/rudi/audioplayer/ui/NeuSlider.kt (file baru, slider Neumorphism; fungsi `NeuSlider` TIDAK menaungi `Slider` M3) ditambahkan — 211->212.
 # Batch 570: .github/workflows/android-artifact.yml + config/spotbugs/spotbugs.gradle.kts + app/src/test/java/com/rudi/audioplayer/ArchitectureTest.kt (file baru, laporan ArchUnit + SpotBugs SARIF utk Claude; workflow ikut dikirim di ZIP seperti build.yml) ditambahkan — 212->215.
 # Batch 574: config/spotbugs/exclude.xml (file baru, filter noise SpotBugs Kotlin) ditambahkan — 215->216.
-# Total: 216 file
+# Batch 595: app/src/main/java/com/rudi/audioplayer/util/LogOrder.kt + app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt (file baru, Log Diagnostik terbaru-di-atas) ditambahkan — 216->218.
+# Total: 218 file
 
 .githooks/pre-commit
 .github/workflows/android-artifact.yml
@@ -240,6 +241,7 @@ app/src/main/java/com/rudi/audioplayer/update/UpdateManager.kt
 app/src/main/java/com/rudi/audioplayer/util/ApkSignatureChecker.kt
 app/src/main/java/com/rudi/audioplayer/util/AppLogger.kt
 app/src/main/java/com/rudi/audioplayer/util/AudioArtFetcher.kt
+app/src/main/java/com/rudi/audioplayer/util/LogOrder.kt
 app/src/main/java/com/rudi/audioplayer/widget/PlayerWidgetProvider.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetUpdater.kt
 app/src/main/java/com/rudi/audioplayer/worker/LyricsPrefetchWorker.kt
@@ -301,6 +303,7 @@ app/src/test/java/com/rudi/audioplayer/playback/AbRepeatLogicTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
+app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt
 build.gradle.kts
 config/detekt/detekt.yml
 config/spotbugs/exclude.xml
