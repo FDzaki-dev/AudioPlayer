@@ -71,13 +71,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.CustomFolderInfo
+import com.rudi.audioplayer.data.AlbumSort
 import com.rudi.audioplayer.data.LibraryFilterStore
+import com.rudi.audioplayer.data.LibrarySort
 import com.rudi.audioplayer.data.OnboardingHintStore
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.RatingStore
 import com.rudi.audioplayer.data.SearchHistoryStore
 import com.rudi.audioplayer.data.SmartPlaylist
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.data.SongSort
 import com.rudi.audioplayer.data.VaultStore
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.PersistentSet
@@ -128,6 +131,9 @@ fun LibraryScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val filterStore = remember { LibraryFilterStore(context) }
+    // Batch 597 — pilihan urutan tab Lagu & Album (tersimpan di LibraryFilterStore).
+    var songSort by remember { mutableStateOf(filterStore.getSongSort()) }
+    var albumSort by remember { mutableStateOf(filterStore.getAlbumSort()) }
     val vaultStore = remember { VaultStore(context) }
     val ratingStore = remember { RatingStore(context) }
     val hintStore = remember(context) { OnboardingHintStore(context) }
@@ -229,6 +235,10 @@ fun LibraryScreen(
     val filteredSongs = remember(searchIndex, searchQuery) {
         searchIndex.search(searchQuery)
     }
+    // Batch 597 — urutan pilihan user hanya untuk daftar penuh; hasil pencarian tetap urutan relevansi.
+    val sortedSongs = remember(filteredSongs, songSort, searchQuery) {
+        if (searchQuery.isBlank()) LibrarySort.sortSongs(filteredSongs, songSort) else filteredSongs
+    }
 
     val playNext: (Song) -> Unit = {
         onPlayNext(it)
@@ -297,6 +307,18 @@ fun LibraryScreen(
 
         if (!searchActive) {
             LibraryFilterChips(selectedTab = selectedTab, onSelect = { selectedTab = it })
+        }
+
+        if (!searchActive && selectedTab == 0) {
+            LibrarySortBar(
+                options = SongSort.values().map { it.label },
+                selectedIndex = songSort.ordinal,
+                onSelect = { index ->
+                    val chosen = SongSort.values()[index]
+                    songSort = chosen
+                    filterStore.setSongSort(chosen)
+                }
+            )
         }
 
         if (!searchActive && showLibraryHint) {
@@ -431,7 +453,7 @@ fun LibraryScreen(
                 subtitle = "Coba kata kunci lain."
             )
             selectedTab == 0 -> SongListView(
-                songs = filteredSongs,
+                songs = sortedSongs,
                 favoriteIds = favoriteIds,
                 onFavoriteToggle = onToggleFavorite,
                 onSongClick = onSongClick,
@@ -449,7 +471,12 @@ fun LibraryScreen(
             )
             selectedTab == 1 -> AlbumGridView(
                 songs = filteredSongs,
-                onSongClick = onSongClick
+                onSongClick = onSongClick,
+                albumSort = albumSort,
+                onAlbumSortChange = { chosen ->
+                    albumSort = chosen
+                    filterStore.setAlbumSort(chosen)
+                }
             )
             selectedTab == 2 -> GroupedListView(
                 songs = filteredSongs,

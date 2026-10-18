@@ -100,7 +100,8 @@
 # Batch 574: config/spotbugs/exclude.xml (file baru, filter noise SpotBugs Kotlin) ditambahkan — 215->216.
 # Batch 595: app/src/main/java/com/rudi/audioplayer/util/LogOrder.kt + app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt (file baru, Log Diagnostik terbaru-di-atas) ditambahkan — 216->218.
 # Batch 596: app/src/main/java/com/rudi/audioplayer/data/VaultCrypto.kt + app/src/test/java/com/rudi/audioplayer/data/VaultCryptoTest.kt (file baru, inti enkripsi Vault AES-256-GCM + Keystore, belum terhubung) ditambahkan — 218->220.
-# Total: 220 file
+# Batch 597: PlayCountTracker.kt, LibrarySort.kt, LibrarySortBar.kt (file baru) + PlayCountTrackerTest.kt, LibrarySortTest.kt (tes baru) ditambahkan — 220->225.
+# Total: 225 file
 
 .githooks/pre-commit
 .github/workflows/android-artifact.yml
@@ -141,6 +142,7 @@ app/src/main/java/com/rudi/audioplayer/data/HourlyListenStore.kt
 app/src/main/java/com/rudi/audioplayer/data/Id3TagWriter.kt
 app/src/main/java/com/rudi/audioplayer/data/LibraryCacheStore.kt
 app/src/main/java/com/rudi/audioplayer/data/LibraryFilterStore.kt
+app/src/main/java/com/rudi/audioplayer/data/LibrarySort.kt
 app/src/main/java/com/rudi/audioplayer/data/ListeningHistoryStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ListeningStatsEngine.kt
 app/src/main/java/com/rudi/audioplayer/data/LrcSyncEditor.kt
@@ -186,6 +188,7 @@ app/src/main/java/com/rudi/audioplayer/playback/EqProfileImport.kt
 app/src/main/java/com/rudi/audioplayer/playback/EqualizerController.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlaybackAudioSession.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlaybackService.kt
+app/src/main/java/com/rudi/audioplayer/playback/PlayCountTracker.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlayerViewModel.kt
 app/src/main/java/com/rudi/audioplayer/playback/ShakeDetector.kt
 app/src/main/java/com/rudi/audioplayer/playback/ShakePulseTracker.kt
@@ -203,6 +206,7 @@ app/src/main/java/com/rudi/audioplayer/ui/LibraryLists.kt
 app/src/main/java/com/rudi/audioplayer/ui/LibraryScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/LibrarySearch.kt
 app/src/main/java/com/rudi/audioplayer/ui/LibrarySearchIndex.kt
+app/src/main/java/com/rudi/audioplayer/ui/LibrarySortBar.kt
 app/src/main/java/com/rudi/audioplayer/ui/LockScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/LyricsSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/lyrics/LyricsView.kt
@@ -293,6 +297,7 @@ app/src/test/java/com/rudi/audioplayer/data/CustomFolderScannerStableIdTest.kt
 app/src/test/java/com/rudi/audioplayer/data/DuplicateDetectorTest.kt
 app/src/test/java/com/rudi/audioplayer/data/Id3TagWriterTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LibraryFilterStoreTest.kt
+app/src/test/java/com/rudi/audioplayer/data/LibrarySortTest.kt
 app/src/test/java/com/rudi/audioplayer/data/ListeningStatsEngineTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LrcSyncEditorTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LyricsParserTest.kt
@@ -303,6 +308,7 @@ app/src/test/java/com/rudi/audioplayer/data/RingtoneCutterTest.kt
 app/src/test/java/com/rudi/audioplayer/data/SmartPlaylistEngineTest.kt
 app/src/test/java/com/rudi/audioplayer/data/VaultCryptoTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/AbRepeatLogicTest.kt
+app/src/test/java/com/rudi/audioplayer/playback/PlayCountTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt

@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 597 — Definisi "putaran" = waktu dengar nyata; pilihan urutan tab Lagu & Album
+- Input user: "2+3" (butir 2 dan 3 dari audit kematangan), lalu "ASAP".
+- Putaran: dulu setiap pergantian lagu = 1 putaran (skip 2 detik pun). Kini `PlayCountTracker` menghitung sekali per sesi bila waktu dengar nyata (jam dinding saat memutar; jeda/seek tidak menambah) mencapai `min(30 detik, setengah durasi)`; pindah lagu sebelum ambang tidak dihitung; repeat-one = sesi baru. `PlayerViewModel` hanya memulai sesi di `onMediaItemTransition`; pengawas `startPlayCountWatcher()` tidur tanpa polling dan memanggil `recordQualifiedPlay()` (isi blok lama). Data lama tidak dihitung ulang; pencatatan tetap di ViewModel (putaran saat UI ditutup belum tercatat).
+- Urutan: `SongSort` (Bawaan/Judul/Artis/Album/Terbaru ditambahkan/Terpanjang) dan `AlbumSort` (Nama/Artis/Terbaru/Terbanyak lagu), pengurut murni `LibrarySort`, tersimpan di `LibraryFilterStore`, baris "Urutkan" (`LibrarySortBar`) di tab Lagu dan grid Album; hasil pencarian tetap urutan relevansi; "Bawaan"/"Nama" = perilaku lama.
+- 7 file source (3 baru) + 2 tes baru (18 tes); 0 Gradle/CI; `FILE_MANIFEST.txt` 220->225. Prediksi: 11 deprecated, 0 lainnya; 173 tes lulus; ArchUnit lulus.
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK; belum dikompilasi/dijalankan; UI dan pengawas putaran belum diuji di device.
+
 ## Batch 596 — Fondasi enkripsi Vault (AES-256-GCM + Android Keystore), belum terhubung
 - Input user: upload analisis kekurangan + `VaultStore.kt` + dokumen paket refactor Vault + snapshot `AudioPlayer-1.9.7-run570.zip` (= proyek yang sama) — "Adaptasi kedalam project!!".
 - Vault saat ini hanya menyembunyikan lagu di balik PIN/biometrik (daftar ID di SharedPreferences), tidak mengenkripsi berkas. Paket usulan tidak bisa ditempel apa adanya (menimpa `VaultStore` berisi PIN/lockout/biometrik yang dipakai 4 file, `PlaybackService` berbasis `MediaPlayer` menggantikan service Media3, `Song.path`/`isInVault` tak ada, `AppLogger.e` salah tanda tangan, `\${song.id}` literal membuat semua berkas bernama sama, plaintext tertinggal di cache, penghapusan berkas asli tanpa verifikasi/izin) — daftar lengkap 11 butir ada di `PROJECT_STATE.md` Catatan Batch 596.

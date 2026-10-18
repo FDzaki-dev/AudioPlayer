@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.MediaStore
 import androidx.compose.ui.graphics.Color
 import androidx.documentfile.provider.DocumentFile
@@ -65,6 +66,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -304,6 +306,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     @Volatile private var uiVisible = true
     private val positionWake = Channel<Unit>(Channel.CONFLATED)
 
+    // Batch 597 — definisi "putaran" = waktu dengar nyata >= min(30 dtk, setengah durasi) (lihat
+    // `PlayCountTracker`); dulu dihitung di tiap pergantian lagu (skip 2 dtk = 1 putaran penuh).
+    private val playCountTracker = PlayCountTracker()
+    private val playCountWake = Channel<Unit>(Channel.CONFLATED)
+
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
 
@@ -333,6 +340,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val sleepTimerStore = com.rudi.audioplayer.data.SleepTimerStore(appContext)
 
     init {
+        startPlayCountWatcher()
         // Gap List #7 (Batch 109) — restore TAMPILAN countdown setelah ViewModel dibuat ulang
         // (mis. proses sempat mati, user buka app lagi selagi Service masih menghitung mundur
         // di background). Eksekusi nyata (pause tepat waktu) tidak bergantung pada blok ini
@@ -553,6 +561,15 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
+            // Batch 597 — waktu dengar nyata: hanya jam dinding saat memutar. Bila belum ada sesi (mis. lagu
+            // yang dilanjutkan setelah app dibuka ulang, tanpa pergantian lagu), mulai sesi dari lagu aktif.
+            playCountTracker.setPlaying(isPlaying, SystemClock.elapsedRealtime())
+            if (isPlaying && !playCountTracker.hasItem()) {
+                _uiState.value.currentSong?.let {
+                    playCountTracker.startItem(it.id, it.duration, SystemClock.elapsedRealtime(), true)
+                }
+            }
+            playCountWake.trySend(Unit)
             if (!isPlaying) persistPlaybackState()
             positionWake.trySend(Unit) // Batch 537: loop posisi cek ulang kadensi + publish segera
             // Gap List #8 — sinyal paling jujur bahwa playback beneran pulih (bukan cuma
@@ -585,13 +602,19 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             _playbackProgress.value = _playbackProgress.value.copy(
                 duration = controller?.duration?.coerceAtLeast(0) ?: 0L
             )
-            song?.let {
-                playStatsStore.recordPlay(it.id)
-                listeningHistoryStore.recordPlay(it.id)
-                hourlyListenStore.recordPlay()
-                _statsVersion.value += 1
-                checkListeningMilestone()
+            // Batch 597 — TIDAK lagi langsung `recordPlay` di sini: sesi baru dimulai, dihitung nanti oleh
+            // `startPlayCountWatcher()` bila waktu dengar nyata mencapai ambang.
+            if (song != null) {
+                playCountTracker.startItem(
+                    song.id,
+                    song.duration,
+                    SystemClock.elapsedRealtime(),
+                    controller?.isPlaying == true
+                )
+            } else {
+                playCountTracker.clearItem()
             }
+            playCountWake.trySend(Unit)
             updateAccentColor(song)
             _currentRating.value = song?.let { ratingStore.getRating(it.id) } ?: 0
             persistPlaybackState()
@@ -1175,6 +1198,31 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     /** Fires a one-time celebration the exact play that crosses a milestone total —
      * checking equality (not >=) means it can only ever trigger once per threshold,
      * even though this runs on every single track transition. */
+    /** Batch 597 — pengawas putaran: tidur sampai ada perubahan (lagu/jeda) atau ambang waktu dengar tercapai,
+     * lalu mencatat SEKALI per sesi. Tanpa polling saat jeda. Berjalan di `viewModelScope` (Main). */
+    private fun startPlayCountWatcher() {
+        viewModelScope.launch {
+            while (isActive) {
+                val wait = playCountTracker.msUntilQualified(SystemClock.elapsedRealtime())
+                if (wait == null) {
+                    playCountWake.receive()
+                } else if (wait > 0L) {
+                    withTimeoutOrNull(wait) { playCountWake.receive() }
+                }
+                val songId = playCountTracker.takeIfQualified(SystemClock.elapsedRealtime()) ?: continue
+                recordQualifiedPlay(songId)
+            }
+        }
+    }
+
+    private fun recordQualifiedPlay(songId: Long) {
+        playStatsStore.recordPlay(songId)
+        listeningHistoryStore.recordPlay(songId)
+        hourlyListenStore.recordPlay()
+        _statsVersion.value += 1
+        checkListeningMilestone()
+    }
+
     private fun checkListeningMilestone() {
         val total = playStatsStore.totalPlayCount()
         val message = when (total) {

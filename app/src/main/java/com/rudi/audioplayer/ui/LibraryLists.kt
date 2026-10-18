@@ -47,6 +47,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.rudi.audioplayer.data.AlbumSort
+import com.rudi.audioplayer.data.LibrarySort
 import com.rudi.audioplayer.data.Song
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentSetOf
@@ -57,13 +59,28 @@ import kotlinx.collections.immutable.toPersistentSet
 // pada 4 deklarasi fungsi (dipanggil dari LibraryScreen.kt / SearchResultsView). Lihat CHANGELOG Batch 517.
 
 @Composable
-internal fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> Unit) {
+internal fun AlbumGridView(
+    songs: List<Song>,
+    onSongClick: (List<Song>, Int) -> Unit,
+    albumSort: AlbumSort = AlbumSort.NAME,
+    // Batch 597 — null = tanpa baris "Urutkan" (pemakai lain tetap seperti sebelumnya).
+    onAlbumSortChange: ((AlbumSort) -> Unit)? = null
+) {
     var selectedAlbum by remember(songs) { mutableStateOf<String?>(null) }
     val grouped = remember(songs) { songs.groupBy { it.album.ifBlank { "Album Tidak Diketahui" } } }
-    val sortedAlbumKeys = remember(grouped) { grouped.keys.sortedBy { it.lowercase() } }
+    val sortedAlbumKeys = remember(grouped, albumSort) { LibrarySort.sortAlbumKeys(grouped, albumSort) }
 
     if (selectedAlbum == null) {
+        Column {
+        if (onAlbumSortChange != null) {
+            LibrarySortBar(
+                options = AlbumSort.values().map { it.label },
+                selectedIndex = albumSort.ordinal,
+                onSelect = { index -> onAlbumSortChange(AlbumSort.values()[index]) }
+            )
+        }
         LazyVerticalGrid(
+            modifier = Modifier.weight(1f),
             columns = GridCells.Fixed(2),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -96,6 +113,7 @@ internal fun AlbumGridView(songs: List<Song>, onSongClick: (List<Song>, Int) -> 
                     )
                 }
             }
+        }
         }
     } else {
         val albumSongs = grouped[selectedAlbum].orEmpty()
