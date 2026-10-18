@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 596 — Fondasi enkripsi Vault (AES-256-GCM + Android Keystore), belum terhubung
+- Input user: upload analisis kekurangan + `VaultStore.kt` + dokumen paket refactor Vault + snapshot `AudioPlayer-1.9.7-run570.zip` (= proyek yang sama) — "Adaptasi kedalam project!!".
+- Vault saat ini hanya menyembunyikan lagu di balik PIN/biometrik (daftar ID di SharedPreferences), tidak mengenkripsi berkas. Paket usulan tidak bisa ditempel apa adanya (menimpa `VaultStore` berisi PIN/lockout/biometrik yang dipakai 4 file, `PlaybackService` berbasis `MediaPlayer` menggantikan service Media3, `Song.path`/`isInVault` tak ada, `AppLogger.e` salah tanda tangan, `\${song.id}` literal membuat semua berkas bernama sama, plaintext tertinggal di cache, penghapusan berkas asli tanpa verifikasi/izin) — daftar lengkap 11 butir ada di `PROJECT_STATE.md` Catatan Batch 596.
+- `data/VaultCrypto.kt` (baru): kunci master AES-256 di Android Keystore membungkus kunci data acak per berkas; isi dienkripsi per potongan 64 KiB AES-256-GCM (nonce = prefiks acak + indeks, AAD = header + penanda potongan terakhir) sehingga bisa seek tanpa plaintext di disk dan tak menumpuk di memori; `encrypt`/`decrypt` mengembalikan sidik jari (panjang + SHA-256) untuk verifikasi sebelum berkas asli disentuh; `openReader` = akses acak.
+- `data/VaultCryptoTest.kt` (baru): 14 tes JUnit4 (round trip, pemalsuan/pemotongan/penukaran terdeteksi, kunci salah, reader acak/berurutan/kosong/terpotong).
+- Rencana 597-599 (salin terenkripsi + verifikasi + pengecualian backup -> pemutaran dari berkas terenkripsi + perbaikan `pruneOrphans` -> penghapusan berkas asli lewat dialog izin sistem) ada di `PROJECT_STATE.md`; tak ada berkas musik user yang dihapus sebelum pemutaran terbukti.
+- Verifikasi yang ada: port Python 1:1 lulus 16 kasus. 0 perubahan perilaku; 1 file source baru + 1 tes baru; 0 Gradle/CI; `FILE_MANIFEST.txt` 218->220.
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK; belum dikompilasi/dijalankan; `KeystoreVaultMasterKey` belum pernah dijalankan di device.
+
 ## Batch 595 — Log Diagnostik urutan terbaru di atas (descending)
 - Input user: "Ada yang lebih mendesak. Log aplikasi seharusnya descending agar masalah baru tidak menumpuk dibawah dan buang-buang waktu nge scroll!!"
 - Sebelumnya berkas log append-only (entri terlama di atas), sehingga masalah terbaru ada di dasar dan harus di-scroll. Semua pembaca (layar Log Diagnostik, salin, ekspor "Repack ke Dokumen") lewat `AppLogger.readLog()`.

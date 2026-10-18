@@ -307,6 +307,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 596** — Persiapan brankas yang benar-benar terenkripsi (AES-256, kunci disimpan di Android Keystore): mesin enkripsinya sudah ditambahkan beserta tesnya, tetapi BELUM dipakai oleh fitur Brankas — perilaku aplikasi tidak berubah. Langkah berikutnya dikerjakan bertahap supaya tidak ada berkas musik yang dihapus sebelum pemutaran dari berkas terenkripsi terbukti jalan. Belum diuji di device.
+
 **Batch 595** — Log Diagnostik (Pengaturan > Lanjutan) kini menampilkan catatan TERBARU di baris paling atas, jadi masalah baru langsung terlihat tanpa scroll ke bawah. Berlaku juga untuk teks yang disalin dan berkas hasil "Repack ke Dokumen"; catatan lama ikut tampil terurut ulang. Belum diuji di device.
 
 **Batch 594** — Aplikasi bisa tiba-tiba mati bila tombol widget (berikutnya/sebelumnya/putar) ditekan berulang saat pemutaran sedang dijeda; penyebabnya terbaca jelas di Log Diagnostik (sistem mematikan layanan pemutar karena tidak segera menandai dirinya sebagai layanan latar depan). Kini layanan langsung menandai diri lebih dulu, lalu melepasnya sendiri setelah beberapa detik. Soal teks judul berjalan di widget: tidak ditemukan kerusakan — judul pendek memang tidak bergerak di widget compact karena sudah muat. Belum diuji di device.

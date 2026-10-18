@@ -99,7 +99,8 @@
 # Batch 570: .github/workflows/android-artifact.yml + config/spotbugs/spotbugs.gradle.kts + app/src/test/java/com/rudi/audioplayer/ArchitectureTest.kt (file baru, laporan ArchUnit + SpotBugs SARIF utk Claude; workflow ikut dikirim di ZIP seperti build.yml) ditambahkan — 212->215.
 # Batch 574: config/spotbugs/exclude.xml (file baru, filter noise SpotBugs Kotlin) ditambahkan — 215->216.
 # Batch 595: app/src/main/java/com/rudi/audioplayer/util/LogOrder.kt + app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt (file baru, Log Diagnostik terbaru-di-atas) ditambahkan — 216->218.
-# Total: 218 file
+# Batch 596: app/src/main/java/com/rudi/audioplayer/data/VaultCrypto.kt + app/src/test/java/com/rudi/audioplayer/data/VaultCryptoTest.kt (file baru, inti enkripsi Vault AES-256-GCM + Keystore, belum terhubung) ditambahkan — 218->220.
+# Total: 220 file
 
 .githooks/pre-commit
 .github/workflows/android-artifact.yml
@@ -173,6 +174,7 @@ app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistStore.kt
 app/src/main/java/com/rudi/audioplayer/data/Song.kt
 app/src/main/java/com/rudi/audioplayer/data/TagEditor.kt
 app/src/main/java/com/rudi/audioplayer/data/ThemeStore.kt
+app/src/main/java/com/rudi/audioplayer/data/VaultCrypto.kt
 app/src/main/java/com/rudi/audioplayer/data/VaultStore.kt
 app/src/main/java/com/rudi/audioplayer/data/VisualizerSettingsStore.kt
 app/src/main/java/com/rudi/audioplayer/playback/AbRepeatLogic.kt
@@ -299,6 +301,7 @@ app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryTrackDiscTest.kt
 app/src/test/java/com/rudi/audioplayer/data/PinLockoutPolicyTest.kt
 app/src/test/java/com/rudi/audioplayer/data/RingtoneCutterTest.kt
 app/src/test/java/com/rudi/audioplayer/data/SmartPlaylistEngineTest.kt
+app/src/test/java/com/rudi/audioplayer/data/VaultCryptoTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/AbRepeatLogicTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
