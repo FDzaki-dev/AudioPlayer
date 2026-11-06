@@ -366,7 +366,15 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // doc-comment) so every future session ID re-attaches automatically, plus attach once now
         // in case a session already exists (e.g. Service kept playing in the background while this
         // ViewModel was recreated).
-        PlaybackAudioSession.onSessionIdChanged = { id -> equalizerController.attach(id) }
+        // Batch 598 — FIX kebocoran memori: lambda lama `{ id -> equalizerController.attach(id) }` membaca
+        // FIELD ViewModel, jadi menangkap `this` (seluruh PlayerViewModel: daftar library, MediaController,
+        // StateFlow) lalu disimpan di `PlaybackAudioSession` (object = referensi statis seumur proses).
+        // `onCleared()` tak pernah mengosongkannya, sedangkan PlaybackService sengaja tetap hidup setelah
+        // Activity ditutup -> ViewModel yang sudah dibuang tetap tertahan di heap (tekanan GC = lag).
+        // Kini lambda hanya menangkap singleton per-proses (lokal `sharedEqualizer`), bukan ViewModel;
+        // perilaku re-attach identik karena `equalizerController` memang `getInstance()` yang sama.
+        val sharedEqualizer = equalizerController
+        PlaybackAudioSession.onSessionIdChanged = { id -> sharedEqualizer.attach(id) }
         if (PlaybackAudioSession.sessionId != 0) {
             equalizerController.attach(PlaybackAudioSession.sessionId)
         }

@@ -307,6 +307,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 598** — Audit kebocoran memori untuk mengurangi lag/stutter. Tiga perbaikan: ViewModel lama tidak lagi tertahan di memori setelah layar ditutup (selama pemutaran tetap berjalan), pemutar kedua milik Crossfade dilepas penuh saat Crossfade dimatikan, dan bitmap perantara sampul widget/bubble dilepas segera. Efeknya ke kelancaran belum diukur di device.
+
 **Batch 597** — Hitungan "diputar" kini hanya untuk lagu yang benar-benar didengar (minimal 30 detik atau setengah durasi, mana yang lebih kecil), jadi lagu yang di-skip tidak lagi mengotori Baru Diputar, Paling Sering Diputar, Mix, dan Statistik. Tab Lagu dan Album punya pilihan urutan (judul, artis, album, terbaru ditambahkan, terpanjang / nama, artis, terbaru, terbanyak lagu) yang tersimpan. Riwayat lama tidak dihitung ulang. Belum diuji di device.
 
 **Batch 596** — Persiapan brankas yang benar-benar terenkripsi (AES-256, kunci disimpan di Android Keystore): mesin enkripsinya sudah ditambahkan beserta tesnya, tetapi BELUM dipakai oleh fitur Brankas — perilaku aplikasi tidak berubah. Langkah berikutnya dikerjakan bertahap supaya tidak ada berkas musik yang dihapus sebelum pemutaran dari berkas terenkripsi terbukti jalan. Belum diuji di device.

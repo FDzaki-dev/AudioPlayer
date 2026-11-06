@@ -755,7 +755,17 @@ class PlaybackService : MediaLibraryService() {
                     // Belum pernah dibangun (crossfadeEngine null) = tidak ada apa pun utk
                     // dimatikan, sama seperti overlapPlayer yang juga belum pernah ada sebelum
                     // batch ini kalau OFF sejak awal — no-op yang identik secara hasil akhir.
-                    crossfadeEngine?.setEnabled(false)
+                    // Batch 598 — FIX tahanan memori: dulu cukup `setEnabled(false)`, jadi ExoPlayer KEDUA
+                    // (overlapPlayer: thread playback + renderer + buffer) tetap hidup idle sampai Service
+                    // mati walau crossfade sudah dimatikan user. Kini dilepas penuh (release() juga abort()
+                    // lebih dulu = volume sesi dipulihkan) dan referensi dikosongkan; menyalakan lagi cukup
+                    // lewat `ensureCrossfadeEngine()` yang memang membangun LAZY. Semua pemakai
+                    // `crossfadeEngine` memakai `?.` (null-safe) dan berjalan di thread utama yang sama.
+                    crossfadeEngine?.let { engine ->
+                        engine.setEnabled(false)
+                        engine.release()
+                    }
+                    crossfadeEngine = null
                 }
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }

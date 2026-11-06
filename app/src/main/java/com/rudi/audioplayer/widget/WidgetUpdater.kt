@@ -461,6 +461,10 @@ object WidgetUpdater {
             )
         }
         canvas.drawPath(leafPath(sizeF, inset = filletWidth / 2f), fillet)
+        // Batch 598 — bitmap perantara hasil crop persegi tak dipakai lagi setelah digambar; lepas memori
+        // native-nya segera (bukan menunggu GC) kecuali `createBitmap` mengembalikan SUMBER yang sama
+        // (kasus sumber sudah persegi) — sumber tetap dipakai pemanggil (bubble memakainya untuk tab minimized).
+        if (squared !== source) squared.recycle()
         return output
     }
 
