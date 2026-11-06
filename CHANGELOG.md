@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 601 — Verifikasi run #29 + fix balapan SimpleDateFormat di crash logger/backup (STCAL 4 temuan)
+- Input user: upload `SONIX_laporan-untuk-claude_run29.zip` (commit `7a711a3`, 2026-11-06 14:09 UTC; DIASUMSIKAN push Batch 600), tanpa teks tambahan.
+- VERIFIED run #29: Gradle exit 0/0/0; ArchUnit LULUS (7 aturan); detekt 0; lintDebug 0; "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)"; **SpotBugs 27 = prediksi Batch 600 persis** -> filter `exclude.xml` terpakai dan 27 sisa = daftar yang dijanjikan.
+- Temuan STCAL (4): `SimpleDateFormat` (tidak thread-safe) `dateFormat`/`fileStampFormat` di `AppLogger` dipakai oleh `appendEntry()` (di bawah kunci) dan oleh `writePublicCrashLog()`/`exportLogToDocuments()` TANPA kunci dari thread yang sedang crash -> log bersamaan dengan crash bisa merusak teks tanggal atau melempar exception di dalam crash handler. `BackupManager.fileStampFormat` pola sama.
+- Fix (2 file source: `util/AppLogger.kt`, `data/BackupManager.kt`): `DateTimeFormatter` (immutable, thread-safe) + `LocalDateTime.now().format(...)`; pola dan hasil teks identik (`Locale.ROOT`, digit ASCII), zona waktu dibaca saat dipanggil. `SimpleDateFormat` lokal di `appendExitInfo` (tidak dibagi) tidak diubah. 0 tes unit menyentuh keduanya.
+- 2 file source + docs; 0 file baru (`FILE_MANIFEST.txt` tetap 225); 0 Gradle/CI. Prediksi: SpotBugs 23 (27 - 4); lainnya tetap (11 deprecated, detekt 0, lint 0, ArchUnit 7 aturan LULUS).
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SpotBugs di sini (kurung seimbang 0/0 di 2 file); 173 tes unit tetap tak terlihat di laporan ini (cek workflow "Build APK"); uji device 598/599 belum ada.
+
 ## Batch 600 — Verifikasi laporan CI run #28 + filter noise SpotBugs terkonfirmasi (config saja)
 - Input user: upload `SONIX_laporan-untuk-claude_run28.zip` (commit `565e1d5`, 2026-11-06 09:18 UTC; DIASUMSIKAN push Batch 599) + "Selesaikan secepatnya!!".
 - VERIFIED run #28: Gradle exit 0/0/0; ArchUnit LULUS (7 aturan, 0 pelanggaran); detekt 0; lintDebug 0; "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)" = prediksi Batch 597-599 cocok -> perubahan Batch 598/599 TERKOMPILASI. 0 temuan SpotBugs di PlaybackService/WidgetUpdater (file yang diubah 598/599).

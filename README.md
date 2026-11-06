@@ -307,6 +307,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 601** — Pencatat log/crash dan nama file backup kini memakai pemformat tanggal yang aman untuk banyak thread, sehingga log yang bersamaan dengan crash tidak bisa merusak laporan crash. Tampilan dan isi file sama seperti sebelumnya.
+
 **Batch 600** — Laporan analisis statis lebih bersih: 31 peringatan palsu hasil kompilasi Kotlin disaring dengan cakupan sempit, 27 peringatan nyata/belum ditinjau tetap tampil. Tidak ada perubahan perilaku aplikasi.
 
 **Batch 599** — Pemeriksa jendela crossfade di layanan pemutaran kini hanya berjalan saat Crossfade aktif, bukan terus-menerus selama pemutaran (termasuk pemutaran dari widget/Bluetooth saat aplikasi sudah ditutup). Belum diuji di device.

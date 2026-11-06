@@ -14,6 +14,8 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 601 [user: upload `SONIX_laporan-untuk-claude_run29.zip`, tanpa teks]**: FAKTA run #29 (commit `7a711a3`, 2026-11-06 14:09 UTC, DIASUMSIKAN push Batch 600; Gradle exit 0/0/0): ArchUnit LULUS (7 aturan), detekt 0, lintDebug 0, \"Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)\", **SpotBugs 27 = PREDIKSI Batch 600 persis** (Batch 600 TERVERIFIKASI). Perubahan: 2 file source — `util/AppLogger.kt` + `data/BackupManager.kt`: `SimpleDateFormat` bersama (balapan: `appendEntry` berkunci vs `writePublicCrashLog`/`exportLogToDocuments` tanpa kunci) diganti `DateTimeFormatter` + `LocalDateTime.now().format(...)`; teks identik; `SimpleDateFormat` lokal di `appendExitInfo` tetap. PREDIKSI: SpotBugs 23 (27-4 STCAL); lainnya tetap. **NOT VERIFIED**: belum compile/CI; 173 tes unit tak terlihat di laporan (cek \"Build APK\"); uji device 598/599 belum ada. Detail: `CHANGELOG.md`.
+
 **Catatan Batch 600 [user: upload `SONIX_laporan-untuk-claude_run28.zip` + \"Selesaikan secepatnya!!\"]**: FAKTA run #28 (commit `565e1d5`, 2026-11-06 09:18 UTC, DIASUMSIKAN push Batch 599; Gradle exit 0/0/0): ArchUnit LULUS (7 aturan), detekt 0, lintDebug 0, \"Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)\" = prediksi cocok -> Batch 598+599 TERKOMPILASI (VERIFIED). SpotBugs 58 (prediksi 55): titik dibaca, semua pola Kotlin (elvis, `use{}`, `object`, sintetis). Langkah ArchUnit hanya menjalankan `ArchitectureTest` -> 173 tes unit TIDAK terverifikasi dari laporan ini (cek workflow \"Build APK\"). Perubahan: 1 file config `config/spotbugs/exclude.xml` (0 source) — filter sempit 31 temuan artefak Kotlin; 27 sisa TETAP tampil (AT_* 12, RV_BAD_PRACTICE 6, STCAL 4, DLS/IP/REC/SA_FIELD/UC 5). PREDIKSI: SpotBugs 27; lainnya tetap. **NOT VERIFIED**: belum jalan di CI; uji device 598/599 belum ada. Detail: `CHANGELOG.md`.
 
 **Catatan Batch 599 [user: \"apakah sudah mencakup sektor pemutaran eksternal yang dilakukan user ketika aplikasi dalam keadaan close??\"]**: Pemeriksaan jalur Service saat app tertutup menemukan celah di luar Batch 598: `PlaybackService.onCreate` menjalankan loop `maybeStartCrossfade()` tiap 250 ms TANPA SYARAT selama Service hidup. Fix (1 file, `playback/PlaybackService.kt`): `startCrossfadePoll()` + `crossfadePollJob`; dipanggil hanya saat Crossfade aktif (cold start bila `CrossfadeStore` ON; perintah enable) dan dibatalkan saat dimatikan. Perilaku crossfade aktif identik. Batch 598 sendiri: hook EQ Application (Batch 490) tak berubah; matikan Crossfade butuh UI. BATAS TETAP: pencatatan putaran saat UI ditutup belum tercatat (Batch 597). PREDIKSI: \"11 (11 deprecated, 0 lainnya)\"; 173 tes lulus; ArchUnit lulus; SpotBugs 55. **NOT VERIFIED**: belum compile/CI/device. Detail: `CHANGELOG.md`.
@@ -354,7 +356,17 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 600. ZIP: `SONIX_v600.zip` (direktori ZIP mode `0755`, dicek). **0 file source**, 1 file config (`config/spotbugs/exclude.xml`) + docs (`PROJECT_STATE.md`, `CHANGELOG.md`, `README.md`); 0 file baru (`FILE_MANIFEST.txt` tetap 225); 0 Gradle/CI. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+- Batch terakhir: 601. ZIP: `SONIX_v601.zip` (direktori ZIP mode `0755`, dicek). **2 file source** (`util/AppLogger.kt`, `data/BackupManager.kt`) + docs (`PROJECT_STATE.md`, `CHANGELOG.md`, `README.md`); 0 file baru (`FILE_MANIFEST.txt` tetap 225); 0 Gradle/CI. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+
+  BUG "lag/stutter + pemutaran eksternal saat app tertutup" -> 598/599 TERKOMPILASI (run #28), 600 TERVERIFIKASI (run #29: SpotBugs 27), uji device BELUM; Batch 601 = fix STCAL (SimpleDateFormat bersama di crash logger/backup) ->
+
+  (1) USER: push (Box DAILY UPDATE), unggah `laporan-untuk-claude.txt` baru. KRITERIA TERIMA: "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)"; ArchUnit 7 aturan LULUS; detekt 0 / lintDebug 0; **SpotBugs 23** (bila 27 = perubahan tak terkompilasi/terpakai; baca log). USER juga cek workflow "Build APK" hijau (tes unit 173).
+
+  (2) USER uji device 598/599: (a) tutup app dari Recents lalu putar lewat widget/Bluetooth/notifikasi -> musik normal, EQ aktif; (b) Crossfade ON -> transisi terjadi; OFF -> ON lagi -> transisi tetap terjadi. Bila lag MASIH ada: ambil bukti (Profiler heap dump / LeakCanary debug), jangan menebak.
+
+  (3) BERIKUTNYA (1 temuan = 1 batch, baca kode dulu): AT_* konkurensi 12 (`PlayerViewModel`/`CrossfadeEngine`), RV_BAD_PRACTICE 6 (`File.delete()/mkdirs()`), lalu pindahkan pengawas putaran ke `PlaybackService` (putaran saat UI ditutup belum tercatat); Vault 599-601 (Catatan Batch 596, nomor bergeser).
+
+- Batch 600 (sebelum 601; filter noise SpotBugs; TERVERIFIKASI run #29 = 27). ZIP: `SONIX_v600.zip` (direktori ZIP mode `0755`, dicek). **0 file source**, 1 file config (`config/spotbugs/exclude.xml`) + docs (`PROJECT_STATE.md`, `CHANGELOG.md`, `README.md`); 0 file baru (`FILE_MANIFEST.txt` tetap 225); 0 Gradle/CI. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
 
   BUG "lag/stutter + pemutaran eksternal saat app tertutup" -> Batch 598/599 TERKOMPILASI (run #28), uji device BELUM; Batch 600 = filter noise SpotBugs terkonfirmasi ->
 

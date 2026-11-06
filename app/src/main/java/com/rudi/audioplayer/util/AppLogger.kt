@@ -15,6 +15,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -73,8 +75,13 @@ object AppLogger {
     private var logFile: File? = null
     private var appContext: Context? = null
     private var previousHandler: Thread.UncaughtExceptionHandler? = null
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT)
-    private val fileStampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT)
+    // Batch 601 — FIX balapan data: dulu `SimpleDateFormat` (TIDAK thread-safe) dipakai bersama oleh appendEntry()
+    // (di bawah kunci) DAN writePublicCrashLog()/exportLogToDocuments() (tanpa kunci, dari thread yang sedang crash).
+    // Log bersamaan dengan crash bisa merusak teks tanggal atau melempar exception di dalam crash handler itu
+    // sendiri. `DateTimeFormatter` immutable + thread-safe; pola dan hasil teks identik (Locale.ROOT = digit ASCII);
+    // zona waktu dibaca saat dipanggil via LocalDateTime.now().
+    private val dateFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT)
+    private val fileStampFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss", Locale.ROOT)
 
     /** Call once from Application.onCreate(). Safe to call more than once (no-ops after the first). */
     @Synchronized
@@ -135,7 +142,7 @@ object AppLogger {
         val text = readLog()
         if (text.isBlank()) return false
         return runCatching {
-            val fileName = "log_${fileStampFormat.format(Date())}_${UUID.randomUUID()}.txt"
+            val fileName = "log_${LocalDateTime.now().format(fileStampFormat)}_${UUID.randomUUID()}.txt"
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "text/plain")
@@ -172,7 +179,7 @@ object AppLogger {
     private fun appendEntry(level: String, message: String) {
         val file = logFile ?: return
         runCatching {
-            file.appendText("${dateFormat.format(Date())} $level $message\n")
+            file.appendText("${LocalDateTime.now().format(dateFormat)} $level $message\n")
             if (file.length() > MAX_LOG_BYTES) trim(file)
         }
     }
@@ -276,12 +283,12 @@ object AppLogger {
      * caps this folder at 50 files instead of growing forever. */
     private fun writePublicCrashLog(thread: Thread, throwable: Throwable) {
         val context = appContext ?: return
-        val fileName = "crash_${fileStampFormat.format(Date())}_${UUID.randomUUID()}.txt"
+        val fileName = "crash_${LocalDateTime.now().format(fileStampFormat)}_${UUID.randomUUID()}.txt"
         val versionInfo = runCatching {
             val info = context.packageManager.getPackageInfo(context.packageName, 0)
             "${info.versionName} (${PackageInfoCompat.getLongVersionCode(info)})"
         }.getOrDefault("unknown")
-        val content = "Waktu: ${dateFormat.format(Date())}\n" +
+        val content = "Waktu: ${LocalDateTime.now().format(dateFormat)}\n" +
             "Versi Aplikasi: $versionInfo\n" +
             "OS: Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n" +
             "Perangkat: ${Build.MANUFACTURER} ${Build.MODEL}\n" +
