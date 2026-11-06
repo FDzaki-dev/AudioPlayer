@@ -12,8 +12,22 @@
     (windowManager, bubbleStore); null-check lateinit melempar UninitializedPropertyAccessException, bukan NPE.
   - RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE: 1 temuan, sumbernya lateinit yang sama.
   - DMI_RANDOM_USED_ONLY_ONCE: AppLockStore memakai SecureRandom sekali per setPin (memang benar).
-  Rule lain TIDAK disaring (konkurensi AT_*, SSD_*, ST_*, STCAL_*, RV_*, OS_OPEN_STREAM, NP_NONNULL_PARAM_VIOLATION,
-  SA_*, DLS, IP, UC, NP_LOAD) supaya tetap tampil di laporan sampai ditinjau satu per satu.
+  Batch 600 — dasar: laporan CI run #28 (58 temuan, lokasi utuh) + pembacaan kode di tiap titik. Disaring HANYA yang
+  terbukti artefak bytecode Kotlin (31 temuan), dengan cakupan SEMPIT (file/kelas/pola yang terlihat di laporan):
+  - RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT @ LazyDsl.kt (13): kelas anonim hasil inline `items{}` Compose (SourceFile
+    mengikuti file fungsi inline di library); bukan kode proyek.
+  - NP_NONNULL_PARAM_VIOLATION @ LyricsRepository.kt / IosScrollPhysics.kt (6, semua baris 0 = sintetis): state machine
+    `suspend`; IosScrollPhysics.kt tak punya literal null sama sekali, LyricsRepository hanya meneruskan `album: String?`.
+  - OS_OPEN_STREAM @ EqualizerSheet.kt (1): `openInputStream(uri)?.use {}` sudah menutup stream (pola `use` Kotlin).
+  - OBL_UNSATISFIED_OBLIGATION @ VaultCrypto.kt (1): `FileInputStream(file).use { readHeader(it) }` (pola `use`);
+    RandomAccessFile dikembalikan ke pemanggil yang wajib menutup Reader (dokumen KDoc `openReader`).
+  - NP_LOAD_OF_KNOWN_NULL_VALUE + SA_LOCAL_SELF_ASSIGNMENT (3): elvis Kotlin (`?: continue`, `x = y ?: x`) dan state machine.
+  - ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD + SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA di `AppLogger` dan
+    `PlaybackAudioSession` (7): Kotlin `object` mengompilasi `var` menjadi field static dan `@Synchronized` mengunci
+    singleton tunggal itu sendiri.
+  Rule lain TETAP tampil (27 sisa, ditinjau per batch): konkurensi AT_* (12), RV_RETURN_VALUE_IGNORED_BAD_PRACTICE (6,
+  `File.delete()/mkdirs()` pembersihan), STCAL_* (4, SimpleDateFormat bersama di AppLogger/BackupManager), DLS, IP, REC,
+  SA_FIELD_SELF_COMPUTATION, UC.
   Kelas hasil generate (ComposableSingletons, Room _Impl, R, BuildConfig) juga dikecualikan.
 -->
 <FindBugsFilter>
@@ -31,5 +45,32 @@
   </Match>
   <Match>
     <Class name="~.*\.BuildConfig"/>
+  </Match>
+  <!-- Batch 600 — artefak bytecode Kotlin terkonfirmasi (alasan di komentar header) -->
+  <Match>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"/>
+    <Source name="LazyDsl.kt"/>
+  </Match>
+  <Match>
+    <Bug pattern="NP_NONNULL_PARAM_VIOLATION"/>
+    <Or>
+      <Source name="LyricsRepository.kt"/>
+      <Source name="IosScrollPhysics.kt"/>
+    </Or>
+  </Match>
+  <Match>
+    <Bug pattern="OS_OPEN_STREAM"/>
+    <Source name="EqualizerSheet.kt"/>
+  </Match>
+  <Match>
+    <Bug pattern="OBL_UNSATISFIED_OBLIGATION"/>
+    <Source name="VaultCrypto.kt"/>
+  </Match>
+  <Match>
+    <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE,SA_LOCAL_SELF_ASSIGNMENT"/>
+  </Match>
+  <Match>
+    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD,SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA"/>
+    <Class name="~com\.rudi\.audioplayer\.(util\.AppLogger|playback\.PlaybackAudioSession)"/>
   </Match>
 </FindBugsFilter>

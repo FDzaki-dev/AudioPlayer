@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 600 — Verifikasi laporan CI run #28 + filter noise SpotBugs terkonfirmasi (config saja)
+- Input user: upload `SONIX_laporan-untuk-claude_run28.zip` (commit `565e1d5`, 2026-11-06 09:18 UTC; DIASUMSIKAN push Batch 599) + "Selesaikan secepatnya!!".
+- VERIFIED run #28: Gradle exit 0/0/0; ArchUnit LULUS (7 aturan, 0 pelanggaran); detekt 0; lintDebug 0; "Peringatan kompilator Kotlin: 11 (11 deprecated, 0 lainnya)" = prediksi Batch 597-599 cocok -> perubahan Batch 598/599 TERKOMPILASI. 0 temuan SpotBugs di PlaybackService/WidgetUpdater (file yang diubah 598/599).
+- SpotBugs 58 (prediksi 55, +3): tiap titik dibaca di kode. Tambahan = pola Kotlin (elvis `?: continue` di `PlayerViewModel` pengawas Batch 597, `use{}` di `VaultCrypto.openReader` Batch 596, dan satu pola serupa), bukan bug.
+- NOT VERIFIED dari laporan ini: jumlah tes unit (173) — langkah ArchUnit hanya menjalankan `ArchitectureTest`; hasil `testDebugUnitTest` ada di workflow "Build APK" (cek hijau). Uji device Batch 598/599 juga belum ada.
+- Fix (1 file config, `config/spotbugs/exclude.xml`; 0 source): filter SEMPIT untuk 31 temuan yang terbukti artefak Kotlin (LazyDsl.kt 13, NP_NONNULL_PARAM_VIOLATION sintetis 6, OS_OPEN_STREAM `use` 1, OBL `use` 1, elvis/self-assign 3, `object` AppLogger/PlaybackAudioSession 7). Alasan tiap rule di komentar XML. 27 temuan sisa SENGAJA tetap tampil: AT_* 12, RV_BAD_PRACTICE 6 (`File.delete()/mkdirs()`), STCAL 4 (SimpleDateFormat bersama), DLS/IP/REC/SA_FIELD/UC 5.
+- Prediksi run berikutnya: SpotBugs 27 (bukan 58); lainnya tetap (11 deprecated, detekt 0, lint 0, ArchUnit 7 aturan LULUS). Bila masih 58 = filter tidak terpakai (baca error di log).
+- **NOT VERIFIED**: tak ada Gradle/SpotBugs di sini (hanya XML valid); efek filter baru terlihat di run berikutnya.
+
 ## Batch 599 — Loop polling crossfade di PlaybackService hanya hidup saat Crossfade aktif
 - Input user: "apakah sudah mencakup sektor pemutaran eksternal yang dilakukan user ketika aplikasi dalam keadaan close??" (setelah Batch 598).
 - Jawaban jujur: Batch 598 tidak mengubah jalur itu secara berbahaya (hook EQ Application tetap; matikan Crossfade butuh UI; cold start membaca `CrossfadeStore`), dan temuan 1 justru menyasar kondisi "app ditutup, Service hidup". Tetapi pemeriksaan jalur Service menemukan celah yang belum tercakup: `serviceScope.launch { while (isActive) { crossfadeEngine?.maybeStartCrossfade(); delay(250) } }` dijalankan TANPA SYARAT di `onCreate` selama Service hidup — 4x/dtk di thread utama, juga saat Crossfade mati/null, saat jeda, dan pada pemutaran eksternal saat aplikasi tertutup.
