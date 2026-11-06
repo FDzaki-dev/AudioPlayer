@@ -80,6 +80,8 @@ class PlaybackService : MediaLibraryService() {
     private val sleepTimerStore by lazy { com.rudi.audioplayer.data.SleepTimerStore(this) }
     // Batch 102 (Gap List #1, True Crossfade) — lihat CrossfadeEngine.kt untuk mekanisme penuh.
     private var crossfadeEngine: CrossfadeEngine? = null
+    // Batch 599 — job polling jendela crossfade; hanya hidup selagi Crossfade AKTIF (lihat startCrossfadePoll()).
+    private var crossfadePollJob: Job? = null
     // Batch 34: pushWidgetUpdate fires on every track transition and every play/pause tap —
     // both high-frequency, high-visibility moments. Tracking the job lets a fast skip/toggle
     // cancel a still-decoding older update instead of letting it land after a newer one and
@@ -137,6 +139,7 @@ class PlaybackService : MediaLibraryService() {
         // instance yang sama sepanjang hidup Service begitu pernah dibangun).
         if (CrossfadeStore(this).isEnabled()) {
             ensureCrossfadeEngine(player).setEnabled(true)
+            startCrossfadePoll()
         }
 
         // ExoPlayer assigns its own audio session ID lazily (once the AudioTrack is created).
@@ -253,12 +256,9 @@ class PlaybackService : MediaLibraryService() {
         // fitur mati atau lagi tidak main. Pola sama seperti PlayerViewModel.startPositionLoop,
         // tapi wajib hidup di sisi Service ini karena overlapPlayer (ExoPlayer mentah) tidak
         // pernah diekspos ke ViewModel — ViewModel cuma pegang MediaController.
-        serviceScope.launch {
-            while (isActive) {
-                crossfadeEngine?.maybeStartCrossfade()
-                delay(250)
-            }
-        }
+        // Batch 599 — loop ini dulu dijalankan TANPA SYARAT di sini selama Service hidup (4x/dtk di thread utama,
+        // juga saat Crossfade mati/null, saat jeda, dan pada pemutaran eksternal ketika aplikasi sudah ditutup).
+        // Kini dipindah ke startCrossfadePoll(): hanya jalan selagi Crossfade aktif; dihentikan saat dimatikan.
 
         // Batch 391 — shakeDetector TIDAK lagi dibangun unconditional di sini. Lihat
         // ensureShakeDetector() di bawah utk root cause + kenapa ini kelas bug yang sama dgn
@@ -330,6 +330,19 @@ class PlaybackService : MediaLibraryService() {
         overlapPlayer.setSkipSilenceEnabled(SilenceSkipStore(this).isEnabled())
         return CrossfadeEngine(sessionPlayer = sessionPlayer, overlapPlayer = overlapPlayer, scope = serviceScope)
             .also { crossfadeEngine = it }
+    }
+
+    /** Batch 599 — polling ringan (250ms) jendela crossfade, dijalankan HANYA selagi Crossfade aktif. Idempoten
+     * (job aktif = no-op). Berjalan di [serviceScope] (Main) seperti loop lama, jadi `crossfadeEngine` diakses di
+     * thread yang sama dengan semua pemakainya; ikut berhenti oleh `serviceScope.cancel()` di onDestroy(). */
+    private fun startCrossfadePoll() {
+        if (crossfadePollJob?.isActive == true) return
+        crossfadePollJob = serviceScope.launch {
+            while (isActive) {
+                crossfadeEngine?.maybeStartCrossfade()
+                delay(250)
+            }
+        }
     }
 
     /** Batch 391 — sektor cold-start berikutnya yang belum tersentuh Batch 385-390: sebelum
@@ -750,6 +763,7 @@ class PlaybackService : MediaLibraryService() {
                     val sessionPlayer = mediaSession?.player as? ExoPlayer
                     if (sessionPlayer != null) {
                         ensureCrossfadeEngine(sessionPlayer).setEnabled(true)
+                        startCrossfadePoll()
                     }
                 } else {
                     // Belum pernah dibangun (crossfadeEngine null) = tidak ada apa pun utk
@@ -766,6 +780,8 @@ class PlaybackService : MediaLibraryService() {
                         engine.release()
                     }
                     crossfadeEngine = null
+                    crossfadePollJob?.cancel()
+                    crossfadePollJob = null
                 }
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }

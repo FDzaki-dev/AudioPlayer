@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 599 — Loop polling crossfade di PlaybackService hanya hidup saat Crossfade aktif
+- Input user: "apakah sudah mencakup sektor pemutaran eksternal yang dilakukan user ketika aplikasi dalam keadaan close??" (setelah Batch 598).
+- Jawaban jujur: Batch 598 tidak mengubah jalur itu secara berbahaya (hook EQ Application tetap; matikan Crossfade butuh UI; cold start membaca `CrossfadeStore`), dan temuan 1 justru menyasar kondisi "app ditutup, Service hidup". Tetapi pemeriksaan jalur Service menemukan celah yang belum tercakup: `serviceScope.launch { while (isActive) { crossfadeEngine?.maybeStartCrossfade(); delay(250) } }` dijalankan TANPA SYARAT di `onCreate` selama Service hidup — 4x/dtk di thread utama, juga saat Crossfade mati/null, saat jeda, dan pada pemutaran eksternal saat aplikasi tertutup.
+- Fix (1 file source, `playback/PlaybackService.kt`): loop dipindah ke `startCrossfadePoll()` (idempoten via `crossfadePollJob?.isActive`), dipanggil hanya saat Crossfade aktif (cold start bila `CrossfadeStore` ON; perintah `ACTION_SET_CROSSFADE_ENABLED` true) dan dibatalkan saat dimatikan; `serviceScope.cancel()` di `onDestroy` tetap menutupnya. Perilaku crossfade saat aktif identik (loop, interval, scope sama).
+- Belum tercakup (batas diketahui): pencatatan putaran masih di `PlayerViewModel`, jadi putaran saat UI ditutup tidak tercatat (Batch 597).
+- 1 file source + docs; 0 file baru (`FILE_MANIFEST.txt` tetap 225); 0 Gradle/CI. Prediksi: 11 deprecated, 0 lainnya; 173 tes lulus; ArchUnit lulus; SpotBugs 55.
+- **NOT VERIFIED**: tak ada kotlinc/Gradle/SDK (kurung seimbang 0/0/0); belum dikompilasi; uji device: nyalakan Crossfade -> transisi tetap terjadi; matikan -> nyalakan lagi -> transisi tetap terjadi; pemutaran eksternal saat app ditutup normal.
+
 ## Batch 598 — Audit kebocoran memori (pemicu lag/stutter): 3 perbaikan
 - Input user: upload `AudioPlayer-1_9_9-run572.zip` — "Temukan potensi memory leak yang menjadi pemicu device mengalami lagging/stuttering. lalu fix secepatnya!!".
 - Metode: audit statis seluruh source (pendaftaran listener/receiver/observer, scope coroutine, referensi global, cache bitmap, loop tak berujung, Visualizer/Equalizer/Crossfade/Bubble/Widget). Tak ada profiler/heap dump/LeakCanary -> kontribusi tiap temuan ke lag BELUM terbukti; ini temuan dari pembacaan kode.
