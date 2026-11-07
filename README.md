@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Widget slim 46dp + cangkang compact asimetris (Batch 606) belum dikompilasi/dilihat di device; widget yang ditarik sangat tinggi (>~200dp) masih berupa layout penuh di tengah (layout khusus tinggi belum dibuat).
 > - Widget penuh dua baris (judul 2 baris + kontrol di tengah) dan layout compact yang dilonggarkan (Batch 605) belum dikompilasi/dilihat di device; marquee judul tetap tidak berjalan di Android 16 Infinix (perangkat tidak mengizinkan `setSelected` lewat widget).
 > - Cangkang widget "bilah" + palung cekung ala Boomly dan layout sheet Log Diagnostik yang dirapikan (Batch 604: dasar panel opak, tombol seragam, bentuk 4-radius, halo anggur) belum dikompilasi/dilihat di device; bubble masih memakai panel daun diagonal Batch 584.
 > - Rombak widget home-screen + bubble floating ke Neumorphism burgundy (Batch 583-584: panel bevel anggur + gilt,
@@ -308,6 +309,8 @@ Riwayat lebih detail per batch pengembangan ada di `CHANGELOG.md`.
 Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("junit:junit:4.13.2")`) — tidak ada Robolectric/instrumentation, tidak ada emulator. Konsekuensinya: hanya business logic yang benar-benar lepas dari `Context`/framework Android (SharedPreferences, ContentResolver, SensorManager, dst.) yang bisa ditest langsung. Pola yang dipakai berulang kali di proyek ini (`PinLockoutPolicy`, dan sejak Batch 27: `ShakePulseTracker`, `MusicRepository.deriveFolderName`, `LibraryFilterStore.shouldKeep`): pisahkan logika murninya ke fungsi/kelas pure, method instance yang butuh Context tinggal delegasikan ke situ tanpa ubah perilaku.
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
+
+**Batch 606** — Widget yang ditarik pendek (sekitar 46dp) tidak lagi terpotong: ada tampilan slim khusus (sampul, kotak judul, dan tombol tampil utuh) dengan bentuk cangkang yang lebih jelas (sudut kanan-bawah melengkung besar, kanan-atas rapat). Tampilan widget compact normal ikut dirapikan. Widget yang ditarik sangat tinggi belum punya tampilan khusus. Belum diuji di device.
 
 **Batch 605** — Widget dirapikan: widget penuh kini dua baris (sampul + judul sampai 2 baris + artis di atas, tombol prev/play/next di tengah bawah) sehingga judul tak lagi terpotong jadi 3 huruf dan tak ada ruang kosong atas-bawah; widget compact diberi napas lebih (sampul/kotak teks tak menempel tepi). Widget dengan tinggi di bawah ~124dp memakai tampilan compact. Belum diuji di device.
 

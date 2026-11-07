@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Batch 606 — LAYOUT SLIM BARU (tinggi < 54dp ATAU lebar < 230dp). Log: user menarik widget ke `min=290x46dp`;
+    layout compact (isi 58dp) terpotong rata di tinggi itu. Slim dirancang untuk 46dp: padding 8dp (kiri/kanan) / 7dp
+    (atas/bawah) -> isi 32dp, `clipToPadding="false"` agar kelebihan kecil meluber ke padding, bukan terpotong.
+    Sampul 32 + palung 32 (memakai `widget_well`, radius tak diskala krn TR+BR = 30 <= 32), medali play 28 (padding 6),
+    kenop 24 (padding 5), judul 13sp 1 baris marquee (sama dgn compact). Lebar tetap non-judul = padding 8x2 + sampul 32 +
+    margin palung 5 + padding palung 11+3 + (24+2) + (28+2) + (24+2) = 149dp (WidgetUpdater.SLIM_FIXED_WIDTH_DP HARUS
+    sama) -> kolom judul ~141dp pada 290dp (compact ~116dp). Cangkang: `widget_background_compact_*`. Semua id lama utuh;
+    `widget_artist` tidak ada (dijaga `!isCompact` di WidgetUpdater).
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background_compact_dark"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:clipToPadding="false"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="7dp"
+    android:paddingBottom="7dp">
+
+    <ImageView
+        android:id="@+id/widget_album_art"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:scaleType="centerCrop" />
+
+    <LinearLayout
+        android:id="@+id/widget_well"
+        android:layout_width="0dp"
+        android:layout_height="32dp"
+        android:layout_weight="1"
+        android:layout_marginStart="5dp"
+        android:background="@drawable/widget_well"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="11dp"
+        android:paddingEnd="3dp">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:includeFontPadding="false"
+            android:scrollHorizontally="true"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:text="Tidak ada lagu">
+            <requestFocus />
+        </TextView>
+
+        <ImageButton
+            android:id="@+id/widget_prev"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="2dp"
+            android:padding="5dp"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_widget_previous"
+            android:contentDescription="Sebelumnya" />
+
+        <ImageButton
+            android:id="@+id/widget_play_pause"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="2dp"
+            android:padding="6dp"
+            android:background="@drawable/widget_play_button_bg"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_widget_play"
+            android:contentDescription="Putar" />
+
+        <ImageButton
+            android:id="@+id/widget_next"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="2dp"
+            android:padding="5dp"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_widget_next"
+            android:contentDescription="Berikutnya" />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
+    Batch 606: + clipToPadding=false (kelebihan kecil tidak dipotong) + includeFontPadding=false pada judul/artis (font
+    perangkat berjarak baris ~1,37x: judul 2 baris + artis hampir menyentuh bibir palung 62dp).
     Batch 605 — LAYOUT PENUH BERTINGKAT DUA BARIS (dulu satu baris: sampul 56 + palung 56 berisi judul + 3 kontrol).
     Akar "tidak rapi" (screenshot widget 290x129dp): isi satu baris hanya 76dp di cangkang 129dp -> ~26dp kosong
     atas & bawah, dan kolom judul tinggal ~64dp (judul "[HAR..", artis "Claw M.." terpotong) karena tiga kontrol
@@ -20,6 +22,7 @@
     android:background="@drawable/widget_background_dark"
     android:orientation="vertical"
     android:gravity="center_vertical"
+    android:clipToPadding="false"
     android:padding="10dp">
 
     <LinearLayout
@@ -55,6 +58,7 @@
                 android:textSize="13sp"
                 android:textStyle="bold"
                 android:maxLines="2"
+                android:includeFontPadding="false"
                 android:ellipsize="end"
                 android:text="Tidak ada lagu" />
 
@@ -66,6 +70,7 @@
                 android:textColor="#98989D"
                 android:textSize="12sp"
                 android:maxLines="1"
+                android:includeFontPadding="false"
                 android:ellipsize="end"
                 android:text="Buka SONIX" />
         </LinearLayout>

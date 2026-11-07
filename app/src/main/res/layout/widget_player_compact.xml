@@ -1,33 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Batch 605 — NAPAS di dalam cangkang (user: "kurang rapi"). Struktur Batch 604 dipertahankan (keping sampul +
-    PALUNG cekung `widget_well` berisi judul + kontrol, di atas cangkang "bilah"), tetapi ukurannya dilonggarkan:
-    cangkang menyisakan ~5dp di tiap sisi (halo 3dp + rim 2dp), jadi padding 7dp lama hanya menyisakan ~2dp antara
-    isi dan rim (sampul/palung terlihat menempel ke tepi, medali play 38dp hampir menyentuh bibir palung 44dp).
-    Kini padding 9dp (~4dp napas), sampul + palung 40dp (tinggi isi 40 + 18 padding = 58dp <= tinggi minimum compact
-    59dp), medali play 36dp (tepi palung 2dp) dan kenop 26dp tetap. Lebar tetap non-judul = padding 9x2 + sampul 40
-    + margin palung 6 + padding palung 12+4 + (26+2) + (36+2) + (26+2) = 174dp (sama dgn Batch 604 -> kolom judul
-    tak menyempit; WidgetUpdater.COMPACT_FIXED_WIDTH_DP / COMPACT_PADDING_DP HARUS sama). Semua id lama dipertahankan.
+    Batch 606 — LAYOUT COMPACT (tinggi 54-123dp). User: "shape nya masih kurang berbentuk" — log menunjukkan widget kini
+    ditarik ke 46dp (dan 129/212/295/627dp); isi Batch 605 butuh 58dp sehingga di 46dp semua anak DIPOTONG RATA oleh
+    clipToPadding (sampul 40->~29dp, medali terpotong atas-bawah). Perbaikan: (1) root `clipToPadding="false"` (anak yang
+    sedikit melebihi tinggi tidak lagi dipotong di tepi padding), (2) cangkang baru `widget_background_compact_*`
+    (inset 3,5dp, radius TL18/TR9/BR22/BL10 -> siluet asimetris tidak diskala jadi pil), (3) padding 9->8dp, sampul +
+    palung 42dp (target tinggi 59dp: 16 + 42 = 58). Tinggi < 54dp memakai `widget_player_slim.xml`. Medali 36dp, kenop 26dp
+    tetap. Lebar tetap non-judul = padding 8x2 + sampul 42 + margin palung 6 + padding palung 12+4 + (26+2) + (36+2) +
+    (26+2) = 174dp (WidgetUpdater.COMPACT_FIXED_WIDTH_DP / COMPACT_PADDING_DP HARUS sama). Semua id lama dipertahankan.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background_dark"
+    android:background="@drawable/widget_background_compact_dark"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:padding="9dp">
+    android:clipToPadding="false"
+    android:padding="8dp">
 
     <ImageView
         android:id="@+id/widget_album_art"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
         android:scaleType="centerCrop" />
 
     <LinearLayout
         android:id="@+id/widget_well"
         android:layout_width="0dp"
-        android:layout_height="40dp"
+        android:layout_height="42dp"
         android:layout_weight="1"
         android:layout_marginStart="6dp"
         android:background="@drawable/widget_well"
@@ -45,6 +46,7 @@
             android:textSize="13sp"
             android:textStyle="bold"
             android:maxLines="1"
+            android:includeFontPadding="false"
             android:scrollHorizontally="true"
             android:ellipsize="marquee"
             android:marqueeRepeatLimit="marquee_forever"

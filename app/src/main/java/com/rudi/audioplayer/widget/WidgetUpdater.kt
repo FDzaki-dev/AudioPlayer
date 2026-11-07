@@ -55,7 +55,8 @@ object WidgetUpdater {
     private const val KEY_ARTIST = "artist"
     private const val KEY_ARTWORK_URI = "artwork_uri"
     private const val KEY_IS_PLAYING = "is_playing"
-    private const val COMPACT_WIDTH_THRESHOLD_DP = 180
+    // Batch 606: ambang lebar 180 -> 230 dan kini memilih layout SLIM (isi lebih sempit: 149dp vs 174dp compact).
+    private const val SLIM_WIDTH_THRESHOLD_DP = 230
     // Batch 208 — dikembalikan (bukan Batch 203's SizeF/setSelected marquee — itu yang
     // dicurigai jadi penyebab crash "Ketuk untuk memulihkan", TETAP di-revert). Height-check
     // sendiri (Batch 201/202, sebelum SizeF masuk di Batch 203) TIDAK PERNAH bikin crash —
@@ -64,14 +65,16 @@ object WidgetUpdater {
     // (dipaksa pendek) bikin judul+artis kepotong vertikal — persis kasus yang height-check
     // ini tangani. Batch 605: 70 -> 124 (layout penuh = 2 baris, isi 126dp; di bawah itu compact 1 baris).
     private const val COMPACT_HEIGHT_THRESHOLD_DP = 124
+    // Batch 606: tinggi < 54dp -> layout slim (log: user menarik widget ke 46dp; compact butuh 58dp -> terpotong).
+    private const val SLIM_HEIGHT_THRESHOLD_DP = 54
 
     // Batch 589 — inset sudut widget. Padding root di bawah HARUS sama dengan `android:padding` root
-    // `widget_player.xml` (10dp) dan `widget_player_compact.xml` (9dp, Batch 605; dulu 7dp) (Batch 604: dulu 14dp/8dp; cangkang "bilah"
+    // `widget_player.xml` (10dp) dan `widget_player_compact.xml` (8dp, Batch 606; dulu 9dp; slim 8/7dp) (Batch 604: dulu 14dp/8dp; cangkang "bilah"
     // memakai margin halo 3dp + rim 2dp di dalam batas widget, jadi isi sudah menjorok ke dalam). `CORNER_INSET_FRACTION` = 1 - 1/sqrt(2):
     // jarak minimum dari tepi agar sudut siku isi tidak keluar dari busur sudut berradius R (launcher meng-clip
     // widget ke radius sistem). `MAX_CORNER_INSET_DP` mencegah layout compact terdesak pada radius ekstrem.
     private const val FULL_PADDING_DP = 10f
-    private const val COMPACT_PADDING_DP = 9f
+    private const val COMPACT_PADDING_DP = 8f
     private const val CORNER_INSET_FRACTION = 0.2929f
     private const val MAX_CORNER_INSET_DP = 16f
 
@@ -90,6 +93,7 @@ object WidgetUpdater {
     // Harus sama dgn `widget_player.xml` / `widget_player_compact.xml` (hanya memengaruhi baris log).
     private const val FULL_FIXED_WIDTH_DP = 114f
     private const val COMPACT_FIXED_WIDTH_DP = 174f
+    private const val SLIM_FIXED_WIDTH_DP = 149f // Batch 606: widget_player_slim.xml (lihat komentar di layout)
     private const val FULL_TITLE_SP = 13f
     private const val COMPACT_TITLE_SP = 13f
 
@@ -240,6 +244,7 @@ object WidgetUpdater {
         isPlaying: Boolean,
         widgetId: Int,
         isCompact: Boolean,
+        isSlim: Boolean,
         options: android.os.Bundle
     ) {
         try {
@@ -257,10 +262,11 @@ object WidgetUpdater {
                 metrics
             )
             val textDp = paint.measureText(shown) / metrics.density
-            val columnMinDp = minW - (if (isCompact) COMPACT_FIXED_WIDTH_DP else FULL_FIXED_WIDTH_DP)
+            val fixedDp = if (isSlim) SLIM_FIXED_WIDTH_DP else if (isCompact) COMPACT_FIXED_WIDTH_DP else FULL_FIXED_WIDTH_DP
+            val columnMinDp = minW - fixedDp
             AppLogger.w(
                 "WidgetUpdater",
-                "Marquee diag #$seq +${sinceLastMs}ms digabung=$skipped | id=$widgetId mode=${if (isCompact) "compact" else "penuh"} " +
+                "Marquee diag #$seq +${sinceLastMs}ms digabung=$skipped | id=$widgetId mode=${if (isSlim) "slim" else if (isCompact) "compact" else "penuh"} " +
                     "min=${minW}x${minH}dp maks=${maxW}x${maxH}dp fontScale=${context.resources.configuration.fontScale} | " +
                     "judul=${shown.length}huruf berubah=$titleChanged playing=$isPlaying | " +
                     "ESTIMASI teks=${textDp.toInt()}dp kolomMin=${columnMinDp.toInt()}dp teks>kolomMin=${textDp > columnMinDp} | " +
@@ -307,10 +313,16 @@ object WidgetUpdater {
             val options = manager.getAppWidgetOptions(id)
             val minWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
             val minHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 250)
-            val isCompact = minWidthDp < COMPACT_WIDTH_THRESHOLD_DP || minHeightDp < COMPACT_HEIGHT_THRESHOLD_DP
-            logMarqueeDiag(context, diagSeqNo, diagSinceMs, diagSkippedNow, title, diagTitleChanged, isPlaying, id, isCompact, options)
+            val isSlim = minWidthDp < SLIM_WIDTH_THRESHOLD_DP || minHeightDp < SLIM_HEIGHT_THRESHOLD_DP
+            val isCompact = isSlim || minHeightDp < COMPACT_HEIGHT_THRESHOLD_DP
+            logMarqueeDiag(context, diagSeqNo, diagSinceMs, diagSkippedNow, title, diagTitleChanged, isPlaying, id, isCompact, isSlim, options)
 
-            val views = RemoteViews(context.packageName, if (isCompact) R.layout.widget_player_compact else R.layout.widget_player)
+            val layoutRes = when {
+                isSlim -> R.layout.widget_player_slim
+                isCompact -> R.layout.widget_player_compact
+                else -> R.layout.widget_player
+            }
+            val views = RemoteViews(context.packageName, layoutRes)
             applyCornerInset(context, views, isCompact)
 
             // Batch 604 — cangkang "bilah" + palung cekung (widget_background_dark/_light + widget_well[_light]).
@@ -319,7 +331,12 @@ object WidgetUpdater {
             views.setInt(
                 R.id.widget_root,
                 "setBackgroundResource",
-                if (isDark) R.drawable.widget_background_dark else R.drawable.widget_background_light
+                when {
+                    isCompact && isDark -> R.drawable.widget_background_compact_dark
+                    isCompact -> R.drawable.widget_background_compact_light
+                    isDark -> R.drawable.widget_background_dark
+                    else -> R.drawable.widget_background_light
+                }
             )
             views.setInt(
                 R.id.widget_well,
