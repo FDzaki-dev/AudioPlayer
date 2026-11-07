@@ -1,5 +1,15 @@
 # Changelog
 
+## Batch 608 — Cangkang widget bahasa-bentuk Boomly: rim tebal bergradasi + bibir cekung + pendar + palung lebih tegas
+- Input user: screenshot (slim v607 di atas, penuh di tengah, Boomly di bawah) + `SONIX_laporan-untuk-claude_run36.zip` — "hasil gak beda jauh. lanjutkan!!".
+- FAKTA run #36 (Gradle exit 0/0/0): v607 TERKOMPILASI. ArchUnit LULUS (7 aturan), detekt 0, lintDebug 0, Kotlin "11 (11 deprecated, 0 lainnya)", SpotBugs 23 (`DB_DUPLICATE_BRANCHES` hilang; `REC_CATCH_EXCEPTION @ WidgetUpdater.kt:220`).
+- AKAR "gak beda jauh" (screenshot diperbesar 2x): Batch 606-607 hanya menggeser radius; rim cangkang tetap 1,5dp tipis di atas badan datar -> tetap terbaca kapsul tipis bergaris emas. Boomly: rim TEBAL bergradasi mawar -> ungu (cahaya dari atas), jalur cekung yang menyala di dasarnya, dan kontras kuat rim vs badan.
+- `widget_background_compact_dark/_light.xml` + `widget_background_dark/_light.xml` ditulis ulang (radius dasar TIDAK berubah): rim 1,5dp -> 3,5dp (compact/slim) dan 2dp -> 4dp (penuh/tinggi) bergradasi vertikal (atas terang -> bawah gelap) + kilau bibir atas; bibir bayangan 1dp antara rim dan permukaan (permukaan tampak cekung); permukaan lebih gelap (kontras rim/badan); pendar dasar permukaan; garis tepi luar 0,75dp; halo lebih pekat. Terang: rim putih perkamen -> umber, bibir bayangan, pendar mawar tipis.
+- `widget_well.xml` (gelap): bibir kanan-bawah lebih terang, lantai lebih gelap, bayangan dinding atas lebih pekat, + mekar pendar 6dp di atas garis ruby 1,5dp (dulu 1dp). `widget_well_light.xml` TIDAK diubah (batas 5 file).
+- Geometri: compact/slim cangkang margin 2 -> rim 3,5 -> permukaan margin 5,5; padding slim 7dp(v)/8dp(h), compact 8dp -> celah isi-ke-permukaan 1,5-2,5dp. Penuh: margin 3 -> rim 4 -> permukaan 7; padding 10dp -> celah 3dp. 0 Kotlin/layout/Gradle/CI diubah (nomor baris SpotBugs `WidgetUpdater` tetap 220).
+- Pratinjau: perender layer-list buatan sendiri (PIL; BUKAN Android) membandingkan v607 vs v608 vs Boomly — rim mawar tebal + bibir + pendar terbaca jelas beda. Pembangkit XML parametrik menjaga radius konsentris tiap lapis.
+- NOT VERIFIED: belum compile/CI/device. Belum dikerjakan: `widget_well_light.xml`; chip sampul berbingkai ala Boomly; selaraskan bubble.
+
 ## Batch 607 — Verifikasi run #35 + layout widget TINGGI + spasi berbobot layout penuh + sapuan cangkang compact
 - Input user: screenshot widget slim v606 (di atas Boomly) + `SONIX_laporan-untuk-claude_run35.zip` — "belum cukup sempurna. lanjutkan!!".
 - FAKTA run #35 (commit `1527c9c`, 2026-11-07 11:09 UTC, = push Batch 606; Gradle exit 0/0/0): v606 TERKOMPILASI. ArchUnit LULUS (7 aturan), detekt 0, lintDebug 0, Kotlin "11 (11 deprecated, 0 lainnya)" = prediksi Batch 606. SpotBugs 24 = prediksi 23 + 1 BARU `DB_DUPLICATE_BRANCHES @ WidgetUpdater.kt:261` (asli dari Batch 605: `FULL_TITLE_SP` jadi 13f = `COMPACT_TITLE_SP` -> `if (isCompact) 13f else 13f`); `REC_CATCH_EXCEPTION @ WidgetUpdater.kt:213` sesuai prediksi.
