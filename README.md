@@ -2,7 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
-> - Cangkang widget bergaya Boomly (rim tebal bergradasi + bibir cekung + pendar, palung gelap lebih tegas; Batch 608) belum dikompilasi/dilihat di device; palung mode terang dan bubble belum diselaraskan.
+> - Bingkai sampul widget (Batch 609) dan palung mode terang belum dikompilasi/dilihat di device. Cangkang widget bergaya Boomly (Batch 608) sempat GAGAL build (satuan dp hilang di XML), diperbaiki di Batch 609, dan tampilannya belum pernah dilihat di device; bubble belum diselaraskan.
 > - Layout widget tinggi (sampul besar, mulai ~210dp), spasi rata layout penuh, dan sapuan cangkang compact (Batch 607) sudah TERKOMPILASI (run #36) dan dilihat user di device, tetapi tampilannya dinilai kurang beda dari Boomly -> Batch 608 (Batch 606 sudah TERKOMPILASI di run #35, tampilannya sudah dikonfirmasi user lewat screenshot).
 > - Widget slim 46dp + cangkang compact asimetris (Batch 606) belum dikompilasi/dilihat di device; widget yang ditarik sangat tinggi (>~200dp) masih berupa layout penuh di tengah (layout khusus tinggi belum dibuat).
 > - Widget penuh dua baris (judul 2 baris + kontrol di tengah) dan layout compact yang dilonggarkan (Batch 605) belum dikompilasi/dilihat di device; marquee judul tetap tidak berjalan di Android 16 Infinix (perangkat tidak mengizinkan `setSelected` lewat widget).
@@ -311,6 +311,8 @@ Riwayat lebih detail per batch pengembangan ada di `CHANGELOG.md`.
 Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("junit:junit:4.13.2")`) — tidak ada Robolectric/instrumentation, tidak ada emulator. Konsekuensinya: hanya business logic yang benar-benar lepas dari `Context`/framework Android (SharedPreferences, ContentResolver, SensorManager, dst.) yang bisa ditest langsung. Pola yang dipakai berulang kali di proyek ini (`PinLockoutPolicy`, dan sejak Batch 27: `ShakePulseTracker`, `MusicRepository.deriveFolderName`, `LibraryFilterStore.shouldKeep`): pisahkan logika murninya ke fungsi/kelas pure, method instance yang butuh Context tinggal delegasikan ke situ tanpa ubah perilaku.
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
+
+**Batch 609** — Perbaikan build: Batch 608 gagal dikompilasi karena satuan ukuran (dp) hilang di empat file tampilan widget; sudah diperbaiki, dan kini semua file tampilan diperiksa satuannya sebelum dikemas. Tambahan: sampul album pada widget kini punya bingkai tebal bergradasi seperti bingkai Boomly (serasi dengan tepi widget, mode gelap & terang), dan jalur judul mode terang disamakan dengan mode gelap. Bubble tidak berubah. Belum diuji di device.
 
 **Batch 608** — Tampilan cangkang widget dibuat jauh lebih mirip Boomly: bingkai tepi kini tebal dengan gradasi terang di atas ke gelap di bawah, ada bibir cekung dan pendar halus, bagian dalam lebih gelap supaya kontras, dan jalur judul (palung) lebih tegas dengan garis menyala di dasarnya. Berlaku untuk widget kecil, sedang, penuh, dan tinggi (mode gelap & terang); bentuk sudutnya tidak berubah. Belum diuji di device.
 

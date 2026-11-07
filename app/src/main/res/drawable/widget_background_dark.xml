@@ -39,7 +39,7 @@
             <corners android:topLeftRadius="22dp" android:topRightRadius="16dp" android:bottomRightRadius="30dp" android:bottomLeftRadius="14dp" />
         </shape>
     </item>
-    <item android:left="20.6" android:top="3.25" android:right="28.6" android:height="1dp" android:gravity="top|fill_horizontal">
+    <item android:left="20.6dp" android:top="3.25dp" android:right="28.6dp" android:height="1dp" android:gravity="top|fill_horizontal">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="0" android:startColor="#00FFD2DA" android:centerColor="#B3FFD2DA" android:endColor="#00FFD2DA" />
         </shape>
@@ -68,13 +68,13 @@
             <corners android:topLeftRadius="18dp" android:topRightRadius="12dp" android:bottomRightRadius="26dp" android:bottomLeftRadius="10dp" />
         </shape>
     </item>
-    <item android:left="7" android:top="7" android:right="7" android:height="12dp" android:gravity="top|fill_horizontal">
+    <item android:left="7dp" android:top="7dp" android:right="7dp" android:height="12dp" android:gravity="top|fill_horizontal">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="270" android:startColor="#14FFFFFF" android:endColor="#00FFFFFF" />
             <corners android:topLeftRadius="18dp" android:topRightRadius="12dp" android:bottomRightRadius="0dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
-    <item android:left="7" android:right="7" android:bottom="7" android:height="7dp" android:gravity="bottom|fill_horizontal">
+    <item android:left="7dp" android:right="7dp" android:bottom="7dp" android:height="7dp" android:gravity="bottom|fill_horizontal">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="90" android:startColor="#42D4506C" android:endColor="#00D4506C" />
             <corners android:topLeftRadius="0dp" android:topRightRadius="0dp" android:bottomRightRadius="26dp" android:bottomLeftRadius="10dp" />

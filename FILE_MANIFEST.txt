@@ -106,6 +106,7 @@
 # Batch 606: app/src/main/res/drawable/widget_background_compact_dark.xml + widget_background_compact_light.xml + app/src/main/res/layout/widget_player_slim.xml (file baru, cangkang compact asimetris + layout slim untuk widget 46dp) ditambahkan — 230->233.
 # Batch 607: app/src/main/res/layout/widget_player_tall.xml (file baru, layout widget tinggi: sampul besar + palung info + kontrol) ditambahkan — 233->234.
 # Batch 608: widget_background_compact_dark/_light.xml + widget_background_dark/_light.xml + widget_well.xml (isi ditulis ulang, rim tebal bergradasi + bibir + pendar); 0 file baru — total tetap 234.
+# Batch 609: widget_background_compact_dark/_light.xml + widget_background_dark/_light.xml (perbaikan satuan dp, build 608 gagal) + widget_well_light.xml + widget/WidgetUpdater.kt (bingkai rim sampul); 0 file baru — total tetap 234.
 # Total: 234 file
 
 .githooks/pre-commit

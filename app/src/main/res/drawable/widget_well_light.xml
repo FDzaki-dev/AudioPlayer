@@ -1,75 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Batch 604 — PALUNG cekung (mode TERANG), pasangan widget_well.xml. Perkamen: bibir gelap kiri-atas -> putih
-    kanan-bawah (cahaya), lantai lebih redup dari permukaan cangkang (widget_background_light.xml), bayangan dinding
-    atas 6dp, garis pendar burgundy tipis di dasar. Geometri/radius SAMA dgn pasangan gelap.
+    Batch 609 — PALUNG cekung (mode TERANG), diselaraskan dgn widget_well.xml Batch 608 + cangkang terang Batch 608. Pasangan gelap: widget_well.xml.
+    Dulu (Batch 604): bibir -> lantai -> bayangan atas 6dp -> garis burgundy 1dp. Kini: bibir gelap kiri-atas lebih pekat -> putih
+    kanan-bawah, lantai lebih redup dari permukaan, bayangan dinding atas 8dp lebih pekat, + MEKAR pendar burgundy 6dp di atas garis
+    1,5dp (dulu 1dp). Radius dp SAMA dgn pasangan gelap TL14/TR10/BR20/BL12 (valid utk tinggi 32dp: TR+BR=30 <= 32).
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <gradient
-                android:type="linear"
-                android:angle="315"
-                android:startColor="#A89A8C"
-                android:centerColor="#D8CCBF"
-                android:endColor="#FFFFFF" />
-            <corners
-                android:topLeftRadius="14dp"
-                android:topRightRadius="10dp"
-                android:bottomRightRadius="20dp"
-                android:bottomLeftRadius="12dp" />
+            <gradient android:type="linear" android:angle="315" android:startColor="#8A7A6B" android:centerColor="#D8CCBF" android:endColor="#FFFFFF" />
+            <corners android:topLeftRadius="14dp" android:topRightRadius="10dp" android:bottomRightRadius="20dp" android:bottomLeftRadius="12dp" />
         </shape>
     </item>
-    <item
-        android:left="1.5dp"
-        android:top="1.5dp"
-        android:right="1dp"
-        android:bottom="1dp">
+    <item android:left="1.5dp" android:top="1.5dp" android:right="1dp" android:bottom="1dp">
         <shape android:shape="rectangle">
-            <gradient
-                android:type="linear"
-                android:angle="270"
-                android:startColor="#D9CDBF"
-                android:endColor="#E8DDD0" />
-            <corners
-                android:topLeftRadius="12.5dp"
-                android:topRightRadius="8.5dp"
-                android:bottomRightRadius="19dp"
-                android:bottomLeftRadius="10.5dp" />
+            <gradient android:type="linear" android:angle="270" android:startColor="#CFC1B2" android:endColor="#E6DACD" />
+            <corners android:topLeftRadius="12.5dp" android:topRightRadius="8.5dp" android:bottomRightRadius="18.5dp" android:bottomLeftRadius="10.5dp" />
         </shape>
     </item>
-    <item
-        android:left="1.5dp"
-        android:top="1.5dp"
-        android:right="1dp"
-        android:height="6dp"
-        android:gravity="top|fill_horizontal">
+    <item android:left="1.5dp" android:top="1.5dp" android:right="1dp" android:height="8dp" android:gravity="top|fill_horizontal">
         <shape android:shape="rectangle">
-            <gradient
-                android:type="linear"
-                android:angle="270"
-                android:startColor="#38000000"
-                android:endColor="#00000000" />
-            <corners
-                android:topLeftRadius="12.5dp"
-                android:topRightRadius="8.5dp"
-                android:bottomRightRadius="0dp"
-                android:bottomLeftRadius="0dp" />
+            <gradient android:type="linear" android:angle="270" android:startColor="#4D000000" android:endColor="#00000000" />
+            <corners android:topLeftRadius="12.5dp" android:topRightRadius="8.5dp" android:bottomRightRadius="0dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
-    <item
-        android:left="14dp"
-        android:right="14dp"
-        android:bottom="3dp"
-        android:height="1dp"
-        android:gravity="bottom|fill_horizontal">
+    <item android:left="9dp" android:right="9dp" android:bottom="2.5dp" android:height="6dp" android:gravity="bottom|fill_horizontal">
         <shape android:shape="rectangle">
-            <gradient
-                android:type="linear"
-                android:angle="0"
-                android:startColor="#00741C32"
-                android:centerColor="#66741C32"
-                android:endColor="#00741C32" />
+            <gradient android:type="linear" android:angle="90" android:startColor="#33A33550" android:endColor="#00A33550" />
+        </shape>
+    </item>
+    <item android:left="12dp" android:right="12dp" android:bottom="3dp" android:height="1.5dp" android:gravity="bottom|fill_horizontal">
+        <shape android:shape="rectangle">
+            <gradient android:type="linear" android:angle="0" android:startColor="#00741C32" android:centerColor="#B3741C32" android:endColor="#00741C32" />
         </shape>
     </item>
 </layer-list>

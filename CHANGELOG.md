@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 609 — PERBAIKAN BUILD Batch 608 (aapt2) + bingkai sampul via bitmap + palung terang
+- Input user: `log_fail_583.zip` (build-output.log, run Build APK #583 = push v608) + "lanjut 609!!" (setelah memilih metode BITMAP untuk bingkai sampul).
+- FAKTA log gagal: v608 GAGAL di `:app:processReleaseResources` — `Android resource linking failed ... '2.25' is incompatible with attribute top (attr) dimension` (juga '18', '14.8', '5.5', '20.6', '3.25', '7') pada `widget_background_compact_dark/_light.xml` dan `widget_background_dark/_light.xml`. AKAR (kesalahan saya): pembangkit XML Batch 608 menulis atribut `<item android:left/top/right/height>` tanpa satuan `dp` (bilangan polos); `xmllint` hanya memeriksa kewellformedan XML, TIDAK memeriksa tipe dimensi. 36 atribut salah di 4 file; `widget_well.xml` aman (string literal ber-dp).
+- PERBAIKAN: pembangkit kini menambah `dp` pada left/top/right/bottom/width/height; ke-4 cangkang digenerasi ulang (isi/warna/geometri sama dgn rancangan Batch 608). Pemeriksa baru (di luar repo, dijalankan sebelum mengemas) memindai SEMUA `res/drawable*/*.xml` + `res/layout*/*.xml` untuk atribut dimensi yang bukan `<angka>dp|sp|px`: sebelum perbaikan = 36 salah (cocok persis dgn log aapt2), sesudah = 0.
+- `widget/WidgetUpdater.kt` (545 -> 609 baris): `buildArtPlate(source, filletColor, rimTop = 0, rimBottom = 0)` — parameter opsional BARU; `rimTop != 0` = bingkai rim "keping terangkat" ala Boomly (`drawArtRim`: bayangan atas 34% SRC_ATOP, cincin tebal 0.065 x sisi bergradasi vertikal mawar -> anggur gelap [gelap] / anggur terang -> tua [terang] = warna rim cangkang Batch 608, bibir gelap 1 lapis di dalam cincin); 0 = fillet gilt lama (`drawArtFillet`, dipindah utuh) -> bubble (`FloatingBubbleService`, 2 argumen) TIDAK berubah. 10 konstanta `ART_RIM_*` baru. REC `WidgetUpdater` 220 -> 234.
+- `widget_well_light.xml`: diselaraskan dgn `widget_well.xml` (bibir gelap kiri-atas lebih pekat, bayangan atas 8dp, mekar pendar burgundy 6dp + garis 1,5dp).
+- Pratinjau (perender mock PIL, BUKAN Android): slim gelap & terang — sampul berbingkai rim mawar/anggur serasi dgn rim cangkang.
+- NOT VERIFIED: belum compile/CI/device (v608 gagal di CI sehingga tampilan cangkang Batch 608 belum pernah dilihat di device). Belum: bubble belum diselaraskan; marquee; EqualizerController; artwork 'unimplemented'.
+
 ## Batch 608 — Cangkang widget bahasa-bentuk Boomly: rim tebal bergradasi + bibir cekung + pendar + palung lebih tegas
 - Input user: screenshot (slim v607 di atas, penuh di tengah, Boomly di bawah) + `SONIX_laporan-untuk-claude_run36.zip` — "hasil gak beda jauh. lanjutkan!!".
 - FAKTA run #36 (Gradle exit 0/0/0): v607 TERKOMPILASI. ArchUnit LULUS (7 aturan), detekt 0, lintDebug 0, Kotlin "11 (11 deprecated, 0 lainnya)", SpotBugs 23 (`DB_DUPLICATE_BRANCHES` hilang; `REC_CATCH_EXCEPTION @ WidgetUpdater.kt:220`).

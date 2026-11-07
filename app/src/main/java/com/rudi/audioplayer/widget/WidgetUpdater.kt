@@ -143,6 +143,20 @@ object WidgetUpdater {
     private const val LEAF_SMALL_FRACTION = 0.16f
     private const val ART_FILLET_STROKE_FRACTION = 0.024f
 
+    // Batch 609 — bingkai sampul "keping terangkat" ala Boomly (HANYA widget; bubble tetap fillet gilt). Cincin bergradasi
+    // vertikal atas -> bawah = warna rim cangkang res/drawable/widget_background_*.xml (gelap: mawar -> anggur gelap;
+    // terang: anggur terang -> anggur tua). Tebal 0.065 x sisi ~ 2,1dp pada sampul slim 32dp, ~4dp pada sampul penuh 62dp.
+    private const val ART_RIM_DARK_TOP = 0xFFE8708A.toInt()
+    private const val ART_RIM_DARK_BOTTOM = 0xFF34132B.toInt()
+    private const val ART_RIM_LIGHT_TOP = 0xFFB8445F.toInt()
+    private const val ART_RIM_LIGHT_BOTTOM = 0xFF6E1B30.toInt()
+    private const val ART_RIM_STROKE_FRACTION = 0.065f
+    private const val ART_RIM_LIP_FRACTION = 0.022f
+    private const val ART_RIM_LIP_ALPHA = 0.7f
+    private const val ART_RIM_SHADE_FRACTION = 0.34f
+    private const val ART_RIM_SHADE_ALPHA = 0.38f
+    private const val ART_RIM_BLACK = 0xFF000000.toInt()
+
     const val ACTION_TOGGLE_PLAY = "com.rudi.audioplayer.widget.TOGGLE_PLAY"
     const val ACTION_NEXT = "com.rudi.audioplayer.widget.NEXT"
     const val ACTION_PREVIOUS = "com.rudi.audioplayer.widget.PREVIOUS"
@@ -323,7 +337,12 @@ object WidgetUpdater {
         // Batch 583 — bahan visual yang SAMA untuk semua widget dibuat SEKALI di luar loop (dulu sampul
         // dibulatkan ulang per widget): sampul berfillet gilt + (mode terang saja) ikon prev/next
         // berwarna burgundy. Null = pakai bawaan layout (ikon PNG ivory / ic_launcher).
-        val artPlate = albumArt?.let { buildArtPlate(it, if (isDark) FILLET_COLOR_DARK else FILLET_COLOR_LIGHT) }
+        // Batch 609 — widget memakai BINGKAI rim (rimTop/rimBottom), bubble tetap fillet gilt (2 argumen).
+        val rimTop = if (isDark) ART_RIM_DARK_TOP else ART_RIM_LIGHT_TOP
+        val rimBottom = if (isDark) ART_RIM_DARK_BOTTOM else ART_RIM_LIGHT_BOTTOM
+        val artPlate = albumArt?.let {
+            buildArtPlate(it, if (isDark) FILLET_COLOR_DARK else FILLET_COLOR_LIGHT, rimTop, rimBottom)
+        }
         val prevGlyph = if (isDark) null else tintedGlyph(context, R.drawable.ic_widget_previous, GLYPH_COLOR_LIGHT)
         val nextGlyph = if (isDark) null else tintedGlyph(context, R.drawable.ic_widget_next, GLYPH_COLOR_LIGHT)
 
@@ -481,7 +500,7 @@ object WidgetUpdater {
      * gradien 3-stop diagonal kiri-atas -> kanan-bawah = arah cahaya Neumorphism. `internal`: bubble memakainya
      * untuk sampul pill (selalu gelap -> [FILLET_COLOR_DARK]).
      */
-    internal fun buildArtPlate(source: Bitmap, filletColor: Int): Bitmap {
+    internal fun buildArtPlate(source: Bitmap, filletColor: Int, rimTop: Int = 0, rimBottom: Int = 0): Bitmap {
         val size = minOf(source.width, source.height)
         val x = (source.width - size) / 2
         val y = (source.height - size) / 2
@@ -495,6 +514,21 @@ object WidgetUpdater {
         paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
         canvas.drawBitmap(squared, 0f, 0f, paint)
 
+        // Batch 609 — [rimTop] != 0 = bingkai rim bergradasi (widget); 0 = fillet gilt lama (bubble, perilaku Batch 584).
+        if (rimTop != 0) {
+            drawArtRim(canvas, sizeF, rimTop, rimBottom)
+        } else {
+            drawArtFillet(canvas, sizeF, filletColor)
+        }
+        // Batch 598 — bitmap perantara hasil crop persegi tak dipakai lagi setelah digambar; lepas memori
+        // native-nya segera (bukan menunggu GC) kecuali `createBitmap` mengembalikan SUMBER yang sama
+        // (kasus sumber sudah persegi) — sumber tetap dipakai pemanggil (bubble memakainya untuk tab minimized).
+        if (squared !== source) squared.recycle()
+        return output
+    }
+
+    /** Fillet gilt diagonal tipis (perilaku Batch 583/584, dipindah utuh dari [buildArtPlate] Batch 609). */
+    private fun drawArtFillet(canvas: Canvas, sizeF: Float, filletColor: Int) {
         val filletWidth = sizeF * ART_FILLET_STROKE_FRACTION
         val fillet = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
@@ -511,11 +545,41 @@ object WidgetUpdater {
             )
         }
         canvas.drawPath(leafPath(sizeF, inset = filletWidth / 2f), fillet)
-        // Batch 598 — bitmap perantara hasil crop persegi tak dipakai lagi setelah digambar; lepas memori
-        // native-nya segera (bukan menunggu GC) kecuali `createBitmap` mengembalikan SUMBER yang sama
-        // (kasus sumber sudah persegi) — sumber tetap dipakai pemanggil (bubble memakainya untuk tab minimized).
-        if (squared !== source) squared.recycle()
-        return output
+    }
+
+    /**
+     * Batch 609 — bingkai "keping terangkat" ala Boomly: (1) bayangan atas 34% tinggi (sampul tampak cekung di dalam
+     * bingkai; SRC_ATOP supaya tepi daun tetap anti-alias), (2) cincin tebal bergradasi vertikal [rimTop] -> [rimBottom]
+     * (cahaya dari atas, sama dgn rim cangkang), (3) bibir gelap 1 lapis di sisi dalam cincin. Seluruhnya DI DALAM
+     * batas bitmap (RemoteViews tak bisa menggambar di luar tile).
+     */
+    private fun drawArtRim(canvas: Canvas, sizeF: Float, rimTop: Int, rimBottom: Int) {
+        val shadeHeight = sizeF * ART_RIM_SHADE_FRACTION
+        val shade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_ATOP)
+            shader = LinearGradient(
+                0f, 0f, 0f, shadeHeight,
+                withAlpha(ART_RIM_BLACK, ART_RIM_SHADE_ALPHA), withAlpha(ART_RIM_BLACK, 0f),
+                Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(0f, 0f, sizeF, shadeHeight, shade)
+
+        val rimWidth = sizeF * ART_RIM_STROKE_FRACTION
+        val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = rimWidth
+            shader = LinearGradient(0f, 0f, 0f, sizeF, rimTop, rimBottom, Shader.TileMode.CLAMP)
+        }
+        canvas.drawPath(leafPath(sizeF, inset = rimWidth / 2f), ring)
+
+        val lipWidth = sizeF * ART_RIM_LIP_FRACTION
+        val lip = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = lipWidth
+            color = withAlpha(ART_RIM_BLACK, ART_RIM_LIP_ALPHA)
+        }
+        canvas.drawPath(leafPath(sizeF, inset = rimWidth + lipWidth / 2f), lip)
     }
 
     private fun withAlpha(color: Int, alpha: Float): Int =
