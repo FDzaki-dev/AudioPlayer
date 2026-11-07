@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Error
@@ -68,6 +69,31 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
         }
     }
 
+    // Batch 603 — crash terbaru (sisi baca AppLogger, diadaptasi dari CrashLogger Boomly): tampil sebagai "baru"
+    // SEKALI lalu ditandai sudah dilihat. Query MediaStore -> Dispatchers.IO (bukan di body composable).
+    var latestCrash by remember { mutableStateOf<AppLogger.CrashLogEntry?>(null) }
+    var crashUnseen by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val (crash, unseen) = withContext(Dispatchers.IO) {
+            val latest = AppLogger.latestCrashLog(context)
+            val isNew = latest != null && AppLogger.isCrashUnseen(context, latest)
+            if (latest != null) AppLogger.markCrashSeen(context)
+            latest to isNew
+        }
+        latestCrash = crash
+        crashUnseen = unseen
+    }
+
+    // Batch 603 — ekspor logcat debug (DiagnosticLogSheet sudah punya banner inline karena Snackbar tertutup sheet).
+    var debugExporting by remember { mutableStateOf(false) }
+    var debugExport by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+    LaunchedEffect(debugExport) {
+        if (debugExport != null) {
+            delay(4000)
+            debugExport = null
+        }
+    }
+
     // Batch 321 — fix blur lintas-window, pola sama BackupRestoreSheet.kt batch ini (rasionalisasi
     // penuh + link dokumentasi resmi Haze di sana / PROJECT_STATE.md Batch 321): tambah
     // `containerColor = Color.Transparent` yang kelewat sejak sheet ini dibuat.
@@ -90,6 +116,14 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.secondary
             )
+            latestCrash?.let { crash ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = (if (crashUnseen) "Crash baru terdeteksi: " else "Crash terakhir: ") + crash.displayName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (crashUnseen) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
 
             if (isLoadingLog) {
@@ -173,6 +207,45 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Hapus")
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = {
+                    debugExporting = true
+                    scope.launch(Dispatchers.IO) {
+                        val path = AppLogger.exportDebugLogToDocuments(context)
+                        withContext(Dispatchers.Main) {
+                            debugExporting = false
+                            haptic.performHapticFeedback(
+                                if (path != null) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
+                            )
+                            debugExport = if (path != null) {
+                                Pair(true, "Tersimpan di $path")
+                            } else {
+                                Pair(false, "Gagal menyimpan log debug")
+                            }
+                            onInfoMessage(if (path != null) "Log debug disimpan ke $path" else "Gagal menyimpan log debug")
+                        }
+                    }
+                },
+                enabled = !debugExporting,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.BugReport, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(if (debugExporting) "Membaca logcat…" else "Ekspor Logcat Debug")
+            }
+
+            debugExport?.let { (ok, text) ->
+                Spacer(modifier = Modifier.height(12.dp))
+                ResultBanner(
+                    style = ResultBannerStyle.Solid,
+                    icon = if (ok) Icons.Default.CheckCircle else Icons.Default.Error,
+                    text = text,
+                    containerColor = if (ok) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
+                    contentColor = if (ok) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
+                )
             }
 
             exportResult?.let { ok ->

@@ -307,6 +307,8 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 603** — Log Diagnostik kini punya tombol "Ekspor Logcat Debug": satu berkas lengkap (info perangkat, daftar efek audio, log diagnostik, logcat aplikasi yang sudah disaring dari derau) disimpan ke Documents/AudioPlayer/debug tanpa perlu kabel/PC/izin khusus, dan layar yang sama menampilkan crash terbaru (ditandai "baru" sekali). Belum diuji di device.
+
 **Batch 601** — Pencatat log/crash dan nama file backup kini memakai pemformat tanggal yang aman untuk banyak thread, sehingga log yang bersamaan dengan crash tidak bisa merusak laporan crash. Tampilan dan isi file sama seperti sebelumnya.
 
 **Batch 600** — Laporan analisis statis lebih bersih: 31 peringatan palsu hasil kompilasi Kotlin disaring dengan cakupan sempit, 27 peringatan nyata/belum ditinjau tetap tampil. Tidak ada perubahan perilaku aplikasi.

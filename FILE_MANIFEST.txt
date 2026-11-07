@@ -101,7 +101,8 @@
 # Batch 595: app/src/main/java/com/rudi/audioplayer/util/LogOrder.kt + app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt (file baru, Log Diagnostik terbaru-di-atas) ditambahkan — 216->218.
 # Batch 596: app/src/main/java/com/rudi/audioplayer/data/VaultCrypto.kt + app/src/test/java/com/rudi/audioplayer/data/VaultCryptoTest.kt (file baru, inti enkripsi Vault AES-256-GCM + Keystore, belum terhubung) ditambahkan — 218->220.
 # Batch 597: PlayCountTracker.kt, LibrarySort.kt, LibrarySortBar.kt (file baru) + PlayCountTrackerTest.kt, LibrarySortTest.kt (tes baru) ditambahkan — 220->225.
-# Total: 225 file
+# Batch 603: app/src/main/java/com/rudi/audioplayer/util/DebugLogFormat.kt + app/src/test/java/com/rudi/audioplayer/util/DebugLogFormatTest.kt (file baru, ekspor logcat debug adaptasi Boomly) ditambahkan — 225->227.
+# Total: 227 file
 
 .githooks/pre-commit
 .github/workflows/android-artifact.yml
@@ -247,6 +248,7 @@ app/src/main/java/com/rudi/audioplayer/update/UpdateManager.kt
 app/src/main/java/com/rudi/audioplayer/util/ApkSignatureChecker.kt
 app/src/main/java/com/rudi/audioplayer/util/AppLogger.kt
 app/src/main/java/com/rudi/audioplayer/util/AudioArtFetcher.kt
+app/src/main/java/com/rudi/audioplayer/util/DebugLogFormat.kt
 app/src/main/java/com/rudi/audioplayer/util/LogOrder.kt
 app/src/main/java/com/rudi/audioplayer/widget/PlayerWidgetProvider.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetUpdater.kt
@@ -312,6 +314,7 @@ app/src/test/java/com/rudi/audioplayer/playback/PlayCountTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
+app/src/test/java/com/rudi/audioplayer/util/DebugLogFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt
 build.gradle.kts
 config/detekt/detekt.yml
