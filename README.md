@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Cangkang widget "bilah" + palung cekung ala Boomly dan layout sheet Log Diagnostik yang dirapikan (Batch 604: dasar panel opak, tombol seragam, bentuk 4-radius, halo anggur) belum dikompilasi/dilihat di device; bubble masih memakai panel daun diagonal Batch 584.
 > - Rombak widget home-screen + bubble floating ke Neumorphism burgundy (Batch 583-584: panel bevel anggur + gilt,
 >   medali play, kenop prev/next berkedalaman, sampul berfillet gilt, ikon burgundy di mode terang; bentuk "daun diagonal"
 >   sudut besar-kecil menggantikan lingkaran) sudah lolos kompilasi di GitHub Actions (run #13, Batch 585; status

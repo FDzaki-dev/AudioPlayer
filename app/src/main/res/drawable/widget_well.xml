@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Batch 604 — PALUNG cekung (mode GELAP) di dalam cangkang widget (widget_background_dark.xml): wadah judul + kontrol
+    (padanan "sumur" tempat teks Boomly). Pasangan terang: widget_well_light.xml (WidgetUpdater menukar lewat
+    setBackgroundResource pada id `widget_well`, mekanisme sama dgn panel/kenop).
+    Kedalaman dari BEVEL (RemoteViews tak bisa bayangan jatuh): bibir terang kanan-bawah (cahaya mengenai tepi)
+    -> lantai gelap -> bayangan dinding atas 8dp -> garis pendar ruby tipis di dasar (padanan garis pink Boomly).
+    Radius dp tetap TL 14 / TR 10 / BR 20 / BL 12 (keluarga bilah, sapuan terbesar kanan-bawah); valid untuk tinggi
+    44dp (compact) dan 56dp (penuh): TR+BR = 30 <= 44.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Bibir: gelap kiri-atas -> terang kanan-bawah -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="315"
+                android:startColor="#080405"
+                android:centerColor="#2B1D1F"
+                android:endColor="#7A6256" />
+            <corners
+                android:topLeftRadius="14dp"
+                android:topRightRadius="10dp"
+                android:bottomRightRadius="20dp"
+                android:bottomLeftRadius="12dp" />
+        </shape>
+    </item>
+    <!-- Lantai -->
+    <item
+        android:left="1.5dp"
+        android:top="1.5dp"
+        android:right="1dp"
+        android:bottom="1dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#180B11"
+                android:endColor="#2A141C" />
+            <corners
+                android:topLeftRadius="12.5dp"
+                android:topRightRadius="8.5dp"
+                android:bottomRightRadius="19dp"
+                android:bottomLeftRadius="10.5dp" />
+        </shape>
+    </item>
+    <!-- Bayangan dinding atas -->
+    <item
+        android:left="1.5dp"
+        android:top="1.5dp"
+        android:right="1dp"
+        android:height="8dp"
+        android:gravity="top|fill_horizontal">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#8C000000"
+                android:endColor="#00000000" />
+            <corners
+                android:topLeftRadius="12.5dp"
+                android:topRightRadius="8.5dp"
+                android:bottomRightRadius="0dp"
+                android:bottomLeftRadius="0dp" />
+        </shape>
+    </item>
+    <!-- Garis pendar ruby di dasar -->
+    <item
+        android:left="14dp"
+        android:right="14dp"
+        android:bottom="3dp"
+        android:height="1dp"
+        android:gravity="bottom|fill_horizontal">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="0"
+                android:startColor="#00C23C58"
+                android:centerColor="#99C23C58"
+                android:endColor="#00C23C58" />
+        </shape>
+    </item>
+</layer-list>

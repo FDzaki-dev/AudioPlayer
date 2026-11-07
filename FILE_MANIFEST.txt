@@ -102,7 +102,8 @@
 # Batch 596: app/src/main/java/com/rudi/audioplayer/data/VaultCrypto.kt + app/src/test/java/com/rudi/audioplayer/data/VaultCryptoTest.kt (file baru, inti enkripsi Vault AES-256-GCM + Keystore, belum terhubung) ditambahkan — 218->220.
 # Batch 597: PlayCountTracker.kt, LibrarySort.kt, LibrarySortBar.kt (file baru) + PlayCountTrackerTest.kt, LibrarySortTest.kt (tes baru) ditambahkan — 220->225.
 # Batch 603: app/src/main/java/com/rudi/audioplayer/util/DebugLogFormat.kt + app/src/test/java/com/rudi/audioplayer/util/DebugLogFormatTest.kt (file baru, ekspor logcat debug adaptasi Boomly) ditambahkan — 225->227.
-# Total: 227 file
+# Batch 604: app/src/main/res/drawable/widget_background_dark.xml + widget_well.xml + widget_well_light.xml (file baru, cangkang "bilah" + palung cekung widget) ditambahkan — 227->230.
+# Total: 230 file
 
 .githooks/pre-commit
 .github/workflows/android-artifact.yml
@@ -261,10 +262,13 @@ app/src/main/res/drawable/ic_widget_pause.png
 app/src/main/res/drawable/ic_widget_play.png
 app/src/main/res/drawable/ic_widget_previous.png
 app/src/main/res/drawable/widget_background.xml
+app/src/main/res/drawable/widget_background_dark.xml
 app/src/main/res/drawable/widget_background_light.xml
 app/src/main/res/drawable/widget_key_bg.xml
 app/src/main/res/drawable/widget_key_bg_light.xml
 app/src/main/res/drawable/widget_play_button_bg.xml
+app/src/main/res/drawable/widget_well.xml
+app/src/main/res/drawable/widget_well_light.xml
 app/src/main/res/layout/bubble_mini_player.xml
 app/src/main/res/layout/bubble_minimized.xml
 app/src/main/res/layout/widget_player.xml

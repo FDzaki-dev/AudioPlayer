@@ -66,11 +66,12 @@ object WidgetUpdater {
     private const val COMPACT_HEIGHT_THRESHOLD_DP = 70
 
     // Batch 589 — inset sudut widget. Padding root di bawah HARUS sama dengan `android:padding` root
-    // `widget_player.xml` (14dp) dan `widget_player_compact.xml` (8dp). `CORNER_INSET_FRACTION` = 1 - 1/sqrt(2):
+    // `widget_player.xml` (10dp) dan `widget_player_compact.xml` (7dp) (Batch 604: dulu 14dp/8dp; cangkang "bilah"
+    // memakai margin halo 3dp + rim 2dp di dalam batas widget, jadi isi sudah menjorok ke dalam). `CORNER_INSET_FRACTION` = 1 - 1/sqrt(2):
     // jarak minimum dari tepi agar sudut siku isi tidak keluar dari busur sudut berradius R (launcher meng-clip
     // widget ke radius sistem). `MAX_CORNER_INSET_DP` mencegah layout compact terdesak pada radius ekstrem.
-    private const val FULL_PADDING_DP = 14f
-    private const val COMPACT_PADDING_DP = 8f
+    private const val FULL_PADDING_DP = 10f
+    private const val COMPACT_PADDING_DP = 7f
     private const val CORNER_INSET_FRACTION = 0.2929f
     private const val MAX_CORNER_INSET_DP = 16f
 
@@ -83,11 +84,12 @@ object WidgetUpdater {
 
     // Batch 593 — INSTRUMENTASI marquee judul (BUKAN perbaikan; hipotesis Batch 592 terbukti salah: gejala sama).
     // Lebar TETAP non-judul tiap layout (dp), dari XML, hanya untuk ESTIMASI lebar kolom judul di log:
-    // penuh = padding 14x2 + sampul 52 + margin kolom 14+8 + prev 34 + (6+44) + (6+34) = 226;
-    // compact = padding 8x2 + sampul 36 + margin judul 8 + (28+4) + (40+4) + (28+4) = 168.
+    // Batch 604 (layout baru: keping sampul + palung cekung): penuh = padding 10x2 + sampul 56 + margin palung 6 +
+    // padding palung 14+6 + margin kolom 4 + prev 34 + (4+44) + (4+34) = 226; compact = padding 7x2 + sampul 44 +
+    // margin palung 5 + padding palung 12+3 + (26+2) + (38+2) + (26+2) = 174.
     // Harus sama dgn `widget_player.xml` / `widget_player_compact.xml` (hanya memengaruhi baris log).
     private const val FULL_FIXED_WIDTH_DP = 226f
-    private const val COMPACT_FIXED_WIDTH_DP = 168f
+    private const val COMPACT_FIXED_WIDTH_DP = 174f
     private const val FULL_TITLE_SP = 14f
     private const val COMPACT_TITLE_SP = 13f
 
@@ -311,10 +313,18 @@ object WidgetUpdater {
             val views = RemoteViews(context.packageName, if (isCompact) R.layout.widget_player_compact else R.layout.widget_player)
             applyCornerInset(context, views, isCompact)
 
+            // Batch 604 — cangkang "bilah" + palung cekung (widget_background_dark/_light + widget_well[_light]).
+            // `widget_background.xml` (daun diagonal) sekarang HANYA dipakai bubble. Mekanisme penukaran identik
+            // dgn sebelumnya (`setBackgroundResource` via RemoteViews) — id `widget_well` ada di KEDUA layout.
             views.setInt(
                 R.id.widget_root,
                 "setBackgroundResource",
-                if (isDark) R.drawable.widget_background else R.drawable.widget_background_light
+                if (isDark) R.drawable.widget_background_dark else R.drawable.widget_background_light
+            )
+            views.setInt(
+                R.id.widget_well,
+                "setBackgroundResource",
+                if (isDark) R.drawable.widget_well else R.drawable.widget_well_light
             )
 
             // Batch 583 — medali play/pause (burgundy + cincin gilt) SATU drawable untuk kedua mode:

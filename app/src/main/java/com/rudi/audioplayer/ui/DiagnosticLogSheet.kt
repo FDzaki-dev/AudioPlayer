@@ -1,8 +1,10 @@
 package com.rudi.audioplayer.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.BugReport
@@ -13,13 +15,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.util.AppLogger
 import kotlinx.coroutines.Dispatchers
@@ -94,22 +102,33 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
         }
     }
 
-    // Batch 321 — fix blur lintas-window, pola sama BackupRestoreSheet.kt batch ini (rasionalisasi
-    // penuh + link dokumentasi resmi Haze di sana / PROJECT_STATE.md Batch 321): tambah
-    // `containerColor = Color.Transparent` yang kelewat sejak sheet ini dibuat.
+    // Batch 604 — LAYOUT DIRAPIKAN (laporan user + screen recording: "layout berantakan dan gak estetik"). Tiga akar yang
+    // terlihat di video: (1) panel `frostedGlass()` di dalam `ModalBottomSheet` = jendela TERPISAH, jadi tak ada sumber blur
+    // dan panel hanya tint transparan -> teks layar Pengaturan di belakangnya tembus dan menumpuk dengan isi sheet;
+    // sekarang panel punya DASAR OPAK (`colorScheme.surface`) di bawah kaca (rim/tint/kedalaman tema tetap digambar di atasnya).
+    // (2) Dua tombol `weight(1f)` berdampingan: label "Repack ke Dokumen" terlalu panjang untuk setengah lebar -> patah per
+    // huruf ("Dokume/n") dan tombol pil memanjang jadi oval raksasa; sekarang label pendek ("Simpan Log"), `maxLines = 1`,
+    // tinggi seragam 48dp, tombol utama "Ekspor Logcat Debug" penuh lebar di atas. (3) Isi log tanpa wadah menempel ke tombol;
+    // sekarang di kotak berlekuk sendiri (tinggi dibatasi, bisa scroll) dengan waktu + tingkat (WARN/ERROR/FATAL) berwarna.
+    // Logika (muat IO, ekspor, hapus, crash terakhir, banner) TIDAK diubah. Catatan lama (Batch 321/340/465): sheet tetap
+    // `containerColor = Transparent` (jendela Haze), `.frostedGlass()` setelah `.fillMaxWidth()`, log tetap LazyColumn per baris.
+    val panelShape = MaterialTheme.shapes.large
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
-        // Batch 340 — BUG FIX (lanjutan antrean "🔍 Audit tambahan" Batch 339, pola identik
-        // BackupRestoreSheet.kt/UpdateCheckSheet.kt batch ini — lihat PROJECT_STATE.md Batch 340
-        // utk rasionalisasi penuh): `.frostedGlass()` ditambah setelah `.fillMaxWidth()`.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, panelShape)
                 .frostedGlass()
-                .heightIn(max = 480.dp)
+                .heightIn(max = 560.dp)
                 .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp)
+                .padding(top = 20.dp, bottom = 28.dp)
         ) {
-            Text("Log Diagnostik", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "Log Diagnostik",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 "Catatan error & crash tersimpan lokal di HP ini saja — tidak pernah dikirim ke mana pun.",
@@ -117,100 +136,72 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                 color = MaterialTheme.colorScheme.secondary
             )
             latestCrash?.let { crash ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = (if (crashUnseen) "Crash baru terdeteksi: " else "Crash terakhir: ") + crash.displayName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (crashUnseen) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
-                )
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (isLoadingLog) {
-                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else if (logText.isBlank()) {
-                Text(
-                    "Belum ada catatan. Kalau nanti ada error atau crash, jejaknya akan muncul di sini.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            } else {
-                // Batch 465 — FIX force-close/freeze: sebelumnya seluruh `logText` (bisa sampai
-                // ~200_000 char, MAX_LOG_BYTES AppLogger.kt) dirender via 1 Text mentah dalam
-                // Column+verticalScroll. Baca file sudah async sejak Batch 431, tapi LAYOUT teks
-                // sepanjang itu di 1 node tetap kerja Main thread saat sheet ini pertama tampil —
-                // sejak Batch 463/464 nambah instrumentasi padat FloatingBubbleService (log tiap
-                // konfigurasi/callback/readback), file lebih cepat mendekati cap, cukup bikin
-                // ANR/freeze pas dibuka. Fix: split per baris, render via LazyColumn (1 Text per
-                // baris, pola sama LyricsSheet.kt/DuplicateFinderSheet.kt) — Compose cuma
-                // measure/layout baris yang KELIHATAN di layar. 0 baris log dibuang (`logText`
-                // tetap dibaca utuh), "Repack ke Dokumen" tetap ekspor `readLog()` utuh, tidak
-                // disentuh.
-                val logLines = remember(logText) { logText.split("\n") }
-                LazyColumn(
+                Spacer(modifier = Modifier.height(12.dp))
+                val crashTint = if (crashUnseen) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f, fill = false)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(crashTint.copy(alpha = 0.12f))
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(logLines) { line ->
+                    Icon(Icons.Default.BugReport, contentDescription = null, tint = crashTint)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            line,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace
+                            if (crashUnseen) "Crash baru terdeteksi" else "Crash terakhir",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = crashTint
                         )
+                        Text(
+                            crash.displayName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Wadah log: satu bentuk untuk keadaan memuat / kosong / berisi, supaya tinggi tidak melompat-lompat.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .heightIn(min = 96.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
+            ) {
+                if (isLoadingLog) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else if (logText.isBlank()) {
+                    Text(
+                        "Belum ada catatan. Kalau nanti ada error atau crash, jejaknya akan muncul di sini.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(16.dp)
+                    )
+                } else {
+                    // Batch 465 — FIX force-close/freeze: split per baris + LazyColumn (Compose hanya measure baris
+                    // yang KELIHATAN); `logText` tetap dibaca utuh, "Simpan Log" tetap mengekspor `readLog()` utuh.
+                    val logLines = remember(logText) { logText.split("\n") }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        items(logLines) { line -> LogLine(line) }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        scope.launch(Dispatchers.IO) {
-                            val ok = AppLogger.exportLogToDocuments(context)
-                            withContext(Dispatchers.Main) {
-                                haptic.performHapticFeedback(
-                                    if (ok) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
-                                )
-                                exportResult = ok
-                                onInfoMessage(
-                                    if (ok) "Log disimpan ke Documents/AudioPlayer/logs"
-                                    else "Gagal menyimpan log (perlu Android 10+)"
-                                )
-                            }
-                        }
-                    },
-                    enabled = logText.isNotBlank(),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.Archive, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Repack ke Dokumen")
-                }
-                OutlinedButton(
-                    onClick = {
-                        scope.launch(Dispatchers.IO) {
-                            AppLogger.clearLog()
-                            withContext(Dispatchers.Main) {
-                                logText = ""
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onInfoMessage("Log diagnostik dihapus")
-                            }
-                        }
-                    },
-                    enabled = logText.isNotBlank(),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.DeleteOutline, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Hapus")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedButton(
+            Button(
                 onClick = {
                     debugExporting = true
                     scope.launch(Dispatchers.IO) {
@@ -230,11 +221,64 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                     }
                 },
                 enabled = !debugExporting,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
             ) {
                 Icon(Icons.Default.BugReport, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(if (debugExporting) "Membaca logcat…" else "Ekspor Logcat Debug")
+                Text(if (debugExporting) "Membaca logcat…" else "Ekspor Logcat Debug", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        scope.launch(Dispatchers.IO) {
+                            val ok = AppLogger.exportLogToDocuments(context)
+                            withContext(Dispatchers.Main) {
+                                haptic.performHapticFeedback(
+                                    if (ok) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
+                                )
+                                exportResult = ok
+                                onInfoMessage(
+                                    if (ok) "Log disimpan ke Documents/AudioPlayer/logs"
+                                    else "Gagal menyimpan log (perlu Android 10+)"
+                                )
+                            }
+                        }
+                    },
+                    enabled = logText.isNotBlank(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                ) {
+                    Icon(Icons.Default.Archive, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Simpan Log", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                OutlinedButton(
+                    onClick = {
+                        scope.launch(Dispatchers.IO) {
+                            AppLogger.clearLog()
+                            withContext(Dispatchers.Main) {
+                                logText = ""
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onInfoMessage("Log diagnostik dihapus")
+                            }
+                        }
+                    },
+                    enabled = logText.isNotBlank(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                ) {
+                    Icon(Icons.Default.DeleteOutline, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Hapus", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
 
             debugExport?.let { (ok, text) ->
@@ -252,8 +296,7 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                 Spacer(modifier = Modifier.height(12.dp))
                 ResultBanner(
                     style = ResultBannerStyle.Solid,
-                    // Batch 228 — Iconography 3/7 (samakan visual weight icon sejenis),
-                    // konsisten dgn fix BackupRestoreSheet.kt & referensi SignatureMatcherSheet.kt.
+                    // Batch 228 — Iconography 3/7 (samakan visual weight icon sejenis).
                     icon = if (ok) Icons.Default.CheckCircle else Icons.Default.Error,
                     text = if (ok) "Tersimpan di Documents/AudioPlayer/logs" else "Gagal menyimpan (perlu Android 10 ke atas)",
                     containerColor = if (ok) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
@@ -261,5 +304,51 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                 )
             }
         }
+    }
+}
+
+/** Awal entri log (format persis `AppLogger.appendEntry`): `yyyy-MM-dd HH:mm:ss LEVEL pesan`. */
+private val LOG_HEADER_REGEX = Regex("^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}) (FATAL|ERROR|WARN) (.*)$")
+
+/**
+ * Satu baris log. Baris awal entri dipecah: waktu (redup) + tingkat (WARN = aksen, ERROR/FATAL = merah) di atas, pesan di
+ * bawahnya, dengan jarak antar-entri; baris lanjutan (stack trace) tampil apa adanya. Teks TIDAK diubah, hanya ditata.
+ */
+@Composable
+private fun LogLine(line: String) {
+    val match = remember(line) { LOG_HEADER_REGEX.matchEntire(line) }
+    val bodyColor = MaterialTheme.colorScheme.onSurface
+    if (match != null) {
+        val time = match.groupValues[1]
+        val level = match.groupValues[2]
+        val message = match.groupValues[3]
+        val levelColor = if (level == "WARN") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+        val dimColor = MaterialTheme.colorScheme.secondary
+        Column(modifier = Modifier.padding(top = 8.dp)) {
+            Text(
+                text = buildAnnotatedString {
+                    withStyle(SpanStyle(color = levelColor, fontWeight = FontWeight.Bold)) { append(level) }
+                    withStyle(SpanStyle(color = dimColor)) { append("  ") ; append(time) }
+                },
+                style = MaterialTheme.typography.labelSmall
+            )
+            Text(
+                message,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
+                color = bodyColor
+            )
+        }
+    } else {
+        Text(
+            line,
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+            color = bodyColor
+        )
     }
 }

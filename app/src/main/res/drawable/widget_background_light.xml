@@ -1,24 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Batch 583/584 — pasangan TERANG panel Neumorphism burgundy; struktur lapis & bentuk "daun diagonal"
-    IDENTIK widget_background.xml (baca komentar di sana). Beda hanya nilai: kanvas perkamen hangat
-    (SkeuNeuSurfaceLight 0xFFF1E8DF; sisi terang +55% putih), rim terang = putih, rim gelap = taupe hangat
-    (bukan hitam pekat: noda kasar di kanvas terang), wash = ruby pekat SkeuLightEmerald 0xFF8E2440 alpha rendah,
-    hairline = SkeuGiltDeep 0xFF9C7E4E, border = burgundy SkeuAccentLight 0xFF741C32 alpha ~25%.
+    Batch 604 — CANGKANG WIDGET "BILAH" (mode TERANG), pasangan widget_background_dark.xml. Geometri/radius/inset
+    IDENTIK dgn pasangan gelap (lihat penjelasan di sana); palet = perkamen (SkeuNeuSurfaceLight 0xFFF1E8DF), halo burgundy
+    SkeuAccentLight 0xFF741C32-turunan, hairline/border gilt dalam SkeuGiltDeep 0xFF9C7E4E. Ditulis ulang dari panel
+    daun diagonal Batch 583/584 (file ini hanya dipakai widget home-screen; bubble selalu gelap dan memakai
+    widget_background.xml).
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Halo: 3 cincin anggur bertumpuk, makin pekat ke arah cangkang -->
     <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#148E2440" />
+            <corners
+                android:topLeftRadius="25dp"
+                android:topRightRadius="19dp"
+                android:bottomRightRadius="33dp"
+                android:bottomLeftRadius="17dp" />
+        </shape>
+    </item>
+    <item
+        android:left="1dp"
+        android:top="1dp"
+        android:right="1dp"
+        android:bottom="1dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#1A8E2440" />
+            <corners
+                android:topLeftRadius="24dp"
+                android:topRightRadius="18dp"
+                android:bottomRightRadius="32dp"
+                android:bottomLeftRadius="16dp" />
+        </shape>
+    </item>
+    <item
+        android:left="2dp"
+        android:top="2dp"
+        android:right="2dp"
+        android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#269A2A48" />
+            <corners
+                android:topLeftRadius="23dp"
+                android:topRightRadius="17dp"
+                android:bottomRightRadius="31dp"
+                android:bottomLeftRadius="15dp" />
+        </shape>
+    </item>
+    <!-- Cangkang: dasar rim gelap -->
+    <item
+        android:left="3dp"
+        android:top="3dp"
+        android:right="3dp"
+        android:bottom="3dp">
         <shape android:shape="rectangle">
             <solid android:color="#B8AA9C" />
             <corners
-                android:topLeftRadius="28dp"
-                android:topRightRadius="12dp"
-                android:bottomRightRadius="28dp"
-                android:bottomLeftRadius="12dp" />
+                android:topLeftRadius="22dp"
+                android:topRightRadius="16dp"
+                android:bottomRightRadius="30dp"
+                android:bottomLeftRadius="14dp" />
         </shape>
     </item>
-    <item android:right="2.5dp"
-        android:bottom="2.5dp">
+    <!-- Rim terang kiri-atas (gilt -> umber -> gelap) -->
+    <item
+        android:left="3dp"
+        android:top="3dp"
+        android:right="5.5dp"
+        android:bottom="5.5dp">
         <shape android:shape="rectangle">
             <gradient
                 android:type="linear"
@@ -27,17 +75,18 @@
                 android:centerColor="#F8F1E9"
                 android:endColor="#E2D7CB" />
             <corners
-                android:topLeftRadius="28dp"
-                android:topRightRadius="12dp"
-                android:bottomRightRadius="28dp"
-                android:bottomLeftRadius="12dp" />
+                android:topLeftRadius="22dp"
+                android:topRightRadius="16dp"
+                android:bottomRightRadius="30dp"
+                android:bottomLeftRadius="14dp" />
         </shape>
     </item>
+    <!-- Permukaan cembung anggur -->
     <item
-        android:left="2.5dp"
-        android:top="2.5dp"
-        android:right="2.5dp"
-        android:bottom="2.5dp">
+        android:left="5dp"
+        android:top="5dp"
+        android:right="5dp"
+        android:bottom="5dp">
         <shape android:shape="rectangle">
             <gradient
                 android:type="linear"
@@ -46,37 +95,39 @@
                 android:centerColor="#F1E8DF"
                 android:endColor="#E6DACD" />
             <corners
-                android:topLeftRadius="25.5dp"
-                android:topRightRadius="9.5dp"
-                android:bottomRightRadius="25.5dp"
-                android:bottomLeftRadius="9.5dp" />
+                android:topLeftRadius="20dp"
+                android:topRightRadius="14dp"
+                android:bottomRightRadius="28dp"
+                android:bottomLeftRadius="12dp" />
         </shape>
     </item>
+    <!-- Wash anggur kiri-atas -->
     <item
-        android:left="2.5dp"
-        android:top="2.5dp"
-        android:right="2.5dp"
-        android:bottom="2.5dp">
+        android:left="5dp"
+        android:top="5dp"
+        android:right="5dp"
+        android:bottom="5dp">
         <shape android:shape="rectangle">
             <gradient
                 android:type="radial"
                 android:centerX="0.04"
                 android:centerY="0.06"
-                android:gradientRadius="170dp"
+                android:gradientRadius="190dp"
                 android:startColor="#2E8E2440"
                 android:endColor="#008E2440" />
             <corners
-                android:topLeftRadius="25.5dp"
-                android:topRightRadius="9.5dp"
-                android:bottomRightRadius="25.5dp"
-                android:bottomLeftRadius="9.5dp" />
+                android:topLeftRadius="20dp"
+                android:topRightRadius="14dp"
+                android:bottomRightRadius="28dp"
+                android:bottomLeftRadius="12dp" />
         </shape>
     </item>
+    <!-- Peredam kanan-bawah (sapuan besar jadi lebih gelap) -->
     <item
-        android:left="2.5dp"
-        android:top="2.5dp"
-        android:right="2.5dp"
-        android:bottom="2.5dp">
+        android:left="5dp"
+        android:top="5dp"
+        android:right="5dp"
+        android:bottom="5dp">
         <shape android:shape="rectangle">
             <gradient
                 android:type="radial"
@@ -86,15 +137,36 @@
                 android:startColor="#332A2024"
                 android:endColor="#002A2024" />
             <corners
-                android:topLeftRadius="25.5dp"
-                android:topRightRadius="9.5dp"
-                android:bottomRightRadius="25.5dp"
-                android:bottomLeftRadius="9.5dp" />
+                android:topLeftRadius="20dp"
+                android:topRightRadius="14dp"
+                android:bottomRightRadius="28dp"
+                android:bottomLeftRadius="12dp" />
         </shape>
     </item>
+    <!-- Kilau kaca separuh atas (pita 20dp, memudar ke bawah) -->
     <item
-        android:left="32dp"
-        android:top="2.5dp"
+        android:left="5dp"
+        android:top="5dp"
+        android:right="5dp"
+        android:height="20dp"
+        android:gravity="top|fill_horizontal">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#66FFFFFF"
+                android:endColor="#00FFFFFF" />
+            <corners
+                android:topLeftRadius="20dp"
+                android:topRightRadius="14dp"
+                android:bottomRightRadius="0dp"
+                android:bottomLeftRadius="0dp" />
+        </shape>
+    </item>
+    <!-- Hairline gilt tepi atas -->
+    <item
+        android:left="30dp"
+        android:top="5dp"
         android:right="20dp"
         android:height="1dp"
         android:gravity="top|fill_horizontal">
@@ -107,20 +179,21 @@
                 android:endColor="#009C7E4E" />
         </shape>
     </item>
+    <!-- Border gilt tipis di batas cangkang -->
     <item
-        android:left="0.5dp"
-        android:top="0.5dp"
-        android:right="0.5dp"
-        android:bottom="0.5dp">
+        android:left="3.5dp"
+        android:top="3.5dp"
+        android:right="3.5dp"
+        android:bottom="3.5dp">
         <shape android:shape="rectangle">
             <stroke
                 android:width="1dp"
                 android:color="#40741C32" />
             <corners
-                android:topLeftRadius="27.5dp"
-                android:topRightRadius="11.5dp"
-                android:bottomRightRadius="27.5dp"
-                android:bottomLeftRadius="11.5dp" />
+                android:topLeftRadius="21.5dp"
+                android:topRightRadius="15.5dp"
+                android:bottomRightRadius="29.5dp"
+                android:bottomLeftRadius="13.5dp" />
         </shape>
     </item>
 </layer-list>
