@@ -67,6 +67,12 @@ object WidgetUpdater {
     private const val COMPACT_HEIGHT_THRESHOLD_DP = 124
     // Batch 606: tinggi < 54dp -> layout slim (log: user menarik widget ke 46dp; compact butuh 58dp -> terpotong).
     private const val SLIM_HEIGHT_THRESHOLD_DP = 54
+    // Batch 607: tinggi >= 210dp (lebar >= SLIM_WIDTH) -> layout tinggi (sampul besar). Default tinggi bila opsi kosong 250 -> 129dp
+    // (4x2 umum) supaya widget tanpa data ukuran tidak salah memakai layout tinggi yang butuh ~210dp.
+    private const val TALL_HEIGHT_THRESHOLD_DP = 210
+    private const val DEFAULT_MIN_HEIGHT_DP = 129
+    private const val ART_THUMB_PX = 200
+    private const val TALL_ART_THUMB_PX = 480
 
     // Batch 589 — inset sudut widget. Padding root di bawah HARUS sama dengan `android:padding` root
     // `widget_player.xml` (10dp) dan `widget_player_compact.xml` (8dp, Batch 606; dulu 9dp; slim 8/7dp) (Batch 604: dulu 14dp/8dp; cangkang "bilah"
@@ -94,8 +100,9 @@ object WidgetUpdater {
     private const val FULL_FIXED_WIDTH_DP = 114f
     private const val COMPACT_FIXED_WIDTH_DP = 174f
     private const val SLIM_FIXED_WIDTH_DP = 149f // Batch 606: widget_player_slim.xml (lihat komentar di layout)
-    private const val FULL_TITLE_SP = 13f
-    private const val COMPACT_TITLE_SP = 13f
+    private const val TALL_FIXED_WIDTH_DP = 46f // Batch 607: widget_player_tall.xml
+    // Batch 607: FULL_TITLE_SP & COMPACT_TITLE_SP sama-sama 13f sejak Batch 605 -> cabang `if` identik (SpotBugs DB_DUPLICATE_BRANCHES run #35).
+    private const val TITLE_SP = 13f
 
     // Batch 68: fix "widget nggak pernah sinkron pas ganti tema" — widget_player(.compact).xml
     // used to hardcode the dark palette permanently (no light counterpart, and nothing ever
@@ -245,6 +252,7 @@ object WidgetUpdater {
         widgetId: Int,
         isCompact: Boolean,
         isSlim: Boolean,
+        isTall: Boolean,
         options: android.os.Bundle
     ) {
         try {
@@ -258,15 +266,20 @@ object WidgetUpdater {
             paint.typeface = Typeface.DEFAULT_BOLD
             paint.textSize = TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_SP,
-                if (isCompact) COMPACT_TITLE_SP else FULL_TITLE_SP,
+                TITLE_SP,
                 metrics
             )
             val textDp = paint.measureText(shown) / metrics.density
-            val fixedDp = if (isSlim) SLIM_FIXED_WIDTH_DP else if (isCompact) COMPACT_FIXED_WIDTH_DP else FULL_FIXED_WIDTH_DP
+            val fixedDp = when {
+                isSlim -> SLIM_FIXED_WIDTH_DP
+                isCompact -> COMPACT_FIXED_WIDTH_DP
+                isTall -> TALL_FIXED_WIDTH_DP
+                else -> FULL_FIXED_WIDTH_DP
+            }
             val columnMinDp = minW - fixedDp
             AppLogger.w(
                 "WidgetUpdater",
-                "Marquee diag #$seq +${sinceLastMs}ms digabung=$skipped | id=$widgetId mode=${if (isSlim) "slim" else if (isCompact) "compact" else "penuh"} " +
+                "Marquee diag #$seq +${sinceLastMs}ms digabung=$skipped | id=$widgetId mode=${if (isSlim) "slim" else if (isCompact) "compact" else if (isTall) "tinggi" else "penuh"} " +
                     "min=${minW}x${minH}dp maks=${maxW}x${maxH}dp fontScale=${context.resources.configuration.fontScale} | " +
                     "judul=${shown.length}huruf berubah=$titleChanged playing=$isPlaying | " +
                     "ESTIMASI teks=${textDp.toInt()}dp kolomMin=${columnMinDp.toInt()}dp teks>kolomMin=${textDp > columnMinDp} | " +
@@ -288,7 +301,15 @@ object WidgetUpdater {
         val artist = prefs.getString(KEY_ARTIST, null)
         val artworkUriRaw = prefs.getString(KEY_ARTWORK_URI, null)
         val isPlaying = prefs.getBoolean(KEY_IS_PLAYING, false)
-        val albumArt = artworkUriRaw?.let { loadAlbumArtBitmap(context, Uri.parse(it)) }
+        // Batch 607 — sampul besar (layout tinggi) butuh thumbnail lebih tajam; widget lain tetap 200px.
+        val wantHeroArt = ids.any { wid ->
+            val o = manager.getAppWidgetOptions(wid)
+            o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250) >= SLIM_WIDTH_THRESHOLD_DP &&
+                o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, DEFAULT_MIN_HEIGHT_DP) >= TALL_HEIGHT_THRESHOLD_DP
+        }
+        val albumArt = artworkUriRaw?.let {
+            loadAlbumArtBitmap(context, Uri.parse(it), if (wantHeroArt) TALL_ART_THUMB_PX else ART_THUMB_PX)
+        }
         val isDark = resolveIsDark(context, ThemeStore(context).getMode())
 
         // Batch 593 — diagnostik marquee: nomor + selang dari update sebelumnya + judul berubah atau tidak.
@@ -312,14 +333,16 @@ object WidgetUpdater {
             // a title, artist, and three buttons that no longer fit.
             val options = manager.getAppWidgetOptions(id)
             val minWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
-            val minHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 250)
+            val minHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, DEFAULT_MIN_HEIGHT_DP)
             val isSlim = minWidthDp < SLIM_WIDTH_THRESHOLD_DP || minHeightDp < SLIM_HEIGHT_THRESHOLD_DP
             val isCompact = isSlim || minHeightDp < COMPACT_HEIGHT_THRESHOLD_DP
-            logMarqueeDiag(context, diagSeqNo, diagSinceMs, diagSkippedNow, title, diagTitleChanged, isPlaying, id, isCompact, isSlim, options)
+            val isTall = !isCompact && minHeightDp >= TALL_HEIGHT_THRESHOLD_DP
+            logMarqueeDiag(context, diagSeqNo, diagSinceMs, diagSkippedNow, title, diagTitleChanged, isPlaying, id, isCompact, isSlim, isTall, options)
 
             val layoutRes = when {
                 isSlim -> R.layout.widget_player_slim
                 isCompact -> R.layout.widget_player_compact
+                isTall -> R.layout.widget_player_tall
                 else -> R.layout.widget_player
             }
             val views = RemoteViews(context.packageName, layoutRes)
@@ -420,11 +443,11 @@ object WidgetUpdater {
         return PendingIntent.getForegroundService(context, requestCode, intent, flags)
     }
 
-    private fun loadAlbumArtBitmap(context: Context, uri: Uri): Bitmap? {
+    private fun loadAlbumArtBitmap(context: Context, uri: Uri, sizePx: Int): Bitmap? {
         return try {
             // Batch 402: pre-Q decodeStream() fallback removed — minSdk 31 guarantees API>=29
             // on every installable device, so that branch was unreachable dead code.
-            context.contentResolver.loadThumbnail(uri, android.util.Size(200, 200), null)
+            context.contentResolver.loadThumbnail(uri, android.util.Size(sizePx, sizePx), null)
         } catch (e: Exception) {
             // Widget jatuh balik ke ikon aplikasi kalau ini gagal (masih terlihat wajar di layar
             // beranda), tapi dicatat supaya kegagalan muat artwork tidak sepenuhnya tak terlihat.

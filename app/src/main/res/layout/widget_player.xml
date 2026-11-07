@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
+    Batch 607: 3 spasi berbobot (atas / antar-baris / bawah) membagi sisa tinggi rata pada widget 124-209dp (dulu isi
+    menggerombol di tengah dgn ruang kosong atas-bawah); pada 129dp sisa ~3dp -> tampilan tidak berubah. Widget >= 210dp
+    memakai `widget_player_tall.xml`.
     Batch 606: + clipToPadding=false (kelebihan kecil tidak dipotong) + includeFontPadding=false pada judul/artis (font
     perangkat berjarak baris ~1,37x: judul 2 baris + artis hampir menyentuh bibir palung 62dp).
     Batch 605 — LAYOUT PENUH BERTINGKAT DUA BARIS (dulu satu baris: sampul 56 + palung 56 berisi judul + 3 kontrol).
@@ -24,6 +27,11 @@
     android:gravity="center_vertical"
     android:clipToPadding="false"
     android:padding="10dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -79,6 +87,11 @@
 
     <LinearLayout
         android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="40dp"
         android:layout_marginTop="4dp"
         android:orientation="horizontal"
@@ -117,5 +130,10 @@
             android:contentDescription="Berikutnya" />
 
     </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
 </LinearLayout>

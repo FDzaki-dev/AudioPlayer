@@ -104,7 +104,8 @@
 # Batch 603: app/src/main/java/com/rudi/audioplayer/util/DebugLogFormat.kt + app/src/test/java/com/rudi/audioplayer/util/DebugLogFormatTest.kt (file baru, ekspor logcat debug adaptasi Boomly) ditambahkan — 225->227.
 # Batch 604: app/src/main/res/drawable/widget_background_dark.xml + widget_well.xml + widget_well_light.xml (file baru, cangkang "bilah" + palung cekung widget) ditambahkan — 227->230.
 # Batch 606: app/src/main/res/drawable/widget_background_compact_dark.xml + widget_background_compact_light.xml + app/src/main/res/layout/widget_player_slim.xml (file baru, cangkang compact asimetris + layout slim untuk widget 46dp) ditambahkan — 230->233.
-# Total: 233 file
+# Batch 607: app/src/main/res/layout/widget_player_tall.xml (file baru, layout widget tinggi: sampul besar + palung info + kontrol) ditambahkan — 233->234.
+# Total: 234 file
 
 .githooks/pre-commit
 .github/workflows/android-artifact.yml
@@ -277,6 +278,7 @@ app/src/main/res/layout/bubble_minimized.xml
 app/src/main/res/layout/widget_player.xml
 app/src/main/res/layout/widget_player_compact.xml
 app/src/main/res/layout/widget_player_slim.xml
+app/src/main/res/layout/widget_player_tall.xml
 app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
 app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 app/src/main/res/mipmap-hdpi/ic_launcher.png

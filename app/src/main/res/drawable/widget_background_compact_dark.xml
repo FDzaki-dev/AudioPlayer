@@ -5,9 +5,9 @@
     Mengapa cangkang terpisah (user: "shape nya masih kurang berbentuk"): cangkang Batch 604 (radius TL22/TR16/BR30/BL14,
     inset 5dp) pada widget 46dp (log: `min=290x46dp`) menyisakan permukaan 36dp; TR+BR = 46 > tinggi cangkang 40dp sehingga
     renderer MENSKALA radius -> siluet jadi pil biasa (asimetri hilang) dan isi 28dp terpotong rata. Di sini: inset 3,5dp
-    (halo 2 cincin 0-1dp + dasar 2dp + rim 1,5dp), radius TL18 / TR9 / BR22 / BL10: sisi kiri 28dp dan kanan 31dp <=
-    tinggi cangkang minimum ~36dp (widget 40dp) -> TIDAK diskala, sudut kanan-bawah tetap "sapuan" terbesar dan kanan-atas
-    rapat (bahasa Boomly), tersisa ruas lurus. Radius tiap lapis = radius dasar dikurangi/ditambah selisih margin (konsentris).
+    (halo 2 cincin 0-1dp + dasar 2dp + rim 1,5dp), radius TL20 / TR8 / BR28 / BL12 (Batch 607: dulu 18/9/22/10 -> sapuan kanan-bawah lebih panjang): sisi kiri 32dp dan
+    kanan 36dp <= tinggi cangkang minimum ~36dp (widget 40dp) -> TIDAK diskala; kanan-atas rapat, kanan-bawah menyapu penuh
+    (bahasa Boomly). Radius tiap lapis = radius dasar dikurangi/ditambah selisih margin (konsentris).
     Lapis hairline/gloss memakai `android:height` + `gravity` (API 23+; minSdk 31). Hex = palet Batch 604.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
@@ -15,10 +15,10 @@
         <shape android:shape="rectangle">
             <solid android:color="#1AA33550" />
             <corners
-                            android:topLeftRadius="20dp"
-                            android:topRightRadius="11dp"
-                            android:bottomRightRadius="24dp"
-                            android:bottomLeftRadius="12dp" />
+                android:topLeftRadius="22dp"
+                android:topRightRadius="10dp"
+                android:bottomRightRadius="30dp"
+                android:bottomLeftRadius="14dp" />
         </shape>
     </item>
     <item
@@ -29,10 +29,10 @@
         <shape android:shape="rectangle">
             <solid android:color="#2AC0405E" />
             <corners
-                            android:topLeftRadius="19dp"
-                            android:topRightRadius="10dp"
-                            android:bottomRightRadius="23dp"
-                            android:bottomLeftRadius="11dp" />
+                android:topLeftRadius="21dp"
+                android:topRightRadius="9dp"
+                android:bottomRightRadius="29dp"
+                android:bottomLeftRadius="13dp" />
         </shape>
     </item>
     <item
@@ -43,10 +43,10 @@
         <shape android:shape="rectangle">
             <solid android:color="#0D090B" />
             <corners
-                            android:topLeftRadius="18dp"
-                            android:topRightRadius="9dp"
-                            android:bottomRightRadius="22dp"
-                            android:bottomLeftRadius="10dp" />
+                android:topLeftRadius="20dp"
+                android:topRightRadius="8dp"
+                android:bottomRightRadius="28dp"
+                android:bottomLeftRadius="12dp" />
         </shape>
     </item>
     <item
@@ -62,10 +62,10 @@
                             android:centerColor="#6B4A44"
                             android:endColor="#1E1417" />
             <corners
-                            android:topLeftRadius="18dp"
-                            android:topRightRadius="9dp"
-                            android:bottomRightRadius="22dp"
-                            android:bottomLeftRadius="10dp" />
+                android:topLeftRadius="20dp"
+                android:topRightRadius="8dp"
+                android:bottomRightRadius="28dp"
+                android:bottomLeftRadius="12dp" />
         </shape>
     </item>
     <item
@@ -81,10 +81,10 @@
                             android:centerColor="#44202C"
                             android:endColor="#2A1119" />
             <corners
-                            android:topLeftRadius="16.5dp"
-                            android:topRightRadius="7.5dp"
-                            android:bottomRightRadius="20.5dp"
-                            android:bottomLeftRadius="8.5dp" />
+                android:topLeftRadius="18.5dp"
+                android:topRightRadius="6.5dp"
+                android:bottomRightRadius="26.5dp"
+                android:bottomLeftRadius="10.5dp" />
         </shape>
     </item>
     <item
@@ -101,10 +101,10 @@
                             android:startColor="#40C0405E"
                             android:endColor="#00C0405E" />
             <corners
-                            android:topLeftRadius="16.5dp"
-                            android:topRightRadius="7.5dp"
-                            android:bottomRightRadius="20.5dp"
-                            android:bottomLeftRadius="8.5dp" />
+                android:topLeftRadius="18.5dp"
+                android:topRightRadius="6.5dp"
+                android:bottomRightRadius="26.5dp"
+                android:bottomLeftRadius="10.5dp" />
         </shape>
     </item>
     <item
@@ -121,10 +121,10 @@
                             android:startColor="#66000000"
                             android:endColor="#00000000" />
             <corners
-                            android:topLeftRadius="16.5dp"
-                            android:topRightRadius="7.5dp"
-                            android:bottomRightRadius="20.5dp"
-                            android:bottomLeftRadius="8.5dp" />
+                android:topLeftRadius="18.5dp"
+                android:topRightRadius="6.5dp"
+                android:bottomRightRadius="26.5dp"
+                android:bottomLeftRadius="10.5dp" />
         </shape>
     </item>
     <item
@@ -140,10 +140,10 @@
                             android:startColor="#1AFFFFFF"
                             android:endColor="#00FFFFFF" />
             <corners
-                            android:topLeftRadius="16.5dp"
-                            android:topRightRadius="7.5dp"
-                            android:bottomRightRadius="0dp"
-                            android:bottomLeftRadius="0dp" />
+                android:topLeftRadius="18.5dp"
+                android:topRightRadius="6.5dp"
+                android:bottomRightRadius="0dp"
+                android:bottomLeftRadius="0dp" />
         </shape>
     </item>
     <item
@@ -171,10 +171,10 @@
                             android:width="1dp"
                             android:color="#3DDCC393" />
             <corners
-                            android:topLeftRadius="17.5dp"
-                            android:topRightRadius="8.5dp"
-                            android:bottomRightRadius="21.5dp"
-                            android:bottomLeftRadius="9.5dp" />
+                android:topLeftRadius="19.5dp"
+                android:topRightRadius="7.5dp"
+                android:bottomRightRadius="27.5dp"
+                android:bottomLeftRadius="11.5dp" />
         </shape>
     </item>
 </layer-list>
