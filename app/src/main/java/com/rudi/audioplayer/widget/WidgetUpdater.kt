@@ -62,16 +62,16 @@ object WidgetUpdater {
     // cuma nilainya yang salah kalibrasi awalnya (90dp > minHeight 80dp declared, sudah
     // dikoreksi 70dp di Batch 202). User laporan screenshot: widget full layout 1-baris
     // (dipaksa pendek) bikin judul+artis kepotong vertikal — persis kasus yang height-check
-    // ini tangani, tanpa API baru/reflection apapun yang berisiko.
-    private const val COMPACT_HEIGHT_THRESHOLD_DP = 70
+    // ini tangani. Batch 605: 70 -> 124 (layout penuh = 2 baris, isi 126dp; di bawah itu compact 1 baris).
+    private const val COMPACT_HEIGHT_THRESHOLD_DP = 124
 
     // Batch 589 — inset sudut widget. Padding root di bawah HARUS sama dengan `android:padding` root
-    // `widget_player.xml` (10dp) dan `widget_player_compact.xml` (7dp) (Batch 604: dulu 14dp/8dp; cangkang "bilah"
+    // `widget_player.xml` (10dp) dan `widget_player_compact.xml` (9dp, Batch 605; dulu 7dp) (Batch 604: dulu 14dp/8dp; cangkang "bilah"
     // memakai margin halo 3dp + rim 2dp di dalam batas widget, jadi isi sudah menjorok ke dalam). `CORNER_INSET_FRACTION` = 1 - 1/sqrt(2):
     // jarak minimum dari tepi agar sudut siku isi tidak keluar dari busur sudut berradius R (launcher meng-clip
     // widget ke radius sistem). `MAX_CORNER_INSET_DP` mencegah layout compact terdesak pada radius ekstrem.
     private const val FULL_PADDING_DP = 10f
-    private const val COMPACT_PADDING_DP = 7f
+    private const val COMPACT_PADDING_DP = 9f
     private const val CORNER_INSET_FRACTION = 0.2929f
     private const val MAX_CORNER_INSET_DP = 16f
 
@@ -84,13 +84,13 @@ object WidgetUpdater {
 
     // Batch 593 — INSTRUMENTASI marquee judul (BUKAN perbaikan; hipotesis Batch 592 terbukti salah: gejala sama).
     // Lebar TETAP non-judul tiap layout (dp), dari XML, hanya untuk ESTIMASI lebar kolom judul di log:
-    // Batch 604 (layout baru: keping sampul + palung cekung): penuh = padding 10x2 + sampul 56 + margin palung 6 +
-    // padding palung 14+6 + margin kolom 4 + prev 34 + (4+44) + (4+34) = 226; compact = padding 7x2 + sampul 44 +
-    // margin palung 5 + padding palung 12+3 + (26+2) + (38+2) + (26+2) = 174.
+    // Batch 605: penuh (2 baris; judul/artis di palung baris 1) = padding 10x2 + sampul 62 + margin palung 6 + padding 14+12 = 114;
+    // compact (Batch 605: 7->9 / 44->40 / 38->36; total tetap) = padding 9x2 + sampul 40 +
+    // margin palung 6 + padding palung 12+4 + (26+2) + (36+2) + (26+2) = 174.
     // Harus sama dgn `widget_player.xml` / `widget_player_compact.xml` (hanya memengaruhi baris log).
-    private const val FULL_FIXED_WIDTH_DP = 226f
+    private const val FULL_FIXED_WIDTH_DP = 114f
     private const val COMPACT_FIXED_WIDTH_DP = 174f
-    private const val FULL_TITLE_SP = 14f
+    private const val FULL_TITLE_SP = 13f
     private const val COMPACT_TITLE_SP = 13f
 
     // Batch 68: fix "widget nggak pernah sinkron pas ganti tema" — widget_player(.compact).xml

@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Batch 604 — STRUKTUR BERTINGKAT ala Boomly: keping sampul (kiri) + PALUNG cekung (widget_well) berisi judul +
-    kontrol, di atas cangkang "bilah" (widget_background_dark/_light). Dulu semuanya mengambang rata di satu permukaan.
-    Lebar tetap non-judul = padding 7x2 + sampul 44 + margin palung 5 + padding palung 12+3 + (26+2) + (38+2) + (26+2)
-    = 174dp (WidgetUpdater.COMPACT_FIXED_WIDTH_DP / COMPACT_PADDING_DP HARUS sama). Tinggi isi 44dp (+14 padding = 58dp <=
-    tinggi minimum compact 59dp). Semua id lama dipertahankan; `widget_well` baru (latar ditukar gelap/terang oleh
-    WidgetUpdater).
+    Batch 605 — NAPAS di dalam cangkang (user: "kurang rapi"). Struktur Batch 604 dipertahankan (keping sampul +
+    PALUNG cekung `widget_well` berisi judul + kontrol, di atas cangkang "bilah"), tetapi ukurannya dilonggarkan:
+    cangkang menyisakan ~5dp di tiap sisi (halo 3dp + rim 2dp), jadi padding 7dp lama hanya menyisakan ~2dp antara
+    isi dan rim (sampul/palung terlihat menempel ke tepi, medali play 38dp hampir menyentuh bibir palung 44dp).
+    Kini padding 9dp (~4dp napas), sampul + palung 40dp (tinggi isi 40 + 18 padding = 58dp <= tinggi minimum compact
+    59dp), medali play 36dp (tepi palung 2dp) dan kenop 26dp tetap. Lebar tetap non-judul = padding 9x2 + sampul 40
+    + margin palung 6 + padding palung 12+4 + (26+2) + (36+2) + (26+2) = 174dp (sama dgn Batch 604 -> kolom judul
+    tak menyempit; WidgetUpdater.COMPACT_FIXED_WIDTH_DP / COMPACT_PADDING_DP HARUS sama). Semua id lama dipertahankan.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -14,25 +16,25 @@
     android:background="@drawable/widget_background_dark"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:padding="7dp">
+    android:padding="9dp">
 
     <ImageView
         android:id="@+id/widget_album_art"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:scaleType="centerCrop" />
 
     <LinearLayout
         android:id="@+id/widget_well"
         android:layout_width="0dp"
-        android:layout_height="44dp"
+        android:layout_height="40dp"
         android:layout_weight="1"
-        android:layout_marginStart="5dp"
+        android:layout_marginStart="6dp"
         android:background="@drawable/widget_well"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="12dp"
-        android:paddingEnd="3dp">
+        android:paddingEnd="4dp">
 
         <TextView
             android:id="@+id/widget_title"
@@ -65,10 +67,10 @@
 
         <ImageButton
             android:id="@+id/widget_play_pause"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:layout_marginStart="2dp"
-            android:padding="9dp"
+            android:padding="8dp"
             android:background="@drawable/widget_play_button_bg"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_widget_play"
