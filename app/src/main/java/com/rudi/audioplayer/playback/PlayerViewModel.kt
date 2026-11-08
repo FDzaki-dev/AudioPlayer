@@ -71,6 +71,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 data class PlaybackUiState(
     val currentSong: Song? = null,
@@ -125,16 +127,18 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var currentQueue: List<Song> = emptyList()
     private var currentQueueSlotIds: List<Long> = emptyList()
-    private var nextQueueSlotId: Long = 0L
+    // Batch 613 — AtomicLong (SpotBugs AT_NONATOMIC_64BIT_PRIMITIVE x3): penghitung Long ini dinaikkan dari
+    // beberapa fungsi antrean; atomik = tak bisa robek/ganda walau suatu saat dipanggil dari thread lain.
+    private val nextQueueSlotId = AtomicLong(0L)
     // Gap List #8 (Playback error recovery) — jaga-jaga terhadap error beruntun (mis. seluruh
     // sisa queue nunjuk file yang sudah dihapus semua): tanpa batas ini, auto-skip di
     // onPlayerError bisa mental dari 1 lagu rusak ke lagu rusak berikutnya tanpa henti (silent
     // infinite loop, tiap iterasi nembak Snackbar error baru). Direset ke 0 begitu playback
     // beneran jalan lagi (onIsPlayingChanged(true)) — bukan cuma pindah track, harus BENAR
     // ISPLAYING true.
-    private var consecutiveErrorCount = 0
+    private val consecutiveErrorCount = AtomicInteger(0)
 
-    private fun newSlotIds(count: Int): List<Long> = List(count) { nextQueueSlotId++ }
+    private fun newSlotIds(count: Int): List<Long> = List(count) { nextQueueSlotId.getAndIncrement() }
 
     private val favoritesStore = FavoritesStore(appContext)
     private val playbackStateStore = PlaybackStateStore(appContext)
@@ -298,7 +302,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val _customFolders = MutableStateFlow(emptyList<CustomFolderInfo>())
     val customFolders: StateFlow<List<CustomFolderInfo>> = _customFolders.asStateFlow()
     private var userTargetVolume = 1f
-    private var positionTick = 0
+    private val positionTick = AtomicInteger(0)
     // Batch 537 (baterai) — kadensi loop posisi ADAPTIF. `uiVisible` default true = perilaku lama
     // persis bila hook ON_START/ON_STOP (MainActivity) tak pernah dipanggil. `positionWake`
     // (CONFLATED) membangunkan loop seketika saat play/pause/seek/ganti lagu/UI tampil lagi, jadi
@@ -549,9 +553,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val _libraryLoading = MutableStateFlow(true)
     val libraryLoading: StateFlow<Boolean> = _libraryLoading.asStateFlow()
 
-    private var libraryLoadedOnce = false
+    // Batch 613 — SpotBugs AT_STALE_THREAD_WRITE/AT_NONATOMIC: flag ditulis dari coroutine dan fungsi biasa ->
+    // @Volatile; penghitung generasi = AtomicLong (increment atomik, perbandingan `generation == ...get()`).
+    @Volatile private var libraryLoadedOnce = false
     private var libraryRefreshJob: Job? = null
-    private var libraryRefreshGeneration = 0L
+    private val libraryRefreshGeneration = AtomicLong(0L)
     private val musicRepository = MusicRepository(appContext)
     // Batch 488 — lihat KDoc `LibraryCacheStore` & `ensureLibraryLoaded()`/`refreshLibrary()`
     // di bawah untuk root cause + rasional penuh ("app reload setiap dibuka lagi pasca kill").
@@ -563,8 +569,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     // satunya prasyarat data yang valid untuk `maybeSyncMiniPlayerOnColdStart()` memetakan
     // mediaId → Song. `coldStartSyncDone` mengunci fungsi itu supaya jalan PERSIS 1x per proses
     // (refresh library berikutnya dari ContentObserver tidak mengulang sync ini).
-    private var librarySnapshotLoadedOnce = false
-    private var coldStartSyncDone = false
+    @Volatile private var librarySnapshotLoadedOnce = false
+    @Volatile private var coldStartSyncDone = false
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -584,7 +590,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             // pindah index): reset counter error beruntun di sini, bukan di
             // onMediaItemTransition (yang juga terpanggil untuk track yang UJUNG-UJUNGNYA error
             // lagi sebelum sempat isPlaying=true).
-            if (isPlaying) consecutiveErrorCount = 0
+            if (isPlaying) consecutiveErrorCount.set(0)
         }
 
         // Batch 537 (baterai) — seek/skip saat JEDA tak lagi menunggu tick: loop dibangunkan.
@@ -690,9 +696,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             val reason = describePlaybackErrorReason(error)
             AppLogger.e("PlayerViewModel", "Playback error pada index=$index ($label) — $reason", error)
 
-            consecutiveErrorCount++
+            val errorStreak = consecutiveErrorCount.incrementAndGet()
             val c = controller
-            if (consecutiveErrorCount >= MAX_CONSECUTIVE_PLAYBACK_ERRORS) {
+            if (errorStreak >= MAX_CONSECUTIVE_PLAYBACK_ERRORS) {
                 // Skip otomatis TIDAK lagi aman diteruskan — kemungkinan besar sisa queue
                 // bermasalah semua (mis. folder sumbernya baru dicabut/dihapus total). Hentikan
                 // di sini alih-alih terus mental dari 1 track rusak ke track rusak berikutnya
@@ -701,7 +707,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 _playbackErrorMessage.value =
                     "Beberapa lagu berturut-turut gagal diputar ($reason). Playback dihentikan — " +
                         "periksa apakah file/folder musik kamu masih ada."
-                consecutiveErrorCount = 0
+                consecutiveErrorCount.set(0)
                 return
             }
 
@@ -896,7 +902,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     fun refreshLibrary(silent: Boolean = false) {
         libraryLoadedOnce = true
         libraryRefreshJob?.cancel()
-        val generation = ++libraryRefreshGeneration
+        val generation = libraryRefreshGeneration.incrementAndGet()
         libraryRefreshJob = viewModelScope.launch {
             if (!silent) {
                 _libraryLoading.value = true
@@ -955,7 +961,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 }
                 // A newer refresh may have started while this scan was running. Never let an
                 // older, slower scan overwrite the newer result.
-                if (generation == libraryRefreshGeneration) {
+                if (generation == libraryRefreshGeneration.get()) {
                     _librarySongs.value = songs
                     librarySnapshotLoadedOnce = true
                     maybeSyncMiniPlayerOnColdStart()
@@ -988,11 +994,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 // loaded. The next ensureLibraryLoaded() call can retry safely — but the
                 // failure itself is still worth a local record, since it used to vanish here.
                 AppLogger.e("PlayerViewModel", "Gagal memindai library", e)
-                if (generation == libraryRefreshGeneration) {
+                if (generation == libraryRefreshGeneration.get()) {
                     libraryLoadedOnce = false
                 }
             } finally {
-                if (generation == libraryRefreshGeneration) {
+                if (generation == libraryRefreshGeneration.get()) {
                     _libraryLoading.value = false
                 }
             }
@@ -1143,7 +1149,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                         c.seekTo(_abRepeatPointA.value ?: 0L)
                     }
 
-                    positionTick++
+                    val tick = positionTick.incrementAndGet()
                     // Batch 537: tick 1 dtk HANYA saat musik main + (UI terlihat ATAU A-B repeat aktif),
                     // atau A-B aktif (loop-back butuh presisi). Selain itu tick 5 dtk. Kadensi simpan
                     // state ~5 dtk dipertahankan: tick 5 dtk -> simpan tiap tick; tick 1 dtk -> tiap 5 tick
@@ -1153,7 +1159,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                     val abActive = AbRepeatLogic.isActive(_abRepeatPointA.value, _abRepeatPointB.value)
                     val relaxed = !abActive && (!playing || !uiVisible)
                     if (relaxed) tickMs = POSITION_TICK_RELAXED_MS
-                    if (playing && (relaxed || positionTick % 5 == 0)) persistPlaybackState()
+                    if (playing && (relaxed || tick % 5 == 0)) persistPlaybackState()
                 }
                 // Tidur sampai timeout ATAU dibangunkan event (play/pause/seek/transisi/UI tampil).
                 withTimeoutOrNull(tickMs) { positionWake.receive() }
@@ -1498,7 +1504,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val insertAt = atIndex.coerceIn(0, currentQueue.size)
         c.addMediaItem(insertAt, mediaItemFor(song))
         currentQueue = currentQueue.toMutableList().apply { add(insertAt, song) }
-        currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { add(insertAt, slotId ?: nextQueueSlotId++) }
+        currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { add(insertAt, slotId ?: nextQueueSlotId.getAndIncrement()) }
         _uiState.value = _uiState.value.copy(
             queue = currentQueue,
             queueSlotIds = currentQueueSlotIds,
@@ -1514,7 +1520,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val item = mediaItemFor(song)
         c.addMediaItem(insertAt, item)
         currentQueue = currentQueue.toMutableList().apply { add(insertAt, song) }
-        currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { add(insertAt, nextQueueSlotId++) }
+        currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { add(insertAt, nextQueueSlotId.getAndIncrement()) }
         _uiState.value = _uiState.value.copy(queue = currentQueue, queueSlotIds = currentQueueSlotIds, currentIndex = c.currentMediaItemIndex)
         persistPlaybackState()
     }
@@ -1524,7 +1530,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val c = controller ?: return
         c.addMediaItem(mediaItemFor(song))
         currentQueue = currentQueue + song
-        currentQueueSlotIds = currentQueueSlotIds + (nextQueueSlotId++)
+        currentQueueSlotIds = currentQueueSlotIds + nextQueueSlotId.getAndIncrement()
         _uiState.value = _uiState.value.copy(queue = currentQueue, queueSlotIds = currentQueueSlotIds, currentIndex = c.currentMediaItemIndex)
         persistPlaybackState()
     }
@@ -1748,7 +1754,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     /** Attaches the equalizer to the current playback session. Call when the Equalizer sheet opens.
      * Safe to call repeatedly. */
     fun ensureEqualizerAttached() {
-        equalizerController.attach(PlaybackAudioSession.sessionId)
+        // Batch 613 — aksi pengguna (sheet dibuka) = boleh mengulang sesi yang tadinya gagal; sesi yang sudah terpasang = no-op.
+        equalizerController.attach(PlaybackAudioSession.sessionId, retryFailed = true)
     }
 
     fun setEqualizerEnabled(enabled: Boolean) = equalizerController.setEnabled(enabled)

@@ -29,10 +29,23 @@
   `File.delete()/mkdirs()` pembersihan), STCAL_* (4, SimpleDateFormat bersama di AppLogger/BackupManager), DLS, IP, REC,
   SA_FIELD_SELF_COMPUTATION, UC.
   Kelas hasil generate (ComposableSingletons, Room _Impl, R, BuildConfig) juga dikecualikan.
+  Batch 613 — dasar: laporan CI run #41 (23 temuan) + pembacaan kode di tiap titik. DIPERBAIKI di kode (bukan disaring):
+  AT_* di PlayerViewModel/CrossfadeEngine (atomik/volatile) dan UC_USELESS_CONDITION di CrossfadeEngine. DISARING (terbukti
+  bukan bug), cakupan sempit:
+  - REC_CATCH_EXCEPTION (1, WidgetUpdater.kt:234): Kotlin tak punya checked exception; `catch (e: Exception)` di sekitar
+    probe refleksi `getMethod` memang idiom dan mengembalikan nilai aman. Aturan gaya, bukan bug.
+  - DLS_DEAD_LOCAL_STORE + IP_PARAMETER_IS_DEAD_BUT_OVERWRITTEN @ BlurUtils.kt:329 (2): berkas hanya 326 baris, jadi baris 329
+    = metode sintetis `frostedGlass$default` (jembatan argumen bawaan Kotlin menimpa parameter bila bit mask aktif).
+  - SA_FIELD_SELF_COMPUTATION @ PlayerViewModel.kt:0 (1): baris 0 = kode sintetis hasil kompilator (state machine coroutine);
+    tak ada baris sumber yang menghitung field terhadap dirinya sendiri.
+  - RV_RETURN_VALUE_IGNORED_BAD_PRACTICE (6): semuanya `File.delete()/mkdirs()` pembersihan best-effort (berkas sementara /
+    folder tujuan unduhan) di LibraryCacheStore, RingtoneEncoder, TagEditor, UpdateDownloader, ApkSignatureChecker; kegagalannya
+    tak berdampak (tulis berikutnya melempar IOException yang sudah ditangkap pemanggil). Konsekuensi diterima: temuan
+    serupa BARU di kelima berkas ini ikut tersaring; `renameTo` yang hasilnya tak dicek harus ditinjau manual di berkas itu.
 -->
 <FindBugsFilter>
   <Match>
-    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2,EI_EXPOSE_STATIC_REP2,MS_EXPOSE_REP,BC_BAD_CAST_TO_ABSTRACT_COLLECTION,NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE,NM_METHOD_NAMING_CONVENTION,NP_NULL_ON_SOME_PATH,RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE,DMI_RANDOM_USED_ONLY_ONCE"/>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2,EI_EXPOSE_STATIC_REP2,MS_EXPOSE_REP,BC_BAD_CAST_TO_ABSTRACT_COLLECTION,NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE,NM_METHOD_NAMING_CONVENTION,NP_NULL_ON_SOME_PATH,RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE,DMI_RANDOM_USED_ONLY_ONCE,REC_CATCH_EXCEPTION"/>
   </Match>
   <Match>
     <Class name="~.*ComposableSingletons.*"/>
@@ -72,5 +85,24 @@
   <Match>
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD,SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA"/>
     <Class name="~com\.rudi\.audioplayer\.(util\.AppLogger|playback\.PlaybackAudioSession)"/>
+  </Match>
+  <!-- Batch 613 — artefak sintetis / pembersihan best-effort terkonfirmasi (alasan di komentar header) -->
+  <Match>
+    <Bug pattern="DLS_DEAD_LOCAL_STORE,IP_PARAMETER_IS_DEAD_BUT_OVERWRITTEN"/>
+    <Source name="BlurUtils.kt"/>
+  </Match>
+  <Match>
+    <Bug pattern="SA_FIELD_SELF_COMPUTATION"/>
+    <Source name="PlayerViewModel.kt"/>
+  </Match>
+  <Match>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>
+    <Or>
+      <Source name="LibraryCacheStore.kt"/>
+      <Source name="RingtoneEncoder.kt"/>
+      <Source name="TagEditor.kt"/>
+      <Source name="UpdateDownloader.kt"/>
+      <Source name="ApkSignatureChecker.kt"/>
+    </Or>
   </Match>
 </FindBugsFilter>

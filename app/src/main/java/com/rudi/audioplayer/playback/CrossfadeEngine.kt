@@ -91,6 +91,10 @@ class CrossfadeEngine(
     private enum class State { IDLE, FADING, HANDBACK }
 
     private var state = State.IDLE
+    // Batch 613 — SpotBugs AT_STALE_THREAD_WRITE_OF_PRIMITIVE: `triggeredForIndex` dan `preFadeVolume` ditulis dari
+    // maybeStartCrossfade/abort DAN dari coroutine ramp; @Volatile = tulisan satu jalur selalu terlihat jalur lain
+    // (`state` sudah @Volatile sejak awal). Nilai/urutan tak berubah.
+    @Volatile
     private var triggeredForIndex = -1
     private var rampJob: Job? = null
 
@@ -99,6 +103,7 @@ class CrossfadeEngine(
     // restore di onSessionAutoTransition() & abort() — jangan pernah coba tebak ulang volume
     // "utuh" dari nilai yang sudah di tengah jalan diubah ramp, itu akar bug Batch 366 (lihat
     // abort() di bawah).
+    @Volatile
     private var preFadeVolume: Float = 1f
 
     // Tells onSessionManualDiscontinuity apart from this engine's own handback seek in
@@ -138,7 +143,9 @@ class CrossfadeEngine(
         if (!sessionPlayer.isPlaying) return
 
         val duration = sessionPlayer.duration
-        if (duration <= 0 || duration == C.TIME_UNSET) return
+        // Batch 613 — SpotBugs UC_USELESS_CONDITION: C.TIME_UNSET bernilai negatif (Long.MIN_VALUE + 1), jadi
+        // `duration <= 0` sudah mencakupnya; pembanding kedua tak pernah bisa true. Perilaku identik.
+        if (duration <= 0) return
         val remaining = duration - sessionPlayer.currentPosition
         if (remaining !in 1..crossfadeDurationMs) return
 

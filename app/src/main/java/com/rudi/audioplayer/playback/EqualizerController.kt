@@ -45,12 +45,37 @@ data class EqImportResult(
 class EqualizerController(private val context: Context) {
 
     private var equalizer: Equalizer? = null
+
+    // Batch 613 — sesi audio yang SEDANG terpasang + sesi yang terakhir gagal dipasang. Dipakai attach()
+    // agar event pemutar yang berulang (hook onEvents -> PlaybackAudioSession -> attach) tidak
+    // membongkar-pasang efek untuk sesi yang sama dan tidak mengulang kegagalan yang sama tiap event.
+    private var attachedSessionId = 0
+    private var failedSessionId = 0
+
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow(EqualizerUiState())
     val state: StateFlow<EqualizerUiState> = _state.asStateFlow()
 
-    fun attach(audioSessionId: Int) {
+    /**
+     * Batch 613 — LOG USER (82x ERROR `UnsupportedOperationException: AudioEffect: invalid parameter
+     * operation` di `Equalizer.setBandLevel`, Infinix X6850 / Android 16): DUA akar di sini.
+     * (1) Catch di bawah dulu hanya `equalizer = null` TANPA `eq.release()` -> efek setengah jadi bocor
+     * dan tetap memegang kontrol efek di sesi itu, sehingga attach berikutnya (Equalizer baru
+     * berprioritas sama = tanpa kontrol) gagal dengan error yang sama, dan `release()` tak bisa lagi
+     * melepasnya (referensinya sudah null). (2) Hook `onEvents` (PlaybackService) menulis ulang
+     * `PlaybackAudioSession.sessionId` di SETIAP event pemutar dan setter-nya memanggil attach() lagi
+     * walau ID-nya sama -> efek dibongkar-pasang berulang. Kini: sesi yang sudah terpasang = no-op;
+     * sesi yang baru gagal tidak diulang otomatis ([retryFailed] = true hanya dari aksi pengguna, mis.
+     * membuka sheet Equalizer); efek setengah jadi SELALU dilepas; level tersimpan dijepit ke rentang
+     * perangkat sebelum diterapkan.
+     */
+    @Synchronized
+    fun attach(audioSessionId: Int, retryFailed: Boolean = false) {
+        if (audioSessionId != 0) {
+            if (equalizer != null && audioSessionId == attachedSessionId) return
+            if (!retryFailed && audioSessionId == failedSessionId) return
+        }
         release()
         if (audioSessionId == 0) return
 
@@ -69,7 +94,7 @@ class EqualizerController(private val context: Context) {
             for (i in 0 until bandCount) {
                 val saved = prefs.getInt(KEY_BAND_PREFIX + i, Int.MIN_VALUE)
                 if (saved != Int.MIN_VALUE) {
-                    eq.setBandLevel(i.toShort(), saved.toShort())
+                    eq.setBandLevel(i.toShort(), saved.coerceIn(range[0].toInt(), range[1].toInt()).toShort())
                 }
             }
 
@@ -93,13 +118,16 @@ class EqualizerController(private val context: Context) {
                 userPresets = visibleUserPresetNames(bandCount),
                 selectedUserPreset = prefs.getString(KEY_USER_PRESET, "") ?: ""
             )
+            attachedSessionId = audioSessionId
+            failedSessionId = 0
         } catch (e: Exception) {
             // UI menampilkan ini persis sama dengan "device memang tidak mendukung equalizer" —
             // tapi keduanya bisa jadi beda kasus (mis. audioSessionId tidak valid, konflik efek
             // audio lain). Dicatat supaya kalau ada laporan "equalizer saya hilang" di device yang
             // seharusnya mendukung, penyebab sebenarnya tidak perlu ditebak dari nol.
             AppLogger.e("EqualizerController", "Gagal attach equalizer ke sesi audio", e)
-            equalizer = null
+            runCatching { release() }
+            failedSessionId = audioSessionId
             _state.value = EqualizerUiState(supported = false)
         }
     }
@@ -332,9 +360,16 @@ class EqualizerController(private val context: Context) {
 
     enum class BoldPreset { FLAT, BASS_BOOST, TREBLE_BOOST, VOCAL_BOOST }
 
+    @Synchronized
     fun release() {
-        equalizer?.release()
-        equalizer = null
+        // Batch 613 — `equalizer` selalu dikosongkan walau release() platform melempar, supaya referensi
+        // efek tidak tertinggal; penanda sesi ikut direset agar attach() berikutnya benar-benar memasang ulang.
+        try {
+            equalizer?.release()
+        } finally {
+            equalizer = null
+            attachedSessionId = 0
+        }
     }
 
     companion object {
