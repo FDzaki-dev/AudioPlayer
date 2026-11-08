@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 616 — CRASH Equalizer: semua pemanggilan efek dari UI dilindungi + log kontrol efek
+- Input user: hasil tes v615 (1 ❌, 2+3 ❔, 4 crash saat pemilihan equalizer) + `crash_20261108_193631_*.txt` + `sonix_debug_20261108_193647.txt`.
+- FAKTA: crash 19:36:31 (v615, build 477, thread main) `UnsupportedOperationException: AudioEffect: invalid parameter operation` di `Equalizer.setBandLevel` dari klik UI; tak ada `Gagal attach equalizer` di sesi v615 -> kontrol hilang setelah attach.
+- PERBAIKAN `playback/EqualizerController.kt`: `guardedEffectOp` membungkus `setEnabled`/`setBandLevel`/`usePreset`/`useBoldPreset`/`applyBandLevels`; gagal = log (sesi, hasControl) + lepas efek + UI "tidak didukung" + satu attach ulang (`pulih=`); prefs/state perubahan yang gagal tidak disimpan. Instrumentasi: `Equalizer terpasang: ... hasControl=` dan `Status kontrol efek berubah: ... granted=`.
+- Tes 1: render pertama setelah proses baru sudah `playing=false` (bukti log); ikon jeda tetap tampil selama proses mati (swipe-up clean) karena launcher menyimpan RemoteViews terakhir — tak bisa diubah dari proses mati.
+- 1 file source (<= 5) + docs; `FILE_MANIFEST.txt` tetap 234. **NOT VERIFIED**: belum compile/CI/device. PREDIKSI: "11 (11 deprecated, 0 lainnya)"; ArchUnit 7 LULUS; detekt 0; lintDebug 0; SpotBugs 0.
+
 ## Batch 615 — Putaran tercatat juga saat UI tertutup (pemutaran via widget/headset/bubble)
 - Input user: `SONIX_v614.zip` + `SONIX_laporan-untuk-claude_run43.zip` — "next".
 - FAKTA run #43 (commit `9237abc`, 2026-11-08 06:13 UTC; Gradle exit 0/0/0): ArchUnit 7 LULUS, detekt 0, lintDebug 0, Kotlin "11 (11 deprecated, 0 lainnya)", SpotBugs 0 = prediksi Batch 614 cocok -> v614 **VERIFIED** build (ZIP unggahan identik dgn keluaran Batch 614).

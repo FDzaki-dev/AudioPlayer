@@ -120,6 +120,13 @@ class EqualizerController(private val context: Context) {
             )
             attachedSessionId = audioSessionId
             failedSessionId = 0
+            // Batch 616 — fakta mentah: baris sukses (1x per sesi baru; sesi sama = no-op) + kapan kontrol efek
+            // berpindah tangan. v615 tak mencatat kegagalan attach tetapi setBandLevel dari UI melempar error
+            // yang sama -> kontrol hilang SETELAH attach; waktu perpindahannya kini terbaca di log.
+            AppLogger.w("EqualizerController", "Equalizer terpasang: sesi=$audioSessionId hasControl=${eq.hasControl()}")
+            eq.setControlStatusListener { _, granted ->
+                AppLogger.w("EqualizerController", "Status kontrol efek berubah: sesi=$audioSessionId granted=$granted")
+            }
         } catch (e: Exception) {
             // UI menampilkan ini persis sama dengan "device memang tidak mendukung equalizer" —
             // tapi keduanya bisa jadi beda kasus (mis. audioSessionId tidak valid, konflik efek
@@ -142,18 +149,49 @@ class EqualizerController(private val context: Context) {
         }
     }
 
+    /**
+     * Batch 616 — CRASH (v615, 19:36:31, thread main): `UnsupportedOperationException: AudioEffect: invalid
+     * parameter operation` dari `Equalizer.setBandLevel` yang dipanggil langsung oleh klik UI (pilih preset
+     * Equalizer) tanpa try/catch -> aplikasi mati. Efek yang kehilangan kontrol menolak SETIAP set-parameter
+     * dengan error itu, jadi SEMUA pemanggilan efek dari UI dibungkus di sini. Gagal = dicatat (fakta mentah:
+     * sesi, hasControl), efek dilepas, lalu SATU kali attach ulang (sesi yang sama, `retryFailed`) supaya kontrol
+     * bisa pulih; bila attach ulang juga gagal, UI jatuh ke "tidak didukung" (jalur attach yang sudah ada).
+     * Mengembalikan false bila operasi gagal (pemanggil TIDAK boleh menyimpan prefs/state perubahan itu).
+     */
+    private fun guardedEffectOp(op: String, block: () -> Unit): Boolean {
+        return try {
+            block()
+            true
+        } catch (e: RuntimeException) {
+            val control = runCatching { equalizer?.hasControl() }.getOrNull()
+            val session = attachedSessionId
+            AppLogger.e("EqualizerController", "Gagal $op: sesi=$session hasControl=$control", e)
+            runCatching { release() }
+            failedSessionId = session
+            _state.value = EqualizerUiState(supported = false)
+            if (session != 0) {
+                attach(session, retryFailed = true)
+                AppLogger.w("EqualizerController", "Attach ulang setelah gagal $op: sesi=$session pulih=${equalizer != null}")
+            }
+            false
+        }
+    }
+
     fun setEnabled(enabled: Boolean) {
-        equalizer?.setEnabled(enabled)
+        if (!guardedEffectOp("setEnabled") { equalizer?.setEnabled(enabled) }) return
         prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()
         _state.value = _state.value.copy(enabled = enabled)
     }
 
     fun setBandLevel(band: Int, level: Short) {
         val eq = equalizer ?: return
-        eq.setBandLevel(band.toShort(), level)
         // Adjusting a band is a clear signal the user wants to hear the effect —
         // don't make them separately remember to flip the enabled switch too.
-        eq.setEnabled(true)
+        if (!guardedEffectOp("setBandLevel band=$band") {
+                eq.setBandLevel(band.toShort(), level)
+                eq.setEnabled(true)
+            }
+        ) return
         prefs.edit()
             .putInt(KEY_BAND_PREFIX + band, level.toInt())
             .putInt(KEY_PRESET, -1)
@@ -175,19 +213,22 @@ class EqualizerController(private val context: Context) {
 
     fun usePreset(presetIndex: Int) {
         val eq = equalizer ?: return
-        eq.usePreset(presetIndex.toShort())
-        eq.setEnabled(true)
-
         val editor = prefs.edit()
             .putInt(KEY_PRESET, presetIndex)
             .putString(KEY_BOLD_PRESET, "")
             .putString(KEY_USER_PRESET, "")
             .putBoolean(KEY_ENABLED, true)
-        val updatedBands = _state.value.bands.map { band ->
-            val newLevel = eq.getBandLevel(band.index.toShort())
-            editor.putInt(KEY_BAND_PREFIX + band.index, newLevel.toInt())
-            band.copy(levelMillibel = newLevel)
-        }
+        var updatedBands = _state.value.bands
+        if (!guardedEffectOp("usePreset preset=$presetIndex") {
+                eq.usePreset(presetIndex.toShort())
+                eq.setEnabled(true)
+                updatedBands = _state.value.bands.map { band ->
+                    val newLevel = eq.getBandLevel(band.index.toShort())
+                    editor.putInt(KEY_BAND_PREFIX + band.index, newLevel.toInt())
+                    band.copy(levelMillibel = newLevel)
+                }
+            }
+        ) return
         editor.apply()
 
         _state.value = _state.value.copy(
@@ -216,20 +257,24 @@ class EqualizerController(private val context: Context) {
             .putString(KEY_USER_PRESET, "")
             .putBoolean(KEY_ENABLED, true)
 
-        val updatedBands = bands.mapIndexed { i, band ->
-            val fraction = if (bands.size == 1) 0f else i / (bands.size - 1).toFloat() // 0 = lowest band, 1 = highest
-            val intensity = when (preset) {
-                BoldPreset.FLAT -> 0f
-                BoldPreset.BASS_BOOST -> ((1f - fraction).coerceIn(0f, 1f)).let { it * it }
-                BoldPreset.TREBLE_BOOST -> fraction.let { it * it }
-                BoldPreset.VOCAL_BOOST -> (1f - (2f * (fraction - 0.5f)) * (2f * (fraction - 0.5f))).coerceIn(0f, 1f)
+        var updatedBands = bands
+        if (!guardedEffectOp("useBoldPreset preset=${preset.name}") {
+                updatedBands = bands.mapIndexed { i, band ->
+                    val fraction = if (bands.size == 1) 0f else i / (bands.size - 1).toFloat() // 0 = lowest band, 1 = highest
+                    val intensity = when (preset) {
+                        BoldPreset.FLAT -> 0f
+                        BoldPreset.BASS_BOOST -> ((1f - fraction).coerceIn(0f, 1f)).let { it * it }
+                        BoldPreset.TREBLE_BOOST -> fraction.let { it * it }
+                        BoldPreset.VOCAL_BOOST -> (1f - (2f * (fraction - 0.5f)) * (2f * (fraction - 0.5f))).coerceIn(0f, 1f)
+                    }
+                    val level = (intensity * maxRange * 0.85f).toInt().toShort()
+                    eq.setBandLevel(i.toShort(), level)
+                    editor.putInt(KEY_BAND_PREFIX + i, level.toInt())
+                    band.copy(levelMillibel = level)
+                }
+                eq.setEnabled(true)
             }
-            val level = (intensity * maxRange * 0.85f).toInt().toShort()
-            eq.setBandLevel(i.toShort(), level)
-            editor.putInt(KEY_BAND_PREFIX + i, level.toInt())
-            band.copy(levelMillibel = level)
-        }
-        eq.setEnabled(true)
+        ) return
         editor.apply()
 
         _state.value = _state.value.copy(
@@ -258,13 +303,17 @@ class EqualizerController(private val context: Context) {
             .putString(KEY_USER_PRESET, userPreset)
             .putBoolean(KEY_ENABLED, true)
 
-        val updatedBands = bands.mapIndexed { i, band ->
-            val level = levels[i].coerceIn(minLevel, maxLevel)
-            eq.setBandLevel(i.toShort(), level)
-            editor.putInt(KEY_BAND_PREFIX + i, level.toInt())
-            band.copy(levelMillibel = level)
-        }
-        eq.setEnabled(true)
+        var updatedBands = bands
+        if (!guardedEffectOp("applyBandLevels") {
+                updatedBands = bands.mapIndexed { i, band ->
+                    val level = levels[i].coerceIn(minLevel, maxLevel)
+                    eq.setBandLevel(i.toShort(), level)
+                    editor.putInt(KEY_BAND_PREFIX + i, level.toInt())
+                    band.copy(levelMillibel = level)
+                }
+                eq.setEnabled(true)
+            }
+        ) return false
         editor.apply()
 
         _state.value = _state.value.copy(

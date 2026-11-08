@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Crash saat memilih preset Equalizer diperbaiki (Batch 616: semua perubahan efek dilindungi; bila kontrol efek hilang, UI jatuh ke "tidak didukung" lalu mencoba memasang ulang) — belum dikompilasi/diuji di device; pastikan memilih preset dan menggeser band tidak membuat aplikasi tertutup.
 > - Putaran lagu kini juga tercatat saat aplikasi ditutup tetapi musik tetap diputar lewat widget/headset (Batch 615) — belum dikompilasi/diuji di device; pastikan setelah menutup app dan memutar >30 dtk lewat widget, jumlah putaran bertambah 1 (bukan 2 saat app terbuka).
 > - Ikon jeda widget tak lagi basi setelah proses dibunuh (Batch 614: status "memutar" hanya dipercaya bila ditulis proses yang sama) dan log gagal-attach Equalizer kini memuat `hasControl` — belum dikompilasi/diuji di device; pastikan setelah instal saat memutar widget tidak menampilkan ikon jeda sebelum musik benar-benar jalan.
 > - Perbaikan attach Equalizer (tak lagi dibongkar-pasang tiap event, efek gagal dilepas) + 23 temuan SpotBugs (Batch 613) sudah TERKOMPILASI (run #42 hijau, SpotBugs 0); di device PID v613 bersih ~105 detik, tetapi belum teruji lintas banyak pergantian lagu — pastikan Equalizer di Infinix X6850 tetap berfungsi setelah ganti lagu.
@@ -317,6 +318,8 @@ Riwayat lebih detail per batch pengembangan ada di `CHANGELOG.md`.
 Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("junit:junit:4.13.2")`) — tidak ada Robolectric/instrumentation, tidak ada emulator. Konsekuensinya: hanya business logic yang benar-benar lepas dari `Context`/framework Android (SharedPreferences, ContentResolver, SensorManager, dst.) yang bisa ditest langsung. Pola yang dipakai berulang kali di proyek ini (`PinLockoutPolicy`, dan sejak Batch 27: `ShakePulseTracker`, `MusicRepository.deriveFolderName`, `LibraryFilterStore.shouldKeep`): pisahkan logika murninya ke fungsi/kelas pure, method instance yang butuh Context tinggal delegasikan ke situ tanpa ubah perilaku.
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
+
+**Batch 616** — Perbaikan crash: memilih preset Equalizer (atau menggeser band) bisa menutup aplikasi bila efek audio kehilangan kontrol di perangkat tertentu. Kini kegagalan itu ditangani tanpa menutup aplikasi dan dicatat di log (termasuk kapan kontrol efek berpindah), sehingga penyebab sebenarnya bisa dilacak. Belum dikompilasi/diuji di device.
 
 **Batch 615** — Perbaikan pencatatan putaran: sebelumnya lagu yang diputar lewat widget, headset, atau bubble setelah aplikasi ditutup tidak masuk statistik (Paling Sering Diputar, Baru Diputar). Kini layanan pemutar ikut mencatat saat tidak ada layar aplikasi yang aktif; saat aplikasi terbuka, pencatatan tetap seperti biasa dan tidak terhitung dua kali. Belum dikompilasi/diuji di device.
 
