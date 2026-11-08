@@ -2,7 +2,8 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
-> - Perbaikan attach Equalizer (tak lagi dibongkar-pasang tiap event, efek gagal dilepas) + 23 temuan SpotBugs (Batch 613) belum dikompilasi/diuji di device; pastikan Equalizer di Infinix X6850 kini tampil dan tetap berfungsi setelah ganti lagu.
+> - Ikon jeda widget tak lagi basi setelah proses dibunuh (Batch 614: status "memutar" hanya dipercaya bila ditulis proses yang sama) dan log gagal-attach Equalizer kini memuat `hasControl` — belum dikompilasi/diuji di device; pastikan setelah instal saat memutar widget tidak menampilkan ikon jeda sebelum musik benar-benar jalan.
+> - Perbaikan attach Equalizer (tak lagi dibongkar-pasang tiap event, efek gagal dilepas) + 23 temuan SpotBugs (Batch 613) sudah TERKOMPILASI (run #42 hijau, SpotBugs 0); di device PID v613 bersih ~105 detik, tetapi belum teruji lintas banyak pergantian lagu — pastikan Equalizer di Infinix X6850 tetap berfungsi setelah ganti lagu.
 > - Garis tepi pink di sekeliling palung widget (Batch 612) belum dikompilasi/dilihat di device.
 > - Palung widget berbentuk daun (Batch 611) sudah terkompilasi (run #40 hijau), tetapi user menilai perubahannya tidak terlihat (sudut yang diubah gelap di atas gelap) -> Batch 612.
 > - Bentuk daun cangkang widget + opt-out clip radius launcher (Batch 610) SUDAH terkompilasi (run #39 hijau) dan dikonfirmasi user lewat screenshot di Infinix X6850: widget slim dan penuh tampil daun, bukan pil.
@@ -315,6 +316,8 @@ Riwayat lebih detail per batch pengembangan ada di `CHANGELOG.md`.
 Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("junit:junit:4.13.2")`) — tidak ada Robolectric/instrumentation, tidak ada emulator. Konsekuensinya: hanya business logic yang benar-benar lepas dari `Context`/framework Android (SharedPreferences, ContentResolver, SensorManager, dst.) yang bisa ditest langsung. Pola yang dipakai berulang kali di proyek ini (`PinLockoutPolicy`, dan sejak Batch 27: `ShakePulseTracker`, `MusicRepository.deriveFolderName`, `LibraryFilterStore.shouldKeep`): pisahkan logika murninya ke fungsi/kelas pure, method instance yang butuh Context tinggal delegasikan ke situ tanpa ubah perilaku.
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
+
+**Batch 614** — Penyisiran bug dari log perangkat terbaru: setelah proses aplikasi dibunuh (mis. instal versi baru saat memutar), widget masih menampilkan ikon jeda karena status "memutar" tersimpan dari proses lama — di satu kasus sampai ~10 menit. Kini status itu hanya dipercaya bila ditulis oleh proses yang sedang hidup; judul, artis, dan sampul tetap tampil. Log gagal-attach Equalizer juga kini mencatat apakah efek memegang kontrol, supaya penyebab sebenarnya terbaca di log berikutnya. Belum dikompilasi/diuji di device.
 
 **Batch 613** — Log perangkat mencatat 82 kali Equalizer gagal dipasang. Penyebabnya: efek yang gagal tidak dilepas (sehingga percobaan berikutnya ikut gagal) dan efek dibongkar-pasang di setiap event pemutar. Kini Equalizer hanya dipasang sekali per sesi audio, efek gagal selalu dilepas, dan membuka sheet Equalizer boleh mengulang pemasangan. Sekaligus menutup 23 temuan SpotBugs: penghitung antrean/posisi dibuat atomik, flag lintas thread `@Volatile`, kondisi redundan di Crossfade dihapus, dan temuan yang terbukti bukan bug (artefak Kotlin, pembersihan berkas best-effort) disaring dengan alasan tercatat. Belum dikompilasi/diuji di device.
 

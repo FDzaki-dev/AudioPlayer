@@ -1,5 +1,15 @@
 # Changelog
 
+## Batch 614 — Penyisiran bug: ikon JEDA widget basi di proses baru + log gagal-attach EQ memuat hasControl
+- Input user: `SONIX_v613.zip` + `SONIX_laporan-untuk-claude_run42.zip` + `sonix_debug_20261108_135110.txt` — "lanjutkan penyisiran bug!!".
+- FAKTA run #42 (commit `43edffa`, 2026-11-08 05:34 UTC, diasumsikan push Batch 613; Gradle exit 0/0/0): ArchUnit 7 LULUS, detekt 0, lintDebug 0, Kotlin "11 (11 deprecated, 0 lainnya)", SpotBugs 0 = semua prediksi Batch 613 cocok -> v613 **VERIFIED** build (kompilasi).
+- FAKTA log (7 PID, 12:09-13:51): 0 FATAL/ANR; 5 `ApplicationExitInfo` = 3x instal paket + 2x REMOVE TASK. 144 kegagalan EQ semuanya di PID build <= 612 (terakhir 13:49:03); PID v613 (14770, ~105 dtk, 1 lagu) = 0 error EQ — BELUM bukti perbaikan (tanpa ganti lagu, tanpa baris sukses).
+- TEMUAN + PERBAIKAN `widget/WidgetUpdater.kt`: 4 dari 7 PID baru melaporkan `playing=true` pada update widget pertama padahal ExoPlayer belum ada (Init +6 dtk / +9,7 mnt / tak pernah / +4 dtk). Akar: `is_playing` di prefs `widget_state` ditulis proses sebelumnya dan tak diturunkan saat proses dibunuh (instal/sistem). Kini `saveState` menulis `state_process` (`Process.getStartElapsedRealtime()`), `performUpdate` memakai `is_playing && state_process == processStamp()`; nilai dari proses lain = tidak memutar. Judul/artis/sampul tetap.
+- INSTRUMENTASI `playback/EqualizerController.kt`: pesan gagal-attach + `sesi=<id> hasControl=<bool> retryFailed=<bool>` (0 perubahan perilaku; `hasControl` dibaca sebelum `release()`).
+- TIDAK DIPERBAIKI (bukan kode aplikasi): `W/System: A resource failed to call Surface.release` 1x (PID 5291; kode main tak membuat `android.view.Surface`); derau vendor MediaCodec/ashmem/avc/AudioTrack/Choreographer. Pindai statis: `MediaMetadataRetriever` 1/1 release, `registerReceiver` 0, semua `contentResolver.query` ber-`?.use` -> 0 kebocoran.
+- 2 file source (<= 5, tanpa justifikasi) + docs; `FILE_MANIFEST.txt` tetap 234.
+- **NOT VERIFIED**: belum compile/CI/device (sandbox tanpa kotlinc/Gradle/SDK; hanya kurung seimbang 0/0/0 + diff). PREDIKSI run berikutnya: "11 (11 deprecated, 0 lainnya)"; ArchUnit 7 LULUS; detekt 0; lintDebug 0; SpotBugs 0; log perangkat: update widget pertama proses baru `playing=false`; `Gagal attach equalizer` (bila ada) memuat `hasControl=`.
+
 ## Batch 613 — Debug temuan lampiran: Equalizer gagal attach (82x di log) + 23 temuan SpotBugs ditangani
 - Input user: `SONIX_v612.zip` + `SONIX_laporan-untuk-claude_run41.zip` + `sonix_debug_20261108_131902.txt` + screenshot widget SONIX/LagFix — "debugging semua temuan yang saya lampirkan!!".
 - FAKTA run #41 (commit `04a3634`, 2026-11-08 05:09 UTC, diasumsikan push Batch 612; Gradle exit 0/0/0): ArchUnit 7 LULUS, detekt 0, lintDebug 0, Kotlin "11 (11 deprecated, 0 lainnya)", SpotBugs 23 = prediksi Batch 612 cocok -> v612 **VERIFIED** build.

@@ -125,7 +125,17 @@ class EqualizerController(private val context: Context) {
             // tapi keduanya bisa jadi beda kasus (mis. audioSessionId tidak valid, konflik efek
             // audio lain). Dicatat supaya kalau ada laporan "equalizer saya hilang" di device yang
             // seharusnya mendukung, penyebab sebenarnya tidak perlu ditebak dari nol.
-            AppLogger.e("EqualizerController", "Gagal attach equalizer ke sesi audio", e)
+            // Batch 614 — fakta mentah (bukan tebakan): `UnsupportedOperationException: invalid parameter
+            // operation` dari `setBandLevel` = efek ini TIDAK memegang kontrol (di framework, set-parameter
+            // tanpa kontrol ditolak dengan status itu). 144 kegagalan di log 8 Nov (build <= 612) tak
+            // menunjukkan SIAPA pemegang kontrolnya; `hasControl` + sesi + `retryFailed` memutuskannya di log
+            // berikutnya tanpa menebak. Dibaca SEBELUM release() (release mengosongkan `equalizer`).
+            val control = runCatching { equalizer?.hasControl() }.getOrNull()
+            AppLogger.e(
+                "EqualizerController",
+                "Gagal attach equalizer ke sesi audio: sesi=$audioSessionId hasControl=$control retryFailed=$retryFailed",
+                e
+            )
             runCatching { release() }
             failedSessionId = audioSessionId
             _state.value = EqualizerUiState(supported = false)

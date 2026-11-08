@@ -55,6 +55,8 @@ object WidgetUpdater {
     private const val KEY_ARTIST = "artist"
     private const val KEY_ARTWORK_URI = "artwork_uri"
     private const val KEY_IS_PLAYING = "is_playing"
+    // Batch 614 — penanda INSTANSI PROSES yang menulis `is_playing` (lihat [processStamp] + performUpdate).
+    private const val KEY_STATE_PROCESS = "state_process"
     // Batch 606: ambang lebar 180 -> 230 dan kini memilih layout SLIM (isi lebih sempit: 149dp vs 174dp compact).
     private const val SLIM_WIDTH_THRESHOLD_DP = 230
     // Batch 208 — dikembalikan (bukan Batch 203's SizeF/setSelected marquee — itu yang
@@ -161,12 +163,19 @@ object WidgetUpdater {
     const val ACTION_NEXT = "com.rudi.audioplayer.widget.NEXT"
     const val ACTION_PREVIOUS = "com.rudi.audioplayer.widget.PREVIOUS"
 
+    /**
+     * Batch 614 — penanda unik INSTANSI proses ini: waktu mulai proses (basis `elapsedRealtime`, tetap
+     * selama proses hidup, berbeda untuk tiap proses baru walau PID dipakai ulang).
+     */
+    private fun processStamp(): Long = android.os.Process.getStartElapsedRealtime()
+
     fun saveState(context: Context, title: String?, artist: String?, artworkUri: Uri?, isPlaying: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
             .putString(KEY_TITLE, title)
             .putString(KEY_ARTIST, artist)
             .putString(KEY_ARTWORK_URI, artworkUri?.toString())
             .putBoolean(KEY_IS_PLAYING, isPlaying)
+            .putLong(KEY_STATE_PROCESS, processStamp())
             .apply()
     }
 
@@ -314,7 +323,15 @@ object WidgetUpdater {
         val title = prefs.getString(KEY_TITLE, null)
         val artist = prefs.getString(KEY_ARTIST, null)
         val artworkUriRaw = prefs.getString(KEY_ARTWORK_URI, null)
-        val isPlaying = prefs.getBoolean(KEY_IS_PLAYING, false)
+        // Batch 614 — LOG USER 8 Nov: dari 7 proses baru, 4 (PID 23905/30712/696/14770) melaporkan `playing=true`
+        // pada update widget PERTAMA padahal ExoPlayer belum ada (Init baru +6 dtk / +9,7 mnt / tak pernah /
+        // +4 dtk) -> ikon JEDA tampil untuk pemutar yang tak memutar (PID 30712: ~10 menit; PID 696: sepanjang
+        // hidupnya), lalu berkedip true -> false -> true saat service hidup. AKAR: `is_playing` di prefs ditulis
+        // proses sebelumnya; saat proses dibunuh (instal/pembunuhan sistem) tak ada callback yang menurunkannya.
+        // Kini `is_playing` hanya dipercaya bila ditulis OLEH PROSES INI (penanda KEY_STATE_PROCESS sama);
+        // dari proses lain / belum pernah ditulis = dianggap tidak memutar. Judul/artis/sampul tetap dipakai.
+        val isPlaying = prefs.getBoolean(KEY_IS_PLAYING, false) &&
+            prefs.getLong(KEY_STATE_PROCESS, -1L) == processStamp()
         // Batch 607 — sampul besar (layout tinggi) butuh thumbnail lebih tajam; widget lain tetap 200px.
         val wantHeroArt = ids.any { wid ->
             val o = manager.getAppWidgetOptions(wid)
