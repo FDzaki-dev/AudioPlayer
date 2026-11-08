@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 617 — Equalizer: pesan kontrol-hilang yang jujur + pemulihan otomatis
+- Input user: screenshot sheet Equalizer "tidak didukung" + `log_20261108_195956_*.txt`.
+- FAKTA log: attach 19:56:02 `hasControl=true` (belum memutar) -> play 19:56:07 -> `granted=false` 19:56:09 -> klik preset: `Gagal useBoldPreset ... hasControl=false` tanpa crash -> attach ulang `hasControl=false` -> sheet dibuka lagi 19:57:51: `hasControl=true` pada sesi yang sama yang memutar. Kontrol hilang sementara; pemegang belum teridentifikasi.
+- `playback/EqualizerController.kt`: `controlLost`, `onControlStatusChanged`, `scheduleControlRecovery` (3/10/30/90 dtk, berhenti saat pulih/sesi berganti/`release()`), `attach` early-return dilewati hanya untuk retry bila kontrol hilang, `release()` vs `releaseEffect()`, log `Pemulihan kontrol`.
+- `ui/EqualizerSheet.kt`: pesan kontrol-hilang (bukan "tidak didukung").
+- 2 file source (<= 5) + docs; `FILE_MANIFEST.txt` tetap 234. **NOT VERIFIED**: belum compile/CI/device. PREDIKSI: "11 (11 deprecated, 0 lainnya)"; ArchUnit 7 LULUS; detekt 0; lintDebug 0; SpotBugs 0.
+
 ## Batch 616 — CRASH Equalizer: semua pemanggilan efek dari UI dilindungi + log kontrol efek
 - Input user: hasil tes v615 (1 ❌, 2+3 ❔, 4 crash saat pemilihan equalizer) + `crash_20261108_193631_*.txt` + `sonix_debug_20261108_193647.txt`.
 - FAKTA: crash 19:36:31 (v615, build 477, thread main) `UnsupportedOperationException: AudioEffect: invalid parameter operation` di `Equalizer.setBandLevel` dari klik UI; tak ada `Gagal attach equalizer` di sesi v615 -> kontrol hilang setelah attach.

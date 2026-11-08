@@ -147,13 +147,24 @@ fun EqualizerSheet(
                     style = MaterialTheme.typography.bodySmall,
                     color = if (state.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                 )
+                if (state.controlLost) {
+                    Text(
+                        "Efek audio lain sedang memegang kontrol — perubahan belum berlaku. Mencoba memulihkan otomatis…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
 
             if (!state.supported) {
                 Text(
-                    "Equalizer tidak didukung di perangkat ini.",
+                    if (state.controlLost) {
+                        "Efek audio lain sedang memegang kontrol Equalizer. Mencoba memulihkan otomatis…"
+                    } else {
+                        "Equalizer tidak didukung di perangkat ini."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(vertical = 24.dp)

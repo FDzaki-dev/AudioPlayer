@@ -2,6 +2,8 @@ package com.rudi.audioplayer.playback
 
 import android.content.Context
 import android.media.audiofx.Equalizer
+import android.os.Handler
+import android.os.Looper
 import com.rudi.audioplayer.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +29,9 @@ data class EqualizerUiState(
     val boldPreset: String = "",
     // Batch 542 — preset EQ buatan pengguna (hanya yang jumlah band-nya cocok dgn perangkat ini).
     val userPresets: List<String> = emptyList(),
-    val selectedUserPreset: String = ""
+    val selectedUserPreset: String = "",
+    // Batch 617 — kontrol efek dipegang pihak lain (bukan "tidak didukung"); UI menampilkan pesan yang tepat.
+    val controlLost: Boolean = false
 )
 
 /** Batch 542 — hasil impor profil AutoEq. [usedFilters] = filter yang berhasil di-parse. */
@@ -55,6 +59,8 @@ class EqualizerController(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow(EqualizerUiState())
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var recoveryGeneration = 0
     val state: StateFlow<EqualizerUiState> = _state.asStateFlow()
 
     /**
@@ -73,10 +79,13 @@ class EqualizerController(private val context: Context) {
     @Synchronized
     fun attach(audioSessionId: Int, retryFailed: Boolean = false) {
         if (audioSessionId != 0) {
-            if (equalizer != null && audioSessionId == attachedSessionId) return
+            // Batch 617 — sesi sama + efek masih ada = no-op, KECUALI ini retry (aksi pengguna / pemulihan) dan
+            // kontrol sudah hilang: baru dipasang ulang. Jalur otomatis (retryFailed=false) tetap no-op.
+            val lostControl = _state.value.controlLost || runCatching { equalizer?.hasControl() }.getOrNull() == false
+            if (equalizer != null && audioSessionId == attachedSessionId && !(retryFailed && lostControl)) return
             if (!retryFailed && audioSessionId == failedSessionId) return
         }
-        release()
+        releaseEffect()
         if (audioSessionId == 0) return
 
         try {
@@ -124,9 +133,7 @@ class EqualizerController(private val context: Context) {
             // berpindah tangan. v615 tak mencatat kegagalan attach tetapi setBandLevel dari UI melempar error
             // yang sama -> kontrol hilang SETELAH attach; waktu perpindahannya kini terbaca di log.
             AppLogger.w("EqualizerController", "Equalizer terpasang: sesi=$audioSessionId hasControl=${eq.hasControl()}")
-            eq.setControlStatusListener { _, granted ->
-                AppLogger.w("EqualizerController", "Status kontrol efek berubah: sesi=$audioSessionId granted=$granted")
-            }
+            eq.setControlStatusListener { _, granted -> onControlStatusChanged(eq, audioSessionId, granted) }
         } catch (e: Exception) {
             // UI menampilkan ini persis sama dengan "device memang tidak mendukung equalizer" —
             // tapi keduanya bisa jadi beda kasus (mis. audioSessionId tidak valid, konflik efek
@@ -143,9 +150,44 @@ class EqualizerController(private val context: Context) {
                 "Gagal attach equalizer ke sesi audio: sesi=$audioSessionId hasControl=$control retryFailed=$retryFailed",
                 e
             )
-            runCatching { release() }
+            runCatching { releaseEffect() }
             failedSessionId = audioSessionId
-            _state.value = EqualizerUiState(supported = false)
+            _state.value = EqualizerUiState(supported = false, controlLost = control == false)
+        }
+    }
+
+    /**
+     * Batch 617 — LOG USER 8 Nov (v616, sesi 2617): attach 19:56:02 `hasControl=true` (pemutar belum memutar) ->
+     * user tekan play 19:56:07 -> `granted=false` 19:56:09 (~2 dtk setelah putar) -> attach ulang 19:56:16
+     * `hasControl=false` -> attach 19:57:51 (sheet dibuka lagi) `hasControl=true` pada sesi yang SAMA yang sedang
+     * memutar. Jadi kontrol hilang sementara lalu bisa didapat lagi; pemegangnya belum teridentifikasi. Kini:
+     * kontrol hilang = UI menampilkan pesan yang tepat (bukan "tidak didukung"), lalu dicoba pulih otomatis
+     * (jadwal [RECOVERY_DELAYS_MS], berhenti begitu pulih / sesi berganti / [release]); kontrol kembali ke efek
+     * yang sama (`granted=true`) = dipasang ulang agar level tersimpan diterapkan lagi.
+     */
+    private fun onControlStatusChanged(eq: Equalizer, session: Int, granted: Boolean) {
+        AppLogger.w("EqualizerController", "Status kontrol efek berubah: sesi=$session granted=$granted")
+        if (equalizer !== eq) return
+        if (granted) {
+            if (_state.value.controlLost) attach(session, retryFailed = true)
+        } else {
+            _state.value = _state.value.copy(controlLost = true)
+            scheduleControlRecovery(session)
+        }
+    }
+
+    private fun scheduleControlRecovery(session: Int) {
+        if (session == 0) return
+        val generation = ++recoveryGeneration
+        for (delayMs in RECOVERY_DELAYS_MS) {
+            mainHandler.postDelayed({
+                if (generation != recoveryGeneration || PlaybackAudioSession.sessionId != session) return@postDelayed
+                if (equalizer != null && !_state.value.controlLost) return@postDelayed // sudah pulih
+                attach(session, retryFailed = true)
+                val recovered = equalizer != null && !_state.value.controlLost
+                AppLogger.w("EqualizerController", "Pemulihan kontrol: sesi=$session tunda=${delayMs}ms pulih=$recovered")
+                if (recovered) recoveryGeneration++ // hentikan sisa jadwal
+            }, delayMs)
         }
     }
 
@@ -166,12 +208,14 @@ class EqualizerController(private val context: Context) {
             val control = runCatching { equalizer?.hasControl() }.getOrNull()
             val session = attachedSessionId
             AppLogger.e("EqualizerController", "Gagal $op: sesi=$session hasControl=$control", e)
-            runCatching { release() }
+            runCatching { releaseEffect() }
             failedSessionId = session
-            _state.value = EqualizerUiState(supported = false)
+            _state.value = EqualizerUiState(supported = false, controlLost = control == false)
             if (session != 0) {
                 attach(session, retryFailed = true)
-                AppLogger.w("EqualizerController", "Attach ulang setelah gagal $op: sesi=$session pulih=${equalizer != null}")
+                val recovered = equalizer != null && !_state.value.controlLost
+                AppLogger.w("EqualizerController", "Attach ulang setelah gagal $op: sesi=$session pulih=$recovered")
+                if (!recovered) scheduleControlRecovery(session)
             }
             false
         }
@@ -419,8 +463,15 @@ class EqualizerController(private val context: Context) {
 
     enum class BoldPreset { FLAT, BASS_BOOST, TREBLE_BOOST, VOCAL_BOOST }
 
+    /** Dipanggil saat sesi audio berakhir (PlaybackService.onDestroy): juga membatalkan jadwal pemulihan. */
     @Synchronized
     fun release() {
+        recoveryGeneration++
+        releaseEffect()
+    }
+
+    @Synchronized
+    private fun releaseEffect() {
         // Batch 613 — `equalizer` selalu dikosongkan walau release() platform melempar, supaya referensi
         // efek tidak tertinggal; penanda sesi ikut direset agar attach() berikutnya benar-benar memasang ulang.
         try {
@@ -439,6 +490,8 @@ class EqualizerController(private val context: Context) {
         private const val KEY_USER_PRESET = "eq_user_preset"
         private const val KEY_USER_PRESETS = "eq_user_presets"
         private const val MAX_USER_PRESETS = 20
+        // Batch 617 — jadwal pemulihan kontrol efek (ms sejak kontrol hilang).
+        private val RECOVERY_DELAYS_MS = longArrayOf(3_000L, 10_000L, 30_000L, 90_000L)
         private const val MAX_PRESET_NAME_LENGTH = 24
         private const val KEY_BAND_PREFIX = "eq_band_"
 
