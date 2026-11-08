@@ -789,6 +789,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         future.addListener({
             controller = future.get()
             controller?.addListener(playerListener)
+            // Batch 615 — ViewModel kini yang mencatat putaran (service diam; lihat PlayCountOwner).
+            PlayCountOwner.viewModelListening = true
             restoreSavedSpeed()
             startPositionLoop()
             // Batch 476 — dipanggil di SINI JUGA (bukan cuma di refreshLibrary()): kedua titik
@@ -1929,6 +1931,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     }
 
     override fun onCleared() {
+        // Batch 615 — UI berakhir: serahkan pencatatan putaran ke PlaybackService (pemutaran tanpa UI).
+        PlayCountOwner.viewModelListening = false
         sleepTimerJob?.cancel()
         accentColorJob?.cancel()
         libraryRefreshJob?.cancel()

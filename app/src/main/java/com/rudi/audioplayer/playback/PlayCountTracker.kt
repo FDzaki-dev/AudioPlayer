@@ -72,3 +72,15 @@ class PlayCountTracker {
             if (durationMs > 0L) minOf(FULL_THRESHOLD_MS, maxOf(MIN_THRESHOLD_MS, durationMs / 2)) else FULL_THRESHOLD_MS
     }
 }
+
+/**
+ * Batch 615 — siapa yang MENCATAT putaran. Pengawas Batch 597 hidup di `PlayerViewModel`, sehingga pemutaran
+ * lewat widget/headset/bubble setelah Activity ditutup (ViewModel dibuang, MediaController dilepas) tak pernah
+ * tercatat. `PlaybackService` kini punya pelacak sendiri yang SELALU berjalan; ia hanya MENCATAT bila tak ada
+ * ViewModel yang mendengar (`viewModelListening == false`), dan tetap menghabiskan status "ambang tercapai"
+ * walau tak mencatat — jadi tak ada hitung ganda saat UI dibuka/ditutup di tengah lagu.
+ */
+object PlayCountOwner {
+    @Volatile
+    var viewModelListening: Boolean = false
+}

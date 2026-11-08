@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -29,6 +30,8 @@ import com.rudi.audioplayer.R
 import com.rudi.audioplayer.bubble.FloatingBubbleService
 import com.rudi.audioplayer.data.CrossfadeStore
 import com.rudi.audioplayer.data.FloatingBubbleStore
+import com.rudi.audioplayer.data.HourlyListenStore
+import com.rudi.audioplayer.data.ListeningHistoryStore
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.PlayStatsStore
@@ -41,10 +44,12 @@ import com.rudi.audioplayer.worker.LyricsPrefetchWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 
 /**
@@ -74,6 +79,57 @@ class PlaybackService : MediaLibraryService() {
     // Batch 594 — generasi penanda jalur widget "service hidup tapi TIDAK sedang memutar" (lihat
     // [handleWidgetActionWhileNotPlaying]); hanya yang terbaru boleh membongkar placeholder foreground.
     private var widgetPausedHandoffGen = 0
+
+    // Batch 615 — pencatatan putaran SAAT UI TUTUP. Pengawas Batch 597 hidup di PlayerViewModel, jadi lagu yang
+    // diputar lewat widget/headset/bubble setelah Activity ditutup tak pernah tercatat (statistik, "Baru Diputar",
+    // Paling Sering Diputar). Pelacak ini SELALU berjalan di service dan menghabiskan "ambang tercapai" tiap sesi,
+    // tetapi hanya MENCATAT bila tak ada ViewModel yang mendengar ([PlayCountOwner]) -> tak ada hitung ganda.
+    private val servicePlayCountTracker = PlayCountTracker()
+    private val servicePlayCountWake = Channel<Unit>(Channel.CONFLATED)
+
+    private fun startServicePlayCount(player: Player) {
+        player.addListener(object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                val songId = mediaItem?.mediaId?.toLongOrNull()
+                if (songId != null) {
+                    servicePlayCountTracker.startItem(
+                        songId, player.duration.coerceAtLeast(0L), SystemClock.elapsedRealtime(), player.isPlaying
+                    )
+                } else {
+                    servicePlayCountTracker.clearItem()
+                }
+                servicePlayCountWake.trySend(Unit)
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                val now = SystemClock.elapsedRealtime()
+                servicePlayCountTracker.setPlaying(isPlaying, now)
+                if (isPlaying && !servicePlayCountTracker.hasItem()) {
+                    player.currentMediaItem?.mediaId?.toLongOrNull()?.let {
+                        servicePlayCountTracker.startItem(it, player.duration.coerceAtLeast(0L), now, true)
+                    }
+                }
+                servicePlayCountWake.trySend(Unit)
+            }
+        })
+        serviceScope.launch {
+            while (isActive) {
+                val wait = servicePlayCountTracker.msUntilQualified(SystemClock.elapsedRealtime())
+                if (wait == null) {
+                    servicePlayCountWake.receive()
+                } else if (wait > 0L) {
+                    withTimeoutOrNull(wait) { servicePlayCountWake.receive() }
+                }
+                val songId = servicePlayCountTracker.takeIfQualified(SystemClock.elapsedRealtime()) ?: continue
+                if (PlayCountOwner.viewModelListening) continue
+                runCatching {
+                    PlayStatsStore(this@PlaybackService).recordPlay(songId)
+                    ListeningHistoryStore(this@PlaybackService).recordPlay(songId)
+                    HourlyListenStore(this@PlaybackService).recordPlay()
+                }.onFailure { AppLogger.e("PlaybackService", "Gagal mencatat putaran tanpa UI: lagu=$songId", it) }
+            }
+        }
+    }
     // Gap List #7 (Batch 109) — job eksekusi sleep timer, hidup di scope Service (bukan
     // ViewModel) supaya tidak ikut mati kalau Activity/ViewModel di-clear duluan.
     private var sleepTimerJob: Job? = null
@@ -148,6 +204,7 @@ class PlaybackService : MediaLibraryService() {
         // time the player reports an event, and the Equalizer reads it from there. onEvents is
         // part of the stable, common Player.Listener API, so this stays robust across versions.
         // The same listener also keeps the home-screen widget in sync with the current track.
+        startServicePlayCount(player) // Batch 615
         player.addListener(object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) {
                 val id = (player as? ExoPlayer)?.audioSessionId ?: return

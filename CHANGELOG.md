@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 615 — Putaran tercatat juga saat UI tertutup (pemutaran via widget/headset/bubble)
+- Input user: `SONIX_v614.zip` + `SONIX_laporan-untuk-claude_run43.zip` — "next".
+- FAKTA run #43 (commit `9237abc`, 2026-11-08 06:13 UTC; Gradle exit 0/0/0): ArchUnit 7 LULUS, detekt 0, lintDebug 0, Kotlin "11 (11 deprecated, 0 lainnya)", SpotBugs 0 = prediksi Batch 614 cocok -> v614 **VERIFIED** build (ZIP unggahan identik dgn keluaran Batch 614).
+- BUG: pengawas putaran Batch 597 hanya ada di `PlayerViewModel`; setelah Activity ditutup tetapi service tetap memutar, putaran tak tercatat di `PlayStatsStore`/`ListeningHistoryStore`/`HourlyListenStore`.
+- PERBAIKAN: `PlayCountTracker.kt` + `object PlayCountOwner`; `PlaybackService.kt` + pelacak/pengawas sendiri yang selalu berjalan dan mencatat HANYA bila tak ada ViewModel yang mendengar; `PlayerViewModel.kt` menyalakan/mematikan flag (attach controller / `onCleared`). Jalur UI tak berubah; tak ada hitung ganda.
+- Batas: tanpa UI tak ada milestone perayaan; durasi tak diketahui saat transisi = ambang 30 dtk; lagu berjalan saat UI dibuka & belum mencapai ambang tak dihitung (sama seperti sebelumnya).
+- 3 file source (<= 5, tanpa justifikasi) + docs; `FILE_MANIFEST.txt` tetap 234. **NOT VERIFIED**: belum compile/CI/device (hanya kurung seimbang + diff). PREDIKSI: "11 (11 deprecated, 0 lainnya)"; ArchUnit 7 LULUS; detekt 0; lintDebug 0; SpotBugs 0.
+
 ## Batch 614 — Penyisiran bug: ikon JEDA widget basi di proses baru + log gagal-attach EQ memuat hasControl
 - Input user: `SONIX_v613.zip` + `SONIX_laporan-untuk-claude_run42.zip` + `sonix_debug_20261108_135110.txt` — "lanjutkan penyisiran bug!!".
 - FAKTA run #42 (commit `43edffa`, 2026-11-08 05:34 UTC, diasumsikan push Batch 613; Gradle exit 0/0/0): ArchUnit 7 LULUS, detekt 0, lintDebug 0, Kotlin "11 (11 deprecated, 0 lainnya)", SpotBugs 0 = semua prediksi Batch 613 cocok -> v613 **VERIFIED** build (kompilasi).
