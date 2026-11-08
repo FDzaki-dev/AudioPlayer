@@ -108,6 +108,7 @@
 # Batch 608: widget_background_compact_dark/_light.xml + widget_background_dark/_light.xml + widget_well.xml (isi ditulis ulang, rim tebal bergradasi + bibir + pendar); 0 file baru — total tetap 234.
 # Batch 609: widget_background_compact_dark/_light.xml + widget_background_dark/_light.xml (perbaikan satuan dp, build 608 gagal) + widget_well_light.xml + widget/WidgetUpdater.kt (bingkai rim sampul); 0 file baru — total tetap 234.
 # Batch 610: widget_player.xml + _compact + _slim + _tall (root dibungkus FrameLayout @android:id/background, opt-out clip launcher) + widget_background_compact_dark/_light.xml + widget_background_dark/_light.xml (bentuk daun, pita tak bocor); 0 file baru — total tetap 234.
+# Batch 611: widget_well.xml + widget_well_light.xml (palung daun TL20/TR4/BR20/BL4, band bayangan/pendar tak bocor); 0 file baru — total tetap 234.
 # Total: 234 file
 
 .githooks/pre-commit

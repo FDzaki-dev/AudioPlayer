@@ -1,32 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Batch 608 — PALUNG cekung (mode GELAP), LEBIH TEGAS (user: "hasil gak beda jauh"). Pasangan terang: widget_well_light.xml
-    (TIDAK diubah batch ini). Dulu: bibir terang kanan-bawah -> lantai -> bayangan atas 8dp -> garis ruby 1dp. Kini: bibir
-    kanan-bawah lebih terang (mawar), lantai lebih gelap, bayangan dinding atas lebih pekat, + MEKAR pendar 6dp di atas garis
-    ruby 1,5dp yang lebih terang (padanan jalur Boomly yang menyala di dasar). Radius dp tetap TL14/TR10/BR20/BL12 (valid
-    untuk tinggi 32dp: TR+BR=30 <= 32; kiri 26).
-    Kedalaman dari BEVEL (RemoteViews tak bisa bayangan jatuh).
+    Batch 611 — PALUNG cekung (GELAP), bentuk DAUN (TL 20 / TR 4 / BR 20 / BL 4; dulu 14/10/20/12 = bilah) — selaras dgn cangkang daun
+    Batch 610 (TL/BR besar, TR/BL runcing). Pasangan: widget_well_light.xml. Radius dasar 20 pada BR TETAP (kenop next menempel 3dp dari tepi
+    palung slim, celah = v609); TL naik 14 -> 20 (celah teks slim 3,2dp, compact 1,6dp, penuh 2,4dp).
+    Lapis konsentris: radius = dasar - inset (lantai 1,5dp). Band bayangan dinding atas: tinggi 8 -> 19 dan pudar 3-warna selesai di
+    tengah band (v609: radius band diskala Skia krn tinggi 8dp < radius TL -> baji gelap bocor di LUAR bentuk palung di sudut kiri-atas).
+    Pendar bawah (rect 6dp): inset kanan 9 -> 13dp supaya ujung kanan tidak keluar dari busur BR (dulu menonjol ~3dp).
+    Padding layout, ukuran palung, kenop, dan Kotlin TIDAK berubah.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="315" android:startColor="#060304" android:centerColor="#2B1D1F" android:endColor="#A5667A" />
-            <corners android:topLeftRadius="14dp" android:topRightRadius="10dp" android:bottomRightRadius="20dp" android:bottomLeftRadius="12dp" />
+            <corners android:topLeftRadius="20dp" android:topRightRadius="4dp" android:bottomRightRadius="20dp" android:bottomLeftRadius="4dp" />
         </shape>
     </item>
     <item android:left="1.5dp" android:top="1.5dp" android:right="1dp" android:bottom="1dp">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="270" android:startColor="#10060A" android:endColor="#26111B" />
-            <corners android:topLeftRadius="12.5dp" android:topRightRadius="8.5dp" android:bottomRightRadius="18.5dp" android:bottomLeftRadius="10.5dp" />
+            <corners android:topLeftRadius="18.5dp" android:topRightRadius="2.5dp" android:bottomRightRadius="18.5dp" android:bottomLeftRadius="2.5dp" />
         </shape>
     </item>
-    <item android:left="1.5dp" android:top="1.5dp" android:right="1dp" android:height="8dp" android:gravity="top|fill_horizontal">
+    <item android:left="1.5dp" android:top="1.5dp" android:right="1dp" android:height="19dp" android:gravity="top|fill_horizontal">
         <shape android:shape="rectangle">
-            <gradient android:type="linear" android:angle="270" android:startColor="#B3000000" android:endColor="#00000000" />
-            <corners android:topLeftRadius="12.5dp" android:topRightRadius="8.5dp" android:bottomRightRadius="0dp" android:bottomLeftRadius="0dp" />
+            <gradient android:type="linear" android:angle="270" android:startColor="#B3000000" android:centerColor="#00000000" android:endColor="#00000000" />
+            <corners android:topLeftRadius="18.5dp" android:topRightRadius="2.5dp" android:bottomRightRadius="0dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
-    <item android:left="9dp" android:right="9dp" android:bottom="2.5dp" android:height="6dp" android:gravity="bottom|fill_horizontal">
+    <item android:left="9dp" android:right="13dp" android:bottom="2.5dp" android:height="6dp" android:gravity="bottom|fill_horizontal">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="90" android:startColor="#40C23C58" android:endColor="#00C23C58" />
         </shape>

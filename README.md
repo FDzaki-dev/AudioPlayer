@@ -2,7 +2,8 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
-> - Bentuk daun cangkang widget + opt-out clip radius launcher (Batch 610) belum dikompilasi/dilihat di device; launcher Infinix belum terbukti menghormati opt-out — bila mengabaikannya, widget slim 46dp tetap tampil membulat seperti pil.
+> - Palung widget berbentuk daun (Batch 611) belum dikompilasi/dilihat di device.
+> - Bentuk daun cangkang widget + opt-out clip radius launcher (Batch 610) SUDAH terkompilasi (run #39 hijau) dan dikonfirmasi user lewat screenshot di Infinix X6850: widget slim dan penuh tampil daun, bukan pil.
 > - Bingkai sampul widget (Batch 609) dan palung mode terang belum dikompilasi/dilihat di device. Cangkang widget bergaya Boomly (Batch 608) sempat GAGAL build (satuan dp hilang di XML), diperbaiki di Batch 609, dan tampilannya belum pernah dilihat di device; bubble belum diselaraskan.
 > - Layout widget tinggi (sampul besar, mulai ~210dp), spasi rata layout penuh, dan sapuan cangkang compact (Batch 607) sudah TERKOMPILASI (run #36) dan dilihat user di device, tetapi tampilannya dinilai kurang beda dari Boomly -> Batch 608 (Batch 606 sudah TERKOMPILASI di run #35, tampilannya sudah dikonfirmasi user lewat screenshot).
 > - Widget slim 46dp + cangkang compact asimetris (Batch 606) belum dikompilasi/dilihat di device; widget yang ditarik sangat tinggi (>~200dp) masih berupa layout penuh di tengah (layout khusus tinggi belum dibuat).
@@ -312,6 +313,8 @@ Riwayat lebih detail per batch pengembangan ada di `CHANGELOG.md`.
 Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("junit:junit:4.13.2")`) — tidak ada Robolectric/instrumentation, tidak ada emulator. Konsekuensinya: hanya business logic yang benar-benar lepas dari `Context`/framework Android (SharedPreferences, ContentResolver, SensorManager, dst.) yang bisa ditest langsung. Pola yang dipakai berulang kali di proyek ini (`PinLockoutPolicy`, dan sejak Batch 27: `ShakePulseTracker`, `MusicRepository.deriveFolderName`, `LibraryFilterStore.shouldKeep`): pisahkan logika murninya ke fungsi/kelas pure, method instance yang butuh Context tinggal delegasikan ke situ tanpa ubah perilaku.
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
+
+**Batch 611** — Bagian palung (kotak cekung berisi judul + kontrol) kini ikut berbentuk daun seperti tepi widget: dua sudut melengkung besar, dua sudut runcing. Bayangan gelap yang sempat bocor keluar dari sudut kiri-atas palung juga dihilangkan. Belum diuji di device.
 
 **Batch 610** — Tepi luar widget kini benar-benar berbentuk daun, bukan pil: penyebab utamanya launcher Android 12+ yang memotong widget ke sudut membulat bawaan sistem (di widget 46dp jadi pil sempurna), bukan angka radius yang kita setel. Widget sekarang meminta launcher berhenti memotong, sudut kiri-atas/kanan-bawah melengkung besar dan kanan-atas/kiri-bawah runcing, dan pendar merah muda yang sempat bocor keluar dari tepi di sudut kanan-bawah sudah dihilangkan. Belum diuji di device.
 
