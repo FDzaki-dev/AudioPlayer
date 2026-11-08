@@ -8,87 +8,99 @@
     palung 42dp (target tinggi 59dp: 16 + 42 = 58). Tinggi < 54dp memakai `widget_player_slim.xml`. Medali 36dp, kenop 26dp
     tetap. Lebar tetap non-judul = padding 8x2 + sampul 42 + margin palung 6 + padding palung 12+4 + (26+2) + (36+2) +
     (26+2) = 174dp (WidgetUpdater.COMPACT_FIXED_WIDTH_DP / COMPACT_PADDING_DP HARUS sama). Semua id lama dipertahankan.
+    Batch 610: root DIBUNGKUS `FrameLayout` ber-id `@android:id/background` + `clipToOutline="true"` = opt-out resmi dari clip radius
+    sudut yang dipaksakan launcher Android 12+ (Launcher3 RoundedCornerEnforcement) -> widget 46dp tidak lagi jadi PIL; bentuk daun
+    digambar HANYA oleh drawable cangkang (`widget_background*`). Pembungkus tanpa latar (outline persegi, tak memotong apa pun);
+    `widget_root` tetap id isi/cangkang (WidgetUpdater tak berubah).
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background_compact_dark"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:clipToPadding="false"
-    android:padding="8dp">
-
-    <ImageView
-        android:id="@+id/widget_album_art"
-        android:layout_width="42dp"
-        android:layout_height="42dp"
-        android:scaleType="centerCrop" />
+    android:clipToOutline="true">
 
     <LinearLayout
-        android:id="@+id/widget_well"
-        android:layout_width="0dp"
-        android:layout_height="42dp"
-        android:layout_weight="1"
-        android:layout_marginStart="6dp"
-        android:background="@drawable/widget_well"
+        android:id="@+id/widget_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/widget_background_compact_dark"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="12dp"
-        android:paddingEnd="4dp">
+        android:clipToPadding="false"
+        android:padding="8dp">
 
-        <TextView
-            android:id="@+id/widget_title"
+        <ImageView
+            android:id="@+id/widget_album_art"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:scaleType="centerCrop" />
+
+        <LinearLayout
+            android:id="@+id/widget_well"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="42dp"
             android:layout_weight="1"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:maxLines="1"
-            android:includeFontPadding="false"
-            android:scrollHorizontally="true"
-            android:ellipsize="marquee"
-            android:marqueeRepeatLimit="marquee_forever"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:text="Tidak ada lagu">
-            <requestFocus />
-        </TextView>
+            android:layout_marginStart="6dp"
+            android:background="@drawable/widget_well"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="4dp">
 
-        <ImageButton
-            android:id="@+id/widget_prev"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_marginStart="2dp"
-            android:padding="4dp"
-            android:background="@android:color/transparent"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_widget_previous"
-            android:contentDescription="Sebelumnya" />
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:includeFontPadding="false"
+                android:scrollHorizontally="true"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:text="Tidak ada lagu">
+                <requestFocus />
+            </TextView>
 
-        <ImageButton
-            android:id="@+id/widget_play_pause"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginStart="2dp"
-            android:padding="8dp"
-            android:background="@drawable/widget_play_button_bg"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_widget_play"
-            android:contentDescription="Putar" />
+            <ImageButton
+                android:id="@+id/widget_prev"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginStart="2dp"
+                android:padding="4dp"
+                android:background="@android:color/transparent"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_previous"
+                android:contentDescription="Sebelumnya" />
 
-        <ImageButton
-            android:id="@+id/widget_next"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_marginStart="2dp"
-            android:padding="4dp"
-            android:background="@android:color/transparent"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_widget_next"
-            android:contentDescription="Berikutnya" />
+            <ImageButton
+                android:id="@+id/widget_play_pause"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="2dp"
+                android:padding="8dp"
+                android:background="@drawable/widget_play_button_bg"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_play"
+                android:contentDescription="Putar" />
+
+            <ImageButton
+                android:id="@+id/widget_next"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginStart="2dp"
+                android:padding="4dp"
+                android:background="@android:color/transparent"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_next"
+                android:contentDescription="Berikutnya" />
+
+        </LinearLayout>
 
     </LinearLayout>
 
-</LinearLayout>
+</FrameLayout>

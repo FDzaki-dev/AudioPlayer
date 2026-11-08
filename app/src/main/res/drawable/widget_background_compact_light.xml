@@ -1,41 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Batch 608 — CANGKANG COMPACT/SLIM (TERANG (perkamen)), bahasa bentuk Boomly. Pasangan: widget_background_compact_light.xml.
-    User: "hasil gak beda jauh" (Batch 607 hanya menggeser radius; rim 1,5dp + badan datar tetap terbaca kapsul tipis).
-    Kini: (1) RIM TEBAL 3,5dp bergradasi vertikal (atas terang -> bawah gelap = cahaya dari atas) + kilau bibir atas,
-    (2) BIBIR bayangan 1dp antara rim & permukaan (permukaan tampak cekung di dalam rim), (3) permukaan lebih gelap
-    -> kontras rim/badan kuat, (4) PENDAR dasar permukaan, (5) garis tepi luar tipis + halo 2 cincin lebih pekat.
-    Geometri (dp): halo 0-1 -> cangkang margin 2 (radius TL20/TR8/BR28/BL12, tak berubah dari Batch 607: sisi kiri 32 dan
-    kanan 36 <= tinggi cangkang min ~36 -> tak diskala) -> rim 3,5 -> permukaan margin 5,5 (radius dikurangi 3,5).
-    Padding layout slim 7dp(v)/8dp(h), compact 8dp -> isi tetap DI DALAM permukaan (celah 1,5-2,5dp).
-    Lapis hairline/gloss/pendar memakai `android:height` + `gravity` (API 23+; minSdk 31).
+    Batch 610 — CANGKANG COMPACT/SLIM (TERANG), bentuk DAUN SUNGGUHAN. Pasangan: widget_background_compact_dark.xml.
+    User: "gambar Border tepi luar yang beneran shape-leaf. no pil, no clipping??".
+    AKAR (bukan radius): launcher Android 12+ memaksa clip rounded-rect radius sistem (16-28dp) pada view latar widget; pada
+    widget slim 46dp radius >= 23dp = PIL, sehingga radius cangkang Batch 606-609 tak pernah terlihat. Opt-out resmi = view
+    `@android:id/background` + `clipToOutline` (pembungkus di layout widget_player*.xml): launcher berhenti meng-clip dan bentuk
+    digambar HANYA oleh drawable ini (tanpa clip, tanpa pil).
+    Bentuk daun: TL 22 / TR 4 / BR 30 / BL 4 (v609: 22/10/30/14 = bilah membulat). TL dibatasi sampul 32dp (celah 0,7dp, sama dgn v609).
+    Lapis konsentris: radius tiap lapis = radius dasar - inset (sudut runcing menjadi 0 di lapis dalam).
+    Pita kilap atas + pendar bawah: tinggi >= radius sudut dan pudar 3-warna selesai di tengah pita. v609: pita pendar 7dp
+    membuat Skia mengecilkan radius -> pendar merah muda bocor ~26% di LUAR bentuk terluar (sudut kanan-bawah).
+    Geometri (dp): halo 0-1 -> cangkang margin 2 -> rim 3,5 -> permukaan margin 5,5. Padding layout slim/compact TIDAK berubah (celah isi tetap).
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <solid android:color="#1A8E2440" />
-            <corners android:topLeftRadius="22dp" android:topRightRadius="10dp" android:bottomRightRadius="30dp" android:bottomLeftRadius="14dp" />
+            <corners android:topLeftRadius="22dp" android:topRightRadius="4dp" android:bottomRightRadius="30dp" android:bottomLeftRadius="4dp" />
         </shape>
     </item>
     <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
         <shape android:shape="rectangle">
             <solid android:color="#2E9A2A48" />
-            <corners android:topLeftRadius="21dp" android:topRightRadius="9dp" android:bottomRightRadius="29dp" android:bottomLeftRadius="13dp" />
+            <corners android:topLeftRadius="21dp" android:topRightRadius="3dp" android:bottomRightRadius="29dp" android:bottomLeftRadius="3dp" />
         </shape>
     </item>
     <item android:left="2dp" android:top="2dp" android:right="2dp" android:bottom="2dp">
         <shape android:shape="rectangle">
             <solid android:color="#9C8E80" />
-            <corners android:topLeftRadius="20dp" android:topRightRadius="8dp" android:bottomRightRadius="28dp" android:bottomLeftRadius="12dp" />
+            <corners android:topLeftRadius="20dp" android:topRightRadius="2dp" android:bottomRightRadius="28dp" android:bottomLeftRadius="2dp" />
         </shape>
     </item>
     <item android:left="2dp" android:top="2dp" android:right="2dp" android:bottom="2dp">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="270" android:startColor="#FFFFFF" android:centerColor="#EFE5DA" android:endColor="#B9A692" />
-            <corners android:topLeftRadius="20dp" android:topRightRadius="8dp" android:bottomRightRadius="28dp" android:bottomLeftRadius="12dp" />
+            <corners android:topLeftRadius="20dp" android:topRightRadius="2dp" android:bottomRightRadius="28dp" android:bottomLeftRadius="2dp" />
         </shape>
     </item>
-    <item android:left="18dp" android:top="2.25dp" android:right="14.8dp" android:height="1dp" android:gravity="top|fill_horizontal">
+    <item android:left="18dp" android:top="2.25dp" android:right="10dp" android:height="1dp" android:gravity="top|fill_horizontal">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#E6FFFFFF" android:endColor="#00FFFFFF" />
         </shape>
@@ -43,43 +45,43 @@
     <item android:left="4.5dp" android:top="4.5dp" android:right="4.5dp" android:bottom="4.5dp">
         <shape android:shape="rectangle">
             <stroke android:width="1dp" android:color="#61741C32" />
-            <corners android:topLeftRadius="17.5dp" android:topRightRadius="5.5dp" android:bottomRightRadius="25.5dp" android:bottomLeftRadius="9.5dp" />
+            <corners android:topLeftRadius="17.5dp" android:topRightRadius="0dp" android:bottomRightRadius="25.5dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
     <item android:left="5.5dp" android:top="5.5dp" android:right="5.5dp" android:bottom="5.5dp">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="315" android:startColor="#FBF7F1" android:centerColor="#F1E8DF" android:endColor="#E3D6C8" />
-            <corners android:topLeftRadius="16.5dp" android:topRightRadius="4.5dp" android:bottomRightRadius="24.5dp" android:bottomLeftRadius="8.5dp" />
+            <corners android:topLeftRadius="16.5dp" android:topRightRadius="0dp" android:bottomRightRadius="24.5dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
     <item android:left="5.5dp" android:top="5.5dp" android:right="5.5dp" android:bottom="5.5dp">
         <shape android:shape="rectangle">
             <gradient android:type="radial" android:centerX="0.04" android:centerY="0.06" android:gradientRadius="150dp" android:startColor="#2E8E2440" android:endColor="#008E2440" />
-            <corners android:topLeftRadius="16.5dp" android:topRightRadius="4.5dp" android:bottomRightRadius="24.5dp" android:bottomLeftRadius="8.5dp" />
+            <corners android:topLeftRadius="16.5dp" android:topRightRadius="0dp" android:bottomRightRadius="24.5dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
     <item android:left="5.5dp" android:top="5.5dp" android:right="5.5dp" android:bottom="5.5dp">
         <shape android:shape="rectangle">
             <gradient android:type="radial" android:centerX="0.96" android:centerY="0.94" android:gradientRadius="110dp" android:startColor="#2E2A2024" android:endColor="#00000000" />
-            <corners android:topLeftRadius="16.5dp" android:topRightRadius="4.5dp" android:bottomRightRadius="24.5dp" android:bottomLeftRadius="8.5dp" />
+            <corners android:topLeftRadius="16.5dp" android:topRightRadius="0dp" android:bottomRightRadius="24.5dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
-    <item android:left="5.5dp" android:top="5.5dp" android:right="5.5dp" android:height="12dp" android:gravity="top|fill_horizontal">
+    <item android:left="5.5dp" android:top="5.5dp" android:right="5.5dp" android:height="24dp" android:gravity="top|fill_horizontal">
         <shape android:shape="rectangle">
-            <gradient android:type="linear" android:angle="270" android:startColor="#66FFFFFF" android:endColor="#00FFFFFF" />
-            <corners android:topLeftRadius="16.5dp" android:topRightRadius="4.5dp" android:bottomRightRadius="0dp" android:bottomLeftRadius="0dp" />
+            <gradient android:type="linear" android:angle="270" android:startColor="#66FFFFFF" android:centerColor="#00FFFFFF" android:endColor="#00FFFFFF" />
+            <corners android:topLeftRadius="16.5dp" android:topRightRadius="0dp" android:bottomRightRadius="0dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
-    <item android:left="5.5dp" android:right="5.5dp" android:bottom="5.5dp" android:height="7dp" android:gravity="bottom|fill_horizontal">
+    <item android:left="5.5dp" android:right="5.5dp" android:bottom="5.5dp" android:height="25dp" android:gravity="bottom|fill_horizontal">
         <shape android:shape="rectangle">
-            <gradient android:type="linear" android:angle="90" android:startColor="#30A33550" android:endColor="#00A33550" />
-            <corners android:topLeftRadius="0dp" android:topRightRadius="0dp" android:bottomRightRadius="24.5dp" android:bottomLeftRadius="8.5dp" />
+            <gradient android:type="linear" android:angle="90" android:startColor="#30A33550" android:centerColor="#00A33550" android:endColor="#00A33550" />
+            <corners android:topLeftRadius="0dp" android:topRightRadius="0dp" android:bottomRightRadius="24.5dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
     <item android:left="2dp" android:top="2dp" android:right="2dp" android:bottom="2dp">
         <shape android:shape="rectangle">
             <stroke android:width="0.75dp" android:color="#73741C32" />
-            <corners android:topLeftRadius="20dp" android:topRightRadius="8dp" android:bottomRightRadius="28dp" android:bottomLeftRadius="12dp" />
+            <corners android:topLeftRadius="20dp" android:topRightRadius="2dp" android:bottomRightRadius="28dp" android:bottomLeftRadius="2dp" />
         </shape>
     </item>
 </layer-list>

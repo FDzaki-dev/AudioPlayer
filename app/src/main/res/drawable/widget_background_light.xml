@@ -1,45 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Batch 608 — CANGKANG WIDGET PENUH/TINGGI (TERANG (perkamen)), bahasa bentuk Boomly. Pasangan: widget_background_light.xml.
-    Ditulis ulang dari Batch 604 (radius TL22/TR16/BR30/BL14 dipertahankan): rim 2dp -> 4dp bergradasi vertikal, bibir
-    bayangan 1dp, permukaan lebih gelap (kontras rim/badan), pendar dasar, garis tepi luar tipis, halo 3 cincin lebih
-    pekat. Geometri (dp): halo margin 0/1/2 -> cangkang margin 3 -> rim 4 -> permukaan margin 7 (radius dikurangi 4).
-    Padding layout penuh/tinggi 10dp -> isi duduk DI DALAM permukaan (celah 3dp).
-    `widget_background.xml` (daun diagonal Batch 584) TETAP dipakai bubble floating - JANGAN dihapus.
-    Lapis hairline/gloss/pendar memakai `android:height` + `gravity` (API 23+; minSdk 31).
+    Batch 610 — CANGKANG WIDGET PENUH/TINGGI (TERANG), bentuk DAUN SUNGGUHAN. Pasangan: widget_background_dark.xml.
+    User: "gambar Border tepi luar yang beneran shape-leaf. no pil, no clipping??".
+    AKAR (bukan radius): launcher Android 12+ memaksa clip rounded-rect radius sistem (16-28dp) pada view latar widget; pada
+    widget slim 46dp radius >= 23dp = PIL, sehingga radius cangkang Batch 606-609 tak pernah terlihat. Opt-out resmi = view
+    `@android:id/background` + `clipToOutline` (pembungkus di layout widget_player*.xml): launcher berhenti meng-clip dan bentuk
+    digambar HANYA oleh drawable ini (tanpa clip, tanpa pil).
+    Bentuk daun: TL 36 / TR 5 / BR 44 / BL 5 (v609: 25/19/33/17 = persegi membulat). Sudut kanan-bawah bebas isi (baris kontrol di tengah).
+    Lapis konsentris: radius tiap lapis = radius dasar - inset (sudut runcing menjadi 0 di lapis dalam).
+    Pita kilap atas + pendar bawah: tinggi >= radius sudut dan pudar 3-warna selesai di tengah pita. v609: pita pendar 7dp
+    membuat Skia mengecilkan radius -> pendar merah muda bocor ~26% di LUAR bentuk terluar (sudut kanan-bawah).
+    Geometri (dp): halo margin 0/1/2 -> cangkang margin 3 -> rim 4 -> permukaan margin 7. Padding layout penuh/tinggi 10dp tidak berubah.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <solid android:color="#1A8E2440" />
-            <corners android:topLeftRadius="25dp" android:topRightRadius="19dp" android:bottomRightRadius="33dp" android:bottomLeftRadius="17dp" />
+            <corners android:topLeftRadius="36dp" android:topRightRadius="5dp" android:bottomRightRadius="44dp" android:bottomLeftRadius="5dp" />
         </shape>
     </item>
     <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
         <shape android:shape="rectangle">
             <solid android:color="#2E9A2A48" />
-            <corners android:topLeftRadius="24dp" android:topRightRadius="18dp" android:bottomRightRadius="32dp" android:bottomLeftRadius="16dp" />
+            <corners android:topLeftRadius="35dp" android:topRightRadius="4dp" android:bottomRightRadius="43dp" android:bottomLeftRadius="4dp" />
         </shape>
     </item>
     <item android:left="2dp" android:top="2dp" android:right="2dp" android:bottom="2dp">
         <shape android:shape="rectangle">
             <solid android:color="#449A2A48" />
-            <corners android:topLeftRadius="23dp" android:topRightRadius="17dp" android:bottomRightRadius="31dp" android:bottomLeftRadius="15dp" />
+            <corners android:topLeftRadius="34dp" android:topRightRadius="3dp" android:bottomRightRadius="42dp" android:bottomLeftRadius="3dp" />
         </shape>
     </item>
     <item android:left="3dp" android:top="3dp" android:right="3dp" android:bottom="3dp">
         <shape android:shape="rectangle">
             <solid android:color="#9C8E80" />
-            <corners android:topLeftRadius="22dp" android:topRightRadius="16dp" android:bottomRightRadius="30dp" android:bottomLeftRadius="14dp" />
+            <corners android:topLeftRadius="33dp" android:topRightRadius="2dp" android:bottomRightRadius="41dp" android:bottomLeftRadius="2dp" />
         </shape>
     </item>
     <item android:left="3dp" android:top="3dp" android:right="3dp" android:bottom="3dp">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="270" android:startColor="#FFFFFF" android:centerColor="#EFE5DA" android:endColor="#B9A692" />
-            <corners android:topLeftRadius="22dp" android:topRightRadius="16dp" android:bottomRightRadius="30dp" android:bottomLeftRadius="14dp" />
+            <corners android:topLeftRadius="33dp" android:topRightRadius="2dp" android:bottomRightRadius="41dp" android:bottomLeftRadius="2dp" />
         </shape>
     </item>
-    <item android:left="20.6dp" android:top="3.25dp" android:right="28.6dp" android:height="1dp" android:gravity="top|fill_horizontal">
+    <item android:left="32dp" android:top="3.25dp" android:right="11dp" android:height="1dp" android:gravity="top|fill_horizontal">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#E6FFFFFF" android:endColor="#00FFFFFF" />
         </shape>
@@ -47,43 +51,43 @@
     <item android:left="6dp" android:top="6dp" android:right="6dp" android:bottom="6dp">
         <shape android:shape="rectangle">
             <stroke android:width="1dp" android:color="#61741C32" />
-            <corners android:topLeftRadius="19dp" android:topRightRadius="13dp" android:bottomRightRadius="27dp" android:bottomLeftRadius="11dp" />
+            <corners android:topLeftRadius="30dp" android:topRightRadius="0dp" android:bottomRightRadius="38dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
     <item android:left="7dp" android:top="7dp" android:right="7dp" android:bottom="7dp">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="315" android:startColor="#FBF7F1" android:centerColor="#F1E8DF" android:endColor="#E3D6C8" />
-            <corners android:topLeftRadius="18dp" android:topRightRadius="12dp" android:bottomRightRadius="26dp" android:bottomLeftRadius="10dp" />
+            <corners android:topLeftRadius="29dp" android:topRightRadius="0dp" android:bottomRightRadius="37dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
     <item android:left="7dp" android:top="7dp" android:right="7dp" android:bottom="7dp">
         <shape android:shape="rectangle">
             <gradient android:type="radial" android:centerX="0.04" android:centerY="0.06" android:gradientRadius="150dp" android:startColor="#2E8E2440" android:endColor="#008E2440" />
-            <corners android:topLeftRadius="18dp" android:topRightRadius="12dp" android:bottomRightRadius="26dp" android:bottomLeftRadius="10dp" />
+            <corners android:topLeftRadius="29dp" android:topRightRadius="0dp" android:bottomRightRadius="37dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
     <item android:left="7dp" android:top="7dp" android:right="7dp" android:bottom="7dp">
         <shape android:shape="rectangle">
             <gradient android:type="radial" android:centerX="0.96" android:centerY="0.94" android:gradientRadius="110dp" android:startColor="#2E2A2024" android:endColor="#00000000" />
-            <corners android:topLeftRadius="18dp" android:topRightRadius="12dp" android:bottomRightRadius="26dp" android:bottomLeftRadius="10dp" />
+            <corners android:topLeftRadius="29dp" android:topRightRadius="0dp" android:bottomRightRadius="37dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
-    <item android:left="7dp" android:top="7dp" android:right="7dp" android:height="12dp" android:gravity="top|fill_horizontal">
+    <item android:left="7dp" android:top="7dp" android:right="7dp" android:height="29dp" android:gravity="top|fill_horizontal">
         <shape android:shape="rectangle">
-            <gradient android:type="linear" android:angle="270" android:startColor="#66FFFFFF" android:endColor="#00FFFFFF" />
-            <corners android:topLeftRadius="18dp" android:topRightRadius="12dp" android:bottomRightRadius="0dp" android:bottomLeftRadius="0dp" />
+            <gradient android:type="linear" android:angle="270" android:startColor="#66FFFFFF" android:centerColor="#00FFFFFF" android:endColor="#00FFFFFF" />
+            <corners android:topLeftRadius="29dp" android:topRightRadius="0dp" android:bottomRightRadius="0dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
-    <item android:left="7dp" android:right="7dp" android:bottom="7dp" android:height="7dp" android:gravity="bottom|fill_horizontal">
+    <item android:left="7dp" android:right="7dp" android:bottom="7dp" android:height="37dp" android:gravity="bottom|fill_horizontal">
         <shape android:shape="rectangle">
-            <gradient android:type="linear" android:angle="90" android:startColor="#30A33550" android:endColor="#00A33550" />
-            <corners android:topLeftRadius="0dp" android:topRightRadius="0dp" android:bottomRightRadius="26dp" android:bottomLeftRadius="10dp" />
+            <gradient android:type="linear" android:angle="90" android:startColor="#30A33550" android:centerColor="#00A33550" android:endColor="#00A33550" />
+            <corners android:topLeftRadius="0dp" android:topRightRadius="0dp" android:bottomRightRadius="37dp" android:bottomLeftRadius="0dp" />
         </shape>
     </item>
     <item android:left="3dp" android:top="3dp" android:right="3dp" android:bottom="3dp">
         <shape android:shape="rectangle">
             <stroke android:width="0.75dp" android:color="#73741C32" />
-            <corners android:topLeftRadius="22dp" android:topRightRadius="16dp" android:bottomRightRadius="30dp" android:bottomLeftRadius="14dp" />
+            <corners android:topLeftRadius="33dp" android:topRightRadius="2dp" android:bottomRightRadius="41dp" android:bottomLeftRadius="2dp" />
         </shape>
     </item>
 </layer-list>
