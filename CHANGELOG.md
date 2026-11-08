@@ -1,5 +1,15 @@
 # Changelog
 
+## Batch 612 — Garis tepi pink mengelilingi palung: bentuk daun palung kini TERLIHAT
+- Input user: `SONIX_laporan-untuk-claude_run40.zip` + "saya rasa gak ada perubahan yang kasat mata dari tampilan sebelumnya".
+- FAKTA run #40 (commit `41cbecd`, 2026-11-08 04:55 UTC = Batch 611; Gradle exit 0/0/0): ArchUnit 7 LULUS, detekt 0, lintDebug 0, Kotlin "11 (11 deprecated, 0 lainnya)", SpotBugs 23 (REC `WidgetUpdater.kt:234`) = prediksi Batch 611 cocok -> v611 **VERIFIED** build. `WidgetUpdater.kt:386` memakai `widget_well` / `widget_well_light` (nama benar -> perubahan ikut APK; bukan soal cache/terlewat).
+- AKAR "tak terlihat" (user BENAR): (1) bibir lapis-1 palung = gradien diagonal 315 (`#060304` -> `#2B1D1F` -> `#A5667A`): TL gelap, TR/BL separuh gelap, hanya BR terang. Batch 611 mengubah TL/TR/BL (gelap di atas gelap) dan membiarkan BR (satu-satunya sudut terang) di 20. (2) Selisih piksel v610->v611 (simulasi, ambang kontras 0,25): ~18 dp^2 dari 7584 dp^2 (0,24%) pada slim, ~17 dari 12524 (0,14%) pada penuh. Koreksi diri: laporan Batch 611 terlalu percaya diri ("jadi daun") tanpa mengukur keterlihatan.
+- PERBAIKAN (2 file, 0 Kotlin): `drawable/widget_well.xml` + `widget_well_light.xml`: gradien lapis-1 kini pink di SELURUH kontur — gelap `#B5607A` -> `#D0728C` -> `#F29AB2` (arah 315: kiri-atas redup, kanan-bawah terang), terang `#A8566F` -> `#C46A84` -> `#E89AB0`. Hanya WARNA lapis-1; radius 20/4/20/4, lantai, band bayangan, pendar = Batch 611.
+- Verifikasi (alat luar-repo): `xmllint` OK; pratinjau komposisi mock (slim/penuh, gelap/terang): lengkung besar TL/BR dan ujung runcing TR/BL terbaca; pemindai dimensi 0 salah. Mock PIL BUKAN Android.
+- Trade-off jujur: ini keputusan GAYA (garis pink penuh ala Boomly), bukan sekadar bentuk. Bila tak suka, balik = 1 baris gradien lapis-1 di 2 file (nilai lama: gelap `#060304/#2B1D1F/#A5667A`; terang `#8A7A6B/#D8CCBF/#FFFFFF`, arah tetap 315).
+- 2 file (<= 5, tanpa justifikasi) + docs; `FILE_MANIFEST.txt` tetap 234.
+- **NOT VERIFIED**: belum compile/CI/device. PREDIKSI run berikutnya: "11 (11 deprecated, 0 lainnya)"; ArchUnit 7 LULUS; detekt 0; lintDebug 0; SpotBugs 23 (REC `WidgetUpdater` baris 234).
+
 ## Batch 611 — Palung widget jadi DAUN (selaras cangkang Batch 610) + baji gelap bocor palung dihilangkan
 - Input user: "finally ada hasil nyata!!" + 2 screenshot (widget slim + penuh SONIX = daun, bukan pil; LagFix/Boomly sebagai pembanding) + `SONIX_laporan-untuk-claude_run39.zip`, lalu "lanjut".
 - FAKTA run #39 (commit `04c4c88`, 2026-11-08 04:38 UTC = Batch 610; Gradle exit 0/0/0): ArchUnit LULUS (7 aturan), detekt 0, lintDebug 0 (risiko `UselessParent` TIDAK muncul), Kotlin "11 (11 deprecated, 0 lainnya)", SpotBugs 23 (`REC_CATCH_EXCEPTION @ WidgetUpdater.kt:234`, tak ada temuan baru) = SEMUA PREDIKSI Batch 610 cocok -> v610 **VERIFIED** di build. FAKTA device (screenshot 8 Nov 12:42, Infinix X6850 / Android 16): launcher MENGHORMATI opt-out `@android:id/background` + `clipToOutline`; slim 46dp + penuh 129dp tampil daun (TL/BR menyapu besar, TR/BL runcing), tanpa pil/clip -> akar Batch 610 (clip launcher) TERBUKTI di device.

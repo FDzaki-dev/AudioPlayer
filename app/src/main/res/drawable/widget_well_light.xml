@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
+    Batch 612 — GARIS TEPI PINK mengelilingi kontur daun palung (mode TERANG). Batch 611 (palung daun 20/4/20/4) dilaporkan user
+    "tidak ada perubahan kasat mata": BENAR — bibir lapis-1 dulu gradien gelap -> terang diagonal (TL gelap, TR/BL separuh gelap) sehingga
+    hanya BR yang terlihat; sudut yang diubah (TL/TR/BL) gelap-di-atas-gelap, selisih piksel v610->v611 hanya 0,14-0,24% area pada kontras
+    terlihat. Kini lapis-1 = pink di SELURUH kontur (kiri-atas lebih redup, kanan-bawah paling terang) -> lengkung besar TL/BR dan
+    ujung runcing TR/BL terbaca jelas. Hanya WARNA lapis-1 berubah; radius, lantai, band, pendar tetap Batch 611.
     Batch 611 — PALUNG cekung (TERANG), bentuk DAUN (TL 20 / TR 4 / BR 20 / BL 4; dulu 14/10/20/12 = bilah) — selaras dgn cangkang daun
     Batch 610 (TL/BR besar, TR/BL runcing). Pasangan: widget_well.xml. Radius dasar 20 pada BR TETAP (kenop next menempel 3dp dari tepi
     palung slim, celah = v609); TL naik 14 -> 20 (celah teks slim 3,2dp, compact 1,6dp, penuh 2,4dp).
@@ -11,7 +16,7 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <gradient android:type="linear" android:angle="315" android:startColor="#8A7A6B" android:centerColor="#D8CCBF" android:endColor="#FFFFFF" />
+            <gradient android:type="linear" android:angle="315" android:startColor="#A8566F" android:centerColor="#C46A84" android:endColor="#E89AB0" />
             <corners android:topLeftRadius="20dp" android:topRightRadius="4dp" android:bottomRightRadius="20dp" android:bottomLeftRadius="4dp" />
         </shape>
     </item>
