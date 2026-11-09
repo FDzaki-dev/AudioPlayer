@@ -200,6 +200,9 @@ class EqualizerController(private val context: Context) {
      * bisa pulih; bila attach ulang juga gagal, UI jatuh ke "tidak didukung" (jalur attach yang sudah ada).
      * Mengembalikan false bila operasi gagal (pemanggil TIDAK boleh menyimpan prefs/state perubahan itu).
      */
+    // Batch 619 — @Synchronized: SpotBugs run #47 IS2_INCONSISTENT_SYNC (baca attachedSessionId / tulis failedSessionId
+    // tanpa kunci, sedang attach()/release() memakai kunci). Reentrant terhadap attach()/releaseEffect().
+    @Synchronized
     private fun guardedEffectOp(op: String, block: () -> Unit): Boolean {
         return try {
             block()

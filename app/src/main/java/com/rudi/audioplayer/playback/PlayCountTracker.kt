@@ -1,5 +1,7 @@
 package com.rudi.audioplayer.playback
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 /**
  * Batch 597 — definisi "satu putaran" (laporan audit: `recordPlay` dulu dipanggil di SETIAP
  * `onMediaItemTransition`, apa pun alasannya, sehingga lagu yang di-skip 2 detik dihitung putaran penuh dan
@@ -81,6 +83,13 @@ class PlayCountTracker {
  * walau tak mencatat — jadi tak ada hitung ganda saat UI dibuka/ditutup di tengah lagu.
  */
 object PlayCountOwner {
-    @Volatile
-    var viewModelListening: Boolean = false
+    // Batch 619 — AtomicBoolean (bukan `@Volatile var` di `object`): SpotBugs run #47 menandai
+    // ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD karena Kotlin `object` mengompilasi `var` jadi field static.
+    private val listening = AtomicBoolean(false)
+
+    var viewModelListening: Boolean
+        get() = listening.get()
+        set(value) {
+            listening.set(value)
+        }
 }

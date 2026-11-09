@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - HOTFIX Batch 619: v618 tertutup sendiri tiap dibuka (galat inisialisasi ViewModel) — diperbaiki; belum dikompilasi/diuji di device; pastikan aplikasi terbuka normal setelah dipasang.
 > - Jaring pengaman bagian vital (Batch 618): galat di pemutar, widget, bubble, dan ViewModel kini dicatat mentah ke log (cari "Galat terjaring") lalu aplikasi lanjut, bukan langsung tertutup — belum dikompilasi/diuji di device; kirim ekspor log bila ada baris itu.
 > - Equalizer yang kehilangan kontrol kini menampilkan pesan yang tepat (bukan "tidak didukung") dan mencoba pulih otomatis (Batch 617) — belum dikompilasi/diuji di device; pastikan setelah memutar lagu dan membuka Equalizer, EQ aktif kembali dalam ±90 detik bila sempat kehilangan kontrol.
 > - Crash saat memilih preset Equalizer diperbaiki (Batch 616: semua perubahan efek dilindungi; bila kontrol efek hilang, UI jatuh ke "tidak didukung" lalu mencoba memasang ulang) — belum dikompilasi/diuji di device; pastikan memilih preset dan menggeser band tidak membuat aplikasi tertutup.
@@ -320,6 +321,8 @@ Riwayat lebih detail per batch pengembangan ada di `CHANGELOG.md`.
 Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("junit:junit:4.13.2")`) — tidak ada Robolectric/instrumentation, tidak ada emulator. Konsekuensinya: hanya business logic yang benar-benar lepas dari `Context`/framework Android (SharedPreferences, ContentResolver, SensorManager, dst.) yang bisa ditest langsung. Pola yang dipakai berulang kali di proyek ini (`PinLockoutPolicy`, dan sejak Batch 27: `ShakePulseTracker`, `MusicRepository.deriveFolderName`, `LibraryFilterStore.shouldKeep`): pisahkan logika murninya ke fungsi/kelas pure, method instance yang butuh Context tinggal delegasikan ke situ tanpa ubah perilaku.
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
+
+**Batch 619** — Perbaikan darurat: versi sebelumnya langsung menutup sendiri setiap kali dibuka karena satu komponen penanganan galat belum siap saat layar pemutar dibuat. Urutan inisialisasi diperbaiki, dan dua temuan analisis kode ikut dibereskan. Belum dikompilasi/diuji di device.
 
 **Batch 618** — Jaring pengaman: kesalahan tak terduga di bagian penting aplikasi (pemutar, widget, bubble, layar pemutar) sekarang dicatat apa adanya ke log diagnostik dan aplikasi tetap berjalan, sehingga penyebabnya bisa langsung dilacak dari ekspor log. Build otomatis juga mencoba ulang sekali bila unduhan dependency gagal karena jaringan. Belum dikompilasi/diuji di device.
 

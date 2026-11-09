@@ -107,6 +107,13 @@ data class PlaybackProgress(
 
 class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
+    // Batch 618 — jaring pengaman coroutine ViewModel: galat di `launch` dicatat mentah, tak lagi mematikan app.
+    // Batch 619 — HARUS properti PERTAMA kelas: Kotlin menjalankan initializer properti & blok `init {}` sesuai urutan
+    // teks. Di v618 deklarasi ini ada di baris ~577 padahal `init {}` (baris ~347) sudah memanggil
+    // `launch(Dispatchers.IO + safeHandler)` -> `safeHandler` masih null -> NullPointerException saat ViewModel
+    // dibuat -> aplikasi mati tiap dibuka (crash 9 Nov 16:46, 1.9.30 build 480). JANGAN dipindah ke bawah `init`.
+    private val safeHandler = SafeGuard.handler("PlayerViewModel")
+
     companion object {
         private const val POSITION_TICK_ACTIVE_MS = 1000L // Batch 537
         private const val POSITION_TICK_RELAXED_MS = 5000L // Batch 537
@@ -572,9 +579,6 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     // (refresh library berikutnya dari ContentObserver tidak mengulang sync ini).
     @Volatile private var librarySnapshotLoadedOnce = false
     @Volatile private var coldStartSyncDone = false
-
-    // Batch 618 — jaring pengaman coroutine ViewModel: galat di `launch` dicatat mentah, tak lagi mematikan app.
-    private val safeHandler = SafeGuard.handler("PlayerViewModel")
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {

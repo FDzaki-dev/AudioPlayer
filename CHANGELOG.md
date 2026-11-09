@@ -1,5 +1,11 @@
 # Changelog
 
+## Batch 619 — HOTFIX: aplikasi mati saat dibuka (NPE `safeHandler` null) + 3 temuan SpotBugs
+- Input user: 2x `crash_20261109_1646*.txt` (build 480 = v618) + `SONIX_laporan-untuk-claude_run47.zip`.
+- AKAR crash: `PlayerViewModel.safeHandler` (Batch 618) dideklarasikan setelah blok `init {}` yang sudah memakainya -> null saat konstruktor -> NPE di `MainActivity.onCreate`. Dipindah menjadi properti pertama kelas + komentar peringatan.
+- Run #47 (v618): ArchUnit 7, detekt 0, lint 0, Kotlin 11 deprecated; SpotBugs 3 -> `PlayCountOwner` pakai `AtomicBoolean` (ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD), `EqualizerController.guardedEffectOp` `@Synchronized` (IS2_INCONSISTENT_SYNC x2).
+- 3 file source (<= 5) + docs. **NOT VERIFIED**: belum compile/CI/device. PREDIKSI: "11 (11 deprecated, 0 lainnya)"; ArchUnit 7 LULUS; detekt 0; lintDebug 0; SpotBugs 0; aplikasi terbuka normal.
+
 ## Batch 618 — Jaring pengaman bagian vital (log mentah + aplikasi lanjut) + retry CI untuk kegagalan jaringan
 - Input user: `log_fail_592.zip` + permintaan "semua bagian Vital dipasangin jaring pengaman ... bisa langsung diatasi lewat log/debug".
 - `log_fail_592` (Build APK): `compileReleaseKotlin` gagal karena unduhan `kotlin-compiler-embeddable-2.4.10.jar` "Read timed out" = jaringan runner, bukan kode. `.github/workflows/build.yml`: build diulang SEKALI hanya bila log cocok pola jaringan; `build-output-attempt1.log` ikut artefak kegagalan; galat kode tetap fail-fast.
