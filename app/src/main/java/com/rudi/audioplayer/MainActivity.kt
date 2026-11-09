@@ -132,6 +132,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.rudi.audioplayer.bubble.FloatingBubbleService
 import com.rudi.audioplayer.playback.PlayerViewModel
+import com.rudi.audioplayer.util.RecentsGuard
 import com.rudi.audioplayer.ui.HomeScreen
 import com.rudi.audioplayer.ui.LockScreen
 import com.rudi.audioplayer.ui.LibraryScreen
@@ -249,6 +250,13 @@ class MainActivity : FragmentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         hasWindowFocus = hasFocus
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Batch 623 — task baru/dibuka ulang (mis. dari launcher saat musik main) ikut status "exclude from recents"
+        // terkini; juga membersihkan tanda basi dari proses yang sudah mati. Lihat util/RecentsGuard.kt.
+        RecentsGuard.reapply(this)
     }
 
     override fun onStop() {

@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 623 — "Exclude from recents" dinamis (`RecentsGuard`): swipe tak sengaja tak lagi membunuh sesi pemutaran
+- Input user: "tambahkan mekanisme exclude from recent apps. biar servis jadi anti kill ketika user gak sengaja nge swipe aplikasi!!" + log v622 (build 484) + `SONIX_laporan-untuk-claude_run51.zip`.
+- Run #51 (v622): ArchUnit 7, SpotBugs 0, detekt 0, lint 0, Kotlin 11 deprecated = prediksi cocok persis. Device v622 terbuka normal.
+- Akar (log 9 Nov 17:57:31): `[Swipe-up clean] manual_swipUpClean` membunuh proses yang sedang memutar seketika; `onTaskRemoved` tak sempat jalan -> satu-satunya tuas kode = tak ada kartu untuk di-swipe.
+- BARU `util/RecentsGuard.kt`: task `setExcludeFromRecents(true)` selama memutar + 10 menit setelah jeda; kembali normal saat sesi berakhir; `reapply` di `MainActivity.onResume`. Dipasang di `PlaybackService` (`onIsPlayingChanged`, `onDestroy`) dan `MainActivity`. Log `[RecentsGuard] Recents: excludeFromRecents=<bool> task=<N> alasan=...`.
+- Dinamis (bukan atribut manifest) supaya aplikasi tak hilang dari Recents selamanya. Batas jujur: hanya menyembunyikan kartu (tombol hapus-semua/force-stop/autostart OEM di luar kode).
+- 3 file source (<= 5) + `FILE_MANIFEST.txt` + docs. **NOT VERIFIED**: belum compile/CI/device. PREDIKSI: "11 (11 deprecated, 0 lainnya)"; ArchUnit 7; detekt 0; lint 0; SpotBugs 0.
+
 ## Batch 622 — Akar `ImageDecoder 'unimplemented'` = lagu tanpa sampul; derau log ERROR+stacktrace -> 1 baris WARN
 - Input user: `sonix_debug_20261109_172903.txt` (v621, build 483) + log AppLogger 17:30 + `SONIX_laporan-untuk-claude_run50.zip`, lalu "segera!!".
 - Run #50 (v621): ArchUnit 7, SpotBugs 0, detekt 0, lint 0, Kotlin 11 deprecated = prediksi cocok persis. Device: v621 terbuka normal, probe tercatat.

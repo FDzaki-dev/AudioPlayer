@@ -40,6 +40,7 @@ import com.rudi.audioplayer.data.SilenceSkipStore
 import com.rudi.audioplayer.data.lyrics.LyricsPrefetchStore
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.ArtFailureLog
+import com.rudi.audioplayer.util.RecentsGuard
 import com.rudi.audioplayer.util.SafeGuard
 import com.rudi.audioplayer.widget.WidgetUpdater
 import com.rudi.audioplayer.worker.LyricsPrefetchWorker
@@ -270,6 +271,9 @@ class PlaybackService : MediaLibraryService() {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 SafeGuard.guard("PlaybackService", "listener.onIsPlayingChanged") {
+                    // Batch 623 — saat memutar, task dikecualikan dari Recents (tak ada kartu untuk di-swipe; OEM
+                    // membunuh proses seketika pada swipe, log 9 Nov 17:57); jeda > tenggang = kartu kembali.
+                    RecentsGuard.onPlaybackActive(this@PlaybackService, isPlaying)
                     pushWidgetUpdate(player)
                     // Batch 102 — pause/resume mid-crossfade harus ikut membekukan/melanjutkan
                     // overlapPlayer, kalau tidak lagu berikutnya tetap terdengar sendiri walau user
@@ -927,6 +931,8 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        // Batch 623 — sesi berakhir: kartu Recents kembali normal sekarang juga (lihat util/RecentsGuard.kt).
+        RecentsGuard.onSessionEnded(this)
         shakeDetector?.stop()
         // Batch 102 — overlapPlayer bukan bagian dari mediaSession, jadi tidak ikut dilepas
         // oleh `player.release()` di bawah kalau tidak dilepas eksplisit di sini dulu.
