@@ -1,5 +1,11 @@
 # Changelog
 
+## Batch 624 — DOCS-ONLY: sinkronisasi hasil Batch 623 (run #52 + log v623)
+- Input user: `sonix_debug_20261110_071321.txt` (v623, build 485) + `SONIX_laporan-untuk-claude_run52.zip`, tanpa teks. 0 perubahan kode.
+- Run #52 (v623): ArchUnit 7, SpotBugs 0, detekt 0, lint 0, Kotlin 11 deprecated = prediksi cocok persis.
+- Device v623: terbuka normal; `[RecentsGuard] excludeFromRecents=true task=1 alasan=memutar` + 2x `activity tampil` = API terpanggil tanpa galat. Efek visual di Recents Infinix + anti swipe-kill belum terlihat dari log (menunggu uji user).
+- Jalur WARN sampul Batch 622 belum terpicu di device. RESUME POINT diselaraskan.
+
 ## Batch 623 — "Exclude from recents" dinamis (`RecentsGuard`): swipe tak sengaja tak lagi membunuh sesi pemutaran
 - Input user: "tambahkan mekanisme exclude from recent apps. biar servis jadi anti kill ketika user gak sengaja nge swipe aplikasi!!" + log v622 (build 484) + `SONIX_laporan-untuk-claude_run51.zip`.
 - Run #51 (v622): ArchUnit 7, SpotBugs 0, detekt 0, lint 0, Kotlin 11 deprecated = prediksi cocok persis. Device v622 terbuka normal.

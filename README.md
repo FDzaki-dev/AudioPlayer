@@ -2,7 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
-> - Batch 623: saat musik diputar, aplikasi disembunyikan dari daftar Recents supaya tidak ada kartu yang bisa tak sengaja di-swipe (di Infinix, swipe kartu membunuh pemutaran seketika). Kartu muncul lagi setelah jeda lebih dari 10 menit atau saat pemutaran berakhir; saat tersembunyi, buka aplikasi lewat launcher, notifikasi, widget, atau bubble — belum dikompilasi/diuji di device.
+> - Batch 623: saat musik diputar, aplikasi disembunyikan dari daftar Recents supaya tidak ada kartu yang bisa tak sengaja di-swipe (di Infinix, swipe kartu membunuh pemutaran seketika). Kartu muncul lagi setelah jeda lebih dari 10 menit atau saat pemutaran berakhir; saat tersembunyi, buka aplikasi lewat launcher, notifikasi, widget, atau bubble — sudah terkompilasi (analisis kode hijau penuh) dan fungsi penyembunyiannya sudah berjalan di device; efek di layar Recents dan ketahanan terhadap swipe menunggu pengujian Anda.
 > - Batch 622: pesan galat sampul album untuk lagu yang memang tidak punya sampul tertanam kini dicatat 1 baris ringkas (bukan galat berstacktrace panjang) agar log tidak penuh derau — belum dikompilasi/diuji di device; tampilan dan perilaku tidak berubah (ikon bawaan tetap dipakai). Galat jenis lain tetap dicatat lengkap.
 > - Batch 621: log diagnostik mencatat detail sampul album yang gagal didecode (1x per lagu) — SUDAH terkompilasi (run #50 hijau penuh) dan TERVERIFIKASI di device: semua lagu yang diprobe ternyata tidak punya sampul tertanam.
 > - Batch 620: temuan analisis kode di pengatur pemulihan Equalizer (penanda generasi dipakai dari beberapa thread) dibuat atomik — belum dikompilasi/diuji di device; perilaku Equalizer tidak berubah.
@@ -326,7 +326,7 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
-**Batch 623** — Anti swipe tak sengaja: selama musik diputar (dan 10 menit setelah dijeda), SONIX tidak ditampilkan di daftar aplikasi terbaru, sehingga tidak ada kartu yang bisa tak sengaja digeser dan mematikan pemutaran. Setelah itu, atau saat pemutaran berakhir, kartu muncul seperti biasa. Hanya menyembunyikan kartu: tombol "hapus semua" atau pembersih bawaan HP tetap di luar kendali aplikasi. Belum dikompilasi/diuji di device.
+**Batch 623** — Anti swipe tak sengaja: selama musik diputar (dan 10 menit setelah dijeda), SONIX tidak ditampilkan di daftar aplikasi terbaru, sehingga tidak ada kartu yang bisa tak sengaja digeser dan mematikan pemutaran. Setelah itu, atau saat pemutaran berakhir, kartu muncul seperti biasa. Hanya menyembunyikan kartu: tombol "hapus semua" atau pembersih bawaan HP tetap di luar kendali aplikasi. Sudah terkompilasi dan fungsi penyembunyiannya sudah berjalan di device; efek di layar Recents menunggu pengujian.
 
 **Batch 622** — Kebisingan log: data pencatatan Batch 621 menunjukkan galat decoder sampul hanya terjadi pada lagu yang tidak punya sampul tertanam (bukan kerusakan). Galat itu kini dicatat 1 baris ringkas, tidak lagi ratusan baris berstacktrace yang memenuhi sekitar 60% log; galat jenis lain tetap lengkap. Tampilan dan perilaku tidak berubah. Belum dikompilasi/diuji di device.
 
