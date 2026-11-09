@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.SafeGuard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,7 +25,9 @@ import kotlinx.coroutines.launch
  * throws.
  */
 class PlayerWidgetProvider : AppWidgetProvider() {
-    private val providerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // Batch 618 — galat updateAll (RemoteViews/bitmap/Binder) dicatat mentah; sebelumnya mematikan proses.
+    private val providerScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Default + SafeGuard.handler("PlayerWidgetProvider", "providerScope"))
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         updateAllAsync(context, "onUpdate ids=${appWidgetIds.joinToString(",")}")

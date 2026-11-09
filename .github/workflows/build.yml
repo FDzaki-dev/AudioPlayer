@@ -146,7 +146,19 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           set -o pipefail
-          gradle testReleaseUnitTest assembleRelease --no-daemon --build-cache 2>&1 | tee build-output.log
+          # Batch 618 — log_fail_592: `compileReleaseKotlin` gagal karena unduhan `kotlin-compiler-embeddable-2.4.10.jar`
+          # "Read timed out" (jaringan runner, BUKAN kode). Diulang SEKALI hanya bila log cocok pola jaringan;
+          # galat kompilasi/tes sungguhan tetap gagal langsung (fail-fast) tanpa diulang.
+          for attempt in 1 2; do
+            gradle testReleaseUnitTest assembleRelease --no-daemon --build-cache 2>&1 | tee build-output.log && break
+            if [ "$attempt" -lt 2 ] && grep -qE "Read timed out|Connect timed out|Could not GET|Could not download|Connection reset|Premature end of Content-Length|Remote host terminated" build-output.log; then
+              echo "::warning::Kegagalan jaringan saat mengunduh dependency (percobaan $attempt) - mengulang sekali"
+              cp build-output.log build-output-attempt1.log
+              sleep 20
+            else
+              exit 1
+            fi
+          done
 
       # ═══════════════════════ 4. PACKAGE & RELEASE ═══════════════════════
       - name: Rename APK to match version
@@ -266,6 +278,7 @@ jobs:
           name: log_fail_${{ github.run_number }}
           path: |
             build-output.log
+            build-output-attempt1.log
             app/build/reports/tests/testReleaseUnitTest/
             app/build/test-results/testReleaseUnitTest/
           if-no-files-found: ignore

@@ -39,6 +39,7 @@ import com.rudi.audioplayer.data.ShakeSettingsStore
 import com.rudi.audioplayer.data.SilenceSkipStore
 import com.rudi.audioplayer.data.lyrics.LyricsPrefetchStore
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.SafeGuard
 import com.rudi.audioplayer.widget.WidgetUpdater
 import com.rudi.audioplayer.worker.LyricsPrefetchWorker
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +52,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.SupervisorJob
 
 /**
  * Background playback: owns the [MediaLibrarySession], the ExoPlayer instance, and the
@@ -73,7 +75,8 @@ import kotlinx.coroutines.withContext
 class PlaybackService : MediaLibraryService() {
 
     private var mediaSession: MediaLibrarySession? = null
-    private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
+    private val serviceScope =
+        CoroutineScope(Dispatchers.Main + SupervisorJob() + SafeGuard.handler("PlaybackService", "serviceScope")) // Batch 618
     private var shakeDetector: ShakeDetector? = null
     private var coldStartNotificationActive = false
     // Batch 594 — generasi penanda jalur widget "service hidup tapi TIDAK sedang memutar" (lihat
@@ -90,26 +93,30 @@ class PlaybackService : MediaLibraryService() {
     private fun startServicePlayCount(player: Player) {
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                val songId = mediaItem?.mediaId?.toLongOrNull()
-                if (songId != null) {
-                    servicePlayCountTracker.startItem(
-                        songId, player.duration.coerceAtLeast(0L), SystemClock.elapsedRealtime(), player.isPlaying
-                    )
-                } else {
-                    servicePlayCountTracker.clearItem()
+                SafeGuard.guard("PlaybackService", "playCount.onMediaItemTransition") {
+                    val songId = mediaItem?.mediaId?.toLongOrNull()
+                    if (songId != null) {
+                        servicePlayCountTracker.startItem(
+                            songId, player.duration.coerceAtLeast(0L), SystemClock.elapsedRealtime(), player.isPlaying
+                        )
+                    } else {
+                        servicePlayCountTracker.clearItem()
+                    }
+                    servicePlayCountWake.trySend(Unit)
                 }
-                servicePlayCountWake.trySend(Unit)
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                val now = SystemClock.elapsedRealtime()
-                servicePlayCountTracker.setPlaying(isPlaying, now)
-                if (isPlaying && !servicePlayCountTracker.hasItem()) {
-                    player.currentMediaItem?.mediaId?.toLongOrNull()?.let {
-                        servicePlayCountTracker.startItem(it, player.duration.coerceAtLeast(0L), now, true)
+                SafeGuard.guard("PlaybackService", "playCount.onIsPlayingChanged") {
+                    val now = SystemClock.elapsedRealtime()
+                    servicePlayCountTracker.setPlaying(isPlaying, now)
+                    if (isPlaying && !servicePlayCountTracker.hasItem()) {
+                        player.currentMediaItem?.mediaId?.toLongOrNull()?.let {
+                            servicePlayCountTracker.startItem(it, player.duration.coerceAtLeast(0L), now, true)
+                        }
                     }
+                    servicePlayCountWake.trySend(Unit)
                 }
-                servicePlayCountWake.trySend(Unit)
             }
         })
         serviceScope.launch {
@@ -207,36 +214,40 @@ class PlaybackService : MediaLibraryService() {
         startServicePlayCount(player) // Batch 615
         player.addListener(object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) {
-                val id = (player as? ExoPlayer)?.audioSessionId ?: return
-                if (id != 0) PlaybackAudioSession.sessionId = id
+                SafeGuard.guard("PlaybackService", "listener.onEvents") {
+                    val id = (player as? ExoPlayer)?.audioSessionId ?: return
+                    if (id != 0) PlaybackAudioSession.sessionId = id
+                }
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                pushWidgetUpdate(player)
-                // Batch 246 — Lyrics offline-first 4/4a. Tiap pindah lagu, jendela "10 lagu
-                // depan" ikut geser satu — enqueue ulang, bukan panggil sekali di onCreate
-                // saja. REPLACE policy di dalam enqueue() bikin ini aman dipanggil sesering
-                // apa pun (skip-spam sekalipun). CATATAN AKURASI (bukan diklaim sempurna):
-                // Worker baca index dari PlaybackStateStore, yang di-`save()` PlayerViewModel
-                // secara PERIODIK (~5 detik saat playing, lihat persistPlaybackState()), BUKAN
-                // sinkron persis di titik transition ini — kalau Worker kebetulan jalan
-                // instan (sudah WiFi, 0 delay) di celah beberapa detik itu, window 10-lagu
-                // yang dibaca bisa 1 index ketinggalan. Konsekuensinya ringan (prefetch geser
-                // 1 lagu, bukan salah total atau crash) — sengaja tidak dikejar presisi
-                // sempurna di batch ini, cukup dicatat sebagai known-limitation.
-                // Batch 247 — guard toggle "Prefetch Saat WiFi" (default ON, lihat
-                // LyricsPrefetchStore.kt). Store dibaca ULANG tiap transition (bukan
-                // di-cache sekali di field Service) — instance SharedPreferences murah dibuat,
-                // dan ini menjamin toggle yang baru saja diubah user di Settings langsung
-                // berlaku transisi lagu BERIKUTNYA, tanpa perlu restart Service.
-                if (LyricsPrefetchStore(this@PlaybackService).isEnabled()) {
-                    LyricsPrefetchWorker.enqueue(this@PlaybackService)
-                }
-                // Batch 102 — sessionPlayer mencapai akhir track sendiri secara alami (bukan
-                // seek/skip manual): ini titik "silent handback" milik CrossfadeEngine, lihat
-                // dokumentasi kelasnya langkah 3.
-                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
-                    crossfadeEngine?.onSessionAutoTransition()
+                SafeGuard.guard("PlaybackService", "listener.onMediaItemTransition") {
+                    pushWidgetUpdate(player)
+                    // Batch 246 — Lyrics offline-first 4/4a. Tiap pindah lagu, jendela "10 lagu
+                    // depan" ikut geser satu — enqueue ulang, bukan panggil sekali di onCreate
+                    // saja. REPLACE policy di dalam enqueue() bikin ini aman dipanggil sesering
+                    // apa pun (skip-spam sekalipun). CATATAN AKURASI (bukan diklaim sempurna):
+                    // Worker baca index dari PlaybackStateStore, yang di-`save()` PlayerViewModel
+                    // secara PERIODIK (~5 detik saat playing, lihat persistPlaybackState()), BUKAN
+                    // sinkron persis di titik transition ini — kalau Worker kebetulan jalan
+                    // instan (sudah WiFi, 0 delay) di celah beberapa detik itu, window 10-lagu
+                    // yang dibaca bisa 1 index ketinggalan. Konsekuensinya ringan (prefetch geser
+                    // 1 lagu, bukan salah total atau crash) — sengaja tidak dikejar presisi
+                    // sempurna di batch ini, cukup dicatat sebagai known-limitation.
+                    // Batch 247 — guard toggle "Prefetch Saat WiFi" (default ON, lihat
+                    // LyricsPrefetchStore.kt). Store dibaca ULANG tiap transition (bukan
+                    // di-cache sekali di field Service) — instance SharedPreferences murah dibuat,
+                    // dan ini menjamin toggle yang baru saja diubah user di Settings langsung
+                    // berlaku transisi lagu BERIKUTNYA, tanpa perlu restart Service.
+                    if (LyricsPrefetchStore(this@PlaybackService).isEnabled()) {
+                        LyricsPrefetchWorker.enqueue(this@PlaybackService)
+                    }
+                    // Batch 102 — sessionPlayer mencapai akhir track sendiri secara alami (bukan
+                    // seek/skip manual): ini titik "silent handback" milik CrossfadeEngine, lihat
+                    // dokumentasi kelasnya langkah 3.
+                    if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                        crossfadeEngine?.onSessionAutoTransition()
+                    }
                 }
             }
 
@@ -245,41 +256,45 @@ class PlaybackService : MediaLibraryService() {
                 newPosition: Player.PositionInfo,
                 reason: Int
             ) {
-                // Batch 102 — skip/seek manual (tombol UI, notifikasi, headset, lock screen,
-                // Bluetooth) apa pun bentuknya wajib membatalkan crossfade yang sedang
-                // berlangsung, supaya overlapPlayer tidak pernah kebablasan main sendiri di
-                // atas lagu yang baru dituju user. Seek internal milik CrossfadeEngine sendiri
-                // (langkah handback) SENGAJA tidak ikut kena — lihat internalSeekInFlight di
-                // CrossfadeEngine.kt.
-                crossfadeEngine?.onSessionManualDiscontinuity(reason)
+                SafeGuard.guard("PlaybackService", "listener.onPositionDiscontinuity") {
+                    // Batch 102 — skip/seek manual (tombol UI, notifikasi, headset, lock screen,
+                    // Bluetooth) apa pun bentuknya wajib membatalkan crossfade yang sedang
+                    // berlangsung, supaya overlapPlayer tidak pernah kebablasan main sendiri di
+                    // atas lagu yang baru dituju user. Seek internal milik CrossfadeEngine sendiri
+                    // (langkah handback) SENGAJA tidak ikut kena — lihat internalSeekInFlight di
+                    // CrossfadeEngine.kt.
+                    crossfadeEngine?.onSessionManualDiscontinuity(reason)
+                }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                pushWidgetUpdate(player)
-                // Batch 102 — pause/resume mid-crossfade harus ikut membekukan/melanjutkan
-                // overlapPlayer, kalau tidak lagu berikutnya tetap terdengar sendiri walau user
-                // sudah menekan jeda.
-                crossfadeEngine?.onSessionPlayWhenReadyChanged(isPlaying)
-                if (isPlaying && ShakeSettingsStore(this@PlaybackService).isEnabled()) {
-                    ensureShakeDetector().start()
-                } else {
-                    shakeDetector?.stop()
-                }
-                // Roadmap #11 lanjutan (Batch 100) — sebelumnya bubble CUMA start dari
-                // MainActivity/BubbleBootReceiver, jadi entry point lain (widget play di
-                // homescreen, tombol notifikasi media, tombol headset) tidak pernah menyalakan
-                // bubble walau togglenya ON, kecuali app-nya sendiri sempat dibuka duluan. Ini
-                // Service yang SELALU hidup di titik manapun playback benar-benar mulai —
-                // dengar isPlaying di sini (bukan tebak per-entry-point di widget/QS tile
-                // masing-masing) otomatis menutup semua celah sekaligus dari SATU tempat.
-                if (isPlaying) maybeStartFloatingBubble()
-                // The cold-start placeholder is a plain NotificationCompat notification, not
-                // a MediaStyle one Media3 keeps in sync automatically — without this, its
-                // action button was permanently stuck on whatever label it had at the instant
-                // it was first built (always "Lanjutkan", since nothing was playing yet at
-                // that exact moment), even after playback actually started.
-                if (coldStartNotificationActive) {
-                    updateColdStartNotification()
+                SafeGuard.guard("PlaybackService", "listener.onIsPlayingChanged") {
+                    pushWidgetUpdate(player)
+                    // Batch 102 — pause/resume mid-crossfade harus ikut membekukan/melanjutkan
+                    // overlapPlayer, kalau tidak lagu berikutnya tetap terdengar sendiri walau user
+                    // sudah menekan jeda.
+                    crossfadeEngine?.onSessionPlayWhenReadyChanged(isPlaying)
+                    if (isPlaying && ShakeSettingsStore(this@PlaybackService).isEnabled()) {
+                        ensureShakeDetector().start()
+                    } else {
+                        shakeDetector?.stop()
+                    }
+                    // Roadmap #11 lanjutan (Batch 100) — sebelumnya bubble CUMA start dari
+                    // MainActivity/BubbleBootReceiver, jadi entry point lain (widget play di
+                    // homescreen, tombol notifikasi media, tombol headset) tidak pernah menyalakan
+                    // bubble walau togglenya ON, kecuali app-nya sendiri sempat dibuka duluan. Ini
+                    // Service yang SELALU hidup di titik manapun playback benar-benar mulai —
+                    // dengar isPlaying di sini (bukan tebak per-entry-point di widget/QS tile
+                    // masing-masing) otomatis menutup semua celah sekaligus dari SATU tempat.
+                    if (isPlaying) maybeStartFloatingBubble()
+                    // The cold-start placeholder is a plain NotificationCompat notification, not
+                    // a MediaStyle one Media3 keeps in sync automatically — without this, its
+                    // action button was permanently stuck on whatever label it had at the instant
+                    // it was first built (always "Lanjutkan", since nothing was playing yet at
+                    // that exact moment), even after playback actually started.
+                    if (coldStartNotificationActive) {
+                        updateColdStartNotification()
+                    }
                 }
             }
 

@@ -36,6 +36,7 @@ import com.rudi.audioplayer.R
 import com.rudi.audioplayer.data.FloatingBubbleStore
 import com.rudi.audioplayer.playback.PlaybackService
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.SafeGuard
 import com.rudi.audioplayer.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.SupervisorJob
 import java.util.concurrent.Executor
 import kotlin.math.abs
 
@@ -469,7 +471,8 @@ class FloatingBubbleService : Service() {
     private var layoutParams: WindowManager.LayoutParams? = null
     private var controller: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
-    private val bubbleScope = CoroutineScope(Dispatchers.Main + Job())
+    private val bubbleScope =
+        CoroutineScope(Dispatchers.Main + SupervisorJob() + SafeGuard.handler("FloatingBubbleService", "bubbleScope")) // Batch 618
     private var bubbleArtJob: Job? = null
     // Batch 453 — timer auto-fade idle, lihat KDoc kelas ini & keepAwakeAndScheduleFade().
     private var idleFadeJob: Job? = null
@@ -483,13 +486,15 @@ class FloatingBubbleService : Service() {
 
     private val playerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
-            if (events.containsAny(
-                    Player.EVENT_IS_PLAYING_CHANGED,
-                    Player.EVENT_MEDIA_ITEM_TRANSITION,
-                    Player.EVENT_MEDIA_METADATA_CHANGED
-                )
-            ) {
-                refreshBubbleContent(player)
+            SafeGuard.guard("FloatingBubbleService", "listener.onEvents") {
+                if (events.containsAny(
+                        Player.EVENT_IS_PLAYING_CHANGED,
+                        Player.EVENT_MEDIA_ITEM_TRANSITION,
+                        Player.EVENT_MEDIA_METADATA_CHANGED
+                    )
+                ) {
+                    refreshBubbleContent(player)
+                }
             }
         }
     }

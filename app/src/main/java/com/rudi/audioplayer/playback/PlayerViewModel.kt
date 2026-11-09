@@ -24,6 +24,7 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.SafeGuard
 import com.rudi.audioplayer.data.AudiobookModeStore
 import com.rudi.audioplayer.data.Bookmark
 import com.rudi.audioplayer.data.BookmarkStore
@@ -467,7 +468,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private var pendingTagWriteTags: com.rudi.audioplayer.data.Id3TagWriter.EditableTags? = null
 
     fun requestSaveTags(song: Song, tags: com.rudi.audioplayer.data.Id3TagWriter.EditableTags) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO + safeHandler) {
             when (val result = tagEditor.writeTags(song, tags)) {
                 is com.rudi.audioplayer.data.TagEditor.TagWriteResult.Success -> {
                     showInfoMessage("Metadata disimpan")
@@ -498,7 +499,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             return
         }
         if (song == null || tags == null) return
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO + safeHandler) {
             when (val result = tagEditor.writeTagsWithConsent(song, tags)) {
                 is com.rudi.audioplayer.data.TagEditor.TagWriteResult.Success -> {
                     showInfoMessage("Metadata disimpan")
@@ -524,7 +525,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         destination: com.rudi.audioplayer.data.RingtoneEncoder.Destination,
         label: String
     ) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO + safeHandler) {
             when (val result = ringtoneEncoder.cut(song, range, destination, label)) {
                 is com.rudi.audioplayer.data.RingtoneEncoder.CutResult.Success ->
                     showInfoMessage("Tersimpan sebagai ${result.destination.label}: ${result.displayName}")
@@ -572,25 +573,30 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     @Volatile private var librarySnapshotLoadedOnce = false
     @Volatile private var coldStartSyncDone = false
 
+    // Batch 618 — jaring pengaman coroutine ViewModel: galat di `launch` dicatat mentah, tak lagi mematikan app.
+    private val safeHandler = SafeGuard.handler("PlayerViewModel")
+
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
-            // Batch 597 — waktu dengar nyata: hanya jam dinding saat memutar. Bila belum ada sesi (mis. lagu
-            // yang dilanjutkan setelah app dibuka ulang, tanpa pergantian lagu), mulai sesi dari lagu aktif.
-            playCountTracker.setPlaying(isPlaying, SystemClock.elapsedRealtime())
-            if (isPlaying && !playCountTracker.hasItem()) {
-                _uiState.value.currentSong?.let {
-                    playCountTracker.startItem(it.id, it.duration, SystemClock.elapsedRealtime(), true)
+            SafeGuard.guard("PlayerViewModel", "listener.onIsPlayingChanged") {
+                _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
+                // Batch 597 — waktu dengar nyata: hanya jam dinding saat memutar. Bila belum ada sesi (mis. lagu
+                // yang dilanjutkan setelah app dibuka ulang, tanpa pergantian lagu), mulai sesi dari lagu aktif.
+                playCountTracker.setPlaying(isPlaying, SystemClock.elapsedRealtime())
+                if (isPlaying && !playCountTracker.hasItem()) {
+                    _uiState.value.currentSong?.let {
+                        playCountTracker.startItem(it.id, it.duration, SystemClock.elapsedRealtime(), true)
+                    }
                 }
+                playCountWake.trySend(Unit)
+                if (!isPlaying) persistPlaybackState()
+                positionWake.trySend(Unit) // Batch 537: loop posisi cek ulang kadensi + publish segera
+                // Gap List #8 — sinyal paling jujur bahwa playback beneran pulih (bukan cuma
+                // pindah index): reset counter error beruntun di sini, bukan di
+                // onMediaItemTransition (yang juga terpanggil untuk track yang UJUNG-UJUNGNYA error
+                // lagi sebelum sempat isPlaying=true).
+                if (isPlaying) consecutiveErrorCount.set(0)
             }
-            playCountWake.trySend(Unit)
-            if (!isPlaying) persistPlaybackState()
-            positionWake.trySend(Unit) // Batch 537: loop posisi cek ulang kadensi + publish segera
-            // Gap List #8 — sinyal paling jujur bahwa playback beneran pulih (bukan cuma
-            // pindah index): reset counter error beruntun di sini, bukan di
-            // onMediaItemTransition (yang juga terpanggil untuk track yang UJUNG-UJUNGNYA error
-            // lagi sebelum sempat isPlaying=true).
-            if (isPlaying) consecutiveErrorCount.set(0)
         }
 
         // Batch 537 (baterai) — seek/skip saat JEDA tak lagi menunggu tick: loop dibangunkan.
@@ -599,86 +605,100 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             newPosition: Player.PositionInfo,
             reason: Int
         ) {
-            positionWake.trySend(Unit)
+            SafeGuard.guard("PlayerViewModel", "listener.onPositionDiscontinuity") {
+                positionWake.trySend(Unit)
+            }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            positionWake.trySend(Unit) // Batch 537
-            val index = controller?.currentMediaItemIndex ?: 0
-            val song = currentQueue.getOrNull(index)
-            _uiState.value = _uiState.value.copy(
-                currentSong = song,
-                currentIndex = index
-            )
-            // Batch 353 (Opsi A) — duration pindah rumah ke _playbackProgress. Diupdate
-            // langsung di sini (bukan nunggu tick berikutnya) persis alasan sebelumnya: biar
-            // durasi lagu baru tidak sempat kebaca durasi lagu lama sebelum tick pertama jalan.
-            _playbackProgress.value = _playbackProgress.value.copy(
-                duration = controller?.duration?.coerceAtLeast(0) ?: 0L
-            )
-            // Batch 597 — TIDAK lagi langsung `recordPlay` di sini: sesi baru dimulai, dihitung nanti oleh
-            // `startPlayCountWatcher()` bila waktu dengar nyata mencapai ambang.
-            if (song != null) {
-                playCountTracker.startItem(
-                    song.id,
-                    song.duration,
-                    SystemClock.elapsedRealtime(),
-                    controller?.isPlaying == true
+            SafeGuard.guard("PlayerViewModel", "listener.onMediaItemTransition") {
+                positionWake.trySend(Unit) // Batch 537
+                val index = controller?.currentMediaItemIndex ?: 0
+                val song = currentQueue.getOrNull(index)
+                _uiState.value = _uiState.value.copy(
+                    currentSong = song,
+                    currentIndex = index
                 )
-            } else {
-                playCountTracker.clearItem()
+                // Batch 353 (Opsi A) — duration pindah rumah ke _playbackProgress. Diupdate
+                // langsung di sini (bukan nunggu tick berikutnya) persis alasan sebelumnya: biar
+                // durasi lagu baru tidak sempat kebaca durasi lagu lama sebelum tick pertama jalan.
+                _playbackProgress.value = _playbackProgress.value.copy(
+                    duration = controller?.duration?.coerceAtLeast(0) ?: 0L
+                )
+                // Batch 597 — TIDAK lagi langsung `recordPlay` di sini: sesi baru dimulai, dihitung nanti oleh
+                // `startPlayCountWatcher()` bila waktu dengar nyata mencapai ambang.
+                if (song != null) {
+                    playCountTracker.startItem(
+                        song.id,
+                        song.duration,
+                        SystemClock.elapsedRealtime(),
+                        controller?.isPlaying == true
+                    )
+                } else {
+                    playCountTracker.clearItem()
+                }
+                playCountWake.trySend(Unit)
+                updateAccentColor(song)
+                _currentRating.value = song?.let { ratingStore.getRating(it.id) } ?: 0
+                persistPlaybackState()
+
+                // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — resume THIS song's own remembered
+                // speed + position, independent of whatever speed the previous track left behind
+                // (that "carries over to every song" behavior is exactly what the roadmap flags as
+                // the thing this feature replaces, per-song, for opted-in files). Skipped on
+                // MEDIA_ITEM_TRANSITION_REASON_REPEAT (REPEAT_MODE_ONE looping the same item) — re-
+                // seeking to a stale saved position on every loop would fight repeat-one's own
+                // restart-from-zero behavior instead of just looping cleanly.
+                val audiobookState = song?.let { audiobookModeStore.get(it.id) }
+                _audiobookModeEnabled.value = audiobookState?.enabled == true
+                if (audiobookState?.enabled == true && reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+                    controller?.setPlaybackSpeed(audiobookState.speed)
+                    if (audiobookState.lastPositionMs > 0) controller?.seekTo(audiobookState.lastPositionMs)
+                }
+
+                // Batch 102 — dulu di sini ada startFadeIn() (fade volume single-player). True
+                // crossfade sekarang seluruhnya dikelola CrossfadeEngine di PlaybackService (dua
+                // ExoPlayer overlap sungguhan) — ViewModel ini cuma pegang MediaController, tidak
+                // punya akses ke ExoPlayer mentah, jadi tidak ada lagi kerja fade di sisi sini sama
+                // sekali. Lihat CrossfadeEngine.kt.
+
+                // A-B Repeat is scoped to one song, never carried to the next — a stale point B
+                // from the previous track would either never trigger (positions rarely line up) or
+                // worse, silently clip the start of a new song if it happened to be short enough.
+                _abRepeatPointA.value = null
+                _abRepeatPointB.value = null
             }
-            playCountWake.trySend(Unit)
-            updateAccentColor(song)
-            _currentRating.value = song?.let { ratingStore.getRating(it.id) } ?: 0
-            persistPlaybackState()
-
-            // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — resume THIS song's own remembered
-            // speed + position, independent of whatever speed the previous track left behind
-            // (that "carries over to every song" behavior is exactly what the roadmap flags as
-            // the thing this feature replaces, per-song, for opted-in files). Skipped on
-            // MEDIA_ITEM_TRANSITION_REASON_REPEAT (REPEAT_MODE_ONE looping the same item) — re-
-            // seeking to a stale saved position on every loop would fight repeat-one's own
-            // restart-from-zero behavior instead of just looping cleanly.
-            val audiobookState = song?.let { audiobookModeStore.get(it.id) }
-            _audiobookModeEnabled.value = audiobookState?.enabled == true
-            if (audiobookState?.enabled == true && reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
-                controller?.setPlaybackSpeed(audiobookState.speed)
-                if (audiobookState.lastPositionMs > 0) controller?.seekTo(audiobookState.lastPositionMs)
-            }
-
-            // Batch 102 — dulu di sini ada startFadeIn() (fade volume single-player). True
-            // crossfade sekarang seluruhnya dikelola CrossfadeEngine di PlaybackService (dua
-            // ExoPlayer overlap sungguhan) — ViewModel ini cuma pegang MediaController, tidak
-            // punya akses ke ExoPlayer mentah, jadi tidak ada lagi kerja fade di sisi sini sama
-            // sekali. Lihat CrossfadeEngine.kt.
-
-            // A-B Repeat is scoped to one song, never carried to the next — a stale point B
-            // from the previous track would either never trigger (positions rarely line up) or
-            // worse, silently clip the start of a new song if it happened to be short enough.
-            _abRepeatPointA.value = null
-            _abRepeatPointB.value = null
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-            _uiState.value = _uiState.value.copy(shuffleEnabled = shuffleModeEnabled)
+            SafeGuard.guard("PlayerViewModel", "listener.onShuffleModeEnabledChanged") {
+                _uiState.value = _uiState.value.copy(shuffleEnabled = shuffleModeEnabled)
+            }
         }
 
         override fun onRepeatModeChanged(repeatMode: Int) {
-            _uiState.value = _uiState.value.copy(repeatMode = repeatMode)
+            SafeGuard.guard("PlayerViewModel", "listener.onRepeatModeChanged") {
+                _uiState.value = _uiState.value.copy(repeatMode = repeatMode)
+            }
         }
 
         override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
-            _uiState.value = _uiState.value.copy(playbackSpeed = playbackParameters.speed)
+            SafeGuard.guard("PlayerViewModel", "listener.onPlaybackParametersChanged") {
+                _uiState.value = _uiState.value.copy(playbackSpeed = playbackParameters.speed)
+            }
         }
 
         override fun onVolumeChanged(volume: Float) {
-            _uiState.value = _uiState.value.copy(volume = volume)
+            SafeGuard.guard("PlayerViewModel", "listener.onVolumeChanged") {
+                _uiState.value = _uiState.value.copy(volume = volume)
+            }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState == Player.STATE_ENDED) {
-                continuePlaybackIfQueueEnded()
+            SafeGuard.guard("PlayerViewModel", "listener.onPlaybackStateChanged") {
+                if (playbackState == Player.STATE_ENDED) {
+                    continuePlaybackIfQueueEnded()
+                }
             }
         }
 
@@ -686,35 +706,37 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // nothing shown to the user. Logs locally (never transmitted) and tries to keep
         // the music going by skipping to the next queued track when one exists.
         override fun onPlayerError(error: PlaybackException) {
-            val index = controller?.currentMediaItemIndex ?: -1
-            val song = currentQueue.getOrNull(index)
-            val label = song?.let { "${it.title} — ${it.artist}" } ?: "Lagu ini"
-            // Gap List #8 — bedakan alasan gagal (file hilang/izin ditolak/format tidak
-            // didukung/rusak/lainnya) alih-alih 1 pesan generik untuk semua kasus; reason
-            // pendek ini juga yang disimpan ke AppLogger untuk diagnostics, bukan cuma stack
-            // trace mentah.
-            val reason = describePlaybackErrorReason(error)
-            AppLogger.e("PlayerViewModel", "Playback error pada index=$index ($label) — $reason", error)
+            SafeGuard.guard("PlayerViewModel", "listener.onPlayerError") {
+                val index = controller?.currentMediaItemIndex ?: -1
+                val song = currentQueue.getOrNull(index)
+                val label = song?.let { "${it.title} — ${it.artist}" } ?: "Lagu ini"
+                // Gap List #8 — bedakan alasan gagal (file hilang/izin ditolak/format tidak
+                // didukung/rusak/lainnya) alih-alih 1 pesan generik untuk semua kasus; reason
+                // pendek ini juga yang disimpan ke AppLogger untuk diagnostics, bukan cuma stack
+                // trace mentah.
+                val reason = describePlaybackErrorReason(error)
+                AppLogger.e("PlayerViewModel", "Playback error pada index=$index ($label) — $reason", error)
 
-            val errorStreak = consecutiveErrorCount.incrementAndGet()
-            val c = controller
-            if (errorStreak >= MAX_CONSECUTIVE_PLAYBACK_ERRORS) {
-                // Skip otomatis TIDAK lagi aman diteruskan — kemungkinan besar sisa queue
-                // bermasalah semua (mis. folder sumbernya baru dicabut/dihapus total). Hentikan
-                // di sini alih-alih terus mental dari 1 track rusak ke track rusak berikutnya
-                // tanpa henti; user dapat 1 pesan jelas, bukan Snackbar error beruntun.
-                c?.pause()
-                _playbackErrorMessage.value =
-                    "Beberapa lagu berturut-turut gagal diputar ($reason). Playback dihentikan — " +
-                        "periksa apakah file/folder musik kamu masih ada."
-                consecutiveErrorCount.set(0)
-                return
-            }
+                val errorStreak = consecutiveErrorCount.incrementAndGet()
+                val c = controller
+                if (errorStreak >= MAX_CONSECUTIVE_PLAYBACK_ERRORS) {
+                    // Skip otomatis TIDAK lagi aman diteruskan — kemungkinan besar sisa queue
+                    // bermasalah semua (mis. folder sumbernya baru dicabut/dihapus total). Hentikan
+                    // di sini alih-alih terus mental dari 1 track rusak ke track rusak berikutnya
+                    // tanpa henti; user dapat 1 pesan jelas, bukan Snackbar error beruntun.
+                    c?.pause()
+                    _playbackErrorMessage.value =
+                        "Beberapa lagu berturut-turut gagal diputar ($reason). Playback dihentikan — " +
+                            "periksa apakah file/folder musik kamu masih ada."
+                    consecutiveErrorCount.set(0)
+                    return
+                }
 
-            _playbackErrorMessage.value = "$label tidak bisa diputar ($reason)."
-            if (c != null && c.hasNextMediaItem()) {
-                c.seekToNextMediaItem()
-                c.play()
+                _playbackErrorMessage.value = "$label tidak bisa diputar ($reason)."
+                if (c != null && c.hasNextMediaItem()) {
+                    c.seekToNextMediaItem()
+                    c.play()
+                }
             }
         }
     }
@@ -830,7 +852,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
                 libraryAutoRefreshJob?.cancel()
-                libraryAutoRefreshJob = viewModelScope.launch {
+                libraryAutoRefreshJob = viewModelScope.launch(safeHandler) {
                     delay(1500)
                     // Batch 516 [laporan user v515: gesture pilih-lagu "gak ikut jari" + "muncul effect
                     // Shimmer"] — refresh OTOMATIS ini dulu selalu `refreshLibrary()` non-silent, jadi tiap
@@ -879,7 +901,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     fun ensureLibraryLoaded() {
         if (libraryLoadedOnce) return
         libraryLoadedOnce = true
-        viewModelScope.launch {
+        viewModelScope.launch(safeHandler) {
             val cached = withContext(Dispatchers.IO) { libraryCacheStore.load() }
             if (cached != null && cached.isNotEmpty()) {
                 _librarySongs.value = cached
@@ -905,7 +927,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         libraryLoadedOnce = true
         libraryRefreshJob?.cancel()
         val generation = libraryRefreshGeneration.incrementAndGet()
-        libraryRefreshJob = viewModelScope.launch {
+        libraryRefreshJob = viewModelScope.launch(safeHandler) {
             if (!silent) {
                 _libraryLoading.value = true
             }
@@ -971,7 +993,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                     // `ensureLibraryLoaded()`/`LibraryCacheStore`). Dispatch ke IO terpisah,
                     // fire-and-forget: gagal/lambatnya penulisan cache TIDAK BOLEH menunda
                     // assignment `_librarySongs` di atas (UI thread SUDAH update duluan).
-                    viewModelScope.launch(Dispatchers.IO) { libraryCacheStore.save(songs) }
+                    viewModelScope.launch(Dispatchers.IO + safeHandler) { libraryCacheStore.save(songs) }
                     // Gap List #9 — orphan cleanup: favorites/ratings/playlist entries pointing
                     // at a song no longer in the freshly-scanned library are dead weight (file
                     // deleted/moved/permission revoked). Deliberately NOT applied to
@@ -1038,7 +1060,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
      * mana pun (atomic), `refreshLibrary()` sendiri sudah aman dipanggil dari coroutine lain
      * (cuma `launch{}` job baru). */
     fun addCustomFolder(treeUri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO + safeHandler) {
             try {
                 appContext.contentResolver.takePersistableUriPermission(
                     treeUri,
@@ -1061,7 +1083,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
      * dulu sinkron di Main (dipanggil dari tombol hapus `FolderManagerSheet.kt` via
      * `MainActivity.kt`'s `onRemoveCustomFolder`), sekarang dipindah IO. */
     fun removeCustomFolder(uriString: String) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO + safeHandler) {
             try {
                 appContext.contentResolver.releasePersistableUriPermission(
                     Uri.parse(uriString),
@@ -1090,7 +1112,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // note). Not the root cause of the widget staying visually frozen across theme
         // switches — see PROJECT_STATE.md for what's still unconfirmed there — but leaving
         // Main-thread I/O in a newly-added call path is a real bug on its own regardless.
-        viewModelScope.launch(Dispatchers.IO) { WidgetUpdater.updateAll(appContext) }
+        viewModelScope.launch(Dispatchers.IO + safeHandler) { WidgetUpdater.updateAll(appContext) }
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -1098,7 +1120,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         _themeMode.value = mode
         // Batch 68: this is the call that actually flips the widget's light/dark background.
         // Batch 72: see setThemeIdentity() above — same Main-thread-I/O fix applied here.
-        viewModelScope.launch(Dispatchers.IO) { WidgetUpdater.updateAll(appContext) }
+        viewModelScope.launch(Dispatchers.IO + safeHandler) { WidgetUpdater.updateAll(appContext) }
     }
 
     private fun loadCustomFolderInfos(): List<CustomFolderInfo> =
@@ -1131,7 +1153,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     }
 
     private fun startPositionLoop() {
-        viewModelScope.launch {
+        viewModelScope.launch(safeHandler) {
             while (true) {
                 val c = controller
                 var tickMs = POSITION_TICK_ACTIVE_MS
@@ -1195,7 +1217,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // ~5 detik — crash nyata pertama app ini yang ketahuan lewat crash logger sejak Batch 22.
         val repeatMode = c.repeatMode
         val shuffleEnabled = c.shuffleModeEnabled
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO + safeHandler) {
             playbackStateStore.save(
                 songIds = songIds,
                 index = index,
@@ -1217,7 +1239,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     /** Batch 597 — pengawas putaran: tidur sampai ada perubahan (lagu/jeda) atau ambang waktu dengar tercapai,
      * lalu mencatat SEKALI per sesi. Tanpa polling saat jeda. Berjalan di `viewModelScope` (Main). */
     private fun startPlayCountWatcher() {
-        viewModelScope.launch {
+        viewModelScope.launch(safeHandler) {
             while (isActive) {
                 val wait = playCountTracker.msUntilQualified(SystemClock.elapsedRealtime())
                 if (wait == null) {
@@ -1258,7 +1280,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // beberapa ekstraksi tumpang tindih — kalau yang lebih lama selesai belakangan, warna
         // aksen lagu yang sudah dilewati bisa menimpa warna lagu yang sedang main sekarang.
         accentColorJob?.cancel()
-        accentColorJob = viewModelScope.launch {
+        accentColorJob = viewModelScope.launch(safeHandler) {
             val color = withContext(Dispatchers.IO) {
                 AccentColorExtractor.extract(appContext, song?.uri)
             }
@@ -1884,7 +1906,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     // Batch 507 (T2) — loop hitung mundur kosmetik yang sebelumnya duplikat di `init` dan
     // `setSleepTimer`. Isi loop identik dengan versi lama; hanya dipindah ke satu tempat.
     private fun startSleepTimerCountdown(endAt: Long) {
-        sleepTimerJob = viewModelScope.launch {
+        sleepTimerJob = viewModelScope.launch(safeHandler) {
             while (true) {
                 // Dihitung ulang dari endAt - now() tiap tick (bukan sekadar decrement lokal)
                 // supaya angka yang ditampilkan tidak drift dari deadline sungguhan yang

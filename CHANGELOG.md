@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 618 — Jaring pengaman bagian vital (log mentah + aplikasi lanjut) + retry CI untuk kegagalan jaringan
+- Input user: `log_fail_592.zip` + permintaan "semua bagian Vital dipasangin jaring pengaman ... bisa langsung diatasi lewat log/debug".
+- `log_fail_592` (Build APK): `compileReleaseKotlin` gagal karena unduhan `kotlin-compiler-embeddable-2.4.10.jar` "Read timed out" = jaringan runner, bukan kode. `.github/workflows/build.yml`: build diulang SEKALI hanya bila log cocok pola jaringan; `build-output-attempt1.log` ikut artefak kegagalan; galat kode tetap fail-fast.
+- BARU `util/SafeGuard.kt` (`guard`, `attempt`, `handler`, `report` ber-throttle; `CancellationException` dilempar ulang, `Error` tak ditelan). Pesan log: `Galat terjaring, aplikasi tetap berjalan: op=... thread=...`.
+- `PlaybackService`: `serviceScope` kini `SupervisorJob` + handler (sebelumnya `Job()` biasa) + 6 callback pemutar dibungkus. `PlayerViewModel`: 9 callback + 16 `launch`. `PlayerWidgetProvider`: handler di `providerScope` (celah nyata: `updateAllAsync` tanpa catch). `FloatingBubbleService`: `bubbleScope` `SupervisorJob` + handler + `onEvents`.
+- Belum tercakup: `MainActivity`, `AudioPlayerApplication`, `BubbleBootReceiver`, `LyricsPrefetchWorker`, `CrossfadeEngine` overlap listener, `PlaybackSessionCallback`, Compose.
+- 5 file source (1 baru, <= 5) + `build.yml` + `FILE_MANIFEST.txt` + docs. **NOT VERIFIED**: belum compile/CI/device. PREDIKSI: "11 (11 deprecated, 0 lainnya)"; ArchUnit 7 LULUS; detekt 0; lintDebug 0; SpotBugs 0 (risiko titik baru di `SafeGuard.kt`).
+
 ## Batch 617 — Equalizer: pesan kontrol-hilang yang jujur + pemulihan otomatis
 - Input user: screenshot sheet Equalizer "tidak didukung" + `log_20261108_195956_*.txt`.
 - FAKTA log: attach 19:56:02 `hasControl=true` (belum memutar) -> play 19:56:07 -> `granted=false` 19:56:09 -> klik preset: `Gagal useBoldPreset ... hasControl=false` tanpa crash -> attach ulang `hasControl=false` -> sheet dibuka lagi 19:57:51: `hasControl=true` pada sesi yang sama yang memutar. Kontrol hilang sementara; pemegang belum teridentifikasi.
