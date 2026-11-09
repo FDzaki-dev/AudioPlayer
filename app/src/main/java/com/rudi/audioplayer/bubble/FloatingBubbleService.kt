@@ -1277,9 +1277,8 @@ class FloatingBubbleService : Service() {
     private fun loadAlbumArtBitmap(uri: Uri): Bitmap? = try {
         contentResolver.loadThumbnail(uri, Size(120, 120), null)
     } catch (e: Exception) {
-        AppLogger.e("FloatingBubbleService", "Gagal muat artwork bubble", e)
-        // Batch 621 — fakta mentah (URI/format sampul) bila ini kegagalan decoder; 1x per URI, tak mengubah hasil.
-        ArtFailureLog.report(this, "FloatingBubbleService", uri, 120, e)
+        // Batch 622 — DecodeException (lagu tanpa sampul) = 1 baris WARN; galat lain tetap ERROR + stacktrace; + probe 1x per URI.
+        ArtFailureLog.logFailure(this, "FloatingBubbleService", "Gagal muat artwork bubble", uri, 120, e)
         null
     }
 

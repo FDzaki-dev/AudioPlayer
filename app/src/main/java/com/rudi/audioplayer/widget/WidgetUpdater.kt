@@ -488,9 +488,8 @@ object WidgetUpdater {
         } catch (e: Exception) {
             // Widget jatuh balik ke ikon aplikasi kalau ini gagal (masih terlihat wajar di layar
             // beranda), tapi dicatat supaya kegagalan muat artwork tidak sepenuhnya tak terlihat.
-            AppLogger.e("WidgetUpdater", "Gagal muat artwork widget", e)
-            // Batch 621 — fakta mentah (URI/format sampul) bila ini kegagalan decoder; 1x per URI, tak mengubah hasil.
-            ArtFailureLog.report(context, "WidgetUpdater", uri, sizePx, e)
+            // Batch 622 — DecodeException (lagu tanpa sampul) = 1 baris WARN; galat lain tetap ERROR + stacktrace; + probe 1x per URI.
+            ArtFailureLog.logFailure(context, "WidgetUpdater", "Gagal muat artwork widget", uri, sizePx, e)
             null
         }
     }

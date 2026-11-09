@@ -116,6 +116,24 @@ object ArtFailureLog {
     private val lock = Any()
     private val probed = LinkedHashSet<String>()
 
+    /**
+     * Batch 622 — pencatatan seragam kegagalan muat sampul (widget/notifikasi/aksen/bubble). DASAR (data probe Batch 621,
+     * log 9 Nov 17:28): 5/5 URI yang gagal dengan `ImageDecoder$DecodeException 'unimplemented'` punya `embeddedPicture=null`,
+     * dan judul pada galat widget lama (26/62/64 huruf) = lagu yang sama dengan probe -> perangkat ini (MediaProvider vendor)
+     * melempar `DecodeException` untuk lagu TANPA sampul tertanam; pemanggil sudah jatuh ke ikon bawaan (hasil null, tak berubah).
+     * Maka `DecodeException` dicatat 1 baris WARN mentah (kelas + pesan asli + URI, tanpa stacktrace yang tadinya
+     * memenuhi 584 dari 978 baris log); galat lain TETAP ERROR + stacktrace. Probe fakta ([report]) tetap jalan, jadi bila ada lagu dengan
+     * sampul tertanam yang benar-benar tak terdecode, `embeddedPicture` + `magic` + hasil `ImageDecoder` tercatat.
+     */
+    fun logFailure(context: Context, tag: String, message: String, uri: android.net.Uri, requestedPx: Int, error: Throwable) {
+        if (error is ImageDecoder.DecodeException) {
+            AppLogger.w(tag, "$message: uri=$uri ${error.javaClass.name}: ${error.message}")
+        } else {
+            AppLogger.e(tag, message, error)
+        }
+        report(context, tag, uri, requestedPx, error)
+    }
+
     /** Dipanggil dari blok catch pemanggil; hanya [ImageDecoder.DecodeException] yang diprobe (kegagalan lain, mis. lagu tanpa sampul, normal). */
     fun report(context: Context, source: String, uri: android.net.Uri, requestedPx: Int, error: Throwable) {
         if (error !is ImageDecoder.DecodeException) return

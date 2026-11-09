@@ -5,7 +5,6 @@ import android.net.Uri
 import android.util.Size
 import androidx.compose.ui.graphics.Color
 import androidx.palette.graphics.Palette
-import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.ArtFailureLog
 
 /**
@@ -36,9 +35,8 @@ object AccentColorExtractor {
         } catch (e: Exception) {
             // Gagal ekstrak warna hanya berarti Now Playing jatuh balik ke aksen statis (tidak
             // fatal), tapi dicatat karena sebelumnya kegagalan ini tidak meninggalkan jejak sama sekali.
-            AppLogger.e("AccentColorExtractor", "Gagal ekstrak warna aksen dari album art", e)
-            // Batch 621 — fakta mentah (URI/format sampul) bila ini kegagalan decoder; 1x per URI, tak mengubah hasil.
-            ArtFailureLog.report(context, "AccentColorExtractor", songUri, 160, e)
+            // Batch 622 — DecodeException (lagu tanpa sampul) = 1 baris WARN; galat lain tetap ERROR + stacktrace; + probe 1x per URI.
+            ArtFailureLog.logFailure(context, "AccentColorExtractor", "Gagal ekstrak warna aksen dari album art", songUri, 160, e)
             null
         }
     }

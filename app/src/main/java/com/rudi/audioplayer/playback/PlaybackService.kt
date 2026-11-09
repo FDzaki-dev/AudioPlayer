@@ -1014,11 +1014,10 @@ private class SongArtBitmapLoader(
                     val bitmap = context.contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null)
                     completer.set(bitmap)
                 } catch (e: Exception) {
-                    AppLogger.e("SongArtBitmapLoader", "Gagal muat artwork notifikasi", e)
                     completer.setException(e)
-                    // Batch 621 — fakta mentah (URI/format sampul) bila ini kegagalan decoder; 1x per URI, setelah
-                    // completer diselesaikan (tak menunda hasil), tak mengubah perilaku.
-                    ArtFailureLog.report(context, "SongArtBitmapLoader", uri, 512, e)
+                    // Batch 622 — DecodeException (lagu tanpa sampul) = 1 baris WARN; galat lain tetap ERROR + stacktrace;
+                    // + probe 1x per URI. Setelah completer diselesaikan (tak menunda hasil), tak mengubah perilaku.
+                    ArtFailureLog.logFailure(context, "SongArtBitmapLoader", "Gagal muat artwork notifikasi", uri, 512, e)
                 }
             }
             "loadBitmap($uri)"

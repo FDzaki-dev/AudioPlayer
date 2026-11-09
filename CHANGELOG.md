@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 622 — Akar `ImageDecoder 'unimplemented'` = lagu tanpa sampul; derau log ERROR+stacktrace -> 1 baris WARN
+- Input user: `sonix_debug_20261109_172903.txt` (v621, build 483) + log AppLogger 17:30 + `SONIX_laporan-untuk-claude_run50.zip`, lalu "segera!!".
+- Run #50 (v621): ArchUnit 7, SpotBugs 0, detekt 0, lint 0, Kotlin 11 deprecated = prediksi cocok persis. Device: v621 terbuka normal, probe tercatat.
+- Data probe: 5/5 URI `embeddedPicture: null`; judul pada galat widget lama (26/62/64 huruf) = lagu yang sama dengan probe -> `DecodeException 'unimplemented'` = lagu tanpa sampul tertanam; fallback ikon sudah benar, bukan bug.
+- Fix: `ArtFailureLog.logFailure` — `DecodeException` = 1 baris WARN mentah (tanpa stacktrace), galat lain tetap ERROR + stacktrace, probe tetap jalan. Dipakai di WidgetUpdater, SongArtBitmapLoader, AccentColorExtractor, FloatingBubbleService. Nilai balik tak berubah.
+- 5 file source (batas) + docs; 0 file baru. **NOT VERIFIED**: belum compile/CI/device. PREDIKSI: "11 (11 deprecated, 0 lainnya)"; ArchUnit 7; detekt 0; lint 0; SpotBugs 0.
+
 ## Batch 621 — Instrumentasi `Gagal muat artwork` (ImageDecoder 'unimplemented'): probe fakta mentah 1x per URI
 - Input user: "mengapa kau gak terapkan instrumentasi nya hah?!!" (setelah Batch 620 yang menunda instrumentasi sebagai usulan). Kelalaian diakui; dieksekusi langsung. ZIP v621 MENGGANTIKAN v620 (memuat perbaikan 620).
 - BARU `object ArtFailureLog` di `util/AudioArtFetcher.kt`: bila galat = `ImageDecoder.DecodeException`, tulis 1 baris WARN `Probe artwork #N` (maks 24 URI/proses): sumber, URI, ukuran diminta, berkas audio (nama/size/mime), `embeddedPicture` (byte + 16 magic byte), hasil `BitmapFactory` bounds dan `ImageDecoder` pada byte yang sama. Tak pernah melempar, tak mengubah hasil pemanggil.

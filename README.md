@@ -2,7 +2,8 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
-> - Batch 621: log diagnostik kini mencatat detail sampul album yang gagal didecode (format/ukuran sampul tertanam, 1x per lagu) supaya penyebab `Gagal muat artwork` bisa ditentukan — belum dikompilasi/diuji di device; tampilan dan perilaku tidak berubah. Kirim ekspor log (cari "Probe artwork") bila sampul masih gagal.
+> - Batch 622: pesan galat sampul album untuk lagu yang memang tidak punya sampul tertanam kini dicatat 1 baris ringkas (bukan galat berstacktrace panjang) agar log tidak penuh derau — belum dikompilasi/diuji di device; tampilan dan perilaku tidak berubah (ikon bawaan tetap dipakai). Galat jenis lain tetap dicatat lengkap.
+> - Batch 621: log diagnostik mencatat detail sampul album yang gagal didecode (1x per lagu) — SUDAH terkompilasi (run #50 hijau penuh) dan TERVERIFIKASI di device: semua lagu yang diprobe ternyata tidak punya sampul tertanam.
 > - Batch 620: temuan analisis kode di pengatur pemulihan Equalizer (penanda generasi dipakai dari beberapa thread) dibuat atomik — belum dikompilasi/diuji di device; perilaku Equalizer tidak berubah.
 > - HOTFIX Batch 619: v618 tertutup sendiri tiap dibuka (galat inisialisasi ViewModel) — SUDAH terkompilasi (run #48 hijau) dan TERVERIFIKASI di device (log 9 Nov 16:57-16:58: v619 terbuka dan memutar normal, tanpa crash).
 > - Jaring pengaman bagian vital (Batch 618): galat di pemutar, widget, bubble, dan ViewModel kini dicatat mentah ke log (cari "Galat terjaring") lalu aplikasi lanjut, bukan langsung tertutup — belum dikompilasi/diuji di device; kirim ekspor log bila ada baris itu.
@@ -323,6 +324,8 @@ Riwayat lebih detail per batch pengembangan ada di `CHANGELOG.md`.
 Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("junit:junit:4.13.2")`) — tidak ada Robolectric/instrumentation, tidak ada emulator. Konsekuensinya: hanya business logic yang benar-benar lepas dari `Context`/framework Android (SharedPreferences, ContentResolver, SensorManager, dst.) yang bisa ditest langsung. Pola yang dipakai berulang kali di proyek ini (`PinLockoutPolicy`, dan sejak Batch 27: `ShakePulseTracker`, `MusicRepository.deriveFolderName`, `LibraryFilterStore.shouldKeep`): pisahkan logika murninya ke fungsi/kelas pure, method instance yang butuh Context tinggal delegasikan ke situ tanpa ubah perilaku.
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
+
+**Batch 622** — Kebisingan log: data pencatatan Batch 621 menunjukkan galat decoder sampul hanya terjadi pada lagu yang tidak punya sampul tertanam (bukan kerusakan). Galat itu kini dicatat 1 baris ringkas, tidak lagi ratusan baris berstacktrace yang memenuhi sekitar 60% log; galat jenis lain tetap lengkap. Tampilan dan perilaku tidak berubah. Belum dikompilasi/diuji di device.
 
 **Batch 621** — Pencatatan diagnostik: ketika sampul album gagal dimuat oleh decoder gambar sistem (widget, notifikasi, warna aksen, bubble, layar), log kini menyimpan detailnya sekali per lagu — nama dan ukuran berkas, ukuran serta format sampul tertanam, dan hasil decoder — sehingga penyebab pastinya bisa dilacak dari ekspor log. Tidak mengubah tampilan atau perilaku. Belum dikompilasi/diuji di device.
 
