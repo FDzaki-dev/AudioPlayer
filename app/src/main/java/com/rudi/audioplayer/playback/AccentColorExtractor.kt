@@ -6,6 +6,7 @@ import android.util.Size
 import androidx.compose.ui.graphics.Color
 import androidx.palette.graphics.Palette
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.ArtFailureLog
 
 /**
  * Extracts a dominant color from a song's album art so the Now Playing
@@ -36,6 +37,8 @@ object AccentColorExtractor {
             // Gagal ekstrak warna hanya berarti Now Playing jatuh balik ke aksen statis (tidak
             // fatal), tapi dicatat karena sebelumnya kegagalan ini tidak meninggalkan jejak sama sekali.
             AppLogger.e("AccentColorExtractor", "Gagal ekstrak warna aksen dari album art", e)
+            // Batch 621 — fakta mentah (URI/format sampul) bila ini kegagalan decoder; 1x per URI, tak mengubah hasil.
+            ArtFailureLog.report(context, "AccentColorExtractor", songUri, 160, e)
             null
         }
     }

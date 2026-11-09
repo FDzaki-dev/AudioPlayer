@@ -29,6 +29,7 @@ import com.rudi.audioplayer.data.ThemeStore
 import com.rudi.audioplayer.playback.PlaybackService
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.ArtFailureLog
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -488,6 +489,8 @@ object WidgetUpdater {
             // Widget jatuh balik ke ikon aplikasi kalau ini gagal (masih terlihat wajar di layar
             // beranda), tapi dicatat supaya kegagalan muat artwork tidak sepenuhnya tak terlihat.
             AppLogger.e("WidgetUpdater", "Gagal muat artwork widget", e)
+            // Batch 621 — fakta mentah (URI/format sampul) bila ini kegagalan decoder; 1x per URI, tak mengubah hasil.
+            ArtFailureLog.report(context, "WidgetUpdater", uri, sizePx, e)
             null
         }
     }

@@ -1,5 +1,11 @@
 # Changelog
 
+## Batch 621 — Instrumentasi `Gagal muat artwork` (ImageDecoder 'unimplemented'): probe fakta mentah 1x per URI
+- Input user: "mengapa kau gak terapkan instrumentasi nya hah?!!" (setelah Batch 620 yang menunda instrumentasi sebagai usulan). Kelalaian diakui; dieksekusi langsung. ZIP v621 MENGGANTIKAN v620 (memuat perbaikan 620).
+- BARU `object ArtFailureLog` di `util/AudioArtFetcher.kt`: bila galat = `ImageDecoder.DecodeException`, tulis 1 baris WARN `Probe artwork #N` (maks 24 URI/proses): sumber, URI, ukuran diminta, berkas audio (nama/size/mime), `embeddedPicture` (byte + 16 magic byte), hasil `BitmapFactory` bounds dan `ImageDecoder` pada byte yang sama. Tak pernah melempar, tak mengubah hasil pemanggil.
+- Dipasang di 5 titik: `AudioArtFetcher` (jalur Coil, sebelumnya diam), `WidgetUpdater`, `SongArtBitmapLoader` (di `PlaybackService`, setelah `completer.setException`), `AccentColorExtractor`, `FloatingBubbleService`.
+- 5 file source (batas) + docs; 0 file baru. **NOT VERIFIED**: belum compile/CI/device. PREDIKSI: "11 (11 deprecated, 0 lainnya)"; ArchUnit 7 LULUS; detekt 0; lintDebug 0; SpotBugs 0 (risiko titik baru di `ArtFailureLog`).
+
 ## Batch 620 — SpotBugs IS2 `recoveryGeneration` (EqualizerController) + verifikasi device v619
 - Input user: `sonix_debug_20261109_170025.txt` (v619, build 481) + `SONIX_laporan-untuk-claude_run48.zip` + `SONIX_v619.zip`, tanpa teks.
 - Run #48 (v619): ArchUnit 7, detekt 0, lint 0, Kotlin 11 deprecated; SpotBugs 1 = `IS2_INCONSISTENT_SYNC` `EqualizerController.kt:184` (3 temuan Batch 618 hilang).

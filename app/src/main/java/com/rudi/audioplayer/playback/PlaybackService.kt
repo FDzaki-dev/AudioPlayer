@@ -39,6 +39,7 @@ import com.rudi.audioplayer.data.ShakeSettingsStore
 import com.rudi.audioplayer.data.SilenceSkipStore
 import com.rudi.audioplayer.data.lyrics.LyricsPrefetchStore
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.ArtFailureLog
 import com.rudi.audioplayer.util.SafeGuard
 import com.rudi.audioplayer.widget.WidgetUpdater
 import com.rudi.audioplayer.worker.LyricsPrefetchWorker
@@ -1015,6 +1016,9 @@ private class SongArtBitmapLoader(
                 } catch (e: Exception) {
                     AppLogger.e("SongArtBitmapLoader", "Gagal muat artwork notifikasi", e)
                     completer.setException(e)
+                    // Batch 621 — fakta mentah (URI/format sampul) bila ini kegagalan decoder; 1x per URI, setelah
+                    // completer diselesaikan (tak menunda hasil), tak mengubah perilaku.
+                    ArtFailureLog.report(context, "SongArtBitmapLoader", uri, 512, e)
                 }
             }
             "loadBitmap($uri)"

@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 621: log diagnostik kini mencatat detail sampul album yang gagal didecode (format/ukuran sampul tertanam, 1x per lagu) supaya penyebab `Gagal muat artwork` bisa ditentukan — belum dikompilasi/diuji di device; tampilan dan perilaku tidak berubah. Kirim ekspor log (cari "Probe artwork") bila sampul masih gagal.
 > - Batch 620: temuan analisis kode di pengatur pemulihan Equalizer (penanda generasi dipakai dari beberapa thread) dibuat atomik — belum dikompilasi/diuji di device; perilaku Equalizer tidak berubah.
 > - HOTFIX Batch 619: v618 tertutup sendiri tiap dibuka (galat inisialisasi ViewModel) — SUDAH terkompilasi (run #48 hijau) dan TERVERIFIKASI di device (log 9 Nov 16:57-16:58: v619 terbuka dan memutar normal, tanpa crash).
 > - Jaring pengaman bagian vital (Batch 618): galat di pemutar, widget, bubble, dan ViewModel kini dicatat mentah ke log (cari "Galat terjaring") lalu aplikasi lanjut, bukan langsung tertutup — belum dikompilasi/diuji di device; kirim ekspor log bila ada baris itu.
@@ -322,6 +323,8 @@ Riwayat lebih detail per batch pengembangan ada di `CHANGELOG.md`.
 Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("junit:junit:4.13.2")`) — tidak ada Robolectric/instrumentation, tidak ada emulator. Konsekuensinya: hanya business logic yang benar-benar lepas dari `Context`/framework Android (SharedPreferences, ContentResolver, SensorManager, dst.) yang bisa ditest langsung. Pola yang dipakai berulang kali di proyek ini (`PinLockoutPolicy`, dan sejak Batch 27: `ShakePulseTracker`, `MusicRepository.deriveFolderName`, `LibraryFilterStore.shouldKeep`): pisahkan logika murninya ke fungsi/kelas pure, method instance yang butuh Context tinggal delegasikan ke situ tanpa ubah perilaku.
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
+
+**Batch 621** — Pencatatan diagnostik: ketika sampul album gagal dimuat oleh decoder gambar sistem (widget, notifikasi, warna aksen, bubble, layar), log kini menyimpan detailnya sekali per lagu — nama dan ukuran berkas, ukuran serta format sampul tertanam, dan hasil decoder — sehingga penyebab pastinya bisa dilacak dari ekspor log. Tidak mengubah tampilan atau perilaku. Belum dikompilasi/diuji di device.
 
 **Batch 620** — Perbaikan kecil: analisis kode menandai penanda internal pemulihan kontrol Equalizer yang dibaca dan ditulis dari beberapa thread tanpa pengaman seragam; kini memakai penghitung atomik. Perilaku tidak berubah. Perbaikan darurat Batch 619 dikonfirmasi bekerja di device (aplikasi terbuka normal). Belum dikompilasi/diuji di device.
 

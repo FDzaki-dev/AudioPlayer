@@ -36,6 +36,7 @@ import com.rudi.audioplayer.R
 import com.rudi.audioplayer.data.FloatingBubbleStore
 import com.rudi.audioplayer.playback.PlaybackService
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.ArtFailureLog
 import com.rudi.audioplayer.util.SafeGuard
 import com.rudi.audioplayer.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
@@ -1277,6 +1278,8 @@ class FloatingBubbleService : Service() {
         contentResolver.loadThumbnail(uri, Size(120, 120), null)
     } catch (e: Exception) {
         AppLogger.e("FloatingBubbleService", "Gagal muat artwork bubble", e)
+        // Batch 621 — fakta mentah (URI/format sampul) bila ini kegagalan decoder; 1x per URI, tak mengubah hasil.
+        ArtFailureLog.report(this, "FloatingBubbleService", uri, 120, e)
         null
     }
 
