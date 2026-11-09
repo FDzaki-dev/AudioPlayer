@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 620 — SpotBugs IS2 `recoveryGeneration` (EqualizerController) + verifikasi device v619
+- Input user: `sonix_debug_20261109_170025.txt` (v619, build 481) + `SONIX_laporan-untuk-claude_run48.zip` + `SONIX_v619.zip`, tanpa teks.
+- Run #48 (v619): ArchUnit 7, detekt 0, lint 0, Kotlin 11 deprecated; SpotBugs 1 = `IS2_INCONSISTENT_SYNC` `EqualizerController.kt:184` (3 temuan Batch 618 hilang).
+- Device: v618 crash NPE `PlayerViewModel` x3 (16:46:22, 16:46:27, 16:55:03); v619 dipasang 16:57:36 dan proses v619 bersih (0 FATAL, 0 `Galat terjaring`, pemutaran jalan) -> hotfix Batch 619 TERVERIFIKASI di device.
+- Fix: `recoveryGeneration` (penanda generasi pemulihan kontrol EQ; ditulis dari 3 thread) dari `Int` menjadi `AtomicInteger`; perilaku identik.
+- Butir lama tetap terbuka (bukan regresi): `ImageDecoder 'unimplemented'` pada `loadThumbnail` (tertangkap, tanpa URI di log -> instrumentasi dulu).
+- 1 file source (<= 5) + docs. **NOT VERIFIED**: belum compile/CI. PREDIKSI: "11 (11 deprecated, 0 lainnya)"; ArchUnit 7 LULUS; detekt 0; lintDebug 0; SpotBugs 0.
+
 ## Batch 619 — HOTFIX: aplikasi mati saat dibuka (NPE `safeHandler` null) + 3 temuan SpotBugs
 - Input user: 2x `crash_20261109_1646*.txt` (build 480 = v618) + `SONIX_laporan-untuk-claude_run47.zip`.
 - AKAR crash: `PlayerViewModel.safeHandler` (Batch 618) dideklarasikan setelah blok `init {}` yang sudah memakainya -> null saat konstruktor -> NPE di `MainActivity.onCreate`. Dipindah menjadi properti pertama kelas + komentar peringatan.

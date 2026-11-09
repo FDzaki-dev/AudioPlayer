@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
+import java.util.concurrent.atomic.AtomicInteger
 
 data class EqualizerBand(
     val index: Int,
@@ -60,7 +61,10 @@ class EqualizerController(private val context: Context) {
 
     private val _state = MutableStateFlow(EqualizerUiState())
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var recoveryGeneration = 0
+    // Batch 620 — SpotBugs run #48 IS2_INCONSISTENT_SYNC @ lambda `scheduleControlRecovery` (baca tanpa kunci, sedang
+    // `release()` menulis berkunci): penanda generasi ditulis dari tiga thread (callback status kontrol efek,
+    // `guardedEffectOp`/`release` berkunci, Runnable di thread utama). AtomicInteger = baca/tulis atomik tanpa kunci.
+    private val recoveryGeneration = AtomicInteger(0)
     val state: StateFlow<EqualizerUiState> = _state.asStateFlow()
 
     /**
@@ -178,15 +182,15 @@ class EqualizerController(private val context: Context) {
 
     private fun scheduleControlRecovery(session: Int) {
         if (session == 0) return
-        val generation = ++recoveryGeneration
+        val generation = recoveryGeneration.incrementAndGet()
         for (delayMs in RECOVERY_DELAYS_MS) {
             mainHandler.postDelayed({
-                if (generation != recoveryGeneration || PlaybackAudioSession.sessionId != session) return@postDelayed
+                if (generation != recoveryGeneration.get() || PlaybackAudioSession.sessionId != session) return@postDelayed
                 if (equalizer != null && !_state.value.controlLost) return@postDelayed // sudah pulih
                 attach(session, retryFailed = true)
                 val recovered = equalizer != null && !_state.value.controlLost
                 AppLogger.w("EqualizerController", "Pemulihan kontrol: sesi=$session tunda=${delayMs}ms pulih=$recovered")
-                if (recovered) recoveryGeneration++ // hentikan sisa jadwal
+                if (recovered) recoveryGeneration.incrementAndGet() // hentikan sisa jadwal
             }, delayMs)
         }
     }
@@ -469,7 +473,7 @@ class EqualizerController(private val context: Context) {
     /** Dipanggil saat sesi audio berakhir (PlaybackService.onDestroy): juga membatalkan jadwal pemulihan. */
     @Synchronized
     fun release() {
-        recoveryGeneration++
+        recoveryGeneration.incrementAndGet()
         releaseEffect()
     }
 
