@@ -11,6 +11,8 @@ import androidx.work.WorkerParameters
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.lyrics.LyricsRepository
+import com.rudi.audioplayer.util.SafeGuard
+import kotlinx.coroutines.CancellationException
 
 /**
  * Batch 246 — Lyrics offline-first 4/4a. Prefetch lirik 10 lagu DEPAN queue saat WiFi
@@ -48,9 +50,15 @@ class LyricsPrefetchWorker(context: Context, params: WorkerParameters) : Corouti
                 repository.ensureCached(song.artist, song.title, song.album)
             }
             Result.success()
+        } catch (e: CancellationException) {
+            // Batch 625 — pembatalan WorkManager (mis. `ExistingWorkPolicy.REPLACE` tiap pindah lagu) HARUS dilempar
+            // ulang (kontrak coroutine) dan TIDAK dicatat sebagai galat.
+            throw e
         } catch (e: Exception) {
             // PlaybackStateStore/MusicRepository gagal baca (mis. storage corrupt) — bukan
-            // kegagalan yang berguna di-retry WorkManager otomatis, cukup diam.
+            // kegagalan yang berguna di-retry WorkManager otomatis. Batch 625: dulu DIAM total (galat hilang tanpa
+            // jejak); kini dicatat mentah (exception + stacktrace apa adanya), hasil tetap `failure()` tanpa retry.
+            SafeGuard.report("LyricsPrefetchWorker", "doWork", e)
             Result.failure()
         }
     }

@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 625 — Jaring pengaman lanjutan: loop vital tak lagi mati karena satu galat; callback sesi, resumption, dan prefetch lirik tak lagi menelan/menggantung (BELUM verified)
+- Input user: `sonix_debug_20261110_082046.txt` (v623, build 485) + `SONIX_v624.zip`, tanpa teks. Log tanpa galat baru -> lanjut jaring pengaman Batch 618 yang tertunda (proaktif).
+- Fakta log: satu proses 74 mnt tanpa kill/crash baru; 0 `Galat terjaring`. `RecentsGuard`: task=1 saat Activity tampil, task=0 saat di background -> pemulihan `false` setelah jeda/sesi berakhir tak menyentuh task apa pun (klaim "kartu kembali setelah jeda" dikoreksi di README/PROJECT_STATE; kode tak diubah). Haptic: 6 proses konsisten `hardware-effects`/`kontrol_amplitudo=false` -> konstanta `*_ONE_SHOT_MS` Batch 514 tak berpengaruh di Infinix X6850; TIDAK diubah.
+- `PlaybackService.kt`: loop `startCrossfadePoll` per tick `SafeGuard.guard` (dulu satu galat mematikan loop -> crossfade berhenti diam-diam); `onCustomCommand` try/catch -> log mentah + `Futures.immediateFailedFuture` (dulu Exception di thread utama = proses mati); `onPlaybackResumption` try di dalam `serviceScope.launch` -> `completer.setException` + log, `CancellationException` -> `setCancelled` + lempar ulang (dulu `completer` menggantung bila `loadSavedQueueItems` gagal).
+- `PlayerViewModel.kt`: `startPositionLoop` blok per-iterasi di `SafeGuard.guard` (dulu satu galat membekukan progress + menghentikan simpan state berkala); `startPlayCountWatcher` -> `recordQualifiedPlay` di `SafeGuard.guard` (dulu watcher mati).
+- `LyricsPrefetchWorker.kt`: catch umum yang diam kini `SafeGuard.report` + `Result.failure()`; `CancellationException` dilempar ulang lebih dulu dan tidak dicatat (REPLACE membatalkan worker tiap pindah lagu).
+- Dibaca & dinilai aman, tak disentuh: `AudioPlayerApplication`, `BubbleBootReceiver`, `CrossfadeEngine` overlap listener. Perilaku normal identik; `diff -w` terhadap v624 = hanya pembungkus + impor.
+- 3 file source (<= 5) + docs. **NOT VERIFIED**: belum compile/CI/device. PREDIKSI: "11 (11 deprecated, 0 lainnya)"; ArchUnit 7; detekt 0; lint 0; SpotBugs 0 (risiko `REC_CATCH_EXCEPTION` baru: baca titiknya).
+
 ## Batch 624 — DOCS-ONLY: sinkronisasi hasil Batch 623 (run #52 + log v623)
 - Input user: `sonix_debug_20261110_071321.txt` (v623, build 485) + `SONIX_laporan-untuk-claude_run52.zip`, tanpa teks. 0 perubahan kode.
 - Run #52 (v623): ArchUnit 7, SpotBugs 0, detekt 0, lint 0, Kotlin 11 deprecated = prediksi cocok persis.

@@ -44,6 +44,7 @@ import com.rudi.audioplayer.util.RecentsGuard
 import com.rudi.audioplayer.util.SafeGuard
 import com.rudi.audioplayer.widget.WidgetUpdater
 import com.rudi.audioplayer.worker.LyricsPrefetchWorker
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -416,7 +417,12 @@ class PlaybackService : MediaLibraryService() {
         if (crossfadePollJob?.isActive == true) return
         crossfadePollJob = serviceScope.launch {
             while (isActive) {
-                crossfadeEngine?.maybeStartCrossfade()
+                // Batch 625 — satu tick yang melempar Exception dulu MEMATIKAN seluruh loop ini (handler scope hanya
+                // mencatat; `crossfadePollJob.isActive` jadi false -> crossfade berhenti diam-diam sampai di-toggle).
+                // Kini tick yang gagal dicatat mentah (throttle SafeGuard) dan loop lanjut ke tick berikutnya.
+                SafeGuard.guard("PlaybackService", "crossfadePoll.tick") {
+                    crossfadeEngine?.maybeStartCrossfade()
+                }
                 delay(250)
             }
         }
@@ -821,56 +827,64 @@ class PlaybackService : MediaLibraryService() {
             customCommand: SessionCommand,
             args: Bundle
         ): ListenableFuture<SessionResult> {
-            if (customCommand.customAction == ACTION_SET_SKIP_SILENCE) {
-                val enabled = args.getBoolean(EXTRA_SKIP_SILENCE_ENABLED, false)
-                (mediaSession?.player as? ExoPlayer)?.setSkipSilenceEnabled(enabled)
-                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
-            }
-            if (customCommand.customAction == ACTION_SET_CROSSFADE_ENABLED) {
-                // Batch 102 — sama pola dengan ACTION_SET_SKIP_SILENCE: CrossfadeEngine hidup
-                // di ExoPlayer mentah milik Service ini, MediaController tidak bisa
-                // menjangkaunya langsung. setEnabled(false) di sini juga otomatis membatalkan
-                // crossfade yang sedang berlangsung (lihat CrossfadeEngine.abort()).
-                val enabled = args.getBoolean(EXTRA_CROSSFADE_ENABLED, false)
-                if (enabled) {
-                    // Batch 389 — kalau ini pertama kalinya Crossfade dinyalakan sesi ini,
-                    // crossfadeEngine masih null (overlapPlayer belum pernah dibangun, lihat
-                    // ensureCrossfadeEngine() di atas) — bangun sekarang. Sudah ada = no-op,
-                    // langsung setEnabled(true) di instance yang sama seperti sebelum batch ini.
-                    val sessionPlayer = mediaSession?.player as? ExoPlayer
-                    if (sessionPlayer != null) {
-                        ensureCrossfadeEngine(sessionPlayer).setEnabled(true)
-                        startCrossfadePoll()
-                    }
-                } else {
-                    // Belum pernah dibangun (crossfadeEngine null) = tidak ada apa pun utk
-                    // dimatikan, sama seperti overlapPlayer yang juga belum pernah ada sebelum
-                    // batch ini kalau OFF sejak awal — no-op yang identik secara hasil akhir.
-                    // Batch 598 — FIX tahanan memori: dulu cukup `setEnabled(false)`, jadi ExoPlayer KEDUA
-                    // (overlapPlayer: thread playback + renderer + buffer) tetap hidup idle sampai Service
-                    // mati walau crossfade sudah dimatikan user. Kini dilepas penuh (release() juga abort()
-                    // lebih dulu = volume sesi dipulihkan) dan referensi dikosongkan; menyalakan lagi cukup
-                    // lewat `ensureCrossfadeEngine()` yang memang membangun LAZY. Semua pemakai
-                    // `crossfadeEngine` memakai `?.` (null-safe) dan berjalan di thread utama yang sama.
-                    crossfadeEngine?.let { engine ->
-                        engine.setEnabled(false)
-                        engine.release()
-                    }
-                    crossfadeEngine = null
-                    crossfadePollJob?.cancel()
-                    crossfadePollJob = null
+            // Batch 625 — callback sesi Media3 berjalan di thread utama: Exception di sini dulu mematikan proses
+            // (mis. `ensureCrossfadeEngine` membangun ExoPlayer kedua, `scheduleSleepTimer`). Kini dicatat mentah;
+            // peminta (MediaController) menerima future gagal (Media3 memetakannya ke kode error), bukan crash.
+            try {
+                if (customCommand.customAction == ACTION_SET_SKIP_SILENCE) {
+                    val enabled = args.getBoolean(EXTRA_SKIP_SILENCE_ENABLED, false)
+                    (mediaSession?.player as? ExoPlayer)?.setSkipSilenceEnabled(enabled)
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
-                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                if (customCommand.customAction == ACTION_SET_CROSSFADE_ENABLED) {
+                    // Batch 102 — sama pola dengan ACTION_SET_SKIP_SILENCE: CrossfadeEngine hidup
+                    // di ExoPlayer mentah milik Service ini, MediaController tidak bisa
+                    // menjangkaunya langsung. setEnabled(false) di sini juga otomatis membatalkan
+                    // crossfade yang sedang berlangsung (lihat CrossfadeEngine.abort()).
+                    val enabled = args.getBoolean(EXTRA_CROSSFADE_ENABLED, false)
+                    if (enabled) {
+                        // Batch 389 — kalau ini pertama kalinya Crossfade dinyalakan sesi ini,
+                        // crossfadeEngine masih null (overlapPlayer belum pernah dibangun, lihat
+                        // ensureCrossfadeEngine() di atas) — bangun sekarang. Sudah ada = no-op,
+                        // langsung setEnabled(true) di instance yang sama seperti sebelum batch ini.
+                        val sessionPlayer = mediaSession?.player as? ExoPlayer
+                        if (sessionPlayer != null) {
+                            ensureCrossfadeEngine(sessionPlayer).setEnabled(true)
+                            startCrossfadePoll()
+                        }
+                    } else {
+                        // Belum pernah dibangun (crossfadeEngine null) = tidak ada apa pun utk
+                        // dimatikan, sama seperti overlapPlayer yang juga belum pernah ada sebelum
+                        // batch ini kalau OFF sejak awal — no-op yang identik secara hasil akhir.
+                        // Batch 598 — FIX tahanan memori: dulu cukup `setEnabled(false)`, jadi ExoPlayer KEDUA
+                        // (overlapPlayer: thread playback + renderer + buffer) tetap hidup idle sampai Service
+                        // mati walau crossfade sudah dimatikan user. Kini dilepas penuh (release() juga abort()
+                        // lebih dulu = volume sesi dipulihkan) dan referensi dikosongkan; menyalakan lagi cukup
+                        // lewat `ensureCrossfadeEngine()` yang memang membangun LAZY. Semua pemakai
+                        // `crossfadeEngine` memakai `?.` (null-safe) dan berjalan di thread utama yang sama.
+                        crossfadeEngine?.let { engine ->
+                            engine.setEnabled(false)
+                            engine.release()
+                        }
+                        crossfadeEngine = null
+                        crossfadePollJob?.cancel()
+                        crossfadePollJob = null
+                    }
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
+                if (customCommand.customAction == ACTION_SET_SLEEP_TIMER) {
+                    // Gap List #7 (Batch 109) — endAt == -1L artinya "batalkan timer" (ViewModel
+                    // tidak bisa kirim null lewat Bundle primitif, -1L jadi sentinel eksplisit).
+                    // Timer punya deadline absolut, bukan durasi — lihat scheduleSleepTimer().
+                    val endAt = args.getLong(EXTRA_SLEEP_TIMER_END_AT, -1L)
+                    if (endAt <= 0L) cancelSleepTimer() else scheduleSleepTimer(endAt)
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
+                return super.onCustomCommand(session, controller, customCommand, args)
+            } catch (e: Exception) {
+                SafeGuard.report("PlaybackService", "onCustomCommand ${customCommand.customAction}", e)
+                return Futures.immediateFailedFuture(e)
             }
-            if (customCommand.customAction == ACTION_SET_SLEEP_TIMER) {
-                // Gap List #7 (Batch 109) — endAt == -1L artinya "batalkan timer" (ViewModel
-                // tidak bisa kirim null lewat Bundle primitif, -1L jadi sentinel eksplisit).
-                // Timer punya deadline absolut, bukan durasi — lihat scheduleSleepTimer().
-                val endAt = args.getLong(EXTRA_SLEEP_TIMER_END_AT, -1L)
-                if (endAt <= 0L) cancelSleepTimer() else scheduleSleepTimer(endAt)
-                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
-            }
-            return super.onCustomCommand(session, controller, customCommand, args)
         }
 
         // Lets Bluetooth devices and the Android System UI media-resumption feature restart
@@ -884,27 +898,39 @@ class PlaybackService : MediaLibraryService() {
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
             return CallbackToFutureAdapter.getFuture { completer ->
                 serviceScope.launch {
-                    val saved = loadSavedQueueItems()
-                    if (saved != null) {
-                        // Batch 319 — sebelumnya repeat/shuffle/speed tersimpan diabaikan total
-                        // di jalur ini: resumption yang dipicu murni dari lock screen/Android
-                        // Auto/Bluetooth (proses sudah mati, PlayerViewModel.connect() tidak
-                        // pernah jalan) selalu kembali ke default. Diset ke `mediaSession.player`
-                        // yang SAMA yang akan menerima `items` dari completer.set() di bawah —
-                        // repeatMode/shuffleModeEnabled/speed independen dari media item mana
-                        // pun yang sedang/akan dimuat, aman diset sebelum Media3 menerapkan hasil
-                        // future ini ke player.
-                        mediaSession.player.repeatMode = saved.repeatMode
-                        mediaSession.player.shuffleModeEnabled = saved.shuffleEnabled
-                        mediaSession.player.setPlaybackSpeed(saved.speed)
-                        completer.set(
-                            MediaSession.MediaItemsWithStartPosition(saved.items, saved.startIndex, saved.startPositionMs)
-                        )
-                    } else {
-                        // Nothing to resume (fresh install, or the saved songs are all gone) —
-                        // fail the future rather than hand back an empty/fake item, which is what
-                        // used to leave a dead, control-less notification stuck on screen.
-                        completer.setException(IllegalStateException("Tidak ada antrean tersimpan untuk dilanjutkan"))
+                    // Batch 625 — dulu Exception di sini (mis. `loadSavedQueueItems`) hanya ditangkap handler scope,
+                    // sedangkan `completer` TIDAK PERNAH diselesaikan -> future menggantung selamanya (resumption dari
+                    // lock screen/Bluetooth/Android Auto macet, notifikasi mati). Kini galat dicatat mentah dan future
+                    // diselesaikan dengan kegagalan; pembatalan scope (service mati) membatalkan future.
+                    try {
+                        val saved = loadSavedQueueItems()
+                        if (saved != null) {
+                            // Batch 319 — sebelumnya repeat/shuffle/speed tersimpan diabaikan total
+                            // di jalur ini: resumption yang dipicu murni dari lock screen/Android
+                            // Auto/Bluetooth (proses sudah mati, PlayerViewModel.connect() tidak
+                            // pernah jalan) selalu kembali ke default. Diset ke `mediaSession.player`
+                            // yang SAMA yang akan menerima `items` dari completer.set() di bawah —
+                            // repeatMode/shuffleModeEnabled/speed independen dari media item mana
+                            // pun yang sedang/akan dimuat, aman diset sebelum Media3 menerapkan hasil
+                            // future ini ke player.
+                            mediaSession.player.repeatMode = saved.repeatMode
+                            mediaSession.player.shuffleModeEnabled = saved.shuffleEnabled
+                            mediaSession.player.setPlaybackSpeed(saved.speed)
+                            completer.set(
+                                MediaSession.MediaItemsWithStartPosition(saved.items, saved.startIndex, saved.startPositionMs)
+                            )
+                        } else {
+                            // Nothing to resume (fresh install, or the saved songs are all gone) —
+                            // fail the future rather than hand back an empty/fake item, which is what
+                            // used to leave a dead, control-less notification stuck on screen.
+                            completer.setException(IllegalStateException("Tidak ada antrean tersimpan untuk dilanjutkan"))
+                        }
+                    } catch (e: CancellationException) {
+                        completer.setCancelled()
+                        throw e
+                    } catch (e: Exception) {
+                        SafeGuard.report("PlaybackService", "onPlaybackResumption", e)
+                        completer.setException(e)
                     }
                 }
                 "onPlaybackResumption" // debug tag only, shown if this future leaks/never completes

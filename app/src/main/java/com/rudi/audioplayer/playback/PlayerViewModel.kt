@@ -1161,33 +1161,38 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             while (true) {
                 val c = controller
                 var tickMs = POSITION_TICK_ACTIVE_MS
-                if (c != null) {
-                    val position = c.currentPosition.coerceAtLeast(0)
-                    val duration = c.duration.coerceAtLeast(0)
-                    val currentProgress = _playbackProgress.value
+                // Batch 625 — satu tick yang melempar Exception (mis. controller sudah dilepas) dulu MEMATIKAN loop
+                // posisi ini: progress beku + simpan state berkala berhenti diam-diam. Kini tick gagal dicatat mentah
+                // (throttle SafeGuard) dan loop tetap hidup; `tickMs` tetap default aktif bila gagal sebelum dihitung.
+                SafeGuard.guard("PlayerViewModel", "positionLoop.tick") {
+                    if (c != null) {
+                        val position = c.currentPosition.coerceAtLeast(0)
+                        val duration = c.duration.coerceAtLeast(0)
+                        val currentProgress = _playbackProgress.value
 
-                    // Batch 353 (Opsi A) — ditulis ke _playbackProgress, BUKAN _uiState lagi
-                    // (lihat komentar di data class PlaybackProgress). Guard "skip kalau sama"
-                    // ini dipertahankan persis seperti sebelumnya, cuma pindah target flow.
-                    if (currentProgress.position != position || currentProgress.duration != duration) {
-                        _playbackProgress.value = PlaybackProgress(position = position, duration = duration)
+                        // Batch 353 (Opsi A) — ditulis ke _playbackProgress, BUKAN _uiState lagi
+                        // (lihat komentar di data class PlaybackProgress). Guard "skip kalau sama"
+                        // ini dipertahankan persis seperti sebelumnya, cuma pindah target flow.
+                        if (currentProgress.position != position || currentProgress.duration != duration) {
+                            _playbackProgress.value = PlaybackProgress(position = position, duration = duration)
+                        }
+
+                        if (AbRepeatLogic.shouldLoopBack(position, _abRepeatPointA.value, _abRepeatPointB.value)) {
+                            c.seekTo(_abRepeatPointA.value ?: 0L)
+                        }
+
+                        val tick = positionTick.incrementAndGet()
+                        // Batch 537: tick 1 dtk HANYA saat musik main + (UI terlihat ATAU A-B repeat aktif),
+                        // atau A-B aktif (loop-back butuh presisi). Selain itu tick 5 dtk. Kadensi simpan
+                        // state ~5 dtk dipertahankan: tick 5 dtk -> simpan tiap tick; tick 1 dtk -> tiap 5 tick
+                        // (Batch 352: modulo 5). Dijeda -> tak ada simpan periodik (sudah disimpan di
+                        // onIsPlayingChanged(false)), sama seperti sebelumnya.
+                        val playing = c.isPlaying
+                        val abActive = AbRepeatLogic.isActive(_abRepeatPointA.value, _abRepeatPointB.value)
+                        val relaxed = !abActive && (!playing || !uiVisible)
+                        if (relaxed) tickMs = POSITION_TICK_RELAXED_MS
+                        if (playing && (relaxed || tick % 5 == 0)) persistPlaybackState()
                     }
-
-                    if (AbRepeatLogic.shouldLoopBack(position, _abRepeatPointA.value, _abRepeatPointB.value)) {
-                        c.seekTo(_abRepeatPointA.value ?: 0L)
-                    }
-
-                    val tick = positionTick.incrementAndGet()
-                    // Batch 537: tick 1 dtk HANYA saat musik main + (UI terlihat ATAU A-B repeat aktif),
-                    // atau A-B aktif (loop-back butuh presisi). Selain itu tick 5 dtk. Kadensi simpan
-                    // state ~5 dtk dipertahankan: tick 5 dtk -> simpan tiap tick; tick 1 dtk -> tiap 5 tick
-                    // (Batch 352: modulo 5). Dijeda -> tak ada simpan periodik (sudah disimpan di
-                    // onIsPlayingChanged(false)), sama seperti sebelumnya.
-                    val playing = c.isPlaying
-                    val abActive = AbRepeatLogic.isActive(_abRepeatPointA.value, _abRepeatPointB.value)
-                    val relaxed = !abActive && (!playing || !uiVisible)
-                    if (relaxed) tickMs = POSITION_TICK_RELAXED_MS
-                    if (playing && (relaxed || tick % 5 == 0)) persistPlaybackState()
                 }
                 // Tidur sampai timeout ATAU dibangunkan event (play/pause/seek/transisi/UI tampil).
                 withTimeoutOrNull(tickMs) { positionWake.receive() }
@@ -1252,7 +1257,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                     withTimeoutOrNull(wait) { playCountWake.receive() }
                 }
                 val songId = playCountTracker.takeIfQualified(SystemClock.elapsedRealtime()) ?: continue
-                recordQualifiedPlay(songId)
+                // Batch 625 — galat penyimpanan (prefs/JSON) dulu mematikan watcher: putaran tak tercatat lagi sampai
+                // ViewModel dibuat ulang. Kini dicatat mentah dan loop lanjut.
+                SafeGuard.guard("PlayerViewModel", "playCountWatcher.record") { recordQualifiedPlay(songId) }
             }
         }
     }
