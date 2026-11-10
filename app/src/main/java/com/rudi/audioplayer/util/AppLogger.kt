@@ -422,7 +422,7 @@ object AppLogger {
     /** Ekspor satu berkas "debug" lengkap ke `Documents/AudioPlayer/debug/` (MediaStore, tanpa izin storage): header
      *  perangkat/versi, daftar efek audio perangkat, log diagnostik aplikasi, dan logcat MILIK APLIKASI SENDIRI
      *  (boleh dibaca tanpa izin `READ_LOGS`) dengan derau disaring ([DebugLogFormat.isNoise]). Satu tombol, tanpa
-     *  adb/PC. Blocking (proses `logcat` + tulis berkas): panggil dari `Dispatchers.IO`.
+     *  adb/PC. Batch 627: bila izin DUMP sudah diberikan, ikut memuat keluaran `dumpsys` per centang ([DumpsysCollector]). Blocking (proses `logcat` + tulis berkas): panggil dari `Dispatchers.IO`.
      *  Return jalur tampilan berkas, atau null bila gagal (tak pernah melempar). */
     fun exportDebugLogToDocuments(context: Context): String? {
         val appContext = context.applicationContext
@@ -432,7 +432,7 @@ object AppLogger {
                 sections = listOf(
                     readAvailableEffects(),
                     DebugLogFormat.buildDiagnosticSection(readLog(), DebugLogFormat.DIAGNOSTIC_MAX_LINES)
-                ),
+                ) + runCatching { DumpsysCollector.collectSections(appContext) }.getOrDefault(emptyList()),
                 logLines = readOwnLogcat(),
                 maxLines = DebugLogFormat.MAX_LINES
             )

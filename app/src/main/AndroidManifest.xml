@@ -76,6 +76,19 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Batch 627 — izin DUMP untuk `dumpsys` di "Ekspor Logcat Debug" (log jauh lebih lengkap). Izin ini
+         signature|privileged|development: TIDAK bisa diminta lewat dialog, hanya diberikan SEKALI lewat
+         `adb shell pm grant <paket> android.permission.DUMP` (tab "Izin dumpsys" di Log Diagnostik menampilkan
+         perintah + status centang). Tanpa pemberian, tak ada efek apa pun. tools:ignore karena lint
+         ProtectedPermissions menandai izin proteksi-sistem; deklarasinya wajib agar `pm grant` diterima. -->
+    <uses-permission android:name="android.permission.DUMP"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Batch 628 — agar getLaunchIntentForPackage dapat melihat aplikasi Shizuku (deteksi terpasang + tombol Buka). -->
+    <queries>
+        <package android:name="moe.shizuku.privileged.api" />
+    </queries>
+
     <application
         android:name=".AudioPlayerApplication"
         android:allowBackup="true"
@@ -189,6 +202,15 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Batch 628 — ShizukuProvider: jalur Shizuku mengirim binder ke aplikasi ini (dokumentasi resmi Shizuku-API). -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
         <!-- Batch 387 (cold-start optimization) — `androidx.work:work-runtime-ktx:2.11.2`
              initializes itself through the shared `androidx.startup.InitializationProvider`

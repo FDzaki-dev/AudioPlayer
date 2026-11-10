@@ -1,18 +1,27 @@
 package com.rudi.audioplayer.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -30,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.DumpsysCollector
+import com.rudi.audioplayer.util.ShizukuBridge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -112,6 +124,8 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
     // sekarang di kotak berlekuk sendiri (tinggi dibatasi, bisa scroll) dengan waktu + tingkat (WARN/ERROR/FATAL) berwarna.
     // Logika (muat IO, ekspor, hapus, crash terakhir, banner) TIDAK diubah. Catatan lama (Batch 321/340/465): sheet tetap
     // `containerColor = Transparent` (jendela Haze), `.frostedGlass()` setelah `.fillMaxWidth()`, log tetap LazyColumn per baris.
+    // Batch 627 — tab: 0 = Log, 1 = Izin dumpsys (rememberSaveable: tahan rotasi).
+    var tab by rememberSaveable { mutableIntStateOf(0) }
     val panelShape = MaterialTheme.shapes.large
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
         Column(
@@ -167,37 +181,44 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
             }
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Wadah log: satu bentuk untuk keadaan memuat / kosong / berisi, supaya tinggi tidak melompat-lompat.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f, fill = false)
-                    .heightIn(min = 96.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
-            ) {
-                if (isLoadingLog) {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                } else if (logText.isBlank()) {
-                    Text(
-                        "Belum ada catatan. Kalau nanti ada error atau crash, jejaknya akan muncul di sini.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(16.dp)
-                    )
-                } else {
-                    // Batch 465 — FIX force-close/freeze: split per baris + LazyColumn (Compose hanya measure baris
-                    // yang KELIHATAN); `logText` tetap dibaca utuh, "Simpan Log" tetap mengekspor `readLog()` utuh.
-                    val logLines = remember(logText) { logText.split("\n") }
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        items(logLines) { line -> LogLine(line) }
+            DiagnosticTabs(selected = tab, onSelect = { tab = it })
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (tab == 0) {
+                // Wadah log: satu bentuk untuk keadaan memuat / kosong / berisi, supaya tinggi tidak melompat-lompat.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .heightIn(min = 96.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
+                ) {
+                    if (isLoadingLog) {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    } else if (logText.isBlank()) {
+                        Text(
+                            "Belum ada catatan. Kalau nanti ada error atau crash, jejaknya akan muncul di sini.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(16.dp)
+                        )
+                    } else {
+                        // Batch 465 — FIX force-close/freeze: split per baris + LazyColumn (Compose hanya measure baris
+                        // yang KELIHATAN); `logText` tetap dibaca utuh, "Simpan Log" tetap mengekspor `readLog()` utuh.
+                        val logLines = remember(logText) { logText.split("\n") }
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            items(logLines) { line -> LogLine(line) }
+                        }
                     }
                 }
+            } else {
+                DumpsysPermissionPanel(modifier = Modifier.fillMaxWidth().weight(1f, fill = false))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -350,5 +371,279 @@ private fun LogLine(line: String) {
             lineHeight = 15.sp,
             color = bodyColor
         )
+    }
+}
+
+/** Batch 627 — pemilih tab sederhana (Log | Izin dumpsys); sengaja bukan TabRow bawaan agar tak menambah peringatan deprecated. */
+@Composable
+private fun DiagnosticTabs(selected: Int, onSelect: (Int) -> Unit) {
+    val titles = listOf("Log", "Izin dumpsys")
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        titles.forEachIndexed { index, title ->
+            val isSelected = index == selected
+            val tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) tint.copy(alpha = 0.14f) else Color.Transparent)
+                    .clickable(role = Role.Tab) { onSelect(index) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = tint,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+/** Keadaan tab Izin dumpsys hasil satu kali pemeriksaan (dihitung di IO). */
+private class DumpsysPanelState(
+    val granted: Boolean,
+    val shizuku: ShizukuBridge.State,
+    val access: DumpsysCollector.Access,
+    val test: DumpsysCollector.TestResult?,
+    val selected: Set<String>
+)
+
+/**
+ * Batch 627/628 — tab "Izin dumpsys": status akses (izin DUMP langsung atau Shizuku) + uji dumpsys nyata (centang hijau /
+ * silang merah), tombol Shizuku (buka, izinkan, beri izin DUMP), perintah adb cadangan (bisa disalin), dan centang per
+ * bagian dumpsys yang ikut "Ekspor Logcat Debug" (default semua ON, tersimpan). Semua pembacaan (izin, Shizuku, uji
+ * proses, prefs) di Dispatchers.IO; tak ada yang dikirim ke mana pun.
+ */
+@Composable
+private fun DumpsysPermissionPanel(modifier: Modifier) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val sections = remember { DumpsysCollector.sections(context.packageName) }
+    var refreshTick by remember { mutableIntStateOf(0) }
+    var checking by remember { mutableStateOf(true) }
+    var panel by remember {
+        mutableStateOf(
+            DumpsysPanelState(false, ShizukuBridge.State.NOT_INSTALLED, DumpsysCollector.Access.NONE, null, sections.map { it.id }.toSet())
+        )
+    }
+    var working by remember { mutableStateOf(false) }
+    var note by remember { mutableStateOf<String?>(null) }
+    var copied by remember { mutableStateOf(false) }
+
+    LaunchedEffect(refreshTick) {
+        checking = true
+        panel = withContext(Dispatchers.IO) {
+            val access = DumpsysCollector.accessMode(context)
+            DumpsysPanelState(
+                granted = DumpsysCollector.isPermissionGranted(context),
+                shizuku = ShizukuBridge.state(context),
+                access = access,
+                test = if (access != DumpsysCollector.Access.NONE) DumpsysCollector.testDumpsys(context) else null,
+                selected = sections.filter { DumpsysCollector.isSelected(context, it.id) }.map { it.id }.toSet()
+            )
+        }
+        checking = false
+    }
+    // Hasil dialog izin Shizuku -> periksa ulang otomatis.
+    DisposableEffect(Unit) {
+        val listener = ShizukuBridge.addPermissionListener { refreshTick++ }
+        onDispose { listener?.let { ShizukuBridge.removePermissionListener(it) } }
+    }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(2000)
+            copied = false
+        }
+    }
+
+    val setSection: (String, Boolean) -> Unit = { id, on ->
+        panel = DumpsysPanelState(
+            panel.granted, panel.shizuku, panel.access, panel.test,
+            if (on) panel.selected + id else panel.selected - id
+        )
+        scope.launch(Dispatchers.IO) { DumpsysCollector.setSelected(context, id, on) }
+    }
+    val command = remember { DumpsysCollector.grantCommand(context) }
+    val secondary = MaterialTheme.colorScheme.secondary
+    val noAccess = panel.access == DumpsysCollector.Access.NONE
+
+    Column(
+        modifier = modifier
+            .heightIn(min = 96.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
+            .verticalScroll(rememberScrollState())
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("Izin dumpsys", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Text(
+            "Dengan akses dumpsys, \"Ekspor Logcat Debug\" ikut memuat keluaran dumpsys (Recents, sesi media, audio, notifikasi, " +
+                "widget, memori, dst.) sehingga log jauh lebih lengkap. Akses didapat lewat Shizuku (disarankan) atau izin DUMP " +
+                "lewat adb. Tanpa keduanya, ekspor tetap berjalan seperti biasa.",
+            style = MaterialTheme.typography.bodySmall,
+            color = secondary
+        )
+        CheckRow(
+            ok = panel.shizuku == ShizukuBridge.State.READY,
+            loading = checking,
+            title = "Shizuku",
+            detail = when {
+                checking -> "Memeriksa…"
+                panel.shizuku == ShizukuBridge.State.READY -> "Siap dan sudah diizinkan"
+                panel.shizuku == ShizukuBridge.State.NEED_PERMISSION -> "Berjalan, belum mengizinkan aplikasi ini"
+                panel.shizuku == ShizukuBridge.State.NOT_RUNNING -> "Terpasang tetapi belum berjalan (jalankan lewat Wireless debugging di aplikasi Shizuku)"
+                else -> "Belum terpasang (RikkaApps/Shizuku)"
+            }
+        )
+        CheckRow(
+            ok = panel.granted,
+            loading = checking,
+            title = "Izin DUMP",
+            detail = if (checking) "Memeriksa…" else if (panel.granted) "Diberikan" else "Belum diberikan"
+        )
+        CheckRow(
+            ok = panel.test?.ok == true,
+            loading = checking,
+            title = "Uji dumpsys",
+            detail = if (checking) "Memeriksa…" else if (noAccess) "Tidak dijalankan (belum ada akses)" else panel.test?.detail.orEmpty()
+        )
+        note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+
+        // Tombol Shizuku sesuai keadaan.
+        when (panel.shizuku) {
+            ShizukuBridge.State.NEED_PERMISSION -> OutlinedButton(
+                onClick = {
+                    note = if (ShizukuBridge.requestPermission()) null else "Gagal membuka dialog izin Shizuku."
+                },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            ) { Text("Izinkan lewat Shizuku", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+
+            ShizukuBridge.State.READY -> if (!panel.granted) OutlinedButton(
+                onClick = {
+                    working = true
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) { DumpsysCollector.grantViaShizuku(context) }
+                        note = result.detail
+                        working = false
+                        refreshTick++
+                    }
+                },
+                enabled = !working,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            ) { Text(if (working) "Memberi izin…" else "Beri izin DUMP via Shizuku", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+
+            ShizukuBridge.State.NOT_RUNNING -> OutlinedButton(
+                onClick = {
+                    ShizukuBridge.launchIntent(context)?.let { intent ->
+                        note = if (runCatching { context.startActivity(intent) }.isSuccess) null else "Gagal membuka Shizuku."
+                    }
+                },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            ) { Text("Buka Shizuku", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+
+            ShizukuBridge.State.NOT_INSTALLED -> Unit
+        }
+
+        if (noAccess) {
+            Text(
+                "Cadangan tanpa Shizuku: beri izin SEKALI lewat adb (tanpa root), mis. dari PC atau Termux + Wireless debugging, " +
+                    "lalu tekan Periksa ulang:",
+                style = MaterialTheme.typography.bodySmall,
+                color = secondary
+            )
+            Text(
+                command,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    .padding(10.dp)
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (noAccess) {
+                OutlinedButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("perintah izin DUMP", command))
+                        copied = true
+                    },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (copied) "Tersalin" else "Salin perintah", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            OutlinedButton(
+                onClick = { refreshTick++ },
+                enabled = !checking,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Periksa ulang", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+
+        Text(
+            "Bagian yang ikut diekspor (${panel.selected.size} dari ${sections.size})",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold
+        )
+        sections.forEach { section ->
+            val on = section.id in panel.selected
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(role = Role.Checkbox) { setSection(section.id, !on) },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(checked = on, onCheckedChange = { setSection(section.id, it) })
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(section.label, style = MaterialTheme.typography.bodyMedium)
+                    Text(section.description, style = MaterialTheme.typography.bodySmall, color = secondary)
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = { sections.forEach { setSection(it.id, true) } }) { Text("Centang semua") }
+            TextButton(onClick = { sections.forEach { setSection(it.id, false) } }) { Text("Kosongkan") }
+        }
+    }
+}
+
+/** Satu baris status: ikon centang hijau (ok) / silang merah (gagal) / pemuat, judul, rincian. */
+@Composable
+private fun CheckRow(ok: Boolean, loading: Boolean, title: String, detail: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (loading) {
+            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+        } else {
+            Icon(
+                if (ok) Icons.Default.CheckCircle else Icons.Default.Error,
+                contentDescription = if (ok) "Lulus" else "Belum",
+                tint = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        }
     }
 }

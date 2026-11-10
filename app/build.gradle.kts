@@ -447,4 +447,11 @@ dependencies {
     // (dicek langsung, bukan diasumsikan dari training data — versi WorkManager sering
     // berubah shape antar rilis).
     implementation("androidx.work:work-runtime-ktx:2.11.2")
+
+    // Batch 628 — Shizuku (RikkaApps): akses shell (dumpsys / pm grant) tanpa adb-PC setelah Shizuku berjalan.
+    // Permintaan eksplisit user ("kenapa tidak terintegrasi dengan Shizuku"). 13.1.5 = rilis terakhir seri 13.x
+    // (versi diambil dari ingatan, BELUM dicek di Maven Central dari sandbox tanpa jaringan: bila Gradle gagal
+    // me-resolve, baca pesan galat run CI dan koreksi versinya).
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 }

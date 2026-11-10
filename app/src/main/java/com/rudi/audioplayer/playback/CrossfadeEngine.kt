@@ -129,6 +129,11 @@ class CrossfadeEngine(
     private val handbackPausedAtMs = AtomicLong(0L)
     private val handbackGapMs = AtomicLong(0L)
 
+    // Batch 627 — jadwal fade yang DIRENCANAKAN (SystemClock.elapsedRealtime): dipakai handback untuk tahu seberapa
+    // jauh fade sudah berjalan saat lagu lama ternyata habis lebih awal dari perkiraan (`duration - posisi`).
+    private val fadeStartAtMs = AtomicLong(0L)
+    private val fadeEndAtMs = AtomicLong(0L)
+
     init {
         overlapPlayer.volume = 0f
         overlapPlayer.addListener(object : Player.Listener {
@@ -179,12 +184,29 @@ class CrossfadeEngine(
         val target = sessionPlayer.volume.let { if (it < VOLUME_EPSILON) 1f else it }
         preFadeVolume = target
 
+        // Batch 627 — overlapPlayer tak pernah menerima kecepatan sessionPlayer: pada kecepatan != 1x lagu baru
+        // masuk 1x lalu "dipercepat" saat handback (sesi berkecepatan penuh). Samakan HANYA bila berbeda
+        // (kecepatan 1x = jalur lama persis), dan hitung sisa dalam waktu NYATA (media / kecepatan).
+        val sessionParams = sessionPlayer.playbackParameters
+        if (overlapPlayer.playbackParameters != sessionParams) overlapPlayer.playbackParameters = sessionParams
+        val speed = sessionParams.speed.coerceAtLeast(MIN_SPEED)
+
         overlapPlayer.setMediaItem(nextItem)
         overlapPlayer.volume = 0f
         overlapPlayer.prepare()
         overlapPlayer.play()
 
-        val fadeSpan = remaining.coerceAtMost(crossfadeDurationMs).coerceAtLeast(200L)
+        val fadeSpan = (remaining / speed).toLong().coerceAtMost(crossfadeDurationMs).coerceAtLeast(200L)
+        val startedAt = SystemClock.elapsedRealtime()
+        fadeStartAtMs.set(startedAt)
+        fadeEndAtMs.set(startedAt + fadeSpan)
+        // Batch 627 — INSTRUMENTASI: dasar jadwal fade. Dibaca bersama baris `Transisi alami` untuk melihat apakah
+        // lagu lama habis lebih awal dari `durasi - posisi` (mis. lompat-senyap / durasi header meleset).
+        AppLogger.w(
+            "CrossfadeEngine",
+            "Crossfade mulai: sisa=${remaining}ms durasi=${duration}ms posisi=${sessionPlayer.currentPosition}ms " +
+                "fade=${fadeSpan}ms kecepatan=${sessionParams.speed}x"
+        )
         rampJob?.cancel()
         rampJob = scope.launch {
             animateDualVolume(fromA = target, toA = 0f, fromB = 0f, toB = target, durationMs = fadeSpan) { a, b ->
@@ -226,11 +248,22 @@ class CrossfadeEngine(
         }
 
         val startB = overlapPlayer.volume
+        // Batch 627 — fade yang DIPOTONG: lagu lama habis sebelum jadwal fade selesai (log v626: fade 2,9 dtk baru
+        // 31% saat transisi; volume lagu baru 0,31 lalu DIPAKSA naik ke 1,0 dalam 400 ms = terdengar "dipercepat di
+        // akhir"). Sisa jadwal fade dipertahankan: penguatan gabungan naik dari volume saat ini ke target selama
+        // sisa jadwal (minimal HANDBACK_MS); serah-terima overlap -> sesi tetap bersilang 400 ms.
+        val now = SystemClock.elapsedRealtime()
+        val plannedMs = (fadeEndAtMs.get() - fadeStartAtMs.get()).coerceAtLeast(1L)
+        val elapsedMs = (now - fadeStartAtMs.get()).coerceIn(0L, plannedMs)
+        val remainingFadeMs = (fadeEndAtMs.get() - now).coerceIn(0L, crossfadeDurationMs)
+        val totalMs = maxOf(HANDBACK_MS, remainingFadeMs)
+        AppLogger.w(
+            "CrossfadeEngine",
+            "Transisi alami: fade_selesai=${elapsedMs * 100 / plannedMs}% sisa_fade=${remainingFadeMs}ms " +
+                "volume_overlap=$startB handback=${totalMs}ms"
+        )
         rampJob = scope.launch {
-            animateDualVolume(fromA = 0f, toA = target, fromB = startB, toB = 0f, durationMs = HANDBACK_MS) { a, b ->
-                sessionPlayer.volume = a
-                overlapPlayer.volume = b
-            }
+            animateHandbackVolume(startGain = startB, target = target, totalMs = totalMs)
             overlapPlayer.pause()
             overlapPlayer.clearMediaItems()
             pendingInternalSeeks.set(0)
@@ -289,6 +322,8 @@ class CrossfadeEngine(
         pendingInternalSeeks.set(0) // Batch 626
         handbackPausedAtMs.set(0L)
         handbackGapMs.set(0L)
+        fadeStartAtMs.set(0L)
+        fadeEndAtMs.set(0L)
         if (state != State.IDLE) {
             // Batch 366 BUGFIX (root cause dari laporan user — audio bisu setelah lagu
             // pertama pasca kill+trigger eksternal, notifikasi/widget tetap "Memutar", cuma
@@ -322,6 +357,22 @@ class CrossfadeEngine(
         triggeredForIndex = -1
     }
 
+    /** Batch 627 — serah-terima overlap -> sesi. Penguatan GABUNGAN `gain` naik linear dari [startGain] ke [target]
+     *  selama [totalMs]; silang (sesi masuk, overlap keluar) dibatasi [HANDBACK_MS]: sesi = gain x s, overlap =
+     *  gain x (1 - s), s: 0 -> 1. Dua salinan lagu yang sama = jumlahnya tetap `gain` (tanpa lonjakan/lubang). */
+    private suspend fun animateHandbackVolume(startGain: Float, target: Float, totalMs: Long) {
+        val steps = (totalMs / STEP_MS).toInt().coerceAtLeast(1)
+        val crossSteps = (HANDBACK_MS / STEP_MS).toInt().coerceAtLeast(1)
+        for (i in 0..steps) {
+            if (!scope.isActive) return
+            val gain = (startGain + (target - startGain) * (i / steps.toFloat())).coerceIn(0f, 1f)
+            val cross = (i / crossSteps.toFloat()).coerceIn(0f, 1f)
+            sessionPlayer.volume = gain * cross
+            overlapPlayer.volume = gain * (1f - cross)
+            if (i < steps) delay(STEP_MS)
+        }
+    }
+
     private suspend fun animateDualVolume(
         fromA: Float,
         toA: Float,
@@ -344,6 +395,7 @@ class CrossfadeEngine(
 
     companion object {
         private const val STEP_MS = 60L
+        private const val MIN_SPEED = 0.25f // Batch 627 — pelindung bagi dengan kecepatan 0
         private const val HANDBACK_MS = 400L
         // Batch 366 — ambang toleransi float utk anggap "sudah 0", dipakai konsisten di semua
         // pengecekan (dulu ada yang exact `<= 0f`, ada yang `<= 0.01f`, tidak konsisten).
