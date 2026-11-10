@@ -3,8 +3,8 @@ package com.rudi.audioplayer.util
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.SystemClock
 import rikka.shizuku.Shizuku
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
@@ -12,6 +12,27 @@ import kotlin.concurrent.thread
 internal class ShellResult(val lines: List<String>, val timedOut: Boolean, val error: String?)
 
 private const val READER_JOIN_MS = 1_000L
+private const val EXIT_POLL_MS = 50L
+
+/**
+ * Batch 629 — pengganti `Process.waitFor(timeout, unit)`. Versi bawaan JDK hanya menangkap IllegalThreadStateException
+ * saat polling `exitValue()`, sedangkan `ShizukuRemoteProcess.exitValue()` melempar IllegalArgumentException("process
+ * hasn't exited") selama proses masih berjalan -> aplikasi CRASH (crash log 11 Nov 06:40, v628, `Process.waitFor`).
+ * Di sini SETIAP galat `exitValue()` dianggap "belum selesai"; true = sudah selesai, false = batas waktu/terinterupsi.
+ */
+private fun waitForExit(process: Process, timeoutMs: Long): Boolean {
+    val deadline = SystemClock.elapsedRealtime() + timeoutMs
+    while (true) {
+        if (runCatching { process.exitValue() }.isSuccess) return true
+        if (SystemClock.elapsedRealtime() >= deadline) return false
+        try {
+            Thread.sleep(EXIT_POLL_MS)
+        } catch (ex: InterruptedException) {
+            Thread.currentThread().interrupt()
+            return false
+        }
+    }
+}
 
 /**
  * Batch 628 — baca keluaran [process] di thread terpisah (dibatasi [lineLimit] baris) dengan batas waktu [timeoutMs].
@@ -27,13 +48,8 @@ internal fun drainProcess(process: Process, timeoutMs: Long, lineLimit: Int): Sh
             }
         }.onFailure { readFailure.set("${it.javaClass.simpleName}: ${it.message.orEmpty()}") }
     }
-    val finished = try {
-        process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-    } catch (ex: InterruptedException) {
-        Thread.currentThread().interrupt()
-        false
-    }
-    if (!finished) process.destroyForcibly()
+    val finished = waitForExit(process, timeoutMs)
+    if (!finished) runCatching { process.destroyForcibly() }
     reader.join(READER_JOIN_MS)
     val snapshot = synchronized(lines) { ArrayList(lines) }
     return ShellResult(snapshot, !finished, readFailure.get())

@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 629: perbaikan crash saat tab "Izin dumpsys" memakai Shizuku (proses Shizuku melempar galat saat ditunggu); kini ditunggu dengan cara aman dan semua pemeriksaan tak lagi menjatuhkan aplikasi — belum dikompilasi/diuji di device.
 > - Batch 628: tab "Izin dumpsys" kini terintegrasi dengan Shizuku (deteksi, dialog izin, tombol Beri izin DUMP, dan dumpsys langsung lewat Shizuku tanpa adb dari PC) — belum dikompilasi/diuji di device; dependensi Shizuku versi 13.1.5 belum diverifikasi.
 > - Batch 627: Fade Halus tak lagi memaksa volume lagu baru naik cepat di akhir saat lagu lama habis lebih awal dari perkiraan (serah-terima kini mengikuti sisa jadwal fade); Log Diagnostik punya tab baru "Izin dumpsys" (centang status izin + pilihan bagian dumpsys) agar Ekspor Logcat Debug jauh lebih panjang/lengkap setelah izin DUMP diberikan lewat adb — belum dikompilasi/diuji di device.
 > - Batch 626: Fade Halus (crossfade) sebelumnya selalu dibatalkan di tahap serah-terima setiap pergantian lagu karena seek internalnya sendiri dianggap seek manual (log: 22 dari 22 transisi); kini seek internal dikenali dan ramp serah-terima berjalan; celah senyap singkat di ujung crossfade masih mungkin ada dan kini diukur di log — belum dikompilasi/diuji di device.
@@ -329,6 +330,8 @@ Riwayat lebih detail per batch pengembangan ada di `CHANGELOG.md`.
 Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("junit:junit:4.13.2")`) — tidak ada Robolectric/instrumentation, tidak ada emulator. Konsekuensinya: hanya business logic yang benar-benar lepas dari `Context`/framework Android (SharedPreferences, ContentResolver, SensorManager, dst.) yang bisa ditest langsung. Pola yang dipakai berulang kali di proyek ini (`PinLockoutPolicy`, dan sejak Batch 27: `ShakePulseTracker`, `MusicRepository.deriveFolderName`, `LibraryFilterStore.shouldKeep`): pisahkan logika murninya ke fungsi/kelas pure, method instance yang butuh Context tinggal delegasikan ke situ tanpa ubah perilaku.
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
+
+**Batch 629** — Perbaikan crash v628: menunggu proses Shizuku dengan `Process.waitFor` melempar IllegalArgumentException ("process hasn't exited") yang tak ditangkap JDK; diganti polling aman. Uji dumpsys, pemberian izin DUMP via Shizuku, dan pemeriksaan panel kini tak pernah melempar ke aplikasi. Belum dikompilasi/diuji di device.
 
 **Batch 628** — Integrasi Shizuku di tab "Izin dumpsys": status Shizuku (terpasang/berjalan/diizinkan), tombol Buka Shizuku, Izinkan lewat Shizuku, dan Beri izin DUMP via Shizuku. Bila Shizuku sudah siap, "Ekspor Logcat Debug" langsung memuat dumpsys lewat shell Shizuku tanpa perlu `adb pm grant` dari PC; perintah adb tetap tampil sebagai cadangan bila Shizuku belum ada. Belum dikompilasi/diuji di device.
 

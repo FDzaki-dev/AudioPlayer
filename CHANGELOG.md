@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 629 — Perbaikan CRASH Shizuku: `Process.waitFor` melempar IllegalArgumentException("process hasn't exited") (BELUM verified)
+- Input user: `crash_20261111_064009_...txt` (v628 = 1.9.39 build 489, Android 16, Infinix X6850, thread main) + `SONIX_laporan-untuk-claude_run56.zip` + "perbaiki woy!!".
+- Run #56 (v628; commit `a9cded0`, 2026-11-10 22:36 UTC; Gradle exit 0/0/0): ArchUnit 7 LULUS, SpotBugs 0, detekt 0, lintDebug 0, Kotlin 11 (11 deprecated, 0 lainnya) = prediksi Batch 628 cocok persis; dependensi Shizuku 13.1.5 ter-resolve dan API yang dipakai ter-kompilasi.
+- AKAR crash (stacktrace): `java.lang.Process.waitFor(Process.java:194)` -> `exitValue()` proses Shizuku -> `IllegalArgumentException: process hasn't exited` (dibuat ulang dari Parcel). `Process.waitFor(timeout, unit)` bawaan JDK hanya menangkap `IllegalThreadStateException` saat polling `exitValue()`; `ShizukuRemoteProcess.exitValue()` melempar IllegalArgumentException selama proses masih berjalan -> keluar dari coroutine -> aplikasi jatuh. Terpicu saat tab Izin dumpsys (Uji dumpsys / Beri izin DUMP / ekspor) memakai Shizuku.
+- `util/ShizukuBridge.kt`: `waitForExit()` (polling `exitValue()` tiap 50 ms; SETIAP galat = "belum selesai"; true selesai, false batas waktu/interupsi) menggantikan `waitFor(timeout)`; `destroyForcibly()` dibungkus `runCatching`. `util/DumpsysCollector.kt`: `testDumpsys`, `grantViaShizuku`, `accessMode` kini TAK melempar (galat menjadi `TestResult(false, "galat: ...")` / `Access.NONE`). `ui/DiagnosticLogSheet.kt`: blok pemeriksaan IO di panel dibungkus `runCatching` -> jatuh ke keadaan "tak ada akses" (tak pernah menjatuhkan aplikasi).
+- 3 file source. **NOT VERIFIED**: belum compile/CI/device. PREDIKSI: Kotlin 11 deprecated (baris peringatan tak bergeser); ArchUnit 7; detekt 0; lint 0; SpotBugs 0 (risiko titik baru `waitForExit` loop/sleep); tes 7 hijau.
+
 ## Batch 628 — Integrasi Shizuku untuk dumpsys / pemberian izin DUMP tanpa adb-PC (BELUM verified; dependensi baru)
 - Input user: "kenapa tidak terintegrasi dengan Shizuku hah?!!" (menyusul Batch 627). Jawaban jujur: Batch 627 hanya mengambil jalur `adb shell pm grant`; Shizuku tidak dipertimbangkan = kelalaian, bukan keterbatasan teknis.
 - `app/build.gradle.kts`: `dev.rikka.shizuku:api:13.1.5` + `provider:13.1.5`. VERSI DARI INGATAN, BELUM dicek di Maven Central (sandbox tanpa jaringan): bila Gradle gagal me-resolve, baca galat CI dan koreksi versinya.

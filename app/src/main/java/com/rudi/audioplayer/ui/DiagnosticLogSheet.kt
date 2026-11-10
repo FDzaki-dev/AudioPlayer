@@ -436,16 +436,20 @@ private fun DumpsysPermissionPanel(modifier: Modifier) {
 
     LaunchedEffect(refreshTick) {
         checking = true
-        panel = withContext(Dispatchers.IO) {
-            val access = DumpsysCollector.accessMode(context)
-            DumpsysPanelState(
-                granted = DumpsysCollector.isPermissionGranted(context),
-                shizuku = ShizukuBridge.state(context),
-                access = access,
-                test = if (access != DumpsysCollector.Access.NONE) DumpsysCollector.testDumpsys(context) else null,
-                selected = sections.filter { DumpsysCollector.isSelected(context, it.id) }.map { it.id }.toSet()
-            )
-        }
+        // Batch 629 — galat apa pun saat memeriksa tak boleh menjatuhkan aplikasi (crash v628): jatuh ke keadaan "tak ada akses".
+        val fallback = DumpsysPanelState(false, ShizukuBridge.State.NOT_INSTALLED, DumpsysCollector.Access.NONE, null, sections.map { it.id }.toSet())
+        panel = runCatching {
+            withContext(Dispatchers.IO) {
+                val access = DumpsysCollector.accessMode(context)
+                DumpsysPanelState(
+                    granted = DumpsysCollector.isPermissionGranted(context),
+                    shizuku = ShizukuBridge.state(context),
+                    access = access,
+                    test = if (access != DumpsysCollector.Access.NONE) DumpsysCollector.testDumpsys(context) else null,
+                    selected = sections.filter { DumpsysCollector.isSelected(context, it.id) }.map { it.id }.toSet()
+                )
+            }
+        }.getOrDefault(fallback)
         checking = false
     }
     // Hasil dialog izin Shizuku -> periksa ulang otomatis.

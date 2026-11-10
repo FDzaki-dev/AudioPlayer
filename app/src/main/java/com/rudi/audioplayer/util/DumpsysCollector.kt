@@ -76,14 +76,19 @@ object DumpsysCollector {
     fun grantCommand(context: Context): String = "adb shell pm grant ${context.packageName} $PERMISSION"
 
     /** Akses efektif saat ini (izin langsung diutamakan, lalu Shizuku). Blocking ringan: panggil dari IO. */
-    fun accessMode(context: Context): Access = when {
+    fun accessMode(context: Context): Access = runCatching { accessModeUnsafe(context) }.getOrDefault(Access.NONE)
+
+    private fun accessModeUnsafe(context: Context): Access = when {
         isPermissionGranted(context) -> Access.DIRECT
         ShizukuBridge.state(context) == ShizukuBridge.State.READY -> Access.SHIZUKU
         else -> Access.NONE
     }
 
     /** Beri izin DUMP ke aplikasi ini lewat shell Shizuku (`pm grant`); [TestResult.ok] true bila izin kini terpasang. */
-    fun grantViaShizuku(context: Context): TestResult {
+    fun grantViaShizuku(context: Context): TestResult = runCatching { grantViaShizukuUnsafe(context) }
+        .getOrElse { TestResult(false, "galat: ${it.javaClass.simpleName}: ${it.message.orEmpty().take(120)}") }
+
+    private fun grantViaShizukuUnsafe(context: Context): TestResult {
         if (ShizukuBridge.state(context) != ShizukuBridge.State.READY) return TestResult(false, "Shizuku belum siap")
         val run = ShizukuBridge.runShell("pm grant ${context.packageName} $PERMISSION 2>&1", GRANT_TIMEOUT_MS, GRANT_LINE_LIMIT)
         if (isPermissionGranted(context)) return TestResult(true, "izin DUMP diberikan lewat Shizuku")
@@ -99,7 +104,10 @@ object DumpsysCollector {
     }
 
     /** Uji nyata: jalankan `dumpsys meminfo <paket>`; ok bila ada keluaran dan tidak ditolak sistem. */
-    fun testDumpsys(context: Context): TestResult {
+    fun testDumpsys(context: Context): TestResult = runCatching { testDumpsysUnsafe(context) }
+        .getOrElse { TestResult(false, "galat: ${it.javaClass.simpleName}: ${it.message.orEmpty().take(120)}") }
+
+    private fun testDumpsysUnsafe(context: Context): TestResult {
         val access = accessMode(context)
         if (access == Access.NONE) return TestResult(false, "belum ada akses: izin DUMP belum diberikan dan Shizuku belum siap")
         val run = runDumpsys(listOf("meminfo", context.packageName), PER_SECTION_TIMEOUT_MS, access)
