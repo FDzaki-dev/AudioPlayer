@@ -128,12 +128,18 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val panelShape = MaterialTheme.shapes.large
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+        // Batch 630 — permintaan user: tab Log Diagnostik FULL SCREEN, bukan setengah layar. Sebelumnya panel dibatasi
+        // `heightIn(max = 560.dp)` + kotak isi `weight(1f, fill = false)` (membungkus konten) -> sheet hanya ~setengah tinggi
+        // layar. Sekarang `fillMaxHeight()` (= tinggi maksimum yang diberikan sheet; pola sama AdvancedControlsSheet Batch 554,
+        // insets status/navigasi tetap ditangani `ModalBottomSheet`) dan kotak log / panel Izin dumpsys `weight(1f)` mengisi
+        // sisa ruang, sehingga tombol Ekspor/Simpan/Hapus tetap menempel di bawah dan area log/centang selapang mungkin.
+        // Logika, state (`tab` rememberSaveable), dan isi TIDAK diubah.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, panelShape)
                 .frostedGlass()
-                .heightIn(max = 560.dp)
+                .fillMaxHeight()
                 .padding(horizontal = 20.dp)
                 .padding(top = 20.dp, bottom = 28.dp)
         ) {
@@ -189,7 +195,7 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f, fill = false)
+                        .weight(1f)
                         .heightIn(min = 96.dp)
                         .clip(RoundedCornerShape(14.dp))
                         .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
@@ -218,7 +224,7 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                     }
                 }
             } else {
-                DumpsysPermissionPanel(modifier = Modifier.fillMaxWidth().weight(1f, fill = false))
+                DumpsysPermissionPanel(modifier = Modifier.fillMaxWidth().weight(1f))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
