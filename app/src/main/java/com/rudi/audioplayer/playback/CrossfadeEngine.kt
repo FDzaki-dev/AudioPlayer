@@ -4,8 +4,11 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.util.UnstableApi
+import android.os.SystemClock
 import androidx.media3.exoplayer.ExoPlayer
 import com.rudi.audioplayer.util.AppLogger
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -109,8 +112,22 @@ class CrossfadeEngine(
     // Tells onSessionManualDiscontinuity apart from this engine's own handback seek in
     // onSessionAutoTransition, which fires the exact same SEEK discontinuity reason and must
     // NOT be treated as a manual skip that aborts itself.
-    @Volatile
-    private var internalSeekInFlight = false
+    //
+    // Batch 626 — dulu `@Volatile Boolean internalSeekInFlight` yang di-set true/false MENGAPIT
+    // `sessionPlayer.seekTo(...)`. Itu tidak pernah bekerja: onSessionAutoTransition dipanggil dari
+    // DALAM callback onMediaItemTransition, dan Media3 `ListenerSet` menunda event yang dilahirkan
+    // di dalam callback sampai callback itu selesai (MEKANISME = dari ingatan source Media3, BELUM
+    // dibuktikan; FAKTA dari log + kode: abort() hanya bisa dipanggil dari jalur ini pada state HANDBACK)
+    // -> onPositionDiscontinuity(SEEK) tiba SETELAH flag sudah false -> dianggap seek manual -> abort() pada SETIAP transisi (log perangkat 10 Nov, v625: 22 dari 22
+    // transisi otomatis berakhir `Crossfade dibatalkan pertengahan (state=HANDBACK)`; ramp handback tak pernah
+    // jalan). Kini: jumlah seek internal yang event SEEK-nya BELUM tiba; satu event SEEK dikonsumsi per
+    // hitungan, tak peduli kapan event itu dikirim. Direset ke 0 saat handback selesai/abort (batas
+    // jendela = state HANDBACK) supaya hitungan yatim tak pernah menelan seek manual berikutnya.
+    private val pendingInternalSeeks = AtomicInteger(0)
+
+    // Batch 626 — pengukuran celah senyap overlapPlayer selama handback (lihat onSessionPlayWhenReadyChanged).
+    private val handbackPausedAtMs = AtomicLong(0L)
+    private val handbackGapMs = AtomicLong(0L)
 
     init {
         overlapPlayer.volume = 0f
@@ -192,11 +209,21 @@ class CrossfadeEngine(
         // pun progress ramp saat ini.
         val target = preFadeVolume
 
-        internalSeekInFlight = true
-        // Safe precisely because sessionPlayer's volume is already ~0 here — see class doc
-        // step 3. Any decode/seek latency this causes is inaudible.
-        sessionPlayer.seekTo(overlapPlayer.currentPosition)
-        internalSeekInFlight = false
+        // Batch 626 — hitung SEBELUM seekTo: event SEEK-nya baru tiba setelah callback pemanggil
+        // (onMediaItemTransition) selesai, lihat komentar pendingInternalSeeks. Bila seekTo melempar,
+        // abort() (reset hitungan + volume sessionPlayer dipulihkan + overlap dihentikan) lalu lempar
+        // ulang: dulu state tertinggal HANDBACK tanpa ramp dan crossfade berikutnya terkunci.
+        handbackPausedAtMs.set(0L)
+        handbackGapMs.set(0L)
+        pendingInternalSeeks.incrementAndGet()
+        try {
+            // Safe precisely because sessionPlayer's volume is already ~0 here — see class doc
+            // step 3. Any decode/seek latency this causes is inaudible.
+            sessionPlayer.seekTo(overlapPlayer.currentPosition)
+        } catch (e: RuntimeException) {
+            abort()
+            throw e
+        }
 
         val startB = overlapPlayer.volume
         rampJob = scope.launch {
@@ -206,8 +233,14 @@ class CrossfadeEngine(
             }
             overlapPlayer.pause()
             overlapPlayer.clearMediaItems()
+            pendingInternalSeeks.set(0)
             state = State.IDLE
             triggeredForIndex = -1
+            // Batch 626 — bukti jalur normal di log (dulu SETIAP transisi berakhir di abort()).
+            AppLogger.w(
+                "CrossfadeEngine",
+                "Handback selesai normal (seek internal tak membatalkan crossfade) celah_overlap=${handbackGapMs.get()}ms"
+            )
         }
     }
 
@@ -215,8 +248,13 @@ class CrossfadeEngine(
      * only [Player.DISCONTINUITY_REASON_SEEK] ones matter here. */
     fun onSessionManualDiscontinuity(reason: Int) {
         if (reason != Player.DISCONTINUITY_REASON_SEEK) return
-        if (internalSeekInFlight) return
         if (state == State.IDLE) return
+        // Batch 626 — event SEEK milik seek handback internal (lihat pendingInternalSeeks): dikonsumsi,
+        // BUKAN seek manual. Event berikutnya (skip/seek pengguna) tetap membatalkan seperti semula.
+        if (pendingInternalSeeks.get() > 0) {
+            pendingInternalSeeks.decrementAndGet()
+            return
+        }
         abort()
     }
 
@@ -224,6 +262,19 @@ class CrossfadeEngine(
      * mid-transition doesn't leave the incoming track playing on its own in the background. */
     fun onSessionPlayWhenReadyChanged(isPlaying: Boolean) {
         if (state == State.IDLE) return
+        // Batch 626 — INSTRUMENTASI (0 perubahan perilaku): `isPlaying` ikut false saat sessionPlayer BUFFERING
+        // setelah seek handback internal, sehingga overlapPlayer ikut dijeda sampai sessionPlayer siap lagi =
+        // celah senyap di ujung crossfade. Durasi celah itu diukur di sini dan dicatat saat handback selesai
+        // (`celah_overlap`), supaya keputusan berikutnya (mis. kompensasi posisi seek) berdasar angka, bukan tebakan.
+        if (state == State.HANDBACK) {
+            val now = SystemClock.elapsedRealtime()
+            if (!isPlaying) {
+                handbackPausedAtMs.compareAndSet(0L, now)
+            } else {
+                val pausedAt = handbackPausedAtMs.getAndSet(0L)
+                if (pausedAt != 0L) handbackGapMs.addAndGet(now - pausedAt)
+            }
+        }
         if (isPlaying) overlapPlayer.play() else overlapPlayer.pause()
     }
 
@@ -235,6 +286,9 @@ class CrossfadeEngine(
     private fun abort() {
         rampJob?.cancel()
         rampJob = null
+        pendingInternalSeeks.set(0) // Batch 626
+        handbackPausedAtMs.set(0L)
+        handbackGapMs.set(0L)
         if (state != State.IDLE) {
             // Batch 366 BUGFIX (root cause dari laporan user — audio bisu setelah lagu
             // pertama pasca kill+trigger eksternal, notifikasi/widget tetap "Memutar", cuma

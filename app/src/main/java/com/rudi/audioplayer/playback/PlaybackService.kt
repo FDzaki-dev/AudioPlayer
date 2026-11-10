@@ -264,8 +264,8 @@ class PlaybackService : MediaLibraryService() {
                     // Bluetooth) apa pun bentuknya wajib membatalkan crossfade yang sedang
                     // berlangsung, supaya overlapPlayer tidak pernah kebablasan main sendiri di
                     // atas lagu yang baru dituju user. Seek internal milik CrossfadeEngine sendiri
-                    // (langkah handback) SENGAJA tidak ikut kena — lihat internalSeekInFlight di
-                    // CrossfadeEngine.kt.
+                    // (langkah handback) SENGAJA tidak ikut kena — lihat pendingInternalSeeks di
+                    // CrossfadeEngine.kt (Batch 626: dulu flag boolean yang tak pernah bekerja).
                     crossfadeEngine?.onSessionManualDiscontinuity(reason)
                 }
             }
