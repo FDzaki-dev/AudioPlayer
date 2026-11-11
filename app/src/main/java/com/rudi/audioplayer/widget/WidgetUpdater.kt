@@ -221,6 +221,35 @@ object WidgetUpdater {
         }
     }
 
+    // Batch 640 — ukuran sampul + kenop layout strip mengikuti ukuran widget (lihat WidgetStripSizing). Layout XML memberi
+    // ukuran dasar (sampul 32dp; kenop 24/28/24dp; jarak 10dp); di sini ditimpa lewat API RemoteViews 31+ (= minSdk).
+    // Padding kenop ikut skala (px) agar proporsi glif tetap. Gagal = ukuran dasar XML tetap (try/catch: widget tak boleh crash).
+    private fun applyStripSizes(context: Context, views: RemoteViews, widthDp: Int, heightDp: Int) {
+        try {
+            val s = WidgetStripSizing.compute(widthDp, heightDp)
+            val dip = TypedValue.COMPLEX_UNIT_DIP
+            val density = context.resources.displayMetrics.density
+            views.setViewLayoutHeight(R.id.widget_album_art, s.artDp, dip)
+            val keys = listOf(
+                Triple(R.id.widget_prev, WidgetStripSizing.KEY_DP, WidgetStripSizing.KEY_PAD_DP),
+                Triple(R.id.widget_play_pause, WidgetStripSizing.PLAY_DP, WidgetStripSizing.PLAY_PAD_DP),
+                Triple(R.id.widget_next, WidgetStripSizing.KEY_DP, WidgetStripSizing.KEY_PAD_DP)
+            )
+            for ((id, baseDp, padDp) in keys) {
+                val sizeDp = baseDp * s.scale
+                val padPx = (padDp * s.scale * density).toInt()
+                views.setViewLayoutWidth(id, sizeDp, dip)
+                views.setViewLayoutHeight(id, sizeDp, dip)
+                views.setViewPadding(id, padPx, padPx, padPx, padPx)
+            }
+            val gapDp = WidgetStripSizing.GAP_DP * s.scale
+            views.setViewLayoutMargin(R.id.widget_play_pause, RemoteViews.MARGIN_TOP, gapDp, dip)
+            views.setViewLayoutMargin(R.id.widget_next, RemoteViews.MARGIN_TOP, gapDp, dip)
+        } catch (e: Exception) {
+            AppLogger.w("WidgetUpdater", "applyStripSizes gagal (ukuran dasar XML dipakai): ${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
+
     // Batch 589 — "window insets" untuk widget layar beranda. RemoteViews dirender launcher dan TIDAK punya API
     // WindowInsets, jadi padanannya: padding root minimal sebesar jarak aman terhadap radius sudut widget yang
     // dipakai launcher (`android.R.dimen.system_app_widget_background_radius`, API 31 = minSdk). Padding XML
@@ -437,6 +466,7 @@ object WidgetUpdater {
             if (isStrip) {
                 // Batch 639 — strip tak punya TextView judul: judul lagu jadi contentDescription sampul (aksesibilitas).
                 views.setContentDescription(R.id.widget_album_art, title ?: "Buka SONIX")
+                applyStripSizes(context, views, minWidthDp, minHeightDp)
             } else {
                 setTitleSelected(views, false)
                 views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")

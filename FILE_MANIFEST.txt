@@ -113,6 +113,7 @@
 # Batch 627: app/src/main/java/com/rudi/audioplayer/util/DumpsysCollector.kt + app/src/test/java/com/rudi/audioplayer/util/DumpsysFormatTest.kt (file baru, dumpsys per centang di ekspor log debug + tab Izin dumpsys) ditambahkan — 237->239.
 # Batch 628: app/src/main/java/com/rudi/audioplayer/util/ShizukuBridge.kt (file baru, jembatan Shizuku untuk dumpsys/pm grant tanpa adb-PC) ditambahkan — 239->240.
 # Batch 639: app/src/main/res/layout/widget_player_strip.xml (file baru, layout widget strip sempit-tinggi: sampul + prev/play/next bertumpuk) ditambahkan — 240->241.
+# Batch 640: app/src/main/java/com/rudi/audioplayer/widget/WidgetStripSizing.kt dan app/src/test/java/com/rudi/audioplayer/widget/WidgetStripSizingTest.kt (file baru, ukuran strip proporsional + tesnya) ditambahkan — 241->243.
 # Total: 234 file
 
 .githooks/pre-commit
@@ -267,6 +268,7 @@ app/src/main/java/com/rudi/audioplayer/util/SafeGuard.kt
 app/src/main/java/com/rudi/audioplayer/util/ShizukuBridge.kt
 app/src/main/java/com/rudi/audioplayer/widget/PlayerWidgetProvider.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetUpdater.kt
+app/src/main/java/com/rudi/audioplayer/widget/WidgetStripSizing.kt
 app/src/main/java/com/rudi/audioplayer/worker/LyricsPrefetchWorker.kt
 app/src/main/res/drawable/ic_bubble_minimize.xml
 app/src/main/res/drawable/ic_bubble_tile.xml
@@ -340,6 +342,7 @@ app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
 app/src/test/java/com/rudi/audioplayer/util/DebugLogFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/util/DumpsysFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt
+app/src/test/java/com/rudi/audioplayer/widget/WidgetStripSizingTest.kt
 build.gradle.kts
 config/detekt/detekt.yml
 config/spotbugs/exclude.xml
