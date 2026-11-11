@@ -50,21 +50,31 @@ internal fun LibraryHeader(
     searchActive: Boolean,
     onToggleSearch: () -> Unit,
     onRescan: () -> Unit,
-    onOpenFolderManager: () -> Unit
+    onOpenFolderManager: () -> Unit,
+    // Batch 635 — layar pendek (landscape HP, tinggi < 480dp): label "LIBRARY" + padding atas/bawah dibuang supaya
+    // daftar lagu mendapat ruang (screen recording 360291: daftar hanya ±1 baris). Default false = tampilan lama.
+    compactHeight: Boolean = false
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 8.dp, top = 20.dp, bottom = 8.dp),
+            .padding(
+                start = 20.dp,
+                end = 8.dp,
+                top = if (compactHeight) 4.dp else 20.dp,
+                bottom = if (compactHeight) 0.dp else 8.dp
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                "LIBRARY",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
-            Spacer(modifier = Modifier.height(2.dp))
+            if (!compactHeight) {
+                Text(
+                    "LIBRARY",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+            }
             Text("Musik Saya", style = MaterialTheme.typography.titleLarge)
         }
         IconButton(onClick = onToggleSearch) {
@@ -155,7 +165,14 @@ private fun libraryChipLabelColor(selected: Boolean): Color = when {
 }
 
 @Composable
-internal fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
+internal fun LibraryFilterChips(
+    selectedTab: Int,
+    onSelect: (Int) -> Unit,
+    // Batch 635 — layar pendek: jarak vertikal baris chip dipersempit + [trailing] (baris "Urutkan") ditaruh SEJAJAR di ujung
+    // kanan baris chip (hemat 1 baris tinggi). Default (false, kosong) = tata letak lama persis: chip memenuhi lebar.
+    compactHeight: Boolean = false,
+    trailing: @Composable () -> Unit = {}
+) {
     var showMoreMenu by remember { mutableStateOf(false) }
     val moreSelected = selectedTab in 3..6
     val moreChipLabel = if (moreSelected) LIBRARY_MORE_TAB_LABELS[selectedTab - 3] else "Lainnya"
@@ -169,61 +186,64 @@ internal fun LibraryFilterChips(selectedTab: Int, onSelect: (Int) -> Unit) {
     // `Radius.xxl` seperti sebelumnya, 0 perubahan visual buat mereka.
     val chipRadius = if (isLiquidGlassTheme()) Radius.liquidPill else Radius.xxl
 
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        itemsIndexed(LIBRARY_PRIMARY_TAB_LABELS) { index, label ->
-            val selected = selectedTab == index
-            Box(
-                modifier = Modifier
-                    .libraryChipSurface(selected, chipRadius)
-                    .clickable { onSelect(index) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    label,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = libraryChipLabelColor(selected)
-                )
-            }
-        }
-        item {
-            Box {
-                Row(
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        LazyRow(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = if (compactHeight) 2.dp else 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            itemsIndexed(LIBRARY_PRIMARY_TAB_LABELS) { index, label ->
+                val selected = selectedTab == index
+                Box(
                     modifier = Modifier
-                        .libraryChipSurface(moreSelected, chipRadius)
-                        .clickable { showMoreMenu = true }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .libraryChipSurface(selected, chipRadius)
+                        .clickable { onSelect(index) }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    val moreLabelColor = libraryChipLabelColor(moreSelected)
                     Text(
-                        moreChipLabel,
+                        label,
                         style = MaterialTheme.typography.bodySmall,
-                        color = moreLabelColor
-                    )
-                    Icon(
-                        Icons.Default.ExpandMore,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = moreLabelColor
+                        color = libraryChipLabelColor(selected)
                     )
                 }
-                DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
-                    LIBRARY_MORE_TAB_LABELS.forEachIndexed { offset, label ->
-                        DropdownMenuItem(
-                            text = { Text(label) },
-                            onClick = {
-                                onSelect(3 + offset)
-                                showMoreMenu = false
-                            }
+            }
+            item {
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .libraryChipSurface(moreSelected, chipRadius)
+                            .clickable { showMoreMenu = true }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val moreLabelColor = libraryChipLabelColor(moreSelected)
+                        Text(
+                            moreChipLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = moreLabelColor
                         )
+                        Icon(
+                            Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = moreLabelColor
+                        )
+                    }
+                    DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                        LIBRARY_MORE_TAB_LABELS.forEachIndexed { offset, label ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    onSelect(3 + offset)
+                                    showMoreMenu = false
+                                }
+                            )
+                        }
                     }
                 }
             }
         }
+        trailing()
     }
 }
 

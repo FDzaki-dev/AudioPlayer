@@ -64,6 +64,7 @@ import com.rudi.audioplayer.ui.theme.Radius
 import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.input.ImeAction
@@ -276,6 +277,24 @@ fun LibraryScreen(
     }
     val deleteSong: (Song) -> Unit = { songsPendingDelete = listOf(it) }
 
+    // Batch 635 — screen recording landscape (360291): header + chip + baris "Urutkan" memakan hampir seluruh tinggi
+    // (~360dp) sehingga daftar lagu hanya ±1 baris. Tinggi jendela < 480dp (pola sama DiagnosticLogSheet) -> header
+    // diringkas dan "Urutkan" dipindah sejajar baris chip. Potret/tablet (tinggi >= 480dp) TIDAK berubah.
+    val compactHeight = LocalWindowInfo.current.containerDpSize.height < 480.dp
+    val sortInChipRow = compactHeight && selectedTab == 0
+    val songSortBar: @Composable (Boolean) -> Unit = { fillWidth ->
+        LibrarySortBar(
+            options = SongSort.values().map { it.label },
+            selectedIndex = songSort.ordinal,
+            onSelect = { index ->
+                val chosen = SongSort.values()[index]
+                songSort = chosen
+                filterStore.setSongSort(chosen)
+            },
+            fillWidth = fillWidth
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         if (selectionMode) {
             SelectionActionBar(
@@ -293,7 +312,8 @@ fun LibraryScreen(
                     if (!searchActive) searchQuery = ""
                 },
                 onRescan = onRescan,
-                onOpenFolderManager = { showFolderManager = true }
+                onOpenFolderManager = { showFolderManager = true },
+                compactHeight = compactHeight
             )
         }
 
@@ -306,19 +326,16 @@ fun LibraryScreen(
         }
 
         if (!searchActive) {
-            LibraryFilterChips(selectedTab = selectedTab, onSelect = { selectedTab = it })
+            LibraryFilterChips(
+                selectedTab = selectedTab,
+                onSelect = { selectedTab = it },
+                compactHeight = compactHeight,
+                trailing = { if (sortInChipRow) songSortBar(false) }
+            )
         }
 
-        if (!searchActive && selectedTab == 0) {
-            LibrarySortBar(
-                options = SongSort.values().map { it.label },
-                selectedIndex = songSort.ordinal,
-                onSelect = { index ->
-                    val chosen = SongSort.values()[index]
-                    songSort = chosen
-                    filterStore.setSongSort(chosen)
-                }
-            )
+        if (!searchActive && selectedTab == 0 && !sortInChipRow) {
+            songSortBar(true)
         }
 
         if (!searchActive && showLibraryHint) {

@@ -30,12 +30,14 @@ internal fun LibrarySortBar(
     options: List<String>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Batch 635 — false = tidak memenuhi lebar (dipakai sejajar di ujung baris chip pada layar pendek/landscape).
+    fillWidth: Boolean = true
 ) {
     var expanded by remember { mutableStateOf(false) }
     Row(
         modifier = modifier
-            .fillMaxWidth()
+            .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
             .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.End
     ) {

@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 635: Perpustakaan landscape — header diringkas + "Urutkan" sejajar baris chip saat tinggi < 480dp (daftar lagu sebelumnya hanya ±1 baris) — Batch 635 belum dikompilasi/diuji.
 > - Batch 634: landscape Log Diagnostik — tombol Simpan Log / Hapus disematkan di dasar kolom kiri (sebelumnya terpotong); rotasi tak mengunci ulang aplikasi terbukti di video — Batch 634 belum dikompilasi/diuji.
 > - Batch 633 (hanya docs): log v632 membuktikan dumpsys 13 dari 13 bagian berisi data dan tak ada crash baru; uji rotasi + landscape (Batch 631) masih menunggu konfirmasi.
 > - Batch 632: bagian dumpsys jobscheduler yang ditolak "Security exception" kini ikut dibaca lewat jalur cadangan Shizuku; dumpsys v631 terbukti di device (12 dari 13 bagian berisi data) — Batch 632 belum dikompilasi/diuji.

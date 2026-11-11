@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 635 — Perpustakaan landscape: header diringkas, "Urutkan" sejajar baris chip (BELUM verified di device)
+- Input user: "lanjutkan kesitu!!" (+ "segera!!") = lanjut ke butir RESUME POINT Batch 634 (Perpustakaan landscape).
+- FAKTA video `360291.mp4` (frame ±9 dtk dan ±14 dtk): di tab Lagu landscape, header (label LIBRARY + Musik Saya) + baris chip + baris "Urutkan: Bawaan" memakan hampir seluruh tinggi (window ±360dp, mini player di bawah) sehingga daftar lagu hanya ±1 baris.
+- PERBAIKAN (3 file source; 0 file baru): HANYA saat tinggi jendela < 480dp (`LocalWindowInfo.containerDpSize`, pola sama `DiagnosticLogSheet`): (1) `LibraryHeader(compactHeight)`: label "LIBRARY" + spacer dibuang, padding atas 20->4dp, bawah 8->0dp; (2) `LibraryFilterChips(compactHeight, trailing)`: jarak vertikal 8->2dp, lalu baris "Urutkan" dirender sejajar di ujung kanan baris chip (tab Lagu) alih-alih baris sendiri; (3) `LibrarySortBar(fillWidth)`: parameter baru, default true = lama. Potret / tablet (tinggi >= 480dp): nilai default = tampilan lama, 0 perubahan. Tab selain Lagu: hanya header + jarak chip yang diringkas.
+- Tidak dikerjakan: mini player landscape (di `MainActivity`), baris "Urutkan" tab Album (di `AlbumGridView`), `rememberSaveable` flag sheet `SettingsScreen`.
+- **NOT VERIFIED**: belum compile/CI/device. PREDIKSI: Kotlin 11 deprecated; ArchUnit 7; detekt 0; lint 0; SpotBugs 0; `DumpsysFormatTest` 11 hijau. Uji device: landscape tab Lagu menampilkan >= 2 baris daftar; "Urutkan" tetap berfungsi (menu muncul, pilihan tersimpan); potret tak berubah.
+
 ## Batch 634 — landscape Log Diagnostik: tombol Simpan Log / Hapus disematkan di bawah (BELUM verified di device)
 - Input user: screen recording `360291.mp4` (1624x720, 43 dtk, landscape; tur Beranda, Perpustakaan, Pengaturan, Log Diagnostik, lalu putar kembali ke potret), tanpa teks.
 - FAKTA video: (1) Batch 631 TERBUKTI untuk rotasi: landscape -> potret di layar Pengaturan TANPA layar PIN/sidik jari, posisi layar tetap; (2) Log Diagnostik landscape tampil dua kolom selebar layar (kiri header + tombol, kanan log) sesuai rancangan; (3) MASALAH: di kolom kiri hanya "Ekspor Logcat Debug" yang terlihat, "Simpan Log" dan "Hapus" terpotong di bawah layar (kolom discroll, tanpa petunjuk, tampak hilang); (4) OBSERVASI di luar permintaan: Perpustakaan landscape hanya menampilkan ±1 baris daftar (header Musik Saya + chip + baris Urutkan + mini player memakan hampir seluruh tinggi ±360dp) — tidak dikerjakan.
