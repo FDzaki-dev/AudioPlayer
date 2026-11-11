@@ -112,6 +112,7 @@
 # Batch 612: widget_well.xml + widget_well_light.xml (gradien lapis-1: garis tepi pink mengelilingi palung); 0 file baru — total tetap 234.
 # Batch 627: app/src/main/java/com/rudi/audioplayer/util/DumpsysCollector.kt + app/src/test/java/com/rudi/audioplayer/util/DumpsysFormatTest.kt (file baru, dumpsys per centang di ekspor log debug + tab Izin dumpsys) ditambahkan — 237->239.
 # Batch 628: app/src/main/java/com/rudi/audioplayer/util/ShizukuBridge.kt (file baru, jembatan Shizuku untuk dumpsys/pm grant tanpa adb-PC) ditambahkan — 239->240.
+# Batch 639: app/src/main/res/layout/widget_player_strip.xml (file baru, layout widget strip sempit-tinggi: sampul + prev/play/next bertumpuk) ditambahkan — 240->241.
 # Total: 234 file
 
 .githooks/pre-commit
@@ -289,6 +290,7 @@ app/src/main/res/layout/bubble_minimized.xml
 app/src/main/res/layout/widget_player.xml
 app/src/main/res/layout/widget_player_compact.xml
 app/src/main/res/layout/widget_player_slim.xml
+app/src/main/res/layout/widget_player_strip.xml
 app/src/main/res/layout/widget_player_tall.xml
 app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
 app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml

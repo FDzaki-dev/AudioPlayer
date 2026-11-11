@@ -1482,7 +1482,13 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             // (HP potret biasa) TIDAK tersentuh sama sekali, NavigationBar bawah tetap seperti
             // semula persis (lihat guard widthClass == COMPACT di atas).
             if (widthClass != AppWidthClass.COMPACT) {
-                NavigationRail {
+                // Batch 639 — screenshot user (Now Playing landscape): panel rail ±400px dgn ±98px ruang kosong di kiri (≈ offset panel dari
+                // tepi kiri layar, 100px) + ±73px di atas isinya (≈ tinggi bilah status), dan label "Perpustakaan" menempel tepi kanan panel. AKAR: `Scaffold` sudah memberi
+                // `padding` inset sistem ke Row ini (panel mulai di x = inset kiri; bilah status di atas), lalu `NavigationRail`
+                // menambahkan `windowInsets` DEFAULT-nya (systemBars: start + vertikal) sekali lagi DI DALAM panel -> inset DOBEL
+                // (pola sama Batch 444 pada NavigationBar bawah). Fix: nolkan `windowInsets` rail di titik ini SAJA + label
+                // diberi napas 4dp kiri/kanan (nilai sama Batch 452) supaya label terpanjang tak rata tepi panel.
+                NavigationRail(windowInsets = WindowInsets(0, 0, 0, 0)) {
                     NavigationRailItem(
                         selected = currentRoute == "home",
                         onClick = {
@@ -1495,7 +1501,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                             }
                         },
                         icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                        label = { Text("Beranda") }
+                        label = { Text("Beranda", modifier = Modifier.padding(horizontal = 4.dp)) }
                     )
                     NavigationRailItem(
                         selected = currentRoute == "library",
@@ -1508,7 +1514,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                             }
                         },
                         icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
-                        label = { Text("Perpustakaan") }
+                        label = { Text("Perpustakaan", modifier = Modifier.padding(horizontal = 4.dp)) }
                     )
                     NavigationRailItem(
                         selected = currentRoute == "settings",
@@ -1521,7 +1527,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                             }
                         },
                         icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                        label = { Text("Pengaturan") }
+                        label = { Text("Pengaturan", modifier = Modifier.padding(horizontal = 4.dp)) }
                     )
                 }
             }

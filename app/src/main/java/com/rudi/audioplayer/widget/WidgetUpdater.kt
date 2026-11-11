@@ -70,6 +70,11 @@ object WidgetUpdater {
     private const val COMPACT_HEIGHT_THRESHOLD_DP = 124
     // Batch 606: tinggi < 54dp -> layout slim (log: user menarik widget ke 46dp; compact butuh 58dp -> terpotong).
     private const val SLIM_HEIGHT_THRESHOLD_DP = 54
+    // Batch 639: lebar < 150dp (di bawah lebar tetap layout slim 149dp = kenop/judul slim sudah tak muat) DAN tinggi >= 160dp
+    // -> layout STRIP vertikal (`widget_player_strip.xml`; tinggi minimum isinya 153dp, lihat komentar layout). Screenshot user:
+    // widget sempit-tinggi (estimasi ±48x297dp) memakai layout slim horizontal -> hanya sampul yang terlihat. Lebar < 150 dgn tinggi < 160 TIDAK berubah.
+    private const val STRIP_WIDTH_THRESHOLD_DP = 150
+    private const val STRIP_MIN_HEIGHT_DP = 160
     // Batch 607: tinggi >= 210dp (lebar >= SLIM_WIDTH) -> layout tinggi (sampul besar). Default tinggi bila opsi kosong 250 -> 129dp
     // (4x2 umum) supaya widget tanpa data ukuran tidak salah memakai layout tinggi yang butuh ~210dp.
     private const val TALL_HEIGHT_THRESHOLD_DP = 210
@@ -277,6 +282,7 @@ object WidgetUpdater {
         isCompact: Boolean,
         isSlim: Boolean,
         isTall: Boolean,
+        isStrip: Boolean,
         options: android.os.Bundle
     ) {
         try {
@@ -285,6 +291,15 @@ object WidgetUpdater {
             val minH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, -1)
             val maxW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, -1)
             val maxH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, -1)
+            if (isStrip) {
+                // Batch 639 — strip vertikal tak menampilkan judul (tak ada kolom judul/marquee): cukup satu baris mode + ukuran.
+                AppLogger.w(
+                    "WidgetUpdater",
+                    "Marquee diag #$seq +${sinceLastMs}ms digabung=$skipped | id=$widgetId mode=strip " +
+                        "min=${minW}x${minH}dp maks=${maxW}x${maxH}dp | tanpa judul di layout ini playing=$isPlaying"
+                )
+                return
+            }
             val shown = title ?: "Tidak ada lagu"
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
             paint.typeface = Typeface.DEFAULT_BOLD
@@ -371,12 +386,16 @@ object WidgetUpdater {
             val options = manager.getAppWidgetOptions(id)
             val minWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
             val minHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, DEFAULT_MIN_HEIGHT_DP)
-            val isSlim = minWidthDp < SLIM_WIDTH_THRESHOLD_DP || minHeightDp < SLIM_HEIGHT_THRESHOLD_DP
-            val isCompact = isSlim || minHeightDp < COMPACT_HEIGHT_THRESHOLD_DP
+            // Batch 639 — strip (sempit-tinggi) dipilih SEBELUM slim; di luar kondisi strip, isSlim/isCompact/isTall persis seperti dulu.
+            // Strip memakai cangkang compact (isCompact = true) agar padding/inset sudut & latar sama dgn slim.
+            val isStrip = minWidthDp < STRIP_WIDTH_THRESHOLD_DP && minHeightDp >= STRIP_MIN_HEIGHT_DP
+            val isSlim = !isStrip && (minWidthDp < SLIM_WIDTH_THRESHOLD_DP || minHeightDp < SLIM_HEIGHT_THRESHOLD_DP)
+            val isCompact = isStrip || isSlim || minHeightDp < COMPACT_HEIGHT_THRESHOLD_DP
             val isTall = !isCompact && minHeightDp >= TALL_HEIGHT_THRESHOLD_DP
-            logMarqueeDiag(context, diagSeqNo, diagSinceMs, diagSkippedNow, title, diagTitleChanged, isPlaying, id, isCompact, isSlim, isTall, options)
+            logMarqueeDiag(context, diagSeqNo, diagSinceMs, diagSkippedNow, title, diagTitleChanged, isPlaying, id, isCompact, isSlim, isTall, isStrip, options)
 
             val layoutRes = when {
+                isStrip -> R.layout.widget_player_strip
                 isSlim -> R.layout.widget_player_slim
                 isCompact -> R.layout.widget_player_compact
                 isTall -> R.layout.widget_player_tall
@@ -415,10 +434,15 @@ object WidgetUpdater {
             if (prevGlyph != null) views.setImageViewBitmap(R.id.widget_prev, prevGlyph)
             if (nextGlyph != null) views.setImageViewBitmap(R.id.widget_next, nextGlyph)
 
-            setTitleSelected(views, false)
-            views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
-            views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
-            setTitleSelected(views, true)
+            if (isStrip) {
+                // Batch 639 — strip tak punya TextView judul: judul lagu jadi contentDescription sampul (aksesibilitas).
+                views.setContentDescription(R.id.widget_album_art, title ?: "Buka SONIX")
+            } else {
+                setTitleSelected(views, false)
+                views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
+                views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
+                setTitleSelected(views, true)
+            }
             views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
             views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))
             if (!isCompact) {
@@ -445,7 +469,7 @@ object WidgetUpdater {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             views.setOnClickPendingIntent(R.id.widget_album_art, openAppPending)
-            views.setOnClickPendingIntent(R.id.widget_title, openAppPending)
+            if (!isStrip) views.setOnClickPendingIntent(R.id.widget_title, openAppPending)
 
             manager.updateAppWidget(id, views)
         }
