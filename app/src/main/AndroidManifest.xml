@@ -84,6 +84,13 @@
     <uses-permission android:name="android.permission.DUMP"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- Batch 631 — Android 16: layanan `package`, `activity`, `notification`, `jobscheduler` menolak pembaca yang hanya
+         punya DUMP ("Permission Denial ... due to missing android.permission.PACKAGE_USAGE_STATS"; log v629: 6 dari 13
+         bagian dumpsys). Sama seperti DUMP: tak bisa diminta lewat dialog, hanya diberikan lewat `pm grant` (tombol
+         Shizuku / perintah adb di tab "Izin dumpsys"); deklarasi wajib agar `pm grant` diterima. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
     <!-- Batch 628 — agar getLaunchIntentForPackage dapat melihat aplikasi Shizuku (deteksi terpasang + tombol Buka). -->
     <queries>
         <package android:name="moe.shizuku.privileged.api" />

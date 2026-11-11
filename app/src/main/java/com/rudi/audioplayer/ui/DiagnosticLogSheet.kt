@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -36,6 +37,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rudi.audioplayer.ui.theme.frostedGlass
@@ -127,7 +129,186 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
     // Batch 627 — tab: 0 = Log, 1 = Izin dumpsys (rememberSaveable: tahan rotasi).
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val panelShape = MaterialTheme.shapes.large
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+    // Batch 631 — LANDSCAPE (screen recording user, 2 temuan): (1) sheet tak selebar layar (batas `sheetMaxWidth` bawaan
+    // 640dp) -> `Dp.Unspecified`; (2) header (judul + keterangan + kartu crash + tab) + 3 tombol MEMAKAN seluruh tinggi layar
+    // landscape (~360dp), sehingga kotak log / panel Izin dumpsys dan tombol Ekspor/Simpan/Hapus tak terlihat sama sekali.
+    // Sekarang tinggi layar pendek + lebar cukup (`twoPane`: tinggi < 480dp dan lebar >= 560dp, dari `LocalWindowInfo` seperti
+    // `rememberAppWidthClass`) memakai DUA KOLOM: kiri header + tombol (bisa discroll), kanan isi (log / panel dumpsys) setinggi
+    // penuh; pegangan seret disembunyikan di mode ini untuk menghemat tinggi. Potret tidak berubah. Ketiga bagian (header, isi,
+    // tombol) kini lambda lokal agar dipakai bersama kedua tata letak tanpa menyalin kode; logika/state TIDAK diubah.
+    val windowDp = LocalWindowInfo.current.containerDpSize
+    val twoPane = windowDp.height < 480.dp && windowDp.width >= 560.dp
+
+    val headerContent: @Composable () -> Unit = {
+        Text(
+            "Log Diagnostik",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "Catatan error & crash tersimpan lokal di HP ini saja — tidak pernah dikirim ke mana pun.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary
+        )
+        latestCrash?.let { crash ->
+            Spacer(modifier = Modifier.height(12.dp))
+            val crashTint = if (crashUnseen) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(crashTint.copy(alpha = 0.12f))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.BugReport, contentDescription = null, tint = crashTint)
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (crashUnseen) "Crash baru terdeteksi" else "Crash terakhir",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = crashTint
+                    )
+                    Text(
+                        crash.displayName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+
+        DiagnosticTabs(selected = tab, onSelect = { tab = it })
+        Spacer(modifier = Modifier.height(10.dp))
+    }
+
+    val bodyContent: @Composable (Modifier) -> Unit = { bodyModifier ->
+        if (tab == 0) {
+            DiagnosticLogBox(modifier = bodyModifier, isLoading = isLoadingLog, logText = logText)
+        } else {
+            DumpsysPermissionPanel(modifier = bodyModifier)
+        }
+    }
+
+    val actionsContent: @Composable () -> Unit = {
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = {
+                debugExporting = true
+                scope.launch(Dispatchers.IO) {
+                    val path = AppLogger.exportDebugLogToDocuments(context)
+                    withContext(Dispatchers.Main) {
+                        debugExporting = false
+                        haptic.performHapticFeedback(
+                            if (path != null) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
+                        )
+                        debugExport = if (path != null) {
+                            Pair(true, "Tersimpan di $path")
+                        } else {
+                            Pair(false, "Gagal menyimpan log debug")
+                        }
+                        onInfoMessage(if (path != null) "Log debug disimpan ke $path" else "Gagal menyimpan log debug")
+                    }
+                }
+            },
+            enabled = !debugExporting,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+        ) {
+            Icon(Icons.Default.BugReport, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(if (debugExporting) "Membaca logcat…" else "Ekspor Logcat Debug", maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = {
+                    scope.launch(Dispatchers.IO) {
+                        val ok = AppLogger.exportLogToDocuments(context)
+                        withContext(Dispatchers.Main) {
+                            haptic.performHapticFeedback(
+                                if (ok) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
+                            )
+                            exportResult = ok
+                            onInfoMessage(
+                                if (ok) "Log disimpan ke Documents/AudioPlayer/logs"
+                                else "Gagal menyimpan log (perlu Android 10+)"
+                            )
+                        }
+                    }
+                },
+                enabled = logText.isNotBlank(),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+            ) {
+                Icon(Icons.Default.Archive, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Simpan Log", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            OutlinedButton(
+                onClick = {
+                    scope.launch(Dispatchers.IO) {
+                        AppLogger.clearLog()
+                        withContext(Dispatchers.Main) {
+                            logText = ""
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onInfoMessage("Log diagnostik dihapus")
+                        }
+                    }
+                },
+                enabled = logText.isNotBlank(),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+            ) {
+                Icon(Icons.Default.DeleteOutline, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Hapus", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+
+        debugExport?.let { (ok, text) ->
+            Spacer(modifier = Modifier.height(12.dp))
+            ResultBanner(
+                style = ResultBannerStyle.Solid,
+                icon = if (ok) Icons.Default.CheckCircle else Icons.Default.Error,
+                text = text,
+                containerColor = if (ok) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
+                contentColor = if (ok) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
+            )
+        }
+
+        exportResult?.let { ok ->
+            Spacer(modifier = Modifier.height(12.dp))
+            ResultBanner(
+                style = ResultBannerStyle.Solid,
+                // Batch 228 — Iconography 3/7 (samakan visual weight icon sejenis).
+                icon = if (ok) Icons.Default.CheckCircle else Icons.Default.Error,
+                text = if (ok) "Tersimpan di Documents/AudioPlayer/logs" else "Gagal menyimpan (perlu Android 10 ke atas)",
+                containerColor = if (ok) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
+                contentColor = if (ok) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
+            )
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.Transparent,
+        sheetMaxWidth = Dp.Unspecified,
+        dragHandle = { if (!twoPane) BottomSheetDefaults.DragHandle() }
+    ) {
         // Batch 630 — permintaan user: tab Log Diagnostik FULL SCREEN, bukan setengah layar. Sebelumnya panel dibatasi
         // `heightIn(max = 560.dp)` + kotak isi `weight(1f, fill = false)` (membungkus konten) -> sheet hanya ~setengah tinggi
         // layar. Sekarang `fillMaxHeight()` (= tinggi maksimum yang diberikan sheet; pola sama AdvancedControlsSheet Batch 554,
@@ -140,195 +321,67 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                 .background(MaterialTheme.colorScheme.surface, panelShape)
                 .frostedGlass()
                 .fillMaxHeight()
+                // Batch 631 — layar landscape: lubang kamera / bar navigasi di sisi (insets horizontal tak diurus sheet).
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                 .padding(horizontal = 20.dp)
-                .padding(top = 20.dp, bottom = 28.dp)
+                .padding(top = if (twoPane) 12.dp else 20.dp, bottom = if (twoPane) 12.dp else 28.dp)
         ) {
-            Text(
-                "Log Diagnostik",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                "Catatan error & crash tersimpan lokal di HP ini saja — tidak pernah dikirim ke mana pun.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
-            latestCrash?.let { crash ->
-                Spacer(modifier = Modifier.height(12.dp))
-                val crashTint = if (crashUnseen) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
+            if (twoPane) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(crashTint.copy(alpha = 0.12f))
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Icon(Icons.Default.BugReport, contentDescription = null, tint = crashTint)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            if (crashUnseen) "Crash baru terdeteksi" else "Crash terakhir",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = crashTint
-                        )
-                        Text(
-                            crash.displayName,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    Column(
+                        modifier = Modifier
+                            .weight(0.42f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        headerContent()
+                        actionsContent()
                     }
-                }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-
-            DiagnosticTabs(selected = tab, onSelect = { tab = it })
-            Spacer(modifier = Modifier.height(10.dp))
-
-            if (tab == 0) {
-                // Wadah log: satu bentuk untuk keadaan memuat / kosong / berisi, supaya tinggi tidak melompat-lompat.
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .heightIn(min = 96.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
-                ) {
-                    if (isLoadingLog) {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                    } else if (logText.isBlank()) {
-                        Text(
-                            "Belum ada catatan. Kalau nanti ada error atau crash, jejaknya akan muncul di sini.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(16.dp)
-                        )
-                    } else {
-                        // Batch 465 — FIX force-close/freeze: split per baris + LazyColumn (Compose hanya measure baris
-                        // yang KELIHATAN); `logText` tetap dibaca utuh, "Simpan Log" tetap mengekspor `readLog()` utuh.
-                        val logLines = remember(logText) { logText.split("\n") }
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            items(logLines) { line -> LogLine(line) }
-                        }
+                    Box(modifier = Modifier.weight(0.58f).fillMaxHeight()) {
+                        bodyContent(Modifier.fillMaxSize())
                     }
                 }
             } else {
-                DumpsysPermissionPanel(modifier = Modifier.fillMaxWidth().weight(1f))
+                headerContent()
+                bodyContent(Modifier.fillMaxWidth().weight(1f))
+                actionsContent()
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = {
-                    debugExporting = true
-                    scope.launch(Dispatchers.IO) {
-                        val path = AppLogger.exportDebugLogToDocuments(context)
-                        withContext(Dispatchers.Main) {
-                            debugExporting = false
-                            haptic.performHapticFeedback(
-                                if (path != null) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
-                            )
-                            debugExport = if (path != null) {
-                                Pair(true, "Tersimpan di $path")
-                            } else {
-                                Pair(false, "Gagal menyimpan log debug")
-                            }
-                            onInfoMessage(if (path != null) "Log debug disimpan ke $path" else "Gagal menyimpan log debug")
-                        }
-                    }
-                },
-                enabled = !debugExporting,
+/** Wadah log: satu bentuk untuk keadaan memuat / kosong / berisi, supaya tinggi tidak melompat-lompat (Batch 631: diekstrak dari sheet). */
+@Composable
+private fun DiagnosticLogBox(modifier: Modifier, isLoading: Boolean, logText: String) {
+    Box(
+        modifier = modifier
+            .heightIn(min = 96.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        } else if (logText.isBlank()) {
+            Text(
+                "Belum ada catatan. Kalau nanti ada error atau crash, jejaknya akan muncul di sini.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
+                    .align(Alignment.Center)
+                    .padding(16.dp)
+            )
+        } else {
+            // Batch 465 — FIX force-close/freeze: split per baris + LazyColumn (Compose hanya measure baris
+            // yang KELIHATAN); `logText` tetap dibaca utuh, "Simpan Log" tetap mengekspor `readLog()` utuh.
+            val logLines = remember(logText) { logText.split("\n") }
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                Icon(Icons.Default.BugReport, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(if (debugExporting) "Membaca logcat…" else "Ekspor Logcat Debug", maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        scope.launch(Dispatchers.IO) {
-                            val ok = AppLogger.exportLogToDocuments(context)
-                            withContext(Dispatchers.Main) {
-                                haptic.performHapticFeedback(
-                                    if (ok) HapticFeedbackType.TextHandleMove else HapticFeedbackType.LongPress
-                                )
-                                exportResult = ok
-                                onInfoMessage(
-                                    if (ok) "Log disimpan ke Documents/AudioPlayer/logs"
-                                    else "Gagal menyimpan log (perlu Android 10+)"
-                                )
-                            }
-                        }
-                    },
-                    enabled = logText.isNotBlank(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp)
-                ) {
-                    Icon(Icons.Default.Archive, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Simpan Log", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                OutlinedButton(
-                    onClick = {
-                        scope.launch(Dispatchers.IO) {
-                            AppLogger.clearLog()
-                            withContext(Dispatchers.Main) {
-                                logText = ""
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onInfoMessage("Log diagnostik dihapus")
-                            }
-                        }
-                    },
-                    enabled = logText.isNotBlank(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp)
-                ) {
-                    Icon(Icons.Default.DeleteOutline, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Hapus", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-
-            debugExport?.let { (ok, text) ->
-                Spacer(modifier = Modifier.height(12.dp))
-                ResultBanner(
-                    style = ResultBannerStyle.Solid,
-                    icon = if (ok) Icons.Default.CheckCircle else Icons.Default.Error,
-                    text = text,
-                    containerColor = if (ok) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
-                    contentColor = if (ok) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-
-            exportResult?.let { ok ->
-                Spacer(modifier = Modifier.height(12.dp))
-                ResultBanner(
-                    style = ResultBannerStyle.Solid,
-                    // Batch 228 — Iconography 3/7 (samakan visual weight icon sejenis).
-                    icon = if (ok) Icons.Default.CheckCircle else Icons.Default.Error,
-                    text = if (ok) "Tersimpan di Documents/AudioPlayer/logs" else "Gagal menyimpan (perlu Android 10 ke atas)",
-                    containerColor = if (ok) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
-                    contentColor = if (ok) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
-                )
+                items(logLines) { line -> LogLine(line) }
             }
         }
     }
@@ -412,6 +465,7 @@ private fun DiagnosticTabs(selected: Int, onSelect: (Int) -> Unit) {
 /** Keadaan tab Izin dumpsys hasil satu kali pemeriksaan (dihitung di IO). */
 private class DumpsysPanelState(
     val granted: Boolean,
+    val usageGranted: Boolean,
     val shizuku: ShizukuBridge.State,
     val access: DumpsysCollector.Access,
     val test: DumpsysCollector.TestResult?,
@@ -433,7 +487,7 @@ private fun DumpsysPermissionPanel(modifier: Modifier) {
     var checking by remember { mutableStateOf(true) }
     var panel by remember {
         mutableStateOf(
-            DumpsysPanelState(false, ShizukuBridge.State.NOT_INSTALLED, DumpsysCollector.Access.NONE, null, sections.map { it.id }.toSet())
+            DumpsysPanelState(false, false, ShizukuBridge.State.NOT_INSTALLED, DumpsysCollector.Access.NONE, null, sections.map { it.id }.toSet())
         )
     }
     var working by remember { mutableStateOf(false) }
@@ -443,12 +497,13 @@ private fun DumpsysPermissionPanel(modifier: Modifier) {
     LaunchedEffect(refreshTick) {
         checking = true
         // Batch 629 — galat apa pun saat memeriksa tak boleh menjatuhkan aplikasi (crash v628): jatuh ke keadaan "tak ada akses".
-        val fallback = DumpsysPanelState(false, ShizukuBridge.State.NOT_INSTALLED, DumpsysCollector.Access.NONE, null, sections.map { it.id }.toSet())
+        val fallback = DumpsysPanelState(false, false, ShizukuBridge.State.NOT_INSTALLED, DumpsysCollector.Access.NONE, null, sections.map { it.id }.toSet())
         panel = runCatching {
             withContext(Dispatchers.IO) {
                 val access = DumpsysCollector.accessMode(context)
                 DumpsysPanelState(
                     granted = DumpsysCollector.isPermissionGranted(context),
+                    usageGranted = DumpsysCollector.isUsageGranted(context),
                     shizuku = ShizukuBridge.state(context),
                     access = access,
                     test = if (access != DumpsysCollector.Access.NONE) DumpsysCollector.testDumpsys(context) else null,
@@ -472,7 +527,7 @@ private fun DumpsysPermissionPanel(modifier: Modifier) {
 
     val setSection: (String, Boolean) -> Unit = { id, on ->
         panel = DumpsysPanelState(
-            panel.granted, panel.shizuku, panel.access, panel.test,
+            panel.granted, panel.usageGranted, panel.shizuku, panel.access, panel.test,
             if (on) panel.selected + id else panel.selected - id
         )
         scope.launch(Dispatchers.IO) { DumpsysCollector.setSelected(context, id, on) }
@@ -480,6 +535,8 @@ private fun DumpsysPermissionPanel(modifier: Modifier) {
     val command = remember { DumpsysCollector.grantCommand(context) }
     val secondary = MaterialTheme.colorScheme.secondary
     val noAccess = panel.access == DumpsysCollector.Access.NONE
+    // Batch 631 — perintah adb juga ditampilkan bila DUMP sudah ada tetapi PACKAGE_USAGE_STATS belum dan Shizuku tak siap.
+    val showAdb = panel.shizuku != ShizukuBridge.State.READY && (noAccess || !panel.usageGranted)
 
     Column(
         modifier = modifier
@@ -516,6 +573,14 @@ private fun DumpsysPermissionPanel(modifier: Modifier) {
             title = "Izin DUMP",
             detail = if (checking) "Memeriksa…" else if (panel.granted) "Diberikan" else "Belum diberikan"
         )
+        // Batch 631 — Android 16: tanpa izin ini layanan package / activity / notification / jobscheduler menolak jalur langsung
+        // (log v629: 6 dari 13 bagian); dengan Shizuku siap, bagian itu otomatis dibaca lewat Shizuku.
+        CheckRow(
+            ok = panel.usageGranted,
+            loading = checking,
+            title = "Izin PACKAGE_USAGE_STATS",
+            detail = if (checking) "Memeriksa…" else if (panel.usageGranted) "Diberikan" else "Belum diberikan (dibutuhkan sebagian bagian dumpsys)"
+        )
         CheckRow(
             ok = panel.test?.ok == true,
             loading = checking,
@@ -534,7 +599,7 @@ private fun DumpsysPermissionPanel(modifier: Modifier) {
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
             ) { Text("Izinkan lewat Shizuku", maxLines = 1, overflow = TextOverflow.Ellipsis) }
 
-            ShizukuBridge.State.READY -> if (!panel.granted) OutlinedButton(
+            ShizukuBridge.State.READY -> if (!panel.granted || !panel.usageGranted) OutlinedButton(
                 onClick = {
                     working = true
                     scope.launch {
@@ -547,7 +612,7 @@ private fun DumpsysPermissionPanel(modifier: Modifier) {
                 enabled = !working,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-            ) { Text(if (working) "Memberi izin…" else "Beri izin DUMP via Shizuku", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            ) { Text(if (working) "Memberi izin…" else "Beri izin DUMP + Usage Stats via Shizuku", maxLines = 1, overflow = TextOverflow.Ellipsis) }
 
             ShizukuBridge.State.NOT_RUNNING -> OutlinedButton(
                 onClick = {
@@ -562,7 +627,7 @@ private fun DumpsysPermissionPanel(modifier: Modifier) {
             ShizukuBridge.State.NOT_INSTALLED -> Unit
         }
 
-        if (noAccess) {
+        if (showAdb) {
             Text(
                 "Cadangan tanpa Shizuku: beri izin SEKALI lewat adb (tanpa root), mis. dari PC atau Termux + Wireless debugging, " +
                     "lalu tekan Periksa ulang:",
@@ -582,11 +647,11 @@ private fun DumpsysPermissionPanel(modifier: Modifier) {
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (noAccess) {
+            if (showAdb) {
                 OutlinedButton(
                     onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("perintah izin DUMP", command))
+                        clipboard.setPrimaryClip(ClipData.newPlainText("perintah izin dumpsys", command))
                         copied = true
                     },
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),

@@ -205,6 +205,10 @@ private val TAB_ROUTES = listOf("home", "library", "settings")
 // pemakaian = riwayat. Tuning = HANYA angka 300 / 80 / 540.
 private val NavKeyEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
 
+/** Batch 631 — kunci Bundle status kunci aplikasi yang dibawa lewat rotasi (lihat `MainActivity.onSaveInstanceState`). */
+private const val STATE_UNLOCKED = "sonix_state_unlocked"
+private const val STATE_BIOMETRIC_PROMPTED = "sonix_state_biometric_prompted"
+
 private fun navKeyGlideSpec(from: Float, to: Float) = tween<Float>(
     durationMillis = (300f + 80f * kotlin.math.abs(to - from)).toInt().coerceIn(300, 540),
     easing = NavKeyEasing
@@ -225,9 +229,11 @@ class MainActivity : FragmentActivity() {
     // callback outside the composition) can still signal the composable tree to react.
     private var pendingShortcutAction by mutableStateOf<String?>(null)
 
-    // Re-locks whenever the app is genuinely backgrounded (not on config changes, since
-    // onStop only fires when actually leaving, not on rotation) — mutableState so Compose
-    // reacts immediately without needing a process restart.
+    // Re-locks whenever the app is genuinely backgrounded (NOT on config changes: onStop skips
+    // the reset when isChangingConfigurations, and the value is carried across the recreated
+    // Activity via onSaveInstanceState — Batch 631; the earlier claim that onStop "does not fire
+    // on rotation" was wrong) — mutableState so Compose reacts immediately without needing a
+    // process restart.
     private var isUnlocked by mutableStateOf(false)
 
     // BiometricPrompt.authenticate() called before the window actually has input focus
@@ -261,8 +267,24 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        isUnlocked = false
-        biometricAutoPrompted = false
+        // Batch 631 — BUG (screen recording user): memutar layar memunculkan kunci PIN/sidik jari LAGI dan menutup layar
+        // yang sedang dibuka (mis. sheet Log Diagnostik). Akar: manifest tanpa `configChanges` -> rotasi MEMBUAT ULANG
+        // Activity; `isUnlocked` adalah field instance (komentar lama "onStop hanya saat benar-benar meninggalkan" keliru:
+        // onStop JUGA dipanggil pada instance lama saat rotasi, dan instance baru selalu mulai dari `false`).
+        // Sekarang: kunci ulang HANYA bila bukan perubahan konfigurasi, dan status dibawa ke instance baru lewat
+        // onSaveInstanceState/onCreate. Latar belakang sungguhan (Home/ganti aplikasi) tetap mengunci: onStop menyimpan false.
+        if (!isChangingConfigurations) {
+            isUnlocked = false
+            biometricAutoPrompted = false
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // Batch 631 — dipanggil SETELAH onStop (API 28+; minSdk proyek 31): saat rotasi bernilai `true` (dibawa ke instance
+        // baru), saat ditinggalkan sungguhan bernilai `false` (kunci ulang, juga setelah proses dimatikan sistem).
+        outState.putBoolean(STATE_UNLOCKED, isUnlocked)
+        outState.putBoolean(STATE_BIOMETRIC_PROMPTED, biometricAutoPrompted)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -304,6 +326,10 @@ class MainActivity : FragmentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
         )
         super.onCreate(savedInstanceState)
+
+        // Batch 631 — pulihkan status kunci hasil rotasi (lihat onStop/onSaveInstanceState); `null` (start dingin) = terkunci.
+        isUnlocked = savedInstanceState?.getBoolean(STATE_UNLOCKED, false) == true
+        biometricAutoPrompted = savedInstanceState?.getBoolean(STATE_BIOMETRIC_PROMPTED, false) == true
 
         pendingShortcutAction = intent?.data?.toString()
         playerViewModel.connect()

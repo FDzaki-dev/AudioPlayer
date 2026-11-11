@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 631: memutar layar tak lagi mengunci ulang aplikasi; Log Diagnostik landscape memakai dua kolom selebar layar; dumpsys: izin PACKAGE_USAGE_STATS + jalur cadangan Shizuku per bagian, uji dumpsys tak lagi lulus palsu — belum dikompilasi/diuji di device.
 > - Batch 630: sheet Log Diagnostik kini FULL SCREEN di kedua tab (Log dan Izin dumpsys), tak lagi setengah layar; tombol Ekspor/Simpan/Hapus tetap di bawah — belum dikompilasi/diuji di device.
 > - Batch 629: perbaikan crash saat tab "Izin dumpsys" memakai Shizuku (proses Shizuku melempar galat saat ditunggu); kini ditunggu dengan cara aman dan semua pemeriksaan tak lagi menjatuhkan aplikasi — belum dikompilasi/diuji di device.
 > - Batch 628: tab "Izin dumpsys" kini terintegrasi dengan Shizuku (deteksi, dialog izin, tombol Beri izin DUMP, dan dumpsys langsung lewat Shizuku tanpa adb dari PC) — belum dikompilasi/diuji di device; dependensi Shizuku versi 13.1.5 belum diverifikasi.
@@ -331,6 +332,8 @@ Riwayat lebih detail per batch pengembangan ada di `CHANGELOG.md`.
 Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("junit:junit:4.13.2")`) — tidak ada Robolectric/instrumentation, tidak ada emulator. Konsekuensinya: hanya business logic yang benar-benar lepas dari `Context`/framework Android (SharedPreferences, ContentResolver, SensorManager, dst.) yang bisa ditest langsung. Pola yang dipakai berulang kali di proyek ini (`PinLockoutPolicy`, dan sejak Batch 27: `ShakePulseTracker`, `MusicRepository.deriveFolderName`, `LibraryFilterStore.shouldKeep`): pisahkan logika murninya ke fungsi/kelas pure, method instance yang butuh Context tinggal delegasikan ke situ tanpa ubah perilaku.
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
+
+**Batch 631** — Memutar layar tidak lagi memunculkan kunci PIN/sidik jari (status "sudah dibuka" kini dibawa lewat rotasi; ditinggalkan sungguhan tetap mengunci). Log Diagnostik di landscape selebar layar dengan dua kolom (kiri header + tombol, kanan log / panel Izin dumpsys). Dumpsys: izin PACKAGE_USAGE_STATS ikut diberikan lewat Shizuku/adb, bagian yang ditolak otomatis dibaca lewat Shizuku, dan "Uji dumpsys" tak lagi menandai lulus saat layanan tak ditemukan. Belum dikompilasi/diuji di device.
 
 **Batch 630** — Log Diagnostik (Pengaturan > Lanjutan) kini tampil FULL SCREEN di tab Log maupun tab Izin dumpsys: batas tinggi 560dp dihapus (`fillMaxHeight()`), kotak log / panel Izin dumpsys mengisi sisa ruang dan tombol Ekspor Logcat Debug / Simpan Log / Hapus tetap menempel di bawah. Logika dan isi tidak berubah. Belum dikompilasi/diuji di device. Temuan baru (belum dikerjakan): 6 dari 13 bagian dumpsys ditolak sistem karena izin PACKAGE_USAGE_STATS dan bagian meminfo tak ditemukan.
 
