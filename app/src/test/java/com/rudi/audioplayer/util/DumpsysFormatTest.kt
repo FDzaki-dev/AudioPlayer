@@ -55,6 +55,14 @@ class DumpsysFormatTest {
     }
 
     @Test
+    fun `isDenied mengenali Security exception berspasi dari jobscheduler`() {
+        val raw = "Security exception: MATCH_ANY_USER flag requires INTERACT_ACROSS_USERS permission: UID 10466 requires " +
+            "android.permission.INTERACT_ACROSS_USERS_FULL or android.permission.INTERACT_ACROSS_USERS to access user 0."
+        assertTrue(DumpsysFormat.isDenied(listOf(raw)))
+        assertTrue(DumpsysFormat.isFailure(listOf(raw)))
+    }
+
+    @Test
     fun `buildSection menandai layanan tidak ditemukan dan jalur cadangan`() {
         val gagal = DumpsysFormat.buildSection(listOf("meminfo", "pkg"), listOf("Can't find service: meminfo"), null, 0, 10, false, null)
         assertTrue(gagal.contains("(layanan tidak ditemukan)"))

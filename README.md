@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 632: bagian dumpsys jobscheduler yang ditolak "Security exception" kini ikut dibaca lewat jalur cadangan Shizuku; dumpsys v631 terbukti di device (12 dari 13 bagian berisi data) — Batch 632 belum dikompilasi/diuji.
 > - Batch 631: memutar layar tak lagi mengunci ulang aplikasi; Log Diagnostik landscape memakai dua kolom selebar layar; dumpsys: izin PACKAGE_USAGE_STATS + jalur cadangan Shizuku per bagian, uji dumpsys tak lagi lulus palsu — belum dikompilasi/diuji di device.
 > - Batch 630: sheet Log Diagnostik kini FULL SCREEN di kedua tab (Log dan Izin dumpsys), tak lagi setengah layar; tombol Ekspor/Simpan/Hapus tetap di bawah — belum dikompilasi/diuji di device.
 > - Batch 629: perbaikan crash saat tab "Izin dumpsys" memakai Shizuku (proses Shizuku melempar galat saat ditunggu); kini ditunggu dengan cara aman dan semua pemeriksaan tak lagi menjatuhkan aplikasi — belum dikompilasi/diuji di device.
@@ -332,6 +333,8 @@ Riwayat lebih detail per batch pengembangan ada di `CHANGELOG.md`.
 Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("junit:junit:4.13.2")`) — tidak ada Robolectric/instrumentation, tidak ada emulator. Konsekuensinya: hanya business logic yang benar-benar lepas dari `Context`/framework Android (SharedPreferences, ContentResolver, SensorManager, dst.) yang bisa ditest langsung. Pola yang dipakai berulang kali di proyek ini (`PinLockoutPolicy`, dan sejak Batch 27: `ShakePulseTracker`, `MusicRepository.deriveFolderName`, `LibraryFilterStore.shouldKeep`): pisahkan logika murninya ke fungsi/kelas pure, method instance yang butuh Context tinggal delegasikan ke situ tanpa ubah perilaku.
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
+
+**Batch 632** — Dari log v631: izin PACKAGE_USAGE_STATS diterima dan 12 dari 13 bagian dumpsys kini berisi data. Sisa satu bagian (jobscheduler, "Security exception") sekarang otomatis dibaca lewat Shizuku. Belum dikompilasi/diuji di device.
 
 **Batch 631** — Memutar layar tidak lagi memunculkan kunci PIN/sidik jari (status "sudah dibuka" kini dibawa lewat rotasi; ditinggalkan sungguhan tetap mengunci). Log Diagnostik di landscape selebar layar dengan dua kolom (kiri header + tombol, kanan log / panel Izin dumpsys). Dumpsys: izin PACKAGE_USAGE_STATS ikut diberikan lewat Shizuku/adb, bagian yang ditolak otomatis dibaca lewat Shizuku, dan "Uji dumpsys" tak lagi menandai lulus saat layanan tak ditemukan. Belum dikompilasi/diuji di device.
 

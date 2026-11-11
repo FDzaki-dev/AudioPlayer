@@ -254,9 +254,14 @@ internal object DumpsysFormat {
     fun capLines(lines: List<String>, maxLines: Int): List<String> =
         if (lines.size <= maxLines) lines else lines.take(maxLines) + "(... ${lines.size - maxLines} baris lain dipotong)"
 
-    /** Layanan menolak pembaca tanpa izin DUMP dengan pesan `Permission Denial` / `SecurityException` di awal keluaran. */
-    fun isDenied(lines: List<String>): Boolean =
-        lines.take(5).any { it.contains("Permission Denial", ignoreCase = true) || it.contains("SecurityException", ignoreCase = true) }
+    /** Layanan menolak pembaca tanpa izin DUMP dengan pesan `Permission Denial` / `SecurityException` di awal keluaran.
+     *  Batch 632 — juga `Security exception` BERSPASI (log v631: `dumpsys jobscheduler` = "Security exception: MATCH_ANY_USER
+     *  flag requires INTERACT_ACROSS_USERS ..." lolos dari deteksi lama sehingga tak diulang lewat Shizuku). */
+    fun isDenied(lines: List<String>): Boolean = lines.take(5).any {
+        it.contains("Permission Denial", ignoreCase = true) ||
+            it.contains("SecurityException", ignoreCase = true) ||
+            it.contains("Security exception", ignoreCase = true)
+    }
 
     /** Batch 631 — gagal dibaca: ditolak ([isDenied]) ATAU layanan tak terlihat uid ini (`Can't find service: meminfo`, log v629). */
     fun isFailure(lines: List<String>): Boolean =
