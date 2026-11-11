@@ -331,13 +331,13 @@ fun DiagnosticLogSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(0.42f)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        headerContent()
+                    // Batch 634 — screen recording landscape v631: tombol "Simpan Log" dan "Hapus" terpotong di bawah kolom kiri
+                    // (header ~283dp + tombol > ~305dp tersedia; kolom bisa discroll tetapi tanpa petunjuk -> terlihat hilang).
+                    // Sekarang HANYA header yang discroll; tombol (+ banner hasil) disematkan di dasar kolom kiri sehingga selalu terlihat.
+                    Column(modifier = Modifier.weight(0.42f).fillMaxHeight()) {
+                        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                            headerContent()
+                        }
                         actionsContent()
                     }
                     Box(modifier = Modifier.weight(0.58f).fillMaxHeight()) {

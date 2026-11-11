@@ -2,6 +2,8 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 634: landscape Log Diagnostik — tombol Simpan Log / Hapus disematkan di dasar kolom kiri (sebelumnya terpotong); rotasi tak mengunci ulang aplikasi terbukti di video — Batch 634 belum dikompilasi/diuji.
+> - Batch 633 (hanya docs): log v632 membuktikan dumpsys 13 dari 13 bagian berisi data dan tak ada crash baru; uji rotasi + landscape (Batch 631) masih menunggu konfirmasi.
 > - Batch 632: bagian dumpsys jobscheduler yang ditolak "Security exception" kini ikut dibaca lewat jalur cadangan Shizuku; dumpsys v631 terbukti di device (12 dari 13 bagian berisi data) — Batch 632 belum dikompilasi/diuji.
 > - Batch 631: memutar layar tak lagi mengunci ulang aplikasi; Log Diagnostik landscape memakai dua kolom selebar layar; dumpsys: izin PACKAGE_USAGE_STATS + jalur cadangan Shizuku per bagian, uji dumpsys tak lagi lulus palsu — belum dikompilasi/diuji di device.
 > - Batch 630: sheet Log Diagnostik kini FULL SCREEN di kedua tab (Log dan Izin dumpsys), tak lagi setengah layar; tombol Ekspor/Simpan/Hapus tetap di bawah — belum dikompilasi/diuji di device.
