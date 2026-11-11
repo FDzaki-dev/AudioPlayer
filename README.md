@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 638: Now Playing landscape — baris waktu dan tombol Rating tidak lagi terpotong (padding diringkas, kolom kanan lebih lebar); Batch 637 terbukti tampil dua kolom di device — Batch 638 belum dikompilasi/diuji.
 > - Batch 637: Now Playing landscape — dua kolom (piringan kiri, judul/seek/waktu/transport kanan) saat tinggi < 480dp; sebelumnya hanya piringan + transport yang terlihat — Batch 637 belum dikompilasi/diuji.
 > - Batch 636: mini player landscape — padding diringkas saat tinggi < 480dp (daftar lagu lebih lapang); Batch 635 terbukti di device (daftar ±2,5 baris) — Batch 636 belum dikompilasi/diuji.
 > - Batch 635: Perpustakaan landscape — header diringkas + "Urutkan" sejajar baris chip saat tinggi < 480dp (daftar lagu sebelumnya hanya ±1 baris) — Batch 635 belum dikompilasi/diuji.

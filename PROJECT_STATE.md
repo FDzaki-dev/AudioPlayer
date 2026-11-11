@@ -18,6 +18,8 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 638 [user: screenshot Now Playing landscape v637, tanpa teks]**: FAKTA: v637 terpasang, dua kolom tampil benar (kompilasi lolos). SISA: baris waktu di bawah waveform terpotong ±27dp, tombol "Rating" terpotong di tepi kanan. FIX (`NowPlayingScreen`, hanya `twoPane`): padding vertikal induk 20->8dp, spacer bawah ikon atas 12->0dp, `contentPadding` 4 tombol 14->8dp, bobot kolom 0,38/0,62, jarak 12dp. **NOT VERIFIED**: belum compile/CI/device untuk 638. Detail: `CHANGELOG.md`.
+
 **Catatan Batch 637 [user: screenshot Now Playing landscape, tanpa teks]**: FAKTA: judul/artis/seek bar/waktu tak terlihat dan tombol putar tergencet (piringan min 140dp + ikon atas + transport menyisakan ±100dp). FIX (`NowPlayingScreen`): `twoPane` (tinggi < 480dp, lebar >= 560dp) -> `artPane`/`infoPane` (lambda pembungkus, isi tak diubah); kiri piringan (BoxWithConstraints), kanan info + transport; potret = urutan lama. **NOT VERIFIED**: belum compile/CI/device — perubahan struktural, periksa kompilasi dulu. Detail: `CHANGELOG.md`.
 
 **Catatan Batch 636 [user: screenshot landscape tab Lagu v635 + "next"]**: FAKTA: Batch 635 TERBUKTI di device (daftar ±2,5 baris, Urutkan sejajar chip). FIX (`MiniPlayerBar`): tinggi jendela < 480dp -> padding luar 8->4dp, padding isi 10->6dp; potret/tablet tak berubah. Flag sheet `SettingsScreen` sengaja tetap `remember` (alasan Batch 544). **NOT VERIFIED**: belum compile/CI/device. Detail: `CHANGELOG.md`.
@@ -430,7 +432,15 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 637. ZIP: `SONIX_v637.zip` (direktori ZIP mode `0755`). 1 file source (`ui/NowPlayingScreen.kt`) + docs; 0 file baru; `FILE_MANIFEST.txt` tak berubah. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+- Batch terakhir: 638. ZIP: `SONIX_v638.zip` (direktori ZIP mode `0755`). 1 file source (`ui/NowPlayingScreen.kt`) + docs; 0 file baru; `FILE_MANIFEST.txt` tak berubah. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+
+  BUTIR "Now Playing landscape" -> dua kolom TERBUKTI tampil di device (screenshot v637, kompilasi lolos); baris waktu + tombol Rating terpotong -> diperbaiki di 638, NOT VERIFIED; BUTIR "mini player landscape" -> 636, NOT VERIFIED; BUTIR "Perpustakaan landscape" -> TERBUKTI; BUTIR "Log Diagnostik landscape: 3 tombol terlihat" -> 634, NOT VERIFIED; BUTIR "rotasi tak mengunci ulang" -> TERBUKTI; BUTIR "dumpsys 13/13" -> SELESAI & TERBUKTI ->
+
+  (1) USER: push v638 (Box DAILY UPDATE), kirim laporan CI v631..v638 (kriteria: build hijau; Kotlin 11 deprecated; ArchUnit 7; detekt 0 / lint 0; SpotBugs 0; `DumpsysFormatTest` 11 hijau). Uji device landscape: Now Playing (waktu terlihat, Rating utuh), Log Diagnostik (3 tombol), mini player.
+
+  (2) LANGKAH BERIKUT (hanya atas instruksi user): (a) baris "Urutkan" tab Album (`AlbumGridView`, `LibraryLists`) belum disejajarkan di landscape; (b) layar/sheet lain di landscape belum diaudit (Antrean, Statistik, Playlist, Pengaturan sheet). Butir Batch 627 tetap: uji crossfade >= 10 transisi; butir lama tak berubah: jalur WARN sampul (Batch 622), uji EQ preset + pemulihan kontrol (Batch 616/617), putaran tanpa UI (Batch 615), widget (Batch 614), widget tes 1 ❌, diag marquee aktif, bubble, banner crash, efek layar Recents `RecentsGuard` NOT VERIFIED.
+
+- Batch 637 (sebelum 638; Now Playing landscape dua kolom). Batch terakhir saat itu: 637. ZIP: `SONIX_v637.zip` (direktori ZIP mode `0755`). 1 file source (`ui/NowPlayingScreen.kt`) + docs; 0 file baru; `FILE_MANIFEST.txt` tak berubah. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
 
   BUTIR "Now Playing landscape: judul/seek bar/waktu tak terlihat" -> dua kolom di 637, NOT VERIFIED (perubahan struktural, kompilasi belum diuji); BUTIR "mini player landscape" -> padding diringkas di 636, NOT VERIFIED; BUTIR "Perpustakaan landscape" -> TERBUKTI (screenshot v635); BUTIR "Log Diagnostik landscape: 3 tombol terlihat" -> 634, NOT VERIFIED; BUTIR "rotasi tak mengunci ulang" -> TERBUKTI; BUTIR "dumpsys 13/13" -> SELESAI & TERBUKTI ->
 

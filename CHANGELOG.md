@@ -1,5 +1,11 @@
 # Changelog
 
+## Batch 638 — Now Playing landscape: baris waktu dan tombol Rating tidak terpotong (BELUM verified di device)
+- Input user: screenshot Now Playing landscape v637 (tanpa teks).
+- FAKTA screenshot: Batch 637 TERBUKTI terpasang dan tampil dua kolom (piringan kiri; judul, artis, tombol Tambah/Bagikan/Lirik, waveform, transport kanan; build v637 terpasang = kompilasi `NowPlayingScreen.kt` lolos). SISA MASALAH: (1) baris waktu (posisi / durasi) di bawah waveform TIDAK terlihat (terpotong ±27dp oleh area transport; perlu scroll); (2) tombol "Rating" terpotong di tepi kanan ("R" saja) karena baris tombol sedikit lebih lebar dari kolom kanan; (3) kolom kiri lebih lebar dari piringan (piringan ±200dp di ruang ±250dp).
+- PERBAIKAN (1 file, `ui/NowPlayingScreen.kt`, HANYA saat `twoPane`): (a) `twoPane` di-hoist ke atas fungsi (dekat `screenHeightDp`) agar bisa dipakai padding induk; (b) padding vertikal Column induk 20->8dp dan spacer di bawah ikon atas 12->0dp (hemat ±36dp tinggi, cukup untuk baris waktu); (c) `contentPadding` horizontal 4 tombol Tambah/Bagikan/Lirik/Rating 14->8dp (hemat ±48dp lebar); (d) bobot kolom 0,42/0,58 -> 0,38/0,62 dan jarak antar kolom 16->12dp (kolom kanan lebih lebar). Potret/tablet tinggi: nilai lama persis.
+- **NOT VERIFIED**: belum compile/CI/device untuk Batch 638 (v637 sudah lolos build di device). PREDIKSI: Kotlin 11 deprecated; ArchUnit 7; detekt 0 (mungkin 1 temuan `LongMethod`); lint 0; SpotBugs 0; `DumpsysFormatTest` 11 hijau. Uji device landscape: waktu (mm:ss kiri/kanan) terlihat di bawah waveform; "Rating" utuh; potret tak berubah.
+
 ## Batch 637 — Now Playing landscape: dua kolom (piringan kiri, info + transport kanan) (BELUM verified di device)
 - Input user: screenshot layar Now Playing landscape (tanpa teks) setelah Batch 636.
 - FAKTA screenshot: hanya ikon atas, piringan, dan tombol transport yang terlihat; judul, artis, tombol Tambah/Bagikan/Lirik/Rating, seek bar, dan waktu TIDAK terlihat; tombol putar/jeda tergencet (tinggi ±43dp, tampil lonjong). Akar (dibaca dari kode): piringan dikunci >= 140dp (+20dp zona gestur) + ikon atas 48dp + spacer, sisa untuk Column scrollable (judul s/d waktu) hanya ±100dp pada jendela ±360dp (tanpa menghitung inset status/navigasi), transport 68dp menekan sisanya.

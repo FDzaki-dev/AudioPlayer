@@ -297,6 +297,11 @@ fun NowPlayingScreen(
     // jadi hitungan di bawah tak bergeser selain pembulatan dp). Nama/pemakaian variabel TETAP.
     val windowSizeDp = LocalWindowInfo.current.containerDpSize
     val screenHeightDp = windowSizeDp.height
+    // Batch 637/638 — screenshot landscape: piringan dikunci >= 140dp + ikon atas + transport 68dp menyisakan ±100dp untuk
+    // judul s/d waktu. Tinggi jendela < 480dp & lebar >= 560dp (pola sama DiagnosticLogSheet/LibraryScreen/MiniPlayerBar) ->
+    // DUA KOLOM (piringan kiri, info + transport kanan). Potret/tablet tinggi: cabang lama persis. Dideklarasi di sini
+    // (bukan dekat Box piringan) supaya padding Column induk di bawah bisa ikut menyusut.
+    val twoPane = screenHeightDp < 480.dp && windowSizeDp.width >= 560.dp
     // Batch 338 — BUG FIX lanjutan (laporan user + konfirmasi: hint banner MASIH nongol, belum
     // pernah di-dismiss): sebelumnya cuma layar pendek (<640dp) yang dapet art box lebih kecil.
     // Tapi di layar NORMAL sekalipun, jumlah tinggi fixed (art 300dp + header + hint banner
@@ -455,7 +460,9 @@ fun NowPlayingScreen(
                 // "transport row kepotong di layar pendek" TETAP ada, cuma scope-nya sekarang PAS
                 // ke bagian yang benar2 butuh (bukan ikut membungkus area gesture yang architecturally
                 // tidak boleh scroll).
-                .padding(20.dp),
+                // Batch 638 — dua kolom: padding vertikal 20->8dp (hemat 24dp; screenshot v637: baris waktu di bawah waveform
+                // terpotong ±27dp). Potret/tablet tinggi: 20dp seperti semula.
+                .padding(horizontal = 20.dp, vertical = if (twoPane) 8.dp else 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
         // Batch 349 — user eksplisit (klarifikasi bertahap via tappable option, bukan tebakan):
@@ -556,7 +563,7 @@ fun NowPlayingScreen(
         // aman dipindah ke ancestor scrollable, 0 regresi ke fix Batch 334 (itu spesifik soal
         // Box gesture brightness/volume yang TETAP tidak boleh py ancestor scrollable).
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(if (twoPane) 0.dp else 12.dp))
 
         val entranceScale = remember { Animatable(0.55f) }
         val entranceAlpha = remember { Animatable(0f) }
@@ -580,11 +587,6 @@ fun NowPlayingScreen(
         // .size(68.dp) adalah child tertinggi) keduanya deterministik dari kode sendiri, 0
         // bergantung ke song/font-scale — 1 measurement loop lebih sedikit = risiko lebih rendah.
         val screenWidthDp = windowSizeDp.width
-        // Batch 637 — screenshot landscape: piringan dikunci >= 140dp + ikon atas + transport 68dp menyisakan ±100dp untuk
-        // judul s/d waktu (tak terlihat, transport tergencet). Tinggi jendela < 480dp & lebar >= 560dp (pola sama
-        // DiagnosticLogSheet/LibraryScreen) -> DUA KOLOM: piringan kiri (ukuran dari ruang nyata), info + transport kanan.
-        // Potret/tablet tinggi: cabang `else` di bawah = urutan & ukuran lama persis.
-        val twoPane = screenHeightDp < 480.dp && screenWidthDp >= 560.dp
         val fixedChromeHeight = 48.dp + 12.dp + 16.dp + 68.dp
         // Piringan persegi TIDAK BOLEH lebih lebar dari layar. 80dp = 2×40dp margin yang sudah
         // dipakai default lama (280dp piringan di layar 360dp lebar = 320dp konten setelah
@@ -977,7 +979,7 @@ fun NowPlayingScreen(
                 },
                 interactionSource = addToPlaylistInteraction,
                 modifier = Modifier.bouncyPress(addToPlaylistInteraction, pressedScale = 0.92f),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                contentPadding = PaddingValues(horizontal = if (twoPane) 8.dp else 14.dp, vertical = 6.dp)
             ) {
                 Icon(
                     Icons.Default.Add,
@@ -1010,7 +1012,7 @@ fun NowPlayingScreen(
                 },
                 interactionSource = shareInteraction,
                 modifier = Modifier.bouncyPress(shareInteraction, pressedScale = 0.92f),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                contentPadding = PaddingValues(horizontal = if (twoPane) 8.dp else 14.dp, vertical = 6.dp)
             ) {
                 Icon(
                     Icons.Default.Share,
@@ -1035,7 +1037,7 @@ fun NowPlayingScreen(
                 },
                 interactionSource = lyricsQuickInteraction,
                 modifier = Modifier.bouncyPress(lyricsQuickInteraction, pressedScale = 0.92f),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                contentPadding = PaddingValues(horizontal = if (twoPane) 8.dp else 14.dp, vertical = 6.dp)
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Article,
@@ -1074,7 +1076,7 @@ fun NowPlayingScreen(
                 },
                 interactionSource = ratingInteraction,
                 modifier = Modifier.bouncyPress(ratingInteraction, pressedScale = 0.92f),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                contentPadding = PaddingValues(horizontal = if (twoPane) 8.dp else 14.dp, vertical = 6.dp)
             ) {
                 Icon(
                     if (currentRating > 0) Icons.Default.Star else Icons.Default.StarBorder,
@@ -1270,15 +1272,15 @@ fun NowPlayingScreen(
         if (twoPane) {
             Row(
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 BoxWithConstraints(
-                    modifier = Modifier.weight(0.42f).fillMaxHeight(),
+                    modifier = Modifier.weight(0.38f).fillMaxHeight(),
                     contentAlignment = Alignment.Center
                 ) {
                     artPane((minOf(maxHeight, maxWidth) - 20.dp).coerceAtLeast(100.dp))
                 }
-                Column(modifier = Modifier.weight(0.58f).fillMaxHeight()) { infoPane() }
+                Column(modifier = Modifier.weight(0.62f).fillMaxHeight()) { infoPane() }
             }
         } else {
             artPane(dynamicArtSize)
