@@ -45,6 +45,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -89,6 +90,9 @@ fun MiniPlayerBar(
 ) {
     val song = uiState.currentSong ?: return
     val haptic = LocalHapticFeedback.current
+    // Batch 636 — layar pendek (landscape HP, tinggi jendela < 480dp; pola sama LibraryScreen/DiagnosticLogSheet): padding
+    // luar 8->4dp dan padding isi 10->6dp (hemat ±16dp tinggi untuk daftar di atasnya). Potret/tablet: nilai lama persis.
+    val compactHeight = LocalWindowInfo.current.containerDpSize.height < 480.dp
     // Must match the shape frostedGlass() now derives from MaterialTheme.shapes.large,
     // or the outer shadow/clip corners (this Box) would mismatch the inner tinted fill's
     // corners — Tactile's own rounding vs Apple's.
@@ -144,7 +148,7 @@ fun MiniPlayerBar(
                 scaleY = scale
             }
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = if (compactHeight) 4.dp else 8.dp)
             .then(
                 // Batch 49: swapped matteEmboss() for the Tactile equivalent, tactileEmboss()
                 // (directional shadow + top-down gradient + bevel border) so the bar reads as
@@ -263,7 +267,7 @@ fun MiniPlayerBar(
         Row(
             modifier = Modifier
                 .background(rowAccentBrush)
-                .padding(10.dp),
+                .padding(if (compactHeight) 6.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AlbumArt(

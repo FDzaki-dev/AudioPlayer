@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 636 — mini player landscape: padding diringkas di layar pendek (BELUM verified di device)
+- Input user: screenshot landscape tab Lagu (v635) + "next".
+- FAKTA screenshot: Batch 635 TERBUKTI di device — header "Musik Saya" tanpa label LIBRARY, chip + "Urutkan: Bawaan" satu baris, daftar lagu menampilkan ±2,5 baris (sebelumnya ±1). Sisa pemakan tinggi terbesar = mini player (kartu + padding ±80dp dari tinggi jendela ±360dp).
+- PERBAIKAN (1 file, `ui/MiniPlayerBar.kt`): HANYA saat tinggi jendela < 480dp (`LocalWindowInfo.containerDpSize`): padding luar vertikal 8->4dp, padding isi 10->6dp (hemat ±16dp). Ukuran sampul 44dp, tombol 40dp, gesture dismiss/expand, progres, tema: TIDAK disentuh. Potret/tablet: nilai lama persis.
+- DIPUTUSKAN TIDAK diubah: flag sheet `SettingsScreen` (`showSignatureMatcher`/`showBackupRestore`/`showUpdateCheck`) tetap `remember` — alasan Batch 544 masih berlaku (state hasil SAF/payload/cek jaringan ikut hilang bila sheet dibuka ulang setelah rotasi, jadi menyimpan flag-nya saja justru membingungkan). Butir ini dicoret dari kandidat.
+- **NOT VERIFIED**: belum compile/CI/device. PREDIKSI: Kotlin 11 deprecated; ArchUnit 7; detekt 0; lint 0; SpotBugs 0; `DumpsysFormatTest` 11 hijau. Uji device: landscape — mini player lebih tipis, daftar lagu bertambah ±0,3 baris; potret tak berubah; tap/swipe mini player normal.
+
 ## Batch 635 — Perpustakaan landscape: header diringkas, "Urutkan" sejajar baris chip (BELUM verified di device)
 - Input user: "lanjutkan kesitu!!" (+ "segera!!") = lanjut ke butir RESUME POINT Batch 634 (Perpustakaan landscape).
 - FAKTA video `360291.mp4` (frame ±9 dtk dan ±14 dtk): di tab Lagu landscape, header (label LIBRARY + Musik Saya) + baris chip + baris "Urutkan: Bawaan" memakan hampir seluruh tinggi (window ±360dp, mini player di bawah) sehingga daftar lagu hanya ±1 baris.

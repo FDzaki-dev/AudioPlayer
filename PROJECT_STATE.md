@@ -18,6 +18,8 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 636 [user: screenshot landscape tab Lagu v635 + "next"]**: FAKTA: Batch 635 TERBUKTI di device (daftar ±2,5 baris, Urutkan sejajar chip). FIX (`MiniPlayerBar`): tinggi jendela < 480dp -> padding luar 8->4dp, padding isi 10->6dp; potret/tablet tak berubah. Flag sheet `SettingsScreen` sengaja tetap `remember` (alasan Batch 544). **NOT VERIFIED**: belum compile/CI/device. Detail: `CHANGELOG.md`.
+
 **Catatan Batch 635 [user: "lanjutkan kesitu!!" + "segera!!"]**: lanjut butir Perpustakaan landscape dari Batch 634 (video `360291.mp4`: daftar lagu hanya ±1 baris). FIX (`LibraryScreen`, `LibrarySearch`, `LibrarySortBar`): tinggi jendela < 480dp -> header diringkas (tanpa label LIBRARY, padding kecil), jarak chip dipersempit, "Urutkan" sejajar baris chip (tab Lagu). Potret/tablet tak berubah (default parameter = lama). **NOT VERIFIED**: belum compile/CI/device. Detail: `CHANGELOG.md`.
 
 **Catatan Batch 634 [user: `360291.mp4` (landscape, 43 dtk), tanpa teks]**: FAKTA video: rotasi landscape -> potret di Pengaturan tanpa layar kunci = Batch 631 (kunci vs rotasi) TERBUKTI; Log Diagnostik landscape dua kolom selebar layar tampil sesuai rancangan. MASALAH: "Simpan Log" dan "Hapus" terpotong di kolom kiri (hanya "Ekspor Logcat Debug" terlihat). FIX (`DiagnosticLogSheet`, `twoPane`): hanya `headerContent()` discroll, tombol disematkan di dasar kolom kiri. OBSERVASI (tidak dikerjakan): Perpustakaan landscape hanya ±1 baris daftar terlihat. **NOT VERIFIED**: belum compile/CI/device. Detail: `CHANGELOG.md`.
@@ -426,7 +428,15 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 635. ZIP: `SONIX_v635.zip` (direktori ZIP mode `0755`). 3 file source (`ui/LibraryScreen.kt`, `ui/LibrarySearch.kt`, `ui/LibrarySortBar.kt`) + docs; 0 file baru; `FILE_MANIFEST.txt` tak berubah. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+- Batch terakhir: 636. ZIP: `SONIX_v636.zip` (direktori ZIP mode `0755`). 1 file source (`ui/MiniPlayerBar.kt`) + docs; 0 file baru; `FILE_MANIFEST.txt` tak berubah. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
+
+  BUTIR "Perpustakaan landscape daftar ±1 baris" -> TERBUKTI di device (screenshot v635: ±2,5 baris); BUTIR "mini player landscape" -> padding diringkas di 636, NOT VERIFIED; BUTIR "Log Diagnostik landscape: 3 tombol terlihat" -> diperbaiki di 634, NOT VERIFIED; BUTIR "rotasi tak mengunci ulang aplikasi" -> TERBUKTI (video); BUTIR "dumpsys 13/13" -> SELESAI & TERBUKTI ->
+
+  (1) USER: push v636 (Box DAILY UPDATE), kirim laporan CI v631..v636 (kriteria: build hijau; Kotlin 11 deprecated; ArchUnit 7; detekt 0 / lint 0; SpotBugs 0; `DumpsysFormatTest` 11 hijau). Uji device landscape: Log Diagnostik (3 tombol terlihat), mini player (tipis, tap/swipe normal), potret tak berubah.
+
+  (2) LANGKAH BERIKUT (hanya atas instruksi user): (a) baris "Urutkan" tab Album (`AlbumGridView`, `LibraryLists`) belum disejajarkan di landscape; (b) flag sheet `SettingsScreen` SENGAJA tetap `remember` (Batch 544) — bukan kandidat. Butir Batch 627 tetap: uji crossfade >= 10 transisi; butir lama tak berubah: jalur WARN sampul (Batch 622), uji EQ preset + pemulihan kontrol (Batch 616/617), putaran tanpa UI (Batch 615), widget (Batch 614), widget tes 1 ❌, diag marquee aktif, bubble, banner crash, efek layar Recents `RecentsGuard` NOT VERIFIED.
+
+- Batch 635 (sebelum 636; Perpustakaan landscape: header ringkas + Urutkan sejajar chip). Batch terakhir saat itu: 635. ZIP: `SONIX_v635.zip` (direktori ZIP mode `0755`). 3 file source (`ui/LibraryScreen.kt`, `ui/LibrarySearch.kt`, `ui/LibrarySortBar.kt`) + docs; 0 file baru; `FILE_MANIFEST.txt` tak berubah. **[RESUME POINT: FITUR_BARU / BUG_TARGET -> STATUS TERAKHIR -> LANGKAH SPESIFIK AKUN BERIKUTNYA]**:
 
   BUTIR "Perpustakaan landscape hanya ±1 baris daftar" -> diperbaiki di 635 (header diringkas + Urutkan sejajar chip saat tinggi < 480dp), NOT VERIFIED; BUTIR "Log Diagnostik landscape: tombol Simpan Log / Hapus terlihat" -> diperbaiki di 634, NOT VERIFIED; BUTIR "rotasi tak mengunci ulang aplikasi" -> TERBUKTI (video); BUTIR "dumpsys 13/13" -> SELESAI & TERBUKTI ->
 
