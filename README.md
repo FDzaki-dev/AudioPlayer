@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 637: Now Playing landscape — dua kolom (piringan kiri, judul/seek/waktu/transport kanan) saat tinggi < 480dp; sebelumnya hanya piringan + transport yang terlihat — Batch 637 belum dikompilasi/diuji.
 > - Batch 636: mini player landscape — padding diringkas saat tinggi < 480dp (daftar lagu lebih lapang); Batch 635 terbukti di device (daftar ±2,5 baris) — Batch 636 belum dikompilasi/diuji.
 > - Batch 635: Perpustakaan landscape — header diringkas + "Urutkan" sejajar baris chip saat tinggi < 480dp (daftar lagu sebelumnya hanya ±1 baris) — Batch 635 belum dikompilasi/diuji.
 > - Batch 634: landscape Log Diagnostik — tombol Simpan Log / Hapus disematkan di dasar kolom kiri (sebelumnya terpotong); rotasi tak mengunci ulang aplikasi terbukti di video — Batch 634 belum dikompilasi/diuji.

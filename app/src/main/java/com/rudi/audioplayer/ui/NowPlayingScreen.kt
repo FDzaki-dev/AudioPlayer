@@ -87,6 +87,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import android.content.Context
 import android.media.AudioManager
@@ -579,6 +580,11 @@ fun NowPlayingScreen(
         // .size(68.dp) adalah child tertinggi) keduanya deterministik dari kode sendiri, 0
         // bergantung ke song/font-scale — 1 measurement loop lebih sedikit = risiko lebih rendah.
         val screenWidthDp = windowSizeDp.width
+        // Batch 637 — screenshot landscape: piringan dikunci >= 140dp + ikon atas + transport 68dp menyisakan ±100dp untuk
+        // judul s/d waktu (tak terlihat, transport tergencet). Tinggi jendela < 480dp & lebar >= 560dp (pola sama
+        // DiagnosticLogSheet/LibraryScreen) -> DUA KOLOM: piringan kiri (ukuran dari ruang nyata), info + transport kanan.
+        // Potret/tablet tinggi: cabang `else` di bawah = urutan & ukuran lama persis.
+        val twoPane = screenHeightDp < 480.dp && screenWidthDp >= 560.dp
         val fixedChromeHeight = 48.dp + 12.dp + 16.dp + 68.dp
         // Piringan persegi TIDAK BOLEH lebih lebar dari layar. 80dp = 2×40dp margin yang sudah
         // dipakai default lama (280dp piringan di layar 360dp lebar = 320dp konten setelah
@@ -596,12 +602,13 @@ fun NowPlayingScreen(
             // Batch 336) supaya 0 flash ukuran aneh sebelum pengukuran nyata mendarat.
             (albumArtBoxHeight - 20.dp).coerceAtLeast(140.dp)
         }
-        val dynamicGestureBoxHeight = dynamicArtSize + 20.dp
-
+        // Batch 637 — blok piringan+zona gestur dibungkus lambda `artPane(ukuranPiringan)` TANPA memindah/mengubah isinya
+        // (tinggi kotak = ukuran + 20dp, sama dgn `dynamicGestureBoxHeight` lama); dipanggil di cabang potret / dua kolom di bawah.
+        val artPane: @Composable (Dp) -> Unit = { artSizeDp ->
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(dynamicGestureBoxHeight)
+                .height(artSizeDp + 20.dp)
         ) {
             // Left half of the whole row: swipe up/down to raise/lower screen brightness.
             // Sized to a true 50% of the available width — independent of however big the
@@ -745,12 +752,13 @@ fun NowPlayingScreen(
                 AlbumArtHero(
                     artworkUri = song?.uri,
                     accentColor = animatedAccent,
-                    artSize = dynamicArtSize,
+                    artSize = artSizeDp,
                     onSwipeNext = onNext,
                     onSwipePrevious = onPrevious
                 )
             }
         }
+        } // tutup artPane (Batch 637)
 
         // Batch 334 — badan scrollable terpisah (lihat komentar Column induk di atas): jaring
         // pengaman Batch 112 utk layar pendek dipindah SPESIFIK ke sini (judul s/d transport),
@@ -825,6 +833,9 @@ fun NowPlayingScreen(
         // sebelumnya kalau tidak ada sisa ruang. Row transport TETAP fixed footer presisi di tepi
         // bawah (Batch 343 TIDAK disentuh/dibatalkan — itu tetap benar & sudah dikonfirmasi user
         // "no more floating thing").
+        // Batch 637 — Column scrollable (judul s/d waktu) + Spacer + Row transport dibungkus lambda `infoPane` (receiver
+        // ColumnScope supaya `weight(1f)` di dalamnya tetap valid) TANPA mengubah isinya; dipanggil di cabang potret/dua kolom.
+        val infoPane: @Composable ColumnScope.() -> Unit = {
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -886,14 +897,17 @@ fun NowPlayingScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        Spacer(modifier = Modifier.height(if (showNowPlayingHint) 20.dp else 32.dp))
+        // Batch 637 — dua kolom (layar pendek): spacer atas 0 dan label "SEDANG DIPUTAR" dilewati agar judul s/d waktu muat.
+        Spacer(modifier = Modifier.height(if (twoPane) 0.dp else if (showNowPlayingHint) 20.dp else 32.dp))
 
-        Text(
-            "SEDANG DIPUTAR",
-            style = MaterialTheme.typography.labelSmall,
-            color = animatedAccent
-        )
-        Spacer(modifier = Modifier.height(6.dp))
+        if (!twoPane) {
+            Text(
+                "SEDANG DIPUTAR",
+                style = MaterialTheme.typography.labelSmall,
+                color = animatedAccent
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+        }
         // Batch 359 — REVERT arah Batch 358. Screenshot device user (Row Plus/Title/Share)
         // dilaporkan "aneh"/berantakan (judul kepanjangan bikin ikon Share nabrak/nempel teks
         // marquee, ikon Plus mepet tepi kiri) — user eksplisit minta disamakan ke entry+layout
@@ -1083,7 +1097,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(if (twoPane) 8.dp else 24.dp))
 
         // Batch 353 (Opsi A) — blok Slider+waveform+teks waktu dipindah ke composable terpisah
         // (PlaybackProgressRow, definisi di bawah fungsi ini) yang collect playbackProgress
@@ -1106,7 +1120,7 @@ fun NowPlayingScreen(
           // FIXED milik Column induk (fillMaxSize), bukan lagi child terakhir Column scrollable —
           // rasionalisasi lengkap "mengambang" ada di komentar deklarasi Column scrollable (atas).
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(if (twoPane) 4.dp else 16.dp))
 
         Row(
             // Batch 170 — sebelumnya Row ini TANPA fillMaxWidth()/horizontalArrangement sama
@@ -1250,6 +1264,25 @@ fun NowPlayingScreen(
                     tint = if (uiState.repeatMode != Player.REPEAT_MODE_OFF) animatedAccent else MaterialTheme.colorScheme.secondary
                 )
             }
+        }
+        } // tutup infoPane (Batch 637)
+
+        if (twoPane) {
+            Row(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                BoxWithConstraints(
+                    modifier = Modifier.weight(0.42f).fillMaxHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    artPane((minOf(maxHeight, maxWidth) - 20.dp).coerceAtLeast(100.dp))
+                }
+                Column(modifier = Modifier.weight(0.58f).fillMaxHeight()) { infoPane() }
+            }
+        } else {
+            artPane(dynamicArtSize)
+            infoPane()
         }
         } // tutup Column induk (fillMaxSize, Batch 343) — Row transport di atas persis child
           // TERAKHIRnya, jadi selalu presisi di tepi bawah layar, 0 spasi kosong tersisa.
