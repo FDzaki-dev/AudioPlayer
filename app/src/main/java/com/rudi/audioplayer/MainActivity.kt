@@ -191,6 +191,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.foundation.gestures.awaitFirstDown
 
@@ -208,6 +209,13 @@ private val NavKeyEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
 /** Batch 631 — kunci Bundle status kunci aplikasi yang dibawa lewat rotasi (lihat `MainActivity.onSaveInstanceState`). */
 private const val STATE_UNLOCKED = "sonix_state_unlocked"
 private const val STATE_BIOMETRIC_PROMPTED = "sonix_state_biometric_prompted"
+
+/**
+ * Batch 647 — kunci `SaveableStateProvider` yang membungkus `AppNavHost` di `setContent`: menyimpan back stack
+ * `NavController` (tab aktif Beranda/Perpustakaan/Pengaturan) + semua `rememberSaveable` di bawahnya (mis. chip
+ * tab Perpustakaan) selagi layar kunci menggantikannya.
+ */
+private const val APP_SAVEABLE_STATE_KEY = "sonix_app_saveable_state"
 
 private fun navKeyGlideSpec(from: Float, to: Float) = tween<Float>(
     durationMillis = (300f + 80f * kotlin.math.abs(to - from)).toInt().coerceIn(300, 540),
@@ -418,6 +426,13 @@ class MainActivity : FragmentActivity() {
                 val lockEnabled by playerViewModel.lockEnabled.collectAsStateWithLifecycle()
                 val biometricEnabled by playerViewModel.biometricEnabled.collectAsStateWithLifecycle()
                 val needsUnlock = lockEnabled && !isUnlocked
+                // Batch 647 — [laporan user v646: "sehabis selesai biometric, tidak bisa mengingat tab terakhir"]. AKAR:
+                // onStop -> isUnlocked=false -> `when` di bawah pindah ke LockScreen, sehingga AppNavHost KELUAR dari
+                // komposisi; tanpa SaveableStateProvider, back stack NavController + seluruh rememberSaveable di bawahnya
+                // (tab bawah, chip tab Perpustakaan) ikut dibuang, dan setelah unlock AppNavHost mulai dari
+                // startDestination "home". Holder ini (hidup selama komposisi Activity) menyimpan state itu selagi terkunci
+                // lalu memulihkannya saat AppNavHost masuk lagi. Isi layar tetap TIDAK dikomposisi saat terkunci.
+                val appStateHolder = rememberSaveableStateHolder()
 
                 LaunchedEffect(needsUnlock, biometricEnabled, hasWindowFocus) {
                     if (needsUnlock && biometricEnabled && hasWindowFocus && !biometricAutoPrompted && isBiometricAvailable()) {
@@ -571,7 +586,9 @@ class MainActivity : FragmentActivity() {
                                 onRequestBiometric = { showBiometricPrompt { isUnlocked = true } },
                                 initialLockedOutUntil = remember(needsUnlock) { playerViewModel.currentPinLockout() }
                             )
-                            hasPermission -> AppNavHost(playerViewModel, isBiometricAvailable())
+                            hasPermission -> appStateHolder.SaveableStateProvider(APP_SAVEABLE_STATE_KEY) {
+                                AppNavHost(playerViewModel, isBiometricAvailable())
+                            }
                             !permissionRequested -> WelcomeScreen(
                                 onContinue = {
                                     permissionRequested = true
