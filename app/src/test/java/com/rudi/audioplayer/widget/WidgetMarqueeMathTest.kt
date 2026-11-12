@@ -132,6 +132,26 @@ class WidgetMarqueeMathTest {
     }
 
     @Test
+    fun `lajur menganggur berhenti setelah 3 loop, yang memutar tak pernah`() {
+        val q = 5
+        val tigaLoop = WidgetMarqueeMath.IDLE_LOOPS * WidgetMarqueeMath.cycleMs(q)
+        assertEquals(3, WidgetMarqueeMath.IDLE_LOOPS)
+        assertFalse(WidgetMarqueeMath.idleFinished(q, false, tigaLoop - 1))
+        assertTrue(WidgetMarqueeMath.idleFinished(q, false, tigaLoop))
+        assertFalse(WidgetMarqueeMath.idleFinished(q, true, tigaLoop * 10))
+    }
+
+    @Test
+    fun `update penuh melanjutkan geseran hanya bila konfigurasi sama dan belum berhenti`() {
+        val q = 5
+        assertTrue(WidgetMarqueeMath.canContinue(true, true, q, 1_000L))
+        assertTrue(WidgetMarqueeMath.canContinue(true, false, q, 1_000L)) // jeda baru ditekan: judul tetap berjalan
+        assertFalse(WidgetMarqueeMath.canContinue(false, true, q, 1_000L)) // judul/layout/segmen berubah: kembali ke awal
+        assertFalse(WidgetMarqueeMath.canContinue(true, false, q, 3 * WidgetMarqueeMath.cycleMs(q))) // sudah berhenti karena menganggur
+        assertTrue(WidgetMarqueeMath.canContinue(true, true, q, 3 * WidgetMarqueeMath.cycleMs(q))) // sedang memutar: tak pernah berhenti
+    }
+
+    @Test
     fun `mengikuti jadwal jeda tak pernah melewatkan atau menggandakan kejadian`() {
         for (q in listOf(1, 2, 5, 12, WidgetMarqueeMath.MAX_SEGMENTS)) {
             var t = 0L

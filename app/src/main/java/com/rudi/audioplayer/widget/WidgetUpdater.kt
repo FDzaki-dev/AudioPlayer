@@ -457,6 +457,10 @@ object WidgetUpdater {
         val nextGlyph = if (isDark) null else tintedGlyph(context, R.drawable.ic_widget_next, GLYPH_COLOR_LIGHT)
 
         val marqueeLanes = ArrayList<WidgetMarqueeDriver.Lane>()
+        // Batch 646 — RemoteViews tiap widget ditahan sampai SEMUA lajur diketahui: keputusan "lanjutkan geseran tanpa reset" bersifat satu untuk semua
+        // (jam siklus driver dipakai bersama). Update penuh yang hanya mengganti ikon play/jeda tak lagi melompatkan judul ke awal.
+        val pendingViews = ArrayList<Pair<Int, RemoteViews>>()
+        val scrollViews = ArrayList<RemoteViews>()
         for (id in ids) {
             // Widgets can be resized independently by the user, so each one gets its own
             // layout choice — a widget shrunk down to just an icon shouldn't try to cram in
@@ -555,11 +559,9 @@ object WidgetUpdater {
                 views.setViewVisibility(R.id.widget_title_static, if (scrolling) View.GONE else View.VISIBLE)
                 views.setViewVisibility(R.id.widget_title_flipper, if (scrolling) View.VISIBLE else View.GONE)
                 if (scrolling) {
-                    // Update penuh SELALU mengembalikan geseran ke awal: margin 0 + `setDisplayedChild(0)` memulai segmen ke-0 (menghapus sisa transformasi
-                    // animasi lama yang ditahan fillAfter; host mendaur ulang view, jadi tanpa ini margin/transformasi lama bertahan).
-                    views.setViewLayoutMargin(R.id.widget_title, RemoteViews.MARGIN_LEFT, 0f, TypedValue.COMPLEX_UNIT_DIP)
-                    views.setDisplayedChild(R.id.widget_title_flipper, 0)
-                    marqueeLanes.add(WidgetMarqueeDriver.Lane(id, layoutRes, titlePlan.segments))
+                    // Batch 646 — margin 0 + `setDisplayedChild(0)` (kembali ke awal) ditambahkan SETELAH loop, hanya bila geseran tak bisa dilanjutkan.
+                    scrollViews.add(views)
+                    marqueeLanes.add(WidgetMarqueeDriver.Lane(id, layoutRes, titlePlan.segments, titlePlan.display))
                 }
             }
             views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
@@ -590,10 +592,21 @@ object WidgetUpdater {
             views.setOnClickPendingIntent(R.id.widget_album_art, openAppPending)
             if (hasTitle) views.setOnClickPendingIntent(R.id.widget_title_viewport, openAppPending)
 
-            manager.updateAppWidget(id, views)
+            pendingViews.add(id to views)
         }
+        // Batch 646 — lanjutkan geseran bila konfigurasi lajur sama & masih berjalan; selain itu update penuh mengembalikan geseran ke awal: margin 0 +
+        // `setDisplayedChild(0)` memulai segmen ke-0 (menghapus sisa transformasi animasi lama yang ditahan fillAfter; host mendaur ulang view, jadi tanpa
+        // ini margin/transformasi lama bertahan). Dulu SELALU di-reset: tiap tekan play/jeda widget melompatkan judul ke awal.
+        val continueMarquee = WidgetMarqueeDriver.canContinue(marqueeLanes)
+        if (!continueMarquee) {
+            for (v in scrollViews) {
+                v.setViewLayoutMargin(R.id.widget_title, RemoteViews.MARGIN_LEFT, 0f, TypedValue.COMPLEX_UNIT_DIP)
+                v.setDisplayedChild(R.id.widget_title_flipper, 0)
+            }
+        }
+        for ((wid, v) in pendingViews) manager.updateAppWidget(wid, v)
         // Batch 641 — SETELAH semua update penuh terkirim (partial berikutnya tak mendahului layout baru di host).
-        WidgetMarqueeDriver.configure(context, marqueeLanes, isPlaying)
+        WidgetMarqueeDriver.configure(context, marqueeLanes, isPlaying, continueMarquee)
     }
 
     /** Mirrors [com.rudi.audioplayer.ui.theme.colorsFor]'s SYSTEM branch (Compose's

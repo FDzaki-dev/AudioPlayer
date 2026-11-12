@@ -226,6 +226,7 @@ class PlaybackService : MediaLibraryService() {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 SafeGuard.guard("PlaybackService", "listener.onMediaItemTransition") {
                     pushWidgetUpdate(player)
+                    persistQueueFromService(player, "transisi")
                     // Batch 246 — Lyrics offline-first 4/4a. Tiap pindah lagu, jendela "10 lagu
                     // depan" ikut geser satu — enqueue ulang, bukan panggil sekali di onCreate
                     // saja. REPLACE policy di dalam enqueue() bikin ini aman dipanggil sesering
@@ -276,6 +277,9 @@ class PlaybackService : MediaLibraryService() {
                     // membunuh proses seketika pada swipe, log 9 Nov 17:57); jeda > tenggang = kartu kembali.
                     RecentsGuard.onPlaybackActive(this@PlaybackService, isPlaying)
                     pushWidgetUpdate(player)
+                    // Batch 646 — jeda = posisi akhir yang akurat. IDLE (mis. `stop()` dari dismiss mini player) dilewati agar antrean yang baru
+                    // dikosongkan pengguna tak dibangkitkan lagi.
+                    if (!isPlaying && player.playbackState != Player.STATE_IDLE) persistQueueFromService(player, "jeda")
                     // Batch 102 — pause/resume mid-crossfade harus ikut membekukan/melanjutkan
                     // overlapPlayer, kalau tidak lagu berikutnya tetap terdengar sendiri walau user
                     // sudah menekan jeda.
@@ -510,6 +514,47 @@ class PlaybackService : MediaLibraryService() {
         runCatching { startForegroundService(intent) }
             .onFailure { AppLogger.e("PlaybackService", "Gagal start FloatingBubbleService dari maybeStartFloatingBubble", it) }
     }
+
+    /**
+     * Batch 646 — LOG USER 13 Nov (cold start lewat widget memutar lagu lain dari yang tampil di widget): antrean + indeks + posisi terakhir HANYA
+     * disimpan [PlayerViewModel] (UI). Saat Activity sudah mati service tetap berpindah lagu sendiri (crossfade otomatis 20:28-20:46 di log), jadi
+     * [PlaybackStateStore] basi (indeks lagu dari terakhir UI hidup) sedangkan snapshot widget (`WidgetUpdater.saveState`, ditulis service) benar ->
+     * cold start memulihkan lagu LAMA. Kini service ikut menyimpan pada tiap pergantian lagu dan saat jeda. Nilai-nilainya dibaca dari player SESSION
+     * (sumber kebenaran; mediaId = song.id seperti di [loadSavedQueueItems] dan PlayerViewModel); satu mediaId non-angka / antrean kosong / indeks di luar
+     * batas = tidak menyimpan apa-apa (tak pernah menulis antrean setengah jadi). Ditulis di thread pemanggil (main) agar urutan tulis terjaga:
+     * `SharedPreferences.apply()` menaruh nilai di memori seketika dan menulis disk async (pola sama [WidgetUpdater.saveState]).
+     */
+    private fun persistQueueFromService(player: Player, alasan: String) {
+        val count = player.mediaItemCount
+        if (count <= 0) return
+        val index = player.currentMediaItemIndex
+        if (index < 0 || index >= count) return
+        val ids = ArrayList<Long>(count)
+        for (i in 0 until count) {
+            ids.add(player.getMediaItemAt(i).mediaId.toLongOrNull() ?: return)
+        }
+        val position = player.currentPosition.coerceAtLeast(0L)
+        val store = PlaybackStateStore(this)
+        // Kecepatan: pakai nilai TERSIMPAN (milik UI: PlayerViewModel.setPlaybackSpeed/connect), bukan kecepatan player saat ini — pada cold start
+        // `restoreLastQueue` memicu transisi SEBELUM `setPlaybackSpeed(saved.speed)`, jadi player masih 1,0x dan akan menimpa kecepatan simpanan.
+        val speed = store.load()?.speed ?: player.playbackParameters.speed
+        store.save(
+            songIds = ids,
+            index = index,
+            positionMs = position,
+            repeatMode = player.repeatMode,
+            shuffleEnabled = player.shuffleModeEnabled,
+            speed = speed
+        )
+        // Log hanya saat (indeks, alasan) berubah: transisi crossfade memicu beberapa jeda/lanjut beruntun.
+        val logKey = index * 2 + (if (alasan == "jeda") 1 else 0)
+        if (logKey != lastQueuePersistLogKey) {
+            lastQueuePersistLogKey = logKey
+            AppLogger.w("PlaybackService", "Antrean disimpan dari service ($alasan): indeks=$index/$count posisi=${position}ms id=${ids[index]}")
+        }
+    }
+
+    private var lastQueuePersistLogKey = -1
 
     private fun pushWidgetUpdate(player: Player) {
         val metadata = player.currentMediaItem?.mediaMetadata

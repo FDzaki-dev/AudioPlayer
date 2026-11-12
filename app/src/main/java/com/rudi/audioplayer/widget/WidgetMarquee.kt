@@ -32,6 +32,9 @@ import kotlin.math.roundToInt
  * WidgetUpdater (spasi) agar akhir loop = bingkai awal (salinan ke-2 tepat di posisi salinan ke-1). Setelah loop: diam [PAUSE_MS] (ujung animasi
  * terakhir ditahan `fillAfter`, tampilannya identik dengan awal), lalu loop berikutnya.
  *
+ * Batch 646 — update penuh yang HANYA mengganti ikon play/jeda (judul/layout/segmen sama) TIDAK lagi mengembalikan geseran ke awal: dulu tiap tekan
+ * play/jeda di widget memaksa margin 0 + restart animasi (judul melompat ke awal). Lihat [canContinue] + [WidgetMarqueeDriver.canContinue].
+ *
  * Batch 644 — v643 (segmen 30dp / 1 dtk) gerak maju tapi TERSENDAT tiap ~1 dtk (laporan user: "berkedut kedut", gejala dipilih: "Maju terus, tapi tersendat
  * tiap ±1 detik"). Dugaan (belum terbukti): tiap update parsial membuat launcher menerapkan ulang seluruh RemoteViews tersimpan -> frame jatuh sesaat, dan
  * jumlahnya sebanding dgn jumlah update. Perbaikan: segmen 90dp / 3 dtk (kecepatan SAMA 30dp/dtk) -> update 3x lebih jarang; selain itu jumlah segmen
@@ -51,6 +54,9 @@ internal object WidgetMarqueeMath {
 
     /** Batas jumlah segmen (17 x 90dp = periode 1530dp, +-190 huruf; 2 salinan < 4000dp TextView); judul lebih panjang tampil statis (ellipsize). */
     const val MAX_SEGMENTS = 17
+
+    /** Saat lagu TIDAK diputar tiap lajur hanya digeser sebanyak ini loop lalu berhenti pada akhir loop. */
+    const val IDLE_LOOPS = 3
 
     /** Teks yang lebihnya di bawah ini dari kolom dianggap muat (tidak digeser). */
     const val MIN_OVERFLOW_DP = 2f
@@ -85,6 +91,18 @@ internal object WidgetMarqueeMath {
 
     fun cycleMs(segments: Int): Long = loopMs(segments) + PAUSE_MS
 
+    /** True bila lajur yang TIDAK memutar sudah menyelesaikan [IDLE_LOOPS] loop (penggulir berhenti di akhir loop = bingkai awal). */
+    fun idleFinished(segments: Int, playing: Boolean, elapsedMs: Long): Boolean =
+        !playing && elapsedMs >= IDLE_LOOPS * cycleMs(segments)
+
+    /**
+     * Batch 646 — apakah update penuh widget boleh MELANJUTKAN geseran yang sedang berjalan (tanpa margin 0 + restart animasi). Syarat: konfigurasi lajur
+     * identik ([sameConfig]: layout, jumlah segmen, teks tampilan) dan lajur belum berhenti karena menganggur. Mis. tekan play/jeda di widget hanya
+     * mengganti ikon — judul tak perlu kembali ke awal.
+     */
+    fun canContinue(sameConfig: Boolean, playing: Boolean, segments: Int, elapsedMs: Long): Boolean =
+        sameConfig && !idleFinished(segments, playing, elapsedMs)
+
     /** Margin kiri (dp, <= 0) untuk awal segmen ke-[segment]. */
     fun marginDp(segment: Int): Float = -segment * SEGMENT_DP
 
@@ -117,15 +135,17 @@ internal object WidgetMarqueeMath {
  * kolomnya. Hanya 1 update parsial per SEGMEN (v644: 3 dtk; v643: 1 dtk; v642: 30/dtk) per widget; gerak halusnya digambar launcher. Berhenti sendiri bila layar mati
  * (ACTION_SCREEN_OFF), tak ada lajur, atau 3 kegagalan beruntun. Saat lagu TIDAK diputar tiap lajur hanya [IDLE_LOOPS] loop lalu berhenti pada akhir loop
  * (tampilan akhir = awal, tak perlu reset); layar menyala = siklus baru. Update penuh ([WidgetUpdater.performUpdate]) menata ulang margin = 0 + memulai
- * segmen ke-0 lalu memanggil [configure].
+ * segmen ke-0 lalu memanggil [configure] — KECUALI [canContinue] (Batch 646: judul/layout/segmen sama, mis. hanya ikon play/jeda berubah): geseran dilanjutkan.
  */
 internal object WidgetMarqueeDriver {
     private const val TAG = "WidgetMarquee"
-    private const val IDLE_LOOPS = 3
     private const val MAX_CONSECUTIVE_FAILURES = 3
 
-    /** Satu widget yang judulnya digeser; [layoutRes] WAJIB sama dengan layout update penuh terakhir (host mendaur ulang view per layout id). */
-    internal class Lane(val widgetId: Int, val layoutRes: Int, val segments: Int)
+    /**
+     * Satu widget yang judulnya digeser; [layoutRes] WAJIB sama dengan layout update penuh terakhir (host mendaur ulang view per layout id).
+     * [display] = teks dua salinan yang dipasang di `widget_title` (dipakai [canContinue] untuk mengenali judul yang sama).
+     */
+    internal class Lane(val widgetId: Int, val layoutRes: Int, val segments: Int, val display: String)
 
     private class Snapshot(val lanes: List<Lane>, val playing: Boolean, val startedAtMs: Long)
 
@@ -140,14 +160,48 @@ internal object WidgetMarqueeDriver {
 
     private val tick = Runnable { runTick() }
 
-    /** Dipanggil di akhir update penuh (di dalam updateLock). [lanes] kosong = hentikan. */
+    /**
+     * Batch 646 — dipanggil SEBELUM update penuh dikirim: true bila SEMUA [lanes] sama persis dengan yang sedang berjalan (widget, layout, segmen, teks)
+     * dan belum ada yang berhenti karena menganggur -> update penuh TIDAK perlu (dan tak boleh) mengembalikan geseran ke awal; lihat
+     * [WidgetMarqueeMath.canContinue]. Satu lajur berubah = semua lajur memulai siklus baru (jam bersama), jadi hasilnya satu keputusan untuk semua.
+     */
     @Synchronized
-    fun configure(context: Context, lanes: List<Lane>, playing: Boolean) {
+    fun canContinue(lanes: List<Lane>): Boolean {
+        val snap = snapshot ?: return false
+        if (lanes.isEmpty() || snap.lanes.size != lanes.size) return false
+        val elapsed = SystemClock.uptimeMillis() - snap.startedAtMs
+        for (lane in lanes) {
+            val old = snap.lanes.firstOrNull { it.widgetId == lane.widgetId } ?: return false
+            val same = old.layoutRes == lane.layoutRes && old.segments == lane.segments && old.display == lane.display
+            if (!WidgetMarqueeMath.canContinue(same, snap.playing, old.segments, elapsed)) return false
+        }
+        return true
+    }
+
+    /**
+     * Dipanggil di akhir update penuh (di dalam updateLock). [lanes] kosong = hentikan. [continued] = keputusan [canContinue] yang DIPAKAI saat menyusun
+     * update penuh tadi (true = update penuh tidak mengembalikan geseran ke awal, jadi jam siklus dipertahankan; hanya status `playing` diperbarui).
+     */
+    @Synchronized
+    fun configure(context: Context, lanes: List<Lane>, playing: Boolean, continued: Boolean = false) {
         if (lanes.isEmpty()) {
             stop()
             return
         }
         ensureStarted(context)
+        val prev = snapshot
+        if (continued && prev != null) {
+            snapshot = Snapshot(lanes, playing, prev.startedAtMs)
+            AppLogger.w(TAG, "Geseran judul DILANJUTKAN tanpa reset (judul/layout/segmen sama): ${lanes.size} widget, playing=$playing")
+            val handlerNow = handler ?: return
+            // Satu tick yang sedang berjalan membandingkan `snapshot === snap` sebelum menjadwal ulang; snapshot diganti, jadi jadwalkan ulang tick (kunci
+            // kejadian tak berubah -> tak ada kiriman ganda; hanya jadwal berikutnya dihitung ulang).
+            handlerNow.post {
+                handlerNow.removeCallbacks(tick)
+                if (screenOn) handlerNow.post(tick)
+            }
+            return
+        }
         snapshot = Snapshot(lanes, playing, SystemClock.uptimeMillis())
         AppLogger.w(
             TAG,
@@ -226,7 +280,7 @@ internal object WidgetMarqueeDriver {
             val manager = AppWidgetManager.getInstance(context)
             val elapsed = SystemClock.uptimeMillis() - snap.startedAtMs
             for (lane in snap.lanes) {
-                val finished = !snap.playing && elapsed >= IDLE_LOOPS * WidgetMarqueeMath.cycleMs(lane.segments)
+                val finished = WidgetMarqueeMath.idleFinished(lane.segments, snap.playing, elapsed)
                 if (finished) continue
                 val key = WidgetMarqueeMath.eventKey(lane.segments, elapsed)
                 if (key >= 0L && lastKey[lane.widgetId] != key) {

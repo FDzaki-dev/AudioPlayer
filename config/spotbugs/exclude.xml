@@ -28,6 +28,9 @@
   Rule lain TETAP tampil (27 sisa, ditinjau per batch): konkurensi AT_* (12), RV_RETURN_VALUE_IGNORED_BAD_PRACTICE (6,
   `File.delete()/mkdirs()` pembersihan), STCAL_* (4, SimpleDateFormat bersama di AppLogger/BackupManager), DLS, IP, REC,
   SA_FIELD_SELF_COMPUTATION, UC.
+  Batch 646 — dasar: laporan CI run #72 (5 temuan, semuanya `WidgetMarquee.kt`): ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD x3 + SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA x2
+  di `object WidgetMarqueeDriver` = pola Kotlin `object` yang SAMA dengan AppLogger/PlaybackAudioSession (var -> field static; `@Synchronized` mengunci
+  singleton tunggal itu sendiri); kelas ditambahkan ke filter yang sudah ada, rule konkurensi lain di kelas itu tetap tampil.
   Kelas hasil generate (ComposableSingletons, Room _Impl, R, BuildConfig) juga dikecualikan.
   Batch 613 — dasar: laporan CI run #41 (23 temuan) + pembacaan kode di tiap titik. DIPERBAIKI di kode (bukan disaring):
   AT_* di PlayerViewModel/CrossfadeEngine (atomik/volatile) dan UC_USELESS_CONDITION di CrossfadeEngine. DISARING (terbukti
@@ -84,7 +87,7 @@
   </Match>
   <Match>
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD,SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA"/>
-    <Class name="~com\.rudi\.audioplayer\.(util\.AppLogger|playback\.PlaybackAudioSession)"/>
+    <Class name="~com\.rudi\.audioplayer\.(util\.AppLogger|playback\.PlaybackAudioSession|widget\.WidgetMarqueeDriver)"/>
   </Match>
   <!-- Batch 613 — artefak sintetis / pembersihan best-effort terkonfirmasi (alasan di komentar header) -->
   <Match>
