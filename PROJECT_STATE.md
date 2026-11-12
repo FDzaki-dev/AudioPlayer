@@ -18,6 +18,10 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Justifikasi >5 file (Batch 643):** gerak marquee dipindah ke animasi view yang digambar launcher: SATU kontrak struktur judul bersama ke-5 layout widget (slim/compact/penuh/tinggi/strip) — `widget_title_viewport` berisi `widget_title_static` + `ViewFlipper widget_title_flipper` (inAnimation `@anim/widget_title_segment`) + `widget_title` 4000dp — karena `WidgetMarqueeDriver` mengirim partial update ke id yang sama pada layout id yang sama; 8 file (WidgetMarquee.kt, WidgetUpdater.kt, 5 layout, 1 anim baru) + 1 uji ditulis ulang.
+
+**Catatan Batch 643 [user: `sonix_debug_20261112_134955.txt` + "60hz saat standby. 120hz saat ponsel digunakan" + "segera!!"; sebelumnya "gak ada cara lebih organik napa?!!"]**: Interpretasi = v642 (30 fps per-frame dari app) masih patah di layar 120 Hz; pindahkan gerak ke animasi yang digambar launcher. SOLUSI: animasi segmen 30dp/1000 ms linear (`res/anim/widget_title_segment.xml`, 0,75% x lebar 4000dp) pada `ViewFlipper` tanpa autoStart; driver kirim 1 update parsial per detik (margin -k x 30dp + `setDisplayedChild(0)` = ulang animasi); periode teks dibulatkan ke kelipatan 30dp lewat spasi (`WidgetUpdater.planTitle`); judul yang muat/terlalu panjang -> `widget_title_static` (ellipsize); klik dipindah ke `widget_title_viewport`. v642 tetap tersedia sebagai fallback. Detail + batas jujur: `CHANGELOG.md`. **NOT VERIFIED**: belum compile/CI/device.
+
 **Catatan Batch 642 [user: `sonix_debug_20261112_104858.txt` + "udah kaku, tidak mulus looping nya lagi"]**: Interpretasi = marquee v641 sudah bergerak (log: `Penggulir judul aktif` x2, 0 galat); perbaiki KUALITAS gerak. AKAR: tick 100 ms (langkah ±3dp) + lompat mendadak ke awal + berhenti mendadak. SOLUSI: loop mulus lewat dua salinan teks (`judul + spasi + judul`, geser satu periode = lebar PERSIS `judul + spasi`), gerak trapesium (ramp 500 ms), tick 33 ms dengan jadwal terhadap awal tick; judul sangat panjang -> mode terbatas lama; `contentDescription` judul = judul asli. 3 file source (`WidgetMarquee.kt`, `WidgetUpdater.kt`, `WidgetMarqueeMathTest.kt`); layout tak berubah. Detail + batas jujur: `CHANGELOG.md`. **NOT VERIFIED**: belum compile/CI/device.
 
 **Justifikasi >5 file (Batch 641):** marquee judul widget memakai SATU kontrak layout bersama: `widget_title_viewport` (FrameLayout pemotong) + `widget_title` selebar tetap 4000dp WAJIB ada di ke-5 layout widget (slim/compact/penuh/tinggi/strip) karena `WidgetMarqueeDriver` mengirim partial update margin kiri ke id `widget_title` pada layout id yang sama; 7 file (1 baru + WidgetUpdater + 5 layout) + 1 uji baru.
@@ -442,7 +446,15 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 642. ZIP: `SONIX_v642.zip` (direktori ZIP mode `0755`). 3 file source (`widget/WidgetMarquee.kt`, `widget/WidgetUpdater.kt`, `src/test/.../widget/WidgetMarqueeMathTest.kt`) + docs; 0 file baru (`FILE_MANIFEST.txt` tetap 245). **[RESUME POINT: marquee widget loop mulus + 30 fps -> NOT VERIFIED (belum compile/CI/device) -> USER push v642 + uji kemulusan]**:
+- Batch terakhir: 643. ZIP: `SONIX_v643.zip` (direktori ZIP mode `0755`). 8 file (`widget/WidgetMarquee.kt`, `widget/WidgetUpdater.kt`, 5 layout `widget_player*.xml`, `res/anim/widget_title_segment.xml` BARU) + 1 uji ditulis ulang (`WidgetMarqueeMathTest.kt`) + docs; `FILE_MANIFEST.txt` 245 -> 246. **[RESUME POINT: marquee widget digambar launcher (animasi segmen 30dp + 1 update/dtk) -> NOT VERIFIED (belum compile/CI/device) -> USER push v643 + uji kemulusan di 120 Hz]**:
+
+  BUTIR "marquee judul widget bergerak" -> TERBUKTI di device (v641/v642); BUTIR "kemulusan di 120 Hz" -> 643, NOT VERIFIED.
+
+  (1) USER: push v643 (Box DAILY UPDATE), kirim laporan CI (kriteria: build hijau; Kotlin 11 deprecated; ArchUnit 7; detekt 0 / lint 0; SpotBugs 0; `WidgetMarqueeMathTest` 12 + `WidgetStripSizingTest` 4 + `DumpsysFormatTest` 11 hijau). Uji device: judul panjang di widget slim/penuh: diam ±1,5 dtk lalu bergeser halus (mengikuti 120 Hz) sampai salinan ke-2 mendarat di posisi awal, diam, ulang; judul pendek tampil statis (ellipsize). Kirim log: WARN `WidgetMarquee Penggulir judul (segmen launcher) aktif`, ERROR `Gagal menggeser judul widget`. BILA judul TAK bergerak / berkedut: host mungkin tak mengulang animasi lewat `setDisplayedChild` parsial -> kembali ke `SONIX_v642.zip` (per-frame) dan evaluasi alternatif (hanya atas instruksi).
+
+  (2) LANGKAH BERIKUT (hanya atas instruksi user): widget lebar 150-229dp dengan tinggi >= 160dp masih slim/compact horizontal; butir (2) entri 639 tetap berlaku.
+
+- Batch 642 (sebelum 643; loop mulus per-frame 30 fps). Batch terakhir saat itu: 642. ZIP: `SONIX_v642.zip` (direktori ZIP mode `0755`). 3 file source (`widget/WidgetMarquee.kt`, `widget/WidgetUpdater.kt`, `src/test/.../widget/WidgetMarqueeMathTest.kt`) + docs; 0 file baru (`FILE_MANIFEST.txt` tetap 245). **[RESUME POINT: marquee widget loop mulus + 30 fps -> NOT VERIFIED (belum compile/CI/device) -> USER push v642 + uji kemulusan]**:
 
   BUTIR "marquee judul widget bergerak" -> TERBUKTI di device (log v641 + keterangan user); BUTIR "kemulusan/loop" -> 642, NOT VERIFIED.
 

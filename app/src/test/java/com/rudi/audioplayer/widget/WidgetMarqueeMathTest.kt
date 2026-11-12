@@ -9,34 +9,18 @@ class WidgetMarqueeMathTest {
 
     @Test
     fun `teks muat di kolom tidak digeser`() {
-        assertEquals(0f, WidgetMarqueeMath.plan(100f, 140f, 120f).travelDp, 0.001f)
-        assertEquals(0f, WidgetMarqueeMath.plan(121f, 160f, 120f).travelDp, 0.001f) // lebih < MIN_OVERFLOW_DP
+        assertFalse(WidgetMarqueeMath.shouldScroll(100f, 120f))
+        assertFalse(WidgetMarqueeMath.shouldScroll(121f, 120f)) // lebih < MIN_OVERFLOW_DP
     }
 
     @Test
     fun `kolom terlalu sempit tidak digeser`() {
-        assertEquals(0f, WidgetMarqueeMath.plan(441f, 480f, 10f).travelDp, 0.001f)
+        assertFalse(WidgetMarqueeMath.shouldScroll(441f, 10f))
     }
 
     @Test
-    fun `judul biasa memakai loop mulus dengan jarak geser = periode`() {
-        val p = WidgetMarqueeMath.plan(441f, 480f, 150f)
-        assertTrue(p.loop)
-        assertEquals(480f, p.travelDp, 0.001f)
-    }
-
-    @Test
-    fun `judul sangat panjang jatuh ke mode terbatas sampai ujung teks`() {
-        val p = WidgetMarqueeMath.plan(2500f, 2540f, 100f) // 2 salinan (5040) > 3900
-        assertFalse(p.loop)
-        assertEquals(2500f - 100f + WidgetMarqueeMath.END_SLACK_DP, p.travelDp, 0.001f)
-    }
-
-    @Test
-    fun `mode terbatas dibatasi lebar maksimum TextView`() {
-        val p = WidgetMarqueeMath.plan(9000f, 9040f, 100f)
-        assertFalse(p.loop)
-        assertEquals(WidgetMarqueeMath.MAX_TEXT_DP - 100f + WidgetMarqueeMath.END_SLACK_DP, p.travelDp, 0.001f)
+    fun `teks melebihi kolom digeser`() {
+        assertTrue(WidgetMarqueeMath.shouldScroll(441f, 150f))
     }
 
     @Test
@@ -46,77 +30,83 @@ class WidgetMarqueeMathTest {
     }
 
     @Test
-    fun `loop - diam di awal, trapesium, tiba tepat di periode lalu mulai lagi dari nol`() {
-        val travel = 300f
-        val total = WidgetMarqueeMath.scrollMs(travel) // 10000 + 500
-        assertEquals(10_500L, total)
-        assertEquals(WidgetMarqueeMath.START_PAUSE_MS + total, WidgetMarqueeMath.cycleMs(travel, true)) // loop: tanpa diam di ujung
-        assertEquals(0f, WidgetMarqueeMath.offsetDp(travel, true, 0L), 0.001f)
-        assertEquals(0f, WidgetMarqueeMath.offsetDp(travel, true, WidgetMarqueeMath.START_PAUSE_MS), 0.001f)
-        // ujung siklus mendekati travel (= bingkai awal pada loop)
-        assertEquals(travel, WidgetMarqueeMath.offsetDp(travel, true, WidgetMarqueeMath.cycleMs(travel, true) - 1), 0.1f)
-        // siklus berikutnya mulai dari 0
-        assertEquals(0f, WidgetMarqueeMath.offsetDp(travel, true, WidgetMarqueeMath.cycleMs(travel, true)), 0.001f)
+    fun `jumlah segmen = periode dibulatkan ke atas ke kelipatan 30dp`() {
+        assertEquals(1, WidgetMarqueeMath.segmentsFor(1f))
+        assertEquals(1, WidgetMarqueeMath.segmentsFor(30f))
+        assertEquals(2, WidgetMarqueeMath.segmentsFor(30.1f))
+        assertEquals(15, WidgetMarqueeMath.segmentsFor(444f)) // 444 -> 450dp
+        assertEquals(450f, WidgetMarqueeMath.targetPeriodDp(15), 0.001f)
     }
 
     @Test
-    fun `kecepatan tengah = kecepatan tetap dan ramp mulai pelan`() {
-        val travel = 300f
-        val base = WidgetMarqueeMath.START_PAUSE_MS
-        // di tengah (jauh dari ramp): selisih 1 dtk = 30dp
-        val mid = base + 5_000L
-        val d = WidgetMarqueeMath.offsetDp(travel, true, mid + 1000L) - WidgetMarqueeMath.offsetDp(travel, true, mid)
-        assertEquals(30f, d, 0.05f)
-        // 100 ms pertama jauh lebih pendek dari kecepatan penuh (3dp)
-        assertTrue(WidgetMarqueeMath.offsetDp(travel, true, base + 100L) < 0.5f)
-        // 100 ms terakhir juga pelan (perlambatan)
-        val end = base + WidgetMarqueeMath.scrollMs(travel)
-        assertTrue(travel - WidgetMarqueeMath.offsetDp(travel, true, end - 100L) < 0.5f)
+    fun `konstanta sejalan dengan animasi XML 30dp per 1000 ms = 30dp per detik`() {
+        assertEquals(WidgetMarqueeMath.SPEED_DP_PER_SEC, WidgetMarqueeMath.SEGMENT_DP / (WidgetMarqueeMath.SEGMENT_MS / 1000f), 0.001f)
     }
 
     @Test
-    fun `mode terbatas - diam di ujung selama jeda akhir lalu mengulang`() {
-        val travel = 300f
-        val scrollEnd = WidgetMarqueeMath.START_PAUSE_MS + WidgetMarqueeMath.scrollMs(travel)
-        assertEquals(travel, WidgetMarqueeMath.offsetDp(travel, false, scrollEnd), 0.01f)
-        assertEquals(travel, WidgetMarqueeMath.offsetDp(travel, false, WidgetMarqueeMath.cycleMs(travel, false) - 1), 0.01f)
-        assertEquals(0f, WidgetMarqueeMath.offsetDp(travel, false, WidgetMarqueeMath.cycleMs(travel, false)), 0.001f)
-        assertEquals(WidgetMarqueeMath.START_PAUSE_MS + WidgetMarqueeMath.scrollMs(travel) + WidgetMarqueeMath.END_PAUSE_MS, WidgetMarqueeMath.cycleMs(travel, false))
+    fun `siklus = loop segmen + diam`() {
+        assertEquals(15_000L, WidgetMarqueeMath.loopMs(15))
+        assertEquals(15_000L + WidgetMarqueeMath.PAUSE_MS, WidgetMarqueeMath.cycleMs(15))
     }
 
     @Test
-    fun `tanpa jarak geser selalu nol`() {
-        assertEquals(0f, WidgetMarqueeMath.offsetDp(0f, true, 5_000L), 0.001f)
-        assertEquals(Long.MAX_VALUE, WidgetMarqueeMath.delayToNextMs(0f, true, 5_000L, 33L))
+    fun `margin awal segmen kelipatan -30dp`() {
+        assertEquals(0f, WidgetMarqueeMath.marginDp(0), 0.001f)
+        assertEquals(-30f, WidgetMarqueeMath.marginDp(1), 0.001f)
+        assertEquals(-420f, WidgetMarqueeMath.marginDp(14), 0.001f)
     }
 
     @Test
-    fun `jeda kiriman berikutnya - diam menunggu sisa, geser memakai tick`() {
-        val travel = 300f
-        assertEquals(WidgetMarqueeMath.START_PAUSE_MS, WidgetMarqueeMath.delayToNextMs(travel, true, 0L, 33L))
-        assertEquals(33L, WidgetMarqueeMath.delayToNextMs(travel, true, WidgetMarqueeMath.START_PAUSE_MS + 500L, 33L))
-        val scrollEnd = WidgetMarqueeMath.START_PAUSE_MS + WidgetMarqueeMath.scrollMs(travel)
-        assertEquals(WidgetMarqueeMath.END_PAUSE_MS, WidgetMarqueeMath.delayToNextMs(travel, false, scrollEnd, 33L))
+    fun `kunci kejadian naik 1 per segmen, -1 saat diam, lalu loop berikutnya lanjut`() {
+        val q = 3
+        assertEquals(0L, WidgetMarqueeMath.eventKey(q, 0L))
+        assertEquals(0L, WidgetMarqueeMath.eventKey(q, 999L))
+        assertEquals(1L, WidgetMarqueeMath.eventKey(q, 1000L))
+        assertEquals(2L, WidgetMarqueeMath.eventKey(q, 2999L))
+        assertEquals(-1L, WidgetMarqueeMath.eventKey(q, 3000L)) // mulai diam
+        assertEquals(-1L, WidgetMarqueeMath.eventKey(q, 3000L + WidgetMarqueeMath.PAUSE_MS - 1))
+        assertEquals(3L, WidgetMarqueeMath.eventKey(q, WidgetMarqueeMath.cycleMs(q))) // loop ke-2 segmen 0
+        assertEquals(0, WidgetMarqueeMath.segmentOfKey(q, 3L))
+        assertEquals(2, WidgetMarqueeMath.segmentOfKey(q, 5L))
     }
 
     @Test
-    fun `offset tak pernah negatif, tak melebihi jarak, tak pernah mundur dalam satu fase geser`() {
-        for (loop in listOf(true, false)) {
-            for (travel in listOf(20f, 60f, 300f, 1200f)) {
-                var t = 0L
-                var prev = 0f
-                val cycle = WidgetMarqueeMath.cycleMs(travel, loop)
-                while (t < 3 * cycle) {
-                    val o = WidgetMarqueeMath.offsetDp(travel, loop, t)
-                    assertTrue("loop=$loop travel=$travel t=$t o=$o", o >= 0f && o <= travel + 0.001f)
-                    if (t % cycle != 0L && t / cycle == (t - 7L) / cycle) {
-                        assertTrue("mundur loop=$loop travel=$travel t=$t", o >= prev - 0.001f)
-                    }
-                    assertTrue(WidgetMarqueeMath.delayToNextMs(travel, loop, t, 33L) >= 1L)
-                    prev = o
-                    t += 7L
+    fun `satu segmen per loop tetap menghasilkan kunci berbeda tiap loop`() {
+        val q = 1
+        assertEquals(0L, WidgetMarqueeMath.eventKey(q, 0L))
+        assertEquals(-1L, WidgetMarqueeMath.eventKey(q, 1000L))
+        assertEquals(1L, WidgetMarqueeMath.eventKey(q, WidgetMarqueeMath.cycleMs(q)))
+    }
+
+    @Test
+    fun `jeda kiriman berikutnya - batas segmen, lalu awal loop berikutnya`() {
+        val q = 3
+        assertEquals(1000L, WidgetMarqueeMath.delayToNextMs(q, 0L))
+        assertEquals(1L, WidgetMarqueeMath.delayToNextMs(q, 999L))
+        assertEquals(1000L, WidgetMarqueeMath.delayToNextMs(q, 1000L))
+        // setelah segmen terakhir dikirim (t = 2000..): kejadian berikut = awal loop berikutnya
+        assertEquals(WidgetMarqueeMath.cycleMs(q) - 2000L, WidgetMarqueeMath.delayToNextMs(q, 2000L))
+        assertEquals(WidgetMarqueeMath.cycleMs(q) - 3500L, WidgetMarqueeMath.delayToNextMs(q, 3500L))
+        assertEquals(WidgetMarqueeMath.cycleMs(1), WidgetMarqueeMath.delayToNextMs(1, 0L)) // 1 segmen: kejadian berikut = loop berikutnya
+    }
+
+    @Test
+    fun `mengikuti jadwal jeda tak pernah melewatkan atau menggandakan kejadian`() {
+        for (q in listOf(1, 2, 5, 15, 50)) {
+            var t = 0L
+            var lastKey = -1L
+            var sent = 0
+            val horizon = 4 * WidgetMarqueeMath.cycleMs(q)
+            while (t < horizon) {
+                val key = WidgetMarqueeMath.eventKey(q, t)
+                if (key >= 0 && key != lastKey) {
+                    assertTrue("q=$q t=$t key=$key last=$lastKey", key == lastKey + 1)
+                    lastKey = key
+                    sent++
                 }
+                t += WidgetMarqueeMath.delayToNextMs(q, t)
             }
+            assertEquals("q=$q", 4 * q, sent)
         }
     }
 }

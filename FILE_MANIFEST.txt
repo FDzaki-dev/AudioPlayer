@@ -115,6 +115,7 @@
 # Batch 639: app/src/main/res/layout/widget_player_strip.xml (file baru, layout widget strip sempit-tinggi: sampul + prev/play/next bertumpuk) ditambahkan — 240->241.
 # Batch 640: app/src/main/java/com/rudi/audioplayer/widget/WidgetStripSizing.kt dan app/src/test/java/com/rudi/audioplayer/widget/WidgetStripSizingTest.kt (file baru, ukuran strip proporsional + tesnya) ditambahkan — 241->243.
 # Batch 641: app/src/main/java/com/rudi/audioplayer/widget/WidgetMarquee.kt dan app/src/test/java/com/rudi/audioplayer/widget/WidgetMarqueeMathTest.kt (file baru, marquee judul widget digerakkan app + tesnya) ditambahkan — 243->245.
+# Batch 643: app/src/main/res/anim/widget_title_segment.xml (file baru, animasi segmen geser judul widget yang digambar launcher) ditambahkan — 245->246.
 # Total: 234 file
 
 .githooks/pre-commit
@@ -272,6 +273,7 @@ app/src/main/java/com/rudi/audioplayer/widget/WidgetMarquee.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetUpdater.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetStripSizing.kt
 app/src/main/java/com/rudi/audioplayer/worker/LyricsPrefetchWorker.kt
+app/src/main/res/anim/widget_title_segment.xml
 app/src/main/res/drawable/ic_bubble_minimize.xml
 app/src/main/res/drawable/ic_bubble_tile.xml
 app/src/main/res/drawable/ic_notification_play_pause.xml

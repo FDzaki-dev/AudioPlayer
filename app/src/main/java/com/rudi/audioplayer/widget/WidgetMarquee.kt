@@ -13,128 +13,110 @@ import android.util.TypedValue
 import android.widget.RemoteViews
 import com.rudi.audioplayer.R
 import com.rudi.audioplayer.util.AppLogger
+import kotlin.math.ceil
+import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Batch 641/642 — MATEMATIKA marquee judul widget (fungsi murni tanpa Android, bisa diuji unit).
+ * Batch 643 — MATEMATIKA marquee judul widget (fungsi murni tanpa Android, bisa diuji unit).
  *
- * Latar: marquee bawaan TextView TIDAK bisa dijalankan dari widget — `TextView.setSelected` tidak remotable (log v639: remotable=false)
- * dan marquee berbasis fokus XML tak andal di launcher (Smart Launcher). Maka app menggeser judul SENDIRI: judul = TextView lebar tetap
- * (4000dp, XML) di dalam viewport FrameLayout yang memotong; app mengirim `partiallyUpdateAppWidget` berisi margin kiri NEGATIF.
+ * Riwayat: marquee bawaan TextView tak bisa jalan di widget (`setSelected` tidak remotable, log v639: remotable=false; fokus XML tak andal di
+ * Smart Launcher). v641 = app mengirim margin per 100 ms (patah-patah). v642 = 30 fps + loop mulus (masih patah di layar 120 Hz: user "gak ada
+ * cara lebih organik?" + refresh 60 Hz diam / 120 Hz dipakai).
  *
- * Batch 642 (user: "udah kaku, tidak mulus looping nya lagi"; log v641 = 10 fps langkah ~3dp + lompat mendadak ke awal):
- * (1) LOOP MULUS seperti marquee asli: teks dipasang DUA SALINAN `judul + jarak + judul`; menggeser sejauh satu PERIODE
- *     (= lebar `judul + jarak`) menaruh salinan ke-2 tepat di posisi salinan ke-1 -> bingkai akhir = bingkai awal, lompat ke 0 tak terlihat.
- *     Bila dua salinan tak muat di lebar TextView (judul sangat panjang) -> mode TERBATAS lama (geser ke ujung, diam, lompat ke awal).
- * (2) Gerak trapesium: percepatan [RAMP_MS] -> kecepatan tetap [SPEED_DP_PER_SEC] -> perlambatan [RAMP_MS] (berhenti halus, bukan stop mendadak).
- * Siklus: diam [START_PAUSE_MS] -> geser -> (mode terbatas: diam [END_PAUSE_MS]) -> ulang.
+ * Batch 643 — GERAK DIGAMBAR LAUNCHER: judul = TextView 4000dp (`widget_title`) berisi DUA salinan `judul + spasi + judul` di dalam ViewFlipper
+ * (`widget_title_flipper`, tanpa autoStart) dengan animasi masuk `@anim/widget_title_segment` = geser 30dp / 1000 ms linear (mengikuti refresh rate layar).
+ * Satu SEGMEN = 1 detik = 30dp. Tiap awal segmen app mengirim 1 update parsial: margin kiri = -k x 30dp + `setDisplayedChild(0)` (mengulang animasi dari 0
+ * pada frame yang sama dengan pergeseran margin -> posisi kontinu). Satu LOOP = [q] segmen, q = periode / 30dp; periode (lebar `judul + spasi`) dibulatkan ke
+ * kelipatan 30dp oleh WidgetUpdater (spasi) agar akhir loop = bingkai awal (salinan ke-2 tepat di posisi salinan ke-1). Setelah loop: diam [PAUSE_MS]
+ * (ujung animasi terakhir ditahan `fillAfter`, tampilannya identik dengan awal), lalu loop berikutnya.
  */
 internal object WidgetMarqueeMath {
     const val SPEED_DP_PER_SEC = 30f
-    const val START_PAUSE_MS = 1500L
-    const val END_PAUSE_MS = 1200L
-    const val RAMP_MS = 500L
 
-    /** Ruang tambahan di ujung (mode terbatas): menyerap selisih ESTIMASI lebar (font/launcher) sehingga huruf terakhir tak terpotong. */
-    const val END_SLACK_DP = 12f
+    /** Jarak satu segmen (dp) = 0,75% x 4000dp di `anim/widget_title_segment.xml`; JANGAN diubah tanpa mengubah XML itu. */
+    const val SEGMENT_DP = 30f
+
+    /** Durasi satu segmen (ms) = `android:duration` di `anim/widget_title_segment.xml`. */
+    const val SEGMENT_MS = 1000L
+
+    /** Diam di awal tiap loop (judul terbaca dari awal). */
+    const val PAUSE_MS = 1500L
+
+    /** Batas jumlah segmen (50 x 30dp = periode 1500dp, +-190 huruf); judul lebih panjang tampil statis (ellipsize). */
+    const val MAX_SEGMENTS = 50
 
     /** Teks yang lebihnya di bawah ini dari kolom dianggap muat (tidak digeser). */
     const val MIN_OVERFLOW_DP = 2f
 
-    /** Batas lebar TextView di XML (4000dp); isi (dua salinan atau satu) tak boleh melewatinya. */
-    const val MAX_TEXT_DP = 3900f
-
     /** Kolom lebih sempit dari ini tak layak digeser (judul praktis tak terlihat). */
     const val MIN_COLUMN_DP = 24f
 
-    /** Jarak antar salinan minimum (dp) pada mode loop. */
+    /** Jarak antar salinan minimum (dp). */
     const val MIN_GAP_DP = 24f
 
-    /** [travelDp] = jarak geser per siklus (dp; 0 = tak digeser); [loop] = teks digandakan dan jarak = satu periode. */
-    class Plan(val loop: Boolean, val travelDp: Float)
-
-    val NONE = Plan(false, 0f)
-
     /** Jarak antar salinan: sepertiga kolom (seperti marquee bawaan), minimal [MIN_GAP_DP]. */
-    fun gapDp(columnDp: Float): Float = maxOf(MIN_GAP_DP, columnDp / 3f)
+    fun gapDp(columnDp: Float): Float = max(MIN_GAP_DP, columnDp / 3f)
+
+    fun shouldScroll(textDp: Float, columnDp: Float): Boolean =
+        columnDp >= MIN_COLUMN_DP && textDp - columnDp >= MIN_OVERFLOW_DP
+
+    /** Jumlah segmen (>= 1) agar q x 30dp >= [periodDp]. */
+    fun segmentsFor(periodDp: Float): Int = ceil(periodDp / SEGMENT_DP).toInt().coerceAtLeast(1)
+
+    fun targetPeriodDp(segments: Int): Float = segments * SEGMENT_DP
+
+    fun loopMs(segments: Int): Long = segments * SEGMENT_MS
+
+    fun cycleMs(segments: Int): Long = loopMs(segments) + PAUSE_MS
+
+    /** Margin kiri (dp, <= 0) untuk awal segmen ke-[segment]. */
+    fun marginDp(segment: Int): Float = -segment * SEGMENT_DP
 
     /**
-     * @param textDp lebar teks (sudah dikali faktor aman), @param periodDp lebar PERSIS `judul + jarak` (tanpa faktor aman — harus sama
-     * dengan geometri render agar loop mulus), @param columnDp lebar kolom judul minimum.
+     * Kunci kejadian kirim (loop x segmen + indeks segmen) pada [elapsedMs] sejak siklus dimulai; -1 selama diam di antara loop.
+     * Kunci naik tepat 1 tiap SEGMENT_MS selama loop, sehingga kiriman tak pernah ganda dan tak pernah terlewat.
      */
-    fun plan(textDp: Float, periodDp: Float, columnDp: Float): Plan {
-        if (columnDp < MIN_COLUMN_DP) return NONE
-        if (textDp - columnDp < MIN_OVERFLOW_DP) return NONE
-        if (periodDp + textDp <= MAX_TEXT_DP) return Plan(true, periodDp)
-        return Plan(false, min(textDp, MAX_TEXT_DP) - columnDp + END_SLACK_DP)
-    }
-
-    /** Lama fase geser (ms): jarak / kecepatan + satu [RAMP_MS] (trapesium: 2 ramp mengurangi jarak setara satu ramp penuh). */
-    fun scrollMs(travelDp: Float): Long = (travelDp / SPEED_DP_PER_SEC * 1000f).toLong() + RAMP_MS
-
-    fun endPauseMs(loop: Boolean): Long = if (loop) 0L else END_PAUSE_MS
-
-    fun cycleMs(travelDp: Float, loop: Boolean): Long = START_PAUSE_MS + scrollMs(travelDp) + endPauseMs(loop)
-
-    /** Offset geser (dp, 0..travel) pada [elapsedMs] sejak siklus dimulai. [travelDp] <= 0 selalu 0. */
-    fun offsetDp(travelDp: Float, loop: Boolean, elapsedMs: Long): Float {
-        if (travelDp <= 0f || elapsedMs < 0L) return 0f
-        val t = elapsedMs % cycleMs(travelDp, loop)
-        if (t < START_PAUSE_MS) return 0f
-        val tau = t - START_PAUSE_MS
-        val total = scrollMs(travelDp)
-        if (tau >= total) return travelDp
-        val v = SPEED_DP_PER_SEC
-        val r = RAMP_MS / 1000f
-        val s = tau / 1000f
-        val tt = total / 1000f
-        val d = when {
-            s < r -> v * s * s / (2f * r)
-            s < tt - r -> v * (s - r / 2f)
-            else -> travelDp - v * (tt - s) * (tt - s) / (2f * r)
-        }
-        return d.coerceIn(0f, travelDp)
-    }
-
-    /**
-     * Jeda (ms, >= 1) sampai kiriman berikutnya perlu: selama fase geser = [tickMs]; selama diam = sisa diam
-     * (tak ada kiriman sia-sia saat judul tidak bergerak).
-     */
-    fun delayToNextMs(travelDp: Float, loop: Boolean, elapsedMs: Long, tickMs: Long): Long {
-        if (travelDp <= 0f) return Long.MAX_VALUE
-        val cycle = cycleMs(travelDp, loop)
+    fun eventKey(segments: Int, elapsedMs: Long): Long {
+        if (elapsedMs < 0L) return -1L
+        val cycle = cycleMs(segments)
         val t = elapsedMs % cycle
-        val scrollEnd = START_PAUSE_MS + scrollMs(travelDp)
-        return when {
-            t < START_PAUSE_MS -> START_PAUSE_MS - t
-            t < scrollEnd -> tickMs
-            else -> cycle - t
-        }.coerceAtLeast(1L)
+        if (t >= loopMs(segments)) return -1L
+        return (elapsedMs / cycle) * segments + t / SEGMENT_MS
+    }
+
+    /** Indeks segmen (0 until segments) dari kunci kejadian. */
+    fun segmentOfKey(segments: Int, key: Long): Int = (key % segments).toInt()
+
+    /** Jeda (ms, >= 1) sampai kejadian kirim berikutnya: batas segmen berikut, atau awal loop berikutnya setelah segmen terakhir. */
+    fun delayToNextMs(segments: Int, elapsedMs: Long): Long {
+        val cycle = cycleMs(segments)
+        val t = elapsedMs % cycle
+        val next = if (t < (segments - 1) * SEGMENT_MS) (t / SEGMENT_MS + 1) * SEGMENT_MS else cycle
+        return (next - t).coerceAtLeast(1L)
     }
 }
 
 /**
- * Batch 641 — penggulir judul widget yang digerakkan app (lihat [WidgetMarqueeMath]). Satu HandlerThread; tiap "lajur" = satu widget
- * dengan judul yang melebihi kolomnya. Berhenti sendiri bila layar mati (ACTION_SCREEN_OFF), tak ada lajur, atau 3 kegagalan beruntun.
- * Saat lagu TIDAK diputar, tiap lajur hanya [IDLE_CYCLES] siklus lalu berhenti di posisi awal (hemat baterai); layar menyala = mulai lagi.
- * Update penuh ([WidgetUpdater.performUpdate]) mengatur ulang margin ke 0 dan memanggil [configure].
+ * Batch 643 — penggerak segmen marquee judul widget (lihat [WidgetMarqueeMath]). Satu HandlerThread; tiap "lajur" = satu widget dengan judul yang melebihi
+ * kolomnya. Hanya 1 update parsial per DETIK per widget (v642: 30/dtk); gerak halusnya digambar launcher. Berhenti sendiri bila layar mati
+ * (ACTION_SCREEN_OFF), tak ada lajur, atau 3 kegagalan beruntun. Saat lagu TIDAK diputar tiap lajur hanya [IDLE_LOOPS] loop lalu berhenti pada akhir loop
+ * (tampilan akhir = awal, tak perlu reset); layar menyala = siklus baru. Update penuh ([WidgetUpdater.performUpdate]) menata ulang margin = 0 + memulai
+ * segmen ke-0 lalu memanggil [configure].
  */
 internal object WidgetMarqueeDriver {
     private const val TAG = "WidgetMarquee"
-    // Batch 642 — 33 ms (~30 fps; langkah ~1dp pada 30dp/dtk) dari 100 ms (~3dp = patah-patah). Dijadwalkan terhadap waktu mulai tick (bukan tertunda
-    // oleh lama panggilan binder); posisi dihitung dari waktu nyata, jadi tick yang terlambat tidak memperlambat geseran.
-    private const val TICK_MS = 33L
-    private const val IDLE_CYCLES = 3
+    private const val IDLE_LOOPS = 3
     private const val MAX_CONSECUTIVE_FAILURES = 3
 
-    /** Satu widget yang judulnya perlu digeser; [layoutRes] WAJIB sama dengan layout update penuh terakhir (host mendaur ulang view per layout id). */
-    internal class Lane(val widgetId: Int, val layoutRes: Int, val travelDp: Float, val loop: Boolean)
+    /** Satu widget yang judulnya digeser; [layoutRes] WAJIB sama dengan layout update penuh terakhir (host mendaur ulang view per layout id). */
+    internal class Lane(val widgetId: Int, val layoutRes: Int, val segments: Int)
 
     private class Snapshot(val lanes: List<Lane>, val playing: Boolean, val startedAtMs: Long)
 
     @Volatile private var snapshot: Snapshot? = null
     @Volatile private var screenOn = true
-    private val lastSentPx = HashMap<Int, Int>() // hanya diakses di thread handler
+    private val lastKey = HashMap<Int, Long>() // hanya diakses di thread handler
     private var failures = 0 // hanya diakses di thread handler
 
     @Volatile private var handler: Handler? = null
@@ -154,14 +136,14 @@ internal object WidgetMarqueeDriver {
         snapshot = Snapshot(lanes, playing, SystemClock.uptimeMillis())
         AppLogger.w(
             TAG,
-            "Penggulir judul aktif: ${lanes.size} widget, jarak geser dp=${lanes.joinToString { "${it.widgetId}:${it.travelDp.toInt()}${if (it.loop) "L" else "T"}" }} " +
+            "Penggulir judul (segmen launcher) aktif: ${lanes.size} widget, segmen 30dp/dtk=${lanes.joinToString { "${it.widgetId}:${it.segments}" }} " +
                 "playing=$playing layarMenyala=$screenOn"
         )
         val h = handler ?: return
         h.post {
-            // Update penuh barusan mengatur margin = 0, jadi 0 dianggap sudah terkirim (tak ada kiriman sia-sia).
-            lastSentPx.clear()
-            for (lane in lanes) lastSentPx[lane.widgetId] = 0
+            // Update penuh barusan menata margin = 0 dan memulai segmen ke-0, jadi kunci 0 dianggap sudah terkirim.
+            lastKey.clear()
+            for (lane in lanes) lastKey[lane.widgetId] = 0L
             failures = 0
             h.removeCallbacks(tick)
             if (screenOn) h.post(tick)
@@ -209,10 +191,11 @@ internal object WidgetMarqueeDriver {
         h.removeCallbacks(tick)
         val snap = snapshot ?: return
         if (on) {
-            // Layar menyala = pengguna mungkin melihat widget: siklus baru dari awal (juga saat lagu dijeda).
+            // Layar menyala = pengguna mungkin melihat widget: siklus baru dari awal (juga saat lagu dijeda). Kunci dihapus agar segmen ke-0
+            // DIKIRIM (posisi di host bisa di mana saja setelah layar mati).
             snapshot = Snapshot(snap.lanes, snap.playing, SystemClock.uptimeMillis())
             h.post {
-                for (lane in snap.lanes) lastSentPx.remove(lane.widgetId)
+                for (lane in snap.lanes) lastKey.remove(lane.widgetId)
                 failures = 0
                 h.post(tick)
             }
@@ -224,24 +207,25 @@ internal object WidgetMarqueeDriver {
         if (!screenOn) return
         val context = appContext ?: return
         var nextDelay = Long.MAX_VALUE
-        val tickStart = SystemClock.uptimeMillis()
         try {
             val manager = AppWidgetManager.getInstance(context)
-            val elapsed = tickStart - snap.startedAtMs
-            val density = context.resources.displayMetrics.density
+            val elapsed = SystemClock.uptimeMillis() - snap.startedAtMs
             for (lane in snap.lanes) {
-                val finished = !snap.playing && elapsed >= IDLE_CYCLES * WidgetMarqueeMath.cycleMs(lane.travelDp, lane.loop)
-                val offsetDp = if (finished) 0f else WidgetMarqueeMath.offsetDp(lane.travelDp, lane.loop, elapsed)
-                val px = (offsetDp * density).toInt()
-                if (lastSentPx[lane.widgetId] != px) {
+                val finished = !snap.playing && elapsed >= IDLE_LOOPS * WidgetMarqueeMath.cycleMs(lane.segments)
+                if (finished) continue
+                val key = WidgetMarqueeMath.eventKey(lane.segments, elapsed)
+                if (key >= 0L && lastKey[lane.widgetId] != key) {
                     val views = RemoteViews(context.packageName, lane.layoutRes)
-                    views.setViewLayoutMargin(R.id.widget_title, RemoteViews.MARGIN_LEFT, -offsetDp, TypedValue.COMPLEX_UNIT_DIP)
+                    // Urutan penting: margin dulu, lalu ulang animasi (T=0) -> posisi kontinu pada frame yang sama.
+                    views.setViewLayoutMargin(
+                        R.id.widget_title, RemoteViews.MARGIN_LEFT,
+                        WidgetMarqueeMath.marginDp(WidgetMarqueeMath.segmentOfKey(lane.segments, key)), TypedValue.COMPLEX_UNIT_DIP
+                    )
+                    views.setDisplayedChild(R.id.widget_title_flipper, 0)
                     manager.partiallyUpdateAppWidget(lane.widgetId, views)
-                    lastSentPx[lane.widgetId] = px
+                    lastKey[lane.widgetId] = key
                 }
-                if (!finished) {
-                    nextDelay = min(nextDelay, WidgetMarqueeMath.delayToNextMs(lane.travelDp, lane.loop, elapsed, TICK_MS))
-                }
+                nextDelay = min(nextDelay, WidgetMarqueeMath.delayToNextMs(lane.segments, elapsed))
             }
             failures = 0
         } catch (e: Exception) {
@@ -252,12 +236,8 @@ internal object WidgetMarqueeDriver {
                 snapshot = null
                 return
             }
-            nextDelay = TICK_MS
+            nextDelay = 1000L
         }
-        if (nextDelay != Long.MAX_VALUE && snapshot === snap) {
-            // Fase geser: kurangi waktu kerja tick ini agar irama tetap ~TICK_MS (bukan TICK_MS + lama panggilan binder).
-            val spent = SystemClock.uptimeMillis() - tickStart
-            handler?.postDelayed(tick, if (nextDelay == TICK_MS) (TICK_MS - spent).coerceAtLeast(1L) else nextDelay)
-        }
+        if (nextDelay != Long.MAX_VALUE && snapshot === snap) handler?.postDelayed(tick, nextDelay)
     }
 }

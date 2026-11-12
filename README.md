@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 643: marquee judul widget SONIX kini digambar launcher sendiri (animasi segmen, mengikuti refresh rate 60/120 Hz; app hanya 1 update/detik) — sebelumnya 30 update/detik dari app masih patah di 120 Hz; Batch 643 belum dikompilasi/diuji.
 > - Batch 642: marquee judul widget kini loop mulus (judul digandakan seperti marquee asli, berhenti/mulai halus, ~30 fps) — sebelumnya bergerak tetapi patah-patah; Batch 642 belum dikompilasi/diuji.
 > - Batch 641: judul lagu di widget SONIX (slim/compact/penuh/tinggi, dan strip >= 100x190dp) kini digeser (marquee) oleh app sendiri lewat update parsial widget — tak bergantung launcher; Batch 641 belum dikompilasi/diuji.
 > - Batch 640: v639 terbukti di device (widget strip + panel navigasi landscape); widget strip yang lebih lebar kini membesarkan sampul dan tombol mengikuti ukuran widget — Batch 640 belum dikompilasi/diuji.

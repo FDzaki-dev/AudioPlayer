@@ -34,7 +34,9 @@ import com.rudi.audioplayer.util.ArtFailureLog
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 /**
  * Pushes the current playback state into any home-screen widgets. The service calls
@@ -235,11 +237,11 @@ object WidgetUpdater {
         }
     }
 
-    // Batch 642 — rencana marquee judul: teks yang DITAMPILKAN + jarak geser + mode loop. Paint bold, sp ikut font scale (sama dgn TextView
-    // `textStyle=bold`). Deteksi overflow memakai lebar x TEXT_SAFETY_FACTOR (font perangkat/launcher bisa sedikit lebih lebar); PERIODE loop
-    // = lebar PERSIS `judul + spasi` (tanpa faktor aman) karena salinan ke-2 harus mendarat tepat di posisi salinan ke-1 agar loop mulus.
-    // Jarak antar salinan = spasi biasa (dibulatkan ke atas ke kelipatan lebar spasi, minimal WidgetMarqueeMath.MIN_GAP_DP).
-    private class TitlePlan(val display: String, val plan: WidgetMarqueeMath.Plan)
+    // Batch 643 — rencana marquee judul: teks yang DITAMPILKAN di tampilan geser + jumlah segmen (0 = statis, muat / tak layak digeser). Paint bold, sp
+    // ikut font scale (sama dgn TextView `textStyle=bold`). Deteksi overflow memakai lebar x TEXT_SAFETY_FACTOR (font perangkat/launcher bisa sedikit
+    // lebih lebar). PERIODE loop (= lebar `judul + spasi`) dibulatkan ke kelipatan SEGMENT_DP (30dp) dgn jumlah spasi biasa terdekat (galat <= ~1/2 lebar
+    // spasi, ±1,8dp) karena animasi segmen di XML berjarak tetap 30dp; salinan ke-2 mendarat (hampir) tepat di posisi salinan ke-1 -> loop mulus.
+    private class TitlePlan(val display: String, val segments: Int)
 
     private fun planTitle(context: Context, shown: String, sp: Float, columnDp: Float): TitlePlan {
         val metrics = context.resources.displayMetrics
@@ -247,11 +249,22 @@ object WidgetUpdater {
         paint.typeface = Typeface.DEFAULT_BOLD
         paint.textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, metrics)
         val textDp = paint.measureText(shown) / metrics.density
+        if (!WidgetMarqueeMath.shouldScroll(textDp * TEXT_SAFETY_FACTOR, columnDp)) return TitlePlan(shown, 0)
         val spaceDp = (paint.measureText(" ") / metrics.density).coerceAtLeast(1f)
-        val spaces = " ".repeat(ceil(WidgetMarqueeMath.gapDp(columnDp) / spaceDp).toInt().coerceAtLeast(1))
-        val periodDp = paint.measureText(shown + spaces) / metrics.density
-        val plan = WidgetMarqueeMath.plan(textDp * TEXT_SAFETY_FACTOR, periodDp, columnDp)
-        return TitlePlan(if (plan.loop) shown + spaces + shown else shown, plan)
+        val segments = WidgetMarqueeMath.segmentsFor(textDp + WidgetMarqueeMath.gapDp(columnDp))
+        if (segments > WidgetMarqueeMath.MAX_SEGMENTS) return TitlePlan(shown, 0)
+        val target = WidgetMarqueeMath.targetPeriodDp(segments)
+        val guess = ((target - textDp) / spaceDp).roundToInt()
+        var bestCount = guess.coerceAtLeast(1)
+        var bestErr = Float.MAX_VALUE
+        for (count in (guess - 1).coerceAtLeast(1)..(guess + 1).coerceAtLeast(1)) {
+            val err = abs(paint.measureText(shown + " ".repeat(count)) / metrics.density - target)
+            if (err < bestErr) {
+                bestErr = err
+                bestCount = count
+            }
+        }
+        return TitlePlan(shown + " ".repeat(bestCount) + shown, segments)
     }
 
     // Batch 640 — ukuran sampul + kenop layout strip mengikuti ukuran widget (lihat WidgetStripSizing). Layout XML memberi
@@ -529,14 +542,23 @@ object WidgetUpdater {
                 }
                 val columnDp = minWidthDp - fixedDp - 2f * extraPadDp
                 val titlePlan = planTitle(context, shownTitle, titleSp, columnDp)
+                val scrolling = titlePlan.segments > 0
+                // Dua tampilan di viewport: statis (muat; ellipsize end) ATAU ViewFlipper (geser). Warna/teks diisi keduanya (yang tersembunyi tak basi).
+                val titleColor = if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT
+                views.setTextViewText(R.id.widget_title_static, shownTitle)
+                views.setTextColor(R.id.widget_title_static, titleColor)
                 views.setTextViewText(R.id.widget_title, titlePlan.display)
-                views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
-                // Mode loop menggandakan teks: pembaca layar tetap membaca judul SEKALI (selalu diatur agar tak basi pada view yang didaur ulang).
+                views.setTextColor(R.id.widget_title, titleColor)
+                // Mode geser menggandakan teks: pembaca layar tetap membaca judul SEKALI (selalu diatur agar tak basi pada view yang didaur ulang).
                 views.setContentDescription(R.id.widget_title, shownTitle)
-                // Update penuh SELALU mengembalikan geseran judul ke awal (host mendaur ulang view; margin lama akan bertahan bila tak diatur).
-                views.setViewLayoutMargin(R.id.widget_title, RemoteViews.MARGIN_LEFT, 0f, TypedValue.COMPLEX_UNIT_DIP)
-                if (titlePlan.plan.travelDp > 0f) {
-                    marqueeLanes.add(WidgetMarqueeDriver.Lane(id, layoutRes, titlePlan.plan.travelDp, titlePlan.plan.loop))
+                views.setViewVisibility(R.id.widget_title_static, if (scrolling) View.GONE else View.VISIBLE)
+                views.setViewVisibility(R.id.widget_title_flipper, if (scrolling) View.VISIBLE else View.GONE)
+                if (scrolling) {
+                    // Update penuh SELALU mengembalikan geseran ke awal: margin 0 + `setDisplayedChild(0)` memulai segmen ke-0 (menghapus sisa transformasi
+                    // animasi lama yang ditahan fillAfter; host mendaur ulang view, jadi tanpa ini margin/transformasi lama bertahan).
+                    views.setViewLayoutMargin(R.id.widget_title, RemoteViews.MARGIN_LEFT, 0f, TypedValue.COMPLEX_UNIT_DIP)
+                    views.setDisplayedChild(R.id.widget_title_flipper, 0)
+                    marqueeLanes.add(WidgetMarqueeDriver.Lane(id, layoutRes, titlePlan.segments))
                 }
             }
             views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
@@ -565,7 +587,7 @@ object WidgetUpdater {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             views.setOnClickPendingIntent(R.id.widget_album_art, openAppPending)
-            if (hasTitle) views.setOnClickPendingIntent(R.id.widget_title, openAppPending)
+            if (hasTitle) views.setOnClickPendingIntent(R.id.widget_title_viewport, openAppPending)
 
             manager.updateAppWidget(id, views)
         }
