@@ -54,7 +54,7 @@ class WidgetMarqueeMathTest {
     }
 
     @Test
-    fun `jarak antar salinan selalu >= minimum dan < max(ideal + setengah segmen, minimum + satu segmen)`() {
+    fun `jarak antar salinan selalu minimal 24dp dan tak melebihi batas ideal atau minimum plus satu segmen`() {
         var text = 100f
         while (text <= 1400f) {
             for (col in listOf(60f, 141f, 176f, 300f)) {

@@ -15,6 +15,12 @@ name: Android CI Artifact for Claude
 # `--stacktrace`; alat NOT VERIFIED / exit != 0 -> laporan memuat kutipan AKAR MASALAH + ekor log tanpa stack frame.
 # Batch 574 — noise Kotlin SpotBugs disaring di sumber (config/spotbugs/exclude.xml).
 #
+# Batch 645 — banner "Laporan untuk Claude" di halaman ringkasan run: (a) ditambah baris "Tes unit" (jumlah tes / gagal / dilewati dari
+# XML hasil tes; kompilasi tes gagal = NOT VERIFIED + kutipan `e:`), (b) banner kini ditulis ke `banner.md` lalu DIPUBLIKASI oleh langkah
+# tersendiri `if: always()` — bila langkah rakit laporan gagal di tengah, banner cadangan (NOT VERIFIED) tetap tampil. `detekt typed`
+# (detektDebug) SENGAJA tak ditambahkan: classpath detekt 1.23.8 (compiler Kotlin 2.0.21) tak cocok dgn Kotlin 2.4.10 proyek
+# (lihat app/build.gradle.kts), jadi hasilnya pasti NOT VERIFIED/derau.
+#
 # Workflow TERPISAH dari `build.yml` ("Build APK", 1 job, kini hanya build + tes + Release + artifact APK): runner
 # sendiri dan berjalan paralel, jadi tidak mengambil jatah waktu build/rilis, dan kegagalan di sini TIDAK memengaruhi
 # APK/Release. Semua langkah analisis NON-BLOCKING; alat yang tak jalan / laporan yang tak terbentuk dicatat
@@ -64,7 +70,7 @@ jobs:
 
       # 1. Tiga invocation Gradle TERPISAH (kegagalan satu tak menjatuhkan yang lain). Exit code disimpan ke
       #    berkas; langkah ini SELALU sukses.
-      - name: ArchUnit + SpotBugs + detekt/lint (NON-BLOCKING)
+      - name: ArchUnit + tes unit + SpotBugs + detekt/lint (NON-BLOCKING)
         id: analysis
         continue-on-error: true
         timeout-minutes: 35
@@ -74,6 +80,8 @@ jobs:
           set +e
           gradle testReleaseUnitTest --tests "com.rudi.audioplayer.ArchitectureTest" --no-daemon --no-build-cache > gradle-arch.log 2>&1
           echo "ARCH_EXIT=$?" > gradle-exit.txt
+          gradle testReleaseUnitTest --continue --no-daemon --no-build-cache > gradle-tests.log 2>&1
+          echo "TESTS_EXIT=$?" >> gradle-exit.txt
           gradle spotbugsRelease -Psonix.spotbugs=true --no-daemon --build-cache > gradle-spotbugs.log 2>&1
           echo "SPOTBUGS_EXIT=$?" >> gradle-exit.txt
           gradle detekt lintDebug --continue --no-daemon --no-build-cache > gradle-static.log 2>&1
@@ -83,6 +91,7 @@ jobs:
 
       # 2. Rakit laporan ringkas. Status tiap alat HANYA dari berkas laporan yang benar-benar ada.
       - name: Create Compact Report for Claude
+        id: report
         if: always()
         run: |
           set +e
@@ -94,12 +103,15 @@ jobs:
           ARCH_EXIT=$(sed -n 's/^ARCH_EXIT=//p' gradle-exit.txt 2>/dev/null | head -n 1)
           SPOTBUGS_EXIT=$(sed -n 's/^SPOTBUGS_EXIT=//p' gradle-exit.txt 2>/dev/null | head -n 1)
           STATIC_EXIT=$(sed -n 's/^STATIC_EXIT=//p' gradle-exit.txt 2>/dev/null | head -n 1)
+          TESTS_EXIT=$(sed -n 's/^TESTS_EXIT=//p' gradle-exit.txt 2>/dev/null | head -n 1)
+          TESTS_EXIT=${TESTS_EXIT:-n/a}
           ARCH_EXIT=${ARCH_EXIT:-n/a}
           SPOTBUGS_EXIT=${SPOTBUGS_EXIT:-n/a}
           STATIC_EXIT=${STATIC_EXIT:-n/a}
           : > report-arch.tmp
           : > report-sarif.tmp
           : > report-static.tmp
+          : > report-tests.tmp
 
           # Kutipan akar masalah dari log Gradle (tanpa baris stack frame): blok FAILURE/"What went wrong",
           # baris kompilasi `e:`, task FAILED, lalu ekor log.
@@ -208,6 +220,32 @@ jobs:
             { echo ""; excerpt gradle-static.log; } >> report-static.tmp
           fi
 
+          # --- Tes unit (Batch 645): jumlah dari XML hasil tes (`<testsuite tests= skipped= failures= errors=>`). Tanpa XML = NOT VERIFIED ---
+          TEST_DIR=app/build/test-results/testReleaseUnitTest
+          sum_attr() { grep -h -o '<testsuite [^>]*>' "$TEST_DIR"/*.xml 2>/dev/null | grep -o " $1=\"[0-9]*\"" | grep -o '[0-9]*' | awk '{s+=$1} END{print s+0}'; }
+          if ls "$TEST_DIR"/*.xml > /dev/null 2>&1; then
+            T_ALL=$(sum_attr tests)
+            T_SKIP=$(sum_attr skipped)
+            T_FAIL=$(sum_attr failures)
+            T_ERR=$(sum_attr errors)
+            T_BAD=$((T_FAIL + T_ERR))
+            if [ "$T_BAD" = "0" ] && [ "$T_ALL" -gt 0 ]; then
+              TESTS_SUMMARY="Tes unit: LULUS ($T_ALL tes, $T_SKIP dilewati)"
+            elif [ "$T_BAD" = "0" ]; then
+              TESTS_SUMMARY="Tes unit: NOT VERIFIED (0 tes terbaca dari XML)"
+              { echo ""; excerpt gradle-tests.log; } >> report-tests.tmp
+            else
+              TESTS_SUMMARY="Tes unit: $T_BAD GAGAL (dari $T_ALL tes, $T_SKIP dilewati)"
+              {
+                echo "Tes gagal (maks 40):"
+                awk '/<testcase /{match($0,/classname="[^"]*"/);c=substr($0,RSTART+11,RLENGTH-12);match($0,/ name="[^"]*"/);n=substr($0,RSTART+7,RLENGTH-8)} /<(failure|error) /{m="";if(match($0,/message="[^"]*"/)){m=substr($0,RSTART+9,RLENGTH-10)};print "- " c "." n ": " substr(m,1,160)}' "$TEST_DIR"/*.xml | head -n 40
+              } >> report-tests.tmp
+            fi
+          else
+            TESTS_SUMMARY="Tes unit: NOT VERIFIED (hasil tes tidak terbentuk: kompilasi tes / Gradle gagal; lihat kutipan log)"
+            { echo ""; excerpt gradle-tests.log; } >> report-tests.tmp
+          fi
+
           # --- Peringatan kompilator Kotlin (Batch 576): baris `w: file://...`, tanpa kode tes, dedupe ---
           : > report-kwarn.tmp
           if grep -q -E '^> Task :app:compile(Release|Debug)Kotlin$' gradle-arch.log gradle-static.log 2>/dev/null; then
@@ -240,13 +278,14 @@ jobs:
             echo "=== LAPORAN EVALUASI UNTUK CLAUDE ==="
             echo "Proyek: ${{ github.event.repository.name }} · Commit: ${{ github.sha }} · Run: #${{ github.run_number }} · Cabang: ${{ github.ref_name }}"
             echo "Dibuat (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "Gradle exit: ArchUnit=$ARCH_EXIT · SpotBugs=$SPOTBUGS_EXIT · detekt+lintDebug=$STATIC_EXIT"
+            echo "Gradle exit: ArchUnit=$ARCH_EXIT · Tes=$TESTS_EXIT · SpotBugs=$SPOTBUGS_EXIT · detekt+lintDebug=$STATIC_EXIT"
             echo ""
             echo "--- RINGKASAN ---"
             echo "$ARCH_SUMMARY"
             echo "$SARIF_SUMMARY"
             echo "$DET_SUMMARY"
             echo "$LINT_SUMMARY"
+            echo "$TESTS_SUMMARY"
             echo "$KWARN_SUMMARY"
             echo "Catatan: NOT VERIFIED = alat tidak jalan / laporan tidak ada; BUKAN berarti bersih."
             if [ "$A_VIOL" != "0" ] || [ "$NEED_ARCH_LOG" = "1" ] || [ "$ARCH_EXIT" != "0" ]; then
@@ -264,6 +303,11 @@ jobs:
               echo "--- STATIC ANALYSIS (DETEKT · LINT) ---"
               cat report-static.tmp
             fi
+            if [ -s report-tests.tmp ]; then
+              echo ""
+              echo "--- TES UNIT ---"
+              cat report-tests.tmp
+            fi
             if [ -s report-kwarn.tmp ]; then
               echo ""
               echo "--- PERINGATAN KOMPILATOR KOTLIN ---"
@@ -271,7 +315,7 @@ jobs:
             fi
           } > laporan-untuk-claude.txt
 
-          echo "::notice::$ARCH_SUMMARY · $SARIF_SUMMARY · $DET_SUMMARY · $LINT_SUMMARY · $KWARN_SUMMARY"
+          echo "::notice::$ARCH_SUMMARY · $SARIF_SUMMARY · $DET_SUMMARY · $LINT_SUMMARY · $TESTS_SUMMARY · $KWARN_SUMMARY"
           {
             echo "### 🔎 Laporan untuk Claude (non-blocking)"
             echo ""
@@ -279,10 +323,27 @@ jobs:
             echo "- $SARIF_SUMMARY"
             echo "- $DET_SUMMARY"
             echo "- $LINT_SUMMARY"
+            echo "- $TESTS_SUMMARY"
             echo "- $KWARN_SUMMARY"
             echo "- Artifact: \`SONIX_laporan-untuk-claude_run${{ github.run_number }}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          } > banner.md
           cat laporan-untuk-claude.txt
+
+      # 2b. Banner ringkasan run (Batch 645): selalu tampil. `banner.md` dari langkah rakit; bila tak ada (langkah rakit gagal di
+      #     tengah / dibatalkan) -> banner cadangan NOT VERIFIED (gagal != lulus).
+      - name: Publish report summary (banner)
+        if: always()
+        run: |
+          if [ -s banner.md ]; then
+            cat banner.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### 🔎 Laporan untuk Claude (non-blocking)"
+              echo ""
+              echo "- NOT VERIFIED: banner tidak terbentuk (analisis: ${{ steps.analysis.outcome }}, rakit laporan: ${{ steps.report.outcome }})"
+              echo "- Artifact: \`SONIX_laporan-untuk-claude_run${{ github.run_number }}\` (mungkin tidak terbentuk)"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       # 3. Artifact resmi GitHub (berkas tunggal .txt; mudah diunduh di HP lalu diunggah ke Claude).
       - name: Upload Report for Claude
