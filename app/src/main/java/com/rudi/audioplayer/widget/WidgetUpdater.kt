@@ -235,14 +235,23 @@ object WidgetUpdater {
         }
     }
 
-    // Batch 641 — ESTIMASI lebar judul (dp): Paint bold, sp ikut font scale. Dikali TEXT_SAFETY_FACTOR karena font perangkat/launcher bisa
-    // sedikit lebih lebar dari Typeface.DEFAULT_BOLD; selisih kecil diserap END_SLACK_DP di WidgetMarqueeMath.
-    private fun measureTitleDp(context: Context, text: String, sp: Float): Float {
+    // Batch 642 — rencana marquee judul: teks yang DITAMPILKAN + jarak geser + mode loop. Paint bold, sp ikut font scale (sama dgn TextView
+    // `textStyle=bold`). Deteksi overflow memakai lebar x TEXT_SAFETY_FACTOR (font perangkat/launcher bisa sedikit lebih lebar); PERIODE loop
+    // = lebar PERSIS `judul + spasi` (tanpa faktor aman) karena salinan ke-2 harus mendarat tepat di posisi salinan ke-1 agar loop mulus.
+    // Jarak antar salinan = spasi biasa (dibulatkan ke atas ke kelipatan lebar spasi, minimal WidgetMarqueeMath.MIN_GAP_DP).
+    private class TitlePlan(val display: String, val plan: WidgetMarqueeMath.Plan)
+
+    private fun planTitle(context: Context, shown: String, sp: Float, columnDp: Float): TitlePlan {
         val metrics = context.resources.displayMetrics
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         paint.typeface = Typeface.DEFAULT_BOLD
         paint.textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, metrics)
-        return paint.measureText(text) / metrics.density
+        val textDp = paint.measureText(shown) / metrics.density
+        val spaceDp = (paint.measureText(" ") / metrics.density).coerceAtLeast(1f)
+        val spaces = " ".repeat(ceil(WidgetMarqueeMath.gapDp(columnDp) / spaceDp).toInt().coerceAtLeast(1))
+        val periodDp = paint.measureText(shown + spaces) / metrics.density
+        val plan = WidgetMarqueeMath.plan(textDp * TEXT_SAFETY_FACTOR, periodDp, columnDp)
+        return TitlePlan(if (plan.loop) shown + spaces + shown else shown, plan)
     }
 
     // Batch 640 — ukuran sampul + kenop layout strip mengikuti ukuran widget (lihat WidgetStripSizing). Layout XML memberi
@@ -509,10 +518,7 @@ object WidgetUpdater {
                 }
             }
             if (hasTitle) {
-                views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
-                views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
-                // Update penuh SELALU mengembalikan geseran judul ke awal (host mendaur ulang view; margin lama akan bertahan bila tak diatur).
-                views.setViewLayoutMargin(R.id.widget_title, RemoteViews.MARGIN_LEFT, 0f, TypedValue.COMPLEX_UNIT_DIP)
+                val shownTitle = title ?: "Tidak ada lagu"
                 val titleSp = if (isStrip) STRIP_TITLE_SP else if (isTall) TALL_TITLE_SP else TITLE_SP
                 val fixedDp = when {
                     isStrip -> STRIP_TITLE_FIXED_WIDTH_DP
@@ -522,9 +528,16 @@ object WidgetUpdater {
                     else -> FULL_FIXED_WIDTH_DP
                 }
                 val columnDp = minWidthDp - fixedDp - 2f * extraPadDp
-                val textDp = measureTitleDp(context, title ?: "Tidak ada lagu", titleSp)
-                val travelDp = WidgetMarqueeMath.travelDp(textDp * TEXT_SAFETY_FACTOR, columnDp)
-                if (travelDp > 0f) marqueeLanes.add(WidgetMarqueeDriver.Lane(id, layoutRes, travelDp))
+                val titlePlan = planTitle(context, shownTitle, titleSp, columnDp)
+                views.setTextViewText(R.id.widget_title, titlePlan.display)
+                views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
+                // Mode loop menggandakan teks: pembaca layar tetap membaca judul SEKALI (selalu diatur agar tak basi pada view yang didaur ulang).
+                views.setContentDescription(R.id.widget_title, shownTitle)
+                // Update penuh SELALU mengembalikan geseran judul ke awal (host mendaur ulang view; margin lama akan bertahan bila tak diatur).
+                views.setViewLayoutMargin(R.id.widget_title, RemoteViews.MARGIN_LEFT, 0f, TypedValue.COMPLEX_UNIT_DIP)
+                if (titlePlan.plan.travelDp > 0f) {
+                    marqueeLanes.add(WidgetMarqueeDriver.Lane(id, layoutRes, titlePlan.plan.travelDp, titlePlan.plan.loop))
+                }
             }
             views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
             views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))

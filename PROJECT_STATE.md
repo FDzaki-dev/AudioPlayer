@@ -18,6 +18,8 @@ Banner DISCONTINUED dicabut eksplisit oleh user (Batch 432). Proyek lanjut norma
 per instruksi eksplisit user seperti biasa (lihat "Sektor DITUTUP" di bawah untuk yang masih
 butuh reopen spesifik).
 
+**Catatan Batch 642 [user: `sonix_debug_20261112_104858.txt` + "udah kaku, tidak mulus looping nya lagi"]**: Interpretasi = marquee v641 sudah bergerak (log: `Penggulir judul aktif` x2, 0 galat); perbaiki KUALITAS gerak. AKAR: tick 100 ms (langkah ±3dp) + lompat mendadak ke awal + berhenti mendadak. SOLUSI: loop mulus lewat dua salinan teks (`judul + spasi + judul`, geser satu periode = lebar PERSIS `judul + spasi`), gerak trapesium (ramp 500 ms), tick 33 ms dengan jadwal terhadap awal tick; judul sangat panjang -> mode terbatas lama; `contentDescription` judul = judul asli. 3 file source (`WidgetMarquee.kt`, `WidgetUpdater.kt`, `WidgetMarqueeMathTest.kt`); layout tak berubah. Detail + batas jujur: `CHANGELOG.md`. **NOT VERIFIED**: belum compile/CI/device.
+
 **Justifikasi >5 file (Batch 641):** marquee judul widget memakai SATU kontrak layout bersama: `widget_title_viewport` (FrameLayout pemotong) + `widget_title` selebar tetap 4000dp WAJIB ada di ke-5 layout widget (slim/compact/penuh/tinggi/strip) karena `WidgetMarqueeDriver` mengirim partial update margin kiri ke id `widget_title` pada layout id yang sama; 7 file (1 baru + WidgetUpdater + 5 layout) + 1 uji baru.
 
 **Catatan Batch 641 [user: "tidak. pokoknya saya mau kamu fokus bagaimana caranya agar Marquee fix berjalan di player eksternal/widget. apapun caranya!!" + "segera!!" + "buruan!!"]**: Interpretasi = tinggalkan poles strip; buat judul widget BENAR-BENAR bergeser. AKAR (log v639): `TextView.setSelected` tak remotable + marquee fokus XML tak andal di Smart Launcher + layout penuh/tinggi 2 baris ellipsize -> marquee bawaan mustahil dari widget. SOLUSI: app menggeser judul sendiri (`widget/WidgetMarquee.kt`: `WidgetMarqueeMath` murni + `WidgetMarqueeDriver` HandlerThread; `partiallyUpdateAppWidget` + `setViewLayoutMargin(widget_title, MARGIN_LEFT, -offset)`; TextView 4000dp di viewport pemotong; 30dp/dtk, diam 1,5 dtk di awal / 1,2 dtk di ujung; tick 100 ms hanya saat geser; layar mati = berhenti; lagu tak diputar = 3 siklus; 3 kegagalan = berhenti). `WidgetUpdater`: margin 0 di tiap update penuh, hitung ESTIMASI teks vs kolom (`applyCornerInset` kini mengembalikan tambahan padding), `configure` setelah semua `updateAppWidget`, `stop()` saat gagal/tak ada widget, `setTitleSelected` dihapus; strip punya baris judul bila >= 100x190dp (ukuran strip dihitung dari tinggi - 28dp). Detail + batas jujur: `CHANGELOG.md`. **NOT VERIFIED**: belum compile/CI/device.
@@ -440,7 +442,15 @@ com.rudi.audioplayer/
 Detail lengkap: README.md § "Standar Penomoran Versi".
 
 [RESUME POINT]
-- Batch terakhir: 641. ZIP: `SONIX_v641.zip` (direktori ZIP mode `0755`). 7 file (`widget/WidgetMarquee.kt` BARU, `widget/WidgetUpdater.kt`, 5 layout `widget_player*.xml`) + 1 uji baru (`WidgetMarqueeMathTest.kt`) + docs; `FILE_MANIFEST.txt` +2 path (243->245). **[RESUME POINT: marquee judul widget digerakkan app -> NOT VERIFIED (belum compile/CI/device) -> USER push v641 + uji judul panjang di widget]**:
+- Batch terakhir: 642. ZIP: `SONIX_v642.zip` (direktori ZIP mode `0755`). 3 file source (`widget/WidgetMarquee.kt`, `widget/WidgetUpdater.kt`, `src/test/.../widget/WidgetMarqueeMathTest.kt`) + docs; 0 file baru (`FILE_MANIFEST.txt` tetap 245). **[RESUME POINT: marquee widget loop mulus + 30 fps -> NOT VERIFIED (belum compile/CI/device) -> USER push v642 + uji kemulusan]**:
+
+  BUTIR "marquee judul widget bergerak" -> TERBUKTI di device (log v641 + keterangan user); BUTIR "kemulusan/loop" -> 642, NOT VERIFIED.
+
+  (1) USER: push v642 (Box DAILY UPDATE), kirim laporan CI (kriteria: build hijau; Kotlin 11 deprecated; ArchUnit 7; detekt 0 / lint 0; SpotBugs 0; `WidgetMarqueeMathTest` 12 + `WidgetStripSizingTest` 4 + `DumpsysFormatTest` 11 hijau). Uji device: judul panjang di widget slim/penuh — diam ±1,5 dtk, mulai pelan, geser halus, melambat dan berhenti saat awal judul muncul lagi, tanpa lompatan. Bila masih patah-patah: kirim log + keterangan (ukuran widget, 60/120Hz); opsi berikutnya (hanya atas instruksi): `TICK_MS` 16, atau kecepatan diubah via `SPEED_DP_PER_SEC`. Bila ada geser ≤1px saat diam di titik loop: koreksi periode.
+
+  (2) LANGKAH BERIKUT (hanya atas instruksi user): widget lebar 150-229dp dengan tinggi >= 160dp masih slim/compact horizontal; butir (2) entri 639 tetap berlaku.
+
+- Batch 641 (sebelum 642; marquee judul widget digerakkan app). Batch terakhir saat itu: 641. ZIP: `SONIX_v641.zip` (direktori ZIP mode `0755`). 7 file (`widget/WidgetMarquee.kt` BARU, `widget/WidgetUpdater.kt`, 5 layout `widget_player*.xml`) + 1 uji baru (`WidgetMarqueeMathTest.kt`) + docs; `FILE_MANIFEST.txt` +2 path (243->245). **[RESUME POINT: marquee judul widget digerakkan app -> NOT VERIFIED (belum compile/CI/device) -> USER push v641 + uji judul panjang di widget]**:
 
   BUTIR "widget strip proporsional" (640) tetap NOT VERIFIED; BUTIR "marquee judul widget" -> 641, NOT VERIFIED.
 
