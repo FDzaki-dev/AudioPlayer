@@ -21,6 +21,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.SystemClock
 import android.util.TypedValue
+import android.view.View
 import android.widget.RemoteViews
 import android.widget.TextView
 import com.rudi.audioplayer.MainActivity
@@ -111,6 +112,17 @@ object WidgetUpdater {
     private const val TALL_FIXED_WIDTH_DP = 46f // Batch 607: widget_player_tall.xml
     // Batch 607: FULL_TITLE_SP & COMPACT_TITLE_SP sama-sama 13f sejak Batch 605 -> cabang `if` identik (SpotBugs DB_DUPLICATE_BRANCHES run #35).
     private const val TITLE_SP = 13f
+
+    // Batch 641 — marquee judul digerakkan app (WidgetMarquee.kt). TALL_TITLE_SP/STRIP_TITLE_SP = ukuran judul di XML tall/strip.
+    // Strip: baris judul (palung kecil: padding 6x2 horizontal, 28dp tinggi dicadangkan) muncul bila lebar >= 100dp & tinggi >= 190dp;
+    // lebar tetap non-judul strip = padding 8x2 + padding palung judul 6x2 = 28dp.
+    private const val TALL_TITLE_SP = 14f
+    private const val TEXT_SAFETY_FACTOR = 1.03f
+    private const val STRIP_TITLE_SP = 12f
+    private const val STRIP_TITLE_MIN_WIDTH_DP = 100
+    private const val STRIP_TITLE_MIN_HEIGHT_DP = 190
+    private const val STRIP_TITLE_ROW_DP = 28
+    private const val STRIP_TITLE_FIXED_WIDTH_DP = 28f
 
     // Batch 68: fix "widget nggak pernah sinkron pas ganti tema" — widget_player(.compact).xml
     // used to hardcode the dark palette permanently (no light counterpart, and nothing ever
@@ -214,11 +226,23 @@ object WidgetUpdater {
             try {
                 performUpdate(context)
             } catch (e: Exception) {
+                WidgetMarqueeDriver.stop() // layout/konfigurasi lama bisa basi bila update penuh gagal di tengah jalan
                 AppLogger.e("WidgetUpdater", "Gagal memperbarui widget", e)
             } catch (e: OutOfMemoryError) {
+                WidgetMarqueeDriver.stop()
                 AppLogger.e("WidgetUpdater", "Memori habis saat memperbarui widget", e)
             }
         }
+    }
+
+    // Batch 641 — ESTIMASI lebar judul (dp): Paint bold, sp ikut font scale. Dikali TEXT_SAFETY_FACTOR karena font perangkat/launcher bisa
+    // sedikit lebih lebar dari Typeface.DEFAULT_BOLD; selisih kecil diserap END_SLACK_DP di WidgetMarqueeMath.
+    private fun measureTitleDp(context: Context, text: String, sp: Float): Float {
+        val metrics = context.resources.displayMetrics
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.typeface = Typeface.DEFAULT_BOLD
+        paint.textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, metrics)
+        return paint.measureText(text) / metrics.density
     }
 
     // Batch 640 — ukuran sampul + kenop layout strip mengikuti ukuran widget (lihat WidgetStripSizing). Layout XML memberi
@@ -255,7 +279,9 @@ object WidgetUpdater {
     // dipakai launcher (`android.R.dimen.system_app_widget_background_radius`, API 31 = minSdk). Padding XML
     // dipertahankan bila sudah cukup (kasus umum: radius <= ~27dp untuk compact, <= ~47dp untuk penuh -> tak ada
     // perubahan); hanya dinaikkan bila radius sistem perangkat lebih besar. Gagal = dilewati (padding XML tetap).
-    private fun applyCornerInset(context: Context, views: RemoteViews, isCompact: Boolean) {
+    // Batch 641 — mengembalikan tambahan padding per sisi (dp) yang diberikan inset ini (0 bila padding XML dipertahankan); dipakai
+    // untuk menyempitkan ESTIMASI kolom judul marquee.
+    private fun applyCornerInset(context: Context, views: RemoteViews, isCompact: Boolean): Float {
         try {
             val resources = context.resources
             val density = resources.displayMetrics.density
@@ -265,10 +291,12 @@ object WidgetUpdater {
             if (inset > xmlPadding) {
                 val pad = ceil(inset).toInt()
                 views.setViewPadding(R.id.widget_root, pad, pad, pad, pad)
+                return ((pad - xmlPadding) / density).coerceAtLeast(0f)
             }
         } catch (e: Exception) {
             AppLogger.e("WidgetUpdater", "Gagal menerapkan inset sudut widget", e)
         }
+        return 0f
     }
 
     private val titleMarqueeSelectable: Boolean by lazy {
@@ -282,14 +310,8 @@ object WidgetUpdater {
         remotable
     }
 
-    // Batch 592 — urutan WAJIB: setSelected(false) SEBELUM teks judul diganti, setSelected(true) SESUDAHNYA.
-    // Mengganti teks `TextView` yang marquee-nya sedang berjalan (selected) merusak state marquee-nya
-    // (layout marquee/ellipsis tertukar), dan `setSelected` hanya memulai marquee saat state BERUBAH. Gejala
-    // yang dilaporkan: marquee jalan hanya saat judul placeholder "Tidak ada lagu" (teks tak pernah berganti)
-    // dan mati begitu judul lagu berganti. Dipanggil di setiap update, jadi marquee mulai dari awal tiap update.
-    private fun setTitleSelected(views: RemoteViews, selected: Boolean) {
-        if (titleMarqueeSelectable) views.setBoolean(R.id.widget_title, "setSelected", selected)
-    }
+    // Batch 641 — setTitleSelected() DIHAPUS: marquee tak lagi memakai TextView.setSelected/fokus (tak remotable di perangkat uji; tak andal di
+    // launcher). Judul digeser app lewat WidgetMarqueeDriver. `titleMarqueeSelectable` hanya tinggal untuk baris log diagnostik.
 
     // Batch 593 — SATU baris log per widget per update (level WARN, tag WidgetUpdater, awalan "Marquee diag"),
     // supaya penyebab marquee mati saat lagu nyata bisa diputuskan dari DATA, bukan tebakan. Isi: nomor update +
@@ -362,7 +384,10 @@ object WidgetUpdater {
         val manager = AppWidgetManager.getInstance(context)
         val component = ComponentName(context, PlayerWidgetProvider::class.java)
         val ids = manager.getAppWidgetIds(component)
-        if (ids.isEmpty()) return
+        if (ids.isEmpty()) {
+            WidgetMarqueeDriver.stop()
+            return
+        }
 
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val title = prefs.getString(KEY_TITLE, null)
@@ -408,6 +433,7 @@ object WidgetUpdater {
         val prevGlyph = if (isDark) null else tintedGlyph(context, R.drawable.ic_widget_previous, GLYPH_COLOR_LIGHT)
         val nextGlyph = if (isDark) null else tintedGlyph(context, R.drawable.ic_widget_next, GLYPH_COLOR_LIGHT)
 
+        val marqueeLanes = ArrayList<WidgetMarqueeDriver.Lane>()
         for (id in ids) {
             // Widgets can be resized independently by the user, so each one gets its own
             // layout choice — a widget shrunk down to just an icon shouldn't try to cram in
@@ -431,7 +457,7 @@ object WidgetUpdater {
                 else -> R.layout.widget_player
             }
             val views = RemoteViews(context.packageName, layoutRes)
-            applyCornerInset(context, views, isCompact)
+            val extraPadDp = applyCornerInset(context, views, isCompact)
 
             // Batch 604 — cangkang "bilah" + palung cekung (widget_background_dark/_light + widget_well[_light]).
             // `widget_background.xml` (daun diagonal) sekarang HANYA dipakai bubble. Mekanisme penukaran identik
@@ -463,15 +489,42 @@ object WidgetUpdater {
             if (prevGlyph != null) views.setImageViewBitmap(R.id.widget_prev, prevGlyph)
             if (nextGlyph != null) views.setImageViewBitmap(R.id.widget_next, nextGlyph)
 
+            // Batch 641 — strip kini punya baris judul bila cukup lebar & tinggi; layout lain selalu punya judul.
+            val showStripTitle = isStrip && minWidthDp >= STRIP_TITLE_MIN_WIDTH_DP && minHeightDp >= STRIP_TITLE_MIN_HEIGHT_DP
+            val hasTitle = !isStrip || showStripTitle
             if (isStrip) {
-                // Batch 639 — strip tak punya TextView judul: judul lagu jadi contentDescription sampul (aksesibilitas).
+                // Batch 639 — judul lagu juga jadi contentDescription sampul (aksesibilitas).
                 views.setContentDescription(R.id.widget_album_art, title ?: "Buka SONIX")
-                applyStripSizes(context, views, minWidthDp, minHeightDp)
-            } else {
-                setTitleSelected(views, false)
+                applyStripSizes(
+                    context, views, minWidthDp,
+                    if (showStripTitle) minHeightDp - STRIP_TITLE_ROW_DP else minHeightDp
+                )
+                if (showStripTitle) {
+                    views.setViewVisibility(R.id.widget_title_viewport, View.VISIBLE)
+                    views.setInt(
+                        R.id.widget_title_viewport,
+                        "setBackgroundResource",
+                        if (isDark) R.drawable.widget_well else R.drawable.widget_well_light
+                    )
+                }
+            }
+            if (hasTitle) {
                 views.setTextViewText(R.id.widget_title, title ?: "Tidak ada lagu")
                 views.setTextColor(R.id.widget_title, if (isDark) TITLE_COLOR_DARK else TITLE_COLOR_LIGHT)
-                setTitleSelected(views, true)
+                // Update penuh SELALU mengembalikan geseran judul ke awal (host mendaur ulang view; margin lama akan bertahan bila tak diatur).
+                views.setViewLayoutMargin(R.id.widget_title, RemoteViews.MARGIN_LEFT, 0f, TypedValue.COMPLEX_UNIT_DIP)
+                val titleSp = if (isStrip) STRIP_TITLE_SP else if (isTall) TALL_TITLE_SP else TITLE_SP
+                val fixedDp = when {
+                    isStrip -> STRIP_TITLE_FIXED_WIDTH_DP
+                    isSlim -> SLIM_FIXED_WIDTH_DP
+                    isCompact -> COMPACT_FIXED_WIDTH_DP
+                    isTall -> TALL_FIXED_WIDTH_DP
+                    else -> FULL_FIXED_WIDTH_DP
+                }
+                val columnDp = minWidthDp - fixedDp - 2f * extraPadDp
+                val textDp = measureTitleDp(context, title ?: "Tidak ada lagu", titleSp)
+                val travelDp = WidgetMarqueeMath.travelDp(textDp * TEXT_SAFETY_FACTOR, columnDp)
+                if (travelDp > 0f) marqueeLanes.add(WidgetMarqueeDriver.Lane(id, layoutRes, travelDp))
             }
             views.setOnClickPendingIntent(R.id.widget_next, servicePendingIntent(context, ACTION_NEXT, 2))
             views.setOnClickPendingIntent(R.id.widget_prev, servicePendingIntent(context, ACTION_PREVIOUS, 3))
@@ -499,10 +552,12 @@ object WidgetUpdater {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             views.setOnClickPendingIntent(R.id.widget_album_art, openAppPending)
-            if (!isStrip) views.setOnClickPendingIntent(R.id.widget_title, openAppPending)
+            if (hasTitle) views.setOnClickPendingIntent(R.id.widget_title, openAppPending)
 
             manager.updateAppWidget(id, views)
         }
+        // Batch 641 — SETELAH semua update penuh terkirim (partial berikutnya tak mendahului layout baru di host).
+        WidgetMarqueeDriver.configure(context, marqueeLanes, isPlaying)
     }
 
     /** Mirrors [com.rudi.audioplayer.ui.theme.colorsFor]'s SYSTEM branch (Compose's

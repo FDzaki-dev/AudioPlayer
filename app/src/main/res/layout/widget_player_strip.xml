@@ -11,6 +11,8 @@
     Tinggi minimum: padding 14 + sampul 32 + margin 5 + palung (kenop 24+28+24 + jarak 2x10 + padding 6 = 102) = 153dp -> ambang 160dp.
     TIDAK ada judul/artis (tak muat di 32dp): WidgetUpdater melewati `widget_title`/`widget_artist` dan mengisi contentDescription sampul
     dgn judul lagu. Id lain utuh (widget_root, widget_well, widget_album_art, widget_prev, widget_play_pause, widget_next).
+    Batch 641 — BARIS JUDUL opsional (`widget_title_viewport`, bawaan GONE; WidgetUpdater memunculkannya bila lebar >= 100dp & tinggi >= 190dp):
+    palung kecil di antara sampul & palung kenop berisi judul 12sp 1 baris yang DIGESER app (lihat WidgetMarquee.kt); sisa tinggi 28dp dicadangkan.
     Cangkang: `widget_background_compact_*`; palung `widget_well[_light]`; root dibungkus `@android:id/background` + `clipToOutline`
     (opt-out clip launcher Android 12+, Batch 610) sama dgn layout lain.
 -->
@@ -39,6 +41,31 @@
             android:layout_height="32dp"
             android:scaleType="fitCenter"
             android:contentDescription="Buka SONIX" />
+
+        <FrameLayout
+            android:id="@+id/widget_title_viewport"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/widget_well"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="4000dp"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:includeFontPadding="false"
+                android:text="Tidak ada lagu" />
+
+        </FrameLayout>
 
         <LinearLayout
             android:id="@+id/widget_well"
