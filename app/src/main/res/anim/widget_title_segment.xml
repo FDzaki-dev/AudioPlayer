@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Batch 643 — SEGMEN geser judul widget yang DIGAMBAR LAUNCHER sendiri (animasi view, mengikuti refresh rate layar: 60/120 Hz), bukan per-frame dari app.
+    Batch 644 — segmen DIPERPANJANG 30dp/1 dtk -> 90dp/3 dtk (kecepatan sama 30dp/dtk) agar update parsial ke launcher 3x lebih jarang (v643: gerak maju
+    tapi tersendat tiap ~1 dtk). Batch 643 — SEGMEN geser judul widget yang DIGAMBAR LAUNCHER sendiri (animasi view, mengikuti refresh rate layar: 60/120 Hz), bukan per-frame dari app.
     Dipakai sebagai `android:inAnimation` ViewFlipper `widget_title_flipper` (tanpa autoStart): WidgetMarqueeDriver cukup mengirim 1 update parsial per
-    detik (`setViewLayoutMargin(widget_title, MARGIN_LEFT, -k*30dp)` + `setDisplayedChild(0)` yang MENGULANG animasi ini dari awal).
-    Jarak = 0,75% lebar sendiri TextView `widget_title` (lebar TETAP 4000dp di XML -> 30dp, tak bergantung densitas); durasi 1000 ms linear -> 30dp/dtk
-    (kecepatan marquee bawaan). `fillAfter` menahan ujung (-30dp) sampai update berikutnya menggeser margin sebesar itu dan memulai ulang dari 0 pada
-    frame yang sama -> posisi kontinu. Jarak/durasi sengaja KONSTAN: lebar periode teks dibulatkan ke kelipatan 30dp lewat spasi (WidgetUpdater.planTitle).
+    segmen (`setViewLayoutMargin(widget_title, MARGIN_LEFT, -k*90dp)` + `setDisplayedChild(0)` yang MENGULANG animasi ini dari awal).
+    Jarak = 2,25% lebar sendiri TextView `widget_title` (lebar TETAP 4000dp di XML -> 90dp, tak bergantung densitas); durasi 3000 ms linear -> 30dp/dtk
+    (kecepatan marquee bawaan). `fillAfter` menahan ujung (-90dp) sampai update berikutnya menggeser margin sebesar itu dan memulai ulang dari 0 pada
+    frame yang sama -> posisi kontinu. Jarak/durasi sengaja KONSTAN: lebar periode teks dibulatkan ke kelipatan 90dp lewat spasi (WidgetUpdater.planTitle).
 -->
 <translate xmlns:android="http://schemas.android.com/apk/res/android"
     android:fromXDelta="0%"
-    android:toXDelta="-0.75%"
-    android:duration="1000"
+    android:toXDelta="-2.25%"
+    android:duration="3000"
     android:interpolator="@android:anim/linear_interpolator"
     android:fillAfter="true" />

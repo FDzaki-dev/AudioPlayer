@@ -239,8 +239,9 @@ object WidgetUpdater {
 
     // Batch 643 — rencana marquee judul: teks yang DITAMPILKAN di tampilan geser + jumlah segmen (0 = statis, muat / tak layak digeser). Paint bold, sp
     // ikut font scale (sama dgn TextView `textStyle=bold`). Deteksi overflow memakai lebar x TEXT_SAFETY_FACTOR (font perangkat/launcher bisa sedikit
-    // lebih lebar). PERIODE loop (= lebar `judul + spasi`) dibulatkan ke kelipatan SEGMENT_DP (30dp) dgn jumlah spasi biasa terdekat (galat <= ~1/2 lebar
-    // spasi, ±1,8dp) karena animasi segmen di XML berjarak tetap 30dp; salinan ke-2 mendarat (hampir) tepat di posisi salinan ke-1 -> loop mulus.
+    // lebih lebar). PERIODE loop (= lebar `judul + spasi`) dibulatkan ke kelipatan SEGMENT_DP (90dp sejak Batch 644; kelipatan terdekat, jarak antar salinan
+    // >= MIN_GAP_DP) dgn jumlah spasi biasa terdekat (galat <= ~1/2 lebar spasi, ±1,8dp) karena animasi segmen di XML berjarak tetap; salinan ke-2 mendarat
+    // (hampir) tepat di posisi salinan ke-1 -> loop mulus.
     private class TitlePlan(val display: String, val segments: Int)
 
     private fun planTitle(context: Context, shown: String, sp: Float, columnDp: Float): TitlePlan {
@@ -251,7 +252,7 @@ object WidgetUpdater {
         val textDp = paint.measureText(shown) / metrics.density
         if (!WidgetMarqueeMath.shouldScroll(textDp * TEXT_SAFETY_FACTOR, columnDp)) return TitlePlan(shown, 0)
         val spaceDp = (paint.measureText(" ") / metrics.density).coerceAtLeast(1f)
-        val segments = WidgetMarqueeMath.segmentsFor(textDp + WidgetMarqueeMath.gapDp(columnDp))
+        val segments = WidgetMarqueeMath.segmentsForText(textDp, columnDp)
         if (segments > WidgetMarqueeMath.MAX_SEGMENTS) return TitlePlan(shown, 0)
         val target = WidgetMarqueeMath.targetPeriodDp(segments)
         val guess = ((target - textDp) / spaceDp).roundToInt()

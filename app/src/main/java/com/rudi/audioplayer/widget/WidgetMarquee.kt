@@ -16,35 +16,41 @@ import com.rudi.audioplayer.util.AppLogger
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
- * Batch 643 — MATEMATIKA marquee judul widget (fungsi murni tanpa Android, bisa diuji unit).
+ * Batch 644 — MATEMATIKA marquee judul widget (fungsi murni tanpa Android, bisa diuji unit).
  *
  * Riwayat: marquee bawaan TextView tak bisa jalan di widget (`setSelected` tidak remotable, log v639: remotable=false; fokus XML tak andal di
  * Smart Launcher). v641 = app mengirim margin per 100 ms (patah-patah). v642 = 30 fps + loop mulus (masih patah di layar 120 Hz: user "gak ada
  * cara lebih organik?" + refresh 60 Hz diam / 120 Hz dipakai).
  *
  * Batch 643 — GERAK DIGAMBAR LAUNCHER: judul = TextView 4000dp (`widget_title`) berisi DUA salinan `judul + spasi + judul` di dalam ViewFlipper
- * (`widget_title_flipper`, tanpa autoStart) dengan animasi masuk `@anim/widget_title_segment` = geser 30dp / 1000 ms linear (mengikuti refresh rate layar).
- * Satu SEGMEN = 1 detik = 30dp. Tiap awal segmen app mengirim 1 update parsial: margin kiri = -k x 30dp + `setDisplayedChild(0)` (mengulang animasi dari 0
- * pada frame yang sama dengan pergeseran margin -> posisi kontinu). Satu LOOP = [q] segmen, q = periode / 30dp; periode (lebar `judul + spasi`) dibulatkan ke
- * kelipatan 30dp oleh WidgetUpdater (spasi) agar akhir loop = bingkai awal (salinan ke-2 tepat di posisi salinan ke-1). Setelah loop: diam [PAUSE_MS]
- * (ujung animasi terakhir ditahan `fillAfter`, tampilannya identik dengan awal), lalu loop berikutnya.
+ * (`widget_title_flipper`, tanpa autoStart) dengan animasi masuk `@anim/widget_title_segment` (mengikuti refresh rate layar). Tiap awal segmen app
+ * mengirim 1 update parsial: margin kiri = -k x SEGMENT_DP + `setDisplayedChild(0)` (mengulang animasi dari 0 pada frame yang sama dengan pergeseran
+ * margin -> posisi kontinu). Satu LOOP = [q] segmen, q = periode / SEGMENT_DP; periode (lebar `judul + spasi`) dibulatkan ke kelipatan SEGMENT_DP oleh
+ * WidgetUpdater (spasi) agar akhir loop = bingkai awal (salinan ke-2 tepat di posisi salinan ke-1). Setelah loop: diam [PAUSE_MS] (ujung animasi
+ * terakhir ditahan `fillAfter`, tampilannya identik dengan awal), lalu loop berikutnya.
+ *
+ * Batch 644 — v643 (segmen 30dp / 1 dtk) gerak maju tapi TERSENDAT tiap ~1 dtk (laporan user: "berkedut kedut", gejala dipilih: "Maju terus, tapi tersendat
+ * tiap ±1 detik"). Dugaan (belum terbukti): tiap update parsial membuat launcher menerapkan ulang seluruh RemoteViews tersimpan -> frame jatuh sesaat, dan
+ * jumlahnya sebanding dgn jumlah update. Perbaikan: segmen 90dp / 3 dtk (kecepatan SAMA 30dp/dtk) -> update 3x lebih jarang; selain itu jumlah segmen
+ * dipilih ke kelipatan TERDEKAT (bukan selalu ke atas) agar jarak antar salinan tak melebar rata-rata ~45dp ([segmentsForText]).
  */
 internal object WidgetMarqueeMath {
     const val SPEED_DP_PER_SEC = 30f
 
-    /** Jarak satu segmen (dp) = 0,75% x 4000dp di `anim/widget_title_segment.xml`; JANGAN diubah tanpa mengubah XML itu. */
-    const val SEGMENT_DP = 30f
+    /** Jarak satu segmen (dp) = 2,25% x 4000dp di `anim/widget_title_segment.xml`; JANGAN diubah tanpa mengubah XML itu. */
+    const val SEGMENT_DP = 90f
 
     /** Durasi satu segmen (ms) = `android:duration` di `anim/widget_title_segment.xml`. */
-    const val SEGMENT_MS = 1000L
+    const val SEGMENT_MS = 3000L
 
     /** Diam di awal tiap loop (judul terbaca dari awal). */
     const val PAUSE_MS = 1500L
 
-    /** Batas jumlah segmen (50 x 30dp = periode 1500dp, +-190 huruf); judul lebih panjang tampil statis (ellipsize). */
-    const val MAX_SEGMENTS = 50
+    /** Batas jumlah segmen (17 x 90dp = periode 1530dp, +-190 huruf; 2 salinan < 4000dp TextView); judul lebih panjang tampil statis (ellipsize). */
+    const val MAX_SEGMENTS = 17
 
     /** Teks yang lebihnya di bawah ini dari kolom dianggap muat (tidak digeser). */
     const val MIN_OVERFLOW_DP = 2f
@@ -61,8 +67,17 @@ internal object WidgetMarqueeMath {
     fun shouldScroll(textDp: Float, columnDp: Float): Boolean =
         columnDp >= MIN_COLUMN_DP && textDp - columnDp >= MIN_OVERFLOW_DP
 
-    /** Jumlah segmen (>= 1) agar q x 30dp >= [periodDp]. */
+    /** Jumlah segmen (>= 1) agar q x SEGMENT_DP >= [periodDp]. */
     fun segmentsFor(periodDp: Float): Int = ceil(periodDp / SEGMENT_DP).toInt().coerceAtLeast(1)
+
+    /**
+     * Jumlah segmen untuk teks selebar [textDp] di kolom [columnDp]: kelipatan SEGMENT_DP TERDEKAT dari `teks + gapDp(kolom)`, tetapi jarak antar salinan
+     * tak pernah di bawah [MIN_GAP_DP] (jadi dibulatkan ke atas bila perlu).
+     */
+    fun segmentsForText(textDp: Float, columnDp: Float): Int {
+        val nearest = ((textDp + gapDp(columnDp)) / SEGMENT_DP).roundToInt()
+        return max(segmentsFor(textDp + MIN_GAP_DP), nearest)
+    }
 
     fun targetPeriodDp(segments: Int): Float = segments * SEGMENT_DP
 
@@ -99,7 +114,7 @@ internal object WidgetMarqueeMath {
 
 /**
  * Batch 643 — penggerak segmen marquee judul widget (lihat [WidgetMarqueeMath]). Satu HandlerThread; tiap "lajur" = satu widget dengan judul yang melebihi
- * kolomnya. Hanya 1 update parsial per DETIK per widget (v642: 30/dtk); gerak halusnya digambar launcher. Berhenti sendiri bila layar mati
+ * kolomnya. Hanya 1 update parsial per SEGMEN (v644: 3 dtk; v643: 1 dtk; v642: 30/dtk) per widget; gerak halusnya digambar launcher. Berhenti sendiri bila layar mati
  * (ACTION_SCREEN_OFF), tak ada lajur, atau 3 kegagalan beruntun. Saat lagu TIDAK diputar tiap lajur hanya [IDLE_LOOPS] loop lalu berhenti pada akhir loop
  * (tampilan akhir = awal, tak perlu reset); layar menyala = siklus baru. Update penuh ([WidgetUpdater.performUpdate]) menata ulang margin = 0 + memulai
  * segmen ke-0 lalu memanggil [configure].
@@ -136,7 +151,7 @@ internal object WidgetMarqueeDriver {
         snapshot = Snapshot(lanes, playing, SystemClock.uptimeMillis())
         AppLogger.w(
             TAG,
-            "Penggulir judul (segmen launcher) aktif: ${lanes.size} widget, segmen 30dp/dtk=${lanes.joinToString { "${it.widgetId}:${it.segments}" }} " +
+            "Penggulir judul (segmen launcher) aktif: ${lanes.size} widget, segmen 90dp/3dtk=${lanes.joinToString { "${it.widgetId}:${it.segments}" }} " +
                 "playing=$playing layarMenyala=$screenOn"
         )
         val h = handler ?: return
