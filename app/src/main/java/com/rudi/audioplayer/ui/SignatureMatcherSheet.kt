@@ -1,5 +1,7 @@
 package com.rudi.audioplayer.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -17,10 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -196,7 +196,10 @@ private fun ApkPickerRow(label: String, result: ApkSignatureResult?, onPick: () 
 /** Full copyable report — this is the dialog the user gets instead of Android's bare "OK" popup. */
 @Composable
 private fun SignatureLogDialog(report: String, onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
-    val clipboard = LocalClipboardManager.current
+    // Batch 648 — `LocalClipboardManager` DEPRECATED (diganti `LocalClipboard` yang suspend). Disalin lewat
+    // `ClipboardManager` sistem, pola SAMA dgn DiagnosticLogSheet.kt (sinkron, tanpa coroutine) — perilaku identik:
+    // teks biasa ke papan klip saat tombol ditekan.
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
     AlertDialog(
@@ -217,7 +220,8 @@ private fun SignatureLogDialog(report: String, onDismiss: () -> Unit, onInfoMess
         },
         confirmButton = {
             TextButton(onClick = {
-                clipboard.setText(AnnotatedString(report))
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("laporan tanda tangan", report))
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onInfoMessage("Laporan disalin ke papan klip")
             }) {

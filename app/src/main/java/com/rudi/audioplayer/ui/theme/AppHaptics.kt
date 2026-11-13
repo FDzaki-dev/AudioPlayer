@@ -156,7 +156,9 @@ private fun systemHapticSnapshot(context: Context): String {
     val ringer = runCatching { context.getSystemService(AudioManager::class.java)?.ringerMode?.toString() }
         .getOrNull() ?: "n/a"
     return "sdk=${Build.VERSION.SDK_INT} hp=${Build.MANUFACTURER}/${Build.MODEL} " +
-        "getar_sentuh=${setting(Settings.System.HAPTIC_FEEDBACK_ENABLED)} " +
+        // Batch 648 — `Settings.System.HAPTIC_FEEDBACK_ENABLED` (DEPRECATED, Java) diganti literal kunci yang sama
+        // ("haptic_feedback_enabled"), seperti kunci lain di fungsi ini; nilai yang dibaca identik.
+        "getar_sentuh=${setting("haptic_feedback_enabled")} " +
         "vibrate_on=${setting("vibrate_on")} " +
         "intensitas_sentuh=${setting("haptic_feedback_intensity")} " +
         "intensitas_media=${setting("media_vibration_intensity")} ringer=$ringer"

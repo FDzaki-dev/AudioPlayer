@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.nativePaint
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -862,7 +863,7 @@ private fun renderNeuCastShadow(
             isAntiAlias = true
             color = style.castShadow.copy(alpha = layer.alpha)
         }
-        paint.asFrameworkPaint().maskFilter =
+        paint.nativePaint.maskFilter =
             BlurMaskFilter(neuBlurRadius(layer.blur * 0.5f * k), BlurMaskFilter.Blur.NORMAL)
         canvas.drawPath(path, paint)
     }
@@ -900,19 +901,19 @@ private fun renderNeuWellInner(shape: Shape, wPx: Float, hPx: Float, density: Fl
         isAntiAlias = true
         color = style.castShadow.copy(alpha = 0.40f)
     }
-    ao.asFrameworkPaint().maskFilter = BlurMaskFilter(neuBlurRadius(2.6f * k), BlurMaskFilter.Blur.NORMAL)
+    ao.nativePaint.maskFilter = BlurMaskFilter(neuBlurRadius(2.6f * k), BlurMaskFilter.Blur.NORMAL)
     canvas.drawPath(outside(0.4f * k, 0.6f * k), ao)
     val shadow = Paint().apply {
         isAntiAlias = true
         color = style.castShadow.copy(alpha = 0.85f)
     }
-    shadow.asFrameworkPaint().maskFilter = BlurMaskFilter(neuBlurRadius(1.6f * k), BlurMaskFilter.Blur.NORMAL)
+    shadow.nativePaint.maskFilter = BlurMaskFilter(neuBlurRadius(1.6f * k), BlurMaskFilter.Blur.NORMAL)
     canvas.drawPath(outside(2.0f * k, 2.6f * k), shadow)
     val lip = Paint().apply {
         isAntiAlias = true
         color = style.rimLight.copy(alpha = 0.20f)
     }
-    lip.asFrameworkPaint().maskFilter = BlurMaskFilter(neuBlurRadius(0.5f * k), BlurMaskFilter.Blur.NORMAL)
+    lip.nativePaint.maskFilter = BlurMaskFilter(neuBlurRadius(0.5f * k), BlurMaskFilter.Blur.NORMAL)
     canvas.drawPath(outside(-1.0f * k, -1.2f * k), lip)
     val cut = Paint().apply {
         isAntiAlias = true
@@ -953,13 +954,13 @@ private fun renderNeuGlassWash(
     val shadeClear = style.rimShade.copy(alpha = 0f).toArgb()
     fun gradientPaint(x0: Float, y0: Float, x1: Float, y1: Float, from: Int, to: Int): Paint =
         Paint().apply {
-            asFrameworkPaint().shader = android.graphics.LinearGradient(
+            nativePaint.shader = android.graphics.LinearGradient(
                 x0, y0, x1, y1, from, to, android.graphics.Shader.TileMode.CLAMP
             )
         }
     // Wash diagonal: sorot (kiri-atas) -> bening (tengah) -> teduh (kanan-bawah).
     val diag = Paint().apply {
-        asFrameworkPaint().shader = android.graphics.LinearGradient(
+        nativePaint.shader = android.graphics.LinearGradient(
             0f, 0f, wf, hf,
             intArrayOf(
                 style.rimLight.copy(alpha = lightA * 0.40f).toArgb(),

@@ -85,6 +85,15 @@ android {
     // biar tidak perlu bump lagi kalau ada dependency lain nagih 35 nanti.
     compileSdk = 36
 
+    // Batch 648 — peringatan deprecated CI: `resourceConfigurations` (dulu di defaultConfig, Batch 29) DEPRECATED
+    // sejak AGP 8.8; proyek kini AGP 8.13.0 (root build.gradle.kts). Pengganti resmi = `androidResources {
+    // localeFilters }` (dok. "Android Gradle plugin API updates", AGP 8.8). Batch 28 dulu gagal ("Unresolved
+    // reference: localeFilters") justru karena AGP saat itu 8.4.1 — kini sudah tersedia. Efek sama: hanya
+    // terjemahan "en" (+ resource default) library yang dipertahankan; 0 filter densitas.
+    androidResources {
+        localeFilters += listOf("en")
+    }
+
     defaultConfig {
         applicationId = "com.rudi.audioplayer"
         // Batch 290 — bump 23→31, fondasi wajib RenderEffect/RenderNode (blur asli Liquid
@@ -116,14 +125,6 @@ android {
         // versionCode and versionName both auto-derive from git commit count (see
         // gitCommitCount()/appVersionName above) — neither needs a manual bump.
         versionName = appVersionName
-        // Batch 29 (hotfix): Batch 28 used androidResources.localeFilters, which doesn't exist
-        // yet on this project's AGP 8.4.1 (confirmed by CI: "Unresolved reference:
-        // localeFilters" — that DSL landed in a later AGP release than what's pinned here).
-        // resourceConfigurations does the same job (drop unused library translation resources)
-        // and is fully supported on 8.4.1 — only deprecated starting AGP 8.8, which this
-        // project isn't on.
-        resourceConfigurations += listOf("en")
-
         // Batch 103 (Gap List #2, Instrumentation testing) — runner default AndroidJUnitRunner
         // dari androidx.test, dibutuhkan supaya app/src/androidTest bisa dieksekusi lewat
         // `./gradlew connectedAndroidTest` (device/emulator fisik) atau job CI baru di
