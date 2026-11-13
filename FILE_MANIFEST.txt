@@ -116,6 +116,7 @@
 # Batch 640: app/src/main/java/com/rudi/audioplayer/widget/WidgetStripSizing.kt dan app/src/test/java/com/rudi/audioplayer/widget/WidgetStripSizingTest.kt (file baru, ukuran strip proporsional + tesnya) ditambahkan — 241->243.
 # Batch 641: app/src/main/java/com/rudi/audioplayer/widget/WidgetMarquee.kt dan app/src/test/java/com/rudi/audioplayer/widget/WidgetMarqueeMathTest.kt (file baru, marquee judul widget digerakkan app + tesnya) ditambahkan — 243->245.
 # Batch 643: app/src/main/res/anim/widget_title_segment.xml (file baru, animasi segmen geser judul widget yang digambar launcher) ditambahkan — 245->246.
+# Batch 651: app/src/main/java/com/rudi/audioplayer/data/LastTabStore.kt dan app/src/test/java/com/rudi/audioplayer/data/LastTabStoreTest.kt (file baru, tab bawah terakhir disimpan ke disk agar selamat dari kematian proses) ditambahkan — 246->248.
 # Total: 234 file
 
 .githooks/pre-commit
@@ -155,6 +156,7 @@ app/src/main/java/com/rudi/audioplayer/data/FavoritesStore.kt
 app/src/main/java/com/rudi/audioplayer/data/FloatingBubbleStore.kt
 app/src/main/java/com/rudi/audioplayer/data/HourlyListenStore.kt
 app/src/main/java/com/rudi/audioplayer/data/Id3TagWriter.kt
+app/src/main/java/com/rudi/audioplayer/data/LastTabStore.kt
 app/src/main/java/com/rudi/audioplayer/data/LibraryCacheStore.kt
 app/src/main/java/com/rudi/audioplayer/data/LibraryFilterStore.kt
 app/src/main/java/com/rudi/audioplayer/data/LibrarySort.kt
@@ -327,6 +329,7 @@ app/src/test/java/com/rudi/audioplayer/ArchitectureTest.kt
 app/src/test/java/com/rudi/audioplayer/data/CustomFolderScannerStableIdTest.kt
 app/src/test/java/com/rudi/audioplayer/data/DuplicateDetectorTest.kt
 app/src/test/java/com/rudi/audioplayer/data/Id3TagWriterTest.kt
+app/src/test/java/com/rudi/audioplayer/data/LastTabStoreTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LibraryFilterStoreTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LibrarySortTest.kt
 app/src/test/java/com/rudi/audioplayer/data/ListeningStatsEngineTest.kt

@@ -18,6 +18,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -132,6 +134,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.rudi.audioplayer.bubble.FloatingBubbleService
 import com.rudi.audioplayer.playback.PlayerViewModel
+import com.rudi.audioplayer.data.LastTabStore
 import com.rudi.audioplayer.util.RecentsGuard
 import com.rudi.audioplayer.ui.HomeScreen
 import com.rudi.audioplayer.ui.LockScreen
@@ -181,6 +184,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 // Batch 442 — fix label nav bawah terpotong/oversized (regresi Batch 439, lihat komentar
 // MagnifyingTabLabel) + drag langsung di tab bar (bukan cuma tap). LocalTextStyle/blur (Batch
@@ -216,6 +220,9 @@ private const val STATE_BIOMETRIC_PROMPTED = "sonix_state_biometric_prompted"
  * tab Perpustakaan) selagi layar kunci menggantikannya.
  */
 private const val APP_SAVEABLE_STATE_KEY = "sonix_app_saveable_state"
+
+/** Batch 651 — batas aman topeng "pemulihan tab": konten NavHost TIDAK PERNAH tersembunyi lebih lama dari ini. */
+private const val TAB_RESTORE_MASK_TIMEOUT_MS = 800L
 
 private fun navKeyGlideSpec(from: Float, to: Float) = tween<Float>(
     durationMillis = (300f + 80f * kotlin.math.abs(to - from)).toInt().coerceIn(300, 540),
@@ -831,6 +838,39 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+    // Batch 651 — keluhan user (v647): "mekanisme pulihkan tab terakhir belum optimal, lebih sering balik ke home".
+    // AKAR: Batch 647 (SaveableStateProvider) hanya menyelamatkan state selama PROSES hidup. Log device: OEM sering mematikan
+    // proses saat di latar belakang (ApplicationExitInfo `reclaim_process_start`, importance CACHED) lalu memulai ulang saat user
+    // kembali -> NavController mulai dari startDestination "home". SOLUSI: simpan tab terakhir ke disk (LastTabStore) dan,
+    // bila app baru mulai di "home" padahal tab tersimpan lain, pindah ke tab itu dgn navigate() yang IDENTIK dgn tap tab bawah.
+    // Supaya Beranda tidak sempat berkedip: konten NavHost disembunyikan (alpha 0) + transisi dimatikan HANYA selama pemulihan
+    // (`tabRestoreSettled` false); jalur normal (tak ada tab tersimpan / sudah home) mulai `true` = perilaku lama, 0 perubahan.
+    val tabStoreContext = LocalContext.current.applicationContext
+    val lastTabStore = remember { LastTabStore(tabStoreContext) }
+    val savedTab = remember { lastTabStore.getLastTab() }
+    var tabRestoreChecked by remember { mutableStateOf(false) }
+    var tabRestoreSettled by remember { mutableStateOf(savedTab == null || savedTab == LastTabStore.START_TAB) }
+    LaunchedEffect(Unit) {
+        delay(TAB_RESTORE_MASK_TIMEOUT_MS)
+        tabRestoreSettled = true
+    }
+    LaunchedEffect(currentRoute) {
+        val route = currentRoute ?: return@LaunchedEffect
+        if (!tabRestoreChecked) {
+            tabRestoreChecked = true
+            val target = LastTabStore.restoreTarget(savedTab, route)
+            if (target != null) {
+                navController.navigate(target) {
+                    popUpTo("home") { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+                return@LaunchedEffect
+            }
+        }
+        if (route in TAB_ROUTES) lastTabStore.setLastTab(route)
+        tabRestoreSettled = true
+    }
 
     // Batch 435 — request eksplisit user: "tambahkan gesture swipe able lintas 3 tab, alih-alih
     // user hanya bisa tap-tab manual berulang". App ini pakai Jetpack Navigation Compose dengan
@@ -1678,6 +1718,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         NavHost(
             navController = navController,
             startDestination = "home",
+            modifier = Modifier.graphicsLayer { this.alpha = if (tabRestoreSettled) 1f else 0f },
             // Batch 330 — default crossfade app-wide (tab bawah home/library/settings +
             // push stats_dashboard). Sebelum ini 0 enter/exitTransition di level NavHost =
             // cut instan bawaan Compose Navigation, kontras dgn "now_playing" yang sudah
@@ -1691,8 +1732,14 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             // `Motion.IosEasing` (S-curve iOS) sesuai instruksi eksplisit user batch ini
             // ("polish animasi/transisi biar mulus like iOS"). Non-breaking murni di
             // lapisan kurva, 0 formula/threshold gesture lain disentuh.
-            enterTransition = { fadeIn(animationSpec = tween(Motion.DURATION_STANDARD, easing = Motion.IosEasing)) },
-            exitTransition = { fadeOut(animationSpec = tween(Motion.DURATION_QUICK, easing = Motion.IosEasing)) },
+            enterTransition = {
+                if (tabRestoreSettled) fadeIn(animationSpec = tween(Motion.DURATION_STANDARD, easing = Motion.IosEasing))
+                else EnterTransition.None
+            },
+            exitTransition = {
+                if (tabRestoreSettled) fadeOut(animationSpec = tween(Motion.DURATION_QUICK, easing = Motion.IosEasing))
+                else ExitTransition.None
+            },
             popEnterTransition = { fadeIn(animationSpec = tween(Motion.DURATION_STANDARD, easing = Motion.IosEasing)) },
             popExitTransition = { fadeOut(animationSpec = tween(Motion.DURATION_QUICK, easing = Motion.IosEasing)) }
         ) {
