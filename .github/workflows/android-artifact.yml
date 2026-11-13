@@ -27,7 +27,7 @@ name: Android CI Artifact for Claude
 # `NOT VERIFIED` (alat gagal != lulus) — TIDAK PERNAH "bersih".
 #
 # Beda dari berkas contoh (alasan):
-#  - `gradle` (setup-gradle 8.14.4, sama dgn build.yml) bukan `./gradlew`: proyek belum punya Gradle Wrapper.
+#  - `gradle` (setup-gradle 8.14.3, sama dgn build.yml) bukan `./gradlew`: proyek belum punya Gradle Wrapper.
 #  - Task `spotbugsRelease` TIDAK ada di proyek Android bila plugin `com.github.spotbugs` dipakai langsung;
 #    dibuat lewat config/spotbugs/spotbugs.gradle.kts (aktif hanya dgn -Psonix.spotbugs=true).
 #  - ArchUnit = tes `ArchitectureTest` (report-only, aktif hanya dgn env SONIX_ARCH_REPORT=1); status dibaca dari
@@ -68,7 +68,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
         with:
-          gradle-version: 8.14.4
+          gradle-version: 8.14.3
           cache-read-only: true
 
       # 1. Tiga invocation Gradle TERPISAH (kegagalan satu tak menjatuhkan yang lain). Exit code disimpan ke
