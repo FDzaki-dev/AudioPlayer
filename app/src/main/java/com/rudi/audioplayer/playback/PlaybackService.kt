@@ -936,10 +936,15 @@ class PlaybackService : MediaLibraryService() {
         // playback with the last saved queue even after this service (and the whole app
         // process) has been killed — the actual mechanism behind the lock-screen media control
         // and status-bar indicator being reachable again without reopening the app.
+        // Batch 649 — peringatan deprecated terakhir di CI: overload 2-arg `onPlaybackResumption(mediaSession,
+        // controller)` DEPRECATED di Media3 1.10.1; pengganti resmi = overload 3-arg dengan `isForPlayback`
+        // (dok. MediaSession.Callback). Isi method TIDAK diubah: dulu overload 3-arg bawaan hanya meneruskan ke
+        // 2-arg tanpa memakai flag itu, jadi mengabaikannya di sini = perilaku identik.
         @UnstableApi
         override fun onPlaybackResumption(
             mediaSession: MediaSession,
-            controller: MediaSession.ControllerInfo
+            controller: MediaSession.ControllerInfo,
+            isForPlayback: Boolean
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
             return CallbackToFutureAdapter.getFuture { completer ->
                 serviceScope.launch {
