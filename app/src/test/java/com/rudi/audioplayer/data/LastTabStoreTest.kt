@@ -7,27 +7,27 @@ import org.junit.Test
 class LastTabStoreTest {
 
     @Test
-    fun `start dingin di home dengan tab tersimpan library -> pindah ke library`() {
+    fun `start dingin di home dengan tab tersimpan library maka pindah ke library`() {
         assertEquals("library", LastTabStore.restoreTarget(saved = "library", firstRoute = "home"))
     }
 
     @Test
-    fun `start dingin di home dengan tab tersimpan settings -> pindah ke settings`() {
+    fun `start dingin di home dengan tab tersimpan settings maka pindah ke settings`() {
         assertEquals("settings", LastTabStore.restoreTarget(saved = "settings", firstRoute = "home"))
     }
 
     @Test
-    fun `tab tersimpan home -> tidak perlu pindah`() {
+    fun `tab tersimpan home maka tidak perlu pindah`() {
         assertNull(LastTabStore.restoreTarget(saved = "home", firstRoute = "home"))
     }
 
     @Test
-    fun `belum ada tab tersimpan -> tidak pindah`() {
+    fun `belum ada tab tersimpan maka tidak pindah`() {
         assertNull(LastTabStore.restoreTarget(saved = null, firstRoute = "home"))
     }
 
     @Test
-    fun `navigasi sudah dipulihkan ke tab lain -> tidak ditimpa`() {
+    fun `navigasi sudah dipulihkan ke tab lain maka tidak ditimpa`() {
         assertNull(LastTabStore.restoreTarget(saved = "library", firstRoute = "library"))
         assertNull(LastTabStore.restoreTarget(saved = "library", firstRoute = "settings"))
     }
@@ -39,7 +39,7 @@ class LastTabStoreTest {
     }
 
     @Test
-    fun `rute pertama belum teramati -> tidak pindah`() {
+    fun `rute pertama belum teramati maka tidak pindah`() {
         assertNull(LastTabStore.restoreTarget(saved = "library", firstRoute = null))
     }
 }

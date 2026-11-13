@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 652 — PERBAIKAN build gagal v651 (nama tes ilegal `->`) + Gradle 8.14.3 -> 8.14.4 (peringatan Kotlin "Deprecated Gradle Version") (BELUM verified)
+- Input user: `log_fail_624.zip` (`build-output.log` build gagal v651) + `sonix_debug_20261113_131932_1.txt` (IDENTIK byte-per-byte dgn `sonix_debug_20261113_131932.txt` yang sudah dianalisis Batch 651: MD5 sama, 4312 baris — tak ada informasi baru).
+- AKAR kegagalan (kesalahan saya, pengulangan pola Batch 644/645): `:app:compileReleaseUnitTestKotlin FAILED` — 6x `LastTabStoreTest.kt:10/15/20/25/30/42:9 Name contains illegal characters: >.` karena 6 nama tes backtick memakai " -> ". JVM melarang `. ; [ ] / < > : \` pada nama fungsi. Kompilasi KODE UTAMA (`compileReleaseKotlin`: `LastTabStore`, `MainActivity`) LOLOS sebelum tes dikompilasi; build berhenti di tes sehingga tidak ada APK v651.
+- PERBAIKAN (1 file tes): `LastTabStoreTest.kt` — " -> " diganti " maka " di 6 nama tes (isi/asersi tes TIDAK diubah). Pencegahan: seluruh nama tes backtick di SEMUA `*.kt` proyek diperiksa dgn regex karakter terlarang sebelum paket dibuat -> 0 nama ilegal.
+- PERBAIKAN (2 file workflow): `build.yml` + `android-artifact.yml` `gradle-version: 8.14.3 -> 8.14.4` — log memuat `w: Deprecated Gradle Version: Gradle 8.14.3 is deprecated ... minimum supported becomes 8.14.4 in Kotlin 2.5.0`. Gradle 8.14.4 = rilis patch 8.14 (23 Jan 2026, memperbaiki 2 kerentanan keamanan; dok. docs.gradle.org/8.14.4/release-notes). Patch-level, tanpa perubahan API.
+- BATAS JUJUR: belum dijalankan. Bila `setup-gradle@v5` gagal mengunduh 8.14.4, kembalikan ke 8.14.3 dan catat. Fix tab Batch 651 TETAP belum teruji di device (build v651 gagal, jadi tak ada APK yang bisa dipasang).
+- FILE (3 <= 5; 0 baru): `LastTabStoreTest.kt`, `build.yml`, `android-artifact.yml` (+ docs; `FILE_MANIFEST.txt` tetap 248).
+- **NOT VERIFIED**. PREDIKSI run berikutnya: build hijau; `Tes unit: LULUS (224 tes, 0 dilewati)` (217 + 7); Peringatan kompilator Kotlin 0; tanpa baris `w: Deprecated Gradle Version`; ArchUnit 7; SpotBugs 0; detekt 0; lint 0. UJI DEVICE: lihat Batch 651.
+
 ## Batch 651 — tab terakhir kini DISIMPAN KE DISK: pulih walau proses app dimatikan OEM (BELUM verified)
 - Input user: `SONIX_laporan-untuk-claude_run77.zip` + `sonix_debug_20261113_131932.txt` (v650 = 1.10.10 build 510) + "mekanisme pulihkan tab terakhir belum berjalan optimal alias lebih sering balik ke home!!".
 - FAKTA run #77 (commit `ce9adde`, exit 0/0/0/0): ArchUnit 7, SpotBugs 0, detekt 0, lintDebug 0, Tes unit 217, Peringatan kompilator Kotlin 0 = v650 (anotasi CI) TERKOMPILASI.
