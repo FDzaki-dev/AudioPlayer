@@ -152,9 +152,12 @@ jobs:
           # Batch 618 — log_fail_592: `compileReleaseKotlin` gagal karena unduhan `kotlin-compiler-embeddable-2.4.10.jar`
           # "Read timed out" (jaringan runner, BUKAN kode). Diulang SEKALI hanya bila log cocok pola jaringan;
           # galat kompilasi/tes sungguhan tetap gagal langsung (fail-fast) tanpa diulang.
+          # Batch 653 — log_fail_625: `processReleaseResources` gagal "Could not resolve all dependencies ... Problems reading
+          # data from Binary store in /home/runner/.gradle/.tmp/gradle*.bin" (berkas sementara resolusi dependency rusak di runner,
+          # BUKAN kode; terjadi SEBELUM tes/kompilasi). Pola itu ikut diulang SEKALI (JVM baru = berkas .bin baru).
           for attempt in 1 2; do
             gradle testReleaseUnitTest assembleRelease --no-daemon --build-cache 2>&1 | tee build-output.log && break
-            if [ "$attempt" -lt 2 ] && grep -qE "Read timed out|Connect timed out|Could not GET|Could not download|Connection reset|Premature end of Content-Length|Remote host terminated" build-output.log; then
+            if [ "$attempt" -lt 2 ] && grep -qE "Read timed out|Connect timed out|Could not GET|Could not download|Connection reset|Premature end of Content-Length|Remote host terminated|Problems reading data from Binary store" build-output.log; then
               echo "::warning::Kegagalan jaringan saat mengunduh dependency (percobaan $attempt) - mengulang sekali"
               cp build-output.log build-output-attempt1.log
               sleep 20
