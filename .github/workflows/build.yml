@@ -19,7 +19,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Batch 650 — `ubuntu-latest` sedang dimigrasi GitHub ke Ubuntu 26.04 (19 Okt - 19 Nov 2026; notice di ringkasan run).
+    # Dipasang eksplisit ke 24.04 = image SAMA seperti sebelumnya (SDK/JDK/alat tak berubah); pindah ke 26.04 nanti
+    # keputusan sendiri, setelah diuji.
+    runs-on: ubuntu-24.04
     # Wajib: GITHUB_TOKEN bawaan cuma read-only ke contents secara default — action
     # pembuat Release di bawah butuh izin tulis buat bikin tag + release + upload asset.
     permissions:
@@ -27,7 +30,7 @@ jobs:
     steps:
       # ═══════════════════════ 1. SETUP ═══════════════════════
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Full history, not a shallow clone — the version scheme below counts total
           # commits, and a shallow checkout would silently under-count that.
@@ -41,13 +44,13 @@ jobs:
           filter: blob:none
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: 8.14.3
           # Batch 62 — cache Gradle User Home (dependency jar, wrapper dist, dan build
@@ -204,7 +207,7 @@ jobs:
         # body_path (Batch 156) — isi release_notes.txt (pesan commit HEAD, step di atas) jadi
         # field "body" GitHub Release, dibaca app lewat GitHubReleaseChecker.kt/
         # UpdateCheckSheet.kt di layar "Cek Update".
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.release_name }}
@@ -215,7 +218,7 @@ jobs:
       # lintdebug/detekt]". Sebelumnya APK HANYA jadi asset Release -> tab Artifacts tak pernah memuat
       # aplikasi. Kini APK juga jadi ARTIFACT (SETELAH Release terbit, jadi tak menunda/menggagalkan rilis).
       # `archive: false` (upload-artifact v7) = APK diunggah APA ADANYA (tanpa dibungkus zip; nama artifact =
-      # nama berkas). `continue-on-error` + langkah cadangan v4 (zip, nama `SONIX_app_...`) di bawah: kalau
+      # nama berkas). `continue-on-error` + langkah cadangan v6 (zip, nama `SONIX_app_...`) di bawah: kalau
       # v7 gagal, artifact aplikasi TETAP ada. `hashFiles` -> hanya bila APK memang terbentuk.
       - name: Upload APK artifact (tanpa zip)
         id: apk_artifact
@@ -230,7 +233,7 @@ jobs:
 
       - name: Upload APK artifact (cadangan, zip)
         if: always() && steps.apk_artifact.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: SONIX_app_v${{ steps.version.outputs.name }}-run${{ github.run_number }}
           path: renamed/AudioPlayer-${{ steps.version.outputs.tag }}.apk
@@ -273,7 +276,7 @@ jobs:
         # invocation, satu stream log berurutan). Path test-output.log dihapus dari daftar
         # supaya tidak tampil "file not found" palsu di setiap kegagalan.
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: log_fail_${{ github.run_number }}
           path: |
