@@ -1338,14 +1338,19 @@ class FloatingBubbleService : Service() {
         private const val NOTIFICATION_ID = 7002 // beda dari COLD_START_NOTIFICATION_ID (7001)
 
         // Batch 453 — tuning auto-fade idle, lihat KDoc kelas & keepAwakeAndScheduleFade().
-        private const val IDLE_FADE_DELAY_MS = 2500L
+        // Batch 661 — user: "terlalu cepat fadeout nya!!" (video 360973.mp4: bubble meredup ~2,5 dtk setelah sentuhan
+        // terakhir & transisinya hanya 250ms = nyaris loncat). Jeda 2500 -> 7000ms, durasi transisi 250 -> 900ms (meredup
+        // pelan). Alpha target 0,45 TIDAK diubah (tak dikeluhkan).
+        private const val IDLE_FADE_DELAY_MS = 7000L
         private const val IDLE_FADE_ALPHA = 0.45f
-        private const val IDLE_FADE_ANIM_MS = 250L
+        private const val IDLE_FADE_ANIM_MS = 900L
         // Batch 454 — tuning auto-minimize idle (dihitung dari titik interaksi terakhir, SAMA
         // dgn titik hitung IDLE_FADE_DELAY_MS, bukan ditambah setelahnya). > IDLE_FADE_DELAY_MS
         // supaya urutan visual selalu fade dulu, baru collapse — user masih sempat lihat bubble
         // meredup sebelum menciut total, bukan langsung "hilang" tiba-tiba dari opaque penuh.
-        private const val IDLE_AUTO_MINIMIZE_DELAY_MS = 6000L
+        // Batch 661 — 6000 -> 11000ms: tetap > IDLE_FADE_DELAY_MS (urutan fade dulu baru collapse), jarak fade->collapse
+        // dipertahankan ~4 dtk (sebelumnya 3,5 dtk) supaya fase "meredup" tetap terlihat sebelum menciut.
+        private const val IDLE_AUTO_MINIMIZE_DELAY_MS = 11000L
         // Batch 455/456/457/458/460 — tuning half-clip tepi layar tab minimized (fraksi bagian
         // VISUAL saja sejak Batch 460, lihat KDoc snapMinimizedToNearestEdge()). Batch 456 SALAH
         // ARAH (0.5f->0.3f menaikkan bagian kelihatan = tambah timbul, kebalikan dari diminta),
