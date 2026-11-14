@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 662 — Fade bubble benar-benar mulus: pemulihan opacity dianimasikan + fade-out lebih lembut (BELUM verified)
+- Input user (setelah v661): "loncatan nya masih ada. belum smooth animasi memudar nya!!".
+- AKAR MASALAH (diukur dari `360973.mp4`, kecerahan panel per frame): fade-OUT memang bergulir mulus (~200ms, kurva halus), tapi pemulihan saat disentuh = `view.alpha = 1f` SEKETIKA -> loncat dari redup ke penuh dalam ~2 frame (luma 66 -> 83 dalam ~80ms). v661 hanya memperlambat fade-out, jadi loncatan balik itu tetap ada. Listener drag memanggil `keepAwakeAndScheduleFade()` di SETIAP `MotionEvent`.
+- `FloatingBubbleService`: (1) pemulihan ke opaque penuh kini `animate().alpha(1f)` 260ms (`IDLE_RESTORE_ANIM_MS`) + `DecelerateInterpolator`, dijaga flag `fadeRestoring` agar tak di-restart tiap event sentuh; `animate().cancel()` tetap dipanggil di luar pemulihan sehingga fade-out yang baru mulai ikut batal; flag di-reset di job fade-out sebagai pengaman bila animasi terputus. (2) Fade-out 900 -> 1200ms (`IDLE_FADE_ANIM_MS`) dgn `PathInterpolator(0.4, 0, 0.2, 1)` (kurva Material standard: awal & akhir lembut, tanpa percepatan tajam). Jeda 7 dtk, auto-minimize 11 dtk, alpha 0,45 tak diubah. Impor baru `DecelerateInterpolator`, `PathInterpolator`.
+- TIDAK diubah: pergantian tampilan saat minimize/expand masih instan (swap visibility + snap) — bila itu yang terasa "loncat", kirim video yang menunjukkannya.
+- 1 file source + docs; `FILE_MANIFEST.txt` tetap 250. PEMERIKSAAN: kurung seimbang; **NOT VERIFIED** (belum compile/device). PREDIKSI tak berubah: Tes unit 247; ArchUnit 7; detekt 0; lint 0; SpotBugs 0; Kotlin 0 peringatan baru.
+
 ## Batch 661 — Fade idle bubble diperlambat (BELUM verified)
 - Input user: `360973.mp4` (rekam bubble Space di Beranda: meredup ~2,5 dtk setelah sentuhan terakhir, transisi nyaris loncat) + "terlalu cepat fadeout nya!!". ASUMSI: yang dimaksud = auto-fade idle (Batch 453), bukan animasi lain.
 - `FloatingBubbleService` (HANYA 3 konstanta, 0 logika): `IDLE_FADE_DELAY_MS` 2500 -> 7000ms (jeda sebelum meredup), `IDLE_FADE_ANIM_MS` 250 -> 900ms (meredup pelan, bukan loncat), `IDLE_AUTO_MINIMIZE_DELAY_MS` 6000 -> 11000ms (wajib tetap > jeda fade supaya urutan fade dulu baru collapse; jarak fade->collapse ~4 dtk, dulu 3,5 dtk). `IDLE_FADE_ALPHA` 0,45 TIDAK diubah. Sentuhan apa pun tetap mengembalikan bubble ke opaque penuh SEKETIKA dan mengulang hitungan.

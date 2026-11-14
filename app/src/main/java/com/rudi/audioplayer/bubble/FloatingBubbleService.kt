@@ -24,6 +24,8 @@ import android.view.TouchDelegate
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -485,6 +487,12 @@ class FloatingBubbleService : Service() {
     private var idleFadeJob: Job? = null
     // Batch 454 — timer auto-minimize-total idle, lihat KDoc kelas ini & keepAwakeAndScheduleFade().
     private var idleMinimizeJob: Job? = null
+    // Batch 662 — pemulihan opacity kini dianimasikan (dulu `view.alpha = 1f` = LONCAT balik dari redup ke penuh dalam
+    // 1 frame, terbukti di video 360973.mp4: luma panel 66 -> 83 dalam ~80ms). Flag mencegah animasi pemulihan
+    // di-restart tiap event sentuh (listener drag memanggil keepAwakeAndScheduleFade() di SETIAP MotionEvent).
+    private var fadeRestoring = false
+    private val fadeOutInterpolator = PathInterpolator(0.4f, 0f, 0.2f, 1f) // kurva Material "standard": mulai & akhir lembut
+    private val fadeInInterpolator = DecelerateInterpolator()
 
     // Optimistic default TRUE — sebelum controller sempat konek, tap tombol tetap harus jatuh
     // ke fallback Intent lama (lihat sendPlaybackAction), bukan langsung dianggap "kosong".
@@ -831,11 +839,26 @@ class FloatingBubbleService : Service() {
         idleFadeJob?.cancel()
         idleMinimizeJob?.cancel()
         val view = bubbleView ?: return
-        view.animate().cancel()
-        if (view.alpha != 1f) view.alpha = 1f
+        // Batch 662 — pulihkan ke opaque penuh DENGAN animasi (bukan set seketika). Selama pemulihan berjalan, event sentuh
+        // berikutnya tak me-restart animasi; `cancel()` selalu dipanggil di luar pemulihan supaya fade-out yang kebetulan
+        // baru mulai (alpha masih 1,0) pun ikut dibatalkan.
+        if (!fadeRestoring) {
+            view.animate().cancel()
+            if (view.alpha < 1f) {
+                fadeRestoring = true
+                view.animate()
+                    .alpha(1f)
+                    .setDuration(IDLE_RESTORE_ANIM_MS)
+                    .setInterpolator(fadeInInterpolator)
+                    .withEndAction { fadeRestoring = false }
+                    .start()
+            }
+        }
         idleFadeJob = bubbleScope.launch {
             delay(IDLE_FADE_DELAY_MS)
-            bubbleView?.animate()?.alpha(IDLE_FADE_ALPHA)?.setDuration(IDLE_FADE_ANIM_MS)?.start()
+            fadeRestoring = false // pengaman: pemulihan yang terputus (view lepas) tak boleh mengunci flag
+            bubbleView?.animate()?.alpha(IDLE_FADE_ALPHA)?.setDuration(IDLE_FADE_ANIM_MS)
+                ?.setInterpolator(fadeOutInterpolator)?.start()
         }
         // Batch 454 — mandat utama user ("wajib bisa split/di-minimize total"), lihat KDoc kelas.
         // Guard `!isMinimized` murni optimisasi (skip launch sia-sia kalau sudah minimized manual
@@ -1343,7 +1366,8 @@ class FloatingBubbleService : Service() {
         // pelan). Alpha target 0,45 TIDAK diubah (tak dikeluhkan).
         private const val IDLE_FADE_DELAY_MS = 7000L
         private const val IDLE_FADE_ALPHA = 0.45f
-        private const val IDLE_FADE_ANIM_MS = 900L
+        private const val IDLE_FADE_ANIM_MS = 1200L // Batch 662: 900 -> 1200ms + kurva lembut (fadeOutInterpolator)
+        private const val IDLE_RESTORE_ANIM_MS = 260L // Batch 662: pemulihan ke opaque penuh saat disentuh (dulu seketika)
         // Batch 454 — tuning auto-minimize idle (dihitung dari titik interaksi terakhir, SAMA
         // dgn titik hitung IDLE_FADE_DELAY_MS, bukan ditambah setelahnya). > IDLE_FADE_DELAY_MS
         // supaya urutan visual selalu fade dulu, baru collapse — user masih sempat lihat bubble
