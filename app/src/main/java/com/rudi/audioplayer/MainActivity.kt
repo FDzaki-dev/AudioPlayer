@@ -178,7 +178,6 @@ import dev.chrisbanes.haze.rememberHazeState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -206,11 +205,17 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 // tab tujuan (index±1) — SATU sumber kebenaran urutan, bukan didup di 2 tempat.
 private val TAB_ROUTES = listOf("home", "library", "settings")
 
-// Batch 556 — gerak KUNCI bilah tab mengikuti `SkeuTabBar` Boomly (B192/B193): ease-out tanpa overshoot (langsung bergerak
-// cepat di frame pertama), durasi sebanding jarak tempuh dlm satuan tab: 1 tab = 380 ms, 2 tab = 460 ms, jarak kecil min
-// 300 ms. Sebelumnya `tween(220)` FastOutSlowIn (mulai pelan = terasa delay saat tap). Komentar lama "tween 220ms" di titik
-// pemakaian = riwayat. Tuning = HANYA angka 300 / 80 / 540.
-private val NavKeyEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+// Batch 657 — gerak bilah tab diukur dari video acuan (frame-by-frame 60 fps, 3 rekaman geser/tap/lepas):
+// (1) KUNCI/pil = PEGAS (bukan tween): menempuh 1 tab ~220 ms dgn overshoot ~1,3% -> ζ ≈ 0,8, ω ≈ 21 rad/dtk
+//     (stiffness = ω² ≈ 440). Dipakai SAMA utk tap, mengikuti jari (jeda pegas ±0,1 tab), dan menetap saat lepas.
+// (2) BILAH membesar 1,05x (lebar 633->665 px, tinggi 130->136 px) selagi jari menekan, kembali saat lepas dgn
+//     pegas kurang teredam (menyusut ±1,3% di bawah ukuran diam lalu pulih, overshoot ±25% -> ζ ≈ 0,42, ω ≈ 18).
+// Pengganti `NavKeyEasing`/tween 300-540 ms (Batch 556: ease-out CubicBezier, durasi sebanding jarak).
+private const val NAV_PILL_DAMPING = 0.8f
+private const val NAV_PILL_STIFFNESS = 440f
+private const val NAV_BAR_PRESS_SCALE = 1.05f
+private const val NAV_BAR_PRESS_DAMPING = 0.42f
+private const val NAV_BAR_PRESS_STIFFNESS = 340f
 
 /** Batch 631 — kunci Bundle status kunci aplikasi yang dibawa lewat rotasi (lihat `MainActivity.onSaveInstanceState`). */
 private const val STATE_UNLOCKED = "sonix_state_unlocked"
@@ -226,9 +231,14 @@ private const val APP_SAVEABLE_STATE_KEY = "sonix_app_saveable_state"
 /** Batch 651 — batas aman topeng "pemulihan tab": konten NavHost TIDAK PERNAH tersembunyi lebih lama dari ini. */
 private const val TAB_RESTORE_MASK_TIMEOUT_MS = 800L
 
-private fun navKeyGlideSpec(from: Float, to: Float) = tween<Float>(
-    durationMillis = (300f + 80f * kotlin.math.abs(to - from)).toInt().coerceIn(300, 540),
-    easing = NavKeyEasing
+private fun navKeyGlideSpec() = spring<Float>(
+    dampingRatio = NAV_PILL_DAMPING,
+    stiffness = NAV_PILL_STIFFNESS
+)
+
+private fun navBarPressSpec() = spring<Float>(
+    dampingRatio = NAV_BAR_PRESS_DAMPING,
+    stiffness = NAV_BAR_PRESS_STIFFNESS
 )
 
 class MainActivity : FragmentActivity() {
@@ -925,11 +935,16 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     // skala ikon+label kini berganti TEPAT di tepi kunci (termasuk tab yang cuma dilewati saat lompat 2 tab), persis
     // `SkeuTabBar` Boomly B191, dan tetap serasi dgn durasi gerak kunci berapa pun. Diam = 1f/0f (identik lama); nudge =
     // identik `tabMagnifyFocus` lama (geser penuh = 1f -> 0f).
-    fun navPillFocus(tabIndex: Int): Float {
+    // Batch 657 — `navPillFocus(tabIndex)` (fokus tenda per tab -> lerp warna/skala) DIGANTI `navPillPosition()`: SATU posisi
+    // PUSAT pil (satuan tab; pegas `navPillIndexAnim` + nudge swipe-konten ±0,5 tab) yang dibaca SERENTAK oleh kunci timbul
+    // (`neuSlidingKey`) dan oleh lapisan warna ter-klip tiap tab (`CustomNavBarTabItem`) -> warna oranye/aksen tepat di
+    // dalam bentuk pil seperti video acuan (ikon/label separuh berwarna saat pil melintas), bukan memudar linear.
+    // Dibaca di fase GAMBAR (0 rekomposisi per frame).
+    fun navPillPosition(): Float {
         val offset = tabDragOffsetPx.floatValue // -40f..40f; negatif = geser ke arah tab BERIKUTNYA
-        val shift = (-offset / 40f).coerceIn(0f, 1f) - (offset / 40f).coerceIn(0f, 1f)
-        val dist = kotlin.math.abs(navPillIndexAnim.value + shift - (tabIndex + 0.5f))
-        return (1f - dist).coerceIn(0f, 1f)
+        val towardNext = (-offset / 40f).coerceIn(0f, 1f)
+        val towardPrev = (offset / 40f).coerceIn(0f, 1f)
+        return navPillIndexAnim.value + (towardNext - towardPrev) * 0.5f
     }
 
     // Batch 101 — Adaptive (multi-device). widthClass dihitung dari LocalConfiguration, jadi
@@ -1184,19 +1199,14 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // masih jalan.
                     val tabBarOverscrollPx = remember { mutableFloatStateOf(0f) }
                     val tabBarOverscrollAnim = remember { Animatable(0f) }
-                    // Fallback ke tabMagnifyFocus (Batch 437) kalau 0 drag tab-bar aktif — 0
-                    // regresi ke behavior lama (nudge dari swipe konten tetap jalan apa adanya).
-                    // Aktif (idxPos bukan NaN): fungsi tenda (segitiga) sederhana dari jarak posisi
-                    // kontinu jari ke titik tengah tiap kolom (`tabIndex + 0.5f`) — 1f persis di
-                    // tengah kolom, turun linear ke 0f pas jarak 1 kolom penuh (= tengah kolom
-                    // tetangga), pas gaya "lensa mengikuti jari" segmented-control asli, 0 nunggu
-                    // navigate() commit index-crossing dulu spt sebelumnya.
-                    fun tabBarDragFocus(tabIndex: Int): Float {
-                        val idxPos = tabBarDragIndexPx.floatValue
-                        if (idxPos.isNaN()) return navPillFocus(tabIndex)
-                        val dist = kotlin.math.abs(idxPos - (tabIndex + 0.5f))
-                        return (1f - dist).coerceIn(0f, 1f)
-                    }
+                    // Batch 657 — mekanisme bilah = video acuan. `tabBarDragFocus` (fungsi tenda dari jari mentah -> lerp warna) DIHAPUS.
+                    // `tabBarPressed` = jari sedang menekan bilah: (a) tab rute yang SUDAH aktif tetap berwarna penuh selama jari
+                    // menekan (video: Alarm tetap oranye walau pil sudah di Stopwatch, baru putih saat jari diangkat), (b) pemicu
+                    // pembesaran bilah. `tabBarPressScale` = skala bilah 1,0 <-> 1,05 (pegas kurang teredam, lihat konstanta di atas).
+                    // Keduanya dibaca di fase gambar/graphicsLayer (0 rekomposisi per tekan).
+                    val tabBarPressed = remember { mutableStateOf(false) }
+                    val tabBarPressScale = remember { Animatable(1f) }
+                    val pillPosition: () -> Float = { navPillPosition() }
                     // Batch 556 — `isTabBarDragging` DIHAPUS: `GlassTabIcon` tak lagi punya animasi sendiri (fokus = posisi kunci).
                     // Batch 448 — ROMBAK TOTAL (gantikan pendekatan "bridge" Batch 446). Root
                     // cause seam/double-pill yang dilaporkan user (dikonfirmasi frame-by-frame
@@ -1258,147 +1268,117 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                             // Batch 555 — `.clip(RoundedCornerShape(28.dp))` + garis catch-light atas (Tactile/Skeu) DIGANTI palung
                             // cekung `neuTrough()` (sudah mengandung clip yang sama persis; garis sorot di tepi ATAS bertentangan dgn
                             // cahaya kiri-atas pada permukaan cekung). TETAP SETELAH `.padding(...)` (margin di luar palung).
+                            // Batch 657 — bilah MEMBESAR 1,05x selagi ditekan (video acuan): `graphicsLayer` skala DI LUAR `neuTrough()` supaya
+                            // palung + kunci + ikon + lapisan warna ter-klip membesar SEREMPAK (satu transform = 0 selisih geometri
+                            // antar-lapisan); `pointerInput` di bawah berada di DALAM layer ini sehingga koordinat jari dipetakan balik
+                            // ke ruang lokal tak-berskala -> pil tetap tepat di bawah jari pada layar. Pivot default = tengah bilah.
+                            .graphicsLayer {
+                                val pressScale = tabBarPressScale.value
+                                scaleX = pressScale
+                                scaleY = pressScale
+                            }
                             .neuTrough(RoundedCornerShape(28.dp), navBarBase)
-                            // Batch 442 — permintaan eksplisit user: "tambahkan fitur drag pada
-                            // tab, bukan hanya tap-tab doang" (screenshot bottom nav bar). Beda
-                            // dari swipe Batch 435 (drag di KONTEN layar, Box pembungkus NavHost
-                            // di bawah, dipicu geser di ATAS layar) — ini drag LANGSUNG di atas
-                            // bar tab itu sendiri, gaya segmented-control iOS: tekan salah satu
-                            // tab lalu geser jari TANPA angkat, tab aktif ikut berpindah mengikuti
-                            // posisi jari melintasi 3 kolom (lebar dibagi rata `TAB_ROUTES.size`
-                            // — valid krn 0 weight kustom dipasang di 3 `NavigationBarItem` di
-                            // bawah, M3 default-nya memang equal-width). 2 mekanisme (tap lama +
-                            // drag baru ini) hidup berdampingan, 0 saling timpa:
-                            // `PointerEventPass.Initial` dipakai (bukan default Main) supaya
-                            // event dibaca SEBELUM `NavigationBarItem` (child, lebih dalam di
-                            // tree) memprosesnya di Main pass-nya sendiri — dan `change.consume()`
-                            // SENGAJA 0 pernah dipanggil sama sekali di blok ini, jadi tap
-                            // polos/ripple-feedback bawaan `NavigationBarItem`+`bouncyPress`
-                            // (Batch 438) TIDAK terganggu sedikit pun (tap singkat = jari tidak
-                            // pernah keluar kolom awal = `newIndex` tidak pernah beda dari
-                            // `hoveredIndex` awal = blok navigate() di bawah tidak pernah
-                            // tereksekusi — murni `onClick` bawaan `NavigationBarItem` yang
-                            // menangani tap biasa, sama seperti sebelum batch ini). `navController
-                            // .navigate` dipanggil dgn opsi IDENTIK popUpTo/launchSingleTop/
-                            // restoreState (pola Batch 301/435), 0 state-preservation baru. Key
-                            // `pointerInput` sengaja `Unit` (BUKAN `currentRoute`) — lihat
-                            // rasionalisasi `currentRouteState` di atas dekat deklarasi
-                            // `homeTabInteraction`: NavigationBar composable ini sendiri TIDAK
-                            // pernah keluar-masuk komposisi selama pindah antar 3 tab (kondisi
-                            // `if` pembungkusnya tetap true di ketiganya), jadi coroutine gesture
-                            // key-`Unit` ini aman hidup terus lintas tab tanpa restart — kalau
-                            // di-key `currentRoute`, coroutine akan MATI-HIDUP ULANG setiap kali
-                            // 1 batas tab terlewati (navigate() mengubah currentRoute = state
-                            // baru = key baru), padahal jari MASIH menekan di tengah gesture yang
-                            // sama — drag yg melewati lebih dari 1 batas tab (mis. Beranda
-                            // langsung ke Pengaturan) akan macet di tab kedua krn instance baru
-                            // cuma menunggu event DOWN baru, bukan lanjutan drag yg sudah berjalan.
+                            // Batch 657 — GESTUR BILAH = video acuan (diukur frame-by-frame, lihat konstanta NAV_* di atas file):
+                            // (1) tekan -> bilah membesar 1,05x (pegas) + pil MELUNCUR (pegas) ke jari; geser -> pil mengikuti jari dgn
+                            //     jeda pegas, dijepit ke pusat tab pertama/terakhir; (2) KONTEN/RUTE TIDAK berpindah di tengah geseran
+                            //     (Batch 442-444 memanggil `navigate()` tiap lintas batas tab + haptik): rute baru dikomit SEKALI saat
+                            //     jari diangkat, ke tab di bawah titik lepas (`hoveredIndex`, posisi event UP ikut diproses — Batch 452);
+                            //     (3) saat diangkat bilah kembali ke 1,0x dan pil menetap di pusat tab tujuan; (4) haptik tiap jari
+                            //     melewati batas tab (tanpa navigasi). Tap polos = kasus khusus gestur yang sama (tekan + lepas di tab
+                            //     yang sama), jadi `onClick` `selectable` tidak lagi dipicu sentuhan: event UP dikonsumsi di sini
+                            //     (pass Initial = sebelum anak). `onClick` tetap ada untuk TalkBack/keyboard (aksi semantik).
+                            // `PointerEventPass.Initial` + key `Unit` = alasan Batch 442 tetap berlaku (coroutine hidup lintas tab;
+                            // `currentRouteState` agar tak beku). `finally` WAJIB: bila komposisi bilah lepas di tengah gestur (mis.
+                            // pindah ke Now Playing) status tekan/skala tidak boleh tertinggal.
                             .pointerInput(Unit) {
                                 awaitEachGesture {
                                     val down = awaitFirstDown(pass = PointerEventPass.Initial)
                                     val barWidthPx = size.width.toFloat()
                                     if (barWidthPx <= 0f) return@awaitEachGesture
-                                    // Batch 444 — jaring pengaman sama pola tabDragOffset/
-                                    // AlbumArtHero: hentikan springback overscroll lama supaya
-                                    // tidak menimpa drag baru yang mulai lagi cepat.
+                                    val tabCount = TAB_ROUTES.size
                                     tabSwipeScope.launch { tabBarOverscrollAnim.stop() }
-                                    tabBarDragIndexPx.floatValue =
-                                        (down.position.x / barWidthPx * TAB_ROUTES.size)
-                                            .coerceIn(0f, TAB_ROUTES.size.toFloat())
-                                    var hoveredIndex = (down.position.x / barWidthPx * TAB_ROUTES.size)
-                                        .toInt()
-                                        .coerceIn(0, TAB_ROUTES.size - 1)
-                                    // Batch 452 — user: pill/tab kadang berhenti 1 kolom SEBELUM
-                                    // posisi jari sungguhan saat lepas ("offside"), terutama drag
-                                    // cepat (flick). Root cause: `if (!change.pressed) break` (lama)
-                                    // dicek DI AWAL badan loop, SEBELUM posisi event ini dibaca —
-                                    // utk event UP (pressed=false) loop break LANGSUNG, jadi posisi
-                                    // asli titik lepas jari itu TIDAK PERNAH diproses ke
-                                    // `tabBarDragIndexPx`/`hoveredIndex`. `hoveredIndex` (dipakai
-                                    // navigate() + target akhir `navPillIndexAnim.animateTo` pasca-
-                                    // loop) jadi nyangkut di event MOVE kedua-dari-akhir, yang pada
-                                    // flick cepat (event batching sistem) bisa beda 1 kolom penuh dari
-                                    // titik lepas sebenarnya. Fix: posisi TIAP event (termasuk UP)
-                                    // diproses dulu sama seperti event MOVE, `pressed` dicek
-                                    // TERAKHIR (akhir badan loop, lihat bawah) sbg syarat
-                                    // lanjut/berhenti — bukan lagi syarat lewati pemrosesan posisi.
-                                    // 0 state/mekanisme baru, murni urutan 2 baris dipertukar.
-                                    while (true) {
-                                        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                                        val change = event.changes.firstOrNull { it.id == down.id }
-                                            ?: break
-                                        val rawX = change.position.x
-                                        val x = rawX.coerceIn(0f, barWidthPx)
-                                        // Batch 444 — posisi kontinu utk pill live-tracking
-                                        // (tabBarDragFocus di atas), dari `x` yg SAMA PERSIS
-                                        // dipakai hitung newIndex di bawah (0 hitungan ganda).
-                                        tabBarDragIndexPx.floatValue = x / barWidthPx * TAB_ROUTES.size
-                                        // Batch 444 — tahanan visual: overscroll dari rawX
-                                        // (BUKAN x yg sudah di-coerce) supaya kebaca begitu jari
-                                        // lewat ujung kolom pertama/terakhir. Redaman 0.3f (pola
-                                        // sama persis tabDragOffsetPx.floatValue = totalTabDrag *
-                                        // 0.3f di bawah) + batas ±24px (jauh lebih kecil dari
-                                        // lebar 1 kolom) supaya terasa "ketahan", bukan ikut
-                                        // sepenuhnya.
-                                        val overscroll = when {
-                                            rawX < 0f -> rawX
-                                            rawX > barWidthPx -> rawX - barWidthPx
-                                            else -> 0f
-                                        }
-                                        tabBarOverscrollPx.floatValue = (overscroll * 0.3f).coerceIn(-24f, 24f)
-                                        val newIndex = (x / barWidthPx * TAB_ROUTES.size)
-                                            .toInt()
-                                            .coerceIn(0, TAB_ROUTES.size - 1)
-                                        if (newIndex != hoveredIndex) {
-                                            hoveredIndex = newIndex
-                                            val target = TAB_ROUTES.getOrNull(newIndex)
-                                            val fromRoute = currentRouteState.value
-                                            if (target != null && target != fromRoute) {
+                                    tabBarPressed.value = true
+                                    tabSwipeScope.launch { tabBarPressScale.animateTo(NAV_BAR_PRESS_SCALE, navBarPressSpec()) }
+                                    var hoveredIndex = tabIndexAt(down.position.x, barWidthPx, tabCount)
+                                    // Tap (jari belum melewati touch slop) = pil meluncur ke PUSAT tab yang ditekan; baru setelah jari
+                                    // bergeser melewati slop (`dragging`, sticky) pil mengikuti jari. Mencegah pil berhenti "di antara"
+                                    // tab saat menekan dekat tepi kolom.
+                                    val touchSlop = viewConfiguration.touchSlop
+                                    var dragging = false
+                                    // Target DITANGKAP ke val lokal sebelum `launch` (coroutine jalan belakangan; membaca state-nya
+                                    // langsung bisa menemukan NaN yg diset `finally` saat jari sudah lepas -> `animateTo(NaN)`).
+                                    val downTarget = hoveredIndex + 0.5f
+                                    tabBarDragIndexPx.floatValue = downTarget
+                                    tabSwipeScope.launch { navPillIndexAnim.animateTo(downTarget, navKeyGlideSpec()) }
+                                    var released = false
+                                    try {
+                                        while (true) {
+                                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                            val change = event.changes.firstOrNull { it.id == down.id }
+                                                ?: break
+                                            val rawX = change.position.x
+                                            val x = rawX.coerceIn(0f, barWidthPx)
+                                            val newIndex = tabIndexAt(x, barWidthPx, tabCount)
+                                            if (newIndex != hoveredIndex) {
+                                                hoveredIndex = newIndex
                                                 tabSwipeHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                navController.navigate(target) {
-                                                    popUpTo("home") { saveState = true }
-                                                    launchSingleTop = true
-                                                    restoreState = true
-                                                }
+                                            }
+                                            if (!dragging && kotlin.math.abs(x - down.position.x) > touchSlop) dragging = true
+                                            val pillTarget = if (dragging) {
+                                                tabPillTarget(x, barWidthPx, tabCount)
+                                            } else {
+                                                hoveredIndex + 0.5f
+                                            }
+                                            tabBarDragIndexPx.floatValue = pillTarget
+                                            tabSwipeScope.launch { navPillIndexAnim.animateTo(pillTarget, navKeyGlideSpec()) }
+                                            // Tahanan visual (Batch 444): overscroll dari rawX (BUKAN x yg di-coerce), redaman 0.3f, ±24px.
+                                            val overscroll = when {
+                                                rawX < 0f -> rawX
+                                                rawX > barWidthPx -> rawX - barWidthPx
+                                                else -> 0f
+                                            }
+                                            tabBarOverscrollPx.floatValue = (overscroll * 0.3f).coerceIn(-24f, 24f)
+                                            // `pressed` dicek TERAKHIR (Batch 452): posisi event UP sudah diproses di atas.
+                                            if (!change.pressed) {
+                                                change.consume()
+                                                released = true
+                                                break
                                             }
                                         }
-                                        // Batch 452 — `pressed` dicek TERAKHIR (lihat komentar
-                                        // panjang di atas `while (true)`): posisi event UP ini SUDAH
-                                        // diproses (tabBarDragIndexPx/hoveredIndex/navigate di atas)
-                                        // sebelum keluar loop, 0 lagi kehilangan 1 event terakhir.
-                                        if (!change.pressed) break
-                                    }
-                                    // Batch 444 — gesture selesai (naik/batal, 2 jalur break di
-                                    // atas SAMA-SAMA jatuh ke sini): lepas live-tracking (fallback
-                                    // balik ke tabMagnifyFocus lewat NaN) + springback overscroll
-                                    // ke 0 lewat tabSwipeScope (non-blocking, awaitEachGesture
-                                    // langsung siap terima down berikutnya tanpa nunggu spring).
-                                    // Batch 448 — handoff pill unified: simpan posisi jari
-                                    // TERAKHIR sebelum di-reset NaN (lokal, 0 state `remember`
-                                    // tambahan — 1 gesture = 1 pemanggilan coroutine ini), lalu
-                                    // `navPillIndexAnim` snapTo persis di situ dulu (0 lompatan)
-                                    // baru animateTo pusat kolom final (`hoveredIndex + 0.5f`,
-                                    // tween 220ms — durasi SAMA PERSIS `glassAlphaAnim` supaya
-                                    // pill & warna ikon/label tiba di tujuan BERSAMAAN).
-                                    val lastLiveIdxPos = tabBarDragIndexPx.floatValue
-                                    tabBarDragIndexPx.floatValue = Float.NaN
-                                    tabSwipeScope.launch {
-                                        navPillIndexAnim.snapTo(lastLiveIdxPos)
-                                        navPillIndexAnim.animateTo(hoveredIndex + 0.5f, navKeyGlideSpec(lastLiveIdxPos, hoveredIndex + 0.5f))
-                                    }
-                                    tabSwipeScope.launch {
-                                        tabBarOverscrollAnim.snapTo(tabBarOverscrollPx.floatValue)
-                                        tabBarOverscrollAnim.animateTo(
-                                            0f,
-                                            spring(
-                                                // Batch 581 — default Compose, tanpa pantulan.
-                                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                                stiffness = Spring.StiffnessMedium
-                                            )
-                                        ) {
-                                            tabBarOverscrollPx.floatValue = value
+                                    } finally {
+                                        tabBarPressed.value = false
+                                        tabBarDragIndexPx.floatValue = Float.NaN
+                                        tabSwipeScope.launch { tabBarPressScale.animateTo(1f, navBarPressSpec()) }
+                                        tabSwipeScope.launch {
+                                            tabBarOverscrollAnim.snapTo(tabBarOverscrollPx.floatValue)
+                                            tabBarOverscrollAnim.animateTo(
+                                                0f,
+                                                spring(
+                                                    // Batch 581 — default Compose, tanpa pantulan.
+                                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                                    stiffness = Spring.StiffnessMedium
+                                                )
+                                            ) {
+                                                tabBarOverscrollPx.floatValue = value
+                                            }
                                         }
                                     }
+                                    // Dicapai HANYA bila loop selesai tanpa pengecualian (pembatalan komposisi melompati ini).
+                                    val fromRoute = currentRouteState.value
+                                    val commitIndex = if (released) {
+                                        hoveredIndex
+                                    } else {
+                                        TAB_ROUTES.indexOfFirst { it == fromRoute }.coerceAtLeast(0)
+                                    }
+                                    val target = TAB_ROUTES.getOrNull(commitIndex)
+                                    if (target != null && target != fromRoute) {
+                                        navController.navigate(target) {
+                                            popUpTo("home") { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                    tabSwipeScope.launch { navPillIndexAnim.animateTo(commitIndex + 0.5f, navKeyGlideSpec()) }
                                 }
                             }
                             .graphicsLayer { translationX = tabBarOverscrollPx.floatValue }
@@ -1417,17 +1397,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 heightFraction = 0.62f,
                                 wine = navBarKeyWine
                             ) {
-                                val liveBarDrag = tabBarDragIndexPx.floatValue
-                                val nudge = tabDragOffsetPx.floatValue
-                                when {
-                                    !liveBarDrag.isNaN() -> liveBarDrag
-                                    nudge != 0f -> {
-                                        val towardNext = (-nudge / 40f).coerceIn(0f, 1f)
-                                        val towardPrev = (nudge / 40f).coerceIn(0f, 1f)
-                                        navPillIndexAnim.value + (towardNext - towardPrev) * 0.5f
-                                    }
-                                    else -> navPillIndexAnim.value
-                                }
+                                // Batch 657 — posisi kunci = SATU sumber `navPillPosition()` (pegas + nudge swipe-konten); jari mentah
+                                // TIDAK lagi dibaca langsung (pil mengikuti jari lewat pegas, jeda ±0,1 tab seperti video acuan).
+                                pillPosition()
                             },
                         // Batch 555 — Surface NavigationBar TRANSPARAN + tonalElevation 0: lantai palung (`neuTrough()`) dan kunci
                         // timbul digambar di modifier di atas, di BELAKANG ikon/label; container opak default akan menutupinya.
@@ -1490,20 +1462,19 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 // supaya tiba bersamaan. Animatable.animateTo mulai otomatis dari
                                 // posisi TERKINI (kalau lagi mid-animasi tap sebelumnya, pola sama
                                 // `glassAlphaAnim`) — 0 penanganan spesial dibutuhkan.
-                                tabSwipeScope.launch { navPillIndexAnim.animateTo(0.5f, navKeyGlideSpec(navPillIndexAnim.value, 0.5f)) }
+                                tabSwipeScope.launch { navPillIndexAnim.animateTo(0.5f, navKeyGlideSpec()) }
                             },
-                            interactionSource = homeTabInteraction
-                        ) {
-                            // Batch 439 — label sudah digabung ke 1 slot ini (dulu slot terpisah
-                            // `label = { MagnifyingTabLabel(...) }`, lihat komentar Batch 439 di
-                            // definisi `GlassTabIcon`). Batch 449 — trailing-lambda
-                            // `CustomNavBarTabItem` ini gantikan slot `icon=` NavigationBarItem
-                            // lama, isi 0 berubah.
+                            interactionSource = homeTabInteraction,
+                            tabCount = TAB_ROUTES.size,
+                            pillPosition = pillPosition,
+                            revealAll = { tabBarPressed.value && currentRouteState.value == "home" }
+                        ) { highlighted ->
+                            // Batch 657 — trailing-lambda dipanggil DUA kali oleh `CustomNavBarTabItem` (lapisan dasar `highlighted =
+                            // false` + salinan warna aksen yang di-klip ke bentuk pil, `highlighted = true`); wajib murni/tanpa efek samping.
                             GlassTabIcon(
                                 icon = Icons.Default.Home,
                                 label = "Beranda",
-                                focus = tabBarDragFocus(0),
-                                interactionSource = homeTabInteraction
+                                highlighted = highlighted
                             )
                         }
                         CustomNavBarTabItem(
@@ -1516,16 +1487,18 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     restoreState = true
                                 }
                                 // Batch 448 — sama seperti onClick "home" di atas.
-                                tabSwipeScope.launch { navPillIndexAnim.animateTo(1.5f, navKeyGlideSpec(navPillIndexAnim.value, 1.5f)) }
+                                tabSwipeScope.launch { navPillIndexAnim.animateTo(1.5f, navKeyGlideSpec()) }
                             },
-                            interactionSource = libraryTabInteraction
-                        ) {
-                            // Batch 439/449 — sama seperti "home" di atas.
+                            interactionSource = libraryTabInteraction,
+                            tabCount = TAB_ROUTES.size,
+                            pillPosition = pillPosition,
+                            revealAll = { tabBarPressed.value && currentRouteState.value == "library" }
+                        ) { highlighted ->
+                            // Batch 657 — sama seperti "home" di atas.
                             GlassTabIcon(
                                 icon = Icons.Default.LibraryMusic,
                                 label = "Perpustakaan",
-                                focus = tabBarDragFocus(1),
-                                interactionSource = libraryTabInteraction
+                                highlighted = highlighted
                             )
                         }
                         CustomNavBarTabItem(
@@ -1538,16 +1511,18 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     restoreState = true
                                 }
                                 // Batch 448 — sama seperti onClick "home" di atas.
-                                tabSwipeScope.launch { navPillIndexAnim.animateTo(2.5f, navKeyGlideSpec(navPillIndexAnim.value, 2.5f)) }
+                                tabSwipeScope.launch { navPillIndexAnim.animateTo(2.5f, navKeyGlideSpec()) }
                             },
-                            interactionSource = settingsTabInteraction
-                        ) {
-                            // Batch 439/449 — sama seperti "home" di atas.
+                            interactionSource = settingsTabInteraction,
+                            tabCount = TAB_ROUTES.size,
+                            pillPosition = pillPosition,
+                            revealAll = { tabBarPressed.value && currentRouteState.value == "settings" }
+                        ) { highlighted ->
+                            // Batch 657 — sama seperti "home" di atas.
                             GlassTabIcon(
                                 icon = Icons.Default.Settings,
                                 label = "Pengaturan",
-                                focus = tabBarDragFocus(2),
-                                interactionSource = settingsTabInteraction
+                                highlighted = highlighted
                             )
                         }
                     }
@@ -1698,7 +1673,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                         // onClick NavigationBarItem, 0 angka/formula baru.
                                         tabSwipeScope.launch {
                                             val keyTo = TAB_ROUTES.indexOfFirst { it == targetRoute } + 0.5f
-                                            navPillIndexAnim.animateTo(keyTo, navKeyGlideSpec(navPillIndexAnim.value, keyTo))
+                                            navPillIndexAnim.animateTo(keyTo, navKeyGlideSpec())
                                         }
                                     }
                                     tabSwipeScope.launch {

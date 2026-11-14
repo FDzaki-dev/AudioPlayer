@@ -15,19 +15,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.rudi.audioplayer.ui.bouncyPress
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 
 // Batch 522 — Wave 2 T10 (MOVE-ONLY, R3; eksekusi ulang — percobaan pertama Batch 520 ditarik Batch 521 karena laporan performa
@@ -61,70 +66,6 @@ import com.rudi.audioplayer.ui.theme.isSkeuTheme
 // `overflow = TextOverflow.Ellipsis` ditambah sbg jaring pengaman (mis. font-scale aksesibilitas
 // besar) — dulu 0 di-set (default Clip), itu sebabnya kliping lama menghasilkan huruf terpotong
 // mentah alih-alih "..." yang jelas.
-// Batch 447 — user lampirkan video referensi iOS Jam (drag lintas tab Alarm/Jam dunia/Timer/
-// Stopwatch): ikon+pill SUDAH ikut lerp warna kontinu 1:1 sinkron jari (Batch 440/446), TAPI
-// label teks di bawahnya TIDAK — root cause: `Text(...)` di bawah 0 pernah di-set `color`
-// eksplisit sejak fungsi ini dibuat (Batch 437), jadi warnanya 100% inherit `LocalContentColor`
-// bawaan `NavigationBarItem` M3, yang HANYA bereaksi ke boolean `selected` (snap begitu
-// navigate() commit index-crossing) — BUKAN ke `focus` kontinu yang sudah dipakai utk
-// scale/opacity DI FUNGSI INI JUGA. Efeknya: selama drag pelan/parsial (belum commit index),
-// ikon sudah keburu blend warna (mengikuti jari), tapi teks di bawahnya masih warna lama 100%
-// sampai commit — "1 aksen bergerak bersama" (tujuan eksplisit Batch 440) putus di teks,
-// persis beda dari referensi video (ikon+label iOS Jam berubah warna BERSAMAAN, bukan teks
-// menyusul lompat). Fix: param baru `color: Color?` (default null = 0 override, IDENTIK
-// perilaku lama persis, 0 regresi ke satu-satunya titik pemakaian lain manapun kalau ada) —
-// dipetakan ke `Text(color = ...)` di bawah. Nilai dihitung di 1 titik pemanggil
-// (`GlassTabIcon`, SUDAH punya `tint`+`unselectedIconColor`+`glassAlpha` yg sama persis
-// dipakai ikon) via `lerp` yang SAMA PERSIS, 0 hitungan/token warna baru — Skeu DIKECUALIKAN
-// (tetap kirim null, warna default M3 apa adanya, aturan solid Batch 58/61/79 tidak disentuh).
-// (ANTI-STALE Batch 449: "tetap kirim null" akurat sampai Batch 448 — `NavigationBarItem` yang
-// menyuplai LocalContentColor tsb DIHAPUS Batch 449, Skeu kini kirim token eksplisit, bukan null
-// lagi. Lihat blok `labelColor`/`skeuIconColor` di `GlassTabIcon` utk kondisi terkini.)
-@Composable
-private fun MagnifyingTabLabel(text: String, focus: Float, color: Color? = null) {
-    val clampedFocus = focus.coerceIn(0f, 1f)
-    val baseStyle = MaterialTheme.typography.labelMedium
-    // Batch 445 — user eksplisit: drag real-time tab-bar "kurang smooth". Root cause KEDUA
-    // (selain fix `glassAlpha` di `GlassTabIcon`): `style = baseStyle.copy(fontSize = ...)` di
-    // bawah ini mengubah fontSize SUNGGUHAN tiap frame drag (bukan cuma transform) — Text harus
-    // di-remeasure+relayout ULANG tiap kali `focus` berubah (tiap pointer-move event selama
-    // drag), dobel dgn scale visual `graphicsLayer` di bawah yang SUDAH cukup utk efek membesar
-    // (2 mekanisme scale independen bertumpuk = magnitude gabungan lebih besar dari maksud awal
-    // DAN beban layout-pass berulang yang berkontribusi ke drag terasa tersendat). Fix: fontSize
-    // asli (`baseStyle`, 0 di-copy) dipertahankan APA ADANYA — 0 remeasure lagi selama drag,
-    // efek "membesar" SEPENUHNYA lewat `graphicsLayer` scale (draw-phase murni, pola sama
-    // persis "Px-sinkron dibaca graphicsLayer" yang sudah dipakai `tabDragOffsetPx`/
-    // `tabBarOverscrollPx`, Batch 433/434/444). Faktor scale dinaikkan dari 0.08f ke 0.23f
-    // (≈ gabungan magnitude lama 1.14×1.08=1.231) supaya besar visual akhir label saat fokus
-    // penuh TETAP sama seperti sebelumnya — 0 perubahan tampilan yang diminta, murni pindah
-    // mekanisme jadi lebih ringan.
-    Text(
-        text = text,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        style = baseStyle,
-        // Batch 447 — lihat komentar lengkap di atas fungsi ini. `Color.Unspecified` (default
-        // param Compose `Text`, bukan literal baru dari batch ini) = perilaku identik dgn 0
-        // parameter `color` sama sekali — inherit LocalContentColor bawaan M3 apa adanya.
-        color = color ?: Color.Unspecified,
-        modifier = Modifier
-            .graphicsLayer {
-                val scale = 1f + clampedFocus * 0.23f
-                scaleX = scale
-                scaleY = scale
-                alpha = 0.68f + 0.32f * clampedFocus
-            }
-            // Batch 442 — `.blur()` efek "kaca pembesar" (Batch 437) DICABUT. Root cause
-            // terpisah dari fix style di atas: radius idle (focus=0, tab TIDAK sedang digeser)
-            // = (1-0)*1.3 = 1.3dp KONSTAN di 2 dari 3 label SETIAP SAAT (bukan cuma sesaat
-            // selama drag) — laporan+screenshot user konfirmasi efeknya cuma bikin
-            // "Perpustakaan"/"Pengaturan" terlihat buram permanen, 0 manfaat visual nyata
-            // (kaskade DESCENDING TRUTH: laporan eksplisit user > spec lama Batch 437).
-            // `scaleX`/`scaleY`/`alpha` (graphicsLayer di atas) TETAP jalan sbg sinyal fokus
-            // kontinu selama drag — cuma komponen blur yang dicabut, 0 elemen lain disentuh.
-    )
-}
-
 // Batch 438 — request eksplisit user: lampiran `drag_drop_glass_ios_kotlin.md` + screenshot
 // bottom nav, "hasil sebelumnya (Batch 437, efek kaca PEMBESAR di LABEL) mengecewakan ...
 // adaptasi 100% berdasarkan panduan". Panduan asli = demo generik (bukan app ini): 3 tab
@@ -175,143 +116,48 @@ private fun MagnifyingTabLabel(text: String, focus: Float, color: Color? = null)
 // obat, bukan seperti referensi). `NavigationRailItem` (tablet) TIDAK disentuh — tidak dipakai
 // `GlassTabIcon` sama sekali (lihat definisinya di `AppNavHost`, pakai `Icon`/`Text` polos), di
 // luar scope 2 screenshot yang keduanya nav ponsel.
+// Batch 657 — GlassTabIcon DIROMBAK sesuai video acuan (ANTI-STALE: komentar Batch 437-556 di atas = riwayat; mekanisme lerp warna
+// `focus`, `MagnifyingTabLabel` (skala 1,23x + alpha 0,68) dan `bouncyPress` (0,9x) sudah TIDAK ada). Video acuan: ikon/label tidak
+// membesar per-tab (yang membesar = BILAH, di `AppNavHost`) dan warna aksen TIDAK memudar linear, melainkan ter-klip tepat di bentuk
+// pil (ikon separuh berwarna saat pil melintas). Fungsi ini kini murni "wajah" statis: `highlighted=false` = warna tak-terpilih,
+// `highlighted=true` = warna terpilih (token M3 utk Skeu, `primary` utk tema lain — identik dgn titik akhir lerp lama).
+// `CustomNavBarTabItem` memanggilnya 2x (dasar + salinan aksen yang di-klip ke pil), jadi WAJIB murni.
 @Composable
 internal fun GlassTabIcon(
     icon: ImageVector,
     label: String,
-    focus: Float,
-    interactionSource: MutableInteractionSource
+    highlighted: Boolean
 ) {
     val isSkeu = isSkeuTheme()
-    // Cross-fade kontinu (bukan snap ON/OFF) — pill kaca menyala/meredup halus mengikuti
-    // transisi selected, pola animasi sama (tween) yang sudah dipakai transisi NavHost (Batch
-    // 330, 200/150ms) supaya "rasa" transisi tetap konsisten satu app.
-    // Batch 440 — request eksplisit user: adaptasi behavior dari panduan
-    // `drag_drop_glass_ios_kotlin.md` (dilampirkan ulang) — kapsul & warna ikon di referensi
-    // bertransisi MENGIKUTI PERSENTASE GESER JARI SECARA LANGSUNG (`pageOffsetFraction`
-    // HorizontalPager), bukan cuma snap ikut boolean `selected` setelah tab commit. Arsitektur
-    // riil app ini TETAP permanent NavHost routes (bukan HorizontalPager — lihat rasionalisasi
-    // Batch 438 di atas, reorder/pager sengaja tidak dipakai literal), tapi app ini SUDAH punya
-    // padanan persis `pageOffsetFraction` guide: `focus` (param di atas, dihitung live tiap
-    // frame selama drag oleh `tabMagnifyFocus`, Batch 435/437 — 1f di tab aktif idle, turun ke
-    // 0f digeser menjauh, tab tetangga naik 0f→1f digeser mendekat). Target
-    // `animateFloatAsState` diganti dari `if (selected) 1f else 0f` (statis, cuma bereaksi
-    // setelah commit) jadi `focus` langsung — idle-nya SAMA PERSIS 1f/0f seperti sebelumnya (0
-    // regresi tap, tween 220ms yang sama tetap jalan sbg smoothing), bedanya sekarang capsule
-    // ini juga ikut bereaksi kontinu selama jari masih menggeser, persis seperti referensi.
-    // Batch 445 — feedback lanjutan user PASCA Batch 444 di device asli, 2 poin: (1) "drag jari
-    // real-time belum sepenuhnya smooth", (2) "floating effect HANYA saat drag, warna berubah
-    // seketika real-time (bukan cuma pindah warna instant lintas tab)". Root cause TUNGGAL utk
-    // keduanya: `animateFloatAsState(targetValue = focus, tween(220))` di atas adalah lapis
-    // smoothing KEDUA di atas `focus` yang SUDAH kontinu real-time (fungsi tenda
-    // `tabBarDragFocus`, Batch 444) — targetnya sendiri bergerak tiap event pointer-move selama
-    // drag, jadi tween 220ms itu terus "mengejar" target yang TERUS PINDAH (bukan mengejar 1
-    // target diam spt transisi tap biasa), hasil yang dirender SELALU tertinggal dari posisi
-    // jari asli: lag itu yang terasa "kurang smooth" (poin 1), dan karena tertinggal, warna
-    // ikon/pill (baca `glassAlpha` di bawah) terlihat menyusul-lompat bukan berubah seketika
-    // sinkron dgn jari (poin 2).
-    // Fix: `animateFloatAsState` diganti `Animatable` manual dikontrol lewat `isDragging` (param
-    // baru, dihitung sekali di pemanggil dari `tabBarDragIndexPx`/`tabDragOffsetPx` — lihat titik
-    // pemakaian di `AppNavHost`) — SELAMA drag aktif: `snapTo(focus)` tiap kali `focus` berubah
-    // (0 animasi, 1:1 sinkron per frame dgn posisi jari mentah, pola sama seperti
-    // `tabDragOffsetPx`/`tabBarOverscrollPx` yang baca nilai mentah langsung tanpa animasi utk
-    // real-time tracking, Batch 433/434/444). Begitu drag lepas (`isDragging` → false):
-    // `animateTo(focus, tween(220))` dari titik SINKRON terakhir itu — nyambung mulus ke posisi
-    // commit final (0f/1f) TANPA lompatan mundur. Tap biasa (0 drag aktif sama sekali) tetap
-    // dapat cross-fade tween(220) yang SAMA PERSIS seperti sebelumnya (Batch 440) — 0 regresi.
-    // Batch 556 — `glassAlphaAnim` (Animatable + tween 220 ms, dikontrol `isDragging`) DIHAPUS: `focus` dari pemanggil kini
-    // = fungsi tenda posisi KUNCI yang meluncur (`navPillFocus`, MainActivity.kt) — sudah kontinu & sudah dianimasikan oleh
-    // gerak kunci, jadi dipakai LANGSUNG (animasi kedua di atasnya = lag mengejar target bergerak, akar keluhan Batch 445).
-    // Warna/skala ikon+label berganti persis di tepi kunci (referensi `SkeuTabBar` Boomly B191). Param `selected` &
-    // `isDragging` ikut dihapus (tak terpakai lagi).
-    val glassAlpha = focus
+    val itemColors = NavigationBarItemDefaults.colors()
     val tint = MaterialTheme.colorScheme.primary
-    // Batch 448 — ROMBAK TOTAL mekanisme drag bottom nav (instruksi eksplisit user + video
-    // referensi iOS Jam asli). Root cause bug "gak bagus sama sekali" (2 kotak pill
-    // tumpang-tindih dgn seam/celah kelihatan pas drag, dikonfirmasi lewat frame-by-frame video
-    // user): sejak Batch 446, ADA 2 SISTEM GAMBAR PILL BERJALAN BERSAMAAN — (1) pill per-tab DI
-    // SINI (dibatasi lebar kolomnya sendiri) DAN (2) 1 pill "bridge" tambahan yang digambar
-    // `drawWithContent` di `NavigationBar` (AppNavHost) BEBAS lintas kolom. Keduanya nyala
-    // BERSAMAAN selama drag (bridge utk lintas-kolom, punya function ini utk idle/tap) — 2 kotak
-    // rounded-rect beda ukuran/beda sumber saling tumpuk = seam persis yg kelihatan di video.
-    // Fix: pill glass (non-Skeu) DIHAPUS TOTAL dari sini — SATU-SATUNYA penggambar pill utk
-    // identitas kaca kini pill unified di `NavigationBar` (AppNavHost, selalu aktif di SEMUA
-    // state: idle/tap/drag/nudge, bukan cuma saat drag spt bridge lama) yang bebas meluncur
-    // mulus lintas kolom tanpa batas/seam krn 1 kanvas bersama. Icon+label lerp warna (baris di
-    // bawah fungsi ini) TIDAK disentuh — itu SUDAH benar 1:1 sesuai video (state Batch 447),
-    // murni pill BACKGROUND yang direstrukturisasi. Skeu TIDAK disentuh sama sekali (aturan lama
-    // "solid, bukan kaca", Batch 58/61/79) — tetap pill diskrit sendiri di bawah, 0 regresi.
+    val iconColor = when {
+        !highlighted -> itemColors.unselectedIconColor
+        isSkeu -> itemColors.selectedIconColor
+        else -> tint
+    }
+    val labelColor = when {
+        !highlighted -> itemColors.unselectedTextColor
+        isSkeu -> itemColors.selectedTextColor
+        else -> tint
+    }
     Column(
+        // Padding horizontal 4.dp (Batch 452: cegah ellipsis "Perpustakaan"/"Pengaturan") dipertahankan; area sentuh = slot
+        // `CustomNavBarTabItem`, bukan padding ini.
         modifier = Modifier
             .widthIn(min = 64.dp)
-            // Batch 555 — latar `secondaryContainer` statis khusus Skeu (pill diskrit per-tab) DIHAPUS: SEMUA 6 tema kini
-            // memakai SATU kunci timbul yang meluncur di dalam palung cekung, digambar `NavigationBar` (MainActivity.kt,
-            // `neuSlidingKey()`); untuk Skeu warna kuncinya = `secondaryContainer` sehingga `selectedIconColor`/`selectedTextColor`
-            // di bawah tetap terbaca. Komentar Batch 448/58/61/79 di atas = riwayat ("Skeu pill diskrit" tak berlaku lagi).
-            .bouncyPress(interactionSource, pressedScale = 0.9f)
-            // Batch 452 — user: label nav bawah masih kepotong ellipsis ("Perpustakaan"/
-            // "Pengaturan") di kondisi normal (bukan cuma font-scale aksesibilitas besar spt
-            // catatan lama Batch 442). Root cause: 12.dp padding kiri+kanan di sini memakan 24.dp
-            // dari lebar kolom (~1/3 lebar bar) SEBELUM Text diukur — margin tipis tapi cukup utk
-            // memicu ellipsis pada label 12 huruf di layar sempit. Touch target 0 kena dampak sama
-            // sekali: area sentuh tab = `Box.weight(1f, fill=true)` di `CustomNavBarTabItem`
-            // (pembungkus di LUAR Column ini), BUKAN padding Column ini — padding ini murni jarak
-            // visual internal. Fix: 12.dp -> 4.dp (bebaskan 16.dp lebar tambahan utk Text, 0
-            // sentuh style/fontSize/theme token). Efek samping disengaja: pill solid Skeu (background
-            // di atas, dibungkus padding yg SAMA) ikut sedikit lebih ramping ke arah teks — masih
-            // proporsional (aturan solid Batch 58/61/79 tidak disentuh), bukan regresi ukuran
-            // kapsul raksasa Batch 450.
             .padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        // Batch 440 — elemen guide yang BELUM diadaptasi batch-batch sebelumnya: ikon sendiri
-        // (bukan cuma pill di belakangnya) ikut `lerp` warna kontinu, teknik PERSIS
-        // `androidx.compose.ui.graphics.lerp` di guide. Titik awal `unselectedIconColor` =
-        // token M3 resmi (`NavigationBarItemDefaults`, IDENTIK dgn default lama sebelum batch
-        // ini — 0 hardcode warna baru, ikut identitas tema aktif apa pun, konsisten dgn aturan
-        // Batch 437 §warna). Titik akhir = `tint` (primary) yang sama dgn aksen pill di atas,
-        // supaya ikon & pill bergerak sebagai 1 aksen, bukan 2 warna lepas. Skeu DIKECUALIKAN
-        // (aturan "solid, bukan kaca" Batch 58/61/79, app-wide) — tetap tint default M3 apa
-        // adanya, 0 lerp.
-        if (isSkeu) {
-            // Batch 449 — dulu implisit lewat `LocalContentColor` bawaan `NavigationBarItem` M3
-            // (DIHAPUS batch ini, lihat `CustomNavBarTabItem`) — tanpa titik ini, ikon Skeu akan
-            // STATIS 1 warna (kehilangan beda selected/unselected sama sekali, bukan cuma soal
-            // gray-flash). Snap biner (0 lerp, aturan solid Batch 58/61/79 tidak disentuh), token
-            // M3 resmi PERSIS yang dulu dipakai NavigationBarItem secara default.
-            // Batch 556 — lerp mengikuti kunci (dulu biner `selected`): ikon berwarna `selectedIconColor` hanya saat berada di
-            // atas kunci `secondaryContainer`, bukan lebih dulu saat kunci masih meluncur menuju tab ini.
-            val skeuIconColor = lerp(
-                NavigationBarItemDefaults.colors().unselectedIconColor,
-                NavigationBarItemDefaults.colors().selectedIconColor,
-                glassAlpha
-            )
-            Icon(icon, contentDescription = null, tint = skeuIconColor)
-        } else {
-            val unselectedIconColor = NavigationBarItemDefaults.colors().unselectedIconColor
-            Icon(icon, contentDescription = null, tint = lerp(unselectedIconColor, tint, glassAlpha))
-        }
-        // Batch 447 — labelColor: PERSIS pola unselectedIconColor/lerp di atas, target token
-        // resmi `unselectedTextColor` (bukan `unselectedIconColor` yg dipakai ikon), 0 hardcode
-        // baru. (ANTI-STALE Batch 449: dulu null utk Skeu di sini — sejak Batch 449 Skeu kirim
-        // token eksplisit, lihat blok `labelColor` di bawah, komentarnya sendiri.)
-        // `glassAlpha` (bukan `focus` mentah) dipakai di SINI (parameter ke-2) juga — identik
-        // nilai selama drag aktif (glassAlpha snapTo(focus) tiap frame), bedanya HANYA di jendela
-        // easing 220ms pasca lepas jari: scale/opacity label kini ikut melunak bareng warna
-        // ikon+labelColor baru ini, bukan snap instan sendirian seperti sebelumnya — konsisten
-        // dgn tujuan "1 aksen bergerak bersama" (Batch 440), 0 dampak ke tap biasa/idle (identik
-        // 0f/1f di kedua kasus).
-        // Batch 449 — sama alasan `skeuIconColor` di atas: dulu implisit `LocalContentColor`
-        // `NavigationBarItem` (DIHAPUS), kini eksplisit token resmi selected/unselectedTextColor.
-        val labelColor = if (isSkeu) {
-            lerp(
-                NavigationBarItemDefaults.colors().unselectedTextColor,
-                NavigationBarItemDefaults.colors().selectedTextColor,
-                glassAlpha
-            )
-        } else lerp(NavigationBarItemDefaults.colors().unselectedTextColor, tint, glassAlpha)
-        MagnifyingTabLabel(label, glassAlpha, labelColor)
+        Icon(icon, contentDescription = null, tint = iconColor)
+        Text(
+            text = label,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.labelMedium,
+            color = labelColor
+        )
     }
 }
 
@@ -405,16 +251,72 @@ private object NoRippleIndication : IndicationNodeFactory {
 // yg meniru API resmi WAJIB diverifikasi ke source/dokumentasi asli dulu, bukan diasumsikan dari
 // pola modifier lain di codebase yg mirip tapi beda konteks — kesalahan 1 modifier bisa merusak
 // SELURUH bottom nav (bukan cuma 1 tab), lebih parah dari bug yg sedang diperbaiki.
+// Batch 657 — geometri pil + pemetaan jari (fungsi MURNI, diuji `TabPillMathTest`). Rumus `tabPillLeft` = rumus `neuKeyDraw`
+// (TactileDepth.kt: `(position * slotW - kw / 2).coerceIn(0, width - kw)`), karena lapisan warna ter-klip di bawah WAJIB sama persis
+// dgn kunci timbul yang digambar `neuSlidingKey` (74% lebar slot, 62% tinggi bar — nilai yang sama dikirim MainActivity).
+internal const val TAB_PILL_WIDTH_FRACTION = 0.74f
+internal const val TAB_PILL_HEIGHT_FRACTION = 0.62f
+private const val TAB_PILL_CORNER_DP = 16f
+
+/** Indeks tab di bawah koordinat-x jari (0 until [count]); lebar/jumlah tidak valid -> 0. */
+internal fun tabIndexAt(x: Float, width: Float, count: Int): Int {
+    if (width <= 0f || count <= 0) return 0
+    return (x / width * count).toInt().coerceIn(0, count - 1)
+}
+
+/** Pusat pil (satuan tab) yang diikuti jari: dijepit ke pusat tab pertama (0,5) dan terakhir ([count] - 0,5). */
+internal fun tabPillTarget(x: Float, width: Float, count: Int): Float {
+    if (width <= 0f || count <= 0) return 0.5f
+    return (x / width * count).coerceIn(0.5f, count.toFloat() - 0.5f)
+}
+
+/** Tepi kiri kunci/pil (px, koordinat bilah) utk pusat [position] (satuan tab) — identik rumus `neuKeyDraw`. */
+internal fun tabPillLeft(position: Float, barWidth: Float, count: Int, widthFraction: Float): Float {
+    val slotW = barWidth / count.coerceAtLeast(1)
+    val keyW = slotW * widthFraction
+    return (position * slotW - keyW / 2f).coerceIn(0f, maxOf(0f, barWidth - keyW))
+}
+
+// Geometri slot hasil `onPlaced`/`onSizeChanged` (bidang polos, BUKAN state: hanya dibaca di fase gambar, dan perubahan ukuran selalu
+// disertai relayout+redraw; menghindari rekomposisi per perubahan ukuran).
+private class TabSlotGeometry {
+    var left = 0f
+    var top = 0f
+    var barWidth = 0f
+    var barHeight = 0f
+    var faceWidth = 0f
+    var faceHeight = 0f
+}
+
+// Batch 657 — slot tab dgn DUA lapisan (video acuan: warna aksen hanya di dalam bentuk pil): lapisan dasar `content(false)` + di atasnya
+// salinan `content(true)` yang digambar ter-klip ke persegi-membulat pil (pusat `pillPosition()`, ukuran = kunci timbul, minimal seukuran
+// wajah ikon+label agar label panjang/font besar tak setengah-abu saat diam). `revealAll()` = true -> salinan aksen digambar PENUH tanpa
+// klip (tab rute yang sudah aktif tetap berwarna selama jari menekan bilah, seperti video). Semua dibaca di fase GAMBAR.
+// Salinan aksen: `clearAndSetSemantics` agar TalkBack tak membaca label dua kali. Wrap-content & tanpa `fillMaxHeight` (pelajaran
+// Batch 450 di atas dipertahankan): koordinat slot dibaca dari `onPlaced`, bukan diasumsikan.
 @Composable
 internal fun RowScope.CustomNavBarTabItem(
     selected: Boolean,
     onClick: () -> Unit,
     interactionSource: MutableInteractionSource,
-    content: @Composable () -> Unit
+    tabCount: Int,
+    pillPosition: () -> Float,
+    revealAll: () -> Boolean,
+    content: @Composable (highlighted: Boolean) -> Unit
 ) {
+    val geometry = remember { TabSlotGeometry() }
+    val pillClipPath = remember { Path() }
     Box(
         modifier = Modifier
             .weight(1f, fill = true)
+            .onPlaced { coordinates ->
+                val position = coordinates.positionInParent()
+                geometry.left = position.x
+                geometry.top = position.y
+                val parent = coordinates.parentLayoutCoordinates
+                geometry.barWidth = (parent?.size?.width ?: 0).toFloat()
+                geometry.barHeight = (parent?.size?.height ?: 0).toFloat()
+            }
             .selectable(
                 selected = selected,
                 onClick = onClick,
@@ -424,6 +326,46 @@ internal fun RowScope.CustomNavBarTabItem(
             ),
         contentAlignment = Alignment.Center
     ) {
-        content()
+        content(false)
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clearAndSetSemantics { }
+                .drawWithContent {
+                    if (revealAll()) {
+                        drawContent()
+                    } else if (geometry.barWidth > 0f && geometry.barHeight > 0f) {
+                        val barWidth = geometry.barWidth
+                        val keyW = barWidth / tabCount.coerceAtLeast(1) * TAB_PILL_WIDTH_FRACTION
+                        val keyH = geometry.barHeight * TAB_PILL_HEIGHT_FRACTION
+                        val keyLeft = tabPillLeft(pillPosition(), barWidth, tabCount, TAB_PILL_WIDTH_FRACTION)
+                        val coverW = maxOf(keyW, geometry.faceWidth)
+                        val coverH = maxOf(keyH, geometry.faceHeight)
+                        val centerX = keyLeft + keyW / 2f - geometry.left
+                        val centerY = geometry.barHeight / 2f - geometry.top
+                        val clipLeft = centerX - coverW / 2f
+                        val clipRight = centerX + coverW / 2f
+                        if (clipRight > 0f && clipLeft < size.width) {
+                            val clipTop = centerY - coverH / 2f
+                            val radius = minOf(TAB_PILL_CORNER_DP.dp.toPx(), minOf(coverW, coverH) / 2f)
+                            pillClipPath.rewind()
+                            pillClipPath.addRoundRect(
+                                RoundRect(clipLeft, clipTop, clipRight, clipTop + coverH, radius, radius)
+                            )
+                            clipPath(pillClipPath) { this@drawWithContent.drawContent() }
+                        }
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier.onSizeChanged { size ->
+                    geometry.faceWidth = size.width.toFloat()
+                    geometry.faceHeight = size.height.toFloat()
+                }
+            ) {
+                content(true)
+            }
+        }
     }
 }

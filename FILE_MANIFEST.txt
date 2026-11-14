@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 657: app/src/test/java/com/rudi/audioplayer/TabPillMathTest.kt (file baru, tes unit pemetaan jari->pil bilah tab) ditambahkan — 249->250.
 # Batch 656: app/src/main/java/com/rudi/audioplayer/ui/theme/SpaceCosmos.kt (file baru, latar kosmos tema Space) ditambahkan — 248->249.
 # Batch 390: app/src/main/java/com/rudi/audioplayer/ui/theme/IosScrollPhysics.kt (dibuat Batch 364)
 # ditemukan tidak pernah masuk manifest — ditambahkan sekarang, 188->189. Ditemukan lewat diff
@@ -328,6 +329,7 @@ app/src/main/res/xml/file_paths.xml
 app/src/main/res/xml/shortcuts.xml
 app/src/main/res/xml/widget_player_info.xml
 app/src/test/java/com/rudi/audioplayer/ArchitectureTest.kt
+app/src/test/java/com/rudi/audioplayer/TabPillMathTest.kt
 app/src/test/java/com/rudi/audioplayer/data/CustomFolderScannerStableIdTest.kt
 app/src/test/java/com/rudi/audioplayer/data/DuplicateDetectorTest.kt
 app/src/test/java/com/rudi/audioplayer/data/Id3TagWriterTest.kt

@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 657: bilah tab bawah kini bergerak seperti video acuan di semua tema (pil berpegas mengikuti jari, bilah membesar 1,05x saat ditekan, warna aksen hanya di dalam pil, halaman berpindah saat jari diangkat) — belum dikompilasi/diuji di device; 6 tes unit pemetaan pil lulus di sandbox
 > - Batch 646: widget kini mengingat lagu terakhir saat cold start walau lagu berganti otomatis tanpa UI (service ikut menyimpan antrean), dan judul marquee tak lagi melompat ke awal saat play/jeda di widget; Batch 646 belum dikompilasi/diuji
 > - Batch 645: perbaikan build gagal v644 (nama tes unit memuat karakter terlarang) dan banner "Laporan untuk Claude" kini memuat baris Tes unit serta selalu tampil; Batch 645 belum dijalankan di Actions
 > - Batch 644: marquee judul widget SONIX kini memakai segmen animasi 3 dtk (update ke launcher 3x lebih jarang) — sebelumnya (Batch 643) bergerak maju tetapi tersendat tiap ±1 dtk; Batch 644 belum dikompilasi/diuji
