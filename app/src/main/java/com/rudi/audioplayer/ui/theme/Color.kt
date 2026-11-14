@@ -420,3 +420,28 @@ val AuroraSurfaceVariant = Color(0xFF161D22)
 // mengorbankan kontras baca.
 val AuroraText = Color(0xFFE7F3EC)
 val AuroraSecondaryText = Color(0xFF7E8C90)
+
+// ============================================================================
+// SPACE -- Batch 656, tema ke-7 (permintaan user: "skin baru theme space dengan shape yang megah
+// dan masterpiece"). Terkunci GELAP permanen (antariksa = malam abadi; pola sama CalmRetro/Aurora:
+// `colorsFor()` mengabaikan isDark). Palet = 1 aksen + 3 hue nebula + 2 bintang, semuanya turunan
+// langit malam sendiri -- BUKAN reuse hue Aurora (hijau-teal), Tactile (biru-ungu 6670FF) maupun
+// Liquid Glass (violet 8E7CFF): primer di sini cyan-pulsar dingin, nebula indigo/violet/rose hanya
+// ingredient gradien alpha-rendah di latar (`SpaceCosmosBackdrop()`, SpaceCosmos.kt) dan rim panel.
+// ============================================================================
+val SpaceAccent = Color(0xFF5CD6FF)        // Pulsar Cyan -> role `primary`, dasar isSpaceTheme()
+val SpaceNebulaIndigo = Color(0xFF4B3FD8)
+val SpaceNebulaViolet = Color(0xFF8E5CF7)
+val SpaceNebulaRose = Color(0xFFE0589F)
+val SpaceStarWhite = Color(0xFFF2F5FF)
+val SpaceStarGold = Color(0xFFFFD58A)
+// Kanvas: void biru-navy di atas -> hitam pekat -> ungu-hitam di bawah (gradien latar kosmos).
+val SpaceVoidTop = Color(0xFF070A1E)
+val SpaceBackground = Color(0xFF03040C)
+val SpaceVoidBottom = Color(0xFF06030F)
+val SpaceSurface = Color(0xFF0A0D1F)
+val SpaceSurfaceVariant = Color(0xFF151A38)
+val SpaceText = Color(0xFFEAF0FF)
+val SpaceSecondaryText = Color(0xFF8B94BD)
+// Alpha puncak rim panel kaca (frostedGlass(), BlurUtils.kt) -- statis (Batch 328: animasi rim = stutter).
+val SpaceRimGlowAlpha = 0.46f

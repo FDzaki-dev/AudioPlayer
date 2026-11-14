@@ -78,6 +78,8 @@ fun Modifier.frostedGlass(
     // Batch 310 — Aurora rim-glow per-panel: needed below for the same reason as isLiquidGlass
     // above, its own edgeBrush branch instead of the generic `else`.
     val isAurora = isAuroraTheme()
+    // Batch 656 — Space: rim panel kosmik (cyan -> violet -> rose), cabang sendiri supaya tidak jatuh ke `else` netral.
+    val isSpace = isSpaceTheme()
     val isDark = LocalIsDarkTheme.current
     // Shape now follows the active theme's own shape tokens instead of a hardcoded 24dp —
     // otherwise every sheet/mini-player using this modifier would keep Apple's soft rounding
@@ -179,7 +181,7 @@ fun Modifier.frostedGlass(
     // remember key/dipakai di dalam lambda — bukan dipanggil ulang di dalamnya.
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val themeBackgroundColor = MaterialTheme.colorScheme.background
-    val edgeBrush = remember(isTactile, isLiquidGlass, isAurora, isDark, onSurfaceColor, themeBackgroundColor) {
+    val edgeBrush = remember(isTactile, isLiquidGlass, isAurora, isSpace, isDark, onSurfaceColor, themeBackgroundColor) {
         when {
         isTactile -> Brush.linearGradient(
             colors = if (isDark) listOf(TactileHighlight, TactileEdge) else listOf(TactileLightHighlight, TactileLightEdge)
@@ -260,6 +262,15 @@ fun Modifier.frostedGlass(
                 AuroraTeal.copy(alpha = AuroraRimGlowAlpha * 0.85f),
                 AuroraViolet.copy(alpha = AuroraRimGlowAlpha * 0.65f),
                 AuroraMagenta.copy(alpha = AuroraRimGlowAlpha * 0.46f)
+            )
+        )
+        // Batch 656 — Space: 3-stop cyan-pulsar -> violet nebula -> rose nebula, alpha menurun (1.0x/0.8x/0.5x) dari
+        // `SpaceRimGlowAlpha`; STATIS (pelajaran Batch 328: rim beranimasi = recomposition semua panel = stutter).
+        isSpace -> Brush.linearGradient(
+            colors = listOf(
+                SpaceAccent.copy(alpha = SpaceRimGlowAlpha),
+                SpaceNebulaViolet.copy(alpha = SpaceRimGlowAlpha * 0.8f),
+                SpaceNebulaRose.copy(alpha = SpaceRimGlowAlpha * 0.5f)
             )
         )
         else -> {

@@ -48,7 +48,10 @@ enum class ThemeIdentity(val storageKey: String, val displayName: String, val de
     // background saja utk saat ini (rim-glow per-panel ditunda). Mekanisme: `auroraGlow()`
     // (TactileDepth.kt, Batch 306) — warna gradien mengalir pelan, bukan shadow/blur/artefak
     // retro seperti 5 identitas lain.
-    AURORA("aurora", "Aurora", "Cahaya aurora borealis mengalir pelan di ambient, aksen hijau-teal-ungu-magenta — selalu gelap, tidak mengikuti toggle Mode");
+    AURORA("aurora", "Aurora", "Cahaya aurora borealis mengalir pelan di ambient, aksen hijau-teal-ungu-magenta — selalu gelap, tidak mengikuti toggle Mode"),
+    // Batch 656 — tema ke-7 (permintaan user: skin Space 🌌 dgn shape megah). Terkunci gelap permanen (pola sama
+    // CALM_RETRO/AURORA). Latar kosmos animasi = `SpaceCosmosBackdrop()` (SpaceCosmos.kt), shape = `SpaceShapes`.
+    SPACE("space", "Space", "🌌 Alam semesta: bintang berkelip, nebula hanyut pelan, panel berbentuk orbit, aksen cyan pulsar — selalu gelap, tidak mengikuti toggle Mode");
 
     companion object {
         fun fromStorageKey(key: String?): ThemeIdentity = entries.find { it.storageKey == key } ?: APPLE
@@ -362,6 +365,28 @@ private val AuroraColors = darkColorScheme(
     error = AuroraMagenta
 )
 
+// Batch 656 — SPACE: 1 colorScheme gelap saja (terkunci gelap; `colorsFor()` mengabaikan isDark). onPrimary hitam:
+// luma SpaceAccent (#5CD6FF) ≈0.78 jauh di atas ambang 0.55. tertiary = nebula violet (onTertiary putih, luma ≈0.28),
+// error = nebula rose (derivasi palet sendiri, pelajaran Batch 130/307).
+private val SpaceColors = darkColorScheme(
+    primary = SpaceAccent,
+    onPrimary = Color.Black,
+    secondary = SpaceSecondaryText,
+    onSecondary = SpaceBackground,
+    tertiary = SpaceNebulaViolet,
+    onTertiary = Color.White,
+    background = SpaceBackground,
+    onBackground = SpaceText,
+    surface = SpaceSurface,
+    onSurface = SpaceText,
+    surfaceVariant = SpaceSurfaceVariant,
+    onSurfaceVariant = SpaceSecondaryText,
+    outline = SpaceSurfaceVariant,
+    surfaceTint = SpaceAccent,
+    error = SpaceNebulaRose,
+    onError = Color.White
+)
+
 // A single, consistent "continuous curve" language across the whole app — Compose's Shapes
 // API only supports true rounded rectangles (Apple's real squircle/superellipse corners
 // aren't natively expressible), so generous rounding is the closest honest approximation.
@@ -467,6 +492,35 @@ val AuroraShapes = Shapes(
     )
 )
 
+// Batch 656 — SPACE "ORBIT": asimetri CERMIN Aurora (Aurora besar di topStart/bottomEnd; Space besar di
+// topEnd/bottomStart) dan lebih dramatis: sudut besar 22/30/42dp vs pasangan kecil 8/10/14dp -> panel terbaca
+// sebagai bulan sabit/jalur orbit yang menyapu diagonal. Murni RoundedCornerShape (API yang sudah terbukti compile
+// di AuroraShapes; Compose otomatis menskala radius bila jumlah sudut melebihi sisi elemen, jadi aman utk
+// elemen pendek). Radius 42dp = pertama melewati rekor liquidLg 34dp, sengaja: itu "megah"-nya tema ini.
+private val SpaceOrbitSmall = 22.dp
+private val SpaceOrbitMedium = 30.dp
+private val SpaceOrbitLarge = 42.dp
+val SpaceShapes = Shapes(
+    small = RoundedCornerShape(
+        topStart = 8.dp,
+        topEnd = SpaceOrbitSmall,
+        bottomEnd = 8.dp,
+        bottomStart = SpaceOrbitSmall
+    ),
+    medium = RoundedCornerShape(
+        topStart = Radius.sm,
+        topEnd = SpaceOrbitMedium,
+        bottomEnd = Radius.sm,
+        bottomStart = SpaceOrbitMedium
+    ),
+    large = RoundedCornerShape(
+        topStart = 14.dp,
+        topEnd = SpaceOrbitLarge,
+        bottomEnd = 14.dp,
+        bottomStart = SpaceOrbitLarge
+    )
+)
+
 // Batch 61 — mode resolution is now completely identity-agnostic (used to take an AppTheme and
 // hardcode TACTILE/SKEU_DARK_LITE to always-true). Every identity honors SYSTEM/LIGHT/DARK the
 // same way; an identity's own light/dark visual DIFFERENCE lives entirely in colorsFor() below.
@@ -507,6 +561,11 @@ fun isLiquidGlassTheme(): Boolean = MaterialTheme.colorScheme.primary == LiquidG
 @Composable
 fun isAuroraTheme(): Boolean = MaterialTheme.colorScheme.primary == AuroraAccent
 
+// Batch 656 — helper ke-6 (pola identik 5 di atas): dipakai MainActivity (Scaffold transparan agar latar kosmos terlihat)
+// dan BlurUtils.kt (rim panel).
+@Composable
+fun isSpaceTheme(): Boolean = MaterialTheme.colorScheme.primary == SpaceAccent
+
 fun colorsFor(identity: ThemeIdentity, isDark: Boolean) = when (identity) {
     ThemeIdentity.TACTILE -> if (isDark) TactileDarkColors else TactileLightColors
     ThemeIdentity.SKEU_DARK_LITE -> if (isDark) SkeuDarkColors else SkeuLightColors
@@ -519,6 +578,8 @@ fun colorsFor(identity: ThemeIdentity, isDark: Boolean) = when (identity) {
     // Batch 307 — isDark sengaja diabaikan, sama alasan CALM_RETRO di atas: Aurora terkunci
     // gelap permanen (dikonfirmasi user sebelum Batch 306).
     ThemeIdentity.AURORA -> AuroraColors
+    // Batch 656 — Space terkunci gelap permanen (isDark diabaikan, sama alasan CALM_RETRO/AURORA).
+    ThemeIdentity.SPACE -> SpaceColors
 }
 
 @Composable
@@ -527,7 +588,9 @@ fun AudioPlayerTheme(
     mode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit
 ) {
-    val isDark = resolveIsDark(mode)
+    // Batch 656 — Space terkunci gelap: sinyal LocalIsDarkTheme (mesin kedalaman neu*/frostedGlass) WAJIB gelap walau
+    // sistem sedang mode terang, kalau tidak panel memakai token terang di atas skema warna gelap. Identitas lain TIDAK diubah.
+    val isDark = resolveIsDark(mode) || identity == ThemeIdentity.SPACE
     // Batch 61 — provides the mode signal to every descendant (tactileEmboss()/skeuEmboss()/
     // frostedGlass()) so their light/dark token branching stays centralized instead of each call
     // site re-deriving it.
@@ -569,6 +632,7 @@ fun AudioPlayerTheme(
                 ThemeIdentity.LIQUID_GLASS -> LiquidGlassTypography
                 ThemeIdentity.CALM_RETRO -> CalmRetroTypography
                 ThemeIdentity.AURORA -> AuroraTypography
+                ThemeIdentity.SPACE -> SpaceTypography
                 else -> AppleTypography
             },
             shapes = when (identity) {
@@ -577,6 +641,7 @@ fun AudioPlayerTheme(
                 ThemeIdentity.CALM_RETRO -> CalmRetroShapes
                 ThemeIdentity.LIQUID_GLASS -> LiquidGlassShapes
                 ThemeIdentity.AURORA -> AuroraShapes
+                ThemeIdentity.SPACE -> SpaceShapes
                 else -> AppleShapes
             },
             content = {

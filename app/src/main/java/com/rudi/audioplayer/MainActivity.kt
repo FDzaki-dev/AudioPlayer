@@ -167,6 +167,8 @@ import com.rudi.audioplayer.ui.theme.calmGrain
 import com.rudi.audioplayer.ui.theme.neuSlidingKey
 import com.rudi.audioplayer.ui.theme.neuTrough
 import com.rudi.audioplayer.ui.theme.auroraGlow
+import com.rudi.audioplayer.ui.theme.SpaceCosmosBackdrop
+import com.rudi.audioplayer.ui.theme.isSpaceTheme
 import com.rudi.audioplayer.ui.theme.LocalHazeState
 import com.rudi.audioplayer.ui.theme.Motion
 import dev.chrisbanes.haze.rememberHazeState
@@ -372,11 +374,14 @@ class MainActivity : FragmentActivity() {
                 // switching to "Terang" leaves status/nav bar icons stuck light-on-light
                 // (styled for the dark theme they started in) and effectively invisible.
                 val isDarkTheme = resolveIsDark(appThemeMode)
+                // Batch 656 — Space terkunci gelap: ikon status/navigasi harus tetap terang walau sistem mode terang
+                // (identitas lain TIDAK diubah).
+                val lightBars = !isDarkTheme && appThemeIdentity != ThemeIdentity.SPACE
                 val decorView = LocalView.current
                 SideEffect {
                     WindowCompat.getInsetsController(window, decorView).apply {
-                        isAppearanceLightStatusBars = !isDarkTheme
-                        isAppearanceLightNavigationBars = !isDarkTheme
+                        isAppearanceLightStatusBars = lightBars
+                        isAppearanceLightNavigationBars = lightBars
                     }
                 }
 
@@ -585,6 +590,9 @@ class MainActivity : FragmentActivity() {
                     contentColor = MaterialTheme.colorScheme.onBackground
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
+                        // Batch 656 — latar kosmos tema Space: anak PERTAMA Box = tergambar di belakang semua layar
+                        // (Scaffold dibuat transparan khusus Space di AppNavHost). Tema lain: 0 perubahan.
+                        if (appThemeIdentity == ThemeIdentity.SPACE) SpaceCosmosBackdrop()
                         when {
                             needsUnlock -> LockScreen(
                                 biometricEnabled = biometricEnabled && isBiometricAvailable(),
@@ -1071,6 +1079,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     // Batch 24: minim-diff, bukan reformat besar-besaran demi estetika indentasi).
     CompositionLocalProvider(LocalHazeState provides hazeState) {
     Scaffold(
+        // Batch 656 — nilai default M3 = `background`; HANYA Space transparan supaya latar kosmos di belakang terlihat.
+        containerColor = if (isSpaceTheme()) Color.Transparent else MaterialTheme.colorScheme.background,
         snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
                 Snackbar(
@@ -1147,6 +1157,23 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // coroutine/snapTo per-delta) — sumbu sinkron-vs-asinkron yang sama yang
                     // sudah dijaga Batch 433/434.
                     val tabBarDragIndexPx = remember { mutableFloatStateOf(Float.NaN) }
+                    // Batch 656 — BUG user (screenshot): tab Perpustakaan dipulihkan tapi bilah menyorot Beranda. AKAR: `navPillIndexAnim`
+                    // hanya digeser oleh tap/swipe/drag; snap di `LaunchedEffect(Unit)` di atas terjadi SEKALI saat bilah pertama
+                    // tampil (rute masih `home`), sedangkan pemulihan Batch 651 memanggil `navigate()` langsung -> kunci tertinggal.
+                    // FIX: tiap rute berganti, tunggu 1 frame (jalur tap/swipe/drag meluncurkan animateTo-nya sendiri dulu), lalu
+                    // BILA kunci diam (bukan sedang animasi/drag) dan beda dari rute -> snap ke tab rute itu. Jalur normal = 0 perubahan.
+                    LaunchedEffect(currentRoute) {
+                        val idx = TAB_ROUTES.indexOfFirst { it == currentRoute }
+                        if (idx < 0) return@LaunchedEffect
+                        androidx.compose.runtime.withFrameNanos { }
+                        val target = idx + 0.5f
+                        if (!navPillIndexAnim.isRunning &&
+                            tabBarDragIndexPx.floatValue.isNaN() &&
+                            kotlin.math.abs(navPillIndexAnim.value - target) > 0.01f
+                        ) {
+                            navPillIndexAnim.snapTo(target)
+                        }
+                    }
                     // Tahanan visual (rubber-band) saat jari didorong lewat ujung kolom
                     // pertama/terakhir (Beranda/Pengaturan) — sebelumnya 0 sinyal apa pun, index
                     // cuma coerceIn diam-diam. Pola SAMA PERSIS dgn tabDragOffsetPx/tabDragOffset

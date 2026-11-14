@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 656: app/src/main/java/com/rudi/audioplayer/ui/theme/SpaceCosmos.kt (file baru, latar kosmos tema Space) ditambahkan — 248->249.
 # Batch 390: app/src/main/java/com/rudi/audioplayer/ui/theme/IosScrollPhysics.kt (dibuat Batch 364)
 # ditemukan tidak pernah masuk manifest — ditambahkan sekarang, 188->189. Ditemukan lewat diff
 # penuh manifest vs isi ZIP (bukan cuma spot-check file yang baru disentuh) saat verifikasi
@@ -254,6 +255,7 @@ app/src/main/java/com/rudi/audioplayer/ui/theme/BlurUtils.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Color.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/IosScrollPhysics.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Motion.kt
+app/src/main/java/com/rudi/audioplayer/ui/theme/SpaceCosmos.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Spacing.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/TactileDepth.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Theme.kt

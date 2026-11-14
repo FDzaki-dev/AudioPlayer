@@ -405,3 +405,46 @@ val AuroraTypography = Typography(
         letterSpacing = 1.4.sp
     )
 )
+
+// Batch 656 -- SPACE, tipografi "kontrol misi": Medium (bukan Light ala Aurora, bukan Bold/SemiBold ala
+// 4 identitas lain) di titleLarge/titleMedium dgn tracking terbuka (1.2sp/0.9sp), body Normal agak longgar,
+// dan labelSmall SemiBold dgn tracking PALING lebar dari 7 identitas (2.0sp, melewati rekor Aurora 1.4sp) --
+// kicker (mis. "LIBRARY") terbaca seperti label panel instrumen. fontSize/fontFamily TETAP 28/17/15/13/11sp +
+// FontFamily.Default (larangan Monospace-hanya-durasi Batch 133 §4; ubah fontSize = risiko reflow layout).
+val SpaceTypography = Typography(
+    titleLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 28.sp,
+        lineHeight = 38.sp,
+        letterSpacing = 1.2.sp
+    ),
+    titleMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 17.sp,
+        lineHeight = 27.sp,
+        letterSpacing = 0.9.sp
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 15.sp,
+        lineHeight = 23.sp,
+        letterSpacing = 0.5.sp
+    ),
+    bodySmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 13.sp,
+        lineHeight = 19.sp,
+        letterSpacing = 0.45.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 11.sp,
+        lineHeight = 17.sp,
+        letterSpacing = 2.0.sp
+    )
+)
