@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 660: + app/src/main/java/com/rudi/audioplayer/bubble/SpaceBubbleSkin.kt + app/src/test/java/com/rudi/audioplayer/bubble/SpaceBubbleMathTest.kt (skin Space bubble) — 248->250.
 # Batch 659: app/src/main/java/com/rudi/audioplayer/data/lyrics/LyricsPrefetchStore.kt + app/src/main/java/com/rudi/audioplayer/worker/LyricsPrefetchWorker.kt (fitur Prefetch Lirik dicabut) dihapus — 250->248.
 # Batch 657: app/src/test/java/com/rudi/audioplayer/TabPillMathTest.kt (file baru, tes unit pemetaan jari->pil bilah tab) ditambahkan — 249->250.
 # Batch 656: app/src/main/java/com/rudi/audioplayer/ui/theme/SpaceCosmos.kt (file baru, latar kosmos tema Space) ditambahkan — 248->249.
@@ -146,6 +147,7 @@ app/src/main/java/com/rudi/audioplayer/OnboardingScreens.kt
 app/src/main/java/com/rudi/audioplayer/bubble/BubbleBootReceiver.kt
 app/src/main/java/com/rudi/audioplayer/bubble/BubbleTileService.kt
 app/src/main/java/com/rudi/audioplayer/bubble/FloatingBubbleService.kt
+app/src/main/java/com/rudi/audioplayer/bubble/SpaceBubbleSkin.kt
 app/src/main/java/com/rudi/audioplayer/data/AppLockStore.kt
 app/src/main/java/com/rudi/audioplayer/data/AudiobookModeStore.kt
 app/src/main/java/com/rudi/audioplayer/data/BackupManager.kt
@@ -329,6 +331,7 @@ app/src/main/res/xml/shortcuts.xml
 app/src/main/res/xml/widget_player_info.xml
 app/src/test/java/com/rudi/audioplayer/ArchitectureTest.kt
 app/src/test/java/com/rudi/audioplayer/TabPillMathTest.kt
+app/src/test/java/com/rudi/audioplayer/bubble/SpaceBubbleMathTest.kt
 app/src/test/java/com/rudi/audioplayer/data/CustomFolderScannerStableIdTest.kt
 app/src/test/java/com/rudi/audioplayer/data/DuplicateDetectorTest.kt
 app/src/test/java/com/rudi/audioplayer/data/Id3TagWriterTest.kt

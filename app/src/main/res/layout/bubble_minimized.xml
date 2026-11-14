@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Batch 100 — bentuk "diminimize" bubble: tab bundar kecil nempel tepi kiri/kanan layar
-     (chat-head style). Reuse widget_play_button_bg (warna aksen bulat yang sudah ada) sebagai
-     background — 0 drawable baru untuk background, cuma ikon chevron minimize yang baru (lihat
-     ic_bubble_minimize.xml).
+<!-- Batch 100 — bentuk "diminimize" bubble: tab bundar kecil nempel tepi kiri/kanan layar (chat-head style).
 
-     Batch 460 — root DILEBARKAN jadi murni AREA SENTUH (48dp→88dp), 100% transparan (0
-     background/elevation di root). Visual bulat asli (yang sebelumnya LANGSUNG di root) DIPINDAH
-     ke child [bubble_minimized_visual] (tetap 48dp x 48dp, gravity CENTER) — bagian ekstra 20dp
-     tiap sisi murni menambah hit-box, TIDAK menambah apa pun yang kelihatan. Simetris kiri/kanan
-     BY DESIGN: layout ini dipakai apa adanya baik snap ke tepi kiri maupun kanan (lihat
-     FloatingBubbleService.snapMinimizedToNearestEdge()), jadi padding sentuh ekstra harus sama
-     besar di kedua sisi supaya konsisten dari sisi mana pun tab menempel — sisi mana yang
-     akhirnya "ke luar layar" (ikut EDGE_CLIP_FRACTION) ditentukan Kotlin lewat perhitungan X,
-     bukan lewat gravity/margin XML. -->
+     Batch 460 — root DILEBARKAN jadi murni AREA SENTUH (48dp->88dp), 100% transparan (0 background/elevation di
+     root). Visual bulat asli DIPINDAH ke child [bubble_minimized_visual] (tetap 48dp x 48dp, gravity CENTER) —
+     bagian ekstra 20dp tiap sisi murni menambah hit-box, TIDAK menambah apa pun yang kelihatan. Simetris
+     kiri/kanan BY DESIGN: layout ini dipakai apa adanya baik snap ke tepi kiri maupun kanan (lihat
+     FloatingBubbleService.snapMinimizedToNearestEdge()); sisi mana yang "ke luar layar" ditentukan Kotlin lewat
+     perhitungan X, bukan lewat gravity/margin XML.
+
+     Batch 660 — lencana Space 🌌: background [bubble_minimized_visual] = SpaceSkinDrawable(badge=true) yang di-set
+     dari FloatingBubbleService.applySpaceSkin() (cakram malam, bintang berkelip, rim sweep berputar, halo + cincin
+     planet + bulan mengorbit). Sampul dikecilkan 36dp -> 34dp agar cincin planet + orbit muat di dalam lencana 48dp.
+     Ukuran 48dp & ID TIDAK berubah (snapMinimizedToNearestEdge membaca lebar visual ini). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/bubble_minimized_root"
     android:layout_width="88dp"
@@ -23,13 +22,12 @@
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_gravity="center"
-        android:background="@drawable/widget_play_button_bg"
         android:elevation="8dp">
 
         <ImageView
             android:id="@+id/bubble_minimized_art"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:layout_gravity="center"
             android:scaleType="centerCrop"
             android:contentDescription="Buka mini player" />

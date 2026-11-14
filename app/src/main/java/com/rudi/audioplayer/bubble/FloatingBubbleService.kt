@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Outline
@@ -450,6 +451,11 @@ class FloatingBubbleService : Service() {
     // expand() tidak perlu findViewById ulang tiap toggle.
     private var expandedView: View? = null
     private var minimizedView: View? = null
+    // Batch 660 — skin Space (SpaceBubbleSkin.kt). Disimpan supaya animasinya bisa dihentikan eksplisit di
+    // onDestroy() dan orb Play bisa diberi tahu status putar di refreshBubbleContent().
+    private var panelSkin: SpaceSkinDrawable? = null
+    private var badgeSkin: SpaceSkinDrawable? = null
+    private var playOrb: SpaceOrbDrawable? = null
     private var isMinimized = false
     // Posisi X terakhir SEBELUM diminimize, dipulihkan saat expand() lagi — murni in-memory
     // (tidak perlu persist terpisah dari FloatingBubbleStore.savePosition biasa: kalau Service
@@ -641,6 +647,12 @@ class FloatingBubbleService : Service() {
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         bubbleScope.cancel() // batalkan bubbleArtJob yang mungkin masih in-flight sekalian
+        panelSkin?.stop() // Batch 660 — hentikan animasi skin Space sebelum view dilepas
+        badgeSkin?.stop()
+        playOrb?.stop()
+        panelSkin = null
+        badgeSkin = null
+        playOrb = null
         bubbleView?.let { view -> runCatching { windowManager.removeView(view) } }
         bubbleView = null
     }
@@ -707,8 +719,9 @@ class FloatingBubbleService : Service() {
         expandedView = expanded
         minimizedView = minimized
 
-        applyLeafClip(expanded.findViewById(R.id.bubble_album_art))
-        applyLeafClip(minimized.findViewById(R.id.bubble_minimized_art))
+        applyPlanetClip(expanded.findViewById(R.id.bubble_album_art))
+        applyPlanetClip(minimized.findViewById(R.id.bubble_minimized_art))
+        applySpaceSkin(expanded, minimized)
         expanded.findViewById<ImageView>(R.id.bubble_album_art).setImageResource(R.mipmap.ic_launcher)
         minimized.findViewById<ImageView>(R.id.bubble_minimized_art).setImageResource(R.mipmap.ic_launcher)
 
@@ -754,18 +767,58 @@ class FloatingBubbleService : Service() {
         keepAwakeAndScheduleFade() // Batch 453 — mulai idle timer dari saat bubble pertama tampil
     }
 
-    /** Batch 584 — pengganti `applyOvalClip` (lingkaran): sampul pill & tab minimized di-clip ke bentuk "daun diagonal"
-     * ([WidgetUpdater.leafPath], keluarga bentuk yang sama dgn panel/medali/kenop). Outline = Path konveks (setPath, API 30+;
-     * minSdk 31); `getOutline` dipanggil ulang otomatis saat ukuran view berubah. Hanya MEMBENTUK clip — logika
-     * sentuh/drag/TouchDelegate tak disentuh (memakai `getHitRect()` persegi, tak terpengaruh bentuk). */
-    private fun applyLeafClip(imageView: ImageView) {
+    /** Batch 660 — sampul pill & lencana minimized di-clip BULAT = "planet" (menggantikan clip daun diagonal Batch 584
+     * yang dipakai gaya Neumorphism). Outline oval persegi min(lebar, tinggi); `getOutline` dipanggil ulang otomatis
+     * saat ukuran view berubah. Hanya MEMBENTUK clip — logika sentuh/drag/TouchDelegate tak disentuh (memakai
+     * `getHitRect()` persegi, tak terpengaruh bentuk). Halo, cincin gradien, orbit & bulan digambar SpaceSkinDrawable
+     * di belakang sampul, konsentris dengan lingkaran ini. */
+    private fun applyPlanetClip(imageView: ImageView) {
         imageView.clipToOutline = true
         imageView.outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(v: View, outline: Outline) {
                 val size = minOf(v.width, v.height)
-                if (size > 0) outline.setPath(WidgetUpdater.leafPath(size.toFloat()))
+                if (size > 0) outline.setOval(0, 0, size, size)
             }
         }
+    }
+
+    /** Batch 660 — pasang skin Space 🌌 (SpaceBubbleSkin.kt) ke panel, lencana, orb Play, & kenop Prev/Next, plus tint
+     * glyph (di kode, bukan XML: tak ada AppCompat, dan tint ImageButton tetap menempel meski `setImageResource` dipanggil
+     * ulang tiap refresh). Pusat planet panel diambil dari posisi NYATA ImageView sampul lewat listener layout, jadi
+     * halo/cincin selalu konsentris dgn sampul walau ukuran XML diubah. Animasi start/stop otomatis lewat
+     * `Drawable.setVisible` (View GONE / layar mati = berhenti); `onDestroy` menghentikan eksplisit. */
+    private fun applySpaceSkin(expanded: View, minimized: View) {
+        val density = resources.displayMetrics.density
+        val glyph = ColorStateList.valueOf(0xFFEAF0FF.toInt())
+
+        val panel = SpaceSkinDrawable(density, badge = false)
+        expanded.background = panel
+        expanded.findViewById<ImageView>(R.id.bubble_album_art).addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+            panel.setPlanet((left + right) / 2f, (top + bottom) / 2f, (right - left) / 2f)
+        }
+        panelSkin = panel
+
+        val orb = SpaceOrbDrawable(density)
+        expanded.findViewById<ImageButton>(R.id.bubble_play_pause).apply {
+            background = orb
+            imageTintList = ColorStateList.valueOf(0xFF06112E.toInt()) // navy tua di atas orb cyan terang
+        }
+        playOrb = orb
+
+        expanded.findViewById<ImageButton>(R.id.bubble_prev).apply {
+            background = SpaceKeyDrawable(density)
+            imageTintList = glyph
+        }
+        expanded.findViewById<ImageButton>(R.id.bubble_next).apply {
+            background = SpaceKeyDrawable(density)
+            imageTintList = glyph
+        }
+        expanded.findViewById<ImageButton>(R.id.bubble_minimize).imageTintList =
+            ColorStateList.valueOf(0xFF8B94BD.toInt())
+
+        val badge = SpaceSkinDrawable(density, badge = true)
+        minimized.findViewById<View>(R.id.bubble_minimized_visual).background = badge
+        badgeSkin = badge
     }
 
     /** Batch 453 — reset bubble ke opaque penuh SEKETIKA (batalkan fade yang mungkin lagi
@@ -1227,6 +1280,7 @@ class FloatingBubbleService : Service() {
         val prev = view.findViewById<ImageButton>(R.id.bubble_prev)
         val next = view.findViewById<ImageButton>(R.id.bubble_next)
         playPause.setImageResource(if (player.isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play)
+        playOrb?.setPlaying(player.isPlaying) // Batch 660 — aura berdenyut + riak hanya saat memutar
         // Batch 98 — indikasi visual antrean kosong: tombol tetap kelihatan (bukan disembunyikan
         // total, biar bentuk pill tidak "loncat" ukuran) tapi setengah transparan. **Batch 470**:
         // ini SEKARANG murni sinyal visual — tap tombol TIDAK lagi otomatis buka app saat alpha
@@ -1250,19 +1304,15 @@ class FloatingBubbleService : Service() {
         }
         bubbleArtJob = bubbleScope.launch {
             val bitmap = withContext(Dispatchers.IO) { loadAlbumArtBitmap(artworkUri) }
-            // Batch 584 — sampul pill = pelat daun diagonal + fillet gilt (sama dgn sampul widget, selalu varian gelap);
-            // tab minimized memakai bitmap polos (bingkainya sudah medali gilt di bubble_minimized.xml). Dihitung di
-            // Dispatchers.Default (CPU), bukan Main.
-            val plate = bitmap?.let {
-                withContext(Dispatchers.Default) { WidgetUpdater.buildArtPlate(it, WidgetUpdater.FILLET_COLOR_DARK) }
-            }
+            // Batch 660 — sampul = bitmap polos yang di-clip bulat (applyPlanetClip); pelat daun + fillet gilt (Batch 584)
+            // tak dipakai lagi di bubble, jadi 0 kerja CPU ekstra di Dispatchers.Default.
             // bubbleView bisa saja sudah null (Service di-destroy selagi decode jalan) — re-cek,
             // jangan pakai `view` closure lama yang mungkin sudah dilepas dari WindowManager.
             val root = bubbleView ?: return@launch
             val expandedArt = root.findViewById<ImageView>(R.id.bubble_album_art)
             val minimizedArt = root.findViewById<ImageView>(R.id.bubble_minimized_art)
-            if (bitmap != null && plate != null) {
-                expandedArt.setImageBitmap(plate)
+            if (bitmap != null) {
+                expandedArt.setImageBitmap(bitmap)
                 minimizedArt.setImageBitmap(bitmap)
             } else {
                 expandedArt.setImageResource(R.mipmap.ic_launcher)
