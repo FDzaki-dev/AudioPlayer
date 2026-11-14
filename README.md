@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 659: fitur "Prefetch Lirik Saat WiFi" dicabut beserta WorkManager (lirik tetap diambil saat lagu diputar; "Hapus Cache Lirik" tetap ada) dan bilah "Lanjutan" di Pengaturan kini tile tekan dengan tombol chevron bulat, label subgrup bertitik aksen, serta isi menjorok di bawah garis pemandu — belum dikompilasi/diuji di device
 > - Batch 658: pulihkan tab terakhir tidak lagi berkedip di Beranda (bilah dan pil langsung menyorot tab tersimpan) dan label tab bawah menyusut otomatis agar utuh, bukan terpotong jadi elipsis — belum dikompilasi/diuji di device
 > - Batch 657: bilah tab bawah kini bergerak seperti video acuan di semua tema (pil berpegas mengikuti jari, bilah membesar 1,05x saat ditekan, warna aksen hanya di dalam pil, halaman berpindah saat jari diangkat) — belum dikompilasi/diuji di device; 6 tes unit pemetaan pil lulus di sandbox
 > - Batch 646: widget kini mengingat lagu terakhir saat cold start walau lagu berganti otomatis tanpa UI (service ikut menyimpan antrean), dan judul marquee tak lagi melompat ke awal saat play/jeda di widget; Batch 646 belum dikompilasi/diuji

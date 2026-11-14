@@ -1,5 +1,11 @@
 package com.rudi.audioplayer.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,7 +21,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
@@ -23,6 +28,7 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.SettingsBackupRestore
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,6 +43,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -44,7 +52,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.BuildConfig
 import com.rudi.audioplayer.data.Song
-import com.rudi.audioplayer.data.lyrics.LyricsPrefetchStore
 import com.rudi.audioplayer.data.lyrics.LyricsRepository
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -117,12 +124,10 @@ fun SettingsScreen(
     var showUpdateCheck by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     // Batch 247 — Lyrics offline-first 4/4b. Pola sama Vault/Duplicate/Backup di file ini:
-    // Store dibaca/ditulis LANGSUNG dari sini pakai LocalContext, bukan di-hoist ke
-    // MainActivity — fitur "utilitas" mandiri di file ini semuanya begini, beda dari toggle
-    // playback-behavior lama (shakeToSkipEnabled dst.) yang state-nya di-hoist dari luar.
+    // cache lirik dibersihkan LANGSUNG dari sini pakai LocalContext, bukan di-hoist ke MainActivity.
+    // Batch 659 — saklar "Prefetch Lirik Saat WiFi" + state-nya dicabut (permintaan user).
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var lyricsPrefetchEnabled by remember { mutableStateOf(LyricsPrefetchStore(context).isEnabled()) }
     var showClearLyricsCacheConfirm by rememberSaveable { mutableStateOf(false) }
 
     LazyColumn(
@@ -310,38 +315,6 @@ fun SettingsScreen(
                     }
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .neuRowTile(active = lyricsPrefetchEnabled)
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    // Batch 247 — Lyrics offline-first 4/4b. Switch ke-5 section ini, pola
-                    // identik 4 lainnya (title+subtitle+Switch, Spacer 12dp) — beda dari 5
-                    // baris "Alat & Utilitas" yg icon+nav-row, konsisten pembagian row-species
-                    // yg sudah diaudit Batch 217/218 (switch vs nav-row beda afinitas
-                    // interaksi, bukan hal yang perlu disamakan).
-                    Text("Prefetch Lirik Saat WiFi", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "Unduh lirik 10 lagu berikutnya di antrean otomatis saat tersambung " +
-                            "WiFi, supaya sudah tersedia offline duluan",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-                Switch(
-                    checked = lyricsPrefetchEnabled,
-                    onCheckedChange = { enabled ->
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        lyricsPrefetchEnabled = enabled
-                        LyricsPrefetchStore(context).setEnabled(enabled)
-                    }
-                )
-            }
         }
 
         item {
@@ -480,85 +453,84 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(modifier = Modifier.height(20.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showAdvancedSettings = !showAdvancedSettings }
-                    .padding(horizontal = 20.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // Batch 659 — hierarki "Lanjutan" dipertegas (user: "rawan gak kelihatan"). Dulu = teks judul polos
+            // (titleMedium) + chevron kecil tanpa wadah -> terbaca sebagai label seksi biasa, bukan kontrol yang
+            // bisa dibuka. Kini: TINGKAT 1 = tile tekan (ikon + judul + ringkasan isi + tombol chevron bulat yang
+            // berputar), TINGKAT 2 = label subgrup (Keamanan / Alat Developer) bertitik aksen, TINGKAT 3 = baris
+            // isi; TINGKAT 2-3 menjorok di bawah garis pemandu aksen di kiri supaya jelas "milik Lanjutan".
+            // Logika/aksi/state (`showAdvancedSettings` tetap rememberSaveable = tahan rotasi) TIDAK berubah.
+            AdvancedGroupHeader(
+                expanded = showAdvancedSettings,
+                onToggle = { showAdvancedSettings = !showAdvancedSettings }
+            )
+
+            AnimatedVisibility(
+                visible = showAdvancedSettings,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Lanjutan", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Kunci PIN, sidik jari, dan alat developer — nggak wajib disentuh",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
+                val guideColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                Column(
+                    modifier = Modifier
+                        .padding(start = 20.dp, top = 12.dp)
+                        .drawBehind {
+                            val lineWidth = 2.dp.toPx()
+                            drawLine(
+                                color = guideColor,
+                                start = Offset(lineWidth / 2f, 0f),
+                                end = Offset(lineWidth / 2f, size.height),
+                                strokeWidth = lineWidth,
+                                cap = StrokeCap.Round
+                            )
+                        }
+                        .padding(start = 8.dp)
+                ) {
+                    AdvancedSubgroupLabel("Keamanan")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AppLockSection(
+                        lockEnabled = lockEnabled,
+                        biometricEnabled = biometricEnabled,
+                        biometricAvailable = biometricAvailable,
+                        onSetPin = onSetPin,
+                        onDisableLock = onDisableLock,
+                        onToggleBiometric = onToggleBiometric
                     )
-                }
-                Icon(
-                    if (showAdvancedSettings) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (showAdvancedSettings) "Tutup Lanjutan" else "Buka Lanjutan",
-                    tint = MaterialTheme.colorScheme.secondary
-                )
-            }
 
-            if (showAdvancedSettings) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "Keamanan",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                AppLockSection(
-                    lockEnabled = lockEnabled,
-                    biometricEnabled = biometricEnabled,
-                    biometricAvailable = biometricAvailable,
-                    onSetPin = onSetPin,
-                    onDisableLock = onDisableLock,
-                    onToggleBiometric = onToggleBiometric
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-                Text(
-                    "Alat Developer",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "Bukan untuk penggunaan sehari-hari — dipakai untuk mengecek APK sebelum instal update manual.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
-                        .neuPressTile { showSignatureMatcher = true }
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    NeuNavIcon(Icons.Default.Fingerprint)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Cek Signature APK", style = MaterialTheme.typography.bodyMedium)
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
-                        .neuPressTile { showDiagnosticLog = true }
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    NeuNavIcon(Icons.Default.BugReport)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Log Diagnostik", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(20.dp))
+                    AdvancedSubgroupLabel("Alat Developer")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Bukan untuk penggunaan sehari-hari — dipakai untuk mengecek APK sebelum instal update manual.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(start = 22.dp, end = 8.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .neuPressTile { showSignatureMatcher = true }
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        NeuNavIcon(Icons.Default.Fingerprint)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Cek Signature APK", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .neuPressTile { showDiagnosticLog = true }
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        NeuNavIcon(Icons.Default.BugReport)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Log Diagnostik", style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
         }
@@ -678,6 +650,64 @@ fun SettingsScreen(
                 TextButton(onClick = { showClearLyricsCacheConfirm = false }) { Text("Batal") }
             }
         )
+    }
+}
+
+// Batch 659 — TINGKAT 1 hierarki "Lanjutan": tile tekan (`neuPressTile`, tampilan sama di 7 tema) berisi ikon,
+// judul, ringkasan isi, dan tombol chevron bulat berwarna aksen yang berputar 180° saat dibuka. Chevron dulu
+// ikon polos tint secondary tanpa wadah (nyaris tak terlihat); wadah bulat = penanda "bisa dibuka".
+@Composable
+private fun AdvancedGroupHeader(expanded: Boolean, onToggle: () -> Unit) {
+    val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "lanjutanChevron")
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .neuPressTile { onToggle() }
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        NeuNavIcon(Icons.Default.Tune)
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Lanjutan", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Kunci PIN, sidik jari, dan alat developer — nggak wajib disentuh",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "Tutup Lanjutan" else "Buka Lanjutan",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.rotate(rotation)
+            )
+        }
+    }
+}
+
+// Batch 659 — TINGKAT 2 hierarki "Lanjutan": label subgrup (titik aksen + judul onSurface). Dulu teks titleSmall
+// warna secondary rata kiri 20dp = sama redup/sejajar dengan judul seksi induk, tak terbaca sebagai anak.
+@Composable
+private fun AdvancedSubgroupLabel(text: String) {
+    Row(modifier = Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 

@@ -1,7 +1,6 @@
 package com.rudi.audioplayer
 
 import android.app.Application
-import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.request.crossfade
@@ -31,7 +30,7 @@ import com.rudi.audioplayer.util.AudioArtFetcher
  * single-arg call infers `T = coil3.Uri` automatically from `AudioArtFetcher.Factory`'s own
  * declared type (`Fetcher.Factory<coil3.Uri>`, see that class), same pattern as every working
  * example in Coil's own docs (`add(CustomFetcher.Factory())`, no explicit type argument). */
-class AudioPlayerApplication : Application(), SingletonImageLoader.Factory, Configuration.Provider {
+class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         AppLogger.init(this)
@@ -57,47 +56,22 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory, Conf
     }
 
     /**
-     * Batch 387 (cold-start optimization) — required pairing for removing WorkManager's default
-     * `androidx.startup`-based initializer entry in `AndroidManifest.xml` (see that file's
-     * comment for the full root-cause story). Implementing `Configuration.Provider` is what lets
-     * WorkManager fall back to Google's documented "on-demand initialization": instead of the
-     * removed ContentProvider eagerly calling `WorkManager.initialize()` before this class's own
-     * `onCreate()` even runs, the framework now calls it lazily, internally, the first time
-     * ANYTHING calls `WorkManager.getInstance(context)` — the one and only call site is
-     * `LyricsPrefetchWorker.enqueue()`, invoked only after a song has actually started playing.
-     *
-     * `Configuration.Builder().build()` here is the exact same unmodified default the removed
-     * ContentProvider used internally — so the ONLY thing this batch changes is *when*
-     * WorkManager sets itself up (on first real use instead of unconditionally on every cold
-     * start), never how it behaves once initialized: same executor, same min logging level, same
-     * everything else. Documented trade-off of on-demand init generally (per AndroidX's own
-     * guidance): WorkManager's automatic rescheduling after a process crash/force-stop is
-     * delayed until the next `getInstance()` call instead of happening immediately at the next
-     * app launch — acceptable here since the only work this app ever schedules
-     * (`LyricsPrefetchWorker`) is a best-effort, already-lossy background prefetch that silently
-     * swallows its own failures by design (see that class's kdoc), not something anything else
-     * depends on completing reliably.
-     */
-    override val workManagerConfiguration: Configuration
-        get() = Configuration.Builder().build()
-
-    /**
      * Batch 385 (cold-start optimization) — `PlayerViewModel` (built the instant
      * `MainActivity.onCreate()` first touches its `by viewModels` delegate) opens **23 separate
      * SharedPreferences files** across its own property initializers (favorites, playback_state,
      * play_stats, ratings, app_lock, vault, listening_history, hourly_listen_stats,
      * shake_settings, radio_settings, floating_bubble_settings, silence_skip_settings,
      * playlists, lyrics, bookmarks, audiobook_mode, equalizer, visualizer_settings, crossfade,
-     * custom_folders, app_theme, smart_playlists, sleep_timer) — plus 5 more (library_filter,
-     * search_history, onboarding_hints, lyrics_prefetch_settings, widget_state) opened by other
+     * custom_folders, app_theme, smart_playlists, sleep_timer) — plus 4 more (library_filter,
+     * search_history, onboarding_hints, widget_state) opened by other
      * Store/Updater classes that screens and the home-screen widget construct moments after
-     * cold start, 28 files in total app-wide. Android only starts a file's own background load
+     * cold start, 27 files in total app-wide (Batch 659: `lyrics_prefetch_settings` dicabut). Android only starts a file's own background load
      * thread the FIRST time `Context.getSharedPreferences(name, MODE_PRIVATE)` is called for it —
      * and several of `PlayerViewModel`'s StateFlow initializers (theme identity/mode, crossfade,
      * playlists, smart playlists, shake/bubble/silence-skip/radio toggles, app-lock flags) plus
      * its `init {}` block (sleep timer) call a getter on that SAME first call, which blocks the
      * calling thread (`awaitLoadedLocked()`) until that specific file's parse finishes. Today
-     * that first call — and therefore the FIRST moment any of these 28 loads can even begin —
+     * that first call — and therefore the FIRST moment any of these 27 loads can even begin —
      * only happens once `MainActivity.onCreate()` runs, after process start, class-loading, and
      * window setup have already spent part of the cold-start budget.
      *
@@ -144,7 +118,7 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory, Conf
             "floating_bubble_settings", "silence_skip_settings", "playlists", "lyrics",
             "bookmarks", "audiobook_mode", "equalizer", "visualizer_settings", "crossfade",
             "custom_folders", "app_theme", "smart_playlists", "sleep_timer", "library_filter",
-            "search_history", "onboarding_hints", "lyrics_prefetch_settings", "widget_state"
+            "search_history", "onboarding_hints", "widget_state"
         )
     }
 }

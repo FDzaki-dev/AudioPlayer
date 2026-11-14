@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 659: app/src/main/java/com/rudi/audioplayer/data/lyrics/LyricsPrefetchStore.kt + app/src/main/java/com/rudi/audioplayer/worker/LyricsPrefetchWorker.kt (fitur Prefetch Lirik dicabut) dihapus — 250->248.
 # Batch 657: app/src/test/java/com/rudi/audioplayer/TabPillMathTest.kt (file baru, tes unit pemetaan jari->pil bilah tab) ditambahkan — 249->250.
 # Batch 656: app/src/main/java/com/rudi/audioplayer/ui/theme/SpaceCosmos.kt (file baru, latar kosmos tema Space) ditambahkan — 248->249.
 # Batch 390: app/src/main/java/com/rudi/audioplayer/ui/theme/IosScrollPhysics.kt (dibuat Batch 364)
@@ -167,7 +168,6 @@ app/src/main/java/com/rudi/audioplayer/data/ListeningStatsEngine.kt
 app/src/main/java/com/rudi/audioplayer/data/LrcSyncEditor.kt
 app/src/main/java/com/rudi/audioplayer/data/LyricsParser.kt
 app/src/main/java/com/rudi/audioplayer/data/LyricsStore.kt
-app/src/main/java/com/rudi/audioplayer/data/lyrics/LyricsPrefetchStore.kt
 app/src/main/java/com/rudi/audioplayer/data/lyrics/LyricsRepository.kt
 app/src/main/java/com/rudi/audioplayer/data/lyrics/api/LyricsApi.kt
 app/src/main/java/com/rudi/audioplayer/data/lyrics/api/LyricsDto.kt
@@ -277,7 +277,6 @@ app/src/main/java/com/rudi/audioplayer/widget/PlayerWidgetProvider.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetMarquee.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetUpdater.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetStripSizing.kt
-app/src/main/java/com/rudi/audioplayer/worker/LyricsPrefetchWorker.kt
 app/src/main/res/anim/widget_title_segment.xml
 app/src/main/res/drawable/ic_bubble_minimize.xml
 app/src/main/res/drawable/ic_bubble_tile.xml

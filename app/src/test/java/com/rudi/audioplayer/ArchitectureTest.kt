@@ -102,8 +102,11 @@ class ArchitectureTest {
             forbid(UI, BUBBLE, WIDGET, WORKER),
         "playback tidak bergantung ke layar UI (ui.theme dikecualikan)" to
             forbid(PLAYBACK, UI_SCREENS, UI_LYRICS, UI_ADAPTIVE),
+        // Batch 659 — paket `worker` KOSONG (satu-satunya isi, `LyricsPrefetchWorker`, dicabut): tanpa
+        // `allowEmptyShould(true)` ArchUnit gagal "failed to check any classes" -> terhitung 1 pelanggaran palsu.
+        // Aturan dipertahankan sebagai penjaga bila paket worker dipakai lagi.
         "worker hanya bergantung ke data/util" to
-            forbid(WORKER, UI, PLAYBACK, BUBBLE, WIDGET, UPDATE),
+            forbid(WORKER, UI, PLAYBACK, BUBBLE, WIDGET, UPDATE).allowEmptyShould(true),
         "update mandiri: tidak bergantung ke ui/data/playback/bubble/widget/worker" to
             forbid(UPDATE, UI, DATA, PLAYBACK, BUBBLE, WIDGET, WORKER),
     )
