@@ -231,6 +231,9 @@ private const val APP_SAVEABLE_STATE_KEY = "sonix_app_saveable_state"
 /** Batch 651 — batas aman topeng "pemulihan tab": konten NavHost TIDAK PERNAH tersembunyi lebih lama dari ini. */
 private const val TAB_RESTORE_MASK_TIMEOUT_MS = 800L
 
+// Batch 658 — jumlah frame menunggu setelah navigate() pemulihan sebelum konten ditampakkan (konten Beranda lama dilepas AnimatedContent).
+private const val TAB_RESTORE_REVEAL_FRAMES = 3
+
 private fun navKeyGlideSpec() = spring<Float>(
     dampingRatio = NAV_PILL_DAMPING,
     stiffness = NAV_PILL_STIFFNESS
@@ -868,16 +871,29 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val savedTab = remember { lastTabStore.getLastTab() }
     var tabRestoreChecked by remember { mutableStateOf(false) }
     var tabRestoreSettled by remember { mutableStateOf(savedTab == null || savedTab == LastTabStore.START_TAB) }
+    var tabRestoreNavigated by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         delay(TAB_RESTORE_MASK_TIMEOUT_MS)
         tabRestoreSettled = true
     }
+    // Batch 658 — user (v657): "masih ada kilatan tab home pada mekanisme tab pemulihan". Dua AKAR (dibaca dari kode, bukan log: log tak
+    // merekam frame): (1) BILAH: `selected`/pil/`navPillIndexAnim` dibaca dari `currentRoute` yang SELALU `home` di 1-3 frame pertama
+    // (NavHost baru memasang graf, lalu `navigate()` pemulihan jalan di efek) -> item Beranda menyala + pil di Beranda lalu melompat
+    // (`LaunchedEffect(currentRoute)` Batch 656 baru snap SETELAH 1 frame). Hanya NavHost yang ditutup alpha 0, bilah tidak. FIX: `barRoute` =
+    // tab tersimpan selama pemulihan berlangsung (aturan murni `LastTabStore.barRoute`), dipakai bilah/rail/pil -> sorotan + pil sudah di tab
+    // tujuan sejak frame pertama, tanpa lompatan. (2) KONTEN: `tabRestoreSettled = true` (alpha 1 + transisi hidup) dipasang di frame yang
+    // sama saat rute baru teramati, padahal konten Beranda lama baru dilepas `AnimatedContent` 1-2 frame setelah `navigate()` (transisi `None`
+    // pun butuh frame) -> Beranda tampak 1 frame. FIX: SETELAH `navigate()` pemulihan, tunggu 3 frame sebelum menampakkan konten. Menunggu
+    // HANYA bila pemulihan benar-benar menavigasi (`tabRestoreNavigated`); jalur lain (mis. buka kunci dgn rute sudah benar) tetap 0 tunggu.
+    // Pengaman 800 ms (`TAB_RESTORE_MASK_TIMEOUT_MS`) tak berubah.
+    val barRoute = LastTabStore.barRoute(tabRestoreSettled, savedTab, currentRoute)
     LaunchedEffect(currentRoute) {
         val route = currentRoute ?: return@LaunchedEffect
         if (!tabRestoreChecked) {
             tabRestoreChecked = true
             val target = LastTabStore.restoreTarget(savedTab, route)
             if (target != null) {
+                tabRestoreNavigated = true
                 navController.navigate(target) {
                     popUpTo("home") { saveState = true }
                     launchSingleTop = true
@@ -887,6 +903,9 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             }
         }
         if (route in TAB_ROUTES) lastTabStore.setLastTab(route)
+        if (!tabRestoreSettled && tabRestoreNavigated) {
+            repeat(TAB_RESTORE_REVEAL_FRAMES) { androidx.compose.runtime.withFrameNanos { } }
+        }
         tabRestoreSettled = true
     }
 
@@ -918,7 +937,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     // NavHost) 0 pernah bisa menyentuhnya sama sekali walau navigate()-nya sendiri berhasil.
     val navPillIndexAnim = remember {
         Animatable(
-            (TAB_ROUTES.indexOfFirst { it == currentRoute }.coerceAtLeast(0) + 0.5f)
+            (TAB_ROUTES.indexOfFirst { it == barRoute }.coerceAtLeast(0) + 0.5f)
         )
     }
 
@@ -1140,7 +1159,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     )
                 }
                 if (widthClass == AppWidthClass.COMPACT &&
-                    (currentRoute == "home" || currentRoute == "library" || currentRoute == "settings")
+                    (barRoute == "home" || barRoute == "library" || barRoute == "settings")
                 ) {
                     // Batch 438 — 1 interactionSource per tab, dibagi ke NavigationBarItem (klik)
                     // dan GlassTabIcon (bouncyPress) supaya keduanya sepakat kapan "pressed" true,
@@ -1152,7 +1171,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // closure `pointerInput(Unit)`) — closure key-`Unit` cuma dibuat SEKALI, baca
                     // `currentRoute` polos di dalamnya akan BEKU ke nilai komposisi pertama
                     // (stale), tidak ikut update tiap kali tab berpindah selama drag berlangsung.
-                    val currentRouteState = rememberUpdatedState(currentRoute)
+                    // Batch 658 — `barRoute` (bukan `currentRoute`): sorotan/pil bilah ikut tab tersimpan selama pemulihan; di luar itu identik `currentRoute`.
+                    val currentRouteState = rememberUpdatedState(barRoute)
                     // Batch 556 — label/ikon kini mengikuti posisi KUNCI (`navPillFocus`), jadi kunci WAJIB sama dgn route aktif
                     // begitu bilah muncul (mis. setelah navigasi lewat NavigationRail di layar lebar lalu kembali compact, atau
                     // balik dari Now Playing). Hanya saat masuk komposisi (bukan tiap pindah tab) -> 0 tabrakan dgn glide tap/drag.
@@ -1177,8 +1197,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // tampil (rute masih `home`), sedangkan pemulihan Batch 651 memanggil `navigate()` langsung -> kunci tertinggal.
                     // FIX: tiap rute berganti, tunggu 1 frame (jalur tap/swipe/drag meluncurkan animateTo-nya sendiri dulu), lalu
                     // BILA kunci diam (bukan sedang animasi/drag) dan beda dari rute -> snap ke tab rute itu. Jalur normal = 0 perubahan.
-                    LaunchedEffect(currentRoute) {
-                        val idx = TAB_ROUTES.indexOfFirst { it == currentRoute }
+                    LaunchedEffect(barRoute) {
+                        val idx = TAB_ROUTES.indexOfFirst { it == barRoute }
                         if (idx < 0) return@LaunchedEffect
                         androidx.compose.runtime.withFrameNanos { }
                         val target = idx + 0.5f
@@ -1438,7 +1458,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         // sini), `.selectable(indication = null, ...)` di `CustomNavBarTabItem`
                         // sudah cukup, 0 override composition-local diperlukan lagi.
                         CustomNavBarTabItem(
-                            selected = currentRoute == "home",
+                            selected = barRoute == "home",
                             onClick = {
                                 // Batch 301 — user melaporkan stuttering pas transisi antar tab
                                 // (beda dari stutter SCROLL Batch 300 yang sudah dijawab lewat
@@ -1478,7 +1498,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                             )
                         }
                         CustomNavBarTabItem(
-                            selected = currentRoute == "library",
+                            selected = barRoute == "library",
                             onClick = {
                                 // Batch 301 — sama seperti onClick "home" di atas.
                                 navController.navigate("library") {
@@ -1502,7 +1522,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                             )
                         }
                         CustomNavBarTabItem(
-                            selected = currentRoute == "settings",
+                            selected = barRoute == "settings",
                             onClick = {
                                 // Batch 301 — sama seperti onClick "home" di atas.
                                 navController.navigate("settings") {
@@ -1549,7 +1569,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 // diberi napas 4dp kiri/kanan (nilai sama Batch 452) supaya label terpanjang tak rata tepi panel.
                 NavigationRail(windowInsets = WindowInsets(0, 0, 0, 0)) {
                     NavigationRailItem(
-                        selected = currentRoute == "home",
+                        selected = barRoute == "home",
                         onClick = {
                             // Batch 301 — mirror NavigationBarItem "home" fix di atas (layar
                             // Medium/Expanded pakai Rail ini, bukan NavigationBar bawah).
@@ -1563,7 +1583,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         label = { Text("Beranda", modifier = Modifier.padding(horizontal = 4.dp)) }
                     )
                     NavigationRailItem(
-                        selected = currentRoute == "library",
+                        selected = barRoute == "library",
                         onClick = {
                             // Batch 301 — sama seperti onClick "home" Rail di atas.
                             navController.navigate("library") {
@@ -1576,7 +1596,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         label = { Text("Perpustakaan", modifier = Modifier.padding(horizontal = 4.dp)) }
                     )
                     NavigationRailItem(
-                        selected = currentRoute == "settings",
+                        selected = barRoute == "settings",
                         onClick = {
                             // Batch 301 — sama seperti onClick "home" Rail di atas.
                             navController.navigate("settings") {

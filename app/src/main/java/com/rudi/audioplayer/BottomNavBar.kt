@@ -5,6 +5,7 @@ import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
@@ -20,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -29,10 +31,15 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 
 // Batch 522 — Wave 2 T10 (MOVE-ONLY, R3; eksekusi ulang — percobaan pertama Batch 520 ditarik Batch 521 karena laporan performa
@@ -151,12 +158,61 @@ internal fun GlassTabIcon(
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Icon(icon, contentDescription = null, tint = iconColor)
+        FittedNavLabel(text = label, color = labelColor)
+    }
+}
+
+// Batch 658 — user: "judul tab kebesaran sehingga berubah menjadi ....." (v657). AKAR: label nav memakai `labelMedium` apa adanya
+// (12-13sp x skala font sistem) di slot yang hanya ±96-113dp (lebar layar 360-411dp: (bilah - 16dp jarak) / 3 - 8dp padding); "Perpustakaan"
+// pada 13sp + font 1,15x = ±98dp > 96dp di layar 360dp -> ellipsis (Batch 442/452 hanya melonggarkan padding, tak menjamin muat).
+// FIX: ukuran huruf label MENYUSUT bertahap (langkah 0,5sp, lantai 9sp) sampai muat satu baris di lebar yang tersedia; muat di ukuran
+// aslinya = 0 perubahan (tak menyusut). Diukur SINKRON saat komposisi (`rememberTextMeasurer` + kunci `remember`), jadi lapisan dasar dan
+// salinan aksen `CustomNavBarTabItem` (2 pemanggil `GlassTabIcon`) mendapat ukuran IDENTIK tanpa berkedip. `lineHeight`/`letterSpacing`
+// tetap (hanya `fontSize` yang berubah) -> tinggi label/bilah/pil TIDAK berubah. Ellipsis tetap jaring pengaman bila 9sp pun tak muat.
+internal const val NAV_LABEL_MIN_SP = 9f
+internal const val NAV_LABEL_STEP_SP = 0.5f
+
+/**
+ * Ukuran huruf (sp) terbesar dari [baseSp] turun per [stepSp] sampai [fits] true; tak pernah di bawah [minSp].
+ * [baseSp] sudah muat -> [baseSp]; tak pernah muat -> [minSp]. Fungsi murni (diuji `TabPillMathTest`).
+ */
+internal fun fitNavLabelSp(baseSp: Float, minSp: Float, stepSp: Float, fits: (Float) -> Boolean): Float {
+    if (stepSp <= 0f || baseSp <= minSp) return baseSp
+    var size = baseSp
+    while (size > minSp && !fits(size)) size -= stepSp
+    return maxOf(size, minSp)
+}
+
+@Composable
+private fun FittedNavLabel(text: String, color: Color) {
+    val base = MaterialTheme.typography.labelMedium
+    val measurer = rememberTextMeasurer(cacheSize = 4)
+    val density = LocalDensity.current
+    BoxWithConstraints {
+        val maxPx = constraints.maxWidth
+        val style = remember(text, base, maxPx, density) {
+            if (maxPx == Constraints.Infinity || base.fontSize == TextUnit.Unspecified) {
+                base
+            } else {
+                val fitted = fitNavLabelSp(base.fontSize.value, NAV_LABEL_MIN_SP, NAV_LABEL_STEP_SP) { sizeSp ->
+                    measurer.measure(
+                        text = text,
+                        style = base.copy(fontSize = sizeSp.sp),
+                        softWrap = false,
+                        maxLines = 1,
+                        density = density
+                    ).size.width <= maxPx
+                }
+                base.copy(fontSize = fitted.sp)
+            }
+        }
         Text(
-            text = label,
+            text = text,
             maxLines = 1,
+            softWrap = false,
             overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.labelMedium,
-            color = labelColor
+            style = style,
+            color = color
         )
     }
 }

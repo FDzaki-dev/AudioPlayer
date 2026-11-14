@@ -37,5 +37,14 @@ class LastTabStore(context: Context) {
          */
         fun restoreTarget(saved: String?, firstRoute: String?): String? =
             saved?.takeIf { firstRoute == START_TAB && it != START_TAB && it in TABS }
+
+        /**
+         * Batch 658 — rute yang ditampilkan BILAH tab (sorotan item + posisi pil). Selama pemulihan belum selesai
+         * ([settled] false) dan rute NavController masih `home`/belum ada (= persis kondisi saat [restoreTarget]
+         * akan memindahkan), bilah langsung menyorot tab tersimpan sehingga Beranda tidak sempat berkedip di bilah.
+         * Di luar kondisi itu (sudah selesai, tak ada tab tersimpan, atau NavController sudah di tab lain) = [current].
+         */
+        fun barRoute(settled: Boolean, saved: String?, current: String?): String? =
+            if (!settled && saved != null && saved in TABS && (current == null || current == START_TAB)) saved else current
     }
 }
