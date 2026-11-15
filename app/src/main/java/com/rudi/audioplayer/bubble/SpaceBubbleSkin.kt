@@ -16,8 +16,9 @@ import android.graphics.Shader
 import android.graphics.SweepGradient
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
-import android.view.animation.LinearInterpolator
 import com.rudi.audioplayer.util.SafeGuard
 import kotlin.math.PI
 import kotlin.math.cos
@@ -32,9 +33,9 @@ import kotlin.random.Random
 // kapsul + lencana minimized: void gradien, 3 awan nebula hanyut, bintang berkelip + kilau silang, meteor, kilatan
 // kaca, rim sweep cyan-violet-rose berputar, halo + cincin planet + bulan mengorbit), [SpaceOrbDrawable] (orb
 // Play berpendar), [SpaceKeyDrawable] (kenop kristal Prev/Next). Aturan performa (pelajaran Batch 328/440):
-// 0 alokasi di draw, shader dibangun SEKALI di onBoundsChange, jam ~30 fps lewat 1 ValueAnimator yang BERHENTI
+// 0 alokasi di draw, shader dibangun SEKALI di onBoundsChange, jam ~30 fps (Handler 32 ms, Batch 668) yang BERHENTI
 // otomatis saat view tak terlihat (setVisible -> layar mati / bubble diminimize = 0 biaya) dan statis bila animator
-// sistem dimatikan. Warna = cermin token Color.kt (Space*), sengaja literal agar Service overlay tak menarik Compose.
+// sistem dimatikan; lencana minimized beku setelah [BADGE_LIVE_MS]. Warna = cermin token Color.kt (Space*), sengaja literal agar Service overlay tak menarik Compose.
 
 internal object SpaceBubblePalette {
     val ACCENT: Int = 0xFF5CD6FF.toInt()
@@ -128,51 +129,62 @@ internal class SpaceBubbleStars(val count: Int, seed: Int) {
     }
 }
 
-/** Pengatur jam 1 ValueAnimator (pemicu frame ~30 fps) dipakai bersama oleh ketiga Drawable. */
-private class SpaceClock(private val onFrame: (Float) -> Unit) {
-    private var animator: ValueAnimator? = null
+/** Pengatur jam (~30 fps) dipakai bersama oleh ketiga Drawable.
+ *
+ * Batch 668 (baterai) — dulu 1 `ValueAnimator` INFINITE: callback-nya datang di SETIAP vsync (120x/dtk di layar 120 Hz)
+ * lalu 3 dari 4 dibuang oleh penyaring 32 ms, jadi thread utama + SurfaceFlinger dibangunkan 120x/dtk hanya untuk
+ * menggambar ~30 frame. Kini `Handler.postDelayed` 32 ms (~31 bangun/dtk); gerak tetap berbasis waktu nyata
+ * (`seconds` dari uptime), jadi kecepatan orbit/kedip tak berubah. [liveMs] > 0 = jam BEKU di frame terakhir setelah
+ * sekian ms sejak [start] (dipakai lencana minimized: tak ada alasan menggambar ulang overlay 30x/dtk selamanya di
+ * atas aplikasi lain); [start] berikutnya (view tampil lagi / layar menyala) menyalakannya lagi sebentar. */
+private class SpaceClock(private val liveMs: Long = 0L, private val onFrame: (Float) -> Unit) {
+    private val handler = Handler(Looper.getMainLooper())
+    private var active = false
     private var originMs = 0L
-    private var lastFrameMs = 0L
+    private var liveStartMs = 0L
     var seconds = 0f
         private set
 
-    val running: Boolean get() = animator?.isRunning == true
+    val running: Boolean get() = active
 
-    fun start() {
-        if (running) return
-        // Animator dimatikan sistem (hemat baterai / skala animasi 0) -> tampil statis di detik terakhir.
-        if (!ValueAnimator.areAnimatorsEnabled()) return
-        originMs = SystemClock.uptimeMillis() - (seconds * 1000f).toLong()
-        animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = TICK_MS
-            repeatCount = ValueAnimator.INFINITE
-            interpolator = LinearInterpolator()
-            addUpdateListener { tick() }
-            start()
+    private val tickRunnable = object : Runnable {
+        override fun run() {
+            if (!active) return
+            val now = SystemClock.uptimeMillis()
+            seconds = (now - originMs) / 1000f
+            onFrame(seconds)
+            if (liveMs > 0L && now - liveStartMs >= liveMs) {
+                active = false // beku di frame yang baru digambar; tak ada tick terjadwal lagi
+                return
+            }
+            handler.postDelayed(this, FRAME_GAP_MS)
         }
     }
 
-    fun stop() {
-        animator?.cancel()
-        animator = null
+    fun start() {
+        if (active) return
+        // Animator dimatikan sistem (hemat baterai / skala animasi 0) -> tampil statis di detik terakhir.
+        if (!ValueAnimator.areAnimatorsEnabled()) return
+        val now = SystemClock.uptimeMillis()
+        originMs = now - (seconds * 1000f).toLong()
+        liveStartMs = now
+        active = true
+        handler.postDelayed(tickRunnable, FRAME_GAP_MS)
     }
 
-    private fun tick() {
-        val now = SystemClock.uptimeMillis()
-        if (now - lastFrameMs < FRAME_GAP_MS) return
-        lastFrameMs = now
-        seconds = (now - originMs) / 1000f
-        onFrame(seconds)
+    fun stop() {
+        active = false
+        handler.removeCallbacks(tickRunnable)
     }
 
     private companion object {
-        const val TICK_MS = 1000L
         const val FRAME_GAP_MS = 32L
     }
 }
 
 private const val PANEL_STAR_COUNT = 28
 private const val BADGE_STAR_COUNT = 9
+private const val BADGE_LIVE_MS = 8_000L // Batch 668 — lencana minimized beku setelah 8 dtk tampil (0 = animasi selamanya)
 private const val METEOR_PERIOD_S = 9f
 private const val METEOR_ACTIVE = 0.16f
 private const val SHIMMER_PERIOD_S = 6.5f
@@ -191,7 +203,7 @@ private const val MOON_TAIL = 6
 internal class SpaceSkinDrawable(private val density: Float, private val badge: Boolean) : Drawable(), Animatable {
 
     private val stars = SpaceBubbleStars(if (badge) BADGE_STAR_COUNT else PANEL_STAR_COUNT, if (badge) 6601 else 6602)
-    private val clock = SpaceClock { invalidateSelf() }
+    private val clock = SpaceClock(if (badge) BADGE_LIVE_MS else 0L) { invalidateSelf() }
 
     private val clipPath = Path()
     private val rimPath = Path()

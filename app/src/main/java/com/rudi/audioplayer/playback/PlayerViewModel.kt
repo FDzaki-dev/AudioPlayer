@@ -117,6 +117,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     companion object {
         private const val POSITION_TICK_ACTIVE_MS = 1000L // Batch 537
         private const val POSITION_TICK_RELAXED_MS = 5000L // Batch 537
+        private const val SLEEP_COUNTDOWN_HIDDEN_MS = 30_000L // Batch 668
         // Gap List #8 — batas berapa kali auto-skip boleh mental beruntun dari error ke error
         // sebelum berhenti total, bukan angka sembarang: cukup toleran untuk beberapa file
         // rusak/hilang tersebar di tengah queue (kasus normal), tapi tetap memutus loop kalau
@@ -317,6 +318,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     // tick lambat (5 dtk) tak pernah terlihat sebagai progress bar beku.
     @Volatile private var uiVisible = true
     private val positionWake = Channel<Unit>(Channel.CONFLATED)
+    private val sleepCountdownWake = Channel<Unit>(Channel.CONFLATED) // Batch 668 — bangunkan hitung mundur timer tidur
 
     // Batch 597 — definisi "putaran" = waktu dengar nyata >= min(30 dtk, setengah durasi) (lihat
     // `PlayCountTracker`); dulu dihitung di tiap pergantian lagu (skip 2 dtk = 1 putaran penuh).
@@ -1153,7 +1155,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
      * saat layar mati/dijeda -> CPU dibangunkan 1x/dtk tanpa ada yang melihat). */
     fun setUiVisible(visible: Boolean) {
         uiVisible = visible
-        if (visible) positionWake.trySend(Unit)
+        if (visible) {
+            positionWake.trySend(Unit)
+            sleepCountdownWake.trySend(Unit) // Batch 668
+        }
     }
 
     private fun startPositionLoop() {
@@ -1925,7 +1930,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 val remaining = endAt - System.currentTimeMillis()
                 if (remaining <= 0) break
                 _sleepTimerRemaining.value = remaining
-                delay(1000)
+                // Batch 668 (baterai) — angka mundur ini murni kosmetik; saat UI tak terlihat (layar mati, timer tidur
+                // semalaman) tak ada yang membacanya, jadi tick 1 dtk dulu = bangun 1x/dtk sia-sia. Kini tidur
+                // <=30 dtk (tak melewati endAt) dan dibangunkan [sleepCountdownWake] saat UI tampil lagi.
+                val waitMs = if (uiVisible) 1000L else minOf(SLEEP_COUNTDOWN_HIDDEN_MS, remaining)
+                withTimeoutOrNull(waitMs) { sleepCountdownWake.receive() }
             }
             _sleepTimerRemaining.value = null
         }

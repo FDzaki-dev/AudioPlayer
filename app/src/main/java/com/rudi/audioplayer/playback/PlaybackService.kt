@@ -404,10 +404,16 @@ class PlaybackService : MediaLibraryService() {
                 // Batch 625 — satu tick yang melempar Exception dulu MEMATIKAN seluruh loop ini (handler scope hanya
                 // mencatat; `crossfadePollJob.isActive` jadi false -> crossfade berhenti diam-diam sampai di-toggle).
                 // Kini tick yang gagal dicatat mentah (throttle SafeGuard) dan loop lanjut ke tick berikutnya.
+                // Batch 668 (baterai) — selang adaptif dari engine (250 ms dekat jendela, 1 dtk saat main jauh dari jendela,
+                // 2 dtk saat dijeda); tick gagal tetap 250 ms.
+                var waitMs = 250L
                 SafeGuard.guard("PlaybackService", "crossfadePoll.tick") {
-                    crossfadeEngine?.maybeStartCrossfade()
+                    crossfadeEngine?.let { engine ->
+                        engine.maybeStartCrossfade()
+                        waitMs = engine.nextPollDelayMs()
+                    }
                 }
-                delay(250)
+                delay(waitMs)
             }
         }
     }

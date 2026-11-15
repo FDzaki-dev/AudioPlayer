@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 668: hemat baterai — jam animasi bubble tak lagi dibangunkan tiap vsync (120x/dtk -> ~31x/dtk) dan lencana minimized beku setelah 8 dtk; polling crossfade 250 ms -> 1-2 dtk saat jauh dari jendela/dijeda; hitung mundur timer tidur berhenti tiap detik saat UI tak terlihat; belum dikompilasi/diuji di device
 > - Batch 667: bubble kini meminta frame rate tinggi (120 Hz) selama animasi minimize/expand supaya auto-minimize saat idle tak lagi jatuh ke 60 Hz (log v666: tap = 120 Hz solid, idle = 60 Hz); belum dikompilasi/diuji di device
 > - Batch 666: log diagnostik baru "Batch666 ritme luncuran" mengukur ritme frame nyata saat bubble meluncur ke/dari tepi; perilaku tak berubah; belum dikompilasi/diuji di device
 > - Batch 665: minimize bubble kini memudarkan pill lebih lama (±325 ms, dulu ±215 ms) supaya seimbang dengan expand; belum dikompilasi/diuji di device

@@ -154,6 +154,22 @@ class CrossfadeEngine(
         if (!value) abort()
     }
 
+    /** Batch 668 (baterai) — selang tidur aman sebelum tick polling berikutnya. Dulu tetap 250 ms SELAMANYA (4 bangun/dtk
+     * sepanjang lagu 2 jam, juga saat dijeda/layar mati). Kini 1000 ms bila lagu sedang main dan jendela crossfade masih
+     * >2,5 dtk NYATA lagi (sisa media / kecepatan), 2000 ms bila tak main; selain itu 250 ms seperti semula. Aman: pada
+     * kecepatan s, 1000 ms nyata = s dtk media, dan jendela baru dimasuki setelah >2,5*s dtk media -> tick berikutnya
+     * tak pernah melompati jendela pada pemutaran normal; seek ke dalam jendela terlambat <=1 dtk, jalur
+     * `fadeSpan = remaining / speed` di [maybeStartCrossfade] memang sudah menangani start terlambat. */
+    fun nextPollDelayMs(): Long {
+        if (!enabled || state != State.IDLE) return POLL_ACTIVE_MS
+        if (!sessionPlayer.isPlaying) return POLL_PAUSED_MS
+        val duration = sessionPlayer.duration
+        if (duration <= 0) return POLL_ACTIVE_MS
+        val speed = sessionPlayer.playbackParameters.speed.coerceAtLeast(MIN_SPEED)
+        val untilWindowRealMs = ((duration - sessionPlayer.currentPosition - crossfadeDurationMs) / speed).toLong()
+        return if (untilWindowRealMs > POLL_FAR_MARGIN_MS) POLL_FAR_MS else POLL_ACTIVE_MS
+    }
+
     /** Call on every position-poll tick while sessionPlayer is alive. Cheap no-op unless
      * genuinely within the crossfade window. */
     fun maybeStartCrossfade() {
@@ -396,6 +412,10 @@ class CrossfadeEngine(
     companion object {
         private const val STEP_MS = 60L
         private const val MIN_SPEED = 0.25f // Batch 627 — pelindung bagi dengan kecepatan 0
+        private const val POLL_ACTIVE_MS = 250L // Batch 668 — selang polling dekat/di jendela crossfade (nilai lama)
+        private const val POLL_FAR_MS = 1000L // Batch 668 — main & jendela masih jauh
+        private const val POLL_PAUSED_MS = 2000L // Batch 668 — dijeda
+        private const val POLL_FAR_MARGIN_MS = 2500L // Batch 668 — sisa NYATA sebelum jendela agar boleh tidur 1 dtk
         private const val HANDBACK_MS = 400L
         // Batch 366 — ambang toleransi float utk anggap "sudah 0", dipakai konsisten di semua
         // pengecekan (dulu ada yang exact `<= 0f`, ada yang `<= 0.01f`, tidak konsisten).
