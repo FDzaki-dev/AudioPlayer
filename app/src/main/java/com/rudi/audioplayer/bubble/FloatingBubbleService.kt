@@ -1,5 +1,8 @@
 package com.rudi.audioplayer.bubble
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -52,6 +55,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.SupervisorJob
 import java.util.concurrent.Executor
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Roadmap #11 — mini player mengambang di atas app apa pun, lewat izin sensitif
@@ -493,6 +497,18 @@ class FloatingBubbleService : Service() {
     private var fadeRestoring = false
     private val fadeOutInterpolator = PathInterpolator(0.4f, 0f, 0.2f, 1f) // kurva Material "standard": mulai & akhir lembut
     private val fadeInInterpolator = DecelerateInterpolator()
+    // Batch 663 — transisi minimize/expand dianimasikan. Dulu keduanya hanya menukar visibility (pill GONE <-> lencana
+    // VISIBLE) + snap posisi seketika: terbukti di video 360976.mp4 (pill penuh -> lencana dalam 1 frame lalu loncat ke
+    // tepi; expand = pill muncul seketika). `transitionT` = kemajuan 0 (pill utuh) .. 1 (lencana utuh); satu animator
+    // menggerakkannya ke kedua arah sehingga transisi yang dipotong di tengah bisa dibalik dari posisi saat itu.
+    // `transitionGen` menandai animator basi (dibatalkan/digantikan) supaya finalisasinya tak berjalan.
+    private var transitionT = 0f
+    private var transitionAnimator: ValueAnimator? = null
+    private var slideAnimator: ValueAnimator? = null
+    private var transitionGen = 0
+    private var planetCx = 0f // pusat sampul pill (koordinat view pill) = titik tujuan pill mengerut / asal lencana tumbuh
+    private var planetCy = 0f
+    private val transitionInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f) // cepat merespons sentuhan, mendarat lembut
 
     // Optimistic default TRUE — sebelum controller sempat konek, tap tombol tetap harus jatuh
     // ke fallback Intent lama (lihat sendPlaybackAction), bukan langsung dianggap "kosong".
@@ -655,6 +671,7 @@ class FloatingBubbleService : Service() {
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         bubbleScope.cancel() // batalkan bubbleArtJob yang mungkin masih in-flight sekalian
+        stopBubbleAnimators() // Batch 663 — animasi minimize/expand tak boleh menyentuh window yang sudah dilepas
         panelSkin?.stop() // Batch 660 — hentikan animasi skin Space sebelum view dilepas
         badgeSkin?.stop()
         playOrb?.stop()
@@ -736,6 +753,7 @@ class FloatingBubbleService : Service() {
         val overlayType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
         isMinimized = bubbleStore.isMinimized()
+        transitionT = if (isMinimized) 1f else 0f // Batch 663
         val saved = bubbleStore.getPosition()
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -913,6 +931,7 @@ class FloatingBubbleService : Service() {
             keepAwakeAndScheduleFade() // Batch 453 — sentuhan apa pun = full-opacity + reset timer
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
+                    settleBubbleTransition() // Batch 663 — sentuhan mengambil alih: animasi minimize/expand dituntaskan dulu
                     initialX = params.x
                     initialY = params.y
                     initialTouchX = event.rawX
@@ -1093,45 +1112,180 @@ class FloatingBubbleService : Service() {
     }
 
     /** Ciutkan pill penuh jadi tab 48dp nempel tepi layar. Service/notifikasi foreground TIDAK
-     * disentuh — cuma toggle visibility 2 child dalam [bubbleView] yang sama, lihat KDoc "Batch
-     * 100" di kelas ini untuk kenapa ini BUKAN tombol close/dismiss. */
+     * disentuh — cuma 2 child dalam [bubbleView] yang sama, lihat KDoc "Batch 100" di kelas ini
+     * untuk kenapa ini BUKAN tombol close/dismiss.
+     *
+     * **Batch 663**: tidak lagi menukar visibility seketika. [startTransition] mengerutkan pill ke pusat sampul sambil
+     * memudar dan menumbuhkan lencana dari titik yang sama; [snapMinimizedToNearestEdge] (`animated = true`) meluncurkan
+     * jendela ke tepi BERSAMAAN dengan itu (bukan loncat). `lastExpandedX` hanya direkam saat pill benar-benar utuh
+     * (`transitionT <= 0`), supaya minimize di tengah expand tak menimpanya dengan posisi tengah-geser. */
     private fun minimize() {
         if (isMinimized) return
         val params = layoutParams ?: return
         isMinimized = true
-        lastExpandedX = params.x
-        expandedView?.visibility = View.GONE
-        minimizedView?.visibility = View.VISIBLE
+        if (transitionT <= 0f) lastExpandedX = params.x
         bubbleStore.setMinimized(true)
-        snapMinimizedToNearestEdge()
+        startTransition(toMinimized = true)
+        snapMinimizedToNearestEdge(animated = true)
     }
 
     /** Kebalikan [minimize] — dipanggil dari tap (bukan drag) di atas tab minimized (lihat
      * [setupDrag]). X dipulihkan ke posisi SEBELUM diminimize ([lastExpandedX]), di-clamp ULANG
-     * terhadap lebar pill penuh yang baru saja terlihat lagi (`container.post{}` menunggu satu
-     * layout pass supaya `container.width` yang dibaca adalah ukuran pill, bukan sisa ukuran
-     * tab 48dp dari frame sebelumnya). */
+     * terhadap lebar pill penuh yang baru saja terlihat lagi.
+     *
+     * **Batch 663**: tidak lagi menukar visibility seketika. Lencana memudar & mengerut, pill tumbuh dari pusat sampul
+     * ([startTransition]) sementara jendela meluncur dari tepi ke [lastExpandedX] ([slideWindowTo]). Lebar pill dibaca
+     * lewat [expandedWidthPx] (bukan `container.width` setelah `post{}`): selama transisi KEDUA child terlihat sehingga
+     * ukuran container = yang terbesar, dan pembacaan setelah `post{}` tak dijamin menunggu layout. Re-apply
+     * TouchDelegate album art (Batch 470, idempotent — perlu bila Service start LANGSUNG minimized) dipindah ke
+     * [finalizeTransition] karena rect `getHitRect()` hanya valid saat skala pill sudah kembali 1. */
     private fun expand() {
         if (!isMinimized) return
         val container = bubbleView as? FrameLayout ?: return
         val params = layoutParams ?: return
         isMinimized = false
-        minimizedView?.visibility = View.GONE
-        expandedView?.visibility = View.VISIBLE
         bubbleStore.setMinimized(false)
-        container.post {
-            // Batch 461 — screenBounds ter-cache, lihat KDoc field (ganti currentWindowMetrics).
-            val maxX = (screenBounds.width() - container.width)
-                .coerceAtLeast(0)
-            params.x = (lastExpandedX ?: params.x).coerceIn(0, maxX)
-            runCatching { windowManager.updateViewLayout(container, params) }
-            bubbleStore.savePosition(params.x, params.y)
-            // Batch 470 — re-apply (idempotent): kalau Service start LANGSUNG minimized (state
-            // tersimpan), `bubble_album_art` 0 pernah ter-measure sampai expand() pertama ini —
-            // panggilan di [addBubbleView] kebagian rect kosong (0x0), delegate baru valid dari
-            // sini. Lihat KDoc [applyAlbumArtTouchDelegate].
-            applyAlbumArtTouchDelegate()
+        startTransition(toMinimized = false)
+        // Batch 461 — screenBounds ter-cache, lihat KDoc field (ganti currentWindowMetrics).
+        val maxX = (screenBounds.width() - expandedWidthPx()).coerceAtLeast(0)
+        val toX = (lastExpandedX ?: params.x).coerceIn(0, maxX)
+        bubbleStore.savePosition(toX, params.y)
+        slideWindowTo(container, params, toX, params.y)
+    }
+
+    /** Batch 663 — lebar pill penuh dalam px. `width` bila view pernah di-layout (tetap benar walau sedang GONE);
+     * bila belum (Service start langsung minimized) diukur manual — LinearLayout wrap_content berukuran dp tetap, jadi
+     * UNSPECIFIED menghasilkan lebar sebenarnya. */
+    private fun expandedWidthPx(): Int {
+        val expanded = expandedView ?: return 0
+        if (expanded.width > 0) return expanded.width
+        val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        expanded.measure(unspecified, unspecified)
+        return expanded.measuredWidth
+    }
+
+    /** Batch 663 — mulai animasi pill <-> lencana dari `transitionT` saat ini ke ujung yang dituju (potong-dan-balik
+     * aman: animator lama dibatalkan, yang baru berangkat dari kemajuan terakhir; durasi sebanding sisa jarak). Kedua
+     * child dibuat VISIBLE selama animasi; yang tersembunyi di ujung baru di-GONE-kan oleh [finalizeTransition]. */
+    private fun startTransition(toMinimized: Boolean) {
+        val expanded = expandedView ?: return
+        val minimized = minimizedView ?: return
+        stopBubbleAnimators()
+        val density = resources.displayMetrics.density
+        val art = expanded.findViewById<View>(R.id.bubble_album_art)
+        planetCx = if (art != null && art.width > 0) art.left + art.width / 2f else PLANET_FALLBACK_DP * density
+        planetCy = if (expanded.height > 0) expanded.height / 2f else PLANET_FALLBACK_DP * density
+        expanded.pivotX = planetCx
+        expanded.pivotY = planetCy
+        expanded.visibility = View.VISIBLE
+        minimized.visibility = View.VISIBLE
+        applyTransition(transitionT) // frame pertama sudah konsisten sebelum animator berdetak (tanpa kedip)
+        val target = if (toMinimized) 1f else 0f
+        val gen = transitionGen
+        val anim = ValueAnimator.ofFloat(transitionT, target)
+        anim.duration = (BUBBLE_TRANSITION_MS * abs(target - transitionT)).toLong().coerceAtLeast(BUBBLE_TRANSITION_MIN_MS)
+        anim.interpolator = transitionInterpolator
+        anim.addUpdateListener {
+            transitionT = it.animatedValue as Float
+            applyTransition(transitionT)
         }
+        anim.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                if (gen != transitionGen) return // basi (dibatalkan/digantikan): finalisasi bukan urusan animator ini
+                transitionAnimator = null
+                finalizeTransition(toMinimized)
+            }
+        })
+        transitionAnimator = anim
+        anim.start()
+    }
+
+    /** Batch 663 — pose kedua child untuk kemajuan [t] (0 = pill utuh, 1 = lencana utuh). Pill memudar & mengerut
+     * (lebih kuat horizontal) ke pusat sampul dalam 70% pertama; lencana muncul sejak 30% dan melayang dari pusat sampul
+     * ke tempat aslinya (selisih pusat sampul pill vs pusat lencana, supaya tak ada loncat saat jendela mengecil). Hanya
+     * properti View (alpha/scale/translation): 0 kerja layout per frame. */
+    private fun applyTransition(t: Float) {
+        val expanded = expandedView ?: return
+        val minimized = minimizedView ?: return
+        val pillP = (t / PILL_PHASE_END).coerceIn(0f, 1f)
+        val badgeP = ((t - BADGE_PHASE_START) / (1f - BADGE_PHASE_START)).coerceIn(0f, 1f)
+        expanded.alpha = 1f - pillP
+        expanded.scaleX = 1f - 0.7f * pillP
+        expanded.scaleY = 1f - 0.4f * pillP
+        val density = resources.displayMetrics.density
+        val badgeCx = if (minimized.width > 0) minimized.width / 2f else BADGE_FALLBACK_CX_DP * density
+        val badgeCy = if (minimized.height > 0) minimized.height / 2f else BADGE_FALLBACK_CY_DP * density
+        val badgeScale = 0.45f + 0.55f * badgeP
+        minimized.alpha = badgeP
+        minimized.scaleX = badgeScale
+        minimized.scaleY = badgeScale
+        minimized.translationX = (planetCx - badgeCx) * (1f - badgeP)
+        minimized.translationY = (planetCy - badgeCy) * (1f - badgeP)
+    }
+
+    /** Batch 663 — keadaan akhir yang bersih: pose ujung, child yang tak dipakai GONE (jendela WRAP_CONTENT mengecil ke
+     * ukuran child yang tersisa seperti sebelumnya). Tak ada penyesuaian posisi di sini — itu urusan
+     * [snapMinimizedToNearestEdge]/[slideWindowTo]. */
+    private fun finalizeTransition(minimizedState: Boolean) {
+        transitionT = if (minimizedState) 1f else 0f
+        applyTransition(transitionT)
+        expandedView?.visibility = if (minimizedState) View.GONE else View.VISIBLE
+        minimizedView?.visibility = if (minimizedState) View.VISIBLE else View.GONE
+        if (!minimizedState) {
+            // Batch 470 — re-apply TouchDelegate setelah pill ter-layout & skala 1 lagi (lihat KDoc [expand]).
+            bubbleView?.post { applyAlbumArtTouchDelegate() }
+        }
+    }
+
+    /** Batch 663 — luncurkan jendela overlay ke ([toX], [toY]) dengan [BUBBLE_TRANSITION_MS]. `params.x/y` diperbarui
+     * tiap frame (listener drag membaca `params` saat ACTION_DOWN, jadi nilainya harus nilai nyata saat itu). Dipotong
+     * animator lain = posisi berhenti di titik terakhir; pemanggil yang menuntut posisi akhir memakai `end()`
+     * ([settleBubbleTransition]). */
+    private fun slideWindowTo(container: View, params: WindowManager.LayoutParams, toX: Int, toY: Int) {
+        slideAnimator?.cancel()
+        val fromX = params.x
+        val fromY = params.y
+        if (fromX == toX && fromY == toY) return
+        val anim = ValueAnimator.ofFloat(0f, 1f)
+        anim.duration = BUBBLE_TRANSITION_MS
+        anim.interpolator = transitionInterpolator
+        anim.addUpdateListener {
+            val f = it.animatedValue as Float
+            params.x = fromX + ((toX - fromX) * f).roundToInt()
+            params.y = fromY + ((toY - fromY) * f).roundToInt()
+            runCatching { windowManager.updateViewLayout(container, params) }
+        }
+        anim.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                if (slideAnimator === animation) slideAnimator = null
+            }
+        })
+        slideAnimator = anim
+        anim.start()
+    }
+
+    /** Batch 663 — hentikan kedua animator TANPA finalisasi (generasi dinaikkan sehingga listener `onAnimationEnd` yang
+     * dipicu `cancel()` tak menjalankan finalisasi). Dipakai sebelum transisi baru & di [onDestroy]. */
+    private fun stopBubbleAnimators() {
+        transitionGen++
+        transitionAnimator?.cancel()
+        slideAnimator?.cancel()
+        transitionAnimator = null
+        slideAnimator = null
+    }
+
+    /** Batch 663 — dipanggil di ACTION_DOWN [setupDrag]: bila ada animasi minimize/expand yang masih jalan, tuntaskan
+     * ke ujungnya (jendela ke posisi akhir, pose child ke keadaan [isMinimized]) sebelum drag/tap dihitung, supaya
+     * `params` & tampilan tak saling berebut. Tanpa animasi = no-op murah. */
+    private fun settleBubbleTransition() {
+        if (transitionAnimator == null && slideAnimator == null) return
+        val slide = slideAnimator
+        transitionGen++
+        transitionAnimator?.cancel()
+        transitionAnimator = null
+        slide?.end()
+        slideAnimator = null
+        finalizeTransition(isMinimized)
     }
 
     /** Chat-head-style "nempel tepi", **Batch 455 — kliping SETENGAH**: X dipaksa ke `-lebarTab/2`
@@ -1174,12 +1328,21 @@ class FloatingBubbleService : Service() {
      * ikut nempel di sisi yang tetap di layar tiap arah snap — area sentuh naik TANPA ikut
      * mengecil saat [EDGE_CLIP_FRACTION] naik. (2) [EDGE_CLIP_FRACTION] 70%→90% (bagian TIMBUL
      * turun ke ~10%). `windowManager.currentWindowMetrics` ganti `resources.displayMetrics` (fix
-     * kliping landscape, lihat KDoc kelas) — 0 formula lain berubah. */
-    private fun snapMinimizedToNearestEdge() {
+     * kliping landscape, lihat KDoc kelas) — 0 formula lain berubah.
+     *
+     * **Batch 663**: param [animated] (default false = perilaku lama untuk semua pemanggil lain). Bila true (hanya
+     * [minimize]) jendela MELUNCUR ke target lewat [slideWindowTo], bukan loncat. Lebar/tinggi jendela dibaca dari
+     * view lencana (`minimizedView`) — sama dengan `container` setelah layout tuntas, tetapi benar juga selama transisi
+     * (pill masih terlihat = `container.width` masih selebar pill) — formula hiddenWidth/nearestRight/clamp TIDAK
+     * berubah. `post{}` animasi yang basi (sentuhan mengambil alih sebelum sempat jalan) dilewati. */
+    private fun snapMinimizedToNearestEdge(animated: Boolean = false) {
         val container = bubbleView as? FrameLayout ?: return
         val params = layoutParams ?: return
+        val gen = transitionGen
         container.post {
-            val width = container.width.takeIf { it > 0 } ?: return@post
+            if (animated && gen != transitionGen) return@post
+            val badgeRoot = minimizedView?.takeIf { isMinimized }
+            val width = (badgeRoot?.width?.takeIf { it > 0 } ?: container.width).takeIf { it > 0 } ?: return@post
             // Batch 460 — lebar VISUAL (tab bulat asli) dibaca terpisah dari lebar ROOT/area-
             // sentuh (`width`, sekarang lebih lebar) — EDGE_CLIP_FRACTION cuma memotong bagian
             // VISUAL, `touchPad` (selisih root-visual) selalu ikut ke sisi yang tetap di layar.
@@ -1191,11 +1354,12 @@ class FloatingBubbleService : Service() {
             val screenWidth = bounds.width()
             val hiddenWidth = touchPad + (visualWidth * EDGE_CLIP_FRACTION).toInt()
             val nearestRight = (params.x + width / 2) > screenWidth / 2
-            params.x = if (nearestRight) (screenWidth - width + hiddenWidth) else -hiddenWidth
+            val snapX = if (nearestRight) (screenWidth - width + hiddenWidth) else -hiddenWidth
             // Y juga di-clamp (bukan cuma X yang "dipaksa tepi") — rotasi bisa mengubah tinggi
             // layar juga, Y lama yang valid di orientasi sebelumnya bisa jadi melebihi batas.
-            val maxY = (bounds.height() - container.height).coerceAtLeast(0)
-            params.y = params.y.coerceIn(0, maxY)
+            val windowHeight = badgeRoot?.height?.takeIf { it > 0 } ?: container.height // Batch 663 (lihat KDoc)
+            val maxY = (bounds.height() - windowHeight).coerceAtLeast(0)
+            val snapY = params.y.coerceIn(0, maxY)
             // Batch 463 — instrumentasi MURNI (0 formula diubah, lihat KDoc kelas "Batch 463"):
             // log nilai TARGET tepat sebelum apply, supaya bisa dibandingkan ke posisi NYATA di
             // layar (readback di bawah) — satu-satunya cara membuktikan/membantah teori Batch 462
@@ -1203,13 +1367,22 @@ class FloatingBubbleService : Service() {
             AppLogger.w(
                 "FloatingBubbleService",
                 "Batch463 snap target: screenWidth=$screenWidth hiddenWidth=$hiddenWidth " +
-                    "nearestRight=$nearestRight -> x=${params.x} y=${params.y}"
+                    "nearestRight=$nearestRight -> x=$snapX y=$snapY animated=$animated"
             )
-            val applied = runCatching { windowManager.updateViewLayout(container, params) }
+            // Batch 663 — animated: params.x/y diperbarui tiap frame oleh slideWindowTo (bukan diloncatkan di sini).
+            val applied = if (animated && (snapX != params.x || snapY != params.y)) {
+                slideWindowTo(container, params, snapX, snapY)
+                Result.success(Unit)
+            } else {
+                slideAnimator?.cancel() // snap seketika (rotasi/lepas-drag) menang atas luncuran yang masih jalan
+                params.x = snapX
+                params.y = snapY
+                runCatching { windowManager.updateViewLayout(container, params) }
+            }
             applied.exceptionOrNull()?.let { err ->
                 AppLogger.w("FloatingBubbleService", "Batch463 snap: updateViewLayout GAGAL - $err")
             }
-            bubbleStore.savePosition(params.x, params.y)
+            bubbleStore.savePosition(snapX, snapY)
             // Batch 463 — readback +250ms: baca posisi NYATA container di layar (bukan
             // layoutParams kita, yang cuma mencatat apa yang KITA minta) — kalau sistem
             // menimpanya setelah apply (teori Batch 462), angka ini akan beda dari x target di
@@ -1219,8 +1392,8 @@ class FloatingBubbleService : Service() {
             // `params` object yang SAMA dipakai bergantian oleh 3 panggilan snap (immediate/150ms/
             // 400ms), jadi kalau dibaca lagi nanti isinya bisa saja sudah ditimpa panggilan
             // berikutnya, bukan lagi nilai yang di-apply oleh panggilan INI.
-            val targetX = params.x
-            val targetY = params.y
+            val targetX = snapX
+            val targetY = snapY
             // Batch 464 — hasil readback Batch 463 (data device fisik pertama, MENGEJUTKAN):
             // mismatch BESAR terjadi bahkan saat minimize() BIASA (0 rotasi sama sekali, screenWidth
             // 1080 tetap portrait) — target x=1011 vs nyata x=551 (selisih 460px). Ini menggeser
@@ -1237,7 +1410,7 @@ class FloatingBubbleService : Service() {
             // ANIMASI (sementara), bukan salah permanen; kalau +800ms MASIH meleset sama, itu bukti
             // salahnya permanen (bukan soal waktu tunggu sama sekali).
             val targetWidth = width
-            val targetHeight = container.height
+            val targetHeight = windowHeight
             fun logReadback(label: String) {
                 val loc = IntArray(2)
                 container.getLocationOnScreen(loc)
@@ -1248,8 +1421,11 @@ class FloatingBubbleService : Service() {
                         "h=${container.height} (target w=$targetWidth h=$targetHeight)"
                 )
             }
-            container.postDelayed({ logReadback("+250ms") }, 250L)
-            container.postDelayed({ logReadback("+800ms") }, 800L)
+            // Batch 663 — saat animated, +250ms masih di tengah luncuran (durasi BUBBLE_TRANSITION_MS): hanya +800ms yang
+            // dibandingkan ke target; label menandai supaya selisih +250ms tak dibaca sebagai bug posisi.
+            val animTag = if (animated) " animasi" else ""
+            container.postDelayed({ logReadback("+250ms$animTag") }, 250L)
+            container.postDelayed({ logReadback("+800ms$animTag") }, 800L)
         }
     }
 
@@ -1368,6 +1544,17 @@ class FloatingBubbleService : Service() {
         private const val IDLE_FADE_ALPHA = 0.45f
         private const val IDLE_FADE_ANIM_MS = 1200L // Batch 662: 900 -> 1200ms + kurva lembut (fadeOutInterpolator)
         private const val IDLE_RESTORE_ANIM_MS = 260L // Batch 662: pemulihan ke opaque penuh saat disentuh (dulu seketika)
+        // Batch 663 — animasi minimize/expand (dulu swap seketika). Satu durasi untuk morf pill<->lencana DAN luncuran
+        // jendela ke/dari tepi supaya keduanya berakhir bersamaan. Fase: pill habis di 70% awal, lencana mulai muncul di 30%.
+        private const val BUBBLE_TRANSITION_MS = 340L
+        private const val BUBBLE_TRANSITION_MIN_MS = 120L // transisi yang dibalik di tengah jalan tak boleh jadi kedipan
+        private const val PILL_PHASE_END = 0.7f
+        private const val BADGE_PHASE_START = 0.3f
+        // Cadangan bila view belum pernah di-layout (Service start langsung minimized): pusat sampul pill
+        // (padding kiri 11dp + sampul 40dp/2 = 31dp, tinggi panel 62dp/2) & pusat root lencana (88dp x 48dp).
+        private const val PLANET_FALLBACK_DP = 31f
+        private const val BADGE_FALLBACK_CX_DP = 44f
+        private const val BADGE_FALLBACK_CY_DP = 24f
         // Batch 454 — tuning auto-minimize idle (dihitung dari titik interaksi terakhir, SAMA
         // dgn titik hitung IDLE_FADE_DELAY_MS, bukan ditambah setelahnya). > IDLE_FADE_DELAY_MS
         // supaya urutan visual selalu fade dulu, baru collapse — user masih sempat lihat bubble
