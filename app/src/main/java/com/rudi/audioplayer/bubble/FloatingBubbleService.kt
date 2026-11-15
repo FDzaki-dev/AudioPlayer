@@ -1182,6 +1182,7 @@ class FloatingBubbleService : Service() {
         expanded.pivotY = planetCy
         expanded.visibility = View.VISIBLE
         minimized.visibility = View.VISIBLE
+        requestBubbleHighFrameRate(true) // Batch 667: auto-minimize idle tadinya 60 Hz; dikembalikan di finalizeTransition
         applyTransition(transitionT) // frame pertama sudah konsisten sebelum animator berdetak (tanpa kedip)
         val target = if (toMinimized) 1f else 0f
         val gen = transitionGen
@@ -1230,6 +1231,7 @@ class FloatingBubbleService : Service() {
      * ukuran child yang tersisa seperti sebelumnya). Tak ada penyesuaian posisi di sini — itu urusan
      * [snapMinimizedToNearestEdge]/[slideWindowTo]. */
     private fun finalizeTransition(minimizedState: Boolean) {
+        requestBubbleHighFrameRate(false) // Batch 667: transisi selesai, lepas permintaan frame rate tinggi
         transitionT = if (minimizedState) 1f else 0f
         applyTransition(transitionT)
         expandedView?.visibility = if (minimizedState) View.GONE else View.VISIBLE
@@ -1306,6 +1308,21 @@ class FloatingBubbleService : Service() {
         })
         slideAnimator = anim
         anim.start()
+    }
+
+    /** Batch 667 — minta layar memakai frame rate TINGGI selama animasi minimize/expand (Android 15+ / API 35:
+     * `View.requestedFrameRate`, kategori HIGH; "View hanya memberi suara saat perlu digambar ulang" — jadi aman dibiarkan
+     * menyala selama transisi, lalu dikembalikan ke DEFAULT). Alasan: log v666 (22 luncuran) menunjukkan transisi lewat
+     * tap sudah 120 Hz mulus (selang_rata ~8,2-8,3 ms), tetapi auto-minimize saat idle berjalan di 60 Hz
+     * (selang_rata ~16,5 ms, frame=34 vs 65) karena layar sedang turun ke 60 Hz dan tak ada sentuhan yang menaikkannya.
+     * `ViewGroup` TIDAK meneruskan nilai ke child, jadi ketiga view diatur sendiri. Di bawah API 35 / perangkat tanpa
+     * dukungan: tak ada efek (tak ada galat). */
+    private fun requestBubbleHighFrameRate(high: Boolean) {
+        if (Build.VERSION.SDK_INT < 35) return
+        val rate = if (high) View.REQUESTED_FRAME_RATE_CATEGORY_HIGH else View.REQUESTED_FRAME_RATE_CATEGORY_DEFAULT
+        bubbleView?.requestedFrameRate = rate
+        expandedView?.requestedFrameRate = rate
+        minimizedView?.requestedFrameRate = rate
     }
 
     /** Batch 664 — tulis satu baris WARN ke [AppLogger] dari `Dispatchers.IO`. `AppLogger.appendEntry` menulis berkas

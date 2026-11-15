@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 667: bubble kini meminta frame rate tinggi (120 Hz) selama animasi minimize/expand supaya auto-minimize saat idle tak lagi jatuh ke 60 Hz (log v666: tap = 120 Hz solid, idle = 60 Hz); belum dikompilasi/diuji di device
 > - Batch 666: log diagnostik baru "Batch666 ritme luncuran" mengukur ritme frame nyata saat bubble meluncur ke/dari tepi; perilaku tak berubah; belum dikompilasi/diuji di device
 > - Batch 665: minimize bubble kini memudarkan pill lebih lama (±325 ms, dulu ±215 ms) supaya seimbang dengan expand; belum dikompilasi/diuji di device
 > - Batch 664: minimize/expand bubble dihaluskan — kurva gerak lembut (kecepatan naik bertahap, bukan lompat di frame pertama), durasi 340 -> 520 ms, dan log diagnostik tak lagi ditulis di main thread saat animasi berjalan; belum dikompilasi/diuji di device
