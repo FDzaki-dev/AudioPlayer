@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 664: minimize/expand bubble dihaluskan — kurva gerak lembut (kecepatan naik bertahap, bukan lompat di frame pertama), durasi 340 -> 520 ms, dan log diagnostik tak lagi ditulis di main thread saat animasi berjalan; belum dikompilasi/diuji di device
 > - Batch 663: minimize/expand bubble kini beranimasi 340 ms (pill mengerut ke sampul & memudar, lencana tumbuh dari titik yang sama dan meluncur ke tepi; expand kebalikannya) — dulu bertukar seketika dalam 1 frame; belum dikompilasi/diuji di device
 > - Batch 662: fade bubble mulus dua arah — pemulihan ke opaque saat disentuh kini dianimasikan (dulu loncat), fade-out 1,2 dtk berkurva lembut — belum diuji di device
 > - Batch 661: auto-fade idle bubble diperlambat (mulai meredup 7 dtk setelah sentuhan terakhir, transisi 0,9 dtk, auto-minimize 11 dtk) — belum diuji di device

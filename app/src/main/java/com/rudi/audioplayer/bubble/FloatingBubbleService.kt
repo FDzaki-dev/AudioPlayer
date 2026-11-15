@@ -508,7 +508,10 @@ class FloatingBubbleService : Service() {
     private var transitionGen = 0
     private var planetCx = 0f // pusat sampul pill (koordinat view pill) = titik tujuan pill mengerut / asal lencana tumbuh
     private var planetCy = 0f
-    private val transitionInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f) // cepat merespons sentuhan, mendarat lembut
+    // Batch 664 — dulu (0,2, 0, 0, 1) @340ms: 50% jarak tercapai di ~75 ms (video 360978.mp4 @30fps: 15% -> 34% -> 19%
+    // per frame = pill hilang dalam <=2 frame, lalu ekor merayap 1px/frame). Kini (0,35, 0, 0,15, 1): kecepatan naik
+    // bertahap (per frame 30fps: 1, 5, 11, 17, 17, 13, 10, 7 %) dan ekor selesai ~425 dari 520 ms.
+    private val transitionInterpolator = PathInterpolator(0.35f, 0f, 0.15f, 1f)
 
     // Optimistic default TRUE — sebelum controller sempat konek, tap tombol tetap harus jatuh
     // ke fallback Intent lama (lihat sendPlaybackAction), bukan langsung dianggap "kosong".
@@ -1249,10 +1252,19 @@ class FloatingBubbleService : Service() {
         val anim = ValueAnimator.ofFloat(0f, 1f)
         anim.duration = BUBBLE_TRANSITION_MS
         anim.interpolator = transitionInterpolator
+        // Batch 664 — lewati updateViewLayout bila posisi bulat tak berubah (ekor kurva: <1px/frame di layar 120 Hz);
+        // tiap panggilan = relayout + IPC ke WindowManager. Frame terakhir (f = 1) selalu tepat di (toX, toY).
+        var lastX = fromX
+        var lastY = fromY
         anim.addUpdateListener {
             val f = it.animatedValue as Float
-            params.x = fromX + ((toX - fromX) * f).roundToInt()
-            params.y = fromY + ((toY - fromY) * f).roundToInt()
+            val nx = fromX + ((toX - fromX) * f).roundToInt()
+            val ny = fromY + ((toY - fromY) * f).roundToInt()
+            if (nx == lastX && ny == lastY) return@addUpdateListener
+            lastX = nx
+            lastY = ny
+            params.x = nx
+            params.y = ny
             runCatching { windowManager.updateViewLayout(container, params) }
         }
         anim.addListener(object : AnimatorListenerAdapter() {
@@ -1262,6 +1274,14 @@ class FloatingBubbleService : Service() {
         })
         slideAnimator = anim
         anim.start()
+    }
+
+    /** Batch 664 — tulis satu baris WARN ke [AppLogger] dari `Dispatchers.IO`. `AppLogger.appendEntry` menulis berkas
+     * SINKRON di thread pemanggil (dan `trim()` membaca-ulang/menulis-ulang log > 200 KB); dari main thread itu jeda I/O
+     * tepat saat animasi minimize/expand berjalan (log "snap target" di frame pertama, readback +250 ms di tengah
+     * luncuran). Pesan tetap disusun di main thread (membaca state View); isi & tag log TIDAK berubah. */
+    private fun logAsync(message: String) {
+        bubbleScope.launch(Dispatchers.IO) { AppLogger.w("FloatingBubbleService", message) }
     }
 
     /** Batch 663 — hentikan kedua animator TANPA finalisasi (generasi dinaikkan sehingga listener `onAnimationEnd` yang
@@ -1364,8 +1384,7 @@ class FloatingBubbleService : Service() {
             // log nilai TARGET tepat sebelum apply, supaya bisa dibandingkan ke posisi NYATA di
             // layar (readback di bawah) — satu-satunya cara membuktikan/membantah teori Batch 462
             // ("ada pihak lain menimpa posisi window pasca-snap") tanpa menebak lagi.
-            AppLogger.w(
-                "FloatingBubbleService",
+            logAsync(
                 "Batch463 snap target: screenWidth=$screenWidth hiddenWidth=$hiddenWidth " +
                     "nearestRight=$nearestRight -> x=$snapX y=$snapY animated=$animated"
             )
@@ -1414,8 +1433,7 @@ class FloatingBubbleService : Service() {
             fun logReadback(label: String) {
                 val loc = IntArray(2)
                 container.getLocationOnScreen(loc)
-                AppLogger.w(
-                    "FloatingBubbleService",
+                logAsync(
                     "Batch464 readback ($label): posisi layar nyata x=${loc[0]} y=${loc[1]} " +
                         "(target x=$targetX y=$targetY) | ukuran nyata w=${container.width} " +
                         "h=${container.height} (target w=$targetWidth h=$targetHeight)"
@@ -1546,8 +1564,9 @@ class FloatingBubbleService : Service() {
         private const val IDLE_RESTORE_ANIM_MS = 260L // Batch 662: pemulihan ke opaque penuh saat disentuh (dulu seketika)
         // Batch 663 — animasi minimize/expand (dulu swap seketika). Satu durasi untuk morf pill<->lencana DAN luncuran
         // jendela ke/dari tepi supaya keduanya berakhir bersamaan. Fase: pill habis di 70% awal, lencana mulai muncul di 30%.
-        private const val BUBBLE_TRANSITION_MS = 340L
-        private const val BUBBLE_TRANSITION_MIN_MS = 120L // transisi yang dibalik di tengah jalan tak boleh jadi kedipan
+        // Batch 664: 340 -> 520 ms (user setelah v663: "masih bisa lebih smooth"; kurva baru, lihat transitionInterpolator).
+        private const val BUBBLE_TRANSITION_MS = 520L
+        private const val BUBBLE_TRANSITION_MIN_MS = 160L // transisi yang dibalik di tengah jalan tak boleh jadi kedipan
         private const val PILL_PHASE_END = 0.7f
         private const val BADGE_PHASE_START = 0.3f
         // Cadangan bila view belum pernah di-layout (Service start langsung minimized): pusat sampul pill
