@@ -1204,7 +1204,7 @@ class FloatingBubbleService : Service() {
     }
 
     /** Batch 663 — pose kedua child untuk kemajuan [t] (0 = pill utuh, 1 = lencana utuh). Pill memudar & mengerut
-     * (lebih kuat horizontal) ke pusat sampul dalam 70% pertama; lencana muncul sejak 30% dan melayang dari pusat sampul
+     * (lebih kuat horizontal) ke pusat sampul dalam 90% pertama (Batch 665; dulu 70%); lencana muncul sejak 30% dan melayang dari pusat sampul
      * ke tempat aslinya (selisih pusat sampul pill vs pusat lencana, supaya tak ada loncat saat jendela mengecil). Hanya
      * properti View (alpha/scale/translation): 0 kerja layout per frame. */
     private fun applyTransition(t: Float) {
@@ -1567,7 +1567,8 @@ class FloatingBubbleService : Service() {
         // Batch 664: 340 -> 520 ms (user setelah v663: "masih bisa lebih smooth"; kurva baru, lihat transitionInterpolator).
         private const val BUBBLE_TRANSITION_MS = 520L
         private const val BUBBLE_TRANSITION_MIN_MS = 160L // transisi yang dibalik di tengah jalan tak boleh jadi kedipan
-        private const val PILL_PHASE_END = 0.7f
+        // Batch 665: 0,7 -> 0,9 (video v664: pill minimize habis ~4-5 frame/±215 ms vs expand ~10 frame/±400 ms; kini ±325 ms).
+        private const val PILL_PHASE_END = 0.9f
         private const val BADGE_PHASE_START = 0.3f
         // Cadangan bila view belum pernah di-layout (Service start langsung minimized): pusat sampul pill
         // (padding kiri 11dp + sampul 40dp/2 = 31dp, tinggi panel 62dp/2) & pusat root lencana (88dp x 48dp).
