@@ -1256,7 +1256,27 @@ class FloatingBubbleService : Service() {
         // tiap panggilan = relayout + IPC ke WindowManager. Frame terakhir (f = 1) selalu tepat di (toX, toY).
         var lastX = fromX
         var lastY = fromY
+        // Batch 666 — ritme frame NYATA luncuran (rekaman layar 24 fps tak bisa melihat jeda di 60/120 Hz): selang antar-
+        // callback animator + durasi updateViewLayout (relayout + IPC). Hanya membaca System.nanoTime(); ringkasan ditulis
+        // 1 baris di akhir lewat logAsync (tak ada I/O selama animasi).
+        var frames = 0
+        var prevNs = 0L
+        var gapMaxNs = 0L
+        var gapSumNs = 0L
+        var lateGaps = 0
+        var calls = 0
+        var callSumNs = 0L
+        var callMaxNs = 0L
         anim.addUpdateListener {
+            val nowNs = System.nanoTime()
+            if (prevNs != 0L) {
+                val gap = nowNs - prevNs
+                gapSumNs += gap
+                if (gap > gapMaxNs) gapMaxNs = gap
+                if (gap > PACING_LATE_GAP_NS) lateGaps++
+            }
+            prevNs = nowNs
+            frames++
             val f = it.animatedValue as Float
             val nx = fromX + ((toX - fromX) * f).roundToInt()
             val ny = fromY + ((toY - fromY) * f).roundToInt()
@@ -1265,11 +1285,23 @@ class FloatingBubbleService : Service() {
             lastY = ny
             params.x = nx
             params.y = ny
+            val callStartNs = System.nanoTime()
             runCatching { windowManager.updateViewLayout(container, params) }
+            val callNs = System.nanoTime() - callStartNs
+            calls++
+            callSumNs += callNs
+            if (callNs > callMaxNs) callMaxNs = callNs
         }
         anim.addListener(object : AnimatorListenerAdapter() {
             override fun onAnimationEnd(animation: Animator) {
                 if (slideAnimator === animation) slideAnimator = null
+                if (frames > 1 && calls > 0) {
+                    logAsync(
+                        "Batch666 ritme luncuran: frame=$frames selang_rata=${gapSumNs / (frames - 1) / 1000}us " +
+                            "selang_maks=${gapMaxNs / 1000}us terlambat(>25ms)=$lateGaps | " +
+                            "updateViewLayout x$calls rata=${callSumNs / calls / 1000}us maks=${callMaxNs / 1000}us"
+                    )
+                }
             }
         })
         slideAnimator = anim
@@ -1567,6 +1599,7 @@ class FloatingBubbleService : Service() {
         // Batch 664: 340 -> 520 ms (user setelah v663: "masih bisa lebih smooth"; kurva baru, lihat transitionInterpolator).
         private const val BUBBLE_TRANSITION_MS = 520L
         private const val BUBBLE_TRANSITION_MIN_MS = 160L // transisi yang dibalik di tengah jalan tak boleh jadi kedipan
+        private const val PACING_LATE_GAP_NS = 25_000_000L // Batch 666: selang > 25 ms = frame terlewat (60 Hz = 16,7; 120 Hz = 8,3)
         // Batch 665: 0,7 -> 0,9 (video v664: pill minimize habis ~4-5 frame/±215 ms vs expand ~10 frame/±400 ms; kini ±325 ms).
         private const val PILL_PHASE_END = 0.9f
         private const val BADGE_PHASE_START = 0.3f
