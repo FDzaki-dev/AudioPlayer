@@ -1,5 +1,12 @@
 # Changelog
 
+## Batch 672 — audio offload bersyarat + scheduling dinamis overlapPlayer (BELUM verified)
+- Input user: log v671 (`sonix_debug_20261116_221843.txt`) + "terapkan semua perbaikan yang tersisa, regresi tinggal debugging".
+- v671 terbukti: `cpuApp` 19,0-19,5% vs 26,4-27,9% (layar mati, doze=ya), `ExoPlayer:Playback` 5,5-6,0% vs 9,6-11,0%; 0 ERROR/underrun; `experimentalSetDynamicSchedulingEnabled` ada di Media3 1.10.1.
+- `PlaybackService.kt`: `overlapPlayer` + scheduling dinamis; `applyAudioOffload` (AudioOffloadPreferences ENABLED + gapless wajib; DISABLED bila Trim Keheningan/Crossfade ON) di `onCreate` + toggle live. Format/perangkat tanpa dukungan offload = tetap PCM.
+- Tidak diubah (disengaja): fps kosmos Space (bukan beban dominan; regresi kehalusan).
+- Risiko: nama API `AudioOffloadPreferences` tak terverifikasi; rollback = mode DISABLED di `applyAudioOffload`. **NOT VERIFIED**. PREDIKSI: Tes unit 252, ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0.
+
 ## Batch 671 — scheduling dinamis ExoPlayer sesi utama (BELUM verified)
 - Input user: `sonix_debug_20261116_174057.txt` (v670, 1.10.30 build 530) + "terapkan perbaikan instant nya, regresi tinggal debugging".
 - Log v670: blok uid aplikasi muncul (fix Batch 670 terbukti); 0 ERROR/FATAL; `cpuApp` 26-28% layar mati + musik, `xfade=tidak` (bukan overlapPlayer), HAL audio 64% di luar kendali app.

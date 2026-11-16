@@ -15,6 +15,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaLibraryService
@@ -191,7 +192,10 @@ class PlaybackService : MediaLibraryService() {
         // baca ulang store ini. setSkipSilenceEnabled() ada di ExoPlayer, BUKAN di interface
         // Player umum — makanya MediaController (dipakai PlayerViewModel/UI) tidak bisa
         // memanggilnya langsung, dan custom SessionCommand ini yang jadi jembatannya.
-        player.setSkipSilenceEnabled(SilenceSkipStore(this).isEnabled())
+        val skipSilence = SilenceSkipStore(this).isEnabled()
+        player.setSkipSilenceEnabled(skipSilence)
+        // Batch 672 — audio offload mengikuti setelan Trim Keheningan + Crossfade (lihat applyAudioOffload).
+        applyAudioOffload(player, skipSilence, CrossfadeStore(this).isEnabled())
 
         // Batch 102 (Gap List #1, True Crossfade) — overlapPlayer adalah ExoPlayer KEDUA, privat,
         // TIDAK PERNAH disentuh MediaSession/notifikasi/UI. handleAudioFocus & becomingNoisy
@@ -395,6 +399,8 @@ class PlaybackService : MediaLibraryService() {
         val overlapPlayer = ExoPlayer.Builder(this)
             .setAudioAttributes(sessionPlayer.audioAttributes, false)
             .setHandleAudioBecomingNoisy(false)
+            // Batch 672 — sama alasan player sesi utama (Batch 671): loop playback tak bangun tiap 10 ms.
+            .experimentalSetDynamicSchedulingEnabled(true)
             .build()
         overlapPlayer.setSkipSilenceEnabled(SilenceSkipStore(this).isEnabled())
         return CrossfadeEngine(sessionPlayer = sessionPlayer, overlapPlayer = overlapPlayer, scope = serviceScope)
@@ -834,6 +840,31 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    /**
+     * Batch 672 — audio offload (DSP mendekode, CPU bisa tidur) untuk pemutaran layar mati. Dipasang HANYA bila tak mematikan
+     * fitur pilihan user: Trim Keheningan (SilenceSkippingAudioProcessor dilewati jalur offload) dan Crossfade (overlapPlayer
+     * kedua) harus OFF. ENABLED (bukan REQUIRED) + gapless wajib: format/perangkat yang tak mendukung tetap PCM persis seperti
+     * sebelumnya; sistem juga kembali ke PCM sendiri bila efek non-offload (Equalizer) aktif. Dipanggil di onCreate dan tiap
+     * toggle live (onCustomCommand) dengan nilai TERBARU sebagai argumen, tak bergantung urutan tulis store. Bukti di log
+     * berikutnya: baris AudioTrack INSP `flags=` (offload != 0x0) + `cpuApp` PowerProbe. Bila ada masalah suara: ganti mode
+     * jadi DISABLED di sini (satu-satunya titik offload).
+     */
+    @UnstableApi
+    private fun applyAudioOffload(player: ExoPlayer, skipSilence: Boolean, crossfade: Boolean) {
+        val mode = if (skipSilence || crossfade) {
+            AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED
+        } else {
+            AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
+        }
+        val prefs = AudioOffloadPreferences.Builder()
+            .setAudioOffloadMode(mode)
+            .setIsGaplessSupportRequired(true)
+            .build()
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setAudioOffloadPreferences(prefs)
+            .build()
+    }
+
     /** Accepts every controller with the same full default access the app has always had
      * (no callback was set before this class existed — MediaLibrarySession.Builder requires
      * one, unlike MediaSession.Builder, so this replicates that same "accept everyone, no
@@ -871,7 +902,10 @@ class PlaybackService : MediaLibraryService() {
             try {
                 if (customCommand.customAction == ACTION_SET_SKIP_SILENCE) {
                     val enabled = args.getBoolean(EXTRA_SKIP_SILENCE_ENABLED, false)
-                    (mediaSession?.player as? ExoPlayer)?.setSkipSilenceEnabled(enabled)
+                    (mediaSession?.player as? ExoPlayer)?.let {
+                        it.setSkipSilenceEnabled(enabled)
+                        applyAudioOffload(it, enabled, CrossfadeStore(this@PlaybackService).isEnabled())
+                    }
                     return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
                 if (customCommand.customAction == ACTION_SET_CROSSFADE_ENABLED) {
@@ -880,6 +914,9 @@ class PlaybackService : MediaLibraryService() {
                     // menjangkaunya langsung. setEnabled(false) di sini juga otomatis membatalkan
                     // crossfade yang sedang berlangsung (lihat CrossfadeEngine.abort()).
                     val enabled = args.getBoolean(EXTRA_CROSSFADE_ENABLED, false)
+                    (mediaSession?.player as? ExoPlayer)?.let {
+                        applyAudioOffload(it, SilenceSkipStore(this@PlaybackService).isEnabled(), enabled)
+                    }
                     if (enabled) {
                         // Batch 389 — kalau ini pertama kalinya Crossfade dinyalakan sesi ini,
                         // crossfadeEngine masih null (overlapPlayer belum pernah dibangun, lihat
