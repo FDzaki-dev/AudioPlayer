@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import com.rudi.audioplayer.util.PowerProbe
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.cos
@@ -81,7 +82,10 @@ fun SpaceCosmosBackdrop() {
     LaunchedEffect(Unit) {
         val origin = withFrameNanos { it }
         while (isActive) {
-            withFrameNanos { now -> clock.floatValue = (now - origin) / NANOS_PER_SECOND }
+            withFrameNanos { now ->
+                clock.floatValue = (now - origin) / NANOS_PER_SECOND
+                PowerProbe.hit(PowerProbe.Hit.COSMOS_FRAME) // Batch 669 — penghitung frame untuk catcher daya
+            }
             delay(SPACE_FRAME_GAP_MS)
         }
     }

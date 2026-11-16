@@ -19,6 +19,7 @@ import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import com.rudi.audioplayer.util.PowerProbe
 import com.rudi.audioplayer.util.SafeGuard
 import kotlin.math.PI
 import kotlin.math.cos
@@ -153,6 +154,7 @@ private class SpaceClock(private val liveMs: Long = 0L, private val onFrame: (Fl
             val now = SystemClock.uptimeMillis()
             seconds = (now - originMs) / 1000f
             onFrame(seconds)
+            PowerProbe.hit(PowerProbe.Hit.BUBBLE_FRAME) // Batch 669 — penghitung frame untuk catcher daya
             if (liveMs > 0L && now - liveStartMs >= liveMs) {
                 active = false // beku di frame yang baru digambar; tak ada tick terjadwal lagi
                 return

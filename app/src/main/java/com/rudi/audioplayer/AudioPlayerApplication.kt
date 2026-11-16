@@ -8,6 +8,7 @@ import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.PlaybackAudioSession
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.AudioArtFetcher
+import com.rudi.audioplayer.util.PowerProbe
 
 /** Every AsyncImage in the app (Library grid/list rows, Home, MiniPlayerBar, Now Playing)
  * uses Coil's default singleton ImageLoader unless it builds its own request — so configuring
@@ -34,6 +35,7 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         AppLogger.init(this)
+        PowerProbe.start(this) // Batch 669 — catcher daya (baris `PowerProbe` di log debug)
         warmUpSharedPreferences()
 
         // Batch 490 — fix: "preset EQ balik ke nol/default pasca app di-kill lalu musik dimainkan

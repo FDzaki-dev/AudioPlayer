@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 669: + app/src/main/java/com/rudi/audioplayer/util/PowerProbe.kt (catcher daya: baris `PowerProbe` di log debug) — 250->251.
 # Batch 660: + app/src/main/java/com/rudi/audioplayer/bubble/SpaceBubbleSkin.kt + app/src/test/java/com/rudi/audioplayer/bubble/SpaceBubbleMathTest.kt (skin Space bubble) — 248->250.
 # Batch 659: app/src/main/java/com/rudi/audioplayer/data/lyrics/LyricsPrefetchStore.kt + app/src/main/java/com/rudi/audioplayer/worker/LyricsPrefetchWorker.kt (fitur Prefetch Lirik dicabut) dihapus — 250->248.
 # Batch 657: app/src/test/java/com/rudi/audioplayer/TabPillMathTest.kt (file baru, tes unit pemetaan jari->pil bilah tab) ditambahkan — 249->250.
@@ -272,6 +273,7 @@ app/src/main/java/com/rudi/audioplayer/util/AudioArtFetcher.kt
 app/src/main/java/com/rudi/audioplayer/util/DebugLogFormat.kt
 app/src/main/java/com/rudi/audioplayer/util/DumpsysCollector.kt
 app/src/main/java/com/rudi/audioplayer/util/LogOrder.kt
+app/src/main/java/com/rudi/audioplayer/util/PowerProbe.kt
 app/src/main/java/com/rudi/audioplayer/util/RecentsGuard.kt
 app/src/main/java/com/rudi/audioplayer/util/SafeGuard.kt
 app/src/main/java/com/rudi/audioplayer/util/ShizukuBridge.kt

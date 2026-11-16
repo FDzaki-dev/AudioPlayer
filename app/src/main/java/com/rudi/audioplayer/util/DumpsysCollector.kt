@@ -68,6 +68,10 @@ object DumpsysCollector {
         Section("appwidget", "Widget", "Widget beranda terpasang", listOf("appwidget"), packageName, 6, 150),
         Section("power", "Daya", "Wake lock milik aplikasi", listOf("power"), packageName, 2, 120),
         Section("deviceidle", "Doze", "Pengecualian hemat baterai", listOf("deviceidle"), packageName, 1, 80),
+        // Batch 669 — bukti daya dari SISTEM (pembanding catcher PowerProbe): estimasi mAh per komponen (cpu/wakelock/layar),
+        // wakelock, job & waktu CPU aplikasi sejak charge terakhir; dan persentase CPU 1/5/15 menit terakhir.
+        Section("batterystats", "Statistik baterai", "Estimasi daya & wakelock aplikasi sejak charge terakhir", listOf("batterystats", "--charged", packageName), maxLines = 320),
+        Section("cpuinfo", "CPU", "Persentase CPU aplikasi 1/5/15 menit terakhir", listOf("cpuinfo"), packageName, 1, 40),
         Section("meminfo", "Memori", "Pemakaian memori aplikasi", listOf("meminfo", packageName), maxLines = 120),
         Section("vibrator", "Getar", "Kemampuan & riwayat getar (bahan haptic)", listOf("vibrator_manager"), maxLines = 200),
         Section("jobscheduler", "Job terjadwal", "Tugas WorkManager aplikasi", listOf("jobscheduler", packageName), maxLines = 150)
