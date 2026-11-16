@@ -176,6 +176,13 @@ class PlaybackService : MediaLibraryService() {
             // instead of blasting through the speaker unannounced — table stakes in every
             // major music app.
             .setHandleAudioBecomingNoisy(true)
+            // Batch 671 — scheduling dinamis: loop playback tidak lagi bangun tiap 10 ms, renderer (audio)
+            // memberi tahu kapan perlu dijalankan lagi. Dasar: PowerProbe v670, layar mati + musik=ya +
+            // xfade=tidak -> ExoPlayer:Playback 9,6-11% + MediaCodec_loop ~12,9% dari satu core (cpuApp
+            // 26-28%), beban pemutaran satu-satunya yang terjangkau app. API @UnstableApi (onCreate sudah
+            // @UnstableApi). Hanya player sesi utama; overlapPlayer (transien saat crossfade) tak disentuh.
+            // Bila muncul glitch/stutter audio: hapus baris ini (satu-satunya perubahan Batch 671).
+            .experimentalSetDynamicSchedulingEnabled(true)
             .build()
 
         // Roadmap #8, Trim Keheningan Otomatis — dibaca sekali di sini untuk proses BARU (mis.

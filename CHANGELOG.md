@@ -1,5 +1,11 @@
 # Changelog
 
+## Batch 671 — scheduling dinamis ExoPlayer sesi utama (BELUM verified)
+- Input user: `sonix_debug_20261116_174057.txt` (v670, 1.10.30 build 530) + "terapkan perbaikan instant nya, regresi tinggal debugging".
+- Log v670: blok uid aplikasi muncul (fix Batch 670 terbukti); 0 ERROR/FATAL; `cpuApp` 26-28% layar mati + musik, `xfade=tidak` (bukan overlapPlayer), HAL audio 64% di luar kendali app.
+- Perubahan: `PlaybackService.kt` — `ExoPlayer.Builder` sesi utama + `.experimentalSetDynamicSchedulingEnabled(true)` (loop playback tak bangun tiap 10 ms). overlapPlayer & audio offload tak disentuh.
+- Risiko: nama API tak terverifikasi di Media3 1.10.1 (hapus baris bila `Unresolved reference`); bila audio glitch/stutter, hapus baris yang sama. **NOT VERIFIED**. PREDIKSI: Tes unit 252, ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0.
+
 ## Batch 670 — `PowerProbe` + status xfade/senyap, `batterystats` menyimpan blok uid aplikasi (BELUM verified)
 - Input user: `SONIX_v669.zip` + `sonix_debug_20261116_170058.txt` (1.10.29 build 529), tanpa teks = baca data `PowerProbe` pertama lalu perbaiki yang nyata.
 - Data: `cpuApp` 27,93% (layar mati, 9m37d) dan 25,83% (layar nyala, 22 dtk), didominasi `MediaCodec_loop` + `ExoPlayer:Playback` (±24 poin); `BUBBLE_FRAME`/`COSMOS_FRAME` = 0; HAL audio mediatek 65% di `cpuinfo` (di luar kendali app); `kuras=0uAh` = resolusi counter; skala `charge_counter` ROM tak konsisten dengan kapasitas 5000 mAh (dugaan x10).
