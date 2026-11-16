@@ -4,6 +4,8 @@ import android.app.Application
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.request.crossfade
+import com.rudi.audioplayer.data.CrossfadeStore
+import com.rudi.audioplayer.data.SilenceSkipStore
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.PlaybackAudioSession
 import com.rudi.audioplayer.util.AppLogger
@@ -35,6 +37,13 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         AppLogger.init(this)
+        // Batch 670 — saklar yang memengaruhi CPU pemutaran dicetak di tiap baris `PowerProbe` (xfade = overlapPlayer kedua;
+        // senyap = trim keheningan). Dibaca di thread probe, bukan di sini.
+        PowerProbe.setStateExtras {
+            val xfade = CrossfadeStore(this).isEnabled()
+            val silence = SilenceSkipStore(this).isEnabled()
+            "xfade=${if (xfade) "ya" else "tidak"} senyap=${if (silence) "ya" else "tidak"}"
+        }
         PowerProbe.start(this) // Batch 669 — catcher daya (baris `PowerProbe` di log debug)
         warmUpSharedPreferences()
 

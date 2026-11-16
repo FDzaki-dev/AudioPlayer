@@ -88,4 +88,41 @@ class DumpsysFormatTest {
         assertTrue(text.contains("akses dumpsys: lewat Shizuku"))
         assertFalse(text.contains("adb shell pm grant"))
     }
+
+    @Test
+    fun `uidLabels memuat angka mentah dan label u0aN untuk uid aplikasi`() {
+        assertEquals(listOf("10466", "u0a466"), DumpsysFormat.uidLabels(10466))
+        assertEquals(listOf("1000"), DumpsysFormat.uidLabels(1000))
+    }
+
+    @Test
+    fun `keepUidBlock menyimpan ringkasan awal lalu blok uid sampai uid berikutnya`() {
+        val lines = listOf("g1", "g2", "g3", "  1000:", "    x", "  u0a466:", "    wake", "    cpu", "  u0a500:", "    lain")
+        val out = DumpsysFormat.keepUidBlock(lines, 10466, 2, 10)
+        assertEquals(listOf("g1", "g2", DumpsysFormat.GAP_MARK, "  u0a466:", "    wake", "    cpu"), out)
+    }
+
+    @Test
+    fun `keepUidBlock memotong blok uid yang terlalu panjang dan mencatat sisa`() {
+        val lines = listOf("g1", "  10466:", "a", "b", "c")
+        val out = DumpsysFormat.keepUidBlock(lines, 10466, 5, 2)
+        assertEquals(listOf("g1", "  10466:", "a", "(... 2 baris blok uid dipotong)"), out)
+    }
+
+    @Test
+    fun `keepUidBlock mencatat bila blok uid tak ditemukan dan tetap memuat keluaran`() {
+        val lines = listOf("g1", "  1000:", "x")
+        val out = DumpsysFormat.keepUidBlock(lines, 10466, 5, 5)
+        assertEquals("(blok uid 10466 tak ditemukan di keluaran)", out.first())
+        assertEquals(lines, out.drop(1))
+    }
+
+    @Test
+    fun `buildSection dengan uid menyaring ke ringkasan plus blok uid aplikasi`() {
+        val lines = listOf("ringkasan", "  1000:", "sysline", "  u0a466:", "wakelock")
+        val text = DumpsysFormat.buildSection(listOf("batterystats"), lines, null, 0, 50, false, null, uid = 10466)
+        assertTrue(text.contains("blok uid 10466"))
+        assertTrue(text.contains("wakelock"))
+        assertFalse(text.contains("sysline"))
+    }
 }

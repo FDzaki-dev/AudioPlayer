@@ -74,6 +74,7 @@ object PowerProbe {
     private var started = false
     private var mark: Mark? = null
     private var clkTck = DEFAULT_CLK_TCK
+    @Volatile private var stateExtras: (() -> String)? = null
     private val totalOn = Total()
     private val totalOff = Total()
 
@@ -122,6 +123,16 @@ object PowerProbe {
     /** Hitung satu kejadian (murah, lock-free; aman dari thread mana pun termasuk thread utama). */
     fun hit(kind: Hit) {
         hits.incrementAndGet(kind.ordinal)
+    }
+
+    /**
+     * Batch 670 — teks status tambahan yang dibaca di tiap baris (saklar fitur yang memengaruhi CPU pemutaran: crossfade, trim
+     * keheningan) agar angka `cpuApp`/`thr` bisa dikaitkan ke konfigurasi tanpa menebak. Diisi dari lapisan atas
+     * (`AudioPlayerApplication`) supaya `util` tetap mandiri (ArchUnit). Provider dipanggil di thread probe; kegagalannya dicatat di
+     * barisnya sendiri dan tak pernah mematikan pencatat.
+     */
+    fun setStateExtras(provider: () -> String) {
+        stateExtras = provider
     }
 
     /** Panggil sekali dari Application.onCreate(). Aman dipanggil berulang (diabaikan setelah yang pertama). */
@@ -291,7 +302,13 @@ object PowerProbe {
         val info = ActivityManager.RunningAppProcessInfo()
         ActivityManager.getMyMemoryState(info)
         return "musik=${yn(audio?.isMusicActive)} impor=${importanceLabel(info.importance)}(${info.importance}) " +
-            "hemat=${yn(power?.isPowerSaveMode)} doze=${yn(power?.isDeviceIdleMode)} termal=${power?.currentThermalStatus ?: -1}"
+            "hemat=${yn(power?.isPowerSaveMode)} doze=${yn(power?.isDeviceIdleMode)} termal=${power?.currentThermalStatus ?: -1}" +
+            describeExtras()
+    }
+
+    private fun describeExtras(): String {
+        val provider = stateExtras ?: return ""
+        return " " + runCatching { provider() }.getOrElse { "extra=galat:${it.javaClass.simpleName}" }
     }
 
     private fun describeHits(prev: Mark, now: Mark, dtS: Double): String {

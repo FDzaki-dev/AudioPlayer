@@ -2,6 +2,7 @@ package com.rudi.audioplayer.util
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Process
 import android.os.SystemClock
 
 /**
@@ -42,7 +43,10 @@ object DumpsysCollector {
         val args: List<String>,
         val needle: String? = null,
         val contextLines: Int = 8,
-        val maxLines: Int = 400
+        val maxLines: Int = 400,
+        /** Batch 670 — true = simpan ringkasan global + blok uid APLIKASI ini saja ([DumpsysFormat.keepUidBlock]); untuk keluaran yang
+         *  mencetak semua uid (`batterystats`) sehingga batas [maxLines] memotong sebelum blok uid aplikasi. */
+        val uidBlock: Boolean = false
     )
 
     /** Hasil uji: [ok] true = dumpsys benar-benar berjalan dan tidak ditolak sistem. */
@@ -70,7 +74,7 @@ object DumpsysCollector {
         Section("deviceidle", "Doze", "Pengecualian hemat baterai", listOf("deviceidle"), packageName, 1, 80),
         // Batch 669 — bukti daya dari SISTEM (pembanding catcher PowerProbe): estimasi mAh per komponen (cpu/wakelock/layar),
         // wakelock, job & waktu CPU aplikasi sejak charge terakhir; dan persentase CPU 1/5/15 menit terakhir.
-        Section("batterystats", "Statistik baterai", "Estimasi daya & wakelock aplikasi sejak charge terakhir", listOf("batterystats", "--charged", packageName), maxLines = 320),
+        Section("batterystats", "Statistik baterai", "Estimasi daya & wakelock aplikasi sejak charge terakhir", listOf("batterystats", "--charged", packageName), maxLines = 420, uidBlock = true),
         Section("cpuinfo", "CPU", "Persentase CPU aplikasi 1/5/15 menit terakhir", listOf("cpuinfo"), packageName, 1, 40),
         Section("meminfo", "Memori", "Pemakaian memori aplikasi", listOf("meminfo", packageName), maxLines = 120),
         Section("vibrator", "Getar", "Kemampuan & riwayat getar (bahan haptic)", listOf("vibrator_manager"), maxLines = 200),
@@ -179,7 +183,8 @@ object DumpsysCollector {
                     val outcome = runWithFallback(section.args, PER_SECTION_TIMEOUT_MS, access, shizukuReady)
                     val run = outcome.run
                     DumpsysFormat.buildSection(
-                        section.args, run.lines, section.needle, section.contextLines, section.maxLines, run.timedOut, run.error, outcome.route
+                        section.args, run.lines, section.needle, section.contextLines, section.maxLines, run.timedOut, run.error, outcome.route,
+                        uid = if (section.uidBlock) Process.myUid() else null
                     )
                 }.getOrElse { error ->
                     DumpsysFormat.buildSection(section.args, emptyList(), null, 0, 0, false, "${error.javaClass.simpleName}: ${error.message.orEmpty()}")
@@ -224,6 +229,53 @@ object DumpsysCollector {
 internal object DumpsysFormat {
 
     const val GAP_MARK = "..."
+
+    private const val UID_HEAD_LINES = 140
+    private const val UID_BLOCK_MAX = 260
+    private const val PER_USER_RANGE = 100_000
+    private const val FIRST_APP_UID = 10_000
+    private val UID_HEADER = Regex("""^ {2}(\d+|u\d+[a-z]\d+):$""")
+
+    /** Batch 670 — penulisan uid di `batterystats`: angka mentah (uid sistem, mis. `1000`) dan/atau `u<user>a<app>` (AOSP, mis. `u0a466`
+     *  untuk uid 10466). Keduanya dikembalikan karena ROM bisa memakai salah satu. */
+    fun uidLabels(uid: Int): List<String> {
+        val appId = uid % PER_USER_RANGE
+        val labels = arrayListOf(uid.toString())
+        if (appId >= FIRST_APP_UID) labels.add("u${uid / PER_USER_RANGE}a${appId - FIRST_APP_UID}")
+        return labels
+    }
+
+    /** Batch 670 — `batterystats` mencetak SEMUA uid (log v669: ~770 baris; 449 dipotong [capLines] SEBELUM blok uid aplikasi sehingga
+     *  wakelock/CPU/daya app tak pernah tampil). Simpan maksimal [headLines] baris ringkasan global (sebelum header uid pertama) + blok
+     *  uid [uid] (header `  <uid>:` sampai header uid berikutnya) dibatasi [blockMax] baris. Blok tak ada = keluaran utuh + catatan. */
+    fun keepUidBlock(lines: List<String>, uid: Int, headLines: Int, blockMax: Int): List<String> {
+        val wanted = uidLabels(uid).map { "  $it:" }
+        val start = lines.indexOfFirst { it.trimEnd() in wanted }
+        if (start < 0) return listOf("(blok uid $uid tak ditemukan di keluaran)") + lines
+        val firstUid = lines.indexOfFirst { UID_HEADER.matches(it.trimEnd()) }
+        val end = (start + 1 until lines.size).firstOrNull { UID_HEADER.matches(lines[it].trimEnd()) } ?: lines.size
+        val head = lines.take(minOf(headLines, firstUid))
+        val block = lines.subList(start, end)
+        val out = ArrayList<String>(head)
+        if (start > head.size) out.add(GAP_MARK)
+        out.addAll(block.take(blockMax))
+        if (block.size > blockMax) out.add("(... ${block.size - blockMax} baris blok uid dipotong)")
+        return out
+    }
+
+    /** Pilih baris yang disimpan: [needle] (+/- [context]) | blok uid [uid] | semua baris. */
+    private fun selectLines(raw: List<String>, needle: String?, context: Int, uid: Int?): List<String> = when {
+        needle != null -> filterAround(raw, needle, context)
+        uid != null -> keepUidBlock(raw, uid, UID_HEAD_LINES, UID_BLOCK_MAX)
+        else -> raw
+    }
+
+    /** Keterangan penyaringan untuk baris pertama isi bagian (null = tak disaring). */
+    private fun selectNote(raw: List<String>, needle: String?, context: Int, uid: Int?): String? = when {
+        needle != null -> "(disaring: baris memuat \"$needle\" +/- $context dari ${raw.size} baris)"
+        uid != null -> "(disaring: ringkasan global + blok uid $uid dari ${raw.size} baris)"
+        else -> null
+    }
 
     /** Penanda bagian yang dibaca lewat jalur cadangan (Batch 631). */
     const val ROUTE_SHIZUKU_FALLBACK = "lewat Shizuku (jalur izin langsung gagal)"
@@ -280,7 +332,8 @@ internal object DumpsysFormat {
         maxLines: Int,
         timedOut: Boolean,
         error: String?,
-        route: String? = null
+        route: String? = null,
+        uid: Int? = null
     ): String = buildString {
         appendLine("---- dumpsys ${args.joinToString(" ")} ----")
         if (route != null && error == null) appendLine("(jalur: $route)")
@@ -292,11 +345,11 @@ internal object DumpsysFormat {
                 rawLines.take(3).forEach { appendLine(it) }
             }
             else -> {
-                val filtered = if (needle != null) filterAround(rawLines, needle, contextLines) else rawLines
+                val filtered = selectLines(rawLines, needle, contextLines, uid)
                 if (needle != null && filtered.isEmpty()) {
                     appendLine("(tak ada baris yang memuat \"$needle\" dari ${rawLines.size} baris keluaran)")
                 } else {
-                    if (needle != null) appendLine("(disaring: baris memuat \"$needle\" +/- $contextLines dari ${rawLines.size} baris)")
+                    selectNote(rawLines, needle, contextLines, uid)?.let { appendLine(it) }
                     capLines(filtered, maxLines).forEach { appendLine(it) }
                     if (timedOut) appendLine("(keluaran terpotong: melewati batas waktu)")
                 }
