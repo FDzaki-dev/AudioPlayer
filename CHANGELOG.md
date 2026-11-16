@@ -1,5 +1,11 @@
 # Changelog
 
+## Batch 673 — saklar Hemat Daya (Scheduling Dinamis + Audio Offload) di Pengaturan Putar (BELUM verified)
+- Input user: screenshot dialog Pengaturan Putar + "tidak menampilkan opsi untuk menonaktifkan ke-2 nya" (dibaca: dua perbaikan baru tanpa saklar).
+- BARU `data/PowerSavingStore.kt` (2 flag default ON + pendengar perubahan); `NowPlayingDialogs.kt` bagian "Hemat Daya (Eksperimen)" (2 Switch); `PlaybackService.kt` flag Builder dari store (berlaku setelah restart app), `applyAudioOffload` ikut saklar + `setIsSpeedChangeSupportRequired(true)`, listener store -> offload LIVE.
+- Lewati Keheningan (Pengaturan) dan Fade Halus (radio Gapless/Fade di dialog yang sama) sudah punya kontrol sebelumnya.
+- Risiko: nama API offload tak terverifikasi; rollback = matikan saklar. **NOT VERIFIED**. PREDIKSI: Tes unit 252, ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0. FILE_MANIFEST 251 -> 252.
+
 ## Batch 672 — audio offload bersyarat + scheduling dinamis overlapPlayer (BELUM verified)
 - Input user: log v671 (`sonix_debug_20261116_221843.txt`) + "terapkan semua perbaikan yang tersisa, regresi tinggal debugging".
 - v671 terbukti: `cpuApp` 19,0-19,5% vs 26,4-27,9% (layar mati, doze=ya), `ExoPlayer:Playback` 5,5-6,0% vs 9,6-11,0%; 0 ERROR/underrun; `experimentalSetDynamicSchedulingEnabled` ada di Media3 1.10.1.

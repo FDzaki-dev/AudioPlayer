@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 673: Pengaturan Putar > Hemat Daya: saklar Scheduling Dinamis (berlaku setelah restart app) dan Audio Offload (live), default ON.
 > - Batch 672: audio offload aktif bila Trim Keheningan & Crossfade OFF (format/perangkat tak mendukung = tetap PCM); overlapPlayer ikut scheduling dinamis.
 > - Batch 671: ExoPlayer sesi utama memakai scheduling dinamis (`experimentalSetDynamicSchedulingEnabled`) untuk menekan CPU pemutaran layar mati.
 > - Batch 670: `PowerProbe` mencetak status `xfade=`/`senyap=`; bagian `batterystats` di log debug kini menyimpan blok uid aplikasi (sebelumnya terpotong sebelum blok itu).

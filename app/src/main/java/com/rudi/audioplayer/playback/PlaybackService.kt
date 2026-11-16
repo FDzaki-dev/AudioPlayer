@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.os.Bundle
 import android.os.SystemClock
@@ -37,6 +38,7 @@ import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.PlayStatsStore
 import com.rudi.audioplayer.data.ShakeSettingsStore
+import com.rudi.audioplayer.data.PowerSavingStore
 import com.rudi.audioplayer.data.SilenceSkipStore
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.ArtFailureLog
@@ -153,6 +155,16 @@ class PlaybackService : MediaLibraryService() {
     // show stale art/state.
     private var widgetUpdateJob: Job? = null
 
+    // Batch 673 — saklar Hemat Daya > Audio Offload (PowerSavingStore) berlaku LIVE: callback apply() datang di thread utama (thread
+    // player). Referensi kuat wajib (SharedPreferences menyimpan pendengar secara lemah); didaftarkan di onCreate, dilepas di onDestroy.
+    private val powerSavingListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == PowerSavingStore.KEY_AUDIO_OFFLOAD) {
+            (mediaSession?.player as? ExoPlayer)?.let {
+                applyAudioOffload(it, SilenceSkipStore(this).isEnabled(), CrossfadeStore(this).isEnabled())
+            }
+        }
+    }
+
     @UnstableApi
     override fun onCreate() {
         super.onCreate()
@@ -182,8 +194,9 @@ class PlaybackService : MediaLibraryService() {
             // xfade=tidak -> ExoPlayer:Playback 9,6-11% + MediaCodec_loop ~12,9% dari satu core (cpuApp
             // 26-28%), beban pemutaran satu-satunya yang terjangkau app. API @UnstableApi (onCreate sudah
             // @UnstableApi). Hanya player sesi utama; overlapPlayer (transien saat crossfade) tak disentuh.
-            // Bila muncul glitch/stutter audio: hapus baris ini (satu-satunya perubahan Batch 671).
-            .experimentalSetDynamicSchedulingEnabled(true)
+            // Batch 673 — kini ada saklar: Pengaturan Putar > Hemat Daya > Scheduling Dinamis (default ON; flag Builder
+            // dibaca saat player dibangun -> berlaku setelah aplikasi dimulai ulang).
+            .experimentalSetDynamicSchedulingEnabled(PowerSavingStore(this).isDynamicScheduling())
             .build()
 
         // Roadmap #8, Trim Keheningan Otomatis — dibaca sekali di sini untuk proses BARU (mis.
@@ -196,6 +209,7 @@ class PlaybackService : MediaLibraryService() {
         player.setSkipSilenceEnabled(skipSilence)
         // Batch 672 — audio offload mengikuti setelan Trim Keheningan + Crossfade (lihat applyAudioOffload).
         applyAudioOffload(player, skipSilence, CrossfadeStore(this).isEnabled())
+        PowerSavingStore(this).registerOnChange(powerSavingListener)
 
         // Batch 102 (Gap List #1, True Crossfade) — overlapPlayer adalah ExoPlayer KEDUA, privat,
         // TIDAK PERNAH disentuh MediaSession/notifikasi/UI. handleAudioFocus & becomingNoisy
@@ -399,8 +413,8 @@ class PlaybackService : MediaLibraryService() {
         val overlapPlayer = ExoPlayer.Builder(this)
             .setAudioAttributes(sessionPlayer.audioAttributes, false)
             .setHandleAudioBecomingNoisy(false)
-            // Batch 672 — sama alasan player sesi utama (Batch 671): loop playback tak bangun tiap 10 ms.
-            .experimentalSetDynamicSchedulingEnabled(true)
+            // Batch 672 — sama alasan player sesi utama (Batch 671): loop playback tak bangun tiap 10 ms. Batch 673 — ikut saklar yang sama.
+            .experimentalSetDynamicSchedulingEnabled(PowerSavingStore(this).isDynamicScheduling())
             .build()
         overlapPlayer.setSkipSilenceEnabled(SilenceSkipStore(this).isEnabled())
         return CrossfadeEngine(sessionPlayer = sessionPlayer, overlapPlayer = overlapPlayer, scope = serviceScope)
@@ -848,10 +862,12 @@ class PlaybackService : MediaLibraryService() {
      * toggle live (onCustomCommand) dengan nilai TERBARU sebagai argumen, tak bergantung urutan tulis store. Bukti di log
      * berikutnya: baris AudioTrack INSP `flags=` (offload != 0x0) + `cpuApp` PowerProbe. Bila ada masalah suara: ganti mode
      * jadi DISABLED di sini (satu-satunya titik offload).
+     * Batch 673 — saklar Pengaturan Putar > Hemat Daya > Audio Offload (PowerSavingStore, default ON) ikut menentukan; kecepatan
+     * != 1x tetap didukung (isSpeedChangeSupportRequired) karena opsi kecepatan 0,5x-2x ada di UI.
      */
     @UnstableApi
     private fun applyAudioOffload(player: ExoPlayer, skipSilence: Boolean, crossfade: Boolean) {
-        val mode = if (skipSilence || crossfade) {
+        val mode = if (!PowerSavingStore(this).isAudioOffload() || skipSilence || crossfade) {
             AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED
         } else {
             AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
@@ -859,6 +875,7 @@ class PlaybackService : MediaLibraryService() {
         val prefs = AudioOffloadPreferences.Builder()
             .setAudioOffloadMode(mode)
             .setIsGaplessSupportRequired(true)
+            .setIsSpeedChangeSupportRequired(true)
             .build()
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .setAudioOffloadPreferences(prefs)
@@ -1039,6 +1056,7 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         // Batch 623 — sesi berakhir: kartu Recents kembali normal sekarang juga (lihat util/RecentsGuard.kt).
         RecentsGuard.onSessionEnded(this)
+        PowerSavingStore(this).unregisterOnChange(powerSavingListener) // Batch 673
         shakeDetector?.stop()
         // Batch 102 — overlapPlayer bukan bagian dari mediaSession, jadi tidak ikut dilepas
         // oleh `player.release()` di bawah kalau tidak dilepas eksplisit di sini dulu.

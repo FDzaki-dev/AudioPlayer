@@ -17,10 +17,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
+import com.rudi.audioplayer.data.PowerSavingStore
 import com.rudi.audioplayer.ui.theme.Radius
 
 // Batch 508 — Wave 2 T4 (docs/PENDING_CodeTidyPlan.md): SleepTimerDialog, SpeedDialog,
@@ -193,12 +195,76 @@ internal fun SpeedDialog(
                     selected = crossfadeEnabled,
                     onClick = { onToggleCrossfade(true) }
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                Spacer(modifier = Modifier.height(8.dp))
+                PowerSavingSection() // Batch 673
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("Tutup") }
         }
     )
+}
+
+// Batch 673 — saklar uji dua penghemat daya pemutaran (default ON) agar tiap perbaikan bisa dimatikan saat debugging regresi.
+// Dibaca/ditulis langsung ke PowerSavingStore (ui boleh ke data, ArchUnit). Audio Offload berlaku LIVE (PlaybackService memantau
+// store); Scheduling Dinamis adalah flag ExoPlayer.Builder -> berlaku setelah aplikasi dimulai ulang.
+@Composable
+private fun PowerSavingSection() {
+    val context = LocalContext.current
+    val store = remember { PowerSavingStore(context) }
+    var dynamicScheduling by remember { mutableStateOf(store.isDynamicScheduling()) }
+    var audioOffload by remember { mutableStateOf(store.isAudioOffload()) }
+    Text(
+        "Hemat Daya (Eksperimen)",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.secondary
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    PowerSavingRow(
+        title = "Scheduling Dinamis",
+        subtitle = "Mesin pemutar tidak bangun tiap 10 md. Berlaku setelah aplikasi dimulai ulang",
+        checked = dynamicScheduling,
+        onCheckedChange = {
+            dynamicScheduling = it
+            store.setDynamicScheduling(it)
+        }
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    PowerSavingRow(
+        title = "Audio Offload",
+        subtitle = "Dekode lewat DSP agar CPU tidur saat layar mati. Aktif hanya bila Lewati Keheningan dan Fade Halus mati",
+        checked = audioOffload,
+        onCheckedChange = {
+            audioOffload = it
+            store.setAudioOffload(it)
+        }
+    )
+}
+
+@Composable
+private fun PowerSavingRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
 }
 
 // Batch 360 — pengganti StarRatingRow lama (5 IconButton permanen di layar, dihapus Batch 357).
