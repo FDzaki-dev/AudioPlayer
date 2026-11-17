@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.util
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LogOrderTest {
@@ -51,5 +52,58 @@ class LogOrderTest {
     fun `log kosong atau hanya spasi dikembalikan apa adanya`() {
         assertEquals("", LogOrder.newestFirst(""))
         assertEquals("  \n", LogOrder.newestFirst("  \n"))
+    }
+
+    // Batch 679 — keepNewestHalf (pemangkasan berkas log per entri berbasis ukuran).
+
+    private fun entry(n: Int) = "2026-10-13 08:00:%02d WARN [A] entri-%02d ${"x".repeat(40)}\n".format(n, n)
+
+    @Test
+    fun `keepNewestHalf mempertahankan entri terbaru dan mulai tepat di awal entri`() {
+        val raw = (0 until 10).joinToString("") { entry(it) }
+
+        val kept = LogOrder.keepNewestHalf(raw)
+
+        assertEquals(entry(5) + entry(6) + entry(7) + entry(8) + entry(9), kept)
+    }
+
+    @Test
+    fun `keepNewestHalf membuang entri multi baris yang melintasi titik tengah secara utuh`() {
+        val trace = "2026-10-13 08:00:30 ERROR [B] gagal: java.lang.IllegalStateException: x\n" +
+            "\tat a.B.c(B.kt:1)\n" +
+            "\tat a.B.d(B.kt:2)\n" +
+            "\tat a.B.e(B.kt:3)\n"
+        val raw = entry(1) + trace + entry(2) + entry(3)
+
+        val kept = LogOrder.keepNewestHalf(raw)
+
+        assertEquals(entry(2) + entry(3), kept)
+        assertTrue(kept.startsWith("2026-"))
+    }
+
+    @Test
+    fun `keepNewestHalf pada satu entri raksasa memotong di batas baris dan pasti mengecil`() {
+        val giant = "2026-10-13 08:00:01 ERROR [A] raksasa\n" + (0 until 40).joinToString("") { "\tat baris.ke$it(F.kt:$it)\n" }
+
+        val kept = LogOrder.keepNewestHalf(giant)
+
+        assertTrue(kept.length < giant.length)
+        assertTrue(kept.endsWith("\n"))
+        assertTrue(kept.startsWith("\tat baris."))
+    }
+
+    @Test
+    fun `keepNewestHalf pada teks kosong atau tanpa baris baru tidak melempar`() {
+        assertEquals("", LogOrder.keepNewestHalf(""))
+        assertEquals("abcdef".substring(3), LogOrder.keepNewestHalf("abcdef"))
+    }
+
+    @Test
+    fun `hasil keepNewestHalf tetap bisa dibaca newestFirst tanpa entri yatim`() {
+        val raw = (0 until 8).joinToString("") { entry(it) }
+
+        val shown = LogOrder.newestFirst(LogOrder.keepNewestHalf(raw))
+
+        assertEquals(entry(7) + entry(6) + entry(5) + entry(4), shown)
     }
 }

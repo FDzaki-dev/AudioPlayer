@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 679 — pemangkasan log per-entri + label `jenis=` pada baris Cold start; aturan ZIP dilarang docs-only (BELUM verified)
+- Input user: `SONIX_v678.zip` + "sematkan dalam project state.md: dilarang keras menyiapkan file zip yang berisikan docs only. wajib terapkan perbaikan yang tersedia dan debugging jika dirasa belum sempurna!!". Aturan disematkan di `PROJECT_STATE.md` (bagian "ATURAN KERAS", `[RESUME POINT]`, Aturan sesi aktif #9).
+- Audit kode (tanpa laporan CI/log baru): crash handler, kursor/retriever/receiver, unduhan Okio, `StartupTrace`, `PowerProbe`, `PlaybackService` jalur daya, `AppLogger`, `WidgetMarquee`, bubble `onDestroy` -> bersih kecuali 2 temuan di bawah.
+- FIX `util/LogOrder.kt` `keepNewestHalf` + `util/AppLogger.kt` `trim`: pemangkasan log 200 KB dulu membuang separuh BARIS tertua -> batas bisa jatuh di tengah entri multi-baris (kepala `ERROR ... : java.lang.X: pesan` hilang, tinggal `\tat ...`) dan separuh baris != separuh byte (berkas berbaris panjang bisa tetap > batas = baca-tulis ulang 200 KB di tiap append). Kini: pertahankan ±separuh teks terbaru mulai dari awal ENTRI pertama pada/setelah titik tengah; satu entri raksasa dipotong di batas baris (pasti mengecil).
+- FIX `util/StartupTrace.kt` `processKind()`: baris `StartupTiming` `Cold start ...` diakhiri `| jenis=start_dingin_murni(jeda app_selesai->act_mulai=Xms)` atau `| jenis=PROSES_HIDUP_TANPA_UI(... BUKAN start dingin murni)` (jeda >= 2000 ms) agar proses hidup tanpa UI (Batch 678: 11480 ms) tak salah dibaca sebagai jank. Judul baris tak berubah.
+- TES `LogOrderTest.kt` +5 (`keepNewestHalf`: batas entri, entri multi-baris melintasi titik tengah, entri raksasa, teks kosong/tanpa newline, kompatibel `newestFirst`). Dijalankan lokal dengan kompiler Kotlin 2.0.21 (JUnit di-stub): 10/10 lulus; 0 error sintaks di seluruh pohon.
+- Tidak diubah (sengaja): state PIN tetap `remember` (jangan masuk saved-state); `AppLogger.w/e` masih sinkron di thread pemanggil (kandidat bila ada `Skipped frames` tertaut).
+- **NOT VERIFIED** untuk compile Android/CI. PREDIKSI: Tes unit 257 (252 + 5), ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0, peringatan Kotlin 0. FILE_MANIFEST tetap 253.
+
 ## Batch 678 — analisis log v677: jank cold start TIDAK terbukti, thread ditutup (docs saja) (BELUM verified)
 - Input user: `sonix_debug_20261117_161203.txt` (v677 = 1.10.37 build 537, ekspor 16:11:59), tanpa teks. Compile v677 TERBUKTI (APK terpasang, baris `StartupTiming` `Cold start` tercetak); hasil CI lint/SpotBugs/detekt/ArchUnit v677 BELUM dilaporkan.
 - 4 start dingin murni (pid 6065/6315/8772/9151, setelah Force stop dari Settings): `frame1_selesai` 325/376/403/331 ms sejak proses mulai; `PlaybackService.onCreate` 29-34 ms pada 263-337 ms; 0 baris `Skipped frames` pada kelima proses v677; 0 ERROR/FATAL di AppLogger sejak v676.

@@ -189,11 +189,11 @@ object AppLogger {
         }
     }
 
+    // Batch 679 — pangkas per ENTRI berbasis ukuran (lihat LogOrder.keepNewestHalf): tak lagi memotong entri multi-baris di tengah
+    // (kepala exception hilang) dan tak lagi menyisakan >200 KB hanya karena baris-baris panjang.
     private fun trim(file: File) {
         runCatching {
-            val lines = file.readLines()
-            val kept = lines.takeLast(lines.size / 2)
-            file.writeText(kept.joinToString("\n", postfix = "\n"))
+            file.writeText(LogOrder.keepNewestHalf(file.readText()))
         }
     }
 
