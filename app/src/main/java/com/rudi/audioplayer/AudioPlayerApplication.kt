@@ -11,6 +11,7 @@ import com.rudi.audioplayer.playback.PlaybackAudioSession
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.AudioArtFetcher
 import com.rudi.audioplayer.util.PowerProbe
+import com.rudi.audioplayer.util.StartupTrace
 
 /** Every AsyncImage in the app (Library grid/list rows, Home, MiniPlayerBar, Now Playing)
  * uses Coil's default singleton ImageLoader unless it builds its own request — so configuring
@@ -36,6 +37,7 @@ import com.rudi.audioplayer.util.PowerProbe
 class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
+        StartupTrace.mark("app_mulai") // Batch 677 — jejak cold start (lihat StartupTrace)
         AppLogger.init(this)
         // Batch 670 — saklar yang memengaruhi CPU pemutaran dicetak di tiap baris `PowerProbe` (xfade = overlapPlayer kedua;
         // senyap = trim keheningan). Dibaca di thread probe, bukan di sini.
@@ -64,6 +66,7 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
         // route through EqualizerController.getInstance() (see its own Batch 490 doc) so this is a
         // genuinely earlier hook onto the SAME shared instance, not a second competing one.
         PlaybackAudioSession.onSessionIdChanged = { id -> EqualizerController.getInstance(this).attach(id) }
+        StartupTrace.mark("app_selesai")
     }
 
     /**

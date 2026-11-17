@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 677 — jejak cold start `StartupTrace` (Application -> Activity -> ViewModel -> komposisi -> frame pertama) (BELUM verified)
+- Input user: "lanjutkan analysis!!" + `SONIX_v676.zip` (tanpa laporan CI/log baru). Interpretasi = langkah (D) Batch 676: ukur `Application.onCreate` + `MainActivity` sampai frame pertama (service sudah dikesampingkan: `onCreate` 32 ms dari ±1841 ms).
+- Verifikasi statis v676: `PowerProbe.kt` kurung/kurawal seimbang, semua impor terpakai (`AudioManager` masih dipakai `describeState`), tak ada sisa rujukan offload; `exclude.xml` XML valid dan `util.PowerProbe` ada di elemen `Match` (bukan hanya komentar).
+- Pembacaan jalur cold start (tanpa angka = tanpa klaim penyebab): `AppLogger.init` -> `logPreviousExits` sudah di `Dispatchers.IO`; `PowerProbe.start` hanya memulai `HandlerThread`; `refreshLibrary`/`ensureLibraryLoaded` kerja berat di IO. Sisa di thread utama = konstruksi `PlayerViewModel` (23 prefs, sudah dipanaskan), `setContent` + komposisi pertama.
+- BARU `util/StartupTrace.kt`: `mark`/`markOnce` (antrean lock-free, tanpa I/O di main) + `traceFirstFrame` (pendengar attach + pra-gambar sekali pakai di `decorView`); setelah frame pertama ditulis SATU baris WARN `StartupTiming` `Cold start ...` lewat thread sendiri, lalu pencatat mati. Titik: `app_mulai`, `app_selesai`, `act_mulai`, `act_super_selesai`, `act_vm_dibuat`, `act_connect_selesai`, `jendela_terpasang`, `compose_apply`, `frame1_predraw`, `frame1_selesai` (ms sejak proses mulai, +selisih).
+- `AudioPlayerApplication.kt`: 2 titik. `MainActivity.kt`: 5 titik + `val vm = playerViewModel` (pembuatan ViewModel tetap di titik yang sama, hanya dipisah dari `connect()` agar terukur) + `traceFirstFrame(this)` + `SideEffect { markOnce("compose_apply") }` di akhir `setContent`. Perilaku aplikasi tak berubah.
+- Sengaja tidak dipakai: `remember { mark() }` (mengembalikan Unit = pola yang diperingatkan lint Compose) dan `ApplicationStartInfo` (API 35; nama API tak bisa diverifikasi di sandbox tanpa android.jar).
+- **NOT VERIFIED** (belum compile/CI/device). PREDIKSI: Tes unit 252, ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0, peringatan Kotlin 0 (RISIKO titik baru di `StartupTrace.kt`: akses `private` dari nested class, `View.post` lambda).
+
 ## Batch 676 — bersihkan temuan CI run #102 (SpotBugs 7 -> 0, deprecated 1 -> 0) (BELUM verified)
 - Input user: laporan CI run #102 + log v675. CI: ArchUnit 7 OK, tes 252 OK, detekt 0, lintDebug 0; SpotBugs 7 + 1 deprecated, semuanya `PowerProbe.kt`.
 - `StartupTiming` v675: service `onCreate` total 32 ms, 1841 ms sejak proses mulai -> jank cold start BUKAN dari service.

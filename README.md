@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 677: jejak cold start `StartupTrace` — log debug mencatat satu baris `StartupTiming` `Cold start` (titik waktu Application -> Activity -> ViewModel -> komposisi -> frame pertama) untuk menemukan sumber ±1,8 dtk sebelum layar pertama; belum dikompilasi/diuji di device.
 > - Batch 676: temuan CI run #102 dibersihkan (SpotBugs `PowerProbe` disaring sebagai pola Kotlin-`object`; diagnostik `[offload]` ter-deprecated dihapus).
 > - Batch 675: log debug mencatat waktu per tahap `PlaybackService.onCreate` (baris `StartupTiming`) untuk memangkas jank cold start berdasarkan data.
 > - Batch 674: log debug mencatat dukungan audio offload perangkat per format (mp3/aac/opus) di baris `[offload]`.

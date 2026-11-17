@@ -136,6 +136,7 @@ import com.rudi.audioplayer.bubble.FloatingBubbleService
 import com.rudi.audioplayer.playback.PlayerViewModel
 import com.rudi.audioplayer.data.LastTabStore
 import com.rudi.audioplayer.util.RecentsGuard
+import com.rudi.audioplayer.util.StartupTrace
 import com.rudi.audioplayer.ui.HomeScreen
 import com.rudi.audioplayer.ui.LockScreen
 import com.rudi.audioplayer.ui.LibraryScreen
@@ -350,19 +351,25 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        StartupTrace.mark("act_mulai") // Batch 677 — jejak cold start (lihat StartupTrace)
         installSplashScreen()
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
         )
         super.onCreate(savedInstanceState)
+        StartupTrace.mark("act_super_selesai")
 
         // Batch 631 — pulihkan status kunci hasil rotasi (lihat onStop/onSaveInstanceState); `null` (start dingin) = terkunci.
         isUnlocked = savedInstanceState?.getBoolean(STATE_UNLOCKED, false) == true
         biometricAutoPrompted = savedInstanceState?.getBoolean(STATE_BIOMETRIC_PROMPTED, false) == true
 
         pendingShortcutAction = intent?.data?.toString()
-        playerViewModel.connect()
+        val vm = playerViewModel // Batch 677 — memaksa pembuatan ViewModel di titik yang SAMA seperti sebelumnya (hanya dipisah utk diukur)
+        StartupTrace.mark("act_vm_dibuat")
+        vm.connect()
+        StartupTrace.mark("act_connect_selesai")
+        StartupTrace.traceFirstFrame(this)
 
         setContent {
             // Batch 24: bridge the two separate LocalLifecycleOwner CompositionLocals.
@@ -631,6 +638,7 @@ class MainActivity : FragmentActivity() {
                 }
             }
             } // tutup CompositionLocalProvider (Batch 24)
+            SideEffect { StartupTrace.markOnce("compose_apply") } // Batch 677 — komposisi pertama selesai diterapkan
         }
     }
 }
