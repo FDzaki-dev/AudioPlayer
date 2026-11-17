@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 676: temuan CI run #102 dibersihkan (SpotBugs `PowerProbe` disaring sebagai pola Kotlin-`object`; diagnostik `[offload]` ter-deprecated dihapus).
 > - Batch 675: log debug mencatat waktu per tahap `PlaybackService.onCreate` (baris `StartupTiming`) untuk memangkas jank cold start berdasarkan data.
 > - Batch 674: log debug mencatat dukungan audio offload perangkat per format (mp3/aac/opus) di baris `[offload]`.
 > - Batch 673: Pengaturan Putar > Hemat Daya: saklar Scheduling Dinamis (berlaku setelah restart app) dan Audio Offload (live), default ON.

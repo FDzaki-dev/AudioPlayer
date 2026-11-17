@@ -1,5 +1,11 @@
 # Changelog
 
+## Batch 676 — bersihkan temuan CI run #102 (SpotBugs 7 -> 0, deprecated 1 -> 0) (BELUM verified)
+- Input user: laporan CI run #102 + log v675. CI: ArchUnit 7 OK, tes 252 OK, detekt 0, lintDebug 0; SpotBugs 7 + 1 deprecated, semuanya `PowerProbe.kt`.
+- `StartupTiming` v675: service `onCreate` total 32 ms, 1841 ms sejak proses mulai -> jank cold start BUKAN dari service.
+- `exclude.xml`: `util.PowerProbe` masuk filter Kotlin-`object` (pola sama dgn AppLogger). `PowerProbe.kt`: diagnostik `[offload]` dihapus (hasil final mp3=0 aac=0 opus=0; API statis ter-deprecated).
+- **NOT VERIFIED**. PREDIKSI: Tes unit 252, ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0, peringatan Kotlin 0.
+
 ## Batch 675 — ukur jank cold start (`StartupTiming` di PlaybackService.onCreate) (BELUM verified)
 - Input user: "jadi kamu mogok kerja sekarang?!!" + log v674. Baris `[offload]`: mp3=0 aac=0 opus=0 -> offload mustahil di perangkat ini; baterai sudah tuntas (cpuApp layar mati+musik 26-28% -> 17-18%, idle 0,00%).
 - Temuan baru: cold start v674 = 4 burst `Skipped frames` (161 frame dalam ±2 dtk): Application+Activity (53), ExoPlayer/MediaSession init (30+32), GC 46 MB LOS (46).
