@@ -1,5 +1,10 @@
 # Changelog
 
+## Batch 675 — ukur jank cold start (`StartupTiming` di PlaybackService.onCreate) (BELUM verified)
+- Input user: "jadi kamu mogok kerja sekarang?!!" + log v674. Baris `[offload]`: mp3=0 aac=0 opus=0 -> offload mustahil di perangkat ini; baterai sudah tuntas (cpuApp layar mati+musik 26-28% -> 17-18%, idle 0,00%).
+- Temuan baru: cold start v674 = 4 burst `Skipped frames` (161 frame dalam ±2 dtk): Application+Activity (53), ExoPlayer/MediaSession init (30+32), GC 46 MB LOS (46).
+- `PlaybackService.kt` `onCreate`: catat sekali `StartupTiming` (total/exo/tengah/sesi+timer/sejak_proses_mulai) lewat `Dispatchers.IO`. Perilaku tak berubah. **NOT VERIFIED**. PREDIKSI: Tes unit 252, ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0.
+
 ## Batch 674 — catat dukungan audio offload perangkat di log (BELUM verified)
 - Input user: log uji v673 (`sonix_debug_20261117_082240.txt`). Hasil: `cpuApp` 17,2-18,3% layar mati (v671 19,0-19,5%, v670 26-28%); 0 ERROR; offload TIDAK aktif (AudioTrack PCM `flags=0x0`, lagu Opus).
 - `PowerProbe.kt`: baris `[offload] dukungan perangkat (0=tidak 1=ya 2=ya+gapless): mp3=.. aac=.. opus=..` sekali saat mulai. Pemutaran tak berubah.

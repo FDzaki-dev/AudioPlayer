@@ -168,6 +168,10 @@ class PlaybackService : MediaLibraryService() {
     @UnstableApi
     override fun onCreate() {
         super.onCreate()
+        // Batch 675 — ukur jank cold start (log v674: 161 frame terlewat dalam ±2 dtk, 4 burst; v670: 3 burst): waktu per tahap
+        // onCreate di thread utama + jarak dari proses mulai. Hanya pengukuran; dicatat sekali di akhir lewat Dispatchers.IO.
+        val startupT0 = SystemClock.elapsedRealtime()
+        val startupSinceProcessMs = startupT0 - android.os.Process.getStartElapsedRealtime()
 
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
@@ -198,6 +202,7 @@ class PlaybackService : MediaLibraryService() {
             // dibaca saat player dibangun -> berlaku setelah aplikasi dimulai ulang).
             .experimentalSetDynamicSchedulingEnabled(PowerSavingStore(this).isDynamicScheduling())
             .build()
+        val startupExoAt = SystemClock.elapsedRealtime()
 
         // Roadmap #8, Trim Keheningan Otomatis — dibaca sekali di sini untuk proses BARU (mis.
         // setelah app di-kill total lalu playback resumption memanggil onCreate lagi); toggle
@@ -351,6 +356,7 @@ class PlaybackService : MediaLibraryService() {
         // ensureShakeDetector() di bawah utk root cause + kenapa ini kelas bug yang sama dgn
         // WorkManager (Batch 387) / overlapPlayer (Batch 389).
 
+        val startupMidAt = SystemClock.elapsedRealtime()
         val sessionActivityIntent = PendingIntent.getActivity(
             this,
             0,
@@ -370,6 +376,11 @@ class PlaybackService : MediaLibraryService() {
         // diabaikan. Dipanggil di sini (bukan di awal onCreate) karena butuh `mediaSession`
         // sudah terbentuk untuk bisa memanggil `.pause()`.
         resumeSleepTimerFromStore()
+        val startupEndAt = SystemClock.elapsedRealtime()
+        val startupMsg = "PlaybackService.onCreate (thread utama): total=${startupEndAt - startupT0}ms " +
+            "exo=${startupExoAt - startupT0}ms tengah=${startupMidAt - startupExoAt}ms " +
+            "sesi+timer=${startupEndAt - startupMidAt}ms | sejak_proses_mulai=${startupSinceProcessMs}ms"
+        serviceScope.launch(Dispatchers.IO) { AppLogger.w("StartupTiming", startupMsg) }
     }
 
     /** Roadmap #11 lanjutan (Batch 100) — dipanggil tiap `isPlaying` jadi true, DARI MANA PUN
