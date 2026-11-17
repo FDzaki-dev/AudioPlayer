@@ -31,6 +31,7 @@ import com.rudi.audioplayer.playback.PlaybackService
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.ArtFailureLog
+import com.rudi.audioplayer.util.ChangeGate
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -218,6 +219,10 @@ object WidgetUpdater {
     private val diagLastTitle = AtomicReference<String?>(null)
     private val diagSkipped = AtomicInteger()
 
+    // Batch 681 — pintu log per id widget: baris `Marquee diag` hanya ditulis bila tanda (mode/ukuran/skala font/teks>kolom)
+    // berubah atau widget baru terlihat di proses ini. Dulu ditulis tiap pembaruan = 30,8% byte log v680 (lihat KDoc ChangeGate).
+    private val diagGate = ChangeGate()
+
     fun updateAll(context: Context) {
         val ticket = updateTicket.incrementAndGet()
         synchronized(updateLock) {
@@ -336,7 +341,8 @@ object WidgetUpdater {
     // Batch 641 — setTitleSelected() DIHAPUS: marquee tak lagi memakai TextView.setSelected/fokus (tak remotable di perangkat uji; tak andal di
     // launcher). Judul digeser app lewat WidgetMarqueeDriver. `titleMarqueeSelectable` hanya tinggal untuk baris log diagnostik.
 
-    // Batch 593 — SATU baris log per widget per update (level WARN, tag WidgetUpdater, awalan "Marquee diag"),
+    // Batch 593 — SATU baris log per widget (level WARN, tag WidgetUpdater, awalan "Marquee diag"; sejak Batch 681 hanya saat tanda
+    // widget berubah / pertama di proses ini, bukan tiap update),
     // supaya penyebab marquee mati saat lagu nyata bisa diputuskan dari DATA, bukan tebakan. Isi: nomor update +
     // selang dari update sebelumnya (update beruntun <~1,2 dtk = marquee diulang sebelum sempat bergerak, jeda mulai
     // marquee Android 1200 ms) + jumlah permintaan basi yang digabung; id widget, mode, ukuran min/maks yang
@@ -367,6 +373,8 @@ object WidgetUpdater {
             val maxH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, -1)
             if (isStrip) {
                 // Batch 639 — strip vertikal tak menampilkan judul (tak ada kolom judul/marquee): cukup satu baris mode + ukuran.
+                // Batch 681 — hanya bila mode/ukuran berubah (play/jeda & ganti lagu tak mengubah apa pun di strip).
+                if (!diagGate.changed(widgetId, "strip|${minW}x$minH|${maxW}x$maxH")) return
                 AppLogger.w(
                     "WidgetUpdater",
                     "Marquee diag #$seq +${sinceLastMs}ms digabung=$skipped | id=$widgetId mode=strip " +
@@ -390,10 +398,15 @@ object WidgetUpdater {
                 else -> FULL_FIXED_WIDTH_DP
             }
             val columnMinDp = minW - fixedDp
+            val modeLabel = if (isSlim) "slim" else if (isCompact) "compact" else if (isTall) "tinggi" else "penuh"
+            val fontScale = context.resources.configuration.fontScale
+            // Batch 681 — tulis hanya bila tanda berubah (mode, ukuran min/maks, skala font, teks lebih lebar dari kolom atau tidak);
+            // play/jeda dan ganti lagu dengan hasil yang sama tak lagi menulis ulang (30,8% byte log v680). Lihat KDoc ChangeGate.
+            if (!diagGate.changed(widgetId, "$modeLabel|${minW}x$minH|${maxW}x$maxH|$fontScale|${textDp > columnMinDp}")) return
             AppLogger.w(
                 "WidgetUpdater",
-                "Marquee diag #$seq +${sinceLastMs}ms digabung=$skipped | id=$widgetId mode=${if (isSlim) "slim" else if (isCompact) "compact" else if (isTall) "tinggi" else "penuh"} " +
-                    "min=${minW}x${minH}dp maks=${maxW}x${maxH}dp fontScale=${context.resources.configuration.fontScale} | " +
+                "Marquee diag #$seq +${sinceLastMs}ms digabung=$skipped | id=$widgetId mode=$modeLabel " +
+                    "min=${minW}x${minH}dp maks=${maxW}x${maxH}dp fontScale=$fontScale | " +
                     "judul=${shown.length}huruf berubah=$titleChanged playing=$isPlaying | " +
                     "ESTIMASI teks=${textDp.toInt()}dp kolomMin=${columnMinDp.toInt()}dp teks>kolomMin=${textDp > columnMinDp} | " +
                     "remotable=$titleMarqueeSelectable"

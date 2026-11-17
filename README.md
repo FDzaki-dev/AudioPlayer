@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 681: Log Diagnostik tak lagi dibanjiri baris `[WidgetUpdater] Marquee diag` (tiap pembaruan widget = 30,8% byte log v680): kini ditulis hanya saat mode/ukuran/skala font/teks-lebih-lebar-dari-kolom berubah atau widget baru terlihat di proses; riwayat log efektif ±34% lebih panjang di batas 200 KB; tes unit +7. CI v680 (run #107) LULUS semua; compile Android/CI v681 belum dilaporkan.
 > - Batch 680: label `jenis=` pada baris `StartupTiming` `Cold start` dikoreksi (ambang 2000 -> 500 ms; proses pasca-instal tak lagi terbaca start dingin murni) dan alasan keluar proses API 34 (`PACKAGE_UPDATED`, dst.) kini bernama di log; tes unit +4. Compile Android/CI belum dilaporkan.
 > - Batch 679: pemangkasan Log Diagnostik kini per-entri (entri multi-baris/stack trace tertua tak lagi terpotong kepalanya) dan baris `StartupTiming` `Cold start` diberi label `jenis=` (start dingin murni vs proses hidup tanpa UI); tes unit +5. Compile Android/CI belum dilaporkan.
 > - Batch 678: analisis log v677 — start dingin murni (force-stop -> buka) terukur 325-403 ms sampai frame pertama, tanpa `Skipped frames`; jank cold start TIDAK terbukti (angka lama 1,84 dtk = proses hidup tanpa UI sejak instal). 0 perubahan kode; CI v677 belum dilaporkan.

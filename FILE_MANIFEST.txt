@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 681: + app/src/main/java/com/rudi/audioplayer/util/ChangeGate.kt + app/src/test/java/com/rudi/audioplayer/util/ChangeGateTest.kt (pintu log tulis-hanya-bila-berubah untuk baris `Marquee diag` widget) — 255->257.
 # Batch 680: + app/src/main/java/com/rudi/audioplayer/util/StartupKind.kt + app/src/test/java/com/rudi/audioplayer/util/StartupKindTest.kt (penentu `jenis=` baris Cold start, ambang dari log nyata) — 253->255.
 # Batch 677: + app/src/main/java/com/rudi/audioplayer/util/StartupTrace.kt (jejak cold start: baris `StartupTiming` `Cold start` di log debug) — 252->253.
 # Batch 673: + app/src/main/java/com/rudi/audioplayer/data/PowerSavingStore.kt (saklar uji Hemat Daya: Scheduling Dinamis + Audio Offload) — 251->252.
@@ -274,6 +275,7 @@ app/src/main/java/com/rudi/audioplayer/update/UpdateManager.kt
 app/src/main/java/com/rudi/audioplayer/util/ApkSignatureChecker.kt
 app/src/main/java/com/rudi/audioplayer/util/AppLogger.kt
 app/src/main/java/com/rudi/audioplayer/util/AudioArtFetcher.kt
+app/src/main/java/com/rudi/audioplayer/util/ChangeGate.kt
 app/src/main/java/com/rudi/audioplayer/util/DebugLogFormat.kt
 app/src/main/java/com/rudi/audioplayer/util/DumpsysCollector.kt
 app/src/main/java/com/rudi/audioplayer/util/LogOrder.kt
@@ -360,6 +362,7 @@ app/src/test/java/com/rudi/audioplayer/playback/PlayCountTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
+app/src/test/java/com/rudi/audioplayer/util/ChangeGateTest.kt
 app/src/test/java/com/rudi/audioplayer/util/DebugLogFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/util/DumpsysFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt
