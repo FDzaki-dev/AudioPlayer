@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 680: + app/src/main/java/com/rudi/audioplayer/util/StartupKind.kt + app/src/test/java/com/rudi/audioplayer/util/StartupKindTest.kt (penentu `jenis=` baris Cold start, ambang dari log nyata) — 253->255.
 # Batch 677: + app/src/main/java/com/rudi/audioplayer/util/StartupTrace.kt (jejak cold start: baris `StartupTiming` `Cold start` di log debug) — 252->253.
 # Batch 673: + app/src/main/java/com/rudi/audioplayer/data/PowerSavingStore.kt (saklar uji Hemat Daya: Scheduling Dinamis + Audio Offload) — 251->252.
 # Batch 669: + app/src/main/java/com/rudi/audioplayer/util/PowerProbe.kt (catcher daya: baris `PowerProbe` di log debug) — 250->251.
@@ -280,6 +281,7 @@ app/src/main/java/com/rudi/audioplayer/util/PowerProbe.kt
 app/src/main/java/com/rudi/audioplayer/util/RecentsGuard.kt
 app/src/main/java/com/rudi/audioplayer/util/SafeGuard.kt
 app/src/main/java/com/rudi/audioplayer/util/ShizukuBridge.kt
+app/src/main/java/com/rudi/audioplayer/util/StartupKind.kt
 app/src/main/java/com/rudi/audioplayer/util/StartupTrace.kt
 app/src/main/java/com/rudi/audioplayer/widget/PlayerWidgetProvider.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetMarquee.kt
@@ -361,6 +363,7 @@ app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
 app/src/test/java/com/rudi/audioplayer/util/DebugLogFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/util/DumpsysFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt
+app/src/test/java/com/rudi/audioplayer/util/StartupKindTest.kt
 app/src/test/java/com/rudi/audioplayer/widget/WidgetMarqueeMathTest.kt
 app/src/test/java/com/rudi/audioplayer/widget/WidgetStripSizingTest.kt
 build.gradle.kts

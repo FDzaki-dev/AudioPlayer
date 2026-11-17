@@ -63,6 +63,9 @@ object AppLogger {
     // Batch 603 — stempel (ms) crash terbaru yang SUDAH dilihat user di layar Log Diagnostik.
     private const val KEY_LAST_SEEN_CRASH_TS = "last_seen_crash_ts"
     private const val EXIT_HISTORY_MAX = 10
+    private const val EXIT_REASON_FREEZER = 14 // Batch 680 — ApplicationExitInfo API 34
+    private const val EXIT_REASON_PACKAGE_STATE_CHANGE = 15
+    private const val EXIT_REASON_PACKAGE_UPDATED = 16
     private const val EXIT_TRACE_MAX_CHARS = 8000
     private val ABNORMAL_EXIT_REASONS = setOf(
         ApplicationExitInfo.REASON_UNKNOWN,
@@ -264,6 +267,11 @@ object AppLogger {
         ApplicationExitInfo.REASON_USER_STOPPED -> "USER_STOPPED"
         ApplicationExitInfo.REASON_DEPENDENCY_DIED -> "DEPENDENCY_DIED"
         ApplicationExitInfo.REASON_OTHER -> "OTHER"
+        // Batch 680 — konstanta API 34 (log v679: `alasan=KODE_16` = "stop ... due to installPackageLI"). minSdk 31 + nama konstanta
+        // tak bisa diverifikasi offline -> angka literal (nilai AOSP: FREEZER=14, PACKAGE_STATE_CHANGE=15, PACKAGE_UPDATED=16).
+        EXIT_REASON_FREEZER -> "FREEZER"
+        EXIT_REASON_PACKAGE_STATE_CHANGE -> "PACKAGE_STATE_CHANGE"
+        EXIT_REASON_PACKAGE_UPDATED -> "PACKAGE_UPDATED"
         else -> "KODE_$reason"
     }
 

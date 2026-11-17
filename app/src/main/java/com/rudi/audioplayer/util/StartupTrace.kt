@@ -31,7 +31,6 @@ object StartupTrace {
 
     private const val TAG = "StartupTiming"
     private const val THREAD_NAME = "StartupTraceLog"
-    private const val HEADLESS_GAP_MS = 2_000L // Batch 679 — jeda app_selesai -> act_mulai >= ini = proses hidup tanpa UI
 
     private class Point(val label: String, val sinceProcessMs: Long)
 
@@ -99,21 +98,15 @@ object StartupTrace {
     }
 
     /**
-     * Batch 679 — baris ini dulu SELALU berjudul "Cold start", padahal proses bisa dihidupkan lebih dulu TANPA UI (widget,
+     * Batch 679/680 — baris ini dulu SELALU berjudul "Cold start", padahal proses bisa dihidupkan lebih dulu TANPA UI (widget,
      * receiver, instal ulang) dan Activity baru dibuka belakangan: `sejak_proses_mulai` lalu mencakup waktu menganggur
-     * (Batch 678: pid 8027 = 11906 ms, jeda `app_selesai` -> `act_mulai` 11480 ms) dan sempat disalahbaca sebagai jank
-     * (premis Batch 675/676 yang keliru). Akhiran `jenis=` kini memisahkannya di log: jeda `app_selesai` -> `act_mulai`
-     * >= [HEADLESS_GAP_MS] = proses hidup tanpa UI (angka frame pertama TIDAK mewakili start dingin); lebih kecil = start dingin
-     * murni. Judul baris sengaja tak diubah (skrip/analisis log lama tetap cocok). Kosong bila salah satu titik tak tercatat.
+     * (Batch 678: pid 8027 = 11906 ms; Batch 680: pid 21122 pasca-instal v679 = jeda 1860 ms) dan sempat disalahbaca sebagai
+     * jank (premis keliru Batch 675/676). Akhiran `jenis=` memisahkannya di log (ambang + dasar angka: [StartupKind]). Judul
+     * baris sengaja tak diubah (skrip/analisis log lama tetap cocok). Kosong bila salah satu titik tak tercatat.
      */
     private fun processKind(): String {
         val appDone = points.firstOrNull { it.label == "app_selesai" }?.sinceProcessMs ?: return ""
         val activityStart = points.firstOrNull { it.label == "act_mulai" }?.sinceProcessMs ?: return ""
-        val gap = activityStart - appDone
-        return if (gap >= HEADLESS_GAP_MS) {
-            " | jenis=PROSES_HIDUP_TANPA_UI(jeda app_selesai->act_mulai=${gap}ms; BUKAN start dingin murni)"
-        } else {
-            " | jenis=start_dingin_murni(jeda app_selesai->act_mulai=${gap}ms)"
-        }
+        return StartupKind.describe(appDone, activityStart)
     }
 }
