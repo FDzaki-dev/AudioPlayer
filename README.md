@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 678: analisis log v677 — start dingin murni (force-stop -> buka) terukur 325-403 ms sampai frame pertama, tanpa `Skipped frames`; jank cold start TIDAK terbukti (angka lama 1,84 dtk = proses hidup tanpa UI sejak instal). 0 perubahan kode; CI v677 belum dilaporkan.
 > - Batch 677: jejak cold start `StartupTrace` — log debug mencatat satu baris `StartupTiming` `Cold start` (titik waktu Application -> Activity -> ViewModel -> komposisi -> frame pertama) untuk menemukan sumber ±1,8 dtk sebelum layar pertama; belum dikompilasi/diuji di device.
 > - Batch 676: temuan CI run #102 dibersihkan (SpotBugs `PowerProbe` disaring sebagai pola Kotlin-`object`; diagnostik `[offload]` ter-deprecated dihapus).
 > - Batch 675: log debug mencatat waktu per tahap `PlaybackService.onCreate` (baris `StartupTiming`) untuk memangkas jank cold start berdasarkan data.

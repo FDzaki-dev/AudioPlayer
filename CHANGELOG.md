@@ -1,5 +1,13 @@
 # Changelog
 
+## Batch 678 — analisis log v677: jank cold start TIDAK terbukti, thread ditutup (docs saja) (BELUM verified)
+- Input user: `sonix_debug_20261117_161203.txt` (v677 = 1.10.37 build 537, ekspor 16:11:59), tanpa teks. Compile v677 TERBUKTI (APK terpasang, baris `StartupTiming` `Cold start` tercetak); hasil CI lint/SpotBugs/detekt/ArchUnit v677 BELUM dilaporkan.
+- 4 start dingin murni (pid 6065/6315/8772/9151, setelah Force stop dari Settings): `frame1_selesai` 325/376/403/331 ms sejak proses mulai; `PlaybackService.onCreate` 29-34 ms pada 263-337 ms; 0 baris `Skipped frames` pada kelima proses v677; 0 ERROR/FATAL di AppLogger sejak v676.
+- Segmen terbesar: `frame1_predraw` -> `frame1_selesai` = 123-126 ms (gambar frame pertama, sangat konsisten); komposisi (`jendela_terpasang` -> `compose_apply`) 28-66 ms; ukur/tata letak 26-53 ms; sisanya <= 41 ms per titik.
+- KOREKSI premis Batch 675/676 ("±1,84 dtk habis sebelum service dibuat"): proses pid 8027 hidup 16:11:08 (tepat setelah `installPackageLI`, dipicu `PlayerWidgetProvider.onUpdate`) dengan `app_selesai`=348 ms, Activity baru dibuka 16:11:20 (`act_mulai`=11828 ms, selisih +11480 ms) -> `sejak_proses_mulai`=11906 ms adalah waktu proses hidup TANPA UI, bukan lambat. Angka lama 1841/5344 ms (v675) berpola sama (proses dimatikan `installPackageLI` beberapa detik sebelumnya) = DUGAAN dari stempel waktu, tidak diukur dengan `StartupTrace`.
+- Baterai (data PowerProbe, tanpa perubahan): layar mati + musik `cpuApp` ±19-20% (~30 mA per 10 mnt) konsisten dengan v673; layar nyala + musik 10-16%.
+- 0 perubahan kode; `StartupTrace` dipertahankan (satu baris per start dingin, murah). **NOT VERIFIED** untuk CI v677.
+
 ## Batch 677 — jejak cold start `StartupTrace` (Application -> Activity -> ViewModel -> komposisi -> frame pertama) (BELUM verified)
 - Input user: "lanjutkan analysis!!" + `SONIX_v676.zip` (tanpa laporan CI/log baru). Interpretasi = langkah (D) Batch 676: ukur `Application.onCreate` + `MainActivity` sampai frame pertama (service sudah dikesampingkan: `onCreate` 32 ms dari ±1841 ms).
 - Verifikasi statis v676: `PowerProbe.kt` kurung/kurawal seimbang, semua impor terpakai (`AudioManager` masih dipakai `describeState`), tak ada sisa rujukan offload; `exclude.xml` XML valid dan `util.PowerProbe` ada di elemen `Match` (bukan hanya komentar).
