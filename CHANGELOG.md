@@ -1,5 +1,10 @@
 # Changelog
 
+## Batch 674 — catat dukungan audio offload perangkat di log (BELUM verified)
+- Input user: log uji v673 (`sonix_debug_20261117_082240.txt`). Hasil: `cpuApp` 17,2-18,3% layar mati (v671 19,0-19,5%, v670 26-28%); 0 ERROR; offload TIDAK aktif (AudioTrack PCM `flags=0x0`, lagu Opus).
+- `PowerProbe.kt`: baris `[offload] dukungan perangkat (0=tidak 1=ya 2=ya+gapless): mp3=.. aac=.. opus=..` sekali saat mulai. Pemutaran tak berubah.
+- Risiko: API `getPlaybackOffloadSupport`/`ENCODING_OPUS` dari ingatan (API 31). **NOT VERIFIED**. PREDIKSI: Tes unit 252, ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0.
+
 ## Batch 673 — saklar Hemat Daya (Scheduling Dinamis + Audio Offload) di Pengaturan Putar (BELUM verified)
 - Input user: screenshot dialog Pengaturan Putar + "tidak menampilkan opsi untuk menonaktifkan ke-2 nya" (dibaca: dua perbaikan baru tanpa saklar).
 - BARU `data/PowerSavingStore.kt` (2 flag default ON + pendengar perubahan); `NowPlayingDialogs.kt` bagian "Hemat Daya (Eksperimen)" (2 Switch); `PlaybackService.kt` flag Builder dari store (berlaku setelah restart app), `applyAudioOffload` ikut saklar + `setIsSpeedChangeSupportRequired(true)`, listener store -> offload LIVE.

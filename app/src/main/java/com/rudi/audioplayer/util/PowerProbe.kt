@@ -5,6 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioAttributes
+import android.media.AudioFormat
 import android.media.AudioManager
 import android.os.BatteryManager
 import android.os.Handler
@@ -60,6 +62,8 @@ object PowerProbe {
     private const val SECONDS_PER_MIN = 60L
     private const val SECONDS_PER_HOUR = 3600L
     private const val UAH_TO_MA = 3.6 // uAh per dtk -> mA rata-rata: uAh * 3600 dtk / dtk / 1000
+    private const val OFFLOAD_RATE_44K = 44_100
+    private const val OFFLOAD_RATE_48K = 48_000
     private const val UA_PER_MA = 1000
     private const val PERCENT = 100.0
     private const val DECI = 10.0
@@ -149,6 +153,30 @@ object PowerProbe {
         probeHandler.post { begin(app, probeHandler) }
     }
 
+    /**
+     * Batch 674 — dukungan audio offload perangkat per format (`AudioManager.getPlaybackOffloadSupport`, API 31): 0 = tidak, 1 = ya,
+     * 2 = ya + gapless. Dicatat sekali saat mulai untuk menjawab apakah offload (Batch 672) BISA aktif untuk format yang diputar;
+     * log v673 menunjukkan AudioTrack tetap PCM (`flags=0x0`) pada lagu Opus. Gagal vendor dicatat sebagai teks, tak mematikan pencatat.
+     */
+    private fun describeOffloadSupport(): String = runCatching {
+        val attrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+            .build()
+        listOf(
+            Triple("mp3", AudioFormat.ENCODING_MP3, OFFLOAD_RATE_44K),
+            Triple("aac", AudioFormat.ENCODING_AAC_LC, OFFLOAD_RATE_44K),
+            Triple("opus", AudioFormat.ENCODING_OPUS, OFFLOAD_RATE_48K)
+        ).joinToString(" ") { (name, encoding, rate) ->
+            val format = AudioFormat.Builder()
+                .setEncoding(encoding)
+                .setSampleRate(rate)
+                .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                .build()
+            "$name=${AudioManager.getPlaybackOffloadSupport(format, attrs)}"
+        }
+    }.getOrElse { "galat:${it.javaClass.simpleName}" }
+
     private fun begin(ctx: Context, probeHandler: Handler) {
         try {
             clkTck = runCatching { Os.sysconf(OsConstants._SC_CLK_TCK) }.getOrDefault(DEFAULT_CLK_TCK)
@@ -170,6 +198,7 @@ object PowerProbe {
                     "arus_kini=${if (first.currentUa == UNSUPPORTED_INT) "TIDAK didukung" else "${first.currentUa / UA_PER_MA}mA"} " +
                     "clkTck=$clkTck thread=${first.threads.size}"
             )
+            AppLogger.w(TAG, "[offload] dukungan perangkat (0=tidak 1=ya 2=ya+gapless): ${describeOffloadSupport()}")
             probeHandler.postDelayed(periodic, PERIODIC_MS)
         } catch (e: Exception) {
             AppLogger.e(TAG, "gagal memulai pencatat daya", e)
