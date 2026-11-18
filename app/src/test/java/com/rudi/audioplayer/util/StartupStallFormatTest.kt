@@ -211,4 +211,59 @@ class StartupStallFormatTest {
         counter.reset()
         assertTrue(counter.topLines(5).isEmpty())
     }
+
+    @Test
+    fun `Batch 685 topBetween mengaitkan sampel hanya ke rentang pesan lambat dan melaporkan rentang kosong`() {
+        val counter = StackSampleCounter()
+        counter.add("binder", 2_320) // pola v684: ISession.setMetadata di dalam pesan 111 ms
+        counter.add("binder", 2_340)
+        counter.add("gambar", 3_990) // di dalam pesan doFrame 200 ms (3964..4164)
+        counter.add("gambar", 4_010)
+        counter.add("gambar", 4_030)
+        counter.add("lain", 4_040)
+        counter.add("luar", 9_000)
+        assertEquals(
+            listOf(
+                StartupStallFormat.intervalSampleLine(3_964, 4_164, 4, 3, "gambar"),
+                StartupStallFormat.intervalSampleLine(3_964, 4_164, 4, 1, "lain")
+            ),
+            counter.topBetween(3_964, 4_164, 3)
+        )
+        assertEquals(
+            listOf(StartupStallFormat.intervalSampleLine(2_381, 2_492, 0, 0, "(tidak ada sampel aktif)")),
+            counter.topBetween(2_381, 2_492, 3)
+        )
+        assertEquals(1, counter.topBetween(2_300, 2_400, 1).size)
+        counter.reset()
+        assertEquals(
+            listOf(StartupStallFormat.intervalSampleLine(0, 10_000, 0, 0, "(tidak ada sampel aktif)")),
+            counter.topBetween(0, 10_000, 3)
+        )
+    }
+
+    @Test
+    fun `Batch 685 SlowIntervals memilih yang terpanjang lalu mengurutkan menurut waktu dan bisa direset`() {
+        val slow = SlowIntervals()
+        slow.add(1_859, 1_994) // 135 ms
+        slow.add(2_381, 2_492) // 111 ms
+        slow.add(3_964, 4_164) // 200 ms
+        slow.add(100, 160) // 60 ms
+        val top = slow.longest(3)
+        assertEquals(listOf(1_859L, 2_381L, 3_964L), top.map { it.fromMs })
+        assertEquals(listOf(1_994L, 2_492L, 4_164L), top.map { it.toMs })
+        assertEquals(1, slow.longest(1).size)
+        assertEquals(3_964L, slow.longest(1)[0].fromMs)
+        slow.reset()
+        assertTrue(slow.longest(3).isEmpty())
+    }
+
+    @Test
+    fun `Batch 685 intervalSampleLine memuat rentang sampel aktif jumlah dan lokasi`() {
+        assertEquals(
+            "Sampel selama pesan lambat t=+3964..+4164ms (4 sampel aktif): 3x | gambar",
+            StartupStallFormat.intervalSampleLine(3_964, 4_164, 4, 3, "gambar")
+        )
+        assertEquals(4, StartupStallFormat.SITE_DEPTH)
+    }
 }
+

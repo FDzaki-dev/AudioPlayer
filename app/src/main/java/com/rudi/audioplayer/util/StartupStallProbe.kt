@@ -66,6 +66,7 @@ private class ProbeSession(
     private val processStart = Process.getStartUptimeMillis()
     private val frameListener = FrameListener(processStart, collector)
     private val sampleCounter = StackSampleCounter()
+    private val slowIntervals = SlowIntervals()
     private val sampler = StackSampler(Looper.getMainLooper().thread, processStart, sampleCounter)
     private val attached = ArrayList<Window>()
     private val closeWindow = Runnable { close() }
@@ -88,7 +89,7 @@ private class ProbeSession(
         kind = newKind
         openedAtMs = sinceProcessStartMs()
         open = true
-        Looper.getMainLooper().setMessageLogging(MessagePrinter(processStart, collector))
+        Looper.getMainLooper().setMessageLogging(MessagePrinter(processStart, collector, slowIntervals))
         sampler.start()
         main.postDelayed(closeWindow, durationMs)
     }
@@ -139,15 +140,22 @@ private class ProbeSession(
             attached.clear()
             open = false
             val lines = collector.drain()
+            val attributionLines = if (lines.isEmpty()) emptyList() else {
+                slowIntervals.longest(StartupStallFormat.MAX_ATTRIBUTIONS).flatMap {
+                    sampleCounter.topBetween(it.fromMs, it.toMs, StartupStallFormat.ATTRIBUTION_SITES)
+                }
+            }
             val sampleLines = if (lines.isNotEmpty()) sampleCounter.topLines(StartupStallFormat.MAX_SAMPLE_LINES) else emptyList()
             collector.reset()
             sampleCounter.reset()
+            slowIntervals.reset()
             if (lines.isNotEmpty()) {
                 val header = StartupStallFormat.windowLine(kind, openedAtMs, activityAtMs)
                 // Satu coroutine supaya urutan baris di berkas log sama dengan urutan [lines] (bukan di thread utama: tak menambah stall).
                 scope.launch {
                     AppLogger.w(tag, header)
                     lines.forEach { AppLogger.w(tag, it) }
+                    attributionLines.forEach { AppLogger.w(tag, it) }
                     sampleLines.forEach { AppLogger.w(tag, it) }
                 }
             }
@@ -166,7 +174,8 @@ private class ProbeSession(
 /** Mengukur durasi tiap pesan thread utama dari pasangan teks `Looper` ">>>>> Dispatching ..." / "<<<<< Finished ...". */
 private class MessagePrinter(
     private val processStart: Long,
-    private val collector: StallCollector
+    private val collector: StallCollector,
+    private val slowIntervals: SlowIntervals
 ) : Printer {
     // Hanya disentuh thread utama (Looper memanggil printer dari thread loop).
     private var beginNs = 0L
@@ -183,6 +192,7 @@ private class MessagePrinter(
             val durationMs = StartupStallFormat.nsToMs(SystemClock.elapsedRealtimeNanos() - beginNs)
             if (durationMs >= StartupStallFormat.MIN_LOG_MS) {
                 val atMs = SystemClock.uptimeMillis() - processStart
+                if (durationMs >= StartupStallFormat.ATTRIBUTE_MS) slowIntervals.add(atMs - durationMs, atMs)
                 collector.add(
                     durationMs,
                     StartupStallFormat.MESSAGE_TRIGGER_MS,

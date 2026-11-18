@@ -59,13 +59,25 @@ internal object StartupStallFormat {
     const val SAMPLE_INTERVAL_MS = 15L
 
     /** Jumlah frame teratas tumpukan yang dipakai sebagai kunci "lokasi" sampel. */
-    const val SITE_DEPTH = 3
+    const val SITE_DEPTH = 4
 
     /** Batas jumlah lokasi berbeda yang ditahan di memori per jendela (lokasi baru di atas batas diabaikan). */
     const val MAX_SITES = 200
 
     /** Jumlah baris sampel (lokasi terbanyak) yang ditulis per jendela bila ada stall besar. */
-    const val MAX_SAMPLE_LINES = 8
+    const val MAX_SAMPLE_LINES = 5
+
+    /** Pesan thread utama selama ini (atau lebih) dikaitkan ke sampel tumpukan pada rentang waktunya sendiri. */
+    const val ATTRIBUTE_MS = 100L
+
+    /** Jumlah pesan lambat terpanjang yang diberi baris atribusi per jendela. */
+    const val MAX_ATTRIBUTIONS = 5
+
+    /** Jumlah lokasi teratas per pesan lambat pada baris atribusi. */
+    const val ATTRIBUTION_SITES = 3
+
+    /** Batas sampel mentah (waktu + lokasi) yang ditahan per jendela (+-22 dtk pada selang 15 ms). */
+    const val MAX_RAW_SAMPLES = 1_500
 
     private const val IDLE_TOP_FRAME = "android.os.MessageQueue.nativePollOnce"
 
@@ -103,6 +115,10 @@ internal object StartupStallFormat {
         if (top.startsWith(IDLE_TOP_FRAME)) return null
         return frames.take(SITE_DEPTH).joinToString(" < ")
     }
+
+    /** Baris atribusi: sampel tumpukan yang jatuh DI DALAM rentang satu pesan lambat ([fromMs]..[toMs]); [active] = sampel tak-idle di rentang itu. */
+    fun intervalSampleLine(fromMs: Long, toMs: Long, active: Int, count: Int, site: String): String =
+        "Sampel selama pesan lambat t=+${fromMs}..+${toMs}ms ($active sampel aktif): ${count}x | $site"
 
     /** Baris untuk satu lokasi sampel: jumlah sampel, rentang waktu (ms sejak proses mulai), dan tumpukan mentah. */
     fun sampleLine(count: Int, firstMs: Long, lastMs: Long, site: String): String =
@@ -202,9 +218,17 @@ internal class StackSampleCounter {
     private class Site(var count: Int, val firstMs: Long, var lastMs: Long)
 
     private val sites = HashMap<String, Site>()
+    private val rawTimes = LongArray(StartupStallFormat.MAX_RAW_SAMPLES)
+    private val rawSites = arrayOfNulls<String>(StartupStallFormat.MAX_RAW_SAMPLES)
+    private var rawCount = 0
 
     @Synchronized
     fun add(site: String, atMs: Long) {
+        if (rawCount < rawTimes.size) {
+            rawTimes[rawCount] = atMs
+            rawSites[rawCount] = site
+            rawCount++
+        }
         val known = sites[site]
         if (known != null) {
             known.count++
@@ -226,8 +250,55 @@ internal class StackSampleCounter {
             .take(limit)
             .map { StartupStallFormat.sampleLine(it.value.count, it.value.firstMs, it.value.lastMs, it.key) }
 
+    /**
+     * Lokasi terbanyak di antara sampel yang waktunya jatuh dalam [fromMs]..[toMs] (inklusif) — "kode mana" yang menahan thread
+     * utama selama satu pesan lambat. Tanpa sampel di rentang itu -> satu baris dengan hitungan 0 supaya tetap terlihat.
+     */
+    @Synchronized
+    fun topBetween(fromMs: Long, toMs: Long, limit: Int): List<String> {
+        val counts = HashMap<String, Int>()
+        var active = 0
+        for (i in 0 until rawCount) {
+            val t = rawTimes[i]
+            val site = rawSites[i]
+            if (site != null && t >= fromMs && t <= toMs) {
+                counts[site] = (counts[site] ?: 0) + 1
+                active++
+            }
+        }
+        if (active == 0) return listOf(StartupStallFormat.intervalSampleLine(fromMs, toMs, 0, 0, "(tidak ada sampel aktif)"))
+        return counts.entries
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .take(limit)
+            .map { StartupStallFormat.intervalSampleLine(fromMs, toMs, active, it.value, it.key) }
+    }
+
     @Synchronized
     fun reset() {
         sites.clear()
+        rawCount = 0
+    }
+}
+
+/** Rentang waktu (ms sejak proses mulai) pesan thread utama yang lambat; hanya disentuh thread utama. */
+internal class SlowIntervals {
+    class Interval(val fromMs: Long, val toMs: Long)
+
+    private val list = ArrayList<Interval>()
+
+    fun add(fromMs: Long, toMs: Long) {
+        if (list.size < MAX_KEPT) list.add(Interval(fromMs, toMs))
+    }
+
+    /** [limit] rentang terpanjang, diurutkan menurut waktu (yang paling awal dulu). */
+    fun longest(limit: Int): List<Interval> =
+        list.sortedByDescending { it.toMs - it.fromMs }.take(limit).sortedBy { it.fromMs }
+
+    fun reset() {
+        list.clear()
+    }
+
+    private companion object {
+        const val MAX_KEPT = 64
     }
 }
