@@ -1,0 +1,99 @@
+package com.rudi.audioplayer.util
+
+/**
+ * Batch 682 — bagian MURNI (tanpa API Android, bisa diuji di JVM) dari [StartupStallProbe].
+ *
+ * Dasar (log v679 + v681, `Choreographer: Skipped 31 frames!` di proses pasca-instal yang lahir tanpa UI lalu Activity dibuka
+ * 1,9 dtk kemudian; 0 kejadian di 4 start dingin force-stop v677 dan di proses v680): penyebab thread utama macet di frame
+ * pertama BELUM diketahui (log hanya memberi jumlah frame, bukan siapa yang menahan). Probe mencatat (a) tiap pesan thread utama
+ * yang lama (teks mentah dari `Looper`: Handler + callback + what) dan (b) rincian fase tiap frame lambat (`FrameMetrics`),
+ * selama [WINDOW_MS] pertama proses.
+ *
+ * Agar Log Diagnostik (batas 200 KB) tidak penuh lagi: entri DITAHAN di memori dan baru ditulis bila ada satu stall besar
+ * (pesan >= [MESSAGE_TRIGGER_MS] atau frame >= [FRAME_TRIGGER_MS]); start normal = 0 baris.
+ */
+internal object StartupStallFormat {
+    /** Lama jendela pemantauan sejak proses mulai (ms). Cukup utk pola pasca-instal (Activity ±2 dtk setelah proses lahir). */
+    const val WINDOW_MS = 8_000L
+
+    /** Pesan/frame di bawah ini tak dicatat sama sekali. */
+    const val MIN_LOG_MS = 60L
+
+    /** Pesan thread utama selama ini (atau lebih) = stall besar -> seluruh entri jendela ditulis ke log. */
+    const val MESSAGE_TRIGGER_MS = 150L
+
+    /** Total durasi frame selama ini (atau lebih) = stall besar -> seluruh entri jendela ditulis ke log. */
+    const val FRAME_TRIGGER_MS = 200L
+
+    /** Batas jumlah baris yang ditulis per proses. */
+    const val MAX_LINES = 12
+
+    /** Awal teks `Looper.setMessageLogging` (platform): ">>>>> Dispatching to <target> <callback>: <what>". */
+    const val DISPATCH_PREFIX = ">>>>> Dispatching to "
+
+    /** Awal teks penutup pesan: "<<<<< Finished to <target> <callback>". */
+    const val FINISH_PREFIX = "<<<<< Finished to "
+
+    private const val MAX_TEXT_CHARS = 200
+    private const val NS_PER_MS = 1_000_000L
+
+    fun nsToMs(ns: Long): Long = ns / NS_PER_MS
+
+    /** Baris untuk satu pesan thread utama yang lama. [atMs] = saat pesan SELESAI, ms sejak proses mulai. */
+    fun messageLine(atMs: Long, durationMs: Long, dispatchText: String): String {
+        val raw = dispatchText.removePrefix(DISPATCH_PREFIX).trim()
+        val text = if (raw.length > MAX_TEXT_CHARS) raw.take(MAX_TEXT_CHARS) + "..." else raw
+        return "Pesan thread utama lambat: ${durationMs}ms (selesai t=+${atMs}ms sejak proses mulai) | $text"
+    }
+
+    /** Baris untuk satu frame lambat. [atMs] = saat metrik frame diterima, ms sejak proses mulai. */
+    fun frameLine(atMs: Long, sample: FrameSample): String =
+        "Frame lambat: total=${nsToMs(sample.totalNs)}ms (t=+${atMs}ms sejak proses mulai) " +
+            "frame_pertama=${if (sample.firstDraw) "ya" else "tidak"} drop=${sample.dropCount} | " +
+            "tunda_vsync=${nsToMs(sample.vsyncDelayNs)}ms input=${nsToMs(sample.inputNs)}ms " +
+            "animasi=${nsToMs(sample.animationNs)}ms layout=${nsToMs(sample.layoutNs)}ms " +
+            "gambar=${nsToMs(sample.drawNs)}ms sinkron=${nsToMs(sample.syncNs)}ms " +
+            "perintah=${nsToMs(sample.issueNs)}ms swap=${nsToMs(sample.swapNs)}ms " +
+            "tak_terhitung=${nsToMs(sample.unknownNs)}ms"
+}
+
+/** Nilai mentah satu frame dari `FrameMetrics` (nanodetik), dipisah dari API Android supaya format bisa diuji di JVM. */
+internal data class FrameSample(
+    val totalNs: Long,
+    val vsyncDelayNs: Long,
+    val inputNs: Long,
+    val animationNs: Long,
+    val layoutNs: Long,
+    val drawNs: Long,
+    val syncNs: Long,
+    val issueNs: Long,
+    val swapNs: Long,
+    val unknownNs: Long,
+    val firstDraw: Boolean,
+    val dropCount: Int
+)
+
+/**
+ * Menahan baris stall di memori. [add] dipanggil dari thread utama (pesan) dan thread callback frame; [drain] dari thread utama
+ * di akhir jendela — karena itu semuanya `@Synchronized`.
+ */
+internal class StallCollector {
+    private val lines = ArrayList<String>()
+    private var triggered = false
+
+    /**
+     * Simpan [line] bila [durationMs] >= [StartupStallFormat.MIN_LOG_MS] dan batas baris belum penuh; tandai "stall besar"
+     * bila [durationMs] >= [triggerMs]. Satu pengecualian: baris stall besar SELALU disimpan walau batas baris sudah penuh
+     * (justru itu baris yang dicari; jumlahnya dibatasi oleh jendela [StartupStallFormat.WINDOW_MS]).
+     */
+    @Synchronized
+    fun add(durationMs: Long, triggerMs: Long, line: String) {
+        val big = durationMs >= triggerMs
+        if (durationMs >= StartupStallFormat.MIN_LOG_MS && (lines.size < StartupStallFormat.MAX_LINES || big)) lines.add(line)
+        if (big) triggered = true
+    }
+
+    /** Baris yang perlu ditulis ke log: seluruh entri bila ada stall besar, selain itu kosong. */
+    @Synchronized
+    fun drain(): List<String> = if (triggered) lines.toList() else emptyList()
+}
