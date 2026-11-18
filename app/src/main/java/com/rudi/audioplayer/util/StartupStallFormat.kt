@@ -16,6 +16,15 @@ package com.rudi.audioplayer.util
  * menjangkaunya. Kini ada dua jendela: (1) [KIND_PROCESS] = [WINDOW_MS] sejak proses mulai (kerja proses/widget sebelum UI),
  * (2) [KIND_ACTIVITY] = [WINDOW_MS] sejak Activity PERTAMA proses dibuat, berapa pun umur prosesnya.
  *
+ * Batch 684 — log v683 (CI run #110 hijau) membuktikan probe Batch 683 jalan (`jenis=activity_pertama` pada proses yang hidup 33 dtk
+ * tanpa UI) dan menunjukkan DUA cacat probe sendiri: (1) baris frame terduplikasi 2-3x (platform menyerahkan metrik frame yang
+ * sama berulang; first-frame 3x) -> kini dibuang lewat [RecentKeys] berkunci `INTENDED_VSYNC_TIMESTAMP`; (2) ambang frame 150 ms
+ * (Batch 683) salah kalibrasi: total `FrameMetrics` frame pertama NORMAL = 155 ms (start dingin murni) / 175 ms (pasca-instal),
+ * bukan 123-126 ms (itu selang `frame1_predraw` -> `frame1_selesai` di `StartupTrace`) -> kembali 200 ms. Jank nyata yang
+ * terukur: satu frame `gambar`=168-182 ms (total 232-242 ms; pesan `Choreographer$FrameDisplayEventReceiver` 206-208 ms) ±1,9-2,1 dtk
+ * SETELAH Activity dibuat, di kedua proses v682/v683; probe baru tahu "frame mana", bukan "kode mana" -> ditambah sampler
+ * tumpukan thread utama ([StackSampleCounter]) yang menjawab "kode mana".
+ *
  * Agar Log Diagnostik (batas 200 KB) tidak penuh lagi: entri DITAHAN di memori dan baru ditulis bila ada satu stall besar
  * (pesan >= [MESSAGE_TRIGGER_MS] atau frame >= [FRAME_TRIGGER_MS]); start normal = 0 baris.
  */
@@ -40,12 +49,25 @@ internal object StartupStallFormat {
 
     /**
      * Total durasi frame selama ini (atau lebih) = stall besar -> seluruh entri jendela ditulis ke log.
-     * Batch 683: 200 -> 150. Frame pertama normal terukur 123-126 ms (v677 x4 + v682 pid 23208; `frame1_predraw` ->
-     * `frame1_selesai`); frame pertama yang kena `Skipped frames` 158 ms (v681) dan 208 ms (v681 pid 31012). Ambang 200 akan
-     * membisukan kasus 158 ms — padahal pesan peluncuran Activity TIDAK bisa tercatat `Looper` (pemasangan printer di tengah
-     * pesan itu), jadi frame pertama adalah satu-satunya pemicu yang tersisa pada jendela Activity.
+     * Batch 684: 150 -> 200 ms. Terukur di log v683 (`FrameMetrics.TOTAL_DURATION`): frame pertama NORMAL 155 ms (start dingin murni)
+     * dan 175 ms (proses pasca-instal, Activity 33 dtk setelah proses lahir) = tak boleh memicu; frame berat 208-242 ms memicu.
+     * (Batch 683 memakai 150 dari selang `StartupTrace` 123-126 ms yang BUKAN ukuran yang sama dengan `TOTAL_DURATION`.)
      */
-    const val FRAME_TRIGGER_MS = 150L
+    const val FRAME_TRIGGER_MS = 200L
+
+    /** Selang pengambilan sampel tumpukan thread utama selama jendela terbuka (ms). */
+    const val SAMPLE_INTERVAL_MS = 15L
+
+    /** Jumlah frame teratas tumpukan yang dipakai sebagai kunci "lokasi" sampel. */
+    const val SITE_DEPTH = 3
+
+    /** Batas jumlah lokasi berbeda yang ditahan di memori per jendela (lokasi baru di atas batas diabaikan). */
+    const val MAX_SITES = 200
+
+    /** Jumlah baris sampel (lokasi terbanyak) yang ditulis per jendela bila ada stall besar. */
+    const val MAX_SAMPLE_LINES = 8
+
+    private const val IDLE_TOP_FRAME = "android.os.MessageQueue.nativePollOnce"
 
     /** Batas jumlah baris biasa yang disimpan per jendela (baris stall besar selalu disimpan). */
     const val MAX_LINES = 12
@@ -71,6 +93,20 @@ internal object StartupStallFormat {
     fun windowLine(kind: String, openedAtMs: Long, activityAtMs: Long?): String =
         "Jendela probe: jenis=$kind dibuka t=+${openedAtMs}ms sejak proses mulai, Activity pertama " +
             (if (activityAtMs == null) "belum dibuat" else "dibuat t=+${activityAtMs}ms")
+
+    /**
+     * Kunci "lokasi" satu sampel tumpukan thread utama: [SITE_DEPTH] frame teratas (teks `StackTraceElement` mentah) digabung
+     * " < ". Null bila thread utama menganggur (`nativePollOnce`) atau tumpukan kosong = sampel dibuang.
+     */
+    fun siteOf(frames: List<String>): String? {
+        val top = frames.firstOrNull() ?: return null
+        if (top.startsWith(IDLE_TOP_FRAME)) return null
+        return frames.take(SITE_DEPTH).joinToString(" < ")
+    }
+
+    /** Baris untuk satu lokasi sampel: jumlah sampel, rentang waktu (ms sejak proses mulai), dan tumpukan mentah. */
+    fun sampleLine(count: Int, firstMs: Long, lastMs: Long, site: String): String =
+        "Sampel tumpukan thread utama: ${count}x (tiap ~${SAMPLE_INTERVAL_MS}ms; t=+${firstMs}..+${lastMs}ms sejak proses mulai) | $site"
 
     /** Baris untuk satu pesan thread utama yang lama. [atMs] = saat pesan SELESAI, ms sejak proses mulai. */
     fun messageLine(atMs: Long, durationMs: Long, dispatchText: String): String {
@@ -135,5 +171,63 @@ internal class StallCollector {
     fun reset() {
         lines.clear()
         triggered = false
+    }
+}
+
+/**
+ * Pembuang duplikat: ingat [capacity] kunci terakhir. Platform menyerahkan metrik frame yang SAMA berulang (log v683: frame
+ * pertama 3x, frame lain 2x), jadi kuncinya `FrameMetrics.INTENDED_VSYNC_TIMESTAMP` (unik per frame).
+ */
+internal class RecentKeys(private val capacity: Int) {
+    private val keys = LongArray(capacity)
+    private var used = 0
+    private var next = 0
+
+    /** True bila [key] belum ada di [capacity] kunci terakhir (lalu dicatat); false = duplikat, abaikan. */
+    @Synchronized
+    fun firstTime(key: Long): Boolean {
+        for (i in 0 until used) if (keys[i] == key) return false
+        keys[next] = key
+        next = (next + 1) % capacity
+        if (used < capacity) used++
+        return true
+    }
+}
+
+/**
+ * Menghitung sampel tumpukan thread utama per "lokasi" ([StartupStallFormat.siteOf]). [add] dipanggil dari thread sampler,
+ * [topLines] / [reset] dari thread utama di akhir jendela — karena itu `@Synchronized`.
+ */
+internal class StackSampleCounter {
+    private class Site(var count: Int, val firstMs: Long, var lastMs: Long)
+
+    private val sites = HashMap<String, Site>()
+
+    @Synchronized
+    fun add(site: String, atMs: Long) {
+        val known = sites[site]
+        if (known != null) {
+            known.count++
+            known.lastMs = atMs
+        } else if (sites.size < StartupStallFormat.MAX_SITES) {
+            sites[site] = Site(1, atMs, atMs)
+        }
+    }
+
+    /** Lokasi terbanyak dulu; seri -> yang muncul lebih awal, lalu urutan teks (deterministik). */
+    @Synchronized
+    fun topLines(limit: Int): List<String> =
+        sites.entries
+            .sortedWith(
+                compareByDescending<Map.Entry<String, Site>> { it.value.count }
+                    .thenBy { it.value.firstMs }
+                    .thenBy { it.key }
+            )
+            .take(limit)
+            .map { StartupStallFormat.sampleLine(it.value.count, it.value.firstMs, it.value.lastMs, it.key) }
+
+    @Synchronized
+    fun reset() {
+        sites.clear()
     }
 }

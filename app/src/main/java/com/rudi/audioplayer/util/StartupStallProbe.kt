@@ -65,6 +65,8 @@ private class ProbeSession(
     private val main = Handler(Looper.getMainLooper())
     private val processStart = Process.getStartUptimeMillis()
     private val frameListener = FrameListener(processStart, collector)
+    private val sampleCounter = StackSampleCounter()
+    private val sampler = StackSampler(Looper.getMainLooper().thread, processStart, sampleCounter)
     private val attached = ArrayList<Window>()
     private val closeWindow = Runnable { close() }
 
@@ -87,6 +89,7 @@ private class ProbeSession(
         openedAtMs = sinceProcessStartMs()
         open = true
         Looper.getMainLooper().setMessageLogging(MessagePrinter(processStart, collector))
+        sampler.start()
         main.postDelayed(closeWindow, durationMs)
     }
 
@@ -131,17 +134,21 @@ private class ProbeSession(
     private fun close() {
         runCatching {
             Looper.getMainLooper().setMessageLogging(null)
+            sampler.stop()
             attached.forEach { runCatching { it.removeOnFrameMetricsAvailableListener(frameListener) } }
             attached.clear()
             open = false
             val lines = collector.drain()
+            val sampleLines = if (lines.isNotEmpty()) sampleCounter.topLines(StartupStallFormat.MAX_SAMPLE_LINES) else emptyList()
             collector.reset()
+            sampleCounter.reset()
             if (lines.isNotEmpty()) {
                 val header = StartupStallFormat.windowLine(kind, openedAtMs, activityAtMs)
                 // Satu coroutine supaya urutan baris di berkas log sama dengan urutan [lines] (bukan di thread utama: tak menambah stall).
                 scope.launch {
                     AppLogger.w(tag, header)
                     lines.forEach { AppLogger.w(tag, it) }
+                    sampleLines.forEach { AppLogger.w(tag, it) }
                 }
             }
             if (activitySeen) app.unregisterActivityLifecycleCallbacks(this)
@@ -191,14 +198,18 @@ private class FrameListener(
     private val processStart: Long,
     private val collector: StallCollector
 ) : Window.OnFrameMetricsAvailableListener {
+    private val seen = RecentKeys(16)
+
     override fun onFrameMetricsAvailable(window: Window, frameMetrics: FrameMetrics, dropCountSinceLastInvocation: Int) {
         val totalNs = frameMetrics.getMetric(FrameMetrics.TOTAL_DURATION)
         val totalMs = StartupStallFormat.nsToMs(totalNs)
         if (totalMs < StartupStallFormat.MIN_LOG_MS) return
+        // Batch 684: platform menyerahkan metrik frame yang sama 2-3x (log v683) -> satu frame = satu entri.
+        val intendedNs = frameMetrics.getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP)
+        if (!seen.firstTime(intendedNs)) return
         val sample = FrameSample(
             totalNs = totalNs,
-            vsyncDelayNs = frameMetrics.getMetric(FrameMetrics.VSYNC_TIMESTAMP) -
-                frameMetrics.getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP),
+            vsyncDelayNs = frameMetrics.getMetric(FrameMetrics.VSYNC_TIMESTAMP) - intendedNs,
             inputNs = frameMetrics.getMetric(FrameMetrics.INPUT_HANDLING_DURATION),
             animationNs = frameMetrics.getMetric(FrameMetrics.ANIMATION_DURATION),
             layoutNs = frameMetrics.getMetric(FrameMetrics.LAYOUT_MEASURE_DURATION),
@@ -212,5 +223,49 @@ private class FrameListener(
         )
         val atMs = SystemClock.uptimeMillis() - processStart
         collector.add(totalMs, StartupStallFormat.FRAME_TRIGGER_MS, StartupStallFormat.frameLine(atMs, sample))
+    }
+}
+
+/**
+ * Batch 684 — "kode mana" yang menahan thread utama: selama jendela terbuka, thread daemon mengambil tumpukan thread utama tiap
+ * [StartupStallFormat.SAMPLE_INTERVAL_MS] dan menghitung per lokasi ([StartupStallFormat.siteOf], teks `StackTraceElement`
+ * mentah; sampel saat thread utama menganggur dibuang). Dihentikan di akhir jendela; tak menyentuh state app. Catatan: build
+ * rilis memakai R8, jadi frame kode app/Compose tampil sebagai nama pendek; frame platform (`android.*`) tetap terbaca.
+ */
+private class StackSampler(
+    private val mainThread: Thread,
+    private val processStart: Long,
+    private val counter: StackSampleCounter
+) {
+    @Volatile
+    private var running = false
+    private var thread: Thread? = null
+
+    fun start() {
+        if (running) return
+        running = true
+        thread = Thread({ loop() }, "StartupStallSampler").also {
+            it.isDaemon = true
+            it.start()
+        }
+    }
+
+    fun stop() {
+        running = false
+        thread?.interrupt()
+        thread = null
+    }
+
+    private fun loop() {
+        while (running) {
+            try {
+                Thread.sleep(StartupStallFormat.SAMPLE_INTERVAL_MS)
+            } catch (e: InterruptedException) {
+                break
+            }
+            val frames = runCatching { mainThread.stackTrace }.getOrNull() ?: continue
+            val site = StartupStallFormat.siteOf(frames.take(StartupStallFormat.SITE_DEPTH).map { it.toString() }) ?: continue
+            counter.add(site, SystemClock.uptimeMillis() - processStart)
+        }
     }
 }

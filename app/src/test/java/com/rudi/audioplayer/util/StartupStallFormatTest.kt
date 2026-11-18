@@ -2,6 +2,7 @@ package com.rudi.audioplayer.util
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -108,18 +109,18 @@ class StartupStallFormatTest {
     }
 
     @Test
-    fun `Batch 683 frame pertama lambat memicu sendiri dan frame pertama normal senyap`() {
-        // Pesan peluncuran Activity tak bisa tercatat Looper (printer dipasang di tengah pesan) -> frame jadi satu-satunya pemicu.
-        val v681 = StallCollector() // v681 pid 27485: frame1_predraw -> frame1_selesai = 158 ms + Skipped 31 frames
-        v681.add(158, StartupStallFormat.FRAME_TRIGGER_MS, "frame v681")
-        assertEquals(listOf("frame v681"), v681.drain())
-        val pid31012 = StallCollector() // v681 pid 31012: 208 ms + Skipped 30 + 31 frames
-        pid31012.add(208, StartupStallFormat.FRAME_TRIGGER_MS, "frame 31012")
-        assertEquals(listOf("frame 31012"), pid31012.drain())
-        for (normalMs in listOf(123L, 124L, 125L, 126L)) { // v677 x4 start dingin murni + v682 pid 23208 (123 ms)
+    fun `Batch 684 ambang frame 200 ms frame pertama normal 155 dan 175 senyap frame berat memicu`() {
+        // TOTAL_DURATION terukur di log v683: frame pertama normal 155 ms (start dingin) / 175 ms (pasca-instal).
+        for (normalMs in listOf(123L, 155L, 175L)) {
             val normal = StallCollector()
             normal.add(normalMs, StartupStallFormat.FRAME_TRIGGER_MS, "frame normal")
             assertTrue(normal.drain().isEmpty())
+        }
+        // Frame berat nyata di v683/pid 31012: 208 (pesan doFrame 206-208), 232, 240, 242 ms.
+        for (heavyMs in listOf(208L, 232L, 240L, 242L)) {
+            val heavy = StallCollector()
+            heavy.add(heavyMs, StartupStallFormat.FRAME_TRIGGER_MS, "frame berat")
+            assertEquals(listOf("frame berat"), heavy.drain())
         }
     }
 
@@ -163,5 +164,51 @@ class StartupStallFormatTest {
             StartupStallFormat.KIND_PROCESS_ACTIVITY,
             StartupStallFormat.KIND_ACTIVITY
         ).size)
+    }
+
+    @Test
+    fun `Batch 684 RecentKeys membuang duplikat dan melupakan kunci tertua`() {
+        val keys = RecentKeys(2)
+        assertTrue(keys.firstTime(10L))
+        assertFalse(keys.firstTime(10L)) // frame yang sama diserahkan platform lagi
+        assertTrue(keys.firstTime(20L))
+        assertFalse(keys.firstTime(10L))
+        assertFalse(keys.firstTime(20L))
+        assertTrue(keys.firstTime(30L)) // kapasitas 2: kunci 10 tergeser
+        assertTrue(keys.firstTime(10L))
+    }
+
+    @Test
+    fun `Batch 684 siteOf membuang sampel menganggur dan menggabung tiga frame teratas`() {
+        assertNull(StartupStallFormat.siteOf(emptyList()))
+        assertNull(StartupStallFormat.siteOf(listOf("android.os.MessageQueue.nativePollOnce(Native Method)", "x.y(Z.java:1)")))
+        assertEquals(
+            "a.A.one(A.java:1) < b.B.two(B.java:2) < c.C.three(C.java:3)",
+            StartupStallFormat.siteOf(
+                listOf("a.A.one(A.java:1)", "b.B.two(B.java:2)", "c.C.three(C.java:3)", "d.D.four(D.java:4)")
+            )
+        )
+        assertEquals("a.A.one(A.java:1)", StartupStallFormat.siteOf(listOf("a.A.one(A.java:1)")))
+    }
+
+    @Test
+    fun `Batch 684 StackSampleCounter mengurutkan terbanyak dulu mencatat rentang waktu dan bisa direset`() {
+        val counter = StackSampleCounter()
+        counter.add("jarang", 100)
+        counter.add("sering", 200)
+        counter.add("sering", 230)
+        counter.add("sering", 260)
+        counter.add("sedang", 150)
+        counter.add("sedang", 180)
+        val lines = counter.topLines(2)
+        assertEquals(2, lines.size)
+        assertEquals(StartupStallFormat.sampleLine(3, 200, 260, "sering"), lines[0])
+        assertEquals(StartupStallFormat.sampleLine(2, 150, 180, "sedang"), lines[1])
+        assertEquals(
+            "Sampel tumpukan thread utama: 3x (tiap ~15ms; t=+200..+260ms sejak proses mulai) | sering",
+            lines[0]
+        )
+        counter.reset()
+        assertTrue(counter.topLines(5).isEmpty())
     }
 }
