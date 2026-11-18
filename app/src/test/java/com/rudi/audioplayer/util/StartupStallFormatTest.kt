@@ -59,7 +59,7 @@ class StartupStallFormatTest {
     fun `tanpa stall besar tidak ada baris yang ditulis`() {
         val collector = StallCollector()
         collector.add(100, StartupStallFormat.MESSAGE_TRIGGER_MS, "pesan sedang")
-        collector.add(180, StartupStallFormat.FRAME_TRIGGER_MS, "frame sedang")
+        collector.add(140, StartupStallFormat.FRAME_TRIGGER_MS, "frame sedang")
         assertTrue(collector.drain().isEmpty())
     }
 
@@ -105,5 +105,63 @@ class StartupStallFormatTest {
         normal.add(113, StartupStallFormat.MESSAGE_TRIGGER_MS, "peluncuran")
         normal.add(123, StartupStallFormat.FRAME_TRIGGER_MS, "frame pertama")
         assertTrue(normal.drain().isEmpty())
+    }
+
+    @Test
+    fun `Batch 683 frame pertama lambat memicu sendiri dan frame pertama normal senyap`() {
+        // Pesan peluncuran Activity tak bisa tercatat Looper (printer dipasang di tengah pesan) -> frame jadi satu-satunya pemicu.
+        val v681 = StallCollector() // v681 pid 27485: frame1_predraw -> frame1_selesai = 158 ms + Skipped 31 frames
+        v681.add(158, StartupStallFormat.FRAME_TRIGGER_MS, "frame v681")
+        assertEquals(listOf("frame v681"), v681.drain())
+        val pid31012 = StallCollector() // v681 pid 31012: 208 ms + Skipped 30 + 31 frames
+        pid31012.add(208, StartupStallFormat.FRAME_TRIGGER_MS, "frame 31012")
+        assertEquals(listOf("frame 31012"), pid31012.drain())
+        for (normalMs in listOf(123L, 124L, 125L, 126L)) { // v677 x4 start dingin murni + v682 pid 23208 (123 ms)
+            val normal = StallCollector()
+            normal.add(normalMs, StartupStallFormat.FRAME_TRIGGER_MS, "frame normal")
+            assertTrue(normal.drain().isEmpty())
+        }
+    }
+
+    @Test
+    fun `Batch 683 reset mengosongkan entri dan pemicu supaya jendela berikutnya mulai bersih`() {
+        val collector = StallCollector()
+        collector.add(300, StartupStallFormat.MESSAGE_TRIGGER_MS, "stall jendela proses")
+        assertEquals(listOf("stall jendela proses"), collector.drain())
+        collector.reset()
+        assertTrue(collector.drain().isEmpty())
+        collector.add(90, StartupStallFormat.MESSAGE_TRIGGER_MS, "kecil jendela Activity")
+        assertTrue(collector.drain().isEmpty()) // pemicu jendela lama tidak terbawa
+        collector.add(160, StartupStallFormat.MESSAGE_TRIGGER_MS, "besar jendela Activity")
+        assertEquals(listOf("kecil jendela Activity", "besar jendela Activity"), collector.drain())
+    }
+
+    @Test
+    fun `Batch 683 jendela proses pola v682 habis sebelum Activity dan pola v681 masih mencakup Activity`() {
+        val processStart = 961_000_000L
+        // v682 pid 23208: Application.onCreate ~142 ms setelah proses mulai, Activity t=+8439 ms.
+        assertEquals(7_858L, StartupStallFormat.processWindowRemainingMs(processStart, processStart + 142))
+        assertEquals(-439L, StartupStallFormat.processWindowRemainingMs(processStart, processStart + 8_439))
+        // v681 pid 27485 (pasca-instal): Activity t=+2061 ms masih di dalam jendela 8 dtk.
+        assertTrue(StartupStallFormat.processWindowRemainingMs(processStart, processStart + 2_061) > 0L)
+        // v681 pid 31012: Activity 12.305.396 ms (3,4 jam) setelah proses mulai -> jauh di luar jendela proses.
+        assertTrue(StartupStallFormat.processWindowRemainingMs(processStart, processStart + 12_305_396) < 0L)
+    }
+
+    @Test
+    fun `Batch 683 windowLine memuat jenis saat dibuka dan saat Activity pertama`() {
+        assertEquals(
+            "Jendela probe: jenis=activity_pertama dibuka t=+8439ms sejak proses mulai, Activity pertama dibuat t=+8439ms",
+            StartupStallFormat.windowLine(StartupStallFormat.KIND_ACTIVITY, 8_439, 8_439)
+        )
+        assertEquals(
+            "Jendela probe: jenis=proses_mulai dibuka t=+142ms sejak proses mulai, Activity pertama belum dibuat",
+            StartupStallFormat.windowLine(StartupStallFormat.KIND_PROCESS, 142, null)
+        )
+        assertEquals(3, setOf(
+            StartupStallFormat.KIND_PROCESS,
+            StartupStallFormat.KIND_PROCESS_ACTIVITY,
+            StartupStallFormat.KIND_ACTIVITY
+        ).size)
     }
 }

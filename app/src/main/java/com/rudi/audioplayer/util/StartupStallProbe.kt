@@ -17,14 +17,26 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * Batch 682 — jawab "SIAPA yang menahan thread utama" pada `Choreographer: Skipped 31 frames!` di frame pertama proses
- * pasca-instal (log v681; sebelumnya 33+30 di v679; 0 di v680 dan 0 di 4 start dingin force-stop v677). Dalam
- * [StartupStallFormat.WINDOW_MS] pertama proses: (a) `Looper.setMessageLogging` mengukur tiap pesan thread utama dan menyimpan teks
- * MENTAH platform (Handler + callback + what) untuk yang lama; (b) `Window.addOnFrameMetricsAvailableListener` menyimpan rincian
- * fase frame lambat (tunda vsync = thread utama sibuk SEBELUM frame; layout/gambar/sinkron = ongkos frame itu sendiri).
+ * Batch 682 — jawab "SIAPA yang menahan thread utama" pada `Choreographer: Skipped 31 frames!` di frame pertama (log v681;
+ * sebelumnya 33+30 di v679; 0 di v680 dan 0 di 4 start dingin force-stop v677). Selama satu jendela
+ * ([StartupStallFormat.WINDOW_MS]): (a) `Looper.setMessageLogging` mengukur tiap pesan thread utama dan menyimpan teks
+ * MENTAH platform (Handler + callback + what) untuk yang lama; (b) `Window.addOnFrameMetricsAvailableListener` menyimpan
+ * rincian fase frame lambat (tunda vsync = thread utama sibuk SEBELUM frame; layout/gambar/sinkron = ongkos frame itu sendiri).
  * Entri ditahan di memori dan ditulis ke Log Diagnostik (tag `StartupStall`, level WARN) HANYA bila ada stall besar
  * (lihat [StartupStallFormat]); start normal tidak menulis apa pun. Tak mengubah perilaku app: semua dibungkus `runCatching`
  * dan dilepas otomatis di akhir jendela. Instrumentasi sementara — hapus bila penyebab sudah ketemu dan diperbaiki.
+ *
+ * Batch 683 — jendela dijangkarkan ke Activity pertama, bukan hanya ke proses mulai. Log v682 membuktikan jendela 8 dtk
+ * sejak proses mulai MELESET: proses pasca-instal hidup tanpa UI 8273 ms sebelum Activity dibuat (jendela habis di t=+8000,
+ * Activity t=+8439 -> 0 baris `StartupStall`), dan pid 31012 (v681) membuka Activity 3,4 jam setelah proses lahir. Sekarang:
+ * - jendela proses (8 dtk dari proses mulai) tetap ada utk kerja sebelum UI (mis. `PlayerWidgetProvider.onUpdate`);
+ * - bila jendela itu habis tanpa Activity, probe HANYA menyisakan satu `ActivityLifecycleCallbacks` (tanpa biaya per pesan;
+ *   `Looper.setMessageLogging` TIDAK dibiarkan menyala berjam-jam di proses pemutar musik) sampai Activity pertama dibuat;
+ * - di `onActivityPreCreated` Activity pertama, jendela baru dibuka (atau jendela proses yang masih terbuka diperpanjang)
+ *   selama [StartupStallFormat.WINDOW_MS], lalu semuanya dilepas. Activity kedua dst. tak memicu apa-apa.
+ * Batasan platform: `Looper` memakai printer yang ditangkap di AWAL tiap pesan, jadi pesan peluncuran Activity itu sendiri
+ * (yang sedang berjalan saat printer dipasang di `onActivityPreCreated`) TIDAK tercatat; yang tercatat = frame pertama
+ * (`FrameMetrics`, dipasang di `onActivityPostCreated`) dan semua pesan sesudahnya.
  */
 object StartupStallProbe {
     private const val TAG = "StartupStall"
@@ -36,34 +48,112 @@ object StartupStallProbe {
     /** Panggil sekali dari `Application.onCreate` (setelah `AppLogger.init`). Panggilan berikutnya tak berefek. */
     fun start(app: Application) {
         if (!started.compareAndSet(false, true)) return
+        runCatching { ProbeSession(app, collector, scope, TAG).begin() }
+    }
+}
+
+/**
+ * Satu sesi probe per proses. SEMUA anggota hanya disentuh thread utama (`Application.onCreate`, callback lifecycle, dan
+ * `Handler` utama), kecuali penulisan log yang dilempar ke [scope].
+ */
+private class ProbeSession(
+    private val app: Application,
+    private val collector: StallCollector,
+    private val scope: CoroutineScope,
+    private val tag: String
+) : Application.ActivityLifecycleCallbacks {
+    private val main = Handler(Looper.getMainLooper())
+    private val processStart = Process.getStartUptimeMillis()
+    private val frameListener = FrameListener(processStart, collector)
+    private val attached = ArrayList<Window>()
+    private val closeWindow = Runnable { close() }
+
+    private var open = false
+    private var kind = StartupStallFormat.KIND_PROCESS
+    private var openedAtMs = 0L
+    private var activitySeen = false
+    private var activityAtMs: Long? = null
+
+    fun begin() {
+        app.registerActivityLifecycleCallbacks(this)
+        val remainingMs = StartupStallFormat.processWindowRemainingMs(processStart, SystemClock.uptimeMillis())
+        if (remainingMs > 0L) openWindow(StartupStallFormat.KIND_PROCESS, remainingMs)
+    }
+
+    private fun sinceProcessStartMs(): Long = SystemClock.uptimeMillis() - processStart
+
+    private fun openWindow(newKind: String, durationMs: Long) {
+        kind = newKind
+        openedAtMs = sinceProcessStartMs()
+        open = true
+        Looper.getMainLooper().setMessageLogging(MessagePrinter(processStart, collector))
+        main.postDelayed(closeWindow, durationMs)
+    }
+
+    /** Activity PERTAMA proses: buka jendela baru, atau perpanjang jendela proses yang masih terbuka. Selanjutnya diabaikan. */
+    override fun onActivityPreCreated(activity: Activity, savedInstanceState: Bundle?) {
+        if (activitySeen) return
+        activitySeen = true
+        activityAtMs = sinceProcessStartMs()
         runCatching {
-            val processStart = Process.getStartUptimeMillis()
-            val remainingMs = processStart + StartupStallFormat.WINDOW_MS - SystemClock.uptimeMillis()
-            if (remainingMs > 0L) install(app, processStart, remainingMs)
+            if (open) {
+                kind = StartupStallFormat.KIND_PROCESS_ACTIVITY
+                main.removeCallbacks(closeWindow)
+                main.postDelayed(closeWindow, StartupStallFormat.WINDOW_MS)
+            } else {
+                openWindow(StartupStallFormat.KIND_ACTIVITY, StartupStallFormat.WINDOW_MS)
+            }
         }
     }
 
-    private fun install(app: Application, processStart: Long, remainingMs: Long) {
-        val main = Handler(Looper.getMainLooper())
-        val frames = FrameWatcher(main, FrameListener(processStart, collector))
-        Looper.getMainLooper().setMessageLogging(MessagePrinter(processStart, collector))
-        app.registerActivityLifecycleCallbacks(frames)
-        main.postDelayed({
-            runCatching {
-                Looper.getMainLooper().setMessageLogging(null)
-                app.unregisterActivityLifecycleCallbacks(frames)
-                frames.detachAll()
-                flush()
-            }
-        }, remainingMs)
+    /**
+     * Memasang listener frame ke jendela Activity SETELAH `onCreate` selesai (API 29+: konten sudah dipasang, jadi
+     * `getDecorView()` tak mengganggu `requestFeature`/setContent); hanya selama jendela terbuka.
+     */
+    override fun onActivityPostCreated(activity: Activity, savedInstanceState: Bundle?) {
+        if (!open) return
+        val window = activity.window
+        runCatching {
+            window.addOnFrameMetricsAvailableListener(frameListener, main)
+            attached.add(window)
+        }
     }
 
-    private fun flush() {
-        val lines = collector.drain()
-        if (lines.isEmpty()) return
-        // Satu coroutine supaya urutan baris di berkas log sama dengan urutan [lines] (bukan di thread utama: tak menambah stall).
-        scope.launch { lines.forEach { AppLogger.w(TAG, it) } }
+    override fun onActivityDestroyed(activity: Activity) {
+        val window = activity.window
+        runCatching {
+            window.removeOnFrameMetricsAvailableListener(frameListener)
+            attached.remove(window)
+        }
     }
+
+    /** Akhir jendela: lepas semua pengamat, tulis entri bila ada stall besar, kosongkan penampung utk jendela berikutnya. */
+    private fun close() {
+        runCatching {
+            Looper.getMainLooper().setMessageLogging(null)
+            attached.forEach { runCatching { it.removeOnFrameMetricsAvailableListener(frameListener) } }
+            attached.clear()
+            open = false
+            val lines = collector.drain()
+            collector.reset()
+            if (lines.isNotEmpty()) {
+                val header = StartupStallFormat.windowLine(kind, openedAtMs, activityAtMs)
+                // Satu coroutine supaya urutan baris di berkas log sama dengan urutan [lines] (bukan di thread utama: tak menambah stall).
+                scope.launch {
+                    AppLogger.w(tag, header)
+                    lines.forEach { AppLogger.w(tag, it) }
+                }
+            }
+            if (activitySeen) app.unregisterActivityLifecycleCallbacks(this)
+        }
+    }
+
+    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+    override fun onActivityStarted(activity: Activity) = Unit
+    override fun onActivityResumed(activity: Activity) = Unit
+    override fun onActivityPaused(activity: Activity) = Unit
+    override fun onActivityStopped(activity: Activity) = Unit
+    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
 }
 
 /** Mengukur durasi tiap pesan thread utama dari pasangan teks `Looper` ">>>>> Dispatching ..." / "<<<<< Finished ...". */
@@ -123,44 +213,4 @@ private class FrameListener(
         val atMs = SystemClock.uptimeMillis() - processStart
         collector.add(totalMs, StartupStallFormat.FRAME_TRIGGER_MS, StartupStallFormat.frameLine(atMs, sample))
     }
-}
-
-/**
- * Memasang [listener] ke jendela tiap Activity SETELAH `onCreate` selesai (`onActivityPostCreated`, API 29+: konten sudah
- * dipasang, jadi `getDecorView()` tak mengganggu `requestFeature`/setContent) dan melepasnya saat Activity dihancurkan atau
- * jendela pemantauan berakhir. Semua callback jalan di thread utama.
- */
-private class FrameWatcher(
-    private val handler: Handler,
-    private val listener: FrameListener
-) : Application.ActivityLifecycleCallbacks {
-    private val attached = ArrayList<Window>()
-
-    override fun onActivityPostCreated(activity: Activity, savedInstanceState: Bundle?) {
-        val window = activity.window
-        runCatching {
-            window.addOnFrameMetricsAvailableListener(listener, handler)
-            attached.add(window)
-        }
-    }
-
-    override fun onActivityDestroyed(activity: Activity) {
-        val window = activity.window
-        runCatching {
-            window.removeOnFrameMetricsAvailableListener(listener)
-            attached.remove(window)
-        }
-    }
-
-    fun detachAll() {
-        attached.forEach { runCatching { it.removeOnFrameMetricsAvailableListener(listener) } }
-        attached.clear()
-    }
-
-    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
-    override fun onActivityStarted(activity: Activity) = Unit
-    override fun onActivityResumed(activity: Activity) = Unit
-    override fun onActivityPaused(activity: Activity) = Unit
-    override fun onActivityStopped(activity: Activity) = Unit
-    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
 }

@@ -40,8 +40,9 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         StartupTrace.mark("app_mulai") // Batch 677 — jejak cold start (lihat StartupTrace)
         AppLogger.init(this)
-        // Batch 682 — probe sementara: siapa menahan thread utama di frame pertama pasca-instal (Skipped 31 frames, v679/v681).
-        // Menulis ke Log Diagnostik HANYA bila ada stall besar dalam 8 dtk pertama proses; lihat util/StartupStallProbe.kt.
+        // Batch 682 — probe sementara: siapa menahan thread utama di frame pertama (Skipped 31 frames, v679/v681).
+        // Batch 683: jendela 8 dtk dari proses mulai DAN 8 dtk dari Activity pertama (v682: Activity dibuat t=+8439 ms = lewat jendela lama).
+        // Menulis ke Log Diagnostik HANYA bila ada stall besar; lihat util/StartupStallProbe.kt.
         StartupStallProbe.start(this)
         // Batch 670 — saklar yang memengaruhi CPU pemutaran dicetak di tiap baris `PowerProbe` (xfade = overlapPlayer kedua;
         // senyap = trim keheningan). Dibaca di thread probe, bukan di sini.
