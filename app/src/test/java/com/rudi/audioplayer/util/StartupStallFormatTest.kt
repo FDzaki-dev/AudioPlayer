@@ -179,15 +179,19 @@ class StartupStallFormatTest {
     }
 
     @Test
-    fun `Batch 684 siteOf membuang sampel menganggur dan menggabung tiga frame teratas`() {
+    fun `Batch 686 siteOf membuang sampel menganggur dan menggabung empat frame teratas`() {
         assertNull(StartupStallFormat.siteOf(emptyList()))
         assertNull(StartupStallFormat.siteOf(listOf("android.os.MessageQueue.nativePollOnce(Native Method)", "x.y(Z.java:1)")))
+        assertEquals(4, StartupStallFormat.SITE_DEPTH)
+        // 5 frame masuk -> hanya SITE_DEPTH (4) teratas yang dipakai sebagai kunci lokasi.
         assertEquals(
-            "a.A.one(A.java:1) < b.B.two(B.java:2) < c.C.three(C.java:3)",
+            "a.A.one(A.java:1) < b.B.two(B.java:2) < c.C.three(C.java:3) < d.D.four(D.java:4)",
             StartupStallFormat.siteOf(
-                listOf("a.A.one(A.java:1)", "b.B.two(B.java:2)", "c.C.three(C.java:3)", "d.D.four(D.java:4)")
+                listOf("a.A.one(A.java:1)", "b.B.two(B.java:2)", "c.C.three(C.java:3)", "d.D.four(D.java:4)", "e.E.five(E.java:5)")
             )
         )
+        // Tumpukan lebih pendek dari SITE_DEPTH dipakai apa adanya.
+        assertEquals("a.A.one(A.java:1) < b.B.two(B.java:2)", StartupStallFormat.siteOf(listOf("a.A.one(A.java:1)", "b.B.two(B.java:2)")))
         assertEquals("a.A.one(A.java:1)", StartupStallFormat.siteOf(listOf("a.A.one(A.java:1)")))
     }
 

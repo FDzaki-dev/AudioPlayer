@@ -1,5 +1,14 @@
 # Changelog
 
+## Batch 686 — perbaiki tes yang rusak oleh Batch 685 (`SITE_DEPTH` 3 -> 4) (log_fail_658.zip: `testReleaseUnitTest` GAGAL 1 dari 287) (BELUM verified)
+- Input user: `log_fail_658.zip` (tanpa teks): `build-output.log` + laporan `testReleaseUnitTest` (Gradle 8.14.3, runner CI, 18 Nov 2026 10:48 UTC). Hasil: 287 tes, 1 GAGAL, 1 dilewati (`ArchitectureTest.writeArchitectureReport`, sengaja: butuh `SONIX_ARCH_REPORT=1`), `BUILD FAILED` di `:app:testReleaseUnitTest`.
+- PENYEBAB (kesalahan saya di Batch 685, terbukti dari `TEST-...StartupStallFormatTest.xml`): `StartupStallFormatTest.kt:185` tes `Batch 684 siteOf ... tiga frame teratas` mengharap 3 frame digabung (`expected ...c.C.three(C.java:3)[]` tetapi `was ...[ < d.D.four(D.java:4)]`) sementara Batch 685 menaikkan `StartupStallFormat.SITE_DEPTH` 3 -> 4 tanpa memperbarui tes itu. Cacat ada di TES, bukan di kode produksi (4 frame memang disengaja).
+- Fakta baik dari laporan yang sama: 286 tes lain LULUS termasuk 3 tes baru Batch 685 (`topBetween`, `SlowIntervals`, `intervalSampleLine`) dan kompilasi `Release` (R8) berhasil = kode Batch 685 TERKOMPILASI; ArchitectureTest lulus. Gate lain (ArchUnit report, SpotBugs, detekt, lintDebug) untuk Batch 685 belum terlihat = NOT VERIFIED.
+- PERBAIKAN (1 file test, 0 file source berubah, 0 file baru): `test/.../StartupStallFormatTest.kt` tes diganti nama + isi menjadi `Batch 686 siteOf membuang sampel menganggur dan menggabung empat frame teratas`: 5 frame masuk -> 4 teratas digabung; tumpukan 2 dan 1 frame dipakai apa adanya; menegaskan `SITE_DEPTH == 4`. Tidak ada tes lain yang memakai `siteOf`/`SITE_DEPTH` (diperiksa). Jumlah tes tetap 287.
+- Verifikasi lokal: sandbox tanpa kompiler -> kurung seimbang. **NOT VERIFIED** di CI. PREDIKSI: Tes unit 287 lulus (0 gagal, 1 dilewati pada `testReleaseUnitTest`), ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0, Kotlin 0.
+- Pelajaran/aturan kerja: setiap kali mengubah konstanta/format yang sudah punya tes, cari seluruh pemakainya di `src/test` SEBELUM mengemas (kali ini tidak dilakukan).
+- Langkah berikutnya tidak berubah dari Batch 685: buka app dari proses lama tanpa UI, kirim log -> baca `Sampel selama pesan lambat`.
+
 ## Batch 685 — probe: sampel tumpukan dikaitkan ke rentang tiap pesan lambat (log v684 + CI run #111) (BELUM verified)
 - Input user: `sonix_debug_20261118_183213.txt` (v684 = 1.10.44 build 544, ekspor 18:32:09) + `SONIX_laporan-untuk-claude_run111.zip` (tanpa teks). Laporan CI run #111 (commit 5f97d0db, Batch 684): ArchUnit 7/0, SpotBugs 0, detekt 0, lintDebug 0, Tes unit 284 LULUS (0 dilewati), peringatan Kotlin 0 = Batch 684 VERIFIED; prediksi tepat (284). FATAL/ANR baru 0 (5 FATAL lama 11-08..11-11).
 - Perbaikan Batch 684 TERBUKTI jalan: baris `Frame lambat` tidak lagi terduplikasi (1 baris per frame), dan sampler menulis 8 baris `Sampel tumpukan thread utama` (proses pid 26875, `jenis=proses_mulai+activity`, Activity t=+1907 ms, jendela s.d. t=+9907 ms).
