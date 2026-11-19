@@ -118,6 +118,23 @@ class UpdateResumePolicyTest {
     }
 
     @Test
+    fun `splice allowed only while the player still holds exactly the restored head item`() {
+        assertTrue(UpdateResumePolicy.canSpliceRestoredQueue("361288", 361288L, 1))
+    }
+
+    @Test
+    fun `splice refused when the queue was replaced or already grown`() {
+        assertFalse("antrean sudah >1 (user/komponen lain)", UpdateResumePolicy.canSpliceRestoredQueue("361288", 361288L, 2))
+        assertFalse("antrean kosong", UpdateResumePolicy.canSpliceRestoredQueue(null, 361288L, 0))
+    }
+
+    @Test
+    fun `splice refused when the single item is a different song`() {
+        assertFalse(UpdateResumePolicy.canSpliceRestoredQueue("42", 361288L, 1))
+        assertFalse(UpdateResumePolicy.canSpliceRestoredQueue(null, 361288L, 1))
+    }
+
+    @Test
     fun `intendsToPlay needs playWhenReady, a queue and a state other than IDLE or ENDED`() {
         val idle = 1
         val buffering = 2

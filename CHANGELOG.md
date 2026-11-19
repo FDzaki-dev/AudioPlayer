@@ -1,5 +1,30 @@
 # Changelog
 
+## Batch 692 — pemulihan pasca-update JALUR CEPAT: putar lagu saat ini dulu, sisa antrean disambung paralel (log v691 = build 551: eksperimen awal BERHASIL) (percepatan BELUM diukur)
+
+- Input user: `sonix_debug_20261120_032126.txt` (v691 = 1.11.1 build 551, ekspor 03:21:21), teks: "masih"; lalu "buruan" sebelumnya.
+
+- HASIL EKSPERIMEN v691 (Infinix X6850 / Android 16): `proses_mulai: memutar_sebelum_update=true ... keputusan=RESUME sejak_mati=1325ms sejak_proses_mulai=384ms` (03:21:06.656) -> `Percobaan awal: start foreground service DIIZINKAN` (06.777; kill 03:21:05.318) = Android 16 MENGIZINKAN start FGS dari `Application.onCreate` (hipotesis "ditolak" gugur). Broadcast menyusul 07.439 (+2,12 dtk, `sejak_mati=2115ms`) dan benar `SKIP_NOT_PLAYING` (penanda sudah diturunkan; tanpa pemulihan ganda). AudioTrack mulai 08.433 -> hening total ±3,12 dtk (v690 ±3,31; v689 ±3,64): hemat hanya ±0,2 dtk dari yang diharapkan ±0,8 dtk karena start dini bertabrakan dengan startup proses yang sama: `PlaybackService.onCreate` 295 ms (sesi+timer 245; v690 132/110), `pulih_antrean=359ms` (v690 210), `tunda_service=1329ms`, `putar=740ms`.
+
+- LINIMASA v691 (kill 05.32): proses lahir 06.07 (+0,75 dtk) -> keputusan 06.66 -> `startForegroundService` kembali 06.78 (binder ±120 ms) -> ExoPlayer init 06.92 -> antrean tersimpan 07.76 -> AudioTrack 08.43. Dari start FGS ke audio 1,66 dtk: onCreate 295 + antrean 359 + persiapan pemain 740 (serial). Pemulihan antrean dan persiapan pemain kini BERJALAN BERURUTAN padahal tak saling bergantung selain lagu pembuka.
+
+- PERUBAHAN (3 file; 0 baru; FILE_MANIFEST tetap 263):
+  - `playback/PlaybackService.kt`: jalur cepat khusus `resumeAfterUpdate`: `restoreHeadForResume()` membaca HANYA lagu saat ini (1 baris MediaStore), `setMediaItem(+posisi tersimpan)`, repeat/shuffle/speed, `prepare()`; lalu `play()`; sisa antrean disambung PARALEL oleh `restoreRestOfQueue` (lagu sebelum indeks via `addMediaItems(0, ..)`, sesudahnya di belakang; tak menginterupsi lagu yang berjalan). Pengaman: (1) `queueRestorePending` membuat `persistQueueFromService` diam selama pemain hanya berisi lagu pembuka (antrean tersimpan utuh tak tertimpa antrean 1 lagu — juga saat proses mati di jendela itu); (2) penyambungan dibatalkan bila pemain sudah berubah (`canSpliceRestoredQueue`); (3) penanda selalu dibersihkan di `finally`; (4) lagu pembuka tak ditemukan/tak ada sesi -> jatuh ke `restoreLastQueue()` penuh (perilaku lama). `MediaItem` kini dibuat `buildSavedMediaItem(song)` (diambil utuh dari `loadSavedQueueItems`, satu sumber untuk jalur penuh dan cepat). Jalur lain (widget cold-start, `onPlaybackResumption`) TIDAK berubah.
+  - `playback/UpdateResumePolicy.kt`: `canSpliceRestoredQueue(currentMediaId, headId, mediaItemCount)` (murni).
+  - `UpdateResumePolicyTest.kt`: +3 tes = 18.
+
+- Log baru: `pulih_antrean=` kini = tahap lagu pembuka saja; baris `sisa antrean disambung +N/+M lagu dalam Xms indeks=i/n` (atau `TIDAK disambung (pemain sudah berubah)`).
+
+- TIDAK diubah: jalur terjamin receiver; percobaan awal v691 (terbukti berguna); kebijakan keputusan.
+
+- RISIKO diketahui (rendah): bila user membuka UI dalam jendela ±0,1-0,3 dtk setelah start dan `PlayerViewModel` menulis antreannya sendiri, antrean 1 lagu bisa tersimpan; jendela itu hanya ada setelah update saat musik berjalan.
+
+- VERIFIKASI LOKAL: `UpdateResumePolicyTest` 18/18 LULUS (`-Werror`); kurung seimbang `PlaybackService`. **NOT VERIFIED**: compile Android/R8/CI (butuh Media3), perilaku `addMediaItems` di perangkat, besar percepatan (perkiraan ±0,25-0,3 dtk = DUGAAN). CI v689-v691 BELUM dikirim.
+
+- PREDIKSI CI: Tes 309 (306 + 3), ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0, Kotlin 0.
+
+- LANGKAH UJI: pasang v692 SAAT musik diputar -> kirim log: cari `Pemulihan pasca-update:` (`pulih_antrean` harus turun dari 359 ms; `sisa antrean disambung`, indeks=i/135) dan selisih kill -> `AudioTrack start` (v691 3,12 dtk). Pastikan lagu tidak mundur/terputus saat antrean disambung.
+
 ## Batch 691 — EKSPERIMEN pemulihan lebih awal: percobaan dari Application.onCreate (sebelum broadcast) + satu pemulihan sekaligus (log v690 = build 550) (hasil BELUM diuji di device)
 
 - Input user: `sonix_debug_20261119_191902.txt` (v690 = 1.11.0 build 550, ekspor 19:18:57), teks: "masih" (hening masih terasa); lalu "buruan".

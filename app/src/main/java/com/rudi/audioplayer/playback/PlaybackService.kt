@@ -37,6 +37,7 @@ import com.rudi.audioplayer.data.ListeningHistoryStore
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
 import com.rudi.audioplayer.data.PlayStatsStore
+import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.data.ShakeSettingsStore
 import com.rudi.audioplayer.data.PowerSavingStore
 import com.rudi.audioplayer.data.SilenceSkipStore
@@ -571,6 +572,9 @@ class PlaybackService : MediaLibraryService() {
      * `SharedPreferences.apply()` menaruh nilai di memori seketika dan menulis disk async (pola sama [WidgetUpdater.saveState]).
      */
     private fun persistQueueFromService(player: Player, alasan: String) {
+        // Batch 692: selama pemain baru berisi lagu pembuka SAJA (pemulihan pasca-update jalur cepat), antrean 1 lagu TIDAK
+        // boleh menimpa antrean tersimpan yang utuh (mis. transisi/berkala saat jendela sambung-antrean).
+        if (queueRestorePending) return
         val count = player.mediaItemCount
         if (count <= 0) return
         val index = player.currentMediaItemIndex
@@ -672,7 +676,7 @@ class PlaybackService : MediaLibraryService() {
         resumeJob = serviceScope.launch {
             try {
                 val restoreStart = SystemClock.elapsedRealtime()
-                if (mediaSession?.player?.mediaItemCount == 0) restoreLastQueue()
+                val pendingRest = if (mediaSession?.player?.mediaItemCount == 0) restoreHeadForResume() else null
                 val restoreMs = SystemClock.elapsedRealtime() - restoreStart
                 val player = mediaSession?.player
                 if (player == null || player.mediaItemCount == 0) {
@@ -684,6 +688,8 @@ class PlaybackService : MediaLibraryService() {
                 val restoredPositionMs = player.currentPosition
                 val playStart = SystemClock.elapsedRealtime()
                 if (!player.playWhenReady) player.play()
+                // Batch 692: sisa antrean disambung PARALEL dengan sumber/seek/codec yang sedang disiapkan pemain.
+                if (pendingRest != null) launch { runRestOfQueue(pendingRest) }
                 var waited = 0L
                 while (!player.isPlaying && waited < MAX_HANDOFF_WAIT_MS) {
                     delay(150)
@@ -706,6 +712,16 @@ class PlaybackService : MediaLibraryService() {
                     AppLogger.e("PlaybackService", "Gagal membongkar placeholder pemulihan pasca-update", e)
                 }
             }
+        }
+    }
+
+    private suspend fun runRestOfQueue(rest: PendingQueueRest) {
+        try {
+            restoreRestOfQueue(rest)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.e("PlaybackService", "Pemulihan pasca-update: sambung sisa antrean gagal (antrean tersimpan utuh)", e)
         }
     }
 
@@ -978,29 +994,105 @@ class PlaybackService : MediaLibraryService() {
         val orderedSongs = saved.songIds.mapNotNull { songMap[it] }
         if (orderedSongs.isEmpty()) return null
 
-        val items = orderedSongs.map { song ->
-            // Batch 67: dulu URI legacy "content://media/external/audio/albumart/$albumId" —
-            // tabel cache albumart itu sering kosong di Android modern (khususnya API 29+),
-            // jadi FileNotFoundException konsisten utk banyak album (lihat log diagnostik,
-            // ratusan entri sejak Batch 22). song.uri (URI file audio-nya sendiri, dari
-            // MusicRepository) didukung loadThumbnail() secara native — framework fallback ke
-            // MediaMetadataRetriever buat ekstrak art embedded, tidak bergantung cache lama itu.
-            MediaItem.Builder()
-                .setMediaId(song.id.toString())
-                .setUri(song.uri)
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle(song.title)
-                        .setArtist(song.artist)
-                        .setAlbumTitle(song.album)
-                        .setArtworkUri(song.uri)
-                        .build()
-                )
-                .build()
-        }
+        val items = orderedSongs.map { buildSavedMediaItem(it) }
 
         val index = saved.index.coerceIn(0, items.size - 1)
         return SavedQueueItems(items, index, saved.positionMs, saved.repeatMode, saved.shuffleEnabled, saved.speed)
+    }
+
+    /**
+     * Batch 692 — pembuat `MediaItem` dari lagu hasil MediaStore, diambil UTUH dari [loadSavedQueueItems] (perilaku sama) agar
+     * jalur penuh dan jalur cepat ([restoreHeadForResume]) tak bisa menyimpang.
+     * Batch 67: dulu URI legacy "content://media/external/audio/albumart/$albumId" — tabel cache albumart itu sering kosong
+     * di Android modern (khususnya API 29+), jadi FileNotFoundException konsisten utk banyak album (lihat log diagnostik,
+     * ratusan entri sejak Batch 22). song.uri (URI file audio-nya sendiri, dari MusicRepository) didukung loadThumbnail()
+     * secara native — framework fallback ke MediaMetadataRetriever buat ekstrak art embedded, tidak bergantung cache lama itu.
+     */
+    private fun buildSavedMediaItem(song: Song): MediaItem =
+        MediaItem.Builder()
+            .setMediaId(song.id.toString())
+            .setUri(song.uri)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(song.title)
+                    .setArtist(song.artist)
+                    .setAlbumTitle(song.album)
+                    .setArtworkUri(song.uri)
+                    .build()
+            )
+            .build()
+
+    /** Batch 692 — sisa antrean tersimpan yang menunggu disambung setelah lagu pembuka diputar ([restoreRestOfQueue]). */
+    private data class PendingQueueRest(val headId: Long, val ids: List<Long>, val headIndex: Int)
+
+    /** Batch 692 — true selama pemain berisi lagu pembuka SAJA dan sisa antrean belum disambung; lihat [persistQueueFromService]. */
+    private var queueRestorePending = false
+
+    /**
+     * Batch 692 — pemulihan pasca-update JALUR CEPAT. Log v691 (20 Nov): `pulih_antrean=359ms` (baca 135 lagu + `setMediaItems` +
+     * binder MediaSession) berjalan SERIAL sebelum `play()` + `putar=740ms`, padahal hening yang terdengar = jumlahnya. Di sini
+     * hanya lagu saat ini yang dibaca (1 baris MediaStore) dan langsung `setMediaItem(+posisi)`/`prepare()`; pemanggil memutar
+     * lalu menyambung sisa antrean lewat [restoreRestOfQueue] SELAGI jalur sumber/seek/codec framework berjalan paralel.
+     * Bila lagu pembuka tak ditemukan lagi atau tak ada sesi: jatuh ke [restoreLastQueue] penuh (perilaku lama) dan
+     * mengembalikan null. Antrean tersimpan di [PlaybackStateStore] TIDAK disentuh (lihat [queueRestorePending]).
+     */
+    private suspend fun restoreHeadForResume(): PendingQueueRest? {
+        val saved = PlaybackStateStore(this).load() ?: return null
+        if (saved.songIds.isEmpty()) return null
+        val headIndex = saved.index.coerceIn(0, saved.songIds.size - 1)
+        val headId = saved.songIds[headIndex]
+        val head = withContext(Dispatchers.IO) {
+            MusicRepository(this@PlaybackService).getSongsByIds(listOf(headId), includeGenre = false)
+        }.firstOrNull()
+        val player = mediaSession?.player
+        if (head == null || player == null) {
+            restoreLastQueue()
+            return null
+        }
+        queueRestorePending = true
+        try {
+            player.repeatMode = saved.repeatMode
+            player.shuffleModeEnabled = saved.shuffleEnabled
+            player.setMediaItem(buildSavedMediaItem(head), saved.positionMs)
+            player.setPlaybackSpeed(saved.speed)
+            player.prepare()
+        } catch (e: Exception) {
+            queueRestorePending = false
+            throw e
+        }
+        return PendingQueueRest(headId, saved.songIds, headIndex)
+    }
+
+    /**
+     * Batch 692 — sambung sisa antrean di sekitar lagu pembuka yang SUDAH diputar: lagu sebelum indeks disisipkan di depan,
+     * sesudahnya di belakang (`addMediaItems` tak menginterupsi lagu yang sedang berjalan). Dibatalkan (tanpa mengubah
+     * apa pun) bila pemain sudah berubah (user/komponen lain mengganti antrean) — [UpdateResumePolicy.canSpliceRestoredQueue].
+     * Penanda [queueRestorePending] SELALU dibersihkan di `finally`.
+     */
+    private suspend fun restoreRestOfQueue(rest: PendingQueueRest) {
+        val startedAt = SystemClock.elapsedRealtime()
+        try {
+            val songs = withContext(Dispatchers.IO) {
+                MusicRepository(this@PlaybackService).getSongsByIds(rest.ids, includeGenre = false)
+            }
+            val player = mediaSession?.player ?: return
+            if (!UpdateResumePolicy.canSpliceRestoredQueue(player.currentMediaItem?.mediaId, rest.headId, player.mediaItemCount)) {
+                AppLogger.w("PlaybackService", "Pemulihan pasca-update: sisa antrean TIDAK disambung (pemain sudah berubah)")
+                return
+            }
+            val byId = songs.associateBy { it.id }
+            val before = rest.ids.subList(0, rest.headIndex).mapNotNull { byId[it] }.map { buildSavedMediaItem(it) }
+            val after = rest.ids.subList(rest.headIndex + 1, rest.ids.size).mapNotNull { byId[it] }.map { buildSavedMediaItem(it) }
+            if (before.isNotEmpty()) player.addMediaItems(0, before)
+            if (after.isNotEmpty()) player.addMediaItems(after)
+            AppLogger.w(
+                "PlaybackService",
+                "Pemulihan pasca-update: sisa antrean disambung +${before.size}/+${after.size} lagu dalam " +
+                    "${SystemClock.elapsedRealtime() - startedAt}ms indeks=${player.currentMediaItemIndex}/${player.mediaItemCount}"
+            )
+        } finally {
+            queueRestorePending = false
+        }
     }
 
     private suspend fun restoreLastQueue() {

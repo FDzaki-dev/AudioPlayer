@@ -73,6 +73,14 @@ object UpdateResumePolicy {
     fun intendsToPlay(playWhenReady: Boolean, mediaItemCount: Int, playbackState: Int): Boolean =
         playWhenReady && mediaItemCount > 0 && playbackState != STATE_IDLE && playbackState != STATE_ENDED
 
+    /**
+     * Batch 692 — apakah sisa antrean tersimpan boleh disambung ke pemain: HANYA bila pemain masih berisi satu lagu = lagu
+     * pembuka yang dipulihkan tadi. Hitungan lain / mediaId lain = user atau komponen lain sudah mengganti antrean sehingga
+     * menyisipkan antrean lama akan merusaknya.
+     */
+    fun canSpliceRestoredQueue(currentMediaId: String?, headId: Long, mediaItemCount: Int): Boolean =
+        mediaItemCount == 1 && currentMediaId == headId.toString()
+
     private const val STATE_IDLE = 1
     private const val STATE_ENDED = 4
 }
