@@ -25,6 +25,11 @@ package com.rudi.audioplayer.util
  * SETELAH Activity dibuat, di kedua proses v682/v683; probe baru tahu "frame mana", bukan "kode mana" -> ditambah sampler
  * tumpukan thread utama ([StackSampleCounter]) yang menjawab "kode mana".
  *
+ * Batch 687 — log v686 (probe Batch 685 jalan): pesan doFrame 225 ms (t=+4434..+4659, ±1,9 dtk setelah Activity) berisi 13 sampel aktif
+ * yang tersebar di >= 9 lokasi (Compose `b1.w1.i < p1.e.c < ...`, `Canvas.drawPath <- c2.a.b`, `TextLine.getRunAdvance`) = kerja Compose
+ * yang MELEBAR (komposisi + ukur teks + gambar path), bukan satu titik panas; dan 4 frame teratas semuanya nama R8 pendek, jadi tak
+ * menunjuk kode app. Perbaikan: R8 tak mengacak nama + sampel dikelompokkan menurut frame kode app terdekat ([isAppClass], dipakai sampler).
+ *
  * Agar Log Diagnostik (batas 200 KB) tidak penuh lagi: entri DITAHAN di memori dan baru ditulis bila ada satu stall besar
  * (pesan >= [MESSAGE_TRIGGER_MS] atau frame >= [FRAME_TRIGGER_MS]); start normal = 0 baris.
  */
@@ -76,6 +81,28 @@ internal object StartupStallFormat {
     /** Jumlah lokasi teratas per pesan lambat pada baris atribusi. */
     const val ATTRIBUTION_SITES = 3
 
+    /**
+     * Batch 687 — awalan paket kode app. Log v686: sampel selama pesan doFrame 225 ms (13 sampel aktif) tersebar di >= 9 lokasi
+     * berbeda dan 4 frame teratasnya semuanya internal Compose/platform berbentuk nama R8 pendek (`b1.w1.i`, `c2.a.b`) -> tak
+     * satu pun menunjuk kode app. Kini tiap sampel juga mencatat frame kode app TERDEKAT dari puncak tumpukan.
+     */
+    const val APP_PACKAGE_PREFIX = "com.rudi.audioplayer."
+
+    /** Kelas probe sendiri dikecualikan dari "kode app" (thread utama sesaat berada di `MessagePrinter.println`). */
+    private const val PROBE_CLASS_PREFIX = "com.rudi.audioplayer.util.StartupStall"
+
+    /** Jumlah frame dari puncak tumpukan yang dipindai mencari frame kode app (tumpukan Compose bisa > 100 frame). */
+    const val APP_SCAN_DEPTH = 150
+
+    /** Jumlah baris "kode app" teratas per pesan lambat (ditulis SEBELUM baris lokasi pesan yang sama). */
+    const val ATTRIBUTION_APP_SITES = 3
+
+    /** Pengganti frame kode app bila tumpukan sampel tak memuat satu pun frame app (murni Compose/platform). */
+    const val NO_APP_FRAME = "(tanpa frame kode app)"
+
+    /** Pemisah antara 4 frame teratas dan frame kode app pada kunci lokasi. */
+    private const val APP_FRAME_SEPARATOR = " << kode app: "
+
     /** Batas sampel mentah (waktu + lokasi) yang ditahan per jendela (+-22 dtk pada selang 15 ms). */
     const val MAX_RAW_SAMPLES = 1_500
 
@@ -110,15 +137,26 @@ internal object StartupStallFormat {
      * Kunci "lokasi" satu sampel tumpukan thread utama: [SITE_DEPTH] frame teratas (teks `StackTraceElement` mentah) digabung
      * " < ". Null bila thread utama menganggur (`nativePollOnce`) atau tumpukan kosong = sampel dibuang.
      */
-    fun siteOf(frames: List<String>): String? {
+    fun siteOf(frames: List<String>, appFrame: String? = null): String? {
         val top = frames.firstOrNull() ?: return null
         if (top.startsWith(IDLE_TOP_FRAME)) return null
-        return frames.take(SITE_DEPTH).joinToString(" < ")
+        val head = frames.take(SITE_DEPTH)
+        val base = head.joinToString(" < ")
+        // Batch 687: frame kode app terdekat ditambahkan HANYA bila belum termasuk 4 frame teratas (tanpa duplikat).
+        return if (appFrame == null || appFrame in head) base else base + APP_FRAME_SEPARATOR + appFrame
     }
+
+    /** True bila [className] milik kode app ([APP_PACKAGE_PREFIX]) dan bukan kelas probe ini sendiri. */
+    fun isAppClass(className: String): Boolean =
+        className.startsWith(APP_PACKAGE_PREFIX) && !className.startsWith(PROBE_CLASS_PREFIX)
 
     /** Baris atribusi: sampel tumpukan yang jatuh DI DALAM rentang satu pesan lambat ([fromMs]..[toMs]); [active] = sampel tak-idle di rentang itu. */
     fun intervalSampleLine(fromMs: Long, toMs: Long, active: Int, count: Int, site: String): String =
         "Sampel selama pesan lambat t=+${fromMs}..+${toMs}ms ($active sampel aktif): ${count}x | $site"
+
+    /** Baris atribusi per frame KODE APP: sama dengan [intervalSampleLine] tetapi dikelompokkan menurut frame app terdekat. */
+    fun appIntervalLine(fromMs: Long, toMs: Long, active: Int, count: Int, appFrame: String): String =
+        "Kode app selama pesan lambat t=+${fromMs}..+${toMs}ms ($active sampel aktif): ${count}x | $appFrame"
 
     /** Baris untuk satu lokasi sampel: jumlah sampel, rentang waktu (ms sejak proses mulai), dan tumpukan mentah. */
     fun sampleLine(count: Int, firstMs: Long, lastMs: Long, site: String): String =
@@ -220,13 +258,16 @@ internal class StackSampleCounter {
     private val sites = HashMap<String, Site>()
     private val rawTimes = LongArray(StartupStallFormat.MAX_RAW_SAMPLES)
     private val rawSites = arrayOfNulls<String>(StartupStallFormat.MAX_RAW_SAMPLES)
+    private val rawApps = arrayOfNulls<String>(StartupStallFormat.MAX_RAW_SAMPLES)
     private var rawCount = 0
 
+    /** [appFrame] (Batch 687) = frame kode app terdekat dari puncak tumpukan; null = tumpukan tanpa frame app. */
     @Synchronized
-    fun add(site: String, atMs: Long) {
+    fun add(site: String, atMs: Long, appFrame: String? = null) {
         if (rawCount < rawTimes.size) {
             rawTimes[rawCount] = atMs
             rawSites[rawCount] = site
+            rawApps[rawCount] = appFrame
             rawCount++
         }
         val known = sites[site]
@@ -271,6 +312,30 @@ internal class StackSampleCounter {
             .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
             .take(limit)
             .map { StartupStallFormat.intervalSampleLine(fromMs, toMs, active, it.value, it.key) }
+    }
+
+    /**
+     * Batch 687 — seperti [topBetween] tetapi dikelompokkan menurut FRAME KODE APP terdekat (bukan 4 frame teratas): sampel yang
+     * tersebar di banyak lokasi Compose/platform tetap menumpuk di satu fungsi app bila memang itu yang memanggilnya. Sampel
+     * tanpa frame app dihitung sebagai [StartupStallFormat.NO_APP_FRAME]. Tanpa sampel di rentang itu -> daftar KOSONG
+     * (barisnya sudah dilaporkan [topBetween]).
+     */
+    @Synchronized
+    fun topAppBetween(fromMs: Long, toMs: Long, limit: Int): List<String> {
+        val counts = HashMap<String, Int>()
+        var active = 0
+        for (i in 0 until rawCount) {
+            val t = rawTimes[i]
+            if (rawSites[i] != null && t >= fromMs && t <= toMs) {
+                val key = rawApps[i] ?: StartupStallFormat.NO_APP_FRAME
+                counts[key] = (counts[key] ?: 0) + 1
+                active++
+            }
+        }
+        return counts.entries
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .take(limit)
+            .map { StartupStallFormat.appIntervalLine(fromMs, toMs, active, it.value, it.key) }
     }
 
     @Synchronized

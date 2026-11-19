@@ -159,7 +159,7 @@ android {
 
     buildTypes {
         release {
-            // Shrinks + obfuscates the release APK. Media3, Coil, and AndroidX all ship
+            // Shrinks the release APK (Batch 687: nama TIDAK diacak lagi, `-dontobfuscate` di proguard-rules.pro). Media3, Coil, and AndroidX all ship
             // their own consumer proguard rules, and this project has no reflection-based
             // JSON/serialization (playlists etc. are hand-rolled org.json), so there's
             // nothing here that R8 needs extra keep rules for.

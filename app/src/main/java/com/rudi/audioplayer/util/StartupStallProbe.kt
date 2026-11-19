@@ -141,8 +141,10 @@ private class ProbeSession(
             open = false
             val lines = collector.drain()
             val attributionLines = if (lines.isEmpty()) emptyList() else {
+                // Batch 687: per pesan lambat, baris KODE APP (dikelompokkan menurut frame app terdekat) lebih dulu, lalu baris lokasi.
                 slowIntervals.longest(StartupStallFormat.MAX_ATTRIBUTIONS).flatMap {
-                    sampleCounter.topBetween(it.fromMs, it.toMs, StartupStallFormat.ATTRIBUTION_SITES)
+                    sampleCounter.topAppBetween(it.fromMs, it.toMs, StartupStallFormat.ATTRIBUTION_APP_SITES) +
+                        sampleCounter.topBetween(it.fromMs, it.toMs, StartupStallFormat.ATTRIBUTION_SITES)
                 }
             }
             val sampleLines = if (lines.isNotEmpty()) sampleCounter.topLines(StartupStallFormat.MAX_SAMPLE_LINES) else emptyList()
@@ -241,6 +243,8 @@ private class FrameListener(
  * [StartupStallFormat.SAMPLE_INTERVAL_MS] dan menghitung per lokasi ([StartupStallFormat.siteOf], teks `StackTraceElement`
  * mentah; sampel saat thread utama menganggur dibuang). Dihentikan di akhir jendela; tak menyentuh state app. Catatan: build
  * rilis memakai R8, jadi frame kode app/Compose tampil sebagai nama pendek; frame platform (`android.*`) tetap terbaca.
+ * Batch 687 — (1) R8 tak lagi mengacak nama (`-dontobfuscate`, `proguard-rules.pro`) sehingga frame app/Compose terbaca;
+ * (2) tiap sampel mencatat frame KODE APP terdekat ([firstAppFrame]) karena 4 frame teratas hampir selalu internal Compose/platform.
  */
 private class StackSampler(
     private val mainThread: Thread,
@@ -274,8 +278,21 @@ private class StackSampler(
                 break
             }
             val frames = runCatching { mainThread.stackTrace }.getOrNull() ?: continue
-            val site = StartupStallFormat.siteOf(frames.take(StartupStallFormat.SITE_DEPTH).map { it.toString() }) ?: continue
-            counter.add(site, SystemClock.uptimeMillis() - processStart)
+            val appFrame = firstAppFrame(frames)
+            val site = StartupStallFormat.siteOf(frames.take(StartupStallFormat.SITE_DEPTH).map { it.toString() }, appFrame) ?: continue
+            counter.add(site, SystemClock.uptimeMillis() - processStart, appFrame)
         }
+    }
+
+    /**
+     * Batch 687 — frame KODE APP terdekat dari puncak tumpukan (teks `StackTraceElement` mentah), null bila tak ada dalam
+     * [StartupStallFormat.APP_SCAN_DEPTH] frame teratas. Hanya `className` yang dibandingkan (murah); `toString()` sekali untuk yang ketemu.
+     */
+    private fun firstAppFrame(frames: Array<StackTraceElement>): String? {
+        val limit = minOf(frames.size, StartupStallFormat.APP_SCAN_DEPTH)
+        for (i in 0 until limit) {
+            if (StartupStallFormat.isAppClass(frames[i].className)) return frames[i].toString()
+        }
+        return null
     }
 }

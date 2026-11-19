@@ -269,5 +269,85 @@ class StartupStallFormatTest {
         )
         assertEquals(4, StartupStallFormat.SITE_DEPTH)
     }
-}
 
+    @Test
+    fun `Batch 687 isAppClass mengenali paket app dan mengecualikan kelas probe sendiri`() {
+        assertTrue(StartupStallFormat.isAppClass("com.rudi.audioplayer.ui.HomeScreenKt"))
+        assertTrue(StartupStallFormat.isAppClass("com.rudi.audioplayer.MainActivity"))
+        assertFalse(StartupStallFormat.isAppClass("com.rudi.audioplayer.util.StartupStallProbe\$MessagePrinter"))
+        assertFalse(StartupStallFormat.isAppClass("com.rudi.audioplayer.util.StartupStallFormat"))
+        assertFalse(StartupStallFormat.isAppClass("androidx.compose.ui.node.LayoutNode"))
+        assertFalse(StartupStallFormat.isAppClass("com.rudi.audioplayerx.Lain")) // awalan harus diakhiri titik
+        assertTrue(StartupStallFormat.APP_SCAN_DEPTH > StartupStallFormat.SITE_DEPTH)
+    }
+
+    @Test
+    fun `Batch 687 siteOf menambah frame kode app di luar frame teratas tanpa duplikat dan tetap membuang sampel menganggur`() {
+        val frames = listOf("a.A.one(A.java:1)", "b.B.two(B.java:2)", "c.C.three(C.java:3)", "d.D.four(D.java:4)", "e.E.five(E.java:5)")
+        val app = "com.rudi.audioplayer.ui.SongRowKt.SongRow(SongRow.kt:42)"
+        // Frame app di luar 4 teratas -> ditambahkan di belakang dengan pemisah tetap.
+        assertEquals(
+            "a.A.one(A.java:1) < b.B.two(B.java:2) < c.C.three(C.java:3) < d.D.four(D.java:4) << kode app: $app",
+            StartupStallFormat.siteOf(frames, app)
+        )
+        // Frame app sudah ada di 4 teratas -> kunci tidak berubah (tanpa duplikat).
+        val withApp = listOf("a.A.one(A.java:1)", app, "c.C.three(C.java:3)")
+        assertEquals("a.A.one(A.java:1) < $app < c.C.three(C.java:3)", StartupStallFormat.siteOf(withApp, app))
+        // Tanpa frame app (null) = perilaku Batch 686 persis.
+        assertEquals(StartupStallFormat.siteOf(frames), StartupStallFormat.siteOf(frames, null))
+        assertEquals(
+            "a.A.one(A.java:1) < b.B.two(B.java:2) < c.C.three(C.java:3) < d.D.four(D.java:4)",
+            StartupStallFormat.siteOf(frames, null)
+        )
+        // Sampel menganggur tetap dibuang walau ada frame app.
+        assertNull(StartupStallFormat.siteOf(listOf("android.os.MessageQueue.nativePollOnce(Native Method)", app), app))
+    }
+
+    @Test
+    fun `Batch 687 topAppBetween mengelompokkan menurut frame app menghitung tanpa-frame-app dan kosong bila tak ada sampel`() {
+        val counter = StackSampleCounter()
+        val row = "com.rudi.audioplayer.ui.SongRowKt.SongRow(SongRow.kt:42)"
+        val bar = "com.rudi.audioplayer.ui.SeekBarKt.SeekBar(SeekBar.kt:7)"
+        // Pola v686: sampel pada pesan doFrame 225 ms tersebar di lokasi berbeda tetapi bermuara di sedikit fungsi app.
+        counter.add("lokasi-1", 4_440, row)
+        counter.add("lokasi-2", 4_455, row)
+        counter.add("lokasi-3", 4_470, row)
+        counter.add("lokasi-4", 4_485, bar)
+        counter.add("lokasi-5", 4_500, bar)
+        counter.add("lokasi-6", 4_515, null)
+        counter.add("lokasi-7", 9_000, row) // di luar rentang
+        assertEquals(
+            listOf(
+                StartupStallFormat.appIntervalLine(4_434, 4_659, 6, 3, row),
+                StartupStallFormat.appIntervalLine(4_434, 4_659, 6, 2, bar)
+            ),
+            counter.topAppBetween(4_434, 4_659, 2)
+        )
+        assertEquals(
+            StartupStallFormat.appIntervalLine(4_434, 4_659, 6, 1, StartupStallFormat.NO_APP_FRAME),
+            counter.topAppBetween(4_434, 4_659, 3)[2]
+        )
+        // Rentang tanpa sampel -> kosong (baris "tidak ada sampel aktif" sudah dilaporkan topBetween).
+        assertTrue(counter.topAppBetween(100, 200, 3).isEmpty())
+        // Pemanggilan gaya lama (2 argumen) tetap jalan dan terhitung tanpa-frame-app; seri diurutkan menurut teks ("(" < "c").
+        counter.add("lama", 4_600)
+        assertEquals(
+            listOf(
+                StartupStallFormat.appIntervalLine(4_434, 4_659, 7, 3, row),
+                StartupStallFormat.appIntervalLine(4_434, 4_659, 7, 2, StartupStallFormat.NO_APP_FRAME),
+                StartupStallFormat.appIntervalLine(4_434, 4_659, 7, 2, bar)
+            ),
+            counter.topAppBetween(4_434, 4_659, 5)
+        )
+        counter.reset()
+        assertTrue(counter.topAppBetween(0, 10_000, 3).isEmpty())
+    }
+
+    @Test
+    fun `Batch 687 appIntervalLine memuat rentang sampel aktif jumlah dan frame app`() {
+        assertEquals(
+            "Kode app selama pesan lambat t=+4434..+4659ms (13 sampel aktif): 5x | com.rudi.audioplayer.ui.SongRowKt.SongRow(SongRow.kt:42)",
+            StartupStallFormat.appIntervalLine(4_434, 4_659, 13, 5, "com.rudi.audioplayer.ui.SongRowKt.SongRow(SongRow.kt:42)")
+        )
+    }
+}
