@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 689: 0 file baru (UpdateResumePolicy.kt, UpdateResumeReceiver.kt, PlaybackService.kt, UpdateResumePolicyTest.kt diubah); jumlah tetap 263.
 # Batch 688: + app/src/main/java/com/rudi/audioplayer/playback/UpdateResumePolicy.kt + app/src/main/java/com/rudi/audioplayer/playback/UpdateResumeReceiver.kt + app/src/test/java/com/rudi/audioplayer/playback/UpdateResumePolicyTest.kt (pemulihan pemutar pasca-update: receiver MY_PACKAGE_REPLACED + kebijakan 2-bukti + penanda 'berniat memutar') — 260->263.
 # Batch 682: + app/src/main/java/com/rudi/audioplayer/util/StartupStallFormat.kt + app/src/main/java/com/rudi/audioplayer/util/StartupStallProbe.kt + app/src/test/java/com/rudi/audioplayer/util/StartupStallFormatTest.kt (probe sementara: siapa menahan thread utama saat startup; menulis ke log hanya bila ada stall besar) — 257->260.
 # Batch 681: + app/src/main/java/com/rudi/audioplayer/util/ChangeGate.kt + app/src/test/java/com/rudi/audioplayer/util/ChangeGateTest.kt (pintu log tulis-hanya-bila-berubah untuk baris `Marquee diag` widget) — 255->257.

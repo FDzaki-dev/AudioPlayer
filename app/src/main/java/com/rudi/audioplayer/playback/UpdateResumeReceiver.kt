@@ -109,9 +109,14 @@ class UpdateResumeStore(context: Context) {
     fun setWasPlaying(value: Boolean) {
         if (prefs.getBoolean(KEY_WAS_PLAYING, false) == value) return
         prefs.edit().putBoolean(KEY_WAS_PLAYING, value).apply()
+        // Batch 689: tiap PERUBAHAN penanda dicatat (hanya saat berubah, jadi jarang). Log v688 14:14 menunjukkan
+        // `memutar_sebelum_update=false` tanpa bukti kapan penanda terakhir ditulis; tanpa baris ini penanda yang
+        // tak pernah menyala (bug listener) tak bisa dibedakan dari pemutar yang memang sedang berhenti.
+        AppLogger.w(TAG, "Penanda berniat-memutar -> $value")
     }
 
     private companion object {
+        const val TAG = "UpdateResume"
         const val PREFS_NAME = "update_resume"
         const val KEY_WAS_PLAYING = "was_playing"
     }

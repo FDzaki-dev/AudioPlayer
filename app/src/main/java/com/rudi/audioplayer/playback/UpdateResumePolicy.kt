@@ -49,9 +49,20 @@ object UpdateResumePolicy {
         return record.description?.contains("installPackage", ignoreCase = true) == true
     }
 
+    /**
+     * Batch 689 — HANYA catatan keluar TERBARU yang menentukan (bukan "ada satu saja"): kematian proses yang lebih baru
+     * dari kematian-karena-update berarti penanda "memutar" sudah basi. Skenario yang ditutup: update #1 (proses
+     * dilanjutkan, penanda menyala) -> OEM mematikan proses 3 menit kemudian tanpa aba-aba (penanda tetap true) ->
+     * update #2 saat app tidak berjalan; catatan update #1 masih dalam jendela 10 menit tetapi bukan yang terbaru.
+     * Urutan daftar tidak diandalkan (dipilih dari cap waktu); catatan berstempel sama dengan yang terbaru ikut dinilai.
+     * Log perangkat 19 Nov: daftar sistem urut terbaru-dulu dan catatan PACKAGE_UPDATED memang yang terbaru.
+     */
     fun decide(wasPlaying: Boolean, exits: List<ProcessExitRecord>, nowMs: Long): Decision {
         if (!wasPlaying) return Decision.SKIP_NOT_PLAYING
-        return if (exits.any { isUpdateKill(it, nowMs) }) Decision.RESUME else Decision.SKIP_NO_UPDATE_EXIT
+        if (exits.isEmpty()) return Decision.SKIP_NO_UPDATE_EXIT
+        val newestTimestamp = exits.maxOf { it.timestampMs }
+        val newestIsUpdateKill = exits.any { it.timestampMs == newestTimestamp && isUpdateKill(it, nowMs) }
+        return if (newestIsUpdateKill) Decision.RESUME else Decision.SKIP_NO_UPDATE_EXIT
     }
 
     /**

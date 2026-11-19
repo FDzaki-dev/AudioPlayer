@@ -76,13 +76,44 @@ class UpdateResumePolicyTest {
     }
 
     @Test
-    fun `an update exit anywhere in the list is enough regardless of order`() {
+    fun `the newest exit decides regardless of list order`() {
         val exits = listOf(
             exit(reason = 3, ageMs = 500_000L),
             exit(UpdateResumePolicy.EXIT_REASON_PACKAGE_UPDATED, 3_000L),
             exit(reason = 4, ageMs = 900_000L)
         )
         assertEquals(Decision.RESUME, UpdateResumePolicy.decide(true, exits.reversed(), now))
+        assertEquals(Decision.RESUME, UpdateResumePolicy.decide(true, exits, now))
+    }
+
+    @Test
+    fun `a newer non-update exit makes an older update exit stale - OEM kill between two updates`() {
+        // update #1 (5 mnt lalu, proses dilanjutkan) -> OEM membunuh proses 2 mnt lalu (penanda tetap true) -> update #2 saat app mati
+        val exits = listOf(
+            exit(reason = 13, ageMs = 120_000L, description = "reclaim_process_start"),
+            exit(UpdateResumePolicy.EXIT_REASON_PACKAGE_UPDATED, 300_000L, "stop com.rudi.audioplayer due to installPackageLI")
+        )
+        assertEquals(Decision.SKIP_NO_UPDATE_EXIT, UpdateResumePolicy.decide(true, exits, now))
+        assertEquals(Decision.SKIP_NO_UPDATE_EXIT, UpdateResumePolicy.decide(true, exits.reversed(), now))
+    }
+
+    @Test
+    fun `newest is chosen by timestamp not by list position`() {
+        val exits = listOf(
+            exit(reason = 3, ageMs = 800_000L),
+            exit(UpdateResumePolicy.EXIT_REASON_PACKAGE_UPDATED, 2_000L),
+            exit(reason = 13, ageMs = 4_000_000L)
+        )
+        assertEquals(Decision.RESUME, UpdateResumePolicy.decide(true, exits, now))
+        assertEquals(Decision.RESUME, UpdateResumePolicy.decide(true, exits.reversed(), now))
+    }
+
+    @Test
+    fun `an update exit sharing the newest timestamp with another record still counts`() {
+        val exits = listOf(
+            exit(reason = 13, ageMs = 2_000L),
+            exit(UpdateResumePolicy.EXIT_REASON_PACKAGE_UPDATED, 2_000L)
+        )
         assertEquals(Decision.RESUME, UpdateResumePolicy.decide(true, exits, now))
     }
 

@@ -665,6 +665,9 @@ class PlaybackService : MediaLibraryService() {
                     AppLogger.w("PlaybackService", "Pemulihan pasca-update: tak ada antrean tersimpan untuk dilanjutkan")
                     return@launch
                 }
+                // Batch 689: posisi tepat setelah antrean dipulihkan & SEBELUM play(), pembanding bagi `posisi=` di log
+                // akhir -> memperlihatkan apakah lagu panjang benar-benar lanjut dari posisi tersimpan (bukan dari 0).
+                val restoredPositionMs = player.currentPosition
                 if (!player.playWhenReady) player.play()
                 var waited = 0L
                 while (!player.isPlaying && waited < MAX_HANDOFF_WAIT_MS) {
@@ -676,7 +679,8 @@ class PlaybackService : MediaLibraryService() {
                     "PlaybackService",
                     "Pemulihan pasca-update: isPlaying=${player.isPlaying} tunda_service=${now - startedAt}ms " +
                         "sejak_proses_mulai=${now - android.os.Process.getStartElapsedRealtime()}ms " +
-                        "indeks=${player.currentMediaItemIndex}/${player.mediaItemCount} posisi=${player.currentPosition}ms"
+                        "indeks=${player.currentMediaItemIndex}/${player.mediaItemCount} " +
+                        "posisi_pulih=${restoredPositionMs}ms posisi=${player.currentPosition}ms"
                 )
             } catch (e: CancellationException) {
                 throw e

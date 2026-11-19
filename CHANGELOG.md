@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 689 — pemulihan pasca-update: hanya catatan keluar TERBARU yang menentukan + log penanda & posisi_pulih (log v688 = build 548; CI run115 = Batch 688 VERIFIED) (perilaku BELUM diuji di device)
+
+- Input user: `sonix_debug_20261119_141528.txt` (v688 = 1.10.48 build 548, ekspor 14:15) + `SONIX_laporan-untuk-claude_run115.zip`, tanpa teks. Interpretasi = `[RESUME POINT]` Batch 688: baca log + laporan CI, lanjutkan dari temuan nyata (ZIP dilarang docs-only).
+
+- CI run115 (Batch 688) = VERIFIED: Tes 303 LULUS (prediksi tepat), ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0, Kotlin 0. `PlaybackService` (tak bisa dikompilasi lokal) ikut lolos compile/R8.
+
+- DATA log v688 (pasca-instal 14:14): `W/UpdateResume 14:14:15.769 MY_PACKAGE_REPLACED: memutar_sebelum_update=false catatan_keluar=8 [16@1795068853576,13@...,13@...] keputusan=SKIP_NOT_PLAYING` = (1) receiver TERDAFTAR dan broadcast `MY_PACKAGE_REPLACED` TERKIRIM di XOS Infinix X6850 / Android 16 (±2,3 dtk setelah proses lama mati); (2) catatan keluar `PACKAGE_UPDATED` (16) sudah terbaca saat itu dan urutan daftar = terbaru-dulu; (3) `SKIP_NOT_PLAYING` WAJAR pada update pertama ini: proses v687 belum menulis penanda. Pemulihan nyata (RESUME) BELUM teramati — butuh update berikutnya saat musik diputar.
+
+- TIDAK DIUBAH (sengaja): (a) jank ±1,9 dtk setelah Activity (kelima kali): atribusi kode app tak meyakinkan (1x `MiniPlayerBar`, 1x lambda `UtilsKt`, 8 dari 13 sampel tanpa frame app, 119 sampel di `nSyncAndDrawFrame`); DUGAAN (belum terbukti): update paket mengosongkan cache shader HWUI/Skia sehingga frame pertama menunggu RenderThread; tak ada jendela pembanding proses lama -> tak ada perbaikan kode yang dibenarkan. (b) Pemicu pemutaran 14:14:17,2 (service dibuat 14:14:16,95, `recentCallingPackage=com.android.systemui`) belum diketahui (kandidat: widget/SystemUI/tombol headset); `onPlaybackResumption` tak punya log sukses.
+
+- PERBAIKAN (4 file source/test; 0 file baru; FILE_MANIFEST tetap 263):
+  - `playback/UpdateResumePolicy.kt`: `decide()` kini menilai catatan keluar TERBARU (cap waktu terbesar, bukan posisi daftar; catatan berstempel sama ikut dinilai) — bukan "ada satu saja dalam 10 menit". Menutup celah: update #1 (proses dilanjutkan, penanda menyala) -> OEM mematikan proses tanpa aba-aba (penanda tetap true) -> update #2 saat app tak berjalan: catatan update #1 masih dalam jendela 10 menit tetapi sudah basi -> kini `SKIP_NO_UPDATE_EXIT` (tak ada audio mendadak). Jalur normal (catatan 16 terbaru) tak berubah.
+  - `playback/UpdateResumeReceiver.kt` (`UpdateResumeStore.setWasPlaying`): tiap PERUBAHAN penanda dicatat `W/UpdateResume: Penanda berniat-memutar -> true/false` (hanya saat berubah). Membedakan "penanda tak pernah menyala (bug listener)" dari "pemutar memang berhenti" pada log berikutnya.
+  - `playback/PlaybackService.kt` (`resumeAfterUpdate`): log `Pemulihan pasca-update` kini memuat `posisi_pulih=` (posisi tepat setelah `restoreLastQueue()`, sebelum `play()`) berdampingan dengan `posisi=` -> terlihat apakah lagu panjang lanjut dari posisi tersimpan, bukan dari 0.
+  - `UpdateResumePolicyTest.kt`: +3 tes (OEM kill antar-update, terbaru menurut cap waktu, cap waktu sama) = 15 tes; 1 tes diganti nama (`an update exit anywhere in the list...` -> `the newest exit decides regardless of list order`).
+
+- VERIFIKASI LOKAL: kompiler Kotlin 2.0.21 + JUnit 4.13.2 -> `UpdateResumePolicyTest` 15/15 LULUS (`-Werror`, 0 peringatan); `UpdateResumeReceiver` terkompilasi terhadap stub android `-Werror` 0 peringatan. **NOT VERIFIED**: compile Android/R8/CI untuk dua baris log di `PlaybackService` (butuh Media3).
+
+- PREDIKSI CI: Tes 306 (303 + 3), ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0, Kotlin 0.
+
+- LANGKAH UJI: pasang v689 SAAT musik diputar (proses v688 sudah menulis penanda) -> kirim log: harapan `keputusan=RESUME` + `Penanda berniat-memutar -> false` lalu `-> true` + `Pemulihan pasca-update: isPlaying=true ... posisi_pulih=... posisi=...`. Tetap NOT VERIFIED: start FGS dari receiver di Android 16, cadangan API 31-33, jalur notifikasi cadangan.
+
 ## Batch 688 — pemulihan pemutar pasca-update: receiver MY_PACKAGE_REPLACED + penanda "berniat memutar" + simpan posisi berkala (log v687 = 1.10.47 build 547) (BELUM verified di device/CI)
 
 - Input user: `sonix_debug_20261119_084840.txt` (v687 = 1.10.47 build 547, ekspor 08:48) + `SONIX_v687.zip`, teks: "buatkan mekanisme agar pemutar dapat memulihkan kondisi dengan cepat/melanjutkan pemutar musik yang terjeda akibat pasca instalasi update app!!" (lalu "buruan").
