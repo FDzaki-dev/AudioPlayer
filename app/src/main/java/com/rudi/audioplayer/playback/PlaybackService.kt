@@ -87,6 +87,11 @@ class PlaybackService : MediaLibraryService() {
     // [handleWidgetActionWhileNotPlaying]); hanya yang terbaru boleh membongkar placeholder foreground.
     private var widgetPausedHandoffGen = 0
 
+    // Batch 688 — pemulihan pasca-update: penanda persisten "berniat memutar" (dibaca [UpdateResumeReceiver] setelah
+    // instalasi mematikan proses) + pencatat posisi berkala selagi memutar (lihat [startPositionPersistTick]).
+    private val updateResumeStore by lazy { UpdateResumeStore(this) }
+    private var positionPersistJob: Job? = null
+
     // Batch 615 — pencatatan putaran SAAT UI TUTUP. Pengawas Batch 597 hidup di PlayerViewModel, jadi lagu yang
     // diputar lewat widget/headset/bubble setelah Activity ditutup tak pernah tercatat (statistik, "Baru Diputar",
     // Paling Sering Diputar). Pelacak ini SELALU berjalan di service dan menghabiskan "ambang tercapai" tiap sesi,
@@ -245,6 +250,17 @@ class PlaybackService : MediaLibraryService() {
         startServicePlayCount(player) // Batch 615
         player.addListener(object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) {
+                // Batch 688 — penanda "berniat memutar" untuk pemulihan pasca-update; hanya event yang mengubahnya.
+                SafeGuard.guard("PlaybackService", "listener.onEvents.updateResume") {
+                    if (events.containsAny(
+                            Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                            Player.EVENT_PLAYBACK_STATE_CHANGED,
+                            Player.EVENT_TIMELINE_CHANGED
+                        )
+                    ) {
+                        syncUpdateResumeFlag(player)
+                    }
+                }
                 SafeGuard.guard("PlaybackService", "listener.onEvents") {
                     val id = (player as? ExoPlayer)?.audioSessionId ?: return
                     if (id != 0) PlaybackAudioSession.sessionId = id
@@ -290,6 +306,9 @@ class PlaybackService : MediaLibraryService() {
                     // Batch 646 — jeda = posisi akhir yang akurat. IDLE (mis. `stop()` dari dismiss mini player) dilewati agar antrean yang baru
                     // dikosongkan pengguna tak dibangkitkan lagi.
                     if (!isPlaying && player.playbackState != Player.STATE_IDLE) persistQueueFromService(player, "jeda")
+                    // Batch 688 — selagi memutar, posisi dicatat berkala (bukan hanya saat ganti lagu/jeda) supaya update yang
+                    // mematikan proses tanpa aba-aba tetap melanjutkan dari posisi yang nyaris sama.
+                    if (isPlaying) startPositionPersistTick(player) else stopPositionPersistTick()
                     // Batch 102 — pause/resume mid-crossfade harus ikut membekukan/melanjutkan
                     // overlapPlayer, kalau tidak lagu berikutnya tetap terdengar sendiri walau user
                     // sudah menekan jeda.
@@ -580,6 +599,104 @@ class PlaybackService : MediaLibraryService() {
 
     private var lastQueuePersistLogKey = -1
 
+    /**
+     * Batch 688 — menyimpan penanda "pemain berniat memutar" ke [UpdateResumeStore]. Diperbarui dari `onEvents` (play-when-
+     * ready / status / timeline berubah), hanya menulis disk bila nilainya berubah. Penanda ini TIDAK dibersihkan saat
+     * proses dimatikan sistem (tak ada callback) — itulah intinya: [UpdateResumeReceiver] membacanya setelah instalasi
+     * mematikan proses dan mencocokkannya dengan `ApplicationExitInfo` ([UpdateResumePolicy]).
+     */
+    private fun syncUpdateResumeFlag(player: Player) {
+        updateResumeStore.setWasPlaying(
+            UpdateResumePolicy.intendsToPlay(player.playWhenReady, player.mediaItemCount, player.playbackState)
+        )
+    }
+
+    /**
+     * Batch 688 — DASAR (log 19 Nov): service hanya menyimpan antrean/posisi saat ganti lagu atau jeda; lagu 90 menit yang
+     * diputar tanpa UI terbuka (id=282255, posisi tersimpan 1.993.499 ms vs nyata ±5.416.000 ms) akan pulih ke posisi
+     * puluhan menit yang lalu setelah update mematikan proses. Selagi memutar, posisi kini ikut disimpan tiap
+     * [POSITION_PERSIST_INTERVAL_MS] lewat [persistQueueFromService] yang SAMA (satu jalur simpan, 0 format baru). `delay`
+     * berbasis uptime: tidak membangunkan CPU yang tidur (mis. audio offload layar mati); berhenti seketika saat jeda.
+     */
+    private fun startPositionPersistTick(player: Player) {
+        if (positionPersistJob?.isActive == true) return
+        positionPersistJob = serviceScope.launch {
+            while (isActive) {
+                delay(POSITION_PERSIST_INTERVAL_MS)
+                if (player.isPlaying) persistQueueFromService(player, "berkala")
+            }
+        }
+    }
+
+    private fun stopPositionPersistTick() {
+        positionPersistJob?.cancel()
+        positionPersistJob = null
+    }
+
+    /**
+     * Batch 688 — dipicu [UpdateResumeReceiver] (`ACTION_MY_PACKAGE_REPLACED`) atau ketukan notifikasi cadangan
+     * ([UpdateResumeNotifier]): lanjutkan antrean terakhir dari posisi tersimpan tanpa menunggu Activity/user. Idempoten:
+     * sudah memutar = tak melakukan apa pun (BEDA dari ACTION_TOGGLE_PLAY yang akan MENJEDA). Urutan mengikuti jalur
+     * cold-start widget yang sudah terbukti: `startForeground()` placeholder SEKARANG (kontrak `startForegroundService`)
+     * -> pulihkan antrean (MediaStore, IO) -> `play()` -> tunggu `isPlaying` -> bongkar placeholder. Waktu tiap tahap
+     * dicatat (`tunda_service`, `sejak_proses_mulai`) untuk menilai kecepatan pemulihan di log berikutnya.
+     */
+    private fun resumeAfterUpdate() {
+        NotificationManagerCompat.from(this).cancel(UpdateResumeNotifier.NOTIFICATION_ID)
+        val current = mediaSession?.player
+        if (current != null && current.playWhenReady && current.mediaItemCount > 0) {
+            AppLogger.w("PlaybackService", "Pemulihan pasca-update: pemain sudah memutar, tak ada yang dilakukan")
+            return
+        }
+        val startedAt = SystemClock.elapsedRealtime()
+        try {
+            startForegroundColdStartNotification()
+        } catch (e: Exception) {
+            AppLogger.e("PlaybackService", "Pemulihan pasca-update: startForeground ditolak", e)
+            UpdateResumeNotifier.post(this)
+            return
+        }
+        coldStartNotificationActive = true
+        serviceScope.launch {
+            try {
+                if (mediaSession?.player?.mediaItemCount == 0) restoreLastQueue()
+                val player = mediaSession?.player
+                if (player == null || player.mediaItemCount == 0) {
+                    AppLogger.w("PlaybackService", "Pemulihan pasca-update: tak ada antrean tersimpan untuk dilanjutkan")
+                    return@launch
+                }
+                if (!player.playWhenReady) player.play()
+                var waited = 0L
+                while (!player.isPlaying && waited < MAX_HANDOFF_WAIT_MS) {
+                    delay(150)
+                    waited += 150
+                }
+                val now = SystemClock.elapsedRealtime()
+                AppLogger.w(
+                    "PlaybackService",
+                    "Pemulihan pasca-update: isPlaying=${player.isPlaying} tunda_service=${now - startedAt}ms " +
+                        "sejak_proses_mulai=${now - android.os.Process.getStartElapsedRealtime()}ms " +
+                        "indeks=${player.currentMediaItemIndex}/${player.mediaItemCount} posisi=${player.currentPosition}ms"
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e("PlaybackService", "Pemulihan pasca-update gagal", e)
+            } finally {
+                coldStartNotificationActive = false
+                try {
+                    if (mediaSession?.player?.playWhenReady == true) {
+                        NotificationManagerCompat.from(this@PlaybackService).cancel(COLD_START_NOTIFICATION_ID)
+                    } else {
+                        stopForeground(android.app.Service.STOP_FOREGROUND_REMOVE)
+                    }
+                } catch (e: Exception) {
+                    AppLogger.e("PlaybackService", "Gagal membongkar placeholder pemulihan pasca-update", e)
+                }
+            }
+        }
+    }
+
     private fun pushWidgetUpdate(player: Player) {
         val metadata = player.currentMediaItem?.mediaMetadata
         // saveState is cheap (SharedPreferences.apply() is already async-safe) and stays on
@@ -605,6 +722,11 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
+        // Batch 688 — pemulihan pasca-update (receiver MY_PACKAGE_REPLACED / notifikasi cadangan); lihat resumeAfterUpdate().
+        if (action == ACTION_RESUME_AFTER_UPDATE) {
+            resumeAfterUpdate()
+            return super.onStartCommand(intent, flags, startId)
+        }
         val isWidgetAction = action == WidgetUpdater.ACTION_TOGGLE_PLAY ||
             action == WidgetUpdater.ACTION_NEXT ||
             action == WidgetUpdater.ACTION_PREVIOUS
@@ -1101,6 +1223,11 @@ class PlaybackService : MediaLibraryService() {
         // Batch 594 — lama placeholder foreground bertahan setelah aksi next/prev widget saat jeda (kontrak
         // startForegroundService sudah terpenuhi sejak startForeground; ini hanya jeda sebelum dibongkar).
         private const val WIDGET_PAUSED_PLACEHOLDER_MS = 1500L
+
+        // Batch 688 — pemulihan pasca-update. Aksi di bawah dikirim [UpdateResumeReceiver] / [UpdateResumeNotifier];
+        // interval = batas galat posisi saat proses dimatikan tanpa aba-aba (lihat startPositionPersistTick).
+        const val ACTION_RESUME_AFTER_UPDATE = "com.rudi.audioplayer.ACTION_RESUME_AFTER_UPDATE"
+        private const val POSITION_PERSIST_INTERVAL_MS = 10_000L
 
         // Roadmap #8, Trim Keheningan Otomatis — nama custom SessionCommand + key Bundle-nya,
         // dipakai bareng PlayerViewModel.setSilenceSkipEnabled() lewat MediaController.

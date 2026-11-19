@@ -185,6 +185,19 @@
             </intent-filter>
         </receiver>
 
+        <!-- Batch 688 — pemulihan pasca-update: instalasi versi baru mematikan proses beserta pemutar
+             (log: ApplicationExitInfo PACKAGE_UPDATED, importance FOREGROUND). Receiver ini menerima
+             MY_PACKAGE_REPLACED (broadcast sistem ke app sendiri; pengecualian resmi larangan start
+             foreground service dari background) dan melanjutkan musik yang sedang diputar saat proses
+             mati. exported="false": sistem tetap mengirim broadcast ini; atribut hanya menutup app lain. -->
+        <receiver
+            android:name=".playback.UpdateResumeReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".widget.PlayerWidgetProvider"
             android:exported="true">
