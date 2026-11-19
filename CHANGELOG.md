@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 690 — pemulihan pasca-update lebih cepat: lewati peta genre saat membaca antrean + log tahap `pulih_antrean`/`putar` (log v689 = build 549: RESUME TERBUKTI di perangkat) (percepatan BELUM diukur)
+
+- Input user: `sonix_debug_20261119_190630.txt` (v689 = 1.10.49 build 549, ekspor 19:06:25), teks: "masih ada jeda sepersekian mili detik". Interpretasi: pemulihan sudah jalan, tetapi masih ada hening antara musik mati (update) dan musik hidup lagi -> pangkas bagian yang dikendalikan kode app.
+
+- HASIL v689 di perangkat (Infinix X6850 / Android 16): `memutar_sebelum_update=true ... keputusan=RESUME` (19:06:08.946) -> `Penanda berniat-memutar -> false` (08.948) -> `-> true` (09.787) -> `Pemulihan pasca-update: isPlaying=true tunda_service=1342ms sejak_proses_mulai=2561ms indeks=0/135 posisi_pulih=5216481ms posisi=5216508ms` (10.579). Musik lanjut dari posisi tersimpan (AudioTrack mulai 10.464, `PLAYING position=5216493`). Mekanisme Batch 688+689 = VERIFIED di device (start FGS dari receiver di Android 16 jalan tanpa penolakan; jalur notifikasi cadangan tak terpakai). 0 FATAL/ANR baru (5 FATAL lama 8-11 Nov).
+
+- LINIMASA hening (proses lama mati 19:06:06.82 -> AudioTrack mulai 19:06:10.46 = ±3,64 dtk): (a) mati -> receiver 2,12 dtk = sistem (instal selesai, proses lahir, `finishAttachApplication`, widget `onUpdate`) — TAK bisa dihilangkan kode app, jadi hening nol mustahil; (b) receiver -> AudioTrack 1,52 dtk = jatah app: receiver 116 ms (`startService` binder ±75 ms + `getHistoricalProcessExitReasons` ±30 ms; sampel probe) + `PlaybackService.onCreate` 174-189 ms (ExoPlayer 77 + sesi 94) + pulihkan antrean ±0,5 dtk (baca MediaStore di IO ±0,38 dtk + `setMediaItems`/binder `MediaSession.setMetadata` di thread utama 155 ms) + persiapan pemain ±0,7 dtk (buka sumber/seek Opus ±0,25 dtk, MediaCodecList + codec ±0,2 dtk, AudioTrack ±0,05 dtk; kerja framework).
+
+- AKAR yang bisa dipangkas: `MusicRepository.getSongsByIds` (satu-satunya pemakai: pemulihan antrean `PlaybackService.loadSavedQueueItems`) memanggil `querySongs` -> `buildGenreMap()` = 1 query daftar genre + 1 query anggota PER genre di SELURUH perpustakaan, padahal hasil pemulihan (`MediaItem`: judul/artis/album/uri) tidak memakai genre. DUGAAN (belum terukur): porsi terbesar dari ±0,38 dtk baca antrean (log berikut mengukurnya lewat `pulih_antrean=`).
+
+- PERBAIKAN (2 file source; 0 file baru; 0 tes baru; FILE_MANIFEST tetap 263):
+  - `data/MusicRepository.kt`: `getSongsByIds(ids, includeGenre = true)` + `querySongs(..., includeGenre = true)`; `false` melewati `buildGenreMap()`. Default `true` = perilaku lama utuh (getAllSongs tak berubah).
+  - `playback/PlaybackService.kt`: `loadSavedQueueItems` memanggil `getSongsByIds(saved.songIds, includeGenre = false)` (menguntungkan SEMUA jalur pemulihan: widget cold-start, `onPlaybackResumption`, pasca-update); `resumeAfterUpdate` mengukur tahap `pulih_antrean` (baca+setMediaItems+prepare) dan `putar` (play -> isPlaying, kelipatan 150 ms), baris log dipindah ke `logResumeOutcome(...)` (tambah `pulih_antrean=`/`putar=`; field lama tak berubah).
+
+- TIDAK diubah (sengaja, BELUM ada bukti/risiko lebih besar): prefetch antrean di receiver paralel dengan `startService`+`onCreate` (±0,27 dtk tumpang-tindih; butuh penampung antar-komponen), memutar 1 lagu dulu lalu menyusul antrean (risiko antrean 1 lagu ikut tersimpan bila proses mati di jendela itu), pemanasan `MediaCodecList` (±0,1 dtk, dugaan), widget `onUpdate` yang berjalan sebelum receiver. Keputusan menunggu angka `pulih_antrean=`/`putar=` di log berikut.
+
+- VERIFIKASI LOKAL: kurung seimbang (`{}`/`()`/`[]` = sama dengan v689) pada kedua file; `UpdateResumePolicyTest` 15/15 tak tersentuh. **NOT VERIFIED**: compile Android/R8/CI dan besar percepatan (Android tak tersedia di sandbox). CI v689 (laporan) BELUM dikirim -> Tes 306/ArchUnit/lint/detekt/SpotBugs Batch 689 masih NOT VERIFIED di Actions (APK build 549 terpasang = compile+R8 berhasil).
+
+- PREDIKSI CI: Tes 306 (tak berubah), ArchUnit 7, detekt 0 (config `style`/`complexity` mati), lintDebug 0, SpotBugs 0, Kotlin 0.
+
+- LANGKAH UJI: pasang v690 SAAT musik diputar -> kirim log: bandingkan `pulih_antrean=` (v689 ±500 ms termasuk baca+set; kini diharapkan turun) dan `tunda_service=` (v689 = 1342 ms).
+
 ## Batch 689 — pemulihan pasca-update: hanya catatan keluar TERBARU yang menentukan + log penanda & posisi_pulih (log v688 = build 548; CI run115 = Batch 688 VERIFIED) (perilaku BELUM diuji di device)
 
 - Input user: `sonix_debug_20261119_141528.txt` (v688 = 1.10.48 build 548, ekspor 14:15) + `SONIX_laporan-untuk-claude_run115.zip`, tanpa teks. Interpretasi = `[RESUME POINT]` Batch 688: baca log + laporan CI, lanjutkan dari temuan nyata (ZIP dilarang docs-only).

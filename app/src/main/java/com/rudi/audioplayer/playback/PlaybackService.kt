@@ -659,7 +659,9 @@ class PlaybackService : MediaLibraryService() {
         coldStartNotificationActive = true
         serviceScope.launch {
             try {
+                val restoreStart = SystemClock.elapsedRealtime()
                 if (mediaSession?.player?.mediaItemCount == 0) restoreLastQueue()
+                val restoreMs = SystemClock.elapsedRealtime() - restoreStart
                 val player = mediaSession?.player
                 if (player == null || player.mediaItemCount == 0) {
                     AppLogger.w("PlaybackService", "Pemulihan pasca-update: tak ada antrean tersimpan untuk dilanjutkan")
@@ -668,20 +670,14 @@ class PlaybackService : MediaLibraryService() {
                 // Batch 689: posisi tepat setelah antrean dipulihkan & SEBELUM play(), pembanding bagi `posisi=` di log
                 // akhir -> memperlihatkan apakah lagu panjang benar-benar lanjut dari posisi tersimpan (bukan dari 0).
                 val restoredPositionMs = player.currentPosition
+                val playStart = SystemClock.elapsedRealtime()
                 if (!player.playWhenReady) player.play()
                 var waited = 0L
                 while (!player.isPlaying && waited < MAX_HANDOFF_WAIT_MS) {
                     delay(150)
                     waited += 150
                 }
-                val now = SystemClock.elapsedRealtime()
-                AppLogger.w(
-                    "PlaybackService",
-                    "Pemulihan pasca-update: isPlaying=${player.isPlaying} tunda_service=${now - startedAt}ms " +
-                        "sejak_proses_mulai=${now - android.os.Process.getStartElapsedRealtime()}ms " +
-                        "indeks=${player.currentMediaItemIndex}/${player.mediaItemCount} " +
-                        "posisi_pulih=${restoredPositionMs}ms posisi=${player.currentPosition}ms"
-                )
+                logResumeOutcome(player, startedAt, restoredPositionMs, restoreMs, SystemClock.elapsedRealtime() - playStart)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -699,6 +695,24 @@ class PlaybackService : MediaLibraryService() {
                 }
             }
         }
+    }
+
+    /**
+     * Batch 690 — baris hasil pemulihan pasca-update, dipisah dari [resumeAfterUpdate] (batas panjang fungsi detekt).
+     * `pulih_antrean` = baca MediaStore + `setMediaItems` + `prepare` (log v689: ±0,5 dtk); `putar` = `play()` sampai
+     * `isPlaying` (dibulatkan ke kelipatan 150 ms oleh polling; log v689: ±0,7 dtk). Keduanya menunjukkan tahap mana yang
+     * layak dipangkas berikutnya.
+     */
+    private fun logResumeOutcome(player: Player, startedAt: Long, restoredPositionMs: Long, restoreMs: Long, playMs: Long) {
+        val now = SystemClock.elapsedRealtime()
+        AppLogger.w(
+            "PlaybackService",
+            "Pemulihan pasca-update: isPlaying=${player.isPlaying} tunda_service=${now - startedAt}ms " +
+                "pulih_antrean=${restoreMs}ms putar=${playMs}ms " +
+                "sejak_proses_mulai=${now - android.os.Process.getStartElapsedRealtime()}ms " +
+                "indeks=${player.currentMediaItemIndex}/${player.mediaItemCount} " +
+                "posisi_pulih=${restoredPositionMs}ms posisi=${player.currentPosition}ms"
+        )
     }
 
     private fun pushWidgetUpdate(player: Player) {
@@ -943,7 +957,8 @@ class PlaybackService : MediaLibraryService() {
     private suspend fun loadSavedQueueItems(): SavedQueueItems? {
         val saved = PlaybackStateStore(this).load() ?: return null
         val foundSongs = withContext(Dispatchers.IO) {
-            MusicRepository(this@PlaybackService).getSongsByIds(saved.songIds)
+            // Batch 690: genre tak dipakai `MediaItem` di bawah -> lewati peta genre (query per-genre di seluruh perpustakaan).
+            MusicRepository(this@PlaybackService).getSongsByIds(saved.songIds, includeGenre = false)
         }
         if (foundSongs.isEmpty()) return null
 

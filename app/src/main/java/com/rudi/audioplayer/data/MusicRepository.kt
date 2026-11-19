@@ -55,19 +55,27 @@ class MusicRepository(private val context: Context) {
         return map
     }
 
-    /** Targeted lookup for just a few IDs — used to restore a saved queue without a full library scan. */
-    fun getSongsByIds(ids: List<Long>): List<Song> {
+    /**
+     * Targeted lookup for just a few IDs — used to restore a saved queue without a full library scan.
+     *
+     * Batch 690: [includeGenre] = false melewati [buildGenreMap] (1 query daftar genre + 1 query anggota PER genre di
+     * SELURUH perpustakaan, lalu dibuang kecuali untuk id yang diminta). Pemulihan antrean hanya butuh judul/artis/album/uri
+     * (genre tak masuk `MediaItem`), padahal pada log v689 (19 Nov, pemulihan pasca-update) tahap baca antrean 135 lagu
+     * ±0,4 dtk (selisih cap waktu log) di jalur kritis "musik mati -> musik hidup lagi"; porsi peta genre di angka itu
+     * masih DUGAAN, diukur di log berikut lewat `pulih_antrean=`. Default `true` = perilaku lama utuh.
+     */
+    fun getSongsByIds(ids: List<Long>, includeGenre: Boolean = true): List<Song> {
         if (ids.isEmpty()) return emptyList()
         val placeholders = ids.joinToString(",") { "?" }
         val selection = "$BASE_SELECTION AND ${MediaStore.Audio.Media._ID} IN ($placeholders)"
         val selectionArgs = ids.map { it.toString() }.toTypedArray()
-        return querySongs(selection, selectionArgs)
+        return querySongs(selection, selectionArgs, includeGenre)
     }
 
-    private fun querySongs(selection: String, selectionArgs: Array<String>?): List<Song> {
+    private fun querySongs(selection: String, selectionArgs: Array<String>?, includeGenre: Boolean = true): List<Song> {
         val songs = mutableListOf<Song>()
         val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        val genreMap = buildGenreMap()
+        val genreMap: Map<Long, String> = if (includeGenre) buildGenreMap() else emptyMap()
 
         // Sektor SDK_INT legacy mati (Batch 402 katalog, dieksekusi hati-hati batch ini): minSdk
         // 31 (sejak Batch 290) sudah di atas Q (29) — RELATIVE_PATH SELALU tersedia, cabang DATA
