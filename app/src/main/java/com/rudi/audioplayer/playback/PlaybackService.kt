@@ -92,6 +92,9 @@ class PlaybackService : MediaLibraryService() {
     private val updateResumeStore by lazy { UpdateResumeStore(this) }
     private var positionPersistJob: Job? = null
 
+    /** Batch 691 — satu pemulihan pasca-update sekaligus (pemicu awal [UpdateResumeCoordinator] + broadcast bisa tumpang-tindih). */
+    private var resumeJob: Job? = null
+
     // Batch 615 — pencatatan putaran SAAT UI TUTUP. Pengawas Batch 597 hidup di PlayerViewModel, jadi lagu yang
     // diputar lewat widget/headset/bubble setelah Activity ditutup tak pernah tercatat (statistik, "Baru Diputar",
     // Paling Sering Diputar). Pelacak ini SELALU berjalan di service dan menghabiskan "ambang tercapai" tiap sesi,
@@ -644,8 +647,17 @@ class PlaybackService : MediaLibraryService() {
     private fun resumeAfterUpdate() {
         NotificationManagerCompat.from(this).cancel(UpdateResumeNotifier.NOTIFICATION_ID)
         val current = mediaSession?.player
+        // Batch 691: pemicu kedua (broadcast MY_PACKAGE_REPLACED menyusul percobaan awal dari Application.onCreate) tidak boleh
+        // memulihkan antrean dua kali (setMediaItems kedua = lagu mundur ke posisi tersimpan yang lebih lama). Penanda disinkronkan
+        // ulang dari keadaan pemain NYATA karena receiver sudah menurunkannya sebelum memanggil kita.
+        if (resumeJob?.isActive == true) {
+            AppLogger.w("PlaybackService", "Pemulihan pasca-update: sudah berjalan, pemicu kedua diabaikan")
+            current?.let { syncUpdateResumeFlag(it) }
+            return
+        }
         if (current != null && current.playWhenReady && current.mediaItemCount > 0) {
             AppLogger.w("PlaybackService", "Pemulihan pasca-update: pemain sudah memutar, tak ada yang dilakukan")
+            syncUpdateResumeFlag(current)
             return
         }
         val startedAt = SystemClock.elapsedRealtime()
@@ -657,7 +669,7 @@ class PlaybackService : MediaLibraryService() {
             return
         }
         coldStartNotificationActive = true
-        serviceScope.launch {
+        resumeJob = serviceScope.launch {
             try {
                 val restoreStart = SystemClock.elapsedRealtime()
                 if (mediaSession?.player?.mediaItemCount == 0) restoreLastQueue()

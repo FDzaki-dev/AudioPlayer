@@ -10,6 +10,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Process
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.rudi.audioplayer.R
@@ -33,45 +35,95 @@ import com.rudi.audioplayer.util.AppLogger
 class UpdateResumeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
-        val appContext = context.applicationContext
         try {
-            handle(appContext)
+            UpdateResumeCoordinator.run(context.applicationContext, UpdateResumeCoordinator.TRIGGER_BROADCAST)
         } catch (e: Exception) {
-            AppLogger.e(TAG, "Pemulihan pasca-update gagal", e)
+            AppLogger.e("UpdateResume", "Pemulihan pasca-update gagal", e)
         }
     }
+}
 
-    private fun handle(context: Context) {
+/**
+ * Batch 691 — logika keputusan+pemicu pemulihan dipakai DUA pemicu:
+ * 1. [TRIGGER_BROADCAST] (jalur terjamin, Batch 688): `ACTION_MY_PACKAGE_REPLACED`, dikecualikan resmi dari larangan start
+ *    foreground service dari background.
+ * 2. [TRIGGER_EARLY] (EKSPERIMEN): dari thread latar di `Application.onCreate`. Log v690 (19 Nov 19:18): proses baru lahir
+ *    +1,0 dtk setelah proses lama mati, tetapi broadcast baru dikirim sistem ±1,1 dtk SETELAH itu (thread utama idle,
+ *    tak ada pesan lambat sebelum receiver) — jendela ±0,8 dtk yang TAK bisa dipakai receiver. Apakah Android mengizinkan
+ *    start FGS dari titik awal ini TIDAK diketahui (pengecualian resminya terikat pada penerimaan broadcast), maka
+ *    penolakan hanya dicatat dan jalur 1 tetap berlaku (penanda TIDAK dikonsumsi bila start gagal).
+ * Kebijakan sama persis ([UpdateResumePolicy]): penanda "memutar" + catatan keluar TERBARU = kematian oleh instalasi.
+ * Pada cold start biasa percobaan awal diam (tanpa log) kecuali keputusan RESUME.
+ */
+object UpdateResumeCoordinator {
+    private const val TAG = "UpdateResume"
+    const val TRIGGER_BROADCAST = "MY_PACKAGE_REPLACED"
+    const val TRIGGER_EARLY = "proses_mulai"
+    private const val EXIT_HISTORY_MAX = 8
+    private const val LOGGED_EXITS = 3
+
+    /** Dipanggil dari `Application.onCreate`; thread daemon sehingga biaya di thread utama ~0. */
+    fun startEarlyAttempt(context: Context) {
+        val appContext = context.applicationContext
+        val worker = Thread({
+            try {
+                run(appContext, TRIGGER_EARLY)
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "Percobaan awal pemulihan pasca-update gagal", e)
+            }
+        }, "UpdateResumeEarly")
+        worker.isDaemon = true
+        worker.start()
+    }
+
+    fun run(context: Context, trigger: String) {
+        val early = trigger == TRIGGER_EARLY
         val store = UpdateResumeStore(context)
         val wasPlaying = store.wasPlaying()
+        if (early && !wasPlaying) return
+        val nowMs = System.currentTimeMillis()
         val exits = readExitRecords(context)
-        val decision = UpdateResumePolicy.decide(wasPlaying, exits, System.currentTimeMillis())
+        val decision = UpdateResumePolicy.decide(wasPlaying, exits, nowMs)
+        if (early && decision != UpdateResumePolicy.Decision.RESUME) return
         val exitSummary = exits.take(LOGGED_EXITS).joinToString(",") { "${it.reason}@${it.timestampMs}" }
+        val sinceKillMs = exits.maxOfOrNull { it.timestampMs }?.let { nowMs - it } ?: -1L
+        val sinceStartMs = SystemClock.elapsedRealtime() - Process.getStartElapsedRealtime()
         AppLogger.w(
             TAG,
-            "MY_PACKAGE_REPLACED: memutar_sebelum_update=$wasPlaying catatan_keluar=${exits.size} [$exitSummary] keputusan=$decision"
+            "$trigger: memutar_sebelum_update=$wasPlaying catatan_keluar=${exits.size} [$exitSummary] keputusan=$decision " +
+                "sejak_mati=${sinceKillMs}ms sejak_proses_mulai=${sinceStartMs}ms"
         )
         when (decision) {
-            UpdateResumePolicy.Decision.RESUME -> {
-                // Dikonsumsi SEKARANG: jalur pemulihan (service atau ketukan notifikasi) menyalakan penanda lagi lewat
-                // listener pemain begitu benar-benar memutar; tak ada pemutaran ulang berantai.
-                store.setWasPlaying(false)
-                startResume(context)
-            }
+            UpdateResumePolicy.Decision.RESUME -> if (early) startEarly(context, store) else startFromBroadcast(context, store)
             // Penanda basi: proses lama tidak mati karena instalasi ini. Dibersihkan agar tak memicu di update berikutnya.
             UpdateResumePolicy.Decision.SKIP_NO_UPDATE_EXIT -> store.setWasPlaying(false)
             UpdateResumePolicy.Decision.SKIP_NOT_PLAYING -> Unit
         }
     }
 
-    private fun startResume(context: Context) {
-        val serviceIntent = Intent(context, PlaybackService::class.java)
-            .setAction(PlaybackService.ACTION_RESUME_AFTER_UPDATE)
+    private fun resumeIntent(context: Context): Intent =
+        Intent(context, PlaybackService::class.java).setAction(PlaybackService.ACTION_RESUME_AFTER_UPDATE)
+
+    private fun startFromBroadcast(context: Context, store: UpdateResumeStore) {
+        // Dikonsumsi SEKARANG: jalur pemulihan (service atau ketukan notifikasi) menyalakan penanda lagi lewat
+        // listener pemain begitu benar-benar memutar; tak ada pemutaran ulang berantai.
+        store.setWasPlaying(false)
         try {
-            ContextCompat.startForegroundService(context, serviceIntent)
+            ContextCompat.startForegroundService(context, resumeIntent(context))
         } catch (e: Exception) {
             AppLogger.e(TAG, "startForegroundService ditolak saat MY_PACKAGE_REPLACED; jatuh ke notifikasi", e)
             UpdateResumeNotifier.post(context)
+        }
+    }
+
+    private fun startEarly(context: Context, store: UpdateResumeStore) {
+        try {
+            ContextCompat.startForegroundService(context, resumeIntent(context))
+            store.setWasPlaying(false)
+            AppLogger.w(TAG, "Percobaan awal: start foreground service DIIZINKAN; pemulihan dimulai sebelum broadcast")
+        } catch (e: Exception) {
+            // Penanda tidak disentuh: jalur broadcast (terjamin) masih akan memutuskan sendiri.
+            AppLogger.e(TAG, "Percobaan awal: start foreground service ditolak; jalur broadcast tetap berlaku", e)
         }
     }
 
@@ -86,12 +138,6 @@ class UpdateResumeReceiver : BroadcastReceiver() {
             AppLogger.e(TAG, "Gagal membaca ApplicationExitInfo", e)
             emptyList()
         }
-    }
-
-    private companion object {
-        const val TAG = "UpdateResume"
-        const val EXIT_HISTORY_MAX = 8
-        const val LOGGED_EXITS = 3
     }
 }
 

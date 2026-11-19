@@ -8,6 +8,7 @@ import com.rudi.audioplayer.data.CrossfadeStore
 import com.rudi.audioplayer.data.SilenceSkipStore
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.PlaybackAudioSession
+import com.rudi.audioplayer.playback.UpdateResumeCoordinator
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.AudioArtFetcher
 import com.rudi.audioplayer.util.PowerProbe
@@ -53,6 +54,8 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
         }
         PowerProbe.start(this) // Batch 669 — catcher daya (baris `PowerProbe` di log debug)
         warmUpSharedPreferences()
+        // Batch 691 — EKSPERIMEN pemulihan pasca-update lebih awal (thread latar, biaya thread utama ~0); lihat UpdateResumeCoordinator.
+        UpdateResumeCoordinator.startEarlyAttempt(this)
 
         // Batch 490 — fix: "preset EQ balik ke nol/default pasca app di-kill lalu musik dimainkan
         // lewat eksternal player". PlaybackAudioSession.onSessionIdChanged (Batch 314) was only

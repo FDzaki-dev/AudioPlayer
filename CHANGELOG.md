@@ -1,5 +1,28 @@
 # Changelog
 
+## Batch 691 — EKSPERIMEN pemulihan lebih awal: percobaan dari Application.onCreate (sebelum broadcast) + satu pemulihan sekaligus (log v690 = build 550) (hasil BELUM diuji di device)
+
+- Input user: `sonix_debug_20261119_191902.txt` (v690 = 1.11.0 build 550, ekspor 19:18:57), teks: "masih" (hening masih terasa); lalu "buruan".
+
+- HASIL v690 di perangkat: `keputusan=RESUME` 19:18:45.119 (proses lama mati 19:18:43.028 = +2,09 dtk), `Pemulihan pasca-update: isPlaying=true tunda_service=1049ms pulih_antrean=210ms putar=705ms indeks=0/135 posisi_pulih=5966835ms posisi=5966853ms`, AudioTrack mulai 19:18:46.338 -> hening total ±3,31 dtk (v689: ±3,64 dtk; `tunda_service` 1342 -> 1049 ms; baca antrean ±0,38 dtk -> ±0,06 dtk di IO; sisa `pulih_antrean` 146 ms = `setMediaItems` + binder `MediaSession.setMetadata` di thread utama). Perbaikan genre v690 TERBUKTI efektif. Tak ada FATAL/ANR baru.
+
+- LINIMASA sisa (kill 43.03): proses baru lahir 44.03 (+1,0 dtk, sistem) -> `onUpdate` widget 44.52 -> receiver 45.12 (+2,09 dtk): probe StartupStall menunjukkan thread utama IDLE (0 pesan lambat) antara +0,28 dtk dan +0,94 dtk sejak proses mulai = menunggu pengiriman broadcast oleh sistem, BUKAN kerja app. Receiver sendiri 166 ms (`startService` binder ±100 ms). Jatah app receiver -> audio = 1,22 dtk: service 154 ms + `onCreate` 132 ms + antrean 210 ms + persiapan pemain 580 ms (buka sumber + seek Opus 99 menit, MediaCodecList/codec, AudioTrack = semua kode framework; tak ada tag app di jendela itu).
+
+- IDE (EKSPERIMEN, hasil tak bisa dipastikan dari log): jendela ±0,8 dtk (proses hidup, broadcast belum tiba) bisa dipakai bila Android mengizinkan start FGS dari `Application.onCreate`. Pengecualian resmi larangan start FGS terikat pada PENERIMAAN broadcast, jadi bisa saja ditolak — itu sebabnya ini percobaan yang aman-gagal.
+
+- PERUBAHAN (3 file source; 0 baru; FILE_MANIFEST tetap 263; 0 tes baru):
+  - `playback/UpdateResumeReceiver.kt`: logika keputusan dipindah ke `object UpdateResumeCoordinator` (dipakai receiver + percobaan awal). `startEarlyAttempt(context)` = thread daemon latar: bila penanda "memutar" menyala DAN catatan keluar terbaru = kematian oleh instalasi (kebijakan SAMA) -> `startForegroundService(ACTION_RESUME_AFTER_UPDATE)`; sukses -> log `Percobaan awal: start foreground service DIIZINKAN`, penanda diturunkan; ditolak -> log raw exception `Percobaan awal: ... ditolak`, penanda TIDAK disentuh dan jalur broadcast (terjamin, tak berubah) tetap memutuskan. Cold start biasa (penanda mati / bukan kill-update) = diam tanpa log. Log keputusan kini memuat `sejak_mati=` (kill -> kejadian ini) dan `sejak_proses_mulai=`; awalan pemicu `MY_PACKAGE_REPLACED:` (receiver) atau `proses_mulai:` (awal).
+  - `playback/PlaybackService.kt`: `resumeJob` = satu pemulihan sekaligus; pemicu kedua (broadcast menyusul percobaan awal) diabaikan dan penanda disinkronkan ulang dari pemain NYATA (receiver sudah menurunkannya) — mencegah `setMediaItems` ganda (lagu mundur ke posisi lama) dan penanda macet `false` saat musik berjalan; cabang "sudah memutar" juga menyinkronkan penanda.
+  - `AudioPlayerApplication.kt`: satu baris `UpdateResumeCoordinator.startEarlyAttempt(this)` setelah `warmUpSharedPreferences()` (thread latar; biaya thread utama ~0).
+
+- TIDAK diubah (sengaja): jalur terjamin receiver; kebijakan `UpdateResumePolicy`; hening sisi sistem (kill -> proses lahir ±1,0 dtk) yang memang di luar jangkauan app.
+
+- VERIFIKASI LOKAL: coordinator+receiver terkompilasi terhadap stub android `-Werror` 0 peringatan; `UpdateResumePolicyTest` 15/15 LULUS; kurung seimbang pada PlaybackService/AudioPlayerApplication. **NOT VERIFIED**: compile Android/R8/CI (butuh Media3/Android), apakah Android MENGIZINKAN start FGS dari Application.onCreate (inti eksperimen), dan besar percepatan bila diizinkan (potensi ≤ ±0,8 dtk). CI v689/v690 BELUM dikirim.
+
+- PREDIKSI CI: Tes 306, ArchUnit 7, detekt 0, lintDebug 0, SpotBugs 0, Kotlin 0.
+
+- LANGKAH UJI: pasang v691 SAAT musik diputar -> kirim log; cari `UpdateResume`: (a) `proses_mulai: ... keputusan=RESUME sejak_mati=..` + `Percobaan awal: ... DIIZINKAN` = eksperimen berhasil (bandingkan kill -> AudioTrack mulai dengan 3,31 dtk v690) ; (b) `ditolak` + stacktrace `ForegroundServiceStartNotAllowedException` = Android menolak, hening ±3,3 dtk adalah batas praktis (jalur receiver tetap memulihkan); (c) `MY_PACKAGE_REPLACED: ... SKIP_NOT_PLAYING` setelah (a) = wajar.
+
 ## Batch 690 — pemulihan pasca-update lebih cepat: lewati peta genre saat membaca antrean + log tahap `pulih_antrean`/`putar` (log v689 = build 549: RESUME TERBUKTI di perangkat) (percepatan BELUM diukur)
 
 - Input user: `sonix_debug_20261119_190630.txt` (v689 = 1.10.49 build 549, ekspor 19:06:25), teks: "masih ada jeda sepersekian mili detik". Interpretasi: pemulihan sudah jalan, tetapi masih ada hening antara musik mati (update) dan musik hidup lagi -> pangkas bagian yang dikendalikan kode app.
