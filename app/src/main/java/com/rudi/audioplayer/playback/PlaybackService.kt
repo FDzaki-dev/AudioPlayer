@@ -3,9 +3,11 @@ package com.rudi.audioplayer.playback
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
+import android.media.MediaCodecList
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.Settings
@@ -181,6 +183,7 @@ class PlaybackService : MediaLibraryService() {
         // onCreate di thread utama + jarak dari proses mulai. Hanya pengukuran; dicatat sekali di akhir lewat Dispatchers.IO.
         val startupT0 = SystemClock.elapsedRealtime()
         val startupSinceProcessMs = startupT0 - android.os.Process.getStartElapsedRealtime()
+        prewarmCodecList()
 
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
@@ -648,6 +651,25 @@ class PlaybackService : MediaLibraryService() {
     }
 
     /**
+     * Batch 694 — logcat v693 (pasang saat memutar, 08:57:51,758-.827): inisialisasi daftar codec platform (`MediaCodecList`, baris
+     * `VideoCapabilities Unsupported mime ...` ±70-110 ms) terjadi di thread playback ExoPlayer TEPAT saat pemain memilih renderer,
+     * yaitu di jalur kritis menuju AudioTrack (start 08:57:52,075). Daftar itu cache statis per proses; menyentuhnya di thread latar
+     * sejak onCreate memindahkan biayanya keluar dari jalur kritis. Murni pemanasan: hasil dibuang; galat dicatat mentah dan tak
+     * mengganggu pemutaran (thread daemon, tak menyentuh pemain/sesi).
+     */
+    private fun prewarmCodecList() {
+        kotlin.concurrent.thread(isDaemon = true, name = "codec-prewarm") {
+            val startedAt = SystemClock.elapsedRealtime()
+            try {
+                val count = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.size
+                AppLogger.w("PlaybackService", "Pemanasan daftar codec: $count codec dalam ${SystemClock.elapsedRealtime() - startedAt}ms (thread latar)")
+            } catch (e: Exception) {
+                AppLogger.e("PlaybackService", "Pemanasan daftar codec gagal", e)
+            }
+        }
+    }
+
+    /**
      * Batch 688 — dipicu [UpdateResumeReceiver] (`ACTION_MY_PACKAGE_REPLACED`) atau ketukan notifikasi cadangan
      * ([UpdateResumeNotifier]): lanjutkan antrean terakhir dari posisi tersimpan tanpa menunggu Activity/user. Idempoten:
      * sudah memutar = tak melakukan apa pun (BEDA dari ACTION_TOGGLE_PLAY yang akan MENJEDA). Urutan mengikuti jalur
@@ -775,6 +797,13 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
+        // Batch 694 — simpan antrean + posisi TEPAT sekarang (dikirim [requestPositionFlush] sebelum pasang update). Tanpa ini
+        // posisi tersimpan tertinggal sampai 10 dtk (log v693: pulih di 573341 ms padahal lagu sudah ±579 s -> ±6 dtk terulang).
+        if (action == ACTION_PERSIST_BEFORE_UPDATE) {
+            lastQueuePersistLogKey = -1 // paksa baris log tercatat (bukti posisi pra-update), walau indeks sama dgn simpan sebelumnya
+            mediaSession?.player?.let { persistQueueFromService(it, "pra-update") }
+            return super.onStartCommand(intent, flags, startId)
+        }
         // Batch 688 — pemulihan pasca-update (receiver MY_PACKAGE_REPLACED / notifikasi cadangan); lihat resumeAfterUpdate().
         if (action == ACTION_RESUME_AFTER_UPDATE) {
             resumeAfterUpdate()
@@ -1391,6 +1420,23 @@ class PlaybackService : MediaLibraryService() {
         // interval = batas galat posisi saat proses dimatikan tanpa aba-aba (lihat startPositionPersistTick).
         const val ACTION_RESUME_AFTER_UPDATE = "com.rudi.audioplayer.ACTION_RESUME_AFTER_UPDATE"
         private const val POSITION_PERSIST_INTERVAL_MS = 10_000L
+
+        // Batch 694 — simpan posisi tepat sebelum pasang update (lihat [requestPositionFlush]).
+        const val ACTION_PERSIST_BEFORE_UPDATE = "com.rudi.audioplayer.ACTION_PERSIST_BEFORE_UPDATE"
+
+        /**
+         * Batch 694 — minta service menyimpan antrean + posisi SEKARANG; dipanggil UI (Activity di latar depan) sesaat sebelum
+         * memasang update. Hanya bila penanda "berniat memutar" menyala (ada yang akan dipulihkan); bila tidak, tak ada yang
+         * dikirim sehingga service tak dihidupkan hanya untuk ini. Galat dicatat mentah dan tak menghalangi pemasangan.
+         */
+        fun requestPositionFlush(context: Context) {
+            if (!UpdateResumeStore(context).wasPlaying()) return
+            try {
+                context.startService(Intent(context, PlaybackService::class.java).setAction(ACTION_PERSIST_BEFORE_UPDATE))
+            } catch (e: Exception) {
+                AppLogger.e("PlaybackService", "Simpan posisi pra-update gagal dikirim", e)
+            }
+        }
 
         // Batch 693 — jeda sebelum percobaan ulang membaca sisa antrean (galat sementara MediaStore tepat setelah update).
         private const val REST_SPLICE_RETRY_DELAY_MS = 1500L

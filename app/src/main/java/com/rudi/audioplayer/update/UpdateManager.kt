@@ -3,6 +3,8 @@ package com.rudi.audioplayer.update
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
+import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.ShizukuBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,6 +28,11 @@ import java.io.File
  */
 object UpdateManager {
 
+    private const val TAG = "UpdateManager"
+
+    /** Batas waktu `pm install` via Shizuku: alir APK ±25 MB lewat stdin + pemasangan; macet lebih lama = jatuh ke installer sistem. */
+    private const val SILENT_INSTALL_TIMEOUT_MS = 120_000L
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     sealed class UpdateState {
@@ -35,6 +42,8 @@ object UpdateManager {
         data class Available(val release: GitHubReleaseChecker.ReleaseInfo) : UpdateState()
         data class Downloading(val progressPercent: Int) : UpdateState()
         data class ReadyToInstall(val apkFile: File) : UpdateState()
+        /** Batch 694 — pasang sedang berjalan (jalur Shizuku senyap, atau transisi singkat sebelum installer sistem dibuka). */
+        data object Installing : UpdateState()
         data class Error(val message: String) : UpdateState()
     }
 
@@ -83,6 +92,39 @@ object UpdateManager {
             _state.value = when (result) {
                 is UpdateDownloader.DownloadResult.Success -> UpdateState.ReadyToInstall(result.file)
                 is UpdateDownloader.DownloadResult.Failure -> UpdateState.Error(result.message)
+            }
+        }
+    }
+
+    /**
+     * Batch 694 — titik pasang tunggal. Shizuku READY (izin sudah diberikan) -> APK dipasang SENYAP lewat `pm install` di proses
+     * Shizuku (tanpa dialog konfirmasi installer; lihat [ShizukuBridge.installApk]); sistem lalu mematikan proses ini dan
+     * pemulihan pemutaran (UpdateResume*) berjalan seperti biasa. Shizuku tak siap ATAU gagal -> installer sistem ([launchInstall],
+     * perilaku lama) sehingga pengguna tak pernah buntu; keluaran mentah kegagalan dicatat di log diagnostik.
+     */
+    fun install(context: Context, apkFile: File) {
+        if (_state.value is UpdateState.Installing) return
+        val appContext = context.applicationContext
+        _state.value = UpdateState.Installing
+        scope.launch {
+            var installed = false
+            if (ShizukuBridge.state(appContext) == ShizukuBridge.State.READY) {
+                val result = ShizukuBridge.installApk(appContext, apkFile, SILENT_INSTALL_TIMEOUT_MS)
+                installed = result.success
+                if (installed) {
+                    AppLogger.w(TAG, "Pasang senyap via Shizuku selesai: ${result.detail}")
+                } else {
+                    AppLogger.e(TAG, "Pasang senyap via Shizuku GAGAL (jatuh ke installer sistem). Keluaran mentah:\n${result.detail}")
+                }
+            }
+            _state.value = UpdateState.ReadyToInstall(apkFile)
+            if (!installed) {
+                try {
+                    launchInstall(appContext, apkFile)
+                } catch (e: Exception) {
+                    AppLogger.e(TAG, "Gagal membuka installer sistem", e)
+                    _state.value = UpdateState.Error(e.message ?: "Gagal membuka installer sistem")
+                }
             }
         }
     }

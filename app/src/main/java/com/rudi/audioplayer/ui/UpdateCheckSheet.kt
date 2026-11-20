@@ -17,8 +17,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rudi.audioplayer.BuildConfig
+import com.rudi.audioplayer.playback.PlaybackService
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.update.UpdateManager
+import com.rudi.audioplayer.util.ShizukuBridge
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Release Downloader Spec — manual-only entry point, never runs on app start. Purely additive:
@@ -30,6 +34,18 @@ fun UpdateCheckSheet(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val state by UpdateManager.state.collectAsStateWithLifecycle()
+
+    // Batch 694 — status Shizuku untuk tombol pasang (READY = dipasang TANPA dialog konfirmasi installer). Dibaca di IO (IPC
+    // binder); hasil dialog izin Shizuku -> periksa ulang. Pola sama DiagnosticLogSheet (refreshTick).
+    var shizukuRefresh by remember { mutableIntStateOf(0) }
+    var shizukuState by remember { mutableStateOf(ShizukuBridge.State.NOT_INSTALLED) }
+    LaunchedEffect(shizukuRefresh) {
+        shizukuState = withContext(Dispatchers.IO) { ShizukuBridge.state(context) }
+    }
+    DisposableEffect(Unit) {
+        val listener = ShizukuBridge.addPermissionListener { shizukuRefresh++ }
+        onDispose { listener?.let { ShizukuBridge.removePermissionListener(it) } }
+    }
 
     // Batch 339 — BUG FIX (laporan user: "sudah selesai install update package tapi gak sengaja
     // salah mencet, malah ke cancel dari awal lagi unduhannya"). Root cause: `onDispose` di bawah
@@ -47,14 +63,16 @@ fun UpdateCheckSheet(onDismiss: () -> Unit) {
     DisposableEffect(Unit) {
         val stateOnEnter = UpdateManager.state.value
         if (stateOnEnter !is UpdateManager.UpdateState.Downloading &&
-            stateOnEnter !is UpdateManager.UpdateState.ReadyToInstall
+            stateOnEnter !is UpdateManager.UpdateState.ReadyToInstall &&
+            stateOnEnter !is UpdateManager.UpdateState.Installing
         ) {
             UpdateManager.checkForUpdate(BuildConfig.VERSION_NAME)
         }
         onDispose {
             val stateOnExit = UpdateManager.state.value
             if (stateOnExit !is UpdateManager.UpdateState.Downloading &&
-                stateOnExit !is UpdateManager.UpdateState.ReadyToInstall
+                stateOnExit !is UpdateManager.UpdateState.ReadyToInstall &&
+                stateOnExit !is UpdateManager.UpdateState.Installing
             ) {
                 UpdateManager.reset()
             }
@@ -154,8 +172,37 @@ fun UpdateCheckSheet(onDismiss: () -> Unit) {
                         text = "Unduhan selesai — siap instal"
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    Button(onClick = { UpdateManager.launchInstall(context, s.apkFile) }) {
-                        Text("Buka Installer")
+                    // Batch 694 — satu titik pasang: Shizuku READY = senyap (tanpa dialog konfirmasi); selain itu / gagal = installer
+                    // sistem (perilaku lama). Posisi putar disimpan tepat sebelum pasang supaya pemulihan pasca-update tak mundur.
+                    Button(onClick = {
+                        PlaybackService.requestPositionFlush(context)
+                        UpdateManager.install(context, s.apkFile)
+                    }) {
+                        Text(if (shizukuState == ShizukuBridge.State.READY) "Pasang Sekarang (Shizuku)" else "Buka Installer")
+                    }
+                    when (shizukuState) {
+                        ShizukuBridge.State.READY -> {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Shizuku siap — dipasang tanpa dialog konfirmasi.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                        ShizukuBridge.State.NEED_PERMISSION -> {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(onClick = { ShizukuBridge.requestPermission() }) {
+                                Text("Izinkan Shizuku (lewati konfirmasi)")
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
+                is UpdateManager.UpdateState.Installing -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Memasang…")
                     }
                 }
                 is UpdateManager.UpdateState.Error -> {

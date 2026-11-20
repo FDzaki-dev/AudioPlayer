@@ -4,7 +4,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.SystemClock
+import okio.buffer
+import okio.sink
+import okio.source
 import rikka.shizuku.Shizuku
+import java.io.File
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
@@ -13,6 +18,38 @@ internal class ShellResult(val lines: List<String>, val timedOut: Boolean, val e
 
 private const val READER_JOIN_MS = 1_000L
 private const val EXIT_POLL_MS = 50L
+private const val INSTALL_LINE_LIMIT = 40
+private const val WRITER_JOIN_MS = 1_000L
+
+/**
+ * Batch 694 — hasil pasang senyap: [success] true HANYA bila keluaran `pm` memuat baris "Success" (tanpa batas waktu);
+ * [detail] = keluaran/galat MENTAH (tanpa tafsiran) untuk dicatat apa adanya di log diagnostik.
+ */
+internal class SilentInstallResult(val success: Boolean, val detail: String)
+
+/**
+ * Batch 694 — perintah pasang: `pm install -r -S <byte>` TANPA path = APK dibaca dari stdin (wajib `-S` = ukuran byte). Berkas di
+ * cacheDir privat app tak terbaca uid `shell` (Shizuku), jadi APK dialirkan lewat stdin, bukan lewat path. `2>&1` menggabung
+ * galat ke keluaran (pola sama pemanggil `runShell` lain).
+ */
+internal fun installCommand(sizeBytes: Long): String = "pm install -r -S $sizeBytes 2>&1"
+
+/** Batch 694 — murni (tanpa Android): ubah keluaran proses `pm install` + galat baca/tulis menjadi [SilentInstallResult]. */
+internal fun parseInstallOutput(
+    lines: List<String>,
+    timedOut: Boolean,
+    readError: String?,
+    writeError: String?
+): SilentInstallResult {
+    val ok = !timedOut && lines.any { it.trim().startsWith("Success") }
+    val raw = buildString {
+        lines.forEach { appendLine(it) }
+        if (timedOut) appendLine("[batas waktu terlewati]")
+        if (readError != null) appendLine("[baca keluaran gagal] $readError")
+        if (writeError != null) appendLine("[tulis APK ke stdin gagal] $writeError")
+    }.trimEnd()
+    return SilentInstallResult(ok, raw.ifEmpty { "(tanpa keluaran)" })
+}
 
 /**
  * Batch 629 — pengganti `Process.waitFor(timeout, unit)`. Versi bawaan JDK hanya menangkap IllegalThreadStateException
@@ -62,7 +99,7 @@ internal fun drainProcess(process: Process, timeoutMs: Long, lineLimit: Int): Sh
  *
  * Semua fungsi aman dipanggil kapan pun: bila Shizuku tak terpasang / tak berjalan / refleksi gagal, hasilnya status
  * `NOT_*` atau [ShellResult.error] (tak melempar). `Shizuku.newProcess` private sejak API 13.1.0 -> dipanggil lewat
- * refleksi (aturan keep R8 di `proguard-rules.pro`). Hanya android.* + pustaka Shizuku (aturan ArchUnit "util mandiri").
+ * refleksi (aturan keep R8 di `proguard-rules.pro`). Hanya android.* + pustaka Shizuku/Okio (aturan ArchUnit "util mandiri").
  */
 object ShizukuBridge {
 
@@ -103,6 +140,39 @@ object ShizukuBridge {
         }
         return drainProcess(process, timeoutMs, lineLimit)
     }
+
+    /**
+     * Batch 694 — pasang [apk] TANPA dialog konfirmasi installer: `pm install -r -S <byte>` dijalankan di proses Shizuku (uid
+     * `shell` memegang INSTALL_PACKAGES) dan APK dialirkan lewat stdin (buffered Okio, `use {}`; lihat [installCommand]).
+     * Hanya bila [state] == READY; selain itu langsung gagal supaya pemanggil jatuh ke installer sistem. Blocking: panggil dari
+     * `Dispatchers.IO`. Bila berhasil, sistem mematikan proses app ini (PACKAGE_UPDATED) SEBELUM fungsi sempat kembali — normal;
+     * pemulihan pemutaran ditangani `UpdateResume*`. Penulisan stdin berjalan di thread sendiri dan keluaran dibaca bersamaan
+     * (tak ada kebuntuan pipa penuh); batas waktu [timeoutMs] menghentikan proses bila macet.
+     */
+    internal fun installApk(context: Context, apk: File, timeoutMs: Long): SilentInstallResult {
+        if (state(context) != State.READY) return SilentInstallResult(false, "Shizuku belum siap (status bukan READY)")
+        val size = apk.length()
+        if (size <= 0L) return SilentInstallResult(false, "APK kosong atau tak ada: ${apk.path}")
+        val process = start(installCommand(size)).getOrElse {
+            return SilentInstallResult(false, "Shizuku: ${it.javaClass.simpleName}: ${it.message.orEmpty()}")
+        }
+        val writeFailure = AtomicReference<String?>(null)
+        val writer = thread(isDaemon = true, name = "apk-writer") { writeFailure.set(streamApk(process, apk)) }
+        val result = drainProcess(process, timeoutMs, INSTALL_LINE_LIMIT)
+        writer.join(WRITER_JOIN_MS)
+        return parseInstallOutput(result.lines, result.timedOut, result.error, writeFailure.get())
+    }
+
+    /** Alirkan [apk] ke stdin [process] lalu tutup (EOF = tanda selesai bagi `pm`); null = sukses, selain itu galat mentah. */
+    private fun streamApk(process: Process, apk: File): String? =
+        try {
+            process.outputStream.sink().buffer().use { sink ->
+                apk.source().use { source -> sink.writeAll(source) }
+            }
+            null
+        } catch (e: IOException) {
+            "${e.javaClass.simpleName}: ${e.message.orEmpty()}"
+        }
 
     private fun start(commandLine: String): Result<Process> = runCatching {
         val method = Shizuku::class.java.getDeclaredMethod(

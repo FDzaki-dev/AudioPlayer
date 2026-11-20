@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 694: + app/src/test/java/com/rudi/audioplayer/util/ShizukuInstallOutputTest.kt (tes parser pasang senyap Shizuku) — 263->264 (ShizukuBridge.kt, UpdateManager.kt, UpdateCheckSheet.kt, PlaybackService.kt diubah).
 # Batch 692: 0 file baru (PlaybackService.kt, UpdateResumePolicy.kt, UpdateResumePolicyTest.kt diubah); jumlah tetap 263.
 # Batch 691: 0 file baru (UpdateResumeReceiver.kt, PlaybackService.kt, AudioPlayerApplication.kt diubah); jumlah tetap 263.
 # Batch 690: 0 file baru (MusicRepository.kt, PlaybackService.kt diubah); jumlah tetap 263.
@@ -377,6 +378,7 @@ app/src/test/java/com/rudi/audioplayer/util/ChangeGateTest.kt
 app/src/test/java/com/rudi/audioplayer/util/DebugLogFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/util/DumpsysFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt
+app/src/test/java/com/rudi/audioplayer/util/ShizukuInstallOutputTest.kt
 app/src/test/java/com/rudi/audioplayer/util/StartupKindTest.kt
 app/src/test/java/com/rudi/audioplayer/util/StartupStallFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/widget/WidgetMarqueeMathTest.kt

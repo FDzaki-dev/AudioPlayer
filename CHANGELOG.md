@@ -1,5 +1,22 @@
 # Changelog
 
+## Batch 694 — pasang update senyap via Shizuku (tanpa dialog konfirmasi) + simpan posisi tepat sebelum pasang + pemanasan daftar codec
+
+- Input user: `sonix_debug_20261120_085810.txt` (v693 = 1.11.3 build 553) + `SONIX_v693.zip`; "masih jeda. dan bisakah app melewati tab konfirmasi download via izin Shizuku?!!"; lalu "buruan".
+
+- LOG v693 (logcat mentah, pid 11052): kill 08:57:49.2 -> proses lahir 50.06 (sistem) -> ExoPlayer init 50.865 -> restore 51.38 -> source/seek 51.41-.70 -> `MediaCodecList` init 51.758-.827 (di thread playback) -> codec 51.868-.943 -> AudioTrack start 52.075 -> PLAYING 52.101 (total kill -> audio ±2,84 dtk; jatah app ±1,7 dtk). `posisi_pulih=573341ms` vs posisi nyata ±579 s saat kill = ±6 dtk terulang.
+
+- PERUBAHAN (5 file; 1 baru; FILE_MANIFEST 263->264):
+  - `util/ShizukuBridge.kt`: `installApk` (`pm install -r -S <byte>` via stdin di proses Shizuku; Okio buffered `use {}`; penulis thread sendiri; batas waktu), `installCommand`, `parseInstallOutput` (murni; sukses hanya bila baris `Success`).
+  - `update/UpdateManager.kt`: state `Installing`; `install()` (Shizuku READY -> senyap; tak siap/gagal -> installer sistem seperti sebelumnya; keluaran mentah kegagalan dicatat).
+  - `ui/UpdateCheckSheet.kt`: tombol "Pasang Sekarang (Shizuku)" / "Buka Installer", tombol "Izinkan Shizuku", cabang `Installing`; `Installing` tidak di-reset saat sheet ditutup.
+  - `playback/PlaybackService.kt`: `ACTION_PERSIST_BEFORE_UPDATE` + `requestPositionFlush` (simpan antrean+posisi sebelum pasang, hanya bila berniat-memutar); `prewarmCodecList()` (thread daemon sejak onCreate).
+  - `ShizukuInstallOutputTest.kt` (BARU): +9 tes.
+
+- TIDAK diubah: installer sistem (cadangan), kebijakan/penerima pemulihan pasca-update, jalur restore antrean, `--dont-kill` sengaja TIDAK dipakai.
+
+- VERIFIKASI: kurung seimbang 5 file; **NOT VERIFIED** compile/CI/tes JVM, pasang via Shizuku di perangkat, efek pemanasan codec. PREDIKSI: Tes 321, ArchUnit 7, detekt 0, lint 0, SpotBugs 0, Kotlin 0.
+
 ## Batch 693 — pemulihan pasca-update: antrean tersimpan tak boleh tertimpa antrean 1 lagu bila sambung sisa gagal (v692 TERVERIFIKASI: jatah app -1,07 dtk)
 
 - Input user: `sonix_debug_20261120_034007.txt` (v692 = 1.11.2 build 552) + `SONIX_v692.zip`, tanpa teks; "buruan".
