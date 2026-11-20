@@ -2,14 +2,21 @@ package com.rudi.audioplayer.data
 
 import android.content.Context
 import com.rudi.audioplayer.util.AppLogger
+import java.io.File
 
+/**
+ * [savedAtMs] — Batch 695: jam dinding (`System.currentTimeMillis()`) saat [positionMs] ditulis; 0 = tak diketahui. Dipakai
+ * pemulihan pasca-update untuk menambah posisi dengan waktu yang berlalu sampai proses dimatikan (lihat
+ * `UpdateResumePolicy.resumePosition`).
+ */
 data class SavedPlaybackState(
     val songIds: List<Long>,
     val index: Int,
     val positionMs: Long,
     val repeatMode: Int,
     val shuffleEnabled: Boolean,
-    val speed: Float = 1.0f
+    val speed: Float = 1.0f,
+    val savedAtMs: Long = 0L
 )
 
 /**
@@ -31,6 +38,9 @@ data class SavedPlaybackState(
 class PlaybackStateStore(context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    // Batch 695 — berkas XML SharedPreferences ini: cap waktu CADANGAN bagi simpanan lama yang ditulis sebelum KEY_SAVED_AT ada.
+    private val prefsFile = File(context.dataDir, "shared_prefs/$PREFS_NAME.xml")
+
     fun save(
         songIds: List<Long>,
         index: Int,
@@ -47,7 +57,26 @@ class PlaybackStateStore(context: Context) {
             .putInt(KEY_REPEAT_MODE, repeatMode)
             .putBoolean(KEY_SHUFFLE, shuffleEnabled)
             .putFloat(KEY_SPEED, speed)
+            // Batch 695 — jam dinding penulisan: pemulihan pasca-update menambah posisi dengan (waktu mati proses - cap ini); log
+            // v694: simpan berkala 14:09:03,8 (posisi 4.871.249) tetapi proses mati 14:09:07,3 -> lagu mundur ±3,5 dtk (bisa ±10 dtk).
+            .putLong(KEY_SAVED_AT, System.currentTimeMillis())
             .apply()
+    }
+
+    /**
+     * Batch 695 — cap waktu simpanan: KEY_SAVED_AT bila ada; simpanan lama (ditulis versi sebelum 695, tak punya kunci itu) memakai
+     * waktu ubah berkas XML-nya (ditulis `apply()` beberapa ms setelah `save`, jadi selisihnya hanya membuat tambahan posisi LEBIH
+     * KECIL, tak pernah berlebih) agar update PERTAMA setelah 695 pun tak mundur. 0 = tak diketahui.
+     */
+    private fun savedAtMs(): Long {
+        val stamped = prefs.getLong(KEY_SAVED_AT, 0L)
+        if (stamped > 0L) return stamped
+        return try {
+            prefsFile.lastModified().coerceAtLeast(0L)
+        } catch (e: SecurityException) {
+            AppLogger.e(TAG, "Gagal membaca waktu ubah berkas playback_state", e)
+            0L
+        }
     }
 
     fun load(): SavedPlaybackState? {
@@ -73,7 +102,7 @@ class PlaybackStateStore(context: Context) {
             // 2), belum ada di state lama, getFloat default aman ke 1.0x tanpa version checking
             // eksplisit.
             val speed = prefs.getFloat(KEY_SPEED, 1.0f)
-            SavedPlaybackState(ids, index, position, repeatMode, shuffleEnabled, speed)
+            SavedPlaybackState(ids, index, position, repeatMode, shuffleEnabled, speed, savedAtMs())
         } catch (e: Exception) {
             // Corrupt/incompatible state tidak boleh menjegal resume seluruh app — anggap saja
             // tidak ada state tersimpan, mulai dari kosong seperti install baru.
@@ -92,6 +121,7 @@ class PlaybackStateStore(context: Context) {
         private const val KEY_REPEAT_MODE = "repeat_mode"
         private const val KEY_SHUFFLE = "shuffle_enabled"
         private const val KEY_SPEED = "speed"
+        private const val KEY_SAVED_AT = "saved_at_wall_ms"
         private const val SCHEMA_VERSION = 3
     }
 }

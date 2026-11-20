@@ -95,6 +95,52 @@ object UpdateResumePolicy {
     fun shouldRetryRestSplice(foundOthers: Int, expectedOthers: Int, attempt: Int, maxAttempts: Int): Boolean =
         isRestMissing(foundOthers, expectedOthers) && attempt < maxAttempts
 
+    /** Batch 695 — batas selisih (simpan -> proses mati) yang masih dipercaya untuk ditambahkan ke posisi; simpan berkala tiap 10 dtk. */
+    const val MAX_POSITION_EXTRAPOLATION_MS = 30_000L
+
+    /** Batch 695 — bila posisi hasil tambahan jatuh dalam jarak ini dari akhir lagu, tambahan dibatalkan (tak melompat ke akhir). */
+    const val POSITION_END_MARGIN_MS = 2_000L
+
+    /** Batch 695 — dasar keputusan [resumePosition]; dicatat di log supaya terlihat kenapa posisi tak/ditambah. */
+    enum class PositionBasis { EXTRAPOLATED, NO_KILL_TIME, NO_SAVE_STAMP, NO_GAP, GAP_TOO_LARGE, NEAR_SONG_END }
+
+    /** Batch 695 — [positionMs] dipakai pemain; [extrapolatedMs] = tambahan terhadap posisi tersimpan (0 bila tak ditambah). */
+    data class ResumePosition(val positionMs: Long, val extrapolatedMs: Long, val basis: PositionBasis)
+
+    /**
+     * Batch 695 — log v694 (14:09): simpan berkala terakhir 14:09:03,8 (posisi 4.871.249 ms), proses dimatikan pemasangan
+     * 14:09:07,3 (`ApplicationExitInfo`), posisi nyata saat mati ±4.874.800 ms, tetapi pemulihan memakai 4.871.249 -> ±3,5 dtk
+     * TERULANG (batas atas = interval simpan 10 dtk). Karena musik berjalan terus (penanda "berniat memutar" menyala sampai mati),
+     * posisi saat mati = posisi tersimpan + (waktu mati - waktu simpan) x kecepatan; berlaku untuk SEMUA jalur pasang (installer
+     * sistem, Shizuku, adb) karena hanya butuh cap waktu, bukan aba-aba sebelum pasang.
+     *
+     * Dasar penjumlahan = yang LEBIH BARU antara [savedAtMs] dan [playingSinceMs] (kapan penanda memutar terakhir menyala):
+     * bila user menjeda lalu memutar lagi setelah simpan, posisi tersimpan = posisi saat dijeda, jadi hanya waktu sejak mulai
+     * memutar lagi yang dihitung. Sengaja KONSERVATIF — kembali ke posisi tersimpan apa adanya (tanpa tambahan) bila: waktu mati /
+     * cap simpan tak diketahui, selisih <= 0 (jam dinding bergeser), selisih > [MAX_POSITION_EXTRAPOLATION_MS], atau hasil jatuh
+     * dalam [POSITION_END_MARGIN_MS] dari akhir lagu ([durationMs] > 0). Kecepatan tak valid (<= 0 / NaN) dianggap 1x.
+     */
+    fun resumePosition(
+        savedPositionMs: Long,
+        savedAtMs: Long,
+        playingSinceMs: Long,
+        killedAtMs: Long,
+        speed: Float,
+        durationMs: Long
+    ): ResumePosition {
+        fun unchanged(basis: PositionBasis) = ResumePosition(savedPositionMs, 0L, basis)
+        if (killedAtMs <= 0L) return unchanged(PositionBasis.NO_KILL_TIME)
+        if (savedAtMs <= 0L) return unchanged(PositionBasis.NO_SAVE_STAMP)
+        val gapMs = killedAtMs - maxOf(savedAtMs, playingSinceMs)
+        if (gapMs <= 0L) return unchanged(PositionBasis.NO_GAP)
+        if (gapMs > MAX_POSITION_EXTRAPOLATION_MS) return unchanged(PositionBasis.GAP_TOO_LARGE)
+        val factor = if (speed.isNaN() || speed <= 0f) 1.0 else speed.toDouble()
+        val extraMs = (gapMs * factor).toLong()
+        val resumed = savedPositionMs + extraMs
+        if (durationMs > 0L && resumed > durationMs - POSITION_END_MARGIN_MS) return unchanged(PositionBasis.NEAR_SONG_END)
+        return ResumePosition(resumed, extraMs, PositionBasis.EXTRAPOLATED)
+    }
+
     private const val STATE_IDLE = 1
     private const val STATE_ENDED = 4
 }

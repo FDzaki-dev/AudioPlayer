@@ -93,32 +93,37 @@ object UpdateResumeCoordinator {
             "$trigger: memutar_sebelum_update=$wasPlaying catatan_keluar=${exits.size} [$exitSummary] keputusan=$decision " +
                 "sejak_mati=${sinceKillMs}ms sejak_proses_mulai=${sinceStartMs}ms"
         )
+        // Batch 695 — waktu mati proses (jam dinding) = dasar penambahan posisi pulih (UpdateResumePolicy.resumePosition).
+        val killedAtMs = exits.maxOfOrNull { it.timestampMs } ?: 0L
         when (decision) {
-            UpdateResumePolicy.Decision.RESUME -> if (early) startEarly(context, store) else startFromBroadcast(context, store)
+            UpdateResumePolicy.Decision.RESUME ->
+                if (early) startEarly(context, store, killedAtMs) else startFromBroadcast(context, store, killedAtMs)
             // Penanda basi: proses lama tidak mati karena instalasi ini. Dibersihkan agar tak memicu di update berikutnya.
             UpdateResumePolicy.Decision.SKIP_NO_UPDATE_EXIT -> store.setWasPlaying(false)
             UpdateResumePolicy.Decision.SKIP_NOT_PLAYING -> Unit
         }
     }
 
-    private fun resumeIntent(context: Context): Intent =
-        Intent(context, PlaybackService::class.java).setAction(PlaybackService.ACTION_RESUME_AFTER_UPDATE)
+    private fun resumeIntent(context: Context, killedAtMs: Long): Intent =
+        Intent(context, PlaybackService::class.java)
+            .setAction(PlaybackService.ACTION_RESUME_AFTER_UPDATE)
+            .putExtra(PlaybackService.EXTRA_KILLED_AT_MS, killedAtMs)
 
-    private fun startFromBroadcast(context: Context, store: UpdateResumeStore) {
+    private fun startFromBroadcast(context: Context, store: UpdateResumeStore, killedAtMs: Long) {
         // Dikonsumsi SEKARANG: jalur pemulihan (service atau ketukan notifikasi) menyalakan penanda lagi lewat
         // listener pemain begitu benar-benar memutar; tak ada pemutaran ulang berantai.
         store.setWasPlaying(false)
         try {
-            ContextCompat.startForegroundService(context, resumeIntent(context))
+            ContextCompat.startForegroundService(context, resumeIntent(context, killedAtMs))
         } catch (e: Exception) {
             AppLogger.e(TAG, "startForegroundService ditolak saat MY_PACKAGE_REPLACED; jatuh ke notifikasi", e)
-            UpdateResumeNotifier.post(context)
+            UpdateResumeNotifier.post(context, killedAtMs)
         }
     }
 
-    private fun startEarly(context: Context, store: UpdateResumeStore) {
+    private fun startEarly(context: Context, store: UpdateResumeStore, killedAtMs: Long) {
         try {
-            ContextCompat.startForegroundService(context, resumeIntent(context))
+            ContextCompat.startForegroundService(context, resumeIntent(context, killedAtMs))
             store.setWasPlaying(false)
             AppLogger.w(TAG, "Percobaan awal: start foreground service DIIZINKAN; pemulihan dimulai sebelum broadcast")
         } catch (e: Exception) {
@@ -152,9 +157,17 @@ class UpdateResumeStore(context: Context) {
 
     fun wasPlaying(): Boolean = prefs.getBoolean(KEY_WAS_PLAYING, false)
 
+    /**
+     * Batch 695 — jam dinding saat penanda TERAKHIR berubah false -> true (tak dihapus saat turun ke false, supaya masih terbaca oleh
+     * pemulihan yang menurunkan penanda lebih dulu); 0 = tak diketahui. Lihat `UpdateResumePolicy.resumePosition`.
+     */
+    fun playingSinceMs(): Long = prefs.getLong(KEY_PLAYING_SINCE, 0L)
+
     fun setWasPlaying(value: Boolean) {
         if (prefs.getBoolean(KEY_WAS_PLAYING, false) == value) return
-        prefs.edit().putBoolean(KEY_WAS_PLAYING, value).apply()
+        val editor = prefs.edit().putBoolean(KEY_WAS_PLAYING, value)
+        if (value) editor.putLong(KEY_PLAYING_SINCE, System.currentTimeMillis())
+        editor.apply()
         // Batch 689: tiap PERUBAHAN penanda dicatat (hanya saat berubah, jadi jarang). Log v688 14:14 menunjukkan
         // `memutar_sebelum_update=false` tanpa bukti kapan penanda terakhir ditulis; tanpa baris ini penanda yang
         // tak pernah menyala (bug listener) tak bisa dibedakan dari pemutar yang memang sedang berhenti.
@@ -165,6 +178,7 @@ class UpdateResumeStore(context: Context) {
         const val TAG = "UpdateResume"
         const val PREFS_NAME = "update_resume"
         const val KEY_WAS_PLAYING = "was_playing"
+        const val KEY_PLAYING_SINCE = "playing_since_wall_ms"
     }
 }
 
@@ -180,7 +194,7 @@ object UpdateResumeNotifier {
     private const val REQUEST_CODE = 102
     const val NOTIFICATION_ID = 7002
 
-    fun post(context: Context) {
+    fun post(context: Context, killedAtMs: Long = 0L) {
         val appContext = context.applicationContext
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -198,6 +212,7 @@ object UpdateResumeNotifier {
             }
             val resumeIntent = Intent(appContext, PlaybackService::class.java)
                 .setAction(PlaybackService.ACTION_RESUME_AFTER_UPDATE)
+                .putExtra(PlaybackService.EXTRA_KILLED_AT_MS, killedAtMs)
             val pendingIntent = PendingIntent.getForegroundService(
                 appContext,
                 REQUEST_CODE,

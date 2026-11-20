@@ -1,5 +1,28 @@
 # Changelog
 
+## Batch 695 — posisi pulih pasca-update tak lagi mundur: tambah waktu sejak simpan terakhir sampai proses mati (CI run #121 = Batch 694 VERIFIED)
+
+- Input user: `sonix_debug_20261120_140926.txt` (v694 = 1.11.4 build 554, ekspor 14:09:21) + `SONIX_v694.zip` + `SONIX_laporan-untuk-claude_run121.zip`, tanpa teks.
+
+- CI run #121 (commit d8097ed, Gradle exit 0/0/0/0): ArchUnit 7/0, SpotBugs 0, detekt 0, lintDebug 0, Tes 321 LULUS (0 dilewati), Kotlin 0 = prediksi Batch 694 cocok -> Batch 694 **VERIFIED**.
+
+- LOG v694: 0 FATAL/ANR baru (5 FATAL buffer lama 11-08..11-11). Pemanasan codec TERBUKTI (`79 codec dalam 111ms (thread latar)`; baris `VideoCapabilities` hanya di jendela thread latar, tak lagi di thread playback). Update dipasang oleh proses v693 -> jalur Shizuku/pra-update v694 BELUM berjalan (NOT VERIFIED). Linimasa: kill 14:09:07,317 -> proses lahir 08.82 (sistem) -> `setMediaItem` 09.867 (`pulih_antrean=390ms`) -> codec 10.049 -> AudioTrack 10.293 (mati -> audio ±2,98 dtk; `sejak_proses_mulai=1480ms`).
+
+- CACAT: `posisi_pulih=4871249ms` (simpan berkala 14:09:03,83) vs posisi nyata saat mati ±4.874.800 ms -> lagu mundur ±3,5 dtk (hingga 10 dtk) pada semua jalur pasang.
+
+- PERUBAHAN (5 file; 0 baru; FILE_MANIFEST tetap 264):
+  - `data/PlaybackStateStore.kt`: `save()` menulis `saved_at_wall_ms`; `SavedPlaybackState.savedAtMs`; simpanan lama (tanpa kunci) memakai waktu ubah berkas `shared_prefs/playback_state.xml`.
+  - `playback/UpdateResumePolicy.kt`: `resumePosition(...)` murni + `PositionBasis`, `ResumePosition`, `MAX_POSITION_EXTRAPOLATION_MS`=30 dtk, `POSITION_END_MARGIN_MS`=2 dtk.
+  - `playback/UpdateResumeReceiver.kt`: `EXTRA_KILLED_AT_MS` (cap ApplicationExitInfo terbaru) pada intent pemulihan (jalur awal, broadcast, notifikasi cadangan); `UpdateResumeStore.playingSinceMs()`.
+  - `playback/PlaybackService.kt`: `resumeAfterUpdate(killedAtMs)`, `restoreHeadForResume(killedAtMs, playingSinceMs)` memakai `resumePosition`; log `posisi_simpan=... tambahan=...ms dasar=... -> posisi_awal=...`.
+  - `UpdateResumePolicyTest.kt`: +10 tes = 31.
+
+- TIDAK diubah: kebijakan keputusan pemulihan, jalur sambung sisa antrean, jalur pasang Shizuku/installer sistem, interval simpan 10 dtk.
+
+- VERIFIKASI: tes JVM `UpdateResumePolicyTest` 31/31 LULUS (`-Werror`, Kotlin 2.0.21 + JUnit 4.13.2); kurung seimbang 5 file; 3 file ber-Android lolos tahap sintaks. **NOT VERIFIED**: compile Android/CI, ketepatan posisi di perangkat. PREDIKSI: Tes 331, ArchUnit 7, detekt 0, lint 0, SpotBugs 0, Kotlin 0.
+
+- LANGKAH UJI: pasang v695 SAAT musik diputar -> cari `Pemulihan pasca-update: posisi_simpan=` (`dasar=EXTRAPOLATED`; `posisi_pulih` mendekati posisi nyata saat mati, tidak mundur).
+
 ## Batch 694 — pasang update senyap via Shizuku (tanpa dialog konfirmasi) + simpan posisi tepat sebelum pasang + pemanasan daftar codec
 
 - Input user: `sonix_debug_20261120_085810.txt` (v693 = 1.11.3 build 553) + `SONIX_v693.zip`; "masih jeda. dan bisakah app melewati tab konfirmasi download via izin Shizuku?!!"; lalu "buruan".

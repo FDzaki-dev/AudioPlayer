@@ -178,4 +178,104 @@ class UpdateResumePolicyTest {
         assertFalse(UpdateResumePolicy.shouldRetryRestSplice(134, 134, attempt = 1, maxAttempts = 2))
         assertFalse(UpdateResumePolicy.shouldRetryRestSplice(0, 0, attempt = 1, maxAttempts = 2))
     }
+
+    // ---- Batch 695: posisi pulih = posisi tersimpan + (waktu mati - waktu simpan) x kecepatan ----
+
+    private val killAt = 1_795_154_947_317L // ApplicationExitInfo log v694: 2026-11-20 14:09:07,317 (+08:00)
+
+    @Test
+    fun `Batch 695 exact v694 log case - saved 3_5 s before the kill resumes at the real position, not 3_5 s back`() {
+        // log v694: simpan berkala 14:09:03,829 posisi 4.871.249; mati 14:09:07,317; posisi nyata saat mati ±4.874.8xx.
+        val r = UpdateResumePolicy.resumePosition(
+            savedPositionMs = 4_871_249L, savedAtMs = killAt - 3_488L, playingSinceMs = killAt - 14_000L,
+            killedAtMs = killAt, speed = 1.0f, durationMs = 5_416_000L
+        )
+        assertEquals(4_874_737L, r.positionMs)
+        assertEquals(3_488L, r.extrapolatedMs)
+        assertEquals(UpdateResumePolicy.PositionBasis.EXTRAPOLATED, r.basis)
+    }
+
+    @Test
+    fun `Batch 695 playing started after the save - only time since play restarted counts`() {
+        // simpan saat jeda (posisi beku), lalu putar lagi 4 dtk sebelum mati -> hanya 4 dtk yang ditambah, bukan seluruh jeda.
+        val r = UpdateResumePolicy.resumePosition(
+            savedPositionMs = 100_000L, savedAtMs = killAt - 20_000L, playingSinceMs = killAt - 4_000L,
+            killedAtMs = killAt, speed = 1.0f, durationMs = 300_000L
+        )
+        assertEquals(104_000L, r.positionMs)
+        assertEquals(4_000L, r.extrapolatedMs)
+    }
+
+    @Test
+    fun `Batch 695 playback speed scales the added time`() {
+        val r = UpdateResumePolicy.resumePosition(50_000L, killAt - 4_000L, 0L, killAt, 1.5f, 300_000L)
+        assertEquals(56_000L, r.positionMs)
+        assertEquals(6_000L, r.extrapolatedMs)
+    }
+
+    @Test
+    fun `Batch 695 invalid speed is treated as 1x`() {
+        assertEquals(53_000L, UpdateResumePolicy.resumePosition(50_000L, killAt - 3_000L, 0L, killAt, 0f, 300_000L).positionMs)
+        assertEquals(53_000L, UpdateResumePolicy.resumePosition(50_000L, killAt - 3_000L, 0L, killAt, Float.NaN, 300_000L).positionMs)
+        assertEquals(53_000L, UpdateResumePolicy.resumePosition(50_000L, killAt - 3_000L, 0L, killAt, -2f, 300_000L).positionMs)
+    }
+
+    @Test
+    fun `Batch 695 unknown kill time or save stamp keeps the saved position untouched`() {
+        val noKill = UpdateResumePolicy.resumePosition(50_000L, killAt - 3_000L, 0L, 0L, 1f, 300_000L)
+        assertEquals(50_000L, noKill.positionMs)
+        assertEquals(UpdateResumePolicy.PositionBasis.NO_KILL_TIME, noKill.basis)
+        val noStamp = UpdateResumePolicy.resumePosition(50_000L, 0L, 0L, killAt, 1f, 300_000L)
+        assertEquals(50_000L, noStamp.positionMs)
+        assertEquals(0L, noStamp.extrapolatedMs)
+        assertEquals(UpdateResumePolicy.PositionBasis.NO_SAVE_STAMP, noStamp.basis)
+    }
+
+    @Test
+    fun `Batch 695 zero or negative gap (clock stepped back) never moves the position`() {
+        val zero = UpdateResumePolicy.resumePosition(50_000L, killAt, 0L, killAt, 1f, 300_000L)
+        val negative = UpdateResumePolicy.resumePosition(50_000L, killAt + 5_000L, 0L, killAt, 1f, 300_000L)
+        assertEquals(UpdateResumePolicy.PositionBasis.NO_GAP, zero.basis)
+        assertEquals(UpdateResumePolicy.PositionBasis.NO_GAP, negative.basis)
+        assertEquals(50_000L, zero.positionMs)
+        assertEquals(50_000L, negative.positionMs)
+    }
+
+    @Test
+    fun `Batch 695 gap boundary - exactly the cap extrapolates, one millisecond more does not`() {
+        val cap = UpdateResumePolicy.MAX_POSITION_EXTRAPOLATION_MS
+        val atCap = UpdateResumePolicy.resumePosition(50_000L, killAt - cap, 0L, killAt, 1f, 0L)
+        val past = UpdateResumePolicy.resumePosition(50_000L, killAt - cap - 1L, 0L, killAt, 1f, 0L)
+        assertEquals(UpdateResumePolicy.PositionBasis.EXTRAPOLATED, atCap.basis)
+        assertEquals(50_000L + cap, atCap.positionMs)
+        assertEquals(UpdateResumePolicy.PositionBasis.GAP_TOO_LARGE, past.basis)
+        assertEquals(50_000L, past.positionMs)
+    }
+
+    @Test
+    fun `Batch 695 result near the end of the song is cancelled - never jump to the end`() {
+        val margin = UpdateResumePolicy.POSITION_END_MARGIN_MS
+        // 5 dtk sebelum akhir + 4 dtk tambahan = 1 dtk dari akhir (< margin) -> dibatalkan
+        val near = UpdateResumePolicy.resumePosition(295_000L, killAt - 4_000L, 0L, killAt, 1f, 300_000L)
+        assertEquals(UpdateResumePolicy.PositionBasis.NEAR_SONG_END, near.basis)
+        assertEquals(295_000L, near.positionMs)
+        // tepat sejauh margin dari akhir masih diizinkan
+        val edge = UpdateResumePolicy.resumePosition(300_000L - margin - 3_000L, killAt - 3_000L, 0L, killAt, 1f, 300_000L)
+        assertEquals(UpdateResumePolicy.PositionBasis.EXTRAPOLATED, edge.basis)
+        assertEquals(300_000L - margin, edge.positionMs)
+    }
+
+    @Test
+    fun `Batch 695 unknown duration still extrapolates - the end guard only applies when the length is known`() {
+        val r = UpdateResumePolicy.resumePosition(50_000L, killAt - 3_000L, 0L, killAt, 1f, 0L)
+        assertEquals(UpdateResumePolicy.PositionBasis.EXTRAPOLATED, r.basis)
+        assertEquals(53_000L, r.positionMs)
+    }
+
+    @Test
+    fun `Batch 695 playing-since in the future relative to the kill is ignored as no gap`() {
+        val r = UpdateResumePolicy.resumePosition(50_000L, killAt - 3_000L, killAt + 1L, killAt, 1f, 300_000L)
+        assertEquals(UpdateResumePolicy.PositionBasis.NO_GAP, r.basis)
+        assertEquals(50_000L, r.positionMs)
+    }
 }

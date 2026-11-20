@@ -38,6 +38,7 @@ import com.rudi.audioplayer.data.HourlyListenStore
 import com.rudi.audioplayer.data.ListeningHistoryStore
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
+import com.rudi.audioplayer.data.SavedPlaybackState
 import com.rudi.audioplayer.data.PlayStatsStore
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.data.ShakeSettingsStore
@@ -676,8 +677,10 @@ class PlaybackService : MediaLibraryService() {
      * cold-start widget yang sudah terbukti: `startForeground()` placeholder SEKARANG (kontrak `startForegroundService`)
      * -> pulihkan antrean (MediaStore, IO) -> `play()` -> tunggu `isPlaying` -> bongkar placeholder. Waktu tiap tahap
      * dicatat (`tunda_service`, `sejak_proses_mulai`) untuk menilai kecepatan pemulihan di log berikutnya.
+     * Batch 695 — [killedAtMs] = jam dinding proses lama mati (`ApplicationExitInfo`, dikirim pemicu lewat [EXTRA_KILLED_AT_MS]; 0 =
+     * tak diketahui): posisi lagu pembuka ditambah waktu yang berlalu sejak simpan terakhir ([UpdateResumePolicy.resumePosition]).
      */
-    private fun resumeAfterUpdate() {
+    private fun resumeAfterUpdate(killedAtMs: Long) {
         NotificationManagerCompat.from(this).cancel(UpdateResumeNotifier.NOTIFICATION_ID)
         val current = mediaSession?.player
         // Batch 691: pemicu kedua (broadcast MY_PACKAGE_REPLACED menyusul percobaan awal dari Application.onCreate) tidak boleh
@@ -694,18 +697,21 @@ class PlaybackService : MediaLibraryService() {
             return
         }
         val startedAt = SystemClock.elapsedRealtime()
+        // Batch 695 — dibaca SEKARANG (sebelum pemain memutar apa pun): listener pemain menimpa cap ini begitu lagu pembuka mulai.
+        val playingSinceMs = updateResumeStore.playingSinceMs()
         try {
             startForegroundColdStartNotification()
         } catch (e: Exception) {
             AppLogger.e("PlaybackService", "Pemulihan pasca-update: startForeground ditolak", e)
-            UpdateResumeNotifier.post(this)
+            UpdateResumeNotifier.post(this, killedAtMs)
             return
         }
         coldStartNotificationActive = true
         resumeJob = serviceScope.launch {
             try {
                 val restoreStart = SystemClock.elapsedRealtime()
-                val pendingRest = if (mediaSession?.player?.mediaItemCount == 0) restoreHeadForResume() else null
+                val pendingRest =
+                    if (mediaSession?.player?.mediaItemCount == 0) restoreHeadForResume(killedAtMs, playingSinceMs) else null
                 val restoreMs = SystemClock.elapsedRealtime() - restoreStart
                 val player = mediaSession?.player
                 if (player == null || player.mediaItemCount == 0) {
@@ -806,7 +812,7 @@ class PlaybackService : MediaLibraryService() {
         }
         // Batch 688 — pemulihan pasca-update (receiver MY_PACKAGE_REPLACED / notifikasi cadangan); lihat resumeAfterUpdate().
         if (action == ACTION_RESUME_AFTER_UPDATE) {
-            resumeAfterUpdate()
+            resumeAfterUpdate(intent?.getLongExtra(EXTRA_KILLED_AT_MS, 0L) ?: 0L)
             return super.onStartCommand(intent, flags, startId)
         }
         val isWidgetAction = action == WidgetUpdater.ACTION_TOGGLE_PLAY ||
@@ -1074,8 +1080,9 @@ class PlaybackService : MediaLibraryService() {
      * lalu menyambung sisa antrean lewat [restoreRestOfQueue] SELAGI jalur sumber/seek/codec framework berjalan paralel.
      * Bila lagu pembuka tak ditemukan lagi atau tak ada sesi: jatuh ke [restoreLastQueue] penuh (perilaku lama) dan
      * mengembalikan null. Antrean tersimpan di [PlaybackStateStore] TIDAK disentuh (lihat [queueRestorePending]).
+     * Batch 695 — posisi awal = posisi tersimpan + waktu sejak simpan sampai proses mati ([UpdateResumePolicy.resumePosition]).
      */
-    private suspend fun restoreHeadForResume(): PendingQueueRest? {
+    private suspend fun restoreHeadForResume(killedAtMs: Long, playingSinceMs: Long): PendingQueueRest? {
         val saved = PlaybackStateStore(this).load() ?: return null
         if (saved.songIds.isEmpty()) return null
         val headIndex = saved.index.coerceIn(0, saved.songIds.size - 1)
@@ -1092,7 +1099,16 @@ class PlaybackService : MediaLibraryService() {
         try {
             player.repeatMode = saved.repeatMode
             player.shuffleModeEnabled = saved.shuffleEnabled
-            player.setMediaItem(buildSavedMediaItem(head), saved.positionMs)
+            val resume = UpdateResumePolicy.resumePosition(
+                savedPositionMs = saved.positionMs,
+                savedAtMs = saved.savedAtMs,
+                playingSinceMs = playingSinceMs,
+                killedAtMs = killedAtMs,
+                speed = saved.speed,
+                durationMs = head.duration
+            )
+            logResumePosition(saved, playingSinceMs, killedAtMs, resume)
+            player.setMediaItem(buildSavedMediaItem(head), resume.positionMs)
             player.setPlaybackSpeed(saved.speed)
             player.prepare()
         } catch (e: Exception) {
@@ -1100,6 +1116,21 @@ class PlaybackService : MediaLibraryService() {
             throw e
         }
         return PendingQueueRest(headId, saved.songIds, headIndex)
+    }
+
+    /** Batch 695 — satu baris bukti penambahan posisi (nilai mentah) agar log berikutnya bisa mencocokkannya dengan posisi nyata. */
+    private fun logResumePosition(
+        saved: SavedPlaybackState,
+        playingSinceMs: Long,
+        killedAtMs: Long,
+        resume: UpdateResumePolicy.ResumePosition
+    ) {
+        AppLogger.w(
+            "PlaybackService",
+            "Pemulihan pasca-update: posisi_simpan=${saved.positionMs}ms simpan_pada=${saved.savedAtMs} mulai_putar=$playingSinceMs " +
+                "mati_pada=$killedAtMs kecepatan=${saved.speed} tambahan=${resume.extrapolatedMs}ms dasar=${resume.basis} " +
+                "-> posisi_awal=${resume.positionMs}ms"
+        )
     }
 
     /**
@@ -1419,6 +1450,9 @@ class PlaybackService : MediaLibraryService() {
         // Batch 688 — pemulihan pasca-update. Aksi di bawah dikirim [UpdateResumeReceiver] / [UpdateResumeNotifier];
         // interval = batas galat posisi saat proses dimatikan tanpa aba-aba (lihat startPositionPersistTick).
         const val ACTION_RESUME_AFTER_UPDATE = "com.rudi.audioplayer.ACTION_RESUME_AFTER_UPDATE"
+
+        // Batch 695 — extra Long pada ACTION_RESUME_AFTER_UPDATE: jam dinding proses lama mati (ApplicationExitInfo); 0/absen = tak diketahui.
+        const val EXTRA_KILLED_AT_MS = "com.rudi.audioplayer.EXTRA_KILLED_AT_MS"
         private const val POSITION_PERSIST_INTERVAL_MS = 10_000L
 
         // Batch 694 — simpan posisi tepat sebelum pasang update (lihat [requestPositionFlush]).
