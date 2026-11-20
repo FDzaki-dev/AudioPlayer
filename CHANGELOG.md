@@ -1,5 +1,22 @@
 # Changelog
 
+## Batch 699 — probe StartupStall diputus + lagu pembuka pemulihan dibaca paralel dgn pembuatan service (v698 VERIFIED)
+
+- Input user: `sonix_debug_20261120_200815.txt` (v698 = 1.11.8 build 558) + `SONIX_laporan-untuk-claude_run125.zip` + teks "gak usah kelamaan kumpulin sample nya. langsung terapkan ultimatum perbaikan nya!!".
+
+- CI run #125 (commit 7c1833f): ArchUnit 7/0, SpotBugs 0, detekt 0, lintDebug 0, Tes 331 LULUS, Kotlin 0 = enam alat terverifikasi -> Batch 698 **VERIFIED**.
+
+- LOG v698: pasang senyap Shizuku saat memutar OK; posisi pulih ±9 ms di belakang titik mati (`tambahan=735ms`); mati -> AudioTrack start ±2,20 dtk; `pulih_antrean=204ms`.
+
+- PERUBAHAN (3 file source; 0 baru; FILE_MANIFEST tetap 264):
+  - `AudioPlayerApplication.kt`: `StartupStallProbe.start(this)` (dan impor) dicabut — probe sendiri membebani thread utama di jendela yang diukur (`Looper.setMessageLogging` per pesan + `getStackTrace()` tiap ~15 ms). Kelas + tes probe masih ada (tak dipanggil), dihapus batch berikut.
+  - `playback/UpdateResumeReceiver.kt`: objek `ResumeHeadPrefetch` — `PlaybackStateStore.load()` + query lagu pembuka dimulai di thread daemon pada `startEarly`, sebelum `startForegroundService`; `takeHead(headId)` sekali pakai, menunggu di IO (maks 1500 ms).
+  - `playback/PlaybackService.kt`: `restoreHeadForResume` memakai `ResumeHeadPrefetch.takeHead(headId)`, jatuh ke query lama bila null (perilaku jalur lagu hilang tak berubah); log `Prefetch lagu pembuka: dipakai=.. umur=..ms tunggu=..ms`.
+
+- VERIFIKASI: diff = hanya 3 file itu, kurung seimbang; **NOT VERIFIED**: compile Android/CI dan efek waktu. PREDIKSI: Tes 331, ArchUnit 7, SpotBugs 0, detekt 0, lint 0, Kotlin 0.
+
+- LANGKAH UJI: pasang v699 SAAT musik diputar lewat tombol Shizuku -> cari `Prefetch lagu pembuka: dipakai=ya`.
+
 ## Batch 698 — `isBiometricAvailable()` (binder sinkron) keluar dari badan komposisi (v697 VERIFIED di CI dan perangkat)
 
 - Input user: `sonix_debug_20261120_195825.txt` (v697 = 1.11.7 build 557, ekspor 19:58:21) + `SONIX_laporan-untuk-claude_run124.zip`, tanpa teks.

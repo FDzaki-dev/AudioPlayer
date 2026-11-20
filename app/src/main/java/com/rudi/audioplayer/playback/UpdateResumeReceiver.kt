@@ -15,7 +15,14 @@ import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.rudi.audioplayer.R
+import com.rudi.audioplayer.data.MusicRepository
+import com.rudi.audioplayer.data.PlaybackStateStore
+import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.util.AppLogger
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Batch 688 [permintaan user: pemutar harus pulih cepat / melanjutkan musik yang terjeda akibat instalasi update].
@@ -40,6 +47,66 @@ class UpdateResumeReceiver : BroadcastReceiver() {
         } catch (e: Exception) {
             AppLogger.e("UpdateResume", "Pemulihan pasca-update gagal", e)
         }
+    }
+}
+
+/**
+ * Batch 699 [perintah user: langsung terapkan perbaikan, tanpa sampel tambahan] — baca lagu pembuka lebih awal.
+ *
+ * Log v695 mengukur tahap `PlaybackStateStore.load()` + query MediaStore lagu pembuka ±0,22 dtk (akhir `onCreate` service +620 ms
+ * -> lanjutan `restoreHeadForResume` mulai +838 ms) SEBELUM `setMediaItem`/`prepare()`; pada log yang sama `onCreate` service
+ * (binder MediaSession) berjalan di thread utama. Query yang sama kini dimulai di thread latar begitu keputusan RESUME jatuh
+ * ([UpdateResumeCoordinator.startEarly]) sehingga tumpang-tindih dengan pembuatan service. Perilaku tak berubah: hasil hanya
+ * dipakai bila id lagu pembuka sama; selain itu (tak ada prefetch / lagu tak ditemukan / lewat batas tunggu / galat) pemanggil
+ * jatuh ke query lamanya sendiri, jadi jalur "lagu pembuka hilang -> restoreLastQueue" tetap persis seperti sebelumnya.
+ */
+internal object ResumeHeadPrefetch {
+    private const val TAG = "UpdateResume"
+    private const val WAIT_MAX_MS = 1500L
+
+    private class Head(val id: Long, val song: Song?)
+
+    @Volatile private var pending: FutureTask<Head?>? = null
+    @Volatile private var startedAtMs = 0L
+
+    fun start(context: Context) {
+        val appContext = context.applicationContext
+        val task = FutureTask<Head?> {
+            val saved = PlaybackStateStore(appContext).load()
+            if (saved == null || saved.songIds.isEmpty()) {
+                null
+            } else {
+                val id = saved.songIds[saved.index.coerceIn(0, saved.songIds.size - 1)]
+                Head(id, MusicRepository(appContext).getSongsByIds(listOf(id), includeGenre = false).firstOrNull())
+            }
+        }
+        pending = task
+        startedAtMs = SystemClock.elapsedRealtime()
+        val worker = Thread(task, "ResumeHeadPrefetch")
+        worker.isDaemon = true
+        worker.start()
+    }
+
+    /** Sekali pakai. Menunggu di IO (bukan thread utama); null = tak ada hasil yang bisa dipakai -> pemanggil query sendiri. */
+    suspend fun takeHead(headId: Long): Song? {
+        val task = pending ?: return null
+        pending = null
+        val waitStartMs = SystemClock.elapsedRealtime()
+        val head = withContext(Dispatchers.IO) {
+            try {
+                task.get(WAIT_MAX_MS, TimeUnit.MILLISECONDS)
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "Prefetch lagu pembuka gagal/lewat batas; jatuh ke query biasa", e)
+                null
+            }
+        }
+        val song = if (head != null && head.id == headId) head.song else null
+        val nowMs = SystemClock.elapsedRealtime()
+        AppLogger.w(
+            TAG,
+            "Prefetch lagu pembuka: dipakai=${if (song != null) "ya" else "tidak"} umur=${waitStartMs - startedAtMs}ms tunggu=${nowMs - waitStartMs}ms"
+        )
+        return song
     }
 }
 
@@ -123,6 +190,8 @@ object UpdateResumeCoordinator {
 
     private fun startEarly(context: Context, store: UpdateResumeStore, killedAtMs: Long) {
         try {
+            // Batch 699 — baca lagu pembuka SEKARANG di thread latar, PARALEL dgn pembuatan service (bukan setelah service siap).
+            ResumeHeadPrefetch.start(context)
             ContextCompat.startForegroundService(context, resumeIntent(context, killedAtMs))
             store.setWasPlaying(false)
             AppLogger.w(TAG, "Percobaan awal: start foreground service DIIZINKAN; pemulihan dimulai sebelum broadcast")

@@ -1089,7 +1089,8 @@ class PlaybackService : MediaLibraryService() {
         if (saved.songIds.isEmpty()) return null
         val headIndex = saved.index.coerceIn(0, saved.songIds.size - 1)
         val headId = saved.songIds[headIndex]
-        val head = withContext(Dispatchers.IO) {
+        // Batch 699 — hasil baca lagu pembuka yang sudah dimulai paralel ([ResumeHeadPrefetch]); null -> query lamanya persis seperti dulu.
+        val head = ResumeHeadPrefetch.takeHead(headId) ?: withContext(Dispatchers.IO) {
             MusicRepository(this@PlaybackService).getSongsByIds(listOf(headId), includeGenre = false)
         }.firstOrNull()
         val player = mediaSession?.player

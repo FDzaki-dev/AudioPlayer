@@ -12,7 +12,6 @@ import com.rudi.audioplayer.playback.UpdateResumeCoordinator
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.AudioArtFetcher
 import com.rudi.audioplayer.util.PowerProbe
-import com.rudi.audioplayer.util.StartupStallProbe
 import com.rudi.audioplayer.util.StartupTrace
 
 /** Every AsyncImage in the app (Library grid/list rows, Home, MiniPlayerBar, Now Playing)
@@ -41,10 +40,9 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         StartupTrace.mark("app_mulai") // Batch 677 — jejak cold start (lihat StartupTrace)
         AppLogger.init(this)
-        // Batch 682 — probe sementara: siapa menahan thread utama di frame pertama (Skipped 31 frames, v679/v681).
-        // Batch 683: jendela 8 dtk dari proses mulai DAN 8 dtk dari Activity pertama (v682: Activity dibuat t=+8439 ms = lewat jendela lama).
-        // Menulis ke Log Diagnostik HANYA bila ada stall besar; lihat util/StartupStallProbe.kt.
-        StartupStallProbe.start(this)
+        // Batch 699 [perintah user: berhenti mengumpulkan sampel] — start `StartupStallProbe` DIPUTUS. Probe itu sendiri membebani
+        // jendela yang diukurnya: `Looper.setMessageLogging` aktif untuk SETIAP pesan thread utama + sampler `getStackTrace()` tiap ~15 ms
+        // menahan thread utama sebentar pada tiap sampel. Kelas + tesnya masih ada (tak dipanggil); dihapus batch berikutnya.
         // Batch 670 — saklar yang memengaruhi CPU pemutaran dicetak di tiap baris `PowerProbe` (xfade = overlapPlayer kedua;
         // senyap = trim keheningan). Dibaca di thread probe, bukan di sini.
         PowerProbe.setStateExtras {
