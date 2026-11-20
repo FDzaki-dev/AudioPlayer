@@ -812,7 +812,9 @@ class PlaybackService : MediaLibraryService() {
         }
         // Batch 688 — pemulihan pasca-update (receiver MY_PACKAGE_REPLACED / notifikasi cadangan); lihat resumeAfterUpdate().
         if (action == ACTION_RESUME_AFTER_UPDATE) {
-            resumeAfterUpdate(intent?.getLongExtra(EXTRA_KILLED_AT_MS, 0L) ?: 0L)
+            // Batch 696 — `action == ACTION_RESUME_AFTER_UPDATE` (konstanta non-null) sudah membuktikan `intent` != null (smart cast K2;
+            // CI run #122: `Unnecessary safe call on a non-null receiver of type 'Intent'`); `getLongExtra` mengembalikan Long non-null.
+            resumeAfterUpdate(intent.getLongExtra(EXTRA_KILLED_AT_MS, 0L))
             return super.onStartCommand(intent, flags, startId)
         }
         val isWidgetAction = action == WidgetUpdater.ACTION_TOGGLE_PLAY ||

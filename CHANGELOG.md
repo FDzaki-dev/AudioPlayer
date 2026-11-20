@@ -1,5 +1,23 @@
 # Changelog
 
+## Batch 696 — peringatan Kotlin CI run #122 dibersihkan + log bukti jalur pasang senyap (v695 VERIFIED di CI dan perangkat)
+
+- Input user: `sonix_debug_20261120_142855.txt` (v695 = 1.11.5 build 555, ekspor 14:28:51) + `SONIX_v695.zip` + `SONIX_laporan-untuk-claude_run122.zip`, tanpa teks.
+
+- CI run #122 (commit 0e1955d, Gradle exit 0/0/0/0): ArchUnit 7/0, SpotBugs 0, detekt 0, lintDebug 0, Tes 331 LULUS (0 dilewati) = prediksi Batch 695 cocok -> Batch 695 **VERIFIED**. Selisih: peringatan Kotlin 1 (prediksi 0): `PlaybackService.kt:815:37 Unnecessary safe call on a non-null receiver of type 'Intent'`.
+
+- LOG v695: 0 FATAL/ANR baru. Posisi pulih pasca-update TERBUKTI tak mundur: pra-update flush 14:28:34,634 (`posisi=6035410ms`) -> mati 14:28:35,551 -> `tambahan=922ms dasar=EXTRAPOLATED -> posisi_awal=6036332ms` -> `posisi=6036333ms`; posisi nyata saat mati ±6036406 ms (MediaSession 6034518 @33,663 + 1,888 dtk) = selisih ±74 ms di belakang (v694: ±3,5 dtk). Jalur kompatibilitas simpanan lama (tanpa `saved_at_wall_ms`, memakai waktu ubah berkas) teruji nyata; `mulai_putar=0` karena penanda ditulis v694. Mati -> AudioTrack start ±2,69 dtk (v694 ±2,98).
+
+- UKUR (tanpa perubahan): thread utama diblok binder `MediaSession.setMetadata`/`setQueue`/`setPlaybackState` tepat pasca-instal (`restoreHeadForResume` 411 ms, +132 ms, +215 ms, `onCreate` 259 ms); `PlaybackStateStore.load()` + query lagu pembuka ≈ 0,22 dtk; jank ±2 dtk setelah Activity: sampel kode app menunjuk `BottomNavBar` (`FittedNavLabel`/`GlassTabIcon`/`drawPath`/`getRunAdvance`) tetapi hanya 13 sampel per jendela -> penyebab belum terbukti. Detail + alasan tidak diubah: `PROJECT_STATE.md` Catatan Batch 696 (D)-(E).
+
+- PERUBAHAN (2 file; 0 baru; FILE_MANIFEST tetap 264):
+  - `playback/PlaybackService.kt`: `onStartCommand` memakai `intent.getLongExtra(EXTRA_KILLED_AT_MS, 0L)` (tanpa `?.` dan `?: 0L`); perilaku identik.
+  - `update/UpdateManager.kt`: `install` menulis WARN `Pasang senyap via Shizuku dimulai: <nama> <ukuran> byte` SEBELUM `ShizukuBridge.installApk` (log v695 tak memuat satu pun baris UpdateManager sehingga jalur Shizuku tak terbukti).
+
+- VERIFIKASI: kurung seimbang 2 file; diff = hanya baris yang dimaksud. **NOT VERIFIED**: compile Android/CI. PREDIKSI: Tes 331, ArchUnit 7, detekt 0, lint 0, SpotBugs 0, Kotlin 0.
+
+- LANGKAH UJI: pasang v696 SAAT musik diputar lewat tombol Shizuku -> cari `UpdateManager Pasang senyap via Shizuku dimulai`, `Pemulihan pasca-update: posisi_simpan=` dgn `mulai_putar` bukan 0.
+
 ## Batch 695 — posisi pulih pasca-update tak lagi mundur: tambah waktu sejak simpan terakhir sampai proses mati (CI run #121 = Batch 694 VERIFIED)
 
 - Input user: `sonix_debug_20261120_140926.txt` (v694 = 1.11.4 build 554, ekspor 14:09:21) + `SONIX_v694.zip` + `SONIX_laporan-untuk-claude_run121.zip`, tanpa teks.

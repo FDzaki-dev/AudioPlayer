@@ -109,6 +109,10 @@ object UpdateManager {
         scope.launch {
             var installed = false
             if (ShizukuBridge.state(appContext) == ShizukuBridge.State.READY) {
+                // Batch 696 — log v695: `Antrean disimpan ... (pra-update)` 14:28:34,634 lalu proses mati 14:28:35,551 tanpa SATU pun baris
+                // UpdateManager, jadi jalur senyap Shizuku tak terbukti dari log (baris "selesai"/"GAGAL" di bawah tak tercatat; DUGAAN:
+                // proses dimatikan sistem saat pemasangan commit sebelum baris itu ditulis). Baris SEBELUM pasang ini yang menentukan jalurnya.
+                AppLogger.w(TAG, "Pasang senyap via Shizuku dimulai: ${apkFile.name} ${apkFile.length()} byte")
                 val result = ShizukuBridge.installApk(appContext, apkFile, SILENT_INSTALL_TIMEOUT_MS)
                 installed = result.success
                 if (installed) {
