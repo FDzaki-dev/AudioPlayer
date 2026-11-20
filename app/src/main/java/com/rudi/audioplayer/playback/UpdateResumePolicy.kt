@@ -81,6 +81,20 @@ object UpdateResumePolicy {
     fun canSpliceRestoredQueue(currentMediaId: String?, headId: Long, mediaItemCount: Int): Boolean =
         mediaItemCount == 1 && currentMediaId == headId.toString()
 
+    /** Batch 693 — jumlah maksimum percobaan membaca+menyambung sisa antrean sebelum antrean tersimpan dibekukan. */
+    const val REST_SPLICE_MAX_ATTEMPTS = 2
+
+    /**
+     * Batch 693 — sisa antrean dianggap HILANG bila tersimpan ada lagu lain ([expectedOthers] > 0) tetapi tak satu pun
+     * ditemukan ([foundOthers] == 0): pola khas galat sementara MediaStore/IO, bukan lagu yang memang sudah dihapus
+     * (itu hasil sebagian, tetap disambung apa adanya seperti jalur penuh).
+     */
+    fun isRestMissing(foundOthers: Int, expectedOthers: Int): Boolean = expectedOthers > 0 && foundOthers == 0
+
+    /** Batch 693 — ulangi baca sisa antrean hanya untuk kasus [isRestMissing] dan selama percobaan belum habis. */
+    fun shouldRetryRestSplice(foundOthers: Int, expectedOthers: Int, attempt: Int, maxAttempts: Int): Boolean =
+        isRestMissing(foundOthers, expectedOthers) && attempt < maxAttempts
+
     private const val STATE_IDLE = 1
     private const val STATE_ENDED = 4
 }

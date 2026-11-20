@@ -157,4 +157,25 @@ class UpdateResumePolicyTest {
         assertTrue(UpdateResumePolicy.intendsToPlay(true, 1, 2))
         assertTrue(UpdateResumePolicy.intendsToPlay(true, 1, 3))
     }
+
+    @Test
+    fun `Batch 693 rest is missing only when others were saved but none were found`() {
+        assertTrue(UpdateResumePolicy.isRestMissing(foundOthers = 0, expectedOthers = 134))
+        assertFalse(UpdateResumePolicy.isRestMissing(foundOthers = 120, expectedOthers = 134)) // sebagian dihapus = bukan galat
+        assertFalse(UpdateResumePolicy.isRestMissing(foundOthers = 0, expectedOthers = 0)) // antrean 1 lagu memang tanpa sisa
+    }
+
+    @Test
+    fun `Batch 693 empty rest is retried until attempts run out`() {
+        val max = UpdateResumePolicy.REST_SPLICE_MAX_ATTEMPTS
+        assertTrue(UpdateResumePolicy.shouldRetryRestSplice(0, 134, attempt = 1, maxAttempts = max))
+        assertFalse(UpdateResumePolicy.shouldRetryRestSplice(0, 134, attempt = max, maxAttempts = max))
+    }
+
+    @Test
+    fun `Batch 693 partial or complete rest is never retried`() {
+        assertFalse(UpdateResumePolicy.shouldRetryRestSplice(1, 134, attempt = 1, maxAttempts = 2))
+        assertFalse(UpdateResumePolicy.shouldRetryRestSplice(134, 134, attempt = 1, maxAttempts = 2))
+        assertFalse(UpdateResumePolicy.shouldRetryRestSplice(0, 0, attempt = 1, maxAttempts = 2))
+    }
 }

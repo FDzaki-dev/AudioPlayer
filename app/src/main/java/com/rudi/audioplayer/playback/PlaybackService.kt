@@ -575,6 +575,13 @@ class PlaybackService : MediaLibraryService() {
         // Batch 692: selama pemain baru berisi lagu pembuka SAJA (pemulihan pasca-update jalur cepat), antrean 1 lagu TIDAK
         // boleh menimpa antrean tersimpan yang utuh (mis. transisi/berkala saat jendela sambung-antrean).
         if (queueRestorePending) return
+        // Batch 693: sambung-sisa-antrean GAGAL (kosong setelah percobaan ulang) -> pemain tinggal lagu pembuka. Selama itu masih
+        // satu-satunya isi pemain, simpan DIBEKUKAN supaya antrean tersimpan yang utuh tak tertimpa antrean 1 lagu; begitu antrean
+        // berubah (user/komponen lain), pembekuan dilepas dan simpan normal lagi.
+        truncatedQueueHeadId?.let { headId ->
+            if (UpdateResumePolicy.canSpliceRestoredQueue(player.currentMediaItem?.mediaId, headId, player.mediaItemCount)) return
+            truncatedQueueHeadId = null
+        }
         val count = player.mediaItemCount
         if (count <= 0) return
         val index = player.currentMediaItemIndex
@@ -1028,6 +1035,9 @@ class PlaybackService : MediaLibraryService() {
     /** Batch 692 — true selama pemain berisi lagu pembuka SAJA dan sisa antrean belum disambung; lihat [persistQueueFromService]. */
     private var queueRestorePending = false
 
+    /** Batch 693 — id lagu pembuka bila sambung sisa antrean gagal total; lihat [persistQueueFromService]. null = tak dibekukan. */
+    private var truncatedQueueHeadId: Long? = null
+
     /**
      * Batch 692 — pemulihan pasca-update JALUR CEPAT. Log v691 (20 Nov): `pulih_antrean=359ms` (baca 135 lagu + `setMediaItems` +
      * binder MediaSession) berjalan SERIAL sebelum `play()` + `putar=740ms`, padahal hening yang terdengar = jumlahnya. Di sini
@@ -1071,28 +1081,58 @@ class PlaybackService : MediaLibraryService() {
      */
     private suspend fun restoreRestOfQueue(rest: PendingQueueRest) {
         val startedAt = SystemClock.elapsedRealtime()
+        var attempt = 0
         try {
-            val songs = withContext(Dispatchers.IO) {
-                MusicRepository(this@PlaybackService).getSongsByIds(rest.ids, includeGenre = false)
-            }
-            val player = mediaSession?.player ?: return
-            if (!UpdateResumePolicy.canSpliceRestoredQueue(player.currentMediaItem?.mediaId, rest.headId, player.mediaItemCount)) {
-                AppLogger.w("PlaybackService", "Pemulihan pasca-update: sisa antrean TIDAK disambung (pemain sudah berubah)")
+            while (true) {
+                attempt++
+                val songs = loadRestSongs(rest)
+                val player = mediaSession?.player ?: return
+                if (!UpdateResumePolicy.canSpliceRestoredQueue(player.currentMediaItem?.mediaId, rest.headId, player.mediaItemCount)) {
+                    AppLogger.w("PlaybackService", "Pemulihan pasca-update: sisa antrean TIDAK disambung (pemain sudah berubah)")
+                    return
+                }
+                val byId = songs.associateBy { it.id }
+                val before = rest.ids.subList(0, rest.headIndex).mapNotNull { byId[it] }.map { buildSavedMediaItem(it) }
+                val after = rest.ids.subList(rest.headIndex + 1, rest.ids.size).mapNotNull { byId[it] }.map { buildSavedMediaItem(it) }
+                val found = before.size + after.size
+                val expected = rest.ids.size - 1
+                if (UpdateResumePolicy.isRestMissing(found, expected)) {
+                    if (UpdateResumePolicy.shouldRetryRestSplice(found, expected, attempt, UpdateResumePolicy.REST_SPLICE_MAX_ATTEMPTS)) {
+                        AppLogger.w("PlaybackService", "Pemulihan pasca-update: sisa antrean kosong (percobaan $attempt), diulang")
+                        delay(REST_SPLICE_RETRY_DELAY_MS)
+                        continue
+                    }
+                    truncatedQueueHeadId = rest.headId
+                    AppLogger.w(
+                        "PlaybackService",
+                        "Pemulihan pasca-update: sisa antrean tetap kosong setelah $attempt percobaan; simpan antrean dibekukan (antrean tersimpan utuh)"
+                    )
+                    return
+                }
+                if (before.isNotEmpty()) player.addMediaItems(0, before)
+                if (after.isNotEmpty()) player.addMediaItems(after)
+                AppLogger.w(
+                    "PlaybackService",
+                    "Pemulihan pasca-update: sisa antrean disambung +${before.size}/+${after.size} lagu dalam " +
+                        "${SystemClock.elapsedRealtime() - startedAt}ms indeks=${player.currentMediaItemIndex}/${player.mediaItemCount}"
+                )
                 return
             }
-            val byId = songs.associateBy { it.id }
-            val before = rest.ids.subList(0, rest.headIndex).mapNotNull { byId[it] }.map { buildSavedMediaItem(it) }
-            val after = rest.ids.subList(rest.headIndex + 1, rest.ids.size).mapNotNull { byId[it] }.map { buildSavedMediaItem(it) }
-            if (before.isNotEmpty()) player.addMediaItems(0, before)
-            if (after.isNotEmpty()) player.addMediaItems(after)
-            AppLogger.w(
-                "PlaybackService",
-                "Pemulihan pasca-update: sisa antrean disambung +${before.size}/+${after.size} lagu dalam " +
-                    "${SystemClock.elapsedRealtime() - startedAt}ms indeks=${player.currentMediaItemIndex}/${player.mediaItemCount}"
-            )
         } finally {
             queueRestorePending = false
         }
+    }
+
+    /** Batch 693 — baca lagu seluruh antrean tersimpan; galat (selain pembatalan) dicatat dan dianggap hasil kosong agar bisa dicoba ulang. */
+    private suspend fun loadRestSongs(rest: PendingQueueRest): List<Song> = try {
+        withContext(Dispatchers.IO) {
+            MusicRepository(this@PlaybackService).getSongsByIds(rest.ids, includeGenre = false)
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AppLogger.e("PlaybackService", "Pemulihan pasca-update: baca sisa antrean gagal", e)
+        emptyList()
     }
 
     private suspend fun restoreLastQueue() {
@@ -1351,6 +1391,9 @@ class PlaybackService : MediaLibraryService() {
         // interval = batas galat posisi saat proses dimatikan tanpa aba-aba (lihat startPositionPersistTick).
         const val ACTION_RESUME_AFTER_UPDATE = "com.rudi.audioplayer.ACTION_RESUME_AFTER_UPDATE"
         private const val POSITION_PERSIST_INTERVAL_MS = 10_000L
+
+        // Batch 693 — jeda sebelum percobaan ulang membaca sisa antrean (galat sementara MediaStore tepat setelah update).
+        private const val REST_SPLICE_RETRY_DELAY_MS = 1500L
 
         // Roadmap #8, Trim Keheningan Otomatis — nama custom SessionCommand + key Bundle-nya,
         // dipakai bareng PlayerViewModel.setSilenceSkipEnabled() lewat MediaController.

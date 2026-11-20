@@ -1,5 +1,17 @@
 # Changelog
 
+## Batch 693 — pemulihan pasca-update: antrean tersimpan tak boleh tertimpa antrean 1 lagu bila sambung sisa gagal (v692 TERVERIFIKASI: jatah app -1,07 dtk)
+
+- Input user: `sonix_debug_20261120_034007.txt` (v692 = 1.11.2 build 552) + `SONIX_v692.zip`, tanpa teks; "buruan".
+
+- HASIL v692 (Infinix X6850 / Android 16, pasang saat memutar): `sisa antrean disambung +0/+134 lagu dalam 50ms`; `tunda_service=901ms pulih_antrean=126ms putar=695ms sejak_proses_mulai=1198ms` (v691: 1329/359/740/2268 ms); posisi pulih 7539700 ms -> 7539713 ms (tanpa mundur). Mati -> AudioTrack start ±3,02 dtk (v691 ±3,1): proses lahir sistem kali ini +1,85 dtk setelah kill (v691 +0,94 dtk).
+
+- CACAT (kode Batch 692): bila baca sisa antrean gagal/kosong, pemain tinggal 1 lagu dan simpan berkala menimpa antrean tersimpan utuh.
+
+- PERUBAHAN (3 file; 0 baru; FILE_MANIFEST tetap 263): `UpdateResumePolicy.kt` (`isRestMissing`, `shouldRetryRestSplice`, `REST_SPLICE_MAX_ATTEMPTS`), `PlaybackService.kt` (`restoreRestOfQueue` ulang 1x setelah 1,5 dtk bila kosong total, lalu bekukan simpan lewat `truncatedQueueHeadId` selama pemain masih lagu pembuka saja; `loadRestSongs`), `UpdateResumePolicyTest.kt` (+3 tes). Jalur sukses/hasil sebagian tak berubah.
+
+- VERIFIKASI: kurung seimbang; **NOT VERIFIED** compile/CI/tes JVM (sandbox tanpa kompiler). PREDIKSI: Tes 312, ArchUnit 7, detekt 0, lint 0, SpotBugs 0, Kotlin 0.
+
 ## Batch 692 — pemulihan pasca-update JALUR CEPAT: putar lagu saat ini dulu, sisa antrean disambung paralel (log v691 = build 551: eksperimen awal BERHASIL) (percepatan BELUM diukur)
 
 - Input user: `sonix_debug_20261120_032126.txt` (v691 = 1.11.1 build 551, ekspor 03:21:21), teks: "masih"; lalu "buruan" sebelumnya.
