@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 701 — musik tak lanjut setelah update: "pkg removed" diterima sebagai kematian-karena-update (CI run #127 = Batch 700 VERIFIED)
+
+- Input user: `sonix_debug_20261121_053728.txt` (v700 = 1.11.10 build 560, ekspor 05:37:23) + `SONIX_laporan-untuk-claude_run127.zip`, tanpa teks.
+
+- CI run #127 (commit c0c3a95): ArchUnit 7/0, detekt 0, lintDebug 0, Tes 331 LULUS, Kotlin 0, SpotBugs 3 (`UpdateResumeReceiver.kt:83,84,93`, Gradle exit 0) -> Batch 700 **VERIFIED** (compile + tes: `NeuBitmapStore.getAsync`, `shrinkToFitWidth`, `navLabelFitScale` terkompilasi dan lulus).
+
+- LOG v700: proses pasca-update (pid 25806) tanpa baris `Skipped N frames` di logcat (0 dari 0 di seluruh log; probe StartupStall sudah dicabut sehingga durasi jank TIDAK terukur); `Activity` -> `frame1_selesai` 246 ms (v699: 294 ms; satu sampel tiap versi = variasi bisa menutupi selisih). Efek v700 ke jank = NOT VERIFIED secara kuantitatif.
+
+- CACAT NYATA (log): update 05:37:06 via tombol Shizuku saat memutar -> `UpdateResume MY_PACKAGE_REPLACED: memutar_sebelum_update=true catatan_keluar=8 [10@...627285,13@...,16@...] keputusan=SKIP_NO_UPDATE_EXIT sejak_mati=1274ms` -> penanda diturunkan ke false, musik TIDAK lanjut (service baru dibuat 5,4 dtk kemudian oleh Activity). `ApplicationExitInfo`: `alasan=USER_REQUESTED importance=FOREGROUND deskripsi=[FORCE STOP] stop com.rudi.audioplayer due to pkg removed` (v695-v699: `PACKAGE_UPDATED ... due to installPackageLI`). `UpdateResumePolicy.isUpdateKill` hanya menerima kode 16 atau deskripsi "installPackage".
+
+- PERUBAHAN (2 file source/test + 1 config; 0 baru; FILE_MANIFEST tetap 264):
+  - `playback/UpdateResumePolicy.kt`: `isUpdateKill` juga menerima deskripsi yang memuat "pkg removed" (teks hanya muncul pada pencopotan/penggantian paket; Force stop dari Pengaturan memakai teks lain). Jendela usia 10 mnt dan aturan "catatan TERBARU" tak berubah.
+  - `UpdateResumePolicyTest.kt`: +3 tes (kasus log v700 persis; force stop biasa + catatan basi tidak dihitung; daftar 3 catatan dari log -> RESUME) = 334.
+  - `config/spotbugs/exclude.xml`: `playback.ResumeHeadPrefetch` ditambahkan ke filter `object` Kotlin yang ada (ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD x3 = `@Volatile var` `object` -> field static; rule lain di kelas itu tetap tampil).
+
+- TIDAK diubah: jalur jank (tak ada data baru), haptic, `Gagal muat artwork` (`ImageDecoder` 'unimplemented' pada berkas tertentu = sudah ditangani/ditulis WARN).
+
+- VERIFIKASI: kurung seimbang, XML valid, port Python 3/3; **NOT VERIFIED** compile Android/CI dan lanjut-putar di perangkat. PREDIKSI: Tes 334, ArchUnit 7, detekt 0, lint 0, Kotlin 0, SpotBugs 0 (3 -> 0).
+
+- LANGKAH UJI: pasang v701 SAAT musik diputar lewat tombol Shizuku -> cari `keputusan=RESUME` dan `Pemulihan pasca-update:`; bila `catatan_keluar` kode 10 lagi, deskripsi mentahnya ada di baris `ApplicationExitInfo`.
+
 ## Batch 700 — jank: render bitmap neumorphic keluar dari thread UI + pas-label bilah tab satu pass (CI run #126 = Batch 699 VERIFIED)
 
 - Input user: `sonix_debug_20261120_202633.txt` (v699 = 1.11.9 build 559) + `SONIX_v699.zip` + `SONIX_laporan-untuk-claude_run126.zip` + teks "terapkan perbaikan besar untuk masalah jank. tanpa pengumpulan sample lebih lanjut!!".

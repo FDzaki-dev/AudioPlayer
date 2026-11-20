@@ -41,12 +41,18 @@ object UpdateResumePolicy {
      * API 34+ memberi `REASON_PACKAGE_UPDATED`; API 31-33 (belum diverifikasi di perangkat) diperkirakan memberi
      * alasan lain dengan `description` berisi "installPackageLI" (format teks AOSP di log: "stop <paket> due to
      * installPackageLI"), jadi deskripsi dipakai sebagai cadangan.
+     * Batch 701 — log v700 (21 Nov 05:37): pasang senyap Shizuku yang SAMA dicatat sistem sebagai `alasan=USER_REQUESTED`
+     * (kode 10) `[FORCE STOP] stop <paket> due to pkg removed` (bukan PACKAGE_UPDATED) -> `keputusan=SKIP_NO_UPDATE_EXIT` dan
+     * musik TIDAK lanjut setelah update. Teks "pkg removed" hanya muncul pada pencopotan/penggantian paket (Force stop dari
+     * Pengaturan memakai teks lain), jadi ikut dihitung sebagai kematian-karena-update; jendela usia dan aturan "catatan
+     * TERBARU" tak berubah.
      */
     fun isUpdateKill(record: ProcessExitRecord, nowMs: Long): Boolean {
         val age = nowMs - record.timestampMs
         if (age < -MAX_CLOCK_SKEW_MS || age > MAX_EXIT_AGE_MS) return false
         if (record.reason == EXIT_REASON_PACKAGE_UPDATED) return true
-        return record.description?.contains("installPackage", ignoreCase = true) == true
+        val text = record.description ?: return false
+        return text.contains("installPackage", ignoreCase = true) || text.contains("pkg removed", ignoreCase = true)
     }
 
     /**

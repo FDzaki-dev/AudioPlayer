@@ -35,6 +35,9 @@
   SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA x3 pada `object PowerProbe` (`started`/`appContext`/`handler` = var `object` -> field static;
   `@Synchronized` mengunci singleton tunggal itu sendiri, start() idempoten) = pola yang SAMA dengan AppLogger/PlaybackAudioSession/
   WidgetMarqueeDriver; kelas ditambahkan ke filter yang sudah ada, rule konkurensi lain di kelas itu tetap tampil.
+  Batch 701 — dasar: laporan CI run #126/#127 (3 temuan, semuanya `UpdateResumeReceiver.kt` baris 83, 84, 93 = `start()`/`takeHead()`): ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD x3
+  pada `object ResumeHeadPrefetch` (`pending`/`startedAtMs` = `@Volatile var` `object` -> field static; satu-satunya penulis = `start()` di thread latar
+  dan `takeHead()` sekali pakai) = pola `object` Kotlin yang SAMA dengan AppLogger/PowerProbe; kelas ditambahkan ke filter yang sudah ada.
   Kelas hasil generate (ComposableSingletons, Room _Impl, R, BuildConfig) juga dikecualikan.
   Batch 613 — dasar: laporan CI run #41 (23 temuan) + pembacaan kode di tiap titik. DIPERBAIKI di kode (bukan disaring):
   AT_* di PlayerViewModel/CrossfadeEngine (atomik/volatile) dan UC_USELESS_CONDITION di CrossfadeEngine. DISARING (terbukti
@@ -91,7 +94,7 @@
   </Match>
   <Match>
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD,SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA"/>
-    <Class name="~com\.rudi\.audioplayer\.(util\.AppLogger|util\.PowerProbe|playback\.PlaybackAudioSession|widget\.WidgetMarqueeDriver)"/>
+    <Class name="~com\.rudi\.audioplayer\.(util\.AppLogger|util\.PowerProbe|playback\.PlaybackAudioSession|playback\.ResumeHeadPrefetch|widget\.WidgetMarqueeDriver)"/>
   </Match>
   <!-- Batch 613 — artefak sintetis / pembersihan best-effort terkonfirmasi (alasan di komentar header) -->
   <Match>

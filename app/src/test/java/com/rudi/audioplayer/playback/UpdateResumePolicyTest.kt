@@ -70,6 +70,35 @@ class UpdateResumePolicyTest {
     }
 
     @Test
+    fun `Batch 701 exact v700 log case - USER_REQUESTED force stop due to pkg removed counts as the update kill`() {
+        val record = exit(reason = 10, ageMs = 1_274L, description = "[FORCE STOP] stop com.rudi.audioplayer due to pkg removed")
+        assertTrue(UpdateResumePolicy.isUpdateKill(record, now))
+    }
+
+    @Test
+    fun `Batch 701 a user force stop with another description does not count`() {
+        assertFalse(UpdateResumePolicy.isUpdateKill(exit(10, 1_274L, "[FORCE STOP] stop com.rudi.audioplayer due to from pid 1234"), now))
+        assertFalse(UpdateResumePolicy.isUpdateKill(exit(10, 1_274L, null), now))
+        // pkg removed tetap terikat jendela usia: catatan basi tidak dihitung
+        assertFalse(
+            UpdateResumePolicy.isUpdateKill(
+                exit(10, UpdateResumePolicy.MAX_EXIT_AGE_MS + 1L, "[FORCE STOP] stop com.rudi.audioplayer due to pkg removed"),
+                now
+            )
+        )
+    }
+
+    @Test
+    fun `Batch 701 v700 log - newest exit is the pkg removed kill with older OEM and update exits behind it resumes`() {
+        val exits = listOf(
+            exit(10, 1_274L, "[FORCE STOP] stop com.rudi.audioplayer due to pkg removed"),
+            exit(13, 9L * 3_600_000L, "[Swipe-up clean] manual_swipUpClean"),
+            exit(UpdateResumePolicy.EXIT_REASON_PACKAGE_UPDATED, 18L * 3_600_000L, "stop com.rudi.audioplayer due to installPackageLI")
+        )
+        assertEquals(Decision.RESUME, UpdateResumePolicy.decide(wasPlaying = true, exits = exits, nowMs = now))
+    }
+
+    @Test
     fun `unrelated description with a non-update reason does not count`() {
         assertFalse(UpdateResumePolicy.isUpdateKill(exit(13, 2_000L, "stop com.rudi.audioplayer due to swipe"), now))
         assertFalse(UpdateResumePolicy.isUpdateKill(exit(13, 2_000L, null), now))
