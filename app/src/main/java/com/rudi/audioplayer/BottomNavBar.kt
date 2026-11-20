@@ -5,7 +5,6 @@ import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
@@ -23,24 +22,25 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 // Batch 522 — Wave 2 T10 (MOVE-ONLY, R3; eksekusi ulang — percobaan pertama Batch 520 ditarik Batch 521 karena laporan performa
 // turun, lalu user menduga penyebabnya HP overheat): MagnifyingTabLabel/GlassTabIcon/NoRippleIndication/CustomNavBarTabItem dipindah
@@ -170,51 +170,60 @@ internal fun GlassTabIcon(
 // salinan aksen `CustomNavBarTabItem` (2 pemanggil `GlassTabIcon`) mendapat ukuran IDENTIK tanpa berkedip. `lineHeight`/`letterSpacing`
 // tetap (hanya `fontSize` yang berubah) -> tinggi label/bilah/pil TIDAK berubah. Ellipsis tetap jaring pengaman bila 9sp pun tak muat.
 internal const val NAV_LABEL_MIN_SP = 9f
-internal const val NAV_LABEL_STEP_SP = 0.5f
+
+// Batch 700 — log v698: pesan thread utama 204 ms (t=+9280..+9484) + frame pertama `layout`=160 ms memuat `TextLine.measure`/`Layout.measurePara`
+// dan `BottomNavBarKt` (v695: `FittedNavLabel`). AKAR (kode): tiap label dipasang di `BoxWithConstraints` (SubcomposeLayout) + `TextMeasurer`
+// mengukur ulang hingga ~8 ukuran huruf di fase KOMPOSISI; 3 tab x 2 salinan (dasar + aksen) = 6 subkomposisi + sampai ~48 pengukuran teks per
+// komposisi bilah (kode dingin pasca-instal = ditafsirkan). FIX: SATU pass `Modifier.layout` — lebar alami dari `maxIntrinsicWidth` (Paragraph yang
+// sudah dibuat `Text` itu sendiri, 0 pengukuran tambahan), lalu skala (`placeWithLayer`) bila melebihi lebar tersedia. Muat = jalur lama persis (tanpa
+// layer, tanpa skala). Lantai skala = `NAV_LABEL_MIN_SP` / ukuran dasar (9sp/12sp = 0,75: sama dgn lantai lama); di lantai & masih tak muat ->
+// `Text` diberi lebar `tersedia / skala` sehingga ellipsis tetap jaring pengaman. Tinggi label TIDAK berubah (tinggi bilah/pil tetap); skala berporos
+// kiri-tengah, lebar tata letak = lebar teks tersusut, jadi `Column` tetap memusatkannya. Dasar + salinan aksen mendapat constraint IDENTIK -> skala IDENTIK.
 
 /**
- * Ukuran huruf (sp) terbesar dari [baseSp] turun per [stepSp] sampai [fits] true; tak pernah di bawah [minSp].
- * [baseSp] sudah muat -> [baseSp]; tak pernah muat -> [minSp]. Fungsi murni (diuji `TabPillMathTest`).
+ * Skala (0..1) agar label selebar [naturalPx] muat di [availablePx]; tak pernah di bawah [minScale]. Sudah muat atau ukuran tak valid -> 1.
+ * Fungsi murni (diuji `TabPillMathTest`).
  */
-internal fun fitNavLabelSp(baseSp: Float, minSp: Float, stepSp: Float, fits: (Float) -> Boolean): Float {
-    if (stepSp <= 0f || baseSp <= minSp) return baseSp
-    var size = baseSp
-    while (size > minSp && !fits(size)) size -= stepSp
-    return maxOf(size, minSp)
+internal fun navLabelFitScale(naturalPx: Int, availablePx: Int, minScale: Float): Float {
+    if (naturalPx <= 0 || availablePx <= 0 || naturalPx <= availablePx) return 1f
+    return maxOf(availablePx.toFloat() / naturalPx, minScale.coerceIn(0f, 1f))
+}
+
+private fun Modifier.shrinkToFitWidth(minScale: Float): Modifier = layout { measurable, constraints ->
+    val available = constraints.maxWidth
+    val natural = if (available == Constraints.Infinity || minScale >= 1f) 0 else measurable.maxIntrinsicWidth(constraints.maxHeight)
+    val scale = navLabelFitScale(natural, available, minScale)
+    if (scale >= 1f) {
+        val placeable = measurable.measure(constraints)
+        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+    } else {
+        val childMaxWidth = ceil(available / scale).toInt()
+        val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = childMaxWidth))
+        val width = (placeable.width * scale).roundToInt().coerceIn(constraints.minWidth, available)
+        layout(width, placeable.height) {
+            placeable.placeWithLayer(0, 0) {
+                scaleX = scale
+                scaleY = scale
+                transformOrigin = TransformOrigin(0f, 0.5f)
+            }
+        }
+    }
 }
 
 @Composable
 private fun FittedNavLabel(text: String, color: Color) {
     val base = MaterialTheme.typography.labelMedium
-    val measurer = rememberTextMeasurer(cacheSize = 4)
-    val density = LocalDensity.current
-    BoxWithConstraints {
-        val maxPx = constraints.maxWidth
-        val style = remember(text, base, maxPx, density) {
-            if (maxPx == Constraints.Infinity || base.fontSize == TextUnit.Unspecified) {
-                base
-            } else {
-                val fitted = fitNavLabelSp(base.fontSize.value, NAV_LABEL_MIN_SP, NAV_LABEL_STEP_SP) { sizeSp ->
-                    measurer.measure(
-                        text = text,
-                        style = base.copy(fontSize = sizeSp.sp),
-                        softWrap = false,
-                        maxLines = 1,
-                        density = density
-                    ).size.width <= maxPx
-                }
-                base.copy(fontSize = fitted.sp)
-            }
-        }
-        Text(
-            text = text,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis,
-            style = style,
-            color = color
-        )
-    }
+    val baseSp = base.fontSize.value
+    val minScale = if (base.fontSize == TextUnit.Unspecified || baseSp <= 0f) 1f else (NAV_LABEL_MIN_SP / baseSp).coerceIn(0.5f, 1f)
+    Text(
+        text = text,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+        style = base,
+        color = color,
+        modifier = Modifier.shrinkToFitWidth(minScale)
+    )
 }
 
 // Batch 439 — 0 dampak ke `selected`/klik: `Indication` kosong (cuma `drawContent()`, 0 layer

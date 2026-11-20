@@ -56,23 +56,25 @@ class TabPillMathTest {
 
     @Test
     fun `label yang sudah muat tidak disusutkan`() {
-        assertEquals(13f, fitNavLabelSp(baseSp = 13f, minSp = 9f, stepSp = 0.5f) { true }, eps)
+        assertEquals(1f, navLabelFitScale(naturalPx = 90, availablePx = 96, minScale = 0.75f), eps)
+        assertEquals(1f, navLabelFitScale(naturalPx = 96, availablePx = 96, minScale = 0.75f), eps)
     }
 
     @Test
-    fun `label yang terlalu lebar menyusut bertahap sampai muat`() {
-        // lebar teks = 8 x ukuran; slot 96 -> muat bila ukuran <= 12 (13 -> 12,5 -> 12)
-        assertEquals(12f, fitNavLabelSp(baseSp = 13f, minSp = 9f, stepSp = 0.5f) { it * 8f <= 96f }, eps)
+    fun `label yang terlalu lebar diskalakan tepat sebesar lebar tersedia per lebar alami`() {
+        // lebar alami 120 px, slot 96 px -> skala 0,8 (teks tersusut persis muat)
+        assertEquals(0.8f, navLabelFitScale(naturalPx = 120, availablePx = 96, minScale = 0.75f), eps)
     }
 
     @Test
-    fun `label tidak pernah menyusut di bawah lantai`() {
-        assertEquals(9f, fitNavLabelSp(baseSp = 13f, minSp = 9f, stepSp = 0.5f) { false }, eps)
+    fun `label tidak pernah diskalakan di bawah lantai`() {
+        assertEquals(0.75f, navLabelFitScale(naturalPx = 400, availablePx = 96, minScale = 0.75f), eps)
     }
 
     @Test
-    fun `ukuran dasar di bawah lantai atau langkah tidak valid dikembalikan apa adanya`() {
-        assertEquals(8f, fitNavLabelSp(baseSp = 8f, minSp = 9f, stepSp = 0.5f) { false }, eps)
-        assertEquals(13f, fitNavLabelSp(baseSp = 13f, minSp = 9f, stepSp = 0f) { false }, eps)
+    fun `ukuran tak valid atau lantai di atas satu mengembalikan skala satu`() {
+        assertEquals(1f, navLabelFitScale(naturalPx = 0, availablePx = 96, minScale = 0.75f), eps)
+        assertEquals(1f, navLabelFitScale(naturalPx = 120, availablePx = 0, minScale = 0.75f), eps)
+        assertEquals(1f, navLabelFitScale(naturalPx = 120, availablePx = 96, minScale = 1.5f), eps)
     }
 }

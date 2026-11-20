@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 700 — jank: render bitmap neumorphic keluar dari thread UI + pas-label bilah tab satu pass (CI run #126 = Batch 699 VERIFIED)
+
+- Input user: `sonix_debug_20261120_202633.txt` (v699 = 1.11.9 build 559) + `SONIX_v699.zip` + `SONIX_laporan-untuk-claude_run126.zip` + teks "terapkan perbaikan besar untuk masalah jank. tanpa pengumpulan sample lebih lanjut!!".
+
+- CI run #126 (commit 9634252): ArchUnit 7/0, detekt 0, lintDebug 0, Tes 331 LULUS, Kotlin 0; SpotBugs 3 (`ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD` @ `UpdateResumeReceiver.kt:83,84,93` = `var` di `object ResumeHeadPrefetch`; Gradle exit SpotBugs 0) -> Batch 699 **VERIFIED** (compile + tes). Temuan SpotBugs tak diperbaiki di batch ini (pola `object` Kotlin sama dgn AppLogger; kandidat filter/`AtomicReference` batch berikut).
+
+- LOG v699 (20:26:20, proses hidup tanpa UI 56,6 dtk): frame pertama normal (`frame1_selesai`=89 ms); probe StartupStall sudah dicabut (tak ada sampel baru). Bukti jank yang SUDAH ada (log v698, pesan thread utama 204 ms t=+9280..+9484, frame `gambar`=183 ms): `android.graphics.BaseCanvas.nDrawPath` <- `AndroidCanvas.drawPath` <- `ui.theme.NeuDrawBlock.invoke` (`BaseCanvas` = canvas PERANGKAT LUNAK bitmap; canvas hardware memakai `BaseRecordingCanvas`) + `PathParser.toPath` <- `PathComponent.draw` <- `BottomNavBarKt` + `TextLine.measure` <- `Layout.getDesiredWidthWithLimit`.
+
+- AKAR (kode): `TactileDepth.kt` merender bayangan jatuh / sumur / wash neumorphic ke `ImageBitmap` dengan `BlurMaskFilter` di `Canvas(ImageBitmap)` SINKRON di thread UI pada gambar pertama tiap kunci (ukuran, tema, bentuk) lewat `NeuBitmapStore.get` di blok `drawWithCache`; bilah tab memakai 2 kunci (palung + kunci geser) dan layar lain puluhan elemen. Pada kode dingin pasca-instal tiap render = puluhan ms di thread UI. `BottomNavBar.kt` `FittedNavLabel`: 6x `BoxWithConstraints` + sampai ~48 pengukuran teks per komposisi bilah.
+
+- PERUBAHAN (3 file: 2 source + 1 tes; 0 baru; FILE_MANIFEST tetap 264):
+  - `ui/theme/TactileDepth.kt`: `NeuBitmapStore.getAsync` — bitmap ada di cache -> dipakai; belum ada -> `null` SEKARANG dan render dijadwalkan di thread latar tunggal `NeuRender` (prioritas `THREAD_PRIORITY_LESS_FAVORABLE`, kunci yang sama tak dirender dua kali, galat render ditelan -> elemen tetap tanpa bayangan, tak crash). Selesai render -> `mutableIntStateOf` dinaikkan di thread utama (digabung: segera bila antrean kosong, selain itu paling sering tiap 120 ms) sehingga blok `drawWithCache` yang membacanya dievaluasi ulang. Dipakai oleh: bayangan jatuh `neuCastShadow` (kind 2), sumur `neuFace` (kind 3), wash kaca `neuFace` (kind 5), bayangan kunci geser bilah (kind 2). Permukaan 48x48 (kind 4) TETAP sinkron (murah; supaya pelat tak berkedip). Semua properti `object` berupa `val` (tanpa `var` static -> tak memancing `ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD`). Dampak visual: bayangan/wash muncul ±1-3 frame SETELAH elemen pertama kali tampil (elemen berukuran sama berbagi bitmap -> hanya yang pertama).
+  - `BottomNavBar.kt`: `FittedNavLabel` ditulis ulang tanpa `BoxWithConstraints`/`rememberTextMeasurer`: `Modifier.shrinkToFitWidth` (satu pass `layout`) membaca `maxIntrinsicWidth` Text, lalu skala `placeWithLayer` (poros kiri-tengah) bila melebihi lebar tersedia. Muat = jalur lama (tanpa layer/skala). Lantai skala = 9sp / ukuran dasar; di lantai & tak muat -> ellipsis tetap (Text diberi lebar `tersedia/skala`). Tinggi label/bilah/pil tak berubah. Fungsi murni baru `navLabelFitScale` menggantikan `fitNavLabelSp` (dan `NAV_LABEL_STEP_SP`).
+  - `TabPillMathTest.kt`: 4 tes `fitNavLabelSp` diganti 4 tes `navLabelFitScale` (muat, skala tepat 0,8, lantai 0,75, input tak valid) -> total tes tetap 331.
+
+- TIDAK diubah (sengaja): `PathParser.toPath` ikon vektor (bagian pustaka Compose, tak ada tuas aman), binder `setMetadata` pasca-instal, haptic, jalur pemulihan pemutar.
+
+- VERIFIKASI: kurung seimbang 3 file; port Python 4/4 tes `navLabelFitScale`; diff terhadap v699 = HANYA 3 file itu + docs; sandbox TANPA kompiler Kotlin/android.jar -> **NOT VERIFIED** compile Android/CI dan efek waktu di perangkat. PREDIKSI: Tes 331, ArchUnit 7, detekt 0, lint 0, Kotlin 0, SpotBugs 3 (sama) atau lebih (RISIKO kecil: pola `NeuBitmapStore` baru).
+
+- LANGKAH UJI: pasang v700 (setelah update, buka app) -> rasakan frame saat bilah tab + kartu pertama muncul; kirim log. Gejala bahaya: bayangan tak pernah muncul (blok cache tak dievaluasi ulang -> cabut `getAsync`, kembali ke `get`), label tab tak muat/terpotong pada font besar.
+
 ## Batch 699 — probe StartupStall diputus + lagu pembuka pemulihan dibaca paralel dgn pembuatan service (v698 VERIFIED)
 
 - Input user: `sonix_debug_20261120_200815.txt` (v698 = 1.11.8 build 558) + `SONIX_laporan-untuk-claude_run125.zip` + teks "gak usah kelamaan kumpulin sample nya. langsung terapkan ultimatum perbaikan nya!!".

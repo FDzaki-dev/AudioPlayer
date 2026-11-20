@@ -2,6 +2,9 @@ package com.rudi.audioplayer.ui.theme
 
 import android.graphics.Bitmap
 import android.graphics.BlurMaskFilter
+import android.os.Handler
+import android.os.Looper
+import android.os.Process
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -20,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -65,6 +69,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.cos
@@ -765,12 +771,38 @@ private data class NeuStoreKey(
     val extra: Any?
 )
 
-/** Cache GLOBAL bitmap efek (LRU, maks 48 entri) — hanya dipakai dari blok cache gambar (thread UI). */
+/** Cache GLOBAL bitmap efek (LRU, maks 48 entri). [get] = render SINKRON di thread UI (hanya untuk bitmap kecil/murah,
+ *  mis. permukaan 48x48). [getAsync] (Batch 700) = bayangan jatuh / sumur / wash: dirender di thread latar karena memakai
+ *  `BlurMaskFilter` + `Canvas(ImageBitmap)` (canvas PERANGKAT LUNAK) — log v698: `BaseCanvas.nDrawPath` <- `NeuDrawBlock.invoke`
+ *  dalam pesan thread utama 204 ms (frame `gambar`=183 ms). Semua properti `val` (tanpa `var` static). */
 private object NeuBitmapStore {
     private const val MAX_ENTRIES = 48
+    private const val BUMP_COALESCE_MS = 120L
     private val map = object : LinkedHashMap<Any, ImageBitmap>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Any, ImageBitmap>?): Boolean =
             size > MAX_ENTRIES
+    }
+
+    /** Kunci yang sedang dirender (dijaga kunci [map]) supaya satu kunci tak dirender dua kali. */
+    private val pending = HashSet<Any>()
+
+    /** Naik tiap batch render latar selesai. DIBACA di [getAsync] (di dalam blok `drawWithCache` pemanggil) sehingga cache
+     *  gambar dievaluasi ulang dan bitmap yang sudah jadi terpakai. */
+    private val ready = mutableIntStateOf(0)
+    private val bumpScheduled = AtomicBoolean(false)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val bumpRunnable = Runnable {
+        bumpScheduled.set(false)
+        ready.intValue = ready.intValue + 1
+    }
+    private val executor = Executors.newSingleThreadExecutor { task ->
+        Thread(
+            {
+                Process.setThreadPriority(Process.THREAD_PRIORITY_LESS_FAVORABLE)
+                task.run()
+            },
+            "NeuRender"
+        ).apply { isDaemon = true }
     }
 
     fun get(key: Any, build: () -> ImageBitmap): ImageBitmap = synchronized(map) {
@@ -781,6 +813,42 @@ private object NeuBitmapStore {
             val fresh = build()
             map[key] = fresh
             fresh
+        }
+    }
+
+    /** Bitmap bila sudah ada di cache; bila belum -> `null` SEKARANG dan render dijadwalkan di thread latar (gambar elemen
+     *  tanpa bayangan dulu, bayangan muncul begitu jadi). Hanya dipanggil dari blok cache gambar (thread UI). */
+    fun getAsync(key: Any, build: () -> ImageBitmap): ImageBitmap? {
+        // Membaca state = mendaftarkan blok `drawWithCache` pemanggil sebagai pengamat; nilainya tak pernah negatif.
+        if (ready.intValue < 0) return null
+        val hit: ImageBitmap?
+        val schedule: Boolean
+        synchronized(map) {
+            hit = map[key]
+            schedule = hit == null && pending.add(key)
+        }
+        if (schedule) executor.execute { renderInBackground(key, build) }
+        return hit
+    }
+
+    private fun renderInBackground(key: Any, build: () -> ImageBitmap) {
+        val fresh: ImageBitmap? = try {
+            build()
+        } catch (e: Exception) {
+            null
+        }
+        val idle: Boolean
+        synchronized(map) {
+            if (fresh != null) map[key] = fresh
+            pending.remove(key)
+            idle = pending.isEmpty()
+        }
+        if (fresh == null) return
+        if (idle) {
+            mainHandler.removeCallbacks(bumpRunnable)
+            mainHandler.post(bumpRunnable)
+        } else if (bumpScheduled.compareAndSet(false, true)) {
+            mainHandler.postDelayed(bumpRunnable, BUMP_COALESCE_MS)
         }
     }
 }
@@ -1106,7 +1174,7 @@ private fun Modifier.neuCastShadow(
             max(w, h) > 160f * d -> NeuBigScale
             else -> NeuSmallScale
         }
-        val bmp = NeuBitmapStore.get(NeuStoreKey(2, wi, hi, d, shape, style, Pair(spec, hollow))) {
+        val bmp = NeuBitmapStore.getAsync(NeuStoreKey(2, wi, hi, d, shape, style, Pair(spec, hollow))) {
             renderNeuCastShadow(shape, w, h, d, style, spec, scale, hollow)
         }
         val base = shape.createOutline(size, layoutDirection, this).toNeuPath()
@@ -1118,7 +1186,7 @@ private fun Modifier.neuCastShadow(
         onDrawBehind {
             val t = press?.value ?: 0f
             val raisedAlpha = 1f - t
-            if (raisedAlpha > 0.01f) {
+            if (bmp != null && raisedAlpha > 0.01f) {
                 drawNeuShadow(bmp, d, scale, spec.bleedDp, raisedAlpha)
             }
             if (t > 0.01f && lip != null) {
@@ -1150,7 +1218,7 @@ private fun Modifier.neuFace(
             if (paintFace) NeuBitmapStore.get(NeuStoreKey(4, 0, 0, 1f, null, style, null)) { renderNeuFace(style) } else null
         val well: ImageBitmap? =
             if (paintFace && press != null) {
-                NeuBitmapStore.get(NeuStoreKey(3, wi, hi, d, shape, style, null)) {
+                NeuBitmapStore.getAsync(NeuStoreKey(3, wi, hi, d, shape, style, null)) {
                     renderNeuWellInner(shape, wi.toFloat(), hi.toFloat(), d, style)
                 }
             } else {
@@ -1159,7 +1227,7 @@ private fun Modifier.neuFace(
         // Batch 553 — panel kaca (paintFace=false): cahaya seluruh permukaan, bukan cuma garis bevel.
         val wash: ImageBitmap? =
             if (!paintFace) {
-                NeuBitmapStore.get(NeuStoreKey(5, wi, hi, d, shape, style, bevelScale)) {
+                NeuBitmapStore.getAsync(NeuStoreKey(5, wi, hi, d, shape, style, bevelScale)) {
                     renderNeuGlassWash(shape, wi.toFloat(), hi.toFloat(), d, style, bevelScale)
                 }
             } else {
@@ -1613,7 +1681,7 @@ private fun Modifier.neuKeyDraw(
             max(kw, kh) > 160f * d -> NeuBigScale
             else -> NeuSmallScale
         }
-        val shadow = NeuBitmapStore.get(NeuStoreKey(2, wi, hi, d, shape, style, Pair(spec, false))) {
+        val shadow = NeuBitmapStore.getAsync(NeuStoreKey(2, wi, hi, d, shape, style, Pair(spec, false))) {
             renderNeuCastShadow(shape, kw, kh, d, style, spec, scale, false)
         }
         val face = NeuBitmapStore.get(NeuStoreKey(4, 0, 0, 1f, null, style, null)) { renderNeuFace(style) }
@@ -1631,7 +1699,7 @@ private fun Modifier.neuKeyDraw(
             val x = (position() * slotW - kw / 2f).coerceIn(0f, max(0f, size.width - kw))
             val y = (size.height - kh) / 2f
             translate(left = x, top = y) {
-                drawNeuShadow(shadow, d, scale, bleedDp, 1f)
+                if (shadow != null) drawNeuShadow(shadow, d, scale, bleedDp, 1f)
                 clipPath(keyPath) {
                     drawImage(face, dstSize = IntSize(wi, hi))
                     for (f in facets) {
