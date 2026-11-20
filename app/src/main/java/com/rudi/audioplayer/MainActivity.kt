@@ -458,6 +458,11 @@ class MainActivity : FragmentActivity() {
                 val lockEnabled by playerViewModel.lockEnabled.collectAsStateWithLifecycle()
                 val biometricEnabled by playerViewModel.biometricEnabled.collectAsStateWithLifecycle()
                 val needsUnlock = lockEnabled && !isUnlocked
+                // Batch 698 — log v697 (pid 463, pesan thread utama 212 ms t=+4897..+5109): sampel `IAuthService.canAuthenticate` (binder
+                // sinkron ke system_server) dari `MainActivityKt$$ExternalSyntheticLambda99`. AKAR: `isBiometricAvailable()` dipanggil LANGSUNG di
+                // badan komposisi (argumen `AppNavHost` + `LockScreen`) -> satu binder di thread utama pada SETIAP rekomposisi lambda akar.
+                // Kini dihitung sekali per perubahan fokus jendela (kembali dari Pengaturan sidik jari = fokus berganti = nilai diperbarui).
+                val biometricAvailable = remember(hasWindowFocus) { isBiometricAvailable() }
                 // Batch 647 — [laporan user v646: "sehabis selesai biometric, tidak bisa mengingat tab terakhir"]. AKAR:
                 // onStop -> isUnlocked=false -> `when` di bawah pindah ke LockScreen, sehingga AppNavHost KELUAR dari
                 // komposisi; tanpa SaveableStateProvider, back stack NavController + seluruh rememberSaveable di bawahnya
@@ -615,14 +620,14 @@ class MainActivity : FragmentActivity() {
                         if (appThemeIdentity == ThemeIdentity.SPACE) SpaceCosmosBackdrop()
                         when {
                             needsUnlock -> LockScreen(
-                                biometricEnabled = biometricEnabled && isBiometricAvailable(),
+                                biometricEnabled = biometricEnabled && biometricAvailable,
                                 onVerifyPin = { pin -> playerViewModel.verifyPin(pin) },
                                 onUnlocked = { isUnlocked = true },
                                 onRequestBiometric = { showBiometricPrompt { isUnlocked = true } },
                                 initialLockedOutUntil = remember(needsUnlock) { playerViewModel.currentPinLockout() }
                             )
                             hasPermission -> appStateHolder.SaveableStateProvider(APP_SAVEABLE_STATE_KEY) {
-                                AppNavHost(playerViewModel, isBiometricAvailable())
+                                AppNavHost(playerViewModel, biometricAvailable)
                             }
                             !permissionRequested -> WelcomeScreen(
                                 onContinue = {

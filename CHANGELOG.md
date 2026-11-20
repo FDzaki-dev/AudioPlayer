@@ -1,5 +1,21 @@
 # Changelog
 
+## Batch 698 — `isBiometricAvailable()` (binder sinkron) keluar dari badan komposisi (v697 VERIFIED di CI dan perangkat)
+
+- Input user: `sonix_debug_20261120_195825.txt` (v697 = 1.11.7 build 557, ekspor 19:58:21) + `SONIX_laporan-untuk-claude_run124.zip`, tanpa teks.
+
+- CI run #124 (commit 4ad67d5): ArchUnit 7/0, SpotBugs 0, detekt 0, lintDebug 0, Tes 331 LULUS, Kotlin 0 = enam alat terverifikasi -> Batch 697 **VERIFIED**. Apakah ulangan detekt terpakai di run ini NOT VERIFIED (laporan tak memuat `gradle-exit.txt`).
+
+- LOG v697: jalur senyap Shizuku TERBUKTI (`Pasang senyap via Shizuku dimulai: update_AudioPlayer-v1.11.7-run670.apk 7101147 byte` 19:58:08,465 -> pra-update flush -> mati 09,370). Posisi pulih ±15 ms di belakang titik mati (`tambahan=893ms dasar=EXTRAPOLATED`, posisi nyata ±8640204 vs `posisi_awal=8640189`). Mati -> AudioTrack start ±2,17 dtk (v696 ±2,63; v695 ±2,69). 0 FATAL/ANR baru.
+
+- TEMUAN: pesan thread utama 212 ms memuat sampel `IAuthService.canAuthenticate` (binder sinkron) dari `MainActivityKt$$ExternalSyntheticLambda99` (1 sampel, 1 proses = bukti lemah untuk durasi; akar di kode pasti).
+
+- PERUBAHAN (1 file; 0 baru; FILE_MANIFEST tetap 264): `MainActivity.kt` — `isBiometricAvailable()` tak lagi dipanggil langsung di badan komposisi (argumen `AppNavHost` dan `LockScreen`, satu IPC per rekomposisi lambda akar); kini `val biometricAvailable = remember(hasWindowFocus) { isBiometricAvailable() }`, dihitung ulang saat fokus jendela berganti. `LaunchedEffect` auto-prompt tak diubah.
+
+- VERIFIKASI: diff = hanya 3 titik itu; **NOT VERIFIED**: compile Android/CI. PREDIKSI: Tes 331, ArchUnit 7, SpotBugs 0, detekt 0, lint 0, Kotlin 0.
+
+- LANGKAH UJI: pasang v698 SAAT musik diputar lewat tombol Shizuku -> cek `canAuthenticate` tak lagi muncul di sampel `StartupStall`.
+
 ## Batch 697 — CI mengulang unduhan dependensi detekt sekali bila gagal (run #123: detekt NOT VERIFIED karena detekt-cli tak terunduh; v696 VERIFIED)
 
 - Input user: `sonix_debug_20261120_144455.txt` (v696 = 1.11.6 build 556, ekspor 14:44:50) + `SONIX_laporan-untuk-claude_run123.zip`, tanpa teks.
