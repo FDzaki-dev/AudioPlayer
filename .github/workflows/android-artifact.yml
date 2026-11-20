@@ -88,7 +88,18 @@ jobs:
           gradle spotbugsRelease -Psonix.spotbugs=true --no-daemon --build-cache > gradle-spotbugs.log 2>&1
           echo "SPOTBUGS_EXIT=$?" >> gradle-exit.txt
           gradle detekt lintDebug --continue --no-daemon --no-build-cache > gradle-static.log 2>&1
-          echo "STATIC_EXIT=$?" >> gradle-exit.txt
+          STATIC_RC=$?
+          # Batch 697 — run #123: `Could not find ...detekt-cli:1.23.8` (unduhan dependensi gagal, BUKAN temuan kode) membuat detekt
+          # NOT VERIFIED; run #122 dgn kode/konfigurasi sama lulus. Hanya bila kegagalan itu sendiri (tanpa detekt.xml + pesan unduhan di
+          # log): ulang SEKALI dgn --refresh-dependencies. Temuan nyata / galat lain tak diulang (tak ada yang disembunyikan).
+          if [ "$STATIC_RC" != "0" ] && [ ! -f app/build/reports/detekt/detekt.xml ] && grep -q -E 'Could not (find|resolve|GET)|Received status code 5|Read timed out|Connection reset' gradle-static.log; then
+            echo "[ULANG] detekt/lint: dependensi gagal diunduh (bukan temuan kode); diulang sekali dengan --refresh-dependencies" >> gradle-static.log
+            sleep 30
+            gradle detekt lintDebug --continue --no-daemon --no-build-cache --refresh-dependencies >> gradle-static.log 2>&1
+            STATIC_RC=$?
+            echo "STATIC_RETRY=1" >> gradle-exit.txt
+          fi
+          echo "STATIC_EXIT=$STATIC_RC" >> gradle-exit.txt
           cat gradle-exit.txt
           exit 0
 

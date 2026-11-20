@@ -1,5 +1,19 @@
 # Changelog
 
+## Batch 697 — CI mengulang unduhan dependensi detekt sekali bila gagal (run #123: detekt NOT VERIFIED karena detekt-cli tak terunduh; v696 VERIFIED)
+
+- Input user: `sonix_debug_20261120_144455.txt` (v696 = 1.11.6 build 556, ekspor 14:44:50) + `SONIX_laporan-untuk-claude_run123.zip`, tanpa teks.
+
+- CI run #123 (commit ff820af): ArchUnit 7/0, SpotBugs 0, lintDebug 0, Tes 331 LULUS, Kotlin 0 = prediksi Batch 696 cocok -> Batch 696 **VERIFIED** (peringatan Kotlin 1 -> 0). detekt NOT VERIFIED: `Could not find io.gitlab.arturbosch.detekt:detekt-cli:1.23.8` (unduhan dependensi, bukan temuan kode; run #122 lulus dgn build file sama).
+
+- LOG v696: 0 FATAL/ANR baru. Pasang v695->v696 saat memutar: `tambahan=720ms dasar=EXTRAPOLATED mulai_putar=1795156117572` (cap `playingSince` kini terisi) -> `posisi_awal=6994513ms`; posisi nyata saat mati ±6994454 -> lanjut ±59 ms di depan (tak mundur). Mati -> AudioTrack start ±2,63 dtk (v695 ±2,69). Baris `UpdateManager ... dimulai` belum muncul: update dipasang proses v695.
+
+- PERUBAHAN (1 file config; 0 source; FILE_MANIFEST tetap 264): `.github/workflows/android-artifact.yml` — `gradle detekt lintDebug` diulang SEKALI dgn `--refresh-dependencies` hanya bila exit != 0, `detekt.xml` tak terbentuk, dan log memuat pesan unduhan gagal; temuan nyata/galat lain tak diulang. `STATIC_RETRY=1` + baris `[ULANG]` dicatat.
+
+- VERIFIKASI: YAML valid, `bash -n` OK, simulasi 3 skenario (unduhan gagal->sukses, temuan nyata, normal). **NOT VERIFIED**: perilaku di GitHub Actions. PREDIKSI: ArchUnit 7, SpotBugs 0, detekt 0, lint 0, Tes 331, Kotlin 0.
+
+- LANGKAH UJI: pasang v697 SAAT musik diputar lewat tombol Shizuku -> cari `UpdateManager Pasang senyap via Shizuku dimulai`.
+
 ## Batch 696 — peringatan Kotlin CI run #122 dibersihkan + log bukti jalur pasang senyap (v695 VERIFIED di CI dan perangkat)
 
 - Input user: `sonix_debug_20261120_142855.txt` (v695 = 1.11.5 build 555, ekspor 14:28:51) + `SONIX_v695.zip` + `SONIX_laporan-untuk-claude_run122.zip`, tanpa teks.
