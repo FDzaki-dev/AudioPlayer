@@ -1,5 +1,25 @@
 # Changelog
 
+## Batch 703 — label `+-1ms` di log diag marquee dirapikan + ±1020 baris kode probe StartupStall yang sudah mati dihapus (CI run #129 = Batch 702 VERIFIED; lanjut-putar pasca-update VERIFIED lagi di v702)
+
+- Input user: `sonix_debug_20261121_115841.txt` (v1.11.13 build 563, ekspor 11:58) + `SONIX_laporan-untuk-claude_run129.zip`, tanpa teks.
+
+- CI run #129 (Gradle exit 0/0/0/0): ArchUnit 7/0, SpotBugs 0, detekt 0, lintDebug 0, Tes 342 LULUS, Kotlin 0 -> Batch 702 **VERIFIED** (sesuai prediksi Tes 342).
+
+- LOG v702 (perangkat): update Shizuku 11:58:16 (`Pasang senyap via Shizuku dimulai: update_AudioPlayer-v1.11.13-run675.apk 7101147 byte`) SAAT memutar -> `ApplicationExitInfo alasan=PACKAGE_UPDATED` -> `UpdateResume proses_mulai ... keputusan=RESUME sejak_mati=1798ms sejak_proses_mulai=163ms` -> `Pemulihan pasca-update: isPlaying=true ... sejak_proses_mulai=1136ms indeks=12/135 posisi_pulih=3580089ms` (antrean disimpan pra-update di 3578960 ms). Ketiga pemasangan senyap sebelumnya di log yang sama juga `RESUME` (1534 ms / 1692 ms). Lanjut-putar pasca-update tetap **VERIFIED**.
+
+- PEMBERSIHAN APK (Batch 702) **NOT VERIFIED**: log TIDAK memuat `APK pembaruan lama dibersihkan dari cache:`. Itu SESUAI harapan, bukan cacat: proses yang mengunduh `v1.11.13-run675` adalah 1.11.11 (kode v701, belum punya `UpdateApkCache.purge`; versi 1.11.12 tak pernah dibangun CI karena commit v702 dan merge-nya dipush bersamaan). Pengunduhan berikutnya (dari 1.11.13) yang mestinya mencatat baris itu.
+
+- CACAT KECIL NYATA di log: `WidgetUpdater` menulis `Marquee diag #N +-1ms digabung=...` — `diagSinceMs` bernilai -1 untuk update PERTAMA proses ("belum ada update sebelumnya") dan ikut tercetak sebagai selang waktu (14 baris di log v702, 22 di log v701). Teks yang menyesatkan (selang negatif palsu) di log yang dipakai membaca perilaku widget.
+
+- KODE MATI NYATA: `util/StartupStallProbe.kt` + `util/StartupStallFormat.kt` (+ `StartupStallFormatTest.kt`, 23 tes) tak dipanggil siapa pun sejak Batch 699 (user: berhenti mengumpulkan sampel; `AudioPlayerApplication` hanya menyisakan komentar). Dicari: tak ada referensi `StartupStallProbe`/`StartupStallFormat` di `app/src/main` selain komentar itu.
+
+- PERBAIKAN (2 file kode; 3 file dihapus; FILE_MANIFEST 266 -> 263): `widget/WidgetUpdater.kt` (helper `diagSinceLabel(sinceMs)`: `< 0` -> `pertama`, selain itu `+Nms` seperti semula; dipakai di kedua baris log `Marquee diag`), `AudioPlayerApplication.kt` (komentar), DIHAPUS: `util/StartupStallProbe.kt` (298 baris), `util/StartupStallFormat.kt` (369), `util/StartupStallFormatTest.kt` (353 baris, 23 tes). Perilaku runtime tak berubah (probe sudah tak terpasang); hanya teks log `+-1ms` -> `pertama`.
+
+- VERIFIKASI LOKAL: kurung/kurawal `WidgetUpdater.kt` seimbang; grep memastikan tak ada lagi referensi `StartupStall*` di `app/src` selain komentar; tak ada tes yang bergantung pada teks `+-1ms` (satu-satunya sebutan di `ChangeGateTest.kt` hanya komentar). **NOT VERIFIED**: kompilasi penuh/CI (tanpa Gradle/android.jar di sini). PREDIKSI CI: Tes 342 - 23 = **319**, ArchUnit 7/0, detekt 0, lint 0, Kotlin 0, SpotBugs 0.
+
+- Langkah berikutnya: push v703, kirim CI; lalu pasang SATU pembaruan dari 1.11.13 dan kirim log — cari `APK pembaruan lama dibersihkan dari cache: terhapus=N (... byte) gagal=0` (perkiraan N=6 ≈ 42,6 MB bila sistem belum mengosongkan cache).
+
 ## Batch 702 — APK pembaruan lama menumpuk di cache: dibersihkan sebelum unduhan baru (CI run #128 = Batch 701 VERIFIED; lanjut-putar pasca-update VERIFIED di perangkat)
 
 - Input user: `sonix_debug_20261121_061550.txt` (v701 = 1.11.11 build 561, ekspor 06:15) + `SONIX_v701.zip` + `SONIX_laporan-untuk-claude_run128.zip`, tanpa teks.

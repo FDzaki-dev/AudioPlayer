@@ -42,7 +42,7 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
         AppLogger.init(this)
         // Batch 699 [perintah user: berhenti mengumpulkan sampel] — start `StartupStallProbe` DIPUTUS. Probe itu sendiri membebani
         // jendela yang diukurnya: `Looper.setMessageLogging` aktif untuk SETIAP pesan thread utama + sampler `getStackTrace()` tiap ~15 ms
-        // menahan thread utama sebentar pada tiap sampel. Kelas + tesnya masih ada (tak dipanggil); dihapus batch berikutnya.
+        // menahan thread utama sebentar pada tiap sampel. Kelas + tesnya (StartupStallProbe/StartupStallFormat) dihapus di Batch 703.
         // Batch 670 — saklar yang memengaruhi CPU pemutaran dicetak di tiap baris `PowerProbe` (xfade = overlapPlayer kedua;
         // senyap = trim keheningan). Dibaca di thread probe, bukan di sini.
         PowerProbe.setStateExtras {

@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 703: - app/src/main/java/com/rudi/audioplayer/util/StartupStallFormat.kt - app/src/main/java/com/rudi/audioplayer/util/StartupStallProbe.kt - app/src/test/java/com/rudi/audioplayer/util/StartupStallFormatTest.kt (probe sementara Batch 682 yang sudah tak dipanggil sejak Batch 699; WidgetUpdater.kt + AudioPlayerApplication.kt diubah) — 266->263.
 # Batch 702: + app/src/main/java/com/rudi/audioplayer/update/UpdateApkCache.kt + app/src/test/java/com/rudi/audioplayer/update/UpdateApkCacheTest.kt (pembersih APK pembaruan basi di cacheDir; UpdateManager.kt diubah) — 264->266.
 # Batch 701: 0 file baru (playback/UpdateResumePolicy.kt, UpdateResumePolicyTest.kt, config/spotbugs/exclude.xml diubah); jumlah tetap 264.
 # Batch 700: 0 file baru (ui/theme/TactileDepth.kt, BottomNavBar.kt, TabPillMathTest.kt diubah); jumlah tetap 264.
@@ -298,8 +299,6 @@ app/src/main/java/com/rudi/audioplayer/util/RecentsGuard.kt
 app/src/main/java/com/rudi/audioplayer/util/SafeGuard.kt
 app/src/main/java/com/rudi/audioplayer/util/ShizukuBridge.kt
 app/src/main/java/com/rudi/audioplayer/util/StartupKind.kt
-app/src/main/java/com/rudi/audioplayer/util/StartupStallFormat.kt
-app/src/main/java/com/rudi/audioplayer/util/StartupStallProbe.kt
 app/src/main/java/com/rudi/audioplayer/util/StartupTrace.kt
 app/src/main/java/com/rudi/audioplayer/widget/PlayerWidgetProvider.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetMarquee.kt
@@ -386,7 +385,6 @@ app/src/test/java/com/rudi/audioplayer/util/DumpsysFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt
 app/src/test/java/com/rudi/audioplayer/util/ShizukuInstallOutputTest.kt
 app/src/test/java/com/rudi/audioplayer/util/StartupKindTest.kt
-app/src/test/java/com/rudi/audioplayer/util/StartupStallFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/widget/WidgetMarqueeMathTest.kt
 app/src/test/java/com/rudi/audioplayer/widget/WidgetStripSizingTest.kt
 build.gradle.kts

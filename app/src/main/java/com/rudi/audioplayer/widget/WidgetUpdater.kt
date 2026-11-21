@@ -219,6 +219,10 @@ object WidgetUpdater {
     private val diagLastTitle = AtomicReference<String?>(null)
     private val diagSkipped = AtomicInteger()
 
+    // Batch 703 — `diagSinceMs` bernilai -1 untuk update PERTAMA proses ini (belum ada update sebelumnya); dulu tercetak "+-1ms"
+    // (22 baris di log v701, 2 di log v702). Selang nyata tetap "+Nms".
+    private fun diagSinceLabel(sinceMs: Long): String = if (sinceMs < 0L) "pertama" else "+${sinceMs}ms"
+
     // Batch 681 — pintu log per id widget: baris `Marquee diag` hanya ditulis bila tanda (mode/ukuran/skala font/teks>kolom)
     // berubah atau widget baru terlihat di proses ini. Dulu ditulis tiap pembaruan = 30,8% byte log v680 (lihat KDoc ChangeGate).
     private val diagGate = ChangeGate()
@@ -377,7 +381,7 @@ object WidgetUpdater {
                 if (!diagGate.changed(widgetId, "strip|${minW}x$minH|${maxW}x$maxH")) return
                 AppLogger.w(
                     "WidgetUpdater",
-                    "Marquee diag #$seq +${sinceLastMs}ms digabung=$skipped | id=$widgetId mode=strip " +
+                    "Marquee diag #$seq ${diagSinceLabel(sinceLastMs)} digabung=$skipped | id=$widgetId mode=strip " +
                         "min=${minW}x${minH}dp maks=${maxW}x${maxH}dp | tanpa judul di layout ini playing=$isPlaying"
                 )
                 return
@@ -405,7 +409,7 @@ object WidgetUpdater {
             if (!diagGate.changed(widgetId, "$modeLabel|${minW}x$minH|${maxW}x$maxH|$fontScale|${textDp > columnMinDp}")) return
             AppLogger.w(
                 "WidgetUpdater",
-                "Marquee diag #$seq +${sinceLastMs}ms digabung=$skipped | id=$widgetId mode=$modeLabel " +
+                "Marquee diag #$seq ${diagSinceLabel(sinceLastMs)} digabung=$skipped | id=$widgetId mode=$modeLabel " +
                     "min=${minW}x${minH}dp maks=${maxW}x${maxH}dp fontScale=$fontScale | " +
                     "judul=${shown.length}huruf berubah=$titleChanged playing=$isPlaying | " +
                     "ESTIMASI teks=${textDp.toInt()}dp kolomMin=${columnMinDp.toInt()}dp teks>kolomMin=${textDp > columnMinDp} | " +
