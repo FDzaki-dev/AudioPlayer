@@ -12,6 +12,10 @@ package com.rudi.audioplayer.playback
  * Alur: [onFocusPause] saat `playWhenReady` jadi false dengan alasan fokus hilang; [onResume] saat `playWhenReady` jadi true.
  * Jeda yang dilanjutkan OLEH pemulihan fokus dihitung; jeda yang berakhir karena pengguna menekan putar (fokus hilang permanen,
  * mis. aplikasi video) tidak dihitung.
+ *
+ * Batch 712 — KOREKSI (log v711 `sonix_debug_20261122_061819.txt`): media3 TIDAK mengubah `playWhenReady` pada fokus hilang
+ * SEMENTARA; ia menahan pemutaran lewat `playbackSuppressionReason = TRANSIENT_AUDIO_FOCUS_LOSS` (playWhenReady tetap true), jadi
+ * `onPlayWhenReadyChanged` hanya menangkap hilang-permanen. Jeda sementara (kasus Shopee) lewat [onSuppression].
  */
 internal class FocusPauseTally {
     private var pausedAt = NONE
@@ -39,6 +43,20 @@ internal class FocusPauseTally {
         totalMs += duration
         if (duration > maxMs) maxMs = duration
         return duration
+    }
+
+    /**
+     * Batch 712 — dipanggil dari `onPlaybackSuppressionReasonChanged`. [transientFocusLoss] true = pemutaran mulai ditahan karena fokus
+     * hilang sementara (awal jeda; mengembalikan null). False = penahanan berakhir: mengembalikan lama jeda (ms) bila [playWhenReady]
+     * masih true (pemutaran lanjut otomatis karena fokus kembali), null bila pengguna sudah menjeda (`playWhenReady` false) atau tak ada
+     * jeda terbuka.
+     */
+    fun onSuppression(transientFocusLoss: Boolean, playWhenReady: Boolean, nowMs: Long): Long? {
+        if (transientFocusLoss) {
+            onFocusPause(nowMs)
+            return null
+        }
+        return onResume(nowMs, playWhenReady)
     }
 
     /** Ringkasan kumulatif untuk log. */

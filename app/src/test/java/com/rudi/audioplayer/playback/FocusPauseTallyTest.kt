@@ -65,4 +65,25 @@ class FocusPauseTallyTest {
         assertNull(tally.onResume(9_000L, byFocusRegain = true))
         assertEquals("jeda_fokus=1 total=2dtk maks=2dtk", tally.summary())
     }
+
+    @Test
+    fun suppression_awalLaluSelesai_playWhenReadyTrue_dihitung() {
+        val tally = FocusPauseTally()
+        assertNull(tally.onSuppression(transientFocusLoss = true, playWhenReady = true, nowMs = 1_000L))
+        assertEquals(2_300L, tally.onSuppression(transientFocusLoss = false, playWhenReady = true, nowMs = 3_300L))
+        assertEquals("jeda_fokus=1 total=2dtk maks=2dtk", tally.summary())
+    }
+
+    @Test
+    fun suppression_selesaiKarenaPenggunaMenjeda_tidakDihitung() {
+        val tally = FocusPauseTally()
+        tally.onSuppression(transientFocusLoss = true, playWhenReady = true, nowMs = 0L)
+        assertNull(tally.onSuppression(transientFocusLoss = false, playWhenReady = false, nowMs = 4_000L))
+        assertEquals("jeda_fokus=0 total=0dtk maks=0dtk", tally.summary())
+    }
+
+    @Test
+    fun suppression_selesaiTanpaJedaTerbuka_null() {
+        assertNull(FocusPauseTally().onSuppression(transientFocusLoss = false, playWhenReady = true, nowMs = 500L))
+    }
 }

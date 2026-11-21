@@ -311,6 +311,8 @@ class PlaybackService : MediaLibraryService() {
             // Batch 711 — keluhan user "audio sering naik turun": log v711 membuktikan com.shopee.id meminta fokus sementara
             // (GAIN_TRANSIENT) berulang 1-14 dtk, tiap kali SONIX dijeda ExoPlayer lalu dilanjutkan. Sebab jeda/lanjut kini tertulis di
             // log aplikasi (sebelumnya hanya "Antrean disimpan (jeda)" tanpa sebab). Hanya pencatatan; perilaku putar TIDAK berubah.
+            // Batch 712 — callback ini HANYA menangkap perubahan playWhenReady (tombol pengguna, fokus hilang PERMANEN, headset dicabut);
+            // fokus hilang SEMENTARA tidak mengubah playWhenReady (lihat onPlaybackSuppressionReasonChanged di bawah).
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 SafeGuard.guard("PlaybackService", "listener.onPlayWhenReadyChanged") {
                     val now = SystemClock.elapsedRealtime()
@@ -335,6 +337,25 @@ class PlaybackService : MediaLibraryService() {
                         "Jeda: alasan=$label"
                     }
                     serviceScope.launch(Dispatchers.IO) { AppLogger.w("AudioFocus", line) }
+                }
+            }
+
+            // Batch 712 — log v711 (22 Nov 06:17-06:18): 4 jeda karena com.shopee.id (`requestAudioFocus req=2` -> `handleLoss -2` ->
+            // `abandonAudioFocus` -> `handleGain`) TIDAK muncul di log `AudioFocus` buatan Batch 711, karena media3 menahan pemutaran lewat
+            // `playbackSuppressionReason` (playWhenReady tetap true) pada fokus hilang sementara. Hanya pencatatan; perilaku putar tak berubah.
+            override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+                SafeGuard.guard("PlaybackService", "listener.onPlaybackSuppressionReasonChanged") {
+                    val transientLoss =
+                        playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS
+                    val pausedMs = focusPauseTally.onSuppression(transientLoss, player.playWhenReady, SystemClock.elapsedRealtime())
+                    val line = when {
+                        transientLoss ->
+                            "Jeda: fokus audio direbut aplikasi lain (TRANSIENT_AUDIO_FOCUS_LOSS, playWhenReady tetap true)"
+                        pausedMs != null ->
+                            "Lanjut otomatis setelah fokus kembali: jeda=${pausedMs}ms | ${focusPauseTally.summary()}"
+                        else -> null
+                    }
+                    if (line != null) serviceScope.launch(Dispatchers.IO) { AppLogger.w("AudioFocus", line) }
                 }
             }
 

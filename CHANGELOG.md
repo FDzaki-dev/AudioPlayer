@@ -1,5 +1,17 @@
 # Changelog
 
+## Batch 712 — koreksi Batch 711: log `AudioFocus` tidak menangkap jeda fokus SEMENTARA (media3 memakai playback suppression)
+
+- Input user: `sonix_debug_20261122_061819.txt` (v711 = 1.11.22 build 572, ekspor 06:18:14), tanpa teks; tanpa laporan CI.
+
+- (A) KESALAHAN v711 (terbukti): 4 jeda karena `com.shopee.id` pada 06:17:02-06:18:00 (dumpsys audio Events log: `requestAudioFocus() ... callingPack=com.shopee.id req=2 flags=0x1` -> `handleLoss code: -2` -> `abandonAudioFocus()` -> `handleGain code: 1`; logcat `onAudioFocusChange(-2)`/`(1)` pid 8952; lama 2,0 / 5,0 / 3,0 / 3,3 dtk; log aplikasi `WidgetMarquee ... playing=false/true` + `Antrean disimpan (jeda)` pada detik yang sama) TIDAK muncul di log `AudioFocus` buatan Batch 711: hanya 3 baris `USER_REQUEST` (06:16:42, 06:17:28 x2, dari user menekan putar/jeda). Sebab: media3 menahan pemutaran pada fokus hilang SEMENTARA lewat `playbackSuppressionReason = TRANSIENT_AUDIO_FOCUS_LOSS` dengan `playWhenReady` TETAP true, sehingga `onPlayWhenReadyChanged` (satu-satunya pengait v711) hanya menangkap hilang-PERMANEN/tombol pengguna. Pencatatan v711 gagal menangkap kejadian yang justru dibuatnya untuk dicatat. Keluhan "audio naik turun" belum berubah (perilaku putar memang tak diubah di v711).
+
+- (B) VERIFIED dari log v711: pembaruan senyap `v1.11.22-run684` (7101147 byte) normal; pemulihan `isPlaying=true sejak_proses_mulai=1708ms posisi_pulih=4095630ms`; `MY_PACKAGE_REPLACED ... SKIP_NOT_PLAYING` sesudah pemulihan = benar (tak memulai ganda); pembersihan APK `terhapus=1 gagal=0`; 0 FATAL/ANR; 1 `Skipped 30 frames` pada 06:17:24 saat Activity pertama dibuka (`act_mulai=43154ms`, tahap cold start sudah dipantau) -> tak ditindak. meminfo: PSS total 205807 KB, GL mtrack 122140 KB. Haptic: 2 entri tekan-lama (06:17:28) = pola 90+45+90 ms, lagi tanpa keluhan; rasa getar **NOT VERIFIED**.
+
+- (C) PERBAIKAN v712, 3 file DIUBAH (0 baru; FILE_MANIFEST tetap 269): `playback/FocusPauseTally.kt` (+`onSuppression(transientFocusLoss, playWhenReady, nowMs)`: awal penahanan = awal jeda; akhir penahanan = lama jeda bila `playWhenReady` masih true, tak dihitung bila pengguna sudah menjeda; KDoc koreksi), `playback/PlaybackService.kt` (+`onPlaybackSuppressionReasonChanged` pada listener utama: tulis `Jeda: fokus audio direbut aplikasi lain (TRANSIENT_AUDIO_FOCUS_LOSS, playWhenReady tetap true)` dan `Lanjut otomatis setelah fokus kembali: jeda=Nms | jeda_fokus=.. total=..dtk maks=..dtk`; komentar `onPlayWhenReadyChanged` dikoreksi; perilaku putar TIDAK berubah), `FocusPauseTallyTest.kt` (+3 tes -> 11). PREDIKSI: Tes 370 (367 + 3), ArchUnit 7, detekt 0, lint 0, Kotlin 0, SpotBugs 0. **NOT VERIFIED** compile/JUnit v712 (sandbox tanpa kotlinc/JUnit) dan semua tool CI v708-v711 (tak ada laporan).
+
+- (D) KEPUTUSAN TERTUNDA (P0 stabilitas > maksud): satu-satunya cara menghentikan jeda dari aplikasi lain adalah pengelola fokus kustom (`handleAudioFocus=false`, ducking kecuali panggilan; menyentuh `CrossfadeEngine`/`PlayerViewModel.setVolume`/pemulihan pasca-update). Bukan sekadar pencatatan; mengubah perilaku inti (telepon/alarm/navigasi) dan tak bisa diverifikasi di sandbox -> butuh persetujuan user dan batch tersendiri dengan tes.
+
 ## Batch 711 — "audio sering naik turun": sebab jeda otomatis (fokus audio direbut aplikasi lain) kini tercatat di log aplikasi
 
 - Input user: `sonix_debug_20261121_234843.txt` (v710 = 1.11.21 build 571, ekspor 23:48:37) + keluhan "kenapa audio sering naik turun?!!"; tanpa laporan CI.

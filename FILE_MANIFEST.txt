@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 712: 0 berkas baru (playback/FocusPauseTally.kt, playback/PlaybackService.kt, test playback/FocusPauseTallyTest.kt diubah) — 269.
 # Batch 711: + app/src/main/java/com/rudi/audioplayer/playback/FocusPauseTally.kt + app/src/test/java/com/rudi/audioplayer/playback/FocusPauseTallyTest.kt (catat sebab jeda otomatis karena fokus audio direbut aplikasi lain; playback/PlaybackService.kt diubah) — 267->269.
 # Batch 710: 0 berkas baru (ui/theme/HapticPacing.kt, ui/theme/AppHaptics.kt, test ui/theme/HapticPacingTest.kt diubah) — 267.
 # Batch 709: + app/src/main/java/com/rudi/audioplayer/ui/theme/HapticPacing.kt + app/src/test/java/com/rudi/audioplayer/ui/theme/HapticPacingTest.kt (haptic on/off kustom + pembatas laju utk HP tanpa kontrol amplitudo; ui/theme/AppHaptics.kt diubah) — 265->267.
