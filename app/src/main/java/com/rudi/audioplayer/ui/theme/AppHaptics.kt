@@ -3,6 +3,7 @@ package com.rudi.audioplayer.ui.theme
 import android.content.Context
 import android.media.AudioManager
 import android.os.Build
+import android.os.SystemClock
 import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -83,9 +84,22 @@ import kotlinx.coroutines.launch
 // 2 konstanta di bawah = satu-satunya yang perlu disetel. Sistem masih boleh menurunkan skala bila user
 // menurunkan intensitas getar di setelan HP.
 
+// Batch 709 — DATA (log v708, `dumpsys vibrator_manager`, Infinix X6850 / Android 16): (1) motor getar HP ini
+// `capabilities = []` = TANPA kontrol amplitudo/primitif/compose; `supportedEffects` = CLICK, DOUBLE_CLICK, TICK,
+// HEAVY_CLICK, TEXTURE_TICK. (2) Getaran SONIX SAMPAI ke motor: 20 entri `usage: MEDIA | com.rudi.audioplayer` (14 CLICK + 6 HEAVY_CLICK)
+// berstatus `finished`, `scale: NONE`, intensitas MEDIA = MEDIUM, efek `Prebaked=CLICK/HEAVY_CLICK(MEDIUM, with fallback)`; sebaliknya
+// semua `usage: TOUCH` (app lain) = `ignored_for_settings` karena `TOUCH = OFF`. Dugaan Batch 513 (getaran dibuang diam-diam)
+// TERBANTAH untuk jalur MEDIA. (3) Cabang amplitudo-penuh Batch 514 hanya aktif bila `hasAmplitudeControl()`; di HP ini FALSE,
+// jadi 514 tak pernah berlaku di sini dan getaran selalu efek prabuat pabrikan (tuning halus utk keyboard; user: "setara
+// Gboard"). Fix: tanpa kontrol amplitudo SELALU on/off kustom (denyut lebih panjang = satu-satunya tuas kekuatan yang tersisa;
+// efek prabuat tidak dipakai lagi) + `HapticThrottle` (HapticPacing.kt) agar tick beruntun tak menyatu jadi dengung dan tak
+// memotong denyut kuat. Angka durasi tetap tebakan awal (belum diuji di tangan); bukti jalur baru: dumpsys MEDIA memuat
+// `Step=45ms`/`Step=90ms`, bukan `Prebaked=`.
+
 private const val HAPTIC_TAG = "AppHaptics"
 private const val TAP_ONE_SHOT_MS = 50L
 private const val HEAVY_ONE_SHOT_MS = 100L
+private const val NO_REPEAT = -1
 
 // Jumlah panggilan haptic PERTAMA per proses yang dicatat ke Log Diagnostik (bukti wrapper terpanggil);
 // dibatasi supaya log tidak banjir saat drag/scroll memicu tick berulang.
@@ -108,7 +122,7 @@ internal class HapticEffects(
 )
 
 private fun buildHapticEffects(vibrator: Vibrator): HapticEffects {
-    // Kode dukungan platform: 0 = UNKNOWN, 1 = YES, 2 = NO (urutan: CLICK/HEAVY_CLICK).
+    // Kode dukungan platform: 0 = UNKNOWN, 1 = YES, 2 = NO (urutan: CLICK/HEAVY_CLICK). Hanya untuk diagnostik.
     val support: IntArray? = runCatching {
         vibrator.areEffectsSupported(
             VibrationEffect.EFFECT_CLICK,
@@ -116,13 +130,8 @@ private fun buildHapticEffects(vibrator: Vibrator): HapticEffects {
         )
     }.getOrNull()
     val supportLabel = support?.joinToString("/") ?: "n/a"
-    val hardwareEffectsOk = support != null && support.isNotEmpty() &&
-        support.all { it == Vibrator.VIBRATION_EFFECT_SUPPORT_YES }
-    val hasAmplitudeControl = vibrator.hasAmplitudeControl()
-    // Batch 514 — kontrol amplitudo tersedia -> getaran custom amplitudo PENUH (lebih kuat dari klik prabuat
-    // pabrikan, yang dilaporkan user cuma "setara Gboard"). Tanpa kontrol amplitudo -> efek prabuat kalau
-    // didukung (perilaku Batch 511-513), selain itu one-shot amplitudo default.
-    if (hasAmplitudeControl) {
+    // Batch 514 — kontrol amplitudo tersedia -> getaran custom amplitudo PENUH (lebih kuat dari klik prabuat pabrikan).
+    if (vibrator.hasAmplitudeControl()) {
         return HapticEffects(
             tap = VibrationEffect.createOneShot(TAP_ONE_SHOT_MS, 255),
             heavy = VibrationEffect.createOneShot(HEAVY_ONE_SHOT_MS, 255),
@@ -130,19 +139,15 @@ private fun buildHapticEffects(vibrator: Vibrator): HapticEffects {
                 "dukungan CLICK/HEAVY=$supportLabel)"
         )
     }
-    if (hardwareEffectsOk) {
-        return HapticEffects(
-            tap = VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK),
-            heavy = VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK),
-            mode = "hardware-effects(kontrol_amplitudo=false, dukungan CLICK/HEAVY=$supportLabel)"
-        )
-    }
-    val amplitude = VibrationEffect.DEFAULT_AMPLITUDE
+    // Batch 709 — tanpa kontrol amplitudo: SELALU on/off kustom, TIDAK pernah efek prabuat (lemah di HP ini, lihat komentar
+    // Batch 709). `createOneShot(.., DEFAULT_AMPLITUDE)` dan `createWaveform(timings, NO_REPEAT)` = motor menyala penuh
+    // sepanjang durasinya.
     return HapticEffects(
-        tap = VibrationEffect.createOneShot(TAP_ONE_SHOT_MS, amplitude),
-        heavy = VibrationEffect.createOneShot(HEAVY_ONE_SHOT_MS, amplitude),
-        mode = "one-shot(${TAP_ONE_SHOT_MS}ms/${HEAVY_ONE_SHOT_MS}ms, amp=default, kontrol_amplitudo=false, " +
-            "dukungan CLICK/HEAVY=$supportLabel)"
+        tap = VibrationEffect.createOneShot(HapticPacing.TAP_PULSE_MS, VibrationEffect.DEFAULT_AMPLITUDE),
+        heavy = VibrationEffect.createWaveform(HapticPacing.heavyTimings(), NO_REPEAT),
+        mode = "on-off-kustom(tap=${HapticPacing.TAP_PULSE_MS}ms, kuat=${HapticPacing.HEAVY_PULSE_MS}+" +
+            "${HapticPacing.HEAVY_GAP_MS}+${HapticPacing.HEAVY_PULSE_MS}ms, kontrol_amplitudo=false, " +
+            "efek_prabuat_tidak_dipakai(dukungan CLICK/HEAVY=$supportLabel))"
     )
 }
 
@@ -195,6 +200,9 @@ internal class StrongHapticFeedback(
 
     private val effects: HapticEffects? = vibrator?.let { buildHapticEffects(it) }
 
+    // Batch 709 — pembatas laju tick beruntun (lihat HapticPacing.kt); satu per instance = satu per pohon UI.
+    private val throttle = HapticThrottle()
+
     // API 33+: kategori getaran MEDIA (lihat komentar Batch 513). Di bawah 33 -> null, `vibrate(effect)` biasa.
     private val mediaAttributes: VibrationAttributes? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -220,6 +228,11 @@ internal class StrongHapticFeedback(
         val n = hapticCallCount.incrementAndGet()
         val trace = n <= HAPTIC_TRACE_LIMIT
         if (effect != null && vibrator != null) {
+            val tierKind = if (isHeavy) HapticTier.HEAVY else HapticTier.TAP
+            if (!throttle.allow(tierKind, SystemClock.elapsedRealtime())) {
+                if (trace) traceHaptic("panggilan #$n tier=$tier: dilewati (pembatas laju, denyut sebelumnya masih berjalan)")
+                return
+            }
             try {
                 val attrs = mediaAttributes
                 if (attrs != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
