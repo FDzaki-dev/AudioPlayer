@@ -725,6 +725,17 @@ class PlaybackService : MediaLibraryService() {
                 if (!player.playWhenReady) player.play()
                 // Batch 692: sisa antrean disambung PARALEL dengan sumber/seek/codec yang sedang disiapkan pemain.
                 if (pendingRest != null) launch { runRestOfQueue(pendingRest) }
+                // Batch 704 — `dumpsys audio` log v703: tiap pemulihan pasca-update (16 kali sejak 19 Nov, tak ada yang lain) menulis
+                // `AudioHardening focus request ... would be ignored` + `background playback would be muted ... level: full`
+                // (developer.android.com/about/versions/17/changes/bg-audio: `level: full` = FGS berjalan TANPA kapabilitas while-in-use; FGS yang
+                // dimulai dari broadcast MY_PACKAGE_REPLACED bukan aksi user). Di Android 16 ini baru "would be" (musik tetap bunyi); saat penegakan
+                // aktif, permintaan fokus ditolak -> ExoPlayer menyetel playWhenReady=false SINKRON di dalam play(). Dalam kasus itu jangan diam:
+                // tampilkan notifikasi "Ketuk untuk melanjutkan" (ketukan = aksi user -> kapabilitas didapat). Antrean sisa sudah disambung di atas.
+                if (!player.playWhenReady) {
+                    AppLogger.w("PlaybackService", "Pemulihan pasca-update: play() ditolak (playWhenReady=false segera setelah play) -> notifikasi cadangan")
+                    UpdateResumeNotifier.post(this@PlaybackService, killedAtMs)
+                    return@launch
+                }
                 var waited = 0L
                 while (!player.isPlaying && waited < MAX_HANDOFF_WAIT_MS) {
                     delay(150)

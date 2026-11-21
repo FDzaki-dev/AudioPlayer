@@ -105,4 +105,91 @@ class UpdateApkCacheTest {
 
         assertEquals(UpdateApkCache.PurgeResult(0, 0L, 0), UpdateApkCache.purge(missing, null))
     }
+
+    // --- Batch 704: sisa APK yang SUDAH terpasang (log v703: v1.11.14-run676 tertinggal setelah pemasangan) ---
+
+    @Test
+    fun `versi dibaca dari nama aset nyata dan dari versionName murni angka`() {
+        assertEquals(listOf(1, 11, 14), UpdateApkCache.apkVersion("update_AudioPlayer-v1.11.14-run676.apk"))
+        assertEquals(listOf(1, 11, 7), UpdateApkCache.apkVersion("update_AudioPlayer-v1.11.7-run670.apk"))
+        assertEquals(listOf(1, 11, 14), UpdateApkCache.apkVersion("update_AudioPlayer-v1.11.14-run676.APK"))
+        assertEquals(listOf(1, 11, 14), UpdateApkCache.installedVersion("1.11.14"))
+    }
+
+    @Test
+    fun `versi yang tak terbaca menghasilkan null`() {
+        assertEquals(null, UpdateApkCache.apkVersion("update_foo.apk"))
+        assertEquals(null, UpdateApkCache.apkVersion("update_AudioPlayer-v1.11-run676.apk"))
+        assertEquals(null, UpdateApkCache.apkVersion("update_AudioPlayer-v99999999999.1.1-run1.apk"))
+        assertEquals(null, UpdateApkCache.apkVersion("AudioPlayer-v1.11.14-run676.apk")) // bukan update_*.apk
+        assertEquals(null, UpdateApkCache.installedVersion("1.11.14-debug"))
+        assertEquals(null, UpdateApkCache.installedVersion("1.11"))
+        assertEquals(null, UpdateApkCache.installedVersion(""))
+    }
+
+    @Test
+    fun `installedNames memilih versi sama dan lebih lama - versi lebih baru dan tak terbaca dipertahankan`() {
+        val names = listOf(
+            "update_AudioPlayer-v1.11.13-run675.apk", // lebih lama
+            "update_AudioPlayer-v1.11.14-run676.apk", // sama = baru saja terpasang (kasus log v703)
+            "update_AudioPlayer-v1.11.15-run677.apk", // lebih baru: diunduh, belum dipasang
+            "update_AudioPlayer-v1.12.0-run700.apk", // lebih baru (minor)
+            "update_AudioPlayer-v2.0.0-run900.apk", // lebih baru (major)
+            "update_AudioPlayer-v1.9.21-run471.apk", // 1.9 < 1.11 (perbandingan angka, bukan teks)
+            "update_foo.apk", // versi tak terbaca
+            "sigcheck_1.apk", // bukan APK pembaruan
+            "catatan.txt"
+        )
+
+        assertEquals(
+            listOf(
+                "update_AudioPlayer-v1.11.13-run675.apk",
+                "update_AudioPlayer-v1.11.14-run676.apk",
+                "update_AudioPlayer-v1.9.21-run471.apk"
+            ),
+            UpdateApkCache.installedNames(names, "1.11.14")
+        )
+    }
+
+    @Test
+    fun `installedNames tanpa versionName terbaca memilih apa pun`() {
+        val names = listOf("update_AudioPlayer-v1.11.13-run675.apk")
+
+        assertEquals(emptyList<String>(), UpdateApkCache.installedNames(names, "1.11.14-debug"))
+        assertEquals(emptyList<String>(), UpdateApkCache.installedNames(names, ""))
+    }
+
+    @Test
+    fun `purgeInstalled menghapus APK terpasang dan lama saja dan menyisakan yang lebih baru`() {
+        val dir = tmp.newFolder("cache")
+        file(dir, "update_AudioPlayer-v1.11.13-run675.apk", 10)
+        file(dir, "update_AudioPlayer-v1.11.14-run676.apk", 20)
+        val newer = file(dir, "update_AudioPlayer-v1.11.15-run677.apk", 30)
+        val unreadable = file(dir, "update_foo.apk", 40)
+        val sigcheck = file(dir, "sigcheck_1.apk", 50)
+
+        val result = UpdateApkCache.purgeInstalled(dir, "1.11.14")
+
+        assertEquals(UpdateApkCache.PurgeResult(deleted = 2, deletedBytes = 30L, failed = 0), result)
+        assertFalse(File(dir, "update_AudioPlayer-v1.11.13-run675.apk").exists())
+        assertFalse(File(dir, "update_AudioPlayer-v1.11.14-run676.apk").exists())
+        assertTrue(newer.exists())
+        assertTrue(unreadable.exists())
+        assertTrue(sigcheck.exists())
+    }
+
+    @Test
+    fun `purgeInstalled pada folder tak ada atau tanpa APK melaporkan nol`() {
+        assertEquals(UpdateApkCache.PurgeResult(0, 0L, 0), UpdateApkCache.purgeInstalled(File(tmp.root, "tidak_ada"), "1.11.14"))
+        assertEquals(UpdateApkCache.PurgeResult(0, 0L, 0), UpdateApkCache.purgeInstalled(tmp.newFolder("kosong"), "1.11.14"))
+    }
+
+    @Test
+    fun `purgeInstalled tidak menyentuh direktori bernama mirip APK pembaruan`() {
+        val dir = tmp.newFolder("cache")
+        val lookalike = File(dir, "update_AudioPlayer-v1.11.13-run675.apk").also { assertTrue(it.mkdir()) }
+
+        assertEquals(UpdateApkCache.PurgeResult(0, 0L, 0), UpdateApkCache.purgeInstalled(dir, "1.11.14"))
+        assertTrue(lookalike.isDirectory)
+    }
 }

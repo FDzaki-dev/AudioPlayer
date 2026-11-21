@@ -9,6 +9,7 @@ import com.rudi.audioplayer.data.SilenceSkipStore
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.PlaybackAudioSession
 import com.rudi.audioplayer.playback.UpdateResumeCoordinator
+import com.rudi.audioplayer.update.UpdateApkCache
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.AudioArtFetcher
 import com.rudi.audioplayer.util.PowerProbe
@@ -52,6 +53,7 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
         }
         PowerProbe.start(this) // Batch 669 — catcher daya (baris `PowerProbe` di log debug)
         warmUpSharedPreferences()
+        purgeInstalledUpdateApks() // Batch 704 — APK pembaruan yang sudah terpasang tak perlu tetap di cache
         // Batch 691 — EKSPERIMEN pemulihan pasca-update lebih awal (thread latar, biaya thread utama ~0); lihat UpdateResumeCoordinator.
         UpdateResumeCoordinator.startEarlyAttempt(this)
 
@@ -115,6 +117,28 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
                 runCatching { getSharedPreferences(name, MODE_PRIVATE) }
             }
         }, "PrefsWarmup").start()
+    }
+
+    /**
+     * Batch 704 — log v703: `update_AudioPlayer-v1.11.14-run676.apk` (7101147 byte) tertinggal di `cacheDir` setelah terpasang (proses
+     * pengunduhnya mati bersama pemasangan, jadi tak sempat menghapusnya; pembersihan Batch 702 baru jalan SEBELUM unduhan berikutnya).
+     * Proses baru menghapus `update_*.apk` yang versinya <= [BuildConfig.VERSION_NAME] di thread latar; versi yang lebih baru tak disentuh
+     * (lihat [UpdateApkCache.purgeInstalled]). Tidak boleh mengganggu start: galat hanya dicatat.
+     */
+    private fun purgeInstalledUpdateApks() {
+        Thread({
+            try {
+                val result = UpdateApkCache.purgeInstalled(cacheDir, BuildConfig.VERSION_NAME)
+                if (result.deleted > 0 || result.failed > 0) {
+                    AppLogger.w(
+                        "UpdateManager",
+                        "APK pembaruan versi terpasang dibersihkan dari cache: terhapus=${result.deleted} (${result.deletedBytes} byte) gagal=${result.failed}"
+                    )
+                }
+            } catch (e: Exception) {
+                AppLogger.e("UpdateManager", "Pembersihan APK pembaruan terpasang gagal", e)
+            }
+        }, "UpdateApkPurge").start()
     }
 
     override fun newImageLoader(context: android.content.Context): ImageLoader {
