@@ -1,5 +1,19 @@
 # Changelog
 
+## Batch 706 — unduhan/pasang APK pembaruan menolak berkas 0 byte/tak lengkap, satu unduhan pada satu waktu, log unduhan
+
+- Input user: `sonix_debug_20261121_174123.txt` (v705 = 1.11.16 build 566, ekspor 17:41:19) + `SONIX_v705.zip`, tanpa teks; tanpa laporan CI.
+
+- (A) CI v705 TIDAK dilaporkan -> ArchUnit/SpotBugs/detekt/lint/Tes **NOT VERIFIED**; kompilasi source utama terbukti tidak langsung (APK `v1.11.16-run678` terpasang dan berjalan).
+
+- LOG v705: lanjut-putar pasca-update **VERIFIED** lagi (`keputusan=RESUME sejak_mati=1031ms`, `isPlaying=true` pada +1637 ms, `posisi_pulih=5147657ms`). `PowerProbe musik_sistem=`/`sonix_putar=` **NOT VERIFIED** (belum ada `[periodik]` dari proses v705).
+
+- CACAT NYATA: 17:37:44-17:40:29 sebelas kali `Pasang senyap via Shizuku dimulai: update_AudioPlayer-v1.11.16-run678.apk 0 byte` -> `GAGAL ... APK kosong atau tak ada` -> installer sistem dibuka untuk berkas yang sama -> status kembali `ReadyToInstall` (buntu). Tak ada baris unduhan di log; penyebab 0 byte tak terbukti (kandidat: ketukan ganda memulai dua unduhan ke berkas yang sama karena `Downloading` baru diset setelah chunk pertama; respons kosong/terpotong tak ditolak; berkas dihapus pihak luar).
+
+- PERBAIKAN (4 file; 0 baru): `UpdateApkCache.kt` (+`fileProblem`, +`downloadProblem`), `UpdateDownloader.kt` (0 byte atau beda dari Content-Length -> hapus berkas + `Failure`), `UpdateManager.kt` (`Downloading(0)` sinkron + penjaga; hasil divalidasi -> `Error`; `install` menolak berkas tak layak; try/catch; log `Unduhan dimulai/selesai/gagal`), `UpdateApkCacheTest.kt` (+8 tes = 334).
+
+- VERIFIKASI: kurung seimbang 4 file, diff terbatas pada titik itu; **NOT VERIFIED** compile Android/CI dan JUnit (sandbox tanpa android.jar/kotlinc/JUnit). PREDIKSI: Tes 334, ArchUnit 7, detekt 0, lint 0, Kotlin 0, SpotBugs 0.
+
 ## Batch 705 — baris `PowerProbe` tak lagi menyamakan musik aplikasi lain dengan pemutaran SONIX (`musik_sistem` + `sonix_putar`)
 
 - Input user: `sonix_debug_20261121_171915.txt` (v704 = 1.11.15 build 565, ekspor 17:19:10) + `SONIX_v704.zip`, tanpa teks; tanpa laporan CI run #131.

@@ -25,6 +25,12 @@ import java.io.File
  * dari `Application.onCreate` (thread latar): menghapus `update_*.apk` yang versinya <= versi terpasang. APK dengan versi LEBIH BARU
  * (sudah diunduh, belum dipasang; mis. installer sistem masih terbuka) dan nama yang versinya tak terbaca TIDAK disentuh.
  *
+ * Batch 706 — validasi berkas APK sebelum dipasang. Log v705 (`sonix_debug_20261121_174123.txt`): 11x berturut-turut 17:37:44-17:40:29
+ * `Pasang senyap via Shizuku dimulai: update_AudioPlayer-v1.11.16-run678.apk 0 byte` -> `APK kosong atau tak ada` -> installer
+ * sistem dibuka untuk berkas yang sama dan gagal; status `ReadyToInstall` tetap menunjuk berkas itu sehingga pengguna buntu.
+ * Tak ada satu pun baris unduhan di log (penyebab 0 byte tak terbukti), jadi [fileProblem] + [downloadProblem] menolak berkas
+ * kosong/tak lengkap di titik unduh dan titik pasang, dan alasannya dicatat mentah.
+ *
  * Murni `java.io` + Kotlin (tanpa API Android) supaya bisa diuji di JVM.
  */
 internal object UpdateApkCache {
@@ -74,6 +80,27 @@ internal object UpdateApkCache {
     /** Menghapus APK pembaruan yang versinya <= versi terpasang (lihat [installedNames]). Blocking I/O. Tidak melempar. */
     fun purgeInstalled(cacheDir: File, installedVersionName: String): PurgeResult =
         deleteSelected(cacheDir) { names -> installedNames(names, installedVersionName) }
+
+    /**
+     * Alasan [file] tak layak dipasang; null bila layak (ada, berkas biasa, > 0 byte). Blocking I/O ringan (stat): panggil dari
+     * `Dispatchers.IO`. Tidak melempar.
+     */
+    fun fileProblem(file: File): String? = when {
+        !file.exists() -> "berkas tidak ada"
+        !file.isFile -> "bukan berkas biasa"
+        file.length() <= 0L -> "berkas 0 byte"
+        else -> null
+    }
+
+    /**
+     * Alasan unduhan tak lengkap; null bila lengkap. [downloaded] = byte yang benar-benar ditulis; [expected] = Content-Length
+     * (<= 0 = server tak memberi, panjang tak bisa dibandingkan sehingga hanya 0 byte yang ditolak).
+     */
+    fun downloadProblem(downloaded: Long, expected: Long): String? = when {
+        downloaded <= 0L -> "unduhan 0 byte (Content-Length=$expected)"
+        expected > 0L && downloaded != expected -> "unduhan tidak lengkap: $downloaded dari $expected byte"
+        else -> null
+    }
 
     private fun deleteSelected(cacheDir: File, select: (List<String>) -> List<String>): PurgeResult {
         val files = cacheDir.listFiles() ?: return PurgeResult(0, 0L, 0)

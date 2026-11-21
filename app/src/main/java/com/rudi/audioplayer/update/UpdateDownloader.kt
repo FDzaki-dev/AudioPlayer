@@ -82,6 +82,13 @@ object UpdateDownloader {
                         sink.flush()
                     }
                 }
+                // Batch 706 — unduhan 0 byte / terpotong tak boleh dilaporkan Success (log v705: berkas 0 byte tetap jadi
+                // `ReadyToInstall`). Dicek SETELAH sink ditutup supaya yang dihitung = yang benar-benar tertulis.
+                val problem = UpdateApkCache.downloadProblem(bytesDownloaded, totalBytes)
+                if (problem != null) {
+                    destFile.delete()
+                    return DownloadResult.Failure("Unduhan ${destFile.name} gagal: $problem (HTTP ${response.code})")
+                }
                 DownloadResult.Success(destFile)
             }
         } catch (e: IOException) {

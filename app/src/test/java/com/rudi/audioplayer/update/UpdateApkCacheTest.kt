@@ -2,6 +2,7 @@ package com.rudi.audioplayer.update
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -191,5 +192,49 @@ class UpdateApkCacheTest {
 
         assertEquals(UpdateApkCache.PurgeResult(0, 0L, 0), UpdateApkCache.purgeInstalled(dir, "1.11.14"))
         assertTrue(lookalike.isDirectory)
+    }
+
+    // Batch 706 — log v705: `update_AudioPlayer-v1.11.16-run678.apk 0 byte` -> `APK kosong atau tak ada` (11x).
+    @Test
+    fun `fileProblem berkas tidak ada dilaporkan`() {
+        assertEquals("berkas tidak ada", UpdateApkCache.fileProblem(File(tmp.root, "update_AudioPlayer-v1.11.16-run678.apk")))
+    }
+
+    @Test
+    fun `fileProblem berkas 0 byte dilaporkan`() {
+        val apk = file(tmp.root, "update_AudioPlayer-v1.11.16-run678.apk", 0)
+        assertEquals("berkas 0 byte", UpdateApkCache.fileProblem(apk))
+    }
+
+    @Test
+    fun `fileProblem direktori dilaporkan bukan berkas biasa`() {
+        val dir = tmp.newFolder("update_AudioPlayer-v1.11.16-run678.apk")
+        assertEquals("bukan berkas biasa", UpdateApkCache.fileProblem(dir))
+    }
+
+    @Test
+    fun `fileProblem berkas berisi lolos`() {
+        assertNull(UpdateApkCache.fileProblem(file(tmp.root, "update_AudioPlayer-v1.11.16-run678.apk", 1024)))
+    }
+
+    @Test
+    fun `downloadProblem 0 byte ditolak walau Content-Length tak diketahui`() {
+        assertEquals("unduhan 0 byte (Content-Length=-1)", UpdateApkCache.downloadProblem(0L, -1L))
+        assertEquals("unduhan 0 byte (Content-Length=0)", UpdateApkCache.downloadProblem(0L, 0L))
+    }
+
+    @Test
+    fun `downloadProblem terpotong ditolak dengan angka mentah`() {
+        assertEquals("unduhan tidak lengkap: 3000000 dari 7101147 byte", UpdateApkCache.downloadProblem(3_000_000L, 7_101_147L))
+    }
+
+    @Test
+    fun `downloadProblem Content-Length tak diketahui tetap lolos bila ada isi`() {
+        assertNull(UpdateApkCache.downloadProblem(7_101_147L, -1L))
+    }
+
+    @Test
+    fun `downloadProblem panjang sama dengan Content-Length lolos`() {
+        assertNull(UpdateApkCache.downloadProblem(7_101_147L, 7_101_147L))
     }
 }

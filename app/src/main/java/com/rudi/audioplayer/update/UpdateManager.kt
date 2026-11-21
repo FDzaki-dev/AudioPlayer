@@ -76,32 +76,65 @@ object UpdateManager {
         }
     }
 
+    /**
+     * Batch 706 — satu unduhan pada satu waktu + hasil divalidasi. Log v705: 11 percobaan pasang berturut-turut memakai
+     * `update_AudioPlayer-v1.11.16-run678.apk` 0 byte (status `ReadyToInstall` menunjuk berkas kosong/hilang) dan tak ada satu pun
+     * baris unduhan di log. `Downloading(0)` kini diset SINKRON sebelum coroutine jalan (sebelumnya baru setelah chunk pertama,
+     * jadi ketukan ganda pada tombol "Unduh & Instal" memulai dua unduhan ke berkas yang sama; unduhan kedua menghapus/menimpa
+     * berkas yang sedang ditulis yang pertama). Hasil yang kosong/tak lengkap menjadi [UpdateState.Error], bukan `ReadyToInstall`.
+     */
     fun downloadAndPrepareInstall(context: Context, release: GitHubReleaseChecker.ReleaseInfo) {
+        synchronized(this) {
+            if (_state.value is UpdateState.Downloading) {
+                AppLogger.w(TAG, "Unduhan diabaikan: unduhan ${release.apkAssetName} sudah berjalan")
+                return
+            }
+            _state.value = UpdateState.Downloading(0)
+        }
         val appContext = context.applicationContext
         scope.launch {
-            val destFile = File(appContext.cacheDir, "update_${release.apkAssetName}")
-            // Batch 702 — APK pembaruan versi lama dihapus sebelum yang baru diunduh (nama berkas memuat versi+run, jadi tak pernah
-            // tertimpa; log v701: 5 pemasangan dalam ±10 jam = ±35 MB menumpuk di cache). Lihat KDoc UpdateApkCache. Tak boleh
-            // menggagalkan unduhan: purge tak melempar, hasilnya hanya dicatat.
-            val purged = UpdateApkCache.purge(appContext.cacheDir, keepName = destFile.name)
-            if (purged.deleted > 0 || purged.failed > 0) {
-                AppLogger.w(
-                    TAG,
-                    "APK pembaruan lama dibersihkan dari cache: terhapus=${purged.deleted} (${purged.deletedBytes} byte) gagal=${purged.failed}"
+            try {
+                val destFile = File(appContext.cacheDir, "update_${release.apkAssetName}")
+                // Batch 702 — APK pembaruan versi lama dihapus sebelum yang baru diunduh (nama berkas memuat versi+run, jadi tak pernah
+                // tertimpa; log v701: 5 pemasangan dalam ±10 jam = ±35 MB menumpuk di cache). Lihat KDoc UpdateApkCache. Tak boleh
+                // menggagalkan unduhan: purge tak melempar, hasilnya hanya dicatat.
+                val purged = UpdateApkCache.purge(appContext.cacheDir, keepName = destFile.name)
+                if (purged.deleted > 0 || purged.failed > 0) {
+                    AppLogger.w(
+                        TAG,
+                        "APK pembaruan lama dibersihkan dari cache: terhapus=${purged.deleted} (${purged.deletedBytes} byte) gagal=${purged.failed}"
+                    )
+                }
+                AppLogger.w(TAG, "Unduhan dimulai: ${release.apkAssetName} (${release.tagName})")
+                val result = UpdateDownloader.download(
+                    url = release.apkDownloadUrl,
+                    destFile = destFile,
+                    onProgress = { downloaded, total ->
+                        if (total > 0) {
+                            _state.value = UpdateState.Downloading(((downloaded * 100) / total).toInt())
+                        }
+                    }
                 )
-            }
-            val result = UpdateDownloader.download(
-                url = release.apkDownloadUrl,
-                destFile = destFile,
-                onProgress = { downloaded, total ->
-                    if (total > 0) {
-                        _state.value = UpdateState.Downloading(((downloaded * 100) / total).toInt())
+                _state.value = when (result) {
+                    is UpdateDownloader.DownloadResult.Success -> {
+                        val problem = UpdateApkCache.fileProblem(result.file)
+                        if (problem == null) {
+                            AppLogger.w(TAG, "Unduhan selesai: ${result.file.name} ${result.file.length()} byte")
+                            UpdateState.ReadyToInstall(result.file)
+                        } else {
+                            AppLogger.e(TAG, "Unduhan ${result.file.name} tidak layak dipasang: $problem (${result.file.path})")
+                            UpdateState.Error("Unduhan tidak layak dipasang ($problem). Tutup lalu buka Cek Update dan unduh ulang.")
+                        }
+                    }
+                    is UpdateDownloader.DownloadResult.Failure -> {
+                        AppLogger.e(TAG, "Unduhan gagal: ${result.message}")
+                        UpdateState.Error(result.message)
                     }
                 }
-            )
-            _state.value = when (result) {
-                is UpdateDownloader.DownloadResult.Success -> UpdateState.ReadyToInstall(result.file)
-                is UpdateDownloader.DownloadResult.Failure -> UpdateState.Error(result.message)
+            } catch (e: Exception) {
+                // Tanpa ini status macet di Downloading (penjaga di atas menolak unduhan berikutnya) bila ada galat tak terduga.
+                AppLogger.e(TAG, "Unduh/siapkan pasang gagal tak terduga", e)
+                _state.value = UpdateState.Error(e.message ?: "Unduhan gagal tak terduga")
             }
         }
     }
@@ -117,6 +150,14 @@ object UpdateManager {
         val appContext = context.applicationContext
         _state.value = UpdateState.Installing
         scope.launch {
+            // Batch 706 — log v705: berkas 0 byte/hilang tetap dipasang berulang-ulang (Shizuku menolak, installer sistem dibuka untuk
+            // berkas yang sama dan gagal, status kembali ke `ReadyToInstall`). Berkas tak layak = Error eksplisit, bukan putaran buntu.
+            val problem = UpdateApkCache.fileProblem(apkFile)
+            if (problem != null) {
+                AppLogger.e(TAG, "Pasang dibatalkan: ${apkFile.name} $problem (${apkFile.path})")
+                _state.value = UpdateState.Error("APK pembaruan tidak bisa dipasang ($problem). Tutup lalu buka Cek Update dan unduh ulang.")
+                return@launch
+            }
             var installed = false
             if (ShizukuBridge.state(appContext) == ShizukuBridge.State.READY) {
                 // Batch 696 — log v695: `Antrean disimpan ... (pra-update)` 14:28:34,634 lalu proses mati 14:28:35,551 tanpa SATU pun baris
