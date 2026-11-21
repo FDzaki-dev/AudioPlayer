@@ -17,26 +17,27 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import coil.compose.SubcomposeAsyncImage
+import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 import java.util.Locale
 
 /**
@@ -56,70 +57,78 @@ import java.util.Locale
  * Android, so most albums silently fell back to the icon below even when the song actually
  * has embedded art. Coil resolves a song's own content URI reliably instead.
  *
- * Batch 329 (laporan user, "placeholder kosong kurang menarik") — the "no cover" look itself
- * redesigned: flat single-tone [surfaceVariant] tile → soft off-center radial tint, and the
- * bare 50%-alpha note icon → an accent-tinted circular badge around a softer [Icons.Rounded]
- * glyph. Both pieces are still built purely from `MaterialTheme.colorScheme` (no hardcoded
- * Aurora/Tactile/Skeu literals here), so the nicer look adapts automatically across every
- * theme × light/dark combo exactly like the old flat fill did — zero per-theme branching
- * added. Every call site (Home/Library/MiniPlayerBar/Now Playing) picks this up for free since
- * none of them pass anything beyond [artworkUri]/[modifier]/[contentScale]/[showIcon].
+ * Batch 344 — BUG FIX (laporan user, screenshot): default [contentScale] SEBELUMNYA
+ * `ContentScale.Fit` — untuk lagu dengan embedded artwork NON-1:1 (mis. thumbnail video
+ * 16:9 yang ikut ke-embed saat rip/tag dari YouTube, kasus nyata user: "TOBI - Warm Up Mix
+ * 2023"), `Fit` mempertahankan seluruh gambar TANPA crop di dalam kotak persegi manapun
+ * (44dp MiniPlayerBar, 48dp/56dp/120dp Library/Home, 280dp hero Now Playing) — sisa
+ * ruang kosong di atas/bawah gambar menampilkan `background(surfaceVariant)` polos, kelihatan
+ * seperti bar hitam/letterbox video, PERSIS "tidak normal/generik" yang dilaporkan. Root cause
+ * SISTEMIK (default di 1 fungsi bersama ini), bukan spesifik 1 layar — SEMUA 6 titik pemakaian
+ * [AlbumArt] app ini (grep) mengandalkan default ini, 0 satu pun override eksplisit KECUALI
+ * backdrop blur Now Playing (`NowPlayingScreen.kt`, sudah `Crop` sejak awal — makanya bug ini
+ * baru kelihatan di kotak seni ART UTAMA/thumbnail, bukan di backdrop). Preseden project SENDIRI
+ * juga sudah konsisten: widget home-screen (`widget_player.xml`, Batch 204) pakai `centerCrop`,
+ * bukan letterbox — dan itu genre-standar universal (Spotify/Apple Music/YouTube Music SELALU
+ * crop-fill cover art, tidak pernah pillarbox/letterbox apa pun rasio sumbernya).
+ * Fix: default diganti `ContentScale.Crop` — cover art SEKARANG selalu penuh mengisi kotaknya
+ * (crop sisi berlebih, 0 bar kosong) di ke-6 titik pemakaian sekaligus, konsisten dgn genre app
+ * ini & preseden widget. Override eksplisit `Crop` di backdrop blur Now Playing SENGAJA TIDAK
+ * dihapus walau kini redundan — bukan bagian dari bug ini, ZERO-REFACTOR.
+ *
+ * Batch 429 (Compose optimization, sektor dibuka eksplisit): `SubcomposeAsyncImage` -> `AsyncImage`.
+ * `SubcomposeAsyncImage` re-runs a real subcomposition pass per state change (loading/success/
+ * error) — genuinely useful when the loading/error slots need their OWN layout constraints
+ * separate from the image's, which this usage never needed (both slots here just draw inside
+ * the same [Box], no independent sizing). `AsyncImage` renders through a single Painter swap
+ * instead — no subcomposition, cheaper per recomposition, especially felt across list/grid
+ * scrolling (Library/Home) where many `AlbumArt` instances mount/recompose in quick succession.
+ * `loading = {}` (blank, unchanged) needs no representation at all — a null/loading image draws
+ * nothing already, matching prior behavior exactly. `error = { AlbumArtFallbackIcon() }` doesn't
+ * fit `AsyncImage`'s `error: Painter?` param directly ([AlbumArtFallbackIcon] resolves
+ * `MaterialTheme.colorScheme` and draws a vector, not expressible as a static Painter without
+ * its own composable context) — tracked via `onState` into a plain `remember`-ed flag instead,
+ * so the icon renders as a normal sibling composable in the same [Box], visually identical to
+ * before (both draw on top of the same tinted background, only one visible at a time). Device
+ * visual verification still pending (0 compiler/device in this session) — see PROJECT_STATE.md.
  */
 @Composable
 fun AlbumArt(
     artworkUri: Uri?,
     modifier: Modifier = Modifier,
-    contentScale: ContentScale = ContentScale.Fit,
+    contentScale: ContentScale = ContentScale.Crop,
     showIcon: Boolean = true
 ) {
+    var showFallback by remember(artworkUri) { mutableStateOf(artworkUri == null) }
     Box(
-        modifier = modifier.background(albumArtFallbackBrush()),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
         if (artworkUri != null) {
-            SubcomposeAsyncImage(
+            AsyncImage(
                 model = artworkUri,
                 contentDescription = null,
                 contentScale = contentScale,
                 modifier = Modifier.matchParentSize(),
-                loading = {},
-                error = { if (showIcon) AlbumArtFallbackIcon() }
+                onState = { state ->
+                    showFallback = state is AsyncImagePainter.State.Error
+                }
             )
-        } else if (showIcon) {
+        }
+        if (showIcon && showFallback) {
             AlbumArtFallbackIcon()
         }
     }
 }
 
-/** Gentle off-center spotlight over [surfaceVariant] (a hint of [primary] mixed in toward the
- * center, fading back to the plain surface tone at the edges) instead of one dead-flat fill —
- * reads like a soft glow sitting behind the badge in [AlbumArtFallbackIcon], not a gray tile.
- * No explicit center/radius passed to [Brush.radialGradient] on purpose — Compose sizes it to
- * the actual draw bounds automatically, so this scales correctly from a 44dp MiniPlayerBar
- * thumbnail up to a 280dp Now Playing hero with the same one code path. */
-@Composable
-private fun albumArtFallbackBrush(): Brush {
-    val base = MaterialTheme.colorScheme.surfaceVariant
-    val glow = lerp(base, MaterialTheme.colorScheme.primary, 0.12f)
-    return Brush.radialGradient(colors = listOf(glow, base))
-}
-
 @Composable
 private fun AlbumArtFallbackIcon() {
-    val accent = MaterialTheme.colorScheme.primary
-    Box(
-        modifier = Modifier
-            .fillMaxSize(0.56f)
-            .background(accent.copy(alpha = 0.14f), CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            Icons.Rounded.MusicNote,
-            contentDescription = null,
-            tint = accent.copy(alpha = 0.85f),
-            modifier = Modifier.fillMaxSize(0.5f)
-        )
-    }
+    Icon(
+        Icons.Default.MusicNote,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier.fillMaxSize(0.4f)
+    )
 }
 
 /**
@@ -156,9 +165,11 @@ fun Modifier.bouncyPress(
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (isPressed) pressedScale else 1f,
+        // Batch 581 — User: efek bounce stuttering/buggy -> spring default Compose (tanpa
+        // overshoot): scale-down saat tekan & kembali ke 1f tetap jalan, hanya pantulannya hilang.
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium
         ),
         label = "bouncyPress"
     )

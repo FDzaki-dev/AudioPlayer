@@ -9,9 +9,12 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.material3.LocalRippleConfiguration
 
 // Batch 61 — REARSITEKTUR: identitas tema (Apple/Tactile/Skeuomorphism) dan mode
 // terang/gelap dulunya digabung jadi satu enum AppTheme (SYSTEM/LIGHT/DARK/TACTILE/
@@ -33,7 +36,7 @@ import dev.chrisbanes.haze.HazeState
 enum class ThemeIdentity(val storageKey: String, val displayName: String, val description: String) {
     APPLE("apple", "Apple", "Tampilan bersih khas iOS, mengikuti mode terang/gelap yang dipilih"),
     TACTILE("tactile_lite", "Tactile", "Kaca premium dengan sentuhan Midnight Blue tipis dan kontrol taktil — kini otonom di mode terang maupun gelap"),
-    SKEU_DARK_LITE("skeu_dark_lite", "Neumorphism", "Panel lembut menyatu dgn kanvas, dual soft-shadow ultra realistic, aksen Titanium dominan dgn sentuhan Zamrud — otonom di mode terang maupun gelap"),
+    SKEU_DARK_LITE("skeu_dark_lite", "Neumorphism", "Panel lembut menyatu dgn kanvas, dual soft-shadow ultra realistic, aksen Burgundy dominan dgn sekunder Champagne yang tenang — kesan old money, otonom di mode terang maupun gelap"),
     CALM_RETRO("calm_retro", "Calm Retro", "Lo-Fi Sci-Fi teduh, aksen Muted Sage — selalu gelap, tidak mengikuti toggle Mode"),
     // Batch 279/280 — ROADMAP_LIQUID_GLASS_REDESIGN.md, §3 dikonfirmasi user: TAMBAH sebagai
     // opsi ke-5 (bukan ganti/konsolidasi 4 di atas), Opsi B (shape+typography+palet statis,
@@ -45,7 +48,10 @@ enum class ThemeIdentity(val storageKey: String, val displayName: String, val de
     // background saja utk saat ini (rim-glow per-panel ditunda). Mekanisme: `auroraGlow()`
     // (TactileDepth.kt, Batch 306) — warna gradien mengalir pelan, bukan shadow/blur/artefak
     // retro seperti 5 identitas lain.
-    AURORA("aurora", "Aurora", "Cahaya aurora borealis mengalir pelan di ambient, aksen hijau-teal-ungu-magenta — selalu gelap, tidak mengikuti toggle Mode");
+    AURORA("aurora", "Aurora", "Cahaya aurora borealis mengalir pelan di ambient, aksen hijau-teal-ungu-magenta — selalu gelap, tidak mengikuti toggle Mode"),
+    // Batch 656 — tema ke-7 (permintaan user: skin Space 🌌 dgn shape megah). Terkunci gelap permanen (pola sama
+    // CALM_RETRO/AURORA). Latar kosmos animasi = `SpaceCosmosBackdrop()` (SpaceCosmos.kt), shape = `SpaceShapes`.
+    SPACE("space", "Space", "🌌 Alam semesta: bintang berkelip, nebula hanyut pelan, panel berbentuk orbit, aksen cyan pulsar — selalu gelap, tidak mengikuti toggle Mode");
 
     companion object {
         fun fromStorageKey(key: String?): ThemeIdentity = entries.find { it.storageKey == key } ?: APPLE
@@ -78,20 +84,15 @@ val LocalIsDarkTheme = staticCompositionLocalOf { true }
 // benar2 dipakai runtime.
 val LocalHazeState = staticCompositionLocalOf { HazeState() }
 
-// Batch 326 — Aurora rim-glow §langkah animasi (kandidat yang sudah dicatat sejak komentar
-// Batch 310 di `frostedGlass()`, BlurUtils.kt: "SENGAJA statis ... kandidat animasi kalau user
-// minta lanjut nanti setelah statis ini terverifikasi visual dulu" — precondition itu sudah
-// terpenuhi, blur+rim statis dikonfirmasi user Batch 325). Sama pola PERSIS LocalHazeState di
-// atas: masalah yang mau dihindari SAMA (Batch 310's kekhawatiran eksplisit) — `frostedGlass()`
-// dipanggil 12+ call site, 12+ `rememberInfiniteTransition` independen serentak adalah biaya
-// performa baru yang belum diverifikasi. Solusinya SAMA: 1 phase float dihitung 1 kali
-// (AppNavHost, MainActivity.kt) via `rememberInfiniteTransition`, diteruskan lewat 1
-// CompositionLocal ini ke semua call site `frostedGlass()` sekaligus — 0 transition tambahan
-// per panel, cukup 1 total (terpisah dari transition internal `auroraGlow()`'s ambient wash di
-// root Surface, TIDAK disatukan/disentuh batch ini — scope minimal, 0 risiko ke Surface root).
-// Default `0f` di sini HANYA fallback preview/test, sama seperti LocalHazeState's default di
-// atas — nilai sungguhan SELALU datang dari provider di AppNavHost.
-val LocalAuroraPhase = staticCompositionLocalOf { 0f }
+// Batch 326 sempat menambah `LocalAuroraPhase` di sini (CompositionLocal berbagi 1 phase
+// animasi rim-glow Aurora ke semua `frostedGlass()`, TactileDepth.kt tidak disentuh). Batch 328
+// MENGHAPUS BALIK — user (device sungguhan): musik stuttering + lag/glitch swipe sheet "Kontrol
+// Lanjutan". Root cause: berbagi 1 `rememberInfiniteTransition` mengurangi JUMLAH transition
+// (12+→1) tapi TIDAK menghilangkan bahwa phase berubah tiap frame memicu recomposition brush di
+// semua consumer sekaligus (termasuk `MiniPlayerBar`, selalu tervisible selama musik main).
+// Detail lengkap & rasionalisasi revert: `PROJECT_STATE.md`/`CHANGELOG.md` Batch 328,
+// komentar Aurora branch `frostedGlass()` (BlurUtils.kt). Sengaja dihapus penuh (bukan
+// ditinggal dead code) — risiko re-enable ceroboh tanpa re-baca rasionalisasi ini.
 
 private val AppleDarkColors = darkColorScheme(
     primary = AppleAccent,
@@ -181,45 +182,90 @@ private val TactileLightColors = lightColorScheme(
 
 // Batch 57 — Skeuomorphism's own color role mapping (DARK expression). Batch 61: renamed
 // SkeuDarkColors kept as-is (name already had "Dark" — now explicitly paired with SkeuLightColors
-// below instead of being the only variant). onPrimary picked by the same luminance rule used
-// elsewhere (>0.55 luminance -> black text): SkeuAccent (0xFFB6BAC0, Titanium+Silver metalik
-// sejak Batch 63 — dulu tembaga 0xFFCB8B4B) simple luma ≈0.73, tetap jauh di atas
-// the threshold, so onPrimary is Color.Black in BOTH variants (accent shared across light/dark).
+// below instead of being the only variant).
+// Batch 563 — ROMBAK "OLD MONEY": primary = BURGUNDY (mode gelap = claret terang `SkeuAccent`, mode
+// terang = burgundy pekat `SkeuAccentLight` — 1 nilai tak bisa lolos kontras di kedua kanvas, lihat
+// Color.kt), sekunder = champagne/sand calm. `onPrimary` kini IVORY (dulu Black di atas titanium
+// terang). Role container/surfaceContainer*/inverse*/outlineVariant yang dulu DIBIARKAN default M3
+// (baseline ungu — mis. `secondaryContainer` = kunci tab bawah, `surfaceContainer` = lantai bilah tab)
+// kini diisi eksplisit supaya tak ada warna ungu bawaan yang menyelinap ke tema ini. Semua pasangan
+// teks/latar dihitung >= 4.5:1 (hitungan WCAG offline, BELUM dilihat di device).
+private val SkeuOnAccent = Color(0xFFFBF3E6) // ivory di atas burgundy
+private val SkeuLightSuccess = Color(0xFF4E6B47) // sage pekat utk kanvas terang (sage gelap 2:1 di sana)
+
 private val SkeuDarkColors = darkColorScheme(
     primary = SkeuAccent,
-    onPrimary = Color.Black,
+    onPrimary = SkeuOnAccent,
+    primaryContainer = Color(0xFF5B1F2F),
+    onPrimaryContainer = Color(0xFFF3D5D0),
+    inversePrimary = SkeuAccentLight,
     secondary = SkeuDarkSecondaryText,
     onSecondary = SkeuDarkBackground,
+    secondaryContainer = Color(0xFF4A2A33),
+    onSecondaryContainer = Color(0xFFF0D9C4),
     tertiary = SkeuDarkSuccess,
     onTertiary = Color.Black,
+    tertiaryContainer = Color(0xFF2F3B2B),
+    onTertiaryContainer = Color(0xFFD5E4C8),
     background = SkeuDarkBackground,
     onBackground = SkeuDarkText,
     surface = SkeuDarkSurface,
     onSurface = SkeuDarkText,
     surfaceVariant = SkeuDarkSurfaceVariant,
     onSurfaceVariant = SkeuDarkSecondaryText,
+    surfaceDim = SkeuDarkBackground,
+    surfaceBright = Color(0xFF3A2D32),
+    surfaceContainerLowest = Color(0xFF0F0B0D),
+    surfaceContainerLow = Color(0xFF1A1316),
+    surfaceContainer = Color(0xFF1F181B),
+    surfaceContainerHigh = Color(0xFF271E22),
+    surfaceContainerHighest = Color(0xFF31262B),
+    inverseSurface = Color(0xFFEDE4D6),
+    inverseOnSurface = Color(0xFF2A2024),
     outline = SkeuDarkSurfaceVariant,
+    outlineVariant = Color(0xFF4A3A40),
     surfaceTint = SkeuAccent,
-    error = SkeuDarkError
+    error = SkeuDarkError,
+    errorContainer = Color(0xFF5C2620),
+    onErrorContainer = Color(0xFFFFDAD4)
 )
 
 // Batch 61 — Skeuomorphism's own LIGHT expression (Color.kt "SKEUOMORPHISM — LIGHT VARIANT").
 private val SkeuLightColors = lightColorScheme(
-    primary = SkeuAccent,
-    onPrimary = Color.Black,
+    primary = SkeuAccentLight,
+    onPrimary = SkeuOnAccent,
+    primaryContainer = Color(0xFFEBCFCF),
+    onPrimaryContainer = Color(0xFF4A0E1F),
+    inversePrimary = SkeuAccent,
     secondary = SkeuLightSecondaryText,
     onSecondary = SkeuLightBackground,
-    tertiary = SkeuDarkSuccess,
-    onTertiary = Color.Black,
+    secondaryContainer = Color(0xFFE3CFC3),
+    onSecondaryContainer = Color(0xFF5A1626),
+    tertiary = SkeuLightSuccess,
+    onTertiary = SkeuOnAccent,
+    tertiaryContainer = Color(0xFFD7E4CB),
+    onTertiaryContainer = Color(0xFF1F2E1A),
     background = SkeuLightBackground,
     onBackground = SkeuLightText,
     surface = SkeuLightSurface,
     onSurface = SkeuLightText,
     surfaceVariant = SkeuLightSurfaceVariant,
     onSurfaceVariant = SkeuLightSecondaryText,
+    surfaceDim = Color(0xFFDDD5CA),
+    surfaceBright = SkeuLightSurfaceVariant,
+    surfaceContainerLowest = Color(0xFFFAF6EF),
+    surfaceContainerLow = Color(0xFFF4EEE5),
+    surfaceContainer = Color(0xFFEFE8DE),
+    surfaceContainerHigh = Color(0xFFE9E1D6),
+    surfaceContainerHighest = Color(0xFFE2D9CD),
+    inverseSurface = Color(0xFF2A2024),
+    inverseOnSurface = Color(0xFFEFE6D8),
     outline = SkeuLightSurfaceVariant,
-    surfaceTint = SkeuAccent,
-    error = SkeuDarkError
+    outlineVariant = Color(0xFFCDBFB0),
+    surfaceTint = SkeuAccentLight,
+    error = SkeuDarkError,
+    errorContainer = Color(0xFFF5D6D1),
+    onErrorContainer = Color(0xFF5C1A12)
 )
 
 // Calm Retro — 1 colorScheme saja (bukan pasangan Dark/Light seperti Tactile/Skeu), karena
@@ -319,6 +365,28 @@ private val AuroraColors = darkColorScheme(
     error = AuroraMagenta
 )
 
+// Batch 656 — SPACE: 1 colorScheme gelap saja (terkunci gelap; `colorsFor()` mengabaikan isDark). onPrimary hitam:
+// luma SpaceAccent (#5CD6FF) ≈0.78 jauh di atas ambang 0.55. tertiary = nebula violet (onTertiary putih, luma ≈0.28),
+// error = nebula rose (derivasi palet sendiri, pelajaran Batch 130/307).
+private val SpaceColors = darkColorScheme(
+    primary = SpaceAccent,
+    onPrimary = Color.Black,
+    secondary = SpaceSecondaryText,
+    onSecondary = SpaceBackground,
+    tertiary = SpaceNebulaViolet,
+    onTertiary = Color.White,
+    background = SpaceBackground,
+    onBackground = SpaceText,
+    surface = SpaceSurface,
+    onSurface = SpaceText,
+    surfaceVariant = SpaceSurfaceVariant,
+    onSurfaceVariant = SpaceSecondaryText,
+    outline = SpaceSurfaceVariant,
+    surfaceTint = SpaceAccent,
+    error = SpaceNebulaRose,
+    onError = Color.White
+)
+
 // A single, consistent "continuous curve" language across the whole app — Compose's Shapes
 // API only supports true rounded rectangles (Apple's real squircle/superellipse corners
 // aren't natively expressible), so generous rounding is the closest honest approximation.
@@ -342,10 +410,17 @@ val TactileShapes = Shapes(
 // Batch 57 — Skeuomorphism's shape language: one notch more rounded than Tactile at every step
 // (md/lg/xxl vs Tactile's sm/md/lg), reading as soft physical buttons/panels. Shared by both
 // light & dark expressions (same Batch 61 principle as TactileShapes above).
+// Batch 563 — ROMBAK TOTAL BENTUK "old money": sudut dirapatkan jadi "tailored" (kabinet/kulit,
+// bukan gelembung): extraSmall 4 / small 6 / medium 10 / large 12 / extraLarge 16 dp (dulu small 12,
+// medium 16, large 20; extraSmall/extraLarge dulu default M3 4/28). Panel/tile berkedalaman yang
+// radiusnya hardcode `Radius.*` dipangkas ke maksimum 12dp di `skeuEmboss()` (`SkeuCappedShape`,
+// TactileDepth.kt) — bukan lewat tabel ini.
 val SkeuDarkShapes = Shapes(
-    small = RoundedCornerShape(Radius.md),
-    medium = RoundedCornerShape(Radius.lg),
-    large = RoundedCornerShape(Radius.xxl)
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(6.dp),
+    medium = RoundedCornerShape(10.dp),
+    large = RoundedCornerShape(12.dp),
+    extraLarge = RoundedCornerShape(16.dp)
 )
 
 // Batch 130 — pemurnian visual: dulu Calm Retro jatuh ke branch `else` di AudioPlayerTheme()
@@ -417,6 +492,35 @@ val AuroraShapes = Shapes(
     )
 )
 
+// Batch 656 — SPACE "ORBIT": asimetri CERMIN Aurora (Aurora besar di topStart/bottomEnd; Space besar di
+// topEnd/bottomStart) dan lebih dramatis: sudut besar 22/30/42dp vs pasangan kecil 8/10/14dp -> panel terbaca
+// sebagai bulan sabit/jalur orbit yang menyapu diagonal. Murni RoundedCornerShape (API yang sudah terbukti compile
+// di AuroraShapes; Compose otomatis menskala radius bila jumlah sudut melebihi sisi elemen, jadi aman utk
+// elemen pendek). Radius 42dp = pertama melewati rekor liquidLg 34dp, sengaja: itu "megah"-nya tema ini.
+private val SpaceOrbitSmall = 22.dp
+private val SpaceOrbitMedium = 30.dp
+private val SpaceOrbitLarge = 42.dp
+val SpaceShapes = Shapes(
+    small = RoundedCornerShape(
+        topStart = 8.dp,
+        topEnd = SpaceOrbitSmall,
+        bottomEnd = 8.dp,
+        bottomStart = SpaceOrbitSmall
+    ),
+    medium = RoundedCornerShape(
+        topStart = Radius.sm,
+        topEnd = SpaceOrbitMedium,
+        bottomEnd = Radius.sm,
+        bottomStart = SpaceOrbitMedium
+    ),
+    large = RoundedCornerShape(
+        topStart = 14.dp,
+        topEnd = SpaceOrbitLarge,
+        bottomEnd = 14.dp,
+        bottomStart = SpaceOrbitLarge
+    )
+)
+
 // Batch 61 — mode resolution is now completely identity-agnostic (used to take an AppTheme and
 // hardcode TACTILE/SKEU_DARK_LITE to always-true). Every identity honors SYSTEM/LIGHT/DARK the
 // same way; an identity's own light/dark visual DIFFERENCE lives entirely in colorsFor() below.
@@ -436,7 +540,11 @@ fun resolveIsDark(mode: ThemeMode): Boolean = when (mode) {
 fun isTactileTheme(): Boolean = MaterialTheme.colorScheme.primary == TactileAccent
 
 @Composable
-fun isSkeuTheme(): Boolean = MaterialTheme.colorScheme.primary == SkeuAccent
+fun isSkeuTheme(): Boolean {
+    // Batch 563 — burgundy punya 2 nilai (gelap/terang), keduanya identitas Neumorphism.
+    val primary = MaterialTheme.colorScheme.primary
+    return primary == SkeuAccent || primary == SkeuAccentLight
+}
 
 @Composable
 fun isCalmRetroTheme(): Boolean = MaterialTheme.colorScheme.primary == CalmRetroAccent
@@ -453,6 +561,11 @@ fun isLiquidGlassTheme(): Boolean = MaterialTheme.colorScheme.primary == LiquidG
 @Composable
 fun isAuroraTheme(): Boolean = MaterialTheme.colorScheme.primary == AuroraAccent
 
+// Batch 656 — helper ke-6 (pola identik 5 di atas): dipakai MainActivity (Scaffold transparan agar latar kosmos terlihat)
+// dan BlurUtils.kt (rim panel).
+@Composable
+fun isSpaceTheme(): Boolean = MaterialTheme.colorScheme.primary == SpaceAccent
+
 fun colorsFor(identity: ThemeIdentity, isDark: Boolean) = when (identity) {
     ThemeIdentity.TACTILE -> if (isDark) TactileDarkColors else TactileLightColors
     ThemeIdentity.SKEU_DARK_LITE -> if (isDark) SkeuDarkColors else SkeuLightColors
@@ -465,6 +578,8 @@ fun colorsFor(identity: ThemeIdentity, isDark: Boolean) = when (identity) {
     // Batch 307 — isDark sengaja diabaikan, sama alasan CALM_RETRO di atas: Aurora terkunci
     // gelap permanen (dikonfirmasi user sebelum Batch 306).
     ThemeIdentity.AURORA -> AuroraColors
+    // Batch 656 — Space terkunci gelap permanen (isDark diabaikan, sama alasan CALM_RETRO/AURORA).
+    ThemeIdentity.SPACE -> SpaceColors
 }
 
 @Composable
@@ -473,11 +588,25 @@ fun AudioPlayerTheme(
     mode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit
 ) {
-    val isDark = resolveIsDark(mode)
+    // Batch 656 — Space terkunci gelap: sinyal LocalIsDarkTheme (mesin kedalaman neu*/frostedGlass) WAJIB gelap walau
+    // sistem sedang mode terang, kalau tidak panel memakai token terang di atas skema warna gelap. Identitas lain TIDAK diubah.
+    val isDark = resolveIsDark(mode) || identity == ThemeIdentity.SPACE
     // Batch 61 — provides the mode signal to every descendant (tactileEmboss()/skeuEmboss()/
     // frostedGlass()) so their light/dark token branching stays centralized instead of each call
     // site re-deriving it.
-    CompositionLocalProvider(LocalIsDarkTheme provides isDark) {
+    // Batch 581 — User: "hilangkan atau balikkan seluruh effect bounce ke setelan default karena
+    // terasa stuttering dan buggy". Provider `LocalOverscrollFactory provides IosOverscrollFactory`
+    // (Batch 364, rubber-band overscroll ala iOS) DICABUT -> semua LazyColumn/LazyRow/verticalScroll/
+    // horizontalScroll kembali ke overscroll bawaan platform. `IosOverscrollFactory` (IosScrollPhysics.kt)
+    // sengaja TIDAK dihapus (tak terpakai); fling `rememberIosFlingBehavior` TIDAK disentuh.
+    // Batch 511 — LocalHapticFeedback diganti implementasi terpusat (lihat AppHaptics.kt): satu baris
+    // ini menguatkan SEMUA 75 titik haptic di app tanpa menyentuh call site-nya satu-satu (pola
+    // sama CompositionLocal lain di blok ini). Jenis haptic selain LongPress/TextHandleMove tetap
+    // diteruskan ke implementasi bawaan Compose.
+    CompositionLocalProvider(
+        LocalIsDarkTheme provides isDark,
+        LocalHapticFeedback provides rememberStrongHapticFeedback(),
+    ) {
         MaterialTheme(
             colorScheme = colorsFor(identity, isDark),
             // Batch 57 — Skeu awalnya reuse AppleTypography (no separate type-scale spec supplied
@@ -503,6 +632,7 @@ fun AudioPlayerTheme(
                 ThemeIdentity.LIQUID_GLASS -> LiquidGlassTypography
                 ThemeIdentity.CALM_RETRO -> CalmRetroTypography
                 ThemeIdentity.AURORA -> AuroraTypography
+                ThemeIdentity.SPACE -> SpaceTypography
                 else -> AppleTypography
             },
             shapes = when (identity) {
@@ -511,9 +641,21 @@ fun AudioPlayerTheme(
                 ThemeIdentity.CALM_RETRO -> CalmRetroShapes
                 ThemeIdentity.LIQUID_GLASS -> LiquidGlassShapes
                 ThemeIdentity.AURORA -> AuroraShapes
+                ThemeIdentity.SPACE -> SpaceShapes
                 else -> AppleShapes
             },
-            content = content
+            content = {
+                // Batch 560 — "refactor total ripple ke effect depth": di DALAM MaterialTheme
+                // (MaterialTheme sendiri menyuntik ripple ke LocalIndication untuk content-nya, jadi
+                // override di luar tertimpa). `LocalIndication` = `NeuDepthIndication` utk semua
+                // clickable/selectable/Surface(onClick); `LocalRippleConfiguration = null` mematikan
+                // ripple M3 yang di-hardcode (IconButton dst). Tab bawah tetap `indication = null`.
+                CompositionLocalProvider(
+                    LocalIndication provides NeuDepthIndication,
+                    LocalRippleConfiguration provides null,
+                    content = content
+                )
+            }
         )
     }
 }

@@ -3,7 +3,8 @@ package com.rudi.audioplayer.playback
 /**
  * Pure A-B repeat boundary logic — deliberately separated from [PlayerViewModel] (same pattern
  * as `ListeningStatsEngine`/`SmartPlaylistEngine`: Context-free so it can be unit-tested without
- * Robolectric). Consulted every position tick (~500ms, see `PlayerViewModel.startPositionLoop()`).
+ * Robolectric). Consulted every position tick (~1000ms since Batch 352, was ~500ms — see
+ * `PlayerViewModel.startPositionLoop()`).
  */
 object AbRepeatLogic {
 

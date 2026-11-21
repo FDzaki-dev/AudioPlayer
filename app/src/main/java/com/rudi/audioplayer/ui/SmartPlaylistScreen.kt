@@ -1,6 +1,6 @@
 package com.rudi.audioplayer.ui
 
-import androidx.compose.foundation.LocalOverscrollConfiguration
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -33,7 +33,9 @@ import com.rudi.audioplayer.data.SmartPlaylist
 import com.rudi.audioplayer.data.SmartPlaylistEngine
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.ui.theme.Radius
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
 /**
  * Smart Playlist tab content: list of rule-based playlists (with live match count), or the
@@ -73,7 +75,10 @@ fun SmartPlaylistTabView(
                     onAction = { editingPlaylist = null; showBuilder = true }
                 )
             } else {
-                LazyColumn {
+                LazyColumn(
+                    // Batch 377 — PENDING_IosFlingBehavior.md item 4/14 (daftar playlist otomatis).
+                    flingBehavior = rememberIosFlingBehavior()
+                ) {
                     itemsIndexed(smartPlaylists, key = { _, p -> p.id }) { _, playlist ->
                         val matchCount = remember(playlist, allSongs) {
                             SmartPlaylistEngine.resolve(playlist, allSongs, ratingOf).size
@@ -83,7 +88,10 @@ fun SmartPlaylistTabView(
                             supportingContent = { Text("$matchCount lagu cocok") },
                             leadingContent = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            modifier = Modifier.clickable { selectedId = playlist.id }
+                            // Batch 486 — `.animateItem()` di awal chain (pola sama LibraryScreen/
+                            // VaultSheet/SongPickerSheet Batch 482/485). Key `p.id` sudah stabil sejak
+                            // awal, 0 gesture drag-reorder di list ini (grep app-wide: 0 hit).
+                            modifier = Modifier.animateItem().clickable { selectedId = playlist.id }
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                     }
@@ -142,7 +150,11 @@ fun SmartPlaylistTabView(
                         subtitle = "Longgarkan aturan lewat tombol pensil di atas."
                     )
                 } else {
-                    LazyColumn {
+                    LazyColumn(
+                        // Batch 377 — PENDING_IosFlingBehavior.md item 4/14 (daftar lagu yang cocok
+                        // dengan aturan playlist otomatis).
+                        flingBehavior = rememberIosFlingBehavior()
+                    ) {
                         itemsIndexed(matchedSongs, key = { _, song -> song.id }) { index, song ->
                             val isPlaying = song.id == currentSongId
                             val background = if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
@@ -165,7 +177,10 @@ fun SmartPlaylistTabView(
                                     )
                                 },
                                 colors = ListItemDefaults.colors(containerColor = background),
-                                modifier = Modifier.clickable { onSongClick(matchedSongs, index) }
+                                // Batch 486 — `.animateItem()`, alasan sama blok playlist di atas.
+                                // List ini brubah isi tiap ganti aturan (search/filter aturan smart
+                                // playlist), key `song.id` stabil, 0 drag-reorder di sini.
+                                modifier = Modifier.animateItem().clickable { onSongClick(matchedSongs, index) }
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                         }
@@ -232,7 +247,7 @@ private fun SmartPlaylistBuilderSheet(
     var selectedFolders by remember { mutableStateOf(initial?.folderNames ?: emptySet()) }
     var minMinutes by remember { mutableStateOf(initial?.minDurationMs?.let { (it / 60_000L).toString() } ?: "") }
     var maxMinutes by remember { mutableStateOf(initial?.maxDurationMs?.let { (it / 60_000L).toString() } ?: "") }
-    var minRating by remember { mutableStateOf(initial?.minRating ?: 0) }
+    var minRating by remember { mutableIntStateOf(initial?.minRating ?: 0) }
     var minYear by remember { mutableStateOf(initial?.minYear?.toString() ?: "") }
     var maxYear by remember { mutableStateOf(initial?.maxYear?.toString() ?: "") }
     var keyword by remember { mutableStateOf(initial?.keyword ?: "") }
@@ -261,18 +276,26 @@ private fun SmartPlaylistBuilderSheet(
     // PROJECT_STATE.md Batch 321/322): tambah `containerColor = Color.Transparent` yang kelewat
     // sejak sheet ini dibuat. `Color` sudah diimpor sebelumnya (dipakai fungsi lain file ini).
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+        // Batch 483 — FIX audit gejala serupa "background glass tembus pandang" (laporan user
+        // di `VaultSheet.kt`, rasional lengkap identik di sana): `.frostedGlass()` yang kelewat
+        // sejak `containerColor = Transparent` dipasang (Batch 323 di file ini, lihat komentar
+        // historis di atas) — audit `.frostedGlass()` Batch 340 tidak mencakup file ini. Dipasang
+        // di Column TERLUAR (dalam `CompositionLocalProvider`, sebelum `verticalScroll`) sesuai
+        // posisi yang sama di sheet lain yang sudah benar (setelah `.fillMaxWidth()`).
         // Batch 263 — user feedback langsung setelah Batch 262 (verticalScroll fix): scroll
         // terasa "bouncy". Root cause: verticalScroll baru otomatis ikut overscroll
         // stretch-glow bawaan Android 12+/Compose Foundation — di dalam ModalBottomSheet yang
-        // JUGA punya gesture drag sendiri, stretch itu terasa berlebihan/ganda. Compose BOM di
-        // project ini (2024.05.00) API terkininya masih `LocalOverscrollConfiguration provides
-        // null` (bukan workaround usang — versi Foundation yang lebih baru dgn parameter
-        // `overscrollEffect` di `verticalScroll()` belum ada di BOM ini). Discope cuma di
+        // JUGA punya gesture drag sendiri, stretch itu terasa berlebihan/ganda. Batch 648 —
+        // `LocalOverscrollConfiguration` DEPRECATED (BOM kini 2026.04.01); dok. Foundation: untuk
+        // mematikan overscroll pakai `LocalOverscrollFactory provides null` (pengganti 1:1, overscroll
+        // tetap mati; penyedia global IosOverscrollFactory sudah dicabut Batch 581 jadi tak ada
+        // yang menimpa). Discope cuma di
         // Column ini (bukan seluruh app), scroll drag/fling-nya sendiri TIDAK diubah.
-        CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
+        CompositionLocalProvider(LocalOverscrollFactory provides null) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 // Bug report user: "Buat Playlist Otomatis" TRUNCATED, 0 bisa discroll —
                 // Column ini isinya banyak (nama+folder chips+genre chips+durasi+tahun+rating+
                 // tombol Batal/Simpan di paling bawah) TANPA verticalScroll sama sekali,
@@ -309,7 +332,7 @@ private fun SmartPlaylistBuilderSheet(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(availableFolders) { folder ->
+                    items(availableFolders, key = { it }) { folder ->
                         FilterChip(
                             selected = folder in selectedFolders,
                             onClick = {
@@ -318,7 +341,10 @@ private fun SmartPlaylistBuilderSheet(
                                     else selectedFolders + folder
                             },
                             shape = chipLiquidShape,
-                            label = { Text(folder) }
+                            label = { Text(folder) },
+                            // Batch 486 — `.animateItem()`, pola sama chip preset EqualizerSheet
+                            // Batch 485. Key = string folder itu sendiri, stabil.
+                            modifier = Modifier.animateItem()
                         )
                     }
                 }
@@ -337,7 +363,7 @@ private fun SmartPlaylistBuilderSheet(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(availableGenres) { genreOption ->
+                    items(availableGenres, key = { it }) { genreOption ->
                         FilterChip(
                             selected = genreOption == selectedGenre,
                             onClick = {
@@ -346,7 +372,9 @@ private fun SmartPlaylistBuilderSheet(
                                 selectedGenre = if (genreOption == selectedGenre) null else genreOption
                             },
                             shape = chipLiquidShape,
-                            label = { Text(genreOption) }
+                            label = { Text(genreOption) },
+                            // Batch 486 — `.animateItem()`, alasan sama blok folder di atas.
+                            modifier = Modifier.animateItem()
                         )
                     }
                 }

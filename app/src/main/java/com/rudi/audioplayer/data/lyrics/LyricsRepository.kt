@@ -27,13 +27,6 @@ class LyricsRepository(context: Context) {
         return fetchAndCache(artist, title, album)
     }
 
-    // Dipakai LyricsPrefetchWorker (batch 4/4) — cache-check dulu SEBELUM fetch, persis spec
-    // item 7 ("Cek cache dulu. Jika tidak ada baru fetch API"), tanpa perlu expose LyricsResult
-    // ke caller yg cuma butuh efek-samping "pastikan ke-cache", bukan hasilnya.
-    suspend fun ensureCached(artist: String, title: String, album: String?) {
-        if (dao.get(artist, title) == null) fetchAndCache(artist, title, album)
-    }
-
     suspend fun clearCache() = dao.clearAll()
 
     suspend fun cacheCount(): Int = dao.count()

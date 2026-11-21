@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Batch 583/584 — KENOP sekunder (sebelumnya/berikutnya), varian GELAP (juga bubble yang selalu gelap).
+    Bentuk "daun diagonal" (Batch 584, bukan lingkaran): kiri-atas & kanan-bawah 13dp, kanan-atas & kiri-bawah
+    6dp. Bevel 1.25dp: dasar rim gelap -> rim terang kiri-atas -> permukaan cembung -> sorot lembut. Warna =
+    keluarga panel widget_background.xml. DITEKAN = cekung + pendar anggur SkeuWineLit ~25%. Catatan: di bubble,
+    listener setupDrag (Batch 474) mengonsumsi event sehingga keadaan ditekan tidak tampil di sana.
+    Pasangan terang: widget_key_bg_light.xml (WidgetUpdater menukar lewat setBackgroundResource).
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#4B3B40" />
+                    <corners
+                        android:topLeftRadius="13dp"
+                        android:topRightRadius="6dp"
+                        android:bottomRightRadius="13dp"
+                        android:bottomLeftRadius="6dp" />
+                </shape>
+            </item>
+            <item android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="315"
+                        android:startColor="#0B0709"
+                        android:endColor="#2A1D21" />
+                    <corners
+                        android:topLeftRadius="13dp"
+                        android:topRightRadius="6dp"
+                        android:bottomRightRadius="13dp"
+                        android:bottomLeftRadius="6dp" />
+                </shape>
+            </item>
+            <item
+                android:left="1.25dp"
+                android:top="1.25dp"
+                android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="315"
+                        android:startColor="#1A1114"
+                        android:endColor="#2B1F23" />
+                    <corners
+                        android:topLeftRadius="11.75dp"
+                        android:topRightRadius="4.75dp"
+                        android:bottomRightRadius="11.75dp"
+                        android:bottomLeftRadius="4.75dp" />
+                </shape>
+            </item>
+            <item
+                android:left="1.25dp"
+                android:top="1.25dp"
+                android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="radial"
+                        android:centerX="0.5"
+                        android:centerY="0.5"
+                        android:gradientRadius="18dp"
+                        android:startColor="#40A33550"
+                        android:endColor="#00A33550" />
+                    <corners
+                        android:topLeftRadius="11.75dp"
+                        android:topRightRadius="4.75dp"
+                        android:bottomRightRadius="11.75dp"
+                        android:bottomLeftRadius="4.75dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#0D090B" />
+                    <corners
+                        android:topLeftRadius="13dp"
+                        android:topRightRadius="6dp"
+                        android:bottomRightRadius="13dp"
+                        android:bottomLeftRadius="6dp" />
+                </shape>
+            </item>
+            <item android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="315"
+                        android:startColor="#8A787C"
+                        android:endColor="#2A1D21" />
+                    <corners
+                        android:topLeftRadius="13dp"
+                        android:topRightRadius="6dp"
+                        android:bottomRightRadius="13dp"
+                        android:bottomLeftRadius="6dp" />
+                </shape>
+            </item>
+            <item
+                android:left="1.25dp"
+                android:top="1.25dp"
+                android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="315"
+                        android:startColor="#3B2D32"
+                        android:endColor="#1F1519" />
+                    <corners
+                        android:topLeftRadius="11.75dp"
+                        android:topRightRadius="4.75dp"
+                        android:bottomRightRadius="11.75dp"
+                        android:bottomLeftRadius="4.75dp" />
+                </shape>
+            </item>
+            <item
+                android:left="1.25dp"
+                android:top="1.25dp"
+                android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="radial"
+                        android:centerX="0.3"
+                        android:centerY="0.25"
+                        android:gradientRadius="20dp"
+                        android:startColor="#2EFFFFFF"
+                        android:endColor="#00FFFFFF" />
+                    <corners
+                        android:topLeftRadius="11.75dp"
+                        android:topRightRadius="4.75dp"
+                        android:bottomRightRadius="11.75dp"
+                        android:bottomLeftRadius="4.75dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

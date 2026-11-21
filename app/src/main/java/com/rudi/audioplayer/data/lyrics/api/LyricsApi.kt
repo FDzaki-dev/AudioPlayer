@@ -2,7 +2,6 @@ package com.rudi.audioplayer.data.lyrics.api
 
 import okhttp3.OkHttpClient
 import okhttp3.Interceptor
-import okhttp3.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
@@ -29,7 +28,7 @@ interface LyricsApi {
             val req = chain.request().newBuilder()
                 .header("User-Agent", "MusicApp/1.3 Hybrid")
                 .build()
-            chain.proceed(req) as Response
+            chain.proceed(req)
         }
 
         private val client = OkHttpClient.Builder()

@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
 /**
  * Sheet pilih-banyak-lagu generik. Lahir dari laporan user (screenshot tab Favorit & Playlist
@@ -104,6 +105,9 @@ fun SongPickerSheet(
     var sweepLastIndex by remember { mutableStateOf<Int?>(null) }
     val currentSelected by rememberUpdatedState(selected)
     var sweepBaseSelection by remember { mutableStateOf(setOf<Long>()) }
+    // Batch 562 — sama dgn `SongListView` (LibraryLists.kt): sapuan yang DIMULAI di baris yang sudah
+    // tercentang = mode BATAL (cabut centang), selain itu mode PILIH (union, perilaku lama).
+    var sweepDeselect by remember { mutableStateOf(false) }
     // Batch 273 — user laporan: sheet ini ("Tambah ke Favorit"/"Tambah ke Playlist") MASIH
     // kena "select → instant self-deselect" pas long-press diam tanpa gerak — bug PERSIS yang
     // sama yang baru dibetulkan Batch 271 di `SongListView` (`LibraryScreen.kt`), tapi FIX
@@ -176,8 +180,10 @@ fun SongPickerSheet(
                                     sweepAnchorIndex = idx
                                     sweepLastIndex = idx
                                     sweepBaseSelection = currentSelected
+                                    sweepDeselect = filtered[idx].id in sweepBaseSelection
                                     suppressClickForId = filtered[idx].id
-                                    selected = sweepBaseSelection + filtered[idx].id
+                                    selected = if (sweepDeselect) sweepBaseSelection - filtered[idx].id
+                                    else sweepBaseSelection + filtered[idx].id
                                 },
                                 onDrag = { change, _ ->
                                     val anchor = sweepAnchorIndex ?: return@detectDragGesturesAfterLongPress
@@ -201,7 +207,8 @@ fun SongPickerSheet(
                                     sweepLastIndex = idx
                                     val range = minOf(anchor, idx)..maxOf(anchor, idx)
                                     val sweptIds = range.map { filtered[it].id }
-                                    selected = sweepBaseSelection + sweptIds
+                                    selected = if (sweepDeselect) sweepBaseSelection - sweptIds.toSet()
+                                    else sweepBaseSelection + sweptIds
                                 },
                                 onDragEnd = { isSweeping = false; sweepAnchorIndex = null; sweepLastIndex = null },
                                 // Defensive cleanup saja — kasus tekan-diam SEHARUSNYA sudah
@@ -211,7 +218,9 @@ fun SongPickerSheet(
                                 // (gesture dibatalkan ancestor sebelum keduanya sempat jalan).
                                 onDragCancel = { isSweeping = false; sweepAnchorIndex = null; sweepLastIndex = null; suppressClickForId = null }
                             )
-                        }
+                        },
+                    // Batch 378 — PENDING_IosFlingBehavior.md item 8/14.
+                    flingBehavior = rememberIosFlingBehavior()
                 ) {
                     itemsIndexed(filtered, key = { _, song -> song.id }) { index, song ->
                         DisposableEffect(index) {
@@ -219,7 +228,16 @@ fun SongPickerSheet(
                         }
                         val isSelected = song.id in selected
                         Row(
+                            // Batch 485 — `.animateItem()` ditambah (posisi awal chain, pola sama
+                            // DuplicateFinderSheet/VaultSheet Batch 482/483). List ini sudah punya
+                            // `key` stabil (`song.id`) sejak awal. Diverifikasi grep app-wide file
+                            // ini: 0 hit `isDragging`/`draggable`/`reorder` — gesture "sweep-select"
+                            // (`isSweeping`/`rowBoundsInRoot`) BUKAN drag-reorder (tidak memindah
+                            // posisi item, cuma menandai rentang checkbox), jadi aman dari resiko
+                            // "berebut" dgn animateItem seperti kasus QueueSheet/PlaylistScreen.
+                            // 0 logic filter/checkbox/sweep disentuh.
                             modifier = Modifier
+                                .animateItem()
                                 .fillMaxWidth()
                                 .onGloballyPositioned { coords ->
                                     val top = coords.positionInRoot().y

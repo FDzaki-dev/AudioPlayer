@@ -2,10 +2,20 @@ package com.rudi.audioplayer.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -16,38 +26,73 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rudi.audioplayer.playback.PlaybackProgress
 import com.rudi.audioplayer.playback.PlaybackUiState
+import kotlinx.coroutines.flow.StateFlow
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
+import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
+import com.rudi.audioplayer.ui.theme.SkeuGilt
+import com.rudi.audioplayer.ui.theme.SkeuGiltDeep
+import com.rudi.audioplayer.ui.theme.SkeuRubyHi
+import com.rudi.audioplayer.ui.theme.SkeuWine
+import com.rudi.audioplayer.ui.theme.SkeuWineLit
+import com.rudi.audioplayer.ui.theme.SkeuAccentLight
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.Radius
+import kotlin.math.abs
 
 @Composable
 fun MiniPlayerBar(
     uiState: PlaybackUiState,
+    // Batch 353 (Opsi A) — dikoleksi LOKAL di bawah (bukan lewat uiState) supaya tick posisi
+    // tiap detik cuma invalidasi MiniPlayerBar ini sendiri, bukan ikut memaksa AppNavHost
+    // (pemanggil composable ini di MainActivity.kt) recompose. Lihat PlaybackProgress di
+    // PlayerViewModel.kt untuk rasional lengkap.
+    playbackProgress: StateFlow<PlaybackProgress>,
     accentColor: Color?,
     onPlayPause: () -> Unit,
-    onExpand: () -> Unit
+    onExpand: () -> Unit,
+    // Batch 476 — "mini player bisa dicancel". Swipe horizontal (kiri/ATAU kanan, pola sama
+    // dengan notifikasi Android) melewati threshold memanggil ini; pemanggil (MainActivity.kt)
+    // meneruskan ke PlayerViewModel.dismissMiniPlayer() yang menghentikan playback + membersihkan
+    // state tersimpan — bar sendiri lenyap lewat AnimatedVisibility pemanggil begitu
+    // uiState.currentSong balik null, bukan diurus manual di sini.
+    onDismiss: () -> Unit
 ) {
     val song = uiState.currentSong ?: return
     val haptic = LocalHapticFeedback.current
+    // Batch 636 — layar pendek (landscape HP, tinggi jendela < 480dp; pola sama LibraryScreen/DiagnosticLogSheet): padding
+    // luar 8->4dp dan padding isi 10->6dp (hemat ±16dp tinggi untuk daftar di atasnya). Potret/tablet: nilai lama persis.
+    val compactHeight = LocalWindowInfo.current.containerDpSize.height < 480.dp
     // Must match the shape frostedGlass() now derives from MaterialTheme.shapes.large,
     // or the outer shadow/clip corners (this Box) would mismatch the inner tinted fill's
     // corners — Tactile's own rounding vs Apple's.
@@ -73,10 +118,37 @@ fun MiniPlayerBar(
     val accentContentColor = if (animatedAccent.luminance() > 0.55f) Color.Black else Color.White
     val miniPlayPauseShape = if (isTactile || isSkeu) MaterialTheme.shapes.medium else CircleShape
 
+    // Batch 476 — swipe-to-dismiss. Pola SAMA PERSIS dengan swipe next/prev album art
+    // (NowPlayingScreen.kt: Animatable snapback, threshold 120px, spring dampingRatio
+    // MediumBouncy/stiffness Low) supaya "rasa" gesture konsisten 1 sistem di seluruh app,
+    // bukan 2 karakter drag berbeda. Beda dari swipe album art: offset TIDAK di-clamp ke
+    // maxOffsetPx (48dp) — bar ini SELEBAR LAYAR, swipe-dismiss wajar mengikuti jari penuh
+    // (pola sama seperti swipe-dismiss notifikasi Android), bukan nudge kecil.
+    val dismissOffsetPx = remember { mutableFloatStateOf(0f) }
+    val dismissOffset = remember { Animatable(0f) }
+    val totalDismissDragPx = remember { mutableFloatStateOf(0f) }
+    val dismissScope = rememberCoroutineScope()
+
     Box(
         modifier = Modifier
+            .graphicsLayer {
+                // Batch 480 — feedback visual drag (murni tambahan, 0 threshold/formula gesture
+                // di bawah disentuh): alpha+scale dibaca LANGSUNG dari dismissOffsetPx di sini
+                // (pola SAMA PERSIS translationX di baris ini sejak awal, rasional Batch 397 di
+                // atas) — cuma invalidasi layer, 0 recomposition tambahan tiap frame drag.
+                // Dikapkan di progress 1f (nilai di titik threshold 120px) supaya drag jauh
+                // melebihi threshold (sengaja 0 di-clamp, lihat komentar Batch 476) tidak bikin
+                // bar nyaris tak terlihat/mengecil drastis selagi masih digeser.
+                val offset = dismissOffsetPx.floatValue
+                translationX = offset
+                val dragProgress = (abs(offset) / 120f).coerceIn(0f, 1f)
+                alpha = 1f - dragProgress * 0.55f
+                val scale = 1f - dragProgress * 0.06f
+                scaleX = scale
+                scaleY = scale
+            }
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = if (compactHeight) 4.dp else 8.dp)
             .then(
                 // Batch 49: swapped matteEmboss() for the Tactile equivalent, tactileEmboss()
                 // (directional shadow + top-down gradient + bevel border) so the bar reads as
@@ -102,16 +174,100 @@ fun MiniPlayerBar(
             // Tactile only), and Apple has no background of its own before this — frostedGlass() is
             // the only fill it gets.
             .then(if (isSkeu) Modifier else Modifier.frostedGlass())
+            .pointerInput(Unit) {
+                // Batch 477 — FIX BUG (laporan user: "mini player nya gak ada drag/button cancel
+                // sama sekali"): root cause SAMA PERSIS dgn Batch 350 (NowPlayingScreen.kt, vinyl
+                // vertikal-vs-horizontal) — 2 gesture recognizer terpisah (drag-dismiss di sini vs
+                // tap-expand milik .clickable() di bawah) bersaing di 1 titik sentuh yang sama, 0
+                // wasit tunggal. `detectHorizontalDragGestures` (lama) & `.clickable()` SAMA-SAMA
+                // jalan di pass Main (default) — Main pass urut child→parent, `.clickable()`
+                // (posisi lebih "dalam"/belakangan di modifier chain) SELALU lihat tiap change
+                // LEBIH DULU sebelum drag detector (lebih "luar") sempat consume() di gilirannya
+                // sendiri — akibatnya `.clickable()` TIDAK PERNAH melihat change yang sudah
+                // di-consume, tap-nya menang mutlak, swipe kelihatan 0 efek sama sekali.
+                // Fix: pola IDENTIK Batch 350 — wasit dipindah ke `PointerEventPass.Initial` (jalan
+                // LEBIH DULU, top-down, SEBELUM pass Main manapun termasuk punya `.clickable()`).
+                // Selama akumulasi gerak < touchSlop: 0 consume sama sekali (tap plain lolos utuh
+                // ke `.clickable()` di bawah — onExpand+ripple normal, 0 regresi item (c) resume
+                // point Batch 476). Begitu > touchSlop: barulah tiap change di-consume() DI SINI —
+                // `.clickable()` otomatis cancel sendiri begitu lihat change yang sudah consumed
+                // (mekanisme baku Compose, SAMA seperti vinyl auto-cancel Batch 350), ripple ikut
+                // batal otomatis tanpa kode tambahan. Formula/threshold 120px/spring MediumBouncy-
+                // Low/haptic Batch 476 0 disentuh sama sekali, murni pindah wasit gesture-nya —
+                // `detectHorizontalDragGestures` diganti loop manual krn API bawaan itu 0 overload
+                // yang terima `pass=`.
+                val slop = viewConfiguration.touchSlop
+                awaitEachGesture {
+                    val down = awaitFirstDown(pass = PointerEventPass.Initial)
+                    totalDismissDragPx.floatValue = 0f
+                    dismissScope.launch { dismissOffset.stop() }
+                    var dragging = false
+                    var thresholdHapticFired = false
+                    while (true) {
+                        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        val dragAmount = change.position.x - change.previousPosition.x
+                        if (!dragging) {
+                            totalDismissDragPx.floatValue += dragAmount
+                            if (abs(totalDismissDragPx.floatValue) > slop) dragging = true
+                        } else {
+                            change.consume()
+                            totalDismissDragPx.floatValue += dragAmount
+                            dismissOffsetPx.floatValue = totalDismissDragPx.floatValue
+                            // Batch 480 — tick HALUS real-time SEKALI persis saat melewati
+                            // threshold 120px yang SAMA dgn pengecekan di !change.pressed di
+                            // bawah (0 angka baru): sinyal "lepas sekarang = dismiss" SELAGI
+                            // masih menggeser, terpisah dari haptic LongPress yg sudah ada di
+                            // bawah (itu konfirmasi dismiss BENERAN terjadi saat jari diangkat).
+                            if (!thresholdHapticFired &&
+                                (dismissOffsetPx.floatValue > 120f || dismissOffsetPx.floatValue < -120f)
+                            ) {
+                                thresholdHapticFired = true
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                        }
+                        if (!change.pressed) {
+                            if (dragging) {
+                                if (totalDismissDragPx.floatValue > 120f || totalDismissDragPx.floatValue < -120f) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onDismiss()
+                                } else {
+                                    dismissScope.launch {
+                                        dismissOffset.snapTo(dismissOffsetPx.floatValue)
+                                        // Batch 581 — snap-back kembali ke spring default (tanpa pantulan).
+                                        dismissOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)) {
+                                            dismissOffsetPx.floatValue = value
+                                        }
+                                    }
+                                }
+                            }
+                            break
+                        }
+                    }
+                }
+            }
             .clickable(onClick = onExpand)
     ) {
+        // Batch 397 — `MiniPlayerBar`'s badan composable ini SENGAJA membaca `playbackProgress`
+        // langsung di scope yang sama (Batch 353's komentar di parameter atas: "tick posisi tiap
+        // detik cuma invalidasi MiniPlayerBar ini sendiri") — jadi SELURUH badan fungsi ini,
+        // termasuk Brush di bawah, tetap recompose tiap detik selama musik main (persis konteks
+        // yang baru dioptimasi Batch 396 di `frostedGlass()`, kali ini di dalam file yang sama
+        // persis, bukan fungsi utility terpisah). `animatedAccent` (`animateColorAsState`, tween
+        // 700ms) MEMANG legitimately berubah selama transisi warna aksen antar-lagu — remember di
+        // sini TIDAK menghilangkan rebuild SELAMA transisi itu (key-nya berubah tiap frame transisi
+        // spt seharusnya), tapi menghilangkan rebuild yang sebelumnya terjadi tiap detik DI LUAR
+        // masa transisi (mayoritas waktu playback, saat `animatedAccent` sudah settle & progress
+        // tick adalah satu-satunya alasan recompose). Zero behavior change — nilai Brush identik.
+        val rowAccentBrush = remember(animatedAccent) {
+            Brush.horizontalGradient(
+                listOf(animatedAccent.copy(alpha = 0.16f), Color.Transparent)
+            )
+        }
         Row(
             modifier = Modifier
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(animatedAccent.copy(alpha = 0.16f), Color.Transparent)
-                    )
-                )
-                .padding(10.dp),
+                .background(rowAccentBrush)
+                .padding(if (compactHeight) 6.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AlbumArt(
@@ -165,7 +321,17 @@ fun MiniPlayerBar(
                     )
                     .bouncyPress(playPauseInteraction, pressedScale = 0.82f)
             ) {
-                AnimatedContent(targetState = uiState.isPlaying, label = "miniPlayPause") { playing ->
+                AnimatedContent(
+                    targetState = uiState.isPlaying,
+                    label = "miniPlayPause",
+                    // Batch 332 — konsisten persis dgn fix NowPlayingScreen.kt (Pending Queue
+                    // item 1, Batch 330): morph scale+fade, durasi asimetris 200ms masuk/150ms
+                    // keluar reuse dari NavHost tab transition (Batch 330).
+                    transitionSpec = {
+                        (scaleIn(initialScale = 0.6f, animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)))
+                            .togetherWith(scaleOut(targetScale = 0.6f, animationSpec = tween(150)) + fadeOut(animationSpec = tween(150)))
+                    }
+                ) { playing ->
                     Icon(
                         if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (playing) "Jeda" else "Putar",
@@ -176,25 +342,63 @@ fun MiniPlayerBar(
                 }
             }
         }
-        // Batch 36: uiState.position/duration sudah di-tick tiap detik untuk NowPlayingScreen
-        // (lihat startPositionTicker di PlayerViewModel) tapi mini bar tidak menampilkannya sama
+        // Batch 36: posisi/durasi di-tick tiap detik untuk NowPlayingScreen (lihat
+        // startPositionLoop di PlayerViewModel) tapi mini bar tidak menampilkannya sama
         // sekali — user harus buka full player cuma buat lihat sudah sampai mana. Garis tipis di
         // tepi bawah ini murni glanceable, tidak seekable (bukan Slider), jadi tidak menambah
         // target sentuh baru yang bisa konflik dengan onExpand di Box pembungkus. Overload
         // progress lambda dipakai karena overload Float sudah deprecated sejak Material3 1.2.0
         // (proyek ini pin compose-bom 2024.05.00 / Material3 ~1.2.1, sudah include lambda ini).
-        val progressFraction = if (uiState.duration > 0) {
-            (uiState.position.toFloat() / uiState.duration.toFloat()).coerceIn(0f, 1f)
+        // Batch 353 (Opsi A): sumbernya sekarang playbackProgress, dikoleksi di sini SAJA.
+        val progress by playbackProgress.collectAsStateWithLifecycle()
+        val progressFraction = if (progress.duration > 0) {
+            (progress.position.toFloat() / progress.duration.toFloat()).coerceIn(0f, 1f)
         } else 0f
-        LinearProgressIndicator(
-            progress = { progressFraction },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(2.dp)
-                .align(Alignment.BottomStart),
-            color = animatedAccent,
-            trackColor = animatedAccent.copy(alpha = 0.15f),
-            strokeCap = StrokeCap.Butt
-        )
+        if (isSkeu) {
+            // Batch 565 — Neumorphism: garis progres ikut sistem anggur/ruby/gilt (bukan lagi `animatedAccent` per-lagu):
+            // alur = anggur gelap redup, isi = gradien anggur -> ruby, ujung = titik gilt. Tipis (3dp) & tetap glanceable
+            // (tanpa target sentuh baru). Digambar di fase gambar dari `progressFraction` yang sama (0 layout baru).
+            val miniDark = LocalIsDarkTheme.current
+            val wineTone = if (miniDark) SkeuWine else SkeuAccentLight
+            val rubyTone = if (miniDark) SkeuRubyHi else SkeuWineLit
+            val giltTone = if (miniDark) SkeuGilt else SkeuGiltDeep
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .align(Alignment.BottomStart)
+                    .drawBehind {
+                        drawRect(wineTone.copy(alpha = if (miniDark) 0.30f else 0.16f))
+                        val fillW = size.width * progressFraction
+                        if (fillW > 0.5f) {
+                            drawRect(
+                                brush = Brush.horizontalGradient(
+                                    0f to wineTone,
+                                    1f to rubyTone,
+                                    startX = 0f,
+                                    endX = fillW
+                                ),
+                                size = Size(fillW, size.height)
+                            )
+                            drawCircle(
+                                color = giltTone,
+                                radius = size.height * 0.85f,
+                                center = Offset(fillW, size.height / 2f)
+                            )
+                        }
+                    }
+            )
+        } else {
+            LinearProgressIndicator(
+                progress = { progressFraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .align(Alignment.BottomStart),
+                color = animatedAccent,
+                trackColor = animatedAccent.copy(alpha = 0.15f),
+                strokeCap = StrokeCap.Butt
+            )
+        }
     }
 }

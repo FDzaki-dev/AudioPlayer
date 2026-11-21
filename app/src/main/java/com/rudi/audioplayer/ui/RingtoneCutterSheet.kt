@@ -46,7 +46,7 @@ fun RingtoneCutterSheet(
     val haptic = LocalHapticFeedback.current
     val duration = song.duration.coerceAtLeast(1L)
 
-    var startMs by remember(song.id) { mutableStateOf(0L) }
+    var startMs by remember(song.id) { mutableLongStateOf(0L) }
     var endMs by remember(song.id) {
         mutableStateOf((duration).coerceAtMost(RingtoneCutter.MAX_DURATION_MS))
     }
@@ -88,7 +88,7 @@ fun RingtoneCutterSheet(
                 "Awal: ${RingtoneCutter.formatTimestamp(range.startMs)}",
                 style = MaterialTheme.typography.labelLarge
             )
-            Slider(
+            NeuSlider(
                 value = startMs.toFloat(),
                 onValueChange = { startMs = it.toLong() },
                 valueRange = 0f..duration.toFloat()
@@ -98,7 +98,7 @@ fun RingtoneCutterSheet(
                 "Akhir: ${RingtoneCutter.formatTimestamp(range.endMs)}",
                 style = MaterialTheme.typography.labelLarge
             )
-            Slider(
+            NeuSlider(
                 value = endMs.toFloat(),
                 onValueChange = { endMs = it.toLong() },
                 valueRange = 0f..duration.toFloat()

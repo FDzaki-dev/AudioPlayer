@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import com.rudi.audioplayer.data.LrcSyncEditor
 import com.rudi.audioplayer.data.LyricsParser
 import com.rudi.audioplayer.data.SyncSession
@@ -260,7 +261,8 @@ fun LyricsSheet(
                         state = listState,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 420.dp)
+                            .heightIn(max = 420.dp),
+                        flingBehavior = rememberIosFlingBehavior()
                     ) {
                         itemsIndexed(lines, key = { index, _ -> index }) { index, line ->
                             val isActive = synced && index == activeIndex
@@ -276,7 +278,15 @@ fun LyricsSheet(
                                     synced -> MaterialTheme.colorScheme.secondary
                                     else -> MaterialTheme.colorScheme.onSurface
                                 },
+                                // Batch 486 — `.animateItem()` ditambah di awal chain (pola sama
+                                // list lain). Prioritas RENDAH krn list ini statis (dibangun ulang
+                                // via `remember(rawLyrics)`, 0 pernah insert/remove saat playback
+                                // normal, key = index bukan id konten) — animateItem cuma kepakai
+                                // kalau user edit lirik lalu simpan (jumlah baris berubah), 0
+                                // berpengaruh ke sync highlight/auto-scroll (logic activeIndex/
+                                // LaunchedEffect di atas 0 disentuh).
                                 modifier = Modifier
+                                    .animateItem()
                                     .fillMaxWidth()
                                     .padding(vertical = 6.dp)
                             )

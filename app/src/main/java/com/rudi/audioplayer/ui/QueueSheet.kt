@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -29,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
@@ -75,8 +77,8 @@ fun QueueSheet(
     val currentOnMove by rememberUpdatedState(onMove)
 
     var draggingSlotId by remember { mutableStateOf<Long?>(null) }
-    var dragOffsetPx by remember { mutableStateOf(0f) }
-    var rowHeightPx by remember { mutableStateOf(0f) }
+    var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+    var rowHeightPx by remember { mutableFloatStateOf(0f) }
     // Batch 137 — lanjutan spread Pilar A (calmScanlines) Batch 135, pola identik EqualizerSheet.
     val isCalmRetro = isCalmRetroTheme()
 
@@ -114,7 +116,9 @@ fun QueueSheet(
                 state = listState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 480.dp)
+                    .heightIn(max = 480.dp),
+                // Batch 367 — PENDING_IosFlingBehavior.md item 4/14.
+                flingBehavior = rememberIosFlingBehavior()
             ) {
                 itemsIndexed(
                     queue,

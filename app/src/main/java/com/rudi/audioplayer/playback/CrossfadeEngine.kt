@@ -4,8 +4,11 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.util.UnstableApi
+import android.os.SystemClock
 import androidx.media3.exoplayer.ExoPlayer
 import com.rudi.audioplayer.util.AppLogger
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -91,14 +94,45 @@ class CrossfadeEngine(
     private enum class State { IDLE, FADING, HANDBACK }
 
     private var state = State.IDLE
+    // Batch 613 — SpotBugs AT_STALE_THREAD_WRITE_OF_PRIMITIVE: `triggeredForIndex` dan `preFadeVolume` ditulis dari
+    // maybeStartCrossfade/abort DAN dari coroutine ramp; @Volatile = tulisan satu jalur selalu terlihat jalur lain
+    // (`state` sudah @Volatile sejak awal). Nilai/urutan tak berubah.
+    @Volatile
     private var triggeredForIndex = -1
     private var rampJob: Job? = null
+
+    // Batch 366 — nilai sessionPlayer.volume yang ditangkap SEBELUM ramp apa pun menyentuhnya
+    // di awal siklus fade (lihat maybeStartCrossfade()). Satu-satunya sumber kebenaran buat
+    // restore di onSessionAutoTransition() & abort() — jangan pernah coba tebak ulang volume
+    // "utuh" dari nilai yang sudah di tengah jalan diubah ramp, itu akar bug Batch 366 (lihat
+    // abort() di bawah).
+    @Volatile
+    private var preFadeVolume: Float = 1f
 
     // Tells onSessionManualDiscontinuity apart from this engine's own handback seek in
     // onSessionAutoTransition, which fires the exact same SEEK discontinuity reason and must
     // NOT be treated as a manual skip that aborts itself.
-    @Volatile
-    private var internalSeekInFlight = false
+    //
+    // Batch 626 — dulu `@Volatile Boolean internalSeekInFlight` yang di-set true/false MENGAPIT
+    // `sessionPlayer.seekTo(...)`. Itu tidak pernah bekerja: onSessionAutoTransition dipanggil dari
+    // DALAM callback onMediaItemTransition, dan Media3 `ListenerSet` menunda event yang dilahirkan
+    // di dalam callback sampai callback itu selesai (MEKANISME = dari ingatan source Media3, BELUM
+    // dibuktikan; FAKTA dari log + kode: abort() hanya bisa dipanggil dari jalur ini pada state HANDBACK)
+    // -> onPositionDiscontinuity(SEEK) tiba SETELAH flag sudah false -> dianggap seek manual -> abort() pada SETIAP transisi (log perangkat 10 Nov, v625: 22 dari 22
+    // transisi otomatis berakhir `Crossfade dibatalkan pertengahan (state=HANDBACK)`; ramp handback tak pernah
+    // jalan). Kini: jumlah seek internal yang event SEEK-nya BELUM tiba; satu event SEEK dikonsumsi per
+    // hitungan, tak peduli kapan event itu dikirim. Direset ke 0 saat handback selesai/abort (batas
+    // jendela = state HANDBACK) supaya hitungan yatim tak pernah menelan seek manual berikutnya.
+    private val pendingInternalSeeks = AtomicInteger(0)
+
+    // Batch 626 — pengukuran celah senyap overlapPlayer selama handback (lihat onSessionPlayWhenReadyChanged).
+    private val handbackPausedAtMs = AtomicLong(0L)
+    private val handbackGapMs = AtomicLong(0L)
+
+    // Batch 627 — jadwal fade yang DIRENCANAKAN (SystemClock.elapsedRealtime): dipakai handback untuk tahu seberapa
+    // jauh fade sudah berjalan saat lagu lama ternyata habis lebih awal dari perkiraan (`duration - posisi`).
+    private val fadeStartAtMs = AtomicLong(0L)
+    private val fadeEndAtMs = AtomicLong(0L)
 
     init {
         overlapPlayer.volume = 0f
@@ -120,6 +154,22 @@ class CrossfadeEngine(
         if (!value) abort()
     }
 
+    /** Batch 668 (baterai) — selang tidur aman sebelum tick polling berikutnya. Dulu tetap 250 ms SELAMANYA (4 bangun/dtk
+     * sepanjang lagu 2 jam, juga saat dijeda/layar mati). Kini 1000 ms bila lagu sedang main dan jendela crossfade masih
+     * >2,5 dtk NYATA lagi (sisa media / kecepatan), 2000 ms bila tak main; selain itu 250 ms seperti semula. Aman: pada
+     * kecepatan s, 1000 ms nyata = s dtk media, dan jendela baru dimasuki setelah >2,5*s dtk media -> tick berikutnya
+     * tak pernah melompati jendela pada pemutaran normal; seek ke dalam jendela terlambat <=1 dtk, jalur
+     * `fadeSpan = remaining / speed` di [maybeStartCrossfade] memang sudah menangani start terlambat. */
+    fun nextPollDelayMs(): Long {
+        if (!enabled || state != State.IDLE) return POLL_ACTIVE_MS
+        if (!sessionPlayer.isPlaying) return POLL_PAUSED_MS
+        val duration = sessionPlayer.duration
+        if (duration <= 0) return POLL_ACTIVE_MS
+        val speed = sessionPlayer.playbackParameters.speed.coerceAtLeast(MIN_SPEED)
+        val untilWindowRealMs = ((duration - sessionPlayer.currentPosition - crossfadeDurationMs) / speed).toLong()
+        return if (untilWindowRealMs > POLL_FAR_MARGIN_MS) POLL_FAR_MS else POLL_ACTIVE_MS
+    }
+
     /** Call on every position-poll tick while sessionPlayer is alive. Cheap no-op unless
      * genuinely within the crossfade window. */
     fun maybeStartCrossfade() {
@@ -131,7 +181,9 @@ class CrossfadeEngine(
         if (!sessionPlayer.isPlaying) return
 
         val duration = sessionPlayer.duration
-        if (duration <= 0 || duration == C.TIME_UNSET) return
+        // Batch 613 — SpotBugs UC_USELESS_CONDITION: C.TIME_UNSET bernilai negatif (Long.MIN_VALUE + 1), jadi
+        // `duration <= 0` sudah mencakupnya; pembanding kedua tak pernah bisa true. Perilaku identik.
+        if (duration <= 0) return
         val remaining = duration - sessionPlayer.currentPosition
         if (remaining !in 1..crossfadeDurationMs) return
 
@@ -145,14 +197,32 @@ class CrossfadeEngine(
         triggeredForIndex = currentIndex
         state = State.FADING
 
-        val target = sessionPlayer.volume.let { if (it <= 0f) 1f else it }
+        val target = sessionPlayer.volume.let { if (it < VOLUME_EPSILON) 1f else it }
+        preFadeVolume = target
+
+        // Batch 627 — overlapPlayer tak pernah menerima kecepatan sessionPlayer: pada kecepatan != 1x lagu baru
+        // masuk 1x lalu "dipercepat" saat handback (sesi berkecepatan penuh). Samakan HANYA bila berbeda
+        // (kecepatan 1x = jalur lama persis), dan hitung sisa dalam waktu NYATA (media / kecepatan).
+        val sessionParams = sessionPlayer.playbackParameters
+        if (overlapPlayer.playbackParameters != sessionParams) overlapPlayer.playbackParameters = sessionParams
+        val speed = sessionParams.speed.coerceAtLeast(MIN_SPEED)
 
         overlapPlayer.setMediaItem(nextItem)
         overlapPlayer.volume = 0f
         overlapPlayer.prepare()
         overlapPlayer.play()
 
-        val fadeSpan = remaining.coerceAtMost(crossfadeDurationMs).coerceAtLeast(200L)
+        val fadeSpan = (remaining / speed).toLong().coerceAtMost(crossfadeDurationMs).coerceAtLeast(200L)
+        val startedAt = SystemClock.elapsedRealtime()
+        fadeStartAtMs.set(startedAt)
+        fadeEndAtMs.set(startedAt + fadeSpan)
+        // Batch 627 — INSTRUMENTASI: dasar jadwal fade. Dibaca bersama baris `Transisi alami` untuk melihat apakah
+        // lagu lama habis lebih awal dari `durasi - posisi` (mis. lompat-senyap / durasi header meleset).
+        AppLogger.w(
+            "CrossfadeEngine",
+            "Crossfade mulai: sisa=${remaining}ms durasi=${duration}ms posisi=${sessionPlayer.currentPosition}ms " +
+                "fade=${fadeSpan}ms kecepatan=${sessionParams.speed}x"
+        )
         rampJob?.cancel()
         rampJob = scope.launch {
             animateDualVolume(fromA = target, toA = 0f, fromB = 0f, toB = target, durationMs = fadeSpan) { a, b ->
@@ -169,24 +239,57 @@ class CrossfadeEngine(
         state = State.HANDBACK
         rampJob?.cancel()
 
-        val target = overlapPlayer.volume.let { if (it <= 0.01f) 1f else it }
+        // Batch 366 — dulu ditebak dari overlapPlayer.volume saat ini (rapuh: kalau ramp awal
+        // maybeStartCrossfade() belum sempat benar-benar sampai ke target pas transisi alami
+        // keburu terjadi — mis. sessionPlayer buru-buru resume dekat ujung lagu abis cold-start
+        // eksternal — target jadi ikut fraksi asal-asalan, bukan volume "utuh" yang benar).
+        // preFadeVolume adalah nilai ASLI yang ditangkap di awal siklus ini, selalu benar apa
+        // pun progress ramp saat ini.
+        val target = preFadeVolume
 
-        internalSeekInFlight = true
-        // Safe precisely because sessionPlayer's volume is already ~0 here — see class doc
-        // step 3. Any decode/seek latency this causes is inaudible.
-        sessionPlayer.seekTo(overlapPlayer.currentPosition)
-        internalSeekInFlight = false
+        // Batch 626 — hitung SEBELUM seekTo: event SEEK-nya baru tiba setelah callback pemanggil
+        // (onMediaItemTransition) selesai, lihat komentar pendingInternalSeeks. Bila seekTo melempar,
+        // abort() (reset hitungan + volume sessionPlayer dipulihkan + overlap dihentikan) lalu lempar
+        // ulang: dulu state tertinggal HANDBACK tanpa ramp dan crossfade berikutnya terkunci.
+        handbackPausedAtMs.set(0L)
+        handbackGapMs.set(0L)
+        pendingInternalSeeks.incrementAndGet()
+        try {
+            // Safe precisely because sessionPlayer's volume is already ~0 here — see class doc
+            // step 3. Any decode/seek latency this causes is inaudible.
+            sessionPlayer.seekTo(overlapPlayer.currentPosition)
+        } catch (e: RuntimeException) {
+            abort()
+            throw e
+        }
 
         val startB = overlapPlayer.volume
+        // Batch 627 — fade yang DIPOTONG: lagu lama habis sebelum jadwal fade selesai (log v626: fade 2,9 dtk baru
+        // 31% saat transisi; volume lagu baru 0,31 lalu DIPAKSA naik ke 1,0 dalam 400 ms = terdengar "dipercepat di
+        // akhir"). Sisa jadwal fade dipertahankan: penguatan gabungan naik dari volume saat ini ke target selama
+        // sisa jadwal (minimal HANDBACK_MS); serah-terima overlap -> sesi tetap bersilang 400 ms.
+        val now = SystemClock.elapsedRealtime()
+        val plannedMs = (fadeEndAtMs.get() - fadeStartAtMs.get()).coerceAtLeast(1L)
+        val elapsedMs = (now - fadeStartAtMs.get()).coerceIn(0L, plannedMs)
+        val remainingFadeMs = (fadeEndAtMs.get() - now).coerceIn(0L, crossfadeDurationMs)
+        val totalMs = maxOf(HANDBACK_MS, remainingFadeMs)
+        AppLogger.w(
+            "CrossfadeEngine",
+            "Transisi alami: fade_selesai=${elapsedMs * 100 / plannedMs}% sisa_fade=${remainingFadeMs}ms " +
+                "volume_overlap=$startB handback=${totalMs}ms"
+        )
         rampJob = scope.launch {
-            animateDualVolume(fromA = 0f, toA = target, fromB = startB, toB = 0f, durationMs = HANDBACK_MS) { a, b ->
-                sessionPlayer.volume = a
-                overlapPlayer.volume = b
-            }
+            animateHandbackVolume(startGain = startB, target = target, totalMs = totalMs)
             overlapPlayer.pause()
             overlapPlayer.clearMediaItems()
+            pendingInternalSeeks.set(0)
             state = State.IDLE
             triggeredForIndex = -1
+            // Batch 626 — bukti jalur normal di log (dulu SETIAP transisi berakhir di abort()).
+            AppLogger.w(
+                "CrossfadeEngine",
+                "Handback selesai normal (seek internal tak membatalkan crossfade) celah_overlap=${handbackGapMs.get()}ms"
+            )
         }
     }
 
@@ -194,8 +297,13 @@ class CrossfadeEngine(
      * only [Player.DISCONTINUITY_REASON_SEEK] ones matter here. */
     fun onSessionManualDiscontinuity(reason: Int) {
         if (reason != Player.DISCONTINUITY_REASON_SEEK) return
-        if (internalSeekInFlight) return
         if (state == State.IDLE) return
+        // Batch 626 — event SEEK milik seek handback internal (lihat pendingInternalSeeks): dikonsumsi,
+        // BUKAN seek manual. Event berikutnya (skip/seek pengguna) tetap membatalkan seperti semula.
+        if (pendingInternalSeeks.get() > 0) {
+            pendingInternalSeeks.decrementAndGet()
+            return
+        }
         abort()
     }
 
@@ -203,6 +311,19 @@ class CrossfadeEngine(
      * mid-transition doesn't leave the incoming track playing on its own in the background. */
     fun onSessionPlayWhenReadyChanged(isPlaying: Boolean) {
         if (state == State.IDLE) return
+        // Batch 626 — INSTRUMENTASI (0 perubahan perilaku): `isPlaying` ikut false saat sessionPlayer BUFFERING
+        // setelah seek handback internal, sehingga overlapPlayer ikut dijeda sampai sessionPlayer siap lagi =
+        // celah senyap di ujung crossfade. Durasi celah itu diukur di sini dan dicatat saat handback selesai
+        // (`celah_overlap`), supaya keputusan berikutnya (mis. kompensasi posisi seek) berdasar angka, bukan tebakan.
+        if (state == State.HANDBACK) {
+            val now = SystemClock.elapsedRealtime()
+            if (!isPlaying) {
+                handbackPausedAtMs.compareAndSet(0L, now)
+            } else {
+                val pausedAt = handbackPausedAtMs.getAndSet(0L)
+                if (pausedAt != 0L) handbackGapMs.addAndGet(now - pausedAt)
+            }
+        }
         if (isPlaying) overlapPlayer.play() else overlapPlayer.pause()
     }
 
@@ -214,14 +335,58 @@ class CrossfadeEngine(
     private fun abort() {
         rampJob?.cancel()
         rampJob = null
+        pendingInternalSeeks.set(0) // Batch 626
+        handbackPausedAtMs.set(0L)
+        handbackGapMs.set(0L)
+        fadeStartAtMs.set(0L)
+        fadeEndAtMs.set(0L)
         if (state != State.IDLE) {
-            sessionPlayer.volume = sessionPlayer.volume.let { if (it <= 0f) 1f else it }
+            // Batch 366 BUGFIX (root cause dari laporan user — audio bisu setelah lagu
+            // pertama pasca kill+trigger eksternal, notifikasi/widget tetap "Memutar", cuma
+            // hilang lagi setelah restart device). Baris lama:
+            //   sessionPlayer.volume = sessionPlayer.volume.let { if (it <= 0f) 1f else it }
+            // adalah NO-OP di HAMPIR SEMUA kejadian nyata: volume di tengah ramp (step 60ms,
+            // lihat animateDualVolume) nyaris tidak pernah persis 0.0f, jadi cabang "reset ke
+            // 1f" nyaris tidak pernah kena — baris itu efektif cuma menulis ulang volume ke
+            // NILAINYA SENDIRI yang sudah turun (mis. 0.05), meninggalkan sessionPlayer
+            // nyangkut nyaris bisu SETIAP kali abort() dipicu pertengahan fade/handback:
+            // overlapPlayer.onPlayerError (decoder kedua gagal siap — paling rawan persis
+            // detik-detik awal sesi baru dari cold-start eksternal, saat pipeline audio
+            // pertama sendiri belum tentu selesai stabil), skip manual selagi fading, atau
+            // toggle Nonaktifkan Crossfade pertengahan fade. Karena Service (dan sessionnya)
+            // tetap hidup di background, sekadar buka-lagi App TIDAK membuat ExoPlayer baru
+            // (volume tidak ikut reset ke default 1.0) — cuma restart device (yang benar-benar
+            // mematikan proses Service) yang terasa "menyembuhkan", sampai kondisi yang sama
+            // terpicu lagi. Fix: restore ke preFadeVolume yang ditangkap SEBELUM ramp apa pun
+            // menyentuhnya — satu-satunya nilai yang selalu benar, tidak bergantung sudah
+            // sejauh apa ramp berjalan saat abort() dipanggil.
+            sessionPlayer.volume = preFadeVolume
             overlapPlayer.pause()
             overlapPlayer.clearMediaItems()
             overlapPlayer.volume = 0f
+            AppLogger.w(
+                "CrossfadeEngine",
+                "Crossfade dibatalkan pertengahan (state=$state) — sessionPlayer.volume dipulihkan ke $preFadeVolume"
+            )
         }
         state = State.IDLE
         triggeredForIndex = -1
+    }
+
+    /** Batch 627 — serah-terima overlap -> sesi. Penguatan GABUNGAN `gain` naik linear dari [startGain] ke [target]
+     *  selama [totalMs]; silang (sesi masuk, overlap keluar) dibatasi [HANDBACK_MS]: sesi = gain x s, overlap =
+     *  gain x (1 - s), s: 0 -> 1. Dua salinan lagu yang sama = jumlahnya tetap `gain` (tanpa lonjakan/lubang). */
+    private suspend fun animateHandbackVolume(startGain: Float, target: Float, totalMs: Long) {
+        val steps = (totalMs / STEP_MS).toInt().coerceAtLeast(1)
+        val crossSteps = (HANDBACK_MS / STEP_MS).toInt().coerceAtLeast(1)
+        for (i in 0..steps) {
+            if (!scope.isActive) return
+            val gain = (startGain + (target - startGain) * (i / steps.toFloat())).coerceIn(0f, 1f)
+            val cross = (i / crossSteps.toFloat()).coerceIn(0f, 1f)
+            sessionPlayer.volume = gain * cross
+            overlapPlayer.volume = gain * (1f - cross)
+            if (i < steps) delay(STEP_MS)
+        }
     }
 
     private suspend fun animateDualVolume(
@@ -246,6 +411,14 @@ class CrossfadeEngine(
 
     companion object {
         private const val STEP_MS = 60L
+        private const val MIN_SPEED = 0.25f // Batch 627 — pelindung bagi dengan kecepatan 0
+        private const val POLL_ACTIVE_MS = 250L // Batch 668 — selang polling dekat/di jendela crossfade (nilai lama)
+        private const val POLL_FAR_MS = 1000L // Batch 668 — main & jendela masih jauh
+        private const val POLL_PAUSED_MS = 2000L // Batch 668 — dijeda
+        private const val POLL_FAR_MARGIN_MS = 2500L // Batch 668 — sisa NYATA sebelum jendela agar boleh tidur 1 dtk
         private const val HANDBACK_MS = 400L
+        // Batch 366 — ambang toleransi float utk anggap "sudah 0", dipakai konsisten di semua
+        // pengecekan (dulu ada yang exact `<= 0f`, ada yang `<= 0.01f`, tidak konsisten).
+        private const val VOLUME_EPSILON = 0.01f
     }
 }

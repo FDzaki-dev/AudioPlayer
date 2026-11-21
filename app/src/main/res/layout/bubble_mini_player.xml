@@ -1,19 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Roadmap #11 — Floating Mini Player. Sengaja reuse drawable widget home-screen apa adanya
-     (widget_background.xml, widget_play_button_bg.xml, ic_widget_*.png) — identitas visual
-     bubble & widget jadi konsisten otomatis, dan 0 asset baru perlu dibuat. Selalu varian
-     GELAP (bukan widget_background_light) — bubble mengambang di atas app APAPUN termasuk yang
-     bertema terang, jadi butuh 1 kontras yang konsisten & jelas terbaca di semua kondisi
-     background, bukan ikut light/dark toggle in-app seperti widget. -->
+<!-- Roadmap #11 — Floating Mini Player.
+
+     Batch 660 — ROMBAK TOTAL ke skin SPACE 🌌 (selalu, terlepas dari tema in-app: bubble mengambang di atas app
+     APAPUN, jadi satu identitas gelap-kosmos yang konsisten). Latar & kenop TIDAK lagi memakai drawable widget
+     (widget_background/widget_key_bg/widget_play_button_bg — itu tetap milik widget home-screen, tak diubah);
+     semuanya di-set dari FloatingBubbleService.applySpaceSkin() karena berupa Drawable animasi buatan kode
+     (SpaceBubbleSkin.kt): panel = kapsul kosmos (nebula, bintang berkelip, meteor, kilatan kaca, rim sweep
+     cyan-violet-rose), sampul = "planet" bulat berhalo + cincin + bulan mengorbit, Play = orb berpendar,
+     Prev/Next = kenop kristal. Tinggi panel 62dp = 9 + orb 44 + 9 -> ujung kiri kapsul (jari-jari 31dp) KONSENTRIS
+     dgn sampul (padding kiri 11 + 20 = 31dp). Hierarki ImageView/ID TIDAK berubah (TouchDelegate album art
+     Batch 470-472 memakai getHitRect() yang sama). Warna glyph (tint di-set dari kode: putih-kebiruan; glyph Play = navy tua di atas
+     orb cyan terang, kontras ~10:1). Chevron minimize sengaja tanpa kenop + alpha 0.72 (aksi sekunder). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/bubble_root"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:background="@drawable/widget_background"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:padding="8dp"
-    android:elevation="8dp">
+    android:paddingStart="11dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="9dp"
+    android:paddingBottom="9dp"
+    android:elevation="10dp">
 
     <ImageView
         android:id="@+id/bubble_album_art"
@@ -24,10 +32,10 @@
 
     <ImageButton
         android:id="@+id/bubble_prev"
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:layout_marginStart="6dp"
-        android:padding="5dp"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginStart="8dp"
+        android:padding="8dp"
         android:background="@android:color/transparent"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_widget_previous"
@@ -35,35 +43,35 @@
 
     <ImageButton
         android:id="@+id/bubble_play_pause"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
         android:layout_marginStart="4dp"
-        android:padding="9dp"
-        android:background="@drawable/widget_play_button_bg"
+        android:padding="13dp"
+        android:background="@android:color/transparent"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_widget_play"
         android:contentDescription="Putar" />
 
     <ImageButton
         android:id="@+id/bubble_next"
-        android:layout_width="28dp"
-        android:layout_height="28dp"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
         android:layout_marginStart="4dp"
-        android:padding="5dp"
+        android:padding="8dp"
         android:background="@android:color/transparent"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_widget_next"
         android:contentDescription="Berikutnya" />
 
-    <!-- Batch 100 — minimize ke tepi layar (BUKAN tombol close/dismiss, lihat FloatingBubbleService
-         KDoc). Ukuran hit-area sengaja sama dengan bubble_prev/bubble_next (28dp) biar konsisten,
-         padding lebih besar karena glyph chevron lebih kecil dari ikon widget play/prev/next. -->
+    <!-- Batch 100 — minimize ke tepi layar (BUKAN tombol close/dismiss, lihat FloatingBubbleService KDoc).
+         Batch 660: glyph di-tint abu-lavender Space (dari kode), tetap tanpa kenop + alpha 0.72. -->
     <ImageButton
         android:id="@+id/bubble_minimize"
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:layout_marginStart="2dp"
-        android:padding="7dp"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:layout_marginStart="6dp"
+        android:padding="6dp"
+        android:alpha="0.72"
         android:background="@android:color/transparent"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_bubble_minimize"

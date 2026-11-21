@@ -4,13 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.chrisbanes.haze.hazeEffect
 
 /**
  * Readable glass surface for Compose.
@@ -61,7 +60,11 @@ fun Modifier.frostedGlass(
     // lever performa, dan user kali ini tidak melaporkan masalah visibilitas. Kalau stutter
     // masih terasa di 24dp, lever berikutnya yang harus dicoba adalah radius lebih rendah lagi
     // atau meninjau frekuensi re-render MiniPlayerBar saat progress lagu jalan — BUKAN tint.
-    blurRadius: Dp = 24.dp
+    blurRadius: Dp = 24.dp,
+    // Batch 553 — false = lewati bayangan jatuh luar (`neuHollowShadow()`). Untuk konten DI DALAM
+    // `ModalBottomSheet`: Surface sheet meng-clip ke bentuknya sendiri, jadi bayangan di luar batas
+    // panel tak pernah terlihat — hanya biaya gambar per frame selama sheet beranimasi/ditarik.
+    outerShadow: Boolean = true
 ): Modifier {
     // Batch 296 — blurRadius was "kept for source compatibility, unused" since Batch 53; now
     // wired to real Haze blur (see `requestedBlurRadius` below) for Liquid Glass specifically.
@@ -75,6 +78,8 @@ fun Modifier.frostedGlass(
     // Batch 310 — Aurora rim-glow per-panel: needed below for the same reason as isLiquidGlass
     // above, its own edgeBrush branch instead of the generic `else`.
     val isAurora = isAuroraTheme()
+    // Batch 656 — Space: rim panel kosmik (cyan -> violet -> rose), cabang sendiri supaya tidak jatuh ke `else` netral.
+    val isSpace = isSpaceTheme()
     val isDark = LocalIsDarkTheme.current
     // Shape now follows the active theme's own shape tokens instead of a hardcoded 24dp —
     // otherwise every sheet/mini-player using this modifier would keep Apple's soft rounding
@@ -143,7 +148,16 @@ fun Modifier.frostedGlass(
     // yang sudah pernah lolos 1 putaran tuning device dulu, kini blocker-nya sudah tuntas.
     // `blurRadius` (32dp, Batch 298) & gap dark/light (0.10) TETAP tidak disentuh, sama alasan
     // seperti sebelumnya (lever yang relevan cuma tint, bukan radius/kontras).
-    val liquidGlassAlpha = if (isDark) 0.38f else 0.48f
+    // Batch 329 — `hazeEffect` DIMATIKAN PERMANEN app-wide (keputusan user: "matikan blur asli
+    // sepenuhnya, balik ke tint solid" — opsi paling aman, lihat rasionalisasi penuh di
+    // `glassBase` bawah). Nilai 0.38f/0.48f di atas SENGAJA diasumsikan blur asli ADA di
+    // baliknya (persis rasionalisasi Batch 296/299/325 di atas) — sekarang blur itu dimatikan,
+    // tint SENDIRIAN wajib menanggung penuh keterbacaan tanpa backdrop tersaring di belakangnya.
+    // BUKAN angka baru/tebakan: reuse persis fallback "0 blur terlihat, tint sendiri wajib jaga
+    // keterbacaan" yang sudah pernah shipped & valid Batch 311-324 (0.85f gelap / 0.90f terang)
+    // — skenario itu dulu darurat/sementara (bug cross-window blur belum ketemu), sekarang jadi
+    // status permanen dengan kebutuhan visual yang identik: tint tanpa blur di baliknya.
+    val liquidGlassAlpha = if (isDark) 0.85f else 0.90f
     val effectiveAlpha = if (isSkeu) 1f else if (isLiquidGlass) liquidGlassAlpha else alpha
     // Batch 53 — spec §8 "Glass edge / highlight" + §9 "Lighting model" (single simulated light,
     // top-left -> bottom-right): a flat single-color border reads as a printed outline, not
@@ -152,7 +166,23 @@ fun Modifier.frostedGlass(
     // bespoke per-corner draw. Batch 61 — both Tactile and Skeu now branch on `isDark` for their
     // own light-tuned token pair (Color.kt "LIGHT VARIANT" sections); Apple's flat branch already
     // handled its own light/dark via the background comparison below, unchanged.
-    val edgeBrush = when {
+    // Batch 396 — `frostedGlass()` adalah titik shared 12+ call site app-wide (komentar Batch
+    // 281 di bawah) TERMASUK `MiniPlayerBar`, yang badan composable-nya (Batch 353's komentar
+    // sendiri, `MiniPlayerBar.kt`) SENGAJA membaca `playbackProgress` LANGSUNG di scope yang SAMA
+    // supaya tick posisi tiap detik "cuma invalidasi MiniPlayerBar ini sendiri" — tapi itu berarti
+    // SELURUH badan `MiniPlayerBar` (termasuk pemanggilan `.frostedGlass()` ini) tetap recompose
+    // tiap detik SELAMA musik main. Sebelum batch ini, `edgeBrush` (`when` block di bawah)
+    // dibangun ULANG dari nol di SETIAP recomposition itu — padahal isi 4 cabangnya (Tactile/
+    // LiquidGlass/Aurora/else) 100% cuma bergantung pada identitas tema + isDark, yang TIDAK
+    // pernah berubah selama playback jalan (beda dari kasus Batch 328 di atas, yang akarnya
+    // phase ANIMASI ikut dibaca di sini — itu sudah dihapus balik, bukan yang disentuh batch
+    // ini). `MaterialTheme.colorScheme.onSurface`/`.background` dibaca SEKALI ke `val` biasa DI
+    // LUAR `remember{}` (pola persis fix Batch 393 utk `@DisallowComposableCalls`) sebelum jadi
+    // remember key/dipakai di dalam lambda — bukan dipanggil ulang di dalamnya.
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val themeBackgroundColor = MaterialTheme.colorScheme.background
+    val edgeBrush = remember(isTactile, isLiquidGlass, isAurora, isSpace, isDark, onSurfaceColor, themeBackgroundColor) {
+        when {
         isTactile -> Brush.linearGradient(
             colors = if (isDark) listOf(TactileHighlight, TactileEdge) else listOf(TactileLightHighlight, TactileLightEdge)
         )
@@ -200,21 +230,6 @@ fun Modifier.frostedGlass(
         // `auroraGlow()`'s multiplier 1.0x/0.85x/0.6x dari `AuroraGlowAlpha`) + 1 falloff
         // tambahan 0.35x utk stop ke-4 — 0 token warna/alpha baru ditambah ke Color.kt, murni
         // reuse AuroraGreen/Teal/Violet/Magenta + AuroraGlowAlpha yang sudah ada sejak Batch 306.
-        // Batch 310 — sengaja dibiarkan STATIS dulu (bukan animated ala `auroraGlow()`):
-        // `frostedGlass()` dipanggil 12+ call site sekaligus, 12+ `rememberInfiniteTransition`
-        // independen serentak adalah biaya performa baru yang belum pernah diverifikasi device —
-        // titik awal paling aman, dicatat eksplisit sebagai "kandidat animasi kalau user minta
-        // lanjut nanti setelah statis ini terverifikasi visual dulu".
-        // Batch 326 — user minta lanjut ("Aurora statis -> bergerak"), precondition Batch 310
-        // (statis terverifikasi visual device) TERPENUHI (Batch 325). Kekhawatiran performa di
-        // atas DITANGANI, bukan diabaikan: phase TIDAK dihitung di sini — dibaca dari
-        // `LocalAuroraPhase` (Theme.kt), 1 `rememberInfiniteTransition` dipegang 1 titik
-        // (AppNavHost, MainActivity.kt, pola identik `LocalHazeState`/`hazeState` Batch 295) lalu
-        // dibagi ke SEMUA call site rim-glow — 0 transition tambahan per panel, tetap 1 total.
-        // Mekanisme lerp() antar-hue identik `auroraGlow()`; stop ke-4 di-lerp balik ke
-        // AuroraGreen (bukan diam di Magenta) supaya rim terasa "mengalir memutar" penuh, bukan
-        // cuma 3 dari 4 stop yang bergerak. Resep durasi/easing/RepeatMode (20 detik/arah,
-        // LinearEasing, Reverse) disalin persis dari `auroraGlow()` — bukan angka baru.
         // Batch 327 — user (device sungguhan): "terlalu tipis, hampir tak kasat mata", scope
         // dikonfirmasi cuma rim-glow ini (`auroraGlow()`'s wash 0 dikeluhkan, TIDAK disentuh).
         // Base alpha pindah `AuroraGlowAlpha` (0.34f, dipakai bareng ambient wash) →
@@ -224,51 +239,90 @@ fun Modifier.frostedGlass(
         // naik dari alpha efektif 0.119 (0.34×0.35) ke 0.202 (0.44×0.46), ~70% lebih terang di
         // titik paling redup, sementara taper (tiap stop tetap lebih redup dari sebelumnya) tetap
         // dipertahankan supaya rim masih kebaca "memudar", bukan flat solid.
-        isAurora -> {
-            val rimPhase = LocalAuroraPhase.current
-            Brush.linearGradient(
-                colors = listOf(
-                    lerp(AuroraGreen, AuroraTeal, rimPhase).copy(alpha = AuroraRimGlowAlpha),
-                    lerp(AuroraTeal, AuroraViolet, rimPhase).copy(alpha = AuroraRimGlowAlpha * 0.85f),
-                    lerp(AuroraViolet, AuroraMagenta, rimPhase).copy(alpha = AuroraRimGlowAlpha * 0.65f),
-                    lerp(AuroraMagenta, AuroraGreen, rimPhase).copy(alpha = AuroraRimGlowAlpha * 0.46f)
-                )
+        // Batch 328 — DIREVERT ke statis. User (device sungguhan): musik stuttering/mandek saat
+        // diputar + lag/glitch saat swipe sheet "Kontrol Lanjutan". Root cause paling mungkin:
+        // asumsi Batch 326 "1 `rememberInfiniteTransition` dibagi lewat CompositionLocal = aman"
+        // TERBUKTI KELIRU di device sungguhan — berbagi 1 instance memang mengurangi JUMLAH
+        // transition (12+→1), TAPI tidak menghilangkan bahwa phase berubah tiap frame (~16ms)
+        // memicu recomposition brush di SEMUA consumer sekaligus, termasuk `MiniPlayerBar`
+        // (selalu tervisible SELAMA musik main) — bersaing langsung dgn thread audio/UI pas
+        // playback aktif, PLUS sheet "Kontrol Lanjutan" yang juga baca `frostedGlass()` sambil
+        // menangani gesture swipe. Sesuai `STABILITY > Speed`: TIDAK ditambal/dioptimasi lebih
+        // jauh (mis. `derivedStateOf`/throttle) — direvert PENUH ke statis, konsisten rasionalisasi
+        // ASLI Batch 310 yang sempat (keliru) dianggap sudah teratasi Batch 326. `LocalAuroraPhase`
+        // (Theme.kt) & phase computation (`AppNavHost`, MainActivity.kt) DIHAPUS BALIK — bukan
+        // cuma berhenti dipakai di sini (dead CompositionLocal ditinggal = risiko re-enable
+        // ceroboh nanti). Nilai alpha Batch 327 (`AuroraRimGlowAlpha` 0.44f + taper
+        // 0.85x/0.65x/0.46x) TETAP dipertahankan statis — itu bukan penyebab regresi (keluhan user
+        // soal alpha & soal stutter adalah 2 laporan device terpisah), dan sudah correct
+        // rasionalisasinya (level "accent-glow biasa", lihat Batch 327 di atas).
+        isAurora -> Brush.linearGradient(
+            colors = listOf(
+                AuroraGreen.copy(alpha = AuroraRimGlowAlpha),
+                AuroraTeal.copy(alpha = AuroraRimGlowAlpha * 0.85f),
+                AuroraViolet.copy(alpha = AuroraRimGlowAlpha * 0.65f),
+                AuroraMagenta.copy(alpha = AuroraRimGlowAlpha * 0.46f)
             )
-        }
+        )
+        // Batch 656 — Space: 3-stop cyan-pulsar -> violet nebula -> rose nebula, alpha menurun (1.0x/0.8x/0.5x) dari
+        // `SpaceRimGlowAlpha`; STATIS (pelajaran Batch 328: rim beranimasi = recomposition semua panel = stutter).
+        isSpace -> Brush.linearGradient(
+            colors = listOf(
+                SpaceAccent.copy(alpha = SpaceRimGlowAlpha),
+                SpaceNebulaViolet.copy(alpha = SpaceRimGlowAlpha * 0.8f),
+                SpaceNebulaRose.copy(alpha = SpaceRimGlowAlpha * 0.5f)
+            )
+        )
         else -> {
-            val flat = MaterialTheme.colorScheme.onSurface.copy(
-                alpha = if (MaterialTheme.colorScheme.background == AppleLightBackground) 0.14f else 0.24f
+            val flat = onSurfaceColor.copy(
+                alpha = if (themeBackgroundColor == AppleLightBackground) 0.14f else 0.24f
             )
             Brush.linearGradient(colors = listOf(flat, flat))
         }
     }
+    }
     // Batch 58 — Skeu's now-stronger bevel border reads better a hair over the glass-theme
     // hairline (1.dp); Tactile/Apple unchanged.
     val edgeWidth = if (isSkeu) 1.5.dp else 1.dp
-    // Batch 296 — Fase 5 langkah 2/5: `hazeEffect` DITAMBAH, bukan menggantikan tint+edge yang
-    // sudah ada (§3b desain: blur based + tint warna tipis + edge highlight, bukan blur polos
-    // tanpa warna — pola sama CONVX/Apple Liquid Glass asli). Urutan modifier PENTING:
-    // `hazeEffect` dipasang PALING LUAR (di `this`, sebelum `.background()`) supaya draw-nya
-    // paling belakang — blur tergambar duluan, baru tint semi-transparan (`effectiveAlpha` yg
-    // sudah diturunkan di atas) menimpa di atasnya, baru border edge-glow di atas itu lagi.
-    // `hazeState` dari `LocalHazeState` (Batch 295's provider di AppNavHost) — 4 identitas lain
-    // 0 disentuh (tidak pernah masuk cabang ini sama sekali, `this` mereka tetap Modifier
-    // polos apa adanya seperti sebelum batch ini).
-    // Bonus kecil: parameter `blurRadius` fungsi ini (baris atas, default 24.dp) sejak dulu
-    // cuma "kept for source compatibility" — 0 dipakai sama sekali krn dulu 0 blur asli sama
-    // sekali. Sekarang AKHIRNYA benar2 dipakai (utk Liquid Glass), makanya ditangkap ke
-    // `requestedBlurRadius` DULU sebelum masuk lambda `hazeEffect{}` — nama beda sengaja,
-    // krn di DALAM lambda itu `blurRadius` polos akan merujuk ke property `HazeEffectScope`
-    // sendiri (name-shadowing lambda-with-receiver Kotlin), bukan parameter fungsi ini; tanpa
-    // capture ke nama lain duluan, `this.blurRadius = blurRadius` di dalam bisa jadi
-    // self-assign yang salah/no-op.
-    val requestedBlurRadius = blurRadius
-    val glassBase = if (isLiquidGlass) {
-        this.hazeEffect(state = LocalHazeState.current) { this.blurRadius = requestedBlurRadius }
-    } else {
-        this
-    }
-    val base = glassBase.background(tint.copy(alpha = effectiveAlpha), shape)
+    // Batch 329 — `hazeEffect` DIMATIKAN PERMANEN app-wide (keputusan eksplisit user: "matikan
+    // blur asli sepenuhnya, balik ke tint solid" — opsi paling aman dari 2 opsi yang ditawarkan).
+    // Root cause yang mendasari keputusan ini: blur asli baru genuinely aktif di 17/17
+    // ModalBottomSheet sejak Batch 324 (sebelumnya no-op cross-window, root cause Batch 311) —
+    // sheet "Kontrol Lanjutan" + `MiniPlayerBar` (SELALU tervisible & terus resample tiap frame
+    // selama musik main, capture-nya lewat `hazeSource` di window yg sama) adalah persis biaya
+    // GPU per-frame yang sudah diperingatkan sejak param `blurRadius` ini pertama ditambah
+    // (komentar Batch 298/300 di atas: "blur asli Haze resample tiap frame"). Beda dari Batch
+    // 328 (yang cuma revert animasi Aurora) — batch ini mematikan MEKANISME blur asli itu
+    // sendiri, bukan cuma 1 dekorasi di atasnya.
+    // Companion change (`MainActivity.kt`, Protected/edit parsial): `.hazeSource(state =
+    // hazeState)` di Box NavHost DILEPAS juga — kalau cuma `hazeEffect` di sini yang dimatikan
+    // tapi `hazeSource` masih terpasang, capture backdrop tiap frame TETAP jalan tanpa 1
+    // consumer pun, jadi tetap bayar sebagian besar biaya GPU yang justru ingin dihilangkan
+    // batch ini. `hazeState`/`LocalHazeState`/`CompositionLocalProvider` (Theme.kt,
+    // MainActivity.kt) SENGAJA TIDAK dibongkar — dibiarkan reuse persis state Batch 295
+    // ("murni plumbing, 0 consumer, 0 perubahan visual", sebelum Batch 296 menyambungkannya ke
+    // hazeEffect/hazeSource) — precedent yang sudah pernah shipped, jadi 0 risiko baru drpd
+    // membongkar CompositionLocalProvider yang membungkus ratusan baris Scaffold (Batch 295's
+    // komentar sendiri: "badan blok TIDAK di-reindent, minim-diff").
+    // `glassBase` sekarang SELALU `this` (identik ke-4 identitas lain) — tidak ada lagi cabang
+    // isLiquidGlass di sini. Parameter `blurRadius` fungsi ini (default 24.dp) BALIK ke status
+    // "kept for source compatibility, unused" persis pra-Batch-296 — tidak dihapus dari
+    // signature (0 call site di app ini pernah pass eksplisit, grep masih 17/17 tanpa argumen),
+    // supaya tidak mengubah kontrak publik fungsi ini tanpa perlu.
+    // Batch 551 — kedalaman Neumorphism Boomly (`neuHollowShadow()`/`neuBevelOnly()`,
+    // TactileDepth.kt) untuk panel kaca identitas NON-emboss: Apple, Calm Retro, Liquid Glass,
+    // Aurora. Tactile & Neumorphism sengaja dilewati: panel padat mereka sudah dapat mesin yang
+    // sama lewat `tactileEmboss()`/`skeuEmboss()`, dan MiniPlayerBar menumpuk `tactileEmboss()` +
+    // `frostedGlass()` untuk Tactile — menambah di sini = bayangan/bevel ganda. Urutan WAJIB:
+    // bayangan jatuh (hollow: area dalam bentuk dikecualikan supaya tint tembus pandang tak
+    // menggelap) -> background tint -> bevel (di atas tint, bukan tertimbun) -> border tema.
+    // Tanpa `.clip()` (alasan sama komentar LyricsSheet: frostedGlass() tidak boleh memotong anak).
+    val glassDepth = !(isTactile || isSkeu)
+    val glassBase = this
+    val base = glassBase
+        .then(if (glassDepth && outerShadow) Modifier.neuHollowShadow(shape = shape, tint = tint, isDark = isDark) else Modifier)
+        .background(tint.copy(alpha = effectiveAlpha), shape)
+        .then(if (glassDepth) Modifier.neuBevelOnly(shape = shape, tint = tint, isDark = isDark) else Modifier)
     // Batch 79 — NEUMORPHISM: Skeu no longer draws ANY edge/border here at all (was a
     // brushed-metal repeating-stripe rim, Batch 73's isSkeu branch above — deleted along with
     // every other border in this identity's redesign, see TactileDepth.kt's skeuEmboss()).

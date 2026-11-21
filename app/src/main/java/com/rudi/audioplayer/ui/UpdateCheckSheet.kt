@@ -15,8 +15,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rudi.audioplayer.BuildConfig
+import com.rudi.audioplayer.playback.PlaybackService
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.update.UpdateManager
+import com.rudi.audioplayer.util.ShizukuBridge
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Release Downloader Spec — manual-only entry point, never runs on app start. Purely additive:
@@ -27,24 +33,72 @@ import com.rudi.audioplayer.update.UpdateManager
 fun UpdateCheckSheet(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val state by UpdateManager.state.collectAsState()
+    val state by UpdateManager.state.collectAsStateWithLifecycle()
 
+    // Batch 694 — status Shizuku untuk tombol pasang (READY = dipasang TANPA dialog konfirmasi installer). Dibaca di IO (IPC
+    // binder); hasil dialog izin Shizuku -> periksa ulang. Pola sama DiagnosticLogSheet (refreshTick).
+    var shizukuRefresh by remember { mutableIntStateOf(0) }
+    var shizukuState by remember { mutableStateOf(ShizukuBridge.State.NOT_INSTALLED) }
+    LaunchedEffect(shizukuRefresh) {
+        shizukuState = withContext(Dispatchers.IO) { ShizukuBridge.state(context) }
+    }
     DisposableEffect(Unit) {
-        UpdateManager.checkForUpdate(BuildConfig.VERSION_NAME)
-        onDispose { UpdateManager.reset() }
+        val listener = ShizukuBridge.addPermissionListener { shizukuRefresh++ }
+        onDispose { listener?.let { ShizukuBridge.removePermissionListener(it) } }
+    }
+
+    // Batch 339 — BUG FIX (laporan user: "sudah selesai install update package tapi gak sengaja
+    // salah mencet, malah ke cancel dari awal lagi unduhannya"). Root cause: `onDispose` di bawah
+    // SEBELUMNYA panggil `UpdateManager.reset()` TANPA SYARAT tiap sheet ini keluar dari komposisi
+    // (sengaja ditutup ATAU salah ke-tap/ke-dismiss) — termasuk saat state sedang `Downloading`
+    // (thread unduhan TETAP jalan di background, tidak ikut ke-cancel betulan) atau sudah
+    // `ReadyToInstall` (APK SUDAH lengkap di cache). Reset ke Idle di momen itu SIA-SIA membuang
+    // progres asli, dan `checkForUpdate()` di baris atas bakal jalan LAGI dari nol tiap sheet
+    // dibuka ulang — user kelihatannya "harus unduh ulang dari awal" walau APK sebenarnya sudah
+    // ada/lengkap di cache. FIX: skip checkForUpdate() (on-enter) & reset() (on-dispose) SAMA
+    // SEKALI kalau state saat ini `Downloading` atau `ReadyToInstall` — 2 state itu representasi
+    // kerja nyata (unduhan jalan/APK jadi) yang TIDAK BOLEH hilang cuma krn sheet ke-tutup. State
+    // lain (Idle/Checking/UpToDate/Available/Error) — 0 perubahan perilaku, tetap cek ulang tiap
+    // buka & reset tiap tutup seperti sebelumnya (tidak ada progres berarti yang bisa hilang).
+    DisposableEffect(Unit) {
+        val stateOnEnter = UpdateManager.state.value
+        if (stateOnEnter !is UpdateManager.UpdateState.Downloading &&
+            stateOnEnter !is UpdateManager.UpdateState.ReadyToInstall &&
+            stateOnEnter !is UpdateManager.UpdateState.Installing
+        ) {
+            UpdateManager.checkForUpdate(BuildConfig.VERSION_NAME)
+        }
+        onDispose {
+            val stateOnExit = UpdateManager.state.value
+            if (stateOnExit !is UpdateManager.UpdateState.Downloading &&
+                stateOnExit !is UpdateManager.UpdateState.ReadyToInstall &&
+                stateOnExit !is UpdateManager.UpdateState.Installing
+            ) {
+                UpdateManager.reset()
+            }
+        }
     }
 
     // Batch 323 — fix blur lintas-window, pola sama Batch 322 (rasionalisasi penuh di
     // PROJECT_STATE.md Batch 321/322): tambah `containerColor = Color.Transparent` yang kelewat
     // sejak sheet ini dibuat. `Color` sudah diimpor sebelumnya (dipakai fungsi lain file ini).
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
-        // Batch 316 — lanjutan audit Batch 314/315: prioritas 4 dari 5 sheet yang kena pola sama
-        // (Column fixed tanpa verticalScroll/LazyColumn jaring pengaman). Konten pendek di
-        // kebanyakan state (Idle/Checking/UpToDate/Error), TAPI state Available bisa memanjang
-        // (judul + catatan rilis multi-baris + tombol), risiko rendah tapi tetap sama pola.
+        // Batch 339 — BUG FIX (laporan user + screenshot: "tab update masih mengalami regresi
+        // tembus pandang" — teks "Tentang Aplikasi" dari SettingsScreen di belakang kelihatan
+        // tembus/tumpang-tindih). Root cause: `containerColor = Color.Transparent` (Batch 322/323,
+        // syarat WAJIB dari sample resmi Haze) TERNYATA tidak cukup SENDIRIAN — itu cuma matikan
+        // fill solid Material3 default, TIDAK menggambar blur apa pun. Elemen yang benar-benar
+        // menggambar blur adalah `.frostedGlass()` (`BlurUtils.kt`) — dan sheet ini SATU-SATUNYA
+        // (dibanding 12+ call site lain: RingtoneCutterSheet.kt, SongInfoEditSheet.kt, dst) yang
+        // KELEWAT modifier ini sejak dibuat. Transparent TANPA frostedGlass() = benar-benar
+        // tembus pandang (0 blur, 0 fill) — bukan cuma "kurang blur", tapi literally kosong,
+        // konten di baliknya (SettingsScreen) kelihatan penuh tanpa filter. FIX: `.frostedGlass()`
+        // ditambah persis di posisi yang sama seperti RingtoneCutterSheet.kt/SongInfoEditSheet.kt
+        // (setelah `.fillMaxWidth()`, sebelum `.verticalScroll()`) — pola identik, 0 penyesuaian.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp)
@@ -118,8 +172,37 @@ fun UpdateCheckSheet(onDismiss: () -> Unit) {
                         text = "Unduhan selesai — siap instal"
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    Button(onClick = { UpdateManager.launchInstall(context, s.apkFile) }) {
-                        Text("Buka Installer")
+                    // Batch 694 — satu titik pasang: Shizuku READY = senyap (tanpa dialog konfirmasi); selain itu / gagal = installer
+                    // sistem (perilaku lama). Posisi putar disimpan tepat sebelum pasang supaya pemulihan pasca-update tak mundur.
+                    Button(onClick = {
+                        PlaybackService.requestPositionFlush(context)
+                        UpdateManager.install(context, s.apkFile)
+                    }) {
+                        Text(if (shizukuState == ShizukuBridge.State.READY) "Pasang Sekarang (Shizuku)" else "Buka Installer")
+                    }
+                    when (shizukuState) {
+                        ShizukuBridge.State.READY -> {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Shizuku siap — dipasang tanpa dialog konfirmasi.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                        ShizukuBridge.State.NEED_PERMISSION -> {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(onClick = { ShizukuBridge.requestPermission() }) {
+                                Text("Izinkan Shizuku (lewati konfirmasi)")
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
+                is UpdateManager.UpdateState.Installing -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Memasang…")
                     }
                 }
                 is UpdateManager.UpdateState.Error -> {

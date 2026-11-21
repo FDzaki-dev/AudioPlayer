@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.MediaStore
 import androidx.compose.ui.graphics.Color
 import androidx.documentfile.provider.DocumentFile
@@ -23,6 +24,7 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.SafeGuard
 import com.rudi.audioplayer.data.AudiobookModeStore
 import com.rudi.audioplayer.data.Bookmark
 import com.rudi.audioplayer.data.BookmarkStore
@@ -30,6 +32,7 @@ import com.rudi.audioplayer.data.CrossfadeStore
 import com.rudi.audioplayer.data.CustomFolderInfo
 import com.rudi.audioplayer.data.CustomFolderScanner
 import com.rudi.audioplayer.data.CustomFolderStore
+import com.rudi.audioplayer.data.LibraryCacheStore
 import com.rudi.audioplayer.data.FavoritesStore
 import com.rudi.audioplayer.data.LyricsStore
 import com.rudi.audioplayer.data.MusicRepository
@@ -59,20 +62,23 @@ import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 data class PlaybackUiState(
     val currentSong: Song? = null,
     val currentIndex: Int = -1,
     val isPlaying: Boolean = false,
-    val position: Long = 0L,
-    val duration: Long = 0L,
     val shuffleEnabled: Boolean = false,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
     val playbackSpeed: Float = 1f,
@@ -85,9 +91,33 @@ data class PlaybackUiState(
     val queueSlotIds: List<Long> = emptyList()
 )
 
+// Batch 353 (Opsi A — fix struktural, lihat PENDING_FixGlobalLagRecomposition.md) —
+// position/duration SENGAJA dikeluarkan dari PlaybackUiState di atas. Sebelumnya keduanya
+// tick tiap detik LEWAT _uiState yang sama, padahal _uiState itu dikoleksi UTUH di scope atas
+// AppNavHost (MainActivity.kt) buat baca field lain (currentSong, isPlaying, dst) — akibatnya
+// tiap tick posisi memaksa AppNavHost & seluruh sub-tree Compose di bawahnya recompose, bukan
+// cuma bagian yang benar-benar menampilkan posisi. PlaybackProgress ini hidup di StateFlow
+// sendiri (`playbackProgress` di bawah) yang HANYA dikoleksi lokal oleh composable kecil yang
+// betul-betul butuh (MiniPlayerBar.kt, PlaybackProgressRow & WithLivePlaybackProgress di
+// NowPlayingScreen.kt) — bukan lagi di-hoist ke AppNavHost.
+data class PlaybackProgress(
+    val position: Long = 0L,
+    val duration: Long = 0L
+)
+
 class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
+    // Batch 618 — jaring pengaman coroutine ViewModel: galat di `launch` dicatat mentah, tak lagi mematikan app.
+    // Batch 619 — HARUS properti PERTAMA kelas: Kotlin menjalankan initializer properti & blok `init {}` sesuai urutan
+    // teks. Di v618 deklarasi ini ada di baris ~577 padahal `init {}` (baris ~347) sudah memanggil
+    // `launch(Dispatchers.IO + safeHandler)` -> `safeHandler` masih null -> NullPointerException saat ViewModel
+    // dibuat -> aplikasi mati tiap dibuka (crash 9 Nov 16:46, 1.9.30 build 480). JANGAN dipindah ke bawah `init`.
+    private val safeHandler = SafeGuard.handler("PlayerViewModel")
+
     companion object {
+        private const val POSITION_TICK_ACTIVE_MS = 1000L // Batch 537
+        private const val POSITION_TICK_RELAXED_MS = 5000L // Batch 537
+        private const val SLEEP_COUNTDOWN_HIDDEN_MS = 30_000L // Batch 668
         // Gap List #8 — batas berapa kali auto-skip boleh mental beruntun dari error ke error
         // sebelum berhenti total, bukan angka sembarang: cukup toleran untuk beberapa file
         // rusak/hilang tersebar di tengah queue (kasus normal), tapi tetap memutus loop kalau
@@ -106,16 +136,18 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var currentQueue: List<Song> = emptyList()
     private var currentQueueSlotIds: List<Long> = emptyList()
-    private var nextQueueSlotId: Long = 0L
+    // Batch 613 — AtomicLong (SpotBugs AT_NONATOMIC_64BIT_PRIMITIVE x3): penghitung Long ini dinaikkan dari
+    // beberapa fungsi antrean; atomik = tak bisa robek/ganda walau suatu saat dipanggil dari thread lain.
+    private val nextQueueSlotId = AtomicLong(0L)
     // Gap List #8 (Playback error recovery) — jaga-jaga terhadap error beruntun (mis. seluruh
     // sisa queue nunjuk file yang sudah dihapus semua): tanpa batas ini, auto-skip di
     // onPlayerError bisa mental dari 1 lagu rusak ke lagu rusak berikutnya tanpa henti (silent
     // infinite loop, tiap iterasi nembak Snackbar error baru). Direset ke 0 begitu playback
     // beneran jalan lagi (onIsPlayingChanged(true)) — bukan cuma pindah track, harus BENAR
     // ISPLAYING true.
-    private var consecutiveErrorCount = 0
+    private val consecutiveErrorCount = AtomicInteger(0)
 
-    private fun newSlotIds(count: Int): List<Long> = List(count) { nextQueueSlotId++ }
+    private fun newSlotIds(count: Int): List<Long> = List(count) { nextQueueSlotId.getAndIncrement() }
 
     private val favoritesStore = FavoritesStore(appContext)
     private val playbackStateStore = PlaybackStateStore(appContext)
@@ -220,7 +252,12 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     /** Whether the CURRENT song (whatever's playing/loaded right now) has Roadmap #12 opted in —
      * recomputed on every song transition, not a per-song lookup table exposed to the UI. */
     val audiobookModeEnabled: StateFlow<Boolean> = _audiobookModeEnabled.asStateFlow()
-    private val equalizerController = EqualizerController(appContext)
+    // Batch 490 — EqualizerController.getInstance() (shared per-process instance, see its own
+    // Batch 490 doc) instead of a private `EqualizerController(appContext)`. AudioPlayerApplication
+    // now ALSO re-attaches the equalizer this early (fixes EQ resetting to flat when playback
+    // resumes headlessly post app-kill), so this ViewModel must share that SAME instance rather
+    // than construct a second one, or the platform effect would end up double-applied.
+    private val equalizerController = EqualizerController.getInstance(appContext)
     val equalizerState: StateFlow<EqualizerUiState> = equalizerController.state
 
     // --- Visualizer Audio (Roadmap #9, Batch 92) ---
@@ -243,13 +280,57 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
     private val customFolderScanner = CustomFolderScanner(appContext)
 
-    private val _customFolders = MutableStateFlow(loadCustomFolderInfos())
+    // Batch 386 (cold-start optimization, lanjutan Batch 385) — dulu diinisialisasi
+    // `MutableStateFlow(loadCustomFolderInfos())` di sini. `loadCustomFolderInfos()` bukan
+    // pembacaan SharedPreferences murah: tiap folder custom yang tersimpan memanggil
+    // `DocumentFile.fromTreeUri(...).name` (round-trip Binder ke proses DocumentsProvider) DAN
+    // `contentResolver.persistedUriPermissions` (query list izin lewat IPC) — keduanya nyata,
+    // bukan sekadar map lookup, dan berjalan di main thread karena ini property initializer
+    // (dieksekusi saat `PlayerViewModel` dibuat, sinkron, sebelum `MainActivity.onCreate()`
+    // sempat memanggil `setContent {}`).
+    //
+    // Root cause: nilai hasil panggilan ini di constructor TIDAK PERNAH benar-benar terlihat.
+    // `connect()` (dipanggil MainActivity SEGERA setelah delegate `by viewModels` selesai
+    // membuat ViewModel ini, baris yang sama sebelum `setContent {}`) selalu memanggil
+    // `ensureLibraryLoaded()` -> `refreshLibrary()` pada cold start (`libraryLoadedOnce` masih
+    // false), dan `refreshLibrary()` sendiri langsung memanggil ulang
+    // `_customFolders.value = loadCustomFolderInfos()` (lihat di bawah) SEBELUM baris itu
+    // menyentuh `withContext(Dispatchers.IO)` — yaitu masih di stack sinkron yang sama
+    // (`viewModelScope` pakai `Dispatchers.Main.immediate`), sebelum composable mana pun sempat
+    // collect `customFolders` (belum ada composition sama sekali, `setContent {}` belum
+    // dipanggil). Praktiknya: constructor menghitung nilai ini, lalu SEKETIKA dibuang & dihitung
+    // ulang dari nol dengan input yang sama persis — kerja Binder/IPC dobel per folder custom,
+    // 100% percuma, di jalur paling panas cold-start.
+    //
+    // Fix: default `emptyList()` di sini (sama pola dengan `_librarySongs`/`_libraryLoading` —
+    // mulai kosong, diisi `refreshLibrary()`). Nilai akhir yang benar-benar diamati composable
+    // mana pun tetap identik: satu-satunya assignment yang bisa mereka lihat tetap baris
+    // `refreshLibrary()` di bawah, TIDAK diubah batch ini. Zero behavior change untuk semua
+    // user; user TANPA folder custom (`getFolderUris()` kosong) sudah 0 biaya dari awal (map
+    // atas list kosong) — win batch ini murni utk user yang punya >=1 folder custom aktif.
+    private val _customFolders = MutableStateFlow(emptyList<CustomFolderInfo>())
     val customFolders: StateFlow<List<CustomFolderInfo>> = _customFolders.asStateFlow()
     private var userTargetVolume = 1f
-    private var positionTick = 0
+    private val positionTick = AtomicInteger(0)
+    // Batch 537 (baterai) — kadensi loop posisi ADAPTIF. `uiVisible` default true = perilaku lama
+    // persis bila hook ON_START/ON_STOP (MainActivity) tak pernah dipanggil. `positionWake`
+    // (CONFLATED) membangunkan loop seketika saat play/pause/seek/ganti lagu/UI tampil lagi, jadi
+    // tick lambat (5 dtk) tak pernah terlihat sebagai progress bar beku.
+    @Volatile private var uiVisible = true
+    private val positionWake = Channel<Unit>(Channel.CONFLATED)
+    private val sleepCountdownWake = Channel<Unit>(Channel.CONFLATED) // Batch 668 — bangunkan hitung mundur timer tidur
+
+    // Batch 597 — definisi "putaran" = waktu dengar nyata >= min(30 dtk, setengah durasi) (lihat
+    // `PlayCountTracker`); dulu dihitung di tiap pergantian lagu (skip 2 dtk = 1 putaran penuh).
+    private val playCountTracker = PlayCountTracker()
+    private val playCountWake = Channel<Unit>(Channel.CONFLATED)
 
     private val _uiState = MutableStateFlow(PlaybackUiState())
     val uiState: StateFlow<PlaybackUiState> = _uiState.asStateFlow()
+
+    // Batch 353 (Opsi A) — lihat komentar di deklarasi data class PlaybackProgress di atas.
+    private val _playbackProgress = MutableStateFlow(PlaybackProgress())
+    val playbackProgress: StateFlow<PlaybackProgress> = _playbackProgress.asStateFlow()
 
     private val _statsVersion = MutableStateFlow(0)
     val statsVersion: StateFlow<Int> = _statsVersion.asStateFlow()
@@ -273,6 +354,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val sleepTimerStore = com.rudi.audioplayer.data.SleepTimerStore(appContext)
 
     init {
+        startPlayCountWatcher()
         // Gap List #7 (Batch 109) — restore TAMPILAN countdown setelah ViewModel dibuat ulang
         // (mis. proses sempat mati, user buka app lagi selagi Service masih menghitung mundur
         // di background). Eksekusi nyata (pause tepat waktu) tidak bergantung pada blok ini
@@ -282,15 +364,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val endAt = sleepTimerStore.getEndAt()
         if (endAt != null && endAt > System.currentTimeMillis()) {
             _sleepTimerRemaining.value = endAt - System.currentTimeMillis()
-            sleepTimerJob = viewModelScope.launch {
-                while (true) {
-                    val remaining = endAt - System.currentTimeMillis()
-                    if (remaining <= 0) break
-                    _sleepTimerRemaining.value = remaining
-                    delay(1000)
-                }
-                _sleepTimerRemaining.value = null
-            }
+            startSleepTimerCountdown(endAt)
         }
 
         // Batch 314 — EqualizerController already persists bands/preset/enabled to
@@ -306,7 +380,15 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // doc-comment) so every future session ID re-attaches automatically, plus attach once now
         // in case a session already exists (e.g. Service kept playing in the background while this
         // ViewModel was recreated).
-        PlaybackAudioSession.onSessionIdChanged = { id -> equalizerController.attach(id) }
+        // Batch 598 — FIX kebocoran memori: lambda lama `{ id -> equalizerController.attach(id) }` membaca
+        // FIELD ViewModel, jadi menangkap `this` (seluruh PlayerViewModel: daftar library, MediaController,
+        // StateFlow) lalu disimpan di `PlaybackAudioSession` (object = referensi statis seumur proses).
+        // `onCleared()` tak pernah mengosongkannya, sedangkan PlaybackService sengaja tetap hidup setelah
+        // Activity ditutup -> ViewModel yang sudah dibuang tetap tertahan di heap (tekanan GC = lag).
+        // Kini lambda hanya menangkap singleton per-proses (lokal `sharedEqualizer`), bukan ViewModel;
+        // perilaku re-attach identik karena `equalizerController` memang `getInstance()` yang sama.
+        val sharedEqualizer = equalizerController
+        PlaybackAudioSession.onSessionIdChanged = { id -> sharedEqualizer.attach(id) }
         if (PlaybackAudioSession.sessionId != 0) {
             equalizerController.attach(PlaybackAudioSession.sessionId)
         }
@@ -314,8 +396,10 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
 
 
     // A-B Repeat (Roadmap #4, Batch 91) — points live here rather than in PlaybackUiState
-    // because they're checked every 500ms tick in startPositionLoop() and don't need to
-    // trigger a full uiState recomposition on their own; the sheet observes them directly.
+    // because they're checked every tick in startPositionLoop() (1000ms since Batch 352,
+    // was 500ms) and don't need to trigger a full uiState recomposition on their own; the
+    // sheet observes them directly. Batch 352 note: loop-back overshoot past point B can now
+    // be up to ~1s (was ~0.5s) — accepted trade-off of the mitigation, see PENDING_FixGlobalLagRecomposition.md.
     private val _abRepeatPointA = MutableStateFlow<Long?>(null)
     val abRepeatPointA: StateFlow<Long?> = _abRepeatPointA.asStateFlow()
     private val _abRepeatPointB = MutableStateFlow<Long?>(null)
@@ -393,7 +477,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private var pendingTagWriteTags: com.rudi.audioplayer.data.Id3TagWriter.EditableTags? = null
 
     fun requestSaveTags(song: Song, tags: com.rudi.audioplayer.data.Id3TagWriter.EditableTags) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO + safeHandler) {
             when (val result = tagEditor.writeTags(song, tags)) {
                 is com.rudi.audioplayer.data.TagEditor.TagWriteResult.Success -> {
                     showInfoMessage("Metadata disimpan")
@@ -424,7 +508,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
             return
         }
         if (song == null || tags == null) return
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO + safeHandler) {
             when (val result = tagEditor.writeTagsWithConsent(song, tags)) {
                 is com.rudi.audioplayer.data.TagEditor.TagWriteResult.Success -> {
                     showInfoMessage("Metadata disimpan")
@@ -450,7 +534,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         destination: com.rudi.audioplayer.data.RingtoneEncoder.Destination,
         label: String
     ) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO + safeHandler) {
             when (val result = ringtoneEncoder.cut(song, range, destination, label)) {
                 is com.rudi.audioplayer.data.RingtoneEncoder.CutResult.Success ->
                     showInfoMessage("Tersimpan sebagai ${result.destination.label}: ${result.displayName}")
@@ -479,87 +563,148 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private val _libraryLoading = MutableStateFlow(true)
     val libraryLoading: StateFlow<Boolean> = _libraryLoading.asStateFlow()
 
-    private var libraryLoadedOnce = false
+    // Batch 613 — SpotBugs AT_STALE_THREAD_WRITE/AT_NONATOMIC: flag ditulis dari coroutine dan fungsi biasa ->
+    // @Volatile; penghitung generasi = AtomicLong (increment atomik, perbandingan `generation == ...get()`).
+    @Volatile private var libraryLoadedOnce = false
     private var libraryRefreshJob: Job? = null
-    private var libraryRefreshGeneration = 0L
+    private val libraryRefreshGeneration = AtomicLong(0L)
     private val musicRepository = MusicRepository(appContext)
+    // Batch 488 — lihat KDoc `LibraryCacheStore` & `ensureLibraryLoaded()`/`refreshLibrary()`
+    // di bawah untuk root cause + rasional penuh ("app reload setiap dibuka lagi pasca kill").
+    private val libraryCacheStore = LibraryCacheStore(appContext)
+
+    // Batch 476 — beda dari `libraryLoadedOnce` di atas (itu diset TRUE sinkron begitu sebuah
+    // scan DIMULAI, bukan selesai — sinyal "jangan scan dobel", bukan "data sudah ada"). Flag
+    // ini murni penanda "_librarySongs sudah pernah diisi hasil scan asli minimal 1x", satu-
+    // satunya prasyarat data yang valid untuk `maybeSyncMiniPlayerOnColdStart()` memetakan
+    // mediaId → Song. `coldStartSyncDone` mengunci fungsi itu supaya jalan PERSIS 1x per proses
+    // (refresh library berikutnya dari ContentObserver tidak mengulang sync ini).
+    @Volatile private var librarySnapshotLoadedOnce = false
+    @Volatile private var coldStartSyncDone = false
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
-            if (!isPlaying) persistPlaybackState()
-            // Gap List #8 — sinyal paling jujur bahwa playback beneran pulih (bukan cuma
-            // pindah index): reset counter error beruntun di sini, bukan di
-            // onMediaItemTransition (yang juga terpanggil untuk track yang UJUNG-UJUNGNYA error
-            // lagi sebelum sempat isPlaying=true).
-            if (isPlaying) consecutiveErrorCount = 0
+            SafeGuard.guard("PlayerViewModel", "listener.onIsPlayingChanged") {
+                _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
+                // Batch 597 — waktu dengar nyata: hanya jam dinding saat memutar. Bila belum ada sesi (mis. lagu
+                // yang dilanjutkan setelah app dibuka ulang, tanpa pergantian lagu), mulai sesi dari lagu aktif.
+                playCountTracker.setPlaying(isPlaying, SystemClock.elapsedRealtime())
+                if (isPlaying && !playCountTracker.hasItem()) {
+                    _uiState.value.currentSong?.let {
+                        playCountTracker.startItem(it.id, it.duration, SystemClock.elapsedRealtime(), true)
+                    }
+                }
+                playCountWake.trySend(Unit)
+                if (!isPlaying) persistPlaybackState()
+                positionWake.trySend(Unit) // Batch 537: loop posisi cek ulang kadensi + publish segera
+                // Gap List #8 — sinyal paling jujur bahwa playback beneran pulih (bukan cuma
+                // pindah index): reset counter error beruntun di sini, bukan di
+                // onMediaItemTransition (yang juga terpanggil untuk track yang UJUNG-UJUNGNYA error
+                // lagi sebelum sempat isPlaying=true).
+                if (isPlaying) consecutiveErrorCount.set(0)
+            }
+        }
+
+        // Batch 537 (baterai) — seek/skip saat JEDA tak lagi menunggu tick: loop dibangunkan.
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int
+        ) {
+            SafeGuard.guard("PlayerViewModel", "listener.onPositionDiscontinuity") {
+                positionWake.trySend(Unit)
+            }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            val index = controller?.currentMediaItemIndex ?: 0
-            val song = currentQueue.getOrNull(index)
-            _uiState.value = _uiState.value.copy(
-                currentSong = song,
-                currentIndex = index,
-                duration = controller?.duration?.coerceAtLeast(0) ?: 0L
-            )
-            song?.let {
-                playStatsStore.recordPlay(it.id)
-                listeningHistoryStore.recordPlay(it.id)
-                hourlyListenStore.recordPlay()
-                _statsVersion.value += 1
-                checkListeningMilestone()
+            SafeGuard.guard("PlayerViewModel", "listener.onMediaItemTransition") {
+                positionWake.trySend(Unit) // Batch 537
+                val index = controller?.currentMediaItemIndex ?: 0
+                val song = currentQueue.getOrNull(index)
+                _uiState.value = _uiState.value.copy(
+                    currentSong = song,
+                    currentIndex = index
+                )
+                // Batch 353 (Opsi A) — duration pindah rumah ke _playbackProgress. Diupdate
+                // langsung di sini (bukan nunggu tick berikutnya) persis alasan sebelumnya: biar
+                // durasi lagu baru tidak sempat kebaca durasi lagu lama sebelum tick pertama jalan.
+                _playbackProgress.value = _playbackProgress.value.copy(
+                    duration = controller?.duration?.coerceAtLeast(0) ?: 0L
+                )
+                // Batch 597 — TIDAK lagi langsung `recordPlay` di sini: sesi baru dimulai, dihitung nanti oleh
+                // `startPlayCountWatcher()` bila waktu dengar nyata mencapai ambang.
+                if (song != null) {
+                    playCountTracker.startItem(
+                        song.id,
+                        song.duration,
+                        SystemClock.elapsedRealtime(),
+                        controller?.isPlaying == true
+                    )
+                } else {
+                    playCountTracker.clearItem()
+                }
+                playCountWake.trySend(Unit)
+                updateAccentColor(song)
+                _currentRating.value = song?.let { ratingStore.getRating(it.id) } ?: 0
+                persistPlaybackState()
+
+                // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — resume THIS song's own remembered
+                // speed + position, independent of whatever speed the previous track left behind
+                // (that "carries over to every song" behavior is exactly what the roadmap flags as
+                // the thing this feature replaces, per-song, for opted-in files). Skipped on
+                // MEDIA_ITEM_TRANSITION_REASON_REPEAT (REPEAT_MODE_ONE looping the same item) — re-
+                // seeking to a stale saved position on every loop would fight repeat-one's own
+                // restart-from-zero behavior instead of just looping cleanly.
+                val audiobookState = song?.let { audiobookModeStore.get(it.id) }
+                _audiobookModeEnabled.value = audiobookState?.enabled == true
+                if (audiobookState?.enabled == true && reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+                    controller?.setPlaybackSpeed(audiobookState.speed)
+                    if (audiobookState.lastPositionMs > 0) controller?.seekTo(audiobookState.lastPositionMs)
+                }
+
+                // Batch 102 — dulu di sini ada startFadeIn() (fade volume single-player). True
+                // crossfade sekarang seluruhnya dikelola CrossfadeEngine di PlaybackService (dua
+                // ExoPlayer overlap sungguhan) — ViewModel ini cuma pegang MediaController, tidak
+                // punya akses ke ExoPlayer mentah, jadi tidak ada lagi kerja fade di sisi sini sama
+                // sekali. Lihat CrossfadeEngine.kt.
+
+                // A-B Repeat is scoped to one song, never carried to the next — a stale point B
+                // from the previous track would either never trigger (positions rarely line up) or
+                // worse, silently clip the start of a new song if it happened to be short enough.
+                _abRepeatPointA.value = null
+                _abRepeatPointB.value = null
             }
-            updateAccentColor(song)
-            _currentRating.value = song?.let { ratingStore.getRating(it.id) } ?: 0
-            persistPlaybackState()
-
-            // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — resume THIS song's own remembered
-            // speed + position, independent of whatever speed the previous track left behind
-            // (that "carries over to every song" behavior is exactly what the roadmap flags as
-            // the thing this feature replaces, per-song, for opted-in files). Skipped on
-            // MEDIA_ITEM_TRANSITION_REASON_REPEAT (REPEAT_MODE_ONE looping the same item) — re-
-            // seeking to a stale saved position on every loop would fight repeat-one's own
-            // restart-from-zero behavior instead of just looping cleanly.
-            val audiobookState = song?.let { audiobookModeStore.get(it.id) }
-            _audiobookModeEnabled.value = audiobookState?.enabled == true
-            if (audiobookState?.enabled == true && reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
-                controller?.setPlaybackSpeed(audiobookState.speed)
-                if (audiobookState.lastPositionMs > 0) controller?.seekTo(audiobookState.lastPositionMs)
-            }
-
-            // Batch 102 — dulu di sini ada startFadeIn() (fade volume single-player). True
-            // crossfade sekarang seluruhnya dikelola CrossfadeEngine di PlaybackService (dua
-            // ExoPlayer overlap sungguhan) — ViewModel ini cuma pegang MediaController, tidak
-            // punya akses ke ExoPlayer mentah, jadi tidak ada lagi kerja fade di sisi sini sama
-            // sekali. Lihat CrossfadeEngine.kt.
-
-            // A-B Repeat is scoped to one song, never carried to the next — a stale point B
-            // from the previous track would either never trigger (positions rarely line up) or
-            // worse, silently clip the start of a new song if it happened to be short enough.
-            _abRepeatPointA.value = null
-            _abRepeatPointB.value = null
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-            _uiState.value = _uiState.value.copy(shuffleEnabled = shuffleModeEnabled)
+            SafeGuard.guard("PlayerViewModel", "listener.onShuffleModeEnabledChanged") {
+                _uiState.value = _uiState.value.copy(shuffleEnabled = shuffleModeEnabled)
+            }
         }
 
         override fun onRepeatModeChanged(repeatMode: Int) {
-            _uiState.value = _uiState.value.copy(repeatMode = repeatMode)
+            SafeGuard.guard("PlayerViewModel", "listener.onRepeatModeChanged") {
+                _uiState.value = _uiState.value.copy(repeatMode = repeatMode)
+            }
         }
 
         override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
-            _uiState.value = _uiState.value.copy(playbackSpeed = playbackParameters.speed)
+            SafeGuard.guard("PlayerViewModel", "listener.onPlaybackParametersChanged") {
+                _uiState.value = _uiState.value.copy(playbackSpeed = playbackParameters.speed)
+            }
         }
 
         override fun onVolumeChanged(volume: Float) {
-            _uiState.value = _uiState.value.copy(volume = volume)
+            SafeGuard.guard("PlayerViewModel", "listener.onVolumeChanged") {
+                _uiState.value = _uiState.value.copy(volume = volume)
+            }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState == Player.STATE_ENDED) {
-                continuePlaybackIfQueueEnded()
+            SafeGuard.guard("PlayerViewModel", "listener.onPlaybackStateChanged") {
+                if (playbackState == Player.STATE_ENDED) {
+                    continuePlaybackIfQueueEnded()
+                }
             }
         }
 
@@ -567,35 +712,37 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // nothing shown to the user. Logs locally (never transmitted) and tries to keep
         // the music going by skipping to the next queued track when one exists.
         override fun onPlayerError(error: PlaybackException) {
-            val index = controller?.currentMediaItemIndex ?: -1
-            val song = currentQueue.getOrNull(index)
-            val label = song?.let { "${it.title} — ${it.artist}" } ?: "Lagu ini"
-            // Gap List #8 — bedakan alasan gagal (file hilang/izin ditolak/format tidak
-            // didukung/rusak/lainnya) alih-alih 1 pesan generik untuk semua kasus; reason
-            // pendek ini juga yang disimpan ke AppLogger untuk diagnostics, bukan cuma stack
-            // trace mentah.
-            val reason = describePlaybackErrorReason(error)
-            AppLogger.e("PlayerViewModel", "Playback error pada index=$index ($label) — $reason", error)
+            SafeGuard.guard("PlayerViewModel", "listener.onPlayerError") {
+                val index = controller?.currentMediaItemIndex ?: -1
+                val song = currentQueue.getOrNull(index)
+                val label = song?.let { "${it.title} — ${it.artist}" } ?: "Lagu ini"
+                // Gap List #8 — bedakan alasan gagal (file hilang/izin ditolak/format tidak
+                // didukung/rusak/lainnya) alih-alih 1 pesan generik untuk semua kasus; reason
+                // pendek ini juga yang disimpan ke AppLogger untuk diagnostics, bukan cuma stack
+                // trace mentah.
+                val reason = describePlaybackErrorReason(error)
+                AppLogger.e("PlayerViewModel", "Playback error pada index=$index ($label) — $reason", error)
 
-            consecutiveErrorCount++
-            val c = controller
-            if (consecutiveErrorCount >= MAX_CONSECUTIVE_PLAYBACK_ERRORS) {
-                // Skip otomatis TIDAK lagi aman diteruskan — kemungkinan besar sisa queue
-                // bermasalah semua (mis. folder sumbernya baru dicabut/dihapus total). Hentikan
-                // di sini alih-alih terus mental dari 1 track rusak ke track rusak berikutnya
-                // tanpa henti; user dapat 1 pesan jelas, bukan Snackbar error beruntun.
-                c?.pause()
-                _playbackErrorMessage.value =
-                    "Beberapa lagu berturut-turut gagal diputar ($reason). Playback dihentikan — " +
-                        "periksa apakah file/folder musik kamu masih ada."
-                consecutiveErrorCount = 0
-                return
-            }
+                val errorStreak = consecutiveErrorCount.incrementAndGet()
+                val c = controller
+                if (errorStreak >= MAX_CONSECUTIVE_PLAYBACK_ERRORS) {
+                    // Skip otomatis TIDAK lagi aman diteruskan — kemungkinan besar sisa queue
+                    // bermasalah semua (mis. folder sumbernya baru dicabut/dihapus total). Hentikan
+                    // di sini alih-alih terus mental dari 1 track rusak ke track rusak berikutnya
+                    // tanpa henti; user dapat 1 pesan jelas, bukan Snackbar error beruntun.
+                    c?.pause()
+                    _playbackErrorMessage.value =
+                        "Beberapa lagu berturut-turut gagal diputar ($reason). Playback dihentikan — " +
+                            "periksa apakah file/folder musik kamu masih ada."
+                    consecutiveErrorCount.set(0)
+                    return
+                }
 
-            _playbackErrorMessage.value = "$label tidak bisa diputar ($reason)."
-            if (c != null && c.hasNextMediaItem()) {
-                c.seekToNextMediaItem()
-                c.play()
+                _playbackErrorMessage.value = "$label tidak bisa diputar ($reason)."
+                if (c != null && c.hasNextMediaItem()) {
+                    c.seekToNextMediaItem()
+                    c.play()
+                }
             }
         }
     }
@@ -637,24 +784,29 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val toAdd = pool.shuffled().take(20)
         if (toAdd.isEmpty()) return
 
-        // Bug fix (laporan user, radio+shuffle mati total pas antrean benar-benar mentok) —
-        // sebelumnya pakai `c.seekToNextMediaItem()` tepat setelah `c.addMediaItems()`.
-        // MediaController men-cache lokal ("mask") hasil command supaya panggilan berantai
-        // berikutnya terasa sinkron, TAPI resolusi "next" itu bergantung ShuffleOrder yang baru
-        // saja disisipi — saat shuffle aktif & antrean lama sudah benar-benar habis (posisi
-        // sekarang = paling akhir di urutan shuffle lama), item baru bisa ke-mask jatuh SEBELUM
-        // posisi sekarang di urutan shuffle yang baru, jadi `seekToNextMediaItem()` diam-diam
-        // no-op: lagu baru KELIHATAN masuk ke antrean UI (state di-update di bawah) tapi player
-        // tidak pernah lanjut — kedengaran "radio/shuffle mati total". Fix: lompat LANGSUNG ke
-        // index linear pasti dari lagu baru pertama (`c.mediaItemCount` SEBELUM add == posisi
-        // sisip, selalu benar terlepas urutan shuffle) via `seekTo(index, 0)`, tidak lagi
-        // bergantung resolusi "next" ExoPlayer sama sekali.
-        val insertionIndex = c.mediaItemCount
+        // Batch 411 (bugfix laporan user — "shuffle cuma repeat lagu terakhir pas antrean
+        // habis"). Root cause: `seekToNextMediaItem()` lama bergantung `hasNextMediaItem()`/
+        // `getNextMediaItemIndex()` MediaController, yang dibaca dari timeline HASIL MASKING
+        // lokal sisi controller (media3 1.3.1, lihat CrossfadeEngine.kt § kenapa project ini
+        // terkunci versi itu) — masking timeline+shuffle-order abis `addMediaItems()` yang
+        // dipanggil SAMA PERSIS di baris di atas belum tentu langsung tercermin sinkron di
+        // titik ini (round-trip session masih di-flight). Efek nyata: `hasNextMediaItem()`
+        // sempat masih baca state LAMA (sebelum 20 lagu baru ditambah) → false →
+        // seekToNextMediaItem() jadi no-op → c.play() dipanggil selagi player masih
+        // STATE_ENDED di lagu TERAKHIR → ExoPlayer restart lagu itu dari posisi 0 (perilaku
+        // baku play() saat STATE_ENDED) — persis gejala shuffle "repeat lagu terakhir".
+        // Fix: JANGAN andalkan hasNextMediaItem()/shuffle-order controller di titik ini sama
+        // sekali — index lagu baru sudah pasti diketahui (append ke akhir timeline = posisi
+        // `insertIndex`, dibaca SEBELUM addMediaItems dipanggil), dan urutan acaknya sendiri
+        // sudah dibikin lewat `.shuffled()` di atas (pola sama dgn shuffleAll()) — jadi
+        // seekTo(index) langsung ke situ, tidak perlu nunggu/percaya ExoPlayer hitung ulang
+        // next/shuffle order controller-side.
+        val insertIndex = c.mediaItemCount
         c.addMediaItems(toAdd.map { mediaItemFor(it) })
         currentQueue = currentQueue + toAdd
         currentQueueSlotIds = currentQueueSlotIds + newSlotIds(toAdd.size)
         _uiState.value = _uiState.value.copy(queue = currentQueue, queueSlotIds = currentQueueSlotIds)
-        c.seekTo(insertionIndex, 0)
+        c.seekTo(insertIndex, 0L)
         c.play()
     }
 
@@ -665,8 +817,15 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         future.addListener({
             controller = future.get()
             controller?.addListener(playerListener)
+            // Batch 615 — ViewModel kini yang mencatat putaran (service diam; lihat PlayCountOwner).
+            PlayCountOwner.viewModelListening = true
             restoreSavedSpeed()
             startPositionLoop()
+            // Batch 476 — dipanggil di SINI JUGA (bukan cuma di refreshLibrary()): kedua titik
+            // sama-sama no-op aman lewat guard di dalam fungsi kalau prasyarat lain (library
+            // snapshot) belum siap — menutup race urutan connect() vs scan library, mana pun
+            // yang selesai lebih dulu.
+            maybeSyncMiniPlayerOnColdStart()
         }, Executor { it.run() }) // same-thread executor — Guava's directExecutor() had no special behavior beyond this
         ensureLibraryLoaded()
         registerLibraryContentObserver()
@@ -699,9 +858,17 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
                 libraryAutoRefreshJob?.cancel()
-                libraryAutoRefreshJob = viewModelScope.launch {
+                libraryAutoRefreshJob = viewModelScope.launch(safeHandler) {
                     delay(1500)
-                    refreshLibrary()
+                    // Batch 516 [laporan user v515: gesture pilih-lagu "gak ikut jari" + "muncul effect
+                    // Shimmer"] — refresh OTOMATIS ini dulu selalu `refreshLibrary()` non-silent, jadi tiap
+                    // perubahan MediaStore audio (yang tidak dipicu user) menyalakan `_libraryLoading` dan
+                    // `LibraryScreen` mengganti SELURUH daftar lagu dgn ShimmerList — daftar yang sedang
+                    // disentuh/di-sweep hilang dari composition dan gesture-nya putus. Persis alasan Batch 488
+                    // membuat parameter `silent` utk revalidasi background; jalur ini luput. Kalau list SUDAH
+                    // berisi -> silent (data lama tetap tampil, diganti diam-diam saat scan selesai); kalau
+                    // masih kosong -> perilaku lama (shimmer sah, belum ada yang bisa ditampilkan).
+                    refreshLibrary(silent = _librarySongs.value.isNotEmpty())
                 }
             }
         }
@@ -715,23 +882,80 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         libraryContentObserver = observer
     }
 
-    /** Scans MediaStore once and caches the result so Home/Library/Playlist don't each scan independently. */
+    /** Scans MediaStore once and caches the result so Home/Library/Playlist don't each scan
+     *  independently.
+     *
+     *  Batch 488 [laporan urgent user: "app tidak load berulang kali setiap dibuka kembali
+     *  pasca app di kill!!"] — root cause CONFIRMED via pembacaan kode (bukan tebakan):
+     *  `libraryLoadedOnce` di bawah murni in-memory `var`, jadi SETIAP proses baru (app-kill
+     *  lalu dibuka lagi) selalu `false` di sini lagi → full scan MediaStore+SAF dipicu ulang
+     *  dari nol, `_libraryLoading=true` (shimmer skeleton, `HomeScreen`/`LibraryScreen`)
+     *  menutupi list SETIAP app dibuka lagi walau library 0 berubah sejak sesi lalu — sudah
+     *  didokumentasikan sendiri Batch 386/436 sbg "jalur paling panas cold-start"; Batch 436
+     *  waktu itu menyimpulkan ini "expected behavior" & TIDAK di-fix. Batch ini merevisi
+     *  kesimpulan itu.
+     *
+     *  Fix: `LibraryCacheStore` (file baru, lihat KDoc kelasnya) memuat snapshot hasil scan
+     *  TERAKHIR dari disk duluan — kalau ada & tidak kosong, `_librarySongs`/`_libraryLoading`
+     *  diisi LANGSUNG dari situ (list asli tampil seketika, 0 shimmer), lalu
+     *  `refreshLibrary(silent = true)` TETAP jalan seperti biasa di background (menangkap lagu
+     *  baru/dihapus sejak sesi lalu) TANPA memicu shimmer lagi (lihat parameter `silent` &
+     *  KDoc `refreshLibrary()` di bawah). Kalau cache tidak ada/korup/kosong (mis. install
+     *  baru) — turun apa adanya ke `refreshLibrary()` (silent=false, default lama): shimmer
+     *  tetap tampil PERSIS seperti sebelum batch ini, 0 regresi ke satu-satunya kondisi lama
+     *  yang masih berlaku sama persis. */
     fun ensureLibraryLoaded() {
         if (libraryLoadedOnce) return
-        refreshLibrary()
+        libraryLoadedOnce = true
+        viewModelScope.launch(safeHandler) {
+            val cached = withContext(Dispatchers.IO) { libraryCacheStore.load() }
+            if (cached != null && cached.isNotEmpty()) {
+                _librarySongs.value = cached
+                _libraryLoading.value = false
+                librarySnapshotLoadedOnce = true
+                maybeSyncMiniPlayerOnColdStart()
+                refreshLibrary(silent = true)
+            } else {
+                refreshLibrary()
+            }
+        }
     }
 
-    /** Forces a fresh MediaStore scan (used by the Library screen's "Pindai Ulang" button). */
-    fun refreshLibrary() {
+    /** Forces a fresh MediaStore scan (used by the Library screen's "Pindai Ulang" button).
+     *  @param silent Batch 488 — true HANYA untuk revalidasi background otomatis yang dipicu
+     *  `ensureLibraryLoaded()` persis setelah cache-hit (lihat di atas): UI SUDAH menampilkan
+     *  list dari cache, jadi menyalakan `_libraryLoading` lagi di sini cuma mengedipkan shimmer
+     *  di atas data yang sudah kelihatan, tanpa guna. Setiap titik panggil LAMA (pull-to-refresh,
+     *  tombol "Pindai Ulang") TETAP memanggil ini TANPA argumen (default `false`) — 0 perubahan
+     *  perilaku ke keduanya, shimmer/loading feedback saat rescan manual tetap tampil PERSIS
+     *  seperti sebelum batch ini. */
+    fun refreshLibrary(silent: Boolean = false) {
         libraryLoadedOnce = true
         libraryRefreshJob?.cancel()
-        val generation = ++libraryRefreshGeneration
-        libraryRefreshJob = viewModelScope.launch {
-            _libraryLoading.value = true
+        val generation = libraryRefreshGeneration.incrementAndGet()
+        libraryRefreshJob = viewModelScope.launch(safeHandler) {
+            if (!silent) {
+                _libraryLoading.value = true
+            }
             // Gap List #5: refresh the permission-status badge every scan, not just right
             // after add/remove — a grant can be revoked from outside the app at any time
             // with no callback, so "was true last time we checked" can go stale silently.
-            _customFolders.value = loadCustomFolderInfos()
+            //
+            // Batch 419 — sama kelas bug & sumber persis yang diperbaiki Batch 418
+            // (`addCustomFolder`/`removeCustomFolder`): `loadCustomFolderInfos()` melakukan
+            // Binder/IPC nyata per folder custom (`DocumentFile.fromTreeUri(...).name` +
+            // `persistedUriPermissions` query — didokumentasikan Batch 386 di komentar
+            // `_customFolders` di atas), tapi baris ini SEBELUMNYA berjalan di Main
+            // (dispatcher default `viewModelScope.launch`, SEBELUM `withContext(Dispatchers
+            // .IO)` di bawah) — dan fungsi ini dipanggil dari `ensureLibraryLoaded()` pada
+            // SETIAP cold start (Batch 386 sendiri menyebutnya "jalur paling panas
+            // cold-start") plus tombol "Pindai Ulang". Ini panggilan ke-3 dari 3 — 2 lainnya
+            // (`addCustomFolder`/`removeCustomFolder`) sudah dibenerin Batch 418, baris ini
+            // kelewat karena bukan di dalam fungsi yang sama. Fix: bungkus
+            // `withContext(Dispatchers.IO)`, 0 perubahan urutan terhadap baris2 di sekitarnya
+            // (tetap sebelum blok scan MediaStore, tetap di luar try/catch persis seperti
+            // semula — exception-safety TIDAK diubah batch ini, di luar scope fix ini).
+            _customFolders.value = withContext(Dispatchers.IO) { loadCustomFolderInfos() }
             try {
                 val songs = withContext(Dispatchers.IO) {
                     val mediaStoreSongs = musicRepository.getAllSongs()
@@ -767,8 +991,15 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 }
                 // A newer refresh may have started while this scan was running. Never let an
                 // older, slower scan overwrite the newer result.
-                if (generation == libraryRefreshGeneration) {
+                if (generation == libraryRefreshGeneration.get()) {
                     _librarySongs.value = songs
+                    librarySnapshotLoadedOnce = true
+                    maybeSyncMiniPlayerOnColdStart()
+                    // Batch 488 — simpan snapshot ini utk cold-start BERIKUTNYA (lihat KDoc
+                    // `ensureLibraryLoaded()`/`LibraryCacheStore`). Dispatch ke IO terpisah,
+                    // fire-and-forget: gagal/lambatnya penulisan cache TIDAK BOLEH menunda
+                    // assignment `_librarySongs` di atas (UI thread SUDAH update duluan).
+                    viewModelScope.launch(Dispatchers.IO + safeHandler) { libraryCacheStore.save(songs) }
                     // Gap List #9 — orphan cleanup: favorites/ratings/playlist entries pointing
                     // at a song no longer in the freshly-scanned library are dead weight (file
                     // deleted/moved/permission revoked). Deliberately NOT applied to
@@ -793,11 +1024,11 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 // loaded. The next ensureLibraryLoaded() call can retry safely — but the
                 // failure itself is still worth a local record, since it used to vanish here.
                 AppLogger.e("PlayerViewModel", "Gagal memindai library", e)
-                if (generation == libraryRefreshGeneration) {
+                if (generation == libraryRefreshGeneration.get()) {
                     libraryLoadedOnce = false
                 }
             } finally {
-                if (generation == libraryRefreshGeneration) {
+                if (generation == libraryRefreshGeneration.get()) {
                     _libraryLoading.value = false
                 }
             }
@@ -816,37 +1047,61 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     )
 
     /** Grants persistent access to a folder the user picked via the system folder picker,
-     * remembers it, and rescans so its audio shows up immediately. */
+     * remembers it, and rescans so its audio shows up immediately.
+     *
+     * Batch 418 — seluruh body dulu berjalan SINKRON di caller thread (Main — dipanggil
+     * langsung dari `addFolderLauncher` result callback di `LibraryScreen.kt` via
+     * `MainActivity.kt`'s `onAddCustomFolder`, keduanya Main thread biasa, 0 coroutine
+     * wrapper di sisi caller). Isinya BUKAN kerja murah: `takePersistableUriPermission` itu
+     * Binder IPC ke system, dan [loadCustomFolderInfos] sendiri sudah didokumentasikan Batch
+     * 386 (lihat komentar `_customFolders` di atas) melakukan `DocumentFile.fromTreeUri(...)
+     * .name` (round-trip Binder ke proses DocumentsProvider) + `persistedUriPermissions`
+     * (query IPC) PER folder custom — "nyata, bukan sekadar map lookup". Batch 386 sendiri
+     * cuma membereskan constructor (panggilan ganda yang terbuang), TIDAK memindahkan
+     * panggilan yang tersisa ini dari Main — persis kelas bug yang sama dengan
+     * `setThemeIdentity`/`setThemeMode` (Batch 72, lihat komentarnya: "leaving Main-thread I/O
+     * in a newly-added call path is a real bug on its own regardless"). Fix: seluruh body
+     * dipindah ke `viewModelScope.launch(Dispatchers.IO)`, 0 perubahan urutan/logic — murni
+     * dispatcher. `_customFolders`/`_actionErrorMessage` StateFlow aman di-set dari thread
+     * mana pun (atomic), `refreshLibrary()` sendiri sudah aman dipanggil dari coroutine lain
+     * (cuma `launch{}` job baru). */
     fun addCustomFolder(treeUri: Uri) {
-        try {
-            appContext.contentResolver.takePersistableUriPermission(
-                treeUri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        } catch (e: SecurityException) {
-            // Sebelumnya gagal 100% diam-diam — user memilih folder, tidak terjadi apa-apa, dan
-            // tidak ada cara untuk tahu kenapa. Sekarang dicatat dan dikabari lewat Snackbar.
-            AppLogger.e("PlayerViewModel", "Gagal ambil izin folder tambahan", e)
-            _actionErrorMessage.value = "Gagal menambahkan folder — izin ditolak sistem."
-            return
+        viewModelScope.launch(Dispatchers.IO + safeHandler) {
+            try {
+                appContext.contentResolver.takePersistableUriPermission(
+                    treeUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: SecurityException) {
+                // Sebelumnya gagal 100% diam-diam — user memilih folder, tidak terjadi apa-apa, dan
+                // tidak ada cara untuk tahu kenapa. Sekarang dicatat dan dikabari lewat Snackbar.
+                AppLogger.e("PlayerViewModel", "Gagal ambil izin folder tambahan", e)
+                _actionErrorMessage.value = "Gagal menambahkan folder — izin ditolak sistem."
+                return@launch
+            }
+            customFolderStore.addFolder(treeUri.toString())
+            _customFolders.value = loadCustomFolderInfos()
+            refreshLibrary()
         }
-        customFolderStore.addFolder(treeUri.toString())
-        _customFolders.value = loadCustomFolderInfos()
-        refreshLibrary()
     }
 
+    /** Batch 418 — sama kelas bug & fix persis [addCustomFolder] di atas (lihat KDoc-nya):
+     * dulu sinkron di Main (dipanggil dari tombol hapus `FolderManagerSheet.kt` via
+     * `MainActivity.kt`'s `onRemoveCustomFolder`), sekarang dipindah IO. */
     fun removeCustomFolder(uriString: String) {
-        try {
-            appContext.contentResolver.releasePersistableUriPermission(
-                Uri.parse(uriString),
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        } catch (e: Exception) {
-            // Permission may already be gone (e.g. folder moved/deleted) — still forget it locally.
+        viewModelScope.launch(Dispatchers.IO + safeHandler) {
+            try {
+                appContext.contentResolver.releasePersistableUriPermission(
+                    Uri.parse(uriString),
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: Exception) {
+                // Permission may already be gone (e.g. folder moved/deleted) — still forget it locally.
+            }
+            customFolderStore.removeFolder(uriString)
+            _customFolders.value = loadCustomFolderInfos()
+            refreshLibrary()
         }
-        customFolderStore.removeFolder(uriString)
-        _customFolders.value = loadCustomFolderInfos()
-        refreshLibrary()
     }
 
     fun setThemeIdentity(identity: ThemeIdentity) {
@@ -863,7 +1118,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // note). Not the root cause of the widget staying visually frozen across theme
         // switches — see PROJECT_STATE.md for what's still unconfirmed there — but leaving
         // Main-thread I/O in a newly-added call path is a real bug on its own regardless.
-        viewModelScope.launch(Dispatchers.IO) { WidgetUpdater.updateAll(appContext) }
+        viewModelScope.launch(Dispatchers.IO + safeHandler) { WidgetUpdater.updateAll(appContext) }
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -871,7 +1126,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         _themeMode.value = mode
         // Batch 68: this is the call that actually flips the widget's light/dark background.
         // Batch 72: see setThemeIdentity() above — same Main-thread-I/O fix applied here.
-        viewModelScope.launch(Dispatchers.IO) { WidgetUpdater.updateAll(appContext) }
+        viewModelScope.launch(Dispatchers.IO + safeHandler) { WidgetUpdater.updateAll(appContext) }
     }
 
     private fun loadCustomFolderInfos(): List<CustomFolderInfo> =
@@ -895,29 +1150,57 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private fun folderLabelFor(treeUri: Uri): String =
         DocumentFile.fromTreeUri(appContext, treeUri)?.name ?: "Folder Tambahan"
 
+    /** Batch 537 (baterai) — dipanggil MainActivity (ON_START/ON_STOP). Saat UI tak terlihat dan
+     * tak ada A-B repeat aktif, loop posisi turun ke tick 5 dtk (dulu 1 dtk TANPA HENTI, termasuk
+     * saat layar mati/dijeda -> CPU dibangunkan 1x/dtk tanpa ada yang melihat). */
+    fun setUiVisible(visible: Boolean) {
+        uiVisible = visible
+        if (visible) {
+            positionWake.trySend(Unit)
+            sleepCountdownWake.trySend(Unit) // Batch 668
+        }
+    }
+
     private fun startPositionLoop() {
-        viewModelScope.launch {
+        viewModelScope.launch(safeHandler) {
             while (true) {
                 val c = controller
-                if (c != null) {
-                    val position = c.currentPosition.coerceAtLeast(0)
-                    val duration = c.duration.coerceAtLeast(0)
-                    val currentState = _uiState.value
+                var tickMs = POSITION_TICK_ACTIVE_MS
+                // Batch 625 — satu tick yang melempar Exception (mis. controller sudah dilepas) dulu MEMATIKAN loop
+                // posisi ini: progress beku + simpan state berkala berhenti diam-diam. Kini tick gagal dicatat mentah
+                // (throttle SafeGuard) dan loop tetap hidup; `tickMs` tetap default aktif bila gagal sebelum dihitung.
+                SafeGuard.guard("PlayerViewModel", "positionLoop.tick") {
+                    if (c != null) {
+                        val position = c.currentPosition.coerceAtLeast(0)
+                        val duration = c.duration.coerceAtLeast(0)
+                        val currentProgress = _playbackProgress.value
 
-                    // Avoid emitting a new immutable UI state while paused and nothing changed.
-                    // This prevents needless recompositions across the whole player UI.
-                    if (currentState.position != position || currentState.duration != duration) {
-                        _uiState.value = currentState.copy(position = position, duration = duration)
+                        // Batch 353 (Opsi A) — ditulis ke _playbackProgress, BUKAN _uiState lagi
+                        // (lihat komentar di data class PlaybackProgress). Guard "skip kalau sama"
+                        // ini dipertahankan persis seperti sebelumnya, cuma pindah target flow.
+                        if (currentProgress.position != position || currentProgress.duration != duration) {
+                            _playbackProgress.value = PlaybackProgress(position = position, duration = duration)
+                        }
+
+                        if (AbRepeatLogic.shouldLoopBack(position, _abRepeatPointA.value, _abRepeatPointB.value)) {
+                            c.seekTo(_abRepeatPointA.value ?: 0L)
+                        }
+
+                        val tick = positionTick.incrementAndGet()
+                        // Batch 537: tick 1 dtk HANYA saat musik main + (UI terlihat ATAU A-B repeat aktif),
+                        // atau A-B aktif (loop-back butuh presisi). Selain itu tick 5 dtk. Kadensi simpan
+                        // state ~5 dtk dipertahankan: tick 5 dtk -> simpan tiap tick; tick 1 dtk -> tiap 5 tick
+                        // (Batch 352: modulo 5). Dijeda -> tak ada simpan periodik (sudah disimpan di
+                        // onIsPlayingChanged(false)), sama seperti sebelumnya.
+                        val playing = c.isPlaying
+                        val abActive = AbRepeatLogic.isActive(_abRepeatPointA.value, _abRepeatPointB.value)
+                        val relaxed = !abActive && (!playing || !uiVisible)
+                        if (relaxed) tickMs = POSITION_TICK_RELAXED_MS
+                        if (playing && (relaxed || tick % 5 == 0)) persistPlaybackState()
                     }
-
-                    if (AbRepeatLogic.shouldLoopBack(position, _abRepeatPointA.value, _abRepeatPointB.value)) {
-                        c.seekTo(_abRepeatPointA.value ?: 0L)
-                    }
-
-                    positionTick++
-                    if (c.isPlaying && positionTick % 10 == 0) persistPlaybackState()
                 }
-                delay(500)
+                // Tidur sampai timeout ATAU dibangunkan event (play/pause/seek/transisi/UI tampil).
+                withTimeoutOrNull(tickMs) { positionWake.receive() }
             }
         }
     }
@@ -948,7 +1231,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // ~5 detik — crash nyata pertama app ini yang ketahuan lewat crash logger sejak Batch 22.
         val repeatMode = c.repeatMode
         val shuffleEnabled = c.shuffleModeEnabled
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO + safeHandler) {
             playbackStateStore.save(
                 songIds = songIds,
                 index = index,
@@ -967,6 +1250,33 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     /** Fires a one-time celebration the exact play that crosses a milestone total —
      * checking equality (not >=) means it can only ever trigger once per threshold,
      * even though this runs on every single track transition. */
+    /** Batch 597 — pengawas putaran: tidur sampai ada perubahan (lagu/jeda) atau ambang waktu dengar tercapai,
+     * lalu mencatat SEKALI per sesi. Tanpa polling saat jeda. Berjalan di `viewModelScope` (Main). */
+    private fun startPlayCountWatcher() {
+        viewModelScope.launch(safeHandler) {
+            while (isActive) {
+                val wait = playCountTracker.msUntilQualified(SystemClock.elapsedRealtime())
+                if (wait == null) {
+                    playCountWake.receive()
+                } else if (wait > 0L) {
+                    withTimeoutOrNull(wait) { playCountWake.receive() }
+                }
+                val songId = playCountTracker.takeIfQualified(SystemClock.elapsedRealtime()) ?: continue
+                // Batch 625 — galat penyimpanan (prefs/JSON) dulu mematikan watcher: putaran tak tercatat lagi sampai
+                // ViewModel dibuat ulang. Kini dicatat mentah dan loop lanjut.
+                SafeGuard.guard("PlayerViewModel", "playCountWatcher.record") { recordQualifiedPlay(songId) }
+            }
+        }
+    }
+
+    private fun recordQualifiedPlay(songId: Long) {
+        playStatsStore.recordPlay(songId)
+        listeningHistoryStore.recordPlay(songId)
+        hourlyListenStore.recordPlay()
+        _statsVersion.value += 1
+        checkListeningMilestone()
+    }
+
     private fun checkListeningMilestone() {
         val total = playStatsStore.totalPlayCount()
         val message = when (total) {
@@ -986,7 +1296,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // beberapa ekstraksi tumpang tindih — kalau yang lebih lama selesai belakangan, warna
         // aksen lagu yang sudah dilewati bisa menimpa warna lagu yang sedang main sekarang.
         accentColorJob?.cancel()
-        accentColorJob = viewModelScope.launch {
+        accentColorJob = viewModelScope.launch(safeHandler) {
             val color = withContext(Dispatchers.IO) {
                 AccentColorExtractor.extract(appContext, song?.uri)
             }
@@ -1015,6 +1325,151 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         controller?.repeatMode = saved.repeatMode
         controller?.shuffleModeEnabled = saved.shuffleEnabled
         playQueue(resolvedSongs, newIndex, saved.positionMs, autoPlay)
+    }
+
+    /** Batch 476 — reopen sync fix ("mini player reset saat app dibuka kembali"). Sebelum ini,
+     * `_uiState.currentSong` HANYA pernah diisi lewat `onMediaItemTransition` (Player.Listener,
+     * cuma terpanggil saat item BERGANTI) atau aksi eksplisit (`playQueue` dkk) — tidak pernah
+     * dari status controller yang SUDAH berjalan di titik connect(). 2 skenario nyata:
+     * (a) PlaybackService TETAP hidup (Activity/proses UI yang mati, kasus umum app-kill/
+     *     backgrounding, ATAU playback dimulai dari luar UI app — bubble/widget/headset/lock
+     *     screen) — controller baru connect() sudah punya media item aktif. State disinkronkan
+     *     LANGSUNG dari controller (posisi/isPlaying/queue sebenarnya), 0 interupsi ke audio
+     *     yang sedang berjalan (tidak ada play()/pause()/seekTo() dipanggil sama sekali).
+     * (b) PlaybackService ikut mati total (proses baru, fresh cold start) — controller kosong
+     *     (`mediaItemCount == 0`). Reuse `resumeFromSaved(autoPlay = false)` yang SUDAH dipakai
+     *     jalur shortcut "Continue Listening"/tombol Resume HomeScreen — queue terakhir termuat
+     *     & mini player muncul (paused, siap dilanjutkan) TANPA auto-play mengejutkan.
+     * Dijaga `coldStartSyncDone` (dikunci begitu prasyarat controller+library snapshot lengkap,
+     * apa pun hasilnya) supaya PERSIS jalan 1x per proses — refresh library berikutnya dari
+     * ContentObserver (perubahan file di background) tidak boleh mengulang/menimpa state yang
+     * sudah berjalan wajar sejak itu. Skip total kalau `currentSong` sudah terisi lebih dulu
+     * (event transisi/aksi user/shortcut sudah menang duluan) — TIDAK PERNAH menimpa state yang
+     * sudah benar. */
+    private fun maybeSyncMiniPlayerOnColdStart() {
+        if (coldStartSyncDone) return
+        val c = controller ?: return
+        if (!librarySnapshotLoadedOnce) return
+        coldStartSyncDone = true
+        if (_uiState.value.currentSong != null) return
+
+        val allSongs = _librarySongs.value
+        if (c.mediaItemCount > 0) {
+            val songMap = allSongs.associateBy { it.id }
+            val rawIndex = c.currentMediaItemIndex.coerceIn(0, c.mediaItemCount - 1)
+            val currentSongResolved = c.getMediaItemAt(rawIndex).mediaId.toLongOrNull()?.let { songMap[it] }
+                ?: return
+            // mapNotNull, bukan map: sebuah lagu di queue eksternal bisa saja sudah dihapus dari
+            // disk sejak terakhir dimuat — slot itu di-drop, indexOf di bawah cari ulang posisi
+            // currentSongResolved di list yang SUDAH terfilter (bukan percaya index mentah
+            // controller yang mungkin sudah geser akibat drop itu).
+            val items = (0 until c.mediaItemCount).mapNotNull { i ->
+                c.getMediaItemAt(i).mediaId.toLongOrNull()?.let { songMap[it] }
+            }
+            val newIndex = items.indexOf(currentSongResolved).takeIf { it >= 0 } ?: 0
+            currentQueue = items
+            currentQueueSlotIds = newSlotIds(items.size)
+            _uiState.value = _uiState.value.copy(
+                currentSong = currentSongResolved,
+                currentIndex = newIndex,
+                isPlaying = c.isPlaying,
+                shuffleEnabled = c.shuffleModeEnabled,
+                repeatMode = c.repeatMode,
+                playbackSpeed = c.playbackParameters.speed,
+                volume = c.volume,
+                queue = items,
+                queueSlotIds = currentQueueSlotIds
+            )
+            _playbackProgress.value = PlaybackProgress(
+                position = c.currentPosition.coerceAtLeast(0L),
+                duration = c.duration.coerceAtLeast(0L)
+            )
+            updateAccentColor(currentSongResolved)
+            _currentRating.value = ratingStore.getRating(currentSongResolved.id)
+        } else {
+            resumeFromSaved(allSongs, autoPlay = false)
+        }
+    }
+
+    /** Batch 476 — "mini player bisa dicancel". Swipe-dismiss di [MiniPlayerBar] memanggil ini:
+     * hentikan playback SEPENUHNYA (bukan cuma sembunyikan bar) dan kosongkan antrean session —
+     * mempertahankan playback di belakang layar padahal bar-nya sendiri sudah "dibuang" pengguna
+     * akan terasa seperti bug (kontrol hilang, notifikasi/bubble masih ada tanpa cara balik yang
+     * jelas selain buka Now Playing lewat jalur lain). Turut menyimpan state kosong lewat
+     * `playbackStateStore.save()` yang SUDAH ADA (bukan API baru) dengan `songIds` kosong — dibaca
+     * `PlaybackStateStore.load()`: string kosong di-split lalu `ids.isEmpty()` balik null, PERSIS
+     * kondisi "0 saved state" yang sudah ditangani `resumeFromSaved()`/`peekSavedSong()`. Ini
+     * WAJIB supaya dismiss eksplisit user tidak dibangkitkan lagi oleh sync cold-start (b) di atas
+     * pada proses berikutnya. */
+    fun dismissMiniPlayer() {
+        // Batch 480 — "konfirmasi user" utk dismiss (sebelumnya destruktif, 0 jalan balik sama
+        // sekali). Snapshot dibaca DULU dari controller/uiState di main thread (pola SAMA PERSIS
+        // persistPlaybackState(): repeat/shuffle langsung dari controller SEBELUM apa pun
+        // diubah) — dipakai UndoableAction di bawah SAJA, BUKAN playbackStateStore (baris di
+        // bawah ini sendiri akan menulisnya kosong). Blok clear asli (9 baris) di bawah 0
+        // disentuh sama sekali.
+        val c = controller
+        val dismissedQueue = currentQueue
+        val dismissedIndex = c?.currentMediaItemIndex ?: _uiState.value.currentIndex
+        val dismissedPositionMs = c?.currentPosition?.coerceAtLeast(0L) ?: 0L
+        val dismissedRepeatMode = c?.repeatMode ?: Player.REPEAT_MODE_OFF
+        val dismissedShuffle = c?.shuffleModeEnabled ?: false
+        val dismissedSpeed = _uiState.value.playbackSpeed
+        val dismissedWasPlaying = c?.isPlaying ?: false
+        val dismissedTitle = _uiState.value.currentSong?.title
+
+        controller?.stop()
+        controller?.clearMediaItems()
+        currentQueue = emptyList()
+        currentQueueSlotIds = emptyList()
+        _uiState.value = PlaybackUiState()
+        _playbackProgress.value = PlaybackProgress()
+        _accentColor.value = null
+        _currentRating.value = 0
+        playbackStateStore.save(
+            songIds = emptyList(),
+            index = 0,
+            positionMs = 0L,
+            repeatMode = Player.REPEAT_MODE_OFF,
+            shuffleEnabled = false,
+            speed = 1f
+        )
+
+        if (dismissedQueue.isNotEmpty()) {
+            val message = if (dismissedTitle != null) "\"$dismissedTitle\" dihentikan" else "Pemutaran dihentikan"
+            _undoableAction.value = UndoableAction(message) {
+                restoreDismissedPlayback(
+                    songs = dismissedQueue,
+                    index = dismissedIndex,
+                    positionMs = dismissedPositionMs,
+                    repeatMode = dismissedRepeatMode,
+                    shuffleEnabled = dismissedShuffle,
+                    speed = dismissedSpeed,
+                    wasPlaying = dismissedWasPlaying
+                )
+            }
+        }
+    }
+
+    /** Undo-half of [dismissMiniPlayer] (Batch 480) — pola SAMA PERSIS [reinsertIntoQueue]/
+     * [resumeFromSaved]: pulihkan queue+index+posisi+repeat/shuffle/speed dari snapshot in-memory
+     * yang diambil SEBELUM dismiss (bukan dari playbackStateStore, yang sudah ditulis kosong oleh
+     * dismissMiniPlayer() itu sendiri) lewat playQueue() yang SUDAH ADA — 0 API baru. Shuffle/
+     * repeat diset SEBELUM playQueue() (alasan sama persis komentar resumeFromSaved di atas).*/
+    private fun restoreDismissedPlayback(
+        songs: List<Song>,
+        index: Int,
+        positionMs: Long,
+        repeatMode: Int,
+        shuffleEnabled: Boolean,
+        speed: Float,
+        wasPlaying: Boolean
+    ) {
+        if (songs.isEmpty()) return
+        controller?.repeatMode = repeatMode
+        controller?.shuffleModeEnabled = shuffleEnabled
+        playQueue(songs, index.coerceIn(0, songs.size - 1), positionMs, autoPlay = wasPlaying)
+        controller?.setPlaybackSpeed(speed)
     }
 
     fun playQueue(songs: List<Song>, startIndex: Int, startPositionMs: Long = 0L, autoPlay: Boolean = true) {
@@ -1089,7 +1544,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val insertAt = atIndex.coerceIn(0, currentQueue.size)
         c.addMediaItem(insertAt, mediaItemFor(song))
         currentQueue = currentQueue.toMutableList().apply { add(insertAt, song) }
-        currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { add(insertAt, slotId ?: nextQueueSlotId++) }
+        currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { add(insertAt, slotId ?: nextQueueSlotId.getAndIncrement()) }
         _uiState.value = _uiState.value.copy(
             queue = currentQueue,
             queueSlotIds = currentQueueSlotIds,
@@ -1105,7 +1560,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val item = mediaItemFor(song)
         c.addMediaItem(insertAt, item)
         currentQueue = currentQueue.toMutableList().apply { add(insertAt, song) }
-        currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { add(insertAt, nextQueueSlotId++) }
+        currentQueueSlotIds = currentQueueSlotIds.toMutableList().apply { add(insertAt, nextQueueSlotId.getAndIncrement()) }
         _uiState.value = _uiState.value.copy(queue = currentQueue, queueSlotIds = currentQueueSlotIds, currentIndex = c.currentMediaItemIndex)
         persistPlaybackState()
     }
@@ -1115,7 +1570,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val c = controller ?: return
         c.addMediaItem(mediaItemFor(song))
         currentQueue = currentQueue + song
-        currentQueueSlotIds = currentQueueSlotIds + (nextQueueSlotId++)
+        currentQueueSlotIds = currentQueueSlotIds + nextQueueSlotId.getAndIncrement()
         _uiState.value = _uiState.value.copy(queue = currentQueue, queueSlotIds = currentQueueSlotIds, currentIndex = c.currentMediaItemIndex)
         persistPlaybackState()
     }
@@ -1320,7 +1775,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         val songId = _uiState.value.currentSong?.id ?: return
         val speed = _uiState.value.playbackSpeed
         audiobookModeStore.setEnabled(songId, enabled, speed)
-        if (enabled) audiobookModeStore.updateProgress(songId, speed, _uiState.value.position)
+        // Batch 353 (Opsi A) — position pindah rumah ke _playbackProgress (lihat data class
+        // PlaybackProgress), _uiState tidak punya field ini lagi.
+        if (enabled) audiobookModeStore.updateProgress(songId, speed, _playbackProgress.value.position)
         _audiobookModeEnabled.value = enabled
     }
 
@@ -1337,7 +1794,8 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     /** Attaches the equalizer to the current playback session. Call when the Equalizer sheet opens.
      * Safe to call repeatedly. */
     fun ensureEqualizerAttached() {
-        equalizerController.attach(PlaybackAudioSession.sessionId)
+        // Batch 613 — aksi pengguna (sheet dibuka) = boleh mengulang sesi yang tadinya gagal; sesi yang sudah terpasang = no-op.
+        equalizerController.attach(PlaybackAudioSession.sessionId, retryFailed = true)
     }
 
     fun setEqualizerEnabled(enabled: Boolean) = equalizerController.setEnabled(enabled)
@@ -1397,8 +1855,26 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         controller?.let { if (it.isPlaying) it.pause() else it.play() }
     }
 
+    /** Batch 489 — QA checklist SONIX v488 gap #1: "tidak ditemukan kontrol Stop musik eksplisit
+     * di UI; terdapat pemanggilan stop() lain yang bukan kontrol playback utama" — merujuk
+     * `controller?.stop()` di dalam [dismissMiniPlayer], yang MEMANG bukan tombol Stop biasa
+     * (fungsi itu juga mengosongkan queue/currentQueueSlotIds/playbackStateStore + menyalakan
+     * UndoableAction — pola "cancel/dismiss", bukan "stop"). Fungsi ini BEDA total: 0 menyentuh
+     * queue/state tersimpan/UndoableAction sama sekali — murni jeda + kembali ke posisi awal,
+     * lagu & antrean tetap utuh, siap diputar lagi dari 0 kapan saja (perilaku "Stop" klasik
+     * pemutar musik). Sengaja pause()+seekTo(0) (BUKAN controller.stop() mentah): stop() Media3
+     * memindahkan player ke STATE_IDLE yang mensyaratkan prepare() ulang sebelum play()
+     * berikutnya — jalur lifecycle itu tidak diaudit batch ini, risiko regresi ke resume/play
+     * lain lebih besar daripada manfaatnya untuk sekadar tombol Stop. */
+    fun stopPlayback() {
+        controller?.let {
+            it.pause()
+            it.seekTo(0L)
+        }
+    }
+
     fun next() = controller?.seekToNextMediaItem() ?: Unit
-    fun previous() = controller?.seekToPreviousMediaItem() ?: Unit
+    fun previous() = controller?.seekToPrevious() ?: Unit
     fun seekTo(positionMs: Long) = controller?.seekTo(positionMs) ?: Unit
 
     fun toggleShuffle() {
@@ -1443,6 +1919,27 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     private fun loadFavoriteIds(): ImmutableSet<Long> =
         favoritesStore.getFavorites().mapNotNull { it.toLongOrNull() }.toPersistentSet()
 
+    // Batch 507 (T2) — loop hitung mundur kosmetik yang sebelumnya duplikat di `init` dan
+    // `setSleepTimer`. Isi loop identik dengan versi lama; hanya dipindah ke satu tempat.
+    private fun startSleepTimerCountdown(endAt: Long) {
+        sleepTimerJob = viewModelScope.launch(safeHandler) {
+            while (true) {
+                // Dihitung ulang dari endAt - now() tiap tick (bukan sekadar decrement lokal)
+                // supaya angka yang ditampilkan tidak drift dari deadline sungguhan yang
+                // dipegang Service, walau app sempat di-throttle di background.
+                val remaining = endAt - System.currentTimeMillis()
+                if (remaining <= 0) break
+                _sleepTimerRemaining.value = remaining
+                // Batch 668 (baterai) — angka mundur ini murni kosmetik; saat UI tak terlihat (layar mati, timer tidur
+                // semalaman) tak ada yang membacanya, jadi tick 1 dtk dulu = bangun 1x/dtk sia-sia. Kini tidur
+                // <=30 dtk (tak melewati endAt) dan dibangunkan [sleepCountdownWake] saat UI tampil lagi.
+                val waitMs = if (uiVisible) 1000L else minOf(SLEEP_COUNTDOWN_HIDDEN_MS, remaining)
+                withTimeoutOrNull(waitMs) { sleepCountdownWake.receive() }
+            }
+            _sleepTimerRemaining.value = null
+        }
+    }
+
     fun setSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()
         val endAt = System.currentTimeMillis() + minutes * 60_000L
@@ -1462,18 +1959,7 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
         // Tapi secara praktis sleep timer cuma bisa dipicu dari UI Now Playing yang mensyaratkan
         // playback sudah berjalan, jadi MediaController.connect() sudah pasti selesai di titik
         // ini.
-        sleepTimerJob = viewModelScope.launch {
-            while (true) {
-                // Dihitung ulang dari endAt - now() tiap tick (bukan sekadar decrement lokal)
-                // supaya angka yang ditampilkan tidak drift dari deadline sungguhan yang
-                // dipegang Service, walau app sempat di-throttle di background.
-                val remaining = endAt - System.currentTimeMillis()
-                if (remaining <= 0) break
-                _sleepTimerRemaining.value = remaining
-                delay(1000)
-            }
-            _sleepTimerRemaining.value = null
-        }
+        startSleepTimerCountdown(endAt)
     }
 
     fun cancelSleepTimer() {
@@ -1487,12 +1973,27 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
     }
 
     override fun onCleared() {
+        // Batch 615 — UI berakhir: serahkan pencatatan putaran ke PlaybackService (pemutaran tanpa UI).
+        PlayCountOwner.viewModelListening = false
         sleepTimerJob?.cancel()
         accentColorJob?.cancel()
         libraryRefreshJob?.cancel()
         libraryAutoRefreshJob?.cancel()
         libraryContentObserver?.let { runCatching { appContext.contentResolver.unregisterContentObserver(it) } }
-        equalizerController.release()
+        // Batch 491 — FIX: root cause of "EQ aktif cuma pas tab dibuka, pasca app-kill balik
+        // flat/default", tepat gejala yang Batch 490 masih belum tuntas. equalizerController
+        // sudah jadi shared per-process singleton sejak Batch 490 (EqualizerController.
+        // getInstance()) — TAPI baris ini (sudah ada sejak sebelum 490) masih me-release()
+        // instance SHARED itu tiap kali ViewModel ini dibuang, bukan cuma milik ViewModel
+        // sendiri lagi. onCleared() terpanggil begitu Activity di-finish (bukan cuma
+        // dikonfigurasi ulang) — termasuk skenario UMUM app di-swipe dari Recents SELAGI
+        // PlaybackService/sesi audio TETAP hidup di background (lihat onTaskRemoved di
+        // PlaybackService.kt: sesi dgn antrean/paused TIDAK ikut mati). Efek Equalizer asli
+        // pun ikut lenyap dari sesi yang MASIH main itu, walau musik terus lanjut — flat sampai
+        // ada re-attach (buka tab Equalizer manual = ensureEqualizerAttached(), ATAU kebetulan
+        // ada onEvents lain yg refire callback). 0 dihapus sekadar dibiarkan tanpa pasangan:
+        // release() yang benar (diikat ke akhir SESI, bukan akhir UI) sekarang di
+        // PlaybackService.onDestroy() — lihat komentar di sana.
         audioVisualizerController.release()
         // Batch 78 — MediaController.releaseFuture() handles BOTH cases correctly: cancels the
         // future if the async connect() handshake hasn't resolved yet, or releases the resolved

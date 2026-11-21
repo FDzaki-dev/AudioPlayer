@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Batch 583/584 — pasangan TERANG widget_key_bg.xml (kenop sekunder di panel perkamen), bentuk & struktur sama
+    (daun diagonal). Rim terang = putih, rim gelap = taupe hangat, permukaan = SkeuNeuSurfaceLight +55% putih.
+    DITEKAN = cekung + pendar burgundy SkeuAccentLight ~16%. Ikon prev/next mode terang diwarnai burgundy oleh
+    WidgetUpdater (PNG ivory tak terbaca di perkamen).
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#FFFFFF" />
+                    <corners
+                        android:topLeftRadius="13dp"
+                        android:topRightRadius="6dp"
+                        android:bottomRightRadius="13dp"
+                        android:bottomLeftRadius="6dp" />
+                </shape>
+            </item>
+            <item android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="315"
+                        android:startColor="#B8AA9C"
+                        android:endColor="#E2D7CB" />
+                    <corners
+                        android:topLeftRadius="13dp"
+                        android:topRightRadius="6dp"
+                        android:bottomRightRadius="13dp"
+                        android:bottomLeftRadius="6dp" />
+                </shape>
+            </item>
+            <item
+                android:left="1.25dp"
+                android:top="1.25dp"
+                android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="315"
+                        android:startColor="#DDD0C2"
+                        android:endColor="#F2E9DF" />
+                    <corners
+                        android:topLeftRadius="11.75dp"
+                        android:topRightRadius="4.75dp"
+                        android:bottomRightRadius="11.75dp"
+                        android:bottomLeftRadius="4.75dp" />
+                </shape>
+            </item>
+            <item
+                android:left="1.25dp"
+                android:top="1.25dp"
+                android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="radial"
+                        android:centerX="0.5"
+                        android:centerY="0.5"
+                        android:gradientRadius="18dp"
+                        android:startColor="#29741C32"
+                        android:endColor="#00741C32" />
+                    <corners
+                        android:topLeftRadius="11.75dp"
+                        android:topRightRadius="4.75dp"
+                        android:bottomRightRadius="11.75dp"
+                        android:bottomLeftRadius="4.75dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#B8AA9C" />
+                    <corners
+                        android:topLeftRadius="13dp"
+                        android:topRightRadius="6dp"
+                        android:bottomRightRadius="13dp"
+                        android:bottomLeftRadius="6dp" />
+                </shape>
+            </item>
+            <item android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="315"
+                        android:startColor="#FFFFFF"
+                        android:endColor="#EADFD3" />
+                    <corners
+                        android:topLeftRadius="13dp"
+                        android:topRightRadius="6dp"
+                        android:bottomRightRadius="13dp"
+                        android:bottomLeftRadius="6dp" />
+                </shape>
+            </item>
+            <item
+                android:left="1.25dp"
+                android:top="1.25dp"
+                android:right="1.25dp"
+                android:bottom="1.25dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="315"
+                        android:startColor="#FDF9F4"
+                        android:endColor="#E8DCCF" />
+                    <corners
+                        android:topLeftRadius="11.75dp"
+                        android:topRightRadius="4.75dp"
+                        android:bottomRightRadius="11.75dp"
+                        android:bottomLeftRadius="4.75dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

@@ -1,5 +1,11 @@
 package com.rudi.audioplayer.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,7 +21,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
@@ -23,6 +28,7 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.SettingsBackupRestore
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,10 +38,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -43,16 +52,35 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.BuildConfig
 import com.rudi.audioplayer.data.Song
-import com.rudi.audioplayer.data.lyrics.LyricsPrefetchStore
 import com.rudi.audioplayer.data.lyrics.LyricsRepository
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
+import com.rudi.audioplayer.ui.theme.SkeuAccentLight
+import com.rudi.audioplayer.ui.theme.SkeuGilt
+import com.rudi.audioplayer.ui.theme.SkeuGiltDeep
+import com.rudi.audioplayer.ui.theme.SkeuRubyHi
+import com.rudi.audioplayer.ui.theme.SkeuWine
+import com.rudi.audioplayer.ui.theme.SkeuWineDeep
+import com.rudi.audioplayer.ui.theme.SkeuWineLit
+import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.colorsFor
+import com.rudi.audioplayer.ui.theme.neuRowTile
+import com.rudi.audioplayer.ui.theme.neuPressTile
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.resolveIsDark
 import com.rudi.audioplayer.ui.theme.Radius
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import kotlinx.coroutines.launch
 
 @Composable
@@ -83,24 +111,30 @@ fun SettingsScreen(
     songs: List<Song> = emptyList(),
     onDeleteSongs: (List<Song>) -> Unit = {}
 ) {
+    // Batch 544 — T11 (layar ke-3): HANYA flag ringan yang tahan rotasi (`rememberSaveable`): log
+    // diagnostik (read-only), seksi Lanjutan, konfirmasi hapus cache lirik. SENGAJA tetap `remember`:
+    // Vault (konten aman), DuplicateFinder (scan berat), UpdateCheck (cek jaringan saat masuk),
+    // BackupRestore + SignatureMatcher (state hasil SAF/payload ikut hilang bila sheet dibuka ulang).
     var showSignatureMatcher by remember { mutableStateOf(false) }
-    var showDiagnosticLog by remember { mutableStateOf(false) }
+    var showDiagnosticLog by rememberSaveable { mutableStateOf(false) }
     var showBackupRestore by remember { mutableStateOf(false) }
     var showDuplicateFinder by remember { mutableStateOf(false) }
     var showVault by remember { mutableStateOf(false) }
-    var showAdvancedSettings by remember { mutableStateOf(false) }
+    var showAdvancedSettings by rememberSaveable { mutableStateOf(false) }
     var showUpdateCheck by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     // Batch 247 — Lyrics offline-first 4/4b. Pola sama Vault/Duplicate/Backup di file ini:
-    // Store dibaca/ditulis LANGSUNG dari sini pakai LocalContext, bukan di-hoist ke
-    // MainActivity — fitur "utilitas" mandiri di file ini semuanya begini, beda dari toggle
-    // playback-behavior lama (shakeToSkipEnabled dst.) yang state-nya di-hoist dari luar.
+    // cache lirik dibersihkan LANGSUNG dari sini pakai LocalContext, bukan di-hoist ke MainActivity.
+    // Batch 659 — saklar "Prefetch Lirik Saat WiFi" + state-nya dicabut (permintaan user).
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var lyricsPrefetchEnabled by remember { mutableStateOf(LyricsPrefetchStore(context).isEnabled()) }
-    var showClearLyricsCacheConfirm by remember { mutableStateOf(false) }
+    var showClearLyricsCacheConfirm by rememberSaveable { mutableStateOf(false) }
 
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        // Batch 377 — PENDING_IosFlingBehavior.md item 5/14.
+        flingBehavior = rememberIosFlingBehavior()
+    ) {
         item {
             Text(
                 "PENGATURAN",
@@ -169,14 +203,20 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(modifier = Modifier.height(20.dp))
-            Text(
+            NeuSectionHeader(
                 "Perilaku Pemutaran",
-                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
+            // Batch 557 — tiap baris pengaturan (switch & navigasi) = tile berkedalaman lewat
+            // `neuRowTile()` (semua tema). Margin 12dp + padding dalam 8dp = 20dp lama: posisi teks
+            // tidak bergeser. Spacer antar tile nav 4dp -> 8dp supaya bayangan tak menimpa tetangga.
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile(active = shakeToSkipEnabled)
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -197,7 +237,11 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile(active = radioAutoContinueEnabled)
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -218,7 +262,11 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile(active = floatingBubbleEnabled)
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -241,7 +289,11 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(
-                modifier = Modifier.padding(horizontal = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .neuRowTile(active = silenceSkipEnabled)
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -263,34 +315,6 @@ fun SettingsScreen(
                     }
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.padding(horizontal = 20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    // Batch 247 — Lyrics offline-first 4/4b. Switch ke-5 section ini, pola
-                    // identik 4 lainnya (title+subtitle+Switch, Spacer 12dp) — beda dari 5
-                    // baris "Alat & Utilitas" yg icon+nav-row, konsisten pembagian row-species
-                    // yg sudah diaudit Batch 217/218 (switch vs nav-row beda afinitas
-                    // interaksi, bukan hal yang perlu disamakan).
-                    Text("Prefetch Lirik Saat WiFi", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "Unduh lirik 10 lagu berikutnya di antrean otomatis saat tersambung " +
-                            "WiFi, supaya sudah tersedia offline duluan",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-                Switch(
-                    checked = lyricsPrefetchEnabled,
-                    onCheckedChange = { enabled ->
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        lyricsPrefetchEnabled = enabled
-                        LyricsPrefetchStore(context).setEnabled(enabled)
-                    }
-                )
-            }
         }
 
         item {
@@ -304,20 +328,20 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(modifier = Modifier.height(20.dp))
-            Text(
+            NeuSectionHeader(
                 "Alat & Utilitas",
-                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onOpenStats() }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp)
+                    .neuPressTile { onOpenStats() }
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.QueryStats, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                NeuNavIcon(Icons.Default.QueryStats)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Statistik Dengar", style = MaterialTheme.typography.bodyMedium)
@@ -331,15 +355,16 @@ fun SettingsScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showBackupRestore = true }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp)
+                    .neuPressTile { showBackupRestore = true }
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.SettingsBackupRestore, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                NeuNavIcon(Icons.Default.SettingsBackupRestore)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Cadangkan & Pulihkan", style = MaterialTheme.typography.bodyMedium)
@@ -353,15 +378,16 @@ fun SettingsScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showDuplicateFinder = true }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp)
+                    .neuPressTile { showDuplicateFinder = true }
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                NeuNavIcon(Icons.Default.ContentCopy)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Deteksi File Duplikat", style = MaterialTheme.typography.bodyMedium)
@@ -375,15 +401,16 @@ fun SettingsScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showVault = true }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp)
+                    .neuPressTile { showVault = true }
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                NeuNavIcon(Icons.Default.Lock)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Vault Lagu Privat", style = MaterialTheme.typography.bodyMedium)
@@ -399,15 +426,16 @@ fun SettingsScreen(
         item {
             // Batch 247 — Lyrics offline-first 4/4b. Item ke-5 grup "Alat & Utilitas", pola
             // identik 4 lainnya (Spacer 4dp, icon+title+subtitle, row seluruhnya .clickable).
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showClearLyricsCacheConfirm = true }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp)
+                    .neuPressTile { showClearLyricsCacheConfirm = true }
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                NeuNavIcon(Icons.Default.DeleteSweep)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Hapus Cache Lirik", style = MaterialTheme.typography.bodyMedium)
@@ -425,91 +453,84 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(modifier = Modifier.height(20.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showAdvancedSettings = !showAdvancedSettings }
-                    .padding(horizontal = 20.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // Batch 659 — hierarki "Lanjutan" dipertegas (user: "rawan gak kelihatan"). Dulu = teks judul polos
+            // (titleMedium) + chevron kecil tanpa wadah -> terbaca sebagai label seksi biasa, bukan kontrol yang
+            // bisa dibuka. Kini: TINGKAT 1 = tile tekan (ikon + judul + ringkasan isi + tombol chevron bulat yang
+            // berputar), TINGKAT 2 = label subgrup (Keamanan / Alat Developer) bertitik aksen, TINGKAT 3 = baris
+            // isi; TINGKAT 2-3 menjorok di bawah garis pemandu aksen di kiri supaya jelas "milik Lanjutan".
+            // Logika/aksi/state (`showAdvancedSettings` tetap rememberSaveable = tahan rotasi) TIDAK berubah.
+            AdvancedGroupHeader(
+                expanded = showAdvancedSettings,
+                onToggle = { showAdvancedSettings = !showAdvancedSettings }
+            )
+
+            AnimatedVisibility(
+                visible = showAdvancedSettings,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Lanjutan", style = MaterialTheme.typography.titleMedium)
+                val guideColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                Column(
+                    modifier = Modifier
+                        .padding(start = 20.dp, top = 12.dp)
+                        .drawBehind {
+                            val lineWidth = 2.dp.toPx()
+                            drawLine(
+                                color = guideColor,
+                                start = Offset(lineWidth / 2f, 0f),
+                                end = Offset(lineWidth / 2f, size.height),
+                                strokeWidth = lineWidth,
+                                cap = StrokeCap.Round
+                            )
+                        }
+                        .padding(start = 8.dp)
+                ) {
+                    AdvancedSubgroupLabel("Keamanan")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AppLockSection(
+                        lockEnabled = lockEnabled,
+                        biometricEnabled = biometricEnabled,
+                        biometricAvailable = biometricAvailable,
+                        onSetPin = onSetPin,
+                        onDisableLock = onDisableLock,
+                        onToggleBiometric = onToggleBiometric
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+                    AdvancedSubgroupLabel("Alat Developer")
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "Kunci PIN, sidik jari, dan alat developer — nggak wajib disentuh",
+                        "Bukan untuk penggunaan sehari-hari — dipakai untuk mengecek APK sebelum instal update manual.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(start = 22.dp, end = 8.dp)
                     )
-                }
-                Icon(
-                    if (showAdvancedSettings) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (showAdvancedSettings) "Tutup Lanjutan" else "Buka Lanjutan",
-                    tint = MaterialTheme.colorScheme.secondary
-                )
-            }
-
-            if (showAdvancedSettings) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "Keamanan",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                AppLockSection(
-                    lockEnabled = lockEnabled,
-                    biometricEnabled = biometricEnabled,
-                    biometricAvailable = biometricAvailable,
-                    onSetPin = onSetPin,
-                    onDisableLock = onDisableLock,
-                    onToggleBiometric = onToggleBiometric
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-                Text(
-                    "Alat Developer",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "Bukan untuk penggunaan sehari-hari — dipakai untuk mengecek APK sebelum instal update manual.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showSignatureMatcher = true }
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Fingerprint,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Cek Signature APK", style = MaterialTheme.typography.bodyMedium)
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDiagnosticLog = true }
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.BugReport,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Log Diagnostik", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .neuPressTile { showSignatureMatcher = true }
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        NeuNavIcon(Icons.Default.Fingerprint)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Cek Signature APK", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                            .neuPressTile { showDiagnosticLog = true }
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        NeuNavIcon(Icons.Default.BugReport)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Log Diagnostik", style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
         }
@@ -518,9 +539,8 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(modifier = Modifier.height(20.dp))
-            Text(
+            NeuSectionHeader(
                 "Tentang Aplikasi",
-                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -548,15 +568,12 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showUpdateCheck = true }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp)
+                    .neuPressTile { showUpdateCheck = true }
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.SettingsBackupRestore,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary
-                )
+                NeuNavIcon(Icons.Default.SettingsBackupRestore)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Cek Update", style = MaterialTheme.typography.bodyMedium)
@@ -636,311 +653,176 @@ fun SettingsScreen(
     }
 }
 
-// Batch 61 — dulu (Batch 60) toggle ini punya cabang `isCustomTheme` yang men-disable "Mode
-// Gelap" saat Tactile/Skeu aktif (karena keduanya dulu dark-only). Sekarang KETIGA identitas
-// otonom di kedua mode, jadi toggle ini murni soal ThemeMode saja — tidak lagi butuh tahu
-// identitas apa yang sedang aktif sama sekali (parameter identity dihapus total).
+// Batch 659 — TINGKAT 1 hierarki "Lanjutan": tile tekan (`neuPressTile`, tampilan sama di 7 tema) berisi ikon,
+// judul, ringkasan isi, dan tombol chevron bulat berwarna aksen yang berputar 180° saat dibuka. Chevron dulu
+// ikon polos tint secondary tanpa wadah (nyaris tak terlihat); wadah bulat = penanda "bisa dibuka".
 @Composable
-private fun ThemeModeToggleSection(currentThemeMode: ThemeMode, onSelectThemeMode: (ThemeMode) -> Unit) {
-    val followSystem = currentThemeMode == ThemeMode.SYSTEM
-    // Preferensi gelap/terang yang "diingat" toggle ini walau lagi disabled (Ikuti Sistem ON).
-    val isDarkChecked = currentThemeMode != ThemeMode.LIGHT
-
-    Surface(
+private fun AdvancedGroupHeader(expanded: Boolean, onToggle: () -> Unit) {
+    val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "lanjutanChevron")
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .clip(RoundedCornerShape(Radius.xl)),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 4.dp
+            .padding(horizontal = 12.dp)
+            .neuPressTile { onToggle() }
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Ikuti Sistem", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "Otomatis menyesuaikan mode terang/gelap perangkat",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-                Switch(
-                    checked = followSystem,
-                    onCheckedChange = { checked ->
-                        onSelectThemeMode(
-                            when {
-                                checked -> ThemeMode.SYSTEM
-                                isDarkChecked -> ThemeMode.DARK
-                                else -> ThemeMode.LIGHT
-                            }
-                        )
-                    }
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Mode Gelap", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        when {
-                            followSystem -> "Nonaktif — mengikuti pengaturan sistem"
-                            isDarkChecked -> "Aktif — berlaku untuk tema apa pun yang dipilih"
-                            else -> "Nonaktif — berlaku untuk tema apa pun yang dipilih"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-                Switch(
-                    checked = isDarkChecked,
-                    enabled = !followSystem,
-                    onCheckedChange = { checked ->
-                        onSelectThemeMode(if (checked) ThemeMode.DARK else ThemeMode.LIGHT)
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ThemeOptionCard(identity: ThemeIdentity, isDark: Boolean, selected: Boolean, onClick: () -> Unit) {
-    // Batch 61 — dulu preview selalu pakai resolveIsDark(theme) (identitas kustom hardcode
-    // gelap). Sekarang isDark datang dari mode aktif (param), jadi preview live INI benar-benar
-    // menunjukkan bagaimana identitas tersebut tampil di mode yang lagi dipilih user —
-    // demonstrasi langsung bahwa identitasnya sekarang otonom, bukan asumsi statis lagi.
-    val previewColors = colorsFor(identity, isDark)
-    // Batch 49: the Tactile row in this exact picker is the app's own showcase —
-    // it should demonstrate the depth treatment live, not sit flat like every other row.
-    // Batch 57: Skeuomorphism Dark Lite gets the same live-showcase treatment via its own
-    // skeuEmboss() primitive — both custom "physical panel" identities now demo themselves.
-    val isTactilePreview = identity == ThemeIdentity.TACTILE
-    val isSkeuPreview = identity == ThemeIdentity.SKEU_DARK_LITE
-    val isEmbossPreview = isTactilePreview || isSkeuPreview
-    // Batch 131 — gap terakhir dari audit cakupan Calm Retro: Tactile/Skeu sudah live-showcase
-    // di baris preview masing-masing (emboss di seluruh Surface), tapi identitas Calm Retro
-    // sengaja TIDAK ikut pola itu (Surface-nya tetap flat/opaque, sesuai identitas — lihat Batch
-    // 130). Showcase-nya sendiri diterapkan lebih presisi: sama seperti CTA play/pause asli
-    // (Batch 129), aberrasi cuma di lingkaran aksen 30dp, bukan seluruh kartu.
-    val isCalmRetroPreview = identity == ThemeIdentity.CALM_RETRO
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .then(
-                when {
-                    isTactilePreview -> Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xl), elevation = if (selected) 12.dp else 8.dp)
-                    isSkeuPreview -> Modifier.skeuEmboss(shape = RoundedCornerShape(Radius.xl), elevation = if (selected) 12.dp else 8.dp)
-                    else -> Modifier.clip(RoundedCornerShape(Radius.xl))
-                }
+        NeuNavIcon(Icons.Default.Tune)
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Lanjutan", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Kunci PIN, sidik jari, dan alat developer — nggak wajib disentuh",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary
             )
-            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton),
-        color = if (isEmbossPreview) Color.Transparent else previewColors.surface,
-        // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent-color
-        // fallback chain (that's exactly what caused the invisible-text LockScreen bug).
-        contentColor = previewColors.onSurface,
-        tonalElevation = if (isEmbossPreview) 0.dp else 4.dp,
-        shadowElevation = if (isEmbossPreview) 0.dp else if (selected) 6.dp else 0.dp,
-        border = if (selected) BorderStroke(2.dp, previewColors.primary) else null,
-        shape = RoundedCornerShape(Radius.xl)
-    ) {
-        Row(
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center
         ) {
-            // Live swatch of the theme's own background/surface/accent — the actual
-            // colors, not a description of them.
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(previewColors.background),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .then(if (isCalmRetroPreview) Modifier.calmAberration(bias = 2.dp) else Modifier)
-                        .clip(CircleShape)
-                        .background(previewColors.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = previewColors.onPrimary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    identity.displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = previewColors.onSurface
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    identity.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = previewColors.onSurfaceVariant
-                )
-            }
-            if (selected) {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = "Tema aktif",
-                    tint = previewColors.primary
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AppLockSection(
-    lockEnabled: Boolean,
-    biometricEnabled: Boolean,
-    biometricAvailable: Boolean,
-    onSetPin: (String) -> Unit,
-    onDisableLock: () -> Unit,
-    onToggleBiometric: (Boolean) -> Unit
-) {
-    var showSetPinDialog by remember { mutableStateOf(false) }
-    var showDisableLockConfirm by remember { mutableStateOf(false) }
-    val haptic = LocalHapticFeedback.current
-
-    Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Kunci Aplikasi (PIN)", style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    if (lockEnabled) "Aktif — diminta tiap kali app dibuka" else "Nonaktif",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
-            Switch(
-                checked = lockEnabled,
-                onCheckedChange = { enabled ->
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    if (enabled) showSetPinDialog = true else showDisableLockConfirm = true
-                }
+            Icon(
+                Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "Tutup Lanjutan" else "Buka Lanjutan",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.rotate(rotation)
             )
         }
+    }
+}
 
-        if (lockEnabled) {
-            Spacer(modifier = Modifier.height(4.dp))
-            TextButton(onClick = { showSetPinDialog = true }) { Text("Ubah PIN") }
+// Batch 659 — TINGKAT 2 hierarki "Lanjutan": label subgrup (titik aksen + judul onSurface). Dulu teks titleSmall
+// warna secondary rata kiri 20dp = sama redup/sejajar dengan judul seksi induk, tak terbaca sebagai anak.
+@Composable
+private fun AdvancedSubgroupLabel(text: String) {
+    Row(modifier = Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
 
-            if (biometricAvailable) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Buka dengan Sidik Jari", style = MaterialTheme.typography.bodyMedium)
+// Batch 564 — judul section Neumorphism: judul + permata belah ketupat burgundy + hairline gilt yang memudar ke
+// kanan (kop bab buku bersampul kulit). Tema lain: Text titleMedium persis seperti sebelumnya. Judul tetap
+// rata kiri di 20dp (ornamen SESUDAH judul), jadi posisi teks tak bergeser.
+@Composable
+private fun NeuSectionHeader(text: String, modifier: Modifier = Modifier) {
+    if (!isSkeuTheme()) {
+        Text(text, style = MaterialTheme.typography.titleMedium, modifier = modifier)
+        return
+    }
+    val isDark = LocalIsDarkTheme.current
+    val gilt = if (isDark) SkeuGilt else SkeuGiltDeep
+    val gemHi = if (isDark) SkeuRubyHi else SkeuWineLit
+    val gemLo = if (isDark) SkeuWine else SkeuAccentLight
+    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(text, style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.width(10.dp))
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .drawBehind {
+                    val path = Path().apply {
+                        moveTo(size.width / 2f, 0f)
+                        lineTo(size.width, size.height / 2f)
+                        lineTo(size.width / 2f, size.height)
+                        lineTo(0f, size.height / 2f)
+                        close()
                     }
-                    Switch(
-                        checked = biometricEnabled,
-                        onCheckedChange = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onToggleBiometric(it)
-                        }
+                    drawPath(
+                        path = path,
+                        brush = Brush.linearGradient(
+                            colors = listOf(gemHi, gemLo),
+                            start = Offset(0f, 0f),
+                            end = Offset(size.width, size.height)
+                        )
+                    )
+                    drawPath(path = path, color = gilt.copy(alpha = 0.75f), style = Stroke(width = 0.8.dp.toPx()))
+                }
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(gilt.copy(alpha = 0.55f), gilt.copy(alpha = 0f))
+                        )
                     )
                 }
-            }
-        }
-    }
-
-    if (showSetPinDialog) {
-        SetPinDialog(
-            onConfirm = { pin -> onSetPin(pin); showSetPinDialog = false },
-            onDismiss = { showSetPinDialog = false }
-        )
-    }
-
-    if (showDisableLockConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDisableLockConfirm = false },
-            icon = { Icon(Icons.Default.LockOpen, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("Nonaktifkan Kunci Aplikasi?") },
-            text = {
-                Text(
-                    "PIN yang tersimpan akan dihapus permanen. Kalau diaktifkan lagi nanti, PIN " +
-                        "baru harus dibuat dari awal.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    onDisableLock()
-                    showDisableLockConfirm = false
-                }) { Text("Nonaktifkan", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDisableLockConfirm = false }) { Text("Batal") }
-            }
         )
     }
 }
 
+// Batch 564 — ikon baris navigasi Neumorphism = MEDALI enamel burgundy (gradasi anggur, kilau atas, cincin gilt
+// 1dp, bayangan jatuh kecil) berglif champagne. Medali digambar 34dp DI LUAR kotak ikon 24dp (tanpa layout
+// shift: ikon + Spacer 12dp tetap, teks tidak bergeser). Tema lain: ikon polos tint secondary seperti semula.
 @Composable
-private fun SetPinDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
-    var pin by remember { mutableStateOf("") }
-    var confirmPin by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Atur PIN") },
-        text = {
-            Column {
-                Text("Masukkan 6 digit PIN baru", style = MaterialTheme.typography.bodySmall)
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = pin,
-                    onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) pin = it },
-                    label = { Text("PIN") },
-                    singleLine = true,
-                    // Batch 36: sebelumnya field ini polos — PIN kelihatan jelas di layar
-                    // sambil diketik, dan keyboard yang muncul QWERTY penuh (bukan numerik),
-                    // padahal LockScreen (layar buka app) sudah lama pakai PIN pad custom
-                    // dengan dot mask. NumberPassword sekaligus kasih keyboard angka DAN
-                    // masking bawaan platform (titik/dot), tanpa perlu VisualTransformation
-                    // manual terpisah.
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+private fun NeuNavIcon(icon: ImageVector) {
+    if (!isSkeuTheme()) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+        return
+    }
+    val isDark = LocalIsDarkTheme.current
+    val gilt = if (isDark) SkeuGilt else SkeuGiltDeep
+    Box(
+        modifier = Modifier
+            .size(24.dp)
+            .drawBehind {
+                val side = 34.dp.toPx()
+                val tl = Offset((size.width - side) / 2f, (size.height - side) / 2f)
+                val sz = Size(side, side)
+                val r = CornerRadius(9.dp.toPx())
+                val br = Offset(tl.x + side, tl.y + side)
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.35f),
+                    topLeft = Offset(tl.x, tl.y + 1.5.dp.toPx()),
+                    size = sz,
+                    cornerRadius = r
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = confirmPin,
-                    onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) confirmPin = it },
-                    label = { Text("Konfirmasi PIN") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                drawRoundRect(
+                    brush = Brush.linearGradient(listOf(SkeuWineLit, SkeuWineDeep), start = tl, end = br),
+                    topLeft = tl,
+                    size = sz,
+                    cornerRadius = r
                 )
-                error?.let {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                when {
-                    pin.length != 6 -> error = "PIN harus 6 digit"
-                    pin != confirmPin -> error = "PIN tidak cocok"
-                    else -> onConfirm(pin)
-                }
-            }) { Text("Simpan") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Batal") }
-        }
-    )
+                drawRoundRect(
+                    brush = Brush.verticalGradient(
+                        0.00f to Color.White.copy(alpha = 0.20f),
+                        0.55f to Color.White.copy(alpha = 0f),
+                        1.00f to Color.White.copy(alpha = 0f),
+                        startY = tl.y,
+                        endY = tl.y + side
+                    ),
+                    topLeft = tl,
+                    size = sz,
+                    cornerRadius = r
+                )
+                drawRoundRect(
+                    brush = Brush.linearGradient(
+                        listOf(gilt.copy(alpha = 0.85f), gilt.copy(alpha = 0.25f)),
+                        start = tl,
+                        end = br
+                    ),
+                    topLeft = Offset(tl.x + 0.5.dp.toPx(), tl.y + 0.5.dp.toPx()),
+                    size = Size(side - 1.dp.toPx(), side - 1.dp.toPx()),
+                    cornerRadius = CornerRadius(8.5.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx())
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = Color(0xFFF6E9CF))
+    }
 }

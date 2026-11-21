@@ -3,7 +3,6 @@ package com.rudi.audioplayer.util
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import java.io.File
 import java.security.MessageDigest
 
@@ -34,33 +33,23 @@ object ApkSignatureChecker {
             } ?: return ApkSignatureResult(displayName, error = "Tidak bisa membuka file yang dipilih.")
 
             val pm = context.packageManager
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                PackageManager.GET_SIGNING_CERTIFICATES
-            } else {
-                @Suppress("DEPRECATION")
-                PackageManager.GET_SIGNATURES
-            }
+            val flags = PackageManager.GET_SIGNING_CERTIFICATES
             val info = pm.getPackageArchiveInfo(tempFile.absolutePath, flags)
                 ?: return ApkSignatureResult(displayName, error = "File ini bukan APK yang valid, atau rusak.")
 
-            val signatureBytes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                val signingInfo = info.signingInfo
-                if (signingInfo?.hasMultipleSigners() == true) {
-                    // Multi-signer apps can't rotate keys — order is irrelevant, any entry
-                    // represents "the" current signer set.
-                    signingInfo.apkContentsSigners?.firstOrNull()?.toByteArray()
-                } else {
-                    // signingCertificateHistory is ordered oldest→newest (original cert at
-                    // index 0, CURRENT cert at the LAST index) — see SigningInfo docs. Taking
-                    // firstOrNull() here silently compared the ORIGINAL signing key instead of
-                    // the current one for any app that has ever rotated its signing key, which
-                    // could report MATCH/MISMATCH inconsistently with what Android's installer
-                    // actually enforces.
-                    signingInfo?.signingCertificateHistory?.lastOrNull()?.toByteArray()
-                }
+            val signingInfo = info.signingInfo
+            val signatureBytes = if (signingInfo?.hasMultipleSigners() == true) {
+                // Multi-signer apps can't rotate keys — order is irrelevant, any entry
+                // represents "the" current signer set.
+                signingInfo.apkContentsSigners?.firstOrNull()?.toByteArray()
             } else {
-                @Suppress("DEPRECATION")
-                info.signatures?.firstOrNull()?.toByteArray()
+                // signingCertificateHistory is ordered oldest→newest (original cert at
+                // index 0, CURRENT cert at the LAST index) — see SigningInfo docs. Taking
+                // firstOrNull() here silently compared the ORIGINAL signing key instead of
+                // the current one for any app that has ever rotated its signing key, which
+                // could report MATCH/MISMATCH inconsistently with what Android's installer
+                // actually enforces.
+                signingInfo?.signingCertificateHistory?.lastOrNull()?.toByteArray()
             }
 
             if (signatureBytes == null) {

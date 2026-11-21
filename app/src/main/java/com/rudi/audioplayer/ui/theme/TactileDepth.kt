@@ -1,39 +1,93 @@
 package com.rudi.audioplayer.ui.theme
 
+import android.graphics.Bitmap
+import android.graphics.BlurMaskFilter
+import android.os.Handler
+import android.os.Looper
+import android.os.Process
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.CacheDrawScope
+import androidx.compose.ui.draw.DrawResult
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Canvas as GfxCanvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ImageBitmapConfig
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.addOutline
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.nativePaint
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlin.random.Random
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.IndicationNodeFactory
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.node.DelegatableNode
+import androidx.compose.ui.node.DrawModifierNode
+import kotlinx.coroutines.launch
 
 /**
  * Batch 53 — repainted again for the user-supplied compose-amoled-hybrid-glass-final.md spec,
@@ -74,6 +128,13 @@ import kotlin.random.Random
 // identical for both identities — only the four surface colors differ — so this avoids a second
 // hand-copied 55-line function drifting out of sync with the original the next time either one
 // gets a polish pass.
+// Batch 551 — `embossSurface()` kini hanya bungkus tipis: SKALA tekan (0.985f, sama seperti
+// sebelumnya) + mesin kedalaman Neumorphism bersama `neuDepth()` (bagian bawah file ini, port
+// dari Boomly B180-B190: permukaan pelat LEBIH TERANG dari kanvas, bevel facet per-sisi menurut
+// cahaya kiri-atas, bayangan jatuh Gaussian 3 lapis, sumur cekung saat ditekan). Parameter lama
+// (4 alpha border + 2 alpha shadow, Batch 58/62) DIHAPUS karena seluruh gambar border/gradien/
+// drop-shadow tangan lama diganti mesin itu — fungsi ini private, satu-satunya pemanggil
+// `tactileEmboss()` di bawah, tanda tangan publik tidak berubah.
 @Composable
 private fun Modifier.embossSurface(
     shape: Shape,
@@ -81,71 +142,20 @@ private fun Modifier.embossSurface(
     pressed: Boolean,
     surfaceTop: Color,
     surfaceBottom: Color,
-    highlight: Color,
-    shadow: Color,
-    label: String,
-    // Batch 58 — these six used to be literals hardcoded straight into the body below (same
-    // values for every caller). That silently discarded whatever alpha `highlight`/`shadow`
-    // already carried (Color.copy REPLACES alpha, it doesn't multiply) — harmless for Tactile
-    // only because these literals happened to be tuned to exactly match TactileHighlight/
-    // TactileShadow's own baked alpha in the first place (Batch 53), but it meant Skeu's own
-    // SkeuHighlight (0.10f, deliberately stronger per Color.kt's comment) and SkeuShadow (0.55f,
-    // deliberately lower) were quietly overwritten back to Tactile's numbers whenever
-    // skeuEmboss() ran — Skeu's bevel never actually rendered as its own designed intensity.
-    // Defaults below are the exact previous Tactile literals, so tactileEmboss() (which doesn't
-    // pass these) is byte-identical to before; skeuEmboss() now passes its own tuned values.
-    borderTopAlphaNormal: Float = 0.065f,
-    borderTopAlphaPressed: Float = 0.03f,
-    borderBottomAlphaNormal: Float = 0.30f,
-    borderBottomAlphaPressed: Float = 0.15f,
-    shadowAlphaNormal: Float = 0.70f,
-    shadowAlphaPressed: Float = 0.35f
+    label: String
 ): Modifier {
-    val animatedElevation by animateDpAsState(
-        targetValue = if (pressed) elevation / 4 else elevation,
-        label = "${label}Elevation"
-    )
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.985f else 1f,
         label = "${label}Scale"
     )
-    // Border stays a whisper per spec §8 ("never a bright white border") / §18 ("no excessive
-    // glow") — these are absolute alphas (Color.copy replaces alpha entirely, it doesn't
-    // multiply the base token's own alpha), so the numbers below are the final on-screen values.
-    val borderTopAlpha = if (pressed) borderTopAlphaPressed else borderTopAlphaNormal
-    val borderBottomAlpha = if (pressed) borderBottomAlphaPressed else borderBottomAlphaNormal
-    // The offset drop-shadow does the actual depth-communication work (spec §5: "GlassShadow").
-    // Kept at the token's own base rather than diluted further, or it disappears against a dark
-    // background; a faint shadow-on-near-black reads as nothing at all — the exact Matte Noir
-    // mistake (PROJECT_STATE.md Batch 39-44), not repeated here.
-    val shadowAlpha = if (pressed) shadowAlphaPressed else shadowAlphaNormal
-
     return this
         .scale(scale)
-        .drawBehind {
-            val outline = shape.createOutline(size, layoutDirection, this)
-            val outlinePath = Path().apply { addOutline(outline) }
-            translate(top = animatedElevation.toPx() * 0.45f) {
-                drawPath(outlinePath, color = shadow.copy(alpha = shadowAlpha))
-            }
-        }
-        .clip(shape)
-        .background(
-            // Diagonal top-left -> bottom-right gradient (spec §9) between the two elevated
-            // surface levels, replacing the old vertical bevel.
-            Brush.linearGradient(colors = listOf(surfaceTop, surfaceBottom))
-        )
-        .border(
-            BorderStroke(
-                1.dp,
-                Brush.linearGradient(
-                    colors = listOf(
-                        highlight.copy(alpha = borderTopAlpha),
-                        shadow.copy(alpha = borderBottomAlpha)
-                    )
-                )
-            ),
-            shape
+        .neuDepth(
+            shape = shape,
+            elevation = elevation,
+            faceTop = surfaceTop,
+            faceBottom = surfaceBottom,
+            pressed = pressed
         )
 }
 
@@ -155,12 +165,11 @@ fun Modifier.tactileEmboss(
     elevation: Dp = 8.dp,
     pressed: Boolean = false
 ): Modifier {
-    // Batch 61 — identitas Tactile sekarang otonom di kedua mode (lihat Theme.kt), jadi bevel-nya
-    // juga wajib pilih token light/dark sendiri lewat LocalIsDarkTheme, bukan lagi hardcode token
-    // gelap terus-menerus seperti sebelum Batch 61. Alpha border/shadow juga dituning ulang khusus
-    // varian terang (kontrasnya terbalik: highlight putih di atas kanvas terang nyaris tak
-    // kelihatan di alpha rendah, jadi butuh alpha jauh lebih tinggi; shadow sebaliknya perlu lebih
-    // rendah dari versi AMOLED-nya supaya tidak jadi noda gelap kasar di atas kanvas terang).
+    // Batch 61 — identitas Tactile otonom di kedua mode (lihat Theme.kt): token light/dark dipilih
+    // lewat LocalIsDarkTheme, bukan parameter baru di tiap call site.
+    // Batch 551 — nada border/shadow Batch 62 (alpha 0.16/0.55/0.90 dst) digantikan profil mesin
+    // `neuDepth()` (alpha bevel/bayangan diturunkan dari warna permukaan Tactile sendiri, mode
+    // terang memakai kekuatan bayangan 0.42x supaya tidak jadi noda gelap di kanvas terang).
     val isDark = LocalIsDarkTheme.current
     return this.embossSurface(
         shape = shape,
@@ -168,20 +177,7 @@ fun Modifier.tactileEmboss(
         pressed = pressed,
         surfaceTop = if (isDark) TactileSurfaceVariant else TactileLightSurfaceVariant,
         surfaceBottom = if (isDark) TactileSurface else TactileLightSurface,
-        highlight = if (isDark) TactileHighlight else TactileLightHighlight,
-        shadow = if (isDark) TactileShadow else TactileLightShadow,
-        label = "tactileEmboss",
-        // Batch 62 — user: "perkuat vibes radikal, tanpa mengikuti batasan light/dark
-        // system". Alpha border/shadow dinaikkan jauh di atas versi Batch 61 (dulu 0.065/
-        // 0.03/0.30/0.15/0.70/0.35) di KEDUA mode — bevel sekarang jauh lebih dramatis/
-        // glossy, sengaja menyimpang dari nada "restrained" spec asli (compose-amoled-
-        // hybrid-glass-final.md §9 menyarankan subtlety) atas instruksi eksplisit user.
-        borderTopAlphaNormal = if (isDark) 0.16f else 1.0f,
-        borderTopAlphaPressed = if (isDark) 0.08f else 0.65f,
-        borderBottomAlphaNormal = if (isDark) 0.55f else 0.30f,
-        borderBottomAlphaPressed = if (isDark) 0.30f else 0.16f,
-        shadowAlphaNormal = if (isDark) 0.90f else 0.34f,
-        shadowAlphaPressed = if (isDark) 0.55f else 0.18f
+        label = "tactileEmboss"
     )
 }
 
@@ -219,110 +215,239 @@ fun Modifier.tactileEmboss(
 // dalam fungsi) supaya "Ambient Light gak bocor" (bagian instruksi user yg belum tersentuh di
 // Batch 79/80) — bayangan dijamin tidak meluber ke sibling lain, halo-nya proporsional ke
 // `elevation` jadi tidak pernah memotong bentuk bayangannya sendiri.
+// Batch 551 — dual-shadow tumpukan manual Batch 79-81 (5 layer drawPath offset + clipRect halo)
+// DIGANTIKAN mesin kedalaman Neumorphism Boomly `neuDepth()` (bagian bawah file ini): permukaan
+// pelat sekarang diangkat dari kanvas oleh LUMINANSI + bevel facet + bayangan Gaussian, dan
+// pressed = sumur cekung (lantai gelap + bayangan dalam + bibir terang) alih-alih membalik
+// diagonal terang/gelap. Yang DIPERTAHANKAN dari Batch 79-81: skala tekan 0.978f, warna panel
+// `SkeuNeuSurfaceDark/Light`, dan glint Zamrud (identitas Titanium + sentuhan Emerald) apa
+// adanya — tanda tangan publik tidak berubah. Token Skeu{Specular,AmbientOcclusion,Highlight,
+// Shadow} dkk. di Color.kt tidak lagi dibaca fungsi ini (tidak dihapus: dipakai AlbumArtHero.kt).
+// Batch 564 — AKSEN BURGUNDY = SISTEM, bukan bintik. Glint radial kecil (Batch 80/563) DIBUANG; gantinya 4 lapis
+// yang sama-sama dihitung di `drawSkeuWine()`: (1) WASH anggur diagonal di seluruh permukaan (tile terbaca
+// "kulit burgundy", bukan arang netral), (2) hairline GILT di tepi atas (kilau emas-champagne di bawah bevel),
+// (3) REL penanda di tepi kiri (pita pembatas buku; hanya tile pendek, bukan pil/lingkaran/panel besar) + pendar
+// ruby di sekitarnya, (4) tekan = anggur "membanjir" (wash + hairline menguat). [active] = keadaan tile AKTIF
+// (mis. baris saklar yang ON): rel jadi ruby terang + pendar + wash menguat — keadaan saklar terbaca dari
+// seluruh tile, bukan cuma dari kenopnya. Default false = perilaku tile biasa.
 @Composable
 fun Modifier.skeuEmboss(
     shape: Shape = MaterialTheme.shapes.medium,
     elevation: Dp = 8.dp,
-    pressed: Boolean = false
+    pressed: Boolean = false,
+    active: Boolean = false
 ): Modifier {
     val isDark = LocalIsDarkTheme.current
     val panelFill = if (isDark) SkeuNeuSurfaceDark else SkeuNeuSurfaceLight
-    val lightNear = if (isDark) {
-        if (pressed) SkeuSpecularPressed else SkeuSpecular
-    } else {
-        if (pressed) SkeuLightSpecularPressed else SkeuLightSpecular
-    }
-    val lightFar = if (isDark) SkeuHighlight else SkeuLightHighlight
-    val darkNear = if (isDark) SkeuAmbientOcclusion else SkeuLightAmbientOcclusion
-    val darkFar = if (isDark) SkeuShadow else SkeuLightShadow
-    val emerald = if (isDark) SkeuEmerald else SkeuLightEmerald
 
-    val animatedElevation by animateDpAsState(
-        targetValue = if (pressed) elevation * 0.6f else elevation,
-        label = "skeuEmbossElevation"
-    )
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.978f else 1f,
         label = "skeuEmbossScale"
     )
-    // Batch 80 — fix: Batch 79's emerald ONLY appeared blended into lightNear (near-white/silver
-    // specular) and ONLY while actively pressed — user feedback: "yang kelihatan cuman Titanium
-    // dominan, mana zamrudnya??", karena (a) lerp 55% ke arah putih terang nyaris tak mengubah
-    // hue yang terlihat mata (mixing a small % of saturated color into near-opaque white mostly
-    // just desaturates it, it doesn't read as that color), dan (b) alpha 0 total saat idle —
-    // kalau user cuma lihat screenshot/UI diam, emerald-nya betul-betul 0%, bukan cuma "sedikit".
-    // Fix: emerald sekarang LAYER SENDIRI (radial glint kecil, bukan di-blend ke lightNear) +
-    // baseline idle > 0 (0.20f, tetap "sedikit" tapi genuinely visible) yang naik ke 0.52f saat
-    // pressed (efek "permata menyala" yang jelas kelihatan pas disentuh).
-    val emeraldAlpha by animateFloatAsState(
-        targetValue = if (pressed) 0.52f else 0.20f,
-        label = "skeuEmbossEmeraldGlow"
+    val pressT by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = tween(durationMillis = if (pressed) 70 else 160),
+        label = "skeuEmbossWinePress"
     )
-
-    // Concave flip: -1f saat pressed membalik SELURUH diagonal terang/gelap, bukan sekadar
-    // memperkecil offset-nya (itu bedanya dengan Tactile — lihat komentar di atas fungsi).
-    val dir = if (pressed) -1f else 1f
+    val activeT by animateFloatAsState(
+        targetValue = if (active) 1f else 0f,
+        animationSpec = tween(durationMillis = 260),
+        label = "skeuEmbossWineActive"
+    )
+    // Batch 563 — bentuk "old money": radius dp hardcode pemanggil (`Radius.xl/xxl`, `shapes.*`) dipangkas
+    // ke <= 12dp; pil/lingkaran dibiarkan. `remember(shape)` + data class = kunci cache bitmap tetap stabil.
+    val tailored = remember(shape) { SkeuCappedShape(shape) }
 
     return this
         .scale(scale)
-        .drawBehind {
-            val outline = shape.createOutline(size, layoutDirection, this)
-            val outlinePath = Path().apply { addOutline(outline) }
-            val basePx = animatedElevation.toPx()
-            // Batch 81 — fix: "Ambient Light yang gak bocor" (instruksi eksplisit user, belum
-            // ditangani Batch 79/80). Compose TIDAK meng-clip drawBehind{} ke bounds layout-nya
-            // sendiri by default — bayangan lebar/menjauh bisa kegambar nimpa sibling di
-            // sekitarnya (row LazyColumn lain, MiniPlayerBar yg cuma berjarak tipis dari
-            // NavigationBar di bawahnya, dst) tanpa ada warning apa pun saat compile. Seluruh
-            // dual-shadow di bawah (kedua sisi, 5 layer) sekarang dibungkus 1 clipRect() dgn
-            // halo TETAP proporsional ke elevation (1.3x offset terjauh yg dipakai, 1.05x) —
-            // bayangan dijamin TIDAK PERNAH meluber lebih jauh dari itu, utk elevation berapa pun
-            // yg dikirim caller (MiniPlayerBar's 16.dp termasuk), tanpa memotong bentuknya sendiri
-            // (halo > offset terjauh, jadi bayangan tetap utuh, cuma areanya yg dibatasi tegas).
-            val haloPx = basePx * 1.3f
-            clipRect(
-                left = -haloPx,
-                top = -haloPx,
-                right = size.width + haloPx,
-                bottom = size.height + haloPx
-            ) {
-                // Sisi GELAP — kanan-bawah normal / kiri-atas saat pressed.
-                translate(left = basePx * 0.28f * dir, top = basePx * 0.28f * dir) {
-                    drawPath(outlinePath, color = darkNear)
-                }
-                translate(left = basePx * 0.60f * dir, top = basePx * 0.60f * dir) {
-                    drawPath(outlinePath, color = darkFar.copy(alpha = darkFar.alpha * 0.7f))
-                }
-                translate(left = basePx * 1.05f * dir, top = basePx * 1.05f * dir) {
-                    drawPath(outlinePath, color = darkFar.copy(alpha = darkFar.alpha * 0.35f))
-                }
-                // Sisi TERANG — kiri-atas normal / kanan-bawah saat pressed.
-                translate(left = -basePx * 0.28f * dir, top = -basePx * 0.28f * dir) {
-                    drawPath(outlinePath, color = lightNear)
-                }
-                translate(left = -basePx * 0.60f * dir, top = -basePx * 0.60f * dir) {
-                    drawPath(outlinePath, color = lightFar.copy(alpha = lightFar.alpha * 0.7f))
-                }
-            }
-        }
-        .clip(shape)
-        // Base surface — flat, hampir sewarna kanvas. Kedalaman 100% dari dual-shadow di atas.
-        .background(panelFill)
-        // Batch 80 — Zamrud, layer TERPISAH (bukan blend) di atas panelFill: titik radial kecil
-        // di kuadran sisi-terang (ikut `dir` — kiri-atas normal, kanan-bawah pressed), warna murni
-        // SkeuEmerald sendiri, jadi selalu kebaca sebagai hijau, bukan cuma putih yang sedikit
-        // kurang saturasi.
-        .drawBehind {
-            val cx = if (dir > 0f) size.width * 0.18f else size.width * 0.82f
-            val cy = if (dir > 0f) size.height * 0.16f else size.height * 0.84f
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(emerald.copy(alpha = emeraldAlpha), Color.Transparent),
-                    center = Offset(cx, cy),
-                    radius = size.minDimension.coerceAtLeast(1f) * 0.32f
-                )
+        .neuDepth(
+            shape = tailored,
+            elevation = elevation,
+            faceTop = panelFill,
+            faceBottom = panelFill,
+            pressed = pressed
+        )
+        .drawBehind { drawSkeuWine(tailored, isDark, pressT, activeT) }
+}
+
+/** Batch 564 — lapisan aksen burgundy tile Neumorphism (lihat komentar [skeuEmboss]). Digambar DI ATAS permukaan
+ *  mesin kedalaman, di dalam `.clip(shape)`-nya, di BAWAH konten. [press]/[active] 0..1. */
+private fun DrawScope.drawSkeuWine(shape: Shape, isDark: Boolean, press: Float, active: Float) {
+    val w = size.width
+    val h = size.height
+    if (w < 8f || h < 8f) return
+    val lit = (active + press * 0.8f).coerceIn(0f, 1f)
+    val wine = if (isDark) SkeuWine else SkeuAccentLight
+    val gilt = if (isDark) SkeuGilt else SkeuGiltDeep
+    val ruby = if (isDark) SkeuRubyHi else SkeuWineLit
+
+    // 1. WASH anggur diagonal: pekat di kiri-atas, memudar ke kanan-bawah (arah cahaya tema).
+    val washA = (if (isDark) 0.30f else 0.12f) * (1f + 0.55f * lit)
+    drawRect(
+        brush = Brush.linearGradient(
+            0.00f to wine.copy(alpha = washA),
+            0.60f to wine.copy(alpha = washA * 0.22f),
+            1.00f to wine.copy(alpha = 0f),
+            start = Offset(0f, 0f),
+            end = Offset(w, h)
+        )
+    )
+
+    // 2. HAIRLINE gilt tepi atas, tepat di bawah bevel 1.5dp (memudar di kedua ujung).
+    val gx0 = w * 0.07f
+    val gx1 = w * 0.93f
+    val giltA = (if (isDark) 0.42f else 0.30f) * (1f + 0.5f * lit)
+    drawRect(
+        brush = Brush.horizontalGradient(
+            0.0f to gilt.copy(alpha = 0f),
+            0.5f to gilt.copy(alpha = giltA.coerceAtMost(0.7f)),
+            1.0f to gilt.copy(alpha = 0f),
+            startX = gx0,
+            endX = gx1
+        ),
+        topLeft = Offset(gx0, 1.5.dp.toPx()),
+        size = Size(gx1 - gx0, 0.75.dp.toPx())
+    )
+
+    // 3. REL penanda kiri: hanya tile berukuran baris (40-140dp tinggi) & bukan pil/lingkaran.
+    if (h < 40.dp.toPx() || h > 140.dp.toPx()) return
+    val outline = shape.createOutline(size, layoutDirection, this)
+    if (outline is Outline.Rounded && outline.roundRect.topLeftCornerRadius.x >= min(w, h) / 2f - 0.5f) return
+    val railW = 3.dp.toPx()
+    val railH = (h * 0.42f).coerceIn(14.dp.toPx(), 30.dp.toPx())
+    val railY = (h - railH) / 2f
+    val railA = 0.62f + 0.38f * lit
+    // pendar di sekitar rel (setengah lingkaran lebar, bukan titik): redup saat idle, terang saat aktif.
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(ruby.copy(alpha = 0.10f + 0.30f * lit), ruby.copy(alpha = 0f)),
+            center = Offset(0f, h / 2f),
+            radius = (h * 0.9f).coerceAtLeast(24.dp.toPx())
+        )
+    )
+    drawRoundRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(ruby.copy(alpha = railA), wine.copy(alpha = railA)),
+            startY = railY,
+            endY = railY + railH
+        ),
+        topLeft = Offset(-railW, railY),
+        size = Size(railW * 2f, railH),
+        cornerRadius = CornerRadius(railW)
+    )
+}
+
+/**
+ * Batch 566 — PERMATA bersorot (keluarga sama dgn permata kenop saklar Batch 564), digambar LANGSUNG tanpa bitmap:
+ * bayangan jatuh + pendar luar + cincin [rim] (gilt) + badan radial [hi] -> [lo] bercahaya dari kiri-atas + sorot
+ * spekular. [radius] = jari-jari badan (px); cincin = radius + 1.1dp. [halo] 0..1 = kekuatan pendar luar. Dipakai titik
+ * PIN terisi (`LockScreen`) dan permata geser waveform Now Playing; warna dikirim pemanggil (ruby, atau turunan aksen).
+ */
+internal fun DrawScope.drawSkeuGem(
+    center: Offset,
+    radius: Float,
+    rim: Color,
+    hi: Color,
+    lo: Color,
+    halo: Float = 1f
+) {
+    if (radius < 1f) return
+    val d = 1.dp.toPx()
+    drawCircle(
+        color = Color.Black.copy(alpha = 0.40f),
+        radius = radius + 1.4f * d,
+        center = Offset(center.x, center.y + 1.2f * d)
+    )
+    if (halo > 0.01f) {
+        drawCircle(color = hi.copy(alpha = 0.28f * halo), radius = radius + 3.2f * d, center = center)
+    }
+    drawCircle(
+        brush = Brush.linearGradient(
+            0.0f to rim.copy(alpha = 0.95f),
+            1.0f to rim.copy(alpha = 0.35f),
+            start = Offset(center.x - radius, center.y - radius),
+            end = Offset(center.x + radius, center.y + radius)
+        ),
+        radius = radius + 1.1f * d,
+        center = center
+    )
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(hi, lo),
+            center = Offset(center.x - 0.28f * radius, center.y - 0.32f * radius),
+            radius = radius * 1.5f
+        ),
+        radius = radius,
+        center = center
+    )
+    drawCircle(
+        color = Color.White.copy(alpha = 0.75f),
+        radius = (0.16f * radius).coerceAtLeast(0.6f * d),
+        center = Offset(center.x - 0.30f * radius, center.y - 0.34f * radius)
+    )
+}
+
+/** Batch 566 — SUMUR bulat kecil (dudukan permata / titik kosong): bibir luar gelap kiri-atas -> terang kanan-bawah,
+ *  lantai gelap, bayangan dinding menguat ke tepi. Pasangan [drawSkeuGem]; tanpa bitmap. */
+internal fun DrawScope.drawSkeuSocket(center: Offset, radius: Float, isDark: Boolean) {
+    if (radius < 1f) return
+    val d = 1.dp.toPx()
+    drawCircle(
+        brush = Brush.linearGradient(
+            0.0f to Color.Black.copy(alpha = 0.55f),
+            1.0f to Color.White.copy(alpha = if (isDark) 0.22f else 0.60f),
+            start = Offset(center.x - radius, center.y - radius),
+            end = Offset(center.x + radius, center.y + radius)
+        ),
+        radius = radius + 1.1f * d,
+        center = center
+    )
+    drawCircle(
+        color = if (isDark) Color(0xFF120B0E) else Color(0xFFD9CCC0),
+        radius = radius,
+        center = center
+    )
+    drawCircle(
+        brush = Brush.radialGradient(
+            0.45f to Color.Transparent,
+            1.00f to Color.Black.copy(alpha = if (isDark) 0.55f else 0.22f),
+            center = Offset(center.x + 0.35f * radius, center.y + 0.40f * radius),
+            radius = radius * 1.6f
+        ),
+        radius = radius,
+        center = center
+    )
+}
+
+/**
+ * Batch 563 — pembungkus bentuk Neumorphism "old money": sudut membulat yang radiusnya > [capDp] dipangkas
+ * ke [capDp] (default 12dp); pil/lingkaran (radius >= setengah sisi terpendek) TIDAK disentuh. Idempoten
+ * (memangkas ulang bentuk yang sudah <= batas = tak berubah) sehingga aman bagi pemanggil yang sudah memakai
+ * `MaterialTheme.shapes.*` baru. Bentuk non-membulat (Rectangle/Generic) diteruskan apa adanya. Data class:
+ * `equals` mengikuti [base] (RoundedCornerShape punya equals) -> aman sebagai kunci `NeuBitmapStore`.
+ */
+internal data class SkeuCappedShape(val base: Shape, val capDp: Float = 12f) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val outline = base.createOutline(size, layoutDirection, density)
+        if (outline !is Outline.Rounded) return outline
+        val rr = outline.roundRect
+        val capPx = capDp * density.density
+        val pill = min(rr.width, rr.height) / 2f
+        fun cap(r: CornerRadius): CornerRadius =
+            if (r.x >= pill - 0.5f || r.y >= pill - 0.5f) r else CornerRadius(min(r.x, capPx), min(r.y, capPx))
+        return Outline.Rounded(
+            RoundRect(
+                left = rr.left,
+                top = rr.top,
+                right = rr.right,
+                bottom = rr.bottom,
+                topLeftCornerRadius = cap(rr.topLeftCornerRadius),
+                topRightCornerRadius = cap(rr.topRightCornerRadius),
+                bottomRightCornerRadius = cap(rr.bottomRightCornerRadius),
+                bottomLeftCornerRadius = cap(rr.bottomLeftCornerRadius)
             )
-        }
+        )
+    }
 }
 
 // ============================================================================
@@ -334,32 +459,54 @@ fun Modifier.skeuEmboss(
 // Calm Retro (isCalmRetroTheme()), tidak menyentuh mekanisme embossSurface() identitas lain.
 // Alpha 0.35f — dalam rentang 30%-40% yang diminta eksplisit spec §"Panduan Desain Penting" #1
 // ("opacity rendah ... agar tidak berubah menjadi neon yang tajam").
+// Batch 399 — Optimasi Compose: kelas bug sama Batch 392/395/396/397/398 (allocation dibangun
+// ulang tiap recomposition tanpa `remember`), tapi titik penyebarannya beda — bukan
+// `Brush.*Gradient()` LANGSUNG di badan sebuah screen (grep app-wide sudah 0 sisa sejak Batch
+// 398), melainkan fungsi Modifier EXTENSION di file ini yang dipanggil ulang dari scope panas.
+// Ditemukan lewat audit lanjutan: `calmAberration()` dipanggil `MiniPlayerBar.kt` (baris
+// `isCalmRetro -> Modifier.calmAberration(bias = 2.dp)`) — MiniPlayerBar sengaja koleksi
+// `playbackProgress` LOKAL tiap detik selama musik main (desain Batch 353), jadi SELURUH badan
+// fungsi itu (termasuk `when` yang memanggil `calmAberration()` ini) recompose 1x/detik. Sebelum
+// fix ini, tiap tick memanggil ulang `this.drawBehind { ... }` — lambda BARU (capture `biasPx`)
+// tiap panggilan, ekuivalen 1 instance `DrawBehindElement` baru tiap detik untuk identitas Calm
+// Retro, padahal `bias` itu sendiri konstan (literal `2.dp` di MiniPlayerBar, `3.dp` default di
+// 2 pemanggil lain — NowPlayingScreen.kt/SettingsScreen.kt, keduanya TIDAK dalam scope panas
+// tick 1x/detik sejak Batch 353 memisahkan posisi/durasi keluar dari body composable besar).
+// Fix: Modifier hasil `drawBehind` dibungkus `remember(bias)` — begitu `bias` sama (kasus
+// SEMUA 3 pemanggil, tiap panggilan pakai literal Dp tetap), instance yang sama dipakai ulang
+// alih-alih dibangun dari nol. `size`/`center`/`radius` di dalam lambda draw TETAP dihitung
+// fresh tiap draw call sungguhan (DrawScope, bukan sesuatu yang bisa/perlu di-remember —
+// bergantung ukuran layout aktual) — cuma WADAH Modifier-nya yang sekarang stabil lintas
+// recomposition tak-terkait. **Zero behavior change**: 2 lingkaran radial-gradient aberrasi
+// tetap identik visual & posisi, cuma alokasi objek berkurang saat `bias` tidak berubah.
 @Composable
 fun Modifier.calmAberration(bias: Dp = 3.dp): Modifier {
-    val biasPx = bias
-    return this.drawBehind {
-        val off = biasPx.toPx()
-        val radius = size.minDimension / 2f + off * 2f
-        val center = Offset(size.width / 2f, size.height / 2f)
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(CalmRetroAberrationLeft.copy(alpha = 0.35f), Color.Transparent),
-                center = center - Offset(off, off),
-                radius = radius
-            ),
-            radius = radius,
-            center = center - Offset(off, off)
-        )
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(CalmRetroAberrationRight.copy(alpha = 0.35f), Color.Transparent),
-                center = center + Offset(off, off),
-                radius = radius
-            ),
-            radius = radius,
-            center = center + Offset(off, off)
-        )
+    val aberrationModifier = remember(bias) {
+        Modifier.drawBehind {
+            val off = bias.toPx()
+            val radius = size.minDimension / 2f + off * 2f
+            val center = Offset(size.width / 2f, size.height / 2f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(CalmRetroAberrationLeft.copy(alpha = 0.35f), Color.Transparent),
+                    center = center - Offset(off, off),
+                    radius = radius
+                ),
+                radius = radius,
+                center = center - Offset(off, off)
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(CalmRetroAberrationRight.copy(alpha = 0.35f), Color.Transparent),
+                    center = center + Offset(off, off),
+                    radius = radius
+                ),
+                radius = radius,
+                center = center + Offset(off, off)
+            )
+        }
     }
+    return this.then(aberrationModifier)
 }
 
 // ============================================================================
@@ -492,4 +639,1233 @@ fun Modifier.auroraGlow(): Modifier {
         )
     )
     return this.background(brush)
+}
+
+// ============================================================================
+// Batch 551 — MESIN KEDALAMAN NEUMORPHISM BERSAMA (port dari Boomly B180-B190, request user:
+// "Terapkan effect kedalaman Neumorphism punya project Boomly ke semua theme yang ada di project
+// SONIX"). Bukan tema baru: ini mekanisme KEDALAMAN yang dipakai SEMUA 6 identitas (Apple, Tactile,
+// Neumorphism/Skeu, Calm Retro, Liquid Glass, Aurora) lewat 3 pintu — (1) `tactileEmboss()` /
+// `skeuEmboss()` (panel padat Tactile & Neumorphism), (2) `frostedGlass()` (BlurUtils.kt: panel
+// kaca Apple/Calm Retro/Liquid Glass/Aurora, lewat `neuHollowShadow()` + `neuBevelOnly()`),
+// (3) `neuSurface()` (kartu datar Apple/Calm Retro/Aurora di Home/Statistik/preview tema).
+// Palet/identitas tiap tema TIDAK diganti — mesin menurunkan warna bevel/bayangan/lantai sumur dari
+// warna permukaan tema itu sendiri (prinsip Boomly B187: "mesin & aturan SAMA, palet/kekuatan
+// mengikuti identitas tema").
+//
+// 3 sumber kedalaman yang terbaca (alasan Boomly B180 \"nyaru\": panel hanya +-3 level dari kanvas
+// + bayangan sehue kanvas = kedalaman nyaris tak terlihat):
+//  1. LUMINANSI — permukaan pelat diangkat lebih terang dari kanvas (`neuStyle()`), lantai sumur
+//     jauh lebih gelap.
+//  2. BEVEL FACET per-sisi menurut cahaya kiri-atas (-0.5522, -0.8337): sisi menghadap cahaya =
+//     sorot, membelakangi = gelap, alpha berskala cos sudut (bukan gradien miring palsu).
+//  3. BAYANGAN JATUH Gaussian 3 lapis (kontak / tengah / ambient) di bitmap perangkat lunak
+//     (`Canvas(ImageBitmap)` + `BlurMaskFilter` — BUKAN canvas hardware), di-cache GLOBAL ber-batas
+//     (LRU 48) sehingga elemen berukuran sama berbagi 1 bitmap & 0 render blur per frame.
+// Pressed = sumur CEKUNG (lantai gelap + bayangan dalam + bibir terang), di-crossfade 110ms.
+//
+// Beda dari port Boomly (sengaja, scope lebih ramping): TANPA tekstur butiran, alur ukir bingkai,
+// kubah knob/rim pil/tab, dan TANPA template 9-slice (bitmap per-ukuran saja — kartu SONIX tidak
+// beranimasi ukuran). Alpha/warna = simulasi statis, BELUM dituning di device.
+// Batch 555: bilah tab bawah = `neuTrough()` (palung cekung permanen) + `neuSlidingKey()` (kunci timbul yang
+// meluncur, referensi `SkeuTabBar` Boomly B191) — SEMUA 6 tema; mesin/cache bitmap sama dgn `neuDepth()`.
+// ============================================================================
+
+private const val NeuLightX = -0.5522f
+private const val NeuLightY = -0.8337f
+private const val NeuCornerSteps = 4
+private const val NeuSmallScale = 0.75f
+private const val NeuBigScale = 0.3333f
+private const val NeuHugeScale = 0.2f
+private const val NeuWellScale = 0.75f
+
+/** Profil kedalaman turunan dari 2 warna permukaan + mode. [shadowStrength] 1f (gelap) / 0.42f
+ *  (terang): bayangan hitam pekat di kanvas terang jadi noda kasar. */
+internal data class NeuStyle(
+    val faceTop: Color,
+    val faceBottom: Color,
+    val rimLight: Color,
+    val rimLightAlpha: Float,
+    val rimShade: Color,
+    val rimShadeAlpha: Float,
+    val bevelWidth: Dp,
+    val castShadow: Color,
+    val shadowStrength: Float,
+    val wellFloor: Color
+)
+
+private fun neuStyle(faceTop: Color, faceBottom: Color, isDark: Boolean): NeuStyle {
+    val top = faceTop.copy(alpha = 1f)
+    val bottom = faceBottom.copy(alpha = 1f)
+    return if (isDark) {
+        NeuStyle(
+            faceTop = lerp(top, Color.White, 0.09f),
+            faceBottom = lerp(bottom, Color.White, 0.04f),
+            rimLight = lerp(top, Color.White, 0.88f),
+            rimLightAlpha = 0.40f,
+            rimShade = lerp(bottom, Color.Black, 0.92f),
+            rimShadeAlpha = 0.58f,
+            bevelWidth = 1.5.dp,
+            castShadow = lerp(bottom, Color.Black, 0.95f),
+            shadowStrength = 1f,
+            wellFloor = lerp(bottom, Color.Black, 0.55f)
+        )
+    } else {
+        NeuStyle(
+            faceTop = lerp(top, Color.White, 0.55f),
+            faceBottom = bottom,
+            rimLight = Color.White,
+            rimLightAlpha = 0.95f,
+            rimShade = lerp(bottom, Color.Black, 0.55f),
+            rimShadeAlpha = 0.30f,
+            bevelWidth = 1.5.dp,
+            castShadow = lerp(bottom, Color.Black, 0.60f),
+            shadowStrength = 0.42f,
+            wellFloor = lerp(bottom, Color.Black, 0.12f)
+        )
+    }
+}
+
+/** Satu lapis bayangan jatuh. [dx]/[dy] = offset (dp, + = kanan/bawah, menjauhi cahaya kiri-atas),
+ *  [blur] = lebar blur (~2 sigma, dp), [alpha] = kepekatan lapis. */
+private data class NeuShadowLayer(val dx: Float, val dy: Float, val blur: Float, val alpha: Float)
+
+private data class NeuShadowSpec(val layers: List<NeuShadowLayer>, val bleedDp: Float)
+
+/** Lapisan = pelat Boomly (kontak tajam + tengah + ambient lebar), diskalakan ke `elevation`
+ *  (8.dp = 1x, dikuantisasi 0.25 supaya spec/bitmap dibagi antar elemen berelevasi mirip). */
+private fun neuShadowSpec(elevation: Dp, strength: Float): NeuShadowSpec {
+    val k = ((elevation.value / 8f).coerceIn(0.5f, 2f) * 4f).roundToInt() / 4f
+    return NeuShadowSpec(
+        layers = listOf(
+            NeuShadowLayer(1.0f * k, 1.5f * k, 2.0f * k, 0.85f * strength),
+            NeuShadowLayer(4.0f * k, 6.0f * k, 8.0f * k, 0.62f * strength),
+            NeuShadowLayer(10.0f * k, 15.0f * k, 18.0f * k, 0.50f * strength)
+        ),
+        bleedDp = ceil(34f * k)
+    )
+}
+
+/** `BlurMaskFilter.radius` -> sigma = 0.57735 * radius + 0.5 (konversi Skia), dibalik supaya
+ *  parameter layer = sigma yang diinginkan (px bitmap); minimal 0.5 (radius <= 0 melempar). */
+private fun neuBlurRadius(sigmaPx: Float): Float = ((sigmaPx - 0.5f) / 0.57735f).coerceAtLeast(0.5f)
+
+private fun Outline.toNeuPath(): Path {
+    val o = this
+    return when (o) {
+        is Outline.Rectangle -> Path().apply { addRect(o.rect) }
+        is Outline.Rounded -> Path().apply { addRoundRect(o.roundRect) }
+        is Outline.Generic -> o.path
+    }
+}
+
+/** Kunci cache global. [kind]: 2 bayangan jatuh per-ukuran (hollow ikut di `extra`), 3 bayangan dalam sumur,
+ *  4 permukaan, 5 lapisan cahaya panel kaca (seluruh permukaan, Batch 553). */
+private data class NeuStoreKey(
+    val kind: Int,
+    val w: Int,
+    val h: Int,
+    val density: Float,
+    val shape: Shape?,
+    val style: NeuStyle?,
+    val extra: Any?
+)
+
+/** Cache GLOBAL bitmap efek (LRU, maks 48 entri). [get] = render SINKRON di thread UI (hanya untuk bitmap kecil/murah,
+ *  mis. permukaan 48x48). [getAsync] (Batch 700) = bayangan jatuh / sumur / wash: dirender di thread latar karena memakai
+ *  `BlurMaskFilter` + `Canvas(ImageBitmap)` (canvas PERANGKAT LUNAK) — log v698: `BaseCanvas.nDrawPath` <- `NeuDrawBlock.invoke`
+ *  dalam pesan thread utama 204 ms (frame `gambar`=183 ms). Semua properti `val` (tanpa `var` static). */
+private object NeuBitmapStore {
+    private const val MAX_ENTRIES = 48
+    private const val BUMP_COALESCE_MS = 120L
+    private val map = object : LinkedHashMap<Any, ImageBitmap>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Any, ImageBitmap>?): Boolean =
+            size > MAX_ENTRIES
+    }
+
+    /** Kunci yang sedang dirender (dijaga kunci [map]) supaya satu kunci tak dirender dua kali. */
+    private val pending = HashSet<Any>()
+
+    /** Naik tiap batch render latar selesai. DIBACA di [getAsync] (di dalam blok `drawWithCache` pemanggil) sehingga cache
+     *  gambar dievaluasi ulang dan bitmap yang sudah jadi terpakai. */
+    private val ready = mutableIntStateOf(0)
+    private val bumpScheduled = AtomicBoolean(false)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val bumpRunnable = Runnable {
+        bumpScheduled.set(false)
+        ready.intValue = ready.intValue + 1
+    }
+    private val executor = Executors.newSingleThreadExecutor { task ->
+        Thread(
+            {
+                Process.setThreadPriority(Process.THREAD_PRIORITY_LESS_FAVORABLE)
+                task.run()
+            },
+            "NeuRender"
+        ).apply { isDaemon = true }
+    }
+
+    fun get(key: Any, build: () -> ImageBitmap): ImageBitmap = synchronized(map) {
+        val hit = map[key]
+        if (hit != null) {
+            hit
+        } else {
+            val fresh = build()
+            map[key] = fresh
+            fresh
+        }
+    }
+
+    /** Bitmap bila sudah ada di cache; bila belum -> `null` SEKARANG dan render dijadwalkan di thread latar (gambar elemen
+     *  tanpa bayangan dulu, bayangan muncul begitu jadi). Hanya dipanggil dari blok cache gambar (thread UI). */
+    fun getAsync(key: Any, build: () -> ImageBitmap): ImageBitmap? {
+        // Membaca state = mendaftarkan blok `drawWithCache` pemanggil sebagai pengamat; nilainya tak pernah negatif.
+        if (ready.intValue < 0) return null
+        val hit: ImageBitmap?
+        val schedule: Boolean
+        synchronized(map) {
+            hit = map[key]
+            schedule = hit == null && pending.add(key)
+        }
+        if (schedule) executor.execute { renderInBackground(key, build) }
+        return hit
+    }
+
+    private fun renderInBackground(key: Any, build: () -> ImageBitmap) {
+        val fresh: ImageBitmap? = try {
+            build()
+        } catch (e: Exception) {
+            null
+        }
+        val idle: Boolean
+        synchronized(map) {
+            if (fresh != null) map[key] = fresh
+            pending.remove(key)
+            idle = pending.isEmpty()
+        }
+        if (fresh == null) return
+        if (idle) {
+            mainHandler.removeCallbacks(bumpRunnable)
+            mainHandler.post(bumpRunnable)
+        } else if (bumpScheduled.compareAndSet(false, true)) {
+            mainHandler.postDelayed(bumpRunnable, BUMP_COALESCE_MS)
+        }
+    }
+}
+
+/** Pembungkus blok `drawWithCache` yang `equals`-nya = kesamaan KUNCI (pola Boomly B190): rantai
+ *  modifier yang diulang saat rekomposisi dgn kunci sama dianggap SAMA -> node tak di-update &
+ *  cache gambar tak di-invalidate (tanpa `composed`). Kunci = SEMUA parameter yang dipakai blok. */
+private class NeuDrawBlock(
+    private val keys: List<Any?>,
+    private val block: CacheDrawScope.() -> DrawResult
+) : (CacheDrawScope) -> DrawResult {
+    override fun invoke(scope: CacheDrawScope): DrawResult = scope.block()
+
+    override fun equals(other: Any?): Boolean = other is NeuDrawBlock && other.keys == keys
+
+    override fun hashCode(): Int = keys.hashCode()
+}
+
+private fun Modifier.neuDraw(tag: String, vararg keys: Any?, block: CacheDrawScope.() -> DrawResult): Modifier =
+    this.drawWithCache(NeuDrawBlock(listOf(tag, *keys), block))
+
+/** Permukaan pelat ter-bake 48x48 (tak bergantung ukuran, di-skala bilinear): gradien
+ *  kiri-atas -> kanan-bawah + peredupan lembut ke kanan-bawah + kilau lembut dari sisi cahaya.
+ *  1 `drawImage` opak menggantikan beberapa pengisian gradien layar penuh per kartu. */
+private fun renderNeuFace(style: NeuStyle): ImageBitmap {
+    val n = 48
+    val top = style.faceTop.toArgb()
+    val bottom = style.faceBottom.toArgb()
+    val lit = style.rimLight.toArgb()
+    val shade = style.rimShade.toArgb()
+    val shifts = intArrayOf(16, 8, 0)
+    val px = IntArray(n * n)
+    for (y in 0 until n) {
+        val v = (y + 0.5f) / n
+        for (x in 0 until n) {
+            val u = (x + 0.5f) / n
+            val t = (u + v) * 0.5f
+            val dv = hypot(u - 0.40f, v - 0.35f).coerceIn(0f, 1f)
+            val va = dv * 0.14f
+            val ds = (hypot(u - 0.20f, v - 0.05f) / 0.85f).coerceIn(0f, 1f)
+            val sa = (1f - ds) * 0.07f
+            var rgb = 0
+            for (shift in shifts) {
+                val c0 = ((top shr shift) and 255).toFloat()
+                val c1 = ((bottom shr shift) and 255).toFloat()
+                var c = c0 + (c1 - c0) * t
+                c = c * (1f - va) + ((shade shr shift) and 255).toFloat() * va
+                c = c * (1f - sa) + ((lit shr shift) and 255).toFloat() * sa
+                rgb = rgb or (c.roundToInt().coerceIn(0, 255) shl shift)
+            }
+            px[y * n + x] = (0xFF shl 24) or rgb
+        }
+    }
+    return Bitmap.createBitmap(px, n, n, Bitmap.Config.ARGB_8888).asImageBitmap()
+}
+
+/** Render bayangan jatuh (timbul) ke bitmap perangkat lunak. Bitmap = bentuk + margin seragam
+ *  `spec.bleedDp` di semua sisi; semua panjang dihitung dalam px-bitmap (`dp * density * scale`),
+ *  `Density(k)` membuat sudut (dalam dp) ikut skala. */
+private fun renderNeuCastShadow(
+    shape: Shape,
+    wPx: Float,
+    hPx: Float,
+    density: Float,
+    style: NeuStyle,
+    spec: NeuShadowSpec,
+    scale: Float,
+    hollow: Boolean
+): ImageBitmap {
+    val k = density * scale
+    val m = spec.bleedDp
+    val bw = ceil((wPx + 2f * m * density) * scale).toInt().coerceAtLeast(2)
+    val bh = ceil((hPx + 2f * m * density) * scale).toInt().coerceAtLeast(2)
+    val bmp = ImageBitmap(bw, bh, ImageBitmapConfig.Argb8888)
+    val canvas = GfxCanvas(bmp)
+    val base = shape.createOutline(Size(wPx * scale, hPx * scale), LayoutDirection.Ltr, Density(k)).toNeuPath()
+    for (layer in spec.layers) {
+        val path = Path().apply { addPath(base, Offset(m * k + layer.dx * k, m * k + layer.dy * k)) }
+        val paint = Paint().apply {
+            isAntiAlias = true
+            color = style.castShadow.copy(alpha = layer.alpha)
+        }
+        paint.nativePaint.maskFilter =
+            BlurMaskFilter(neuBlurRadius(layer.blur * 0.5f * k), BlurMaskFilter.Blur.NORMAL)
+        canvas.drawPath(path, paint)
+    }
+    if (hollow) {
+        // Batch 553 — panel kaca: area DALAM bentuk dikecualikan dibakar ke bitmap (DstOut), bukan
+        // lagi `clipPath(ClipOp.Difference)` tiap frame gambar (clip path-AA per frame saat sheet/
+        // panel beranimasi). Bayangan tak lagi menggelapkan isi kaca, tanpa biaya clip saat gambar.
+        val cut = Paint().apply {
+            isAntiAlias = true
+            color = Color.Black
+            blendMode = BlendMode.DstOut
+        }
+        canvas.drawPath(Path().apply { addPath(base, Offset(m * k, m * k)) }, cut)
+    }
+    return bmp
+}
+
+/** Render bayangan DALAM (cekung): oklusi ambien merata + bayangan gelap dari dinding sisi
+ *  kiri-atas + bibir terang tipis di dinding sisi kanan-bawah, dipotong ke bentuk (`DstOut` pada
+ *  area luar = tepi tetap mulus). */
+private fun renderNeuWellInner(shape: Shape, wPx: Float, hPx: Float, density: Float, style: NeuStyle): ImageBitmap {
+    val bw = (wPx * NeuWellScale).roundToInt().coerceAtLeast(1)
+    val bh = (hPx * NeuWellScale).roundToInt().coerceAtLeast(1)
+    val k = density * NeuWellScale
+    val bmp = ImageBitmap(bw, bh, ImageBitmapConfig.Argb8888)
+    val canvas = GfxCanvas(bmp)
+    val shapePath = shape.createOutline(Size(bw.toFloat(), bh.toFloat()), LayoutDirection.Ltr, Density(k)).toNeuPath()
+    val pad = 48f * k
+    fun outside(dx: Float, dy: Float): Path = Path().apply {
+        fillType = PathFillType.EvenOdd
+        addRect(Rect(-pad + dx, -pad + dy, bw + pad + dx, bh + pad + dy))
+        addPath(shapePath, Offset(dx, dy))
+    }
+    val ao = Paint().apply {
+        isAntiAlias = true
+        color = style.castShadow.copy(alpha = 0.40f)
+    }
+    ao.nativePaint.maskFilter = BlurMaskFilter(neuBlurRadius(2.6f * k), BlurMaskFilter.Blur.NORMAL)
+    canvas.drawPath(outside(0.4f * k, 0.6f * k), ao)
+    val shadow = Paint().apply {
+        isAntiAlias = true
+        color = style.castShadow.copy(alpha = 0.85f)
+    }
+    shadow.nativePaint.maskFilter = BlurMaskFilter(neuBlurRadius(1.6f * k), BlurMaskFilter.Blur.NORMAL)
+    canvas.drawPath(outside(2.0f * k, 2.6f * k), shadow)
+    val lip = Paint().apply {
+        isAntiAlias = true
+        color = style.rimLight.copy(alpha = 0.20f)
+    }
+    lip.nativePaint.maskFilter = BlurMaskFilter(neuBlurRadius(0.5f * k), BlurMaskFilter.Blur.NORMAL)
+    canvas.drawPath(outside(-1.0f * k, -1.2f * k), lip)
+    val cut = Paint().apply {
+        isAntiAlias = true
+        color = Color.Black
+        blendMode = BlendMode.DstOut
+    }
+    canvas.drawPath(outside(0f, 0f), cut)
+    return bmp
+}
+
+/** Batch 553 — lapisan cahaya SELURUH permukaan panel kaca (bevel 1.5dp saja = kedalaman cuma tampak
+ *  di garis tepi). Satu bitmap kecil ber-cache: wash diagonal sorot kiri-atas -> teduh kanan-bawah +
+ *  4 pita tepi-dalam (atas/kiri terang, bawah/kanan gelap, lebar ~14dp, memudar ke dalam), dipotong ke
+ *  bentuk (`DstOut` pada area luar). [bevelScale] = pengali alpha seperti bevel. */
+private fun renderNeuGlassWash(
+    shape: Shape,
+    wPx: Float,
+    hPx: Float,
+    density: Float,
+    style: NeuStyle,
+    bevelScale: Float
+): ImageBitmap {
+    val scale = when {
+        wPx * hPx > (480f * density) * (480f * density) -> NeuHugeScale
+        max(wPx, hPx) > 160f * density -> NeuBigScale
+        else -> NeuSmallScale
+    }
+    val bw = (wPx * scale).roundToInt().coerceAtLeast(2)
+    val bh = (hPx * scale).roundToInt().coerceAtLeast(2)
+    val k = density * scale
+    val bmp = ImageBitmap(bw, bh, ImageBitmapConfig.Argb8888)
+    val canvas = GfxCanvas(bmp)
+    val wf = bw.toFloat()
+    val hf = bh.toFloat()
+    val lightA = style.rimLightAlpha * bevelScale
+    val shadeA = style.rimShadeAlpha * bevelScale
+    val lightClear = style.rimLight.copy(alpha = 0f).toArgb()
+    val shadeClear = style.rimShade.copy(alpha = 0f).toArgb()
+    fun gradientPaint(x0: Float, y0: Float, x1: Float, y1: Float, from: Int, to: Int): Paint =
+        Paint().apply {
+            nativePaint.shader = android.graphics.LinearGradient(
+                x0, y0, x1, y1, from, to, android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+    // Wash diagonal: sorot (kiri-atas) -> bening (tengah) -> teduh (kanan-bawah).
+    val diag = Paint().apply {
+        nativePaint.shader = android.graphics.LinearGradient(
+            0f, 0f, wf, hf,
+            intArrayOf(
+                style.rimLight.copy(alpha = lightA * 0.40f).toArgb(),
+                lightClear,
+                style.rimShade.copy(alpha = shadeA * 0.45f).toArgb()
+            ),
+            floatArrayOf(0f, 0.5f, 1f),
+            android.graphics.Shader.TileMode.CLAMP
+        )
+    }
+    canvas.drawRect(0f, 0f, wf, hf, diag)
+    // Pita tepi-dalam: tebal 14dp (maks 1/4 sisi terpendek), memudar ke dalam panel.
+    val band = min(14f * k, min(wf, hf) * 0.25f).coerceAtLeast(1f)
+    val top = gradientPaint(0f, 0f, 0f, band, style.rimLight.copy(alpha = lightA * 0.90f).toArgb(), lightClear)
+    canvas.drawRect(0f, 0f, wf, band, top)
+    val left = gradientPaint(0f, 0f, band, 0f, style.rimLight.copy(alpha = lightA * 0.60f).toArgb(), lightClear)
+    canvas.drawRect(0f, 0f, band, hf, left)
+    val bottom = gradientPaint(0f, hf - band, 0f, hf, shadeClear, style.rimShade.copy(alpha = shadeA * 0.80f).toArgb())
+    canvas.drawRect(0f, hf - band, wf, hf, bottom)
+    val right = gradientPaint(wf - band, 0f, wf, 0f, shadeClear, style.rimShade.copy(alpha = shadeA * 0.60f).toArgb())
+    canvas.drawRect(wf - band, 0f, wf, hf, right)
+    // Potong ke bentuk: area luar dihapus (tepi tetap mulus, sudut membulat ikut bentuk).
+    val shapePath = shape.createOutline(Size(wf, hf), LayoutDirection.Ltr, Density(k)).toNeuPath()
+    val pad = 48f * k
+    val outside = Path().apply {
+        fillType = PathFillType.EvenOdd
+        addRect(Rect(-pad, -pad, wf + pad, hf + pad))
+        addPath(shapePath)
+    }
+    val cut = Paint().apply {
+        isAntiAlias = true
+        color = Color.Black
+        blendMode = BlendMode.DstOut
+    }
+    canvas.drawPath(outside, cut)
+    return bmp
+}
+
+/** Gambar bitmap bayangan per-ukuran (margin seragam [bleedDp] di semua sisi). */
+private fun DrawScope.drawNeuShadow(bmp: ImageBitmap, density: Float, scale: Float, bleedDp: Float, alpha: Float) {
+    val m = (bleedDp * density).roundToInt()
+    drawImage(
+        image = bmp,
+        dstOffset = IntOffset(-m, -m),
+        dstSize = IntSize((bmp.width / scale).roundToInt(), (bmp.height / scale).roundToInt()),
+        alpha = alpha
+    )
+}
+
+private fun neuQuad(x0: Float, y0: Float, x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float): Path =
+    Path().apply {
+        moveTo(x0, y0)
+        lineTo(x1, y1)
+        lineTo(x2, y2)
+        lineTo(x3, y3)
+        close()
+    }
+
+/** Bevel FACET untuk pelat bersudut radius [r] (0 = persegi), lebar [b]: 4 sisi lurus + 4 sudut
+ *  yang dipecah [NeuCornerSteps] irisan busur; tiap facet diwarnai menurut `dot(normal, arahCahaya)`
+ *  (sisi menghadap cahaya = sorot, membelakangi = gelap). [scale] mengecilkan alpha bevel (panel
+ *  kaca memakai < 1 supaya tak bertumpuk berat dgn border tema). */
+private fun neuRoundFacets(
+    out: MutableList<Pair<Path, Color>>,
+    w: Float,
+    h: Float,
+    r: Float,
+    b: Float,
+    style: NeuStyle,
+    scale: Float
+) {
+    fun colorFor(nx: Float, ny: Float): Color {
+        val l = nx * NeuLightX + ny * NeuLightY
+        val scaled = min(1f, abs(l) / 0.83f)
+        return if (l > 0f) {
+            style.rimLight.copy(alpha = style.rimLightAlpha * scaled * scale)
+        } else {
+            style.rimShade.copy(alpha = style.rimShadeAlpha * scaled * scale)
+        }
+    }
+    val bi = (r - b).coerceAtLeast(0f)
+    if (w - 2f * r > 0.5f) {
+        out.add(Pair(neuQuad(r, 0f, w - r, 0f, w - r, b, r, b), colorFor(0f, -1f)))
+        out.add(Pair(neuQuad(r, h, w - r, h, w - r, h - b, r, h - b), colorFor(0f, 1f)))
+    }
+    if (h - 2f * r > 0.5f) {
+        out.add(Pair(neuQuad(w, r, w, h - r, w - b, h - r, w - b, r), colorFor(1f, 0f)))
+        out.add(Pair(neuQuad(0f, r, 0f, h - r, b, h - r, b, r), colorFor(-1f, 0f)))
+    }
+    if (r < 0.5f) return
+    // Pusat busur & sudut awal (derajat, y ke bawah): kiri-atas 180->270, kanan-atas 270->360,
+    // kanan-bawah 0->90, kiri-bawah 90->180.
+    val cxs = floatArrayOf(r, w - r, w - r, r)
+    val cys = floatArrayOf(r, r, h - r, h - r)
+    val starts = floatArrayOf(180f, 270f, 0f, 90f)
+    val step = 90f / NeuCornerSteps
+    for (i in 0 until 4) {
+        val cx = cxs[i]
+        val cy = cys[i]
+        val outerRect = Rect(cx - r, cy - r, cx + r, cy + r)
+        val innerRect = Rect(cx - bi, cy - bi, cx + bi, cy + bi)
+        for (s in 0 until NeuCornerSteps) {
+            val a0 = starts[i] + s * step
+            val mid = Math.toRadians((a0 + step / 2f).toDouble())
+            val path = Path().apply {
+                arcTo(outerRect, a0, step, true)
+                if (bi > 0.05f) {
+                    arcTo(innerRect, a0 + step, -step, false)
+                } else {
+                    lineTo(cx, cy)
+                }
+                close()
+            }
+            out.add(Pair(path, colorFor(cos(mid).toFloat(), sin(mid).toFloat())))
+        }
+    }
+}
+
+/** Bayangan jatuh (digambar DI BELAKANG, boleh keluar batas — jangan di-clip di atasnya).
+ *  [press] = progres tekan 0..1 (null = tak pernah ditekan): bayangan memudar saat pressed, bibir
+ *  sumur (garis terang tipis di tepi kanan-bawah LUAR) muncul. [hollow] = permukaan di atasnya
+ *  tembus pandang (panel kaca): area DALAM bentuk dikecualikan (dibakar ke bitmap, Batch 553) supaya
+ *  bayangan tak menggelapkan isi kaca. */
+private fun Modifier.neuCastShadow(
+    shape: Shape,
+    style: NeuStyle,
+    spec: NeuShadowSpec,
+    press: State<Float>?,
+    hollow: Boolean
+): Modifier = neuDraw("neuCast", shape, style, spec, press, hollow) {
+    val w = size.width
+    val h = size.height
+    val d = density
+    if (w < 2f || h < 2f) {
+        onDrawBehind { }
+    } else {
+        val wi = w.roundToInt()
+        val hi = h.roundToInt()
+        // Panel raksasa (sheet kaca layar-penuh) memakai skala 0.2f: bayangannya sangat buram,
+        // jadi bitmap kecil di-upsample tetap mulus & memori per entri cache tetap < ~0.6 MB.
+        val scale = when {
+            w * h > (480f * d) * (480f * d) -> NeuHugeScale
+            max(w, h) > 160f * d -> NeuBigScale
+            else -> NeuSmallScale
+        }
+        val bmp = NeuBitmapStore.getAsync(NeuStoreKey(2, wi, hi, d, shape, style, Pair(spec, hollow))) {
+            renderNeuCastShadow(shape, w, h, d, style, spec, scale, hollow)
+        }
+        val base = shape.createOutline(size, layoutDirection, this).toNeuPath()
+        val lip: Path? = if (!hollow && press != null) {
+            Path().apply { addPath(base, Offset(0.7f * d, 1.0f * d)) }
+        } else {
+            null
+        }
+        onDrawBehind {
+            val t = press?.value ?: 0f
+            val raisedAlpha = 1f - t
+            if (bmp != null && raisedAlpha > 0.01f) {
+                drawNeuShadow(bmp, d, scale, spec.bleedDp, raisedAlpha)
+            }
+            if (t > 0.01f && lip != null) {
+                drawPath(lip, style.rimLight.copy(alpha = 0.22f * t))
+            }
+        }
+    }
+}
+
+/** Permukaan pelat + bevel + (saat pressed) sumur cekung, digambar DI DALAM bentuk (pasang SETELAH
+ *  `.clip(shape)` bila [paintFace]). [paintFace] false = hanya bevel (panel kaca: tint tema sudah
+ *  digambar `frostedGlass()`, pasang SETELAH `.background(...)`). [bevelScale] = pengali alpha bevel. */
+private fun Modifier.neuFace(
+    shape: Shape,
+    style: NeuStyle,
+    press: State<Float>?,
+    paintFace: Boolean,
+    bevelScale: Float
+): Modifier = neuDraw("neuFace", shape, style, press, paintFace, bevelScale) {
+    val w = size.width
+    val h = size.height
+    val d = density
+    if (w < 4f || h < 4f) {
+        onDrawBehind { }
+    } else {
+        val wi = w.roundToInt()
+        val hi = h.roundToInt()
+        val face: ImageBitmap? =
+            if (paintFace) NeuBitmapStore.get(NeuStoreKey(4, 0, 0, 1f, null, style, null)) { renderNeuFace(style) } else null
+        val well: ImageBitmap? =
+            if (paintFace && press != null) {
+                NeuBitmapStore.getAsync(NeuStoreKey(3, wi, hi, d, shape, style, null)) {
+                    renderNeuWellInner(shape, wi.toFloat(), hi.toFloat(), d, style)
+                }
+            } else {
+                null
+            }
+        // Batch 553 — panel kaca (paintFace=false): cahaya seluruh permukaan, bukan cuma garis bevel.
+        val wash: ImageBitmap? =
+            if (!paintFace) {
+                NeuBitmapStore.getAsync(NeuStoreKey(5, wi, hi, d, shape, style, bevelScale)) {
+                    renderNeuGlassWash(shape, wi.toFloat(), hi.toFloat(), d, style, bevelScale)
+                }
+            } else {
+                null
+            }
+        val b = style.bevelWidth.toPx()
+        val outline = shape.createOutline(size, layoutDirection, this)
+        val radius: Float = when (outline) {
+            is Outline.Rounded -> min(outline.roundRect.topLeftCornerRadius.x, min(w, h) / 2f)
+            is Outline.Rectangle -> 0f
+            is Outline.Generic -> -1f
+        }
+        val facets = ArrayList<Pair<Path, Color>>(4 + 4 * NeuCornerSteps)
+        if (radius >= 0f) neuRoundFacets(facets, w, h, radius, b, style, bevelScale)
+        val fallbackPath: Path? = if (radius < 0f) outline.toNeuPath() else null
+        val fallbackBrush = Brush.linearGradient(
+            0.00f to style.rimLight.copy(alpha = style.rimLightAlpha * bevelScale),
+            0.50f to Color.Transparent,
+            1.00f to style.rimShade.copy(alpha = style.rimShadeAlpha * bevelScale),
+            start = Offset(0f, 0f),
+            end = Offset(w, h)
+        )
+        onDrawBehind {
+            val t = press?.value ?: 0f
+            if (face != null) drawImage(face, dstSize = IntSize(wi, hi))
+            if (wash != null) drawImage(wash, dstSize = IntSize(wi, hi))
+            if (t > 0.01f) {
+                drawRect(style.wellFloor.copy(alpha = t))
+                if (well != null) drawImage(well, dstSize = IntSize(wi, hi), alpha = t)
+            }
+            val bevelAlpha = 1f - t
+            if (bevelAlpha > 0.01f) {
+                for (f in facets) {
+                    drawPath(f.first, f.second.copy(alpha = f.second.alpha * bevelAlpha))
+                }
+                if (fallbackPath != null) {
+                    drawPath(fallbackPath, brush = fallbackBrush, alpha = bevelAlpha, style = Stroke(width = b))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Panel PADAT berkedalaman (Tactile, Neumorphism, dan kartu datar Apple/Calm Retro/Aurora):
+ * bayangan jatuh Gaussian di belakang -> `.clip(shape)` -> permukaan pelat ter-angkat + bevel
+ * facet. [pressed] non-null = elemen interaktif (sumur cekung saat true); null = statis (tanpa
+ * bitmap sumur). [faceTop]/[faceBottom] = warna permukaan tema (mesin mengangkat luminansinya);
+ * [isDark] default = mode tema aktif (preview picker tema mengirim mode preview-nya sendiri).
+ */
+@Composable
+fun Modifier.neuDepth(
+    shape: Shape,
+    elevation: Dp,
+    faceTop: Color,
+    faceBottom: Color,
+    pressed: Boolean? = null,
+    isDark: Boolean = LocalIsDarkTheme.current
+): Modifier {
+    val style = remember(faceTop, faceBottom, isDark) { neuStyle(faceTop, faceBottom, isDark) }
+    val spec = remember(elevation, style.shadowStrength) { neuShadowSpec(elevation, style.shadowStrength) }
+    val press: State<Float>? = if (pressed != null) {
+        animateFloatAsState(
+            targetValue = if (pressed) 1f else 0f,
+            // Batch 561 — masuk 70ms (terasa INSTAN saat jari menyentuh), keluar 160ms (lembut);
+            // dulu simetris 110ms: tap singkat (<110ms) tak sempat tenggelam penuh.
+            animationSpec = tween(durationMillis = if (pressed) 70 else 160),
+            label = "neuDepthPress"
+        )
+    } else {
+        null
+    }
+    return this
+        .neuCastShadow(shape, style, spec, press, false)
+        .clip(shape)
+        .neuFace(shape, style, press, true, 1f)
+}
+
+/** Kartu datar tema non-panel (Apple, Calm Retro, Aurora) — warna permukaan dari `colorScheme.surface`.
+ *  Pasangkan dengan `Surface(color = Color.Transparent, tonalElevation = 0.dp)` (pola yang sama
+ *  dgn cabang Tactile/Neumorphism): fill digambar di sini, bukan oleh Surface. */
+@Composable
+fun Modifier.neuSurface(shape: Shape, elevation: Dp = 8.dp, pressed: Boolean? = null): Modifier {
+    val surface = MaterialTheme.colorScheme.surface
+    return this.neuDepth(shape = shape, elevation = elevation, faceTop = surface, faceBottom = surface, pressed = pressed)
+}
+
+/**
+ * Batch 557 — TILE baris (baris Pengaturan + baris daftar lagu): satu pintu untuk semua identitas.
+ * Tactile -> [tactileEmboss], Neumorphism -> [skeuEmboss], Apple/Calm Retro/Liquid Glass/Aurora ->
+ * [neuSurface]. Liquid Glass SENGAJA `neuSurface()` (bukan `frostedGlass()`): blur Haze per baris
+ * yang ikut di-scroll terlalu mahal (lihat catatan performa `BlurUtils.kt`). Fill digambar mesin
+ * kedalaman, jadi node ini TIDAK boleh punya `.background()` permukaan lagi; pasang `.clickable`
+ * SESUDAH modifier ini supaya ripple ter-clip ke bentuk tile.
+ * Batch 564 — [active]: keadaan tile aktif (mis. baris saklar ON); hanya Neumorphism yang
+ * menggambarnya (rel ruby + pendar + wash anggur menguat), tema lain mengabaikan.
+ */
+@Composable
+fun Modifier.neuRowTile(
+    shape: Shape = RoundedCornerShape(Radius.xl),
+    elevation: Dp = 4.dp,
+    pressed: Boolean? = null,
+    active: Boolean = false
+): Modifier = when {
+    isTactileTheme() -> this.tactileEmboss(shape = shape, elevation = elevation, pressed = pressed == true)
+    isSkeuTheme() -> this.skeuEmboss(shape = shape, elevation = elevation, pressed = pressed == true, active = active)
+    else -> this.neuSurface(shape = shape, elevation = elevation, pressed = pressed)
+}
+
+/**
+ * Batch 559 — tile baris yang bisa DITEKAN: [neuRowTile] + sumur cekung selama jari menekan
+ * (Tactile/Neumorphism ikut skala emboss 0.985/0.978). Tanpa ripple/overlay (Batch 560), clip dari
+ * mesin kedalaman. Pasang `.padding()` isi SESUDAH modifier ini; jangan tambah `.clickable` lagi.
+ * Batch 561 — sumur TIDAK lagi dibaca dari `PressInteraction` milik `clickable`: di dalam kontainer
+ * scroll (LazyColumn) Compose menunda `Press` ~100ms (`tapIndicationDelay`) dan tap singkat baru
+ * mengirim Press+Release sekaligus saat jari diangkat -> sumur nyaris tak terlihat. Kini sumur
+ * dipicu [neuInstantPress] (saat jari MENYENTUH, tanpa jeda; batal bila jari bergeser > touch slop
+ * = mulai scroll, atau bila anak seperti tombol favorit sudah mengonsumsi sentuhan). [held] = tetap
+ * terbenam walau jari sudah lepas/bergeser (baris TERPILIH di mode pilih; sweep-select mengonsumsi
+ * gerakan jari sehingga tanpa ini sumur lenyap tepat saat drag-select dimulai).
+ */
+@Composable
+fun Modifier.neuPressTile(
+    shape: Shape = RoundedCornerShape(Radius.xl),
+    elevation: Dp = 4.dp,
+    held: Boolean = false,
+    onClick: () -> Unit
+): Modifier {
+    val interactionSource = remember { MutableInteractionSource() }
+    val touching = remember { mutableStateOf(false) }
+    return this
+        .neuRowTile(shape = shape, elevation = elevation, pressed = touching.value || held)
+        .clickable(
+            interactionSource = interactionSource,
+            // Batch 560 — TANPA indication: sumur cekung milik tile sudah jadi feedback tekan;
+            // `NeuDepthIndication` (LocalIndication) di atasnya akan jadi dobel.
+            indication = null,
+            onClick = onClick
+        )
+        // Batch 561 — SESUDAH `.clickable` (= lebih dalam di rantai): pada pass Main node ini jalan
+        // SEBELUM `clickable` milik tile dan SESUDAH anak (IconButton favorit/menu, Checkbox), sehingga
+        // `requireUnconsumed = true` hanya lolos untuk sentuhan yang memang milik tile ini.
+        .neuInstantPress(touching)
+}
+
+/**
+ * Batch 561 — penanda "jari sedang menyentuh" TANPA jeda: [touching] jadi true pada event down
+ * pertama dan false saat jari diangkat / dibatalkan / bergeser lebih dari touch slop (gerakan itu
+ * = scroll atau drag, bukan tap). Tidak mengonsumsi apa pun, jadi `clickable`, scroll, dan
+ * `detectDragGesturesAfterLongPress` (sweep-select) tetap jalan persis seperti semula.
+ * [pass]/[requireUnconsumed]: default Main + true untuk node yang dipasang SESUDAH `clickable` tile;
+ * komponen tanpa anak yang mengonsumsi (tombol play/pause) memakai Initial + false.
+ */
+internal fun Modifier.neuInstantPress(
+    touching: MutableState<Boolean>,
+    pass: PointerEventPass = PointerEventPass.Main,
+    requireUnconsumed: Boolean = true
+): Modifier = this.pointerInput(touching, pass, requireUnconsumed) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = requireUnconsumed, pass = pass)
+        touching.value = true
+        try {
+            val slop = viewConfiguration.touchSlop
+            while (true) {
+                val change = awaitPointerEvent(pass).changes.firstOrNull { it.id == down.id } ?: break
+                if (!change.pressed || (change.position - down.position).getDistance() > slop) break
+            }
+        } finally {
+            touching.value = false
+        }
+    }
+}
+
+/**
+ * Batch 561 — KUNCI AKSEN timbul untuk tombol aksi utama (play/pause NowPlaying), SEMUA tema.
+ * Akar bug "tombol masih datar saat diam": `FilledIconButton` mengecat `containerColor` OPAK di atas
+ * lapisan permukaan/bevel `tactileEmboss()`/`skeuEmboss()` (yang digambar `drawBehind`) -> yang tersisa
+ * hanya bayangan jatuh; tema lain (Apple/Calm Retro/Liquid Glass/Aurora) bahkan tanpa modifier depth.
+ * Di sini permukaan = [accent] APA ADANYA (tanpa angkat luminansi `neuStyle`, ikon tetap kontras) +
+ * vignette/kilau lembut + bevel rim kiri-atas terang / kanan-bawah gelap; [pressed] = sumur cekung
+ * (lantai gelap + bayangan dalam kiri-atas + bibir terang kanan-bawah, bevel memudar). Bayangan jatuh
+ * dari mesin bersama dgn gaya NETRAL dari `colorScheme.background` (pola [neuCastOnly]).
+ * [accent] beranimasi per frame (`animateColorAsState` 700ms) -> permukaan/bevel digambar LANGSUNG
+ * (tanpa `NeuBitmapStore`): style berbasis accent akan merender ulang bitmap blur tiap frame dan
+ * menguras cache LRU 48 entri. Sudah mengandung `.clip(shape)`; konten digambar di atasnya.
+ */
+@Composable
+fun Modifier.neuAccentKey(
+    shape: Shape,
+    accent: Color,
+    elevation: Dp = 10.dp,
+    pressed: Boolean,
+    isDark: Boolean = LocalIsDarkTheme.current,
+    bezel: Color? = null
+): Modifier {
+    val canvas = MaterialTheme.colorScheme.background
+    val style = remember(canvas, isDark) { neuStyle(canvas, canvas, isDark) }
+    val spec = remember(elevation, style.shadowStrength) { neuShadowSpec(elevation, style.shadowStrength) }
+    val press = animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = tween(durationMillis = if (pressed) 70 else 160),
+        label = "neuAccentKeyPress"
+    )
+    return this
+        .neuCastShadow(shape, style, spec, press, false)
+        .clip(shape)
+        .drawBehind { drawNeuAccentFace(shape, accent, isDark, press.value, bezel) }
+}
+
+// Batch 565 — [bezel] (opsional, dipakai HANYA Neumorphism = gilt): cincin tipis 1.25dp di dalam bevel, menjadikan tombol
+// aksi utama "medali" (bingkai emas di atas permukaan aksen dinamis per-lagu; warna aksen TIDAK diganti). Memudar
+// setengah saat ditekan. null = perilaku Batch 561 persis.
+private fun DrawScope.drawNeuAccentFace(shape: Shape, accent: Color, isDark: Boolean, t: Float, bezel: Color? = null) {
+    val w = size.width
+    val h = size.height
+    if (w < 4f || h < 4f) return
+    val base = accent.copy(alpha = 1f)
+    val shade = lerp(base, Color.Black, if (isDark) 0.92f else 0.55f)
+    val lit = if (isDark) lerp(base, Color.White, 0.88f) else Color.White
+    val edge = min(w, h)
+    val b = 1.5.dp.toPx()
+    // 1. permukaan + vignette (pusat 0.40/0.35) + kilau (pusat 0.20/0.05), angka = renderNeuFace().
+    drawRect(base)
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(shade.copy(alpha = 0f), shade.copy(alpha = 0.14f)),
+            center = Offset(0.40f * w, 0.35f * h),
+            radius = edge
+        )
+    )
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(lit.copy(alpha = 0.07f), lit.copy(alpha = 0f)),
+            center = Offset(0.20f * w, 0.05f * h),
+            radius = edge * 0.85f
+        )
+    )
+    // 2. bevel rim (memudar saat ditekan): Stroke 2b dipusatkan di tepi, separuh luarnya ter-clip.
+    val bevelAlpha = 1f - t
+    if (bevelAlpha > 0.01f) {
+        val rim = shape.createOutline(size, layoutDirection, this).toNeuPath()
+        drawPath(
+            path = rim,
+            brush = Brush.linearGradient(
+                0.00f to lit.copy(alpha = (if (isDark) 0.40f else 0.95f) * bevelAlpha),
+                0.50f to Color.Transparent,
+                1.00f to shade.copy(alpha = (if (isDark) 0.58f else 0.30f) * bevelAlpha),
+                start = Offset(0f, 0f),
+                end = Offset(w, h)
+            ),
+            style = Stroke(width = 2f * b)
+        )
+    }
+    // 2b. bezel gilt (Batch 565): cincin diagonal terang -> redup -> terang, inset 5dp dari tepi.
+    if (bezel != null) {
+        val inset = 5.dp.toPx()
+        val rw = w - 2f * inset
+        val rh = h - 2f * inset
+        if (rw > 8f && rh > 8f) {
+            val ringA = 1f - 0.5f * t
+            val ring = shape.createOutline(Size(rw, rh), layoutDirection, this).toNeuPath()
+            translate(left = inset, top = inset) {
+                drawPath(
+                    path = ring,
+                    brush = Brush.linearGradient(
+                        0.00f to bezel.copy(alpha = 0.85f * ringA),
+                        0.50f to bezel.copy(alpha = 0.22f * ringA),
+                        1.00f to bezel.copy(alpha = 0.60f * ringA),
+                        start = Offset(0f, 0f),
+                        end = Offset(rw, rh)
+                    ),
+                    style = Stroke(width = 1.25.dp.toPx())
+                )
+            }
+        }
+    }
+    // 3. sumur cekung saat ditekan.
+    if (t > 0.01f) {
+        val band = 8.dp.toPx().coerceAtMost(edge / 2f)
+        drawRect(Color.Black.copy(alpha = 0.18f * t))
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color.Black.copy(alpha = 0.34f * t), Color.Transparent),
+                startY = 0f,
+                endY = band
+            ),
+            size = Size(w, band)
+        )
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Black.copy(alpha = 0.34f * t), Color.Transparent),
+                startX = 0f,
+                endX = band
+            ),
+            size = Size(band, h)
+        )
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.14f * t)),
+                startY = h - band,
+                endY = h
+            ),
+            topLeft = Offset(0f, h - band),
+            size = Size(w, band)
+        )
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.14f * t)),
+                startX = w - band,
+                endX = w
+            ),
+            topLeft = Offset(w - band, 0f),
+            size = Size(band, h)
+        )
+    }
+}
+
+/** Bayangan jatuh SAJA untuk konten OPAK yang menggambar dirinya sendiri (hero album art): tanpa
+ *  permukaan/bevel (art menutupi bagian belakang), tanpa `.clip()` — pasang SEBELUM `.clip(shape)`
+ *  milik pemanggil. Warna bayangan diturunkan dari `colorScheme.background` (hue tema). */
+@Composable
+fun Modifier.neuCastOnly(
+    shape: Shape,
+    elevation: Dp = 8.dp,
+    isDark: Boolean = LocalIsDarkTheme.current
+): Modifier {
+    val canvas = MaterialTheme.colorScheme.background
+    val style = remember(canvas, isDark) { neuStyle(canvas, canvas, isDark) }
+    val spec = remember(elevation, style.shadowStrength) { neuShadowSpec(elevation, style.shadowStrength) }
+    return this.neuCastShadow(shape, style, spec, null, false)
+}
+
+/** Bayangan jatuh untuk panel KACA (tint di atasnya tembus pandang) — dipakai `frostedGlass()`
+ *  SEBELUM `.background(tint)`. Area dalam bentuk dikecualikan (lihat [neuCastShadow]). */
+@Composable
+internal fun Modifier.neuHollowShadow(
+    shape: Shape,
+    tint: Color,
+    elevation: Dp = 8.dp,
+    isDark: Boolean = LocalIsDarkTheme.current
+): Modifier {
+    val style = remember(tint, isDark) { neuStyle(tint, tint, isDark) }
+    val spec = remember(elevation, style.shadowStrength) { neuShadowSpec(elevation, style.shadowStrength) }
+    return this.neuCastShadow(shape, style, spec, null, true)
+}
+
+/** Bevel facet untuk panel KACA — dipakai `frostedGlass()` SETELAH `.background(tint)` supaya
+ *  tidak tertimbun tint. Alpha 0.7x (border tema tetap digambar sesudahnya). */
+@Composable
+internal fun Modifier.neuBevelOnly(
+    shape: Shape,
+    tint: Color,
+    isDark: Boolean = LocalIsDarkTheme.current
+): Modifier {
+    val style = remember(tint, isDark) { neuStyle(tint, tint, isDark) }
+    return this.neuFace(shape, style, null, false, 0.7f)
+}
+
+/**
+ * Batch 555 — PALUNG CEKUNG permanen untuk bilah tab bawah (referensi `SkeuTabBar` Boomly B191:
+ * palung cekung + SATU kunci timbul yang meluncur). Sama dengan keadaan `pressed = true` milik
+ * [neuDepth] (lantai sumur gelap + bayangan dalam + bibir terang di tepi kanan-bawah luar) tetapi TETAP:
+ * tanpa bevel luar, tanpa bayangan jatuh. [base] = warna permukaan bilah tema aktif (lantai sumur
+ * diturunkan darinya, palet/identitas tema tidak diganti). Sudah mengandung `.clip(shape)` — modifier
+ * sesudahnya ter-clip ke bentuk palung.
+ */
+@Composable
+fun Modifier.neuTrough(
+    shape: Shape,
+    base: Color,
+    isDark: Boolean = LocalIsDarkTheme.current
+): Modifier = this.neuDepth(
+    shape = shape,
+    elevation = 8.dp,
+    faceTop = base,
+    faceBottom = base,
+    pressed = true,
+    isDark = isDark
+)
+
+/**
+ * Batch 555 — KUNCI TIMBUL (pill) yang meluncur di dalam [neuTrough]: bayangan jatuh Gaussian 3 lapis +
+ * permukaan pelat ter-angkat + bevel facet, semuanya dari cache bitmap global yang sama dengan
+ * [neuDepth] (0 render blur per frame). Digambar DI BELAKANG konten node (`onDrawBehind`) sehingga ikon/label
+ * tetap di atas kunci; syarat: node yang dipasangi modifier ini tidak boleh punya latar opak sendiri.
+ * [count] = jumlah tab; [widthFraction] = lebar kunci relatif terhadap SATU slot tab; [heightFraction] =
+ * tinggi kunci relatif terhadap tinggi node; [position] = posisi PUSAT kunci dalam satuan tab (0.5f =
+ * tengah tab pertama), dibaca di fase GAMBAR (0 rekomposisi per frame; di-clamp ke tepi node).
+ * [base] = warna permukaan kunci (mesin mengangkat luminansinya).
+ * Batch 565 — [wine] = true (HANYA Neumorphism): kunci diberi lapisan aksen burgundy yang sama dgn tile Pengaturan
+ * ([drawSkeuKeyWine]: wash anggur diagonal + hairline gilt tepi atas + pendar ruby di belakang ikon). Lapisan
+ * digambar DI ATAS permukaan kunci, di dalam clip-nya, di BELAKANG ikon/label; alpha dijaga rendah supaya kontras
+ * `onSecondaryContainer` di atas kunci tetap >= 4.5:1 (hitungan offline, wash + pendar ditumpuk = kasus terburuk:
+ * 6.7:1 gelap / 6.1:1 terang). Default false = perilaku Batch 555 persis.
+ */
+@Composable
+fun Modifier.neuSlidingKey(
+    shape: Shape,
+    base: Color,
+    count: Int,
+    widthFraction: Float,
+    heightFraction: Float,
+    elevation: Dp = 4.dp,
+    isDark: Boolean = LocalIsDarkTheme.current,
+    wine: Boolean = false,
+    position: () -> Float
+): Modifier {
+    // Mode gelap: [neuStyle] mengangkat permukaan 9%/4% ke putih (kunci akan lebih terang dari warna [base] dan
+    // menurunkan kontras label berwarna di atasnya, mis. primary di tema gelap ~3.6:1 -> ~2.9:1 hitungan offline).
+    // Basis dibalik-angkat dulu supaya warna permukaan kunci TETAP = [base]; kedalaman tetap datang dari
+    // vignette/sorot, bevel facet, dan bayangan jatuh. Mode terang: angkat ke putih dibiarkan (kontras naik).
+    val style = remember(base, isDark) {
+        if (isDark) neuStyle(neuUnlift(base, 0.09f), neuUnlift(base, 0.04f), true) else neuStyle(base, base, false)
+    }
+    val spec = remember(elevation, style.shadowStrength) { neuShadowSpec(elevation, style.shadowStrength) }
+    return this.neuKeyDraw(shape, style, spec, count, widthFraction, heightFraction, wine, isDark, position)
+}
+
+/** Kebalikan `lerp(c, Color.White, t)` per kanal (hasil dijepit 0..1; alpha 1). */
+private fun neuUnlift(c: Color, t: Float): Color = Color(
+    red = ((c.red - t) / (1f - t)).coerceIn(0f, 1f),
+    green = ((c.green - t) / (1f - t)).coerceIn(0f, 1f),
+    blue = ((c.blue - t) / (1f - t)).coerceIn(0f, 1f),
+    alpha = 1f
+)
+
+/** Isi [neuSlidingKey]. Kunci cache = SEMUA parameter selain [position] (lambda dibaca di fase gambar dan
+ *  hanya menutup state yang stabil — pola Boomly B190). */
+private fun Modifier.neuKeyDraw(
+    shape: Shape,
+    style: NeuStyle,
+    spec: NeuShadowSpec,
+    count: Int,
+    widthFraction: Float,
+    heightFraction: Float,
+    wine: Boolean,
+    isDark: Boolean,
+    position: () -> Float
+): Modifier = neuDraw("neuKey", shape, style, spec, count, widthFraction, heightFraction, wine, isDark) {
+    val d = density
+    val slotW = size.width / count.coerceAtLeast(1)
+    val kw = slotW * widthFraction
+    val kh = size.height * heightFraction
+    if (kw < 4f || kh < 4f) {
+        onDrawBehind { }
+    } else {
+        val wi = kw.roundToInt()
+        val hi = kh.roundToInt()
+        val scale = when {
+            kw * kh > (480f * d) * (480f * d) -> NeuHugeScale
+            max(kw, kh) > 160f * d -> NeuBigScale
+            else -> NeuSmallScale
+        }
+        val shadow = NeuBitmapStore.getAsync(NeuStoreKey(2, wi, hi, d, shape, style, Pair(spec, false))) {
+            renderNeuCastShadow(shape, kw, kh, d, style, spec, scale, false)
+        }
+        val face = NeuBitmapStore.get(NeuStoreKey(4, 0, 0, 1f, null, style, null)) { renderNeuFace(style) }
+        val outline = shape.createOutline(Size(kw, kh), layoutDirection, this)
+        val keyPath = outline.toNeuPath()
+        val radius: Float = when (outline) {
+            is Outline.Rounded -> min(outline.roundRect.topLeftCornerRadius.x, min(kw, kh) / 2f)
+            is Outline.Rectangle -> 0f
+            is Outline.Generic -> -1f
+        }
+        val facets = ArrayList<Pair<Path, Color>>(4 + 4 * NeuCornerSteps)
+        if (radius >= 0f) neuRoundFacets(facets, kw, kh, radius, style.bevelWidth.toPx(), style, 1f)
+        val bleedDp = spec.bleedDp
+        onDrawBehind {
+            val x = (position() * slotW - kw / 2f).coerceIn(0f, max(0f, size.width - kw))
+            val y = (size.height - kh) / 2f
+            translate(left = x, top = y) {
+                if (shadow != null) drawNeuShadow(shadow, d, scale, bleedDp, 1f)
+                clipPath(keyPath) {
+                    drawImage(face, dstSize = IntSize(wi, hi))
+                    for (f in facets) {
+                        drawPath(f.first, f.second)
+                    }
+                    if (wine) drawSkeuKeyWine(kw, kh, isDark)
+                }
+            }
+        }
+    }
+}
+
+/** Batch 565 — lapisan aksen burgundy kunci geser bilah tab Neumorphism (lihat KDoc [neuSlidingKey]). [kw]/[kh] =
+ *  ukuran KUNCI (bukan node); dipanggil di dalam `translate` + `clipPath(keyPath)`, jadi koordinat (0,0) = pojok
+ *  kiri-atas kunci. Tanpa bitmap/BlurMaskFilter: 3 gradien langsung. */
+private fun DrawScope.drawSkeuKeyWine(kw: Float, kh: Float, isDark: Boolean) {
+    if (kw < 8f || kh < 8f) return
+    val wine = if (isDark) SkeuWine else SkeuAccentLight
+    val gilt = if (isDark) SkeuGilt else SkeuGiltDeep
+    val ruby = if (isDark) SkeuRubyHi else SkeuWineLit
+    // 1. WASH anggur diagonal (arah cahaya tema): pekat kiri-atas, habis di kanan-bawah.
+    drawRect(
+        brush = Brush.linearGradient(
+            0.00f to wine.copy(alpha = if (isDark) 0.46f else 0.16f),
+            0.65f to wine.copy(alpha = if (isDark) 0.14f else 0.05f),
+            1.00f to wine.copy(alpha = 0f),
+            start = Offset(0f, 0f),
+            end = Offset(kw, kh)
+        ),
+        size = Size(kw, kh)
+    )
+    // 2. PENDAR ruby di belakang ikon (pusat sedikit di atas tengah, tempat ikon duduk): permata menyala dari dalam.
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(ruby.copy(alpha = if (isDark) 0.20f else 0.09f), ruby.copy(alpha = 0f)),
+            center = Offset(kw / 2f, kh * 0.40f),
+            radius = kw * 0.46f
+        ),
+        size = Size(kw, kh)
+    )
+    // 3. HAIRLINE gilt tepi atas, tepat di bawah bevel (memudar di kedua ujung) — keluarga sama dgn `drawSkeuWine`.
+    val inset = kw * 0.14f
+    drawRect(
+        brush = Brush.horizontalGradient(
+            0.0f to gilt.copy(alpha = 0f),
+            0.5f to gilt.copy(alpha = if (isDark) 0.55f else 0.42f),
+            1.0f to gilt.copy(alpha = 0f),
+            startX = inset,
+            endX = kw - inset
+        ),
+        topLeft = Offset(inset, 1.5.dp.toPx()),
+        size = Size(kw - 2f * inset, 0.75.dp.toPx())
+    )
+}
+
+/**
+ * Batch 560 — pengganti ripple SELURUH app ("refactor total ripple ke effect depth"): saat jari
+ * menekan, area klik TERBENAM — redaman tipis + bayangan dalam di tepi kiri-atas dan pantulan terang
+ * di tepi kanan-bawah (sumur cekung Neumorphism), masuk cepat (90ms) dan keluar lembut (240ms).
+ * Dipasang di `AudioPlayerTheme` lewat `LocalIndication` + `LocalRippleConfiguration = null` (yang
+ * kedua mematikan ripple M3 yang di-hardcode komponen, mis. `IconButton`). Bentuk mengikuti clip
+ * pemilik klik (persegi bila tak ada clip). Tile `neuPressTile()` memakai `indication = null`: sumur
+ * miliknya sendiri sudah jadi feedback tekan. Pola `IndicationNodeFactory` sama dgn
+ * `NoRippleIndication` (equals/hashCode WAJIB eksplisit, log_fail_425).
+ */
+object NeuDepthIndication : IndicationNodeFactory {
+    override fun create(interactionSource: InteractionSource): DelegatableNode =
+        NeuDepthIndicationNode(interactionSource)
+
+    override fun equals(other: Any?): Boolean = other === this
+
+    override fun hashCode(): Int = -2
+}
+
+private class NeuDepthIndicationNode(
+    private val interactionSource: InteractionSource
+) : Modifier.Node(), DrawModifierNode {
+    private val depth = Animatable(0f)
+
+    override fun onAttach() {
+        coroutineScope.launch {
+            var held = 0
+            interactionSource.interactions.collect { interaction ->
+                when (interaction) {
+                    is PressInteraction.Press -> {
+                        held++
+                        launch { depth.animateTo(1f, tween(durationMillis = 90)) }
+                    }
+                    is PressInteraction.Release, is PressInteraction.Cancel -> {
+                        held = (held - 1).coerceAtLeast(0)
+                        if (held == 0) launch { depth.animateTo(0f, tween(durationMillis = 240)) }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun ContentDrawScope.draw() {
+        drawContent()
+        val p = depth.value
+        if (p <= 0.001f) return
+        val w = size.width
+        val h = size.height
+        if (w <= 0f || h <= 0f) return
+        val band = 8.dp.toPx().coerceAtMost(minOf(w, h) / 2f)
+        drawRect(color = Color.Black.copy(alpha = 0.08f * p))
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color.Black.copy(alpha = 0.28f * p), Color.Transparent),
+                startY = 0f,
+                endY = band
+            ),
+            size = Size(w, band)
+        )
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Black.copy(alpha = 0.28f * p), Color.Transparent),
+                startX = 0f,
+                endX = band
+            ),
+            size = Size(band, h)
+        )
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.10f * p)),
+                startY = h - band,
+                endY = h
+            ),
+            topLeft = Offset(0f, h - band),
+            size = Size(w, band)
+        )
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.10f * p)),
+                startX = w - band,
+                endX = w
+            ),
+            topLeft = Offset(w - band, 0f),
+            size = Size(band, h)
+        )
+    }
+}
+
+/**
+ * Batch 569 — FILLET gilt tipis di tepi thumbnail art (keluarga fillet hero album art Batch 566): garis emas diagonal
+ * terang -> redup -> terang, `Stroke` 1.6dp berpusat di tepi (separuh luar ter-clip `.clip(shape)` pemanggil = 0.8dp
+ * tampak), digambar DI ATAS isi art. HANYA Neumorphism; tema lain mengembalikan `this` (0 perubahan). WAJIB dipanggil
+ * SETELAH `.clip(shape)` dengan [shape] yang SAMA, dan SEBELUM `AlbumArt` menambah `background` (urutan rantai = art
+ * tergambar dulu, fillet menimpanya).
+ */
+@Composable
+fun Modifier.neuArtFillet(shape: Shape): Modifier {
+    if (!isSkeuTheme()) return this
+    val gilt = if (LocalIsDarkTheme.current) SkeuGilt else SkeuGiltDeep
+    return this.drawWithContent {
+        drawContent()
+        drawOutline(
+            outline = shape.createOutline(size, layoutDirection, this),
+            brush = Brush.linearGradient(
+                0.0f to gilt.copy(alpha = 0.90f),
+                0.5f to gilt.copy(alpha = 0.18f),
+                1.0f to gilt.copy(alpha = 0.60f),
+                start = Offset(0f, 0f),
+                end = Offset(size.width, size.height)
+            ),
+            style = Stroke(width = 1.6.dp.toPx())
+        )
+    }
 }

@@ -1,5 +1,8 @@
 package com.rudi.audioplayer.bubble
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -7,12 +10,12 @@ import android.app.Service
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Outline
 import android.graphics.PixelFormat
-import android.media.MediaMetadataRetriever
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
@@ -20,9 +23,12 @@ import android.util.Size
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
+import android.view.TouchDelegate
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -36,15 +42,20 @@ import com.rudi.audioplayer.R
 import com.rudi.audioplayer.data.FloatingBubbleStore
 import com.rudi.audioplayer.playback.PlaybackService
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.ArtFailureLog
+import com.rudi.audioplayer.util.SafeGuard
 import com.rudi.audioplayer.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.SupervisorJob
 import java.util.concurrent.Executor
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Roadmap #11 — mini player mengambang di atas app apa pun, lewat izin sensitif
@@ -62,9 +73,11 @@ import kotlin.math.abs
  *
  * **Kontrol/state**: [MediaController] asli (pola sama `PlayerViewModel.connect()`) untuk
  * update LIVE play/pause/art lewat `Player.Listener` — bukan polling. Tap tombol pakai
- * controller langsung kalau sudah konek; `WidgetUpdater.ACTION_TOGGLE_PLAY/NEXT/PREVIOUS` ke
- * `PlaybackService` (kontrak Intent yang SAMA dipakai widget) jadi fallback kalau controller
- * belum sempat konek — tidak ada action constant baru yang perlu ditambah.
+ * controller langsung kalau sudah konek DAN antrean sesi itu tidak kosong (Batch 470, lihat KDoc
+ * "Batch 470" & [sendPlaybackAction]); `WidgetUpdater.ACTION_TOGGLE_PLAY/NEXT/PREVIOUS` ke
+ * `PlaybackService` (kontrak Intent yang SAMA dipakai widget) jadi fallback baik saat controller
+ * belum konek MAUPUN saat konek tapi antrean masih kosong (cold-start) — tidak ada action
+ * constant baru yang perlu ditambah.
  *
  * **Touch pass-through**: window overlay di-`WRAP_CONTENT` (bukan `MATCH_PARENT`) + tanpa flag
  * fullscreen — area di luar pill 100% tembus ke app di bawahnya secara struktural, bukan
@@ -81,9 +94,11 @@ import kotlin.math.abs
  * ditangani [BubbleBootReceiver], bukan di sini.
  *
  * **Batch 98 — state antrean kosong**: sebelumnya tombol play/prev/next tetap "aktif" walau
- * tidak ada lagu dimuat sama sekali (tap play = no-op senyap yang membingungkan). Sekarang
- * [hasQueue] dicek tiap update — kalau kosong, tombol jadi setengah transparan dan tap-nya
- * membuka app alih-alih coba mainkan apa pun.
+ * tidak ada lagu dimuat sama sekali (tap play = no-op senyap yang membingungkan). [hasQueue]
+ * dicek tiap update — kalau kosong, tombol jadi setengah transparan (indikasi visual, MASIH
+ * berlaku). **Koreksi Batch 470**: routing tap TIDAK lagi digerbang oleh [hasQueue] (lihat KDoc
+ * "Batch 470" & [sendPlaybackAction]) — [hasQueue] SEKARANG murni sinyal visual alpha, bukan
+ * penentu buka-app-atau-tidak lagi.
  *
  * **Batch 98 — rotasi layar**: posisi bubble di-clamp ulang di [onConfigurationChanged] —
  * sebelumnya rotasi bisa membuat bubble kepental separuh di luar layar (mis. y besar di
@@ -115,6 +130,323 @@ import kotlin.math.abs
  * `withContext(Dispatchers.IO)` untuk decode, `bubbleArtJob?.cancel()` sebelum tiap relaunch
  * (pola identik `widgetUpdateJob` di `PlaybackService.kt` — skip/next cepat berturut-turut tidak
  * boleh bikin hasil decode lama landing belakangan menimpa art lagu yang lebih baru).
+ *
+ * **Batch 453 — auto-fade saat idle**: instruksi eksplisit user — pill/tab dibiarkan diam di atas
+ * konten app lain (opaque penuh) dirasa terlalu menutupi, minta "bisa split/di-minimize total,
+ * atau minimal fade out saat tidak digeser". [minimize] ke tepi layar (Batch 100) SUDAH ada
+ * sebagai mekanisme "total" (manual, lewat tombol chevron) — celah yang belum ada adalah kondisi
+ * IDLE tanpa aksi user sama sekali. Fix: [keepAwakeAndScheduleFade] meredupkan alpha
+ * [bubbleView] (container, bukan per-child — otomatis ikut kena baik pill penuh MAUPUN tab
+ * minimized, mana pun yang sedang terlihat) ke [IDLE_FADE_ALPHA] setelah [IDLE_FADE_DELAY_MS]
+ * tanpa sentuhan, dan mengembalikannya ke opaque penuh SEKETIKA di setiap awal interaksi baru
+ * (sentuh/drag di [setupDrag], atau tap tombol kontrol/minimize di [setupControls]) — bubble
+ * TIDAK PERNAH pudar selagi benar-benar sedang dipakai/digeser, cuma saat benar-benar dibiarkan
+ * diam. Timer pakai [bubbleScope] yang SUDAH ada (bukan Handler/Thread baru) supaya otomatis ikut
+ * ter-cancel oleh `bubbleScope.cancel()` di [onDestroy] — 0 leak, 0 dependency baru selain 1
+ * import `kotlinx.coroutines.delay` (satu paket dengan `launch`/`withContext` yang sudah dipakai).
+ * Alpha window overlay tidak mengubah keterjangkauan sentuh (`FLAG_NOT_FOCUSABLE` tidak terkait
+ * alpha) — tap pada bubble yang lagi pudar tetap normal, jadi ini murni sinyal visual "idle".
+ *
+ * **Batch 454 — auto-minimize total saat idle berkepanjangan**: instruksi asli user (dikutip di
+ * catatan Batch 453) minta "wajib bisa split/di-minimize total, ATAU minimal dulu bisa fade out"
+ * — Batch 453 baru menuntaskan fallback minimumnya (fade). Fix ini menuntaskan mandat utamanya:
+ * kalau bubble TETAP idle lebih lama lagi setelah fade ([IDLE_AUTO_MINIMIZE_DELAY_MS] dihitung
+ * dari titik interaksi terakhir yang sama dgn timer fade, BUKAN ditambah setelah fade selesai),
+ * [minimize] ke tab tepi layar dipanggil OTOMATIS — 0 logic collapse baru, reuse fungsi [minimize]
+ * yang sudah ada sejak Batch 100 apa adanya (termasuk guard `if (isMinimized) return` di
+ * dalamnya, jadi aman dipanggil berulang tanpa efek samping kalau user sempat minimize manual
+ * duluan). Timer kedua ([idleMinimizeJob]) dijadwalkan/dibatalkan di titik yang SAMA PERSIS
+ * dengan [idleFadeJob] di [keepAwakeAndScheduleFade] — 1 titik kontrol utk kedua timer, 0
+ * Handler/Thread baru, otomatis ikut ter-cancel oleh `bubbleScope.cancel()` di [onDestroy] yang
+ * sudah ada. Alpha container TIDAK direset ke opaque saat auto-minimize terjadi (bubble sudah
+ * pudar dari fade sebelumnya, tab hasil minimize mewarisi alpha yang sama — konsisten dengan
+ * desain "1 titik kontrol alpha di container" Batch 453, 0 percabangan state baru). Sentuhan/tap
+ * apa pun (drag maupun tombol kontrol) tetap membatalkan KEDUA timer via pemanggilan
+ * [keepAwakeAndScheduleFade] yang sudah ada di [setupDrag]/[setupControls] — 0 perubahan di
+ * kedua fungsi itu.
+ *
+ * **Batch 455 — tab minimized kliping SETENGAH di tepi layar**: feedback eksplisit user setelah
+ * Batch 454 ("minimize otomatis nya berhasil, TAPI yang benar-benar diinginkan: circle bubble
+ * bisa kliping setengah/menyisakan mini trigger, wajib mentok maksimal ke tepi layar saat idle").
+ * Tab 48dp bundar (Batch 100) sebelumnya berhenti flush-tapi-100%-kelihatan di X=0/`screenWidth -
+ * lebarTab`. Sekarang [snapMinimizedToNearestEdge] mendorong X SETENGAH lebar tab melewati batas
+ * layar (`-lebarTab/2` kiri, `screenWidth - lebarTab/2` kanan) — window overlay SUDAH
+ * `FLAG_LAYOUT_NO_LIMITS` sejak Batch 100 ([addBubbleView]), jadi 0 flag/permission baru,
+ * WindowManager & sistem yang otomatis memotong render di luar layar. **0 fungsi/state/timer
+ * baru** — cuma formula X di 1 titik kontrol yang sudah ada, otomatis berlaku ke semua pemicu
+ * snap yang sudah ada (lepas-drag minimized, auto-minimize Batch 454, tombol chevron manual,
+ * restart service, rotasi). Selagi masih di-drag aktif tab tetap dibatasi penuh di dalam layar
+ * ([setupDrag] tidak disentuh) — setengah-tersembunyi HANYA muncul begitu benar-benar idle/diam
+ * di tepi, sesuai kata "saat idle" di instruksi user.
+ *
+ * **Batch 456 — kurangi fraksi clip tepi [SALAH ARAH, DIREVERT Batch 457]**: fraksi
+ * disembunyikan dikecilkan 50%→30%, TAPI ini justru MEMPERBESAR bagian tab yang kelihatan
+ * (`hiddenWidth` turun → sisa kelihatan naik) — kebalikan dari maksud user, hasilnya tab makin
+ * "timbul" bukan makin ke-clip. Formula generalisasi (`hiddenWidth = width * EDGE_CLIP_FRACTION`)
+ * DIPERTAHANKAN (regresi-aman, netral arah), cuma nilai konstantanya yang salah.
+ *
+ * **Batch 457 — revert fraksi clip ke Batch 455**: feedback eksplisit user ("bukannya hilangin
+ * yang timbul malah dibikin tambah timbul"). [EDGE_CLIP_FRACTION] dikembalikan 30%→50% (nilai
+ * awal Batch 455) — satu-satunya perubahan, 0 formula/fungsi/titik panggil baru disentuh. Hasil
+ * setelah revert identik matematis dengan Batch 455 (tab minimized separuh lebar tersembunyi di
+ * luar layar, separuh kelihatan sebagai mini trigger).
+ *
+ * **Batch 458 — kurangi timbul lebih jauh dari Batch 455/457**: user minta "~30%" — DIKONFIRMASI
+ * via pilihan tap (bukan ditebak) bahwa ini merujuk ke bagian TIMBUL (kelihatan), bukan ke fraksi
+ * klip itu sendiri, supaya tidak mengulang kesalahan arah Batch 456. [EDGE_CLIP_FRACTION]
+ * dinaikkan 50%→70% (fraksi SEMBUNYI), hasilnya bagian kelihatan turun jadi ~30%. 0
+ * formula/fungsi/titik panggil baru — cuma nilai konstanta.
+ *
+ * **Batch 460 — touch target independen dari visual, + fix kliping landscape**: 2 instruksi
+ * eksplisit user, 2 file (`bubble_minimized.xml` + file ini). (1) Konfirmasi device fisik Batch
+ * 458 mencatat mini trigger "sedikit lebih susah" di-tap seiring bagian TIMBUL mengecil — opsi
+ * yang sudah dicatat PROJECT_STATE.md ("perbesar touch target independen dari lebar visual")
+ * dieksekusi sekarang: `bubble_minimized.xml` root DILEBARKAN jadi murni area-sentuh (48dp→88dp),
+ * visual bulat asli DIPINDAH ke child baru `R.id.bubble_minimized_visual` (tetap 48dp, gravity
+ * CENTER) — area ekstra 100% transparan (0 background), murni menambah hit-box tanpa menambah
+ * apa pun yang kelihatan. [snapMinimizedToNearestEdge] dipisah jadi 2 lebar (`visualWidth` untuk
+ * [EDGE_CLIP_FRACTION], `width`/root untuk posisi X) — `touchPad` (selisih keduanya /2) SELALU
+ * ikut ke sisi yang tetap di layar, jadi [EDGE_CLIP_FRACTION] naik = visual makin ngumpet TANPA
+ * ikut mengecilkan area sentuh (2 parameter independen). (2) [EDGE_CLIP_FRACTION] dinaikkan lagi
+ * 70%→90% — instruksi eksplisit user pakai kata "timbul" ("visual turunkan jadi ~10% yang timbul
+ * saja"), konsisten arah konvensi Batch 456→458, 0 klarifikasi tap diperlukan (kata sudah
+ * eksplisit, lihat catatan proses PROJECT_STATE.md). (3) `resources.displayMetrics` (4 titik:
+ * [onConfigurationChanged], [setupDrag], [expand], [snapMinimizedToNearestEdge]) DIGANTI
+ * `windowManager.currentWindowMetrics.bounds` — root cause bubble gagal konsisten mentok ke ujung
+ * layar saat landscape: `resources.displayMetrics` di Context Service tidak dijamin ter-refresh
+ * SEKETIKA saat [onConfigurationChanged] terpanggil pasca-rotasi (beda dari Activity/
+ * WindowContext), `currentWindowMetrics` (API 30+, aman di minSdk 31) selalu bounds window
+ * REAL-TIME. 0 breaking change ke formula/state lain, 0 sektor DITUTUP disentuh.
+ *
+ * **Batch 461 [FIX RESIDUAL] — bounds landscape masih tidak konsisten meski Batch 460**:
+ * konfirmasi device fisik user (1,2,4,5 ✅, 3 ❌ "masih nongol" — tab minimized belum SELALU
+ * mentok tepi kiri/kanan pas rotasi landscape berulang). Root cause: `windowManager` di kelas ini
+ * didapat dari Context Service BIASA (bukan `UiContext`/`WindowContext` seperti Activity) — per
+ * dokumentasi resmi `WindowManager#getCurrentWindowMetrics()`, Context non-UI SELALU jatuh ke
+ * `getMaximumWindowMetrics()`, hasilnya BUKAN dijamin sinkron atomik persis di momen rotasi (kelas
+ * masalah sama dengan `resources.displayMetrics` yang sudah didiagnosis Batch 460 — cuma API-nya
+ * beda, root sumbernya sama-sama Context Service). **Fix**: [screenBounds] (field baru, single
+ * source of truth) SEKARANG diisi dari `newConfig` (parameter [onConfigurationChanged]) — SATU-
+ * SATUNYA sumber yang dijamin sistem fresh PERSIS di momen callback rotasi terpanggil, bukan
+ * re-query Context async. 4 titik baca (sama seperti Batch 460: [onConfigurationChanged],
+ * [setupDrag], [expand], [snapMinimizedToNearestEdge]) sekarang baca [screenBounds] ter-cache,
+ * 0 lagi query `windowManager.currentWindowMetrics` langsung di titik mana pun selain nilai awal
+ * (`onCreate`, baseline sebelum rotasi pertama). 0 breaking change ke formula
+ * EDGE_CLIP_FRACTION/touchPad/visualWidth Batch 460, 0 sektor DITUTUP disentuh. BELUM
+ * diverifikasi device fisik (0 env Android nyata di sesi ini).
+ *
+ * **Batch 462 [FIX RESIDUAL #2] — Batch 461 GAGAL TOTAL, bukan cuma kurang tepat**: konfirmasi
+ * device fisik user: tab minimized 100% KELIHATAN/gak keclip sama sekali di landscape (bukan versi
+ * "kurang pas dikit" — total tidak ter-klip). Sinyal ini menggeser diagnosis dari "sumber bounds
+ * kurang akurat" (teori Batch 460/461, TERBUKTI SALAH — `screenBounds` Batch 461 sendiri sudah
+ * benar dp→px dari `newConfig`) ke **"ada pihak lain menimpa posisi window SETELAH snap kita
+ * apply"** — paling mungkin sanitasi/enforcement posisi window oleh sistem selama transisi ANIMASI
+ * rotasi (perilaku umum overlay `TYPE_APPLICATION_OVERLAY` lintas OEM, tidak seragam & tidak bisa
+ * dipastikan tanpa logcat device asli). **Fix — safety-net re-assert, BUKAN ganti formula/sumber
+ * data lagi** (SOP eksplisit: jangan ulang pola "ganti API baca metrics"): [onConfigurationChanged]
+ * sekarang re-panggil [snapMinimizedToNearestEdge] 2x tambahan dengan delay 150ms & 400ms
+ * (`ROTATION_RESNAP_DELAYS_MS`) SETELAH panggilan immediate yang sudah ada — membracket durasi
+ * animasi transisi rotasi tipikal. Idempotent kalau snap pertama sudah benar (re-apply nilai sama,
+ * 0 efek kelihatan tambahan), jadi fallback pasti kalau snap pertama sempat ketiban sistem. 0
+ * breaking change ke formula EDGE_CLIP_FRACTION/touchPad/visualWidth/screenBounds, 0 sektor
+ * DITUTUP disentuh. **CATATAN JUJUR**: ini mitigasi defensif berdasar sinyal device fisik, BUKAN
+ * root-cause pasti (0 akses logcat/device fisik di sesi ini) — kalau residual masih muncul lagi
+ * setelah batch ini, WAJIB logcat device asli sebelum lanjut tebak lagi (lihat PROJECT_STATE.md).
+ *
+ * **Batch 463 [PIVOT KE INSTRUMENTASI] — Batch 462 GAGAL LAGI, logcat user 0 sinyal**: user
+ * konfirmasi device fisik "masih nongol" pasca Batch 462, DAN membawa `bubble_log.txt` (logcat
+ * `-iE "floatingbubble|configurationchanged|windowmanager"`) — dicek baris-per-baris, hasilnya
+ * NOL baris dari service ini (2 satu-satunya kecocokan "floatingbubble" adalah ECHO PERINTAH
+ * grep-nya sendiri, bukan output). Kesimpulan: service ini TIDAK PERNAH menulis apa pun ke
+ * logcat — 3 teori berturut-turut (Batch 460/461/462) semua ditebak murni dari baca-kode +
+ * dokumentasi resmi, TANPA data eksekusi nyata. SOP sendiri (PROJECT_STATE.md, "PELAJARAN PROSES
+ * Batch 461→462") melarang tebakan fix ke-4 tanpa data baru. **0 formula/logic diubah sama
+ * sekali** — batch ini murni menambah [AppLogger].w() (tag `"FloatingBubbleService"`, pola sama
+ * [loadAlbumArtBitmap]) di 4 titik: (1) entry [onConfigurationChanged] (orientation+screenBounds+
+ * isMinimized), (2) 2 guard null `bubbleView`/`layoutParams` yang sebelumnya return diam-diam,
+ * (3) tiap callback [ROTATION_RESNAP_DELAYS_MS] benar tereksekusi, (4) di [snapMinimizedToNearestEdge]:
+ * nilai X TARGET tepat sebelum `updateViewLayout` + hasil sukses/gagalnya (`runCatching` lama
+ * SEBELUMNYA membungkam exception total, 0 sinyal kalau apply gagal) + **readback posisi NYATA
+ * di layar 250ms kemudian** (`container.getLocationOnScreen()`) — satu-satunya cara membuktikan
+ * atau membantah teori Batch 462 ("sistem menimpa posisi window pasca-snap") dengan data, bukan
+ * dugaan. `AppLogger.w()` (bukan `Log.d` polos) sengaja dipilih — otomatis kepakai ke ATAU
+ * logcat ATAU `diagnostic_log.txt` privat app yang bisa diekspor lewat Settings > Lanjutan > Log
+ * Diagnostik (0 perlu Termux/adb kalau salah satu kanal gagal lagi, lihat `AppLogger.kt`).
+ * Sesi berikutnya: baca log HASIL rotasi nyata dulu (logcat ATAU ekspor Log Diagnostik), BARU
+ * putuskan fix ke-4 dari situ — bukan dari teori baru tanpa bukti (lihat PROJECT_STATE.md).
+ *
+ * **Batch 464 [DATA BARU MENGEJUTKAN — perluas instrumentasi]**: readback +250ms Batch 463
+ * (device fisik pertama) menunjukkan mismatch BESAR (target x=1011 vs nyata x=551) SAAT
+ * [minimize] BIASA — 0 rotasi terlibat sama sekali (screenWidth tetap 1080/portrait). Ini
+ * mengubah arah dugaan: mismatch mungkin BUKAN soal animasi transisi ROTASI (fokus Batch 462),
+ * tapi soal window overlay `WRAP_CONTENT` ini resize FISIK tiap toggle expanded↔minimized, dan
+ * `width` yang dibaca [snapMinimizedToNearestEdge] via `container.post{}` mungkin representasi
+ * View yang sudah di-measure tapi window WindowManager-nya sendiri belum tuntas resize saat
+ * `updateViewLayout` dipanggil — teori BARU, belum pernah diuji Batch 460-462. **0 formula/logic
+ * diubah lagi** — 2 tambahan MURNI observasi: (1) readback sekarang JUGA log `container.width`/
+ * `container.height` NYATA, dibanding ke ukuran saat target dihitung — kalau beda, itu bukti
+ * langsung window/view masih resize saat snap di-apply; (2) readback KEDUA ditambah di +800ms
+ * (selain +250ms yang sudah ada) — kalau +800ms sudah cocok ke target (beda dari +250ms yang
+ * meleset), itu soal SETTLING/animasi sementara; kalau +800ms MASIH meleset sama, itu salah
+ * PERMANEN, bukan soal waktu tunggu. Sesi berikutnya: baca PERBANDINGAN kedua readback (250ms vs
+ * 800ms) + ukuran nyata vs target SEBELUM memutuskan fix apa pun — 2 hasil berbeda mengarah ke 2
+ * kelas fix yang sama sekali berbeda (delay lebih panjang vs re-urutan resize-lalu-posisikan).
+ *
+ * **Batch 468 [FIX — branch (c) Batch 464 dikonfirmasi jadi kode, berdasar data device Batch
+ * 467]**: user jalankan device-test Method A/B (protokol lengkap: PROJECT_STATE.md Batch 467).
+ * (A) drag bubble ke tepi ATAS layar (portrait) — GAP KOSONG terlihat sebelum bubble mulai,
+ * bubble TIDAK pernah menutupi status bar. (B) screenshot landscape (app lain fullscreen)
+ * menunjukkan pola sama + 1 temuan tambahan: bubble minimized landscape tetap mentok PERSIS ke
+ * ujung layar TANPA ter-klip sama sekali — gejala IDENTIK dengan kegagalan landscape-edge-clip
+ * Batch 460/461/462 yang SEBELUMNYA dianggap bug terpisah & gagal terdiagnosis 3x berturut-turut.
+ *
+ * Root cause: [addBubbleView] pasang `FLAG_LAYOUT_NO_LIMITS` TANPA `FLAG_LAYOUT_IN_SCREEN`.
+ * Tanpa flag itu, per dokumentasi resmi `WindowManager.LayoutParams`, posisi x/y dengan
+ * `Gravity.TOP|START` diinterpretasi RELATIF ke content area (exclude status bar & inset sistem
+ * lain, beda tiap orientasi/config), sedangkan [screenBounds] (sumber target, sejak Batch
+ * 460/461 dari `currentWindowMetrics.bounds`) SELALU full-screen absolut — SAMA seperti
+ * `container.getLocationOnScreen()` yang dipakai readback Batch 463. Target dihitung di 1 sistem
+ * koordinat, diterapkan window manager di sistem koordinat LAIN — origin mismatch itu sumber
+ * SEMUA delta readback Batch 463-466 (99px/66px, cocok kisaran inset status/nav bar), DAN
+ * kemungkinan besar JUGA sumber gejala "tidak ter-klip landscape": kalau inset landscape (nav
+ * bar sisi) cukup besar, ia bisa mengkompensasi hampir seluruh `hiddenWidth`/[EDGE_CLIP_FRACTION]
+ * yang seharusnya menyembunyikan bubble, membuatnya nongol utuh walau formula clip Batch 456-459
+ * sendiri BENAR. **Ini hipotesis PENYATUAN 2 gejala yang sebelumnya dianggap terpisah** — kuat
+ * didukung data, TAPI belum kepastian mutlak sampai dikonfirmasi device pasca-build.
+ *
+ * **Fix (1 baris)**: tambah `WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN` ke flags
+ * [addBubbleView] (sebelah `FLAG_NOT_FOCUSABLE or FLAG_LAYOUT_NO_LIMITS` yang sudah ada sejak
+ * Batch 100). **0 formula lain diubah** — [EDGE_CLIP_FRACTION]/`touchPad`/`visualWidth`/
+ * [screenBounds]/`ROTATION_RESNAP_DELAYS_MS` TETAP persis Batch 460-464, tidak disentuh sama
+ * sekali (1 variabel diubah per percobaan, supaya efeknya terisolasi & bisa dibaca dari data).
+ * Readback instrumentasi Batch 463/464 SENGAJA TIDAK dihapus — dipakai validasi: kalau fix ini
+ * benar, delta readback harusnya (0,0) di semua kasus pasca-update.
+ *
+ * **RISIKO**: flag ini mengubah origin koordinat SELURUH window overlay, bukan cuma snap-to-edge
+ * — termasuk posisi awal expand/drag manual & posisi TERSIMPAN (`FloatingBubbleStore.getPosition()`)
+ * dari sesi SEBELUM update (dihitung di sistem koordinat lama/salah, mungkin kelihatan "geser"
+ * sekali di buka pertama pasca-update — EXPECTED, bukan bug baru, re-snap 1x manual akan
+ * memperbaikinya). WAJIB regression-test manual penuh ke SEMUA yang sebelumnya "confirmed"
+ * (Batch 98-100/451/453-458/460-463): drag manual, mini trigger, minimize/expand/fade/
+ * auto-minimize, DAN khususnya mentok-tepi-landscape (poin yang gagal 3x sebelumnya). **0
+ * diverifikasi CI/device Batch 468** — 0 env Android nyata/device fisik/compiler Kotlin di sesi
+ * ini. Perlu dari user: install APK baru, ulangi Method A/B + tes khusus landscape-edge-clip,
+ * kirim hasil/log lagi.
+ *
+ * **Batch 469 [REGRESI BARU pasca-468 — instrumentasi, BUKAN fix lagi]**: user laporkan bubble
+ * MENGHILANG TOTAL saat di-drag ke tepi landscape yang berbeda (sisi nav-bar-bottom), balik
+ * normal HANYA kalau device dirotasi ke portrait lagi. Ini gejala BARU, lebih parah dari sebelum
+ * Batch 468 (dulu cuma "kurang ter-klip", sekarang bisa hilang total/unreachable). Dugaan kuat:
+ * [screenBounds] diisi dari 2 API BERBEDA tergantung KAPAN — `onCreate` pakai
+ * `currentWindowMetrics.bounds` (baris ~401), `onConfigurationChanged` pakai
+ * `newConfig.screenWidthDp/HeightDp * density` (Batch 461, demi alasan freshness/timing yang
+ * TERBUKTI valid saat itu) — 2 API ini TIDAK dijamin identik secara SEMANTIK (area yang diukur
+ * bisa beda: device-level Configuration vs WindowMetrics). Sebelum Batch 468 (posisi
+ * content-area-relative), potensi selisih ini "aman" karena WindowManager & clamp SAMA-SAMA
+ * relatif ke area yang lebih kecil; sejak Batch 468 (posisi full-screen-absolute), selisih itu
+ * bisa mendorong posisi hasil clamp ke [screenBounds] versi `newConfig` keluar dari layar NYATA
+ * yang sekarang dipakai WindowManager. **BELUM DIPASTIKAN** — teori, bukan bukti. SOP eksplisit
+ * ("PELAJARAN PROSES Batch 461->462"): JANGAN ganti-ganti sumber API lagi tanpa data, apalagi ini
+ * regresi ke-2 di file yang sama minggu ini. **0 formula/clamp/posisi diubah SAMA SEKALI** —
+ * batch ini MURNI 2 titik log baru: (1) [onConfigurationChanged] sekarang JUGA log
+ * `currentWindowMetrics.bounds` (read-only, cuma pembanding) di sebelah [screenBounds] yang
+ * BENAR-BENAR dipakai — kalau 2 angka itu beda, itu BUKTI LANGSUNG teori di atas; (2)
+ * [setupDrag] `ACTION_UP` (drag manual, path yang SEBELUMNYA 0 instrumentasi sama sekali, beda
+ * dari [snapMinimizedToNearestEdge] yang sudah ada sejak Batch 463) sekarang log target akhir +
+ * [screenBounds] yang dipakai clamp + readback `getLocationOnScreen()` +250ms — kalau readback
+ * keluar dari rentang [0, screenBounds] atau beda drastis dari target, itu bukti bubble memang
+ * dirender di luar layar nyata. Sesi berikutnya: WAJIB baca log HASIL reproduksi persis skenario
+ * ini (landscape, drag ke tepi nav-bottom, JANGAN rotasi balik dulu sebelum ekspor Log
+ * Diagnostik — rotasi ke portrait "memperbaiki" gejala tapi JUGA menghapus jendela diagnostik)
+ * SEBELUM coding fix apa pun — bukan tebakan ke-5.
+ *
+ * **Batch 470 [status Batch 469 + 2 fitur baru]**: user konfirmasi kliping landscape SEKARANG
+ * bekerja ("sudah bisa kliping dalam mode landscape sekalipun") — TAPI ini konfirmasi umum, BUKAN
+ * reproduksi protokol spesifik Batch 469 (drag ke tepi nav-bottom, jangan rotasi balik, ekspor
+ * Log Diagnostik) yang masih belum pernah dikirim. Regresi "MENGHILANG TOTAL" Batch 469 karena itu
+ * dianggap BELUM RESMI terkonfirmasi selesai (bukan juga terbantahkan) — kalau muncul lagi,
+ * protokol lama di atas TETAP berlaku. User mengarahkan sesi ini ke 2 permintaan baru (0 sentuh
+ * [screenBounds]/formula clamp/posisi sama sekali, 0 tumpang tindih dengan investigasi Batch 469):
+ *
+ * 1. **Cold-start**: [sendPlaybackAction] sebelumnya pakai panggilan [MediaController] langsung
+ *    begitu [controller] lokal != null, TANPA cek `mediaItemCount` — celah: pada boot murni
+ *    (bubble auto-start lewat [BubbleBootReceiver], user belum pernah buka app/widget), MediaController
+ *    lokal bisa konek DUAN (bind doang, 0 lewat `onStartCommand`) SEBELUM antrean sempat
+ *    di-restore, mengonfirmasi `mediaItemCount == 0` lalu [hasQueue] nge-latch `false` selamanya —
+ *    akibatnya SETIAP tap play/prev/next di bubble jatuh ke `openApp()`, padahal `PlaybackService`
+ *    punya jalur cold-start-restore yang justru dirancang untuk skenario ini (lihat KDoc
+ *    `PlaybackService.onStartCommand`'s `isWidgetAction` branch) — cuma jalur itu HANYA terpicu
+ *    lewat Intent (`startForegroundService`), BUKAN panggilan controller langsung lewat binder
+ *    sesi. Fix: [sendPlaybackAction] sekarang syarat `c.mediaItemCount > 0` sebelum pakai
+ *    controller langsung; kalau tidak, SELALU fallback ke Intent yang sama seperti widget home-
+ *    screen (yang memang TIDAK PERNAH pegang referensi controller lokal sama sekali, lihat KDoc
+ *    `WidgetUpdater.servicePendingIntent`, jadi TIDAK PERNAH kena celah ini). [setupControls] 3
+ *    tombol (play/prev/next) tidak lagi gerbang lewat [hasQueue] duluan — keputusan "controller
+ *    langsung vs fallback" 100% dipindah ke 1 titik ([sendPlaybackAction]) yang selalu baca state
+ *    FRESH, bukan snapshot [hasQueue] yang bisa basi.
+ * 2. **Drag & tap-buka-app discoped ke album art saja**: SEBELUMNYA [setupDrag] dipasang di
+ *    [bubbleView] (`container`) penuh — termasuk padding kosong `bubble_root` di sekitar pill
+ *    (bukan cuma tombol, yang memang sudah aman lewat prioritas child, lihat KDoc [setupDrag]) —
+ *    jadi drag/tap-buka-app bisa kepicu dari mana saja di badan pill, bukan cuma [bubble_album_art].
+ *    Sekarang [setupDrag] dipanggil 2x terpisah: 1x ke [minimizedView] (chat-head, 0 berubah — tab
+ *    minimized MEMANG murni area sentuh luas by design sejak Batch 460), 1x ke `bubble_album_art`
+ *    SAJA untuk state expanded. Supaya area sentuh album art TETAP gampang disentuh (bukan cuma
+ *    40dp mentah) tanpa mengubah layout/ukuran view NYATA (0 dp baru di XML), dipasang
+ *    [TouchDelegate] (lihat [applyAlbumArtTouchDelegate]) — memperluas HIT-TEST doang, padding
+ *    kosong sisa `bubble_root` yang dulu ikut memicu SEKARANG diam (window tetap menelan
+ *    sentuhannya, cuma 0 efek apa pun, TIDAK diteruskan ke app di bawah — konsisten sama perilaku
+ *    "touch pass-through" yang didesain hanya untuk di LUAR pill). Pergerakan drag itu sendiri
+ *    (setelah tersentuh) TETAP bebas penuh ke seluruh [screenBounds] seperti sebelumnya — SATU-
+ *    SATUNYA yang berubah adalah TITIK AWAL sentuhan yang sah, bukan jangkauan gerak. 0 formula
+ *    clamp/posisi/[screenBounds] disentuh sama sekali (lihat guard Batch 469 di atas).
+ *
+ * **Batch 471 [2 laporan user: drag "sulit/terbatas" + "bubble survive 100%?"]**: 0 tumpang
+ * tindih investigasi Batch 469 (screenBounds/clamp/posisi 0 disentuh sama sekali).
+ * 1. **Drag area diperlebar sisi kanan**: lihat KDoc "Koreksi Batch 471" di
+ *    [applyAlbumArtTouchDelegate] — [ALBUM_ART_TOUCH_PAD_RIGHT_DP] 3f→6f (full gap asli),
+ *    terbukti aman krn anak/tombol selalu menang bounds sendiri. Kiri/atas/bawah SUDAH maksimal
+ *    secara fisik (padding riil `bubble_root` cuma 8dp) — kalau masih kurang, opsi lanjutan
+ *    (naikkan padding XML) WAJIB konfirmasi user dulu, belum diterapkan batch ini.
+ * 2. **Bubble survive app-kill**: lihat KDoc [onTaskRemoved] (baru) — re-assert foreground
+ *    defensif + `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (AndroidManifest.xml + MainActivity.kt).
+ *    BATAS JUJUR eksplisit didokumentasikan di [onTaskRemoved]: "100%" TIDAK bisa dijanjikan dari
+ *    kode manapun (OEM autostart/protected-apps proprietary di luar API Android resmi).
+ *
+ *
+ * **Batch 472 [1 laporan user: drag masih "sempit" pasca-471 + 2 klarifikasi survive app-kill]**:
+ * 0 tumpang tindih investigasi Batch 469 (screenBounds/clamp/posisi 0 disentuh sama sekali).
+ * 1. **Drag area mentok penuh ke tepi kanan**: lihat KDoc "Koreksi Batch 472" di
+ *    [applyAlbumArtTouchDelegate] — `rect.right` sekarang dinamis = `expanded.width` (tepi kanan
+ *    `bubble_root` sesungguhnya, melewati seluruh badan 4 tombol kontrol), gantikan konstanta
+ *    pad tetap Batch 470/471 (`ALBUM_ART_TOUCH_PAD_RIGHT_DP`, dicabut — cuma sampai gap sebelum
+ *    `bubble_prev`) yang terbukti belum cukup lega. Aman krn alasan yang SAMA sudah dibuktikan
+ *    Batch 471: tombol selalu menang bounds sendiri di dispatch Android baku, lepas dari overlap
+ *    rect delegate induk.
+ * 2. **Dialog battery-optimization (Batch 471) DIKONFIRMASI user**: muncul PERSIS sesuai desain —
+ *    hanya terpicu begitu user toggle bubble OFF→ON manual (0 nge-nag di luar alur itu). 0 kode
+ *    disentuh, murni sinkronisasi status ke PROJECT_STATE.md.
+ * 3. **Survive app-kill (swipe dari Recents) BELUM ditest user** — laporan user malah 1 observasi
+ *    DI LUAR protokol yang diminta ("bubble tetap muncul saat player eksternal dimainkan"), makna
+ *    AMBIGU (arsitektur [controller] HANYA konek ke [PlaybackService] app ini sendiri lewat
+ *    [SessionToken] — 0 jalur kode yang menampilkan sesi app lain, lihat "Kontrol/state" di atas).
+ *    SOP larang tebak fix tanpa data — 0 kode disentuh, klarifikasi diminta balik ke user (lihat
+ *    PROJECT_STATE.md RESUME POINT).
+ *
+ * **Batch 474 [instruksi eksplisit user: drag diutamakan di atas tap di 4 tombol kontrol]**:
+ * lanjutan langsung sektor drag yang sama (Batch 469-472), user jawab pertanyaan survive
+ * app-kill (Batch 471/472, RESMI DITUTUP via konfirmasi informal — lihat PROJECT_STATE.md) lalu
+ * minta 1 hal baru: tombol play/pause/prev/next/minimize sebelumnya CUMA clickable, jadi drag
+ * yang dimulai persis di atas salah satunya 0 pernah ikut memindah bubble (dispatch touch
+ * Android baku memegang SELURUH sequence sentuhan ke 1 view yang menangkap `ACTION_DOWN`, lihat
+ * KDoc [setupDrag] "Batch 474"). Fix: [setupDrag] digeneralisasi (param baru `onTap`, default
+ * IDENTIK perilaku lama — 0 breaking change ke 2 pemanggil lama album-art/minimized) lalu
+ * dipasang JUGA ke ke-4 tombol lewat [setupControls] (lihat KDoc di sana) — `onTap` untuk tombol
+ * manggil `performClick()` milik tombol itu sendiri, jadi [setOnClickListener] yang SUDAH ADA
+ * tetap 1 satu-satunya sumber kebenaran aksi tombol, 0 duplikasi logic. 0 formula
+ * clamp/posisi/[screenBounds] disentuh (di luar cakupan guard Batch 469), 0 sektor DITUTUP
+ * disentuh.
+ *
+ * **File diubah**: `FloatingBubbleService.kt` (1 file, dalam batas 3 file/tugas).
  */
 class FloatingBubbleService : Service() {
 
@@ -125,17 +457,61 @@ class FloatingBubbleService : Service() {
     // expand() tidak perlu findViewById ulang tiap toggle.
     private var expandedView: View? = null
     private var minimizedView: View? = null
+    // Batch 660 — skin Space (SpaceBubbleSkin.kt). Disimpan supaya animasinya bisa dihentikan eksplisit di
+    // onDestroy() dan orb Play bisa diberi tahu status putar di refreshBubbleContent().
+    private var panelSkin: SpaceSkinDrawable? = null
+    private var badgeSkin: SpaceSkinDrawable? = null
+    private var playOrb: SpaceOrbDrawable? = null
     private var isMinimized = false
     // Posisi X terakhir SEBELUM diminimize, dipulihkan saat expand() lagi — murni in-memory
     // (tidak perlu persist terpisah dari FloatingBubbleStore.savePosition biasa: kalau Service
     // mati total lalu restart, posisi tersimpan yang dibaca ulang toh sudah posisi APAPUN state
     // terakhir, expanded atau minimized, cukup akurat untuk titik awal).
     private var lastExpandedX: Int? = null
+    // Batch 461 — single source of truth utk bounds layar, GANTI 4 titik baca langsung
+    // `windowManager.currentWindowMetrics.bounds` (Batch 460). Root cause residual landscape
+    // masih tidak konsisten mentok tepi meski Batch 460 sudah pakai currentWindowMetrics:
+    // `windowManager` di sini didapat dari Context Service biasa (BUKAN UiContext/WindowContext) —
+    // per dokumentasi resmi Android, `currentWindowMetrics` pada Context non-UI selalu jatuh ke
+    // `getMaximumWindowMetrics()`, yang bergantung pada objek Display yang di-cache Context itu;
+    // TIDAK ada jaminan sinkron atomik dengan momen persis rotasi terjadi (beda kelas masalah dari
+    // `resources.displayMetrics`, tapi akar sama: keduanya nebeng Context Service yang sama).
+    // Fix: [onConfigurationChanged] di-refresh dari `newConfig` — SATU-SATUNYA sumber yang
+    // dijamin sistem fresh PERSIS di momen rotasi (bukan re-query async) — field ini lalu dibaca
+    // oleh 3 fungsi lain (`setupDrag`, `expand`, `snapMinimizedToNearestEdge`), 0 lagi query
+    // WindowManager langsung di tempat lain.
+    private val screenBounds = Rect()
     private var layoutParams: WindowManager.LayoutParams? = null
     private var controller: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
-    private val bubbleScope = CoroutineScope(Dispatchers.Main + Job())
+    private val bubbleScope =
+        CoroutineScope(Dispatchers.Main + SupervisorJob() + SafeGuard.handler("FloatingBubbleService", "bubbleScope")) // Batch 618
     private var bubbleArtJob: Job? = null
+    // Batch 453 — timer auto-fade idle, lihat KDoc kelas ini & keepAwakeAndScheduleFade().
+    private var idleFadeJob: Job? = null
+    // Batch 454 — timer auto-minimize-total idle, lihat KDoc kelas ini & keepAwakeAndScheduleFade().
+    private var idleMinimizeJob: Job? = null
+    // Batch 662 — pemulihan opacity kini dianimasikan (dulu `view.alpha = 1f` = LONCAT balik dari redup ke penuh dalam
+    // 1 frame, terbukti di video 360973.mp4: luma panel 66 -> 83 dalam ~80ms). Flag mencegah animasi pemulihan
+    // di-restart tiap event sentuh (listener drag memanggil keepAwakeAndScheduleFade() di SETIAP MotionEvent).
+    private var fadeRestoring = false
+    private val fadeOutInterpolator = PathInterpolator(0.4f, 0f, 0.2f, 1f) // kurva Material "standard": mulai & akhir lembut
+    private val fadeInInterpolator = DecelerateInterpolator()
+    // Batch 663 — transisi minimize/expand dianimasikan. Dulu keduanya hanya menukar visibility (pill GONE <-> lencana
+    // VISIBLE) + snap posisi seketika: terbukti di video 360976.mp4 (pill penuh -> lencana dalam 1 frame lalu loncat ke
+    // tepi; expand = pill muncul seketika). `transitionT` = kemajuan 0 (pill utuh) .. 1 (lencana utuh); satu animator
+    // menggerakkannya ke kedua arah sehingga transisi yang dipotong di tengah bisa dibalik dari posisi saat itu.
+    // `transitionGen` menandai animator basi (dibatalkan/digantikan) supaya finalisasinya tak berjalan.
+    private var transitionT = 0f
+    private var transitionAnimator: ValueAnimator? = null
+    private var slideAnimator: ValueAnimator? = null
+    private var transitionGen = 0
+    private var planetCx = 0f // pusat sampul pill (koordinat view pill) = titik tujuan pill mengerut / asal lencana tumbuh
+    private var planetCy = 0f
+    // Batch 664 — dulu (0,2, 0, 0, 1) @340ms: 50% jarak tercapai di ~75 ms (video 360978.mp4 @30fps: 15% -> 34% -> 19%
+    // per frame = pill hilang dalam <=2 frame, lalu ekor merayap 1px/frame). Kini (0,35, 0, 0,15, 1): kecepatan naik
+    // bertahap (per frame 30fps: 1, 5, 11, 17, 17, 13, 10, 7 %) dan ekor selesai ~425 dari 520 ms.
+    private val transitionInterpolator = PathInterpolator(0.35f, 0f, 0.15f, 1f)
 
     // Optimistic default TRUE — sebelum controller sempat konek, tap tombol tetap harus jatuh
     // ke fallback Intent lama (lihat sendPlaybackAction), bukan langsung dianggap "kosong".
@@ -144,13 +520,15 @@ class FloatingBubbleService : Service() {
 
     private val playerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
-            if (events.containsAny(
-                    Player.EVENT_IS_PLAYING_CHANGED,
-                    Player.EVENT_MEDIA_ITEM_TRANSITION,
-                    Player.EVENT_MEDIA_METADATA_CHANGED
-                )
-            ) {
-                refreshBubbleContent(player)
+            SafeGuard.guard("FloatingBubbleService", "listener.onEvents") {
+                if (events.containsAny(
+                        Player.EVENT_IS_PLAYING_CHANGED,
+                        Player.EVENT_MEDIA_ITEM_TRANSITION,
+                        Player.EVENT_MEDIA_METADATA_CHANGED
+                    )
+                ) {
+                    refreshBubbleContent(player)
+                }
             }
         }
     }
@@ -159,6 +537,9 @@ class FloatingBubbleService : Service() {
         super.onCreate()
         bubbleStore = FloatingBubbleStore(this)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        // Batch 461 — nilai awal screenBounds sebelum rotasi pertama terjadi (baseline, lihat
+        // KDoc field). Sesudah ini SATU-SATUNYA writer adalah onConfigurationChanged.
+        screenBounds.set(windowManager.currentWindowMetrics.bounds)
         startForegroundWithNotification()
         addBubbleView()
         connectController()
@@ -170,18 +551,79 @@ class FloatingBubbleService : Service() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        val view = bubbleView ?: return
-        val params = layoutParams ?: return
+        // Batch 461 — `newConfig` DIJAMIN sistem fresh persis di momen rotasi (lihat KDoc field
+        // screenBounds) — refresh SATU-SATUNYA writer ini DULUAN, SEBELUM early-return guard di
+        // bawah, supaya screenBounds tidak pernah lewat ter-skip walau bubbleView/layoutParams
+        // sempat null (mis. timing race view belum sempat di-attach).
+        val density = resources.displayMetrics.density
+        screenBounds.set(0, 0, (newConfig.screenWidthDp * density).toInt(), (newConfig.screenHeightDp * density).toInt())
+        // Batch 463 — instrumentasi MURNI (0 formula/logic diubah): Batch 462 (re-assert 2x
+        // delay) dikonfirmasi GAGAL LAGI oleh user ("masih nongol") dan logcat yang dibawa user
+        // (grep floatingbubble|configurationchanged|windowmanager) TERBUKTI 0 baris dari service
+        // ini sama sekali — cuma berisi echo command-nya sendiri. Root cause tidak bisa ditebak
+        // lagi tanpa data; log ini adalah data itu. AppLogger.w() dipilih (bukan Log.d polos)
+        // supaya OTOMATIS tersimpan ke 2 kanal sekaligus: logcat (tag "FloatingBubbleService",
+        // akan kena grep yang SAMA persis dipakai user) DAN diagnostic_log.txt privat app
+        // (dibaca/diekspor lewat Settings > Lanjutan > Log Diagnostik, 0 perlu Termux/adb sama
+        // sekali) — 2 jalur pengambilan data, salah satu pasti kepakai.
+        AppLogger.w(
+            "FloatingBubbleService",
+            "Batch463 onConfigurationChanged: orientation=${newConfig.orientation} " +
+                "screenBounds=$screenBounds isMinimized=$isMinimized"
+        )
+        // Batch 469 — instrumentasi MURNI (0 formula diubah): user laporkan bubble MENGHILANG
+        // total saat di-drag ke tepi landscape berbeda (nav bottom), balik normal cuma kalau
+        // rotasi ke portrait lagi — BARU muncul setelah Batch 468 (FLAG_LAYOUT_IN_SCREEN).
+        // Hipotesis: [screenBounds] di atas (dari `newConfig.screenWidthDp/HeightDp`, API BEDA
+        // dari `currentWindowMetrics.bounds` yang dipakai `onCreate` baris ~383) mungkin TIDAK
+        // sama dengan bounds full-screen NYATA yang sekarang dipakai WindowManager buat render
+        // (sejak Batch 468) — kalau bounds dari `newConfig` LEBIH BESAR dari layar asli, params
+        // hasil clamp ke bounds itu bisa jatuh DI LUAR layar yang sungguhan attributable.
+        // JANGAN ganti sumber [screenBounds] lagi tanpa data (pola terlarang, lihat KDoc kelas
+        // "PELAJARAN PROSES Batch 461->462") — baris ini CUMA baca+log pembanding, 0 mengubah
+        // nilai [screenBounds] yang benar-benar dipakai formula di bawah.
+        val liveBounds = runCatching { windowManager.currentWindowMetrics.bounds }.getOrNull()
+        AppLogger.w(
+            "FloatingBubbleService",
+            "Batch469 bounds-compare: newConfigBounds=$screenBounds vs " +
+                "currentWindowMetricsBounds=$liveBounds density=${resources.displayMetrics.density} " +
+                "orientation=${newConfig.orientation}"
+        )
+        val view = bubbleView ?: run {
+            AppLogger.w("FloatingBubbleService", "Batch463 onConfigurationChanged: bubbleView NULL, skip re-snap")
+            return
+        }
+        val params = layoutParams ?: run {
+            AppLogger.w("FloatingBubbleService", "Batch463 onConfigurationChanged: layoutParams NULL, skip re-snap")
+            return
+        }
         // Batch 100 — kalau lagi minimized, X SELALU harus tetap di tepi 0/maxX (bukan cuma
         // di-clamp masuk batas layar baru) — re-snap penuh, bukan clamp biasa yang bisa saja
         // menyisakan X "nyaris tepi tapi bukan tepi" pas rotasi mengubah lebar layar.
         if (isMinimized) {
             snapMinimizedToNearestEdge()
+            // Batch 462 — safety-net re-assert, lihat KDoc kelas "Batch 462". Device fisik
+            // konfirmasi Batch 461 GAGAL total (tab 100% kelihatan/gak keclip sama sekali di
+            // landscape, bukan cuma "kurang tepat") — indikasi kuat ADA pihak lain (transisi
+            // animasi rotasi sistem) menimpa posisi window SETELAH snap pertama kita apply.
+            // Re-assert 2x dengan delay berbeda (bracket durasi animasi rotasi tipikal) —
+            // idempotent kalau snap pertama sudah benar (re-apply nilai sama, 0 efek kelihatan),
+            // tapi jadi fallback pasti kalau snap pertama sempat ketiban sistem.
+            for (delay in ROTATION_RESNAP_DELAYS_MS) {
+                view.postDelayed({
+                    // Batch 463 — instrumentasi: buktikan apakah callback delay ini BENAR
+                    // tereksekusi sama sekali (0 cara lain memverifikasi ini dari luar).
+                    AppLogger.w("FloatingBubbleService", "Batch463 re-snap delay=${delay}ms terpanggil, isMinimized=$isMinimized")
+                    if (isMinimized) snapMinimizedToNearestEdge()
+                }, delay)
+            }
             return
         }
-        val metrics = resources.displayMetrics
-        val maxX = (metrics.widthPixels - view.width).coerceAtLeast(0)
-        val maxY = (metrics.heightPixels - view.height).coerceAtLeast(0)
+        // Batch 461 — baca dari screenBounds ter-cache (bukan lagi query currentWindowMetrics
+        // langsung), lihat KDoc field.
+        val bounds = screenBounds
+        val maxX = (bounds.width() - view.width).coerceAtLeast(0)
+        val maxY = (bounds.height() - view.height).coerceAtLeast(0)
         val clampedX = params.x.coerceIn(0, maxX)
         val clampedY = params.y.coerceIn(0, maxY)
         if (clampedX != params.x || clampedY != params.y) {
@@ -192,17 +634,53 @@ class FloatingBubbleService : Service() {
         }
     }
 
+    /** Batch 471 — user tanya "bagaimana caranya bubble survive 100% / tidak hilang saat app
+     * di-kill". **Baseline SEBELUM batch ini**: class ini 0 pernah override [onTaskRemoved] sama
+     * sekali — default [Service] TIDAK auto-stop diri sendiri saat task di-swipe dari Recents
+     * (beda dari [PlaybackService.onTaskRemoved] yang JUSTRU eksplisit `stopSelf()` kalau antrean
+     * kosong) — jadi bubble SEHARUSNYA sudah bertahan lewat swipe-Recents biasa sejak Batch 98
+     * (foreground+specialUse). Ditambah di sini murni sebagai lapisan re-assert defensif: kalau
+     * task removal memicu sistem menurunkan importance proses SESAAT sebelum benar-benar
+     * membunuhnya, panggil ulang [startForegroundWithNotification] (idempotent — sama seperti di
+     * [onCreate]) supaya notifikasi+status foreground ditegaskan ulang selagi proses MASIH hidup.
+     * `runCatching` (pola sama [BubbleBootReceiver], Batch 466) — ini dipanggil dari proses yang
+     * sudah punya Service hidup, BUKAN `startForegroundService()` dari luar, jadi seharusnya tidak
+     * kena `ForegroundServiceStartNotAllowedException`, tapi dibungkus tetap untuk jaga-jaga.
+     *
+     * **BATAS JUJUR (WAJIB dibaca sebelum lapor "masih hilang")**: log Batch 466 SUDAH
+     * MEMBUKTIKAN device user kena OEM App Standby/battery restriction yang bisa memblokir
+     * foreground service WALAU semua API resmi (foreground+specialUse+START_STICKY+boot-restart)
+     * sudah benar — lihat PROJECT_STATE.md Batch 466. Kalau OS/OEM membunuh PROSES secara
+     * langsung (bukan cuma task removal), callback [onTaskRemoved] ini TIDAK PERNAH sempat
+     * terpanggil sama sekali — TIDAK ADA kode aplikasi yang bisa mencegat itu, ini batasan
+     * arsitektur Android, bukan bug. Lapisan tambahan yang benar-benar menyentuh root cause itu:
+     * `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (lihat AndroidManifest.xml & MainActivity.kt's
+     * requestIgnoreBatteryOptimizationsIfNeeded, batch ini juga) — WAJIB user grant manual lewat
+     * dialog sistem, TIDAK bisa dipaksa dari kode. Sisanya (OEM "autostart"/"protected apps" list
+     * proprietary di luar API Android resmi) di luar jangkauan kode sama sekali — kalau device user
+     * masih agresif setelah ini, satu-satunya jalan tersisa adalah user whitelist manual lewat
+     * pengaturan baterai/autostart OEM masing-masing. **"100%" secara teknis TIDAK bisa dijanjikan
+     * dari kode manapun** — ini batas jujur, bukan batas usaha. */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        AppLogger.w("FloatingBubbleService", "onTaskRemoved — app di-swipe dari Recents, re-assert foreground")
+        runCatching { startForegroundWithNotification() }
+            .onFailure { AppLogger.e("FloatingBubbleService", "Re-assert foreground gagal di onTaskRemoved", it) }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
-        }
+        stopForeground(STOP_FOREGROUND_REMOVE)
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         bubbleScope.cancel() // batalkan bubbleArtJob yang mungkin masih in-flight sekalian
+        stopBubbleAnimators() // Batch 663 — animasi minimize/expand tak boleh menyentuh window yang sudah dilepas
+        panelSkin?.stop() // Batch 660 — hentikan animasi skin Space sebelum view dilepas
+        badgeSkin?.stop()
+        playOrb?.stop()
+        panelSkin = null
+        badgeSkin = null
+        playOrb = null
         bubbleView?.let { view -> runCatching { windowManager.removeView(view) } }
         bubbleView = null
     }
@@ -211,17 +689,15 @@ class FloatingBubbleService : Service() {
      * ini. Ikon & channel-creation-guard meniru persis pola `PlaybackService.
      * startForegroundColdStartNotification()` untuk konsistensi gaya di seluruh proyek. */
     private fun startForegroundWithNotification() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = getSystemService(NotificationManager::class.java)
-            if (manager.getNotificationChannel(NOTIFICATION_CHANNEL_ID) == null) {
-                manager.createNotificationChannel(
-                    NotificationChannel(
-                        NOTIFICATION_CHANNEL_ID,
-                        "Mini Player Mengambang",
-                        NotificationManager.IMPORTANCE_MIN
-                    )
+        val manager = getSystemService(NotificationManager::class.java)
+        if (manager.getNotificationChannel(NOTIFICATION_CHANNEL_ID) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    NOTIFICATION_CHANNEL_ID,
+                    "Mini Player Mengambang",
+                    NotificationManager.IMPORTANCE_MIN
                 )
-            }
+            )
         }
 
         val openAppIntent = Intent(this, MainActivity::class.java)
@@ -271,25 +747,23 @@ class FloatingBubbleService : Service() {
         expandedView = expanded
         minimizedView = minimized
 
-        applyOvalClip(expanded.findViewById(R.id.bubble_album_art))
-        applyOvalClip(minimized.findViewById(R.id.bubble_minimized_art))
+        applyPlanetClip(expanded.findViewById(R.id.bubble_album_art))
+        applyPlanetClip(minimized.findViewById(R.id.bubble_minimized_art))
+        applySpaceSkin(expanded, minimized)
         expanded.findViewById<ImageView>(R.id.bubble_album_art).setImageResource(R.mipmap.ic_launcher)
         minimized.findViewById<ImageView>(R.id.bubble_minimized_art).setImageResource(R.mipmap.ic_launcher)
 
-        val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
+        val overlayType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
         isMinimized = bubbleStore.isMinimized()
+        transitionT = if (isMinimized) 1f else 0f // Batch 663
         val saved = bubbleStore.getPosition()
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             overlayType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -302,45 +776,165 @@ class FloatingBubbleService : Service() {
         minimized.visibility = if (isMinimized) View.VISIBLE else View.GONE
         if (!isMinimized) lastExpandedX = params.x
 
-        setupDrag(container, params)
-        setupControls(expanded)
+        // Batch 470 — 2 titik drag terpisah, windowView SELALU `container` di keduanya (lihat
+        // KDoc [setupDrag] "Batch 470" & KDoc kelas "Batch 470"): minimized (chat-head) tetap
+        // 0 berubah (touch source = seluruh tab, sudah luas by design sejak Batch 460); expanded
+        // SEKARANG discoped ke `bubble_album_art` saja (bukan lagi seluruh `container`), diperluas
+        // lewat TouchDelegate di [applyAlbumArtTouchDelegate] biar tetap gampang disentuh.
+        setupDrag(minimized, container, params)
+        setupDrag(expanded.findViewById<ImageView>(R.id.bubble_album_art), container, params)
+        setupControls(expanded, container, params) // Batch 474 — drag diutamakan di 4 tombol kontrol, lihat KDoc setupControls
 
         runCatching { windowManager.addView(container, params) }
+            .onSuccess { container.post { applyAlbumArtTouchDelegate() } }
             .onFailure { AppLogger.e("FloatingBubbleService", "Gagal memasang overlay bubble", it) }
 
         // Sesi sebelumnya diakhiri dalam keadaan minimized — posisi tersimpan mungkin bukan
         // posisi tepi yang valid lagi (mis. rotasi/resolusi beda sejak terakhir disimpan).
         // Snap ulang begitu container ke-layout, konsisten sama kondisi minimize() manapun.
         if (isMinimized) snapMinimizedToNearestEdge()
+        keepAwakeAndScheduleFade() // Batch 453 — mulai idle timer dari saat bubble pertama tampil
     }
 
-    private fun applyOvalClip(imageView: ImageView) {
+    /** Batch 660 — sampul pill & lencana minimized di-clip BULAT = "planet" (menggantikan clip daun diagonal Batch 584
+     * yang dipakai gaya Neumorphism). Outline oval persegi min(lebar, tinggi); `getOutline` dipanggil ulang otomatis
+     * saat ukuran view berubah. Hanya MEMBENTUK clip — logika sentuh/drag/TouchDelegate tak disentuh (memakai
+     * `getHitRect()` persegi, tak terpengaruh bentuk). Halo, cincin gradien, orbit & bulan digambar SpaceSkinDrawable
+     * di belakang sampul, konsentris dengan lingkaran ini. */
+    private fun applyPlanetClip(imageView: ImageView) {
         imageView.clipToOutline = true
         imageView.outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(v: View, outline: Outline) {
-                outline.setOval(0, 0, v.width, v.height)
+                val size = minOf(v.width, v.height)
+                if (size > 0) outline.setOval(0, 0, size, size)
             }
         }
     }
 
-    /** Drag-untuk-pindah + tap-untuk-buka-app di area kosong pill, dibedakan lewat TOTAL jarak
-     * gerak (bukan cuma delta awal-akhir, supaya jari gemetar kecil tidak salah dianggap drag).
-     * Tombol play/pause/prev/next tetap dapat event klik normal — ImageButton clickable
-     * mengonsumsi ACTION_DOWN duluan sebelum sempat ke OnTouchListener root ini, jadi drag/tap
-     * di sini otomatis cuma aktif di luar area ke-3 tombol tanpa perlu logic pemisah manual.
-     * Batch 98: DisplayMetrics dibaca ULANG tiap ACTION_MOVE (bukan di-cache sekali di awal
-     * seperti sebelumnya) — device bisa saja rotasi PAS lagi di-drag, metrics yang di-cache di
-     * awal akan basi. */
-    private fun setupDrag(view: View, params: WindowManager.LayoutParams) {
+    /** Batch 660 — pasang skin Space 🌌 (SpaceBubbleSkin.kt) ke panel, lencana, orb Play, & kenop Prev/Next, plus tint
+     * glyph (di kode, bukan XML: tak ada AppCompat, dan tint ImageButton tetap menempel meski `setImageResource` dipanggil
+     * ulang tiap refresh). Pusat planet panel diambil dari posisi NYATA ImageView sampul lewat listener layout, jadi
+     * halo/cincin selalu konsentris dgn sampul walau ukuran XML diubah. Animasi start/stop otomatis lewat
+     * `Drawable.setVisible` (View GONE / layar mati = berhenti); `onDestroy` menghentikan eksplisit. */
+    private fun applySpaceSkin(expanded: View, minimized: View) {
+        val density = resources.displayMetrics.density
+        val glyph = ColorStateList.valueOf(0xFFEAF0FF.toInt())
+
+        val panel = SpaceSkinDrawable(density, badge = false)
+        expanded.background = panel
+        expanded.findViewById<ImageView>(R.id.bubble_album_art).addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+            panel.setPlanet((left + right) / 2f, (top + bottom) / 2f, (right - left) / 2f)
+        }
+        panelSkin = panel
+
+        val orb = SpaceOrbDrawable(density)
+        expanded.findViewById<ImageButton>(R.id.bubble_play_pause).apply {
+            background = orb
+            imageTintList = ColorStateList.valueOf(0xFF06112E.toInt()) // navy tua di atas orb cyan terang
+        }
+        playOrb = orb
+
+        expanded.findViewById<ImageButton>(R.id.bubble_prev).apply {
+            background = SpaceKeyDrawable(density)
+            imageTintList = glyph
+        }
+        expanded.findViewById<ImageButton>(R.id.bubble_next).apply {
+            background = SpaceKeyDrawable(density)
+            imageTintList = glyph
+        }
+        expanded.findViewById<ImageButton>(R.id.bubble_minimize).imageTintList =
+            ColorStateList.valueOf(0xFF8B94BD.toInt())
+
+        val badge = SpaceSkinDrawable(density, badge = true)
+        minimized.findViewById<View>(R.id.bubble_minimized_visual).background = badge
+        badgeSkin = badge
+    }
+
+    /** Batch 453 — reset bubble ke opaque penuh SEKETIKA (batalkan fade yang mungkin lagi
+     * berjalan/sudah selesai) lalu jadwalkan ulang fade berikutnya [IDLE_FADE_DELAY_MS] dari
+     * SEKARANG. Dipanggil di SETIAP titik masuk interaksi user (lihat pemanggil di [setupDrag]
+     * & [setupControls]) — hasilnya bubble selalu full-opacity selama masih dipakai, mulai
+     * meredup hanya setelah benar-benar tidak disentuh selama durasi itu. Lihat KDoc kelas ini
+     * untuk rasionalisasi penuh (kenapa [bubbleScope] dipakai ulang, kenapa alpha di container). */
+    private fun keepAwakeAndScheduleFade() {
+        idleFadeJob?.cancel()
+        idleMinimizeJob?.cancel()
+        val view = bubbleView ?: return
+        // Batch 662 — pulihkan ke opaque penuh DENGAN animasi (bukan set seketika). Selama pemulihan berjalan, event sentuh
+        // berikutnya tak me-restart animasi; `cancel()` selalu dipanggil di luar pemulihan supaya fade-out yang kebetulan
+        // baru mulai (alpha masih 1,0) pun ikut dibatalkan.
+        if (!fadeRestoring) {
+            view.animate().cancel()
+            if (view.alpha < 1f) {
+                fadeRestoring = true
+                view.animate()
+                    .alpha(1f)
+                    .setDuration(IDLE_RESTORE_ANIM_MS)
+                    .setInterpolator(fadeInInterpolator)
+                    .withEndAction { fadeRestoring = false }
+                    .start()
+            }
+        }
+        idleFadeJob = bubbleScope.launch {
+            delay(IDLE_FADE_DELAY_MS)
+            fadeRestoring = false // pengaman: pemulihan yang terputus (view lepas) tak boleh mengunci flag
+            bubbleView?.animate()?.alpha(IDLE_FADE_ALPHA)?.setDuration(IDLE_FADE_ANIM_MS)
+                ?.setInterpolator(fadeOutInterpolator)?.start()
+        }
+        // Batch 454 — mandat utama user ("wajib bisa split/di-minimize total"), lihat KDoc kelas.
+        // Guard `!isMinimized` murni optimisasi (skip launch sia-sia kalau sudah minimized manual
+        // duluan) — minimize() sendiri SUDAH guard `if (isMinimized) return`, jadi aman tanpa cek
+        // ini juga kalau state berubah di tengah delay.
+        idleMinimizeJob = bubbleScope.launch {
+            delay(IDLE_AUTO_MINIMIZE_DELAY_MS)
+            if (!isMinimized) minimize()
+        }
+    }
+
+    /** Drag-untuk-pindah + tap, dibedakan lewat TOTAL jarak gerak (bukan cuma delta awal-akhir,
+     * supaya jari gemetar kecil tidak salah dianggap drag). Batch 98: metrics dibaca ULANG tiap
+     * ACTION_MOVE (bukan di-cache sekali di awal seperti sebelumnya) — device bisa saja rotasi
+     * PAS lagi di-drag, metrics yang di-cache di awal akan basi. Batch 460: sumbernya
+     * `windowManager.currentWindowMetrics` (bukan lagi `resources.displayMetrics`, lihat KDoc
+     * kelas "Batch 460").
+     *
+     * **Batch 470**: [touchSource] (view yang menerima sentuhan) DIPISAH dari [windowView] (view
+     * jendela WindowManager yang SEBENARNYA dipindah/di-resize/di-baca ukurannya) — sebelumnya 1
+     * parameter `view` dipakai untuk KEDUANYA sekaligus (selalu `container`). Pemisahan ini MURNI
+     * supaya pemanggil bisa memasang listener di child spesifik (mis. `bubble_album_art`, lihat
+     * pemanggil di [addBubbleView]) SEMENTARA clamp/`updateViewLayout`/readback tetap konsisten
+     * memakai ukuran & identitas [windowView] (`container`) seperti sebelumnya — 0 formula clamp,
+     * 0 nilai posisi, 0 logic drag/tap yang berubah, cuma sumber event-nya.
+     *
+     * **Batch 474**: param baru [onTap] (default = perilaku lama album-art/minimized: `if
+     * (isMinimized) expand() else openApp()`) — TIDAK ada pemanggil lama yang perlu ubah argumen
+     * (default IDENTIK). Ini yang memungkinkan [setupControls] memasang fungsi ini JUGA ke 4
+     * tombol kontrol (lihat KDoc di sana & KDoc kelas "Batch 474") — sebelumnya ImageButton
+     * clickable SELALU menang bounds sendiri (dispatch Android baku), jadi drag yang DIMULAI
+     * persis di atas tombol 0 pernah tertangkap fungsi ini sama sekali (bukan cuma "tap
+     * duluan" — API touch Android men-dispatch SELURUH sequence DOWN→MOVE→UP dari 1 pointer ke
+     * SATU view yang menangkap DOWN, jadi drag yang dimulai di tombol dulu ya 100% milik tombol
+     * itu, tidak pernah "diteruskan"). Kalimat KDoc lama di paragraf ini yang menjelaskan
+     * "ImageButton otomatis aman lepas dari logic pemisah manual" SUDAH TIDAK BERLAKU sejak
+     * tombol sendiri kini jadi [touchSource]-nya sendiri, dihapus supaya tidak jadi dokumentasi
+     * basi. */
+    private fun setupDrag(
+        touchSource: View,
+        windowView: View,
+        params: WindowManager.LayoutParams,
+        onTap: () -> Unit = { if (isMinimized) expand() else openApp() }
+    ) {
         var initialX = 0
         var initialY = 0
         var initialTouchX = 0f
         var initialTouchY = 0f
         var totalMovement = 0f
 
-        view.setOnTouchListener { v, event ->
+        touchSource.setOnTouchListener { _, event ->
+            keepAwakeAndScheduleFade() // Batch 453 — sentuhan apa pun = full-opacity + reset timer
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
+                    settleBubbleTransition() // Batch 663 — sentuhan mengambil alih: animasi minimize/expand dituntaskan dulu
                     initialX = params.x
                     initialY = params.y
                     initialTouchX = event.rawX
@@ -353,26 +947,57 @@ class FloatingBubbleService : Service() {
                     val dy = event.rawY - initialTouchY
                     totalMovement += abs(dx) + abs(dy)
                     if (totalMovement > TOUCH_SLOP) {
-                        val metrics = resources.displayMetrics
-                        val maxX = (metrics.widthPixels - v.width).coerceAtLeast(0)
-                        val maxY = (metrics.heightPixels - v.height).coerceAtLeast(0)
+                        // Batch 461 — screenBounds ter-cache, lihat KDoc field (ganti currentWindowMetrics).
+                        val bounds = screenBounds
+                        val maxX = (bounds.width() - windowView.width).coerceAtLeast(0)
+                        val maxY = (bounds.height() - windowView.height).coerceAtLeast(0)
                         params.x = (initialX + dx.toInt()).coerceIn(0, maxX)
                         params.y = (initialY + dy.toInt()).coerceIn(0, maxY)
-                        runCatching { windowManager.updateViewLayout(v, params) }
+                        runCatching { windowManager.updateViewLayout(windowView, params) }
                     }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
                     if (totalMovement > TOUCH_SLOP) {
                         bubbleStore.savePosition(params.x, params.y)
+                        // Batch 469 — instrumentasi MURNI (0 formula diubah, lihat KDoc kelas
+                        // "Batch 469"): user laporkan bubble MENGHILANG saat di-drag ke tepi
+                        // landscape berbeda (nav bottom), pola BARU muncul setelah Batch 468
+                        // (FLAG_LAYOUT_IN_SCREEN). Log target akhir drag + [screenBounds] yang
+                        // dipakai clamp DI SINI (baris ~657-660), PLUS readback posisi NYATA di
+                        // layar 250ms kemudian (`getLocationOnScreen`, pola sama
+                        // [snapMinimizedToNearestEdge] Batch 463) — kalau readback keluar dari
+                        // rentang [0, screenBounds] atau beda dari target, itu bukti langsung
+                        // bubble memang dirender di luar layar nyata saat drag biasa (BUKAN cuma
+                        // lewat [snapMinimizedToNearestEdge]).
+                        val dragTargetX = params.x
+                        val dragTargetY = params.y
+                        val dragBounds = Rect(screenBounds)
+                        AppLogger.w(
+                            "FloatingBubbleService",
+                            "Batch469 drag release target: x=$dragTargetX y=$dragTargetY " +
+                                "screenBounds=$dragBounds isMinimized=$isMinimized"
+                        )
+                        windowView.postDelayed({
+                            val loc = IntArray(2)
+                            windowView.getLocationOnScreen(loc)
+                            AppLogger.w(
+                                "FloatingBubbleService",
+                                "Batch469 drag readback (+250ms): posisi layar nyata x=${loc[0]} " +
+                                    "y=${loc[1]} (target x=$dragTargetX y=$dragTargetY, " +
+                                    "screenBounds=$dragBounds)"
+                            )
+                        }, 250L)
                         // Batch 100 — mode minimized SELALU "nempel" tepi terdekat begitu jari
                         // dilepas, tidak boleh mengambang bebas di tengah layar seperti pill
                         // penuh (itu yang membedakan visual "minimized" dari "expanded biasa").
                         if (isMinimized) snapMinimizedToNearestEdge()
-                    } else if (isMinimized) {
-                        expand()
                     } else {
-                        openApp()
+                        // Batch 474 — dulu `if (isMinimized) expand() else openApp()` hardcode di
+                        // sini, sekarang dipindah jadi default param [onTap] (lihat KDoc fungsi)
+                        // supaya pemanggil lain (tombol kontrol) bisa override aksi tap-nya
+                        // sendiri tanpa duplikasi logic drag di atas.
+                        onTap()
                     }
                     true
                 }
@@ -381,88 +1006,530 @@ class FloatingBubbleService : Service() {
         }
     }
 
-    private fun setupControls(view: View) {
-        view.findViewById<ImageButton>(R.id.bubble_play_pause).setOnClickListener {
-            if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_TOGGLE_PLAY) else openApp()
+    /** Batch 470 — perluas area TAP/DRAG `bubble_album_art` pakai [TouchDelegate] (hit-test
+     * SAJA, 0 perubahan layout/ukuran view nyata, 0 dp baru di XML) supaya tetap gampang
+     * disentuh biarpun sentuhan sekarang discoped ke album art (lihat KDoc kelas "Batch 470" &
+     * [setupDrag]). Sentuhan di padding kosong DI SEKITAR album art (dalam radius delegate) tetap
+     * kena listener [setupDrag] yang terpasang di `bubble_album_art`; sentuhan di LUAR delegate
+     * (termasuk seluruh area ke-4 tombol kontrol) 0 terpengaruh — anak/tombol SELALU menang
+     * duluan untuk hit PERSIS di bounds-nya sendiri (dispatch Android baku), [TouchDelegate] cuma
+     * fallback untuk dead-space yang sebelumnya tidak diklaim siapa pun. Dipanggil setelah layout
+     * pass (album art harus sudah ter-measure) — lihat pemanggil di [addBubbleView] & [expand].
+     *
+     * **Koreksi Batch 471 [drag terasa "sulit/terbatas" pasca-scoping Batch 470]**: sisi kanan
+     * (arah tombol [bubble_prev]) sebelumnya cuma dapat +3dp dari gap asli 6dp (lihat
+     * `bubble_mini_player.xml`), dipilih "konservatif" waktu itu TAPI klaim sendiri di paragraf
+     * atas ("anak/tombol SELALU menang duluan di bounds-nya sendiri, TouchDelegate cuma fallback
+     * dead-space") sudah membuktikan margin ekstra itu tidak perlu — overlap rect delegate ke
+     * bounds tombol TIDAK PERNAH bisa mencuri sentuhan dari tombol (dispatch Android baku
+     * memprioritaskan child match PERSIS duluan, lepas dari apa pun isi rect TouchDelegate induk).
+     * Sisi kiri/atas/bawah TETAP di [ALBUM_ART_TOUCH_PAD_DP] lama — nilai itu SUDAH melebihi
+     * padding riil `bubble_root` (8dp, lihat XML), jadi sudah maksimal secara fisik untuk
+     * arsitektur "0 dp baru di XML" saat ini; menaikkannya lebih lanjut 0 efek (window WRAP_CONTENT
+     * pas di tepi child yang visible, tidak ada ruang sentuh lagi di luar itu — sentuhan di sana
+     * sudah tembus ke app di bawah, bukan lagi milik window ini). 0 formula
+     * clamp/posisi/[screenBounds] disentuh (di luar cakupan guard Batch 469).
+     *
+     * **Koreksi Batch 472 [masih "sempit" pasca-471]**: sisi kanan Batch 471 (fixed +6dp, cuma
+     * sampai gap `bubble_album_art`→`bubble_prev`) TERNYATA belum cukup — user eksplisit minta
+     * area sentuh mentok sampai ke ujung kanan `bubble_root` (melewati SELURUH badan 4 tombol
+     * kontrol, bukan cuma gap sebelum tombol pertama). Aman krn 2 alasan yang SAMA dibuktikan
+     * sendiri Batch 471 di atas: (1) child match PERSIS bounds-nya sendiri SELALU menang duluan
+     * di dispatch Android baku, lepas dari seberapa jauh rect [TouchDelegate] induk meng-overlap
+     * bounds ke-4 tombol itu — tap tombol play/pause/prev/next/minimize 0 terganggu; (2) window
+     * ini sendiri `WRAP_CONTENT` pas di tepi `bubble_root`, jadi `rect.right` tidak bisa melewati
+     * `expanded.width` (window ini SATU-SATUNYA yang bisa nangkap sentuhan, di luar itu sudah
+     * milik app lain di bawah) — `rect.right = expanded.width` sudah maksimal fisik yang mungkin,
+     * bukan angka dp ditebak lagi. [ALBUM_ART_TOUCH_PAD_RIGHT_DP] (Batch 470/471) jadi tidak
+     * terpakai lagi, dicabut. */
+    private fun applyAlbumArtTouchDelegate() {
+        val expanded = expandedView ?: return
+        val albumArt = expanded.findViewById<ImageView>(R.id.bubble_album_art) ?: return
+        if (albumArt.width <= 0 || albumArt.height <= 0) return // belum ter-measure; pemanggil lain akan re-apply
+        if (expanded.width <= 0) return // container induk belum ter-measure; pemanggil lain akan re-apply
+        val density = resources.displayMetrics.density
+        val padSidePx = (ALBUM_ART_TOUCH_PAD_DP * density).toInt()
+        val rect = Rect()
+        albumArt.getHitRect(rect)
+        rect.left -= padSidePx
+        rect.top -= padSidePx
+        rect.bottom += padSidePx
+        rect.right = expanded.width // Batch 472 — mentok penuh ke tepi kanan container (bukan lagi pad tetap)
+        expanded.touchDelegate = TouchDelegate(rect, albumArt)
+    }
+
+    /** **Batch 474 [drag diutamakan di atas tap di ke-4 tombol kontrol]**: sebelumnya tombol
+     * play/pause/prev/next/minimize CUMA punya [View.setOnClickListener] — per dispatch touch
+     * Android baku, tombol yang menangkap `ACTION_DOWN` memegang SELURUH sequence sentuhan itu
+     * sampai `ACTION_UP`/`CANCEL` (lihat KDoc [setupDrag] "Batch 474"), jadi drag yang DIMULAI
+     * persis di atas salah satu tombol ini TIDAK PERNAH ikut memindah bubble sama sekali —
+     * user melaporkan ini terasa seperti tap "menang" atas drag di area situ. Fix: [setupDrag]
+     * (fungsi yang SAMA PERSIS dipakai album art & tab minimized, 0 duplikasi logic drag) kini
+     * DIPASANG JUGA ke ke-4 `ImageButton` ini, `onTap` di-override manggil `performClick()` milik
+     * tombol itu sendiri — [setOnClickListener] di bawah TIDAK disentuh/dipindah sama sekali,
+     * cuma sekarang dipicu lewat `performClick()` (bukan lagi lewat `View.onTouchEvent` bawaan)
+     * saat gerakan MASIH di bawah [TOUCH_SLOP], sehingga 1 satu-satunya sumber kebenaran aksi
+     * tombol tetap listener yang sama, aksesibilitas (TalkBack dkk yang manggil `performClick()`
+     * sendiri) & event klik tetap konsisten. Kalau gerakan MELEWATI [TOUCH_SLOP], [setupDrag]
+     * memindah `windowView` (`container`, SAMA seperti drag dari album art) alih-alih memicu tap
+     * apa pun — persis yang diminta user. **Efek samping jujur, disengaja**: bunyi klik sistem
+     * Android bawaan (dipicu `View.onTouchEvent` default, BUKAN oleh `performClick()`) tidak lagi
+     * terdengar saat tap tombol ini — konsisten filosofi iOS-look proyek ini (ripple Android juga
+     * sudah dimatikan di nav bar, lihat Batch 439), bukan regresi yang perlu di-fix balik. 0
+     * warna/style/drawable/background tombol disentuh — ketiganya (`widget_play_button_bg[_light]`
+     * dkk) statis TANPA `state_pressed`, jadi 0 feedback visual pressed yang hilang. */
+    private fun setupControls(view: View, windowView: View, params: WindowManager.LayoutParams) {
+        // Batch 470 — 0 lagi gerbang [hasQueue] di sini (dulu: `if (hasQueue) ... else openApp()`).
+        // [hasQueue] cuma snapshot terakhir kali `refreshBubbleContent` jalan — pada cold start
+        // snapshot itu SAH-SAH SAJA `false` (antrean session memang masih 0 SAAT itu) tapi TIDAK
+        // BERARTI selamanya kosong (lihat KDoc kelas "Batch 470" & [sendPlaybackAction]). Selalu
+        // dispatch; [sendPlaybackAction] yang memutuskan controller-langsung vs fallback Intent
+        // cold-start-capable pakai state FRESH detik itu juga, bukan snapshot ini.
+        val playPause = view.findViewById<ImageButton>(R.id.bubble_play_pause)
+        playPause.setOnClickListener {
+            keepAwakeAndScheduleFade()
+            sendPlaybackAction(WidgetUpdater.ACTION_TOGGLE_PLAY)
         }
-        view.findViewById<ImageButton>(R.id.bubble_prev).setOnClickListener {
-            if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_PREVIOUS) else openApp()
+        val prev = view.findViewById<ImageButton>(R.id.bubble_prev)
+        prev.setOnClickListener {
+            keepAwakeAndScheduleFade()
+            sendPlaybackAction(WidgetUpdater.ACTION_PREVIOUS)
         }
-        view.findViewById<ImageButton>(R.id.bubble_next).setOnClickListener {
-            if (hasQueue) sendPlaybackAction(WidgetUpdater.ACTION_NEXT) else openApp()
+        val next = view.findViewById<ImageButton>(R.id.bubble_next)
+        next.setOnClickListener {
+            keepAwakeAndScheduleFade()
+            sendPlaybackAction(WidgetUpdater.ACTION_NEXT)
         }
-        view.findViewById<ImageButton>(R.id.bubble_minimize).setOnClickListener { minimize() }
+        val minimizeButton = view.findViewById<ImageButton>(R.id.bubble_minimize)
+        minimizeButton.setOnClickListener {
+            keepAwakeAndScheduleFade()
+            minimize()
+        }
+
+        // Batch 474 — lihat KDoc fungsi ini: drag di atas tombol kini diutamakan, tap tetap
+        // jalan lewat performClick() ke listener yang SAMA persis di atas.
+        setupDrag(playPause, windowView, params) { playPause.performClick() }
+        setupDrag(prev, windowView, params) { prev.performClick() }
+        setupDrag(next, windowView, params) { next.performClick() }
+        setupDrag(minimizeButton, windowView, params) { minimizeButton.performClick() }
     }
 
     /** Ciutkan pill penuh jadi tab 48dp nempel tepi layar. Service/notifikasi foreground TIDAK
-     * disentuh — cuma toggle visibility 2 child dalam [bubbleView] yang sama, lihat KDoc "Batch
-     * 100" di kelas ini untuk kenapa ini BUKAN tombol close/dismiss. */
+     * disentuh — cuma 2 child dalam [bubbleView] yang sama, lihat KDoc "Batch 100" di kelas ini
+     * untuk kenapa ini BUKAN tombol close/dismiss.
+     *
+     * **Batch 663**: tidak lagi menukar visibility seketika. [startTransition] mengerutkan pill ke pusat sampul sambil
+     * memudar dan menumbuhkan lencana dari titik yang sama; [snapMinimizedToNearestEdge] (`animated = true`) meluncurkan
+     * jendela ke tepi BERSAMAAN dengan itu (bukan loncat). `lastExpandedX` hanya direkam saat pill benar-benar utuh
+     * (`transitionT <= 0`), supaya minimize di tengah expand tak menimpanya dengan posisi tengah-geser. */
     private fun minimize() {
         if (isMinimized) return
         val params = layoutParams ?: return
         isMinimized = true
-        lastExpandedX = params.x
-        expandedView?.visibility = View.GONE
-        minimizedView?.visibility = View.VISIBLE
+        if (transitionT <= 0f) lastExpandedX = params.x
         bubbleStore.setMinimized(true)
-        snapMinimizedToNearestEdge()
+        startTransition(toMinimized = true)
+        snapMinimizedToNearestEdge(animated = true)
     }
 
     /** Kebalikan [minimize] — dipanggil dari tap (bukan drag) di atas tab minimized (lihat
      * [setupDrag]). X dipulihkan ke posisi SEBELUM diminimize ([lastExpandedX]), di-clamp ULANG
-     * terhadap lebar pill penuh yang baru saja terlihat lagi (`container.post{}` menunggu satu
-     * layout pass supaya `container.width` yang dibaca adalah ukuran pill, bukan sisa ukuran
-     * tab 48dp dari frame sebelumnya). */
+     * terhadap lebar pill penuh yang baru saja terlihat lagi.
+     *
+     * **Batch 663**: tidak lagi menukar visibility seketika. Lencana memudar & mengerut, pill tumbuh dari pusat sampul
+     * ([startTransition]) sementara jendela meluncur dari tepi ke [lastExpandedX] ([slideWindowTo]). Lebar pill dibaca
+     * lewat [expandedWidthPx] (bukan `container.width` setelah `post{}`): selama transisi KEDUA child terlihat sehingga
+     * ukuran container = yang terbesar, dan pembacaan setelah `post{}` tak dijamin menunggu layout. Re-apply
+     * TouchDelegate album art (Batch 470, idempotent — perlu bila Service start LANGSUNG minimized) dipindah ke
+     * [finalizeTransition] karena rect `getHitRect()` hanya valid saat skala pill sudah kembali 1. */
     private fun expand() {
         if (!isMinimized) return
         val container = bubbleView as? FrameLayout ?: return
         val params = layoutParams ?: return
         isMinimized = false
-        minimizedView?.visibility = View.GONE
-        expandedView?.visibility = View.VISIBLE
         bubbleStore.setMinimized(false)
-        container.post {
-            val maxX = (resources.displayMetrics.widthPixels - container.width).coerceAtLeast(0)
-            params.x = (lastExpandedX ?: params.x).coerceIn(0, maxX)
-            runCatching { windowManager.updateViewLayout(container, params) }
-            bubbleStore.savePosition(params.x, params.y)
+        startTransition(toMinimized = false)
+        // Batch 461 — screenBounds ter-cache, lihat KDoc field (ganti currentWindowMetrics).
+        val maxX = (screenBounds.width() - expandedWidthPx()).coerceAtLeast(0)
+        val toX = (lastExpandedX ?: params.x).coerceIn(0, maxX)
+        bubbleStore.savePosition(toX, params.y)
+        slideWindowTo(container, params, toX, params.y)
+    }
+
+    /** Batch 663 — lebar pill penuh dalam px. `width` bila view pernah di-layout (tetap benar walau sedang GONE);
+     * bila belum (Service start langsung minimized) diukur manual — LinearLayout wrap_content berukuran dp tetap, jadi
+     * UNSPECIFIED menghasilkan lebar sebenarnya. */
+    private fun expandedWidthPx(): Int {
+        val expanded = expandedView ?: return 0
+        if (expanded.width > 0) return expanded.width
+        val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        expanded.measure(unspecified, unspecified)
+        return expanded.measuredWidth
+    }
+
+    /** Batch 663 — mulai animasi pill <-> lencana dari `transitionT` saat ini ke ujung yang dituju (potong-dan-balik
+     * aman: animator lama dibatalkan, yang baru berangkat dari kemajuan terakhir; durasi sebanding sisa jarak). Kedua
+     * child dibuat VISIBLE selama animasi; yang tersembunyi di ujung baru di-GONE-kan oleh [finalizeTransition]. */
+    private fun startTransition(toMinimized: Boolean) {
+        val expanded = expandedView ?: return
+        val minimized = minimizedView ?: return
+        stopBubbleAnimators()
+        val density = resources.displayMetrics.density
+        val art = expanded.findViewById<View>(R.id.bubble_album_art)
+        planetCx = if (art != null && art.width > 0) art.left + art.width / 2f else PLANET_FALLBACK_DP * density
+        planetCy = if (expanded.height > 0) expanded.height / 2f else PLANET_FALLBACK_DP * density
+        expanded.pivotX = planetCx
+        expanded.pivotY = planetCy
+        expanded.visibility = View.VISIBLE
+        minimized.visibility = View.VISIBLE
+        requestBubbleHighFrameRate(true) // Batch 667: auto-minimize idle tadinya 60 Hz; dikembalikan di finalizeTransition
+        applyTransition(transitionT) // frame pertama sudah konsisten sebelum animator berdetak (tanpa kedip)
+        val target = if (toMinimized) 1f else 0f
+        val gen = transitionGen
+        val anim = ValueAnimator.ofFloat(transitionT, target)
+        anim.duration = (BUBBLE_TRANSITION_MS * abs(target - transitionT)).toLong().coerceAtLeast(BUBBLE_TRANSITION_MIN_MS)
+        anim.interpolator = transitionInterpolator
+        anim.addUpdateListener {
+            transitionT = it.animatedValue as Float
+            applyTransition(transitionT)
+        }
+        anim.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                if (gen != transitionGen) return // basi (dibatalkan/digantikan): finalisasi bukan urusan animator ini
+                transitionAnimator = null
+                finalizeTransition(toMinimized)
+            }
+        })
+        transitionAnimator = anim
+        anim.start()
+    }
+
+    /** Batch 663 — pose kedua child untuk kemajuan [t] (0 = pill utuh, 1 = lencana utuh). Pill memudar & mengerut
+     * (lebih kuat horizontal) ke pusat sampul dalam 90% pertama (Batch 665; dulu 70%); lencana muncul sejak 30% dan melayang dari pusat sampul
+     * ke tempat aslinya (selisih pusat sampul pill vs pusat lencana, supaya tak ada loncat saat jendela mengecil). Hanya
+     * properti View (alpha/scale/translation): 0 kerja layout per frame. */
+    private fun applyTransition(t: Float) {
+        val expanded = expandedView ?: return
+        val minimized = minimizedView ?: return
+        val pillP = (t / PILL_PHASE_END).coerceIn(0f, 1f)
+        val badgeP = ((t - BADGE_PHASE_START) / (1f - BADGE_PHASE_START)).coerceIn(0f, 1f)
+        expanded.alpha = 1f - pillP
+        expanded.scaleX = 1f - 0.7f * pillP
+        expanded.scaleY = 1f - 0.4f * pillP
+        val density = resources.displayMetrics.density
+        val badgeCx = if (minimized.width > 0) minimized.width / 2f else BADGE_FALLBACK_CX_DP * density
+        val badgeCy = if (minimized.height > 0) minimized.height / 2f else BADGE_FALLBACK_CY_DP * density
+        val badgeScale = 0.45f + 0.55f * badgeP
+        minimized.alpha = badgeP
+        minimized.scaleX = badgeScale
+        minimized.scaleY = badgeScale
+        minimized.translationX = (planetCx - badgeCx) * (1f - badgeP)
+        minimized.translationY = (planetCy - badgeCy) * (1f - badgeP)
+    }
+
+    /** Batch 663 — keadaan akhir yang bersih: pose ujung, child yang tak dipakai GONE (jendela WRAP_CONTENT mengecil ke
+     * ukuran child yang tersisa seperti sebelumnya). Tak ada penyesuaian posisi di sini — itu urusan
+     * [snapMinimizedToNearestEdge]/[slideWindowTo]. */
+    private fun finalizeTransition(minimizedState: Boolean) {
+        requestBubbleHighFrameRate(false) // Batch 667: transisi selesai, lepas permintaan frame rate tinggi
+        transitionT = if (minimizedState) 1f else 0f
+        applyTransition(transitionT)
+        expandedView?.visibility = if (minimizedState) View.GONE else View.VISIBLE
+        minimizedView?.visibility = if (minimizedState) View.VISIBLE else View.GONE
+        if (!minimizedState) {
+            // Batch 470 — re-apply TouchDelegate setelah pill ter-layout & skala 1 lagi (lihat KDoc [expand]).
+            bubbleView?.post { applyAlbumArtTouchDelegate() }
         }
     }
 
-    /** Chat-head-style "nempel tepi": X dipaksa ke 0 (kiri) atau `screenWidth - lebarTab`
-     * (kanan) — mana pun yang lebih dekat dari posisi X saat ini, TIDAK PERNAH mengambang bebas
-     * di tengah layar selagi minimized. `container.post{}` supaya ukuran tab yang SEBENARNYA
-     * (dari `layout_width="48dp"` di bubble_minimized.xml, sudah ke-measure oleh sistem) yang
-     * dipakai hitung tepi kanan — bukan angka dp ditebak manual dari kode, yang gampang meleset
-     * kalau ukuran layout diubah lagi nanti dan lupa disinkronkan ke sini. */
-    private fun snapMinimizedToNearestEdge() {
+    /** Batch 663 — luncurkan jendela overlay ke ([toX], [toY]) dengan [BUBBLE_TRANSITION_MS]. `params.x/y` diperbarui
+     * tiap frame (listener drag membaca `params` saat ACTION_DOWN, jadi nilainya harus nilai nyata saat itu). Dipotong
+     * animator lain = posisi berhenti di titik terakhir; pemanggil yang menuntut posisi akhir memakai `end()`
+     * ([settleBubbleTransition]). */
+    private fun slideWindowTo(container: View, params: WindowManager.LayoutParams, toX: Int, toY: Int) {
+        slideAnimator?.cancel()
+        val fromX = params.x
+        val fromY = params.y
+        if (fromX == toX && fromY == toY) return
+        val anim = ValueAnimator.ofFloat(0f, 1f)
+        anim.duration = BUBBLE_TRANSITION_MS
+        anim.interpolator = transitionInterpolator
+        // Batch 664 — lewati updateViewLayout bila posisi bulat tak berubah (ekor kurva: <1px/frame di layar 120 Hz);
+        // tiap panggilan = relayout + IPC ke WindowManager. Frame terakhir (f = 1) selalu tepat di (toX, toY).
+        var lastX = fromX
+        var lastY = fromY
+        // Batch 666 — ritme frame NYATA luncuran (rekaman layar 24 fps tak bisa melihat jeda di 60/120 Hz): selang antar-
+        // callback animator + durasi updateViewLayout (relayout + IPC). Hanya membaca System.nanoTime(); ringkasan ditulis
+        // 1 baris di akhir lewat logAsync (tak ada I/O selama animasi).
+        var frames = 0
+        var prevNs = 0L
+        var gapMaxNs = 0L
+        var gapSumNs = 0L
+        var lateGaps = 0
+        var calls = 0
+        var callSumNs = 0L
+        var callMaxNs = 0L
+        anim.addUpdateListener {
+            val nowNs = System.nanoTime()
+            if (prevNs != 0L) {
+                val gap = nowNs - prevNs
+                gapSumNs += gap
+                if (gap > gapMaxNs) gapMaxNs = gap
+                if (gap > PACING_LATE_GAP_NS) lateGaps++
+            }
+            prevNs = nowNs
+            frames++
+            val f = it.animatedValue as Float
+            val nx = fromX + ((toX - fromX) * f).roundToInt()
+            val ny = fromY + ((toY - fromY) * f).roundToInt()
+            if (nx == lastX && ny == lastY) return@addUpdateListener
+            lastX = nx
+            lastY = ny
+            params.x = nx
+            params.y = ny
+            val callStartNs = System.nanoTime()
+            runCatching { windowManager.updateViewLayout(container, params) }
+            val callNs = System.nanoTime() - callStartNs
+            calls++
+            callSumNs += callNs
+            if (callNs > callMaxNs) callMaxNs = callNs
+        }
+        anim.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                if (slideAnimator === animation) slideAnimator = null
+                if (frames > 1 && calls > 0) {
+                    logAsync(
+                        "Batch666 ritme luncuran: frame=$frames selang_rata=${gapSumNs / (frames - 1) / 1000}us " +
+                            "selang_maks=${gapMaxNs / 1000}us terlambat(>25ms)=$lateGaps | " +
+                            "updateViewLayout x$calls rata=${callSumNs / calls / 1000}us maks=${callMaxNs / 1000}us"
+                    )
+                }
+            }
+        })
+        slideAnimator = anim
+        anim.start()
+    }
+
+    /** Batch 667 — minta layar memakai frame rate TINGGI selama animasi minimize/expand (Android 15+ / API 35:
+     * `View.requestedFrameRate`, kategori HIGH; "View hanya memberi suara saat perlu digambar ulang" — jadi aman dibiarkan
+     * menyala selama transisi, lalu dikembalikan ke DEFAULT). Alasan: log v666 (22 luncuran) menunjukkan transisi lewat
+     * tap sudah 120 Hz mulus (selang_rata ~8,2-8,3 ms), tetapi auto-minimize saat idle berjalan di 60 Hz
+     * (selang_rata ~16,5 ms, frame=34 vs 65) karena layar sedang turun ke 60 Hz dan tak ada sentuhan yang menaikkannya.
+     * `ViewGroup` TIDAK meneruskan nilai ke child, jadi ketiga view diatur sendiri. Di bawah API 35 / perangkat tanpa
+     * dukungan: tak ada efek (tak ada galat). */
+    private fun requestBubbleHighFrameRate(high: Boolean) {
+        if (Build.VERSION.SDK_INT < 35) return
+        val rate = if (high) View.REQUESTED_FRAME_RATE_CATEGORY_HIGH else View.REQUESTED_FRAME_RATE_CATEGORY_DEFAULT
+        bubbleView?.requestedFrameRate = rate
+        expandedView?.requestedFrameRate = rate
+        minimizedView?.requestedFrameRate = rate
+    }
+
+    /** Batch 664 — tulis satu baris WARN ke [AppLogger] dari `Dispatchers.IO`. `AppLogger.appendEntry` menulis berkas
+     * SINKRON di thread pemanggil (dan `trim()` membaca-ulang/menulis-ulang log > 200 KB); dari main thread itu jeda I/O
+     * tepat saat animasi minimize/expand berjalan (log "snap target" di frame pertama, readback +250 ms di tengah
+     * luncuran). Pesan tetap disusun di main thread (membaca state View); isi & tag log TIDAK berubah. */
+    private fun logAsync(message: String) {
+        bubbleScope.launch(Dispatchers.IO) { AppLogger.w("FloatingBubbleService", message) }
+    }
+
+    /** Batch 663 — hentikan kedua animator TANPA finalisasi (generasi dinaikkan sehingga listener `onAnimationEnd` yang
+     * dipicu `cancel()` tak menjalankan finalisasi). Dipakai sebelum transisi baru & di [onDestroy]. */
+    private fun stopBubbleAnimators() {
+        transitionGen++
+        transitionAnimator?.cancel()
+        slideAnimator?.cancel()
+        transitionAnimator = null
+        slideAnimator = null
+    }
+
+    /** Batch 663 — dipanggil di ACTION_DOWN [setupDrag]: bila ada animasi minimize/expand yang masih jalan, tuntaskan
+     * ke ujungnya (jendela ke posisi akhir, pose child ke keadaan [isMinimized]) sebelum drag/tap dihitung, supaya
+     * `params` & tampilan tak saling berebut. Tanpa animasi = no-op murah. */
+    private fun settleBubbleTransition() {
+        if (transitionAnimator == null && slideAnimator == null) return
+        val slide = slideAnimator
+        transitionGen++
+        transitionAnimator?.cancel()
+        transitionAnimator = null
+        slide?.end()
+        slideAnimator = null
+        finalizeTransition(isMinimized)
+    }
+
+    /** Chat-head-style "nempel tepi", **Batch 455 — kliping SETENGAH**: X dipaksa ke `-lebarTab/2`
+     * (kiri) atau `screenWidth - lebarTab/2` (kanan) — mana pun yang lebih dekat dari posisi X
+     * saat ini, TIDAK PERNAH mengambang bebas di tengah layar selagi minimized. Sebelumnya
+     * (Batch 100) tab berhenti flush tapi 100% kelihatan (`0`/`screenWidth - lebarTab`) — instruksi
+     * eksplisit user menolak itu ("kliping setengah/menyisakan mini trigger", "wajib mentok
+     * maksimal ke tepi"): sekarang SETENGAH lebar tab sengaja diposisikan MELEWATI batas layar,
+     * sisa setengah yang kelihatan jadi tap-target "mini trigger" mentok tepi. Window overlay
+     * SUDAH `FLAG_LAYOUT_NO_LIMITS` sejak awal (lihat [addBubbleView]) — prasyarat X negatif/lewat
+     * `screenWidth` diterima WindowManager, 0 flag baru; sistem otomatis memotong render di luar
+     * layar, tidak perlu clip manual. `container.post{}` supaya ukuran tab yang SEBENARNYA (dari
+     * `layout_width="48dp"` di bubble_minimized.xml, sudah ke-measure oleh sistem) yang dipakai
+     * hitung `lebarTab/2` — bukan angka dp ditebak manual dari kode. **1 titik kontrol ini saja**
+     * yang diubah — otomatis berlaku ke SEMUA pemanggil yang sudah ada (drag-lepas saat minimized,
+     * auto-minimize idle Batch 454, tombol chevron manual via [minimize], restart service, rotasi
+     * via [onConfigurationChanged]) — 0 titik panggil baru, 0 state/timer baru. Saat masih di-drag
+     * aktif, tab TETAP dibatasi penuh di dalam layar seperti biasa ([setupDrag] clamp `[0, maxX]`
+     * pakai lebar penuh) — half-clip HANYA berlaku begitu jari dilepas & tab benar-benar diam
+     * (idle) di tepi, bukan selagi masih dipegang/dipindah.
+     *
+     * **Batch 456 [SALAH ARAH]**: fraksi clip dikecilkan 50%→30% — efek sebenarnya menambah
+     * bagian tab yang kelihatan (tambah "timbul"), kebalikan dari maksud user. Formula
+     * digeneralisasi (`hiddenWidth = width * EDGE_CLIP_FRACTION`, bukan `width/2` hardcoded)
+     * TETAP DIPERTAHANKAN — netral arah, cuma nilai konstanta yang salah.
+     *
+     * **Batch 457**: [EDGE_CLIP_FRACTION] DIREVERT 30%→50% atas feedback eksplisit user ("malah
+     * dibikin tambah timbul, bukan saya suruh"). 0 formula/titik panggil lain disentuh — pada
+     * 0.5f formula ini identik matematis dengan Batch 455 (regresi-aman).
+     *
+     * **Batch 458**: [EDGE_CLIP_FRACTION] dinaikkan 50%→70% — user minta bagian TIMBUL turun ke
+     * ~30%, dikonfirmasi via tap-choice merujuk ke "kelihatan" bukan ke fraksi klip (menghindari
+     * ulang salah-arah Batch 456). 0 formula/titik panggil baru.
+     *
+     * **Batch 460**: 2 perubahan. (1) `hiddenWidth` dipisah jadi `touchPad + visualWidth *
+     * EDGE_CLIP_FRACTION` (bukan `width * EDGE_CLIP_FRACTION` polos) — `width` root sekarang
+     * lebih lebar dari `visualWidth` sejak `bubble_minimized.xml` dapat child
+     * `R.id.bubble_minimized_visual` terpisah (area ekstra transparan, murni perluas area sentuh,
+     * lihat KDoc kelas). `touchPad` (selisih root-visual /2, simetris kiri/kanan by design) SELALU
+     * ikut nempel di sisi yang tetap di layar tiap arah snap — area sentuh naik TANPA ikut
+     * mengecil saat [EDGE_CLIP_FRACTION] naik. (2) [EDGE_CLIP_FRACTION] 70%→90% (bagian TIMBUL
+     * turun ke ~10%). `windowManager.currentWindowMetrics` ganti `resources.displayMetrics` (fix
+     * kliping landscape, lihat KDoc kelas) — 0 formula lain berubah.
+     *
+     * **Batch 663**: param [animated] (default false = perilaku lama untuk semua pemanggil lain). Bila true (hanya
+     * [minimize]) jendela MELUNCUR ke target lewat [slideWindowTo], bukan loncat. Lebar/tinggi jendela dibaca dari
+     * view lencana (`minimizedView`) — sama dengan `container` setelah layout tuntas, tetapi benar juga selama transisi
+     * (pill masih terlihat = `container.width` masih selebar pill) — formula hiddenWidth/nearestRight/clamp TIDAK
+     * berubah. `post{}` animasi yang basi (sentuhan mengambil alih sebelum sempat jalan) dilewati. */
+    private fun snapMinimizedToNearestEdge(animated: Boolean = false) {
         val container = bubbleView as? FrameLayout ?: return
         val params = layoutParams ?: return
+        val gen = transitionGen
         container.post {
-            val width = container.width.takeIf { it > 0 } ?: return@post
-            val metrics = resources.displayMetrics
-            val screenWidth = metrics.widthPixels
+            if (animated && gen != transitionGen) return@post
+            val badgeRoot = minimizedView?.takeIf { isMinimized }
+            val width = (badgeRoot?.width?.takeIf { it > 0 } ?: container.width).takeIf { it > 0 } ?: return@post
+            // Batch 460 — lebar VISUAL (tab bulat asli) dibaca terpisah dari lebar ROOT/area-
+            // sentuh (`width`, sekarang lebih lebar) — EDGE_CLIP_FRACTION cuma memotong bagian
+            // VISUAL, `touchPad` (selisih root-visual) selalu ikut ke sisi yang tetap di layar.
+            val visualWidth = minimizedView?.findViewById<View>(R.id.bubble_minimized_visual)
+                ?.width?.takeIf { it > 0 } ?: width
+            val touchPad = ((width - visualWidth) / 2).coerceAtLeast(0)
+            // Batch 461 — screenBounds ter-cache, lihat KDoc field (ganti currentWindowMetrics).
+            val bounds = screenBounds
+            val screenWidth = bounds.width()
+            val hiddenWidth = touchPad + (visualWidth * EDGE_CLIP_FRACTION).toInt()
             val nearestRight = (params.x + width / 2) > screenWidth / 2
-            params.x = if (nearestRight) (screenWidth - width).coerceAtLeast(0) else 0
+            val snapX = if (nearestRight) (screenWidth - width + hiddenWidth) else -hiddenWidth
             // Y juga di-clamp (bukan cuma X yang "dipaksa tepi") — rotasi bisa mengubah tinggi
             // layar juga, Y lama yang valid di orientasi sebelumnya bisa jadi melebihi batas.
-            val maxY = (metrics.heightPixels - container.height).coerceAtLeast(0)
-            params.y = params.y.coerceIn(0, maxY)
-            runCatching { windowManager.updateViewLayout(container, params) }
-            bubbleStore.savePosition(params.x, params.y)
+            val windowHeight = badgeRoot?.height?.takeIf { it > 0 } ?: container.height // Batch 663 (lihat KDoc)
+            val maxY = (bounds.height() - windowHeight).coerceAtLeast(0)
+            val snapY = params.y.coerceIn(0, maxY)
+            // Batch 463 — instrumentasi MURNI (0 formula diubah, lihat KDoc kelas "Batch 463"):
+            // log nilai TARGET tepat sebelum apply, supaya bisa dibandingkan ke posisi NYATA di
+            // layar (readback di bawah) — satu-satunya cara membuktikan/membantah teori Batch 462
+            // ("ada pihak lain menimpa posisi window pasca-snap") tanpa menebak lagi.
+            logAsync(
+                "Batch463 snap target: screenWidth=$screenWidth hiddenWidth=$hiddenWidth " +
+                    "nearestRight=$nearestRight -> x=$snapX y=$snapY animated=$animated"
+            )
+            // Batch 663 — animated: params.x/y diperbarui tiap frame oleh slideWindowTo (bukan diloncatkan di sini).
+            val applied = if (animated && (snapX != params.x || snapY != params.y)) {
+                slideWindowTo(container, params, snapX, snapY)
+                Result.success(Unit)
+            } else {
+                slideAnimator?.cancel() // snap seketika (rotasi/lepas-drag) menang atas luncuran yang masih jalan
+                params.x = snapX
+                params.y = snapY
+                runCatching { windowManager.updateViewLayout(container, params) }
+            }
+            applied.exceptionOrNull()?.let { err ->
+                AppLogger.w("FloatingBubbleService", "Batch463 snap: updateViewLayout GAGAL - $err")
+            }
+            bubbleStore.savePosition(snapX, snapY)
+            // Batch 463 — readback +250ms: baca posisi NYATA container di layar (bukan
+            // layoutParams kita, yang cuma mencatat apa yang KITA minta) — kalau sistem
+            // menimpanya setelah apply (teori Batch 462), angka ini akan beda dari x target di
+            // atas. 250ms dipilih supaya readback tiap snap (immediate/150ms/400ms) sempat
+            // menangkap window SEBELUM re-assert berikutnya menimpanya lagi. Target di-snapshot
+            // ke `val` LOKAL (`targetX`/`targetY`, bukan baca `params.x` lagi di dalam lambda) —
+            // `params` object yang SAMA dipakai bergantian oleh 3 panggilan snap (immediate/150ms/
+            // 400ms), jadi kalau dibaca lagi nanti isinya bisa saja sudah ditimpa panggilan
+            // berikutnya, bukan lagi nilai yang di-apply oleh panggilan INI.
+            val targetX = snapX
+            val targetY = snapY
+            // Batch 464 — hasil readback Batch 463 (data device fisik pertama, MENGEJUTKAN):
+            // mismatch BESAR terjadi bahkan saat minimize() BIASA (0 rotasi sama sekali, screenWidth
+            // 1080 tetap portrait) — target x=1011 vs nyata x=551 (selisih 460px). Ini menggeser
+            // dugaan: mungkin BUKAN soal animasi transisi ROTASI (teori Batch 462) — window overlay
+            // ini `WRAP_CONTENT` (resize fisik tiap toggle expanded<->minimized), dan `width` yang
+            // dibaca di `container.post{}` BISA JADI representasi ukuran View yang sudah di-measure
+            // tapi window WindowManager-nya sendiri belum tuntas resize saat `updateViewLayout`
+            // dipanggil (race lain, beda dari 3 teori Batch 460-462, TIDAK PERNAH diuji sebelum ini).
+            // 2 tambahan MURNI observasi (0 masih formula/logic diubah): (1) log `container.width`/
+            // `container.height` DI READBACK juga — kalau beda dari `width`/`container.height` saat
+            // target dihitung di atas, itu BUKTI LANGSUNG window/view masih resize saat kita apply;
+            // (2) 1 readback TAMBAHAN di +800ms (bukan cuma +250ms) — kalau posisi di +800ms SUDAH
+            // sama dengan target (beda dari +250ms yang meleset), itu bukti ini soal SETTLING/
+            // ANIMASI (sementara), bukan salah permanen; kalau +800ms MASIH meleset sama, itu bukti
+            // salahnya permanen (bukan soal waktu tunggu sama sekali).
+            val targetWidth = width
+            val targetHeight = windowHeight
+            fun logReadback(label: String) {
+                val loc = IntArray(2)
+                container.getLocationOnScreen(loc)
+                logAsync(
+                    "Batch464 readback ($label): posisi layar nyata x=${loc[0]} y=${loc[1]} " +
+                        "(target x=$targetX y=$targetY) | ukuran nyata w=${container.width} " +
+                        "h=${container.height} (target w=$targetWidth h=$targetHeight)"
+                )
+            }
+            // Batch 663 — saat animated, +250ms masih di tengah luncuran (durasi BUBBLE_TRANSITION_MS): hanya +800ms yang
+            // dibandingkan ke target; label menandai supaya selisih +250ms tak dibaca sebagai bug posisi.
+            val animTag = if (animated) " animasi" else ""
+            container.postDelayed({ logReadback("+250ms$animTag") }, 250L)
+            container.postDelayed({ logReadback("+800ms$animTag") }, 800L)
         }
     }
 
+    /** Batch 470 [cold-start fix] — lihat KDoc kelas "Batch 470" untuk kronologi lengkap celahnya.
+     * Ringkas: `c != null` SAJA tidak cukup buat aman pakai panggilan controller langsung —
+     * kalau [controller] lokal ini konek tapi sesi `PlaybackService` masih 0 antrean (cold start,
+     * restore belum pernah terpicu SAMA SEKALI karena connect controller murni BIND lewat binder
+     * sesi, 0 lewat `onStartCommand`), `c.play()` dkk di situ adalah NO-OP SENYAP — TIDAK PERNAH
+     * memicu `PlaybackService.restoreLastQueue()` (jalur itu HANYA ada di `onStartCommand`'s
+     * `isWidgetAction` branch, dipicu Intent). Syarat tambahan `c.mediaItemCount > 0` DI SINI
+     * (dibaca FRESH tiap panggilan, bukan snapshot [hasQueue] yang bisa basi) memastikan kondisi
+     * cold-start SELALU jatuh ke fallback Intent yang sama persis dipakai widget home-screen
+     * (lihat KDoc `WidgetUpdater.servicePendingIntent`) — widget TIDAK PERNAH kena celah ini
+     * karena memang TIDAK PERNAH pegang referensi controller lokal sama sekali. */
     private fun sendPlaybackAction(action: String) {
         val c = controller
         when {
-            c != null && action == WidgetUpdater.ACTION_TOGGLE_PLAY -> if (c.isPlaying) c.pause() else c.play()
-            c != null && action == WidgetUpdater.ACTION_NEXT -> c.seekToNextMediaItem()
-            c != null && action == WidgetUpdater.ACTION_PREVIOUS -> c.seekToPreviousMediaItem()
+            c != null && c.mediaItemCount > 0 && action == WidgetUpdater.ACTION_TOGGLE_PLAY ->
+                if (c.isPlaying) c.pause() else c.play()
+            c != null && c.mediaItemCount > 0 && action == WidgetUpdater.ACTION_NEXT -> c.seekToNextMediaItem()
+            c != null && c.mediaItemCount > 0 && action == WidgetUpdater.ACTION_PREVIOUS -> c.seekToPrevious()
             else -> {
-                // Fallback: controller belum konek, pakai kontrak Intent yang sama widget pakai.
+                // Fallback: controller belum konek ATAU antrean sesi ini masih kosong (cold-start,
+                // lihat KDoc fungsi) — pakai kontrak Intent yang sama widget pakai, memicu jalur
+                // cold-start restore PlaybackService.onStartCommand.
+                // Batch 475 [sinkronisasi cold-start/persistent bubble <-> PlaybackService] — arah
+                // KEBALIKAN dari PlaybackService.maybeStartFloatingBubble() (lihat KDoc fungsi itu):
+                // di sana PlaybackService menyalakan bubble balik pasca-trigger eksternal, di sini
+                // bubble MEMICU cold-start PlaybackService pasca-tap user. `runCatching` disamakan
+                // ke pola yang SUDAH ada di [onTaskRemoved] kelas ini (Batch 471) & BubbleBootReceiver.kt
+                // (Batch 466) untuk API startForegroundService yang SAMA persis — sebelum ini titik
+                // panggil KETIGA yang belum ikut terlindungi, exception tak tertangkap di sini bisa
+                // menjatuhkan Service bubble yang sedang aktif hanya karena start player ditolak OS,
+                // padahal bubble seharusnya tetap hidup & bisa dicoba lagi di tap berikutnya.
                 val intent = Intent(this, PlaybackService::class.java).setAction(action)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+                runCatching { startForegroundService(intent) }
+                    .onFailure { AppLogger.e("FloatingBubbleService", "Gagal trigger cold-start PlaybackService dari sendPlaybackAction", it) }
             }
         }
     }
@@ -479,9 +1546,11 @@ class FloatingBubbleService : Service() {
         val prev = view.findViewById<ImageButton>(R.id.bubble_prev)
         val next = view.findViewById<ImageButton>(R.id.bubble_next)
         playPause.setImageResource(if (player.isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play)
+        playOrb?.setPlaying(player.isPlaying) // Batch 660 — aura berdenyut + riak hanya saat memutar
         // Batch 98 — indikasi visual antrean kosong: tombol tetap kelihatan (bukan disembunyikan
-        // total, biar bentuk pill tidak "loncat" ukuran) tapi setengah transparan, dan tap-nya
-        // membuka app alih-alih coba mainkan apa pun (lihat setupControls).
+        // total, biar bentuk pill tidak "loncat" ukuran) tapi setengah transparan. **Batch 470**:
+        // ini SEKARANG murni sinyal visual — tap tombol TIDAK lagi otomatis buka app saat alpha
+        // ini aktif (lihat KDoc kelas "Batch 470" & setupControls/sendPlaybackAction).
         val alpha = if (hasQueue) 1f else 0.4f
         playPause.alpha = alpha
         prev.alpha = alpha
@@ -501,6 +1570,8 @@ class FloatingBubbleService : Service() {
         }
         bubbleArtJob = bubbleScope.launch {
             val bitmap = withContext(Dispatchers.IO) { loadAlbumArtBitmap(artworkUri) }
+            // Batch 660 — sampul = bitmap polos yang di-clip bulat (applyPlanetClip); pelat daun + fillet gilt (Batch 584)
+            // tak dipakai lagi di bubble, jadi 0 kerja CPU ekstra di Dispatchers.Default.
             // bubbleView bisa saja sudah null (Service di-destroy selagi decode jalan) — re-cek,
             // jangan pakai `view` closure lama yang mungkin sudah dilepas dari WindowManager.
             val root = bubbleView ?: return@launch
@@ -520,19 +1591,10 @@ class FloatingBubbleService : Service() {
      * lagu itu sendiri (bukan decode byte mentah, lihat catatan Batch 68 di AudioArtFetcher.kt
      * kenapa pendekatan lain pernah gagal total di sini). */
     private fun loadAlbumArtBitmap(uri: Uri): Bitmap? = try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            contentResolver.loadThumbnail(uri, Size(120, 120), null)
-        } else {
-            val retriever = MediaMetadataRetriever()
-            try {
-                retriever.setDataSource(this, uri)
-                retriever.embeddedPicture?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-            } finally {
-                retriever.release()
-            }
-        }
+        contentResolver.loadThumbnail(uri, Size(120, 120), null)
     } catch (e: Exception) {
-        AppLogger.e("FloatingBubbleService", "Gagal muat artwork bubble", e)
+        // Batch 622 — DecodeException (lagu tanpa sampul) = 1 baris WARN; galat lain tetap ERROR + stacktrace; + probe 1x per URI.
+        ArtFailureLog.logFailure(this, "FloatingBubbleService", "Gagal muat artwork bubble", uri, 120, e)
         null
     }
 
@@ -540,5 +1602,53 @@ class FloatingBubbleService : Service() {
         private const val TOUCH_SLOP = 12f
         private const val NOTIFICATION_CHANNEL_ID = "floating_bubble"
         private const val NOTIFICATION_ID = 7002 // beda dari COLD_START_NOTIFICATION_ID (7001)
+
+        // Batch 453 — tuning auto-fade idle, lihat KDoc kelas & keepAwakeAndScheduleFade().
+        // Batch 661 — user: "terlalu cepat fadeout nya!!" (video 360973.mp4: bubble meredup ~2,5 dtk setelah sentuhan
+        // terakhir & transisinya hanya 250ms = nyaris loncat). Jeda 2500 -> 7000ms, durasi transisi 250 -> 900ms (meredup
+        // pelan). Alpha target 0,45 TIDAK diubah (tak dikeluhkan).
+        private const val IDLE_FADE_DELAY_MS = 7000L
+        private const val IDLE_FADE_ALPHA = 0.45f
+        private const val IDLE_FADE_ANIM_MS = 1200L // Batch 662: 900 -> 1200ms + kurva lembut (fadeOutInterpolator)
+        private const val IDLE_RESTORE_ANIM_MS = 260L // Batch 662: pemulihan ke opaque penuh saat disentuh (dulu seketika)
+        // Batch 663 — animasi minimize/expand (dulu swap seketika). Satu durasi untuk morf pill<->lencana DAN luncuran
+        // jendela ke/dari tepi supaya keduanya berakhir bersamaan. Fase: pill habis di 70% awal, lencana mulai muncul di 30%.
+        // Batch 664: 340 -> 520 ms (user setelah v663: "masih bisa lebih smooth"; kurva baru, lihat transitionInterpolator).
+        private const val BUBBLE_TRANSITION_MS = 520L
+        private const val BUBBLE_TRANSITION_MIN_MS = 160L // transisi yang dibalik di tengah jalan tak boleh jadi kedipan
+        private const val PACING_LATE_GAP_NS = 25_000_000L // Batch 666: selang > 25 ms = frame terlewat (60 Hz = 16,7; 120 Hz = 8,3)
+        // Batch 665: 0,7 -> 0,9 (video v664: pill minimize habis ~4-5 frame/±215 ms vs expand ~10 frame/±400 ms; kini ±325 ms).
+        private const val PILL_PHASE_END = 0.9f
+        private const val BADGE_PHASE_START = 0.3f
+        // Cadangan bila view belum pernah di-layout (Service start langsung minimized): pusat sampul pill
+        // (padding kiri 11dp + sampul 40dp/2 = 31dp, tinggi panel 62dp/2) & pusat root lencana (88dp x 48dp).
+        private const val PLANET_FALLBACK_DP = 31f
+        private const val BADGE_FALLBACK_CX_DP = 44f
+        private const val BADGE_FALLBACK_CY_DP = 24f
+        // Batch 454 — tuning auto-minimize idle (dihitung dari titik interaksi terakhir, SAMA
+        // dgn titik hitung IDLE_FADE_DELAY_MS, bukan ditambah setelahnya). > IDLE_FADE_DELAY_MS
+        // supaya urutan visual selalu fade dulu, baru collapse — user masih sempat lihat bubble
+        // meredup sebelum menciut total, bukan langsung "hilang" tiba-tiba dari opaque penuh.
+        // Batch 661 — 6000 -> 11000ms: tetap > IDLE_FADE_DELAY_MS (urutan fade dulu baru collapse), jarak fade->collapse
+        // dipertahankan ~4 dtk (sebelumnya 3,5 dtk) supaya fase "meredup" tetap terlihat sebelum menciut.
+        private const val IDLE_AUTO_MINIMIZE_DELAY_MS = 11000L
+        // Batch 455/456/457/458/460 — tuning half-clip tepi layar tab minimized (fraksi bagian
+        // VISUAL saja sejak Batch 460, lihat KDoc snapMinimizedToNearestEdge()). Batch 456 SALAH
+        // ARAH (0.5f->0.3f menaikkan bagian kelihatan = tambah timbul, kebalikan dari diminta),
+        // Batch 457 REVERT ke 0.5f, Batch 458 naik ke 0.7f (30% timbul, dikonfirmasi tap). Batch
+        // 460: user eksplisit pakai kata "timbul" minta turun ke ~10% — naik lagi ke 0.9f (90%
+        // sembunyi, 10% timbul). Sejak Batch 460 TIDAK LAGI ikut mengecilkan area sentuh (lihat
+        // touchPad independen di snapMinimizedToNearestEdge()).
+        private const val EDGE_CLIP_FRACTION = 0.9f
+        // Batch 462 — 2 delay safety-net re-assert kliping pasca rotasi (lihat KDoc kelas
+        // "Batch 462" & onConfigurationChanged). Bracket durasi animasi transisi rotasi tipikal
+        // sistem (bervariasi antar OEM/API level) — jaga-jaga ada override posisi window dari
+        // sistem SETELAH snap pertama (immediate) tapi SEBELUM animasi rotasi selesai settle.
+        private val ROTATION_RESNAP_DELAYS_MS = longArrayOf(150L, 400L)
+        // Batch 470 — padding TouchDelegate `bubble_album_art` (hit-test saja, lihat KDoc
+        // [applyAlbumArtTouchDelegate]). Cuma sisi kiri/atas/bawah lagi sejak Batch 472 — sisi
+        // kanan sekarang dihitung dinamis mentok ke `expanded.width` (lihat KDoc "Koreksi Batch
+        // 472"), bukan lagi konstanta dp tetap.
+        private const val ALBUM_ART_TOUCH_PAD_DP = 10f
     }
 }

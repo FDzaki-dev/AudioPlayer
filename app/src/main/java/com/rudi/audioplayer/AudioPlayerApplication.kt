@@ -1,29 +1,144 @@
 package com.rudi.audioplayer
 
 import android.app.Application
-import coil.ImageLoader
-import coil.ImageLoaderFactory
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.request.crossfade
+import com.rudi.audioplayer.data.CrossfadeStore
+import com.rudi.audioplayer.data.SilenceSkipStore
+import com.rudi.audioplayer.playback.EqualizerController
+import com.rudi.audioplayer.playback.PlaybackAudioSession
+import com.rudi.audioplayer.playback.UpdateResumeCoordinator
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.AudioArtFetcher
+import com.rudi.audioplayer.util.PowerProbe
+import com.rudi.audioplayer.util.StartupTrace
 
 /** Every AsyncImage in the app (Library grid/list rows, Home, MiniPlayerBar, Now Playing)
  * uses Coil's default singleton ImageLoader unless it builds its own request — so configuring
  * it once here applies everywhere. Crossfading album art in (instead of it popping in the
  * instant a bitmap decodes) masks normal decode latency and is one of the cheapest, most
- * broadly-felt wins for making list/grid scrolling feel smooth. */
-class AudioPlayerApplication : Application(), ImageLoaderFactory {
+ * broadly-felt wins for making list/grid scrolling feel smooth.
+ *
+ * Batch 425 (Coil 2.6.0 -> 3.6.2 migration): `ImageLoaderFactory` was renamed
+ * `SingletonImageLoader.Factory` and now receives the platform `Context` as a `newImageLoader`
+ * parameter instead of relying on `this@AudioPlayerApplication` as an implicit receiver.
+ * Batch 427 (CI FAILED, corrected): `crossfade()` is a top-level Kotlin extension function in
+ * Coil 3 (`coil3.request.crossfade`), not an `ImageLoader.Builder` member like it effectively
+ * was in Coil 2 — needs its own explicit import.
+ * Batch 428 (CI FAILED again, corrected): `components { }` IS a genuine member function of
+ * `ImageLoader.Builder` (needs no import, unlike `crossfade`) — removed the invalid
+ * `import coil3.components` (no such top-level symbol exists). Also removed the invalid 2-arg
+ * `add(factory, CoilUri::class)` call below: `ComponentRegistry.Builder`'s only `Fetcher.Factory`
+ * overload is `inline fun <T : Any> add(factory: Fetcher.Factory<T>)` — no KClass-taking
+ * overload exists for fetchers (that 2-arg form only exists for `Keyer`/`Mapper`). The
+ * single-arg call infers `T = coil3.Uri` automatically from `AudioArtFetcher.Factory`'s own
+ * declared type (`Fetcher.Factory<coil3.Uri>`, see that class), same pattern as every working
+ * example in Coil's own docs (`add(CustomFetcher.Factory())`, no explicit type argument). */
+class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
+        StartupTrace.mark("app_mulai") // Batch 677 — jejak cold start (lihat StartupTrace)
         AppLogger.init(this)
+        // Batch 699 [perintah user: berhenti mengumpulkan sampel] — start `StartupStallProbe` DIPUTUS. Probe itu sendiri membebani
+        // jendela yang diukurnya: `Looper.setMessageLogging` aktif untuk SETIAP pesan thread utama + sampler `getStackTrace()` tiap ~15 ms
+        // menahan thread utama sebentar pada tiap sampel. Kelas + tesnya masih ada (tak dipanggil); dihapus batch berikutnya.
+        // Batch 670 — saklar yang memengaruhi CPU pemutaran dicetak di tiap baris `PowerProbe` (xfade = overlapPlayer kedua;
+        // senyap = trim keheningan). Dibaca di thread probe, bukan di sini.
+        PowerProbe.setStateExtras {
+            val xfade = CrossfadeStore(this).isEnabled()
+            val silence = SilenceSkipStore(this).isEnabled()
+            "xfade=${if (xfade) "ya" else "tidak"} senyap=${if (silence) "ya" else "tidak"}"
+        }
+        PowerProbe.start(this) // Batch 669 — catcher daya (baris `PowerProbe` di log debug)
+        warmUpSharedPreferences()
+        // Batch 691 — EKSPERIMEN pemulihan pasca-update lebih awal (thread latar, biaya thread utama ~0); lihat UpdateResumeCoordinator.
+        UpdateResumeCoordinator.startEarlyAttempt(this)
+
+        // Batch 490 — fix: "preset EQ balik ke nol/default pasca app di-kill lalu musik dimainkan
+        // lewat eksternal player". PlaybackAudioSession.onSessionIdChanged (Batch 314) was only
+        // ever registered from PlayerViewModel's init{} — i.e. only once MainActivity/UI exists.
+        // When the process is instead resurrected headlessly for playback resumption (widget tap,
+        // Bluetooth/media-button, notification action, Android Auto — none of which create an
+        // Activity) after a full app-kill, PlaybackService still creates a brand-new ExoPlayer
+        // session (its onEvents listener still sets PlaybackAudioSession.sessionId) — but with 0
+        // listener registered, that new platform Equalizer effect never learns the saved
+        // bands/preset, so it plays at Android's own flat/disabled default despite
+        // SharedPreferences holding the real values. Registering the same re-attach hook here
+        // instead closes the gap: Application.onCreate() runs before ANY component (Activity or
+        // Service) regardless of what triggered process start, so this listener now exists before
+        // PlaybackService's player can ever fire its first onEvents. PlayerViewModel's own init{}
+        // still runs later and still re-registers/re-attaches once the UI does open — both now
+        // route through EqualizerController.getInstance() (see its own Batch 490 doc) so this is a
+        // genuinely earlier hook onto the SAME shared instance, not a second competing one.
+        PlaybackAudioSession.onSessionIdChanged = { id -> EqualizerController.getInstance(this).attach(id) }
+        StartupTrace.mark("app_selesai")
     }
 
-    override fun newImageLoader(): ImageLoader {
-        return ImageLoader.Builder(this)
+    /**
+     * Batch 385 (cold-start optimization) — `PlayerViewModel` (built the instant
+     * `MainActivity.onCreate()` first touches its `by viewModels` delegate) opens **23 separate
+     * SharedPreferences files** across its own property initializers (favorites, playback_state,
+     * play_stats, ratings, app_lock, vault, listening_history, hourly_listen_stats,
+     * shake_settings, radio_settings, floating_bubble_settings, silence_skip_settings,
+     * playlists, lyrics, bookmarks, audiobook_mode, equalizer, visualizer_settings, crossfade,
+     * custom_folders, app_theme, smart_playlists, sleep_timer) — plus 4 more (library_filter,
+     * search_history, onboarding_hints, widget_state) opened by other
+     * Store/Updater classes that screens and the home-screen widget construct moments after
+     * cold start, 27 files in total app-wide (Batch 659: `lyrics_prefetch_settings` dicabut). Android only starts a file's own background load
+     * thread the FIRST time `Context.getSharedPreferences(name, MODE_PRIVATE)` is called for it —
+     * and several of `PlayerViewModel`'s StateFlow initializers (theme identity/mode, crossfade,
+     * playlists, smart playlists, shake/bubble/silence-skip/radio toggles, app-lock flags) plus
+     * its `init {}` block (sleep timer) call a getter on that SAME first call, which blocks the
+     * calling thread (`awaitLoadedLocked()`) until that specific file's parse finishes. Today
+     * that first call — and therefore the FIRST moment any of these 27 loads can even begin —
+     * only happens once `MainActivity.onCreate()` runs, after process start, class-loading, and
+     * window setup have already spent part of the cold-start budget.
+     *
+     * Fix: touch every known file name here, from a background thread, as early as
+     * `Application.onCreate()` allows — process start, before any Activity exists. Android
+     * caches the resulting `SharedPreferencesImpl` per-file by absolute path (synchronized in
+     * `ContextImpl`), so the SAME instance every Store's own `getSharedPreferences()` call
+     * returns later — this is a genuine head start for the same load, not a duplicate one. By
+     * the time `PlayerViewModel`'s constructor reaches each read, the load has had the entire
+     * rest of process/window startup to finish in the background instead of starting cold.
+     *
+     * Zero behavior change: no value is read or written here, only the file handle is warmed —
+     * every Store's own getters/setters, defaults, and first-run behavior are untouched. Safe to
+     * leave a stale name here if a Store is ever removed (a harmless no-op file touch), and safe
+     * to add a new one later if a Store is added — this list is intentionally a plain
+     * best-effort mirror of each Store's own `PREFS_NAME`, not a shared source of truth.
+     */
+    private fun warmUpSharedPreferences() {
+        Thread({
+            for (name in PREFS_TO_WARM) {
+                runCatching { getSharedPreferences(name, MODE_PRIVATE) }
+            }
+        }, "PrefsWarmup").start()
+    }
+
+    override fun newImageLoader(context: android.content.Context): ImageLoader {
+        return ImageLoader.Builder(context)
             .crossfade(200)
             // Batch 68: extracts embedded art from song.uri instead of Coil's default
             // fetcher trying (and failing) to decode audio bytes as an image. See
             // AudioArtFetcher kdoc for the full regression story.
-            .components { add(AudioArtFetcher.Factory(this@AudioPlayerApplication)) }
+            // Batch 428: single-arg add() — T (coil3.Uri) infers from AudioArtFetcher.Factory's
+            // own Fetcher.Factory<coil3.Uri> declaration, no KClass overload exists to pass one.
+            .components { add(AudioArtFetcher.Factory(context)) }
             .build()
+    }
+
+    companion object {
+        // Batch 385 — keep in sync (best-effort) with each Store's own `PREFS_NAME` constant
+        // under data/*.kt, playback/EqualizerController.kt, and widget/WidgetUpdater.kt.
+        private val PREFS_TO_WARM = arrayOf(
+            "favorites", "playback_state", "play_stats", "ratings", "app_lock", "vault",
+            "listening_history", "hourly_listen_stats", "shake_settings", "radio_settings",
+            "floating_bubble_settings", "silence_skip_settings", "playlists", "lyrics",
+            "bookmarks", "audiobook_mode", "equalizer", "visualizer_settings", "crossfade",
+            "custom_folders", "app_theme", "smart_playlists", "sleep_timer", "library_filter",
+            "search_history", "onboarding_hints", "widget_state"
+        )
     }
 }

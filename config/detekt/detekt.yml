@@ -1,0 +1,54 @@
+# Batch 531 — detekt FOKUS & NON-BLOCKING (menggantikan rancangan ketat Batch 525).
+# Prinsip (instruksi user): hanya aturan yang temuannya BISA DIAMATI di laporan dan BISA
+# DIPERBAIKI di source; yang lain dimatikan. Dipakai bersama buildUponDefaultConfig=true
+# (app/build.gradle.kts): file ini hanya menimpa default detekt 1.23.8.
+# Sengaja HANYA properti/rule yang pasti valid di 1.23.8 (validasi config aktif: salah eja =
+# detekt gagal sebelum menganalisis apa pun).
+#
+# AKTIF (default detekt): potential-bugs, exceptions, empty-blocks, performance, coroutines
+# (kecuali rule yang dimatikan di bawah).
+# DIMATIKAN dan alasannya:
+#  - formatting (ktlint): gaya, bukan cacat; autoCorrect menulis ulang source di runner CI
+#    sehingga perbaikannya tidak pernah masuk repo (sumber ~84% temuan #503-#507 + goyang antar-run).
+#  - complexity/style/naming/comments: perbaikannya refactor besar (Compose = fungsi panjang,
+#    angka dp/alpha dianggap MagicNumber) -> melanggar "tanpa structural rewrite", tidak actionable.
+#  - TooGenericExceptionCaught: 28 temuan, mayoritas fallback Android yang disengaja.
+#  - Batch 533 — SwallowedException (8 temuan run #508, SEMUA fallback disengaja ber-komentar/return
+#    null/NotFound; "perbaikan" = menambah logger = ubah perilaku) dan SpreadOperator (1, `*arrayOf(...)`
+#    di Brush.linearGradient MainActivity — vararg tak bisa dihindari tanpa menulis ulang gradien):
+#    terlihat di laporan tapi tidak ada perbaikan yang layak -> dimatikan.
+# Tidak memblokir: `ignoreFailures = true` di app/build.gradle.kts (bukan di sini).
+
+build:
+  maxIssues: 0
+
+config:
+  validation: true
+  warningsAsErrors: true
+
+complexity:
+  active: false
+
+style:
+  active: false
+
+naming:
+  active: false
+
+comments:
+  active: false
+
+exceptions:
+  SwallowedException:
+    active: false
+  TooGenericExceptionCaught:
+    active: false
+
+performance:
+  SpreadOperator:
+    active: false
+
+coroutines:
+  # Guard "Battery & Background": jangan GlobalScope — pakai viewModelScope/lifecycleScope/WorkManager.
+  GlobalCoroutineUsage:
+    active: true

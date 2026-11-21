@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Person
@@ -27,9 +27,11 @@ import com.rudi.audioplayer.ui.theme.Radius
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
+import com.rudi.audioplayer.ui.theme.neuSurface
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.tactileEmboss
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import java.time.DayOfWeek
 
 /** Full-screen dashboard reached from Settings ("Statistik Dengar"). Every number here is
@@ -46,7 +48,7 @@ fun StatsDashboardScreen(snapshot: ListeningStatsEngine.Snapshot, onBack: () -> 
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
             }
             Spacer(modifier = Modifier.width(4.dp))
             Text("Statistik Dengar", style = MaterialTheme.typography.titleLarge)
@@ -58,7 +60,11 @@ fun StatsDashboardScreen(snapshot: ListeningStatsEngine.Snapshot, onBack: () -> 
                 subtitle = "Statistik muncul begitu kamu mulai memutar lagu — jam favorit, artis paling sering, dan tren mingguan akan terisi otomatis."
             )
         } else {
-            LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                // Batch 377 — PENDING_IosFlingBehavior.md item 6/14.
+                flingBehavior = rememberIosFlingBehavior()
+            ) {
                 item {
                     Row(modifier = Modifier.fillMaxWidth()) {
                         SummaryStatCard(
@@ -209,7 +215,9 @@ private fun StatSectionCard(modifier: Modifier = Modifier, content: @Composable 
     val isTactile = isTactileTheme()
     val isSkeu = isSkeuTheme()
     val isLiquidGlass = isLiquidGlassTheme()
-    val isPanelTheme = isTactile || isSkeu || isLiquidGlass
+    // Batch 551 — sama pola ContinueListeningCard (HomeScreen.kt): `else` (Apple/Calm Retro/
+    // Aurora) -> `neuSurface()` dgn bentuk lama `RoundedCornerShape(Radius.xl)`; Surface selalu
+    // transparan karena fill digambar mesin kedalaman.
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -218,12 +226,12 @@ private fun StatSectionCard(modifier: Modifier = Modifier, content: @Composable 
                     isTactile -> Modifier.tactileEmboss(shape = MaterialTheme.shapes.medium, elevation = 6.dp)
                     isSkeu -> Modifier.skeuEmboss(shape = MaterialTheme.shapes.medium, elevation = 6.dp)
                     isLiquidGlass -> Modifier.frostedGlass()
-                    else -> Modifier.clip(RoundedCornerShape(Radius.xl))
+                    else -> Modifier.neuSurface(shape = RoundedCornerShape(Radius.xl), elevation = 6.dp)
                 }
             ),
-        color = if (isPanelTheme) Color.Transparent else MaterialTheme.colorScheme.surface,
+        color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = if (isPanelTheme) 0.dp else 2.dp
+        tonalElevation = 0.dp
     ) {
         Column(modifier = Modifier.padding(16.dp), content = content)
     }

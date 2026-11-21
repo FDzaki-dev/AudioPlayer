@@ -1,0 +1,128 @@
+package com.rudi.audioplayer.util
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class DumpsysFormatTest {
+
+    @Test
+    fun `filterAround menyimpan baris cocok plus konteks dan memisahkan kelompok`() {
+        val lines = listOf("a", "b", "X1", "c", "d", "e", "f", "X2", "g")
+        val out = DumpsysFormat.filterAround(lines, "X", 1)
+        assertEquals(listOf("b", "X1", "c", DumpsysFormat.GAP_MARK, "f", "X2", "g"), out)
+    }
+
+    @Test
+    fun `filterAround tanpa baris cocok mengembalikan kosong`() {
+        assertTrue(DumpsysFormat.filterAround(listOf("a", "b"), "Z", 2).isEmpty())
+    }
+
+    @Test
+    fun `capLines memotong dan mencatat sisa`() {
+        val out = DumpsysFormat.capLines(listOf("1", "2", "3", "4", "5"), 3)
+        assertEquals(listOf("1", "2", "3", "(... 2 baris lain dipotong)"), out)
+        assertEquals(listOf("1", "2"), DumpsysFormat.capLines(listOf("1", "2"), 3))
+    }
+
+    @Test
+    fun `isDenied mengenali penolakan izin`() {
+        assertTrue(DumpsysFormat.isDenied(listOf("Permission Denial: can't dump meminfo from pid=1")))
+        assertFalse(DumpsysFormat.isDenied(listOf("Applications Memory Usage (in Kilobytes):")))
+    }
+
+    @Test
+    fun `buildSection memuat judul dan isi`() {
+        val text = DumpsysFormat.buildSection(listOf("meminfo", "pkg"), listOf("baris1", "baris2"), null, 0, 10, false, null)
+        assertTrue(text.startsWith("---- dumpsys meminfo pkg ----"))
+        assertTrue(text.contains("baris1"))
+    }
+
+    @Test
+    fun `statusSection menyebut akses tidak ada beserta perintahnya`() {
+        val text = DumpsysFormat.statusSection("TIDAK ADA", false, "adb shell pm grant x android.permission.DUMP", listOf("Audio"), 13)
+        assertTrue(text.contains("akses dumpsys: TIDAK ADA"))
+        assertTrue(text.contains("adb shell pm grant x"))
+        assertTrue(text.contains("(1 dari 13)"))
+    }
+
+    @Test
+    fun `isFailure mengenali Cant find service selain Permission Denial`() {
+        assertTrue(DumpsysFormat.isFailure(listOf("Can't find service: meminfo")))
+        assertTrue(DumpsysFormat.isFailure(listOf("Permission Denial: can't dump ActivityManager due to missing android.permission.PACKAGE_USAGE_STATS permission")))
+        assertFalse(DumpsysFormat.isFailure(listOf("ACTIVITY MANAGER SERVICES (dumpsys activity services)", "  (nothing)")))
+    }
+
+    @Test
+    fun `isDenied mengenali Security exception berspasi dari jobscheduler`() {
+        val raw = "Security exception: MATCH_ANY_USER flag requires INTERACT_ACROSS_USERS permission: UID 10466 requires " +
+            "android.permission.INTERACT_ACROSS_USERS_FULL or android.permission.INTERACT_ACROSS_USERS to access user 0."
+        assertTrue(DumpsysFormat.isDenied(listOf(raw)))
+        assertTrue(DumpsysFormat.isFailure(listOf(raw)))
+    }
+
+    @Test
+    fun `buildSection menandai layanan tidak ditemukan dan jalur cadangan`() {
+        val gagal = DumpsysFormat.buildSection(listOf("meminfo", "pkg"), listOf("Can't find service: meminfo"), null, 0, 10, false, null)
+        assertTrue(gagal.contains("(layanan tidak ditemukan)"))
+        assertTrue(gagal.contains("Can't find service: meminfo"))
+        val cadangan = DumpsysFormat.buildSection(
+            listOf("meminfo", "pkg"), listOf("Total PSS by process:"), null, 0, 10, false, null, DumpsysFormat.ROUTE_SHIZUKU_FALLBACK
+        )
+        assertTrue(cadangan.contains("(jalur: ${DumpsysFormat.ROUTE_SHIZUKU_FALLBACK})"))
+        assertTrue(cadangan.contains("Total PSS by process:"))
+    }
+
+    @Test
+    fun `statusSection memuat baris rincian izin bila diberikan`() {
+        val text = DumpsysFormat.statusSection(
+            "izin DUMP langsung", true, "x", listOf("Audio"), 13, "izin: DUMP=ya, PACKAGE_USAGE_STATS=tidak; Shizuku=siap"
+        )
+        assertTrue(text.contains("izin: DUMP=ya, PACKAGE_USAGE_STATS=tidak; Shizuku=siap"))
+    }
+
+    @Test
+    fun `statusSection dengan akses tidak menampilkan petunjuk pemberian izin`() {
+        val text = DumpsysFormat.statusSection("lewat Shizuku", true, "adb shell pm grant x android.permission.DUMP", listOf("Audio", "Memori"), 13)
+        assertTrue(text.contains("akses dumpsys: lewat Shizuku"))
+        assertFalse(text.contains("adb shell pm grant"))
+    }
+
+    @Test
+    fun `uidLabels memuat angka mentah dan label u0aN untuk uid aplikasi`() {
+        assertEquals(listOf("10466", "u0a466"), DumpsysFormat.uidLabels(10466))
+        assertEquals(listOf("1000"), DumpsysFormat.uidLabels(1000))
+    }
+
+    @Test
+    fun `keepUidBlock menyimpan ringkasan awal lalu blok uid sampai uid berikutnya`() {
+        val lines = listOf("g1", "g2", "g3", "  1000:", "    x", "  u0a466:", "    wake", "    cpu", "  u0a500:", "    lain")
+        val out = DumpsysFormat.keepUidBlock(lines, 10466, 2, 10)
+        assertEquals(listOf("g1", "g2", DumpsysFormat.GAP_MARK, "  u0a466:", "    wake", "    cpu"), out)
+    }
+
+    @Test
+    fun `keepUidBlock memotong blok uid yang terlalu panjang dan mencatat sisa`() {
+        val lines = listOf("g1", "  10466:", "a", "b", "c")
+        val out = DumpsysFormat.keepUidBlock(lines, 10466, 5, 2)
+        assertEquals(listOf("g1", "  10466:", "a", "(... 2 baris blok uid dipotong)"), out)
+    }
+
+    @Test
+    fun `keepUidBlock mencatat bila blok uid tak ditemukan dan tetap memuat keluaran`() {
+        val lines = listOf("g1", "  1000:", "x")
+        val out = DumpsysFormat.keepUidBlock(lines, 10466, 5, 5)
+        assertEquals("(blok uid 10466 tak ditemukan di keluaran)", out.first())
+        assertEquals(lines, out.drop(1))
+    }
+
+    @Test
+    fun `buildSection dengan uid menyaring ke ringkasan plus blok uid aplikasi`() {
+        val lines = listOf("ringkasan", "  1000:", "sysline", "  u0a466:", "wakelock")
+        val text = DumpsysFormat.buildSection(listOf("batterystats"), lines, null, 0, 50, false, null, uid = 10466)
+        assertTrue(text.contains("blok uid 10466"))
+        assertTrue(text.contains("wakelock"))
+        assertFalse(text.contains("sysline"))
+    }
+}

@@ -3,10 +3,13 @@ package com.rudi.audioplayer.playback
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
-import android.os.Build
+import android.media.MediaCodecList
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -15,6 +18,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaLibraryService
@@ -30,22 +34,33 @@ import com.rudi.audioplayer.R
 import com.rudi.audioplayer.bubble.FloatingBubbleService
 import com.rudi.audioplayer.data.CrossfadeStore
 import com.rudi.audioplayer.data.FloatingBubbleStore
+import com.rudi.audioplayer.data.HourlyListenStore
+import com.rudi.audioplayer.data.ListeningHistoryStore
 import com.rudi.audioplayer.data.MusicRepository
 import com.rudi.audioplayer.data.PlaybackStateStore
+import com.rudi.audioplayer.data.SavedPlaybackState
+import com.rudi.audioplayer.data.PlayStatsStore
+import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.data.ShakeSettingsStore
+import com.rudi.audioplayer.data.PowerSavingStore
 import com.rudi.audioplayer.data.SilenceSkipStore
-import com.rudi.audioplayer.data.lyrics.LyricsPrefetchStore
 import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.ArtFailureLog
+import com.rudi.audioplayer.util.RecentsGuard
+import com.rudi.audioplayer.util.SafeGuard
 import com.rudi.audioplayer.widget.WidgetUpdater
-import com.rudi.audioplayer.worker.LyricsPrefetchWorker
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.SupervisorJob
 
 /**
  * Background playback: owns the [MediaLibrarySession], the ExoPlayer instance, and the
@@ -68,24 +83,108 @@ import kotlinx.coroutines.withContext
 class PlaybackService : MediaLibraryService() {
 
     private var mediaSession: MediaLibrarySession? = null
-    private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
+    private val serviceScope =
+        CoroutineScope(Dispatchers.Main + SupervisorJob() + SafeGuard.handler("PlaybackService", "serviceScope")) // Batch 618
     private var shakeDetector: ShakeDetector? = null
     private var coldStartNotificationActive = false
+    // Batch 594 — generasi penanda jalur widget "service hidup tapi TIDAK sedang memutar" (lihat
+    // [handleWidgetActionWhileNotPlaying]); hanya yang terbaru boleh membongkar placeholder foreground.
+    private var widgetPausedHandoffGen = 0
+
+    // Batch 688 — pemulihan pasca-update: penanda persisten "berniat memutar" (dibaca [UpdateResumeReceiver] setelah
+    // instalasi mematikan proses) + pencatat posisi berkala selagi memutar (lihat [startPositionPersistTick]).
+    private val updateResumeStore by lazy { UpdateResumeStore(this) }
+    private var positionPersistJob: Job? = null
+
+    /** Batch 691 — satu pemulihan pasca-update sekaligus (pemicu awal [UpdateResumeCoordinator] + broadcast bisa tumpang-tindih). */
+    private var resumeJob: Job? = null
+
+    // Batch 615 — pencatatan putaran SAAT UI TUTUP. Pengawas Batch 597 hidup di PlayerViewModel, jadi lagu yang
+    // diputar lewat widget/headset/bubble setelah Activity ditutup tak pernah tercatat (statistik, "Baru Diputar",
+    // Paling Sering Diputar). Pelacak ini SELALU berjalan di service dan menghabiskan "ambang tercapai" tiap sesi,
+    // tetapi hanya MENCATAT bila tak ada ViewModel yang mendengar ([PlayCountOwner]) -> tak ada hitung ganda.
+    private val servicePlayCountTracker = PlayCountTracker()
+    private val servicePlayCountWake = Channel<Unit>(Channel.CONFLATED)
+
+    private fun startServicePlayCount(player: Player) {
+        player.addListener(object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                SafeGuard.guard("PlaybackService", "playCount.onMediaItemTransition") {
+                    val songId = mediaItem?.mediaId?.toLongOrNull()
+                    if (songId != null) {
+                        servicePlayCountTracker.startItem(
+                            songId, player.duration.coerceAtLeast(0L), SystemClock.elapsedRealtime(), player.isPlaying
+                        )
+                    } else {
+                        servicePlayCountTracker.clearItem()
+                    }
+                    servicePlayCountWake.trySend(Unit)
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                SafeGuard.guard("PlaybackService", "playCount.onIsPlayingChanged") {
+                    val now = SystemClock.elapsedRealtime()
+                    servicePlayCountTracker.setPlaying(isPlaying, now)
+                    if (isPlaying && !servicePlayCountTracker.hasItem()) {
+                        player.currentMediaItem?.mediaId?.toLongOrNull()?.let {
+                            servicePlayCountTracker.startItem(it, player.duration.coerceAtLeast(0L), now, true)
+                        }
+                    }
+                    servicePlayCountWake.trySend(Unit)
+                }
+            }
+        })
+        serviceScope.launch {
+            while (isActive) {
+                val wait = servicePlayCountTracker.msUntilQualified(SystemClock.elapsedRealtime())
+                if (wait == null) {
+                    servicePlayCountWake.receive()
+                } else if (wait > 0L) {
+                    withTimeoutOrNull(wait) { servicePlayCountWake.receive() }
+                }
+                val songId = servicePlayCountTracker.takeIfQualified(SystemClock.elapsedRealtime()) ?: continue
+                if (PlayCountOwner.viewModelListening) continue
+                runCatching {
+                    PlayStatsStore(this@PlaybackService).recordPlay(songId)
+                    ListeningHistoryStore(this@PlaybackService).recordPlay(songId)
+                    HourlyListenStore(this@PlaybackService).recordPlay()
+                }.onFailure { AppLogger.e("PlaybackService", "Gagal mencatat putaran tanpa UI: lagu=$songId", it) }
+            }
+        }
+    }
     // Gap List #7 (Batch 109) — job eksekusi sleep timer, hidup di scope Service (bukan
     // ViewModel) supaya tidak ikut mati kalau Activity/ViewModel di-clear duluan.
     private var sleepTimerJob: Job? = null
     private val sleepTimerStore by lazy { com.rudi.audioplayer.data.SleepTimerStore(this) }
     // Batch 102 (Gap List #1, True Crossfade) — lihat CrossfadeEngine.kt untuk mekanisme penuh.
     private var crossfadeEngine: CrossfadeEngine? = null
+    // Batch 599 — job polling jendela crossfade; hanya hidup selagi Crossfade AKTIF (lihat startCrossfadePoll()).
+    private var crossfadePollJob: Job? = null
     // Batch 34: pushWidgetUpdate fires on every track transition and every play/pause tap —
     // both high-frequency, high-visibility moments. Tracking the job lets a fast skip/toggle
     // cancel a still-decoding older update instead of letting it land after a newer one and
     // show stale art/state.
     private var widgetUpdateJob: Job? = null
 
+    // Batch 673 — saklar Hemat Daya > Audio Offload (PowerSavingStore) berlaku LIVE: callback apply() datang di thread utama (thread
+    // player). Referensi kuat wajib (SharedPreferences menyimpan pendengar secara lemah); didaftarkan di onCreate, dilepas di onDestroy.
+    private val powerSavingListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == PowerSavingStore.KEY_AUDIO_OFFLOAD) {
+            (mediaSession?.player as? ExoPlayer)?.let {
+                applyAudioOffload(it, SilenceSkipStore(this).isEnabled(), CrossfadeStore(this).isEnabled())
+            }
+        }
+    }
+
     @UnstableApi
     override fun onCreate() {
         super.onCreate()
+        // Batch 675 — ukur jank cold start (log v674: 161 frame terlewat dalam ±2 dtk, 4 burst; v670: 3 burst): waktu per tahap
+        // onCreate di thread utama + jarak dari proses mulai. Hanya pengukuran; dicatat sekali di akhir lewat Dispatchers.IO.
+        val startupT0 = SystemClock.elapsedRealtime()
+        val startupSinceProcessMs = startupT0 - android.os.Process.getStartElapsedRealtime()
+        prewarmCodecList()
 
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
@@ -96,11 +195,27 @@ class PlaybackService : MediaLibraryService() {
             // true = ExoPlayer requests/abandons audio focus automatically, ducking or
             // pausing when a call, notification sound, or another app needs the output.
             .setAudioAttributes(audioAttributes, true)
+            // Gap #2 (Batch 495, re-added post media3 1.10.1 bump Batch 494): kunci threshold
+            // "restart lagu ini vs pindah ke lagu sebelumnya" secara eksplisit alih-alih warisan
+            // default Media3 (C.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS = 3000ms, nilai identik).
+            // 0 perubahan behavior runtime — murni proteksi terhadap perubahan default diam-diam
+            // di versi Media3 mendatang. Hanya player sesi utama; overlapPlayer (crossfade
+            // privat, tidak pernah terhubung ke tombol Previous UI) SENGAJA tidak disentuh.
+            .setMaxSeekToPreviousPositionMs(3000L)
             // Auto-pauses when headphones are unplugged or a Bluetooth device disconnects,
             // instead of blasting through the speaker unannounced — table stakes in every
             // major music app.
             .setHandleAudioBecomingNoisy(true)
+            // Batch 671 — scheduling dinamis: loop playback tidak lagi bangun tiap 10 ms, renderer (audio)
+            // memberi tahu kapan perlu dijalankan lagi. Dasar: PowerProbe v670, layar mati + musik=ya +
+            // xfade=tidak -> ExoPlayer:Playback 9,6-11% + MediaCodec_loop ~12,9% dari satu core (cpuApp
+            // 26-28%), beban pemutaran satu-satunya yang terjangkau app. API @UnstableApi (onCreate sudah
+            // @UnstableApi). Hanya player sesi utama; overlapPlayer (transien saat crossfade) tak disentuh.
+            // Batch 673 — kini ada saklar: Pengaturan Putar > Hemat Daya > Scheduling Dinamis (default ON; flag Builder
+            // dibaca saat player dibangun -> berlaku setelah aplikasi dimulai ulang).
+            .experimentalSetDynamicSchedulingEnabled(PowerSavingStore(this).isDynamicScheduling())
             .build()
+        val startupExoAt = SystemClock.elapsedRealtime()
 
         // Roadmap #8, Trim Keheningan Otomatis — dibaca sekali di sini untuk proses BARU (mis.
         // setelah app di-kill total lalu playback resumption memanggil onCreate lagi); toggle
@@ -108,7 +223,11 @@ class PlaybackService : MediaLibraryService() {
         // baca ulang store ini. setSkipSilenceEnabled() ada di ExoPlayer, BUKAN di interface
         // Player umum — makanya MediaController (dipakai PlayerViewModel/UI) tidak bisa
         // memanggilnya langsung, dan custom SessionCommand ini yang jadi jembatannya.
-        player.setSkipSilenceEnabled(SilenceSkipStore(this).isEnabled())
+        val skipSilence = SilenceSkipStore(this).isEnabled()
+        player.setSkipSilenceEnabled(skipSilence)
+        // Batch 672 — audio offload mengikuti setelan Trim Keheningan + Crossfade (lihat applyAudioOffload).
+        applyAudioOffload(player, skipSilence, CrossfadeStore(this).isEnabled())
+        PowerSavingStore(this).registerOnChange(powerSavingListener)
 
         // Batch 102 (Gap List #1, True Crossfade) — overlapPlayer adalah ExoPlayer KEDUA, privat,
         // TIDAK PERNAH disentuh MediaSession/notifikasi/UI. handleAudioFocus & becomingNoisy
@@ -116,13 +235,19 @@ class PlaybackService : MediaLibraryService() {
         // headset lepas, dua ExoPlayer yang sama-sama minta fokus akan bentrok. Detail mekanisme
         // lengkap + kenapa MediaSession.setPlayer() hot-swap SENGAJA dihindari: lihat
         // CrossfadeEngine.kt (dokumentasi kelasnya) dan CHANGELOG.md Batch 102.
-        val overlapPlayer = ExoPlayer.Builder(this)
-            .setAudioAttributes(audioAttributes, false)
-            .setHandleAudioBecomingNoisy(false)
-            .build()
-        overlapPlayer.setSkipSilenceEnabled(SilenceSkipStore(this).isEnabled())
-        crossfadeEngine = CrossfadeEngine(sessionPlayer = player, overlapPlayer = overlapPlayer, scope = serviceScope)
-        crossfadeEngine?.setEnabled(CrossfadeStore(this).isEnabled())
+        // Batch 389 — overlapPlayer sendiri TIDAK lagi dibangun di sini unconditional. CrossfadeStore
+        // default OFF (opt-in, lihat CrossfadeStore.kt), jadi mayoritas cold start sebelum batch ini
+        // selalu membangun ExoPlayer kedua yang lengkap (native decoder/renderer/AudioTrack) padahal
+        // provably tidak pernah dipakai sesi itu. ensureCrossfadeEngine() di bawah membangunnya LAZY,
+        // hanya kalau Crossfade genuinely pernah aktif (baris di bawah ini utk yang sudah ON sejak
+        // sebelum cold start, atau dari onCustomCommand ACTION_SET_CROSSFADE_ENABLED kalau dinyalakan
+        // belakangan) — bukan fitur/behavior baru, hasil akhir yang user lihat identik: 100% sama
+        // seperti sebelum batch ini di kedua kasus (mati tetap mati, nyala tetap nyala & tetap
+        // instance yang sama sepanjang hidup Service begitu pernah dibangun).
+        if (CrossfadeStore(this).isEnabled()) {
+            ensureCrossfadeEngine(player).setEnabled(true)
+            startCrossfadePoll()
+        }
 
         // ExoPlayer assigns its own audio session ID lazily (once the AudioTrack is created).
         // PlayerViewModel talks to playback only through a MediaController, which doesn't expose
@@ -130,38 +255,37 @@ class PlaybackService : MediaLibraryService() {
         // time the player reports an event, and the Equalizer reads it from there. onEvents is
         // part of the stable, common Player.Listener API, so this stays robust across versions.
         // The same listener also keeps the home-screen widget in sync with the current track.
+        startServicePlayCount(player) // Batch 615
         player.addListener(object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) {
-                val id = (player as? ExoPlayer)?.audioSessionId ?: return
-                if (id != 0) PlaybackAudioSession.sessionId = id
+                // Batch 688 — penanda "berniat memutar" untuk pemulihan pasca-update; hanya event yang mengubahnya.
+                SafeGuard.guard("PlaybackService", "listener.onEvents.updateResume") {
+                    if (events.containsAny(
+                            Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                            Player.EVENT_PLAYBACK_STATE_CHANGED,
+                            Player.EVENT_TIMELINE_CHANGED
+                        )
+                    ) {
+                        syncUpdateResumeFlag(player)
+                    }
+                }
+                SafeGuard.guard("PlaybackService", "listener.onEvents") {
+                    val id = (player as? ExoPlayer)?.audioSessionId ?: return
+                    if (id != 0) PlaybackAudioSession.sessionId = id
+                }
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                pushWidgetUpdate(player)
-                // Batch 246 — Lyrics offline-first 4/4a. Tiap pindah lagu, jendela "10 lagu
-                // depan" ikut geser satu — enqueue ulang, bukan panggil sekali di onCreate
-                // saja. REPLACE policy di dalam enqueue() bikin ini aman dipanggil sesering
-                // apa pun (skip-spam sekalipun). CATATAN AKURASI (bukan diklaim sempurna):
-                // Worker baca index dari PlaybackStateStore, yang di-`save()` PlayerViewModel
-                // secara PERIODIK (~5 detik saat playing, lihat persistPlaybackState()), BUKAN
-                // sinkron persis di titik transition ini — kalau Worker kebetulan jalan
-                // instan (sudah WiFi, 0 delay) di celah beberapa detik itu, window 10-lagu
-                // yang dibaca bisa 1 index ketinggalan. Konsekuensinya ringan (prefetch geser
-                // 1 lagu, bukan salah total atau crash) — sengaja tidak dikejar presisi
-                // sempurna di batch ini, cukup dicatat sebagai known-limitation.
-                // Batch 247 — guard toggle "Prefetch Saat WiFi" (default ON, lihat
-                // LyricsPrefetchStore.kt). Store dibaca ULANG tiap transition (bukan
-                // di-cache sekali di field Service) — instance SharedPreferences murah dibuat,
-                // dan ini menjamin toggle yang baru saja diubah user di Settings langsung
-                // berlaku transisi lagu BERIKUTNYA, tanpa perlu restart Service.
-                if (LyricsPrefetchStore(this@PlaybackService).isEnabled()) {
-                    LyricsPrefetchWorker.enqueue(this@PlaybackService)
-                }
-                // Batch 102 — sessionPlayer mencapai akhir track sendiri secara alami (bukan
-                // seek/skip manual): ini titik "silent handback" milik CrossfadeEngine, lihat
-                // dokumentasi kelasnya langkah 3.
-                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
-                    crossfadeEngine?.onSessionAutoTransition()
+                SafeGuard.guard("PlaybackService", "listener.onMediaItemTransition") {
+                    pushWidgetUpdate(player)
+                    persistQueueFromService(player, "transisi")
+                    // Batch 659 — enqueue prefetch lirik (Batch 246/247) dicabut atas permintaan user.
+                    // Batch 102 — sessionPlayer mencapai akhir track sendiri secara alami (bukan
+                    // seek/skip manual): ini titik "silent handback" milik CrossfadeEngine, lihat
+                    // dokumentasi kelasnya langkah 3.
+                    if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                        crossfadeEngine?.onSessionAutoTransition()
+                    }
                 }
             }
 
@@ -170,42 +294,79 @@ class PlaybackService : MediaLibraryService() {
                 newPosition: Player.PositionInfo,
                 reason: Int
             ) {
-                // Batch 102 — skip/seek manual (tombol UI, notifikasi, headset, lock screen,
-                // Bluetooth) apa pun bentuknya wajib membatalkan crossfade yang sedang
-                // berlangsung, supaya overlapPlayer tidak pernah kebablasan main sendiri di
-                // atas lagu yang baru dituju user. Seek internal milik CrossfadeEngine sendiri
-                // (langkah handback) SENGAJA tidak ikut kena — lihat internalSeekInFlight di
-                // CrossfadeEngine.kt.
-                crossfadeEngine?.onSessionManualDiscontinuity(reason)
+                SafeGuard.guard("PlaybackService", "listener.onPositionDiscontinuity") {
+                    // Batch 102 — skip/seek manual (tombol UI, notifikasi, headset, lock screen,
+                    // Bluetooth) apa pun bentuknya wajib membatalkan crossfade yang sedang
+                    // berlangsung, supaya overlapPlayer tidak pernah kebablasan main sendiri di
+                    // atas lagu yang baru dituju user. Seek internal milik CrossfadeEngine sendiri
+                    // (langkah handback) SENGAJA tidak ikut kena — lihat pendingInternalSeeks di
+                    // CrossfadeEngine.kt (Batch 626: dulu flag boolean yang tak pernah bekerja).
+                    crossfadeEngine?.onSessionManualDiscontinuity(reason)
+                }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                pushWidgetUpdate(player)
-                // Batch 102 — pause/resume mid-crossfade harus ikut membekukan/melanjutkan
-                // overlapPlayer, kalau tidak lagu berikutnya tetap terdengar sendiri walau user
-                // sudah menekan jeda.
-                crossfadeEngine?.onSessionPlayWhenReadyChanged(isPlaying)
-                if (isPlaying && ShakeSettingsStore(this@PlaybackService).isEnabled()) {
-                    shakeDetector?.start()
+                SafeGuard.guard("PlaybackService", "listener.onIsPlayingChanged") {
+                    // Batch 623 — saat memutar, task dikecualikan dari Recents (tak ada kartu untuk di-swipe; OEM
+                    // membunuh proses seketika pada swipe, log 9 Nov 17:57); jeda > tenggang = kartu kembali.
+                    RecentsGuard.onPlaybackActive(this@PlaybackService, isPlaying)
+                    pushWidgetUpdate(player)
+                    // Batch 646 — jeda = posisi akhir yang akurat. IDLE (mis. `stop()` dari dismiss mini player) dilewati agar antrean yang baru
+                    // dikosongkan pengguna tak dibangkitkan lagi.
+                    if (!isPlaying && player.playbackState != Player.STATE_IDLE) persistQueueFromService(player, "jeda")
+                    // Batch 688 — selagi memutar, posisi dicatat berkala (bukan hanya saat ganti lagu/jeda) supaya update yang
+                    // mematikan proses tanpa aba-aba tetap melanjutkan dari posisi yang nyaris sama.
+                    if (isPlaying) startPositionPersistTick(player) else stopPositionPersistTick()
+                    // Batch 102 — pause/resume mid-crossfade harus ikut membekukan/melanjutkan
+                    // overlapPlayer, kalau tidak lagu berikutnya tetap terdengar sendiri walau user
+                    // sudah menekan jeda.
+                    crossfadeEngine?.onSessionPlayWhenReadyChanged(isPlaying)
+                    if (isPlaying && ShakeSettingsStore(this@PlaybackService).isEnabled()) {
+                        ensureShakeDetector().start()
+                    } else {
+                        shakeDetector?.stop()
+                    }
+                    // Roadmap #11 lanjutan (Batch 100) — sebelumnya bubble CUMA start dari
+                    // MainActivity/BubbleBootReceiver, jadi entry point lain (widget play di
+                    // homescreen, tombol notifikasi media, tombol headset) tidak pernah menyalakan
+                    // bubble walau togglenya ON, kecuali app-nya sendiri sempat dibuka duluan. Ini
+                    // Service yang SELALU hidup di titik manapun playback benar-benar mulai —
+                    // dengar isPlaying di sini (bukan tebak per-entry-point di widget/QS tile
+                    // masing-masing) otomatis menutup semua celah sekaligus dari SATU tempat.
+                    if (isPlaying) maybeStartFloatingBubble()
+                    // The cold-start placeholder is a plain NotificationCompat notification, not
+                    // a MediaStyle one Media3 keeps in sync automatically — without this, its
+                    // action button was permanently stuck on whatever label it had at the instant
+                    // it was first built (always "Lanjutkan", since nothing was playing yet at
+                    // that exact moment), even after playback actually started.
+                    if (coldStartNotificationActive) {
+                        updateColdStartNotification()
+                    }
+                }
+            }
+
+            // Batch 498 — Gap #3 (shuffle anti-repeat-nearby). Fires from BOTH existing shuffle
+            // entry points at once (PlayerViewModel.toggleShuffle() dan .shuffleAll() sama-sama
+            // cuma flip flag ini di controller yang sama) — 0 perubahan diperlukan di
+            // PlayerViewModel.kt. Hanya jalan saat shuffle BARU dinyalakan (false->true), bukan
+            // tiap event lain; re-apply diam-diam selagi sudah ON tidak pernah terjadi. Detail
+            // lengkap + jawaban klarifikasi user: lihat KDoc AntiRepeatShuffleOrder.kt.
+            override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                if (!shuffleModeEnabled) return
+                // `player` di sini adalah val ExoPlayer yang sama persis dibangun di atas
+                // (closure, pola sama dgn pushWidgetUpdate(player) di onIsPlayingChanged) — 0
+                // cast diperlukan, sudah konkret ExoPlayer sejak awal.
+                val count = player.mediaItemCount
+                if (count <= 1) return
+                val songIds = (0 until count).map { i -> player.getMediaItemAt(i).mediaId.toLongOrNull() ?: -1L }
+                val windowSize = AntiRepeatShuffleOrder.windowSizeFor(count)
+                val recentIds = if (windowSize > 0) {
+                    PlayStatsStore(this@PlaybackService).getRecentIds(windowSize).toHashSet()
                 } else {
-                    shakeDetector?.stop()
+                    emptySet()
                 }
-                // Roadmap #11 lanjutan (Batch 100) — sebelumnya bubble CUMA start dari
-                // MainActivity/BubbleBootReceiver, jadi entry point lain (widget play di
-                // homescreen, tombol notifikasi media, tombol headset) tidak pernah menyalakan
-                // bubble walau togglenya ON, kecuali app-nya sendiri sempat dibuka duluan. Ini
-                // Service yang SELALU hidup di titik manapun playback benar-benar mulai —
-                // dengar isPlaying di sini (bukan tebak per-entry-point di widget/QS tile
-                // masing-masing) otomatis menutup semua celah sekaligus dari SATU tempat.
-                if (isPlaying) maybeStartFloatingBubble()
-                // The cold-start placeholder is a plain NotificationCompat notification, not
-                // a MediaStyle one Media3 keeps in sync automatically — without this, its
-                // action button was permanently stuck on whatever label it had at the instant
-                // it was first built (always "Lanjutkan", since nothing was playing yet at
-                // that exact moment), even after playback actually started.
-                if (coldStartNotificationActive) {
-                    updateColdStartNotification()
-                }
+                val order = buildAntiRepeatNearbyOrder(songIds, recentIds)
+                player.setShuffleOrder(AntiRepeatShuffleOrder(order))
             }
         })
 
@@ -214,15 +375,15 @@ class PlaybackService : MediaLibraryService() {
         // fitur mati atau lagi tidak main. Pola sama seperti PlayerViewModel.startPositionLoop,
         // tapi wajib hidup di sisi Service ini karena overlapPlayer (ExoPlayer mentah) tidak
         // pernah diekspos ke ViewModel — ViewModel cuma pegang MediaController.
-        serviceScope.launch {
-            while (isActive) {
-                crossfadeEngine?.maybeStartCrossfade()
-                delay(250)
-            }
-        }
+        // Batch 599 — loop ini dulu dijalankan TANPA SYARAT di sini selama Service hidup (4x/dtk di thread utama,
+        // juga saat Crossfade mati/null, saat jeda, dan pada pemutaran eksternal ketika aplikasi sudah ditutup).
+        // Kini dipindah ke startCrossfadePoll(): hanya jalan selagi Crossfade aktif; dihentikan saat dimatikan.
 
-        shakeDetector = ShakeDetector(this) { mediaSession?.player?.seekToNextMediaItem() }
+        // Batch 391 — shakeDetector TIDAK lagi dibangun unconditional di sini. Lihat
+        // ensureShakeDetector() di bawah utk root cause + kenapa ini kelas bug yang sama dgn
+        // WorkManager (Batch 387) / overlapPlayer (Batch 389).
 
+        val startupMidAt = SystemClock.elapsedRealtime()
         val sessionActivityIntent = PendingIntent.getActivity(
             this,
             0,
@@ -242,6 +403,11 @@ class PlaybackService : MediaLibraryService() {
         // diabaikan. Dipanggil di sini (bukan di awal onCreate) karena butuh `mediaSession`
         // sudah terbentuk untuk bisa memanggil `.pause()`.
         resumeSleepTimerFromStore()
+        val startupEndAt = SystemClock.elapsedRealtime()
+        val startupMsg = "PlaybackService.onCreate (thread utama): total=${startupEndAt - startupT0}ms " +
+            "exo=${startupExoAt - startupT0}ms tengah=${startupMidAt - startupExoAt}ms " +
+            "sesi+timer=${startupEndAt - startupMidAt}ms | sejak_proses_mulai=${startupSinceProcessMs}ms"
+        serviceScope.launch(Dispatchers.IO) { AppLogger.w("StartupTiming", startupMsg) }
     }
 
     /** Roadmap #11 lanjutan (Batch 100) — dipanggil tiap `isPlaying` jadi true, DARI MANA PUN
@@ -252,7 +418,98 @@ class PlaybackService : MediaLibraryService() {
      * [FloatingBubbleStore.isEnabled] preferensi user, DAN `Settings.canDrawOverlays` — izin
      * overlay bisa dicabut user dari Pengaturan sistem kapan saja tanpa lewat toggle app ini
      * sama sekali, device settings selalu menang atas preferensi in-app (pola sama persis
-     * BubbleBootReceiver.kt). */
+     * BubbleBootReceiver.kt).
+     *
+     * **Batch 475 [sinkronisasi cold-start/persistent bubble <-> PlaybackService setelah app
+     * di-kill]**: titik ini adalah SATU-SATUNYA jalur yang menyalakan bubble balik ketika
+     * `isPlaying` jadi true murni dari trigger EKSTERNAL (Bluetooth/headset/Android Auto/lock
+     * screen media resumption) SETELAH proses app sebelumnya benar-benar mati total — skenario
+     * PERSIS yang dikonfirmasi user sendiri sebagai jalur andalan survive-app-kill (PROJECT_STATE.md
+     * Batch 474: "sudah bisa dipicu pakai pemutar SONIX eksternal"). Sebelum batch ini,
+     * `startForegroundService()` di bawah TIDAK dibungkus `runCatching` — beda dari 2 titik lain
+     * yang memanggil API SAMA PERSIS untuk menyalakan [FloatingBubbleService] (`BubbleBootReceiver.kt`
+     * Batch 466, `FloatingBubbleService.onTaskRemoved` Batch 471), yang keduanya SUDAH dibungkus
+     * setelah device nyata user MEMBUKTIKAN `ForegroundServiceStartNotAllowedException` bisa
+     * terjadi walau semua API resmi sudah benar (log_20260915_133616, PROJECT_STATE.md Batch 466).
+     * Titik INI justru lebih kritis dari keduanya: exception yang tidak tertangkap di sini
+     * terjadi DI DALAM listener [Player] milik [PlaybackService] SENDIRI — kalau propagate,
+     * berisiko menjatuhkan proses playback yang justru SEDANG berhasil dipicu ulang lewat
+     * trigger eksternal, bukan cuma gagal menampilkan bubble. */
+    /** Batch 389 — builds overlapPlayer (ExoPlayer KEDUA, lihat dokumentasi lengkap di
+     * CrossfadeEngine.kt) + CrossfadeEngine sekali, hanya saat Crossfade genuinely diaktifkan
+     * (dipanggil dari onCreate kalau sudah ON sejak sebelum cold start, atau dari onCustomCommand
+     * ACTION_SET_CROSSFADE_ENABLED kalau baru dinyalakan user belakangan). Early-return kalau
+     * sudah pernah dibangun sesi ini — instance yang sama dipakai sepanjang hidup Service persis
+     * seperti sebelum batch ini, cuma titik pembuatannya yang mundur. AudioAttributes overlapPlayer
+     * dibaca balik dari `sessionPlayer.audioAttributes` (Player interface, bukan dibangun ulang
+     * dari nol) — nilainya sendiri cuma di-set SEKALI saat `player` dibangun di onCreate dan tidak
+     * pernah diubah lagi sepanjang hidup Service (digrep app-wide), jadi ini selalu 100% sama
+     * dengan yang dipakai `player`, valid dipanggil dari titik mana pun sesudahnya. */
+    @UnstableApi
+    private fun ensureCrossfadeEngine(sessionPlayer: ExoPlayer): CrossfadeEngine {
+        crossfadeEngine?.let { return it }
+        val overlapPlayer = ExoPlayer.Builder(this)
+            .setAudioAttributes(sessionPlayer.audioAttributes, false)
+            .setHandleAudioBecomingNoisy(false)
+            // Batch 672 — sama alasan player sesi utama (Batch 671): loop playback tak bangun tiap 10 ms. Batch 673 — ikut saklar yang sama.
+            .experimentalSetDynamicSchedulingEnabled(PowerSavingStore(this).isDynamicScheduling())
+            .build()
+        overlapPlayer.setSkipSilenceEnabled(SilenceSkipStore(this).isEnabled())
+        return CrossfadeEngine(sessionPlayer = sessionPlayer, overlapPlayer = overlapPlayer, scope = serviceScope)
+            .also { crossfadeEngine = it }
+    }
+
+    /** Batch 599 — polling ringan (250ms) jendela crossfade, dijalankan HANYA selagi Crossfade aktif. Idempoten
+     * (job aktif = no-op). Berjalan di [serviceScope] (Main) seperti loop lama, jadi `crossfadeEngine` diakses di
+     * thread yang sama dengan semua pemakainya; ikut berhenti oleh `serviceScope.cancel()` di onDestroy(). */
+    private fun startCrossfadePoll() {
+        if (crossfadePollJob?.isActive == true) return
+        crossfadePollJob = serviceScope.launch {
+            while (isActive) {
+                // Batch 625 — satu tick yang melempar Exception dulu MEMATIKAN seluruh loop ini (handler scope hanya
+                // mencatat; `crossfadePollJob.isActive` jadi false -> crossfade berhenti diam-diam sampai di-toggle).
+                // Kini tick yang gagal dicatat mentah (throttle SafeGuard) dan loop lanjut ke tick berikutnya.
+                // Batch 668 (baterai) — selang adaptif dari engine (250 ms dekat jendela, 1 dtk saat main jauh dari jendela,
+                // 2 dtk saat dijeda); tick gagal tetap 250 ms.
+                var waitMs = 250L
+                SafeGuard.guard("PlaybackService", "crossfadePoll.tick") {
+                    crossfadeEngine?.let { engine ->
+                        engine.maybeStartCrossfade()
+                        waitMs = engine.nextPollDelayMs()
+                    }
+                }
+                delay(waitMs)
+            }
+        }
+    }
+
+    /** Batch 391 — sektor cold-start berikutnya yang belum tersentuh Batch 385-390: sebelum
+     * batch ini, `shakeDetector` dibangun UNCONDITIONAL di `onCreate()` (baris di atas, sekarang
+     * dihapus) tiap kali Service dibuat, apa pun nilai [ShakeSettingsStore.isEnabled] — padahal
+     * shake-to-skip default OFF (opt-in, lihat ShakeSettingsStore.kt).
+     *
+     * **Root cause**: konstruktor `ShakeDetector` (lihat ShakeDetector.kt) memanggil
+     * `context.getSystemService(Context.SENSOR_SERVICE)` lalu `getDefaultSensor(TYPE_ACCELEROMETER)`.
+     * Panggilan PERTAMA ke SENSOR_SERVICE dalam 1 proses memaksa `SystemSensorManager` melakukan
+     * enumerasi SEMUA sensor device lewat HAL/JNI (bukan cuma akselerometer) — kerja nyata,
+     * sekali per proses, yang sebelum batch ini SELALU terjadi tiap cold start apa pun
+     * pengaturan user, di jalur `onCreate()` Service yang sama-sama kritis dengan yang disentuh
+     * Batch 387/389. Kelas bug sama persis: resource yang butuh kerja HAL/IPC dibangun di jalur
+     * startup yang provably tidak dibutuhkan buat mayoritas user (default OFF).
+     *
+     * **Fix**: dipindah ke sini, dipanggil LAZY hanya dari titik `ensureShakeDetector().start()`
+     * di listener `onIsPlayingChanged` (kondisi `isPlaying && isEnabled()` — sama persis kondisi
+     * yang sebelum batch ini menentukan apakah `.start()` benar-benar melakukan sesuatu).
+     * `shakeDetector?.stop()` di baris `else` & `onDestroy()` TIDAK diubah — `?.` sudah aman kalau
+     * belum pernah dibangun (no-op, bukan crash), user yang shake-nya OFF permanen sekarang 0
+     * biaya SENSOR_SERVICE sama sekali sepanjang hidup Service. **Zero behavior change**: begitu
+     * genuinely dibutuhkan (isPlaying+enabled pertama kali), instance dibangun sekali lalu dipakai
+     * ulang sepanjang hidup Service — identik siklus hidup `shakeDetector` sebelum batch ini,
+     * cuma titik pembuatannya yang mundur, pola sama persis `ensureCrossfadeEngine()` di atas. */
+    private fun ensureShakeDetector(): ShakeDetector =
+        shakeDetector ?: ShakeDetector(this) { mediaSession?.player?.seekToNextMediaItem() }
+            .also { shakeDetector = it }
+
     /** Gap List #7 (Batch 109) — dipanggil dari `onCustomCommand` (ViewModel set sleep timer
      * baru) DAN dari `resumeSleepTimerFromStore` (restore setelah proses/Service dibuat ulang).
      * `endAtMillis` SELALU absolut (epoch millis), bukan durasi — supaya kalkulasi sisa waktu
@@ -300,9 +557,225 @@ class PlaybackService : MediaLibraryService() {
 
     private fun maybeStartFloatingBubble() {
         if (!FloatingBubbleStore(this).isEnabled()) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) return
+        if (!Settings.canDrawOverlays(this)) return
         val intent = Intent(this, FloatingBubbleService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+        // Batch 475 — lihat KDoc fungsi ini di atas untuk alasan lengkap. runCatching mengisolasi
+        // kegagalan start-bubble supaya TIDAK PERNAH bisa menjatuhkan playback yang sedang
+        // berjalan/baru saja dipicu ulang (pola identik BubbleBootReceiver.kt/onTaskRemoved).
+        runCatching { startForegroundService(intent) }
+            .onFailure { AppLogger.e("PlaybackService", "Gagal start FloatingBubbleService dari maybeStartFloatingBubble", it) }
+    }
+
+    /**
+     * Batch 646 — LOG USER 13 Nov (cold start lewat widget memutar lagu lain dari yang tampil di widget): antrean + indeks + posisi terakhir HANYA
+     * disimpan [PlayerViewModel] (UI). Saat Activity sudah mati service tetap berpindah lagu sendiri (crossfade otomatis 20:28-20:46 di log), jadi
+     * [PlaybackStateStore] basi (indeks lagu dari terakhir UI hidup) sedangkan snapshot widget (`WidgetUpdater.saveState`, ditulis service) benar ->
+     * cold start memulihkan lagu LAMA. Kini service ikut menyimpan pada tiap pergantian lagu dan saat jeda. Nilai-nilainya dibaca dari player SESSION
+     * (sumber kebenaran; mediaId = song.id seperti di [loadSavedQueueItems] dan PlayerViewModel); satu mediaId non-angka / antrean kosong / indeks di luar
+     * batas = tidak menyimpan apa-apa (tak pernah menulis antrean setengah jadi). Ditulis di thread pemanggil (main) agar urutan tulis terjaga:
+     * `SharedPreferences.apply()` menaruh nilai di memori seketika dan menulis disk async (pola sama [WidgetUpdater.saveState]).
+     */
+    private fun persistQueueFromService(player: Player, alasan: String) {
+        // Batch 692: selama pemain baru berisi lagu pembuka SAJA (pemulihan pasca-update jalur cepat), antrean 1 lagu TIDAK
+        // boleh menimpa antrean tersimpan yang utuh (mis. transisi/berkala saat jendela sambung-antrean).
+        if (queueRestorePending) return
+        // Batch 693: sambung-sisa-antrean GAGAL (kosong setelah percobaan ulang) -> pemain tinggal lagu pembuka. Selama itu masih
+        // satu-satunya isi pemain, simpan DIBEKUKAN supaya antrean tersimpan yang utuh tak tertimpa antrean 1 lagu; begitu antrean
+        // berubah (user/komponen lain), pembekuan dilepas dan simpan normal lagi.
+        truncatedQueueHeadId?.let { headId ->
+            if (UpdateResumePolicy.canSpliceRestoredQueue(player.currentMediaItem?.mediaId, headId, player.mediaItemCount)) return
+            truncatedQueueHeadId = null
+        }
+        val count = player.mediaItemCount
+        if (count <= 0) return
+        val index = player.currentMediaItemIndex
+        if (index < 0 || index >= count) return
+        val ids = ArrayList<Long>(count)
+        for (i in 0 until count) {
+            ids.add(player.getMediaItemAt(i).mediaId.toLongOrNull() ?: return)
+        }
+        val position = player.currentPosition.coerceAtLeast(0L)
+        val store = PlaybackStateStore(this)
+        // Kecepatan: pakai nilai TERSIMPAN (milik UI: PlayerViewModel.setPlaybackSpeed/connect), bukan kecepatan player saat ini — pada cold start
+        // `restoreLastQueue` memicu transisi SEBELUM `setPlaybackSpeed(saved.speed)`, jadi player masih 1,0x dan akan menimpa kecepatan simpanan.
+        val speed = store.load()?.speed ?: player.playbackParameters.speed
+        store.save(
+            songIds = ids,
+            index = index,
+            positionMs = position,
+            repeatMode = player.repeatMode,
+            shuffleEnabled = player.shuffleModeEnabled,
+            speed = speed
+        )
+        // Log hanya saat (indeks, alasan) berubah: transisi crossfade memicu beberapa jeda/lanjut beruntun.
+        val logKey = index * 2 + (if (alasan == "jeda") 1 else 0)
+        if (logKey != lastQueuePersistLogKey) {
+            lastQueuePersistLogKey = logKey
+            AppLogger.w("PlaybackService", "Antrean disimpan dari service ($alasan): indeks=$index/$count posisi=${position}ms id=${ids[index]}")
+        }
+    }
+
+    private var lastQueuePersistLogKey = -1
+
+    /**
+     * Batch 688 — menyimpan penanda "pemain berniat memutar" ke [UpdateResumeStore]. Diperbarui dari `onEvents` (play-when-
+     * ready / status / timeline berubah), hanya menulis disk bila nilainya berubah. Penanda ini TIDAK dibersihkan saat
+     * proses dimatikan sistem (tak ada callback) — itulah intinya: [UpdateResumeReceiver] membacanya setelah instalasi
+     * mematikan proses dan mencocokkannya dengan `ApplicationExitInfo` ([UpdateResumePolicy]).
+     */
+    private fun syncUpdateResumeFlag(player: Player) {
+        updateResumeStore.setWasPlaying(
+            UpdateResumePolicy.intendsToPlay(player.playWhenReady, player.mediaItemCount, player.playbackState)
+        )
+    }
+
+    /**
+     * Batch 688 — DASAR (log 19 Nov): service hanya menyimpan antrean/posisi saat ganti lagu atau jeda; lagu 90 menit yang
+     * diputar tanpa UI terbuka (id=282255, posisi tersimpan 1.993.499 ms vs nyata ±5.416.000 ms) akan pulih ke posisi
+     * puluhan menit yang lalu setelah update mematikan proses. Selagi memutar, posisi kini ikut disimpan tiap
+     * [POSITION_PERSIST_INTERVAL_MS] lewat [persistQueueFromService] yang SAMA (satu jalur simpan, 0 format baru). `delay`
+     * berbasis uptime: tidak membangunkan CPU yang tidur (mis. audio offload layar mati); berhenti seketika saat jeda.
+     */
+    private fun startPositionPersistTick(player: Player) {
+        if (positionPersistJob?.isActive == true) return
+        positionPersistJob = serviceScope.launch {
+            while (isActive) {
+                delay(POSITION_PERSIST_INTERVAL_MS)
+                if (player.isPlaying) persistQueueFromService(player, "berkala")
+            }
+        }
+    }
+
+    private fun stopPositionPersistTick() {
+        positionPersistJob?.cancel()
+        positionPersistJob = null
+    }
+
+    /**
+     * Batch 694 — logcat v693 (pasang saat memutar, 08:57:51,758-.827): inisialisasi daftar codec platform (`MediaCodecList`, baris
+     * `VideoCapabilities Unsupported mime ...` ±70-110 ms) terjadi di thread playback ExoPlayer TEPAT saat pemain memilih renderer,
+     * yaitu di jalur kritis menuju AudioTrack (start 08:57:52,075). Daftar itu cache statis per proses; menyentuhnya di thread latar
+     * sejak onCreate memindahkan biayanya keluar dari jalur kritis. Murni pemanasan: hasil dibuang; galat dicatat mentah dan tak
+     * mengganggu pemutaran (thread daemon, tak menyentuh pemain/sesi).
+     */
+    private fun prewarmCodecList() {
+        kotlin.concurrent.thread(isDaemon = true, name = "codec-prewarm") {
+            val startedAt = SystemClock.elapsedRealtime()
+            try {
+                val count = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.size
+                AppLogger.w("PlaybackService", "Pemanasan daftar codec: $count codec dalam ${SystemClock.elapsedRealtime() - startedAt}ms (thread latar)")
+            } catch (e: Exception) {
+                AppLogger.e("PlaybackService", "Pemanasan daftar codec gagal", e)
+            }
+        }
+    }
+
+    /**
+     * Batch 688 — dipicu [UpdateResumeReceiver] (`ACTION_MY_PACKAGE_REPLACED`) atau ketukan notifikasi cadangan
+     * ([UpdateResumeNotifier]): lanjutkan antrean terakhir dari posisi tersimpan tanpa menunggu Activity/user. Idempoten:
+     * sudah memutar = tak melakukan apa pun (BEDA dari ACTION_TOGGLE_PLAY yang akan MENJEDA). Urutan mengikuti jalur
+     * cold-start widget yang sudah terbukti: `startForeground()` placeholder SEKARANG (kontrak `startForegroundService`)
+     * -> pulihkan antrean (MediaStore, IO) -> `play()` -> tunggu `isPlaying` -> bongkar placeholder. Waktu tiap tahap
+     * dicatat (`tunda_service`, `sejak_proses_mulai`) untuk menilai kecepatan pemulihan di log berikutnya.
+     * Batch 695 — [killedAtMs] = jam dinding proses lama mati (`ApplicationExitInfo`, dikirim pemicu lewat [EXTRA_KILLED_AT_MS]; 0 =
+     * tak diketahui): posisi lagu pembuka ditambah waktu yang berlalu sejak simpan terakhir ([UpdateResumePolicy.resumePosition]).
+     */
+    private fun resumeAfterUpdate(killedAtMs: Long) {
+        NotificationManagerCompat.from(this).cancel(UpdateResumeNotifier.NOTIFICATION_ID)
+        val current = mediaSession?.player
+        // Batch 691: pemicu kedua (broadcast MY_PACKAGE_REPLACED menyusul percobaan awal dari Application.onCreate) tidak boleh
+        // memulihkan antrean dua kali (setMediaItems kedua = lagu mundur ke posisi tersimpan yang lebih lama). Penanda disinkronkan
+        // ulang dari keadaan pemain NYATA karena receiver sudah menurunkannya sebelum memanggil kita.
+        if (resumeJob?.isActive == true) {
+            AppLogger.w("PlaybackService", "Pemulihan pasca-update: sudah berjalan, pemicu kedua diabaikan")
+            current?.let { syncUpdateResumeFlag(it) }
+            return
+        }
+        if (current != null && current.playWhenReady && current.mediaItemCount > 0) {
+            AppLogger.w("PlaybackService", "Pemulihan pasca-update: pemain sudah memutar, tak ada yang dilakukan")
+            syncUpdateResumeFlag(current)
+            return
+        }
+        val startedAt = SystemClock.elapsedRealtime()
+        // Batch 695 — dibaca SEKARANG (sebelum pemain memutar apa pun): listener pemain menimpa cap ini begitu lagu pembuka mulai.
+        val playingSinceMs = updateResumeStore.playingSinceMs()
+        try {
+            startForegroundColdStartNotification()
+        } catch (e: Exception) {
+            AppLogger.e("PlaybackService", "Pemulihan pasca-update: startForeground ditolak", e)
+            UpdateResumeNotifier.post(this, killedAtMs)
+            return
+        }
+        coldStartNotificationActive = true
+        resumeJob = serviceScope.launch {
+            try {
+                val restoreStart = SystemClock.elapsedRealtime()
+                val pendingRest =
+                    if (mediaSession?.player?.mediaItemCount == 0) restoreHeadForResume(killedAtMs, playingSinceMs) else null
+                val restoreMs = SystemClock.elapsedRealtime() - restoreStart
+                val player = mediaSession?.player
+                if (player == null || player.mediaItemCount == 0) {
+                    AppLogger.w("PlaybackService", "Pemulihan pasca-update: tak ada antrean tersimpan untuk dilanjutkan")
+                    return@launch
+                }
+                // Batch 689: posisi tepat setelah antrean dipulihkan & SEBELUM play(), pembanding bagi `posisi=` di log
+                // akhir -> memperlihatkan apakah lagu panjang benar-benar lanjut dari posisi tersimpan (bukan dari 0).
+                val restoredPositionMs = player.currentPosition
+                val playStart = SystemClock.elapsedRealtime()
+                if (!player.playWhenReady) player.play()
+                // Batch 692: sisa antrean disambung PARALEL dengan sumber/seek/codec yang sedang disiapkan pemain.
+                if (pendingRest != null) launch { runRestOfQueue(pendingRest) }
+                var waited = 0L
+                while (!player.isPlaying && waited < MAX_HANDOFF_WAIT_MS) {
+                    delay(150)
+                    waited += 150
+                }
+                logResumeOutcome(player, startedAt, restoredPositionMs, restoreMs, SystemClock.elapsedRealtime() - playStart)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e("PlaybackService", "Pemulihan pasca-update gagal", e)
+            } finally {
+                coldStartNotificationActive = false
+                try {
+                    if (mediaSession?.player?.playWhenReady == true) {
+                        NotificationManagerCompat.from(this@PlaybackService).cancel(COLD_START_NOTIFICATION_ID)
+                    } else {
+                        stopForeground(android.app.Service.STOP_FOREGROUND_REMOVE)
+                    }
+                } catch (e: Exception) {
+                    AppLogger.e("PlaybackService", "Gagal membongkar placeholder pemulihan pasca-update", e)
+                }
+            }
+        }
+    }
+
+    private suspend fun runRestOfQueue(rest: PendingQueueRest) {
+        try {
+            restoreRestOfQueue(rest)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.e("PlaybackService", "Pemulihan pasca-update: sambung sisa antrean gagal (antrean tersimpan utuh)", e)
+        }
+    }
+
+    /**
+     * Batch 690 — baris hasil pemulihan pasca-update, dipisah dari [resumeAfterUpdate] (batas panjang fungsi detekt).
+     * `pulih_antrean` = baca MediaStore + `setMediaItems` + `prepare` (log v689: ±0,5 dtk); `putar` = `play()` sampai
+     * `isPlaying` (dibulatkan ke kelipatan 150 ms oleh polling; log v689: ±0,7 dtk). Keduanya menunjukkan tahap mana yang
+     * layak dipangkas berikutnya.
+     */
+    private fun logResumeOutcome(player: Player, startedAt: Long, restoredPositionMs: Long, restoreMs: Long, playMs: Long) {
+        val now = SystemClock.elapsedRealtime()
+        AppLogger.w(
+            "PlaybackService",
+            "Pemulihan pasca-update: isPlaying=${player.isPlaying} tunda_service=${now - startedAt}ms " +
+                "pulih_antrean=${restoreMs}ms putar=${playMs}ms " +
+                "sejak_proses_mulai=${now - android.os.Process.getStartElapsedRealtime()}ms " +
+                "indeks=${player.currentMediaItemIndex}/${player.mediaItemCount} " +
+                "posisi_pulih=${restoredPositionMs}ms posisi=${player.currentPosition}ms"
+        )
     }
 
     private fun pushWidgetUpdate(player: Player) {
@@ -330,6 +803,20 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
+        // Batch 694 — simpan antrean + posisi TEPAT sekarang (dikirim [requestPositionFlush] sebelum pasang update). Tanpa ini
+        // posisi tersimpan tertinggal sampai 10 dtk (log v693: pulih di 573341 ms padahal lagu sudah ±579 s -> ±6 dtk terulang).
+        if (action == ACTION_PERSIST_BEFORE_UPDATE) {
+            lastQueuePersistLogKey = -1 // paksa baris log tercatat (bukti posisi pra-update), walau indeks sama dgn simpan sebelumnya
+            mediaSession?.player?.let { persistQueueFromService(it, "pra-update") }
+            return super.onStartCommand(intent, flags, startId)
+        }
+        // Batch 688 — pemulihan pasca-update (receiver MY_PACKAGE_REPLACED / notifikasi cadangan); lihat resumeAfterUpdate().
+        if (action == ACTION_RESUME_AFTER_UPDATE) {
+            // Batch 696 — `action == ACTION_RESUME_AFTER_UPDATE` (konstanta non-null) sudah membuktikan `intent` != null (smart cast K2;
+            // CI run #122: `Unnecessary safe call on a non-null receiver of type 'Intent'`); `getLongExtra` mengembalikan Long non-null.
+            resumeAfterUpdate(intent.getLongExtra(EXTRA_KILLED_AT_MS, 0L))
+            return super.onStartCommand(intent, flags, startId)
+        }
         val isWidgetAction = action == WidgetUpdater.ACTION_TOGGLE_PLAY ||
             action == WidgetUpdater.ACTION_NEXT ||
             action == WidgetUpdater.ACTION_PREVIOUS
@@ -372,12 +859,59 @@ class PlaybackService : MediaLibraryService() {
                         NotificationManagerCompat.from(this@PlaybackService).cancel(COLD_START_NOTIFICATION_ID)
                     }
                 }
+            } else if (player?.playWhenReady != true) {
+                // Batch 594 — AKAR "aplikasi hilang tanpa jejak" yang TERBUKTI di log (ApplicationExitInfo ANR 12 Okt
+                // 07:52 + 13 Okt 08:45; Debug Store: SvcStart act=...widget.NEXT): tombol widget memakai
+                // PendingIntent.getForegroundService -> sistem mewajibkan startForeground() dalam beberapa detik
+                // SETIAP kali. Saat pemutaran dijeda Media3 tidak berada di foreground dan tidak memanggil
+                // startForeground() untuk intent kustom ini -> "did not then call Service.startForeground()" -> ANR,
+                // proses dimatikan sistem (terpicu bila next/prev widget ditekan saat jeda).
+                handleWidgetActionWhileNotPlaying(action)
             } else {
                 applyWidgetAction(action)
             }
         }
 
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    /** Batch 594 — jalur widget saat service SUDAH punya antrean tetapi TIDAK sedang memutar (`playWhenReady` false).
+     * Memenuhi kontrak `startForegroundService()` dengan placeholder yang SAMA dengan jalur cold-start
+     * ([startForegroundColdStartNotification]) DULU, baru menjalankan aksi widget. Pembongkaran hanya oleh generasi
+     * terbaru (tekan beruntun = satu pembongkaran, tidak berkedip): aksi play dulu menunggu `isPlaying` (maks
+     * [MAX_HANDOFF_WAIT_MS], pola cold-start), aksi lain (next/prev) cukup [WIDGET_PAUSED_PLACEHOLDER_MS]. Setelah itu:
+     * bila pemutaran sudah berjalan (Media3 mengambil alih foreground) placeholder cukup di-cancel; bila tetap
+     * jeda -> `stopForeground(STOP_FOREGROUND_REMOVE)` supaya notifikasi "SONIX" tidak tertinggal. Jalur cold-start
+     * ([coldStartNotificationActive]) mengurus dirinya sendiri dan tidak disentuh. */
+    private fun handleWidgetActionWhileNotPlaying(action: String?) {
+        startForegroundColdStartNotification()
+        val gen = ++widgetPausedHandoffGen
+        applyWidgetAction(action)
+        serviceScope.launch {
+            try {
+                if (action == WidgetUpdater.ACTION_TOGGLE_PLAY) {
+                    var waited = 0L
+                    while (mediaSession?.player?.isPlaying != true && waited < MAX_HANDOFF_WAIT_MS) {
+                        delay(150)
+                        waited += 150
+                    }
+                } else {
+                    delay(WIDGET_PAUSED_PLACEHOLDER_MS)
+                }
+            } finally {
+                if (gen == widgetPausedHandoffGen && !coldStartNotificationActive) {
+                    try {
+                        if (mediaSession?.player?.playWhenReady == true) {
+                            NotificationManagerCompat.from(this@PlaybackService).cancel(COLD_START_NOTIFICATION_ID)
+                        } else {
+                            stopForeground(android.app.Service.STOP_FOREGROUND_REMOVE)
+                        }
+                    } catch (e: Exception) {
+                        AppLogger.e("PlaybackService", "Gagal membongkar placeholder foreground widget", e)
+                    }
+                }
+            }
+        }
     }
 
     /** Batch 319 (laporan user, screenshot kartu OEM "SONIX sekarang") — dibalik dari pendekatan
@@ -394,11 +928,7 @@ class PlaybackService : MediaLibraryService() {
     private fun buildColdStartNotification(): android.app.Notification {
         val toggleIntent = Intent(this, PlaybackService::class.java).setAction(WidgetUpdater.ACTION_TOGGLE_PLAY)
         val toggleFlags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        val togglePendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            PendingIntent.getForegroundService(this, 101, toggleIntent, toggleFlags)
-        } else {
-            PendingIntent.getService(this, 101, toggleIntent, toggleFlags)
-        }
+        val togglePendingIntent = PendingIntent.getForegroundService(this, 101, toggleIntent, toggleFlags)
 
         return NotificationCompat.Builder(this, COLD_START_CHANNEL_ID)
             .setContentTitle("SONIX")
@@ -439,11 +969,7 @@ class PlaybackService : MediaLibraryService() {
      * scope 2 laporan user). */
     private fun updateColdStartNotification() {
         val notification = buildColdStartNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        } else {
-            startForeground(COLD_START_NOTIFICATION_ID, notification)
-        }
+        startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
     }
 
     /** Bare-minimum "waking up" notification so the OS treats this process as a legitimate
@@ -452,26 +978,20 @@ class PlaybackService : MediaLibraryService() {
      * Media3's own full notification takes over, the user has something to tap instead of a
      * dead, control-less notification. */
     private fun startForegroundColdStartNotification() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = getSystemService(NotificationManager::class.java)
-            if (manager.getNotificationChannel(COLD_START_CHANNEL_ID) == null) {
-                manager.createNotificationChannel(
-                    NotificationChannel(
-                        COLD_START_CHANNEL_ID,
-                        "Memulai Pemutaran",
-                        NotificationManager.IMPORTANCE_LOW
-                    )
+        val manager = getSystemService(NotificationManager::class.java)
+        if (manager.getNotificationChannel(COLD_START_CHANNEL_ID) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    COLD_START_CHANNEL_ID,
+                    "Memulai Pemutaran",
+                    NotificationManager.IMPORTANCE_LOW
                 )
-            }
+            )
         }
 
         val notification = buildColdStartNotification()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        } else {
-            startForeground(COLD_START_NOTIFICATION_ID, notification)
-        }
+        startForeground(COLD_START_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
     }
 
     private fun applyWidgetAction(action: String?) {
@@ -479,7 +999,7 @@ class PlaybackService : MediaLibraryService() {
         when (action) {
             WidgetUpdater.ACTION_TOGGLE_PLAY -> if (player.isPlaying) player.pause() else player.play()
             WidgetUpdater.ACTION_NEXT -> player.seekToNextMediaItem()
-            WidgetUpdater.ACTION_PREVIOUS -> player.seekToPreviousMediaItem()
+            WidgetUpdater.ACTION_PREVIOUS -> player.seekToPrevious()
         }
     }
 
@@ -509,7 +1029,8 @@ class PlaybackService : MediaLibraryService() {
     private suspend fun loadSavedQueueItems(): SavedQueueItems? {
         val saved = PlaybackStateStore(this).load() ?: return null
         val foundSongs = withContext(Dispatchers.IO) {
-            MusicRepository(this@PlaybackService).getSongsByIds(saved.songIds)
+            // Batch 690: genre tak dipakai `MediaItem` di bawah -> lewati peta genre (query per-genre di seluruh perpustakaan).
+            MusicRepository(this@PlaybackService).getSongsByIds(saved.songIds, includeGenre = false)
         }
         if (foundSongs.isEmpty()) return null
 
@@ -517,29 +1038,164 @@ class PlaybackService : MediaLibraryService() {
         val orderedSongs = saved.songIds.mapNotNull { songMap[it] }
         if (orderedSongs.isEmpty()) return null
 
-        val items = orderedSongs.map { song ->
-            // Batch 67: dulu URI legacy "content://media/external/audio/albumart/$albumId" —
-            // tabel cache albumart itu sering kosong di Android modern (khususnya API 29+),
-            // jadi FileNotFoundException konsisten utk banyak album (lihat log diagnostik,
-            // ratusan entri sejak Batch 22). song.uri (URI file audio-nya sendiri, dari
-            // MusicRepository) didukung loadThumbnail() secara native — framework fallback ke
-            // MediaMetadataRetriever buat ekstrak art embedded, tidak bergantung cache lama itu.
-            MediaItem.Builder()
-                .setMediaId(song.id.toString())
-                .setUri(song.uri)
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle(song.title)
-                        .setArtist(song.artist)
-                        .setAlbumTitle(song.album)
-                        .setArtworkUri(song.uri)
-                        .build()
-                )
-                .build()
-        }
+        val items = orderedSongs.map { buildSavedMediaItem(it) }
 
         val index = saved.index.coerceIn(0, items.size - 1)
         return SavedQueueItems(items, index, saved.positionMs, saved.repeatMode, saved.shuffleEnabled, saved.speed)
+    }
+
+    /**
+     * Batch 692 — pembuat `MediaItem` dari lagu hasil MediaStore, diambil UTUH dari [loadSavedQueueItems] (perilaku sama) agar
+     * jalur penuh dan jalur cepat ([restoreHeadForResume]) tak bisa menyimpang.
+     * Batch 67: dulu URI legacy "content://media/external/audio/albumart/$albumId" — tabel cache albumart itu sering kosong
+     * di Android modern (khususnya API 29+), jadi FileNotFoundException konsisten utk banyak album (lihat log diagnostik,
+     * ratusan entri sejak Batch 22). song.uri (URI file audio-nya sendiri, dari MusicRepository) didukung loadThumbnail()
+     * secara native — framework fallback ke MediaMetadataRetriever buat ekstrak art embedded, tidak bergantung cache lama itu.
+     */
+    private fun buildSavedMediaItem(song: Song): MediaItem =
+        MediaItem.Builder()
+            .setMediaId(song.id.toString())
+            .setUri(song.uri)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(song.title)
+                    .setArtist(song.artist)
+                    .setAlbumTitle(song.album)
+                    .setArtworkUri(song.uri)
+                    .build()
+            )
+            .build()
+
+    /** Batch 692 — sisa antrean tersimpan yang menunggu disambung setelah lagu pembuka diputar ([restoreRestOfQueue]). */
+    private data class PendingQueueRest(val headId: Long, val ids: List<Long>, val headIndex: Int)
+
+    /** Batch 692 — true selama pemain berisi lagu pembuka SAJA dan sisa antrean belum disambung; lihat [persistQueueFromService]. */
+    private var queueRestorePending = false
+
+    /** Batch 693 — id lagu pembuka bila sambung sisa antrean gagal total; lihat [persistQueueFromService]. null = tak dibekukan. */
+    private var truncatedQueueHeadId: Long? = null
+
+    /**
+     * Batch 692 — pemulihan pasca-update JALUR CEPAT. Log v691 (20 Nov): `pulih_antrean=359ms` (baca 135 lagu + `setMediaItems` +
+     * binder MediaSession) berjalan SERIAL sebelum `play()` + `putar=740ms`, padahal hening yang terdengar = jumlahnya. Di sini
+     * hanya lagu saat ini yang dibaca (1 baris MediaStore) dan langsung `setMediaItem(+posisi)`/`prepare()`; pemanggil memutar
+     * lalu menyambung sisa antrean lewat [restoreRestOfQueue] SELAGI jalur sumber/seek/codec framework berjalan paralel.
+     * Bila lagu pembuka tak ditemukan lagi atau tak ada sesi: jatuh ke [restoreLastQueue] penuh (perilaku lama) dan
+     * mengembalikan null. Antrean tersimpan di [PlaybackStateStore] TIDAK disentuh (lihat [queueRestorePending]).
+     * Batch 695 — posisi awal = posisi tersimpan + waktu sejak simpan sampai proses mati ([UpdateResumePolicy.resumePosition]).
+     */
+    private suspend fun restoreHeadForResume(killedAtMs: Long, playingSinceMs: Long): PendingQueueRest? {
+        val saved = PlaybackStateStore(this).load() ?: return null
+        if (saved.songIds.isEmpty()) return null
+        val headIndex = saved.index.coerceIn(0, saved.songIds.size - 1)
+        val headId = saved.songIds[headIndex]
+        // Batch 699 — hasil baca lagu pembuka yang sudah dimulai paralel ([ResumeHeadPrefetch]); null -> query lamanya persis seperti dulu.
+        val head = ResumeHeadPrefetch.takeHead(headId) ?: withContext(Dispatchers.IO) {
+            MusicRepository(this@PlaybackService).getSongsByIds(listOf(headId), includeGenre = false)
+        }.firstOrNull()
+        val player = mediaSession?.player
+        if (head == null || player == null) {
+            restoreLastQueue()
+            return null
+        }
+        queueRestorePending = true
+        try {
+            player.repeatMode = saved.repeatMode
+            player.shuffleModeEnabled = saved.shuffleEnabled
+            val resume = UpdateResumePolicy.resumePosition(
+                savedPositionMs = saved.positionMs,
+                savedAtMs = saved.savedAtMs,
+                playingSinceMs = playingSinceMs,
+                killedAtMs = killedAtMs,
+                speed = saved.speed,
+                durationMs = head.duration
+            )
+            logResumePosition(saved, playingSinceMs, killedAtMs, resume)
+            player.setMediaItem(buildSavedMediaItem(head), resume.positionMs)
+            player.setPlaybackSpeed(saved.speed)
+            player.prepare()
+        } catch (e: Exception) {
+            queueRestorePending = false
+            throw e
+        }
+        return PendingQueueRest(headId, saved.songIds, headIndex)
+    }
+
+    /** Batch 695 — satu baris bukti penambahan posisi (nilai mentah) agar log berikutnya bisa mencocokkannya dengan posisi nyata. */
+    private fun logResumePosition(
+        saved: SavedPlaybackState,
+        playingSinceMs: Long,
+        killedAtMs: Long,
+        resume: UpdateResumePolicy.ResumePosition
+    ) {
+        AppLogger.w(
+            "PlaybackService",
+            "Pemulihan pasca-update: posisi_simpan=${saved.positionMs}ms simpan_pada=${saved.savedAtMs} mulai_putar=$playingSinceMs " +
+                "mati_pada=$killedAtMs kecepatan=${saved.speed} tambahan=${resume.extrapolatedMs}ms dasar=${resume.basis} " +
+                "-> posisi_awal=${resume.positionMs}ms"
+        )
+    }
+
+    /**
+     * Batch 692 — sambung sisa antrean di sekitar lagu pembuka yang SUDAH diputar: lagu sebelum indeks disisipkan di depan,
+     * sesudahnya di belakang (`addMediaItems` tak menginterupsi lagu yang sedang berjalan). Dibatalkan (tanpa mengubah
+     * apa pun) bila pemain sudah berubah (user/komponen lain mengganti antrean) — [UpdateResumePolicy.canSpliceRestoredQueue].
+     * Penanda [queueRestorePending] SELALU dibersihkan di `finally`.
+     */
+    private suspend fun restoreRestOfQueue(rest: PendingQueueRest) {
+        val startedAt = SystemClock.elapsedRealtime()
+        var attempt = 0
+        try {
+            while (true) {
+                attempt++
+                val songs = loadRestSongs(rest)
+                val player = mediaSession?.player ?: return
+                if (!UpdateResumePolicy.canSpliceRestoredQueue(player.currentMediaItem?.mediaId, rest.headId, player.mediaItemCount)) {
+                    AppLogger.w("PlaybackService", "Pemulihan pasca-update: sisa antrean TIDAK disambung (pemain sudah berubah)")
+                    return
+                }
+                val byId = songs.associateBy { it.id }
+                val before = rest.ids.subList(0, rest.headIndex).mapNotNull { byId[it] }.map { buildSavedMediaItem(it) }
+                val after = rest.ids.subList(rest.headIndex + 1, rest.ids.size).mapNotNull { byId[it] }.map { buildSavedMediaItem(it) }
+                val found = before.size + after.size
+                val expected = rest.ids.size - 1
+                if (UpdateResumePolicy.isRestMissing(found, expected)) {
+                    if (UpdateResumePolicy.shouldRetryRestSplice(found, expected, attempt, UpdateResumePolicy.REST_SPLICE_MAX_ATTEMPTS)) {
+                        AppLogger.w("PlaybackService", "Pemulihan pasca-update: sisa antrean kosong (percobaan $attempt), diulang")
+                        delay(REST_SPLICE_RETRY_DELAY_MS)
+                        continue
+                    }
+                    truncatedQueueHeadId = rest.headId
+                    AppLogger.w(
+                        "PlaybackService",
+                        "Pemulihan pasca-update: sisa antrean tetap kosong setelah $attempt percobaan; simpan antrean dibekukan (antrean tersimpan utuh)"
+                    )
+                    return
+                }
+                if (before.isNotEmpty()) player.addMediaItems(0, before)
+                if (after.isNotEmpty()) player.addMediaItems(after)
+                AppLogger.w(
+                    "PlaybackService",
+                    "Pemulihan pasca-update: sisa antrean disambung +${before.size}/+${after.size} lagu dalam " +
+                        "${SystemClock.elapsedRealtime() - startedAt}ms indeks=${player.currentMediaItemIndex}/${player.mediaItemCount}"
+                )
+                return
+            }
+        } finally {
+            queueRestorePending = false
+        }
+    }
+
+    /** Batch 693 — baca lagu seluruh antrean tersimpan; galat (selain pembatalan) dicatat dan dianggap hasil kosong agar bisa dicoba ulang. */
+    private suspend fun loadRestSongs(rest: PendingQueueRest): List<Song> = try {
+        withContext(Dispatchers.IO) {
+            MusicRepository(this@PlaybackService).getSongsByIds(rest.ids, includeGenre = false)
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AppLogger.e("PlaybackService", "Pemulihan pasca-update: baca sisa antrean gagal", e)
+        emptyList()
     }
 
     private suspend fun restoreLastQueue() {
@@ -555,6 +1211,34 @@ class PlaybackService : MediaLibraryService() {
             setPlaybackSpeed(saved.speed)
             prepare()
         }
+    }
+
+    /**
+     * Batch 672 — audio offload (DSP mendekode, CPU bisa tidur) untuk pemutaran layar mati. Dipasang HANYA bila tak mematikan
+     * fitur pilihan user: Trim Keheningan (SilenceSkippingAudioProcessor dilewati jalur offload) dan Crossfade (overlapPlayer
+     * kedua) harus OFF. ENABLED (bukan REQUIRED) + gapless wajib: format/perangkat yang tak mendukung tetap PCM persis seperti
+     * sebelumnya; sistem juga kembali ke PCM sendiri bila efek non-offload (Equalizer) aktif. Dipanggil di onCreate dan tiap
+     * toggle live (onCustomCommand) dengan nilai TERBARU sebagai argumen, tak bergantung urutan tulis store. Bukti di log
+     * berikutnya: baris AudioTrack INSP `flags=` (offload != 0x0) + `cpuApp` PowerProbe. Bila ada masalah suara: ganti mode
+     * jadi DISABLED di sini (satu-satunya titik offload).
+     * Batch 673 — saklar Pengaturan Putar > Hemat Daya > Audio Offload (PowerSavingStore, default ON) ikut menentukan; kecepatan
+     * != 1x tetap didukung (isSpeedChangeSupportRequired) karena opsi kecepatan 0,5x-2x ada di UI.
+     */
+    @UnstableApi
+    private fun applyAudioOffload(player: ExoPlayer, skipSilence: Boolean, crossfade: Boolean) {
+        val mode = if (!PowerSavingStore(this).isAudioOffload() || skipSilence || crossfade) {
+            AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED
+        } else {
+            AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
+        }
+        val prefs = AudioOffloadPreferences.Builder()
+            .setAudioOffloadMode(mode)
+            .setIsGaplessSupportRequired(true)
+            .setIsSpeedChangeSupportRequired(true)
+            .build()
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setAudioOffloadPreferences(prefs)
+            .build()
     }
 
     /** Accepts every controller with the same full default access the app has always had
@@ -588,63 +1272,121 @@ class PlaybackService : MediaLibraryService() {
             customCommand: SessionCommand,
             args: Bundle
         ): ListenableFuture<SessionResult> {
-            if (customCommand.customAction == ACTION_SET_SKIP_SILENCE) {
-                val enabled = args.getBoolean(EXTRA_SKIP_SILENCE_ENABLED, false)
-                (mediaSession?.player as? ExoPlayer)?.setSkipSilenceEnabled(enabled)
-                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            // Batch 625 — callback sesi Media3 berjalan di thread utama: Exception di sini dulu mematikan proses
+            // (mis. `ensureCrossfadeEngine` membangun ExoPlayer kedua, `scheduleSleepTimer`). Kini dicatat mentah;
+            // peminta (MediaController) menerima future gagal (Media3 memetakannya ke kode error), bukan crash.
+            try {
+                if (customCommand.customAction == ACTION_SET_SKIP_SILENCE) {
+                    val enabled = args.getBoolean(EXTRA_SKIP_SILENCE_ENABLED, false)
+                    (mediaSession?.player as? ExoPlayer)?.let {
+                        it.setSkipSilenceEnabled(enabled)
+                        applyAudioOffload(it, enabled, CrossfadeStore(this@PlaybackService).isEnabled())
+                    }
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
+                if (customCommand.customAction == ACTION_SET_CROSSFADE_ENABLED) {
+                    // Batch 102 — sama pola dengan ACTION_SET_SKIP_SILENCE: CrossfadeEngine hidup
+                    // di ExoPlayer mentah milik Service ini, MediaController tidak bisa
+                    // menjangkaunya langsung. setEnabled(false) di sini juga otomatis membatalkan
+                    // crossfade yang sedang berlangsung (lihat CrossfadeEngine.abort()).
+                    val enabled = args.getBoolean(EXTRA_CROSSFADE_ENABLED, false)
+                    (mediaSession?.player as? ExoPlayer)?.let {
+                        applyAudioOffload(it, SilenceSkipStore(this@PlaybackService).isEnabled(), enabled)
+                    }
+                    if (enabled) {
+                        // Batch 389 — kalau ini pertama kalinya Crossfade dinyalakan sesi ini,
+                        // crossfadeEngine masih null (overlapPlayer belum pernah dibangun, lihat
+                        // ensureCrossfadeEngine() di atas) — bangun sekarang. Sudah ada = no-op,
+                        // langsung setEnabled(true) di instance yang sama seperti sebelum batch ini.
+                        val sessionPlayer = mediaSession?.player as? ExoPlayer
+                        if (sessionPlayer != null) {
+                            ensureCrossfadeEngine(sessionPlayer).setEnabled(true)
+                            startCrossfadePoll()
+                        }
+                    } else {
+                        // Belum pernah dibangun (crossfadeEngine null) = tidak ada apa pun utk
+                        // dimatikan, sama seperti overlapPlayer yang juga belum pernah ada sebelum
+                        // batch ini kalau OFF sejak awal — no-op yang identik secara hasil akhir.
+                        // Batch 598 — FIX tahanan memori: dulu cukup `setEnabled(false)`, jadi ExoPlayer KEDUA
+                        // (overlapPlayer: thread playback + renderer + buffer) tetap hidup idle sampai Service
+                        // mati walau crossfade sudah dimatikan user. Kini dilepas penuh (release() juga abort()
+                        // lebih dulu = volume sesi dipulihkan) dan referensi dikosongkan; menyalakan lagi cukup
+                        // lewat `ensureCrossfadeEngine()` yang memang membangun LAZY. Semua pemakai
+                        // `crossfadeEngine` memakai `?.` (null-safe) dan berjalan di thread utama yang sama.
+                        crossfadeEngine?.let { engine ->
+                            engine.setEnabled(false)
+                            engine.release()
+                        }
+                        crossfadeEngine = null
+                        crossfadePollJob?.cancel()
+                        crossfadePollJob = null
+                    }
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
+                if (customCommand.customAction == ACTION_SET_SLEEP_TIMER) {
+                    // Gap List #7 (Batch 109) — endAt == -1L artinya "batalkan timer" (ViewModel
+                    // tidak bisa kirim null lewat Bundle primitif, -1L jadi sentinel eksplisit).
+                    // Timer punya deadline absolut, bukan durasi — lihat scheduleSleepTimer().
+                    val endAt = args.getLong(EXTRA_SLEEP_TIMER_END_AT, -1L)
+                    if (endAt <= 0L) cancelSleepTimer() else scheduleSleepTimer(endAt)
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
+                return super.onCustomCommand(session, controller, customCommand, args)
+            } catch (e: Exception) {
+                SafeGuard.report("PlaybackService", "onCustomCommand ${customCommand.customAction}", e)
+                return Futures.immediateFailedFuture(e)
             }
-            if (customCommand.customAction == ACTION_SET_CROSSFADE_ENABLED) {
-                // Batch 102 — sama pola dengan ACTION_SET_SKIP_SILENCE: CrossfadeEngine hidup
-                // di ExoPlayer mentah milik Service ini, MediaController tidak bisa
-                // menjangkaunya langsung. setEnabled(false) di sini juga otomatis membatalkan
-                // crossfade yang sedang berlangsung (lihat CrossfadeEngine.abort()).
-                val enabled = args.getBoolean(EXTRA_CROSSFADE_ENABLED, false)
-                crossfadeEngine?.setEnabled(enabled)
-                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
-            }
-            if (customCommand.customAction == ACTION_SET_SLEEP_TIMER) {
-                // Gap List #7 (Batch 109) — endAt == -1L artinya "batalkan timer" (ViewModel
-                // tidak bisa kirim null lewat Bundle primitif, -1L jadi sentinel eksplisit).
-                // Timer punya deadline absolut, bukan durasi — lihat scheduleSleepTimer().
-                val endAt = args.getLong(EXTRA_SLEEP_TIMER_END_AT, -1L)
-                if (endAt <= 0L) cancelSleepTimer() else scheduleSleepTimer(endAt)
-                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
-            }
-            return super.onCustomCommand(session, controller, customCommand, args)
         }
 
         // Lets Bluetooth devices and the Android System UI media-resumption feature restart
         // playback with the last saved queue even after this service (and the whole app
         // process) has been killed — the actual mechanism behind the lock-screen media control
         // and status-bar indicator being reachable again without reopening the app.
+        // Batch 649 — peringatan deprecated terakhir di CI: overload 2-arg `onPlaybackResumption(mediaSession,
+        // controller)` DEPRECATED di Media3 1.10.1; pengganti resmi = overload 3-arg dengan `isForPlayback`
+        // (dok. MediaSession.Callback). Isi method TIDAK diubah: dulu overload 3-arg bawaan hanya meneruskan ke
+        // 2-arg tanpa memakai flag itu, jadi mengabaikannya di sini = perilaku identik.
         @UnstableApi
         override fun onPlaybackResumption(
             mediaSession: MediaSession,
-            controller: MediaSession.ControllerInfo
+            controller: MediaSession.ControllerInfo,
+            isForPlayback: Boolean
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
             return CallbackToFutureAdapter.getFuture { completer ->
                 serviceScope.launch {
-                    val saved = loadSavedQueueItems()
-                    if (saved != null) {
-                        // Batch 319 — sebelumnya repeat/shuffle/speed tersimpan diabaikan total
-                        // di jalur ini: resumption yang dipicu murni dari lock screen/Android
-                        // Auto/Bluetooth (proses sudah mati, PlayerViewModel.connect() tidak
-                        // pernah jalan) selalu kembali ke default. Diset ke `mediaSession.player`
-                        // yang SAMA yang akan menerima `items` dari completer.set() di bawah —
-                        // repeatMode/shuffleModeEnabled/speed independen dari media item mana
-                        // pun yang sedang/akan dimuat, aman diset sebelum Media3 menerapkan hasil
-                        // future ini ke player.
-                        mediaSession.player.repeatMode = saved.repeatMode
-                        mediaSession.player.shuffleModeEnabled = saved.shuffleEnabled
-                        mediaSession.player.setPlaybackSpeed(saved.speed)
-                        completer.set(
-                            MediaSession.MediaItemsWithStartPosition(saved.items, saved.startIndex, saved.startPositionMs)
-                        )
-                    } else {
-                        // Nothing to resume (fresh install, or the saved songs are all gone) —
-                        // fail the future rather than hand back an empty/fake item, which is what
-                        // used to leave a dead, control-less notification stuck on screen.
-                        completer.setException(IllegalStateException("Tidak ada antrean tersimpan untuk dilanjutkan"))
+                    // Batch 625 — dulu Exception di sini (mis. `loadSavedQueueItems`) hanya ditangkap handler scope,
+                    // sedangkan `completer` TIDAK PERNAH diselesaikan -> future menggantung selamanya (resumption dari
+                    // lock screen/Bluetooth/Android Auto macet, notifikasi mati). Kini galat dicatat mentah dan future
+                    // diselesaikan dengan kegagalan; pembatalan scope (service mati) membatalkan future.
+                    try {
+                        val saved = loadSavedQueueItems()
+                        if (saved != null) {
+                            // Batch 319 — sebelumnya repeat/shuffle/speed tersimpan diabaikan total
+                            // di jalur ini: resumption yang dipicu murni dari lock screen/Android
+                            // Auto/Bluetooth (proses sudah mati, PlayerViewModel.connect() tidak
+                            // pernah jalan) selalu kembali ke default. Diset ke `mediaSession.player`
+                            // yang SAMA yang akan menerima `items` dari completer.set() di bawah —
+                            // repeatMode/shuffleModeEnabled/speed independen dari media item mana
+                            // pun yang sedang/akan dimuat, aman diset sebelum Media3 menerapkan hasil
+                            // future ini ke player.
+                            mediaSession.player.repeatMode = saved.repeatMode
+                            mediaSession.player.shuffleModeEnabled = saved.shuffleEnabled
+                            mediaSession.player.setPlaybackSpeed(saved.speed)
+                            completer.set(
+                                MediaSession.MediaItemsWithStartPosition(saved.items, saved.startIndex, saved.startPositionMs)
+                            )
+                        } else {
+                            // Nothing to resume (fresh install, or the saved songs are all gone) —
+                            // fail the future rather than hand back an empty/fake item, which is what
+                            // used to leave a dead, control-less notification stuck on screen.
+                            completer.setException(IllegalStateException("Tidak ada antrean tersimpan untuk dilanjutkan"))
+                        }
+                    } catch (e: CancellationException) {
+                        completer.setCancelled()
+                        throw e
+                    } catch (e: Exception) {
+                        SafeGuard.report("PlaybackService", "onPlaybackResumption", e)
+                        completer.setException(e)
                     }
                 }
                 "onPlaybackResumption" // debug tag only, shown if this future leaks/never completes
@@ -671,11 +1413,21 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        // Batch 623 — sesi berakhir: kartu Recents kembali normal sekarang juga (lihat util/RecentsGuard.kt).
+        RecentsGuard.onSessionEnded(this)
+        PowerSavingStore(this).unregisterOnChange(powerSavingListener) // Batch 673
         shakeDetector?.stop()
         // Batch 102 — overlapPlayer bukan bagian dari mediaSession, jadi tidak ikut dilepas
         // oleh `player.release()` di bawah kalau tidak dilepas eksplisit di sini dulu.
         crossfadeEngine?.release()
         crossfadeEngine = null
+        // Batch 491 — pasangan yang benar utk EqualizerController.getInstance() (shared
+        // per-process, Batch 490): dilepas DI SINI (akhir sesi audio sungguhan), BUKAN lagi di
+        // PlayerViewModel.onCleared() (akhir UI, lihat komentar di sana utk root cause bug yang
+        // ini perbaiki). Service ini bisa TETAP hidup lama setelah ViewModel/Activity dibuang
+        // (onTaskRemoved di atas sengaja membiarkan sesi dgn antrean tetap jalan) — effect asli
+        // sekarang cuma lenyap begitu sesi itu SENDIRI benar-benar berakhir.
+        EqualizerController.getInstance(this).release()
         serviceScope.cancel()
         mediaSession?.run {
             player.release()
@@ -693,6 +1445,38 @@ class PlaybackService : MediaLibraryService() {
         // forever in the rare case playback never actually starts (e.g. every saved song was
         // deleted from disk since it was last played).
         private const val MAX_HANDOFF_WAIT_MS = 8000L
+
+        // Batch 594 — lama placeholder foreground bertahan setelah aksi next/prev widget saat jeda (kontrak
+        // startForegroundService sudah terpenuhi sejak startForeground; ini hanya jeda sebelum dibongkar).
+        private const val WIDGET_PAUSED_PLACEHOLDER_MS = 1500L
+
+        // Batch 688 — pemulihan pasca-update. Aksi di bawah dikirim [UpdateResumeReceiver] / [UpdateResumeNotifier];
+        // interval = batas galat posisi saat proses dimatikan tanpa aba-aba (lihat startPositionPersistTick).
+        const val ACTION_RESUME_AFTER_UPDATE = "com.rudi.audioplayer.ACTION_RESUME_AFTER_UPDATE"
+
+        // Batch 695 — extra Long pada ACTION_RESUME_AFTER_UPDATE: jam dinding proses lama mati (ApplicationExitInfo); 0/absen = tak diketahui.
+        const val EXTRA_KILLED_AT_MS = "com.rudi.audioplayer.EXTRA_KILLED_AT_MS"
+        private const val POSITION_PERSIST_INTERVAL_MS = 10_000L
+
+        // Batch 694 — simpan posisi tepat sebelum pasang update (lihat [requestPositionFlush]).
+        const val ACTION_PERSIST_BEFORE_UPDATE = "com.rudi.audioplayer.ACTION_PERSIST_BEFORE_UPDATE"
+
+        /**
+         * Batch 694 — minta service menyimpan antrean + posisi SEKARANG; dipanggil UI (Activity di latar depan) sesaat sebelum
+         * memasang update. Hanya bila penanda "berniat memutar" menyala (ada yang akan dipulihkan); bila tidak, tak ada yang
+         * dikirim sehingga service tak dihidupkan hanya untuk ini. Galat dicatat mentah dan tak menghalangi pemasangan.
+         */
+        fun requestPositionFlush(context: Context) {
+            if (!UpdateResumeStore(context).wasPlaying()) return
+            try {
+                context.startService(Intent(context, PlaybackService::class.java).setAction(ACTION_PERSIST_BEFORE_UPDATE))
+            } catch (e: Exception) {
+                AppLogger.e("PlaybackService", "Simpan posisi pra-update gagal dikirim", e)
+            }
+        }
+
+        // Batch 693 — jeda sebelum percobaan ulang membaca sisa antrean (galat sementara MediaStore tepat setelah update).
+        private const val REST_SPLICE_RETRY_DELAY_MS = 1500L
 
         // Roadmap #8, Trim Keheningan Otomatis — nama custom SessionCommand + key Bundle-nya,
         // dipakai bareng PlayerViewModel.setSilenceSkipEnabled() lewat MediaController.
@@ -743,18 +1527,14 @@ private class SongArtBitmapLoader(
         CallbackToFutureAdapter.getFuture { completer ->
             scope.launch(Dispatchers.IO) {
                 try {
-                    val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        context.contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null)
-                    } else {
-                        context.contentResolver.openInputStream(uri)?.use {
-                            android.graphics.BitmapFactory.decodeStream(it)
-                        }
-                    }
-                    if (bitmap != null) completer.set(bitmap)
-                    else completer.setException(java.io.FileNotFoundException("Tidak ada artwork utk $uri"))
+                    // loadThumbnail() @NonNull — tak ada artwork = melempar IOException (ditangkap di bawah).
+                    val bitmap = context.contentResolver.loadThumbnail(uri, android.util.Size(512, 512), null)
+                    completer.set(bitmap)
                 } catch (e: Exception) {
-                    AppLogger.e("SongArtBitmapLoader", "Gagal muat artwork notifikasi", e)
                     completer.setException(e)
+                    // Batch 622 — DecodeException (lagu tanpa sampul) = 1 baris WARN; galat lain tetap ERROR + stacktrace;
+                    // + probe 1x per URI. Setelah completer diselesaikan (tak menunda hasil), tak mengubah perilaku.
+                    ArtFailureLog.logFailure(context, "SongArtBitmapLoader", "Gagal muat artwork notifikasi", uri, 512, e)
                 }
             }
             "loadBitmap($uri)"

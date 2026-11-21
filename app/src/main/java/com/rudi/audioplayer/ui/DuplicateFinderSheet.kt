@@ -20,6 +20,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.DuplicateDetector
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Gap List #2 — Duplicate Detection UI. Full-height ModalBottomSheet (not a small popup — group
@@ -43,8 +47,24 @@ fun DuplicateFinderSheet(
     val haptic = LocalHapticFeedback.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val libraryGroups = remember(songs) { DuplicateDetector.findLibraryDuplicates(songs) }
-    val physicalGroups = remember(songs) { DuplicateDetector.findPhysicalDuplicates(songs) }
+    // Batch 431 — Compose perf (utang teknis tercatat PROJECT_STATE.md, dibuka eksplisit per
+    // instruksi user): `groupBy`+`sortedByDescending` atas SELURUH `songs` sebelumnya jalan
+    // synchronous di dalam `remember` — bagian dari fase composition itu sendiri (Main thread).
+    // Library besar = freeze singkat tiap sheet ini dibuka/`songs` berubah. Fix: pindah komputasi
+    // ke `LaunchedEffect` + `Dispatchers.Default` (CPU-bound, bukan I/O — lihat KDoc
+    // DuplicateDetector.kt), state hasil baru di-assign balik ke Main lewat composable state.
+    var libraryGroups by remember { mutableStateOf<List<DuplicateDetector.DuplicateGroup>>(emptyList()) }
+    var physicalGroups by remember { mutableStateOf<List<DuplicateDetector.DuplicateGroup>>(emptyList()) }
+    var isScanning by remember { mutableStateOf(true) }
+    LaunchedEffect(songs) {
+        isScanning = true
+        val (lib, phys) = withContext(Dispatchers.Default) {
+            DuplicateDetector.findLibraryDuplicates(songs) to DuplicateDetector.findPhysicalDuplicates(songs)
+        }
+        libraryGroups = lib
+        physicalGroups = phys
+        isScanning = false
+    }
 
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var showConfirm by remember { mutableStateOf(false) }
@@ -57,9 +77,13 @@ fun DuplicateFinderSheet(
     // penuh + link dokumentasi resmi Haze di sana / PROJECT_STATE.md Batch 321): tambah
     // `containerColor = Color.Transparent` yang kelewat sejak sheet ini dibuat.
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+        // Batch 340 — BUG FIX (lanjutan antrean "🔍 Audit tambahan" Batch 339, pola identik
+        // BackupRestoreSheet.kt/DiagnosticLogSheet.kt/UpdateCheckSheet.kt batch ini — lihat
+        // PROJECT_STATE.md Batch 340): `.frostedGlass()` ditambah setelah `.fillMaxWidth()`.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 .fillMaxHeight(0.9f)
                 .padding(horizontal = 20.dp)
         ) {
@@ -72,7 +96,11 @@ fun DuplicateFinderSheet(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (libraryGroups.isEmpty() && physicalGroups.isEmpty()) {
+            if (isScanning) {
+                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (libraryGroups.isEmpty() && physicalGroups.isEmpty()) {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     Text(
                         "Tidak ditemukan duplikat di library.",
@@ -81,7 +109,7 @@ fun DuplicateFinderSheet(
                     )
                 }
             } else {
-                LazyColumn(modifier = Modifier.weight(1f)) {
+                LazyColumn(modifier = Modifier.weight(1f), flingBehavior = rememberIosFlingBehavior()) {
                     if (libraryGroups.isNotEmpty()) {
                         item {
                             DuplicateSectionHeader(
@@ -92,7 +120,12 @@ fun DuplicateFinderSheet(
                         }
                         libraryGroups.forEach { group ->
                             items(group.songs, key = { "lib_${it.id}" }) { song ->
-                                DuplicateSongRow(song = song, checked = song.id in selectedIds, onToggle = { toggle(song.id) })
+                                DuplicateSongRow(
+                                    song = song,
+                                    checked = song.id in selectedIds,
+                                    onToggle = { toggle(song.id) },
+                                    modifier = Modifier.animateItem()
+                                )
                             }
                             item { HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(vertical = 8.dp)) }
                         }
@@ -107,7 +140,12 @@ fun DuplicateFinderSheet(
                         }
                         physicalGroups.forEach { group ->
                             items(group.songs, key = { "phys_${it.id}" }) { song ->
-                                DuplicateSongRow(song = song, checked = song.id in selectedIds, onToggle = { toggle(song.id) })
+                                DuplicateSongRow(
+                                    song = song,
+                                    checked = song.id in selectedIds,
+                                    onToggle = { toggle(song.id) },
+                                    modifier = Modifier.animateItem()
+                                )
                             }
                             item { HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(vertical = 8.dp)) }
                         }
@@ -169,9 +207,15 @@ private fun DuplicateSectionHeader(
 }
 
 @Composable
-private fun DuplicateSongRow(song: Song, checked: Boolean, onToggle: () -> Unit) {
+private fun DuplicateSongRow(song: Song, checked: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier
+        // Batch 482 — parameter `modifier` baru (default `Modifier`, 0 breaking di 2 titik
+        // panggil yang sudah ada) supaya caller bisa suntik `.animateItem()` dari dalam
+        // `items {}` (LazyItemScope) — list ini sudah punya key stabil ("lib_"/"phys_" + id)
+        // sejak awal, prasyarat animateItem sudah terpenuhi. Parameter `modifier` jadi AWAL
+        // chain (pola sama `LibraryScreen.kt`) supaya animasi placement bekerja di root
+        // layout node item, bukan di child. 0 logic checkbox/toggle disentuh.
+        modifier = modifier
             .fillMaxWidth()
             .clickable { onToggle() }
             .padding(vertical = 6.dp),

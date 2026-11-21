@@ -5,8 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.app.RecoverableSecurityException
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -17,15 +17,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,6 +32,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,6 +49,31 @@ import androidx.compose.material3.NavigationRailItem
 import com.rudi.audioplayer.ui.adaptive.AppWidthClass
 import com.rudi.audioplayer.ui.adaptive.rememberAppWidthClass
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
+// Batch 449 — `selectable` (kontrak resmi Compose Foundation, param `indication` eksplisit) +
+// `Role` (semantics aksesibilitas Tab) — pengganti langsung `NavigationBarItem` M3 yang dihapus
+// dari 3 titik pemakaian `bottomBar` (root cause kilatan kotak abu-abu, lihat komentar panjang
+// di `CustomNavBarTabItem`, dekat `GlassTabIcon`).
+import androidx.compose.foundation.selection.selectable
+// Batch 439 — 4 import baru, semua utk 1 tujuan: matikan ripple Android bawaan di 3
+// NavigationBarItem tab bawah tanpa mengganti mekanisme klik (lihat `NoRippleIndication` +
+// pemakaiannya di `bottomBar`). `LocalIndication` (dipakai internal semua komponen
+// selectable/clickable Compose Foundation, termasuk `NavigationBarItem`), `InteractionSource`
+// = tipe parameter kontrak itu (beda dari `MutableInteractionSource` di atas yang sudah lama
+// dipakai — itu implementasi konkretnya), `ContentDrawScope` = receiver wajib method `draw()`.
+// Batch 440 — trigger `log_fail_424.zip`: `Indication`/`IndicationInstance` (kontrak lama)
+// DIHAPUS dari sini, `compileDebugKotlin`/`compileReleaseKotlin` FAILED (bukan cuma warning —
+// versi Compose Foundation di compose-bom 2026.04.01 sudah menaikkan level deprecation
+// interface itu jadi ERROR, bukan lagi WARNING). Diganti `IndicationNodeFactory`
+// (`NoRippleIndication` di bawah) — kontrak pengganti resmi berbasis `Modifier.Node`, 0 API
+// publik lain disentuh, 0 perubahan behavior (masih murni `drawContent()` kosong).
+import androidx.compose.foundation.IndicationNodeFactory
+import androidx.compose.ui.node.DelegatableNode
+import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.GraphicEq
@@ -62,7 +87,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
@@ -77,23 +102,26 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+// Batch 555 — impor `drawWithContent`/`drawBehind` DIHAPUS: pill tab-bar (Batch 446/448) dan garis catch-light
+// (Batch 40) tak lagi digambar di sini; depth bilah tab = `neuTrough()` + `neuSlidingKey()` (ui/theme/TactileDepth.kt).
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.SideEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.core.view.WindowCompat
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -106,6 +134,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.rudi.audioplayer.bubble.FloatingBubbleService
 import com.rudi.audioplayer.playback.PlayerViewModel
+import com.rudi.audioplayer.data.LastTabStore
+import com.rudi.audioplayer.util.RecentsGuard
+import com.rudi.audioplayer.util.StartupTrace
 import com.rudi.audioplayer.ui.HomeScreen
 import com.rudi.audioplayer.ui.LockScreen
 import com.rudi.audioplayer.ui.LibraryScreen
@@ -114,6 +145,8 @@ import com.rudi.audioplayer.ui.StatsDashboardScreen
 import com.rudi.audioplayer.ui.MiniPlayerBar
 import com.rudi.audioplayer.ui.NowPlayingScreen
 import com.rudi.audioplayer.ui.theme.ThemeIdentity
+import com.rudi.audioplayer.ui.theme.isSkeuTheme
+import com.rudi.audioplayer.ui.bouncyPress
 import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.ui.theme.AudioPlayerTheme
 import com.rudi.audioplayer.ui.theme.resolveIsDark
@@ -121,9 +154,7 @@ import com.rudi.audioplayer.ui.theme.MidnightBlue
 import com.rudi.audioplayer.ui.theme.MidnightBlueAmbientAlpha
 import com.rudi.audioplayer.ui.theme.MidnightBlueLightAmbientAlpha
 import com.rudi.audioplayer.ui.theme.AmoledSurface
-import com.rudi.audioplayer.ui.theme.TactileHighlight
 import com.rudi.audioplayer.ui.theme.TactileLightSurfaceVariant
-import com.rudi.audioplayer.ui.theme.SkeuHighlight
 import com.rudi.audioplayer.ui.theme.SkeuAccent
 import com.rudi.audioplayer.ui.theme.TitaniumDark
 import com.rudi.audioplayer.ui.theme.SilverHighlight
@@ -134,11 +165,85 @@ import com.rudi.audioplayer.ui.theme.SkeuAmbientAlphaLight
 import com.rudi.audioplayer.ui.theme.SkeuEmerald
 import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
 import com.rudi.audioplayer.ui.theme.calmGrain
+import com.rudi.audioplayer.ui.theme.neuSlidingKey
+import com.rudi.audioplayer.ui.theme.neuTrough
 import com.rudi.audioplayer.ui.theme.auroraGlow
+import com.rudi.audioplayer.ui.theme.SpaceCosmosBackdrop
+import com.rudi.audioplayer.ui.theme.isSpaceTheme
 import com.rudi.audioplayer.ui.theme.LocalHazeState
-import com.rudi.audioplayer.ui.theme.LocalAuroraPhase
+import com.rudi.audioplayer.ui.theme.Motion
 import dev.chrisbanes.haze.rememberHazeState
-import dev.chrisbanes.haze.hazeSource
+// Batch 435 — swipe-lintas-3-tab (Beranda/Perpustakaan/Pengaturan). Semua import di bawah
+// disalin persis dari path yang SUDAH terbukti compile di ui/NowPlayingScreen.kt
+// (AlbumArtHero, Batch 434) — bukan tebakan path baru.
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+// Batch 442 — fix label nav bawah terpotong/oversized (regresi Batch 439, lihat komentar
+// MagnifyingTabLabel) + drag langsung di tab bar (bukan cuma tap). LocalTextStyle/blur (Batch
+// 437) DILEPAS — diganti MaterialTheme.typography.labelMedium (style resmi label nav M3) +
+// TextOverflow.Ellipsis (jaring pengaman); 0 blur lagi (root cause efek blur "useless" di
+// screenshot user). awaitEachGesture/PointerEventPass/awaitFirstDown = drag-to-switch pada tab
+// bar itu sendiri (PointerEventPass.Initial, 0 consume, 0 rebutan dgn tap/ripple NavigationBarItem).
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.awaitFirstDown
+
+// Batch 435 — urutan resmi 3 tab bawah (sama persis urutan NavigationBarItem/NavigationRailItem
+// di AppNavHost bawah: Beranda, Perpustakaan, Pengaturan). Dipakai gesture swipe untuk hitung
+// tab tujuan (index±1) — SATU sumber kebenaran urutan, bukan didup di 2 tempat.
+private val TAB_ROUTES = listOf("home", "library", "settings")
+
+// Batch 657 — gerak bilah tab diukur dari video acuan (frame-by-frame 60 fps, 3 rekaman geser/tap/lepas):
+// (1) KUNCI/pil = PEGAS (bukan tween): menempuh 1 tab ~220 ms dgn overshoot ~1,3% -> ζ ≈ 0,8, ω ≈ 21 rad/dtk
+//     (stiffness = ω² ≈ 440). Dipakai SAMA utk tap, mengikuti jari (jeda pegas ±0,1 tab), dan menetap saat lepas.
+// (2) BILAH membesar 1,05x (lebar 633->665 px, tinggi 130->136 px) selagi jari menekan, kembali saat lepas dgn
+//     pegas kurang teredam (menyusut ±1,3% di bawah ukuran diam lalu pulih, overshoot ±25% -> ζ ≈ 0,42, ω ≈ 18).
+// Pengganti `NavKeyEasing`/tween 300-540 ms (Batch 556: ease-out CubicBezier, durasi sebanding jarak).
+private const val NAV_PILL_DAMPING = 0.8f
+private const val NAV_PILL_STIFFNESS = 440f
+private const val NAV_BAR_PRESS_SCALE = 1.05f
+private const val NAV_BAR_PRESS_DAMPING = 0.42f
+private const val NAV_BAR_PRESS_STIFFNESS = 340f
+
+/** Batch 631 — kunci Bundle status kunci aplikasi yang dibawa lewat rotasi (lihat `MainActivity.onSaveInstanceState`). */
+private const val STATE_UNLOCKED = "sonix_state_unlocked"
+private const val STATE_BIOMETRIC_PROMPTED = "sonix_state_biometric_prompted"
+
+/**
+ * Batch 647 — kunci `SaveableStateProvider` yang membungkus `AppNavHost` di `setContent`: menyimpan back stack
+ * `NavController` (tab aktif Beranda/Perpustakaan/Pengaturan) + semua `rememberSaveable` di bawahnya (mis. chip
+ * tab Perpustakaan) selagi layar kunci menggantikannya.
+ */
+private const val APP_SAVEABLE_STATE_KEY = "sonix_app_saveable_state"
+
+/** Batch 651 — batas aman topeng "pemulihan tab": konten NavHost TIDAK PERNAH tersembunyi lebih lama dari ini. */
+private const val TAB_RESTORE_MASK_TIMEOUT_MS = 800L
+
+// Batch 658 — jumlah frame menunggu setelah navigate() pemulihan sebelum konten ditampakkan (konten Beranda lama dilepas AnimatedContent).
+private const val TAB_RESTORE_REVEAL_FRAMES = 3
+
+private fun navKeyGlideSpec() = spring<Float>(
+    dampingRatio = NAV_PILL_DAMPING,
+    stiffness = NAV_PILL_STIFFNESS
+)
+
+private fun navBarPressSpec() = spring<Float>(
+    dampingRatio = NAV_BAR_PRESS_DAMPING,
+    stiffness = NAV_BAR_PRESS_STIFFNESS
+)
 
 class MainActivity : FragmentActivity() {
 
@@ -155,14 +260,62 @@ class MainActivity : FragmentActivity() {
     // callback outside the composition) can still signal the composable tree to react.
     private var pendingShortcutAction by mutableStateOf<String?>(null)
 
-    // Re-locks whenever the app is genuinely backgrounded (not on config changes, since
-    // onStop only fires when actually leaving, not on rotation) — mutableState so Compose
-    // reacts immediately without needing a process restart.
+    // Re-locks whenever the app is genuinely backgrounded (NOT on config changes: onStop skips
+    // the reset when isChangingConfigurations, and the value is carried across the recreated
+    // Activity via onSaveInstanceState — Batch 631; the earlier claim that onStop "does not fire
+    // on rotation" was wrong) — mutableState so Compose reacts immediately without needing a
+    // process restart.
     private var isUnlocked by mutableStateOf(false)
+
+    // BiometricPrompt.authenticate() called before the window actually has input focus
+    // (e.g. straight from onCreate/first composition, especially with installSplashScreen()
+    // still holding the splash content) can fail to show at all, silently — showBiometricPrompt()
+    // below only overrides onAuthenticationSucceeded, so that failure has no visible effect.
+    // Gating the auto-trigger on real window focus is what makes it reliably pop up on its own.
+    private var hasWindowFocus by mutableStateOf(false)
+
+    // Batch 516 [laporan user v515: "tab biometric fingerprint yang maksa nampilin dialog berkali-kali,
+    // bagaimana dengan user yang mau buka via PIN"] — root cause (pembacaan kode): LaunchedEffect
+    // auto-prompt di bawah di-key ke `hasWindowFocus`. BiometricPrompt sendiri MENGAMBIL fokus jendela
+    // saat tampil dan MENGEMBALIKANNYA saat ditutup (tombol "Pakai PIN", tap luar, back) -> hasWindowFocus
+    // false->true -> effect jalan ULANG -> dialog muncul lagi, tiap kali ditutup. User yang memilih PIN
+    // tidak pernah bisa menyentuh keypad dengan tenang. Penanda ini membuat auto-prompt HANYA 1x per sesi
+    // kunci; di-reset di onStop() (saat app benar-benar ditinggalkan = sesi kunci baru). Tombol "Sidik
+    // Jari" manual di LockScreen tetap bisa dipakai kapan saja untuk memanggil prompt lagi.
+    private var biometricAutoPrompted = false
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        hasWindowFocus = hasFocus
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Batch 623 — task baru/dibuka ulang (mis. dari launcher saat musik main) ikut status "exclude from recents"
+        // terkini; juga membersihkan tanda basi dari proses yang sudah mati. Lihat util/RecentsGuard.kt.
+        RecentsGuard.reapply(this)
+    }
 
     override fun onStop() {
         super.onStop()
-        isUnlocked = false
+        // Batch 631 — BUG (screen recording user): memutar layar memunculkan kunci PIN/sidik jari LAGI dan menutup layar
+        // yang sedang dibuka (mis. sheet Log Diagnostik). Akar: manifest tanpa `configChanges` -> rotasi MEMBUAT ULANG
+        // Activity; `isUnlocked` adalah field instance (komentar lama "onStop hanya saat benar-benar meninggalkan" keliru:
+        // onStop JUGA dipanggil pada instance lama saat rotasi, dan instance baru selalu mulai dari `false`).
+        // Sekarang: kunci ulang HANYA bila bukan perubahan konfigurasi, dan status dibawa ke instance baru lewat
+        // onSaveInstanceState/onCreate. Latar belakang sungguhan (Home/ganti aplikasi) tetap mengunci: onStop menyimpan false.
+        if (!isChangingConfigurations) {
+            isUnlocked = false
+            biometricAutoPrompted = false
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // Batch 631 — dipanggil SETELAH onStop (API 28+; minSdk proyek 31): saat rotasi bernilai `true` (dibawa ke instance
+        // baru), saat ditinggalkan sungguhan bernilai `false` (kunci ulang, juga setelah proses dimatikan sistem).
+        outState.putBoolean(STATE_UNLOCKED, isUnlocked)
+        outState.putBoolean(STATE_BIOMETRIC_PROMPTED, biometricAutoPrompted)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -198,15 +351,25 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        StartupTrace.mark("act_mulai") // Batch 677 — jejak cold start (lihat StartupTrace)
         installSplashScreen()
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
         )
         super.onCreate(savedInstanceState)
+        StartupTrace.mark("act_super_selesai")
+
+        // Batch 631 — pulihkan status kunci hasil rotasi (lihat onStop/onSaveInstanceState); `null` (start dingin) = terkunci.
+        isUnlocked = savedInstanceState?.getBoolean(STATE_UNLOCKED, false) == true
+        biometricAutoPrompted = savedInstanceState?.getBoolean(STATE_BIOMETRIC_PROMPTED, false) == true
 
         pendingShortcutAction = intent?.data?.toString()
-        playerViewModel.connect()
+        val vm = playerViewModel // Batch 677 — memaksa pembuatan ViewModel di titik yang SAMA seperti sebelumnya (hanya dipisah utk diukur)
+        StartupTrace.mark("act_vm_dibuat")
+        vm.connect()
+        StartupTrace.mark("act_connect_selesai")
+        StartupTrace.traceFirstFrame(this)
 
         setContent {
             // Batch 24: bridge the two separate LocalLifecycleOwner CompositionLocals.
@@ -217,8 +380,11 @@ class MainActivity : FragmentActivity() {
             // the old one on Compose UI 1.6.x — bumping lifecycle to 2.8.2 alone (Batch 23) did
             // not fix this crash in practice, despite upstream release notes claiming it should.
             // Explicitly providing it here removes the dependency on that fix entirely.
+            // Batch 580: sisi kanan diganti ke lokal baru (yang lama deprecated: "Moved to
+            // lifecycle-runtime-compose"). Di Compose UI baru blok ini kemungkinan identitas —
+            // kandidat dihapus, tapi HANYA atas instruksi user (bug asli Batch 24 = crash nyata).
             CompositionLocalProvider(
-                androidx.lifecycle.compose.LocalLifecycleOwner provides androidx.compose.ui.platform.LocalLifecycleOwner.current
+                androidx.lifecycle.compose.LocalLifecycleOwner provides androidx.lifecycle.compose.LocalLifecycleOwner.current
             ) {
             val appThemeIdentity by playerViewModel.themeIdentity.collectAsStateWithLifecycle()
             val appThemeMode by playerViewModel.themeMode.collectAsStateWithLifecycle()
@@ -228,11 +394,14 @@ class MainActivity : FragmentActivity() {
                 // switching to "Terang" leaves status/nav bar icons stuck light-on-light
                 // (styled for the dark theme they started in) and effectively invisible.
                 val isDarkTheme = resolveIsDark(appThemeMode)
+                // Batch 656 — Space terkunci gelap: ikon status/navigasi harus tetap terang walau sistem mode terang
+                // (identitas lain TIDAK diubah).
+                val lightBars = !isDarkTheme && appThemeIdentity != ThemeIdentity.SPACE
                 val decorView = LocalView.current
                 SideEffect {
                     WindowCompat.getInsetsController(window, decorView).apply {
-                        isAppearanceLightStatusBars = !isDarkTheme
-                        isAppearanceLightNavigationBars = !isDarkTheme
+                        isAppearanceLightStatusBars = lightBars
+                        isAppearanceLightNavigationBars = lightBars
                     }
                 }
 
@@ -289,9 +458,22 @@ class MainActivity : FragmentActivity() {
                 val lockEnabled by playerViewModel.lockEnabled.collectAsStateWithLifecycle()
                 val biometricEnabled by playerViewModel.biometricEnabled.collectAsStateWithLifecycle()
                 val needsUnlock = lockEnabled && !isUnlocked
+                // Batch 698 — log v697 (pid 463, pesan thread utama 212 ms t=+4897..+5109): sampel `IAuthService.canAuthenticate` (binder
+                // sinkron ke system_server) dari `MainActivityKt$$ExternalSyntheticLambda99`. AKAR: `isBiometricAvailable()` dipanggil LANGSUNG di
+                // badan komposisi (argumen `AppNavHost` + `LockScreen`) -> satu binder di thread utama pada SETIAP rekomposisi lambda akar.
+                // Kini dihitung sekali per perubahan fokus jendela (kembali dari Pengaturan sidik jari = fokus berganti = nilai diperbarui).
+                val biometricAvailable = remember(hasWindowFocus) { isBiometricAvailable() }
+                // Batch 647 — [laporan user v646: "sehabis selesai biometric, tidak bisa mengingat tab terakhir"]. AKAR:
+                // onStop -> isUnlocked=false -> `when` di bawah pindah ke LockScreen, sehingga AppNavHost KELUAR dari
+                // komposisi; tanpa SaveableStateProvider, back stack NavController + seluruh rememberSaveable di bawahnya
+                // (tab bawah, chip tab Perpustakaan) ikut dibuang, dan setelah unlock AppNavHost mulai dari
+                // startDestination "home". Holder ini (hidup selama komposisi Activity) menyimpan state itu selagi terkunci
+                // lalu memulihkannya saat AppNavHost masuk lagi. Isi layar tetap TIDAK dikomposisi saat terkunci.
+                val appStateHolder = rememberSaveableStateHolder()
 
-                LaunchedEffect(needsUnlock, biometricEnabled) {
-                    if (needsUnlock && biometricEnabled && isBiometricAvailable()) {
+                LaunchedEffect(needsUnlock, biometricEnabled, hasWindowFocus) {
+                    if (needsUnlock && biometricEnabled && hasWindowFocus && !biometricAutoPrompted && isBiometricAvailable()) {
+                        biometricAutoPrompted = true
                         showBiometricPrompt { isUnlocked = true }
                     }
                 }
@@ -334,52 +516,76 @@ class MainActivity : FragmentActivity() {
                 // logam disikat ("brushed metal streak"), lalu turun lagi ke SkeuSurfaceVariant.
                 // Warnanya pun sudah bukan lagi turunan SkeuAccent tembaga (dihapus total) — murni
                 // TitaniumDark/SilverHighlight, keluarga token baru khusus utk efek metalik ini.
-                val identityRootBrush = when (appThemeIdentity) {
-                    ThemeIdentity.TACTILE -> Brush.linearGradient(
-                        colors = if (isDarkTheme)
-                            listOf(
-                                MaterialTheme.colorScheme.background,
-                                MidnightBlue.copy(alpha = MidnightBlueAmbientAlpha),
-                                AmoledSurface
-                            )
-                        else
-                            listOf(
-                                MaterialTheme.colorScheme.background,
-                                MidnightBlue.copy(alpha = MidnightBlueLightAmbientAlpha),
-                                TactileLightSurfaceVariant
-                            )
-                    )
-                    ThemeIdentity.SKEU_DARK_LITE -> {
-                        val streakAlpha = if (isDarkTheme) SkeuAmbientAlphaDark else SkeuAmbientAlphaLight
-                        val streakEnd = if (isDarkTheme) SkeuDarkSurfaceVariant else SkeuLightSurfaceVariant
-                        // Batch 80 — fix: Batch 79's emerald stop used `streakAlpha * 0.9f`, tapi
-                        // streakAlpha itself sudah sangat kecil (0.05f gelap / 0.12f terang) —
-                        // hasil akhirnya cuma alpha ~0.045/0.108, praktis tak kelihatan (user:
-                        // "yang kelihatan cuman Titanium dominan, mana zamrudnya??"). Beda dgn
-                        // SilverHighlight yg walau alpha kecil tetap kebaca krn warnanya nyaris
-                        // putih (kontras tinggi thd background gelap/terang), warna emerald yg
-                        // medium-saturation butuh alpha jauh lebih tinggi buat kebaca sama sekali.
-                        // Sekarang pakai alpha TETAP (tidak lagi diturunkan dari streakAlpha),
-                        // sengaja masih di bawah level accent-glow biasa (~0.42-0.45f di tempat
-                        // lain di app ini) supaya tetap terbaca "sentuhan", bukan aksen utama —
-                        // tapi genuinely visible, bukan cuma teknis-ada-di-kode.
-                        val emerald = if (isDarkTheme) SkeuEmerald else SkeuLightEmerald
-                        val emeraldStreakAlpha = if (isDarkTheme) 0.30f else 0.36f
-                        Brush.linearGradient(
-                            *arrayOf(
-                                0.00f to MaterialTheme.colorScheme.background,
-                                0.55f to TitaniumDark.copy(alpha = streakAlpha),
-                                // Titik kilau sempit (0.60-0.68) ditumpuk tepat setelah TitaniumDark
-                                // — rentang fraction yang sengaja disempitkan (bukan disebar rata
-                                // seperti resep 3-stop Tactile) supaya terbaca sebagai satu garis
-                                // pantulan cahaya di logam, bukan gradasi warna yang mulus.
-                                0.62f to SilverHighlight.copy(alpha = streakAlpha * 1.8f),
-                                0.68f to TitaniumDark.copy(alpha = streakAlpha),
-                                0.76f to emerald.copy(alpha = emeraldStreakAlpha),
-                                1.00f to streakEnd
-                            )
-                        )                    }
-                    else -> null
+                // Batch 393 — HOTFIX Batch 392, laporan build gagal user (log_fail_378.zip,
+                // Gradle 8.14.3 / CI build #378): `compileDebugKotlin`/`compileReleaseKotlin`
+                // GAGAL, 3 error identik "@Composable invocations can only happen from the
+                // context of a @Composable function" persis di 3 baris `MaterialTheme
+                // .colorScheme.background` yang Batch 392 pindahkan ke dalam `remember { }` di
+                // bawah tanpa disadari. Root cause: parameter `calculation` milik `remember()`
+                // ditandai `@DisallowComposableCalls` oleh Compose runtime sendiri — memanggil
+                // property `@Composable` apa pun (termasuk `MaterialTheme.colorScheme`, getter-
+                // nya sendiri `@Composable @ReadOnlyComposable`) di dalam lambda itu ilegal,
+                // bukan sekadar gaya penulisan. Ini TIDAK kelihatan dari pembacaan kode statis
+                // biasa (compiler Kotlin+Compose plugin sungguhan yang menegakkannya) — persis
+                // kelas kesalahan yang PROJECT_STATE.md sendiri sudah wanti-wanti berulang kali:
+                // "belum ditest di device asli ATAU build/lint sungguhan" utk tiap batch sejak
+                // 385, sekarang benar-benar kejadian. Fix: `MaterialTheme.colorScheme.background`
+                // dibaca SEKALI di sini, di context composable biasa (bukan di dalam remember) —
+                // lalu `remember(...)` menutup atas NILAI plain `Color` ini (`rootBackgroundColor`,
+                // ditambahkan sbg key ke-3 supaya tetap benar kalau suatu saat nilainya berubah
+                // lepas dari appThemeIdentity/isDarkTheme), bukan memanggil ulang property
+                // composable-nya. **Zero behavior change** dari niat asli Batch 392 — nilai brush
+                // yang dihasilkan identik, cuma titik pembacaan warnanya yang dipindah ke luar
+                // lambda `remember`. Detail lengkap CHANGELOG.md Batch 393.
+                val rootBackgroundColor = MaterialTheme.colorScheme.background
+                val identityRootBrush = remember(appThemeIdentity, isDarkTheme, rootBackgroundColor) {
+                    when (appThemeIdentity) {
+                        ThemeIdentity.TACTILE -> Brush.linearGradient(
+                            colors = if (isDarkTheme)
+                                listOf(
+                                    rootBackgroundColor,
+                                    MidnightBlue.copy(alpha = MidnightBlueAmbientAlpha),
+                                    AmoledSurface
+                                )
+                            else
+                                listOf(
+                                    rootBackgroundColor,
+                                    MidnightBlue.copy(alpha = MidnightBlueLightAmbientAlpha),
+                                    TactileLightSurfaceVariant
+                                )
+                        )
+                        ThemeIdentity.SKEU_DARK_LITE -> {
+                            val streakAlpha = if (isDarkTheme) SkeuAmbientAlphaDark else SkeuAmbientAlphaLight
+                            val streakEnd = if (isDarkTheme) SkeuDarkSurfaceVariant else SkeuLightSurfaceVariant
+                            // Batch 80 — fix: Batch 79's emerald stop used `streakAlpha * 0.9f`, tapi
+                            // streakAlpha itself sudah sangat kecil (0.05f gelap / 0.12f terang) —
+                            // hasil akhirnya cuma alpha ~0.045/0.108, praktis tak kelihatan (user:
+                            // "yang kelihatan cuman Titanium dominan, mana zamrudnya??"). Beda dgn
+                            // SilverHighlight yg walau alpha kecil tetap kebaca krn warnanya nyaris
+                            // putih (kontras tinggi thd background gelap/terang), warna emerald yg
+                            // medium-saturation butuh alpha jauh lebih tinggi buat kebaca sama sekali.
+                            // Sekarang pakai alpha TETAP (tidak lagi diturunkan dari streakAlpha),
+                            // sengaja masih di bawah level accent-glow biasa (~0.42-0.45f di tempat
+                            // lain di app ini) supaya tetap terbaca "sentuhan", bukan aksen utama —
+                            // tapi genuinely visible, bukan cuma teknis-ada-di-kode.
+                            val emerald = if (isDarkTheme) SkeuEmerald else SkeuLightEmerald
+                            val emeraldStreakAlpha = if (isDarkTheme) 0.30f else 0.36f
+                            Brush.linearGradient(
+                                *arrayOf(
+                                    0.00f to rootBackgroundColor,
+                                    // Titik kilau sempit (0.60-0.68) ditumpuk tepat setelah TitaniumDark
+                                    // — rentang fraction yang sengaja disempitkan (bukan disebar rata
+                                    // seperti resep 3-stop Tactile) supaya terbaca sebagai satu garis
+                                    // pantulan cahaya di logam, bukan gradasi warna yang mulus.
+                                    0.55f to TitaniumDark.copy(alpha = streakAlpha),
+                                    0.62f to SilverHighlight.copy(alpha = streakAlpha * 1.8f),
+                                    0.68f to TitaniumDark.copy(alpha = streakAlpha),
+                                    0.76f to emerald.copy(alpha = emeraldStreakAlpha),
+                                    1.00f to streakEnd
+                                )
+                            )                        }
+                        else -> null
+                    }
                 }
 
                 Surface(
@@ -409,15 +615,20 @@ class MainActivity : FragmentActivity() {
                     contentColor = MaterialTheme.colorScheme.onBackground
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
+                        // Batch 656 — latar kosmos tema Space: anak PERTAMA Box = tergambar di belakang semua layar
+                        // (Scaffold dibuat transparan khusus Space di AppNavHost). Tema lain: 0 perubahan.
+                        if (appThemeIdentity == ThemeIdentity.SPACE) SpaceCosmosBackdrop()
                         when {
                             needsUnlock -> LockScreen(
-                                biometricEnabled = biometricEnabled && isBiometricAvailable(),
+                                biometricEnabled = biometricEnabled && biometricAvailable,
                                 onVerifyPin = { pin -> playerViewModel.verifyPin(pin) },
                                 onUnlocked = { isUnlocked = true },
                                 onRequestBiometric = { showBiometricPrompt { isUnlocked = true } },
                                 initialLockedOutUntil = remember(needsUnlock) { playerViewModel.currentPinLockout() }
                             )
-                            hasPermission -> AppNavHost(playerViewModel, isBiometricAvailable())
+                            hasPermission -> appStateHolder.SaveableStateProvider(APP_SAVEABLE_STATE_KEY) {
+                                AppNavHost(playerViewModel, biometricAvailable)
+                            }
                             !permissionRequested -> WelcomeScreen(
                                 onContinue = {
                                     permissionRequested = true
@@ -432,102 +643,8 @@ class MainActivity : FragmentActivity() {
                 }
             }
             } // tutup CompositionLocalProvider (Batch 24)
+            SideEffect { StartupTrace.markOnce("compose_apply") } // Batch 677 — komposisi pertama selesai diterapkan
         }
-    }
-}
-
-@Composable
-private fun WelcomeScreen(onContinue: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.background)
-                )
-            )
-            // Batch 111 — layar ini render DI LUAR Scaffold (lihat setContent di MainActivity),
-            // jadi tidak dapat contentWindowInsets bawaan Scaffold sama sekali. Di gesture-nav
-            // (Android 16 test device) bar cuma overlay tipis nyaris tak kelihatan; di 3-button
-            // nav (masih umum Android 15 ke bawah) bar opaque menutupi konten — insets manual di
-            // sini yang menutup gap-nya. Padding fixed 32dp tetap di bawah (jarak visual dari
-            // konten ke insets), bukan pengganti.
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surface)
-                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.MusicNote,
-                contentDescription = null,
-                modifier = Modifier.size(40.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-        Text(
-            "SELAMAT DATANG",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.secondary
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            "SONIX",
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            "Untuk menampilkan koleksi musik kamu, aplikasi ini butuh izin membaca file audio di perangkat.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.secondary,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-        WelcomeHighlight(Icons.Default.WifiOff, "Semua diproses di HP — tidak ada data yang dikirim ke internet")
-        Spacer(modifier = Modifier.height(12.dp))
-        WelcomeHighlight(Icons.Default.FolderOff, "Kamu yang atur folder mana yang tampil")
-        Spacer(modifier = Modifier.height(12.dp))
-        WelcomeHighlight(Icons.Default.GraphicEq, "Equalizer, crossfade, sampai widget — lengkap")
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(onClick = onContinue, modifier = Modifier.fillMaxWidth()) {
-            Text("Lanjutkan")
-        }
-    }
-}
-
-@Composable
-private fun WelcomeHighlight(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.secondary
-        )
     }
 }
 
@@ -540,30 +657,21 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     // file. 0 consumer sama sekali batch ini (belum ada .hazeSource()/.hazeEffect() dipasang
     // di manapun) — murni plumbing, 0 perubahan visual.
     val hazeState = rememberHazeState()
-    // Batch 326 — LocalAuroraPhase (Theme.kt), sama pola persis hazeState di atas: 1 phase float
-    // dihitung 1 kali di sini, diteruskan ke `frostedGlass()` (BlurUtils.kt) via CompositionLocal
-    // supaya 12+ call site rim-glow tidak masing-masing bikin `rememberInfiniteTransition`
-    // sendiri (kekhawatiran performa eksplisit Batch 310). Resep animasi (durasi/easing/
-    // RepeatMode) SENGAJA disalin persis dari `auroraGlow()` (TactileDepth.kt, Batch 306) —
-    // bukan angka baru, supaya ambient wash root & rim-glow panel terasa satu keluarga gerakan
-    // walau 2 transition terpisah (root Surface's `auroraGlow()` TIDAK disentuh batch ini, 0
-    // risiko ke situ). `rememberInfiniteTransition`/`animateFloat` jalan tanpa syarat (bukan
-    // cuma saat tema Aurora aktif) — biaya 1 animateFloat kosong utk 4 tema lain diputuskan
-    // dapat diterima (sama persis `hazeState` di atas yang juga selalu dihitung tanpa syarat
-    // identitas tema apa pun), jauh lebih murah dari alternatif "if/else di tiap consumer".
-    val auroraPhaseTransition = rememberInfiniteTransition(label = "auroraRimGlowPhase")
-    val auroraPhase by auroraPhaseTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 20000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "auroraRimGlowPhaseValue"
-    )
+    // Batch 326 sempat menambah `auroraPhaseTransition`/`auroraPhase` di sini (1
+    // `rememberInfiniteTransition` dibagi ke semua `frostedGlass()` rim-glow lewat
+    // `LocalAuroraPhase`). Batch 328 MENGHAPUS BALIK — user (device sungguhan): musik
+    // stuttering/mandek + lag/glitch saat swipe sheet "Kontrol Lanjutan". Asumsi Batch 326
+    // ("1 instance dibagi = aman") terbukti keliru: phase berubah tiap frame tetap memicu
+    // recomposition brush di semua consumer sekaligus, termasuk `MiniPlayerBar` yang selalu
+    // tervisible selama musik main — bersaing langsung dgn thread audio/UI. Rasionalisasi penuh:
+    // `PROJECT_STATE.md`/`CHANGELOG.md` Batch 328, komentar Aurora branch `frostedGlass()`
+    // (BlurUtils.kt).
     val uiState by playerViewModel.uiState.collectAsStateWithLifecycle()
     val favoriteIds by playerViewModel.favoriteIds.collectAsStateWithLifecycle()
-    val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsStateWithLifecycle()
+    // Batch 354 — sleepTimerRemaining SENGAJA TIDAK dikoleksi di sini lagi (dulu `by ...
+    // collectAsStateWithLifecycle()` persis di scope teratas ini, pola identik bug
+    // position/duration Batch 353). StateFlow-nya sendiri dioper mentah ke NowPlayingScreen di
+    // bawah, dikoleksi lokal di SleepTimerDialog/AdvancedControlsSheet.
     val abRepeatPointA by playerViewModel.abRepeatPointA.collectAsStateWithLifecycle()
     val abRepeatPointB by playerViewModel.abRepeatPointB.collectAsStateWithLifecycle()
     val statsVersion by playerViewModel.statsVersion.collectAsStateWithLifecycle()
@@ -588,7 +696,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val appThemeIdentity by playerViewModel.themeIdentity.collectAsStateWithLifecycle()
     val visualizerEnabled by playerViewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerSupported by playerViewModel.visualizerSupported.collectAsStateWithLifecycle()
-    val visualizerBars by playerViewModel.visualizerBars.collectAsStateWithLifecycle()
+    // Batch 354 — visualizerBars sama, dihapus dari sini (dulu `by ...
+    // collectAsStateWithLifecycle()` di scope ini, ~15fps + tembus 4 layer composable turunan —
+    // kandidat kuat kenapa lag masih terasa meski Batch 353 sudah jalan). StateFlow mentah dioper
+    // ke NowPlayingScreen, dikoleksi lokal di SpectrumBars (VisualizerSheet.kt).
     val audiobookModeEnabled by playerViewModel.audiobookModeEnabled.collectAsStateWithLifecycle()
     val floatingBubbleEnabled by playerViewModel.floatingBubbleEnabled.collectAsStateWithLifecycle()
     val silenceSkipEnabled by playerViewModel.silenceSkipEnabled.collectAsStateWithLifecycle()
@@ -629,7 +740,30 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     // fallback, sekarang disatukan di 1 helper biar tidak diketik ulang 3x di bawah.
     fun startBubbleService(context: android.content.Context) {
         val intent = Intent(context, FloatingBubbleService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
+        context.startForegroundService(intent)
+    }
+
+    // Batch 471 — lihat KDoc permission REQUEST_IGNORE_BATTERY_OPTIMIZATIONS di AndroidManifest.xml
+    // utk root cause (OEM App Standby/battery restriction, bukti Batch 466/467). Dipanggil HANYA
+    // dari 2 titik user AKTIF menyalakan toggle (bawah) — SENGAJA TIDAK dipanggil dari
+    // LaunchedEffect(Unit) auto-restart di bawah (itu jalan tiap app dibuka tanpa aksi user
+    // langsung; minta dialog sistem di situ = nge-nag tiap buka app kalau user pernah menolak,
+    // pola anti-pattern). isIgnoringBatteryOptimizations() dicek dulu supaya dialog sistem 0
+    // pernah muncul kalau sudah dikecualikan — bukan diminta ulang tiap toggle ON.
+    fun requestIgnoreBatteryOptimizationsIfNeeded(context: android.content.Context) {
+        val powerManager = context.getSystemService(PowerManager::class.java) ?: return
+        if (powerManager.isIgnoringBatteryOptimizations(context.packageName)) return
+        runCatching {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:${context.packageName}")
+                )
+            )
+        }
+        // Gagal (mis. OEM blokir action ini) = diam-diam skip, bubble TETAP nyala lewat
+        // startBubbleService() yang sudah dipanggil di pemanggil — dialog ini murni penambah
+        // keandalan, bukan syarat bubble bisa jalan sama sekali.
     }
 
     val overlayPermissionLauncher = rememberLauncherForActivityResult(
@@ -638,6 +772,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         if (Settings.canDrawOverlays(overlayPermissionContext)) {
             playerViewModel.setFloatingBubbleEnabled(true)
             startBubbleService(overlayPermissionContext)
+            requestIgnoreBatteryOptimizationsIfNeeded(overlayPermissionContext)
         }
         // Ditolak/dibatalkan: toggle di SettingsScreen tetap OFF (floatingBubbleEnabled tidak
         // pernah diset true di sini), tidak perlu penanganan tambahan.
@@ -652,6 +787,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         if (Settings.canDrawOverlays(overlayPermissionContext)) {
             playerViewModel.setFloatingBubbleEnabled(true)
             startBubbleService(overlayPermissionContext)
+            requestIgnoreBatteryOptimizationsIfNeeded(overlayPermissionContext)
         } else {
             overlayPermissionLauncher.launch(
                 Intent(
@@ -684,8 +820,12 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                playerViewModel.refreshFloatingBubbleEnabled()
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> playerViewModel.refreshFloatingBubbleEnabled()
+                // Batch 537 (baterai) — loop posisi di ViewModel melambat saat UI tak terlihat.
+                Lifecycle.Event.ON_START -> playerViewModel.setUiVisible(true)
+                Lifecycle.Event.ON_STOP -> playerViewModel.setUiVisible(false)
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -721,41 +861,123 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         if (songs.isEmpty()) return
         val resolver = deleteContext.contentResolver
         val uris = songs.map { it.uri }
-        when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
-                // Android 11+: the only correct path — the system shows its own confirmation
-                // and handles the actual deletion; we never touch the files directly.
-                val pendingIntent = android.provider.MediaStore.createDeleteRequest(resolver, uris)
-                deleteRequestLauncher.launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
-            }
-            Build.VERSION.SDK_INT == Build.VERSION_CODES.Q -> {
-                // Android 10: delete() throws a RecoverableSecurityException carrying the
-                // exact system confirmation prompt to launch for files this app doesn't own.
-                try {
-                    uris.forEach { resolver.delete(it, null, null) }
-                    playerViewModel.refreshLibrary()
-                } catch (e: RecoverableSecurityException) {
-                    deleteRequestLauncher.launch(IntentSenderRequest.Builder(e.userAction.actionIntent.intentSender).build())
-                }
-            }
-            else -> {
-                // Pre-Android 10: no scoped-storage confirmation flow exists yet; a direct
-                // delete (content resolver + backing file) is the standard approach.
-                uris.forEach { uri ->
-                    try {
-                        resolver.delete(uri, null, null)
-                    } catch (e: Exception) {
-                        // Leave library state consistent even if one file couldn't be removed
-                        // (e.g. already gone) — refreshLibrary() below re-syncs regardless.
-                    }
-                }
-                playerViewModel.refreshLibrary()
-            }
-        }
+        // minSdk 31 (Android 12) guarantees SDK_INT >= R (30) unconditionally — this used to be
+        // the first branch of a `when` whose Q/else branches were shadowed dead code (R always
+        // matched first, not because Q/pre-Q were individually below minSdk). The only path any
+        // device on this app can actually take: the system shows its own confirmation and
+        // handles the actual deletion; we never touch the files directly.
+        val pendingIntent = android.provider.MediaStore.createDeleteRequest(resolver, uris)
+        deleteRequestLauncher.launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
     }
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+    // Batch 651 — keluhan user (v647): "mekanisme pulihkan tab terakhir belum optimal, lebih sering balik ke home".
+    // AKAR: Batch 647 (SaveableStateProvider) hanya menyelamatkan state selama PROSES hidup. Log device: OEM sering mematikan
+    // proses saat di latar belakang (ApplicationExitInfo `reclaim_process_start`, importance CACHED) lalu memulai ulang saat user
+    // kembali -> NavController mulai dari startDestination "home". SOLUSI: simpan tab terakhir ke disk (LastTabStore) dan,
+    // bila app baru mulai di "home" padahal tab tersimpan lain, pindah ke tab itu dgn navigate() yang IDENTIK dgn tap tab bawah.
+    // Supaya Beranda tidak sempat berkedip: konten NavHost disembunyikan (alpha 0) + transisi dimatikan HANYA selama pemulihan
+    // (`tabRestoreSettled` false); jalur normal (tak ada tab tersimpan / sudah home) mulai `true` = perilaku lama, 0 perubahan.
+    val tabStoreContext = LocalContext.current.applicationContext
+    val lastTabStore = remember { LastTabStore(tabStoreContext) }
+    val savedTab = remember { lastTabStore.getLastTab() }
+    var tabRestoreChecked by remember { mutableStateOf(false) }
+    var tabRestoreSettled by remember { mutableStateOf(savedTab == null || savedTab == LastTabStore.START_TAB) }
+    var tabRestoreNavigated by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(TAB_RESTORE_MASK_TIMEOUT_MS)
+        tabRestoreSettled = true
+    }
+    // Batch 658 — user (v657): "masih ada kilatan tab home pada mekanisme tab pemulihan". Dua AKAR (dibaca dari kode, bukan log: log tak
+    // merekam frame): (1) BILAH: `selected`/pil/`navPillIndexAnim` dibaca dari `currentRoute` yang SELALU `home` di 1-3 frame pertama
+    // (NavHost baru memasang graf, lalu `navigate()` pemulihan jalan di efek) -> item Beranda menyala + pil di Beranda lalu melompat
+    // (`LaunchedEffect(currentRoute)` Batch 656 baru snap SETELAH 1 frame). Hanya NavHost yang ditutup alpha 0, bilah tidak. FIX: `barRoute` =
+    // tab tersimpan selama pemulihan berlangsung (aturan murni `LastTabStore.barRoute`), dipakai bilah/rail/pil -> sorotan + pil sudah di tab
+    // tujuan sejak frame pertama, tanpa lompatan. (2) KONTEN: `tabRestoreSettled = true` (alpha 1 + transisi hidup) dipasang di frame yang
+    // sama saat rute baru teramati, padahal konten Beranda lama baru dilepas `AnimatedContent` 1-2 frame setelah `navigate()` (transisi `None`
+    // pun butuh frame) -> Beranda tampak 1 frame. FIX: SETELAH `navigate()` pemulihan, tunggu 3 frame sebelum menampakkan konten. Menunggu
+    // HANYA bila pemulihan benar-benar menavigasi (`tabRestoreNavigated`); jalur lain (mis. buka kunci dgn rute sudah benar) tetap 0 tunggu.
+    // Pengaman 800 ms (`TAB_RESTORE_MASK_TIMEOUT_MS`) tak berubah.
+    val barRoute = LastTabStore.barRoute(tabRestoreSettled, savedTab, currentRoute)
+    LaunchedEffect(currentRoute) {
+        val route = currentRoute ?: return@LaunchedEffect
+        if (!tabRestoreChecked) {
+            tabRestoreChecked = true
+            val target = LastTabStore.restoreTarget(savedTab, route)
+            if (target != null) {
+                tabRestoreNavigated = true
+                navController.navigate(target) {
+                    popUpTo("home") { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+                return@LaunchedEffect
+            }
+        }
+        if (route in TAB_ROUTES) lastTabStore.setLastTab(route)
+        if (!tabRestoreSettled && tabRestoreNavigated) {
+            repeat(TAB_RESTORE_REVEAL_FRAMES) { androidx.compose.runtime.withFrameNanos { } }
+        }
+        tabRestoreSettled = true
+    }
+
+    // Batch 435 — request eksplisit user: "tambahkan gesture swipe able lintas 3 tab, alih-alih
+    // user hanya bisa tap-tab manual berulang". App ini pakai Jetpack Navigation Compose dengan
+    // 3 route top-level TERPISAH (home/library/settings, bukan HorizontalPager 1-route) — swipe
+    // di sini DIDETEKSI lalu memicu navController.navigate() yang SAMA PERSIS dgn onClick
+    // NavigationBarItem/NavigationRailItem di bawah (popUpTo("home"){saveState=true} +
+    // launchSingleTop + restoreState), jadi 0 perubahan ke state-preservation tab yang sudah ada.
+    // enter/exitTransition NavHost (Batch 330, fade 200/150ms) SENGAJA tidak disentuh — tetap
+    // dipakai apa adanya baik utk tap maupun swipe. Pola threshold 120px + haptic +
+    // dragOffsetPx(sinkron)/Animatable(springback-only) di bawah REUSE 1:1 dari AlbumArtHero
+    // (NowPlayingScreen.kt, Batch 434) — sumbu bug sinkron-vs-asinkron yang sama sengaja tidak
+    // diulang di sini. Modifier gesture-nya sendiri HANYA dipasang saat currentRoute ada di
+    // TAB_ROUTES (lihat Box pembungkus NavHost di bawah) supaya 0 rebutan dgn gesture horizontal
+    // lain yang sudah ada di layar non-tab (mis. swipe next/prev AlbumArtHero di "now_playing").
+    val tabSwipeHaptic = LocalHapticFeedback.current
+    val tabSwipeScope = rememberCoroutineScope()
+    val tabDragOffsetPx = remember { mutableFloatStateOf(0f) }
+    val tabDragOffset = remember { Animatable(0f) }
+    // Batch 479 — HOISTED dari dalam lambda `bottomBar =` (posisi lama, lihat komentar penuh di
+    // titik pemakaian `NavigationBar` di bawah) ke scope `AppNavHost` di sini — pola sinkronisasi
+    // yang SAMA PERSIS dgn `tabSwipeScope`/`tabDragOffsetPx`/`tabDragOffset` di atas (semua di
+    // scope ini justru SUPAYA bisa dibaca lintas lambda `content =` & `bottomBar =` milik
+    // `Scaffold`, 2 lambda terpisah yg 0 saling lihat state satu sama lain). Root cause bug "drag
+    // lintas tab, bottom nav diam" (lihat RESUME POINT Batch 478 di PROJECT_STATE.md): sebelum
+    // hoist ini, `navPillIndexAnim` cuma bisa disentuh dari DALAM `bottomBar =` (tab-bar-drag-end
+    // & 3 onClick `NavigationBarItem`) — swipe KONTEN (`content =`, blok pointerInput di bawah
+    // NavHost) 0 pernah bisa menyentuhnya sama sekali walau navigate()-nya sendiri berhasil.
+    val navPillIndexAnim = remember {
+        Animatable(
+            (TAB_ROUTES.indexOfFirst { it == barRoute }.coerceAtLeast(0) + 0.5f)
+        )
+    }
+
+    // Batch 437 — request eksplisit user: efek "kaca pembesar" ala iOS di label bawah, bereaksi
+    // kontinu mengikuti gesture drag yang SAMA PERSIS dgn Batch 435 (0 gesture/state baru) —
+    // `tabDragOffsetPx` di atas SUDAH live ter-update tiap frame selama `onHorizontalDrag`
+    // (±40px, lihat Box pembungkus NavHost di bawah) dan sudah spring-back ke 0 di `onDragEnd`/
+    // `onDragCancel`; fungsi ini murni MEMBACA ulang sinyal itu sebagai bobot fokus per-tab, 0
+    // pointerInput/Animatable kedua. Dipanggil di titik pemakaian (dalam tiap `label = { ... }`
+    // NavigationBarItem, bukan di-hoist ke NavigationBar) SENGAJA — scope recomposition tetap
+    // sekecil mungkin (hanya Text label yang berubah tiap frame drag, bukan seluruh NavigationBar).
+    // Batch 556 — `tabMagnifyFocus` (berbasis `currentRoute`, biner 1f/0f saat diam) DIGANTI `navPillFocus`: fokus = fungsi
+    // tenda jarak PUSAT KUNCI yang meluncur (`navPillIndexAnim` + geseran nudge swipe-konten) ke pusat kolom tab. Warna/
+    // skala ikon+label kini berganti TEPAT di tepi kunci (termasuk tab yang cuma dilewati saat lompat 2 tab), persis
+    // `SkeuTabBar` Boomly B191, dan tetap serasi dgn durasi gerak kunci berapa pun. Diam = 1f/0f (identik lama); nudge =
+    // identik `tabMagnifyFocus` lama (geser penuh = 1f -> 0f).
+    // Batch 657 — `navPillFocus(tabIndex)` (fokus tenda per tab -> lerp warna/skala) DIGANTI `navPillPosition()`: SATU posisi
+    // PUSAT pil (satuan tab; pegas `navPillIndexAnim` + nudge swipe-konten ±0,5 tab) yang dibaca SERENTAK oleh kunci timbul
+    // (`neuSlidingKey`) dan oleh lapisan warna ter-klip tiap tab (`CustomNavBarTabItem`) -> warna oranye/aksen tepat di
+    // dalam bentuk pil seperti video acuan (ikon/label separuh berwarna saat pil melintas), bukan memudar linear.
+    // Dibaca di fase GAMBAR (0 rekomposisi per frame).
+    fun navPillPosition(): Float {
+        val offset = tabDragOffsetPx.floatValue // -40f..40f; negatif = geser ke arah tab BERIKUTNYA
+        val towardNext = (-offset / 40f).coerceIn(0f, 1f)
+        val towardPrev = (offset / 40f).coerceIn(0f, 1f)
+        return navPillIndexAnim.value + (towardNext - towardPrev) * 0.5f
+    }
 
     // Batch 101 — Adaptive (multi-device). widthClass dihitung dari LocalConfiguration, jadi
     // otomatis berubah live saat rotasi/lipat-buka foldable/resize split-screen — TIDAK perlu
@@ -831,14 +1053,18 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     val nowPlayingContent: @Composable (onBack: () -> Unit) -> Unit = { onBackAction ->
         NowPlayingScreen(
             uiState = uiState,
+            playbackProgress = playerViewModel.playbackProgress,
             isFavorite = uiState.currentSong?.let { favoriteIds.contains(it.id) } ?: false,
             currentRating = currentRating,
             onSetRating = { stars -> playerViewModel.setCurrentSongRating(stars) },
-            sleepTimerRemainingMs = sleepTimerRemaining,
+            sleepTimerRemaining = playerViewModel.sleepTimerRemaining,
             accentColor = accentColor,
             onPlayPause = { playerViewModel.togglePlayPause() },
             onNext = { playerViewModel.next() },
             onPrevious = { playerViewModel.previous() },
+            // Batch 489 — QA checklist gap #1 (kontrol Stop eksplisit), lihat komentar
+            // PlayerViewModel.stopPlayback().
+            onStopPlayback = { playerViewModel.stopPlayback() },
             onSeek = { playerViewModel.seekTo(it) },
             onShuffle = { playerViewModel.toggleShuffle() },
             onRepeat = { playerViewModel.cycleRepeatMode() },
@@ -874,7 +1100,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             visualizerEnabled = visualizerEnabled,
             visualizerSupported = visualizerSupported,
             visualizerPermissionGranted = visualizerPermissionGranted,
-            visualizerBars = visualizerBars,
+            visualizerBars = playerViewModel.visualizerBars,
             onOpenVisualizer = { playerViewModel.ensureVisualizerAttached() },
             onCloseVisualizer = { playerViewModel.stopVisualizerCapture() },
             onToggleVisualizerEnabled = { playerViewModel.setVisualizerEnabled(it) },
@@ -883,6 +1109,13 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             onCutRingtone = { song, range, destination, label ->
                 playerViewModel.requestCutRingtone(song, range, destination, label)
             },
+            // Batch 358 — ikon "Plus" baru di Now Playing (samping judul). Sama persis 3 baris
+            // yang sudah dipakai LibraryScreen (di atas, ~line 1153-1157), playlists StateFlow-nya
+            // pun sudah dikoleksi dari playerViewModel lebih awal di fungsi ini (val playlists),
+            // 0 sumber data baru.
+            playlists = playlists,
+            onAddSongToPlaylist = { id, songId -> playerViewModel.addSongToPlaylist(id, songId) },
+            onCreatePlaylist = { name -> playerViewModel.createPlaylist(name) },
             onBack = onBackAction
         )
     }
@@ -891,8 +1124,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
     // atas) supaya scope-nya jelas 1 titik, sama gaya CompositionLocalProvider yang SUDAH ADA
     // di file ini (Batch 24, baris ~210) — badan blok TIDAK di-reindent (pola sama persis
     // Batch 24: minim-diff, bukan reformat besar-besaran demi estetika indentasi).
-    CompositionLocalProvider(LocalHazeState provides hazeState, LocalAuroraPhase provides auroraPhase) {
+    CompositionLocalProvider(LocalHazeState provides hazeState) {
     Scaffold(
+        // Batch 656 — nilai default M3 = `background`; HANYA Space transparan supaya latar kosmos di belakang terlihat.
+        containerColor = if (isSpaceTheme()) Color.Transparent else MaterialTheme.colorScheme.background,
         snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
                 Snackbar(
@@ -927,70 +1162,321 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 ) {
                     MiniPlayerBar(
                         uiState = uiState,
+                        playbackProgress = playerViewModel.playbackProgress,
                         accentColor = accentColor,
                         onPlayPause = { playerViewModel.togglePlayPause() },
                         onExpand = {
                             navController.navigate("now_playing") { launchSingleTop = true }
-                        }
+                        },
+                        onDismiss = { playerViewModel.dismissMiniPlayer() }
                     )
                 }
                 if (widthClass == AppWidthClass.COMPACT &&
-                    (currentRoute == "home" || currentRoute == "library" || currentRoute == "settings")
+                    (barRoute == "home" || barRoute == "library" || barRoute == "settings")
                 ) {
-                    // Batch 40: tonalElevation alone still reads flat (no directional light) —
-                    // a 1-2px catch-light line along the top edge is the same border cue
-                    // tactileEmboss() uses elsewhere, applied here without restructuring
-                    // NavigationBar's own internals (it's a whole M3 component, not a bare
-                    // Surface tactileEmboss() could wrap directly).
-                    // Batch 53 — spec §15 "Navigation should be calm... Do not turn every
-                    // navigation item into a glowing glass capsule" + §5 GlassHighlight is now
-                    // 0.065f (was 0.055f pre-Batch-53), so the catch-light line's own alphas are
-                    // re-matched to that new base (0.13f/0.03f) to keep the same relative
-                    // brightness step it always had.
-                    // Batch 57: the catch-light line + raised tonalElevation is a "physical
-                    // panel" cue, not Tactile-specific — Skeuomorphism Dark Lite is the same
-                    // kind of identity (raised surface catching light from top-left) just with
-                    // its own warmer highlight token, so it gets the same treatment here with
-                    // SkeuHighlight instead of TactileHighlight. Apple/Light/Dark stay untouched.
-                    val navCatchLightColor = when (appThemeIdentity) {
-                        ThemeIdentity.TACTILE -> TactileHighlight
-                        ThemeIdentity.SKEU_DARK_LITE -> SkeuHighlight
-                        else -> null
+                    // Batch 438 — 1 interactionSource per tab, dibagi ke NavigationBarItem (klik)
+                    // dan GlassTabIcon (bouncyPress) supaya keduanya sepakat kapan "pressed" true,
+                    // pola identik `PinKey`/`RoundGlyphButton` (LockScreen.kt).
+                    // Batch 442 — dibaca oleh pointerInput drag-on-tab-bar di bawah (key `Unit`,
+                    // coroutine gesture HIDUP TERUS lintas 3 tab supaya 1 drag jari bisa lewati
+                    // lebih dari 1 batas tab tanpa putus — lihat rasionalisasi penuh di situ).
+                    // `rememberUpdatedState` WAJIB di sini (bukan baca `currentRoute` langsung di
+                    // closure `pointerInput(Unit)`) — closure key-`Unit` cuma dibuat SEKALI, baca
+                    // `currentRoute` polos di dalamnya akan BEKU ke nilai komposisi pertama
+                    // (stale), tidak ikut update tiap kali tab berpindah selama drag berlangsung.
+                    // Batch 658 — `barRoute` (bukan `currentRoute`): sorotan/pil bilah ikut tab tersimpan selama pemulihan; di luar itu identik `currentRoute`.
+                    val currentRouteState = rememberUpdatedState(barRoute)
+                    // Batch 556 — label/ikon kini mengikuti posisi KUNCI (`navPillFocus`), jadi kunci WAJIB sama dgn route aktif
+                    // begitu bilah muncul (mis. setelah navigasi lewat NavigationRail di layar lebar lalu kembali compact, atau
+                    // balik dari Now Playing). Hanya saat masuk komposisi (bukan tiap pindah tab) -> 0 tabrakan dgn glide tap/drag.
+                    LaunchedEffect(Unit) {
+                        val idx = TAB_ROUTES.indexOfFirst { it == currentRouteState.value }
+                        if (idx >= 0) navPillIndexAnim.snapTo(idx + 0.5f)
                     }
+                    val homeTabInteraction = remember { MutableInteractionSource() }
+                    val libraryTabInteraction = remember { MutableInteractionSource() }
+                    val settingsTabInteraction = remember { MutableInteractionSource() }
+                    // Batch 444 — user eksplisit: pill/capsule drag tab-bar (Batch 442) 0 ikut
+                    // posisi jari real-time (baru "lompat" pas commit index-crossing). Posisi
+                    // kontinu (satuan "index", 0f..TAB_ROUTES.size) selama drag tab-bar aktif,
+                    // NaN = tidak sedang drag di SINI (state TERPISAH dari tabDragOffsetPx milik
+                    // swipe KONTEN Batch 435/437 — beda area sentuh, 0 saling pakai). Ditulis
+                    // SINKRON langsung di loop awaitEachGesture yang sudah ada (bukan lewat
+                    // coroutine/snapTo per-delta) — sumbu sinkron-vs-asinkron yang sama yang
+                    // sudah dijaga Batch 433/434.
+                    val tabBarDragIndexPx = remember { mutableFloatStateOf(Float.NaN) }
+                    // Batch 656 — BUG user (screenshot): tab Perpustakaan dipulihkan tapi bilah menyorot Beranda. AKAR: `navPillIndexAnim`
+                    // hanya digeser oleh tap/swipe/drag; snap di `LaunchedEffect(Unit)` di atas terjadi SEKALI saat bilah pertama
+                    // tampil (rute masih `home`), sedangkan pemulihan Batch 651 memanggil `navigate()` langsung -> kunci tertinggal.
+                    // FIX: tiap rute berganti, tunggu 1 frame (jalur tap/swipe/drag meluncurkan animateTo-nya sendiri dulu), lalu
+                    // BILA kunci diam (bukan sedang animasi/drag) dan beda dari rute -> snap ke tab rute itu. Jalur normal = 0 perubahan.
+                    LaunchedEffect(barRoute) {
+                        val idx = TAB_ROUTES.indexOfFirst { it == barRoute }
+                        if (idx < 0) return@LaunchedEffect
+                        androidx.compose.runtime.withFrameNanos { }
+                        val target = idx + 0.5f
+                        if (!navPillIndexAnim.isRunning &&
+                            tabBarDragIndexPx.floatValue.isNaN() &&
+                            kotlin.math.abs(navPillIndexAnim.value - target) > 0.01f
+                        ) {
+                            navPillIndexAnim.snapTo(target)
+                        }
+                    }
+                    // Tahanan visual (rubber-band) saat jari didorong lewat ujung kolom
+                    // pertama/terakhir (Beranda/Pengaturan) — sebelumnya 0 sinyal apa pun, index
+                    // cuma coerceIn diam-diam. Pola SAMA PERSIS dgn tabDragOffsetPx/tabDragOffset
+                    // (swipe konten Batch 435, di bawah) & AlbumArtHero (NowPlayingScreen.kt,
+                    // Batch 434): *Px = sumber kebenaran sinkron dibaca graphicsLayer, Animatable
+                    // HANYA dipakai fase springback (reuse tabSwipeScope yang sudah ada) supaya
+                    // 0 nge-block awaitEachGesture menunggu gesture berikutnya selama springback
+                    // masih jalan.
+                    val tabBarOverscrollPx = remember { mutableFloatStateOf(0f) }
+                    val tabBarOverscrollAnim = remember { Animatable(0f) }
+                    // Batch 657 — mekanisme bilah = video acuan. `tabBarDragFocus` (fungsi tenda dari jari mentah -> lerp warna) DIHAPUS.
+                    // `tabBarPressed` = jari sedang menekan bilah: (a) tab rute yang SUDAH aktif tetap berwarna penuh selama jari
+                    // menekan (video: Alarm tetap oranye walau pil sudah di Stopwatch, baru putih saat jari diangkat), (b) pemicu
+                    // pembesaran bilah. `tabBarPressScale` = skala bilah 1,0 <-> 1,05 (pegas kurang teredam, lihat konstanta di atas).
+                    // Keduanya dibaca di fase gambar/graphicsLayer (0 rekomposisi per tekan).
+                    val tabBarPressed = remember { mutableStateOf(false) }
+                    val tabBarPressScale = remember { Animatable(1f) }
+                    val pillPosition: () -> Float = { navPillPosition() }
+                    // Batch 556 — `isTabBarDragging` DIHAPUS: `GlassTabIcon` tak lagi punya animasi sendiri (fokus = posisi kunci).
+                    // Batch 448 — ROMBAK TOTAL (gantikan pendekatan "bridge" Batch 446). Root
+                    // cause seam/double-pill yang dilaporkan user (dikonfirmasi frame-by-frame
+                    // dari video referensi): Batch 446 menambah 1 pill BARU via `drawWithContent`
+                    // tapi 3 pill LAMA per-tab (`GlassTabIcon`) TETAP jalan bersamaan — 2 sistem
+                    // gambar pill aktif serentak selama drag = tumpang-tindih kotak dgn seam
+                    // kelihatan (persis yg direkam user). Fix root-cause (bukan tempel lapisan
+                    // ke-3): 3 pill lama DIHAPUS TOTAL (lihat `GlassTabIcon`) — SEKARANG HANYA 1
+                    // pill yang pernah digambar, di SINI, aktif di SEMUA state (idle/tap/drag/
+                    // nudge), bukan cuma saat drag spt bridge lama.
+                    // `navPillIndexAnim`: satu-satunya sumber posisi "rest" pill (satuan index
+                    // kontinu, mis. 1.5 = tengah kolom ke-2 dari 3), dipakai saat TIDAK sedang
+                    // drag langsung di tab-bar (idle/nudge-konten/baru selesai drag). Selama drag
+                    // LANGSUNG di tab-bar, posisi dibaca live dari `tabBarDragIndexPx` (mentah,
+                    // 1:1 jari, pola sinkron yang sama persis dipertahankan dari Batch 444/445) —
+                    // disinkronkan via snapTo+animateTo eksplisit di 3 jalur: selesai drag LANGSUNG
+                    // di tab-bar (di bawah, dekat `tabBarDragIndexPx.floatValue = Float.NaN`), 3
+                    // onClick tap biasa (dekat tiap `NavigationBarItem`), DAN (Batch 479) selesai
+                    // drag swipe KONTEN (`content =`, blok pointerInput di luar `Scaffold` ini) —
+                    // 0 LaunchedEffect(currentRoute) generik dipasang di titik mana pun supaya 0
+                    // race kondisi start-animasi ganda antar 3 jalur di atas. Batch 479 — deklarasi
+                    // DIPINDAH (hoisted) ke scope `AppNavHost` atas (dekat `tabDragOffsetPx`) supaya
+                    // jalur ke-3 di atas (`content =`, scope terpisah dari `bottomBar =` ini) bisa
+                    // ikut menyentuhnya — lihat komentar lengkap di titik deklarasi barunya untuk
+                    // root cause penuh. Nilai awal (di titik deklarasi) = index tab aktif SAAT
+                    // AppNavHost pertama komposisi (bukan hardcode 0/tengah), 0 lompatan visual
+                    // pas start app di tab mana pun.
+                    // Batch 555 — depth bilah tab (referensi `SkeuTabBar` Boomly B191: palung CEKUNG + SATU kunci TIMBUL
+                    // yang meluncur), SEMUA 6 tema. `navBarBase` = warna permukaan bar yang SUDAH tampil sebelumnya
+                    // (default `NavigationBar`) -> lantai palung diturunkan darinya, palet tema tidak diganti. Warna
+                    // kunci: Skeu = `secondaryContainer` (identik latar tab terpilih lama, `selectedIconColor` M3 tetap
+                    // terbaca); tema lain = primary 16% di atas bar (identik pill alpha-0.16 lama).
+                    val navBarBase = NavigationBarDefaults.containerColor
+                    val navBarKeyBase = if (isSkeuTheme()) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        androidx.compose.ui.graphics.lerp(navBarBase, MaterialTheme.colorScheme.primary, 0.16f)
+                    }
+                    val navBarContentColor = MaterialTheme.colorScheme.onSurface
+                    // Batch 565 — kunci geser Neumorphism ikut sistem anggur/ruby/gilt (`neuSlidingKey(wine = true)`): wash anggur +
+                    // pendar ruby di belakang ikon + hairline gilt atas. Warna dasar kunci TETAP `secondaryContainer` (pasangan
+                    // kontras `selectedIconColor`/`selectedTextColor` tak berubah); tema lain 0 perubahan.
+                    val navBarKeyWine = isSkeuTheme()
                     NavigationBar(
-                        modifier = if (navCatchLightColor != null)
-                            Modifier.drawBehind {
-                                drawLine(
-                                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                        listOf(
-                                            navCatchLightColor.copy(alpha = 0.13f),
-                                            navCatchLightColor.copy(alpha = 0.03f)
-                                        )
-                                    ),
-                                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                                    end = androidx.compose.ui.geometry.Offset(size.width, 0f),
-                                    strokeWidth = 2f
-                                )
+                        // Batch 439 — referensi iOS Jam: bar bawah bukan persegi nempel penuh
+                        // ke tepi layar, tapi kapsul rounded yang "mengambang" dengan jarak dari
+                        // 3 tepi (kiri/kanan/bawah). `NavigationBar` M3 sendiri 0 parameter
+                        // `shape` publik (Surface internalnya default persegi) — `.clip(...)`
+                        // dipasang LANGSUNG di modifier terluar composable ini, cukup untuk
+                        // membulatkan render akhirnya tanpa bongkar internal M3. `.padding(...)`
+                        // WAJIB di LUAR `.clip(...)` (urutan modifier menentukan) supaya jaraknya
+                        // benar-benar "di luar" kapsul (margin), bukan padding konten di DALAM
+                        // kapsul yang sudah dibulatkan. `windowInsets` bawaan NavigationBar (utk
+                        // gesture-nav Android) TIDAK disentuh — margin 12.dp di bawah ini
+                        // tambahan DI ATAS inset itu, bukan pengganti, jadi 0 risiko kapsul
+                        // ketutup gesture bar.
+                        modifier = Modifier
+                            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                            // Batch 555 — `.clip(RoundedCornerShape(28.dp))` + garis catch-light atas (Tactile/Skeu) DIGANTI palung
+                            // cekung `neuTrough()` (sudah mengandung clip yang sama persis; garis sorot di tepi ATAS bertentangan dgn
+                            // cahaya kiri-atas pada permukaan cekung). TETAP SETELAH `.padding(...)` (margin di luar palung).
+                            // Batch 657 — bilah MEMBESAR 1,05x selagi ditekan (video acuan): `graphicsLayer` skala DI LUAR `neuTrough()` supaya
+                            // palung + kunci + ikon + lapisan warna ter-klip membesar SEREMPAK (satu transform = 0 selisih geometri
+                            // antar-lapisan); `pointerInput` di bawah berada di DALAM layer ini sehingga koordinat jari dipetakan balik
+                            // ke ruang lokal tak-berskala -> pil tetap tepat di bawah jari pada layar. Pivot default = tengah bilah.
+                            .graphicsLayer {
+                                val pressScale = tabBarPressScale.value
+                                scaleX = pressScale
+                                scaleY = pressScale
                             }
-                        else Modifier,
-                        // Batch 53: lowered from 12.dp — spec §15 keeps navigation "calm and
-                        // immediately understandable" and explicitly warns against every item (or
-                        // in this case, the whole bar) reading as an accent-tinted glow. M3's
-                        // tonalElevation overlay scales with elevation and this app's
-                        // surfaceTint is the accent color (Theme.kt), so 12.dp let the bar itself
-                        // read as "blue" before "glass" — 6.dp keeps a legible elevated-glass lift
-                        // (Level 2, spec §4) without the accent wash dominating the one piece of
-                        // chrome that's always on screen. Batch 57: Skeu shares this same 6.dp —
-                        // same reasoning (SkeuAccent as surfaceTint would otherwise dominate).
-                        tonalElevation = if (navCatchLightColor != null) 6.dp else NavigationBarDefaults.Elevation
+                            .neuTrough(RoundedCornerShape(28.dp), navBarBase)
+                            // Batch 657 — GESTUR BILAH = video acuan (diukur frame-by-frame, lihat konstanta NAV_* di atas file):
+                            // (1) tekan -> bilah membesar 1,05x (pegas) + pil MELUNCUR (pegas) ke jari; geser -> pil mengikuti jari dgn
+                            //     jeda pegas, dijepit ke pusat tab pertama/terakhir; (2) KONTEN/RUTE TIDAK berpindah di tengah geseran
+                            //     (Batch 442-444 memanggil `navigate()` tiap lintas batas tab + haptik): rute baru dikomit SEKALI saat
+                            //     jari diangkat, ke tab di bawah titik lepas (`hoveredIndex`, posisi event UP ikut diproses — Batch 452);
+                            //     (3) saat diangkat bilah kembali ke 1,0x dan pil menetap di pusat tab tujuan; (4) haptik tiap jari
+                            //     melewati batas tab (tanpa navigasi). Tap polos = kasus khusus gestur yang sama (tekan + lepas di tab
+                            //     yang sama), jadi `onClick` `selectable` tidak lagi dipicu sentuhan: event UP dikonsumsi di sini
+                            //     (pass Initial = sebelum anak). `onClick` tetap ada untuk TalkBack/keyboard (aksi semantik).
+                            // `PointerEventPass.Initial` + key `Unit` = alasan Batch 442 tetap berlaku (coroutine hidup lintas tab;
+                            // `currentRouteState` agar tak beku). `finally` WAJIB: bila komposisi bilah lepas di tengah gestur (mis.
+                            // pindah ke Now Playing) status tekan/skala tidak boleh tertinggal.
+                            .pointerInput(Unit) {
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(pass = PointerEventPass.Initial)
+                                    val barWidthPx = size.width.toFloat()
+                                    if (barWidthPx <= 0f) return@awaitEachGesture
+                                    val tabCount = TAB_ROUTES.size
+                                    tabSwipeScope.launch { tabBarOverscrollAnim.stop() }
+                                    tabBarPressed.value = true
+                                    tabSwipeScope.launch { tabBarPressScale.animateTo(NAV_BAR_PRESS_SCALE, navBarPressSpec()) }
+                                    var hoveredIndex = tabIndexAt(down.position.x, barWidthPx, tabCount)
+                                    // Tap (jari belum melewati touch slop) = pil meluncur ke PUSAT tab yang ditekan; baru setelah jari
+                                    // bergeser melewati slop (`dragging`, sticky) pil mengikuti jari. Mencegah pil berhenti "di antara"
+                                    // tab saat menekan dekat tepi kolom.
+                                    val touchSlop = viewConfiguration.touchSlop
+                                    var dragging = false
+                                    // Target DITANGKAP ke val lokal sebelum `launch` (coroutine jalan belakangan; membaca state-nya
+                                    // langsung bisa menemukan NaN yg diset `finally` saat jari sudah lepas -> `animateTo(NaN)`).
+                                    val downTarget = hoveredIndex + 0.5f
+                                    tabBarDragIndexPx.floatValue = downTarget
+                                    tabSwipeScope.launch { navPillIndexAnim.animateTo(downTarget, navKeyGlideSpec()) }
+                                    var released = false
+                                    try {
+                                        while (true) {
+                                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                            val change = event.changes.firstOrNull { it.id == down.id }
+                                                ?: break
+                                            val rawX = change.position.x
+                                            val x = rawX.coerceIn(0f, barWidthPx)
+                                            val newIndex = tabIndexAt(x, barWidthPx, tabCount)
+                                            if (newIndex != hoveredIndex) {
+                                                hoveredIndex = newIndex
+                                                tabSwipeHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            }
+                                            if (!dragging && kotlin.math.abs(x - down.position.x) > touchSlop) dragging = true
+                                            val pillTarget = if (dragging) {
+                                                tabPillTarget(x, barWidthPx, tabCount)
+                                            } else {
+                                                hoveredIndex + 0.5f
+                                            }
+                                            tabBarDragIndexPx.floatValue = pillTarget
+                                            tabSwipeScope.launch { navPillIndexAnim.animateTo(pillTarget, navKeyGlideSpec()) }
+                                            // Tahanan visual (Batch 444): overscroll dari rawX (BUKAN x yg di-coerce), redaman 0.3f, ±24px.
+                                            val overscroll = when {
+                                                rawX < 0f -> rawX
+                                                rawX > barWidthPx -> rawX - barWidthPx
+                                                else -> 0f
+                                            }
+                                            tabBarOverscrollPx.floatValue = (overscroll * 0.3f).coerceIn(-24f, 24f)
+                                            // `pressed` dicek TERAKHIR (Batch 452): posisi event UP sudah diproses di atas.
+                                            if (!change.pressed) {
+                                                change.consume()
+                                                released = true
+                                                break
+                                            }
+                                        }
+                                    } finally {
+                                        tabBarPressed.value = false
+                                        tabBarDragIndexPx.floatValue = Float.NaN
+                                        tabSwipeScope.launch { tabBarPressScale.animateTo(1f, navBarPressSpec()) }
+                                        tabSwipeScope.launch {
+                                            tabBarOverscrollAnim.snapTo(tabBarOverscrollPx.floatValue)
+                                            tabBarOverscrollAnim.animateTo(
+                                                0f,
+                                                spring(
+                                                    // Batch 581 — default Compose, tanpa pantulan.
+                                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                                    stiffness = Spring.StiffnessMedium
+                                                )
+                                            ) {
+                                                tabBarOverscrollPx.floatValue = value
+                                            }
+                                        }
+                                    }
+                                    // Dicapai HANYA bila loop selesai tanpa pengecualian (pembatalan komposisi melompati ini).
+                                    val fromRoute = currentRouteState.value
+                                    val commitIndex = if (released) {
+                                        hoveredIndex
+                                    } else {
+                                        TAB_ROUTES.indexOfFirst { it == fromRoute }.coerceAtLeast(0)
+                                    }
+                                    val target = TAB_ROUTES.getOrNull(commitIndex)
+                                    if (target != null && target != fromRoute) {
+                                        navController.navigate(target) {
+                                            popUpTo("home") { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                    tabSwipeScope.launch { navPillIndexAnim.animateTo(commitIndex + 0.5f, navKeyGlideSpec()) }
+                                }
+                            }
+                            .graphicsLayer { translationX = tabBarOverscrollPx.floatValue }
+                            // Batch 555 — KUNCI TIMBUL (depth) di dalam palung `neuTrough()`; menggantikan pill alpha-0.16/stroke putih
+                            // lama (Batch 448, digambar DI ATAS ikon lewat `drawWithContent`) dan latar `secondaryContainer` statis Skeu di
+                            // `GlassTabIcon` -> SATU kunci untuk 6 tema, digambar DI BELAKANG ikon/label (Surface NavigationBar transparan,
+                            // lihat `containerColor` di bawah). Geometri IDENTIK pill lama: 74% lebar kolom, 62% tinggi bar, sudut 16.dp,
+                            // pusat = `idxPos` (satuan tab) di-clamp ke tepi bar. Sumber posisi 3 tingkat TIDAK berubah (Batch 448): (1) drag
+                            // LANGSUNG di bar (`tabBarDragIndexPx`), (2) nudge swipe-konten (`tabDragOffsetPx`), (3) rest `navPillIndexAnim`.
+                            // Lambda dibaca di fase GAMBAR (0 rekomposisi per frame); hanya menutup 3 state stabil hasil `remember`.
+                            .neuSlidingKey(
+                                shape = RoundedCornerShape(16.dp),
+                                base = navBarKeyBase,
+                                count = TAB_ROUTES.size,
+                                widthFraction = 0.74f,
+                                heightFraction = 0.62f,
+                                wine = navBarKeyWine
+                            ) {
+                                // Batch 657 — posisi kunci = SATU sumber `navPillPosition()` (pegas + nudge swipe-konten); jari mentah
+                                // TIDAK lagi dibaca langsung (pil mengikuti jari lewat pegas, jeda ±0,1 tab seperti video acuan).
+                                pillPosition()
+                            },
+                        // Batch 555 — Surface NavigationBar TRANSPARAN + tonalElevation 0: lantai palung (`neuTrough()`) dan kunci
+                        // timbul digambar di modifier di atas, di BELAKANG ikon/label; container opak default akan menutupinya.
+                        // `contentColor` dikunci = `onSurface` (nilai default sebelumnya utk container `surfaceContainer`) karena
+                        // `contentColorFor(Transparent)` = Unspecified. Catatan lama Batch 53/57 (tonalElevation 6.dp utk Tactile/Skeu
+                        // agar accent surfaceTint tak mendominasi) tidak berlaku lagi: tanpa overlay tonal sama sekali.
+                        containerColor = Color.Transparent,
+                        contentColor = navBarContentColor,
+                        tonalElevation = 0.dp,
+                        // Batch 444 — user: "border tab nav terluar kebesaran". Root cause:
+                        // `windowInsets` DEFAULT NavigationBar (`NavigationBarDefaults.windowInsets`)
+                        // masih mereservasi tinggi system-nav-bar DI DALAM capsule (Batch 439 0
+                        // pernah sentuh param ini — lihat komentar lama di `.padding(...)` atas:
+                        // "margin 12.dp TAMBAHAN di atas inset itu, BUKAN pengganti"), padahal
+                        // capsule ini sudah "mengambang" lewat margin luar sejak Batch 439 — jadi
+                        // inset system-bar itu kini DOBEL terhitung (sekali di dalam tinggi
+                        // capsule, sekali lagi di margin luar), bikin capsule terlihat lebih
+                        // tebal/besar dari semestinya. Fix: nolkan `windowInsets` di titik ini
+                        // SAJA (bukan ganti default NavigationBarDefaults.windowInsets app-wide) —
+                        // margin luar 12.dp bawah (Batch 439) TETAP jalan sendiri, tetap 0 risiko
+                        // capsule ketutup gesture-nav (device minSdk 31 = gesture-nav umum, margin
+                        // 12.dp historisnya sudah cukup sebelum inset dobel ini ditambah).
+                        windowInsets = WindowInsets(0, 0, 0, 0)
                     ) {
-                        NavigationBarItem(
-                            selected = currentRoute == "home",
+                        // Batch 449 — `NavigationBarItem` M3 DIHAPUS TOTAL dari 3 titik pemakaian
+                        // ini (root cause kilatan kotak abu-abu di tab yang baru ditinggalkan,
+                        // lihat komentar panjang di definisi `CustomNavBarTabItem`, dekat
+                        // `GlassTabIcon`/`NoRippleIndication`) — diganti `CustomNavBarTabItem` x3.
+                        // `selected`/`onClick`/route-navigate/`navPillIndexAnim.animateTo(...)` di
+                        // masing-masing 0 diubah SAMA SEKALI (logic isinya identik persis, cuma
+                        // pindah wadah pemanggilan dari slot `onClick=`/`icon=` NavigationBarItem
+                        // ke param `onClick=`/trailing-lambda `CustomNavBarTabItem`).
+                        // `CompositionLocalProvider(LocalIndication provides NoRippleIndication)`
+                        // (Batch 439) yang dulu membungkus blok ini juga DIHAPUS — sudah tidak
+                        // relevan (0 lagi ada NavigationBarItem yang baca `LocalIndication` di
+                        // sini), `.selectable(indication = null, ...)` di `CustomNavBarTabItem`
+                        // sudah cukup, 0 override composition-local diperlukan lagi.
+                        CustomNavBarTabItem(
+                            selected = barRoute == "home",
                             onClick = {
                                 // Batch 301 — user melaporkan stuttering pas transisi antar tab
                                 // (beda dari stutter SCROLL Batch 300 yang sudah dijawab lewat
                                 // blurRadius). Root cause: `popUpTo`/`navigate` di 6 titik ini
-                                // (3 NavigationBarItem + 3 NavigationRailItem, pola identik) 0
+                                // (3 tab bawah + 3 NavigationRailItem, pola identik) 0
                                 // pernah pakai `saveState`/`restoreState` — tiap tap tab
                                 // MENGHANCURKAN TOTAL layar tujuan (LazyColumn state, scroll
                                 // position, ViewModel scope) lalu membangunnya dari nol, bukan
@@ -1004,12 +1490,28 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     launchSingleTop = true
                                     restoreState = true
                                 }
+                                // Batch 448 — tap biasa (0 drag): pill unified ikut pindah ke
+                                // kolom ini, tween 220ms SAMA PERSIS `glassAlphaAnim` (icon/label)
+                                // supaya tiba bersamaan. Animatable.animateTo mulai otomatis dari
+                                // posisi TERKINI (kalau lagi mid-animasi tap sebelumnya, pola sama
+                                // `glassAlphaAnim`) — 0 penanganan spesial dibutuhkan.
+                                tabSwipeScope.launch { navPillIndexAnim.animateTo(0.5f, navKeyGlideSpec()) }
                             },
-                            icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                            label = { Text("Beranda") }
-                        )
-                        NavigationBarItem(
-                            selected = currentRoute == "library",
+                            interactionSource = homeTabInteraction,
+                            tabCount = TAB_ROUTES.size,
+                            pillPosition = pillPosition,
+                            revealAll = { tabBarPressed.value && currentRouteState.value == "home" }
+                        ) { highlighted ->
+                            // Batch 657 — trailing-lambda dipanggil DUA kali oleh `CustomNavBarTabItem` (lapisan dasar `highlighted =
+                            // false` + salinan warna aksen yang di-klip ke bentuk pil, `highlighted = true`); wajib murni/tanpa efek samping.
+                            GlassTabIcon(
+                                icon = Icons.Default.Home,
+                                label = "Beranda",
+                                highlighted = highlighted
+                            )
+                        }
+                        CustomNavBarTabItem(
+                            selected = barRoute == "library",
                             onClick = {
                                 // Batch 301 — sama seperti onClick "home" di atas.
                                 navController.navigate("library") {
@@ -1017,12 +1519,23 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     launchSingleTop = true
                                     restoreState = true
                                 }
+                                // Batch 448 — sama seperti onClick "home" di atas.
+                                tabSwipeScope.launch { navPillIndexAnim.animateTo(1.5f, navKeyGlideSpec()) }
                             },
-                            icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
-                            label = { Text("Perpustakaan") }
-                        )
-                        NavigationBarItem(
-                            selected = currentRoute == "settings",
+                            interactionSource = libraryTabInteraction,
+                            tabCount = TAB_ROUTES.size,
+                            pillPosition = pillPosition,
+                            revealAll = { tabBarPressed.value && currentRouteState.value == "library" }
+                        ) { highlighted ->
+                            // Batch 657 — sama seperti "home" di atas.
+                            GlassTabIcon(
+                                icon = Icons.Default.LibraryMusic,
+                                label = "Perpustakaan",
+                                highlighted = highlighted
+                            )
+                        }
+                        CustomNavBarTabItem(
+                            selected = barRoute == "settings",
                             onClick = {
                                 // Batch 301 — sama seperti onClick "home" di atas.
                                 navController.navigate("settings") {
@@ -1030,10 +1543,21 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                     launchSingleTop = true
                                     restoreState = true
                                 }
+                                // Batch 448 — sama seperti onClick "home" di atas.
+                                tabSwipeScope.launch { navPillIndexAnim.animateTo(2.5f, navKeyGlideSpec()) }
                             },
-                            icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                            label = { Text("Pengaturan") }
-                        )
+                            interactionSource = settingsTabInteraction,
+                            tabCount = TAB_ROUTES.size,
+                            pillPosition = pillPosition,
+                            revealAll = { tabBarPressed.value && currentRouteState.value == "settings" }
+                        ) { highlighted ->
+                            // Batch 657 — sama seperti "home" di atas.
+                            GlassTabIcon(
+                                icon = Icons.Default.Settings,
+                                label = "Pengaturan",
+                                highlighted = highlighted
+                            )
+                        }
                     }
                 }
             }
@@ -1050,9 +1574,15 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             // (HP potret biasa) TIDAK tersentuh sama sekali, NavigationBar bawah tetap seperti
             // semula persis (lihat guard widthClass == COMPACT di atas).
             if (widthClass != AppWidthClass.COMPACT) {
-                NavigationRail {
+                // Batch 639 — screenshot user (Now Playing landscape): panel rail ±400px dgn ±98px ruang kosong di kiri (≈ offset panel dari
+                // tepi kiri layar, 100px) + ±73px di atas isinya (≈ tinggi bilah status), dan label "Perpustakaan" menempel tepi kanan panel. AKAR: `Scaffold` sudah memberi
+                // `padding` inset sistem ke Row ini (panel mulai di x = inset kiri; bilah status di atas), lalu `NavigationRail`
+                // menambahkan `windowInsets` DEFAULT-nya (systemBars: start + vertikal) sekali lagi DI DALAM panel -> inset DOBEL
+                // (pola sama Batch 444 pada NavigationBar bawah). Fix: nolkan `windowInsets` rail di titik ini SAJA + label
+                // diberi napas 4dp kiri/kanan (nilai sama Batch 452) supaya label terpanjang tak rata tepi panel.
+                NavigationRail(windowInsets = WindowInsets(0, 0, 0, 0)) {
                     NavigationRailItem(
-                        selected = currentRoute == "home",
+                        selected = barRoute == "home",
                         onClick = {
                             // Batch 301 — mirror NavigationBarItem "home" fix di atas (layar
                             // Medium/Expanded pakai Rail ini, bukan NavigationBar bawah).
@@ -1063,10 +1593,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                             }
                         },
                         icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                        label = { Text("Beranda") }
+                        label = { Text("Beranda", modifier = Modifier.padding(horizontal = 4.dp)) }
                     )
                     NavigationRailItem(
-                        selected = currentRoute == "library",
+                        selected = barRoute == "library",
                         onClick = {
                             // Batch 301 — sama seperti onClick "home" Rail di atas.
                             navController.navigate("library") {
@@ -1076,10 +1606,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                             }
                         },
                         icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
-                        label = { Text("Perpustakaan") }
+                        label = { Text("Perpustakaan", modifier = Modifier.padding(horizontal = 4.dp)) }
                     )
                     NavigationRailItem(
-                        selected = currentRoute == "settings",
+                        selected = barRoute == "settings",
                         onClick = {
                             // Batch 301 — sama seperti onClick "home" Rail di atas.
                             navController.navigate("settings") {
@@ -1089,27 +1619,164 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                             }
                         },
                         icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                        label = { Text("Pengaturan") }
+                        label = { Text("Pengaturan", modifier = Modifier.padding(horizontal = 4.dp)) }
                     )
                 }
             }
+        // Batch 477 — FIX BUG (laporan user: "video drag langsung lintas tab ternyata tidak
+        // berefek pada pergerakan bilah bottom nav sama sekali"): root cause — pointerInput di
+        // bawah (Batch 435, content-area swipe) di-key `currentRoute`. Persis pola bahaya yang
+        // SUDAH didokumentasikan di `currentRouteState`/Batch 442 (dekat NavigationBar di atas):
+        // begitu `navigate()` di `onDragEnd` mengubah `currentRoute`, key berubah → Compose
+        // cancel+restart coroutine gesture ini di komposisi berikutnya. Untuk drag SATU tab tetap
+        // 0 kelihatan (restart terjadi SETELAH gesture selesai), tapi utk swipe LANGSUNG LINTAS
+        // >1 tab dalam 1 gesture kontinu (jari belum terangkat): begitu batas tab pertama
+        // terlewati, instance lama mati, instance baru cuma `awaitFirstDown()` — down utk jari
+        // yg SUDAH menekan sejak awal TIDAK PERNAH datang lagi, sisa drag itu 0 diproses sama
+        // sekali (tabDragOffsetPx/tabMagnifyFocus/nudge konten beku, pill/label bottom nav 0
+        // bergerak lagi). `currentRouteState` yang sudah ada (Batch 442, dekat deklarasi
+        // `homeTabInteraction`) TIDAK bisa dipakai ulang di sini — scope-nya di dalam lambda
+        // `bottomBar =` milik `Scaffold`, sudah di luar jangkauan di lambda `content =` ini. Fix:
+        // instance BARU (scope lokal di sini saja, 0 mengubah yang lama sama sekali) + key
+        // `pointerInput` diganti `Unit` di bawah — 0 formula/threshold 120px/damping 0.3f/clamp
+        // ±40px Batch 435/437 disentuh, murni pindah pola sinkronisasi state yg SUDAH terbukti.
+        val contentSwipeRouteState = rememberUpdatedState(currentRoute)
+        val isOnTabRoute = TAB_ROUTES.any { it == currentRoute }
         Box(
             modifier = Modifier
                 .weight(1f)
-                // Fase 5 langkah 2/5 (Batch 296) — hazeSource HANYA saat Liquid Glass aktif
-                // (0 biaya render tambahan utk 4 identitas lain yang tidak pernah consume
-                // capture ini — frostedGlass()'s cabang mereka tidak panggil hazeEffect sama
-                // sekali). `hazeState` = instance yang SAMA dipegang AppNavHost sendiri (Batch
-                // 295), jadi baca langsung variabel lokal, bukan LocalHazeState.current (fungsi
-                // ini justru PROVIDER-nya, bukan consumer).
+                // Batch 329 — `.hazeSource(state = hazeState)` (Batch 296) DILEPAS. Root cause:
+                // user matikan `hazeEffect` permanen app-wide (BlurUtils.kt) krn ini + MiniPlayerBar
+                // yang terus resample tiap frame selama musik main adalah biaya GPU yang sudah
+                // diperingatkan sejak awal. Kalau capture ini dibiarkan terpasang tanpa 1 consumer
+                // pun, tetap bayar sebagian besar biaya capture tsb demi 0 manfaat visual — jadi
+                // dilepas juga, bukan cuma dinonaktifkan di sisi consumer. `hazeState`/
+                // `CompositionLocalProvider(LocalHazeState)` di bawah SENGAJA TIDAK dibongkar —
+                // reuse persis state Batch 295 (murni plumbing, 0 consumer), lihat rasionalisasi
+                // penuh di BlurUtils.kt.
+                // Batch 435 — nudge visual damped searah jari selama swipe (feedback "tergenggam",
+                // bukan page-turn 1:1 — page-swap SEBENARNYA tetap lewat fade NavHost Batch 330
+                // begitu navigate() terpicu, translationX ini cuma sinyal tangkapan gesture).
+                .graphicsLayer { translationX = tabDragOffsetPx.floatValue }
                 .then(
-                    if (appThemeIdentity == ThemeIdentity.LIQUID_GLASS) Modifier.hazeSource(state = hazeState)
-                    else Modifier
+                    if (isOnTabRoute) {
+                        Modifier.pointerInput(Unit) {
+                            var totalTabDrag = 0f
+                            detectHorizontalDragGestures(
+                                onDragStart = {
+                                    totalTabDrag = 0f
+                                    // jaring pengaman sama seperti AlbumArtHero: hentikan
+                                    // springback lama supaya tidak menimpa drag baru.
+                                    tabSwipeScope.launch { tabDragOffset.stop() }
+                                },
+                                onDragEnd = {
+                                    val fromIdx = TAB_ROUTES.indexOfFirst { it == contentSwipeRouteState.value }
+                                    val targetRoute = when {
+                                        totalTabDrag < -120f -> TAB_ROUTES.getOrNull(fromIdx + 1)
+                                        totalTabDrag > 120f -> TAB_ROUTES.getOrNull(fromIdx - 1)
+                                        else -> null
+                                    }
+                                    if (targetRoute != null) {
+                                        tabSwipeHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        // Pola navigate IDENTIK dgn onClick NavigationBarItem/
+                                        // NavigationRailItem (Batch 301) — 0 state baru, reuse
+                                        // saveState/restoreState yang sudah ada.
+                                        navController.navigate(targetRoute) {
+                                            popUpTo("home") { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                        // Batch 479 — FIX root cause (data log instrumentasi Batch
+                                        // 478 dikonfirmasi user: drag/navigate di atas TERBUKTI
+                                        // jalan normal, currentRoute berubah sesuai target — tapi
+                                        // pill bottom nav tetap diam). Penyebab sebenarnya:
+                                        // `navPillIndexAnim` (deklarasi di-hoist ke scope
+                                        // AppNavHost atas, lihat komentar di titik deklarasinya)
+                                        // SEBELUMNYA cuma disinkronkan dari 2 jalur — selesai drag
+                                        // LANGSUNG di tab-bar (Batch 444/448) & onClick 3
+                                        // `NavigationBarItem` (Batch 448) — blok swipe KONTEN ini
+                                        // manggil navController.navigate() langsung TANPA PERNAH
+                                        // menyentuh navPillIndexAnim, jadi pill kehilangan sinyal
+                                        // pindah tab walau navigasi & konten sudah benar
+                                        // berpindah. Fix: 1 panggilan eksplisit tambahan HANYA di
+                                        // jalur ini (bukan LaunchedEffect(currentRoute) generik —
+                                        // sengaja dihindari, lihat rasionalisasi asli di titik
+                                        // deklarasi navPillIndexAnim, supaya 0 race start-animasi
+                                        // ganda dgn 2 jalur lain) — pola tween(220) IDENTIK dgn 3
+                                        // onClick NavigationBarItem, 0 angka/formula baru.
+                                        tabSwipeScope.launch {
+                                            val keyTo = TAB_ROUTES.indexOfFirst { it == targetRoute } + 0.5f
+                                            navPillIndexAnim.animateTo(keyTo, navKeyGlideSpec())
+                                        }
+                                    }
+                                    tabSwipeScope.launch {
+                                        tabDragOffset.snapTo(tabDragOffsetPx.floatValue)
+                                        tabDragOffset.animateTo(
+                                            0f,
+                                            spring(
+                                                // Batch 581 — default Compose, tanpa pantulan.
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = Spring.StiffnessMedium
+                                            )
+                                        ) {
+                                            tabDragOffsetPx.floatValue = value
+                                        }
+                                    }
+                                },
+                                onDragCancel = {
+                                    tabSwipeScope.launch {
+                                        tabDragOffset.snapTo(tabDragOffsetPx.floatValue)
+                                        tabDragOffset.animateTo(
+                                            0f,
+                                            spring(
+                                                // Batch 581 — default Compose, tanpa pantulan.
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = Spring.StiffnessMedium
+                                            )
+                                        ) {
+                                            tabDragOffsetPx.floatValue = value
+                                        }
+                                    }
+                                },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    totalTabDrag += dragAmount
+                                    change.consume()
+                                    tabDragOffsetPx.floatValue = (totalTabDrag * 0.3f).coerceIn(-40f, 40f)
+                                }
+                            )
+                        }
+                    } else {
+                        Modifier
+                    }
                 )
         ) {
         NavHost(
             navController = navController,
-            startDestination = "home"
+            startDestination = "home",
+            modifier = Modifier.graphicsLayer { this.alpha = if (tabRestoreSettled) 1f else 0f },
+            // Batch 330 — default crossfade app-wide (tab bawah home/library/settings +
+            // push stats_dashboard). Sebelum ini 0 enter/exitTransition di level NavHost =
+            // cut instan bawaan Compose Navigation, kontras dgn "now_playing" yang sudah
+            // punya slide+fade sendiri sejak lama. Angka 200/150 REUSE persis dari yang
+            // sudah ada (tween(200) exitTransition "now_playing" bawah, tween(150) fadeIn
+            // NowPlayingScreen.kt) — bukan angka baru. Simetris maju/mundur (pop = sama
+            // dgn forward) karena tab switch bukan hierarki push/pop searah.
+            // Batch 481 — durasi 200/150 di bawah 0 diubah (masih Motion.DURATION_STANDARD/
+            // DURATION_QUICK, alias angka yang sama persis), yang diubah HANYA easing:
+            // default `tween()` bawaan (FastOutSlowInEasing, kurva Material) diganti
+            // `Motion.IosEasing` (S-curve iOS) sesuai instruksi eksplisit user batch ini
+            // ("polish animasi/transisi biar mulus like iOS"). Non-breaking murni di
+            // lapisan kurva, 0 formula/threshold gesture lain disentuh.
+            enterTransition = {
+                if (tabRestoreSettled) fadeIn(animationSpec = tween(Motion.DURATION_STANDARD, easing = Motion.IosEasing))
+                else EnterTransition.None
+            },
+            exitTransition = {
+                if (tabRestoreSettled) fadeOut(animationSpec = tween(Motion.DURATION_QUICK, easing = Motion.IosEasing))
+                else ExitTransition.None
+            },
+            popEnterTransition = { fadeIn(animationSpec = tween(Motion.DURATION_STANDARD, easing = Motion.IosEasing)) },
+            popExitTransition = { fadeOut(animationSpec = tween(Motion.DURATION_QUICK, easing = Motion.IosEasing)) }
         ) {
             composable("home") {
                 HomeScreen(
@@ -1202,7 +1869,39 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     onDeleteSongs = { songs -> deleteSongsFromDevice(songs) }
                 )
             }
-            composable("stats_dashboard") {
+            composable(
+                route = "stats_dashboard",
+                // Batch 331 — override default fade NavHost (Batch 330) khusus rute ini:
+                // "stats_dashboard" adalah push hierarkis (drill-down dari Pengaturan), beda
+                // sifat dari tab lateral home/library/settings yang cukup crossfade generik.
+                // Pola gerak iOS-push: layar ini slide dari kanan + fade saat masuk, slide balik
+                // ke kanan + fade saat di-pop (tombol back). Angka tween(300) REUSE persis dari
+                // popExitTransition rute "now_playing" di file yang sama (bukan angka baru).
+                // HANYA 2 field (bukan 4): per dokumentasi resmi Navigation-Compose,
+                // enterTransition/popExitTransition dievaluasi dari destination ini SENDIRI saat
+                // dia jadi targetState(forward)/initialState(pop) — tapi exitTransition/
+                // popEnterTransition destination ini hanya berlaku kalau dia jadi
+                // initialState(forward)/targetState(pop), yang TIDAK PERNAH terjadi untuk rute
+                // leaf ini (0 rute lain navigate() forward dari sini, 0 rute pop kembali ke
+                // sini — diverifikasi grep app-wide). "settings" (initial saat forward-nav,
+                // target saat pop) pakai default NavHost Batch 330 (fadeOut 150 / fadeIn 200)
+                // buat sisi dia, tidak perlu override tambahan.
+                enterTransition = {
+                    // Batch 481 — angka 300 0 diubah (Motion.DURATION_EMPHASIZED, alias
+                    // persis), easing diganti Motion.IosEasing (lihat catatan Batch 481 di
+                    // NavHost atas untuk rasional lengkap).
+                    slideInHorizontally(
+                        initialOffsetX = { fullWidth -> fullWidth },
+                        animationSpec = tween(Motion.DURATION_EMPHASIZED, easing = Motion.IosEasing)
+                    ) + fadeIn(tween(Motion.DURATION_EMPHASIZED, easing = Motion.IosEasing))
+                },
+                popExitTransition = {
+                    slideOutHorizontally(
+                        targetOffsetX = { fullWidth -> fullWidth },
+                        animationSpec = tween(Motion.DURATION_EMPHASIZED, easing = Motion.IosEasing)
+                    ) + fadeOut(tween(Motion.DURATION_EMPHASIZED, easing = Motion.IosEasing))
+                }
+            ) {
                 val statsSnapshot = remember(librarySongs, statsVersion) {
                     playerViewModel.getListeningStats(librarySongs)
                 }
@@ -1213,20 +1912,23 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
             }
             composable(
                 route = "now_playing",
+                // Batch 481 — angka 350/200/300 0 diubah (Motion.DURATION_SCREEN/QUICK/
+                // EMPHASIZED, alias persis), easing diganti Motion.IosEasing (rasional
+                // lengkap di catatan Batch 481, NavHost atas).
                 enterTransition = {
                     slideInVertically(
                         initialOffsetY = { fullHeight -> fullHeight },
-                        animationSpec = tween(350)
-                    ) + fadeIn(tween(350))
+                        animationSpec = tween(Motion.DURATION_SCREEN, easing = Motion.IosEasing)
+                    ) + fadeIn(tween(Motion.DURATION_SCREEN, easing = Motion.IosEasing))
                 },
                 exitTransition = {
-                    fadeOut(tween(200))
+                    fadeOut(tween(Motion.DURATION_QUICK, easing = Motion.IosEasing))
                 },
                 popExitTransition = {
                     slideOutVertically(
                         targetOffsetY = { fullHeight -> fullHeight },
-                        animationSpec = tween(300)
-                    ) + fadeOut(tween(300))
+                        animationSpec = tween(Motion.DURATION_EMPHASIZED, easing = Motion.IosEasing)
+                    ) + fadeOut(tween(Motion.DURATION_EMPHASIZED, easing = Motion.IosEasing))
                 }
             ) {
                 nowPlayingContent { navController.popBackStack() }
@@ -1253,51 +1955,4 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
         } // tutup Row adaptif (Batch 101)
     } // tutup Scaffold
     } // tutup CompositionLocalProvider(LocalHazeState) (Batch 295)
-}
-
-@Composable
-private fun PermissionRationale(onRequest: () -> Unit) {
-    val context = LocalContext.current
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            // Batch 111 — sama seperti WelcomeScreen, layar ini juga render di luar Scaffold.
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            Icons.Default.MusicNote,
-            contentDescription = null,
-            modifier = Modifier.size(56.dp),
-            tint = MaterialTheme.colorScheme.secondary
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-        Text(
-            "Izin akses musik dibutuhkan",
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            "Aplikasi tidak bisa menampilkan lagu tanpa izin ini. Kalau tombol di bawah tidak memunculkan dialog izin, aktifkan izinnya lewat Pengaturan Aplikasi.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.secondary,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = onRequest, modifier = Modifier.fillMaxWidth()) {
-            Text("Coba Lagi")
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        TextButton(onClick = {
-            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", context.packageName, null)
-            }
-            context.startActivity(intent)
-        }) {
-            Text("Buka Pengaturan Aplikasi")
-        }
-    }
 }

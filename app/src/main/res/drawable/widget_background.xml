@@ -1,54 +1,139 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Batch 84/85 — Neumorphism widget (lihat Batch 84 utk konteks lengkap kenapa "di-hardcode").
-    Batch 85: user feedback dari screenshot device sungguhan — "kurang efek depth/3D" — 2 layer
-    gradient LINEAR diagonal Batch 84 nyebar rata ke SELURUH panel, di widget sebesar ini jadi
-    nyaris tak kelihatan (alpha far/lemah token asli ternyata terlalu halus utk bidang seluas
-    ini, beda konteks dari border tipis skeuEmboss()). Diganti gradient RADIAL dipusatkan PERSIS
-    di pojok (bukan nyebar diagonal merata) — cahaya/bayangan mengumpul di 1 titik pojok itu jauh
-    lebih kebaca sebagai "sumber cahaya" drpd wash tipis merata, dan alpha dinaikkan signifikan
-    (bukan lagi sisi "far" token asli — di widget ini falloff radial sendiri yang membuat area
-    tetap sempit, jadi aman pakai alpha lebih tinggi tanpa banjir 1 warna). `gradientRadius` fix
-    140dp (bukan persen — `%`/`%p` butuh API 29+, minSdk app ini 23), jadi proporsinya bisa
-    sedikit beda di widget yang di-resize sangat kecil/besar oleh user — trade-off diterima.
+    Batch 583/584 — ROMBAK Neumorphism BURGUNDY (sistem anggur/ruby/gilt Batch 563-569), pengganti panel
+    charcoal-biru `#191C21` + sorot radial putih/hitam (Batch 84/85, palet "zamrud" lama). Dipakai widget
+    home-screen (mode gelap) DAN bubble floating (bubble_mini_player.xml, selalu gelap): SATU kontrak
+    drawable bersama, jadi identitas keduanya seragam.
+
+    Batch 584 — BENTUK "DAUN DIAGONAL" (permintaan user: jangan lingkaran monoton): sudut kiri-atas &
+    kanan-bawah besar (28dp), kanan-atas & kiri-bawah kecil (12dp) — sumbu besar searah sumber cahaya
+    kiri-atas (NeuLightX/Y TactileDepth.kt). Semua lapis di bawah memakai keluarga radius yang sama
+    dikurangi inset-nya, supaya bevel tetap sejajar tepi.
+
+    Panel RemoteViews tidak bisa menggambar bayangan jatuh (batas widget meng-clip), jadi kedalaman dibangun
+    dari BEVEL di dalam batas: 1) dasar rim gelap (kanan-bawah) -> 2) rim terang (kiri-atas, gradien memudar)
+    -> 3) permukaan cembung -> 4) wash anggur kiri-atas + peredam kanan-bawah -> 5) hairline gilt tepi atas
+    -> 6) border gilt tipis. Hex = token Color.kt: permukaan SkeuNeuSurfaceDark 0xFF231619 (+9% putih sisi
+    terang, neuStyle()), wash SkeuWineLit 0xFFA33550, gilt SkeuGilt 0xFFDCC393. Border gilt 1dp = pengganti
+    border Batch 207 ("pembatas visual", permintaan user). Rim bevel 1.5dp DI DALAM border (strip total 2.5dp).
+    Lapis 1 solid opak: outline elevation bubble (8dp) diturunkan dari lapis ini (GradientDrawable dgn radius
+    per-sudut menghasilkan outline Path — konveks, aman). gradientRadius dp tetap (bukan %), trade-off Batch 85.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#191C21" />
-            <corners android:radius="24dp" />
+            <solid android:color="#0D090B" />
+            <corners
+                android:topLeftRadius="28dp"
+                android:topRightRadius="12dp"
+                android:bottomRightRadius="28dp"
+                android:bottomLeftRadius="12dp" />
         </shape>
     </item>
-    <item>
+    <item android:right="2.5dp"
+        android:bottom="2.5dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="315"
+                android:startColor="#8A787C"
+                android:centerColor="#4A3C40"
+                android:endColor="#1E1417" />
+            <corners
+                android:topLeftRadius="28dp"
+                android:topRightRadius="12dp"
+                android:bottomRightRadius="28dp"
+                android:bottomLeftRadius="12dp" />
+        </shape>
+    </item>
+    <item
+        android:left="2.5dp"
+        android:top="2.5dp"
+        android:right="2.5dp"
+        android:bottom="2.5dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="315"
+                android:startColor="#36292D"
+                android:centerColor="#291C20"
+                android:endColor="#1E1417" />
+            <corners
+                android:topLeftRadius="25.5dp"
+                android:topRightRadius="9.5dp"
+                android:bottomRightRadius="25.5dp"
+                android:bottomLeftRadius="9.5dp" />
+        </shape>
+    </item>
+    <item
+        android:left="2.5dp"
+        android:top="2.5dp"
+        android:right="2.5dp"
+        android:bottom="2.5dp">
         <shape android:shape="rectangle">
             <gradient
                 android:type="radial"
-                android:centerX="0.05"
-                android:centerY="0.08"
-                android:gradientRadius="140dp"
-                android:startColor="#59FFFFFF"
-                android:endColor="#00FFFFFF" />
-            <corners android:radius="24dp" />
+                android:centerX="0.04"
+                android:centerY="0.06"
+                android:gradientRadius="170dp"
+                android:startColor="#3DA33550"
+                android:endColor="#00A33550" />
+            <corners
+                android:topLeftRadius="25.5dp"
+                android:topRightRadius="9.5dp"
+                android:bottomRightRadius="25.5dp"
+                android:bottomLeftRadius="9.5dp" />
         </shape>
     </item>
-    <item>
+    <item
+        android:left="2.5dp"
+        android:top="2.5dp"
+        android:right="2.5dp"
+        android:bottom="2.5dp">
         <shape android:shape="rectangle">
             <gradient
                 android:type="radial"
-                android:centerX="0.95"
-                android:centerY="0.92"
-                android:gradientRadius="140dp"
-                android:startColor="#8C000000"
+                android:centerX="0.96"
+                android:centerY="0.94"
+                android:gradientRadius="150dp"
+                android:startColor="#73000000"
                 android:endColor="#00000000" />
-            <corners android:radius="24dp" />
+            <corners
+                android:topLeftRadius="25.5dp"
+                android:topRightRadius="9.5dp"
+                android:bottomRightRadius="25.5dp"
+                android:bottomLeftRadius="9.5dp" />
         </shape>
     </item>
-    <!-- Batch 207 — border tipis, murni untuk batas visual widget selalu jelas (diminta user:
-         "pembatas/border visual") — bukan fungsional, tidak pengaruh ke layout/insets. -->
-    <item>
+    <item
+        android:left="32dp"
+        android:top="2.5dp"
+        android:right="20dp"
+        android:height="1dp"
+        android:gravity="top|fill_horizontal">
         <shape android:shape="rectangle">
-            <stroke android:width="1dp" android:color="#33FFFFFF" />
-            <corners android:radius="24dp" />
+            <gradient
+                android:type="linear"
+                android:angle="0"
+                android:startColor="#00DCC393"
+                android:centerColor="#99DCC393"
+                android:endColor="#00DCC393" />
+        </shape>
+    </item>
+    <item
+        android:left="0.5dp"
+        android:top="0.5dp"
+        android:right="0.5dp"
+        android:bottom="0.5dp">
+        <shape android:shape="rectangle">
+            <stroke
+                android:width="1dp"
+                android:color="#38DCC393" />
+            <corners
+                android:topLeftRadius="27.5dp"
+                android:topRightRadius="11.5dp"
+                android:bottomRightRadius="27.5dp"
+                android:bottomLeftRadius="11.5dp" />
         </shape>
     </item>
 </layer-list>

@@ -1,5 +1,10 @@
 # MANUAL_QA_CHECKLIST.md
 
+> **Catatan penutupan (Batch 384):** Proyek ini **discontinued** (lihat `README.md` &
+> `PROJECT_STATE.md` §"Status penutupan"). Daftar di bawah **0/19 pernah dicentang** — tidak
+> difabrikasi/diasumsikan lolos hanya krn proyek ditutup. Kalau proyek dibuka lagi, checklist ini
+> apa adanya, belum ada satu pun yang terverifikasi di device fisik.
+
 Dibuat di Batch 103 sebagai pasangan `app/src/androidTest/` — bukan pengganti, tapi bagian yang
 jujur tidak bisa (atau belum sepadan usahanya utk) diotomasi murni lewat kode di sesi kerja ini.
 `PlaybackTransportTest.kt` menutup play/pause/seek/skip/next-previous/repeat-off-all-one/shuffle

@@ -26,6 +26,7 @@ import com.rudi.audioplayer.data.Bookmark as BookmarkModel
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
 import com.rudi.audioplayer.ui.theme.calmScanlines
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
 /**
  * Roadmap #4 (`ROADMAP_15_FITUR_OFFLINE.md`), Batch 91 — combines two related "mark a moment
@@ -155,7 +156,10 @@ fun ABRepeatBookmarkSheet(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp)
                 )
             } else {
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+                    flingBehavior = rememberIosFlingBehavior()
+                ) {
                     items(bookmarks, key = { it.id }) { bookmark ->
                         BookmarkRow(
                             bookmark = bookmark,
@@ -164,7 +168,8 @@ fun ABRepeatBookmarkSheet(
                                 onSeek(bookmark.positionMs)
                                 onDismiss()
                             },
-                            onDelete = { onDeleteBookmark(bookmark.id) }
+                            onDelete = { onDeleteBookmark(bookmark.id) },
+                            modifier = Modifier.animateItem()
                         )
                     }
                 }
@@ -202,9 +207,21 @@ private fun AbPointButton(label: String, value: Long?, modifier: Modifier = Modi
 }
 
 @Composable
-private fun BookmarkRow(bookmark: BookmarkModel, onJump: () -> Unit, onDelete: () -> Unit) {
+private fun BookmarkRow(
+    bookmark: BookmarkModel,
+    onJump: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Batch 485 — parameter `modifier` baru (default `Modifier`, 0 breaking di satu-satunya
+    // titik panggil) supaya caller bisa suntik `.animateItem()` dari dalam `items {}`
+    // (LazyItemScope) — list ini sudah punya key stabil (`it.id`) sejak awal, prasyarat
+    // animateItem sudah terpenuhi. Grep app-wide file ini: 0 hit `isDragging`/`draggable`/
+    // `reorder` — murni delete-list, aman. Parameter `modifier` jadi AWAL chain (pola sama
+    // `DuplicateSongRow` Batch 482) supaya animasi placement bekerja di root layout node item.
+    // 0 logic jump/delete disentuh.
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onJump)
             .padding(vertical = 10.dp),

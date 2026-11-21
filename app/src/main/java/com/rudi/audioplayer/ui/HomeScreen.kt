@@ -29,8 +29,12 @@ import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import com.rudi.audioplayer.ui.theme.isLiquidGlassTheme
+import com.rudi.audioplayer.ui.theme.neuSurface
+import com.rudi.audioplayer.ui.theme.neuCastOnly
+import com.rudi.audioplayer.ui.theme.neuArtFillet
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.ui.theme.Radius
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import kotlinx.collections.immutable.ImmutableSet
 import java.util.Calendar
 
@@ -64,7 +68,13 @@ fun HomeScreen(
     val artistMix = remember(songs, statsVersion) { topArtistMixProvider(songs) }
     val flashback = remember(songs, statsVersion) { flashbackProvider(songs) }
 
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        // Batch 367 — PENDING_IosFlingBehavior.md item 1/14: kurva fling ala iOS (rubber-band
+        // overscroll-nya sendiri sudah app-wide lewat LocalOverscrollFactory, Theme.kt, tidak
+        // perlu disentuh di sini). Lihat IosScrollPhysics.kt.
+        flingBehavior = rememberIosFlingBehavior()
+    ) {
         item {
             HomeGreeting(
                 showShuffleAll = songs.isNotEmpty(),
@@ -260,7 +270,10 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
     // cabang isLiquidGlass sendiri, pola identik isTactile/isSkeu (opaque Surface color diganti
     // Transparent, .frostedGlass() yang menggambar tint+blur+edge-nya sendiri).
     val isLiquidGlass = isLiquidGlassTheme()
-    val isPanelTheme = isTactile || isSkeu || isLiquidGlass
+    // Batch 551 — cabang `else` (Apple/Calm Retro/Aurora) dulu = clip + Surface warna solid
+    // datar; sekarang `neuSurface()` (kedalaman Neumorphism Boomly, TactileDepth.kt) dgn bentuk
+    // SAMA (`RoundedCornerShape(Radius.xl)`). Karena fill digambar mesin itu, Surface JADI
+    // transparan untuk SEMUA identitas (`isPanelTheme` lama dihapus: selalu true sekarang).
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -270,14 +283,14 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
                     isTactile -> Modifier.tactileEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
                     isSkeu -> Modifier.skeuEmboss(shape = MaterialTheme.shapes.medium, elevation = 8.dp)
                     isLiquidGlass -> Modifier.frostedGlass()
-                    else -> Modifier.clip(RoundedCornerShape(Radius.xl))
+                    else -> Modifier.neuSurface(shape = RoundedCornerShape(Radius.xl), elevation = 8.dp)
                 }
             )
             .clickable(onClick = onClick),
-        color = if (isPanelTheme) Color.Transparent else MaterialTheme.colorScheme.surface,
+        color = Color.Transparent,
         // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent fallback.
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = if (isPanelTheme) 0.dp else 4.dp
+        tonalElevation = 0.dp
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -288,6 +301,8 @@ private fun ContinueListeningCard(song: Song, onClick: () -> Unit) {
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(Radius.xxl))
+                    // Batch 569 — fillet gilt Neumorphism (tema lain: no-op); setelah clip, bentuk SAMA.
+                    .neuArtFillet(RoundedCornerShape(Radius.xxl))
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -342,7 +357,10 @@ private fun HomeSectionRow(
         Spacer(modifier = Modifier.height(8.dp))
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            // Batch 367 — PENDING_IosFlingBehavior.md item 2/14 (row horizontal "Baru Ditambahkan"
+            // dst. di Home).
+            flingBehavior = rememberIosFlingBehavior()
         ) {
             items(songs, key = { it.id }) { song ->
                 HomeSongCard(song = song, onClick = { onSongClick(song) })
@@ -362,7 +380,12 @@ private fun HomeSongCard(song: Song, onClick: () -> Unit) {
             artworkUri = song.uri,
             modifier = Modifier
                 .size(120.dp)
+                // Batch 559 — art OPAK: bayangan jatuh saja (`neuCastOnly`, pola AlbumArtHero
+                // Batch 552), SEBELUM `.clip`; ukuran/geometri kartu tak berubah.
+                .neuCastOnly(RoundedCornerShape(Radius.xxl), elevation = 6.dp)
                 .clip(RoundedCornerShape(Radius.xxl))
+                // Batch 569 — fillet gilt Neumorphism (tema lain: no-op); setelah clip, bentuk SAMA.
+                .neuArtFillet(RoundedCornerShape(Radius.xxl))
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(

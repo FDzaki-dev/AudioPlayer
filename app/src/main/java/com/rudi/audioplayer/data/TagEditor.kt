@@ -1,10 +1,8 @@
 package com.rudi.audioplayer.data
 
-import android.app.RecoverableSecurityException
 import android.content.Context
 import android.content.IntentSender
 import android.media.MediaScannerConnection
-import android.os.Build
 import android.provider.MediaStore
 import com.rudi.audioplayer.util.AppLogger
 import java.io.File
@@ -51,24 +49,12 @@ class TagEditor(private val context: Context) {
     fun writeTags(song: Song, tags: Id3TagWriter.EditableTags): TagWriteResult {
         editabilityCheck(song)?.let { return it }
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                // Android 11+: minta izin user DI MUKA lewat API resmi, sebelum coba nulis
-                // apa pun — lebih eksplisit daripada mengandalkan exception sebagai kontrol
-                // alur (pola yang sama seperti createDeleteRequest yang sudah ada di
-                // MainActivity.deleteSongsFromDevice untuk hapus lagu).
-                val pending = MediaStore.createWriteRequest(context.contentResolver, listOf(song.uri))
-                TagWriteResult.NeedsConsent(pending.intentSender)
-            } else {
-                // Android 10: belum ada createWriteRequest — pola resminya coba tulis dulu,
-                // tangkap RecoverableSecurityException kalau app ini bukan pemilik file.
-                try {
-                    performRewrite(song, tags)
-                    rescan(song)
-                    TagWriteResult.Success
-                } catch (e: RecoverableSecurityException) {
-                    TagWriteResult.NeedsConsent(e.userAction.actionIntent.intentSender)
-                }
-            }
+            // Android 11+ (minSdk 31 sudah selalu di atas ini): minta izin user DI MUKA lewat
+            // API resmi, sebelum coba nulis apa pun — lebih eksplisit daripada mengandalkan
+            // exception sebagai kontrol alur (pola yang sama seperti createDeleteRequest yang
+            // sudah ada di MainActivity.deleteSongsFromDevice untuk hapus lagu).
+            val pending = MediaStore.createWriteRequest(context.contentResolver, listOf(song.uri))
+            TagWriteResult.NeedsConsent(pending.intentSender)
         } catch (e: Exception) {
             AppLogger.e("TagEditor", "Gagal menulis tag untuk '${song.title}'", e)
             TagWriteResult.Failure(e.message ?: "Kesalahan tidak diketahui")
@@ -76,9 +62,7 @@ class TagEditor(private val context: Context) {
     }
 
     /** Dipanggil ViewModel setelah user menyetujui dialog izin dari [TagWriteResult.NeedsConsent]
-     *  (jalur Android 11+ `createWriteRequest`; jalur Android 10 `RecoverableSecurityException`
-     *  di [writeTags] sudah langsung retry sendiri lewat sistem activity-result, tidak pernah
-     *  sampai ke fungsi ini). */
+     *  (jalur `createWriteRequest` di [writeTags] — satu-satunya jalur sejak minSdk 31). */
     fun writeTagsWithConsent(song: Song, tags: Id3TagWriter.EditableTags): TagWriteResult {
         return try {
             performRewrite(song, tags)

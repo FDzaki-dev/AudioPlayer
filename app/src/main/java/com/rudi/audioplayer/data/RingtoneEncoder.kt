@@ -6,7 +6,6 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import com.rudi.audioplayer.util.AppLogger
@@ -52,10 +51,13 @@ class RingtoneEncoder(private val context: Context) {
 
     private val fileStampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
 
+    // Batch 412: dipindah keluar dari buildDisplayName() — sebelumnya Regex baru dikompilasi
+    // ulang tiap panggilan cut(), padahal pattern-nya konstan. Pola sama LRC_LINE_REGEX
+    // (LyricsView.kt) / lrcLineRegex (LyricsParser.kt), yang sudah top-level/class-level sejak
+    // awal.
+    private val displayNameSanitizerRegex = Regex("[^A-Za-z0-9 _-]")
+
     private fun editabilityCheck(song: Song): CutResult.Unsupported? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            return CutResult.Unsupported("Potong nada dering butuh Android 10 ke atas.")
-        }
         if (song.uri.authority != MediaStore.AUTHORITY) {
             return CutResult.Unsupported("Lagu dari folder tambahan belum didukung untuk dipotong.")
         }
@@ -125,7 +127,16 @@ class RingtoneEncoder(private val context: Context) {
                 // dari 0, bukan dari offset lagu asli (pemutar mana pun butuh timestamp mulai
                 // dari 0 di file baru yang berdiri sendiri).
                 bufferInfo.presentationTimeUs = (sampleTimeUs - startUs).coerceAtLeast(0)
-                bufferInfo.flags = extractor.sampleFlags
+                // Batch 533 — SAMPLE_FLAG_* (MediaExtractor) dan BUFFER_FLAG_* (MediaCodec.BufferInfo) =
+                // dua rumpun konstanta berbeda; menyalin nilainya langsung ditandai lint WrongConstant
+                // (bit 2/4 SAMPLE_FLAG_* = CODEC_CONFIG/END_OF_STREAM di BUFFER_FLAG_*). Mapping
+                // eksplisit: hanya sampel sync -> KEY_FRAME. Hasil SAMA utk sampel audio biasa
+                // (flags 0/1); file lokal di sini tidak terenkripsi/partial.
+                bufferInfo.flags = if ((extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) {
+                    android.media.MediaCodec.BUFFER_FLAG_KEY_FRAME
+                } else {
+                    0
+                }
 
                 muxer.writeSampleData(muxerTrackIndex, buffer, bufferInfo)
                 extractor.advance()
@@ -151,7 +162,7 @@ class RingtoneEncoder(private val context: Context) {
 
     private fun buildDisplayName(label: String): String {
         val safeLabel = label.trim().ifEmpty { "Ringtone" }
-            .replace(Regex("[^A-Za-z0-9 _-]"), "")
+            .replace(displayNameSanitizerRegex, "")
             .take(40)
         return "${safeLabel}_${fileStampFormat.format(Date())}_${UUID.randomUUID().toString().take(8)}.m4a"
     }

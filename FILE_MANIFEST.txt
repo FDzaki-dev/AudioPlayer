@@ -1,21 +1,153 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
-# Total: 188 file
+# Batch 702: + app/src/main/java/com/rudi/audioplayer/update/UpdateApkCache.kt + app/src/test/java/com/rudi/audioplayer/update/UpdateApkCacheTest.kt (pembersih APK pembaruan basi di cacheDir; UpdateManager.kt diubah) — 264->266.
+# Batch 701: 0 file baru (playback/UpdateResumePolicy.kt, UpdateResumePolicyTest.kt, config/spotbugs/exclude.xml diubah); jumlah tetap 264.
+# Batch 700: 0 file baru (ui/theme/TactileDepth.kt, BottomNavBar.kt, TabPillMathTest.kt diubah); jumlah tetap 264.
+# Batch 695: 0 file baru (PlaybackStateStore.kt, UpdateResumePolicy.kt, UpdateResumeReceiver.kt, PlaybackService.kt, UpdateResumePolicyTest.kt diubah); jumlah tetap 264.
+# Batch 694: + app/src/test/java/com/rudi/audioplayer/util/ShizukuInstallOutputTest.kt (tes parser pasang senyap Shizuku) — 263->264 (ShizukuBridge.kt, UpdateManager.kt, UpdateCheckSheet.kt, PlaybackService.kt diubah).
+# Batch 692: 0 file baru (PlaybackService.kt, UpdateResumePolicy.kt, UpdateResumePolicyTest.kt diubah); jumlah tetap 263.
+# Batch 691: 0 file baru (UpdateResumeReceiver.kt, PlaybackService.kt, AudioPlayerApplication.kt diubah); jumlah tetap 263.
+# Batch 690: 0 file baru (MusicRepository.kt, PlaybackService.kt diubah); jumlah tetap 263.
+# Batch 689: 0 file baru (UpdateResumePolicy.kt, UpdateResumeReceiver.kt, PlaybackService.kt, UpdateResumePolicyTest.kt diubah); jumlah tetap 263.
+# Batch 688: + app/src/main/java/com/rudi/audioplayer/playback/UpdateResumePolicy.kt + app/src/main/java/com/rudi/audioplayer/playback/UpdateResumeReceiver.kt + app/src/test/java/com/rudi/audioplayer/playback/UpdateResumePolicyTest.kt (pemulihan pemutar pasca-update: receiver MY_PACKAGE_REPLACED + kebijakan 2-bukti + penanda 'berniat memutar') — 260->263.
+# Batch 682: + app/src/main/java/com/rudi/audioplayer/util/StartupStallFormat.kt + app/src/main/java/com/rudi/audioplayer/util/StartupStallProbe.kt + app/src/test/java/com/rudi/audioplayer/util/StartupStallFormatTest.kt (probe sementara: siapa menahan thread utama saat startup; menulis ke log hanya bila ada stall besar) — 257->260.
+# Batch 681: + app/src/main/java/com/rudi/audioplayer/util/ChangeGate.kt + app/src/test/java/com/rudi/audioplayer/util/ChangeGateTest.kt (pintu log tulis-hanya-bila-berubah untuk baris `Marquee diag` widget) — 255->257.
+# Batch 680: + app/src/main/java/com/rudi/audioplayer/util/StartupKind.kt + app/src/test/java/com/rudi/audioplayer/util/StartupKindTest.kt (penentu `jenis=` baris Cold start, ambang dari log nyata) — 253->255.
+# Batch 677: + app/src/main/java/com/rudi/audioplayer/util/StartupTrace.kt (jejak cold start: baris `StartupTiming` `Cold start` di log debug) — 252->253.
+# Batch 673: + app/src/main/java/com/rudi/audioplayer/data/PowerSavingStore.kt (saklar uji Hemat Daya: Scheduling Dinamis + Audio Offload) — 251->252.
+# Batch 669: + app/src/main/java/com/rudi/audioplayer/util/PowerProbe.kt (catcher daya: baris `PowerProbe` di log debug) — 250->251.
+# Batch 660: + app/src/main/java/com/rudi/audioplayer/bubble/SpaceBubbleSkin.kt + app/src/test/java/com/rudi/audioplayer/bubble/SpaceBubbleMathTest.kt (skin Space bubble) — 248->250.
+# Batch 659: app/src/main/java/com/rudi/audioplayer/data/lyrics/LyricsPrefetchStore.kt + app/src/main/java/com/rudi/audioplayer/worker/LyricsPrefetchWorker.kt (fitur Prefetch Lirik dicabut) dihapus — 250->248.
+# Batch 657: app/src/test/java/com/rudi/audioplayer/TabPillMathTest.kt (file baru, tes unit pemetaan jari->pil bilah tab) ditambahkan — 249->250.
+# Batch 656: app/src/main/java/com/rudi/audioplayer/ui/theme/SpaceCosmos.kt (file baru, latar kosmos tema Space) ditambahkan — 248->249.
+# Batch 390: app/src/main/java/com/rudi/audioplayer/ui/theme/IosScrollPhysics.kt (dibuat Batch 364)
+# ditemukan tidak pernah masuk manifest — ditambahkan sekarang, 188->189. Ditemukan lewat diff
+# penuh manifest vs isi ZIP (bukan cuma spot-check file yang baru disentuh) saat verifikasi
+# integritas repack. .github/workflows/build.yml & .gitignore TETAP tercatat di manifest ini
+# (mengikuti konvensi 'setara git ls-files') walau TIDAK ikut dikirim di ZIP sesi — sesuai desain:
+# skrip Termux [DAILY UPDATE] sengaja skip `-name '.*'` saat replace isi folder, jadi 2 file itu
+# dikelola permanen di device, bukan lewat siklus ZIP tiap sesi (bukan bug/drift).
+# Batch 417: app/src/test/java/com/rudi/audioplayer/data/DuplicateDetectorTest.kt (file baru,
+# audit cakupan test) ditambahkan — 189->190.
+# Housekeeping dokumentasi: 6 dokumen arsip + PROJECT_STATE_ARCHIVE.md dipindah root ->
+# docs/archive/ (path baru, isi tidak diubah kecuali PROJECT_STATE.md/README.md dipangkas dari
+# narasi batch usang). Total path tidak berubah — 190 file.
+# Batch 481: app/src/main/java/com/rudi/audioplayer/ui/theme/Motion.kt (file baru, token
+# easing/durasi iOS) ditambahkan — 190->191.
+# Batch 488: app/src/main/java/com/rudi/audioplayer/data/LibraryCacheStore.kt (file baru, cache
+# disk snapshot library utk cold-start instan) ditambahkan — 191->192.
+# Batch 489: docs/QA_CHECKLIST_SONIX_v488.md (salinan checklist QA eksternal, aktif — lihat
+# PROJECT_STATE.md § Aturan sesi aktif #4) ditambahkan — 192->193.
+# Batch 498: app/src/main/java/com/rudi/audioplayer/playback/AntiRepeatShuffleOrder.kt (file
+# baru, custom ShuffleOrder Gap #3 shuffle anti-repeat-nearby) ditambahkan — 193->194.
+# Batch 504: docs/PLANNING.md (roadmap + audit teknis baru) ditambahkan — 194->195. VERIFIKASI
+# INTEGRITAS sesi ini (diff manifest vs isi ZIP, pola sama Batch 390): 7 file docs/archive/ di
+# bawah (baris "docs/archive/*") TERCATAT di manifest TAPI TIDAK ADA di ZIP
+# AudioPlayer-1.7.20-run482.zip (187 file nyata vs 194 klaim manifest sebelum batch ini — selisih
+# PERSIS 7 file itu). Detail + risiko: docs/PLANNING.md § 1. Baris path di bawah TETAP
+# dipertahankan (pola sama .github/build.yml — dicatat sesuai konvensi, bukan bukti file ada).
+# Batch 505: docs/PENDING_CodeTidyPlan.md (planning perapihan kode berbasis konstitusi, PROPOSAL)
+# ditambahkan — 195->196. Temuan P0 docs/archive/ Batch 504 TIDAK berubah (7 path archive di bawah
+# tetap tercatat tapi tidak ada di ZIP sumber).
+# Batch 506: 7 file docs/archive/ (dipulihkan dari riwayat git, disalin dari docs_archive.zip
+# unggahan user) KINI ADA di ZIP — catatan "tercatat tapi tidak ada di ZIP" Batch 504/505 di atas
+# sudah usang. Daftar path tidak berubah; total tetap 196 (194 di ZIP + 2 dotfile .github/.gitignore
+# yang sengaja tidak dikirim, lihat catatan Batch 390).
+# Batch 507: app/src/main/java/com/rudi/audioplayer/ui/SharedComponents.kt (file baru, T1 Wave 1
+# docs/PENDING_CodeTidyPlan.md — EmptyState/Shimmer* dipindah dari LibraryScreen.kt) ditambahkan —
+# 196->197 (195 di ZIP + 2 dotfile .github/.gitignore yang sengaja tidak dikirim).
+# Batch 508: app/src/main/java/com/rudi/audioplayer/ui/NowPlayingDialogs.kt (file baru, T4 Wave 2
+# docs/PENDING_CodeTidyPlan.md — SleepTimerDialog/SpeedDialog/RatingDialog/TransitionModeOption
+# dipindah dari NowPlayingScreen.kt) ditambahkan — 197->198 (196 di ZIP + 2 dotfile
+# .github/.gitignore yang sengaja tidak dikirim).
+# Batch 509: app/src/main/java/com/rudi/audioplayer/ui/AdvancedControlsSheet.kt (file baru, T5 Wave 2
+# docs/PENDING_CodeTidyPlan.md — AdvancedControlsSheet/AdvancedControlsSectionHeader/
+# AdvancedControlRow dipindah dari NowPlayingScreen.kt) ditambahkan — 198->199 (197 di ZIP + 2
+# dotfile .github/.gitignore yang sengaja tidak dikirim).
+# Batch 510: app/src/main/java/com/rudi/audioplayer/ui/AlbumArtHero.kt (file baru, T6 Wave 2
+# docs/PENDING_CodeTidyPlan.md — AlbumArtHero dipindah dari NowPlayingScreen.kt) ditambahkan —
+# 199->200 (198 di ZIP + 2 dotfile .github/.gitignore yang sengaja tidak dikirim).
+# Batch 511: app/src/main/java/com/rudi/audioplayer/ui/theme/AppHaptics.kt (file baru, haptic terpusat
+# pengganti LocalHapticFeedback bawaan Compose) ditambahkan — 200->201 (199 di ZIP + 2 dotfile
+# .github/.gitignore yang sengaja tidak dikirim).
+# Batch 515: app/src/main/java/com/rudi/audioplayer/ui/SettingsSections.kt (file baru, T7 Wave 2
+# docs/PENDING_CodeTidyPlan.md — ThemeModeToggleSection/ThemeOptionCard/AppLockSection/SetPinDialog
+# dipindah dari SettingsScreen.kt) ditambahkan — 201->202 (200 di ZIP + 2 dotfile
+# .github/.gitignore yang sengaja tidak dikirim).
+# Batch 517: app/src/main/java/com/rudi/audioplayer/ui/LibraryLists.kt (file baru, T8a Wave 2
+# docs/PENDING_CodeTidyPlan.md — AlbumGridView/SongListView/GroupedListView/SongRow dipindah dari
+# LibraryScreen.kt) ditambahkan — 202->203 (201 di ZIP + 2 dotfile .github/.gitignore yang sengaja
+# tidak dikirim).
+# Batch 518: app/src/main/java/com/rudi/audioplayer/ui/LibrarySearch.kt (file baru, T8b Wave 2
+# docs/PENDING_CodeTidyPlan.md — LibraryHeader/LibrarySearchField/LibraryFilterChips/SearchHistoryView/
+# SearchSectionLabel/SearchResultsView dipindah dari LibraryScreen.kt) ditambahkan — 203->204 (202 di
+# ZIP + 2 dotfile .github/.gitignore yang sengaja tidak dikirim).
+# Batch 519: app/src/main/java/com/rudi/audioplayer/OnboardingScreens.kt (file baru, T9 Wave 2
+# docs/PENDING_CodeTidyPlan.md — WelcomeScreen/WelcomeHighlight/PermissionRationale dipindah dari
+# MainActivity.kt; paket root `com.rudi.audioplayer`) ditambahkan — 204->205 (203 di ZIP + 2 dotfile
+# .github/.gitignore yang sengaja tidak dikirim).
+# Batch 520: app/src/main/java/com/rudi/audioplayer/BottomNavBar.kt (file baru, T10 Wave 2
+# docs/PENDING_CodeTidyPlan.md — MagnifyingTabLabel/GlassTabIcon/NoRippleIndication/CustomNavBarTabItem
+# dipindah dari MainActivity.kt; paket root `com.rudi.audioplayer`) ditambahkan — 205->206 (204 di ZIP + 2
+# dotfile .github/.gitignore yang sengaja tidak dikirim).
+# Batch 521: app/src/main/java/com/rudi/audioplayer/BottomNavBar.kt DIHAPUS (rollback T10 —
+# regresi performa dilaporkan user pada v520; source app/ = v519) — 206->205 (203 di ZIP + 2 dotfile
+# .github/.gitignore yang sengaja tidak dikirim).
+# Batch 522: app/src/main/java/com/rudi/audioplayer/BottomNavBar.kt ditambahkan lagi (T10 dieksekusi ulang
+# setelah rollback Batch 521; paket root) — 205->206 (204 di ZIP + 2 dotfile .github/.gitignore yang
+# sengaja tidak dikirim).
+# Batch 523: 0 file baru/dihapus (dokumen saja) — 206 tetap. VERIFIKASI INTEGRITAS (diff manifest vs isi ZIP v522, pola Batch 390/504): 206 path manifest
+# vs 204 file nyata di ZIP; selisih PERSIS 2 dotfile (.github/workflows/build.yml, .gitignore) yang sengaja tidak dikirim di ZIP (lihat catatan Batch 390) —
+# 0 path hilang, 0 path liar di ZIP, 0 duplikat. Path sama, ISI berubah di 4 dokumen: PROJECT_STATE.md, docs/archive/PROJECT_STATE_ARCHIVE.md,
+# docs/PLANNING.md, docs/PENDING_CodeTidyPlan.md.
+# Batch 525: config/detekt/detekt.yml + .githooks/pre-commit (file baru, detekt+lintDebug ketat) ditambahkan — 206->208 (207 di ZIP + 1 dotfile .gitignore yang
+# sengaja tidak dikirim). PENGECUALIAN batch ini: .github/workflows/build.yml IKUT dikirim di ZIP (job static-analysis baru; menimpa salinan device) — catatan Batch 390
+# tetap berlaku utk .gitignore dan utk batch lain.
+# Batch 528: .github/workflows/baseline.yml (file baru, workflow manual pembuat baseline detekt+lint) ditambahkan — 208->209 (208 di ZIP + 1 dotfile .gitignore yang
+# sengaja tidak dikirim). Seperti Batch 525, file di .github/ IKUT dikirim di ZIP (menimpa/menambah salinan device); catatan Batch 390 tetap berlaku utk .gitignore.
+# Batch 530: app/detekt-baseline.xml + app/lint-baseline.xml (file baru, baseline detekt+lint dari artifact `baseline_1` workflow "Generate Baselines", byte-identik, TIDAK ditulis tangan)
+# ditambahkan — 209->211 (211 di ZIP, termasuk .gitignore yang memang ada di ZIP v528/v529; diff manifest vs isi ZIP: 0 path hilang, 0 path liar). Catatan Batch 390 soal .gitignore tidak diubah.
+# Batch 531: .github/workflows/baseline.yml + app/detekt-baseline.xml + app/lint-baseline.xml DIHAPUS (rencana baseline A/B/C dibatalkan user: static analysis fokus & non-blocking, tanpa baseline) — 211->208
+# (208 di ZIP, termasuk .gitignore). Tidak ada file baru. Catatan Batch 390 soal .gitignore tidak diubah.
+# Batch 542: app/src/main/java/com/rudi/audioplayer/playback/EqProfileImport.kt (file baru, parser profil AutoEq + pemetaan ke band Equalizer) ditambahkan — 208->209.
+# Batch 543: .github/workflows/ci-report.yml (file baru, workflow "CI Report" dipicu workflow_run setelah "Build APK"; ikut dikirim di ZIP seperti build.yml) ditambahkan — 209->210.
+# Batch 545: .github/workflows/ci-report.yml DIHAPUS (CI disatukan ke build.yml: job `build` + `static-analysis`, tanpa instrumentation/collect) — 210->209. Tidak ada file baru.
+# Batch 550: .github/workflows/ci-report.yml DIKEMBALIKAN sbg STUB NONAKTIF (hanya workflow_dispatch) — Box DAILY UPDATE tak menghapus file di `.github/` yang hilang dari ZIP, jadi berkas lama (workflow_run) terus terpicu; stub menimpanya — 209->210.
+# Batch 563: app/src/main/java/com/rudi/audioplayer/ui/NeuSwitch.kt (file baru, saklar berkedalaman; `Switch` package `ui` menaungi `Switch` M3) ditambahkan — 210->211.
+# Batch 568: app/src/main/java/com/rudi/audioplayer/ui/NeuSlider.kt (file baru, slider Neumorphism; fungsi `NeuSlider` TIDAK menaungi `Slider` M3) ditambahkan — 211->212.
+# Batch 570: .github/workflows/android-artifact.yml + config/spotbugs/spotbugs.gradle.kts + app/src/test/java/com/rudi/audioplayer/ArchitectureTest.kt (file baru, laporan ArchUnit + SpotBugs SARIF utk Claude; workflow ikut dikirim di ZIP seperti build.yml) ditambahkan — 212->215.
+# Batch 574: config/spotbugs/exclude.xml (file baru, filter noise SpotBugs Kotlin) ditambahkan — 215->216.
+# Batch 595: app/src/main/java/com/rudi/audioplayer/util/LogOrder.kt + app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt (file baru, Log Diagnostik terbaru-di-atas) ditambahkan — 216->218.
+# Batch 596: app/src/main/java/com/rudi/audioplayer/data/VaultCrypto.kt + app/src/test/java/com/rudi/audioplayer/data/VaultCryptoTest.kt (file baru, inti enkripsi Vault AES-256-GCM + Keystore, belum terhubung) ditambahkan — 218->220.
+# Batch 597: PlayCountTracker.kt, LibrarySort.kt, LibrarySortBar.kt (file baru) + PlayCountTrackerTest.kt, LibrarySortTest.kt (tes baru) ditambahkan — 220->225.
+# Batch 603: app/src/main/java/com/rudi/audioplayer/util/DebugLogFormat.kt + app/src/test/java/com/rudi/audioplayer/util/DebugLogFormatTest.kt (file baru, ekspor logcat debug adaptasi Boomly) ditambahkan — 225->227.
+# Batch 604: app/src/main/res/drawable/widget_background_dark.xml + widget_well.xml + widget_well_light.xml (file baru, cangkang "bilah" + palung cekung widget) ditambahkan — 227->230.
+# Batch 606: app/src/main/res/drawable/widget_background_compact_dark.xml + widget_background_compact_light.xml + app/src/main/res/layout/widget_player_slim.xml (file baru, cangkang compact asimetris + layout slim untuk widget 46dp) ditambahkan — 230->233.
+# Batch 607: app/src/main/res/layout/widget_player_tall.xml (file baru, layout widget tinggi: sampul besar + palung info + kontrol) ditambahkan — 233->234.
+# Batch 608: widget_background_compact_dark/_light.xml + widget_background_dark/_light.xml + widget_well.xml (isi ditulis ulang, rim tebal bergradasi + bibir + pendar); 0 file baru — total tetap 234.
+# Batch 609: widget_background_compact_dark/_light.xml + widget_background_dark/_light.xml (perbaikan satuan dp, build 608 gagal) + widget_well_light.xml + widget/WidgetUpdater.kt (bingkai rim sampul); 0 file baru — total tetap 234.
+# Batch 610: widget_player.xml + _compact + _slim + _tall (root dibungkus FrameLayout @android:id/background, opt-out clip launcher) + widget_background_compact_dark/_light.xml + widget_background_dark/_light.xml (bentuk daun, pita tak bocor); 0 file baru — total tetap 234.
+# Batch 611: widget_well.xml + widget_well_light.xml (palung daun TL20/TR4/BR20/BL4, band bayangan/pendar tak bocor); 0 file baru — total tetap 234.
+# Batch 612: widget_well.xml + widget_well_light.xml (gradien lapis-1: garis tepi pink mengelilingi palung); 0 file baru — total tetap 234.
+# Batch 627: app/src/main/java/com/rudi/audioplayer/util/DumpsysCollector.kt + app/src/test/java/com/rudi/audioplayer/util/DumpsysFormatTest.kt (file baru, dumpsys per centang di ekspor log debug + tab Izin dumpsys) ditambahkan — 237->239.
+# Batch 628: app/src/main/java/com/rudi/audioplayer/util/ShizukuBridge.kt (file baru, jembatan Shizuku untuk dumpsys/pm grant tanpa adb-PC) ditambahkan — 239->240.
+# Batch 639: app/src/main/res/layout/widget_player_strip.xml (file baru, layout widget strip sempit-tinggi: sampul + prev/play/next bertumpuk) ditambahkan — 240->241.
+# Batch 640: app/src/main/java/com/rudi/audioplayer/widget/WidgetStripSizing.kt dan app/src/test/java/com/rudi/audioplayer/widget/WidgetStripSizingTest.kt (file baru, ukuran strip proporsional + tesnya) ditambahkan — 241->243.
+# Batch 641: app/src/main/java/com/rudi/audioplayer/widget/WidgetMarquee.kt dan app/src/test/java/com/rudi/audioplayer/widget/WidgetMarqueeMathTest.kt (file baru, marquee judul widget digerakkan app + tesnya) ditambahkan — 243->245.
+# Batch 643: app/src/main/res/anim/widget_title_segment.xml (file baru, animasi segmen geser judul widget yang digambar launcher) ditambahkan — 245->246.
+# Batch 651: app/src/main/java/com/rudi/audioplayer/data/LastTabStore.kt dan app/src/test/java/com/rudi/audioplayer/data/LastTabStoreTest.kt (file baru, tab bawah terakhir disimpan ke disk agar selamat dari kematian proses) ditambahkan — 246->248.
+# Total: 234 file
 
+.githooks/pre-commit
+.github/workflows/android-artifact.yml
 .github/workflows/build.yml
+.github/workflows/ci-report.yml
 .gitignore
-ARCHIVED_MICRO_UIUX_AUDIT.md
-ARCHIVED_POLISH_AUDIT.md
-ARCHIVED_ROADMAP_15_FITUR_OFFLINE.md
 CHANGELOG.md
 FILE_MANIFEST.txt
-LIQUID_GLASS_BLUR_ENGINE_DESIGN.md
-MANUAL_QA_CHECKLIST.md
 PROJECT_STATE.md
-PROJECT_STATE_ARCHIVE.md
 README.md
-ROADMAP_LIQUID_GLASS_REDESIGN.md
 app/build.gradle.kts
 app/compose_stability_config.conf
 app/proguard-rules.pro
@@ -25,10 +157,13 @@ app/src/androidTest/java/com/rudi/audioplayer/playback/PlaybackServiceTestHelper
 app/src/androidTest/java/com/rudi/audioplayer/playback/PlaybackTransportTest.kt
 app/src/main/AndroidManifest.xml
 app/src/main/java/com/rudi/audioplayer/AudioPlayerApplication.kt
+app/src/main/java/com/rudi/audioplayer/BottomNavBar.kt
 app/src/main/java/com/rudi/audioplayer/MainActivity.kt
+app/src/main/java/com/rudi/audioplayer/OnboardingScreens.kt
 app/src/main/java/com/rudi/audioplayer/bubble/BubbleBootReceiver.kt
 app/src/main/java/com/rudi/audioplayer/bubble/BubbleTileService.kt
 app/src/main/java/com/rudi/audioplayer/bubble/FloatingBubbleService.kt
+app/src/main/java/com/rudi/audioplayer/bubble/SpaceBubbleSkin.kt
 app/src/main/java/com/rudi/audioplayer/data/AppLockStore.kt
 app/src/main/java/com/rudi/audioplayer/data/AudiobookModeStore.kt
 app/src/main/java/com/rudi/audioplayer/data/BackupManager.kt
@@ -42,13 +177,16 @@ app/src/main/java/com/rudi/audioplayer/data/FavoritesStore.kt
 app/src/main/java/com/rudi/audioplayer/data/FloatingBubbleStore.kt
 app/src/main/java/com/rudi/audioplayer/data/HourlyListenStore.kt
 app/src/main/java/com/rudi/audioplayer/data/Id3TagWriter.kt
+app/src/main/java/com/rudi/audioplayer/data/LastTabStore.kt
+app/src/main/java/com/rudi/audioplayer/data/LibraryCacheStore.kt
 app/src/main/java/com/rudi/audioplayer/data/LibraryFilterStore.kt
+app/src/main/java/com/rudi/audioplayer/data/LibrarySort.kt
 app/src/main/java/com/rudi/audioplayer/data/ListeningHistoryStore.kt
 app/src/main/java/com/rudi/audioplayer/data/ListeningStatsEngine.kt
 app/src/main/java/com/rudi/audioplayer/data/LrcSyncEditor.kt
 app/src/main/java/com/rudi/audioplayer/data/LyricsParser.kt
 app/src/main/java/com/rudi/audioplayer/data/LyricsStore.kt
-app/src/main/java/com/rudi/audioplayer/data/lyrics/LyricsPrefetchStore.kt
+app/src/main/java/com/rudi/audioplayer/data/PowerSavingStore.kt
 app/src/main/java/com/rudi/audioplayer/data/lyrics/LyricsRepository.kt
 app/src/main/java/com/rudi/audioplayer/data/lyrics/api/LyricsApi.kt
 app/src/main/java/com/rudi/audioplayer/data/lyrics/api/LyricsDto.kt
@@ -76,19 +214,27 @@ app/src/main/java/com/rudi/audioplayer/data/SmartPlaylistStore.kt
 app/src/main/java/com/rudi/audioplayer/data/Song.kt
 app/src/main/java/com/rudi/audioplayer/data/TagEditor.kt
 app/src/main/java/com/rudi/audioplayer/data/ThemeStore.kt
+app/src/main/java/com/rudi/audioplayer/data/VaultCrypto.kt
 app/src/main/java/com/rudi/audioplayer/data/VaultStore.kt
 app/src/main/java/com/rudi/audioplayer/data/VisualizerSettingsStore.kt
 app/src/main/java/com/rudi/audioplayer/playback/AbRepeatLogic.kt
 app/src/main/java/com/rudi/audioplayer/playback/AccentColorExtractor.kt
+app/src/main/java/com/rudi/audioplayer/playback/AntiRepeatShuffleOrder.kt
 app/src/main/java/com/rudi/audioplayer/playback/AudioVisualizerController.kt
 app/src/main/java/com/rudi/audioplayer/playback/CrossfadeEngine.kt
+app/src/main/java/com/rudi/audioplayer/playback/EqProfileImport.kt
 app/src/main/java/com/rudi/audioplayer/playback/EqualizerController.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlaybackAudioSession.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlaybackService.kt
+app/src/main/java/com/rudi/audioplayer/playback/PlayCountTracker.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlayerViewModel.kt
 app/src/main/java/com/rudi/audioplayer/playback/ShakeDetector.kt
 app/src/main/java/com/rudi/audioplayer/playback/ShakePulseTracker.kt
+app/src/main/java/com/rudi/audioplayer/playback/UpdateResumePolicy.kt
+app/src/main/java/com/rudi/audioplayer/playback/UpdateResumeReceiver.kt
 app/src/main/java/com/rudi/audioplayer/ui/ABRepeatBookmarkSheet.kt
+app/src/main/java/com/rudi/audioplayer/ui/AdvancedControlsSheet.kt
+app/src/main/java/com/rudi/audioplayer/ui/AlbumArtHero.kt
 app/src/main/java/com/rudi/audioplayer/ui/BackupRestoreSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/DiagnosticLogSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/DuplicateFinderSheet.kt
@@ -96,18 +242,26 @@ app/src/main/java/com/rudi/audioplayer/ui/EqualizerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/FeatureHintBanner.kt
 app/src/main/java/com/rudi/audioplayer/ui/FolderManagerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/HomeScreen.kt
+app/src/main/java/com/rudi/audioplayer/ui/LibraryLists.kt
 app/src/main/java/com/rudi/audioplayer/ui/LibraryScreen.kt
+app/src/main/java/com/rudi/audioplayer/ui/LibrarySearch.kt
 app/src/main/java/com/rudi/audioplayer/ui/LibrarySearchIndex.kt
+app/src/main/java/com/rudi/audioplayer/ui/LibrarySortBar.kt
 app/src/main/java/com/rudi/audioplayer/ui/LockScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/LyricsSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/lyrics/LyricsView.kt
 app/src/main/java/com/rudi/audioplayer/ui/lyrics/LyricsViewModel.kt
 app/src/main/java/com/rudi/audioplayer/ui/MiniPlayerBar.kt
+app/src/main/java/com/rudi/audioplayer/ui/NeuSlider.kt
+app/src/main/java/com/rudi/audioplayer/ui/NeuSwitch.kt
+app/src/main/java/com/rudi/audioplayer/ui/NowPlayingDialogs.kt
 app/src/main/java/com/rudi/audioplayer/ui/NowPlayingScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/PlaylistScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/QueueSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/RingtoneCutterSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SettingsScreen.kt
+app/src/main/java/com/rudi/audioplayer/ui/SettingsSections.kt
+app/src/main/java/com/rudi/audioplayer/ui/SharedComponents.kt
 app/src/main/java/com/rudi/audioplayer/ui/SignatureMatcherSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SmartPlaylistScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/SongInfoEditSheet.kt
@@ -118,21 +272,40 @@ app/src/main/java/com/rudi/audioplayer/ui/Utils.kt
 app/src/main/java/com/rudi/audioplayer/ui/VaultSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/VisualizerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/adaptive/WindowAdaptive.kt
+app/src/main/java/com/rudi/audioplayer/ui/theme/AppHaptics.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/BlurUtils.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Color.kt
+app/src/main/java/com/rudi/audioplayer/ui/theme/IosScrollPhysics.kt
+app/src/main/java/com/rudi/audioplayer/ui/theme/Motion.kt
+app/src/main/java/com/rudi/audioplayer/ui/theme/SpaceCosmos.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Spacing.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/TactileDepth.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Theme.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Type.kt
 app/src/main/java/com/rudi/audioplayer/update/GitHubReleaseChecker.kt
+app/src/main/java/com/rudi/audioplayer/update/UpdateApkCache.kt
 app/src/main/java/com/rudi/audioplayer/update/UpdateDownloader.kt
 app/src/main/java/com/rudi/audioplayer/update/UpdateManager.kt
 app/src/main/java/com/rudi/audioplayer/util/ApkSignatureChecker.kt
 app/src/main/java/com/rudi/audioplayer/util/AppLogger.kt
 app/src/main/java/com/rudi/audioplayer/util/AudioArtFetcher.kt
+app/src/main/java/com/rudi/audioplayer/util/ChangeGate.kt
+app/src/main/java/com/rudi/audioplayer/util/DebugLogFormat.kt
+app/src/main/java/com/rudi/audioplayer/util/DumpsysCollector.kt
+app/src/main/java/com/rudi/audioplayer/util/LogOrder.kt
+app/src/main/java/com/rudi/audioplayer/util/PowerProbe.kt
+app/src/main/java/com/rudi/audioplayer/util/RecentsGuard.kt
+app/src/main/java/com/rudi/audioplayer/util/SafeGuard.kt
+app/src/main/java/com/rudi/audioplayer/util/ShizukuBridge.kt
+app/src/main/java/com/rudi/audioplayer/util/StartupKind.kt
+app/src/main/java/com/rudi/audioplayer/util/StartupStallFormat.kt
+app/src/main/java/com/rudi/audioplayer/util/StartupStallProbe.kt
+app/src/main/java/com/rudi/audioplayer/util/StartupTrace.kt
 app/src/main/java/com/rudi/audioplayer/widget/PlayerWidgetProvider.kt
+app/src/main/java/com/rudi/audioplayer/widget/WidgetMarquee.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetUpdater.kt
-app/src/main/java/com/rudi/audioplayer/worker/LyricsPrefetchWorker.kt
+app/src/main/java/com/rudi/audioplayer/widget/WidgetStripSizing.kt
+app/src/main/res/anim/widget_title_segment.xml
 app/src/main/res/drawable/ic_bubble_minimize.xml
 app/src/main/res/drawable/ic_bubble_tile.xml
 app/src/main/res/drawable/ic_notification_play_pause.xml
@@ -141,13 +314,22 @@ app/src/main/res/drawable/ic_widget_pause.png
 app/src/main/res/drawable/ic_widget_play.png
 app/src/main/res/drawable/ic_widget_previous.png
 app/src/main/res/drawable/widget_background.xml
+app/src/main/res/drawable/widget_background_compact_dark.xml
+app/src/main/res/drawable/widget_background_compact_light.xml
+app/src/main/res/drawable/widget_background_dark.xml
 app/src/main/res/drawable/widget_background_light.xml
+app/src/main/res/drawable/widget_key_bg.xml
+app/src/main/res/drawable/widget_key_bg_light.xml
 app/src/main/res/drawable/widget_play_button_bg.xml
-app/src/main/res/drawable/widget_play_button_bg_light.xml
+app/src/main/res/drawable/widget_well.xml
+app/src/main/res/drawable/widget_well_light.xml
 app/src/main/res/layout/bubble_mini_player.xml
 app/src/main/res/layout/bubble_minimized.xml
 app/src/main/res/layout/widget_player.xml
 app/src/main/res/layout/widget_player_compact.xml
+app/src/main/res/layout/widget_player_slim.xml
+app/src/main/res/layout/widget_player_strip.xml
+app/src/main/res/layout/widget_player_tall.xml
 app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
 app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 app/src/main/res/mipmap-hdpi/ic_launcher.png
@@ -173,9 +355,15 @@ app/src/main/res/xml/data_extraction_rules.xml
 app/src/main/res/xml/file_paths.xml
 app/src/main/res/xml/shortcuts.xml
 app/src/main/res/xml/widget_player_info.xml
+app/src/test/java/com/rudi/audioplayer/ArchitectureTest.kt
+app/src/test/java/com/rudi/audioplayer/TabPillMathTest.kt
+app/src/test/java/com/rudi/audioplayer/bubble/SpaceBubbleMathTest.kt
 app/src/test/java/com/rudi/audioplayer/data/CustomFolderScannerStableIdTest.kt
+app/src/test/java/com/rudi/audioplayer/data/DuplicateDetectorTest.kt
 app/src/test/java/com/rudi/audioplayer/data/Id3TagWriterTest.kt
+app/src/test/java/com/rudi/audioplayer/data/LastTabStoreTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LibraryFilterStoreTest.kt
+app/src/test/java/com/rudi/audioplayer/data/LibrarySortTest.kt
 app/src/test/java/com/rudi/audioplayer/data/ListeningStatsEngineTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LrcSyncEditorTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LyricsParserTest.kt
@@ -184,10 +372,36 @@ app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryTrackDiscTest.kt
 app/src/test/java/com/rudi/audioplayer/data/PinLockoutPolicyTest.kt
 app/src/test/java/com/rudi/audioplayer/data/RingtoneCutterTest.kt
 app/src/test/java/com/rudi/audioplayer/data/SmartPlaylistEngineTest.kt
+app/src/test/java/com/rudi/audioplayer/data/VaultCryptoTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/AbRepeatLogicTest.kt
+app/src/test/java/com/rudi/audioplayer/playback/PlayCountTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
+app/src/test/java/com/rudi/audioplayer/playback/UpdateResumePolicyTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
+app/src/test/java/com/rudi/audioplayer/update/UpdateApkCacheTest.kt
+app/src/test/java/com/rudi/audioplayer/util/ChangeGateTest.kt
+app/src/test/java/com/rudi/audioplayer/util/DebugLogFormatTest.kt
+app/src/test/java/com/rudi/audioplayer/util/DumpsysFormatTest.kt
+app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt
+app/src/test/java/com/rudi/audioplayer/util/ShizukuInstallOutputTest.kt
+app/src/test/java/com/rudi/audioplayer/util/StartupKindTest.kt
+app/src/test/java/com/rudi/audioplayer/util/StartupStallFormatTest.kt
+app/src/test/java/com/rudi/audioplayer/widget/WidgetMarqueeMathTest.kt
+app/src/test/java/com/rudi/audioplayer/widget/WidgetStripSizingTest.kt
 build.gradle.kts
+config/detekt/detekt.yml
+config/spotbugs/exclude.xml
+config/spotbugs/spotbugs.gradle.kts
+docs/PENDING_CodeTidyPlan.md
+docs/PLANNING.md
+docs/QA_CHECKLIST_SONIX_v488.md
+docs/archive/ARCHIVED_MICRO_UIUX_AUDIT.md
+docs/archive/ARCHIVED_POLISH_AUDIT.md
+docs/archive/ARCHIVED_ROADMAP_15_FITUR_OFFLINE.md
+docs/archive/LIQUID_GLASS_BLUR_ENGINE_DESIGN.md
+docs/archive/MANUAL_QA_CHECKLIST.md
+docs/archive/PROJECT_STATE_ARCHIVE.md
+docs/archive/ROADMAP_LIQUID_GLASS_REDESIGN.md
 gradle.properties
 settings.gradle.kts

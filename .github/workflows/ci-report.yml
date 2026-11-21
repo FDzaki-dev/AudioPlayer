@@ -1,0 +1,17 @@
+# Batch 550 — STUB NONAKTIF. Workflow "CI Report" (dipicu `workflow_run` setelah "Build APK",
+# Batch 543) sudah TIDAK dipakai sejak Batch 545 (CI = build.yml, 1 job). Berkas lama TETAP hidup di
+# repo karena Box DAILY UPDATE hanya menghapus entri non-hidden (`! -name '.*'`) lalu `unzip -o`:
+# file di `.github/` yang hilang dari ZIP tidak pernah terhapus -> "CI Report" terus terpicu (run 2x).
+# Berkas ini MENIMPA isi lama dengan stub yang TIDAK PERNAH jalan otomatis (hanya klik manual).
+# Hapus total (opsional, sekali, di Termux): git rm .github/workflows/ci-report.yml
+name: CI Report (NONAKTIF)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Nonaktif
+        run: echo "Workflow nonaktif. CI = build.yml (Build APK, 1 job)."

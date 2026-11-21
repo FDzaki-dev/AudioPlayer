@@ -1,5 +1,7 @@
 package com.rudi.audioplayer.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -17,15 +19,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.util.ApkSignatureChecker
 import com.rudi.audioplayer.util.ApkSignatureResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Lets the user pick two APK files (e.g. the currently-installed build and a freshly
@@ -42,12 +46,31 @@ fun SignatureMatcherSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit
     var oldResult by remember { mutableStateOf<ApkSignatureResult?>(null) }
     var newResult by remember { mutableStateOf<ApkSignatureResult?>(null) }
     var showLogDialog by remember { mutableStateOf(false) }
+    // Batch 421 — Thread Safety (lanjutan sektor Batch 418-420): `ApkSignatureChecker.inspect()`
+    // sinkron total (`openInputStream`+`copyTo` menyalin SELURUH APK ke cacheDir, lalu
+    // `getPackageArchiveInfo`+SHA-256 digest) + `displayNameFor()` (`ContentResolver.query` Binder
+    // IPC) sebelumnya — keduanya dipanggil LANGSUNG dari callback `rememberLauncherForActivityResult`
+    // (Main thread), 0 coroutine wrapper. APK bisa puluhan MB — kandidat freeze UI PALING parah
+    // di sektor ini sejauh ini (dibanding file JSON kecil di BackupManager, Batch 420). Fix sama
+    // pola: `rememberCoroutineScope()` (bukan ViewModel) + `Dispatchers.IO`, switch balik
+    // `Dispatchers.Main` cuma untuk assignment state.
+    val scope = rememberCoroutineScope()
 
     val oldPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) oldResult = ApkSignatureChecker.inspect(context, uri, displayNameFor(context, uri))
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                val result = ApkSignatureChecker.inspect(context, uri, displayNameFor(context, uri))
+                withContext(Dispatchers.Main) { oldResult = result }
+            }
+        }
     }
     val newPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) newResult = ApkSignatureChecker.inspect(context, uri, displayNameFor(context, uri))
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                val result = ApkSignatureChecker.inspect(context, uri, displayNameFor(context, uri))
+                withContext(Dispatchers.Main) { newResult = result }
+            }
+        }
     }
 
     val matchState: MatchState? = remember(oldResult, newResult) {
@@ -65,9 +88,14 @@ fun SignatureMatcherSheet(onDismiss: () -> Unit, onInfoMessage: (String) -> Unit
     // rasionalisasi penuh di PROJECT_STATE.md Batch 321/322): tambah `containerColor =
     // Color.Transparent` yang kelewat sejak sheet ini dibuat.
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+        // Batch 483 — FIX audit gejala serupa "background glass tembus pandang" (laporan user
+        // di `VaultSheet.kt`, rasional lengkap identik di sana): `.frostedGlass()` yang kelewat
+        // sejak `containerColor = Transparent` dipasang (Batch 323 di file ini, lihat komentar
+        // historis di atas) — audit `.frostedGlass()` Batch 340 tidak mencakup file ini.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp)
         ) {
@@ -168,7 +196,10 @@ private fun ApkPickerRow(label: String, result: ApkSignatureResult?, onPick: () 
 /** Full copyable report — this is the dialog the user gets instead of Android's bare "OK" popup. */
 @Composable
 private fun SignatureLogDialog(report: String, onDismiss: () -> Unit, onInfoMessage: (String) -> Unit) {
-    val clipboard = LocalClipboardManager.current
+    // Batch 648 — `LocalClipboardManager` DEPRECATED (diganti `LocalClipboard` yang suspend). Disalin lewat
+    // `ClipboardManager` sistem, pola SAMA dgn DiagnosticLogSheet.kt (sinkron, tanpa coroutine) — perilaku identik:
+    // teks biasa ke papan klip saat tombol ditekan.
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
     AlertDialog(
@@ -189,7 +220,8 @@ private fun SignatureLogDialog(report: String, onDismiss: () -> Unit, onInfoMess
         },
         confirmButton = {
             TextButton(onClick = {
-                clipboard.setText(AnnotatedString(report))
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("laporan tanda tangan", report))
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onInfoMessage("Laporan disalin ke papan klip")
             }) {

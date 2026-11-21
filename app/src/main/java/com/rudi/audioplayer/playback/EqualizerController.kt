@@ -2,10 +2,16 @@ package com.rudi.audioplayer.playback
 
 import android.content.Context
 import android.media.audiofx.Equalizer
+import android.os.Handler
+import android.os.Looper
 import com.rudi.audioplayer.util.AppLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
+import java.util.concurrent.atomic.AtomicInteger
 
 data class EqualizerBand(
     val index: Int,
@@ -21,7 +27,19 @@ data class EqualizerUiState(
     val bands: List<EqualizerBand> = emptyList(),
     val presets: List<String> = emptyList(),
     val selectedPreset: Int = -1,
-    val boldPreset: String = ""
+    val boldPreset: String = "",
+    // Batch 542 — preset EQ buatan pengguna (hanya yang jumlah band-nya cocok dgn perangkat ini).
+    val userPresets: List<String> = emptyList(),
+    val selectedUserPreset: String = "",
+    // Batch 617 — kontrol efek dipegang pihak lain (bukan "tidak didukung"); UI menampilkan pesan yang tepat.
+    val controlLost: Boolean = false
+)
+
+/** Batch 542 — hasil impor profil AutoEq. [usedFilters] = filter yang berhasil di-parse. */
+data class EqImportResult(
+    val applied: Boolean,
+    val usedFilters: Int,
+    val ignoredFilters: Int
 )
 
 /**
@@ -32,13 +50,46 @@ data class EqualizerUiState(
 class EqualizerController(private val context: Context) {
 
     private var equalizer: Equalizer? = null
+
+    // Batch 613 — sesi audio yang SEDANG terpasang + sesi yang terakhir gagal dipasang. Dipakai attach()
+    // agar event pemutar yang berulang (hook onEvents -> PlaybackAudioSession -> attach) tidak
+    // membongkar-pasang efek untuk sesi yang sama dan tidak mengulang kegagalan yang sama tiap event.
+    private var attachedSessionId = 0
+    private var failedSessionId = 0
+
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow(EqualizerUiState())
+    private val mainHandler = Handler(Looper.getMainLooper())
+    // Batch 620 — SpotBugs run #48 IS2_INCONSISTENT_SYNC @ lambda `scheduleControlRecovery` (baca tanpa kunci, sedang
+    // `release()` menulis berkunci): penanda generasi ditulis dari tiga thread (callback status kontrol efek,
+    // `guardedEffectOp`/`release` berkunci, Runnable di thread utama). AtomicInteger = baca/tulis atomik tanpa kunci.
+    private val recoveryGeneration = AtomicInteger(0)
     val state: StateFlow<EqualizerUiState> = _state.asStateFlow()
 
-    fun attach(audioSessionId: Int) {
-        release()
+    /**
+     * Batch 613 — LOG USER (82x ERROR `UnsupportedOperationException: AudioEffect: invalid parameter
+     * operation` di `Equalizer.setBandLevel`, Infinix X6850 / Android 16): DUA akar di sini.
+     * (1) Catch di bawah dulu hanya `equalizer = null` TANPA `eq.release()` -> efek setengah jadi bocor
+     * dan tetap memegang kontrol efek di sesi itu, sehingga attach berikutnya (Equalizer baru
+     * berprioritas sama = tanpa kontrol) gagal dengan error yang sama, dan `release()` tak bisa lagi
+     * melepasnya (referensinya sudah null). (2) Hook `onEvents` (PlaybackService) menulis ulang
+     * `PlaybackAudioSession.sessionId` di SETIAP event pemutar dan setter-nya memanggil attach() lagi
+     * walau ID-nya sama -> efek dibongkar-pasang berulang. Kini: sesi yang sudah terpasang = no-op;
+     * sesi yang baru gagal tidak diulang otomatis ([retryFailed] = true hanya dari aksi pengguna, mis.
+     * membuka sheet Equalizer); efek setengah jadi SELALU dilepas; level tersimpan dijepit ke rentang
+     * perangkat sebelum diterapkan.
+     */
+    @Synchronized
+    fun attach(audioSessionId: Int, retryFailed: Boolean = false) {
+        if (audioSessionId != 0) {
+            // Batch 617 — sesi sama + efek masih ada = no-op, KECUALI ini retry (aksi pengguna / pemulihan) dan
+            // kontrol sudah hilang: baru dipasang ulang. Jalur otomatis (retryFailed=false) tetap no-op.
+            val lostControl = _state.value.controlLost || runCatching { equalizer?.hasControl() }.getOrNull() == false
+            if (equalizer != null && audioSessionId == attachedSessionId && !(retryFailed && lostControl)) return
+            if (!retryFailed && audioSessionId == failedSessionId) return
+        }
+        releaseEffect()
         if (audioSessionId == 0) return
 
         try {
@@ -56,7 +107,7 @@ class EqualizerController(private val context: Context) {
             for (i in 0 until bandCount) {
                 val saved = prefs.getInt(KEY_BAND_PREFIX + i, Int.MIN_VALUE)
                 if (saved != Int.MIN_VALUE) {
-                    eq.setBandLevel(i.toShort(), saved.toShort())
+                    eq.setBandLevel(i.toShort(), saved.coerceIn(range[0].toInt(), range[1].toInt()).toShort())
                 }
             }
 
@@ -76,60 +127,168 @@ class EqualizerController(private val context: Context) {
                 bands = bands,
                 presets = presetNames,
                 selectedPreset = prefs.getInt(KEY_PRESET, -1),
-                boldPreset = prefs.getString(KEY_BOLD_PRESET, "") ?: ""
+                boldPreset = prefs.getString(KEY_BOLD_PRESET, "") ?: "",
+                userPresets = visibleUserPresetNames(bandCount),
+                selectedUserPreset = prefs.getString(KEY_USER_PRESET, "") ?: ""
             )
+            attachedSessionId = audioSessionId
+            failedSessionId = 0
+            // Batch 616 — fakta mentah: baris sukses (1x per sesi baru; sesi sama = no-op) + kapan kontrol efek
+            // berpindah tangan. v615 tak mencatat kegagalan attach tetapi setBandLevel dari UI melempar error
+            // yang sama -> kontrol hilang SETELAH attach; waktu perpindahannya kini terbaca di log.
+            AppLogger.w("EqualizerController", "Equalizer terpasang: sesi=$audioSessionId hasControl=${eq.hasControl()}")
+            eq.setControlStatusListener { _, granted -> onControlStatusChanged(eq, audioSessionId, granted) }
         } catch (e: Exception) {
             // UI menampilkan ini persis sama dengan "device memang tidak mendukung equalizer" —
             // tapi keduanya bisa jadi beda kasus (mis. audioSessionId tidak valid, konflik efek
             // audio lain). Dicatat supaya kalau ada laporan "equalizer saya hilang" di device yang
             // seharusnya mendukung, penyebab sebenarnya tidak perlu ditebak dari nol.
-            AppLogger.e("EqualizerController", "Gagal attach equalizer ke sesi audio", e)
-            equalizer = null
-            _state.value = EqualizerUiState(supported = false)
+            // Batch 614 — fakta mentah (bukan tebakan): `UnsupportedOperationException: invalid parameter
+            // operation` dari `setBandLevel` = efek ini TIDAK memegang kontrol (di framework, set-parameter
+            // tanpa kontrol ditolak dengan status itu). 144 kegagalan di log 8 Nov (build <= 612) tak
+            // menunjukkan SIAPA pemegang kontrolnya; `hasControl` + sesi + `retryFailed` memutuskannya di log
+            // berikutnya tanpa menebak. Dibaca SEBELUM release() (release mengosongkan `equalizer`).
+            val control = runCatching { equalizer?.hasControl() }.getOrNull()
+            AppLogger.e(
+                "EqualizerController",
+                "Gagal attach equalizer ke sesi audio: sesi=$audioSessionId hasControl=$control retryFailed=$retryFailed",
+                e
+            )
+            runCatching { releaseEffect() }
+            failedSessionId = audioSessionId
+            _state.value = EqualizerUiState(supported = false, controlLost = control == false)
+        }
+    }
+
+    /**
+     * Batch 617 — LOG USER 8 Nov (v616, sesi 2617): attach 19:56:02 `hasControl=true` (pemutar belum memutar) ->
+     * user tekan play 19:56:07 -> `granted=false` 19:56:09 (~2 dtk setelah putar) -> attach ulang 19:56:16
+     * `hasControl=false` -> attach 19:57:51 (sheet dibuka lagi) `hasControl=true` pada sesi yang SAMA yang sedang
+     * memutar. Jadi kontrol hilang sementara lalu bisa didapat lagi; pemegangnya belum teridentifikasi. Kini:
+     * kontrol hilang = UI menampilkan pesan yang tepat (bukan "tidak didukung"), lalu dicoba pulih otomatis
+     * (jadwal [RECOVERY_DELAYS_MS], berhenti begitu pulih / sesi berganti / [release]); kontrol kembali ke efek
+     * yang sama (`granted=true`) = dipasang ulang agar level tersimpan diterapkan lagi.
+     */
+    private fun onControlStatusChanged(eq: Equalizer, session: Int, granted: Boolean) {
+        AppLogger.w("EqualizerController", "Status kontrol efek berubah: sesi=$session granted=$granted")
+        if (equalizer !== eq) return
+        if (granted) {
+            if (_state.value.controlLost) attach(session, retryFailed = true)
+        } else {
+            _state.value = _state.value.copy(controlLost = true)
+            scheduleControlRecovery(session)
+        }
+    }
+
+    private fun scheduleControlRecovery(session: Int) {
+        if (session == 0) return
+        val generation = recoveryGeneration.incrementAndGet()
+        for (delayMs in RECOVERY_DELAYS_MS) {
+            mainHandler.postDelayed({
+                if (generation != recoveryGeneration.get() || PlaybackAudioSession.sessionId != session) return@postDelayed
+                if (equalizer != null && !_state.value.controlLost) return@postDelayed // sudah pulih
+                attach(session, retryFailed = true)
+                val recovered = equalizer != null && !_state.value.controlLost
+                AppLogger.w("EqualizerController", "Pemulihan kontrol: sesi=$session tunda=${delayMs}ms pulih=$recovered")
+                if (recovered) recoveryGeneration.incrementAndGet() // hentikan sisa jadwal
+            }, delayMs)
+        }
+    }
+
+    /**
+     * Batch 616 — CRASH (v615, 19:36:31, thread main): `UnsupportedOperationException: AudioEffect: invalid
+     * parameter operation` dari `Equalizer.setBandLevel` yang dipanggil langsung oleh klik UI (pilih preset
+     * Equalizer) tanpa try/catch -> aplikasi mati. Efek yang kehilangan kontrol menolak SETIAP set-parameter
+     * dengan error itu, jadi SEMUA pemanggilan efek dari UI dibungkus di sini. Gagal = dicatat (fakta mentah:
+     * sesi, hasControl), efek dilepas, lalu SATU kali attach ulang (sesi yang sama, `retryFailed`) supaya kontrol
+     * bisa pulih; bila attach ulang juga gagal, UI jatuh ke "tidak didukung" (jalur attach yang sudah ada).
+     * Mengembalikan false bila operasi gagal (pemanggil TIDAK boleh menyimpan prefs/state perubahan itu).
+     */
+    // Batch 619 — @Synchronized: SpotBugs run #47 IS2_INCONSISTENT_SYNC (baca attachedSessionId / tulis failedSessionId
+    // tanpa kunci, sedang attach()/release() memakai kunci). Reentrant terhadap attach()/releaseEffect().
+    @Synchronized
+    private fun guardedEffectOp(op: String, block: () -> Unit): Boolean {
+        return try {
+            block()
+            true
+        } catch (e: RuntimeException) {
+            val control = runCatching { equalizer?.hasControl() }.getOrNull()
+            val session = attachedSessionId
+            AppLogger.e("EqualizerController", "Gagal $op: sesi=$session hasControl=$control", e)
+            runCatching { releaseEffect() }
+            failedSessionId = session
+            _state.value = EqualizerUiState(supported = false, controlLost = control == false)
+            if (session != 0) {
+                attach(session, retryFailed = true)
+                val recovered = equalizer != null && !_state.value.controlLost
+                AppLogger.w("EqualizerController", "Attach ulang setelah gagal $op: sesi=$session pulih=$recovered")
+                if (!recovered) scheduleControlRecovery(session)
+            }
+            false
         }
     }
 
     fun setEnabled(enabled: Boolean) {
-        equalizer?.setEnabled(enabled)
+        if (!guardedEffectOp("setEnabled") { equalizer?.setEnabled(enabled) }) return
         prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()
         _state.value = _state.value.copy(enabled = enabled)
     }
 
     fun setBandLevel(band: Int, level: Short) {
         val eq = equalizer ?: return
-        eq.setBandLevel(band.toShort(), level)
         // Adjusting a band is a clear signal the user wants to hear the effect —
         // don't make them separately remember to flip the enabled switch too.
-        eq.setEnabled(true)
+        if (!guardedEffectOp("setBandLevel band=$band") {
+                eq.setBandLevel(band.toShort(), level)
+                eq.setEnabled(true)
+            }
+        ) return
         prefs.edit()
             .putInt(KEY_BAND_PREFIX + band, level.toInt())
             .putInt(KEY_PRESET, -1)
             .putString(KEY_BOLD_PRESET, "")
+            .putString(KEY_USER_PRESET, "")
             .putBoolean(KEY_ENABLED, true)
             .apply()
         val updatedBands = _state.value.bands.map {
             if (it.index == band) it.copy(levelMillibel = level) else it
         }
-        _state.value = _state.value.copy(bands = updatedBands, selectedPreset = -1, enabled = true, boldPreset = "")
+        _state.value = _state.value.copy(
+            bands = updatedBands,
+            selectedPreset = -1,
+            enabled = true,
+            boldPreset = "",
+            selectedUserPreset = ""
+        )
     }
 
     fun usePreset(presetIndex: Int) {
         val eq = equalizer ?: return
-        eq.usePreset(presetIndex.toShort())
-        eq.setEnabled(true)
-
         val editor = prefs.edit()
             .putInt(KEY_PRESET, presetIndex)
             .putString(KEY_BOLD_PRESET, "")
+            .putString(KEY_USER_PRESET, "")
             .putBoolean(KEY_ENABLED, true)
-        val updatedBands = _state.value.bands.map { band ->
-            val newLevel = eq.getBandLevel(band.index.toShort())
-            editor.putInt(KEY_BAND_PREFIX + band.index, newLevel.toInt())
-            band.copy(levelMillibel = newLevel)
-        }
+        var updatedBands = _state.value.bands
+        if (!guardedEffectOp("usePreset preset=$presetIndex") {
+                eq.usePreset(presetIndex.toShort())
+                eq.setEnabled(true)
+                updatedBands = _state.value.bands.map { band ->
+                    val newLevel = eq.getBandLevel(band.index.toShort())
+                    editor.putInt(KEY_BAND_PREFIX + band.index, newLevel.toInt())
+                    band.copy(levelMillibel = newLevel)
+                }
+            }
+        ) return
         editor.apply()
 
-        _state.value = _state.value.copy(bands = updatedBands, selectedPreset = presetIndex, enabled = true, boldPreset = "")
+        _state.value = _state.value.copy(
+            bands = updatedBands,
+            selectedPreset = presetIndex,
+            enabled = true,
+            boldPreset = "",
+            selectedUserPreset = ""
+        )
     }
 
     /**
@@ -146,37 +305,188 @@ class EqualizerController(private val context: Context) {
         val editor = prefs.edit()
             .putInt(KEY_PRESET, -1)
             .putString(KEY_BOLD_PRESET, preset.name)
+            .putString(KEY_USER_PRESET, "")
             .putBoolean(KEY_ENABLED, true)
 
-        val updatedBands = bands.mapIndexed { i, band ->
-            val fraction = if (bands.size == 1) 0f else i / (bands.size - 1).toFloat() // 0 = lowest band, 1 = highest
-            val intensity = when (preset) {
-                BoldPreset.FLAT -> 0f
-                BoldPreset.BASS_BOOST -> ((1f - fraction).coerceIn(0f, 1f)).let { it * it }
-                BoldPreset.TREBLE_BOOST -> fraction.let { it * it }
-                BoldPreset.VOCAL_BOOST -> (1f - (2f * (fraction - 0.5f)) * (2f * (fraction - 0.5f))).coerceIn(0f, 1f)
+        var updatedBands = bands
+        if (!guardedEffectOp("useBoldPreset preset=${preset.name}") {
+                updatedBands = bands.mapIndexed { i, band ->
+                    val fraction = if (bands.size == 1) 0f else i / (bands.size - 1).toFloat() // 0 = lowest band, 1 = highest
+                    val intensity = when (preset) {
+                        BoldPreset.FLAT -> 0f
+                        BoldPreset.BASS_BOOST -> ((1f - fraction).coerceIn(0f, 1f)).let { it * it }
+                        BoldPreset.TREBLE_BOOST -> fraction.let { it * it }
+                        BoldPreset.VOCAL_BOOST -> (1f - (2f * (fraction - 0.5f)) * (2f * (fraction - 0.5f))).coerceIn(0f, 1f)
+                    }
+                    val level = (intensity * maxRange * 0.85f).toInt().toShort()
+                    eq.setBandLevel(i.toShort(), level)
+                    editor.putInt(KEY_BAND_PREFIX + i, level.toInt())
+                    band.copy(levelMillibel = level)
+                }
+                eq.setEnabled(true)
             }
-            val level = (intensity * maxRange * 0.85f).toInt().toShort()
-            eq.setBandLevel(i.toShort(), level)
-            editor.putInt(KEY_BAND_PREFIX + i, level.toInt())
-            band.copy(levelMillibel = level)
-        }
-        eq.setEnabled(true)
+        ) return
         editor.apply()
 
         _state.value = _state.value.copy(
             bands = updatedBands,
             selectedPreset = -1,
             enabled = true,
-            boldPreset = preset.name
+            boldPreset = preset.name,
+            selectedUserPreset = ""
         )
+    }
+
+    /**
+     * Batch 542 — menerapkan level band (millibel) langsung, satu per band perangkat. Dipakai preset
+     * pengguna + impor profil AutoEq. Ukuran [levels] HARUS = jumlah band; kalau tidak -> false, 0 efek.
+     */
+    fun applyBandLevels(levels: List<Short>, userPreset: String = ""): Boolean {
+        val eq = equalizer ?: return false
+        val bands = _state.value.bands
+        if (bands.isEmpty() || levels.size != bands.size) return false
+
+        val minLevel = _state.value.minLevel
+        val maxLevel = _state.value.maxLevel
+        val editor = prefs.edit()
+            .putInt(KEY_PRESET, -1)
+            .putString(KEY_BOLD_PRESET, "")
+            .putString(KEY_USER_PRESET, userPreset)
+            .putBoolean(KEY_ENABLED, true)
+
+        var updatedBands = bands
+        if (!guardedEffectOp("applyBandLevels") {
+                updatedBands = bands.mapIndexed { i, band ->
+                    val level = levels[i].coerceIn(minLevel, maxLevel)
+                    eq.setBandLevel(i.toShort(), level)
+                    editor.putInt(KEY_BAND_PREFIX + i, level.toInt())
+                    band.copy(levelMillibel = level)
+                }
+                eq.setEnabled(true)
+            }
+        ) return false
+        editor.apply()
+
+        _state.value = _state.value.copy(
+            bands = updatedBands,
+            selectedPreset = -1,
+            enabled = true,
+            boldPreset = "",
+            selectedUserPreset = userPreset
+        )
+        return true
+    }
+
+    /** Menyimpan level band SAAT INI sebagai preset bernama (nama sama = ditimpa). */
+    fun saveUserPreset(rawName: String): Boolean {
+        val bands = _state.value.bands
+        if (equalizer == null || bands.isEmpty()) return false
+        val name = rawName.trim().take(MAX_PRESET_NAME_LENGTH)
+        if (name.isEmpty()) return false
+
+        val others = readUserPresets().filter { it.name != name }
+        if (others.size >= MAX_USER_PRESETS) return false
+
+        writeUserPresets(others + StoredUserPreset(name, bands.map { it.levelMillibel }))
+        prefs.edit().putString(KEY_USER_PRESET, name).apply()
+        _state.value = _state.value.copy(
+            userPresets = visibleUserPresetNames(bands.size),
+            selectedUserPreset = name
+        )
+        return true
+    }
+
+    fun useUserPreset(name: String): Boolean {
+        val bandCount = _state.value.bands.size
+        val preset = readUserPresets().firstOrNull { it.name == name && it.levels.size == bandCount }
+            ?: return false
+        return applyBandLevels(preset.levels, name)
+    }
+
+    fun deleteUserPreset(name: String) {
+        val bandCount = _state.value.bands.size
+        writeUserPresets(readUserPresets().filter { it.name != name })
+        val wasSelected = _state.value.selectedUserPreset == name
+        if (wasSelected) prefs.edit().putString(KEY_USER_PRESET, "").apply()
+        _state.value = _state.value.copy(
+            userPresets = visibleUserPresetNames(bandCount),
+            selectedUserPreset = if (wasSelected) "" else _state.value.selectedUserPreset
+        )
+    }
+
+    /**
+     * Batch 542 — impor profil AutoEq/EqualizerAPO (`ParametricEQ.txt`) lalu terapkan sebagai
+     * perkiraan ke band perangkat (lihat batas jujur di [EqProfileImport]).
+     */
+    fun importProfile(text: String): EqImportResult {
+        val profile = EqProfileImport.parse(text) ?: return EqImportResult(false, 0, 0)
+        val bands = _state.value.bands
+        if (equalizer == null || bands.isEmpty()) {
+            return EqImportResult(false, profile.filters.size, profile.ignoredFilters)
+        }
+        val levels = EqProfileImport.toBandLevels(
+            profile = profile,
+            centerFreqsHz = bands.map { it.frequencyHz },
+            minMillibel = _state.value.minLevel.toInt(),
+            maxMillibel = _state.value.maxLevel.toInt()
+        )
+        return EqImportResult(applyBandLevels(levels), profile.filters.size, profile.ignoredFilters)
+    }
+
+    private data class StoredUserPreset(val name: String, val levels: List<Short>)
+
+    private fun visibleUserPresetNames(bandCount: Int): List<String> =
+        readUserPresets().filter { it.levels.size == bandCount }.map { it.name }
+
+    private fun readUserPresets(): List<StoredUserPreset> {
+        val raw = prefs.getString(KEY_USER_PRESETS, null) ?: return emptyList()
+        return try {
+            val array = JSONArray(raw)
+            (0 until array.length()).mapNotNull { i ->
+                val obj = array.optJSONObject(i) ?: return@mapNotNull null
+                val name = obj.optString("n")
+                val levelArray = obj.optJSONArray("l") ?: return@mapNotNull null
+                if (name.isBlank()) return@mapNotNull null
+                StoredUserPreset(name, (0 until levelArray.length()).map { levelArray.getInt(it).toShort() })
+            }
+        } catch (e: JSONException) {
+            // Data rusak = anggap tidak ada preset; band aktif TIDAK tersentuh.
+            AppLogger.e("EqualizerController", "Daftar preset EQ pengguna korup, diabaikan", e)
+            emptyList()
+        }
+    }
+
+    private fun writeUserPresets(presets: List<StoredUserPreset>) {
+        val array = JSONArray()
+        presets.forEach { preset ->
+            array.put(
+                JSONObject()
+                    .put("n", preset.name)
+                    .put("l", JSONArray(preset.levels.map { it.toInt() }))
+            )
+        }
+        prefs.edit().putString(KEY_USER_PRESETS, array.toString()).apply()
     }
 
     enum class BoldPreset { FLAT, BASS_BOOST, TREBLE_BOOST, VOCAL_BOOST }
 
+    /** Dipanggil saat sesi audio berakhir (PlaybackService.onDestroy): juga membatalkan jadwal pemulihan. */
+    @Synchronized
     fun release() {
-        equalizer?.release()
-        equalizer = null
+        recoveryGeneration.incrementAndGet()
+        releaseEffect()
+    }
+
+    @Synchronized
+    private fun releaseEffect() {
+        // Batch 613 — `equalizer` selalu dikosongkan walau release() platform melempar, supaya referensi
+        // efek tidak tertinggal; penanda sesi ikut direset agar attach() berikutnya benar-benar memasang ulang.
+        try {
+            equalizer?.release()
+        } finally {
+            equalizer = null
+            attachedSessionId = 0
+        }
     }
 
     companion object {
@@ -184,6 +494,42 @@ class EqualizerController(private val context: Context) {
         private const val KEY_ENABLED = "eq_enabled"
         private const val KEY_PRESET = "eq_preset"
         private const val KEY_BOLD_PRESET = "eq_bold_preset"
+        private const val KEY_USER_PRESET = "eq_user_preset"
+        private const val KEY_USER_PRESETS = "eq_user_presets"
+        private const val MAX_USER_PRESETS = 20
+        // Batch 617 — jadwal pemulihan kontrol efek (ms sejak kontrol hilang).
+        private val RECOVERY_DELAYS_MS = longArrayOf(3_000L, 10_000L, 30_000L, 90_000L)
+        private const val MAX_PRESET_NAME_LENGTH = 24
         private const val KEY_BAND_PREFIX = "eq_band_"
+
+        @Volatile
+        private var sharedInstance: EqualizerController? = null
+
+        /**
+         * Batch 490 — shared per-process instance. Root cause of "preset EQ balik ke
+         * nol/default pasca app di-kill lalu musik dimainkan lewat eksternal player": the only
+         * place that ever re-attached this controller to a new audio session was
+         * [PlayerViewModel]'s `init{}` (Batch 314) — a ViewModel construct that simply does not
+         * exist until MainActivity is created. When the process is instead resurrected headlessly
+         * (widget/Bluetooth/media-button/notification/Android Auto after a full app-kill),
+         * [PlaybackService] still creates a brand-new ExoPlayer session with 0 listener
+         * registered, so the platform Equalizer for THAT session never learns the saved
+         * bands/preset at all — it just sits at Android's own flat/disabled default even though
+         * SharedPreferences still holds the real values.
+         *
+         * Fix (see [com.rudi.audioplayer.AudioPlayerApplication.onCreate], also Batch 490): the
+         * re-attach hook is now ALSO registered there, which runs before any component regardless
+         * of what started the process. That means two independent call sites can now legitimately
+         * want an [EqualizerController] for the same process. android.media.audiofx.Equalizer
+         * does not dedupe by session — two SEPARATE instances attached to the same session would
+         * be two real inserted effects, silently double-applying every band gain the moment both
+         * happened to be alive together. getInstance() makes that structurally impossible: every
+         * caller in this process shares the ONE underlying platform Equalizer object, so attach()
+         * only ever recreates it (release-then-new), never stacks a second one alongside it.
+         */
+        fun getInstance(context: Context): EqualizerController =
+            sharedInstance ?: synchronized(this) {
+                sharedInstance ?: EqualizerController(context.applicationContext).also { sharedInstance = it }
+            }
     }
 }

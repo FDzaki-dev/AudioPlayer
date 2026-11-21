@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Batch 639 — LAYOUT STRIP BARU (lebar < 150dp DAN tinggi >= 160dp; WidgetUpdater.STRIP_WIDTH_THRESHOLD_DP / STRIP_MIN_HEIGHT_DP).
+    Screenshot user: widget ditarik jadi strip sempit-tinggi (ESTIMASI ±48 x ±297dp: sampul slim 32dp mengisi hampir seluruh lebar strip). Layout slim (baris horizontal, lebar tetap non-judul
+    149dp) dipakai karena lebar < 230dp -> kolom judul + kenop terdorong keluar (lebar palung 0dp), hanya sampul 32dp yang tampil di
+    tengah strip. Strip = slim DIPUTAR 90 derajat: sampul 32dp di atas, palung (`widget_well`, tinggi mengisi sisa, bobot 1) berisi
+    kenop prev / play / next BERTUMPUK vertikal dan dipusatkan. Ukuran kenop = slim (24 / 28 / 24dp) -> muat di palung selebar 32dp
+    (lebar strip 48 - padding 8x2). Padding 8 (kiri/kanan) / 7 (atas/bawah) = slim, jadi geometri sudut cangkang compact (TL 22 / TR 4 / BR 30 / BL 4)
+    dan `WidgetUpdater.applyCornerInset` (isCompact) berlaku sama. Sampul `match_parent` x 32dp + fitCenter: menyusut sendiri bila
+    padding naik (inset sudut) dan tetap 32dp bila strip lebih lebar. `clipToPadding="false"` agar kelebihan kecil meluber ke padding.
+    Tinggi minimum: padding 14 + sampul 32 + margin 5 + palung (kenop 24+28+24 + jarak 2x10 + padding 6 = 102) = 153dp -> ambang 160dp.
+    TIDAK ada judul/artis (tak muat di 32dp): WidgetUpdater melewati `widget_title`/`widget_artist` dan mengisi contentDescription sampul
+    dgn judul lagu. Id lain utuh (widget_root, widget_well, widget_album_art, widget_prev, widget_play_pause, widget_next).
+    Batch 641 — BARIS JUDUL opsional (`widget_title_viewport`, bawaan GONE; WidgetUpdater memunculkannya bila lebar >= 100dp & tinggi >= 190dp):
+    palung kecil di antara sampul & palung kenop berisi judul 12sp 1 baris yang DIGESER app (lihat WidgetMarquee.kt); sisa tinggi 28dp dicadangkan.
+    Cangkang: `widget_background_compact_*`; palung `widget_well[_light]`; root dibungkus `@android:id/background` + `clipToOutline`
+    (opt-out clip launcher Android 12+, Batch 610) sama dgn layout lain.
+    Batch 643 — judul punya DUA tampilan di `widget_title_viewport`: `widget_title_static` (muat di kolom: 1 baris, ellipsize end) ATAU `widget_title_flipper`
+    (ViewFlipper tanpa autoStart; judul tak muat: `widget_title` 4000dp berisi dua salinan teks, digeser oleh animasi segmen `@anim/widget_title_segment`
+    yang digambar launcher + 1 update margin per detik dari WidgetMarqueeDriver). WidgetUpdater menampilkan salah satunya (`setViewVisibility`).
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipToOutline="true">
+
+    <LinearLayout
+        android:id="@+id/widget_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/widget_background_compact_dark"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:clipToPadding="false"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="7dp"
+        android:paddingBottom="7dp">
+
+        <ImageView
+            android:id="@+id/widget_album_art"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:scaleType="fitCenter"
+            android:contentDescription="Buka SONIX" />
+
+        <FrameLayout
+            android:id="@+id/widget_title_viewport"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/widget_well"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/widget_title_static"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:includeFontPadding="false"
+                android:ellipsize="end"
+                android:text="Tidak ada lagu" />
+
+            <ViewFlipper
+                android:id="@+id/widget_title_flipper"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inAnimation="@anim/widget_title_segment"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/widget_title"
+                    android:layout_width="4000dp"
+                    android:layout_height="wrap_content"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:includeFontPadding="false"
+                    android:text="Tidak ada lagu" />
+
+            </ViewFlipper>
+
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_well"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/widget_well"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp">
+
+            <ImageButton
+                android:id="@+id/widget_prev"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:padding="5dp"
+                android:background="@android:color/transparent"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_previous"
+                android:contentDescription="Sebelumnya" />
+
+            <ImageButton
+                android:id="@+id/widget_play_pause"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginTop="10dp"
+                android:padding="6dp"
+                android:background="@drawable/widget_play_button_bg"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_play"
+                android:contentDescription="Putar" />
+
+            <ImageButton
+                android:id="@+id/widget_next"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginTop="10dp"
+                android:padding="5dp"
+                android:background="@android:color/transparent"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_widget_next"
+                android:contentDescription="Berikutnya" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</FrameLayout>

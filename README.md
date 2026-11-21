@@ -1,5 +1,219 @@
 # SONIX
 
+> **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
+> daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 702: CI run #128 = Batch 701 VERIFIED (enam alat lulus, Tes 334). Log v701: update Shizuku saat memutar sekarang MELANJUTKAN musik (`keputusan=RESUME`, `isPlaying=true` pada +1534 ms, audio ±2,99 dtk setelah proses mati) = lanjut-putar pasca-update VERIFIED di perangkat. Cacat baru: APK pembaruan lama (`cacheDir/update_*.apk`, ±7,1 MB tiap pembaruan, 5 berkas dalam ±10 jam di log) tak pernah dihapus; v702 membersihkannya sebelum unduhan baru (`UpdateApkCache`, 8 tes JVM LULUS lokal). NOT VERIFIED: compile penuh/CI dan efek di perangkat (cari `APK pembaruan lama dibersihkan dari cache:` di log setelah dua kali unduh).
+> - Batch 701: CI run #127 = Batch 700 VERIFIED (enam alat lulus; SpotBugs 3 `UpdateResumeReceiver.kt`). Log v700: update Shizuku 05:37:06 TIDAK melanjutkan musik (`SKIP_NO_UPDATE_EXIT`) karena sistem mencatat kematian proses sebagai `USER_REQUESTED` `[FORCE STOP] ... due to pkg removed`, bukan PACKAGE_UPDATED; v701 menerima "pkg removed" sebagai kematian-karena-update dan menyaring 3 temuan SpotBugs `ResumeHeadPrefetch`. Compile/CI v701 dan lanjut-putar di perangkat BELUM diverifikasi.
+> - Batch 700: CI run #126 = Batch 699 VERIFIED (enam alat lulus; SpotBugs 3 = `UpdateResumeReceiver.kt:83,84,93` `ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD`, tak mengubah exit 0). Atas perintah user (tanpa sampel baru) v700 memindahkan render bitmap bayangan/sumur/wash neumorphic (`BlurMaskFilter` di canvas perangkat lunak, terlihat di pesan thread utama 204 ms v698) ke thread latar dan mengganti pas-label bilah tab (`BoxWithConstraints` + ukur teks berulang) dengan satu pass `Modifier.layout`. Compile Android/CI v700 dan efek ke jank BELUM diverifikasi.
+> - Batch 699: CI run #125 = Batch 698 VERIFIED (enam alat lulus); log v698: posisi pulih ±9 ms di belakang titik mati, mati -> audio ±2,20 dtk. Atas perintah user (berhenti mengumpulkan sampel) v699 memutus probe StartupStall (pengamat yang membebani thread utama) dan membaca lagu pembuka pemulihan secara paralel dgn pembuatan service. Compile Android/CI v699 dan penghematan waktu BELUM diverifikasi.
+> - Batch 698: CI run #124 = Batch 697 VERIFIED (enam alat lulus: ArchUnit 7, SpotBugs 0, detekt 0, lint 0, Tes 331, Kotlin 0). Log v697 membuktikan jalur pasang senyap Shizuku dan posisi pulih ±15 ms di belakang titik mati (mati -> audio ±2,17 dtk). v698 memindahkan panggilan `isBiometricAvailable()` (binder sinkron ke system_server, terlihat 1 sampel di thread utama) keluar dari badan komposisi. Compile Android/CI v698 dan efek ke jank startup BELUM diverifikasi (bukti durasi hanya 1 sampel).
+> - Batch 697: CI run #123 = Batch 696 VERIFIED (Tes 331, ArchUnit 7, SpotBugs 0, lint 0, Kotlin 0) tetapi detekt NOT VERIFIED (detekt-cli 1.23.8 gagal diunduh di CI, bukan temuan kode). Log v696 membuktikan posisi pulih tak mundur (±59 ms di depan titik mati; mati -> audio ±2,63 dtk). v697 membuat CI mengulang detekt/lint sekali bila unduhan dependensi gagal. Perilaku ulangan di GitHub Actions dan jalur senyap Shizuku di perangkat BELUM diverifikasi.
+> - Batch 696: CI run #122 = Batch 695 VERIFIED (Tes 331, ArchUnit 7, detekt 0, lint 0, SpotBugs 0); log v695 membuktikan posisi pulih pasca-update tak lagi mundur (±74 ms di belakang titik mati; sebelumnya ±3,5 dtk) dan mati -> audio ±2,69 dtk. v696 membersihkan 1 peringatan Kotlin (`PlaybackService.kt:815`) dan mencatat baris sebelum pasang senyap Shizuku (jalur Shizuku belum terbukti dari log karena proses mati sebelum baris `selesai`). Compile Android/CI v696 dan jalur Shizuku di perangkat BELUM diverifikasi.
+> - Batch 695: CI run #121 = Batch 694 VERIFIED (Tes 321, ArchUnit 7, detekt 0, lint 0, SpotBugs 0, Kotlin 0); log v694 membuktikan pemanasan codec jalan di thread latar. Cacat nyata: setelah update lagu mundur ±3,5 dtk (posisi tersimpan tertinggal dari waktu proses mati). v695 menambah posisi pulih dengan waktu sejak simpan terakhir sampai proses mati (semua jalur pasang; konservatif bila data tak pasti). Tes JVM kebijakan 31/31 lulus lokal; compile Android/CI, pasang senyap Shizuku, dan ketepatan posisi di perangkat BELUM diverifikasi.
+> - Batch 693: log v692 membuktikan jalur cepat pemulihan pasca-update (jatah app proses lahir -> audio 2,27 -> 1,20 dtk; total mati -> audio ±3,02 dtk, sisanya kerja sistem). v693 menutup celah stabilitas: bila sambung sisa antrean gagal, antrean tersimpan tak lagi tertimpa antrean 1 lagu. Compile/CI Batch 689-693 dan jalur gagal di perangkat BELUM diverifikasi.
+> - Batch 692: log v691 membuktikan Android 16 MENGIZINKAN start foreground service dari `Application.onCreate` (percobaan awal berhasil; hening ±3,12 dtk, v690 ±3,31). v692 mempercepat tahap berikutnya: lagu saat ini dibaca dan diputar DULU, sisa antrean disambung paralel (antrean tersimpan dijaga agar tak tertimpa antrean 1 lagu). Compile/CI Batch 689-692 (laporan CI belum dikirim), perilaku `addMediaItems` di perangkat, dan besar percepatan BELUM diverifikasi; uji: pasang v692 saat musik diputar lalu cari `pulih_antrean` dan `sisa antrean disambung` di log.
+> - Batch 691: log v690 membuktikan percepatan Batch 690 (hening kill -> audio ±3,64 -> ±3,31 dtk; sisa ±2,09 dtk dipakai sistem sebelum receiver jalan). v691 = EKSPERIMEN: pemulihan dicoba juga dari `Application.onCreate` (thread latar) agar bisa mendahului broadcast ±0,8 dtk, bila Android mengizinkan start foreground service dari sana; ditolak = hanya dicatat dan jalur receiver tetap. Pemulihan dijaga satu kali sekaligus. Compile/CI, izin FGS awal, dan percepatannya BELUM diverifikasi; uji: pasang v691 saat musik diputar lalu cari `Percobaan awal` di log.
+> - Batch 690: log v689 membuktikan pemulihan pasca-update BERJALAN di perangkat (`keputusan=RESUME`, musik lanjut dari posisi tersimpan; mati -> audio ±3,64 dtk, 2,12 dtk di antaranya kerja sistem yang tak bisa dihilangkan). v690 memangkas pembacaan antrean (melewati peta genre yang tak dipakai; semua jalur pemulihan antrean ikut lebih cepat) dan mencatat `pulih_antrean=`/`putar=`. Besar percepatan, compile Android/CI Batch 689-690 (laporan CI v689 belum dikirim) BELUM diverifikasi; uji: pasang v690 saat musik diputar lalu bandingkan `tunda_service=` (v689 = 1342 ms).
+> - Batch 689: lanjutan pemulihan pasca-update. CI run115 = v688 VERIFIED (Tes 303, ArchUnit 7, detekt 0, lint 0, SpotBugs 0, Kotlin 0) dan log v688 membuktikan `MY_PACKAGE_REPLACED` TERKIRIM di XOS/Android 16 (update pertama = SKIP_NOT_PLAYING, wajar). Kebijakan kini hanya menuruti catatan keluar proses TERBARU (penanda basi pasca-OEM-kill tak membunyikan audio mendadak), perubahan penanda dicatat di log, dan log pemulihan memuat `posisi_pulih`. Tes JVM 15/15 lulus lokal; compile/CI Batch 689 dan RESUME nyata (pasang update saat musik diputar; start FGS dari receiver di Android 16) BELUM diverifikasi. Jank ±1,9 dtk pasca-Activity (kelima kali) tetap tanpa perbaikan: DUGAAN cache shader dikosongkan update, belum terbukti.
+> - Batch 688: permintaan user "pemutar harus pulih cepat / melanjutkan musik yang terjeda akibat instalasi update" — log v687 membuktikan update mematikan proses saat memutar (`PACKAGE_UPDATED`, FOREGROUND) lalu antrean pulih DALAM KEADAAN JEDA. Ditambah receiver `MY_PACKAGE_REPLACED` + penanda "berniat memutar" + verifikasi `ApplicationExitInfo` (cegah musik menyala tiba-tiba) + simpan posisi tiap 10 dtk selagi memutar + notifikasi cadangan bila start foreground service ditolak. Tes JVM 12/12 lulus lokal; compile Android/R8/CI, pengiriman `MY_PACKAGE_REPLACED` di XOS, dan start FGS dari receiver di Android 16 BELUM diverifikasi. Aktif mulai update v688 -> v689 (v687 belum menulis penanda).
+> - Batch 687: log v686 (jalan: probe Batch 685) menunjukkan jank ±1,9 dtk setelah Activity terulang keempat kali berupa kerja Compose yang melebar (pesan doFrame 225 ms, 13 sampel di >= 9 lokasi), bukan binder atau satu titik panas; kode app belum bisa ditunjuk karena sampler hanya 4 frame teratas dan R8 mengacak nama. Probe kini mengelompokkan sampel menurut frame KODE APP dan R8 tidak lagi mengacak nama (`-dontobfuscate`; shrink/optimize tetap), sehingga stacktrace di log terbaca; tes unit +4 (291). Perilaku app tidak berubah; compile Android/R8/CI belum dilaporkan.
+> - Batch 686: perbaikan tes — Batch 685 menaikkan kedalaman lokasi sampel tumpukan (3 -> 4) tetapi satu tes lama masih mengharap 3 (CI `testReleaseUnitTest` gagal 1 dari 287). Hanya file tes yang berubah; kode produksi dan perilaku app tidak berubah.
+> - Batch 685: log v684 (CI run #111 hijau, 284 tes) menunjukkan binder bloking di thread utama (`ISession.setMetadata`, `enqueueNotificationWithTag`) dan jank frame ±2 dtk setelah Activity yang terulang; sampler Batch 684 teragregasi 8 dtk sehingga belum menunjuk kode. Probe kini mengaitkan sampel tumpukan ke rentang tiap pesan lambat; tes unit +3. Perilaku app tidak berubah.
+> - Batch 684: log v683 menjawab pertanyaan stall frame pertama (tidak ada stall khusus; frame pertama 155-175 ms, `Skipped frames` = ambang Choreographer terlampaui saat kerja luncur ≥ ±360 ms) dan menemukan jank nyata ±2 dtk setelah Activity (frame `gambar` 168-182 ms). Probe: buang duplikat frame, ambang frame 200 ms, sampler tumpukan thread utama utk menunjuk kodenya; tes unit +3. CI run #110 (Batch 683) hijau.
+> - Batch 683: probe `StartupStall` (Batch 682) dijangkarkan ke Activity PERTAMA proses, bukan hanya 8 dtk sejak proses mulai: log v682 membuktikan probe lama meleset (Activity dibuat t=+8439 ms setelah jendela habis; pid 31012 membuka Activity 3,4 jam setelah proses lahir) sehingga 0 baris tercatat. Kini dua jendela (proses + Activity pertama), ambang frame 150 ms; tes unit +4. Compile Android/CI belum dilaporkan.
+> - Batch 682: probe diagnostik SEMENTARA untuk jank frame pertama pasca-instal (`Skipped 31 frames`, v681): selama 8 dtk pertama proses mencatat pesan thread utama yang lama (teks mentah `Looper`) + rincian fase frame lambat (`FrameMetrics`), ditulis ke Log Diagnostik (tag `StartupStall`) HANYA bila ada stall besar (pesan >= 150 ms / frame >= 200 ms); start normal = 0 baris; perilaku app tak berubah; tes unit +9. CI v681 belum dilaporkan; compile Android/CI v682 belum dilaporkan.
+> - Batch 681: Log Diagnostik tak lagi dibanjiri baris `[WidgetUpdater] Marquee diag` (tiap pembaruan widget = 30,8% byte log v680): kini ditulis hanya saat mode/ukuran/skala font/teks-lebih-lebar-dari-kolom berubah atau widget baru terlihat di proses; riwayat log efektif ±34% lebih panjang di batas 200 KB; tes unit +7. CI v680 (run #107) LULUS semua; compile Android/CI v681 belum dilaporkan.
+> - Batch 680: label `jenis=` pada baris `StartupTiming` `Cold start` dikoreksi (ambang 2000 -> 500 ms; proses pasca-instal tak lagi terbaca start dingin murni) dan alasan keluar proses API 34 (`PACKAGE_UPDATED`, dst.) kini bernama di log; tes unit +4. Compile Android/CI belum dilaporkan.
+> - Batch 679: pemangkasan Log Diagnostik kini per-entri (entri multi-baris/stack trace tertua tak lagi terpotong kepalanya) dan baris `StartupTiming` `Cold start` diberi label `jenis=` (start dingin murni vs proses hidup tanpa UI); tes unit +5. Compile Android/CI belum dilaporkan.
+> - Batch 678: analisis log v677 — start dingin murni (force-stop -> buka) terukur 325-403 ms sampai frame pertama, tanpa `Skipped frames`; jank cold start TIDAK terbukti (angka lama 1,84 dtk = proses hidup tanpa UI sejak instal). 0 perubahan kode; CI v677 belum dilaporkan.
+> - Batch 677: jejak cold start `StartupTrace` — log debug mencatat satu baris `StartupTiming` `Cold start` (titik waktu Application -> Activity -> ViewModel -> komposisi -> frame pertama) untuk menemukan sumber ±1,8 dtk sebelum layar pertama; belum dikompilasi/diuji di device.
+> - Batch 676: temuan CI run #102 dibersihkan (SpotBugs `PowerProbe` disaring sebagai pola Kotlin-`object`; diagnostik `[offload]` ter-deprecated dihapus).
+> - Batch 675: log debug mencatat waktu per tahap `PlaybackService.onCreate` (baris `StartupTiming`) untuk memangkas jank cold start berdasarkan data.
+> - Batch 674: log debug mencatat dukungan audio offload perangkat per format (mp3/aac/opus) di baris `[offload]`.
+> - Batch 673: Pengaturan Putar > Hemat Daya: saklar Scheduling Dinamis (berlaku setelah restart app) dan Audio Offload (live), default ON.
+> - Batch 672: audio offload aktif bila Trim Keheningan & Crossfade OFF (format/perangkat tak mendukung = tetap PCM); overlapPlayer ikut scheduling dinamis.
+> - Batch 671: ExoPlayer sesi utama memakai scheduling dinamis (`experimentalSetDynamicSchedulingEnabled`) untuk menekan CPU pemutaran layar mati.
+> - Batch 670: `PowerProbe` mencetak status `xfade=`/`senyap=`; bagian `batterystats` di log debug kini menyimpan blok uid aplikasi (sebelumnya terpotong sebelum blok itu).
+> - Batch 669: catcher daya `PowerProbe` — tiap segmen layar/charger/10 menit dicatat ke log debug (kuras uAh/mA nyata, CPU app + thread teratas, frame bubble/kosmos) + bagian dumpsys batterystats & cpuinfo; belum dikompilasi/diuji di device
+> - Batch 668: hemat baterai — jam animasi bubble tak lagi dibangunkan tiap vsync (120x/dtk -> ~31x/dtk) dan lencana minimized beku setelah 8 dtk; polling crossfade 250 ms -> 1-2 dtk saat jauh dari jendela/dijeda; hitung mundur timer tidur berhenti tiap detik saat UI tak terlihat; belum dikompilasi/diuji di device
+> - Batch 667: bubble kini meminta frame rate tinggi (120 Hz) selama animasi minimize/expand supaya auto-minimize saat idle tak lagi jatuh ke 60 Hz (log v666: tap = 120 Hz solid, idle = 60 Hz); belum dikompilasi/diuji di device
+> - Batch 666: log diagnostik baru "Batch666 ritme luncuran" mengukur ritme frame nyata saat bubble meluncur ke/dari tepi; perilaku tak berubah; belum dikompilasi/diuji di device
+> - Batch 665: minimize bubble kini memudarkan pill lebih lama (±325 ms, dulu ±215 ms) supaya seimbang dengan expand; belum dikompilasi/diuji di device
+> - Batch 664: minimize/expand bubble dihaluskan — kurva gerak lembut (kecepatan naik bertahap, bukan lompat di frame pertama), durasi 340 -> 520 ms, dan log diagnostik tak lagi ditulis di main thread saat animasi berjalan; belum dikompilasi/diuji di device
+> - Batch 663: minimize/expand bubble kini beranimasi 340 ms (pill mengerut ke sampul & memudar, lencana tumbuh dari titik yang sama dan meluncur ke tepi; expand kebalikannya) — dulu bertukar seketika dalam 1 frame; belum dikompilasi/diuji di device
+> - Batch 662: fade bubble mulus dua arah — pemulihan ke opaque saat disentuh kini dianimasikan (dulu loncat), fade-out 1,2 dtk berkurva lembut — belum diuji di device
+> - Batch 661: auto-fade idle bubble diperlambat (mulai meredup 7 dtk setelah sentuhan terakhir, transisi 0,9 dtk, auto-minimize 11 dtk) — belum diuji di device
+> - Batch 660: bubble mini player melayang dirombak total ke skin Space 🌌 (panel kapsul bernebula, bintang berkelip, meteor, kilatan kaca, rim berputar, sampul = planet beraura + bulan mengorbit, orb Play berpendar, lencana minimized planet mini) — animasi berhenti otomatis saat tak terlihat; belum dikompilasi/diuji di device
+> - Batch 659: fitur "Prefetch Lirik Saat WiFi" dicabut beserta WorkManager (lirik tetap diambil saat lagu diputar; "Hapus Cache Lirik" tetap ada) dan bilah "Lanjutan" di Pengaturan kini tile tekan dengan tombol chevron bulat, label subgrup bertitik aksen, serta isi menjorok di bawah garis pemandu — belum dikompilasi/diuji di device
+> - Batch 658: pulihkan tab terakhir tidak lagi berkedip di Beranda (bilah dan pil langsung menyorot tab tersimpan) dan label tab bawah menyusut otomatis agar utuh, bukan terpotong jadi elipsis — belum dikompilasi/diuji di device
+> - Batch 657: bilah tab bawah kini bergerak seperti video acuan di semua tema (pil berpegas mengikuti jari, bilah membesar 1,05x saat ditekan, warna aksen hanya di dalam pil, halaman berpindah saat jari diangkat) — belum dikompilasi/diuji di device; 6 tes unit pemetaan pil lulus di sandbox
+> - Batch 646: widget kini mengingat lagu terakhir saat cold start walau lagu berganti otomatis tanpa UI (service ikut menyimpan antrean), dan judul marquee tak lagi melompat ke awal saat play/jeda di widget; Batch 646 belum dikompilasi/diuji
+> - Batch 645: perbaikan build gagal v644 (nama tes unit memuat karakter terlarang) dan banner "Laporan untuk Claude" kini memuat baris Tes unit serta selalu tampil; Batch 645 belum dijalankan di Actions
+> - Batch 644: marquee judul widget SONIX kini memakai segmen animasi 3 dtk (update ke launcher 3x lebih jarang) — sebelumnya (Batch 643) bergerak maju tetapi tersendat tiap ±1 dtk; Batch 644 belum dikompilasi/diuji
+> - Batch 643: marquee judul widget SONIX kini digambar launcher sendiri (animasi segmen, mengikuti refresh rate 60/120 Hz; app hanya 1 update/detik) — sebelumnya 30 update/detik dari app masih patah di 120 Hz; Batch 643 belum dikompilasi/diuji.
+> - Batch 642: marquee judul widget kini loop mulus (judul digandakan seperti marquee asli, berhenti/mulai halus, ~30 fps) — sebelumnya bergerak tetapi patah-patah; Batch 642 belum dikompilasi/diuji.
+> - Batch 641: judul lagu di widget SONIX (slim/compact/penuh/tinggi, dan strip >= 100x190dp) kini digeser (marquee) oleh app sendiri lewat update parsial widget — tak bergantung launcher; Batch 641 belum dikompilasi/diuji.
+> - Batch 640: v639 terbukti di device (widget strip + panel navigasi landscape); widget strip yang lebih lebar kini membesarkan sampul dan tombol mengikuti ukuran widget — Batch 640 belum dikompilasi/diuji.
+> - Batch 639: widget SONIX yang ditarik jadi strip sempit-tinggi (lebar < 150dp, tinggi >= 160dp) kini punya layout vertikal sendiri (sampul + tombol prev/play/next; sebelumnya hanya sampul), dan panel navigasi samping di landscape tak lagi memakai inset dobel (ruang kosong kiri/atas hilang, label tak rata tepi) — Batch 639 belum dikompilasi/diuji.
+> - Batch 638: Now Playing landscape — baris waktu dan tombol Rating tidak lagi terpotong (padding diringkas, kolom kanan lebih lebar); Batch 637 terbukti tampil dua kolom di device — Batch 638 belum dikompilasi/diuji.
+> - Batch 637: Now Playing landscape — dua kolom (piringan kiri, judul/seek/waktu/transport kanan) saat tinggi < 480dp; sebelumnya hanya piringan + transport yang terlihat — Batch 637 belum dikompilasi/diuji.
+> - Batch 636: mini player landscape — padding diringkas saat tinggi < 480dp (daftar lagu lebih lapang); Batch 635 terbukti di device (daftar ±2,5 baris) — Batch 636 belum dikompilasi/diuji.
+> - Batch 635: Perpustakaan landscape — header diringkas + "Urutkan" sejajar baris chip saat tinggi < 480dp (daftar lagu sebelumnya hanya ±1 baris) — Batch 635 belum dikompilasi/diuji.
+> - Batch 634: landscape Log Diagnostik — tombol Simpan Log / Hapus disematkan di dasar kolom kiri (sebelumnya terpotong); rotasi tak mengunci ulang aplikasi terbukti di video — Batch 634 belum dikompilasi/diuji.
+> - Batch 633 (hanya docs): log v632 membuktikan dumpsys 13 dari 13 bagian berisi data dan tak ada crash baru; uji rotasi + landscape (Batch 631) masih menunggu konfirmasi.
+> - Batch 632: bagian dumpsys jobscheduler yang ditolak "Security exception" kini ikut dibaca lewat jalur cadangan Shizuku; dumpsys v631 terbukti di device (12 dari 13 bagian berisi data) — Batch 632 belum dikompilasi/diuji.
+> - Batch 631: memutar layar tak lagi mengunci ulang aplikasi; Log Diagnostik landscape memakai dua kolom selebar layar; dumpsys: izin PACKAGE_USAGE_STATS + jalur cadangan Shizuku per bagian, uji dumpsys tak lagi lulus palsu — belum dikompilasi/diuji di device.
+> - Batch 630: sheet Log Diagnostik kini FULL SCREEN di kedua tab (Log dan Izin dumpsys), tak lagi setengah layar; tombol Ekspor/Simpan/Hapus tetap di bawah — belum dikompilasi/diuji di device.
+> - Batch 629: perbaikan crash saat tab "Izin dumpsys" memakai Shizuku (proses Shizuku melempar galat saat ditunggu); kini ditunggu dengan cara aman dan semua pemeriksaan tak lagi menjatuhkan aplikasi — belum dikompilasi/diuji di device.
+> - Batch 628: tab "Izin dumpsys" kini terintegrasi dengan Shizuku (deteksi, dialog izin, tombol Beri izin DUMP, dan dumpsys langsung lewat Shizuku tanpa adb dari PC) — belum dikompilasi/diuji di device; dependensi Shizuku versi 13.1.5 belum diverifikasi.
+> - Batch 627: Fade Halus tak lagi memaksa volume lagu baru naik cepat di akhir saat lagu lama habis lebih awal dari perkiraan (serah-terima kini mengikuti sisa jadwal fade); Log Diagnostik punya tab baru "Izin dumpsys" (centang status izin + pilihan bagian dumpsys) agar Ekspor Logcat Debug jauh lebih panjang/lengkap setelah izin DUMP diberikan lewat adb — belum dikompilasi/diuji di device.
+> - Batch 626: Fade Halus (crossfade) sebelumnya selalu dibatalkan di tahap serah-terima setiap pergantian lagu karena seek internalnya sendiri dianggap seek manual (log: 22 dari 22 transisi); kini seek internal dikenali dan ramp serah-terima berjalan; celah senyap singkat di ujung crossfade masih mungkin ada dan kini diukur di log — belum dikompilasi/diuji di device.
+> - Batch 625: perulangan pembaruan posisi lagu, crossfade, dan pencatat putaran kini tidak mati total bila satu langkahnya gagal; perintah sesi pemutar dan pemulihan antrean dari lock screen/Bluetooth tidak lagi membuat aplikasi tertutup atau menggantung saat terjadi galat; galat dicatat mentah di log (cari "Galat terjaring") — belum dikompilasi/diuji di device; perilaku normal tidak berubah. Koreksi Batch 623: dari log, kartu Recents TIDAK dipulihkan otomatis saat aplikasi di latar belakang (tidak ada task yang bisa dipulihkan); kartu dipulihkan saat aplikasi dibuka lagi (tampilan Recents belum diverifikasi).
+> - Batch 623: saat musik diputar, aplikasi disembunyikan dari daftar Recents supaya tidak ada kartu yang bisa tak sengaja di-swipe (di Infinix, swipe kartu membunuh pemutaran seketika). Kartu muncul lagi setelah jeda lebih dari 10 menit atau saat pemutaran berakhir; saat tersembunyi, buka aplikasi lewat launcher, notifikasi, widget, atau bubble — sudah terkompilasi (analisis kode hijau penuh) dan fungsi penyembunyiannya sudah berjalan di device; efek di layar Recents dan ketahanan terhadap swipe menunggu pengujian Anda.
+> - Batch 622: pesan galat sampul album untuk lagu yang memang tidak punya sampul tertanam kini dicatat 1 baris ringkas (bukan galat berstacktrace panjang) agar log tidak penuh derau — belum dikompilasi/diuji di device; tampilan dan perilaku tidak berubah (ikon bawaan tetap dipakai). Galat jenis lain tetap dicatat lengkap.
+> - Batch 621: log diagnostik mencatat detail sampul album yang gagal didecode (1x per lagu) — SUDAH terkompilasi (run #50 hijau penuh) dan TERVERIFIKASI di device: semua lagu yang diprobe ternyata tidak punya sampul tertanam.
+> - Batch 620: temuan analisis kode di pengatur pemulihan Equalizer (penanda generasi dipakai dari beberapa thread) dibuat atomik — belum dikompilasi/diuji di device; perilaku Equalizer tidak berubah.
+> - HOTFIX Batch 619: v618 tertutup sendiri tiap dibuka (galat inisialisasi ViewModel) — SUDAH terkompilasi (run #48 hijau) dan TERVERIFIKASI di device (log 9 Nov 16:57-16:58: v619 terbuka dan memutar normal, tanpa crash).
+> - Jaring pengaman bagian vital (Batch 618): galat di pemutar, widget, bubble, dan ViewModel kini dicatat mentah ke log (cari "Galat terjaring") lalu aplikasi lanjut, bukan langsung tertutup — belum dikompilasi/diuji di device; kirim ekspor log bila ada baris itu.
+> - Equalizer yang kehilangan kontrol kini menampilkan pesan yang tepat (bukan "tidak didukung") dan mencoba pulih otomatis (Batch 617) — belum dikompilasi/diuji di device; pastikan setelah memutar lagu dan membuka Equalizer, EQ aktif kembali dalam ±90 detik bila sempat kehilangan kontrol.
+> - Crash saat memilih preset Equalizer diperbaiki (Batch 616: semua perubahan efek dilindungi; bila kontrol efek hilang, UI jatuh ke "tidak didukung" lalu mencoba memasang ulang) — belum dikompilasi/diuji di device; pastikan memilih preset dan menggeser band tidak membuat aplikasi tertutup.
+> - Putaran lagu kini juga tercatat saat aplikasi ditutup tetapi musik tetap diputar lewat widget/headset (Batch 615) — belum dikompilasi/diuji di device; pastikan setelah menutup app dan memutar >30 dtk lewat widget, jumlah putaran bertambah 1 (bukan 2 saat app terbuka).
+> - Ikon jeda widget tak lagi basi setelah proses dibunuh (Batch 614: status "memutar" hanya dipercaya bila ditulis proses yang sama) dan log gagal-attach Equalizer kini memuat `hasControl` — belum dikompilasi/diuji di device; pastikan setelah instal saat memutar widget tidak menampilkan ikon jeda sebelum musik benar-benar jalan.
+> - Perbaikan attach Equalizer (tak lagi dibongkar-pasang tiap event, efek gagal dilepas) + 23 temuan SpotBugs (Batch 613) sudah TERKOMPILASI (run #42 hijau, SpotBugs 0); di device PID v613 bersih ~105 detik, tetapi belum teruji lintas banyak pergantian lagu — pastikan Equalizer di Infinix X6850 tetap berfungsi setelah ganti lagu.
+> - Garis tepi pink di sekeliling palung widget (Batch 612) belum dikompilasi/dilihat di device.
+> - Palung widget berbentuk daun (Batch 611) sudah terkompilasi (run #40 hijau), tetapi user menilai perubahannya tidak terlihat (sudut yang diubah gelap di atas gelap) -> Batch 612.
+> - Bentuk daun cangkang widget + opt-out clip radius launcher (Batch 610) SUDAH terkompilasi (run #39 hijau) dan dikonfirmasi user lewat screenshot di Infinix X6850: widget slim dan penuh tampil daun, bukan pil.
+> - Bingkai sampul widget (Batch 609) dan palung mode terang belum dikompilasi/dilihat di device. Cangkang widget bergaya Boomly (Batch 608) sempat GAGAL build (satuan dp hilang di XML), diperbaiki di Batch 609, dan tampilannya belum pernah dilihat di device; bubble belum diselaraskan.
+> - Layout widget tinggi (sampul besar, mulai ~210dp), spasi rata layout penuh, dan sapuan cangkang compact (Batch 607) sudah TERKOMPILASI (run #36) dan dilihat user di device, tetapi tampilannya dinilai kurang beda dari Boomly -> Batch 608 (Batch 606 sudah TERKOMPILASI di run #35, tampilannya sudah dikonfirmasi user lewat screenshot).
+> - Widget slim 46dp + cangkang compact asimetris (Batch 606) belum dikompilasi/dilihat di device; widget yang ditarik sangat tinggi (>~200dp) masih berupa layout penuh di tengah (layout khusus tinggi belum dibuat).
+> - Widget penuh dua baris (judul 2 baris + kontrol di tengah) dan layout compact yang dilonggarkan (Batch 605) belum dikompilasi/dilihat di device; marquee judul tetap tidak berjalan di Android 16 Infinix (perangkat tidak mengizinkan `setSelected` lewat widget).
+> - Cangkang widget "bilah" + palung cekung ala Boomly dan layout sheet Log Diagnostik yang dirapikan (Batch 604: dasar panel opak, tombol seragam, bentuk 4-radius, halo anggur) belum dikompilasi/dilihat di device; bubble masih memakai panel daun diagonal Batch 584.
+> - Rombak widget home-screen + bubble floating ke Neumorphism burgundy (Batch 583-584: panel bevel anggur + gilt,
+>   medali play, kenop prev/next berkedalaman, sampul berfillet gilt, ikon burgundy di mode terang; bentuk "daun diagonal"
+>   sudut besar-kecil menggantikan lingkaran) sudah lolos kompilasi di GitHub Actions (run #13, Batch 585; status
+>   "Build APK" belum dilaporkan) tetapi belum dilihat di device asli.
+> - Seluruh **19 item** `docs/archive/MANUAL_QA_CHECKLIST.md` (audio focus, Bluetooth, kontrol lock-screen,
+>   headset kabel, process death, background playback) — **0/19 pernah dicentang**, karena tidak
+>   ada satu pun sesi kerja proyek ini yang punya akses ke device Android fisik.
+> - Pencabutan efek bounce (Batch 581: overscroll bawaan platform + spring snap-back/tekan default
+>   tanpa pantulan; menggantikan overscroll iOS Batch 364 dan spring bouncy swipe album art Batch 434)
+>   belum dikonfirmasi user di device asli. Sisa pantulan: spring entrance Now Playing.
+> - Pengurangan stutter cold-start tab Library (Batch 582: indeks pencarian + daftar turunan dibuat lazy) belum
+>   dikonfirmasi user di device asli; akar masalahnya belum terbukti dengan pengukuran.
+> - Efek pembesar label tab bawah (Batch 437) belum dikonfirmasi user di device asli —
+>   khususnya kemulusan transisi fokus saat drag & 0 frame-drop tambahan. Komponen blur-nya
+>   sendiri sudah DICABUT (Batch 442, lihat di bawah), jadi bukan lagi "efek kaca".
+> - Drag langsung di tab bar (Batch 442, dirombak total Batch 448): **pill unified meluncur mulus
+>   lintas kolom TANPA seam/kotak ganda — DIKONFIRMASI user di device asli (Batch 449)**, root fix
+>   Batch 448 valid. Masih belum dikonfirmasi: drag jari lintas tab bar (termasuk lintas >1 batas
+>   tab) berpindah tab dgn benar; pill/warna ikon melacak posisi jari 1:1 real-time TANPA
+>   lag/jitter selama drag (Batch 445); tahanan visual halus di ujung kolom Beranda/Pengaturan
+>   (Batch 444); transisi mulus TANPA lompatan visual persis saat jari dilepas (handoff
+>   drag→settle, pola Batch 445); label 3 tab 0 lagi ellipsis di font-scale NORMAL & pill/tab
+>   berhenti TEPAT di tab tujuan tanpa "mundur 1 kolom" saat drag flick cepat/tap biasa (2 fix baru
+>   Batch 452 — label masih boleh ellipsis di font-scale aksesibilitas BESAR, itu jaring pengaman
+>   disengaja Batch 442, bukan target "minimize" Batch 452).
+> - **Batch 449 (fix DIKONFIRMASI device, Batch 451)**: user device-test Batch 448 menemukan
+>   kilatan kotak abu-abu ~0.25 detik di tab yang BARU DITINGGALKAN tiap pindah tab — root cause
+>   `NavigationBarItem` M3 (state-layer internalnya TIDAK benar-benar mati oleh `NoRippleIndication`
+>   Batch 439). Fix Batch 449: `NavigationBarItem` DIHAPUS TOTAL, diganti `CustomNavBarTabItem`.
+>   Batch 449 itu sendiri sempat membawa 1 regresi fatal (`.fillMaxHeight()` keliru bikin pill
+>   melar jadi kapsul raksasa) — diperbaiki Batch 450. **Batch 451: user konfirmasi via video +
+>   analisis frame-by-frame 60fps tambahan — pill kembali ukuran normal DAN 0 lagi kilatan
+>   abu-abu, keduanya terbukti benar di device fisik.** Masih belum dikonfirmasi: regresi warna
+>   ikon/label tema Skeu (video test pakai tema default/gelap, bukan Skeu); TalkBack/screen-reader
+>   (tidak bisa dicek dari rekaman visual). **Batch 452**: 2 fix instruksi eksplisit user — (1)
+>   padding horizontal Column label 12.dp->4.dp (bebaskan lebar utk Text, 0 sentuh touch
+>   target/typography) supaya label "Perpustakaan"/"Pengaturan" berhenti kepotong ellipsis di font
+>   normal; (2) urutan pengecekan lepas-jari di loop drag-tab-bar diperbaiki (posisi event UP kini
+>   ikut diproses sebelum loop berhenti, dulu terlewat) supaya pill/tab commit TEPAT di kolom titik
+>   jari dilepas — sebelumnya bisa "mundur 1 kolom" dari titik lepas sungguhan saat drag cepat
+>   (flick). Keduanya belum dikonfirmasi device fisik.
+> - **Auto-fade + auto-minimize idle Mini Player Mengambang (Batch 453-454)**: bubble (pill penuh
+>   maupun tab minimized) meredup ke ~45% opacity setelah 2.5 detik diam (Batch 453), lalu kalau
+>   TETAP idle sampai ~6 detik total, otomatis menciut jadi tab 48dp nempel tepi layar (Batch 454,
+>   reuse mekanisme "minimize total" manual yang sudah ada sejak Batch 100) — opaque penuh lagi
+>   seketika begitu disentuh/tombol kontrolnya ditekan, timer keduanya ikut reset bersamaan.
+> - **Tab minimized kliping tepi layar (Batch 455/457/458, DIKONFIRMASI device fisik Batch 458)**:
+>   tab 48dp yang tadinya berhenti flush TAPI 100% kelihatan di tepi sebagian lebarnya sengaja
+>   didorong melewati batas layar (`snapMinimizedToNearestEdge()`, reuse `FLAG_LAYOUT_NO_LIMITS`
+>   sejak Batch 100), sisa yang kelihatan jadi "mini trigger" yang masih bisa di-tap — dikonfirmasi
+>   user di device fisik: ~30% kelihatan/~70% tersembunyi di semua jalur snap (manual/auto-
+>   minimize/restart/rotasi) sesuai target, drag tetap 100% kelihatan selagi digeser, 0 regresi ke
+>   fade/auto-minimize/expand Batch 98-100/453/454. *(Batch 456 sempat 30% sembunyi/70% timbul —
+>   itu SALAH ARAH, direvert Batch 457.)* Residual dari konfirmasi ini: mini trigger dilaporkan
+>   "sedikit lebih susah" di-tap seiring bagian kelihatan mengecil — **fix di item Batch 460 di
+>   bawah**.
+> - **Batch 460 — touch target diperluas independen dari visual + fix kliping landscape**: 2
+>   instruksi eksplisit user, 2 file (`bubble_minimized.xml` + `FloatingBubbleService.kt`). Area
+>   sentuh tab minimized DILEBARKAN jadi 88dp (dari 48dp) via padding transparan simetris kiri/
+>   kanan — visual bulat aslinya TETAP 48dp (0 tambahan yang kelihatan), tap di area padding tetap
+>   membuka mini player. Bagian TIMBUL/kelihatan diturunkan lagi ke ~10% (`EDGE_CLIP_FRACTION`
+>   70%→90%, instruksi eksplisit user pakai kata "timbul") — sekarang independen dari lebar area
+>   sentuh, jadi makin ngumpet TIDAK ikut mempersempit target tap seperti sebelumnya. Sumber
+>   metrics layar (`onConfigurationChanged`/drag/expand/snap) diganti
+>   `windowManager.currentWindowMetrics` dari `resources.displayMetrics` untuk coba fix bubble gagal
+>   konsisten mentok ke ujung layar saat HP mode landscape. **DIKONFIRMASI device fisik user**: (1)
+>   mini trigger lebih gampang di-tap, (2) bagian timbul ~10%, (4) drag 100% kelihatan, (5) 0
+>   regresi — **KECUALI (3) mentok tepi landscape MASIH GAGAL** ("masih nongol") — fix Batch 460
+>   untuk item ini TIDAK CUKUP, root cause sebenarnya + fix baru di item Batch 461 di bawah.
+> - **Batch 461 [FIX RESIDUAL] — landscape masih tidak konsisten mentok tepi**: root cause:
+>   `windowManager` di kelas ini didapat dari Context Service biasa (bukan `UiContext`/
+>   `WindowContext`) — per dokumentasi resmi Android, `currentWindowMetrics` pada Context non-UI
+>   SELALU jatuh ke `getMaximumWindowMetrics()`, TIDAK dijamin sinkron atomik persis di momen
+>   rotasi (kelas masalah sama dengan `resources.displayMetrics` yang didiagnosis Batch 460, akar
+>   sumbernya sama-sama Context Service). Fix: field baru `screenBounds` (single source of truth)
+>   diisi dari parameter `newConfig` di `onConfigurationChanged` — SATU-SATUNYA sumber yang dijamin
+>   sistem fresh PERSIS di momen callback rotasi, bukan re-query Context async. 4 titik baca yang
+>   sama (`onConfigurationChanged`/`setupDrag`/`expand`/`snapMinimizedToNearestEdge`) sekarang baca
+>   `screenBounds` ter-cache. 1 file diubah (`FloatingBubbleService.kt`). **DIKONFIRMASI device
+>   fisik user: GAGAL TOTAL** — tab 100% kelihatan, gak keclip sama sekali di landscape (bukan
+>   cuma "kurang tepat"). Diagnosis "sumber bounds kurang akurat" (teori batch ini) TERBUKTI SALAH.
+> - **Batch 462 [FIX RESIDUAL #2] — safety-net re-assert, bukan ganti sumber data lagi**: sinyal
+>   "100% gagal total" (bukan "tidak konsisten") menggeser diagnosis ke "ada pihak lain menimpa
+>   posisi window SETELAH snap kita apply" — paling mungkin sanitasi posisi window oleh sistem
+>   selama animasi transisi rotasi (perilaku `TYPE_APPLICATION_OVERLAY` yang tidak seragam lintas
+>   OEM). Fix: `onConfigurationChanged` memanggil `snapMinimizedToNearestEdge()` immediate + 2x
+>   re-panggil delay 150ms & 400ms (`ROTATION_RESNAP_DELAYS_MS`, via `view.postDelayed`) —
+>   membracket durasi animasi rotasi tipikal, idempotent kalau snap pertama sudah benar. Formula
+>   `EDGE_CLIP_FRACTION`/`touchPad`/`visualWidth`/`screenBounds` TIDAK disentuh (2 batch sebelumnya
+>   sudah membuktikan itu bukan akar masalah). 1 file diubah. **Ini mitigasi defensif, bukan
+>   root-cause pasti** (0 akses logcat device asli). **DIKONFIRMASI device fisik user: GAGAL LAGI**
+>   ("masih nongol/gak ke kliping") — 3x berturut-turut gagal sekarang (Batch 460/461/462).
+> - **Batch 463 [PIVOT KE INSTRUMENTASI] — 0 fix baru, murni logging**: user membawa logcat
+>   (`bubble_log.txt`) sesuai permintaan Batch 462, tapi dicek baris-per-baris hasilnya 0 baris
+>   dari `FloatingBubbleService` sama sekali (service tidak pernah menulis logcat) — 3 teori
+>   berturut-turut (460/461/462) semua tebakan tanpa validasi eksekusi nyata. Fix: `AppLogger.w()`
+>   ditambah di 4 titik kunci `onConfigurationChanged`/`snapMinimizedToNearestEdge` + readback
+>   posisi NYATA di layar 250ms setelah tiap snap (`getLocationOnScreen()`) — kepakai ke logcat
+>   MAUPUN `diagnostic_log.txt` privat app (Settings > Lanjutan > Log Diagnostik). 1 file diubah,
+>   0 formula/logic diubah. **Menunggu log hasil rotasi nyata dari user sebelum fix ke-4 apa pun.**
+> - **Batch 464 [DATA PERTAMA MENGEJUTKAN] — mismatch terjadi saat minimize biasa, bukan cuma
+>   rotasi**: readback pertama dari device fisik user JUSTRU dari event `minimize()` biasa (0
+>   rotasi terlibat) — target `x=1011 y=469` vs posisi nyata 250ms kemudian `x=551 y=568` (selisih
+>   460px). Menggeser dugaan dari "animasi transisi rotasi" ke kemungkinan baru: window
+>   `WRAP_CONTENT` ini belum tuntas resize saat `updateViewLayout` dipanggil. Fix: readback
+>   diperluas log ukuran nyata (`container.width/height`) + 1 titik tambahan di +800ms (selain
+>   +250ms) — membedakan "settling sementara" vs "salah permanen". 1 file diubah, 0 formula/logic
+>   diubah. **Masih menunggu log lengkap sebelum fix ke-4 apa pun.**
+> - Pill indicator glassmorphism ikon tab bawah (Batch 438) belum dikonfirmasi user di device asli
+>   — khususnya kontras/keterbacaan di tiap identitas tema x mode terang/gelap.
+> - Kapsul mengambang di bottom nav (Batch 439) belum dikonfirmasi user di device asli — khususnya
+>   jarak kapsul ke gesture-nav bar. ("Ripple mati" klaim asli Batch 439 TERBUKTI keliru sebagian
+>   — lihat item Batch 449 BARU di atas; sudah dikoreksi via `CustomNavBarTabItem`.)
+> - Fix compile `NoRippleIndication` (migrasi `Indication`→`IndicationNodeFactory` Batch 440,
+>   lalu tambahan wajib `equals`/`hashCode` Batch 441 — 2 fix berturut-turut utk kontrak yang
+>   sama) belum dikonfirmasi CI hijau nyata — cuma review manual kode, 0 akses compiler
+>   Kotlin/Gradle sesi ini. Ikon tab ikut lerp warna real-time saat drag (Batch 440) juga belum
+>   dikonfirmasi user di device asli — khususnya kemulusan transisi warna ikon+pill 1 aksen
+>   selama jari masih menggeser.
+> - Label teks tab bawah ikut lerp warna real-time bersama ikon + easing post-release (Batch
+>   447, adaptasi dari video referensi iOS Jam) belum dikonfirmasi user di device asli —
+>   khususnya label & ikon benar2 berubah warna BERSAMAAN (bukan label menyusul-lompat) selama
+>   drag pelan/parsial.
+> - Flow "Cek Update" (`update/UpdateManager.kt`, Batch 432) belum ditest ulang di device asli
+>   setelah migrasi Thread→Coroutines.
+
 Audio player Android — Kotlin + Jetpack Compose + Media3 ExoPlayer. 100% offline, tanpa izin
 INTERNET sama sekali.
 
@@ -8,74 +222,10 @@ INTERNET sama sekali.
 (signed), siap install langsung, tidak perlu build sendiri. Setiap push ke `main` otomatis
 memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 
-> 🆕 **Update terbaru — Batch 329 (Redesign placeholder "no cover" AlbumArt, 1 file):** User:
-> "Redesign icon placeholder album musik yang kosong jadi lebih menarik!!" — latar flat 1 warna
-> jadi radial-gradient tint lembut ke `primary`, ikon note polos jadi `Icons.Rounded` di dalam
-> badge lingkaran ber-tint — berlaku app-wide (Home/Library/MiniPlayerBar/Now Playing) lewat 1
-> titik render, otomatis ikut semua tema × light/dark (0 literal warna baru).
-> Batch 328 (Fix Radio Auto-Continue + Shuffle mati total saat antrean
-> benar-benar mentok, 1 file): User: "Mode radio, shuffle gak berfungsi sama sekali saat
-> daftar playlist musik user benar-benar habis/mentok!!" — root cause: seek ke lagu baru
-> lewat `seekToNextMediaItem()` bergantung resolusi ShuffleOrder yang bisa ke-mask salah pas
-> shuffle aktif & antrean lama sudah mentok; sekarang lompat pasti via index (`seekTo`), tidak
-> lagi bergantung urutan shuffle sama sekali.
-> Batch 327 (Naikkan alpha rim-glow Aurora, token baru
-> `AuroraRimGlowAlpha` 0.44f, 2 file): User: "terlalu tipis, hampir tak kasat mata" — floor
-> stop ke-4 naik ~70% (alpha efektif 0.119→0.202), ambient wash `auroraGlow()` tidak disentuh.
-> Batch 326 (Aurora rim-glow statis → animated, 3 file): Fase 6/N Aurora
-> selesai — rim-glow 12+ panel sekarang bergerak lewat `LocalAuroraPhase` (1 phase dibagi
-> semua titik, 0 transition tambahan per panel — kekhawatiran performa Batch 310 tertangani).
-> Batch 325 (Blur Liquid Glass dikonfirmasi user di device sungguhan —
-> `liquidGlassAlpha` diturunkan balik 0.85f/0.90f→0.38f/0.48f, 1 file): Sub-langkah 5/5
-> (visual) roadmap blur asli selesai. Performa (GPU/lag) masih belum eksplisit dikonfirmasi.
-> Batch 324 (Tuntaskan antrean Batch 322/323: fix `containerColor` di
-> `VaultSheet.kt`, 1 file): Ke-7 gap `containerColor`/blur lintas-window yang ditemukan Batch
-> 322 TUNTAS semua — 17/17 call site `ModalBottomSheet` app-wide sudah konsisten.
-> Batch 323 (Lanjutan Batch 322: fix `containerColor` 3 dari 4 sheet
-> tersisa, 3 file): `SignatureMatcherSheet`/`SmartPlaylistScreen`/`UpdateCheckSheet` diperbaiki.
-> Batch 322 (Fix blur lintas-window Liquid Glass, 3 file — root cause Batch
-> 311 diriset ulang & ternyata keliru, `MainActivity.kt` diperiksa tapi 0 bug jadi TIDAK diubah):**
-> 7 sheet kelewat pasang `containerColor = Color.Transparent` (syarat resmi Haze) — 3 diperbaiki
-> batch ini, 4 diantre. Blur belum diturunkan tint-nya sampai user konfirmasi visual device.
-> Batch 321 (Housekeeping dokumentasi: arsip `PROJECT_STATE.md` Batch
-> 58–219 → `PROJECT_STATE_ARCHIVE.md`, 0 kode diubah):** Murni beres-beres dokumentasi internal
-> proyek (file catatan sesi kerja terlalu panjang) — 0 fitur/perilaku app berubah sama sekali
-> dari Batch 320.
-> Batch 320 (Verifikasi integritas rilis, 0 bug, 0 kode diubah): Sesi
-> tanpa laporan bug baru — repack ini murni diverifikasi ulang (manifest file, keseimbangan
-> kode seluruh file `.kt`, hasil Batch 318/319 dicek cocok) sebelum dikirim ulang. 0 fitur/
-> perilaku berubah dari Batch 319.
-> Batch 319 (Fix efek persistent hilang via kontrol eksternal setelah app
-> di-kill + notifikasi cold-start jadi statis/universal): Kecepatan Putar/Repeat/Shuffle
-> sekarang genuinely ikut ke lagu yang diputar walau app di-kill total lalu dikontrol lewat
-> widget/media player eksternal/notifikasi (sebelumnya cuma dipulihkan kalau app dibuka).
-> Notifikasi cold-start "SONIX" juga dibuat statis: tombol toggle jadi 1 ikon Putar/Jeda gabungan
-> kustom (bukan lagi ganti-ganti ikon+label "Jeda"/"Lanjutkan"), teks jadi kalimat tetap (bukan
-> lagi judul lagu yang bisa stale) — keduanya tidak lagi bergantung pada sinkronisasi yang oleh
-> desainnya sendiri tidak akan pernah 100% akurat.
-> Batch 318 (Fix teks "Fade Halus" ke-clip di dialog Pengaturan Putar):
-> `SpeedDialog` (Now Playing → ⋮ → Kecepatan) sekarang bisa discroll (`verticalScroll`) — pola
-> `Column` fixed tanpa jaring pengaman yang sama seperti Batch 314-316, tapi di `AlertDialog`
-> yang luput dari audit ModalBottomSheet batch-batch itu.
-> Batch 317 (Kecepatan Putar sekarang persistent): Sebelumnya "Kecepatan
-> Putar" cuma hidup di memori — reset ke 1x tiap app dibuka ulang. Sekarang tersimpan otomatis dan
-> dipulihkan lintas sesi, berlaku ke lagu apa pun yang diputar (bukan cuma saat lanjut queue lama).
-> Mode Audiobook per-lagu tetap override-nya sendiri kalau diaktifkan untuk lagu itu.
-> Batch 316 (Tuntaskan audit Batch 314: `verticalScroll` ke 2 sheet terakhir): `UpdateCheckSheet.kt` dan `BackupRestoreSheet.kt` sekarang bisa discroll (`verticalScroll`) — 2 sisa terakhir dari 5 sheet yang diaudit Batch 314. Dengan ini, audit "pola tab serupa" (`Column` tanpa jaring pengaman scroll) TUNTAS untuk semua 5 sheet yang teridentifikasi (`EqualizerSheet.kt`/`RingtoneCutterSheet.kt`/`VisualizerSheet.kt` Batch 315, 2 sheet ini Batch 316).
-> Batch 315: `verticalScroll` ke `EqualizerSheet.kt`, `RingtoneCutterSheet.kt`, `VisualizerSheet.kt` — 3 dari 5 sheet yang diaudit Batch 314 karena punya pola sama (`Column` tanpa jaring pengaman scroll, berisiko baris bawah ke-clip diam-diam di layar pendek/font besar).
-> Batch 314: Fix sheet "Kontrol Lanjutan" terpotong (`AdvancedControlsSheet` sekarang bisa discroll, sebelumnya "Potong Nada Dering" ke-clip diam-diam) + Equalizer kini auto re-attach ke sesi audio BARU (cold-start/Service restart/lagu baru) lewat hook `PlaybackAudioSession.onSessionIdChanged` — sebelumnya cuma ter-reattach kalau sheet Equalizer dibuka manual.
-> Batch 313: Fix CI build gagal dari Batch 312 — `Modifier.padding(horizontal=..., top=..., bottom=...)` mencampur 2 overload berbeda yang tidak valid di `AdvancedControlsSectionHeader`. Diganti ke `Modifier.padding(start, top, end, bottom)` — hasil visual identik, cuma sintaks yang diperbaiki.
-> Batch 312: Sheet "Kontrol Lanjutan" dikelompokkan jadi 3 seksi — **Pemutaran** (Antrean/Sleep Timer/Kecepatan/Repeat A-B), **Audio** (Equalizer/Visualizer/Peredam Volume), **Lagu** (Lirik/Edit Info/Potong Nada Dering) — tiap seksi punya label kecil + divider pemisah.
-> Fitur Ringtone Cutter sendiri (Batch 121): potong bagian lagu (MP3/M4A) jadi file baru, simpan
-> sebagai Nada Dering/Notifikasi/Alarm lewat Kontrol Lanjutan (Roadmap #5).
-> Riwayat lengkap ada di `CHANGELOG.md` (selalu terbaru di paling atas).
-
-> **Mulai dari sini kalau ini sesi/percakapan baru:** baca `PROJECT_STATE.md` (status +
-> riwayat insiden ringkas), `CHANGELOG.md` (histori tiap batch), dan bagian "Keputusan
-> Arsitektur" di bawah sebelum mengubah apa pun — terutama sebelum menyentuh
-> `PlaybackService.kt`, `AppLockStore.kt`, atau `app/build.gradle.kts`. Konteks percakapan
-> lama tidak ikut ke sesi baru; dua file itu sudah pernah menyebabkan asumsi salah yang baru
-> ketahuan setelah build gagal (lihat Batch 10-14 di CHANGELOG).
+> **Mulai dari sini kalau ini sesi/percakapan baru:** baca `PROJECT_STATE.md` (status + rule
+> aktif), `CHANGELOG.md` (histori tiap batch), dan bagian "Keputusan Arsitektur" di bawah
+> sebelum mengubah apa pun — terutama sebelum menyentuh `PlaybackService.kt`, `AppLockStore.kt`,
+> atau `app/build.gradle.kts`. Konteks percakapan lama tidak ikut ke sesi baru.
 
 ## Daftar Isi
 - [📥 Unduh Aplikasi](#-unduh-aplikasi)
@@ -92,13 +242,16 @@ memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 - Scan otomatis semua file audio di perangkat via MediaStore (mendukung codec mainstream: MP3, AAC/M4A, FLAC, WAV, OGG/Vorbis, OPUS, AMR — apa pun yang bisa diindeks sistem)
 - Tab **Lagu** (semua lagu, urut judul) dan **Folder** (dikelompokkan per folder, folder = playlist)
 - Playback background via foreground service (Media3 `MediaLibraryService`, mendukung Playback Resumption resmi) + kontrol di notification/lock screen
-- Now Playing: album art, seek bar, shuffle, repeat (off/all/one), play/pause/next/prev
-- Mini player persisten di bagian bawah layar
+- Now Playing: album art, seek bar, shuffle, repeat (off/all/one), play/pause/next/prev. Shuffle
+  (tombol player & "Shuffle All" Home) pakai custom anti-repeat-nearby engine sejak Batch 498 —
+  lagu yang barusan diputar (lihat "Baru Diputar") dan lagu sama persis bersebelahan langsung
+  dihindari, bukan urutan acak murni Media3. Detail teknis: `CHANGELOG.md` § Batch 498
+- Mini player persisten di bagian bawah layar — bisa **di-swipe (kiri/kanan) untuk dibatalkan** (Batch 476): playback berhenti total & antrean dikosongkan, bukan cuma bar-nya yang hilang. **Batch 480**: bar meredup+mengecil halus mengikuti jari selama digeser, tick getar halus tepat saat melewati titik pembatalan, dan aksi ini kini bisa **diurungkan** lewat tombol "Urungkan" di Snackbar setelahnya (memulihkan lagu, posisi, repeat/shuffle/kecepatan persis seperti sebelumnya)
 - Dark mode default
 - Pencarian (search) judul/artis di Perpustakaan
 - Sleep timer (10/15/30/45/60 menit)
 - Kecepatan putar (0.5x–2x), tersimpan otomatis lintas sesi (dipulihkan tiap app dibuka ulang)
-- Resume otomatis dari posisi terakhir setelah app ditutup
+- Resume otomatis dari posisi terakhir setelah app ditutup — **mini player ikut sinkron begitu app dibuka kembali** (Batch 476), baik saat PlaybackService masih hidup di belakang layar (musik jalan dari widget/headset/bubble/lock screen) maupun saat proses ikut mati total, alih-alih tampil kosong/reset sampai lagu berikutnya diputar
 - Favorit lagu
 - **Antrean putar (Queue)**: lihat antrean, naik/turunkan urutan, hapus dari antrean, lompat langsung ke lagu manapun, plus aksi "Putar Berikutnya" / "Tambah ke Antrean" via tekan-lama pada lagu di Perpustakaan
 - **Beranda pintar**: bagian "Baru Diputar" dan "Paling Sering Diputar" otomatis terisi dari riwayat dengar, tanpa perlu aksi manual dari user
@@ -115,7 +268,10 @@ memicu build baru lewat GitHub Actions (lihat bagian [Build](#build)).
 - **Kontrol volume** langsung dari Now Playing (slider attenuasi internal app, terpisah dari volume sistem)
 - **Kelola folder**: pilih folder mana saja yang mau disertakan/dikecualikan dari pemindaian musik otomatis, **plus tambahkan folder tambahan lewat izin sistem** (Storage Access Framework) untuk memindai audio yang belum terdeteksi MediaStore — bekerja penuh offline/lokal, tidak ada koneksi internet yang terlibat
 - **Widget lebih tahan banting**: diperbaiki supaya tetap merespons play/pause/next meski aplikasi sudah disingkirkan total dari recent apps — service langsung "lapor" ke sistem sebagai proses aktif begitu widget ditekan, sebelum sempat dibunuh oleh pengelola baterai agresif (relevan khususnya di skin seperti XOS/MIUI). Widget juga ikut update judul/artis/status main tiap kali lagu berganti
-- **Mini Player Mengambang (Bubble)**: pelengkap widget — kontrol play/pause/prev/next mengambang di atas app lain mana pun (mirip chat bubble Messenger), bisa digeser ke mana saja di layar, posisi tersimpan otomatis & di-clamp ulang saat rotasi. Bisa di-**minimize** jadi tab kecil nempel tepi kiri/kanan layar (bukan di-close total — Service tetap hidup), tap lagi untuk buka penuh. Nyala otomatis begitu playback mulai dari widget/notifikasi/headset mana pun, tanpa perlu buka app dulu — plus **Quick Settings Tile** sendiri untuk toggle cepat dari shade notifikasi. Opt-in dari Settings (nonaktif default), butuh izin sistem "tampil di atas app lain" yang diminta eksplisit saat toggle dinyalakan. Foreground service (notifikasi importance minim, nyaris tak kelihatan) + auto-restart setelah HP reboot — jauh lebih tahan dibunuh OS dibanding rilis awal
+- **Mini Player Mengambang (Bubble)**: pelengkap widget — kontrol play/pause/prev/next mengambang di atas app lain mana pun (mirip chat bubble Messenger), bisa digeser ke mana saja di layar, posisi tersimpan otomatis & di-clamp ulang saat rotasi. Bisa di-**minimize** jadi tab kecil nempel tepi kiri/kanan layar (bukan di-close total — Service tetap hidup), tap lagi untuk buka penuh — manual (tap chevron) maupun **otomatis** kalau dibiarkan idle (lihat di bawah). **Auto-fade + auto-minimize saat idle** (Batch 453-454): dibiarkan diam (tidak disentuh) 2.5 detik meredup jadi ~45% opacity supaya tidak menutupi konten di baliknya, dan kalau TETAP diam sampai ~6 detik total, otomatis menciut jadi tab tepi layar (setara tap chevron manual) — opaque penuh & ukuran normal lagi seketika begitu disentuh/digeser/tombol kontrolnya ditekan. **Tab tepi kliping (Batch 455/457/458, ditune Batch 460 ke ~10% timbul)**: begitu tab minimized diam di tepi (bukan lagi digeser), sebagian lebarnya sengaja didorong melewati batas layar (`EDGE_CLIP_FRACTION` 90% sembunyi, ~10% kelihatan/timbul) — sisa yang kelihatan jadi "mini trigger" mentok tepi, tap untuk buka penuh lagi; selagi masih digeser tab tetap 100% kelihatan seperti biasa. **Area sentuhnya sengaja LEBIH LEBAR dari yang kelihatan (Batch 460)** — padding transparan di sekitar tab bulat memperluas target tap tanpa menambah apa pun secara visual, jadi makin ngumpet TIDAK ikut mempersempit target tap. **Drag diutamakan di atas tap di ke-4
+tombol kontrol (Batch 474)** — geser jari mulai dari play/pause/prev/next/minimize kini ikut
+memindah bubble (sebelumnya 0 efek dari titik itu); tap tanpa gerak tetap menjalankan fungsi
+tombol seperti biasa. Posisi mentok tepi MASIH residual — 3 fix berturut-turut (Batch 460/461/462) dikonfirmasi GAGAL oleh device fisik user; Batch 463/464 pivot ke instrumentasi (logging + readback posisi & ukuran layar nyata), dan data pertama menunjukkan mismatch-nya mungkin bukan soal rotasi sama sekali — kemungkinan window `WRAP_CONTENT` ini belum tuntas resize saat posisi di-apply, masih diinvestigasi dari data device fisik nyata sebelum fix berikutnya. Nyala otomatis begitu playback mulai dari widget/notifikasi/headset mana pun, tanpa perlu buka app dulu — plus **Quick Settings Tile** sendiri untuk toggle cepat dari shade notifikasi. Opt-in dari Settings (nonaktif default), butuh izin sistem "tampil di atas app lain" yang diminta eksplisit saat toggle dinyalakan. Foreground service (notifikasi importance minim, nyaris tak kelihatan) + auto-restart setelah HP reboot — jauh lebih tahan dibunuh OS dibanding rilis awal
 - **Lewati Keheningan Otomatis**: percepat bagian hening di tengah/awal/akhir lagu saat diputar, pakai deteksi bawaan Media3/ExoPlayer (belum ada slider sensitivitas custom). Opt-in dari Settings (nonaktif default) — bisa memotong intro/outro yang memang senyap secara musikal, coba dulu lalu matikan lagi kalau terasa mengganggu
 - **Pencocok Signature APK**: alat diagnostik di Perpustakaan (ikon sidik jari) — pilih dua file APK (versi lama & baru), langsung ketahuan apakah keduanya ditandatangani dengan key yang sama tanpa perlu install dulu. Kalau beda, laporan lengkap (nama package, versi, SHA-256 tiap file) bisa disalin ke papan klip lewat dialog khusus (bisa di-scroll penuh) — bukan cuma tombol OK polos kayak dialog instalasi Android
 - **5 tema**: keluarga utama gaya Apple (ikuti sistem, terang, gelap — palet iOS system color, sudut membulat generous) plus dua identitas custom. **Tactile**, murni dari spesifikasi desain Premium AMOLED Hybrid Glassmorphism yang di-supply user (`compose-amoled-hybrid-glass-final.md`, Batch 53 — menggantikan varian literal Midnight Blue Batch 52, hybrid-glass Batch 51, AMOLED-hitam Batch 50, varian terang Batch 49, & Matte Noir sebelumnya). Wajib gelap (bukan ikut sistem, selalu gelap), fondasi AMOLED near-black (`#030508`) dengan permukaan kaca translusen (level glass §5) sebagai material utama, Midnight Blue (`#191970`) HANYA sebagai gradient ambient tipis di layar root (bukan warna latar datar lagi), aksen biru restrain (`#6670FF`), bevel/bayangan gambar-tangan diagonal (bukan aset tekstur bitmap) lewat satu helper terpusat `tactileEmboss()` — bukan sekadar ganti warna datar. Border & glow sengaja direstrain (alpha rendah, literal 0.065/0.035/0.70 dari spec, brush diagonal top-left→bottom-right, bukan border putih terang); sliders/toggles/switches tetap komponen Material3 polos (di luar cakupan batch ini, kandidat
@@ -124,7 +280,7 @@ sering dilihat — sekarang punya bentuk rounded-square + emboss taktil sendiri,
 flat Apple; border hero art album disamakan ke arah bevel diagonal yang sama seperti seluruh
 permukaan kaca lainnya.
 
-  **Neumorphism — Titanium & Emerald** (Batch 57, redesain total Batch 73, upgrade identitas dari
+  **Neumorphism — Burgundy & Champagne (Old Money)** (Batch 57, redesain total Batch 73, upgrade identitas dari
   Skeuomorphism ke Neumorphism Batch 79-81) — identitas custom kedua, otonom penuh dari Tactile
   (tidak berbagi mekanisme bevel `embossSurface()` maupun struktur border). Panel dibaca "dipahat
   dari material yang sama dengan kanvas" — bukan lagi panel logam bertekstur seperti sebelumnya —
@@ -133,11 +289,13 @@ permukaan kaca lainnya.
   ganda ala neumorphism klasik, dibatasi `clipRect()` supaya bayangannya tidak pernah meluber ke
   komponen lain di sekitarnya. **0 border, 0 tekstur grain** — ciri khas neumorphism, kedalaman
   murni dari bayangan. Tertekan (pressed) = *concave*, sisi terang/gelap terbalik total (bukan
-  cuma mengecil), kesan permukaan masuk ke kanvas. Fondasi tetap charcoal/platinum netral dengan
-  aksen Titanium+Silver metalik dingin yang dominan (satu-satunya token di role warna utama), plus
-  sentuhan Zamrud/Emerald kecil & disengaja (glint permata kecil saat panel ditekan, satu vena
-  tipis di ambient wash layar utama, dan titik permanen di piringan album) — bukan aksen yang
-  bersaing dengan Titanium. Wajib gelap-mode-independen (punya ekspresi terang sendiri sejak
+  cuma mengecil), kesan permukaan masuk ke kanvas. Palet (Batch 563, rombak total): aksen primer
+  **Burgundy** (claret di mode gelap, burgundy pekat di mode terang — dikenali `isSkeuTheme()`), sekunder
+  **Champagne/sand** yang tenang, kanvas arang berundertone anggur (gelap) / perkamen hangat (terang), teks ivory,
+  status sukses sage. Aksen burgundy dipakai sebagai SISTEM (Batch 564; diperluas keluar Pengaturan di Batch 565: kunci geser bilah tab bawah, bingkai gilt tombol play Now Playing, chip filter Library, garis progres mini player; Batch 566: layar kunci bermedali dengan titik PIN permata ruby, permata geser gilt di seek bar Now Playing, fillet gilt di tepi hero album art; Batch 568: slider Equalizer/volume Kontrol Lanjutan/Pemotong Nada Dering = sumur + pita anggur + permata ruby gilt, `ui/NeuSlider.kt`; Batch 569: fillet gilt tipis di thumbnail art daftar lagu & kartu Home), bukan titik kilau: wash anggur diagonal + hairline gilt di tiap tile, rel penanda kiri (ruby terang saat tile aktif), medali enamel burgundy di ikon navigasi Pengaturan, kop section berpermata + garis gilt. Bentuk "tailored": radius panel/tile dipangkas ke
+  <= 12dp (`SkeuCappedShape`), skala bentuk M3 4/6/10/12/16dp. **Saklar** (`ui/NeuSwitch.kt`, Batch 564) = sumur
+  berdinding dalam (bayangan dinding, bibir luar, tanda pahat "I"/"O") + kenop kuningan berkubah yang meluncur di SEMUA
+  tema; ON = lantai burgundy berpendar + permata ruby di pusat kenop. Wajib gelap-mode-independen (punya ekspresi terang sendiri sejak
   Batch 61). Dipasang di mini player, tombol play/pause (mini & Now Playing), piringan album hero,
   kartu "Lanjutkan Mendengarkan", banner undo-sembunyikan-lagu, badge indikator gesture, dan baris
   pemilih tema. **Typography sendiri** (Batch 305, murni 100% — bukan pinjaman Apple lagi):
@@ -152,23 +310,30 @@ permukaan kaca lainnya.
 - **Onboarding**: layar selamat datang menjelaskan kenapa izin dibutuhkan sebelum dialog izin muncul, dengan fallback "Buka Pengaturan Aplikasi" kalau izin ditolak permanen
 - **Optimalisasi**: pemindaian MediaStore kini terpusat satu kali di ViewModel (bukan diulang di setiap Beranda/Perpustakaan/Playlist), mengurangi kerja I/O berulang dan flicker loading tiap pindah tab
 - **Navigasi gesture back**: gesture back sistem sekarang navigasi bertahap sesuai stack (Now Playing → Perpustakaan/Beranda), bukan langsung keluar aplikasi
+- **Swipe lintas 3 tab** (Batch 435): geser horizontal di konten Beranda/Perpustakaan/Pengaturan untuk pindah tab — alih-alih harus tap ikon navigasi bawah/rail satu-satu. Berlaku di layout ponsel (NavigationBar bawah) maupun tablet/lipat (NavigationRail samping). Tidak aktif di layar Now Playing/Dashboard Statistik (supaya tidak rebutan dengan swipe next/prev lagu di piringan album)
+- **Efek pembesar pada label tab bawah** (Batch 437, blur dicabut Batch 442): selama swipe di atas berlangsung, label Beranda/Perpustakaan/Pengaturan di NavigationBar bawah (layout ponsel) ikut bereaksi kontinu mengikuti arah jari — label tab yang sedang "disorot" tampak sedikit lebih besar & terang, label lainnya mengecil dan meredup sebagian (skala+opacity kontinu, TANPA blur — blur lama dicabut Batch 442 karena bikin buram permanen 2 label nonaktif setiap saat, bukan cuma manfaat sesaat selama drag). Belum berlaku di NavigationRail tablet/lipat (di luar scope permintaan)
+- **Fix label tab bawah terpotong/oversized + drag langsung di tab bar** (Batch 442): label "Perpustakaan"/"Pengaturan" yang sempat terpotong ("Perpusta"/"Pengatur") dan pill "Beranda" yang tampak anomali besar — root cause: style label salah baca ambient default (bukan style label nav resmi) sejak Batch 439 memindahkan label ke slot ikon — sudah diperbaiki. Ditambah fitur baru: geser jari LANGSUNG di atas bar tab (bukan cuma di konten layar seperti swipe Batch 435) untuk pindah tab, gaya segmented-control iOS — tekan 1 tab lalu geser tanpa angkat jari, tab ikut berpindah mengikuti posisi jari melintasi Beranda/Perpustakaan/Pengaturan, termasuk melewati lebih dari 1 tab dalam satu gerakan. Tap satu-satu tetap berfungsi seperti biasa, berdampingan dengan cara baru ini. Hanya di NavigationBar bawah (ponsel), belum di NavigationRail tablet/lipat. **Batch 446**: pill highlight saat drag kini digambar sebagai 1 lapisan bersama yang membentang lintas kolom (bukan 3 pill independen per-tab) — warna/posisi tidak lagi terlihat "putus" pas melintasi celah kecil antar label, adaptasi dari video ilustrasi referensi yang diberikan user. **Batch 448**: root cause seam/kotak-ganda (Batch 446: 3 pill per-tab + 1 pill "bridge" aktif BERSAMAAN selama drag, 2 kotak tumpang-tindih) dirombak total — diganti 1 pill unified digambar sekali di `NavigationBar` (`drawWithContent`), aktif di SEMUA state (idle/tap/drag/nudge), bebas meluncur lintas kolom tanpa seam. **Dikonfirmasi user di device asli (Batch 449): 0 seam/kotak-ganda.** Batch 449 sekaligus menemukan 1 bug baru tak terkait pill: kilatan kotak abu-abu ~0.25 detik di tab yang baru ditinggalkan tiap pindah tab (state-layer bawaan `NavigationBarItem` M3 sendiri, bukan regresi Batch 448, bukan bagian pill) — `NavigationBarItem` dihapus total dari 3 titik pemakaian bottom nav, diganti komponen kustom (`CustomNavBarTabItem`: Row+Box manual + `Modifier.selectable(indication = null)`, kontrak resmi Compose Foundation, 0 lagi lapisan bawaan M3 yang bisa berkedip). **Batch 450**: fix Batch 449 itu sendiri ternyata membawa 1 regresi FATAL — `Modifier.fillMaxHeight()` yang ditambahkan ke `CustomNavBarTabItem` (asumsi keliru soal sizing internal `NavigationBarItem`, tidak diverifikasi ke source resmi) bikin pill unified melar jadi kapsul raksasa (dari pertengahan layar sampai hampir dasar layar). Sudah diperbaiki (`.fillMaxHeight()` dihapus, `Box` kembali wrap-content). Belum dikonfirmasi device fisik (0 compiler/device/network sesi Batch 449 maupun 450). **Batch 451**: dikonfirmasi device fisik user — pill ukuran normal & 0 kilatan abu-abu, keduanya valid. **Batch 452**: 2 fix instruksi eksplisit user, root cause murni jarak/urutan (0 arsitektur baru) — (1) label "Perpustakaan"/"Pengaturan" masih sesekali kepotong ellipsis di font NORMAL (bukan cuma aksesibilitas besar spt Batch 442): padding horizontal Column 12.dp->4.dp membebaskan lebar utk Text, 0 sentuh touch target (area sentuh = Box pembungkus di `CustomNavBarTabItem`, bukan padding ini) maupun typography; (2) pill/tab drag-langsung-di-bar kadang commit 1 kolom SEBELUM titik jari sungguhan dilepas ("offside") saat flick cepat: root cause pengecekan lepas-jari di loop drag dicek SEBELUM posisi event itu sendiri diproses, jadi posisi UP asli terlewat — urutan dibalik (posisi diproses dulu, pengecekan lepas-jari di akhir loop) supaya pill/route commit ke kolom titik lepas yang sebenarnya, berlaku baik untuk drag maupun tap-tab biasa. Belum dikonfirmasi device fisik
+- **Pill indicator glassmorphism ala iOS pada ikon tab bawah** (Batch 438): pill di belakang ikon tab yang aktif (Beranda/Perpustakaan/Pengaturan) kini translucent dengan rim tipis (bukan warna flat solid bawaan), menyala/meredup halus saat pindah tab, plus animasi tekan (scale-down halus) tiap tab disentuh — mengikuti panduan glassmorphism iOS yang diberikan user, diadaptasi ke arsitektur nav app ini (bukan blur asli — blur asli/Haze sudah dimatikan permanen sejak Batch 329 karena stutter musik di device asli). Khusus identitas tema **Skeu** (identitasnya sendiri "solid, bukan kaca") pill tetap solid seperti sebelumnya, tidak ikut efek ini. Berjalan berdampingan dengan efek kaca-pembesar label (Batch 437) di atas, sama-sama hanya di NavigationBar bawah (ponsel), belum di NavigationRail tablet/lipat
+- **Bottom nav bergaya iOS Jam: pill gabungan ikon+label, kapsul mengambang, 0 ripple** (Batch 439): 3 penyesuaian visual mengikuti referensi tab bar iOS Jam/Clock yang diberikan user. (1) Pill translucent Batch 438 di atas kini membungkus ikon DAN label sekaligus jadi 1 blok (dulu cuma bungkus ikon, label dirender terpisah di bawahnya) — bentuknya juga jadi kotak rounded (bukan kapsul penuh) supaya proporsional di tinggi baru. (2) `NavigationBar` bawah kini kapsul yang mengambang dengan jarak dari 3 tepi layar, bukan persegi nempel edge-to-edge seperti sebelumnya. (3) Efek gelombang ripple khas Android saat tab ditekan sudah dimatikan — feedback tekan sekarang murni dari animasi scale-down (`bouncyPress`, Batch 438) tanpa gelombang ripple di atasnya. Sama seperti Batch 437/438, hanya berlaku di NavigationBar bawah (ponsel); NavigationRail tablet/lipat tidak ikut berubah
+- **Ikon tab bawah ikut berwarna aksen real-time saat digeser** (Batch 440, lag dihilangkan Batch 445): sebelumnya (Batch 438/439) cuma pill kaca di belakang ikon yang bertransisi warna, ikonnya sendiri diam di warna default. Sekarang ikon & pill bergerak sebagai 1 aksen warna yang sama, mengikuti persentase geser jari secara langsung 1:1 tanpa lag (bukan cuma snap setelah tab berpindah) — meniru transisi warna kontinu ala tab bar iOS Jam/Clock. Skeu tetap dikecualikan (identitasnya solid, bukan kaca). **Batch 447**: label teks di bawah ikon kini ikut lerp warna yang SAMA (dulu cuma snap begitu tab commit berpindah, "menyusul-lompat" dibanding ikon) — adaptasi dari video rekaman asli tab bar iOS Jam yang diberikan user, ikon+label kini bergerak sebagai 1 aksen warna sepenuhnya, termasuk easing halus 220ms pasca lepas jari
 - **Now Playing lebih atmosferik**: backdrop blur dari album art (seperti Spotify/Apple Music) di belakang piringan hitam yang berputar, dipadu warna aksen dinamis per lagu
-- **Micro-interaction**: tombol play/pause, shuffle, repeat, favorit, dan navigasi lagu kini punya animasi "bounce" halus tiap ditekan — bukan cuma ganti ikon instan
+- **Micro-interaction**: tombol play/pause, shuffle, repeat, favorit, dan navigasi lagu kini punya animasi "bounce" halus tiap ditekan — bukan cuma ganti ikon instan (Batch 581: animasi skala tekan kini TANPA pantulan/overshoot)
 - **Status bar & navigation bar** ikut mode terang/gelap tema aktif (ikon gelap di tema terang, ikon terang di tema gelap/Tactile) — bukan dipaksa satu arah
 - **Shimmer skeleton loading** kini konsisten di Beranda (bentuknya persis kartu asli), bukan cuma spinner generik
 - **Haptic diperluas**: reorder antrean, hapus dari antrean, dan berhasil tambah ke playlist masing-masing punya pola getar berbeda
+- **Haptic terpusat & lebih kuat** (Batch 511): semua getar di app kini lewat satu titik (`ui/theme/AppHaptics.kt`, dipasang di `AudioPlayerTheme`) dan dikirim langsung ke motor getar (permission `VIBRATE`, tanpa dialog) — bukan lagi tick bawaan Compose yang nyaris tak terasa; tingkat "ketuk" vs "kuat" tetap dibedakan (Batch 512: denyut mode one-shot diperkuat + diagnostik haptic di Log Diagnostik); Batch 513: getaran dikirim dgn kategori media (Android 13+) supaya tidak ikut mati saat "getar sentuh" sistem dimatikan; Batch 514: HP dengan kontrol amplitudo getar memakai getaran amplitudo penuh (lebih kuat dari klik bawaan pabrikan). Catatan: opsi umpan balik haptic di setelan sistem HP tetap perlu aktif agar getaran sentuh terasa
 - **Search dikelompokkan**: hasil pencarian dipisah per Artis / Album / Lagu (bukan satu list rata), plus riwayat pencarian terbaru saat kolom pencarian masih kosong
 - **Transisi Now Playing**: piringan hitam "tumbuh" masuk dengan animasi scale-spring saat layar dibuka, alih-alih muncul instan penuh
 - **Audio focus & "becoming noisy"**: auto-pause saat headset/Bluetooth dicabut, auto-duck saat ada notifikasi/telepon masuk
 - **Radio otomatis & Mix Artis**: saat antrean habis (repeat off), pemutaran otomatis lanjut dengan lagu lain dari library; Beranda punya bagian "Mix: [Artis]" berdasarkan artis yang paling sering didengar
 - **App icon adaptif**: ikon aplikasi diganti dari placeholder default Android Studio menjadi identitas "Ink & Brass" sendiri (piringan hitam brass di atas ink hitam), pakai format Adaptive Icon (`mipmap-anydpi-v26`) untuk Android 8+, dengan fallback PNG untuk versi lebih lama
-- **Equalizer**: `EqualizerController.kt` tersambung penuh — sheet di Now Playing dengan toggle aktif/nonaktif, **preset kuat buatan sendiri** (Flat/Bass+/Treble+/Vokal+, sengaja dibuat dramatis karena preset bawaan Android biasanya sangat halus di banyak perangkat), preset bawaan perangkat, dan slider per band frekuensi. Geser slider atau pilih preset otomatis mengaktifkan efeknya. Tersimpan otomatis dan diterapkan ulang tiap sesi
+- **Equalizer**: `EqualizerController.kt` tersambung penuh — sheet di Now Playing dengan toggle aktif/nonaktif, **preset kuat buatan sendiri** (Flat/Bass+/Treble+/Vokal+, sengaja dibuat dramatis karena preset bawaan Android biasanya sangat halus di banyak perangkat), preset bawaan perangkat, dan slider per band frekuensi. Geser slider atau pilih preset otomatis mengaktifkan efeknya. **Preset Saya + impor profil AutoEq (Batch 542, ide dari Convx, belum diuji di device)**: simpan susunan band sendiri sebagai preset bernama (maks 20) atau impor file `ParametricEQ.txt` AutoEq — profil dipetakan sebagai PERKIRAAN kasar ke band perangkat (bukan filter parametrik sungguhan). Tersimpan otomatis dan diterapkan ulang tiap sesi
 - **Gapless (Murni) vs Fade Halus**: dialog "Pengaturan Putar" sekarang menampilkan dua pilihan eksplisit, bukan cuma satu toggle fade — "Gapless (Murni)" membiarkan transisi alami tanpa campur tangan (default), "Fade Halus" menerapkan fade volume ±3 detik di tiap pergantian lagu
 - **APK release ditandatangani konsisten**: CI memakai keystore release asli (lewat secret GitHub) untuk build release, bukan debug key — install APK baru tidak perlu uninstall dulu. Otomatis jatuh ke debug key kalau secret belum diisi, jadi tidak pernah gagal build
 - **Gesture swipe kecerahan & volume**: di layar Now Playing, geser vertikal di **separuh kiri** untuk atur kecerahan layar, **separuh kanan** untuk atur volume — masing-masing zona selebar 50% layar penuh (bukan cuma strip tipis di ujung), lengkap indikator persentase mengambang selagi digeser. Volume yang diatur adalah **volume sistem Android sungguhan** (sama seperti tombol fisik HP), bukan sekadar penguat internal app. Area geser horizontal di piringan hitam (lagu berikutnya/sebelumnya) tetap berfungsi normal di atasnya. Kecerahan diatur lewat override per-window (tidak butuh izin tambahan) dan otomatis kembali ke pengaturan sistem begitu layar Now Playing ditutup
 - **Keamanan kunci PIN**: hash PIN pakai PBKDF2 + salt unik per-instalasi (bukan SHA-256 polos), plus lockout berjenjang setelah 4x percobaan gagal (30 detik → 1 menit → 2 menit → maksimal 4 menit) — layar kunci menampilkan hitung mundur dan mengunci keypad selama masa lockout
 - **Backup dikecualikan untuk data sensitif**: `app_lock` (hash PIN + status lockout) dikecualikan dari cloud backup & device transfer Android; data lain tetap ikut backup seperti biasa
-- **Release build di-shrink & di-obfuscate** (R8 minify + resource shrinking) — APK lebih kecil dan tidak gampang dibongkar kalau bocor
+- **Release build di-shrink** (R8 minify + resource shrinking; sejak Batch 687 nama TIDAK diacak lagi agar stacktrace di Log Diagnostik terbaca) — APK lebih kecil
 - **Antrean (Queue) bisa di-drag**: pegangan drag baru di tiap baris antrean untuk mengurutkan ulang lewat tahan-geser, tombol panah atas/bawah tetap ada sebagai cara presisi/fallback
 - **Undo untuk hapus**: hapus lagu dari antrean atau playlist memunculkan Snackbar "Urungkan" yang mengembalikan lagu persis ke posisi semula
 - **Auto-refresh library**: perubahan file musik dari luar app (file manager, sinkronisasi) terdeteksi otomatis lewat pengamat MediaStore selagi app terbuka, tanpa perlu pencet "Pindai Ulang" manual
@@ -177,6 +342,7 @@ permukaan kaca lainnya.
 - **Penanganan error playback**: file yang dihapus/rusak saat sedang diputar memicu pesan + otomatis lompat ke lagu berikutnya, bukan diam macet tanpa penjelasan
 - **Kilas Balik**: bagian "Kilas Balik: [label]" di Beranda, otomatis menampilkan lagu yang didengar persis di tanggal yang sama 1 tahun lalu, atau 6 bulan lalu, atau 1 bulan lalu (dicek berurutan dari yang terjauh, dipakai match pertama yang ada isinya) — berdasarkan riwayat dengar harian asli, bukan tebakan. Baru muncul setelah ada histori dengar minimal sebulan
 - **Shake-to-Skip**: opsi di Pengaturan (nonaktif secara default — gesture fisik harus sengaja diaktifkan user) untuk lompat ke lagu berikutnya dengan mengocok HP selagi musik diputar. Pakai accelerometer dengan debounce (satu kocokan = satu skip, bukan rentetan), dan sensor cuma aktif selagi musik benar-benar berjalan — hemat baterai, tidak kepicu asal di kantong saat idle
+- **Scroll & overscroll ala iOS** (Batch 364, diperluas Batch 367, pegas balik dipercepat Batch 368-370, dituning presisi ke nilai custom di antara 2 preset Batch 371, jarak tarikan sebelum "mentok" dibikin proporsional ke ukuran viewport device Batch 372 — sebelumnya jarak tetap 220px yang kerasa kaku di device modern manapun): menarik list lewat batas atas/bawah sekarang rubber-band (konten ikut tertarik dengan tahanan yang makin kuat, lalu pegas balik sigap — termasuk saat jari dilepas pelan-pelan tanpa sentakan setelah ditarik sampai mentok, bukan cuma saat fling) alih-alih glow instan bawaan Android — berlaku **otomatis di seluruh app**, dipasang sekali di root tema. Kurva fling (momentum setelah jari dilepas) juga dibuat meluncur lebih panjang & mulus meniru UIScrollView, dan **sudah terpasang di seluruh 14 layar berscroll di app ini** (tuntas Batch 380): tab **Lagu** Perpustakaan (Batch 364), **Beranda**, dialog **Tambah ke Playlist**, dan **Antrean Putar** (Batch 367), **Playlist Otomatis**, **Pengaturan**, dan **Dashboard Statistik** (Batch 377), **Vault**, **Pilih Lagu** (sheet Tambah ke Favorit/Playlist), dan **Kelola Perpustakaan** (Batch 378), **Deteksi Duplikat**, **Repeat A-B & Bookmark**, dan **Equalizer** (Batch 379), serta **Lirik** (`LyricsSheet`) dan tampilan lirik sinkron/plain (`LyricsView`, Batch 380) — riwayat lengkap pemasangan per-batch ada di `CHANGELOG.md` **Batch 581: provider overscroll iOS (`IosOverscrollFactory`) DICABUT — overscroll kembali bawaan platform; fling ala iOS (`rememberIosFlingBehavior`) tetap dipakai.**
 
 ## Standar Penomoran Versi
 `versionCode` dan `versionName` (Batch 30, formula `versionName` diperbarui Batch 86) **sama-sama
@@ -197,7 +363,7 @@ terpisah (Gradle & `.github/workflows/build.yml`) dan tidak butuh salah satunya 
 lain — kalau `commitsPerMinor` diubah di salah satu tempat, HARUS diubah sama di yang satunya
 juga (dicatat sebagai komentar di kedua file).
 
-Nama file ZIP hasil tiap batch pengembangan (`AudioPlayer-batchN-release.zip`) tetap melacak nomor batch percakapan, **bukan** versionName/versionCode — ini sengaja tetap terpisah, karena nomor batch melacak paket kerja per sesi chat, sedangkan versionName/versionCode melacak histori commit git; keduanya naik dengan kecepatan berbeda (satu batch chat bisa berisi banyak commit).
+Nama file ZIP hasil tiap batch pengembangan (`SONIX_v<N>.zip`, diperbarui Batch 446 dari nama lama `AudioPlayer-batchN-release.zip` — branding aktif app ini SONIX, lihat `app_name`/judul dokumen ini; `AudioPlayer`/`com.rudi.audioplayer` cuma nama teknis package/rootProject yang sengaja tidak ikut berubah) tetap melacak nomor batch percakapan, **bukan** versionName/versionCode — ini sengaja tetap terpisah, karena nomor batch melacak paket kerja per sesi chat, sedangkan versionName/versionCode melacak histori commit git; keduanya naik dengan kecepatan berbeda (satu batch chat bisa berisi banyak commit).
 
 File APK hasil build dan asset GitHub Release membawa nomor versi di namanya, diakhiri `-run<nomor run>` (`AudioPlayer-v1.5.17-run42.apk`) — bukan nama generik statis, dan sengaja **tanpa** short commit hash di belakang supaya nama file tetap stabil/gampang dikenali. Penamaan ini dikerjakan di level workflow CI (`.github/workflows/build.yml`), bukan dobel dengan Gradle, biar tidak saling tabrak. Kata "release" yang dulu ada di antara versi & run number dihapus (Batch 107) — run number sendiri sudah cukup bikin nama unik per run, "release" di tengah cuma noise.
 
@@ -215,6 +381,7 @@ Ringkasan kenapa, bukan cuma apa — supaya sesi kerja berikutnya (chat AI baru 
 - **`MusicRepository.deriveFolderName` & `LibraryFilterStore.shouldKeep` jadi pure function di companion object** (Batch 27): folder-name parsing dan filter gabungan folder/lagu-disembunyikan sebelumnya menyatu dengan kelas ber-Context, jadi tidak testable. `shouldKeep` sengaja menerima `folderPath`/`id` polos, bukan `Song` utuh — `Song.uri` bertipe `android.net.Uri` yang tidak aman dikonstruksi di unit test JVM murni (lihat bagian Testing di bawah).
 - **`favoriteIds`/`selectedIds` pakai `ImmutableSet<Long>` (kotlinx.collections.immutable), bukan `Set<Long>` biasa**: `Set`/`List` bawaan Kotlin selalu dianggap *unstable* oleh Compose compiler (tidak ada jaminan compile-time bebas mutasi in-place), jadi composable manapun yang menerimanya sebagai parameter tidak bisa di-skip recomposition-nya sekalipun isinya sama persis — di `LibraryScreen`, ini bikin seluruh baris lagu yang sedang tampil ikut recompose setiap kali state lain yang tidak terkait berubah (mis. posisi playback yang tick tiap detik). Konsekuensinya: kalau ada `Set<Long>`/`List<T>` baru yang dikirim sebagai parameter ke composable list yang sering di-recompose, pertimbangkan pola yang sama, bukan `Set`/`List` polos.
 - **Compose stability config (`app/compose_stability_config.conf`) menandai `android.net.Uri` sebagai stable**: `Song.uri` bertipe `Uri` (tipe platform yang tidak bisa diverifikasi compiler), yang bikin seluruh `Song` dianggap unstable walau field lainnya (Long/String) sudah stabil. `Uri` sendiri efektif immutable (tidak ada setter publik), jadi aman ditandai stable secara manual.
+- **File config yang sama juga menandai `kotlin.collections.List` sebagai stable (Batch 413)**: `List` adalah interface (bisa dibungkus implementasi mutable seperti `ArrayList`), jadi Compose compiler selalu menandainya unstable — ini penyebab `List<Song>` di 10 layar (`HomeScreen`, `LibraryScreen`, `QueueSheet`, dkk.) tidak bisa skip recomposition walau `Song`-nya sendiri sudah fully stable. Diverifikasi dulu (Batch 413) codebase ini tidak pernah memutasi `List<Song>` in-place setelah masuk composition — reorder/hapus antrean selalu bikin copy baru via `toMutableList()` + reassign, bukan mutasi langsung — baru ditandai stable. Kalau ada kode baru nanti yang memutasi sebuah `List` secara in-place (bukan bikin copy + reassign) sementara list itu sudah dipegang composable, kontrak ini rusak dan UI bisa jadi stale karena recomposition yang harusnya jalan malah ter-skip.
 - **`androidx.concurrent:concurrent-futures`, bukan `com.google.guava:guava` penuh** (Batch 28): satu-satunya alasan Guava ada di project ini adalah API session callback Media3 yang mengembalikan `ListenableFuture` — bukan kebutuhan Guava yang sesungguhnya (collections/cache/dst. tidak dipakai sama sekali). `concurrent-futures` menyediakan `CallbackToFutureAdapter` untuk konstruksi `ListenableFuture` async, dan tipe `ListenableFuture`-nya sendiri datang dari shim kecil `com.google.guava:listenablefuture:1.0` (dependency transitif, bukan jar Guava penuh).
 
 **Batasan yang tidak bisa dihilangkan dari sisi kode:** HP dengan pengelolaan RAM agresif (sebagian skin Xiaomi/Oppo/Vivo, dan sebagian Samsung) tetap bisa membunuh proses aplikasi kapan saja kecuali user manual whitelist app itu di pengaturan baterai — ini keterbatasan Android, bukan sesuatu yang bisa diperbaiki murni lewat kode di app manapun.
@@ -226,6 +393,120 @@ Semua test di `app/src/test` adalah **pure JVM test** (`testImplementation("juni
 
 CI (`.github/workflows/build.yml`) menjalankan `gradle testDebugUnitTest` sejak Batch 27, sebelum step build APK — sebelum itu test yang ada di repo tidak pernah benar-benar dijalankan otomatis.
 
+**Batch 632** — Dari log v631: izin PACKAGE_USAGE_STATS diterima dan 12 dari 13 bagian dumpsys kini berisi data. Sisa satu bagian (jobscheduler, "Security exception") sekarang otomatis dibaca lewat Shizuku. Belum dikompilasi/diuji di device.
+
+**Batch 631** — Memutar layar tidak lagi memunculkan kunci PIN/sidik jari (status "sudah dibuka" kini dibawa lewat rotasi; ditinggalkan sungguhan tetap mengunci). Log Diagnostik di landscape selebar layar dengan dua kolom (kiri header + tombol, kanan log / panel Izin dumpsys). Dumpsys: izin PACKAGE_USAGE_STATS ikut diberikan lewat Shizuku/adb, bagian yang ditolak otomatis dibaca lewat Shizuku, dan "Uji dumpsys" tak lagi menandai lulus saat layanan tak ditemukan. Belum dikompilasi/diuji di device.
+
+**Batch 630** — Log Diagnostik (Pengaturan > Lanjutan) kini tampil FULL SCREEN di tab Log maupun tab Izin dumpsys: batas tinggi 560dp dihapus (`fillMaxHeight()`), kotak log / panel Izin dumpsys mengisi sisa ruang dan tombol Ekspor Logcat Debug / Simpan Log / Hapus tetap menempel di bawah. Logika dan isi tidak berubah. Belum dikompilasi/diuji di device. Temuan baru (belum dikerjakan): 6 dari 13 bagian dumpsys ditolak sistem karena izin PACKAGE_USAGE_STATS dan bagian meminfo tak ditemukan.
+
+**Batch 629** — Perbaikan crash v628: menunggu proses Shizuku dengan `Process.waitFor` melempar IllegalArgumentException ("process hasn't exited") yang tak ditangkap JDK; diganti polling aman. Uji dumpsys, pemberian izin DUMP via Shizuku, dan pemeriksaan panel kini tak pernah melempar ke aplikasi. Belum dikompilasi/diuji di device.
+
+**Batch 628** — Integrasi Shizuku di tab "Izin dumpsys": status Shizuku (terpasang/berjalan/diizinkan), tombol Buka Shizuku, Izinkan lewat Shizuku, dan Beri izin DUMP via Shizuku. Bila Shizuku sudah siap, "Ekspor Logcat Debug" langsung memuat dumpsys lewat shell Shizuku tanpa perlu `adb pm grant` dari PC; perintah adb tetap tampil sebagai cadangan bila Shizuku belum ada. Belum dikompilasi/diuji di device.
+
+**Batch 627** — (1) Fade Halus: dari log, pada satu pergantian lagu lagu lama habis setelah ~0,8 dtk dari fade yang direncanakan ~2,9 dtk, sehingga volume lagu baru yang baru 31% DIPAKSA naik ke penuh dalam 0,4 dtk (terdengar dipercepat di akhir). Kini serah-terima menaikkan volume sepanjang sisa jadwal fade; kecepatan putar sesi juga disamakan ke pemutar overlap bila bukan 1x. (2) Tab "Izin dumpsys" di Log Diagnostik: centang hijau/silang untuk izin DUMP dan uji dumpsys, perintah adb yang bisa disalin (`adb shell pm grant <paket> android.permission.DUMP`), dan 13 centang bagian dumpsys yang ikut Ekspor Logcat Debug. Tanpa izin, ekspor berjalan seperti biasa. Belum dikompilasi/diuji di device.
+
+**Batch 626** — Perbaikan Fade Halus: dari log perangkat, setiap pergantian lagu otomatis dengan Fade Halus berakhir dibatalkan di tahap serah-terima (22 dari 22 transisi dalam satu sesi 3 jam), sehingga ramp serah-terima tidak pernah berjalan dan widget sempat berkedip ke ikon jeda sekitar 0,1-0,2 detik tiap ganti lagu. Penyebab: seek internal milik Fade Halus sendiri dianggap seek manual pengguna. Kini seek internal dikenali dan tidak membatalkan; seek/skip manual tetap membatalkan seperti semula. Celah senyap singkat di ujung crossfade belum dihilangkan (butuh angka dari log baru `celah_overlap` supaya tidak berganti menjadi gema). Belum dikompilasi/diuji di device.
+
+**Batch 625** — Jaring pengaman lanjutan: beberapa perulangan penting (pembaruan posisi lagu, pemicu crossfade, pencatat putaran) sebelumnya berhenti diam-diam bila satu langkahnya gagal sekali; kini langkah yang gagal dicatat apa adanya ke log dan perulangan lanjut. Perintah sesi pemutar (skip hening, crossfade, timer tidur) dan pemulihan antrean dari lock screen/Bluetooth/Android Auto tidak lagi menutup aplikasi atau menggantung bila terjadi galat, dan prefetch lirik kini mencatat kegagalannya (sebelumnya diam). Tampilan dan perilaku normal tidak berubah. Catatan dari log: di Infinix X6850 getaran memakai efek bawaan HP (konstanta durasi getar tidak berpengaruh), tidak diubah; kartu Recents tidak otomatis kembali saat aplikasi di latar belakang. Belum dikompilasi/diuji di device.
+
+**Batch 623** — Anti swipe tak sengaja: selama musik diputar (dan 10 menit setelah dijeda), SONIX tidak ditampilkan di daftar aplikasi terbaru, sehingga tidak ada kartu yang bisa tak sengaja digeser dan mematikan pemutaran. Setelah itu, atau saat pemutaran berakhir, kartu muncul seperti biasa. Hanya menyembunyikan kartu: tombol "hapus semua" atau pembersih bawaan HP tetap di luar kendali aplikasi. Sudah terkompilasi dan fungsi penyembunyiannya sudah berjalan di device; efek di layar Recents menunggu pengujian.
+
+**Batch 622** — Kebisingan log: data pencatatan Batch 621 menunjukkan galat decoder sampul hanya terjadi pada lagu yang tidak punya sampul tertanam (bukan kerusakan). Galat itu kini dicatat 1 baris ringkas, tidak lagi ratusan baris berstacktrace yang memenuhi sekitar 60% log; galat jenis lain tetap lengkap. Tampilan dan perilaku tidak berubah. Belum dikompilasi/diuji di device.
+
+**Batch 621** — Pencatatan diagnostik: ketika sampul album gagal dimuat oleh decoder gambar sistem (widget, notifikasi, warna aksen, bubble, layar), log kini menyimpan detailnya sekali per lagu — nama dan ukuran berkas, ukuran serta format sampul tertanam, dan hasil decoder — sehingga penyebab pastinya bisa dilacak dari ekspor log. Tidak mengubah tampilan atau perilaku. Belum dikompilasi/diuji di device.
+
+**Batch 620** — Perbaikan kecil: analisis kode menandai penanda internal pemulihan kontrol Equalizer yang dibaca dan ditulis dari beberapa thread tanpa pengaman seragam; kini memakai penghitung atomik. Perilaku tidak berubah. Perbaikan darurat Batch 619 dikonfirmasi bekerja di device (aplikasi terbuka normal). Belum dikompilasi/diuji di device.
+
+**Batch 619** — Perbaikan darurat: versi sebelumnya langsung menutup sendiri setiap kali dibuka karena satu komponen penanganan galat belum siap saat layar pemutar dibuat. Urutan inisialisasi diperbaiki, dan dua temuan analisis kode ikut dibereskan. Belum dikompilasi/diuji di device.
+
+**Batch 618** — Jaring pengaman: kesalahan tak terduga di bagian penting aplikasi (pemutar, widget, bubble, layar pemutar) sekarang dicatat apa adanya ke log diagnostik dan aplikasi tetap berjalan, sehingga penyebabnya bisa langsung dilacak dari ekspor log. Build otomatis juga mencoba ulang sekali bila unduhan dependency gagal karena jaringan. Belum dikompilasi/diuji di device.
+
+**Batch 617** — Perbaikan Equalizer: di beberapa perangkat efek audio lain bisa sementara mengambil kontrol Equalizer tak lama setelah lagu diputar, sehingga layar Equalizer salah menyatakan "tidak didukung". Kini layar menampilkan pesan yang sebenarnya dan aplikasi mencoba memulihkan kontrol otomatis beberapa kali dalam ±90 detik. Belum dikompilasi/diuji di device.
+
+**Batch 616** — Perbaikan crash: memilih preset Equalizer (atau menggeser band) bisa menutup aplikasi bila efek audio kehilangan kontrol di perangkat tertentu. Kini kegagalan itu ditangani tanpa menutup aplikasi dan dicatat di log (termasuk kapan kontrol efek berpindah), sehingga penyebab sebenarnya bisa dilacak. Belum dikompilasi/diuji di device.
+
+**Batch 615** — Perbaikan pencatatan putaran: sebelumnya lagu yang diputar lewat widget, headset, atau bubble setelah aplikasi ditutup tidak masuk statistik (Paling Sering Diputar, Baru Diputar). Kini layanan pemutar ikut mencatat saat tidak ada layar aplikasi yang aktif; saat aplikasi terbuka, pencatatan tetap seperti biasa dan tidak terhitung dua kali. Belum dikompilasi/diuji di device.
+
+**Batch 614** — Penyisiran bug dari log perangkat terbaru: setelah proses aplikasi dibunuh (mis. instal versi baru saat memutar), widget masih menampilkan ikon jeda karena status "memutar" tersimpan dari proses lama — di satu kasus sampai ~10 menit. Kini status itu hanya dipercaya bila ditulis oleh proses yang sedang hidup; judul, artis, dan sampul tetap tampil. Log gagal-attach Equalizer juga kini mencatat apakah efek memegang kontrol, supaya penyebab sebenarnya terbaca di log berikutnya. Belum dikompilasi/diuji di device.
+
+**Batch 613** — Log perangkat mencatat 82 kali Equalizer gagal dipasang. Penyebabnya: efek yang gagal tidak dilepas (sehingga percobaan berikutnya ikut gagal) dan efek dibongkar-pasang di setiap event pemutar. Kini Equalizer hanya dipasang sekali per sesi audio, efek gagal selalu dilepas, dan membuka sheet Equalizer boleh mengulang pemasangan. Sekaligus menutup 23 temuan SpotBugs: penghitung antrean/posisi dibuat atomik, flag lintas thread `@Volatile`, kondisi redundan di Crossfade dihapus, dan temuan yang terbukti bukan bug (artefak Kotlin, pembersihan berkas best-effort) disaring dengan alasan tercatat. Belum dikompilasi/diuji di device.
+
+**Batch 612** — Perubahan palung di Batch 611 ternyata nyaris tak kelihatan (sudut yang diubah gelap di atas gelap). Kini palung diberi garis tepi pink yang mengikuti seluruh bentuk daunnya, sehingga lengkung besar di kiri-atas/kanan-bawah dan ujung runcing di kanan-atas/kiri-bawah terlihat jelas, mode gelap maupun terang. Belum diuji di device.
+
+**Batch 611** — Bagian palung (kotak cekung berisi judul + kontrol) kini ikut berbentuk daun seperti tepi widget: dua sudut melengkung besar, dua sudut runcing. Bayangan gelap yang sempat bocor keluar dari sudut kiri-atas palung juga dihilangkan. Belum diuji di device.
+
+**Batch 610** — Tepi luar widget kini benar-benar berbentuk daun, bukan pil: penyebab utamanya launcher Android 12+ yang memotong widget ke sudut membulat bawaan sistem (di widget 46dp jadi pil sempurna), bukan angka radius yang kita setel. Widget sekarang meminta launcher berhenti memotong, sudut kiri-atas/kanan-bawah melengkung besar dan kanan-atas/kiri-bawah runcing, dan pendar merah muda yang sempat bocor keluar dari tepi di sudut kanan-bawah sudah dihilangkan. Belum diuji di device.
+
+**Batch 609** — Perbaikan build: Batch 608 gagal dikompilasi karena satuan ukuran (dp) hilang di empat file tampilan widget; sudah diperbaiki, dan kini semua file tampilan diperiksa satuannya sebelum dikemas. Tambahan: sampul album pada widget kini punya bingkai tebal bergradasi seperti bingkai Boomly (serasi dengan tepi widget, mode gelap & terang), dan jalur judul mode terang disamakan dengan mode gelap. Bubble tidak berubah. Belum diuji di device.
+
+**Batch 608** — Tampilan cangkang widget dibuat jauh lebih mirip Boomly: bingkai tepi kini tebal dengan gradasi terang di atas ke gelap di bawah, ada bibir cekung dan pendar halus, bagian dalam lebih gelap supaya kontras, dan jalur judul (palung) lebih tegas dengan garis menyala di dasarnya. Berlaku untuk widget kecil, sedang, penuh, dan tinggi (mode gelap & terang); bentuk sudutnya tidak berubah. Belum diuji di device.
+
+**Batch 607** — Widget yang ditarik tinggi (mulai ~210dp) kini punya tampilan sendiri: sampul besar di atas, judul/artis di tengah, tombol di bawah. Widget ukuran menengah mengatur jarak isinya merata, dan bentuk widget compact/slim makin menyapu di sudut kanan-bawah. Satu temuan SpotBugs kecil (cabang identik) ikut dibersihkan. Belum diuji di device.
+
+**Batch 606** — Widget yang ditarik pendek (sekitar 46dp) tidak lagi terpotong: ada tampilan slim khusus (sampul, kotak judul, dan tombol tampil utuh) dengan bentuk cangkang yang lebih jelas (sudut kanan-bawah melengkung besar, kanan-atas rapat). Tampilan widget compact normal ikut dirapikan. Widget yang ditarik sangat tinggi belum punya tampilan khusus. Belum diuji di device.
+
+**Batch 605** — Widget dirapikan: widget penuh kini dua baris (sampul + judul sampai 2 baris + artis di atas, tombol prev/play/next di tengah bawah) sehingga judul tak lagi terpotong jadi 3 huruf dan tak ada ruang kosong atas-bawah; widget compact diberi napas lebih (sampul/kotak teks tak menempel tepi). Widget dengan tinggi di bawah ~124dp memakai tampilan compact. Belum diuji di device.
+
+**Batch 603** — Log Diagnostik kini punya tombol "Ekspor Logcat Debug": satu berkas lengkap (info perangkat, daftar efek audio, log diagnostik, logcat aplikasi yang sudah disaring dari derau) disimpan ke Documents/AudioPlayer/debug tanpa perlu kabel/PC/izin khusus, dan layar yang sama menampilkan crash terbaru (ditandai "baru" sekali). Belum diuji di device.
+
+**Batch 601** — Pencatat log/crash dan nama file backup kini memakai pemformat tanggal yang aman untuk banyak thread, sehingga log yang bersamaan dengan crash tidak bisa merusak laporan crash. Tampilan dan isi file sama seperti sebelumnya.
+
+**Batch 600** — Laporan analisis statis lebih bersih: 31 peringatan palsu hasil kompilasi Kotlin disaring dengan cakupan sempit, 27 peringatan nyata/belum ditinjau tetap tampil. Tidak ada perubahan perilaku aplikasi.
+
+**Batch 599** — Pemeriksa jendela crossfade di layanan pemutaran kini hanya berjalan saat Crossfade aktif, bukan terus-menerus selama pemutaran (termasuk pemutaran dari widget/Bluetooth saat aplikasi sudah ditutup). Belum diuji di device.
+
+**Batch 598** — Audit kebocoran memori untuk mengurangi lag/stutter. Tiga perbaikan: ViewModel lama tidak lagi tertahan di memori setelah layar ditutup (selama pemutaran tetap berjalan), pemutar kedua milik Crossfade dilepas penuh saat Crossfade dimatikan, dan bitmap perantara sampul widget/bubble dilepas segera. Efeknya ke kelancaran belum diukur di device.
+
+**Batch 597** — Hitungan "diputar" kini hanya untuk lagu yang benar-benar didengar (minimal 30 detik atau setengah durasi, mana yang lebih kecil), jadi lagu yang di-skip tidak lagi mengotori Baru Diputar, Paling Sering Diputar, Mix, dan Statistik. Tab Lagu dan Album punya pilihan urutan (judul, artis, album, terbaru ditambahkan, terpanjang / nama, artis, terbaru, terbanyak lagu) yang tersimpan. Riwayat lama tidak dihitung ulang. Belum diuji di device.
+
+**Batch 596** — Persiapan brankas yang benar-benar terenkripsi (AES-256, kunci disimpan di Android Keystore): mesin enkripsinya sudah ditambahkan beserta tesnya, tetapi BELUM dipakai oleh fitur Brankas — perilaku aplikasi tidak berubah. Langkah berikutnya dikerjakan bertahap supaya tidak ada berkas musik yang dihapus sebelum pemutaran dari berkas terenkripsi terbukti jalan. Belum diuji di device.
+
+**Batch 595** — Log Diagnostik (Pengaturan > Lanjutan) kini menampilkan catatan TERBARU di baris paling atas, jadi masalah baru langsung terlihat tanpa scroll ke bawah. Berlaku juga untuk teks yang disalin dan berkas hasil "Repack ke Dokumen"; catatan lama ikut tampil terurut ulang. Belum diuji di device.
+
+**Batch 594** — Aplikasi bisa tiba-tiba mati bila tombol widget (berikutnya/sebelumnya/putar) ditekan berulang saat pemutaran sedang dijeda; penyebabnya terbaca jelas di Log Diagnostik (sistem mematikan layanan pemutar karena tidak segera menandai dirinya sebagai layanan latar depan). Kini layanan langsung menandai diri lebih dulu, lalu melepasnya sendiri setelah beberapa detik. Soal teks judul berjalan di widget: tidak ditemukan kerusakan — judul pendek memang tidak bergerak di widget compact karena sudah muat. Belum diuji di device.
+
+**Batch 593** — Marquee judul widget: perbaikan Batch 592 tidak berhasil (judul lagu nyata masih diam), jadi batch ini hanya menambah pencatatan di Log Diagnostik (ukuran widget, selang antar-update, pemicu update, perkiraan lebar judul) supaya penyebabnya bisa ditentukan dari data, bukan tebakan. Perilaku widget tidak berubah. Belum diuji di device.
+
+**Batch 592** — Marquee judul widget: urutan aksi diperbaiki (matikan dulu, ganti teks, baru nyalakan) karena marquee hanya berjalan pada teks placeholder "Tidak ada lagu" dan mati saat judul lagu berganti. Ini perbaikan berdasarkan dugaan mekanisme, belum diuji di device.
+
+**Batch 591** — Marquee judul widget: karena versi XML murni tidak bergerak, aplikasi kini mencoba menyalakan teks berjalan lewat mekanisme widget (`setSelected`) — hanya bila sistem perangkat mengizinkan, dan hasil pengecekannya dicatat di Log Diagnostik. Kelas teks berjalan buatan sendiri tidak bisa dipakai di widget (launcher tidak mengenalnya). Belum diuji di device.
+
+**Batch 590** — Judul lagu di widget layar beranda kini memakai teks berjalan (marquee) untuk judul panjang, dengan cara murni layout agar kompatibel dengan widget; nama artis tetap dipotong titik-titik. Apakah teks bergerak bergantung pada launcher; bila tidak bergerak, tampilan sama seperti sebelumnya. Belum diuji di device.
+
+**Batch 589** — Widget layar beranda kini menjaga jarak isi dari sudut membulat launcher: bila radius sudut sistem perangkat besar, padding widget dinaikkan secukupnya agar konten tidak terpotong (widget tidak punya WindowInsets; ini padanannya). Pada perangkat berradius kecil/menengah tidak ada perubahan. Belum dikompilasi/diuji di device.
+
+**Batch 587** — Pembaruan widget layar beranda kini berjalan satu per satu: saat lagu diganti cepat lewat tombol widget, permintaan basi dilewati dan hanya yang terbaru diproses; kegagalan (termasuk kehabisan memori) saat menyegarkan widget dicatat ke Log Diagnostik dan tidak lagi mematikan aplikasi. Dibuat sebagai pengerasan karena aplikasi dilaporkan hilang tanpa jejak saat gonta-ganti lagu lewat widget; penyebab pastinya belum terbukti. Sudah lolos kompilasi di GitHub Actions (run #16, Batch 588; status "Build APK" belum dilaporkan), belum diuji di device.
+
+**Batch 586** — Log Diagnostik kini ikut mencatat alasan kematian proses sebelumnya yang dilaporkan sistem (`ApplicationExitInfo`: ANR, native crash, dimatikan sistem karena memori/OEM, dll.), ditulis saat aplikasi dibuka berikutnya sebagai baris `[ApplicationExitInfo]` dengan nilai mentah (alasan, status, importance, pss/rss, deskripsi; ANR + awal trace). Dibuat karena crash yang dilaporkan tidak meninggalkan baris FATAL; handler crash Java dan berkas `crash_*.txt` tidak berubah. Belum dikompilasi/diuji di device.
+
+**Batch 580** — 3 pemakaian `LocalLifecycleOwner` deprecated (`MainActivity.kt` x2, `NowPlayingScreen.kt` x1) dipindah ke `androidx.lifecycle.compose.LocalLifecycleOwner`; tanpa perubahan perilaku yang disengaja. Laporan run #8 memverifikasi Batch 579 (peringatan kompilator 14 = 14 deprecated + 0 lainnya); target berikutnya 11.
+
+**Batch 579** — 5 pemakaian ikon deprecated terakhir (`Icons.Default.Article/VolumeOff/VolumeDown/VolumeUp` di `NowPlayingScreen.kt`, `Backspace` di `LockScreen.kt`) dimigrasikan ke `Icons.AutoMirrored.Filled.*`; kelompok ikon tuntas, tampilan LTR identik. Laporan run #7 memverifikasi Batch 578 (peringatan kompilator 19 = 19 deprecated + 0 lainnya); target berikutnya 14.
+
+**Batch 578** — 11 pemakaian ikon deprecated (`Icons.Default.QueueMusic/VolumeUp/VolumeDown/VolumeOff/Article/PlaylistPlay/PlaylistAdd/ArrowBack`) dimigrasikan ke `Icons.AutoMirrored.Filled.*` di 5 layar (bagian 1 dari 2); tampilan LTR identik. Laporan run #6 memverifikasi Batch 577 (peringatan kompilator 30 = 30 deprecated + 0 lainnya); target berikutnya 19.
+
+**Batch 577** — 3 peringatan kompilator Kotlin non-deprecated dibersihkan (cast tak perlu di `LyricsApi.kt`, cabang mati `loadThumbnail` di `PlaybackService.kt`, `@OptIn(FlowPreview::class)` di `LyricsViewModel.kt`); tanpa perubahan perilaku. Laporan run #5 memverifikasi baris peringatan kompilator Batch 576 (33 = 30 deprecated + 3 lainnya); target berikutnya 30 + 0.
+
+**Batch 576** — peringatan kompilator Kotlin (API deprecated, "Condition is always true", dll.) kini ikut dilaporkan di `laporan-untuk-claude.txt` (baris ringkasan ke-5 + daftar). Workflow laporan memakai `--no-build-cache` untuk kompilasi supaya peringatan selalu tercetak. Belum diverifikasi CI.
+
+**Batch 575** — static analysis (detekt + lintDebug) dipindah dari `build.yml` ke workflow laporan Claude: artifact `SONIX_static_analysis_v<versi>-run<run>` tidak ada lagi; hasil detekt/lint kini masuk `laporan-untuk-claude.txt` bersama ArchUnit + SpotBugs (4 baris ringkasan, detail hanya bila ada temuan). `build.yml` kini hanya build + tes + Release + artifact APK. Belum diverifikasi CI.
+
+**Batch 570** — laporan CI untuk Claude: workflow terpisah `.github/workflows/android-artifact.yml` ("Android CI Artifact for Claude", berdampingan dgn `build.yml` yang tak berubah) menjalankan ArchUnit (`ArchitectureTest`, report-only, 7 aturan dependensi antar-package) + SpotBugs (SARIF, opt-in `-Psonix.spotbugs=true` via `config/spotbugs/spotbugs.gradle.kts`), lalu mengunggah `laporan-untuk-claude.txt` sebagai artifact `SONIX_laporan-untuk-claude_run<N>`. Non-blocking; alat yang tak jalan dicatat `NOT VERIFIED`, bukan "bersih". Terverifikasi jalan di CI (run #3, Batch 573): ArchUnit LULUS (7 aturan, 0 pelanggaran), SpotBugs 391 temuan (mayoritas diperkirakan false positive bytecode Kotlin).
+
+**Batch 562** — drag-select di daftar lagu dan sheet pilih-lagu kini bisa MEMBATALKAN centang (sapuan yang dimulai di baris tercentang = mode batal); hero album Now Playing diberi kedalaman statis tambahan (bayangan lantai, kilau kaca, pantulan warna aksen); CI kini juga mengunggah APK sebagai artifact tanpa zip dan menulis hasil detekt/lint ke ringkasan run. Belum diverifikasi compile/CI/device.
+
+**Batch 549** — struktur CI disalin dari template workflow user: 1 job `build`; APK + Release terbit dulu, lalu analisis statis (detekt + lint) jadi langkah paling akhir, non-blocking, dengan ringkasan anotasi dan artifact sendiri `SONIX_static_analysis_v<versi>-run<run>` (marker + log + laporan mentah). Job `static-analysis` terpisah, gate merah, dan zip `ci_report` dicabut. Belum diverifikasi CI.
+
+**Batch 548** — artifact static analysis kini berdiri sendiri dan terpisah dari build aplikasi, mengikuti contoh workflow dari user: `static_analysis_<run>_SONIX` berisi `STATIC_ANALYSIS_MARKER.txt` (identitas proyek), `gradle-static-analysis.log`, dan laporan detekt + lint mentah. Tidak ada lagi zip bernama `ci_report` maupun artifact `log_fail_static_*` terpisah. Kriteria gate sama. Belum diverifikasi CI.
+
+**Batch 547** — job `static-analysis` disederhanakan mengikuti contoh workflow dari user: tidak ada lagi langkah yang merakit/membungkus laporan di akhir (tanpa folder `ci_report/` rakitan dan `INDEX.txt`). Laporan detekt + lint diunggah mentah langsung sebagai artifact `ci_report_<run>_SONIX`; hasil gate tampil sebagai anotasi di halaman run; log Gradle hanya diunggah (`log_fail_static_<run>_SONIX`) bila job gagal. Kriteria gate sama. Belum diverifikasi CI.
+
+**Batch 546** — lint bersih: 2 warning terakhir (`ConfigurationScreenWidthHeight` di `NowPlayingScreen.kt`) diperbaiki dengan memakai `LocalWindowInfo.current.containerDpSize` (bukan `LocalConfiguration`), dan gate `static-analysis` diketatkan: batas warning lint 2 -> 0. Belum diverifikasi CI.
+
+**Batch 545** — CI disederhanakan: instrumentation (emulator) dihapus dari CI dan workflow `ci-report.yml` dihapus. `build.yml` ("Build APK") kini 1 run dengan 2 job paralel: `build` (tes unit + `assembleRelease` + Release APK, tidak berubah) dan `static-analysis` (detekt + `lintDebug`, gate: merah bila detekt > 0, lint error > 0, lint warning > 2, atau Gradle/laporan gagal). Job itu langsung menerbitkan 1 artifact `ci_report_<run>_SONIX` (`INDEX.txt` + laporan; plus log failure Gradle hanya bila gate gagal), tanpa proses collect. Sumber `app/src/androidTest` tetap ada untuk dijalankan manual di device. Belum diverifikasi CI.
+
+**Batch 543** — CI dipisah jadi 2 workflow supaya build hijau duluan: `build.yml` ("Build APK") hanya berisi job `build` (`testReleaseUnitTest assembleRelease` + Release APK); `ci-report.yml` ("CI Report", dipicu `workflow_run` SETELAH build selesai) menjalankan instrumentation + detekt/lintDebug lalu menggabungkan semuanya jadi `ci_report_<run>` (artifact ada di run "CI Report", bukan di run "Build APK"; nomor `<run>` = nomor run build).
+
 `android.net.Uri` tidak bisa dikonstruksi aman di unit test JVM tanpa Robolectric —
 `Uri.parse(...)` dkk mengembalikan `null` di bawah `isReturnDefaultValues = true`, bukan
 placeholder aman. Dua pola dipakai tergantung situasi: (1) kalau fungsi pure-nya kita yang
@@ -235,10 +516,15 @@ tulis, ubah supaya menerima field mentah (`folderPath`, `id`) saja, bukan `Song`
 `org.mockito:mockito-core` → `mock(Uri::class.java)` untuk dapat instance yang tidak throw,
 tanpa peduli isinya.
 
+**Batch 417** — audit cakupan test app-wide menemukan `DuplicateDetector.kt` (Gap List #2, pure,
+0 Context/I/O) sebagai satu-satunya kelas pure yang belum punya test file sejak dibuat;
+`DuplicateDetectorTest.kt` ditambah (12 test, fixture `mock(Uri::class.java)` sama seperti
+`SmartPlaylistEngineTest`) — 0 kelas pure lain tersisa tanpa test per audit ini.
+
 ## Belum selesai / dalam pengerjaan
 - Tag Editor (Edit Info Lagu) baru menulis MP3/ID3v2.3 untuk lagu MediaStore — FLAC/OGG/M4A/WMA belum didukung (masing-masing format biner beda total, butuh writer terpisah per format), dan lagu dari folder tambahan (SAF) juga belum bisa diedit (folder tambahan cuma diberi izin baca saat ditambahkan, belum ada alur minta izin tulis). Kedua batasan ini ditampilkan langsung ke user lewat pesan di sheet edit, bukan gagal diam-diam
 - Gradle Wrapper (`gradlew`/`gradle/wrapper/gradle-wrapper.jar`) belum ada — jar biner itu perlu di-generate lewat `gradle wrapper` (butuh Gradle terpasang) atau diunduh, keduanya tidak tersedia dari lingkungan kerja yang dipakai mengembangkan proyek ini; CI pakai `gradle` dari `setup-gradle@v3` sebagai workaround
-- Lint sebagai quality gate rilis (`checkReleaseBuilds`) masih dimatikan — mengaktifkannya butuh baseline lint sungguhan dari `gradle lint` (butuh Android SDK/Gradle terpasang) supaya tidak asal menyalakan gate atas warning yang belum pernah dilihat
+- Lint sebagai quality gate rilis (`checkReleaseBuilds`) masih dimatikan — mengaktifkannya butuh baseline lint sungguhan dari `gradle lint` (butuh Android SDK/Gradle terpasang) supaya tidak asal menyalakan gate atas warning yang belum pernah dilihat. **Batch 525**: `detekt` (1.23.8, `config/detekt/detekt.yml`) + `lintDebug` ditambahkan lewat job CI terpisah `static-analysis` (tidak memblokir publish APK) dan hook opt-in `.githooks/pre-commit`. **Batch 531**: diubah jadi FOKUS & NON-BLOCKING (instruksi user) — hanya aturan yang temuannya bisa diamati + diperbaiki: detekt = potential-bugs/exceptions/empty-blocks/performance/coroutines (ktlint-formatting, complexity, style, naming, comments dimatikan; `ignoreFailures = true`, `autoCorrect = false`), lint = whitelist `checkOnly` di `app/build.gradle.kts` (`abortOnError`/`warningsAsErrors` = false). Tanpa baseline (baseline menyembunyikan temuan): `.github/workflows/baseline.yml` + 2 file baseline Batch 528-530 dihapus. Gate rilis `checkReleaseBuilds` tetap dimatikan. **Batch 533**: whitelist dipangkas lagi ke temuan yang benar-benar bisa diperbaiki (detekt: `SwallowedException` + `SpreadOperator` dimatikan; lint `checkOnly` 10 -> 8 ID, `Recycle` + `StartActivityAndCollapseDeprecated` keluar karena false positive) dan 3 temuan lint nyata diperbaiki (`RingtoneEncoder`, `LockScreen`, `EqualizerSheet`). **Batch 534**: `ConstantLocale` 3 situs diperbaiki (`BackupManager`, `AppLogger` -> `Locale.ROOT`) + `AutoboxingStateCreation` tahap 1 (5 situs Float di `AlbumArtHero`, `PlaylistScreen`, `QueueSheet` -> `mutableFloatStateOf`); sisa Autoboxing 6 file dikerjakan bertahap (CI #511 hijau: detekt 0, lint 13). **Batch 535**: `AutoboxingStateCreation` tahap 2 (7 situs Int/Long di `LibraryScreen`, `LockScreen`, `VaultSheet`, `SmartPlaylistScreen`, `RingtoneCutterSheet` -> `mutableIntStateOf`/`mutableLongStateOf`); sisa 3 situs di `NowPlayingScreen` (CI #512 hijau: detekt 0, lint 6). **Batch 536**: `AutoboxingStateCreation` tahap 3 (3 situs di `NowPlayingScreen` -> `mutableIntStateOf`/`mutableFloatStateOf`); opsi D tuntas, sisa static analysis hanya `ConfigurationScreenWidthHeight` 3 **Batch 537**: T11 — 9 flag dialog/sheet ringan di `NowPlayingScreen` pakai `rememberSaveable` (tahan rotasi; Equalizer/Visualizer/Edit Info/Ringtone sengaja tidak) + hemat baterai: loop posisi `PlayerViewModel` melambat 1 dtk -> 5 dtk saat dijeda/UI tak terlihat (dibangunkan seketika oleh event player), capture Visualizer berhenti saat app ke background/rotasi. Belum diverifikasi CI. **Batch 538**: T11 lanjutan — tab/pencarian/seleksi/flag sheet ringan di `LibraryScreen` pakai `rememberSaveable` (`selectedIds` lewat `Saver`): tahan rotasi dan juga bertahan saat pindah tab bawah. Batch 537 terverifikasi CI #514 (kompilasi). Belum diverifikasi CI untuk 538. **Batch 539**: lint `ConfigurationScreenWidthHeight` 3 -> 2 (prediksi offline): `WindowAdaptive.kt` membaca lebar jendela dari `LocalWindowInfo.containerDpSize` (breakpoint 600/840 sama); 2 titik `NowPlayingScreen` sengaja ditahan (dipakai sebagai ruang tersedia, butuh ukuran terukur — bukan swap 1:1). Belum diverifikasi CI untuk 538 + 539. **Batch 540**: pangkas waktu CI — job `build` menjalankan `testReleaseUnitTest assembleRelease` (menggantikan `testDebugUnitTest` yang disebut di atas; varian debug tak lagi dikompilasi di job itu), configuration-cache + step cache-nya dimatikan (tak terbukti efektif, entri bisa memuat secret signing), dan `ci_report_<run>/INDEX.txt` kini memuat blok "DURASI CI" (durasi job + 5 step terlama). Terverifikasi CI #517 untuk 538-540 (build hijau, detekt 0, lint 2). **Batch 541**: `ci_report_<run>/INDEX.txt` memisahkan "WAKTU BUILD NYATA" (job `build`: jalur APK rilis) dari "JALUR LAPORAN" (instrumentation-tests, static-analysis) — keduanya tak lagi dijumlahkan jadi satu angka. Run #517: build 286s (Gradle 259s); jalur laporan 432s.
 - Shared-element transition sungguhan (mini player → Now Playing sebagai satu elemen visual) belum ada — versi sekarang pakai animasi scale-in sebagai pendekatan yang lebih aman (lihat catatan di riwayat commit); butuh bump Compose BOM dari 2024.05.00
 - Pull-to-refresh gesture di Library belum ada (cuma tombol manual + auto-refresh saat resume/ContentObserver) — API pull-to-refresh Material3 yang simpel baru stabil di versi Compose BOM lebih baru; naikkan BOM berisiko ke komponen lain yang sudah jalan
 - Ekstraksi penuh string hardcode ke `strings.xml` (untuk i18n) belum dikerjakan — 339 string literal tersebar di banyak file (Batch 54 audit), refactor mekanis sebesar itu belum aman dikerjakan tanpa akses compiler untuk verifikasi
@@ -257,21 +543,22 @@ Untuk file **FLAC/WAV** (lossless), jalur "Gapless (Murni)" menjamin sambungan s
 Untuk **MP3/AAC** (lossy), gapless yang benar-benar sample-accurate juga bergantung pada metadata encoder di file itu sendiri (LAME tag / iTunSMPB) dan seberapa tepat decoder ExoPlayer memangkas padding-nya — ini terjadi di level library, bukan sesuatu yang bisa "ditambahkan" lewat kode aplikasi ini, dan saya belum bisa memverifikasinya dengan telinga di device fisik. Kalau setelah dicoba masih kerasa ada jeda halus khusus di file MP3/AAC tertentu, itu petunjuk berharga — kabari, biar bisa ditelusuri lebih spesifik ke file/formatnya.
 
 ## Build
-Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai **GitHub Release** bertag `v<versi>-release` (bukan CI artifact — release asset di-serve GitHub apa adanya, tanpa dibungkus `.zip`, dan bisa diunduh publik tanpa login). Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
+Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diunggah sebagai **GitHub Release** bertag `v<versi>-release` (release asset di-serve GitHub apa adanya, tanpa dibungkus `.zip`, dan bisa diunduh publik tanpa login; sejak Batch 562 APK yang sama juga muncul di tab Artifacts run sebagai berkas `.apk` tanpa zip). Kalau secret `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, dan `SIGNING_KEY_PASSWORD` sudah diisi di pengaturan repo, APK ditandatangani pakai keystore release asli — kalau salah satu kosong, otomatis jatuh ke debug key tanpa bikin build gagal.
 
 ## Rencana v2 (belum dibuat)
 - **Redesign identitas visual terinspirasi CONVX ("Liquid Glass")** — arah baru sejak Batch 278,
-  kini tema ke-5 yang aktif (bukan lagi tahap perencanaan). Sudah punya shape/typography sendiri
-  (fase 1-4), blur asli via Haze (`hazeSource`/`hazeEffect`, fase 5 langkah 1-4, Batch 295-297,
-  diperkuat lagi Batch 298), dan tuning typography khusus (Batch 298). **Satu-satunya yang masih
-  tersisa: langkah 5/5 fase blur — verifikasi visual+performa di device Android sungguhan**, kini
-  di **putaran tuning ke-3** (Batch 300): 2 laporan device masuk sekaligus — card Home/Statistik
-  yang sebelumnya flat sekarang sudah ikut `.frostedGlass()`, dan radius blur diturunkan 32dp →
-  24dp meredam sedikit stutter scroll yang dilaporkan. Tint (`liquidGlassAlpha`, 0.38f/0.48f sejak
-  Batch 299) belum dapat konfirmasi ulang user — masih menunggu apakah 24dp sudah cukup meredakan
-  stutter, dan apakah tint saat ini sudah pas. Lihat `PROJECT_STATE.md` untuk detail yang perlu
-  dicek. Rencana lengkap & histori keputusan di `ROADMAP_LIQUID_GLASS_REDESIGN.md` dan
-  `LIQUID_GLASS_BLUR_ENGINE_DESIGN.md`.
+  tema ke-5 aktif. Shape/typography sendiri (fase 1-4) final. **Blur asli via Haze
+  (`hazeSource`/`hazeEffect`) DIMATIKAN PERMANEN app-wide sejak Batch 329.** Setelah blur genuinely
+  aktif di 17/17 `ModalBottomSheet` (Batch 324) & dikonfirmasi visual user (Batch 325), device
+  sungguhan justru melaporkan musik stuttering + lag/glitch swipe sheet "Kontrol Lanjutan"; root
+  cause: resample GPU per-frame dari blur asli + `MiniPlayerBar` yang SELALU tervisible selama
+  musik main — persis risiko yang sudah diperingatkan sejak param `blurRadius` pertama ditambah
+  (Batch 296). Sesuai `STABILITY > Speed`, fase 5/5 blur DITUTUP dengan keputusan final: kembali
+  ke tint solid opaque (`liquidGlassAlpha` 0.85f gelap / 0.90f terang — fallback yang sama persis
+  sudah pernah tervalidasi Batch 311-324), bukan blur. Identitas Liquid Glass sekarang murni
+  tint+edge-glow seperti 4 tema lain, TANPA blur asli — final, bukan lagi kandidat tuning
+  lanjutan. Detail: `PROJECT_STATE.md` Batch 329, `docs/archive/ROADMAP_LIQUID_GLASS_REDESIGN.md`,
+  `docs/archive/LIQUID_GLASS_BLUR_ENGINE_DESIGN.md`.
 - **Tema ke-6 "Aurora"** — arah baru sejak Batch 306, permintaan user eksplisit "100% ide sendiri,
   tanpa contek gaya desain visual apapun manapun". Mekanisme orisinal: warna gradien ambient yang
   mengalir pelan (animated hue-shift antar hijau→teal→ungu→magenta, terinspirasi spektrum aurora
@@ -284,15 +571,18 @@ Build otomatis lewat GitHub Actions setiap push ke `main`. Hasil APK release diu
   lain. **Fase 5/N selesai** (Batch 310) — rim-glow per-panel (sebelumnya ditunda sejak Batch 306)
   akhirnya di-wiring app-wide lewat `frostedGlass()`: MiniPlayerBar, panel NowPlaying, tiap bottom
   sheet, dan card Home/Library sekarang punya rim ber-gradasi 4 warna Aurora di tepinya. **Fase
-  6/N selesai (Batch 326)** — rim-glow ini SEKARANG ANIMATED (statis sejak Batch 310, ditunda
-  murni pertimbangan performa): 1 phase float dihitung sekali di `AppNavHost` lewat
-  `LocalAuroraPhase`, dibagi ke semua 12+ titik rim-glow — 0 `rememberInfiniteTransition`
-  tambahan per panel. **Batch 327** — user device sungguhan: rim-glow "terlalu tipis, hampir tak
+  6/N — Batch 326 mencoba ANIMATED (1 phase float dibagi via `LocalAuroraPhase`), TAPI
+  **DIREVERT Batch 328**: user device sungguhan lapor musik stuttering + lag/glitch swipe sheet
+  "Kontrol Lanjutan" — berbagi 1 `rememberInfiniteTransition` tetap memicu recomposition tiap
+  frame di semua panel (termasuk `MiniPlayerBar` yang selalu tervisible selama musik main).
+  Rim-glow kini **statis permanen** (bukan lagi kandidat animasi — keputusan final, proyek masuk
+  fase discontinued). **Batch 327** — user device sungguhan: rim-glow "terlalu tipis, hampir tak
   kasat mata"; alpha puncaknya dinaikkan ke token baru `AuroraRimGlowAlpha` (0.44f, terpisah dari
-  `AuroraGlowAlpha` 0.34f milik ambient wash yang tidak dikeluhkan/tidak disentuh). **Dengan
-  ini cakupan Aurora yang dikonfirmasi user Batch 306 (ambient background + rim-glow per-panel,
-  keduanya kini bergerak) SELESAI PENUH**, di atas color+typography+shape yang sudah lengkap
+  `AuroraGlowAlpha` 0.34f milik ambient wash yang tidak dikeluhkan/tidak disentuh) — nilai ini
+  TETAP dipakai statis pasca-revert Batch 328. **Dengan
+  ini cakupan Aurora yang dikonfirmasi user Batch 306 (ambient background bergerak + rim-glow
+  per-panel statis-terang) SELESAI**, di atas color+typography+shape yang sudah lengkap
   sejak Batch 309.
-  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-310, 326-327.
+  Detail & urutan fase di `PROJECT_STATE.md`/`CHANGELOG.md` Batch 306-310, 326-328.
 - Shared-element transition mini player ↔ Now Playing (butuh bump versi Compose)
 - Lirik otomatis (cari/unduh dari internet — versi sekarang murni input manual)

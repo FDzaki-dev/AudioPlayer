@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import com.rudi.audioplayer.data.CustomFolderInfo
 import com.rudi.audioplayer.data.Song
 
@@ -86,7 +87,11 @@ fun FolderManagerSheet(
                 )
             }
 
-            LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 420.dp),
+                // Batch 378 — PENDING_IosFlingBehavior.md item 9/14.
+                flingBehavior = rememberIosFlingBehavior()
+            ) {
                 items(folders, key = { it.path }) { folder ->
                     Row(
                         modifier = Modifier

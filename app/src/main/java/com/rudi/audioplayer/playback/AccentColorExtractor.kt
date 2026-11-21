@@ -1,13 +1,11 @@
 package com.rudi.audioplayer.playback
 
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.Build
 import android.util.Size
 import androidx.compose.ui.graphics.Color
 import androidx.palette.graphics.Palette
-import com.rudi.audioplayer.util.AppLogger
+import com.rudi.audioplayer.util.ArtFailureLog
 
 /**
  * Extracts a dominant color from a song's album art so the Now Playing
@@ -26,11 +24,10 @@ object AccentColorExtractor {
     fun extract(context: Context, songUri: Uri?): Color? {
         if (songUri == null) return null
         return try {
-            val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                context.contentResolver.loadThumbnail(songUri, Size(160, 160), null)
-            } else {
-                context.contentResolver.openInputStream(songUri)?.use { BitmapFactory.decodeStream(it) }
-            } ?: return null
+            // Batch 402: pre-Q decodeStream() fallback removed — minSdk 31 (Batch 290)
+            // guarantees API>=29 on every installable device, so that branch was unreachable
+            // dead code (loadThumbnail() is the only path that has ever actually run).
+            val bitmap = context.contentResolver.loadThumbnail(songUri, Size(160, 160), null)
 
             val palette = Palette.from(bitmap).generate()
             val swatch = palette.vibrantSwatch ?: palette.dominantSwatch ?: palette.mutedSwatch
@@ -38,7 +35,8 @@ object AccentColorExtractor {
         } catch (e: Exception) {
             // Gagal ekstrak warna hanya berarti Now Playing jatuh balik ke aksen statis (tidak
             // fatal), tapi dicatat karena sebelumnya kegagalan ini tidak meninggalkan jejak sama sekali.
-            AppLogger.e("AccentColorExtractor", "Gagal ekstrak warna aksen dari album art", e)
+            // Batch 622 — DecodeException (lagu tanpa sampul) = 1 baris WARN; galat lain tetap ERROR + stacktrace; + probe 1x per URI.
+            ArtFailureLog.logFailure(context, "AccentColorExtractor", "Gagal ekstrak warna aksen dari album art", songUri, 160, e)
             null
         }
     }

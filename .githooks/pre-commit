@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Batch 531 — pre-commit ADVISORY (NON-BLOCKING): jalankan detekt + lintDebug fokus dan TAMPILKAN
+# temuannya, tetapi TIDAK PERNAH membatalkan commit (selalu exit 0). Menggantikan hook pemblokir
+# Batch 525. Rule yang aktif dibatasi ke yang bisa diamati + diperbaiki (config/detekt/detekt.yml,
+# blok `lint { checkOnly }` di app/build.gradle.kts).
+# OPT-IN (tidak aktif sendiri): aktifkan sekali per clone ->
+#   chmod +x .githooks/pre-commit && git config core.hooksPath .githooks
+# Aman utk device tanpa toolchain: kalau Gradle atau Android SDK tidak ada, hook SKIP — penegak/
+# pelapor utamanya job CI `static-analysis`.
+
+ROOT="$(git rev-parse --show-toplevel)" || exit 0
+cd "$ROOT" || exit 0
+
+if [ -x ./gradlew ]; then
+  GRADLE="./gradlew"
+elif command -v gradle >/dev/null 2>&1; then
+  # Proyek belum punya Gradle Wrapper (gap list #19) -> fallback ke `gradle` di PATH.
+  GRADLE="gradle"
+else
+  echo "[pre-commit] SKIP: gradle/gradlew tidak ditemukan — pelapor = job CI static-analysis." >&2
+  exit 0
+fi
+
+if [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_SDK_ROOT:-}" ] && [ ! -f local.properties ]; then
+  echo "[pre-commit] SKIP: Android SDK tidak terdeteksi — pelapor = job CI static-analysis." >&2
+  exit 0
+fi
+
+"$GRADLE" detekt lintDebug --console=plain --continue || {
+  echo "[pre-commit] PERINGATAN (tidak memblokir): detekt/lintDebug melaporkan masalah — lihat output di atas." >&2
+}
+
+exit 0

@@ -8,6 +8,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     // Batch 243 — Room (Lyrics cache). Lihat root build.gradle.kts utk versi.
     id("com.google.devtools.ksp")
+    // Batch 525 — static analysis ketat. Lihat root build.gradle.kts utk versi + alasan.
+    id("io.gitlab.arturbosch.detekt")
 }
 
 // A hardcoded versionCode has to be remembered and manually bumped on every single
@@ -83,6 +85,15 @@ android {
     // biar tidak perlu bump lagi kalau ada dependency lain nagih 35 nanti.
     compileSdk = 36
 
+    // Batch 648 — peringatan deprecated CI: `resourceConfigurations` (dulu di defaultConfig, Batch 29) DEPRECATED
+    // sejak AGP 8.8; proyek kini AGP 8.13.0 (root build.gradle.kts). Pengganti resmi = `androidResources {
+    // localeFilters }` (dok. "Android Gradle plugin API updates", AGP 8.8). Batch 28 dulu gagal ("Unresolved
+    // reference: localeFilters") justru karena AGP saat itu 8.4.1 — kini sudah tersedia. Efek sama: hanya
+    // terjemahan "en" (+ resource default) library yang dipertahankan; 0 filter densitas.
+    androidResources {
+        localeFilters += listOf("en")
+    }
+
     defaultConfig {
         applicationId = "com.rudi.audioplayer"
         // Batch 290 — bump 23→31, fondasi wajib RenderEffect/RenderNode (blur asli Liquid
@@ -92,19 +103,28 @@ android {
         // drop dukungan Android <12 (API <31) total — device lama TIDAK BISA install app ini
         // lagi sejak versi ini, bukan cuma fitur blur yang hilang di device lama.
         minSdk = 31
-        targetSdk = 34
+        // Batch 422 — bump 34→36 (sektor baru: audit compileSdk/targetSdk, item #3 status
+        // penutupan Batch 384 "belum ada audit eksplisit kompatibilitas Android 15/16", dibuka
+        // sesuai instruksi eksplisit user, bukan proaktif). Trigger konkret, bukan cuma "prioritas
+        // mutakhir" rule #3: Google Play WAJIB target API 36 (Android 16) utk app update sejak
+        // 31 Agu 2026 (dicek web_search Sep 2026, support.google.com/googleplay/android-developer/
+        // answer/11926878) — targetSdk 34 project ini SUDAH lewat deadline itu. Disamakan ke 36,
+        // bukan dinaikkan lagi ke compileSdk (masih 36 juga, tidak diubah batch ini) — API 37 SUDAH
+        // ada tapi butuh AGP 9.1+, migrasi breaking (hapus DSL BaseExtension/AppExtension lama
+        // total) yang SENGAJA ditunda sejak Batch 291 (lihat compose-bom di bawah) — di luar scope
+        // 1-task audit ini, konsisten STABILITY > Speed & ZERO-REFACTOR.
+        // Perilaku Android 15/16 yang BELUM diverifikasi batch ini (audit BARU dibuka, belum
+        // tuntas — lihat PROJECT_STATE.md § "Batch terakhir yang selesai" utk daftar lengkap):
+        // edge-to-edge wajib (enforced sejak targetSdk 35, project ini lompat 34→36 langsung jadi
+        // baru kena skrg), predictive back, foreground service type (SUDAH declared dari batch
+        // lampau, tapi belum diverifikasi ulang thd 36). 0 kode UI disentuh batch ini — murni
+        // bump angka config, verifikasi visual butuh compiler+device asli yang tidak tersedia di
+        // environment kerja ini.
+        targetSdk = 36
         versionCode = appVersionCode
         // versionCode and versionName both auto-derive from git commit count (see
         // gitCommitCount()/appVersionName above) — neither needs a manual bump.
         versionName = appVersionName
-        // Batch 29 (hotfix): Batch 28 used androidResources.localeFilters, which doesn't exist
-        // yet on this project's AGP 8.4.1 (confirmed by CI: "Unresolved reference:
-        // localeFilters" — that DSL landed in a later AGP release than what's pinned here).
-        // resourceConfigurations does the same job (drop unused library translation resources)
-        // and is fully supported on 8.4.1 — only deprecated starting AGP 8.8, which this
-        // project isn't on.
-        resourceConfigurations += listOf("en")
-
         // Batch 103 (Gap List #2, Instrumentation testing) — runner default AndroidJUnitRunner
         // dari androidx.test, dibutuhkan supaya app/src/androidTest bisa dieksekusi lewat
         // `./gradlew connectedAndroidTest` (device/emulator fisik) atau job CI baru di
@@ -139,7 +159,7 @@ android {
 
     buildTypes {
         release {
-            // Shrinks + obfuscates the release APK. Media3, Coil, and AndroidX all ship
+            // Shrinks the release APK (Batch 687: nama TIDAK diacak lagi, `-dontobfuscate` di proguard-rules.pro). Media3, Coil, and AndroidX all ship
             // their own consumer proguard rules, and this project has no reflection-based
             // JSON/serialization (playlists etc. are hand-rolled org.json), so there's
             // nothing here that R8 needs extra keep rules for.
@@ -192,6 +212,33 @@ android {
     // ini cuma melepas pengait OTOMATISnya dari tiap assembleRelease di CI.
     lint {
         checkReleaseBuilds = false
+        // Batch 531 — lintDebug FOKUS & NON-BLOCKING (menggantikan abortOnError/warningsAsErrors
+        // Batch 525 + baseline Batch 530). checkReleaseBuilds=false (Batch 76) TIDAK diubah ->
+        // lintVitalRelease tetap lepas dari assembleRelease, jalur rilis utuh; lintDebug hanya
+        // jalan lewat `gradle lintDebug` (job CI static-analysis + hook opt-in).
+        abortOnError = false
+        warningsAsErrors = false
+        // WHITELIST: hanya isu yang nyata, terlihat di laporan, dan punya perbaikan lokal di
+        // source. Sisa 159 dari 194 temuan lama sengaja TIDAK dijalankan: UseKtx/KtxExtensionAvailable
+        // (gaya), GradleDependency/NewerVersionAvailable (nag versi), HardcodedText/ContentDescription/
+        // ModifierParameter/ComposableNaming (gaya/i18n), UnsafeOptInUsageError (24, stabilitas API
+        // media3), ikon launcher, serta kebijakan/false positive (BatteryLife, ExportedService, StaticFieldLeak).
+        // Batch 533 — juga dikeluarkan (terlihat di laporan tapi false positive, tak ada perbaikan nyata):
+        // Recycle (10; semua kursor/stream sudah `?.use { }`, lint tak mengenalinya) dan
+        // StartActivityAndCollapseDeprecated (1; cabang API<34 BubbleTileService sudah dijaga).
+        // Baseline TIDAK dipakai: baseline menyembunyikan temuan, bertentangan dengan "bisa diamati".
+        checkOnly.addAll(
+            listOf(
+                "WrongConstant",
+                "NewApi",
+                "MissingPermission",
+                "AutoboxingStateCreation",
+                "UseOfNonLambdaOffsetOverload",
+                "ConfigurationScreenWidthHeight",
+                "ConstantLocale",
+                "NonObservableLocale"
+            )
+        )
     }
 
     // The unit tests under src/test are plain JVM tests (no Robolectric, no emulator) — any
@@ -218,6 +265,42 @@ kotlin {
                 "${project.projectDir}/compose_stability_config.conf"
         )
     }
+}
+
+// Batch 531 — detekt FOKUS & NON-BLOCKING (menggantikan rancangan ketat Batch 525): hanya aturan
+// yang temuannya bisa diamati + diperbaiki (lihat config/detekt/detekt.yml). `ignoreFailures = true`
+// = temuan tetap tercatat di laporan tapi task TIDAK gagal. `autoCorrect = false`: detekt tidak
+// lagi menulis ulang source (perbaikan di runner tak pernah masuk repo). Tanpa baseline (menyembunyikan
+// temuan). Task `detekt` polos (TANPA type resolution): detektDebug/detektMain akan membaca classpath
+// Kotlin 2.4.10 dgn compiler 2.0.21 milik detekt 1.23.8 -> tidak dipakai. `check` otomatis ikut
+// menjalankan detekt, tapi CI rilis (`testDebugUnitTest assembleRelease`) TIDAK bergantung ke
+// `check` -> jalur rilis tidak tersentuh.
+detekt {
+    toolVersion = "1.23.8"
+    buildUponDefaultConfig = true
+    allRules = false
+    parallel = true
+    ignoreFailures = true
+    autoCorrect = false
+    config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+}
+
+// Resep resmi detekt (docs "Gradle > Dependencies"): detekt erat dgn versi compiler Kotlin-nya.
+// Pin HANYA konfigurasi detekt/detektPlugins ke 2.0.21 (versi build detekt 1.23.8); compile app
+// tetap Kotlin 2.4.10 — konfigurasi compileClasspath/kotlin plugin TIDAK disentuh.
+configurations.matching { it.name == "detekt" || it.name == "detektPlugins" }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlin") {
+            useVersion("2.0.21")
+        }
+    }
+}
+
+// Batch 570 — SpotBugs (laporan SARIF) OPT-IN utk `.github/workflows/android-artifact.yml`: hanya aktif
+// bila `-Psonix.spotbugs=true`. Tanpa flag itu, plugin/dependency/task SpotBugs TIDAK dimuat sama sekali ->
+// `build.yml` (`testReleaseUnitTest assembleRelease`) tak tersentuh. Isi + alasan: config/spotbugs/spotbugs.gradle.kts.
+if (providers.gradleProperty("sonix.spotbugs").isPresent) {
+    apply(from = rootProject.file("config/spotbugs/spotbugs.gradle.kts"))
 }
 
 // NOTE: output APK renaming is handled in .github/workflows/build.yml (the "Rename APK to
@@ -285,11 +368,23 @@ dependencies {
     // LiquidGlassAccent yang SUDAH ADA di frostedGlass(), bukan style bawaan Haze.
     implementation("dev.chrisbanes.haze:haze:1.7.2")
 
-    implementation("androidx.media3:media3-exoplayer:1.3.1")
-    implementation("androidx.media3:media3-session:1.3.1")
-    implementation("androidx.media3:media3-common:1.3.1")
+    // Batch 494: bump 1.3.1 -> 1.10.1 (latest stable per developer.android.com, dicek
+    // web_search; 1.11.0-alpha01 di alpha channel, TIDAK dipakai — kebijakan project stable-only).
+    // Instruksi eksplisit user: unlock Gap #2 (previous-3-detik, setMaxSeekToPreviousPositionMs,
+    // reverted Batch 493 krn Unresolved reference di 1.3.1). Scope MURNI version string, 0 source
+    // Kotlin disentuh batch ini (re-add API Gap #2 BELUM dieksekusi — tunggu instruksi terpisah).
+    implementation("androidx.media3:media3-exoplayer:1.10.1")
+    implementation("androidx.media3:media3-session:1.10.1")
+    implementation("androidx.media3:media3-common:1.10.1")
 
-    implementation("io.coil-kt:coil-compose:2.6.0")
+    // Batch 426 (correction, was 3.6.2 in Batch 425): CI build FAILED — checkDebugAarMetadata,
+    // 3.4.0+ transitively requires Compose Foundation/Animation/UI 1.12.0 -> compileSdk 37 +
+    // AGP 9.1.0, this project is locked compileSdk 36 / AGP 8.13.0 (PROJECT_STATE.md, AGP 9.x
+    // migration blocked). Pinned 3.3.0 — its own README/POM targets compileSdk 36, last version
+    // before that transitive bump. Same io.coil-kt.coil3 namespace/API used in the 3 migrated
+    // files (Batch 425) — 0 source changed, version string only.
+    implementation("io.coil-kt.coil3:coil-compose:3.3.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
     implementation("androidx.palette:palette:1.0.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.fragment:fragment-ktx:1.7.1")
@@ -310,6 +405,11 @@ dependencies {
     // instance via bytecode proxying instead of calling into the stubbed platform class, so
     // test fixtures that need *a* Uri (without caring what it resolves to) can get one safely.
     testImplementation("org.mockito:mockito-core:5.12.0")
+    // Batch 570 — ArchUnit (aturan arsitektur) utk app/src/test/.../ArchitectureTest.kt. `archunit` inti, BUKAN
+    // `archunit-junit5`: tes proyek ini JUnit 4 (junit:junit di atas). 1.4.2 = rilis stabil terbaru
+    // (18 Apr 2026; dicek web_search Okt 2026). Tes-nya dilewati kecuali env SONIX_ARCH_REPORT=1 (hanya
+    // android-artifact.yml) -> `build.yml` hanya menanggung resolusi dependency ini, tanpa analisis.
+    testImplementation("com.tngtech.archunit:archunit:1.4.2")
 
     // Batch 103 (Gap List #2) — src/androidTest, BEDA dari src/test di atas: ini jalan di
     // device/emulator sungguhan (bukan pure-JVM), lewat `./gradlew connectedAndroidTest` atau
@@ -343,9 +443,10 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
 
-    // Batch 246 — Lyrics offline-first 4/4a. CoroutineWorker buat LyricsPrefetchWorker.
-    // Versi 2.11.2 = rekomendasi resmi developer.android.com/kotlin/ktx per Agustus 2026
-    // (dicek langsung, bukan diasumsikan dari training data — versi WorkManager sering
-    // berubah shape antar rilis).
-    implementation("androidx.work:work-runtime-ktx:2.11.2")
+    // Batch 628 — Shizuku (RikkaApps): akses shell (dumpsys / pm grant) tanpa adb-PC setelah Shizuku berjalan.
+    // Permintaan eksplisit user ("kenapa tidak terintegrasi dengan Shizuku"). 13.1.5 = rilis terakhir seri 13.x
+    // (versi diambil dari ingatan, BELUM dicek di Maven Central dari sandbox tanpa jaringan: bila Gradle gagal
+    // me-resolve, baca pesan galat run CI dan koreksi versinya).
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 }

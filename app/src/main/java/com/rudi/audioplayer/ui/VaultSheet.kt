@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.RemoveCircleOutline
@@ -25,6 +26,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.data.VaultStore
+import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 import kotlinx.coroutines.delay
 
 /**
@@ -40,6 +43,37 @@ import kotlinx.coroutines.delay
  * bisa jadi batch lanjutan kalau diminta; menahannya di sini menjaga sheet ini tidak perlu
  * disambungkan ke seluruh permukaan `MediaController`/`PlayerViewModel` di batch pertamanya.
  */
+/** Batch 484 — sama persis pola [com.rudi.audioplayer.MainActivity.isBiometricAvailable]: minta
+ *  BIOMETRIC_STRONG saja (bukan WEAK/DEVICE_CREDENTIAL), biar konsisten dgn Kunci Aplikasi.
+ *  Duplikat kecil (bukan reuse MainActivity) sengaja — sheet ini sudah dari awal "self-contained,
+ *  no dependency on AppLockStore" (lihat KDoc atas), fungsi privat 2 baris ini menjaga itu tetap
+ *  benar utk fitur baru juga, bukan cuma utk store PIN-nya. */
+private fun isVaultBiometricAvailable(context: android.content.Context): Boolean {
+    val manager = androidx.biometric.BiometricManager.from(context)
+    return manager.canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+        androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
+}
+
+/** Sama persis pola [com.rudi.audioplayer.MainActivity.showBiometricPrompt]. Butuh
+ *  [androidx.fragment.app.FragmentActivity] sbg host — aman dipaksa non-null di call site karena
+ *  [com.rudi.audioplayer.MainActivity] (satu-satunya activity di app ini) sudah FragmentActivity. */
+private fun showVaultBiometricPrompt(activity: androidx.fragment.app.FragmentActivity, onSuccess: () -> Unit) {
+    val executor = androidx.core.content.ContextCompat.getMainExecutor(activity)
+    val prompt = androidx.biometric.BiometricPrompt(
+        activity, executor,
+        object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) {
+                onSuccess()
+            }
+        }
+    )
+    val info = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+        .setTitle("Buka Vault")
+        .setNegativeButtonText("Pakai PIN")
+        .build()
+    prompt.authenticate(info)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VaultSheet(
@@ -47,15 +81,36 @@ fun VaultSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val activity = context as? androidx.fragment.app.FragmentActivity
     val vaultStore = remember { VaultStore(context) }
     val haptic = LocalHapticFeedback.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var vaultEnabled by remember { mutableStateOf(vaultStore.isVaultEnabled()) }
     var unlocked by remember { mutableStateOf(false) }
-    var vaultedIdsVersion by remember { mutableStateOf(0) }
+    var vaultedIdsVersion by remember { mutableIntStateOf(0) }
     var showDisableConfirm by remember { mutableStateOf(false) }
     var showAddPicker by remember { mutableStateOf(false) }
+
+    // Batch 484 — biometrik vault: sengaja QUERY ULANG tiap kali sheet ini dibuka (bukan
+    // remember sekali di atas activity, atau ditaruh di ViewModel) karena BIOMETRIC_STRONG bisa
+    // berubah antar-buka (enrollment sidik jari baru/dihapus user di System Settings di luar
+    // app ini) — pola sama persis `isBiometricAvailable()` MainActivity yang juga dipanggil
+    // ulang tiap kali dibutuhkan, bukan disimpan sekali di init.
+    val biometricAvailable = remember { isVaultBiometricAvailable(context) }
+    var vaultBiometricEnabled by remember { mutableStateOf(vaultStore.isBiometricEnabled()) }
+
+    // Auto-tawarkan sidik jari begitu gerbang PIN vault tampil, pola sama persis
+    // `LaunchedEffect(needsUnlock, biometricEnabled)` di MainActivity.kt utk Kunci Aplikasi —
+    // tetap ada tombol manual di VaultUnlockSection sbg fallback kalau prompt ini di-cancel user.
+    LaunchedEffect(vaultEnabled, unlocked, vaultBiometricEnabled, activity) {
+        if (vaultEnabled && !unlocked && vaultBiometricEnabled && biometricAvailable && activity != null) {
+            showVaultBiometricPrompt(activity) {
+                unlocked = true
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+        }
+    }
 
     val vaultedSongs = remember(songs, vaultedIdsVersion) {
         val ids = vaultStore.getVaultedSongIds()
@@ -63,9 +118,23 @@ fun VaultSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.Transparent) {
+        // Batch 483 — FIX regresi dilaporkan user ("background glass tembus pandang pada tab
+        // vault") + audit gejala serupa. Root cause TERKONFIRMASI dari perbandingan kode (bukan
+        // tebakan): `containerColor = Color.Transparent` (di atas) butuh `.frostedGlass()` di
+        // Column konten supaya panel tetap terlihat solid — 13/16 sheet lain di app ini SUDAH
+        // punya pasangan ini (grep `.frostedGlass()` app-wide), literally 0 punya
+        // `containerColor = Transparent` TANPA `.frostedGlass()` KECUALI 3 file: `VaultSheet.kt`
+        // (ini), `SmartPlaylistScreen.kt`, `SignatureMatcherSheet.kt` (2 file lain kena fix sama
+        // persis batch ini juga). BUKAN regresi dari Batch 481/482 (0 disentuh sebelumnya) —
+        // sudah bolong sejak `containerColor = Transparent` pertama dipasang (Batch 322/323,
+        // lihat komentar historis 2 file lain), audit `.frostedGlass()` Batch 340 ("lanjutan
+        // antrean Audit tambahan Batch 339") ternyata TIDAK mencakup 3 file ini — gap lama,
+        // baru ketahuan sekarang. `.frostedGlass()` dipanggil TANPA argumen (pola sama 12/12
+        // call site existing lain, 0 parameter baru/angka baru).
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .frostedGlass()
                 .fillMaxHeight(0.9f)
                 .padding(horizontal = 20.dp)
         ) {
@@ -88,10 +157,25 @@ fun VaultSheet(
                 )
                 !unlocked -> VaultUnlockSection(
                     vaultStore = vaultStore,
-                    onUnlocked = { unlocked = true; haptic.performHapticFeedback(HapticFeedbackType.LongPress) }
+                    onUnlocked = { unlocked = true; haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                    biometricAvailable = biometricAvailable && vaultBiometricEnabled,
+                    onRequestBiometric = {
+                        activity?.let { a ->
+                            showVaultBiometricPrompt(a) {
+                                unlocked = true
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                        }
+                    }
                 )
                 else -> VaultContentSection(
                     vaultedSongs = vaultedSongs,
+                    biometricAvailable = biometricAvailable,
+                    biometricEnabled = vaultBiometricEnabled,
+                    onToggleBiometric = { enabled ->
+                        vaultStore.setBiometricEnabled(enabled)
+                        vaultBiometricEnabled = enabled
+                    },
                     onRemove = { id ->
                         vaultStore.setSongVaulted(id, false)
                         vaultedIdsVersion++
@@ -193,7 +277,12 @@ private fun VaultSetupSection(onPinSet: (String) -> Unit) {
 }
 
 @Composable
-private fun VaultUnlockSection(vaultStore: VaultStore, onUnlocked: () -> Unit) {
+private fun VaultUnlockSection(
+    vaultStore: VaultStore,
+    onUnlocked: () -> Unit,
+    biometricAvailable: Boolean,
+    onRequestBiometric: () -> Unit
+) {
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var lockedUntil by remember { mutableStateOf(vaultStore.lockedOutUntil()) }
@@ -252,12 +341,30 @@ private fun VaultUnlockSection(vaultStore: VaultStore, onUnlocked: () -> Unit) {
             interactionSource = unlockInteraction,
             modifier = Modifier.fillMaxWidth().bouncyPress(unlockInteraction)
         ) { Text("Buka") }
+
+        if (biometricAvailable) {
+            Spacer(modifier = Modifier.height(8.dp))
+            val biometricInteraction = remember { MutableInteractionSource() }
+            OutlinedButton(
+                onClick = onRequestBiometric,
+                enabled = lockedUntil == null,
+                interactionSource = biometricInteraction,
+                modifier = Modifier.fillMaxWidth().bouncyPress(biometricInteraction)
+            ) {
+                Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Sidik Jari")
+            }
+        }
     }
 }
 
 @Composable
 private fun VaultContentSection(
     vaultedSongs: List<Song>,
+    biometricAvailable: Boolean,
+    biometricEnabled: Boolean,
+    onToggleBiometric: (Boolean) -> Unit,
     onRemove: (Long) -> Unit,
     onAddClick: () -> Unit,
     onDisableClick: () -> Unit
@@ -284,10 +391,21 @@ private fun VaultContentSection(
                 )
             }
         } else {
-            LazyColumn(modifier = Modifier.weight(1f)) {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                // Batch 378 — PENDING_IosFlingBehavior.md item 7/14 (daftar lagu vault).
+                flingBehavior = rememberIosFlingBehavior()
+            ) {
                 items(vaultedSongs, key = { it.id }) { song ->
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        // Batch 482 — `.animateItem()` ditambah (posisi TERTENTU di awal chain,
+                        // pola sama persis `LibraryScreen.kt`/ListItem riwayat pencarian): list
+                        // ini sudah punya `key` stabil (`it.id`) sejak awal, prasyarat animateItem
+                        // sudah terpenuhi, cuma modifier-nya belum pernah dipasang. Micro-task
+                        // instruksi eksplisit user "polish transisi biar mulus like iOS" — hapus
+                        // lagu dari vault sekarang slide+fade keluar, bukan pop instan. 0 logic
+                        // toggle/hapus/state lain disentuh.
+                        modifier = Modifier.animateItem().fillMaxWidth().padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -310,6 +428,14 @@ private fun VaultContentSection(
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
+            }
+        }
+
+        if (biometricAvailable) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+                Text("Buka dengan Sidik Jari", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Switch(checked = biometricEnabled, onCheckedChange = onToggleBiometric)
             }
         }
 
@@ -358,10 +484,20 @@ private fun VaultAddPickerDialog(
                         color = MaterialTheme.colorScheme.secondary
                     )
                 } else {
-                    LazyColumn {
+                    LazyColumn(
+                        // Batch 378 — PENDING_IosFlingBehavior.md item 7/14 (daftar kandidat lagu
+                        // di dialog Tambah — bukan chip filter pendek, ini daftar konten asli
+                        // sepanjang jumlah lagu belum-di-vault, jadi ikut dipasang; koreksi
+                        // hitungan dokumen dari "1 scrollable" jadi 2 utk file ini).
+                        flingBehavior = rememberIosFlingBehavior()
+                    ) {
                         items(candidates, key = { it.id }) { song ->
                             Row(
+                                // Batch 482 — `.animateItem()` ditambah, pola sama persis blok
+                                // `vaultedSongs` di atas & `LibraryScreen.kt` (list ini sudah
+                                // punya key stabil `it.id`). 0 logic `onAdd`/state lain disentuh.
                                 modifier = Modifier
+                                    .animateItem()
                                     .fillMaxWidth()
                                     .clickable { onAdd(song.id) }
                                     .padding(vertical = 8.dp),

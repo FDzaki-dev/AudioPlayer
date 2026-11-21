@@ -4,14 +4,13 @@ import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import com.rudi.audioplayer.util.AppLogger
 import org.json.JSONArray
 import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 
@@ -40,7 +39,8 @@ object BackupManager {
 
     private val BACKUP_RELATIVE_PATH = "${Environment.DIRECTORY_DOCUMENTS}/AudioPlayer/backups"
     private const val MAX_BACKUPS = 20
-    private val fileStampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+    // Batch 601 — DateTimeFormatter (thread-safe) menggantikan SimpleDateFormat bersama; pola/hasil teks identik.
+    private val fileStampFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss", Locale.ROOT)
 
     /** prefsName -> label manusiawi dipakai di ringkasan konfirmasi restore. Urutan di sini juga
      * urutan tampil ringkasan. */
@@ -80,9 +80,8 @@ object BackupManager {
     }
 
     /** Serialize seluruh prefs whitelist ke 1 file JSON di Documents/AudioPlayer/backups.
-     * Return nama file kalau sukses, null kalau gagal/di bawah API 29. */
+     * Return nama file kalau sukses, null kalau gagal. */
     fun exportToDocuments(context: Context): String? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
         return runCatching {
             val app = context.applicationContext
             val root = JSONObject()
@@ -99,7 +98,7 @@ object BackupManager {
             }
             root.put("prefs", prefsRoot)
 
-            val fileName = "backup_${fileStampFormat.format(Date())}_${UUID.randomUUID()}.json"
+            val fileName = "backup_${LocalDateTime.now().format(fileStampFormat)}_${UUID.randomUUID()}.json"
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "application/json")

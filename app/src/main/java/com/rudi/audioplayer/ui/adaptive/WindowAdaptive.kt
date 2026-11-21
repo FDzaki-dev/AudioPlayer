@@ -1,7 +1,8 @@
 package com.rudi.audioplayer.ui.adaptive
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.dp
 
 /**
  * Batch 101 — Adaptive layout (multi-device: tablet/foldable/Chromebook/split-screen).
@@ -9,14 +10,15 @@ import androidx.compose.ui.platform.LocalConfiguration
  * Breakpoint dp di bawah SAMA PERSIS dengan rekomendasi resmi Material 3 window size classes
  * (https://m3.material.io/foundations/layout/applying-layout/window-size-classes) — Compact
  * <600dp, Medium 600-839dp, Expanded >=840dp. Sengaja dihitung langsung dari
- * `LocalConfiguration.screenWidthDp` alih-alih menambah dependency
+ * `LocalWindowInfo.containerDpSize.width` alih-alih menambah dependency
  * `androidx.compose.material3:material3-window-size-class` baru di `build.gradle.kts`
  * (protected asset) — angka breakpoint identik, cuma beda sumber baca, jadi 0 risiko tambahan
  * di dependency graph untuk kebutuhan app ini (pilih rail-vs-bar & satu-pane-vs-dua-pane).
  *
- * `LocalConfiguration.current` sendiri sudah reactive terhadap rotasi layar, masuk/keluar mode
- * multi-window/split-screen, dan lipat/buka foldable — jadi nilai ini otomatis recompose ulang
- * di semua kejadian itu tanpa kode tambahan apa pun di pemanggil.
+ * Batch 539 — sumber baca dipindah dari `LocalConfiguration.current.screenWidthDp` (temuan lint
+ * `ConfigurationScreenWidthHeight`) ke `LocalWindowInfo.current.containerDpSize.width`: dokumentasi
+ * resmi `WindowInfo` menyebut ukuran ini DIPAKAI sebagai breakpoint antar konfigurasi UI (persis
+ * kegunaan di sini), bukan sebagai ruang tersedia. Breakpoint 600/840 tidak berubah.
  */
 enum class AppWidthClass {
     /** HP dalam potret biasa. Semua perilaku UI di app ini SAMA seperti sebelum Batch 101 di
@@ -34,10 +36,10 @@ enum class AppWidthClass {
 
 @Composable
 fun rememberAppWidthClass(): AppWidthClass {
-    val widthDp = LocalConfiguration.current.screenWidthDp
+    val widthDp = LocalWindowInfo.current.containerDpSize.width
     return when {
-        widthDp < 600 -> AppWidthClass.COMPACT
-        widthDp < 840 -> AppWidthClass.MEDIUM
+        widthDp < 600.dp -> AppWidthClass.COMPACT
+        widthDp < 840.dp -> AppWidthClass.MEDIUM
         else -> AppWidthClass.EXPANDED
     }
 }

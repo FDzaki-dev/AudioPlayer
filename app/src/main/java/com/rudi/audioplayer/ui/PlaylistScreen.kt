@@ -4,9 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -15,7 +17,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.data.Song
+import com.rudi.audioplayer.ui.theme.Radius
+import com.rudi.audioplayer.ui.theme.neuPressTile
+import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
 
 /** Playlist tab content: list of playlists, or the detail view of a selected one. */
 @Composable
@@ -72,11 +76,14 @@ fun PlaylistTabView(
                         ListItem(
                             headlineContent = { Text(playlist.name) },
                             supportingContent = { Text("${playlist.songIds.size} lagu") },
-                            leadingContent = { Icon(Icons.Default.QueueMusic, contentDescription = null) },
+                            leadingContent = { Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null) },
                             colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                            modifier = Modifier.clickable { selectedPlaylistId = playlist.id }
+                            // Batch 558 — baris playlist = tile berkedalaman (`neuRowTile()`, semua
+                            // tema); divider dibuang. Isi ListItem bergeser +12dp (margin tile).
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp, vertical = 3.dp)
+                                .neuPressTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp) { selectedPlaylistId = playlist.id }
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                     }
                     item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
@@ -103,8 +110,8 @@ fun PlaylistTabView(
             val currentOnMoveSongInPlaylist by rememberUpdatedState(onMoveSongInPlaylist)
             val currentPlaylistId by rememberUpdatedState(selectedPlaylist.id)
             var draggingSongId by remember { mutableStateOf<Long?>(null) }
-            var dragOffsetPx by remember { mutableStateOf(0f) }
-            var rowHeightPx by remember { mutableStateOf(0f) }
+            var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+            var rowHeightPx by remember { mutableFloatStateOf(0f) }
 
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
@@ -211,7 +218,7 @@ fun PlaylistTabView(
                                     }
                                 )
                             )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                            // Batch 558 — divider dibuang (baris = tile berkedalaman).
                         }
                     }
                     FloatingActionButton(
@@ -338,9 +345,13 @@ private fun PlaylistSongRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            // Batch 558 — baris = tile berkedalaman (pola `SongRow` Batch 557). Margin 12/3dp +
+            // padding dalam 8/5dp = 20/8dp lama -> posisi isi & tinggi baris 64dp (dipakai hitungan
+            // geser `rowHeightPx`) TIDAK berubah. Tile ikut `translationY` caller saat di-drag.
+            .padding(horizontal = 12.dp, vertical = 3.dp)
+            .neuPressTile(shape = RoundedCornerShape(Radius.xl), elevation = 3.dp, onClick = onClick)
             .background(background)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -475,7 +486,12 @@ fun AddToPlaylistDialog(
                         color = MaterialTheme.colorScheme.secondary
                     )
                 } else {
-                    LazyColumn(modifier = Modifier.heightIn(max = 260.dp)) {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 260.dp),
+                        // Batch 367 — PENDING_IosFlingBehavior.md item 3/14 (list playlist di
+                        // dialog "Tambah ke Playlist").
+                        flingBehavior = rememberIosFlingBehavior()
+                    ) {
                         itemsIndexed(playlists, key = { _, playlist -> playlist.id }) { _, playlist ->
                             ListItem(
                                 headlineContent = { Text(playlist.name) },

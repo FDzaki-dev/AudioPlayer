@@ -31,6 +31,19 @@ class LibraryFilterStore(context: Context) {
         prefs.edit().putStringSet(KEY_HIDDEN_SONGS, current).apply()
     }
 
+    /** Batch 597 — urutan tab Lagu / Album yang dipilih user (tersimpan; default = perilaku lama). */
+    fun getSongSort(): SongSort = SongSort.fromName(prefs.getString(KEY_SONG_SORT, null))
+
+    fun setSongSort(sort: SongSort) {
+        prefs.edit().putString(KEY_SONG_SORT, sort.name).apply()
+    }
+
+    fun getAlbumSort(): AlbumSort = AlbumSort.fromName(prefs.getString(KEY_ALBUM_SORT, null))
+
+    fun setAlbumSort(sort: AlbumSort) {
+        prefs.edit().putString(KEY_ALBUM_SORT, sort.name).apply()
+    }
+
     /** Applies the current exclusion rules to a freshly scanned song list. */
     fun apply(songs: List<Song>): List<Song> {
         val excludedFolders = getExcludedFolders()
@@ -43,6 +56,8 @@ class LibraryFilterStore(context: Context) {
         private const val PREFS_NAME = "library_filter"
         private const val KEY_EXCLUDED_FOLDERS = "excluded_folders"
         private const val KEY_HIDDEN_SONGS = "hidden_songs"
+        private const val KEY_SONG_SORT = "song_sort"
+        private const val KEY_ALBUM_SORT = "album_sort"
 
         /**
          * Pure predicate behind [apply], operating on plain folderPath/id instead of a full

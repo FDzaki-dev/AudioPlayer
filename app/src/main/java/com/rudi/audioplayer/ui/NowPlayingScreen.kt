@@ -1,6 +1,6 @@
 package com.rudi.audioplayer.ui
 
-import android.net.Uri
+import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -12,128 +12,142 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Article
-import androidx.compose.material.icons.filled.ContentCut
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BrightnessHigh
 import androidx.compose.material.icons.filled.BrightnessLow
 import androidx.compose.material.icons.filled.BrightnessMedium
-import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.VolumeDown
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.addOutline
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import android.content.Context
 import android.media.AudioManager
 import android.view.WindowManager
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.media3.common.Player
-import com.rudi.audioplayer.data.OnboardingHintStore
+import com.rudi.audioplayer.data.Playlist
 import com.rudi.audioplayer.ui.lyrics.LyricsViewModel
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.EqualizerUiState
+import com.rudi.audioplayer.playback.PlaybackProgress
 import com.rudi.audioplayer.playback.PlaybackUiState
 import com.rudi.audioplayer.ui.theme.frostedGlass
+import com.rudi.audioplayer.ui.theme.neuAccentKey
+import com.rudi.audioplayer.ui.theme.neuInstantPress
+import com.rudi.audioplayer.ui.theme.neuSurface
 import com.rudi.audioplayer.ui.theme.tactileEmboss
 import com.rudi.audioplayer.ui.theme.skeuEmboss
 import com.rudi.audioplayer.ui.theme.isTactileTheme
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
-import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
-import com.rudi.audioplayer.ui.theme.calmScanlines
-import com.rudi.audioplayer.ui.theme.calmAberration
-import com.rudi.audioplayer.ui.theme.TactileHighlight
-import com.rudi.audioplayer.ui.theme.TactileShadow
-import com.rudi.audioplayer.ui.theme.TactileLightHighlight
-import com.rudi.audioplayer.ui.theme.TactileLightShadow
-import com.rudi.audioplayer.ui.theme.SkeuAmbientOcclusion
-import com.rudi.audioplayer.ui.theme.SkeuHighlight
-import com.rudi.audioplayer.ui.theme.SkeuShadow
-import com.rudi.audioplayer.ui.theme.SkeuSpecular
-import com.rudi.audioplayer.ui.theme.SkeuEmerald
-import com.rudi.audioplayer.ui.theme.SkeuLightEmerald
-import com.rudi.audioplayer.ui.theme.SkeuLightAmbientOcclusion
-import com.rudi.audioplayer.ui.theme.SkeuLightHighlight
-import com.rudi.audioplayer.ui.theme.SkeuLightShadow
-import com.rudi.audioplayer.ui.theme.SkeuLightSpecular
 import com.rudi.audioplayer.ui.theme.LocalIsDarkTheme
+import com.rudi.audioplayer.ui.theme.SkeuGilt
+import com.rudi.audioplayer.ui.theme.SkeuGiltDeep
+import com.rudi.audioplayer.ui.theme.drawSkeuGem
+import com.rudi.audioplayer.ui.theme.isCalmRetroTheme
+import com.rudi.audioplayer.ui.theme.calmAberration
 import com.rudi.audioplayer.ui.theme.Radius
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingScreen(
     uiState: PlaybackUiState,
+    // Batch 353 (Opsi A, PENDING_FixGlobalLagRecomposition.md) — dikoleksi LOKAL oleh
+    // PlaybackProgressRow & WithLivePlaybackProgress di bawah, TIDAK di top-level fungsi ini,
+    // supaya tick posisi tiap detik tidak ikut memaksa seluruh NowPlayingScreen (dan
+    // AppNavHost pemanggilnya di MainActivity.kt) recompose.
+    playbackProgress: StateFlow<PlaybackProgress>,
     isFavorite: Boolean,
     currentRating: Int,
     onSetRating: (Int) -> Unit,
-    sleepTimerRemainingMs: Long?,
+    // Batch 354 — sama pola playbackProgress di atas (Batch 353): StateFlow mentah, dikoleksi
+    // LOKAL oleh SleepTimerDialog (teks countdown) & AdvancedControlsSheet (status Aktif/
+    // Nonaktif) di bawah, TIDAK di top-level fungsi ini — tick 1 detik dulu bocor sampai
+    // AppNavHost (MainActivity.kt) lewat parameter Long? polos di sini.
+    sleepTimerRemaining: StateFlow<Long?>,
     accentColor: Color?,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
+    // Batch 489 — QA checklist gap #1 (kontrol Stop eksplisit), lihat komentar
+    // PlayerViewModel.stopPlayback(). Diletakkan di sheet "Kontrol Lanjutan" (bukan Row transport
+    // utama Shuffle/Prev/Play/Next/Repeat) supaya 0 mengubah layout 5-ikon yang sudah di-tuning
+    // (SpaceEvenly, hierarki ukuran, dst — lihat komentar Batch 170/224/226 di Row itu).
+    onStopPlayback: () -> Unit,
     onSeek: (Long) -> Unit,
     onShuffle: () -> Unit,
     onRepeat: () -> Unit,
@@ -169,7 +183,11 @@ fun NowPlayingScreen(
     visualizerEnabled: Boolean,
     visualizerSupported: Boolean,
     visualizerPermissionGranted: Boolean,
-    visualizerBars: FloatArray,
+    // Batch 354 — sama alasan sleepTimerRemaining di atas, malah lebih kritis: ~15fps (bukan
+    // 1 tick/detik) + dulu menembus 4 layer composable (AppNavHost -> NowPlayingScreen ->
+    // VisualizerSheet -> SpectrumBars) sebelum akhirnya dipakai. Dikoleksi LOKAL di SpectrumBars
+    // saja (VisualizerSheet.kt) — VisualizerSheet sendiri & fungsi ini cuma meneruskan referensi.
+    visualizerBars: StateFlow<FloatArray>,
     onOpenVisualizer: () -> Unit,
     onCloseVisualizer: () -> Unit,
     onToggleVisualizerEnabled: (Boolean) -> Unit,
@@ -178,6 +196,13 @@ fun NowPlayingScreen(
     // di atas: hasil sukses/gagal muncul lewat Snackbar infoMessage/actionErrorMessage yang
     // sudah ada di MainActivity, bukan callback result langsung ke sini.
     onSaveSongTags: (com.rudi.audioplayer.data.Song, com.rudi.audioplayer.data.Id3TagWriter.EditableTags) -> Unit,
+    // Batch 358 — ikon "Plus" baru di samping judul (lihat Row baru di body fungsi ini) reuse
+    // AddToPlaylistDialog (PlaylistScreen.kt) + pola callback yang SAMA PERSIS dgn LibraryScreen.kt
+    // (addToPlaylist lambda di sana), bukan mekanisme baru. 3 param ini wajib supaya sheet itu
+    // bisa dipanggil dari sini juga.
+    playlists: List<Playlist>,
+    onAddSongToPlaylist: (String, Long) -> Boolean,
+    onCreatePlaylist: (String) -> Playlist,
     // Roadmap #5 (Ringtone Cutter) — fire-and-forget sama pola onSaveSongTags di atas.
     onCutRingtone: (
         com.rudi.audioplayer.data.Song,
@@ -202,14 +227,20 @@ fun NowPlayingScreen(
     // Batch 129 — hoist sama alasan isTactile/isSkeu di atas: tombol play/pause ini persis
     // "tombol utama"/`.calm-play-button` yang ditarget spec markdown user.
     val isCalmRetro = isCalmRetroTheme()
-    var showSleepTimerDialog by remember { mutableStateOf(false) }
-    var showSpeedDialog by remember { mutableStateOf(false) }
-    var showQueueSheet by remember { mutableStateOf(false) }
-    var showLyricsSheet by remember { mutableStateOf(false) }
+    // Batch 537 (T11) — flag dialog/sheet RINGAN pakai `rememberSaveable` supaya tidak hilang saat
+    // rotasi (Activity di-recreate; manifest tanpa `configChanges`). SENGAJA tetap `remember`:
+    // Equalizer, Visualizer (capture OS ~15fps), SongInfoEdit (state form), RingtoneCutter (decode
+    // audio) — sheet berat/ber-efek-samping tidak dibuka ulang otomatis (keputusan user: paling aman).
+    var showSleepTimerDialog by rememberSaveable { mutableStateOf(false) }
+    var showSpeedDialog by rememberSaveable { mutableStateOf(false) }
+    var showQueueSheet by rememberSaveable { mutableStateOf(false) }
+    var showLyricsSheet by rememberSaveable { mutableStateOf(false) }
+    var showAddToPlaylistDialog by rememberSaveable { mutableStateOf(false) } // Batch 358
+    var showRatingDialog by rememberSaveable { mutableStateOf(false) } // Batch 360
     var showEqualizerSheet by remember { mutableStateOf(false) }
     var showVisualizerSheet by remember { mutableStateOf(false) }
-    var showAdvancedSheet by remember { mutableStateOf(false) }
-    var showAbRepeatBookmarkSheet by remember { mutableStateOf(false) }
+    var showAdvancedSheet by rememberSaveable { mutableStateOf(false) }
+    var showAbRepeatBookmarkSheet by rememberSaveable { mutableStateOf(false) }
     var showSongInfoEditSheet by remember { mutableStateOf(false) }
     var showRingtoneCutterSheet by remember { mutableStateOf(false) }
 
@@ -222,12 +253,25 @@ fun NowPlayingScreen(
     // API tiap transisi cepat), bukan baru mulai fetch pas user buka sheet — lirik sudah siap
     // duluan saat sheet dibuka.
     val lyricsViewModel: LyricsViewModel = viewModel(factory = LyricsViewModel.factory(context))
-    val lyricsAutoState by lyricsViewModel.uiState.collectAsState()
+    val lyricsAutoState by lyricsViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(song?.id) {
         song?.let { lyricsViewModel.loadLyrics(it.artist, it.title, it.album) }
     }
-    val hintStore = remember(context) { OnboardingHintStore(context) }
-    var showNowPlayingHint by remember { mutableStateOf(!hintStore.hasSeenNowPlayingHint()) }
+    // Batch 341 — user eksplisit lapor (screenshot NowPlayingScreen): banner onboarding "bisa
+    // kena dismiss permanen dan gak balik lagi" — begitu di-tap X sekali, hilang selamanya, 0
+    // cara buka lagi kalau lupa isinya. GANTI TOTAL mekanismenya: bukan lagi auto-tampil-sekali
+    // + persist "sudah pernah lihat" (`OnboardingHintStore.hasSeenNowPlayingHint()`/
+    // `markNowPlayingHintSeen()`, dihapus dari file ini — class-nya sendiri TETAP ada & TIDAK
+    // diubah, masih dipakai `LibraryScreen.kt` utk hint lain, ZERO-REFACTOR) — SEKARANG murni
+    // toggle biasa dikontrol tombol info permanen di Row atas (samping ikon favorit, lihat
+    // Row bawah), bisa dibuka/tutup KAPAN SAJA tanpa batas, mulai dari tersembunyi (`false`).
+    // Efek samping yang SENGAJA disertakan: karena hint sekarang cuma tampil atas aksi eksplisit
+    // user (bukan lagi otomatis kejadian di setiap first-launch tanpa diminta), seluruh saga
+    // "art box menyusut buat kompensasi ruang scroll selama hint numpang tampil" (Batch 336-338,
+    // cabang `showNowPlayingHint -> 260.dp` di `albumArtBoxHeight` bawah) TIDAK relevan lagi —
+    // dihapus di titik itu (lihat komentar di sana). Cabang layar pendek (`screenHeightDp <
+    // 640.dp`, Batch 336) TETAP ada — itu fix legitimate terpisah, tidak terkait hint sama sekali.
+    var showNowPlayingHint by rememberSaveable { mutableStateOf(false) }
     val activity = remember(context) { context.findActivity() }
     // Full 0-100% swing over a fixed 140dp of drag, regardless of how tall the gesture zone
     // itself renders — the old version divided by the zone's full 300dp height, so a normal
@@ -235,8 +279,57 @@ fun NowPlayingScreen(
     // respond. This roughly doubles sensitivity for the same physical swipe distance.
     val density = LocalDensity.current
     val gestureRangePx = remember(density) { with(density) { 140.dp.toPx() } }
+    // Batch 336 — root cause beda level dari Batch 335 (bukan overscroll glow, tapi safety
+    // net Batch 112/334 sendiri regresi): header (Row + hint banner opsional + art box FIXED
+    // 300dp) tidak ikut discroll, jadi di layar pendek (landscape/split-screen) sisa ruang
+    // buat Column konten (weight+verticalScroll) bisa kepepet sampai nyaris 0dp — transport
+    // row jadi TIDAK kejangkau walau discroll. Sebelum Batch 334 semuanya 1 Column scroll jadi
+    // art ikut ke-scroll off-screen; sekarang art dikunci fixed supaya gesture brightness/
+    // volume-nya lolos dari nested-scroll conflict (Batch 334). Fix: susutkan TINGGI art box
+    // (bukan strukturnya — gesture zone TETAP di luar ancestor scrollable, tidak regresi
+    // Batch 334) secara proporsional saat layar pendek, supaya sisa ruang scroll cukup buat
+    // transport row selalu kejangkau. (Update Batch 338 di bawah: layar normal SEKARANG BISA
+    // ikut menyusut juga, tapi HANYA sementara selama hint banner tampil — bukan lagi 100%
+    // tetap 300dp seperti klaim awal batch ini.)
+    // Batch 546 — lint `ConfigurationScreenWidthHeight`: sumber ukuran jendela dipindah dari
+    // `LocalConfiguration.current.screen{Width,Height}Dp` ke `LocalWindowInfo.current.containerDpSize`
+    // (pengganti yang disarankan lint; targetSdk 36 -> kedua sumber sama-sama ukuran jendela PENUH,
+    // jadi hitungan di bawah tak bergeser selain pembulatan dp). Nama/pemakaian variabel TETAP.
+    val windowSizeDp = LocalWindowInfo.current.containerDpSize
+    val screenHeightDp = windowSizeDp.height
+    // Batch 637/638 — screenshot landscape: piringan dikunci >= 140dp + ikon atas + transport 68dp menyisakan ±100dp untuk
+    // judul s/d waktu. Tinggi jendela < 480dp & lebar >= 560dp (pola sama DiagnosticLogSheet/LibraryScreen/MiniPlayerBar) ->
+    // DUA KOLOM (piringan kiri, info + transport kanan). Potret/tablet tinggi: cabang lama persis. Dideklarasi di sini
+    // (bukan dekat Box piringan) supaya padding Column induk di bawah bisa ikut menyusut.
+    val twoPane = screenHeightDp < 480.dp && windowSizeDp.width >= 560.dp
+    // Batch 338 — BUG FIX lanjutan (laporan user + konfirmasi: hint banner MASIH nongol, belum
+    // pernah di-dismiss): sebelumnya cuma layar pendek (<640dp) yang dapet art box lebih kecil.
+    // Tapi di layar NORMAL sekalipun, jumlah tinggi fixed (art 300dp + header + hint banner
+    // ~150dp, Batch 112) + konten scrollable (judul s/d transport) bisa TETAP melebihi viewport
+    // selama hint SEDANG tampil (kondisi sekali-tampil, sementara) — scroll jadi kepicu padahal
+    // user anggap layarnya "normal", harusnya muat tanpa scroll sama sekali. Fix: pas
+    // `showNowPlayingHint == true`, susutkan art box juga (260dp, bukan cuma saat layar pendek)
+    // — begitu user dismiss (SEKALI, permanen via hintStore, tidak muncul lagi selamanya),
+    // art balik penuh 300dp seperti biasa. Layar pendek (<640dp) tetap pakai rumus proporsional
+    // lama (Batch 336) — dua kondisi ini independen, yang paling kecil yang menang.
+    // Batch 341 — cabang `showNowPlayingHint -> 260.dp` (Batch 338) DIHAPUS: hint sekarang
+    // murni opt-in lewat tombol info (Row atas), bukan lagi otomatis tampil tiap first-launch
+    // tanpa diminta — 0 lagi alasan buat preemptive-susutkan art box FIXED cuma krn hint
+    // "kebetulan lagi kebuka". Cabang layar pendek di bawah (Batch 336) TIDAK disentuh, itu
+    // fix legitimate terpisah (device pendek beneran, tidak terkait hint sama sekali).
+    val albumArtBoxHeight = when {
+        screenHeightDp < 640.dp -> (screenHeightDp * 0.28f).coerceIn(160.dp, 300.dp)
+        else -> 300.dp
+    }
+    // Batch 346 — sejak batch ini, `albumArtBoxHeight` di atas TIDAK LAGI dipakai LANGSUNG sbg
+    // tinggi final Box piringan — perannya berubah jadi fallback PRA-pengukuran saja (lihat
+    // `dynamicArtSize` dekat Box piringan bawah). Formula/komentar di atas TIDAK diubah sama
+    // sekali (masih valid persis sebagai fallback layar-pendek), murni PERAN-nya yang berubah.
+    // `contentGroupHeightPx` — hasil ukur Column pembungkus grup konten (hint s/d baris waktu,
+    // lihat komentar `onGloballyPositioned` di sana) dalam pixel, 0 = belum pernah terukur.
+    var contentGroupHeightPx by remember { mutableIntStateOf(0) }
     var brightnessLevel by remember {
-        mutableStateOf(
+        mutableFloatStateOf(
             activity?.window?.attributes?.screenBrightness
                 ?.takeIf { it in 0f..1f } ?: 0.5f
         )
@@ -324,43 +417,79 @@ fun NowPlayingScreen(
                 .alpha(backdropAlpha)
         )
 
+        // Batch 398 — `NowPlayingScreen(...)` (fungsi ini) adalah 1 badan composable BESAR
+        // (~1400 baris) yang membaca BANYAK state langsung di scope yang sama (dialog show/hide,
+        // queue, sleep timer, dst — live position sendiri SUDAH diisolasi terpisah sejak Batch
+        // 353, lihat `WithLivePlaybackProgress` di bawah, tapi state lain TIDAK). Brush wash
+        // di bawah cuma bergantung 2 input nyata (`animatedAccent`,
+        // `MaterialTheme.colorScheme.background`) yang jauh lebih jarang berubah drpd frekuensi
+        // recomposition scope ini secara keseluruhan — pola identik `identityRootBrush` (Batch
+        // 392, `MainActivity.kt`). Warna background dibaca ke `val` biasa DI LUAR `remember{}`
+        // (pola fix Batch 393 utk `@DisallowComposableCalls`) sebelum jadi remember key.
+        val nowPlayingBgColor = MaterialTheme.colorScheme.background
+        val accentWashBrush = remember(animatedAccent, nowPlayingBgColor) {
+            Brush.verticalGradient(
+                listOf(
+                    animatedAccent.copy(alpha = 0.35f),
+                    nowPlayingBgColor.copy(alpha = 0.75f),
+                    nowPlayingBgColor.copy(alpha = 0.97f)
+                )
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            animatedAccent.copy(alpha = 0.35f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.75f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.97f)
-                        )
-                    )
-                )
+                .background(accentWashBrush)
         )
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                // Batch 112 — root cause TERPISAH dari Batch 111 (yang soal insets di luar
-                // Scaffold): layar ini SUDAH di dalam Scaffold/NavHost, jadi sudah dapat
-                // contentWindowInsets via `padding` di AppNavHost. Bug sebenarnya: Column ini
-                // fillMaxSize() TANPA scroll, isinya fixed-height (hero art 300dp + hint banner
-                // ~150dp kalau tampil + title/rating/waveform/tombol) — total gampang > tinggi
-                // viewport asli setelah dipotong status/nav bar, apalagi 3-button nav (umum di
-                // Android 15 ke bawah) yang makan tinggi layar riil vs gesture-nav (overlay
-                // tipis, Android 16 test device) yang nyaris tidak makan ruang — match persis
-                // observasi user "normal di 16, kacau di 15 ke bawah". Sebelumnya konten yang
-                // overflow BUKAN discroll, tapi ke-clip diam-diam di tepi layar — baris tombol
-                // transport (shuffle/prev/play/next/repeat), paling bawah dalam urutan Column,
-                // paling sering jadi korban. `verticalScroll` di sini murni jaring pengaman:
-                // kalau konten muat (layar tinggi/gesture-nav), scroll offset tetap 0, nol
-                // perubahan visual; kalau tidak muat, sekarang bisa digeser bukan hilang.
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+                // Batch 334 — FIX BUG NYATA (laporan user + screenshot): `verticalScroll()`
+                // (Batch 112, jaring pengaman layar pendek) SEBELUMNYA membungkus Box gesture
+                // brightness/volume (baris di bawah) — 2 pointer-drag-vertikal recognizer di
+                // SUMBU YANG SAMA bersarang (parent scrollable + child `detectVerticalDragGestures`)
+                // BENTROK memperebutkan touch stream yang sama, walau child sudah `change.consume()`
+                // (Compose's ancestor `scrollable()` tetap bisa menang arbitrase drag-start/slop
+                // duluan sebelum child sempat consume). GEJALA: swipe kecerahan/volume di piringan
+                // jadi tersendat/salah baca sebagai scroll, persis laporan user.
+                // FIX: Column ini TIDAK LAGI scrollable sendiri — cuma header (tombol atas+hint+
+                // Spacer+Box art/gesture) yang tetap di sini (fixed, 0 ancestor scrollable lagi utk
+                // gesture zone). Sisa konten (judul s/d tombol transport) dipindah ke Column BARU
+                // di bawah (`.weight(1f).verticalScroll(...)`) — jaring pengaman Batch 112 utk
+                // "transport row kepotong di layar pendek" TETAP ada, cuma scope-nya sekarang PAS
+                // ke bagian yang benar2 butuh (bukan ikut membungkus area gesture yang architecturally
+                // tidak boleh scroll).
+                // Batch 638 — dua kolom: padding vertikal 20->8dp (hemat 24dp; screenshot v637: baris waktu di bawah waveform
+                // terpotong ±27dp). Potret/tablet tinggi: 20dp seperti semula.
+                .padding(horizontal = 20.dp, vertical = if (twoPane) 8.dp else 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
+        // Batch 349 — user eksplisit (klarifikasi bertahap via tappable option, bukan tebakan):
+        // `Arrangement.SpaceBetween` (Batch 342, dipertahankan+diverifikasi ulang s.d. Batch 348)
+        // dilaporkan "jelek banget" — user secara eksplisit TIDAK mau ke-4 ikon disebar rata
+        // sepanjang lebar layar. Diklarifikasi 2 tahap sebelum eksekusi (bukan langsung tebak):
+        // (1) "urutan/posisi ikon" vs "jarak/spacing" vs "gaya ikon" -> user pilih spacing; (2)
+        // opsi konkret arah pengelompokan -> user pilih eksplisit "Tutup sendiri di kiri, 3 ikon
+        // lain rapat di kanan" — INI ADALAH POLA YANG SAMA PERSIS yang di-Batch-342 (versi lama,
+        // sebelum SpaceBetween) & sempat dicatat "ditolak" di riwayat investigasi Batch 345. TAPI
+        // preferensi user bisa berubah dari sesi ke sesi — pilihan REALTIME & EKSPLISIT sesi ini
+        // (bukan asumsi ulang dari catatan lama) yang jadi rujukan, sesuai Hierarki `User Inst >
+        // Core Protocol > PROJECT_STATE.md`. Fix: `horizontalArrangement = SpaceBetween` dibuang
+        // dari `Row` (balik ke default `Start`), `Spacer(weight(1f))` dipasang lagi PERSIS setelah
+        // tombol Tutup — Tutup presisi kiri mentok, Favorit+Info+Kontrol Lanjutan menumpuk rapat
+        // di kanan mentok. 0 ikon ditambah/dihapus/diganti fungsi, 0 urutan logis 3 ikon kanan
+        // diubah (tetap Favorit→Info→Kontrol Lanjutan, sesuai Batch 341).
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val backInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = onBack,
+                interactionSource = backInteraction,
+                modifier = Modifier.bouncyPress(backInteraction)
+            ) {
                 Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Tutup")
             }
             Spacer(modifier = Modifier.weight(1f))
@@ -379,7 +508,47 @@ fun NowPlayingScreen(
                     tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                 )
             }
-            IconButton(onClick = { showAdvancedSheet = true }) {
+            // Batch 341 — user eksplisit (screenshot): ganti banner onboarding auto-tampil-
+            // sekali (bisa "kena dismiss permanen dan gak balik lagi") jadi tombol permanen di
+            // samping ikon favorit ini — buka/tutup kartu tip gestur (geser=kecerahan/volume,
+            // ⋮=Sleep Timer/Kecepatan/Equalizer) KAPAN SAJA, bukan cuma sekali di awal. Toggle
+            // (bukan cuma buka) — tap lagi saat kartu sudah tampil = tutup, simetris dgn tombol
+            // X di kartunya sendiri. `showNowPlayingHint` (state sama yg dulu dikontrol
+            // hintStore) dipakai ulang 1:1 — lihat deklarasi & render kartu di bawah.
+            // Batch 343 — user eksplisit (screenshot): Row 4-ikon ini (spacing SpaceBetween sejak
+            // Batch 342) masih "kelihatan anomali" — root cause BUKAN spacing (dikonfirmasi ulang
+            // dari screenshot user: ke-4 posisi ikon renggang merata, sama seperti niat Batch 342),
+            // tapi BOBOT VISUAL: `Icons.Default.Info` (varian "Filled") me-render sebagai lingkaran
+            // PADAT dgn "i" — satu-satunya ikon berbentuk badge solid di antara 3 ikon lain yang
+            // semuanya guratan tipis (Tutup/chevron, Favorit-border, Kontrol Lanjutan/titik tiga)
+            // — persis kelas masalah yang sama dgn audit "samakan visual weight icon sejenis"
+            // (Batch 228). Fix: `Icons.Outlined.Info` (paket `material-icons-extended`, SUDAH jadi
+            // dependency app ini — grep `app/build.gradle.kts` konfirmasi) — cuma lingkaran GARIS
+            // tipis + "i" tipis, bobot visual sama dgn 3 ikon lain, 0 lagi terlihat sbg badge
+            // menonjol sendirian. 0 posisi/handler/tooltip Row ini disentuh batch itu (spacing
+            // `SpaceBetween` Batch 342 waktu itu dipertahankan apa adanya — BELAKANGAN diganti
+            // lagi jadi pengelompokan kanan oleh Batch 349, lihat komentar Batch 349 di atas Row).
+            val hintButtonInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    showNowPlayingHint = !showNowPlayingHint
+                },
+                interactionSource = hintButtonInteraction,
+                modifier = Modifier.bouncyPress(hintButtonInteraction)
+            ) {
+                Icon(
+                    Icons.Outlined.Info,
+                    contentDescription = if (showNowPlayingHint) "Tutup tip gestur" else "Tip gestur & pintasan",
+                    tint = if (showNowPlayingHint) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                )
+            }
+            val advancedInteraction = remember { MutableInteractionSource() }
+            IconButton(
+                onClick = { showAdvancedSheet = true },
+                interactionSource = advancedInteraction,
+                modifier = Modifier.bouncyPress(advancedInteraction)
+            ) {
                 Icon(
                     Icons.Default.MoreVert,
                     contentDescription = "Kontrol lanjutan",
@@ -388,18 +557,13 @@ fun NowPlayingScreen(
             }
         }
 
-        if (showNowPlayingHint) {
-            Spacer(modifier = Modifier.height(8.dp))
-            FeatureHintBanner(
-                text = "Geser di kiri/kanan piringan buat atur kecerahan & volume HP. Ketuk ⋮ buat Sleep Timer, Kecepatan, dan Equalizer.",
-                onDismiss = {
-                    showNowPlayingHint = false
-                    hintStore.markNowPlayingHintSeen()
-                }
-            )
-        }
+        // Batch 337 — hint banner (~150dp, Batch 112's own catatan) DIPINDAH dari sini ke dalam
+        // Column scrollable di bawah (lihat komentar Batch 337 di sana) — bukan lagi bagian
+        // fixed zone. Zero gesture handling di banner ini (cuma Card+teks+tombol dismiss), jadi
+        // aman dipindah ke ancestor scrollable, 0 regresi ke fix Batch 334 (itu spesifik soal
+        // Box gesture brightness/volume yang TETAP tidak boleh py ancestor scrollable).
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(if (twoPane) 0.dp else 12.dp))
 
         val entranceScale = remember { Animatable(0.55f) }
         val entranceAlpha = remember { Animatable(0f) }
@@ -413,10 +577,40 @@ fun NowPlayingScreen(
             launch { entranceAlpha.animateTo(1f, animationSpec = tween(280)) }
         }
 
+        // Batch 346 — inti fitur "art scale dinamis". Rasional lengkap ada di komentar Column
+        // pengukur (`onGloballyPositioned`) di atas, dekat blok if(showNowPlayingHint) — cuma
+        // rangkuman perhitungan di sini:
+        // sisaRuang = tinggiKontenTersedia − chromeTetap − tinggiGrupKontenTerukur
+        // dynamicArtSize = sisaRuang − 20dp (selisih art↔glow, lihat AlbumArtHero) lalu di-clamp.
+        // `fixedChromeHeight` SENGAJA konstanta (bukan diukur run-time spt grup konten) — Row
+        // ikon-atas (48dp, default IconButton) & Row transport (68dp, FilledIconButton eksplisit
+        // .size(68.dp) adalah child tertinggi) keduanya deterministik dari kode sendiri, 0
+        // bergantung ke song/font-scale — 1 measurement loop lebih sedikit = risiko lebih rendah.
+        val screenWidthDp = windowSizeDp.width
+        val fixedChromeHeight = 48.dp + 12.dp + 16.dp + 68.dp
+        // Piringan persegi TIDAK BOLEH lebih lebar dari layar. 80dp = 2×40dp margin yang sudah
+        // dipakai default lama (280dp piringan di layar 360dp lebar = 320dp konten setelah
+        // padding Column 20dp -> 40dp margin tersisa) — formula ini SENGAJA balik ke 280dp
+        // persis di layar 360dp lebar, konsisten dgn tampilan default lama, bukan lompatan baru.
+        val maxArtByWidth = (screenWidthDp - 80.dp).coerceAtLeast(200.dp)
+        val dynamicArtSize = if (contentGroupHeightPx > 0) {
+            val measuredContentHeight = with(density) { contentGroupHeightPx.toDp() }
+            val availableContentHeight = screenHeightDp - 40.dp // padding(20.dp) Column induk, 2 sisi
+            (availableContentHeight - fixedChromeHeight - measuredContentHeight - 20.dp)
+                .coerceIn(140.dp, maxArtByWidth)
+        } else {
+            // Frame pertama sebelum Column pengukur sempat invoke onGloballyPositioned —
+            // fallback ke `albumArtBoxHeight` (formula lama, sudah adaptif layar pendek sejak
+            // Batch 336) supaya 0 flash ukuran aneh sebelum pengukuran nyata mendarat.
+            (albumArtBoxHeight - 20.dp).coerceAtLeast(140.dp)
+        }
+        // Batch 637 — blok piringan+zona gestur dibungkus lambda `artPane(ukuranPiringan)` TANPA memindah/mengubah isinya
+        // (tinggi kotak = ukuran + 20dp, sama dgn `dynamicGestureBoxHeight` lama); dipanggil di cabang potret / dua kolom di bawah.
+        val artPane: @Composable (Dp) -> Unit = { artSizeDp ->
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(300.dp)
+                .height(artSizeDp + 20.dp)
         ) {
             // Left half of the whole row: swipe up/down to raise/lower screen brightness.
             // Sized to a true 50% of the available width — independent of however big the
@@ -469,10 +663,39 @@ fun NowPlayingScreen(
                     }
             )
 
-            // Vinyl sits centered on top of both zones. It gets first claim on touches within
-            // its own bounds (its own pointerInput for horizontal swipe-next/prev), the same
-            // way it already did before this change — only the leftover vertical drag outside
-            // its bounds reaches the brightness/volume zones underneath.
+            // Batch 350 — BUG FIX (laporan berulang user, "dari dulu susahnya minta ampun"):
+            // klaim komentar lama di bawah ("vinyl dapat first claim, HANYA leftover DI LUAR
+            // bounds-nya yang sampai ke zona brightness/volume") ternyata TIDAK match perilaku
+            // asli device — swipe vertikal yang jarinya mendarat DI ATAS vinyl (area yang sangat
+            // wajar disentuh, krn itu elemen visual terbesar di layar) tetap "ditelan" duluan oleh
+            // `detectHorizontalDragGestures` milik `AlbumArtHero` (baris ~1577), walau gerakan
+            // jarinya vertikal murni — root cause: gesture recognizer terpisah (kiri/kanan
+            // vertikal vs vinyl horizontal) sama-sama bersaing di 1 titik sentuh tanpa 1 wasit
+            // tunggal yg menentukan SUMBU gerakan lebih dulu.
+            //
+            // Fix: `pointerInput` BARU di sini (bukan mengubah `AlbumArtHero`/`detectHorizontal-
+            // DragGestures`-nya sama sekali — 0 baris logic swipe-next/prev threshold-120px/
+            // spring/haptic Batch 178/256 disentuh) — didaftarkan di `PointerEventPass.Initial`,
+            // yang dijalankan Compose DULUAN (top-down) SEBELUM event sampai ke pointerInput Main-
+            // pass default milik `AlbumArtHero` di bawahnya. Selama sumbu gerakan belum jelas
+            // (belum lewati `touchSlop`), event dibiarkan lewat APA ADANYA (0 consume) — vinyl
+            // tetap bebas mendeteksi sendiri seperti biasa. Begitu akumulasi gerakan melewati
+            // slop: kalau dominan HORIZONTAL, tetap 0 disentuh (biarkan vinyl lanjut persis
+            // seperti sebelum batch ini — swipe ganti lagu 0 regresi). Kalau dominan VERTIKAL,
+            // baru DARI SITU setiap `change` di-consume() di pass Initial — akibatnya `detect-
+            // HorizontalDragGestures` milik vinyl (jalan belakangan, di pass Main) melihat change
+            // yang SUDAH consumed, jadi otomatis cancel (memicu `onDragCancel` bawaannya sendiri
+            // -> `dragOffset` spring balik ke 0, 0 kode baru perlu ditulis utk itu) — sementara di
+            // sini delta-Y-nya dialihkan ke `applyBrightness`/`applySystemVolume` yang SAMA PERSIS
+            // dipakai 2 Box zona kiri/kanan di bawah (baris ~569-615), termasuk indikator pill +
+            // delay 600ms sebelum hilang, biar konsisten 1 pengalaman dgn versi di luar vinyl.
+            // Separuh kiri/kanan ditentukan dari posisi X sentuh-awal RELATIF ke lebar vinyl itu
+            // sendiri (`size.width` milik Box vinyl ini) — karena vinyl dipusatkan (`Alignment.
+            // Center`) di dalam Box induk yang sama, titik tengah lokal vinyl ini otomatis persis
+            // sejajar garis tengah layar yang sama dipakai 2 zona kiri/kanan itu (0 offset
+            // koordinat perlu dikonversi manual). 2 Box zona kiri/kanan ITU SENDIRI 0 disentuh —
+            // fix ini murni menambal celah "vertikal di ATAS vinyl", bukan mengganti apa pun yang
+            // sudah benar (perilaku touch DI LUAR vinyl 0 berubah).
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -481,29 +704,226 @@ fun NowPlayingScreen(
                         scaleY = entranceScale.value
                         alpha = entranceAlpha.value
                     }
+                    .pointerInput(Unit) {
+                        val slop = viewConfiguration.touchSlop
+                        awaitEachGesture {
+                            val down = awaitFirstDown(pass = PointerEventPass.Initial)
+                            val isLeftHalf = down.position.x < size.width / 2f
+                            var axisLocked: Boolean? = null // null = belum ketahuan, true = vertikal (intercept), false = horizontal (biarkan)
+                            var accumX = 0f
+                            var accumY = 0f
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!change.pressed) break
+                                    val delta = change.position - change.previousPosition
+                                    when (axisLocked) {
+                                        null -> {
+                                            accumX += delta.x
+                                            accumY += delta.y
+                                            if (abs(accumX) > slop || abs(accumY) > slop) {
+                                                axisLocked = abs(accumY) > abs(accumX)
+                                                if (axisLocked == true) {
+                                                    if (isLeftHalf) showBrightnessIndicator = true else showVolumeIndicator = true
+                                                }
+                                            }
+                                        }
+                                        true -> {
+                                            change.consume()
+                                            if (isLeftHalf) {
+                                                applyBrightness(brightnessLevel - delta.y / gestureRangePx)
+                                            } else {
+                                                applySystemVolume(systemVolumeFraction - delta.y / gestureRangePx)
+                                            }
+                                        }
+                                        false -> { /* horizontal terkunci — 0 disentuh, vinyl lanjut normal */ }
+                                    }
+                                }
+                            } finally {
+                                if (axisLocked == true) {
+                                    gestureScope.launch {
+                                        delay(600)
+                                        if (isLeftHalf) showBrightnessIndicator = false else showVolumeIndicator = false
+                                    }
+                                }
+                            }
+                        }
+                    }
             ) {
                 AlbumArtHero(
                     artworkUri = song?.uri,
                     accentColor = animatedAccent,
+                    artSize = artSizeDp,
                     onSwipeNext = onNext,
                     onSwipePrevious = onPrevious
                 )
             }
         }
+        } // tutup artPane (Batch 637)
 
-        Spacer(modifier = Modifier.height(32.dp))
+        // Batch 334 — badan scrollable terpisah (lihat komentar Column induk di atas): jaring
+        // pengaman Batch 112 utk layar pendek dipindah SPESIFIK ke sini (judul s/d transport),
+        // TIDAK LAGI ikut membungkus Box gesture brightness/volume di atas.
+        // Batch 335 — FIX BUG BARU (laporan user, device): begitu Column ini py `weight(1f)`
+        // sendiri (fixed height dari sisa ruang, BUKAN unbounded lagi spt Column tunggal lama
+        // sebelum Batch 334), pada layar yang cukup tinggi kontennya SUDAH muat penuh (maxScroll
+        // scrollState = 0) — TAPI overscroll stretch-glow bawaan Android 12+/Compose Foundation
+        // tetap terpicu visual tiap drag disentuh, walau posisi scroll tidak benar-benar
+        // berpindah (rubber-band kosong). User baca ini sebagai "masih bisa discroll" walau
+        // konten sudah muat. Root cause BEDA dari bug Batch 334 (itu soal 2 recognizer axis sama
+        // bentrok, INI soal efek visual overscroll yang terpicu independen dari maxScroll).
+        // FIX: matikan overscroll KHUSUS di Column ini lewat overload `verticalScroll(state,
+        // overscrollEffect = null, ...)` — API OverscrollEffect langsung di parameter fungsi,
+        // BUKAN pola lama `CompositionLocalProvider(LocalOverscrollConfiguration provides null)`
+        // (dipakai SmartPlaylistScreen.kt Batch 263 saat BOM masih 2024.05.00) — dicek ulang
+        // `web_search` ke dokumentasi resmi Compose Foundation: `LocalOverscrollConfiguration`/
+        // `OverscrollConfiguration` SUDAH DEPRECATED (diganti `LocalOverscrollFactory`), persis
+        // risiko yang sudah ditandai eksplisit di catatan Batch 291 soal lompatan BOM ini —
+        // overload `overscrollEffect` di `verticalScroll()` sendiri sudah tersedia sejak lama di
+        // BOM 2026.04.01 project ini (jauh di atas versi minimum ditambahkannya parameter itu),
+        // jadi dipakai langsung sesuai kebijakan prioritas mutakhir (aturan sesi #3) — bukan
+        // menambah 1 lagi titik pakai API usang yang sudah ketahuan berisiko. Getaran/animasi
+        // scroll GENUINELY dibutuhkan (kalau konten overflow di layar pendek) TETAP jalan penuh
+        // via `scrollState` — cuma efek visual overscroll DI LUAR rentang scroll asli yang
+        // dimatikan, 0 logic gesture/scroll lain diubah.
+        // Batch 343 — user eksplisit ("bagian pemutar dilarang keras untuk mengambang/tidak
+        // menyentuh dasar sama sekali"): Row transport (shuffle/prev/play-pause/next/repeat)
+        // SEBELUMNYA jadi child TERAKHIR di dalam Column scrollable+weight(1f) ini. Root cause
+        // "mengambang": `Column` biasa (verticalArrangement default = Top) menaruh anak-anaknya
+        // rapat dari ATAS ruang yang tersedia — begitu total tinggi konten (judul s/d transport)
+        // LEBIH PENDEK dari tinggi weighted-area (kasus umum di layar normal/tinggi, art box
+        // sudah fixed 300dp duluan di atas), transport row berhenti persis di bawah konten
+        // terakhirnya sendiri, MENYISAKAN spasi kosong di antara transport row dan tepi bawah
+        // layar — persis "mengambang" yang dilaporkan, bukan cuma soal padding/margin.
+        // FIX (struktural, bukan tuning angka): Row transport ini DIKELUARKAN dari Column
+        // scrollable ini, jadi sibling TETAP (fixed) tepat SETELAH Column scrollable ini ditutup
+        // (lihat Row transport & Spacer 16dp pemisahnya di bawah, di luar blok `{ }` Column ini).
+        // Karena Column INDUK (fillMaxSize, bukan yang scrollable ini) menaruh Column scrollable
+        // ini dgn `weight(1f)`, Column scrollable otomatis kebagian PERSIS sisa ruang di ATAS Row
+        // transport yang sekarang fixed di posisi TERAKHIR Column induk — hasilnya Row transport
+        // SELALU presisi di tepi bawah (sebelum padding 20dp layar), 0 spasi kosong tersisa di
+        // bawahnya, terlepas dari tinggi konten judul-slider di atasnya ataupun tinggi layar.
+        // Bonus: ini SEKALIGUS menuntaskan seluruh saga reachability Batch 336-338 secara lebih
+        // kuat — transport SEKARANG SELALU terlihat tanpa perlu scroll sama sekali (bukan cuma
+        // "terjangkau via scroll"), di layar pendek pun cuma konten judul-slider yang battle-scroll
+        // di ruang tersisa, transport tetap fixed & penuh terlihat. 0 logic scroll/gesture/timing
+        // lain di Column ini diubah — cuma 1 child (Row transport) yang pindah lokasi.
+        // Batch 345 — user kirim 2 screenshot (crop Row ikon atas + crop area waktu/transport) +
+        // laporan: "susunan badge anomali yang terpaku oleh jarak" & "masih ada bagian kosong
+        // karena bagian atas terlalu mentok ke badge — gak ada susunan normal begitu". Diinvestigasi
+        // eksplisit poin 1 (Row 4-ikon atas) dulu — DIUKUR ULANG per-pixel (bukan cuma lihat
+        // sekilas): jarak antar-ikon 279/280/279px, PERSIS merata (`SpaceBetween` Batch 342 masih
+        // benar), dan bobot visual ke-4 ikon sudah konsisten tipis (`Outlined.Info` Batch 343 juga
+        // masih benar) — 0 regresi di Row itu sendiri. Root cause SEBENARNYA (dikonfirmasi via
+        // screenshot ke-2): fix Batch 343 (Row transport dikeluarkan jadi footer fixed) MEMINDAH
+        // lokasi "gambang" tsb, TIDAK MENGHILANGKANNYA — Column INI (scrollable+weight) masih
+        // `verticalArrangement` default (Top), jadi begitu tinggi konten (judul s/d waktu) LEBIH
+        // PENDEK dari ruang weighted (kasus layar user), semua sisa ruang kosong tetap menumpuk
+        // jadi SATU gap besar, cuma sekarang lokasinya PINDAH ke ANTARA baris waktu & Row
+        // transport (bukan lagi di bawah Row transport) — persis yang kelihatan di screenshot
+        // ke-2 user. Laporan poin 1 ("terpaku oleh jarak") & poin 2 ("bagian atas mentok") SAMA
+        // root cause ini dilihat dari 2 sudut: konten atas (Row ikon+art+judul dst) tetap rapat
+        // ke atas ("mentok"/"terpaku") walau ruang tersedia jauh lebih tinggi — gak ada distribusi
+        // proporsional ("susunan normal") atas sisa ruang tsb, semua dikumpulkan jadi 1 blok di
+        // bawah. FIX: `verticalArrangement = Arrangement.Center` di Column ini — saat konten LEBIH
+        // PENDEK dari ruang weighted, `Center` membagi sisa ruang itu proporsional ke ATAS (antara
+        // art box & judul) DAN ke BAWAH (antara baris waktu & Row transport) alih-alih ditumpuk
+        // 100% di satu sisi — 1 gap besar jadi 2 gap seimbang, lebih dekat ke "susunan normal"
+        // yang diminta. 0 efek saat konten SUDAH >= tinggi viewport (layar pendek/konten panjang)
+        // — `Center` cuma berlaku kalau ada sisa ruang, scroll tetap jalan identik seperti
+        // sebelumnya kalau tidak ada sisa ruang. Row transport TETAP fixed footer presisi di tepi
+        // bawah (Batch 343 TIDAK disentuh/dibatalkan — itu tetap benar & sudah dikonfirmasi user
+        // "no more floating thing").
+        // Batch 637 — Column scrollable (judul s/d waktu) + Spacer + Row transport dibungkus lambda `infoPane` (receiver
+        // ColumnScope supaya `weight(1f)` di dalamnya tetap valid) TANPA mengubah isinya; dipanggil di cabang potret/dua kolom.
+        val infoPane: @Composable ColumnScope.() -> Unit = {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(state = rememberScrollState(), overscrollEffect = null),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
 
-        Text(
-            "SEDANG DIPUTAR",
-            style = MaterialTheme.typography.labelSmall,
-            color = animatedAccent
-        )
-        Spacer(modifier = Modifier.height(6.dp))
+        // Batch 337 — BUG FIX (laporan user, device): Batch 336 (album art box adaptif) TIDAK
+        // CUKUP — "belum ngefek" di device user. Root cause SATU LEVEL LEBIH DALAM (kebijakan
+        // Batch 24: fix resmi sudah diikuti, gejala IDENTIK, curigai akar beda): `FeatureHintBanner`
+        // (~150dp, dicatat eksplisit di root cause asli Batch 112) SEBELUMNYA ada di fixed header
+        // zone (sebelum Box art) — elemen fixed ~150dp INI, bukan cuma art 300dp, yang jadi
+        // kontributor terbesar ke penyempitan ruang scroll di layar pendek (khususnya kombinasi
+        // 3-button nav + hint belum di-dismiss user, persis skenario asli Batch 112). Susutkan
+        // art (Batch 336) saja tidak cukup selama hint banner MASIH fixed & tidak bisa direbut
+        // ulang ruangnya oleh scroll. FIX: banner ini (0 gesture handling — cuma Card+teks+tombol
+        // dismiss, aman dipindah, 0 regresi Batch 334) dipindah jadi child PERTAMA di Column
+        // scrollable ini — sekarang ikut jadi bagian yang bisa "discroll lewat" utk menjangkau
+        // transport row di layar pendek, alih-alih permanen menghabiskan jatah fixed zone yang
+        // tidak pernah bisa diciutkan scroll. Urutan visual SEDIKIT berubah (hint sekarang di
+        // BAWAH piringan art, bukan di ATAS lagi, sebelum art) — trade-off sengaja diambil demi
+        // reachability transport row (fungsi inti) di atas posisi visual hint (onboarding,
+        // sekali tampil, dismissable).
+        // Batch 338 — lanjutan (user konfirmasi hint MASIH nongol saat komplain "scroll gak
+        // seharusnya kepicu di layar saya"): selain art box (di atas), teks banner ini sendiri
+        // dipersingkat (5-ish baris → ~2 baris bodySmall) + 2 Spacer sekitarnya diciutkan —
+        // makna/isi 2 tip TIDAK berkurang (kecerahan/volume + menu ⋮), cuma dikemas lebih padat.
+        // Total 3 lever batch ini (art box, teks banner, spacer) sengaja dikombinasi
+        // supaya layar "normal" (bukan cuma yg <640dp) juga muat tanpa scroll SELAMA hint
+        // sekali-tampil ini masih ada — begitu di-dismiss, semua balik ke ukuran penuh biasa.
+        // Batch 341 — user eksplisit: "kena dismiss permanen dan gak balik lagi" jadi masalah
+        // utama — `onDismiss` di bawah TIDAK lagi panggil `hintStore.markNowPlayingHintSeen()`
+        // (dihapus, lihat deklarasi `showNowPlayingHint` di atas), cuma toggle tutup POPUP saat
+        // ini — bisa dibuka lagi kapan saja lewat tombol info baru di Row atas (samping ikon
+        // favorit). Teks/posisi/tampilan banner ITU SENDIRI 0 diubah (masih card sama, Batch 338).
+        // Batch 346 — user pilih lanjut ide "art scale dinamis" yang dicatat sbg trade-off
+        // Batch 345 (solusi paling "otentik" ala Spotify: sisa ruang di-ISI PIRINGAN, bukan
+        // didistribusikan jadi 2 gap kosong via Arrangement.Center). Column pembungkus BARU ini
+        // (hint s/d baris waktu, grup yang SAMA yang tadinya dipusatkan Center) diukur tinggi
+        // NYATA-nya lewat `onGloballyPositioned` — kuncinya: `verticalScroll` (parent) memberi
+        // constraint tinggi TAK TERBATAS ke children-nya (supaya tahu total tinggi buat discroll),
+        // jadi tinggi yang dilaporkan grup ini SELALU intrinsik (isi asli), TIDAK PERNAH terpotong/
+        // dipaksa oleh `weight(1f)` Column induknya — beda dari mengukur Column induk itu sendiri
+        // (yang akan selalu melaporkan tinggi teralokasi, bukan tinggi konten). Hasil pengukuran
+        // (`contentGroupHeightPx`) dipakai di deklarasi `dynamicArtSize` bawah (sebelum Box
+        // piringan) buat menghitung sisa ruang yang diberikan ke piringan. Pola `onGloballyPositioned`
+        // ini BUKAN hal baru di codebase — sudah dipakai identik di LibraryScreen.kt/QueueSheet.kt/
+        // SongPickerSheet.kt/PlaylistScreen.kt.
+        Column(
+            modifier = Modifier.onGloballyPositioned { contentGroupHeightPx = it.size.height },
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+        if (showNowPlayingHint) {
+            FeatureHintBanner(
+                text = "Geser piringan: kiri = kecerahan, kanan = volume. Ketuk ⋮ buat Sleep Timer, Kecepatan & Equalizer.",
+                onDismiss = { showNowPlayingHint = false }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Batch 637 — dua kolom (layar pendek): spacer atas 0 dan label "SEDANG DIPUTAR" dilewati agar judul s/d waktu muat.
+        Spacer(modifier = Modifier.height(if (twoPane) 0.dp else if (showNowPlayingHint) 20.dp else 32.dp))
+
+        if (!twoPane) {
+            Text(
+                "SEDANG DIPUTAR",
+                style = MaterialTheme.typography.labelSmall,
+                color = animatedAccent
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+        // Batch 359 — REVERT arah Batch 358. Screenshot device user (Row Plus/Title/Share)
+        // dilaporkan "aneh"/berantakan (judul kepanjangan bikin ikon Share nabrak/nempel teks
+        // marquee, ikon Plus mepet tepi kiri) — user eksplisit minta disamakan ke entry+layout
+        // "Lirik" saja, yaitu opsi yang sudah dicatat (tapi belum dipilih) di komentar Batch 358
+        // sendiri. Judul balik jadi Text polos (0 ikon flanking, 0 Row pembungkus) — sama seperti
+        // sebelum Batch 358, cuma fillMaxWidth+textAlign Center dipertahankan (bukan wrap-content)
+        // supaya basicMarquee tetap mulai dari titik tengah horizontalAlignment Column induk,
+        // identik posisi visual sebelumnya.
         Text(
             song?.title ?: "-",
             style = MaterialTheme.typography.titleLarge,
             maxLines = 1,
-            modifier = Modifier.basicMarquee()
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().basicMarquee()
         )
         Text(
             song?.artist ?: "-",
@@ -511,66 +931,198 @@ fun NowPlayingScreen(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        Spacer(modifier = Modifier.height(6.dp))
-        StarRatingRow(rating = currentRating, onRate = onSetRating, accentColor = animatedAccent)
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        var sliderPosition by remember(uiState.position) { mutableStateOf(uiState.position.toFloat()) }
-        val progressFraction = (sliderPosition / uiState.duration.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
-
-        Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
-            WaveformSeekBar(
-                seed = song?.id ?: 0L,
-                progress = progressFraction,
-                playedColor = animatedAccent,
-                unplayedColor = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth().height(32.dp)
-            )
-            Slider(
-                value = sliderPosition,
-                onValueChange = { sliderPosition = it },
-                onValueChangeFinished = {
+        Spacer(modifier = Modifier.height(4.dp))
+        // Tambah/Bagikan sekarang REUSE persis pola visual+struktur tombol "Lirik" (icon 16dp +
+        // Spacer 6dp + Text labelMedium bertint animatedAccent, bouncyPress 0.92f, contentPadding
+        // horizontal=14/vertical=6) — bukan cuma disamakan sekilas, tapi 1:1 entry yang sama,
+        // ditaruh dalam 1 Row bareng "Lirik" (Arrangement.Center, jarak alami dari padding tiap
+        // TextButton sendiri, 0 Spacer manual tambahan diperlukan). Handler/logic KEDUANYA 0
+        // diubah dari Batch 358 (AddToPlaylistDialog & Intent.ACTION_SEND sama persis) — murni
+        // migrasi tempat+gaya render, ikon jadi contentDescription = null (pola Batch 230/235:
+        // decorative krn sudah ada Text label sibling di button yang sama, semantics ke-merge ke
+        // 1 title TalkBack per tombol, konsisten cara "Lirik" sudah dari awal).
+        // Batch 361 — FIX BUG NYATA (laporan user + screenshot): di layar sempit, 4 TextButton
+        // (Tambah/Bagikan/Lirik/Rating, ditambah Batch 360) TIDAK muat 1 baris — Row tanpa scroll
+        // dipaksa mengecilkan lebar TextButton terakhir sampai nyaris 0dp, bikin Text("Rating")
+        // di dalamnya wrap PER-HURUF turun vertikal di tepi kanan layar (persis yang kefoto:
+        // "R/a/t/i/n/g" numpuk 1 kolom, nembus ke bawah sampai overlap area waveform). ROOT CAUSE
+        // GANDA, 2 FIX terpisah tapi saling melengkapi (bukan cuma 1):
+        // (1) Row 0 pernah dikasih jalan keluar kalau kontennya kepanjangan (0 scroll, 0 wrap) —
+        //     ditambah `.horizontalScroll(rememberScrollState())` supaya di layar manapun yang
+        //     kurang lebar, Row jadi scrollable ke samping (bukan overflow diam-diam/kepotong)
+        //     alih-alih maksa compress. Kalau muat (layar lebar), scrollState diam di 0 & visualnya
+        //     IDENTIK versi sebelumnya (Arrangement.Center tetap efektif krn area scroll = area
+        //     Row kalau konten <= viewport). `fillMaxWidth()` ditambah eksplisit di modifier Row
+        //     (dulu implicit ikut ukuran anak) — perlu supaya area scroll punya batas ukur yang
+        //     jelas, bukan supaya krusial untuk fix ini sendiri.
+        // (2) Independen dari (1), SEMUA 4 Text label tombol (Tambah/Bagikan/Lirik/Rating) dikasih
+        //     `maxLines = 1` + `overflow = TextOverflow.Ellipsis` (pola sama persis judul lagu di
+        //     atas — Text(song?.title, maxLines=1,...) — cuma belum pernah diterapkan ke Text di
+        //     Row tombol ini dari batch manapun sebelumnya, termasuk 3 tombol lama). Ini JARING
+        //     PENGAMAN independen dari (1): meskipun (1) sudah bikin Row scrollable (jadi secara
+        //     teori tiap TextButton SELALU dapat lebar penuh sesuai intrinsic width-nya, tidak
+        //     pernah dipaksa compress lagi), maxLines=1 memastikan text tidak PERNAH bisa wrap
+        //     vertikal lagi di skenario manapun (mis. font-scale sistem user disetel besar) —
+        //     4 tombol lama SEHARUSNYA sudah begini dari awal, gap yang baru ketahuan sekarang.
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+        ) {
+            val addToPlaylistInteraction = remember { MutableInteractionSource() }
+            TextButton(
+                onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onSeek(sliderPosition.toLong())
+                    showAddToPlaylistDialog = true
                 },
-                valueRange = 0f..(uiState.duration.coerceAtLeast(1L).toFloat()),
-                colors = SliderDefaults.colors(
-                    thumbColor = animatedAccent,
-                    activeTrackColor = Color.Transparent,
-                    inactiveTrackColor = Color.Transparent
+                interactionSource = addToPlaylistInteraction,
+                modifier = Modifier.bouncyPress(addToPlaylistInteraction, pressedScale = 0.92f),
+                contentPadding = PaddingValues(horizontal = if (twoPane) 8.dp else 14.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                    tint = animatedAccent,
+                    modifier = Modifier.size(16.dp)
                 )
-            )
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            // Batch v3 upgrade — Pilar C spec palet_warna_calm_retro_v3.md ("Muted Monospace"):
-            // font ketikan-mesin HANYA di data fungsional pendek (durasi waktu), sesuai literal
-            // contoh spec `01:42 / 03:55` — bukan judul/lirik (larangan eksplisit §4 "JANGAN").
-            // `isCalmRetro` sudah di-hoist di atas (baris 198, dipakai bareng CTA aberration).
-            val timeFontFamily = if (isCalmRetro) FontFamily.Monospace else FontFamily.Default
-            Text(
-                formatDuration(uiState.position),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary,
-                fontFamily = timeFontFamily
-            )
-            Text(
-                // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — "menit tersisa" alih-alih
-                // total durasi untuk file yang di-opt-in mode ini, format "-mm:ss" sama seperti
-                // konvensi umum podcast player (Spotify/Apple/Google Podcasts) — universal tanpa
-                // perlu kata tambahan, dan langsung beda dari total durasi biasa secara visual.
-                if (audiobookModeEnabled) {
-                    "-" + formatDuration((uiState.duration - uiState.position).coerceAtLeast(0))
-                } else {
-                    formatDuration(uiState.duration)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    "Tambah",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = animatedAccent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            val shareInteraction = remember { MutableInteractionSource() }
+            TextButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    song?.let { s ->
+                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "audio/*"
+                            putExtra(Intent.EXTRA_STREAM, s.uri)
+                            putExtra(Intent.EXTRA_TITLE, s.title)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(sendIntent, "Bagikan lagu"))
+                    }
                 },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary,
-                fontFamily = timeFontFamily
-            )
+                interactionSource = shareInteraction,
+                modifier = Modifier.bouncyPress(shareInteraction, pressedScale = 0.92f),
+                contentPadding = PaddingValues(horizontal = if (twoPane) 8.dp else 14.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    Icons.Default.Share,
+                    contentDescription = null,
+                    tint = animatedAccent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    "Bagikan",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = animatedAccent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            val lyricsQuickInteraction = remember { MutableInteractionSource() }
+            TextButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    showLyricsSheet = true
+                },
+                interactionSource = lyricsQuickInteraction,
+                modifier = Modifier.bouncyPress(lyricsQuickInteraction, pressedScale = 0.92f),
+                contentPadding = PaddingValues(horizontal = if (twoPane) 8.dp else 14.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Article,
+                    contentDescription = null,
+                    tint = animatedAccent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    "Lirik",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = animatedAccent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            // Batch 360 — jawaban PENDING_RatingEntryPoint.md (Batch 357): Opsi 4 dipilih user
+            // ("Balik ke Now Playing, versi ringkas") — StarRatingRow LAMA (5 IconButton tetap
+            // tampil) TIDAK dikembalikan; sebagai gantinya 1 entry "Rating" REUSE 1:1 pola
+            // visual+struktur Tambah/Bagikan/Lirik di atas (icon 16dp + Spacer 6dp + Text
+            // labelMedium bertint animatedAccent, bouncyPress 0.92f, contentPadding sama) —
+            // ringkas sesuai literal permintaan user, bukan mengembalikan 5 ikon permanen.
+            // `currentRating`/`onSetRating` dari signature fungsi ini (SENGAJA tidak dihapus
+            // Batch 357, lihat komentar parameter) dipakai lagi di sini tanpa perlu menyentuh
+            // MainActivity.kt sama sekali. Icon dibuat DINAMIS (Star terisi vs StarBorder) —
+            // beda dari Tambah/Bagikan/Lirik yang iconnya statis — karena di sini bentuk icon
+            // itu sendiri membawa informasi (sudah dirating atau belum) yang TIDAK terwakili
+            // oleh label teks statis "Rating"; makanya contentDescription-nya TIDAK null (beda
+            // dari 3 sibling di atas) — konsisten aturan Batch 230/235 (null cuma untuk icon yang
+            // genuinely decorative, di sini icon menyampaikan state, bukan dekoratif semata).
+            val ratingInteraction = remember { MutableInteractionSource() }
+            TextButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    showRatingDialog = true
+                },
+                interactionSource = ratingInteraction,
+                modifier = Modifier.bouncyPress(ratingInteraction, pressedScale = 0.92f),
+                contentPadding = PaddingValues(horizontal = if (twoPane) 8.dp else 14.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    if (currentRating > 0) Icons.Default.Star else Icons.Default.StarBorder,
+                    contentDescription = if (currentRating > 0) {
+                        "Rating saat ini: $currentRating dari 5 bintang"
+                    } else {
+                        "Belum ada rating"
+                    },
+                    tint = animatedAccent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    "Rating",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = animatedAccent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(if (twoPane) 8.dp else 24.dp))
+
+        // Batch 353 (Opsi A) — blok Slider+waveform+teks waktu dipindah ke composable terpisah
+        // (PlaybackProgressRow, definisi di bawah fungsi ini) yang collect playbackProgress
+        // SENDIRI, bukan lewat uiState.position/duration lagi. Behavior/tampilan 1:1 sama,
+        // cuma scope recompose-nya sekarang terisolasi ke composable kecil itu saja. Komentar
+        // asli (Batch v3 font waktu, Roadmap #12 audiobook remaining-time) dipindah ke sana.
+        PlaybackProgressRow(
+            playbackProgress = playbackProgress,
+            audiobookModeEnabled = audiobookModeEnabled,
+            animatedAccent = animatedAccent,
+            isCalmRetro = isCalmRetro,
+            songId = song?.id,
+            haptic = haptic,
+            onSeek = onSeek
+        )
+        } // tutup Column pengukur (Batch 346, onGloballyPositioned) — pasangan pembuka di atas,
+          // sebelum blok if(showNowPlayingHint) — lihat rasional lengkap di sana.
+        } // tutup Column scrollable (Batch 334) — Batch 343: penutup ini SENGAJA dipindah ke sini
+          // (sebelumnya menutup SETELAH Row transport di bawah) supaya Row transport jadi sibling
+          // FIXED milik Column induk (fillMaxSize), bukan lagi child terakhir Column scrollable —
+          // rasionalisasi lengkap "mengambang" ada di komentar deklarasi Column scrollable (atas).
+
+        Spacer(modifier = Modifier.height(if (twoPane) 4.dp else 16.dp))
 
         Row(
             // Batch 170 — sebelumnya Row ini TANPA fillMaxWidth()/horizontalArrangement sama
@@ -584,6 +1136,11 @@ fun NowPlayingScreen(
             // Column dan kanan tombol Ulangi ke tepi Column TIDAK menempel rapat ke padding
             // 20dp Column — tetap ada ruang, konsisten "bernapas" dengan elemen lain di layar
             // yang sama (title/artist/slider semua punya margin dari tepi).
+            // Batch 343 — Row ini SEKARANG fixed footer (sibling Column induk, BUKAN lagi child
+            // Column scrollable di atasnya) — jaminan "menyentuh dasar" datang dari posisi barunya
+            // ini, bukan dari Row ini sendiri. 0 isi/ikon/handler/spacing Row ini diubah, murni
+            // pindah lokasi struktural (lihat rasionalisasi lengkap di komentar deklarasi Column
+            // scrollable di atas).
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
@@ -613,64 +1170,71 @@ fun NowPlayingScreen(
                 Icon(Icons.Default.SkipPrevious, contentDescription = "Sebelumnya", modifier = Modifier.size(36.dp))
             }
             val playPauseInteraction = remember { MutableInteractionSource() }
-            // Batch 55 — Tactile gets its own shape language here too (moderate rounded-square,
-            // matching TactileShapes.medium, same "machined control" read as every other tactile
-            // surface) instead of silently inheriting Apple's circular filledShape default; wrapped
-            // in tactileEmboss() so the app's single most-used button reads as a lifted hardware
-            // key (diagonal bevel + drop shadow), not just a flat colored disc like Apple's.
+            // Batch 561 — tombol play/pause datar saat diam: akar = `FilledIconButton` mengecat
+            // `containerColor` OPAK di atas lapisan depth (`tactileEmboss`/`skeuEmboss` digambar
+            // `drawBehind`, tema lain tanpa depth sama sekali), jadi hanya feedback tekan global
+            // (`NeuDepthIndication`) yang terlihat. Kini `Box` + `neuAccentKey()` (semua tema): permukaan
+            // aksen timbul (bevel + vignette + bayangan jatuh) saat DIAM, sumur cekung saat jari
+            // menyentuh (`neuInstantPress`, tanpa jeda). Bentuk (persegi membulat Tactile/Neumorphism,
+            // lingkaran lainnya), ukuran 68dp, haptic, `bouncyPress` 0.85f, `calmAberration`, warna ikon,
+            // dan morph `AnimatedContent` TIDAK berubah.
             val playPauseShape = if (isTactile || isSkeu) MaterialTheme.shapes.medium else CircleShape
-            FilledIconButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onPlayPause()
-                },
-                interactionSource = playPauseInteraction,
-                shape = playPauseShape,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = animatedAccent,
-                    // Batch 69: dulu `MaterialTheme.colorScheme.background` — warna latar
-                    // HALAMAN, sama sekali tidak berkaitan dengan warna lingkaran tombol ini
-                    // sendiri (animatedAccent, aksen dinamis per lagu). Kalau kebetulan
-                    // keduanya senasib gelap (mode gelap + aksen gelap) atau senasib terang,
-                    // ikon menyatu sempurna dengan lingkarannya -> "gak kelihatan sama
-                    // sekali" / "box kosong". Fix: pola luminance yang sama persis dgn
-                    // MiniPlayerBar.kt (accentContentColor) — kontras terhadap animatedAccent
-                    // itu sendiri, bukan warna halaman.
-                    contentColor = if (animatedAccent.luminance() > 0.55f) Color.Black else Color.White
-                ),
+            val playPauseTouching = remember { mutableStateOf(false) }
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .size(68.dp)
-                    .then(
-                        when {
-                            isTactile -> Modifier.tactileEmboss(shape = playPauseShape, elevation = 10.dp)
-                            isSkeu -> Modifier.skeuEmboss(shape = playPauseShape, elevation = 10.dp)
-                            isCalmRetro -> Modifier.calmAberration()
-                            else -> Modifier
+                    .bouncyPress(playPauseInteraction, pressedScale = 0.85f)
+                    .then(if (isCalmRetro) Modifier.calmAberration() else Modifier)
+                    .neuAccentKey(
+                        shape = playPauseShape,
+                        accent = animatedAccent,
+                        elevation = 10.dp,
+                        pressed = playPauseTouching.value,
+                        // Batch 565 — Neumorphism: bingkai gilt "medali" di permukaan aksen (warna aksen per-lagu TIDAK diganti).
+                        bezel = if (isSkeu) (if (LocalIsDarkTheme.current) SkeuGilt else SkeuGiltDeep) else null
+                    )
+                    .neuInstantPress(playPauseTouching, pass = PointerEventPass.Initial, requireUnconsumed = false)
+                    .clickable(
+                        interactionSource = playPauseInteraction,
+                        indication = null,
+                        role = Role.Button,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onPlayPause()
                         }
                     )
-                    .bouncyPress(playPauseInteraction, pressedScale = 0.85f)
             ) {
-                AnimatedContent(targetState = uiState.isPlaying, label = "playPause") { playing ->
-                    Icon(
-                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playing) "Jeda" else "Putar",
-                        // Batch 224 — Iconography 1/7 (audit ukuran icon). Sebelumnya 34dp: LEBIH
-                        // KECIL dari icon SkipPrevious/SkipNext yang mengapitnya (36dp), padahal
-                        // tombol ini kontainer PALING BESAR di row (68dp vs default ~48dp
-                        // IconButton) — hierarki visual kebalik (aksi utama harusnya glyph
-                        // TERBESAR, bukan terkecil). Baris Shuffle/Repeat (default 24dp, tanpa
-                        // override) < Skip (36dp) < Play/Pause sekarang 40dp — urutan bobot
-                        // visual 3-tingkat yang benar utuh dipulihkan.
-                        // Batch 226 — Iconography 2/7 (audit optical alignment). Glyph segitiga
-                        // PlayArrow punya bobot visual condong ke kiri dalam bounding box-nya
-                        // (beda dari Pause yang simetris) — kalau ukuran sama & posisi sama
-                        // persis pas AnimatedContent switch, mata lihat PlayArrow "kegeser kiri"
-                        // dari titik pusat lingkaran tombol. Fix: offset +1dp ke kanan HANYA
-                        // saat PlayArrow (bukan Pause) buat kompensasi bias optik tsb.
-                        modifier = Modifier
-                            .size(40.dp)
-                            .then(if (!playing) Modifier.offset(x = 1.dp) else Modifier)
-                    )
+                // Batch 69: dulu `MaterialTheme.colorScheme.background` — warna latar HALAMAN, sama sekali
+                // tidak berkaitan dengan warna tombol ini sendiri (animatedAccent, aksen dinamis per
+                // lagu); kalau kebetulan senasib gelap/terang, ikon menyatu -> "box kosong". Fix: pola
+                // luminance yang sama dgn MiniPlayerBar.kt (accentContentColor) — kontras terhadap
+                // animatedAccent itu sendiri. Batch 561: nilai sama, kini lewat `LocalContentColor`.
+                CompositionLocalProvider(
+                    LocalContentColor provides if (animatedAccent.luminance() > 0.55f) Color.Black else Color.White
+                ) {
+                    AnimatedContent(
+                        targetState = uiState.isPlaying,
+                        label = "playPause",
+                        // Batch 332 — morph scale+fade: ikon baru masuk membesar dari 0.6x sambil fade in,
+                        // ikon lama keluar mengecil ke 0.6x sambil fade out (200ms masuk / 150ms keluar,
+                        // pola asimetris Batch 330). `togetherWith` (bukan `with` yang deprecated).
+                        transitionSpec = {
+                            (scaleIn(initialScale = 0.6f, animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)))
+                                .togetherWith(scaleOut(targetScale = 0.6f, animationSpec = tween(150)) + fadeOut(animationSpec = tween(150)))
+                        }
+                    ) { playing ->
+                        Icon(
+                            if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (playing) "Jeda" else "Putar",
+                            // Batch 224 — glyph 40dp (> Skip 36dp > Shuffle/Repeat 24dp): aksi utama = glyph
+                            // TERBESAR. Batch 226 — PlayArrow condong kiri secara optik: offset +1dp ke
+                            // kanan HANYA saat PlayArrow.
+                            modifier = Modifier
+                                .size(40.dp)
+                                .then(if (!playing) Modifier.offset(x = 1.dp) else Modifier)
+                        )
+                    }
                 }
             }
             val nextInteraction = remember { MutableInteractionSource() }
@@ -703,7 +1267,27 @@ fun NowPlayingScreen(
                 )
             }
         }
+        } // tutup infoPane (Batch 637)
+
+        if (twoPane) {
+            Row(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                BoxWithConstraints(
+                    modifier = Modifier.weight(0.38f).fillMaxHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    artPane((minOf(maxHeight, maxWidth) - 20.dp).coerceAtLeast(100.dp))
+                }
+                Column(modifier = Modifier.weight(0.62f).fillMaxHeight()) { infoPane() }
+            }
+        } else {
+            artPane(dynamicArtSize)
+            infoPane()
         }
+        } // tutup Column induk (fillMaxSize, Batch 343) — Row transport di atas persis child
+          // TERAKHIRnya, jadi selalu presisi di tepi bawah layar, 0 spasi kosong tersisa.
 
         AnimatedVisibility(
             visible = showBrightnessIndicator,
@@ -734,9 +1318,9 @@ fun NowPlayingScreen(
         ) {
             GestureIndicatorBadge(
                 icon = when {
-                    systemVolumeFraction <= 0f -> Icons.Default.VolumeOff
-                    systemVolumeFraction < 0.5f -> Icons.Default.VolumeDown
-                    else -> Icons.Default.VolumeUp
+                    systemVolumeFraction <= 0f -> Icons.AutoMirrored.Filled.VolumeOff
+                    systemVolumeFraction < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
+                    else -> Icons.AutoMirrored.Filled.VolumeUp
                 },
                 value = systemVolumeFraction,
                 accentColor = animatedAccent,
@@ -747,7 +1331,7 @@ fun NowPlayingScreen(
 
     if (showSleepTimerDialog) {
         SleepTimerDialog(
-            currentRemainingMs = sleepTimerRemainingMs,
+            sleepTimerRemaining = sleepTimerRemaining,
             onDismiss = { showSleepTimerDialog = false },
             onSelect = onSetSleepTimer,
             onCancelTimer = onCancelSleepTimer
@@ -778,48 +1362,94 @@ fun NowPlayingScreen(
         )
     }
 
+    // Batch 358 — dialog utk ikon "Plus" baru di Row judul. Reuse AddToPlaylistDialog
+    // (PlaylistScreen.kt) apa adanya, callback body copy pola addToPlaylist/onAddToExisting/
+    // onCreateAndAdd LibraryScreen.kt (baris ~219 & ~474) — beda cuma sumber `song` (di sini dari
+    // uiState.currentSong yg sudah di-scope di atas, bukan songForPlaylistDialog lokal) & 0
+    // onInfoMessage (NowPlayingScreen belum punya param itu, konsisten pola fire-and-forget
+    // lain di file ini spt onAddBookmark/onSetRating — haptic LongPress cukup jadi konfirmasi).
+    if (showAddToPlaylistDialog && song != null) {
+        AddToPlaylistDialog(
+            song = song,
+            playlists = playlists,
+            onAddToExisting = { playlist ->
+                onAddSongToPlaylist(playlist.id, song.id)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                showAddToPlaylistDialog = false
+            },
+            onCreateAndAdd = { name ->
+                val playlist = onCreatePlaylist(name)
+                onAddSongToPlaylist(playlist.id, song.id)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                showAddToPlaylistDialog = false
+            },
+            onDismiss = { showAddToPlaylistDialog = false }
+        )
+    }
+
+    // Batch 360 — dialog untuk entry "Rating" baru di Row Tambah/Bagikan/Lirik/Rating (lihat
+    // komentar di atas Row-nya). RatingDialog (definisi di bawah fungsi ini, pola sama persis
+    // SpeedDialog: AlertDialog + tombol "Tutup", pilihan diterapkan LANGSUNG saat ditekan tanpa
+    // menutup dialog, biar user bisa lihat hasilnya dulu sebelum menutup manual).
+    if (showRatingDialog) {
+        RatingDialog(
+            currentRating = currentRating,
+            onDismiss = { showRatingDialog = false },
+            onSetRating = onSetRating
+        )
+    }
+
     if (showLyricsSheet && song != null) {
         var lyricsText by remember(song.id) { mutableStateOf(onGetLyrics(song.id)) }
-        LyricsSheet(
-            rawLyrics = lyricsText,
-            autoUiState = lyricsAutoState,
-            positionMs = uiState.position,
-            isPlaying = uiState.isPlaying,
-            onPlayPause = onPlayPause,
-            onDismiss = { showLyricsSheet = false },
-            onSave = { text ->
-                onSaveLyrics(song.id, text)
-                lyricsText = text
-            },
-            onDelete = {
-                onDeleteLyrics(song.id)
-                lyricsText = null
-            }
-        )
+        // Batch 353 (Opsi A) — WithLivePlaybackProgress (definisi di bawah fungsi ini) collect
+        // playbackProgress di scope-nya SENDIRI lalu suplai positionMs lewat parameter lambda;
+        // sheet ini aktif live (auto-scroll lirik), jadi WAJAR ikut re-render tiap tick — yang
+        // penting itu TIDAK bocor ke scope NowPlayingScreen di luar blok if ini.
+        WithLivePlaybackProgress(playbackProgress) { livePositionMs, _ ->
+            LyricsSheet(
+                rawLyrics = lyricsText,
+                autoUiState = lyricsAutoState,
+                positionMs = livePositionMs,
+                isPlaying = uiState.isPlaying,
+                onPlayPause = onPlayPause,
+                onDismiss = { showLyricsSheet = false },
+                onSave = { text ->
+                    onSaveLyrics(song.id, text)
+                    lyricsText = text
+                },
+                onDelete = {
+                    onDeleteLyrics(song.id)
+                    lyricsText = null
+                }
+            )
+        }
     }
 
     if (showAbRepeatBookmarkSheet && song != null) {
         var bookmarks by remember(song.id) { mutableStateOf(onGetBookmarks(song.id)) }
-        ABRepeatBookmarkSheet(
-            songId = song.id,
-            positionMs = uiState.position,
-            pointAMs = abRepeatPointA,
-            pointBMs = abRepeatPointB,
-            bookmarks = bookmarks,
-            onDismiss = { showAbRepeatBookmarkSheet = false },
-            onSetPointA = onSetAbRepeatPointA,
-            onSetPointB = onSetAbRepeatPointB,
-            onClearAbRepeat = onClearAbRepeat,
-            onSeek = onSeek,
-            onAddBookmark = { label, positionMs ->
-                onAddBookmark(song.id, label, positionMs)
-                bookmarks = onGetBookmarks(song.id)
-            },
-            onDeleteBookmark = { bookmarkId ->
-                onDeleteBookmark(song.id, bookmarkId)
-                bookmarks = onGetBookmarks(song.id)
-            }
-        )
+        // Batch 353 (Opsi A) — sama alasan dengan LyricsSheet di atas.
+        WithLivePlaybackProgress(playbackProgress) { livePositionMs, _ ->
+            ABRepeatBookmarkSheet(
+                songId = song.id,
+                positionMs = livePositionMs,
+                pointAMs = abRepeatPointA,
+                pointBMs = abRepeatPointB,
+                bookmarks = bookmarks,
+                onDismiss = { showAbRepeatBookmarkSheet = false },
+                onSetPointA = onSetAbRepeatPointA,
+                onSetPointB = onSetAbRepeatPointB,
+                onClearAbRepeat = onClearAbRepeat,
+                onSeek = onSeek,
+                onAddBookmark = { label, positionMs ->
+                    onAddBookmark(song.id, label, positionMs)
+                    bookmarks = onGetBookmarks(song.id)
+                },
+                onDeleteBookmark = { bookmarkId ->
+                    onDeleteBookmark(song.id, bookmarkId)
+                    bookmarks = onGetBookmarks(song.id)
+                }
+            )
+        }
     }
 
     if (showEqualizerSheet) {
@@ -834,11 +1464,38 @@ fun NowPlayingScreen(
     }
 
     if (showVisualizerSheet) {
+        // Batch 537 (baterai) — capture Visualizer OS (~15fps + FFT) dulu HANYA berhenti lewat
+        // `onDismiss`. Dua celah bocor: (1) rotasi/komposisi lepas -> flag `remember` hilang TANPA
+        // onDismiss, capture jalan terus tanpa sheet; (2) app ke background dgn sheet terbuka -> capture
+        // jalan terus saat layar mati. Sekarang: ON_STOP -> lepas, ON_START (setelah STOP) -> pasang
+        // lagi, onDispose -> lepas (idempoten: `release()` aman dipanggil berulang).
+        val vizLifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(vizLifecycleOwner) {
+            var stoppedInBackground = false
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_STOP -> {
+                        stoppedInBackground = true
+                        onCloseVisualizer()
+                    }
+                    Lifecycle.Event.ON_START -> if (stoppedInBackground) {
+                        stoppedInBackground = false
+                        onOpenVisualizer()
+                    }
+                    else -> Unit
+                }
+            }
+            vizLifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                vizLifecycleOwner.lifecycle.removeObserver(observer)
+                onCloseVisualizer()
+            }
+        }
         VisualizerSheet(
             enabled = visualizerEnabled,
             supported = visualizerSupported,
             permissionGranted = visualizerPermissionGranted,
-            bars = visualizerBars,
+            visualizerBars = visualizerBars,
             accentColor = animatedAccent,
             onDismiss = {
                 showVisualizerSheet = false
@@ -851,7 +1508,7 @@ fun NowPlayingScreen(
 
     if (showAdvancedSheet) {
         AdvancedControlsSheet(
-            sleepTimerRemainingMs = sleepTimerRemainingMs,
+            sleepTimerRemaining = sleepTimerRemaining,
             playbackSpeed = uiState.playbackSpeed,
             volume = uiState.volume,
             onSetVolume = onSetVolume,
@@ -886,6 +1543,10 @@ fun NowPlayingScreen(
             onOpenAbRepeatBookmark = {
                 showAdvancedSheet = false
                 showAbRepeatBookmarkSheet = true
+            },
+            onStopPlayback = {
+                showAdvancedSheet = false
+                onStopPlayback()
             },
             onOpenVisualizer = {
                 showAdvancedSheet = false
@@ -926,193 +1587,95 @@ fun NowPlayingScreen(
     }
 }
 
-/** Houses the controls a casual listener rarely touches mid-song — antrean, lirik, sleep timer,
- * playback speed, equalizer, and the in-app volume attenuation — behind one "Lanjutan" entry
- * point instead of crowding the main Now Playing top bar with equal-weight icons. */
-@OptIn(ExperimentalMaterial3Api::class)
+// Batch 353 (Opsi A, PENDING_FixGlobalLagRecomposition.md) — waveform+Slider+teks waktu,
+// dipindah dari isi NowPlayingScreen langsung. Composable TERPISAH ini yang collect
+// playbackProgress (bukan NowPlayingScreen di scope atas), jadi tiap tick posisi cuma
+// invalidasi baris kecil ini — tidak ikut menyeret seluruh NowPlayingScreen recompose.
+// Tampilan & behavior 1:1 sama seperti sebelum dipindah.
 @Composable
-private fun AdvancedControlsSheet(
-    sleepTimerRemainingMs: Long?,
-    playbackSpeed: Float,
-    volume: Float,
-    onSetVolume: (Float) -> Unit,
-    onDismiss: () -> Unit,
-    onOpenQueue: () -> Unit,
-    onOpenLyrics: () -> Unit,
-    onOpenSleepTimer: () -> Unit,
-    onOpenSpeed: () -> Unit,
-    onOpenEqualizer: () -> Unit,
-    onOpenAbRepeatBookmark: () -> Unit,
-    onOpenVisualizer: () -> Unit,
-    onOpenSongInfoEdit: () -> Unit,
-    onOpenRingtoneCutter: () -> Unit
+private fun PlaybackProgressRow(
+    playbackProgress: StateFlow<PlaybackProgress>,
+    audiobookModeEnabled: Boolean,
+    animatedAccent: Color,
+    isCalmRetro: Boolean,
+    songId: Long?,
+    haptic: HapticFeedback,
+    onSeek: (Long) -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val haptic = LocalHapticFeedback.current
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = Color.Transparent
-    ) {
-        // Batch 314 — laporan user: sheet ini terpotong (baris terakhir, "Potong Nada Dering",
-        // tidak terjangkau di layar pendek/font besar). Sama persis root cause & pola jaring
-        // pengaman yang sudah dipakai body utama NowPlayingScreen (lihat komentar
-        // `verticalScroll` di scaffold utama fungsi ini): 3 seksi + divider + slider volume TIDAK
-        // pernah discroll, cuma diam-diam ke-clip di tepi layar begitu total tinggi > tinggi sheet
-        // yang tersedia. Kalau konten muat (layar tinggi/gesture-nav), scroll offset tetap 0, nol
-        // perubahan visual; kalau tidak muat, sekarang bisa digeser bukan hilang.
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .frostedGlass()
-                .verticalScroll(rememberScrollState())
-        ) {
-            Text(
-                "Kontrol Lanjutan",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-            )
+    val progress by playbackProgress.collectAsStateWithLifecycle()
+    var sliderPosition by remember(progress.position) { mutableFloatStateOf(progress.position.toFloat()) }
+    val progressFraction = (sliderPosition / progress.duration.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
+    // Batch 566 — Neumorphism: thumb bulat M3 DITRANSPARANKAN, diganti permata gilt yang digambar `WaveformSeekBar`.
+    val isSkeuSeek = isSkeuTheme()
+    val seekGemRim = if (isSkeuSeek) (if (LocalIsDarkTheme.current) SkeuGilt else SkeuGiltDeep) else null
 
-            // Batch 312 — sebelumnya 9 baris flat tanpa pengelompokan (permintaan user: "rapikan
-            // menu utilitas yang tidak dipisahkan berdasarkan kegunaan umumnya"). Dikelompokkan
-            // jadi 3 seksi ala grouped-list iOS (label kecil di atas tiap grup + divider di
-            // antaranya, pola sama seperti "Peredam Dalam Aplikasi" yang sudah ada sebelumnya):
-            // "Pemutaran" (kontrol JALANNYA putar lagu saat ini), "Audio" (pemrosesan/tampilan
-            // sinyal audio), "Lagu" (konten/metadata per-lagu, bukan soal pemutaran real-time).
-            AdvancedControlsSectionHeader("Pemutaran")
-            AdvancedControlRow(
-                icon = Icons.Default.QueueMusic,
-                label = "Antrean Putar",
-                value = null,
-                onClick = onOpenQueue
+    Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+        WaveformSeekBar(
+            seed = songId ?: 0L,
+            progress = progressFraction,
+            playedColor = lerp(animatedAccent, Color.White, 0.2f),
+            unplayedColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            modifier = Modifier.fillMaxWidth().height(32.dp),
+            gemRim = seekGemRim
+        )
+        Slider(
+            value = sliderPosition,
+            onValueChange = { sliderPosition = it },
+            onValueChangeFinished = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onSeek(sliderPosition.toLong())
+            },
+            valueRange = 0f..(progress.duration.coerceAtLeast(1L).toFloat()),
+            colors = SliderDefaults.colors(
+                thumbColor = if (isSkeuSeek) Color.Transparent else animatedAccent,
+                activeTrackColor = Color.Transparent,
+                inactiveTrackColor = Color.Transparent
             )
-            AdvancedControlRow(
-                icon = Icons.Default.Timer,
-                label = "Sleep Timer",
-                value = if (sleepTimerRemainingMs != null) "Aktif" else "Nonaktif",
-                onClick = onOpenSleepTimer
-            )
-            AdvancedControlRow(
-                icon = Icons.Default.Speed,
-                label = "Kecepatan Putar",
-                value = "${playbackSpeed}x",
-                onClick = onOpenSpeed
-            )
-            AdvancedControlRow(
-                icon = Icons.Default.Repeat,
-                label = "Repeat A-B & Bookmark",
-                value = null,
-                onClick = onOpenAbRepeatBookmark
-            )
-
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-            )
-
-            AdvancedControlsSectionHeader("Audio")
-            AdvancedControlRow(
-                icon = Icons.Default.Equalizer,
-                label = "Equalizer",
-                value = null,
-                onClick = onOpenEqualizer
-            )
-            AdvancedControlRow(
-                icon = Icons.Default.GraphicEq,
-                label = "Visualizer Audio",
-                value = null,
-                onClick = onOpenVisualizer
-            )
-            Text(
-                "Peredam Dalam Aplikasi (bukan volume HP)",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val volumeIcon = when {
-                    volume <= 0f -> Icons.Default.VolumeOff
-                    volume < 0.5f -> Icons.Default.VolumeDown
-                    else -> Icons.Default.VolumeUp
-                }
-                Icon(volumeIcon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Slider(
-                    value = volume,
-                    onValueChange = onSetVolume,
-                    onValueChangeFinished = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
-                    valueRange = 0f..1f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.secondary,
-                        activeTrackColor = MaterialTheme.colorScheme.secondary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                )
-            }
-
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-            )
-
-            AdvancedControlsSectionHeader("Lagu")
-            AdvancedControlRow(
-                icon = Icons.Default.Article,
-                label = "Lirik",
-                value = null,
-                onClick = onOpenLyrics
-            )
-            AdvancedControlRow(
-                icon = Icons.Default.Edit,
-                label = "Edit Info Lagu",
-                value = null,
-                onClick = onOpenSongInfoEdit
-            )
-            AdvancedControlRow(
-                icon = Icons.Default.ContentCut,
-                label = "Potong Nada Dering",
-                value = null,
-                onClick = onOpenRingtoneCutter
-            )
-            Spacer(modifier = Modifier.height(20.dp))
-        }
+        )
+    }
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        // Batch v3 upgrade — Pilar C spec palet_warna_calm_retro_v3.md ("Muted Monospace"):
+        // font ketikan-mesin HANYA di data fungsional pendek (durasi waktu), sesuai literal
+        // contoh spec `01:42 / 03:55` — bukan judul/lirik (larangan eksplisit §4 "JANGAN").
+        val timeFontFamily = if (isCalmRetro) FontFamily.Monospace else FontFamily.Default
+        Text(
+            formatDuration(progress.position),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary,
+            fontFamily = timeFontFamily
+        )
+        Text(
+            // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — "menit tersisa" alih-alih
+            // total durasi untuk file yang di-opt-in mode ini, format "-mm:ss" sama seperti
+            // konvensi umum podcast player (Spotify/Apple/Google Podcasts) — universal tanpa
+            // perlu kata tambahan, dan langsung beda dari total durasi biasa secara visual.
+            if (audiobookModeEnabled) {
+                "-" + formatDuration((progress.duration - progress.position).coerceAtLeast(0))
+            } else {
+                formatDuration(progress.duration)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary,
+            fontFamily = timeFontFamily
+        )
     }
 }
 
-/** Batch 312 — label kecil di atas tiap grup "Kontrol Lanjutan" (Pemutaran/Audio/Lagu), gaya
- * sama persis "Peredam Dalam Aplikasi" yang sudah ada sebelumnya (labelSmall + secondary),
- * supaya terasa 1 sistem konsisten, bukan pola baru yang asing di sheet ini. */
+// Batch 353 (Opsi A) — helper generik: collect playbackProgress di scope composable INI
+// (bukan di pemanggilnya), lalu suplai position/duration ke `content` lewat parameter lambda.
+// `content` adalah lambda @Composable yang, saat dipanggil dari sini, dapat restart-group-nya
+// SENDIRI (pola sama seperti `content` di Box/Column bawaan Compose) — jadi tick posisi tiap
+// detik cuma invalidasi isi `content`, TIDAK bocor ke scope pemanggil (blok if di
+// NowPlayingScreen). Dipakai untuk LyricsSheet & ABRepeatBookmarkSheet yang perlu positionMs
+// tapi punya closure (var lyricsText/bookmarks) yang lebih aman dibiarkan apa adanya di
+// pemanggil, ketimbang dipindah jadi parameter composable baru.
 @Composable
-private fun AdvancedControlsSectionHeader(title: String) {
-    Text(
-        title,
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.secondary,
-        modifier = Modifier.padding(start = 20.dp, top = 4.dp, end = 20.dp, bottom = 4.dp)
-    )
-}
-
-@Composable
-private fun AdvancedControlRow(icon: ImageVector, label: String, value: String?, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        if (value != null) {
-            Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-        }
-    }
+private fun WithLivePlaybackProgress(
+    playbackProgress: StateFlow<PlaybackProgress>,
+    content: @Composable (livePositionMs: Long, liveDurationMs: Long) -> Unit
+) {
+    val progress by playbackProgress.collectAsStateWithLifecycle()
+    content(progress.position, progress.duration)
 }
 
 /**
@@ -1129,7 +1692,8 @@ private fun WaveformSeekBar(
     progress: Float,
     playedColor: Color,
     unplayedColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    gemRim: Color? = null
 ) {
     val barHeights = remember(seed) {
         val random = kotlin.random.Random(seed)
@@ -1153,32 +1717,26 @@ private fun WaveformSeekBar(
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
             )
         }
+        // Batch 566 — Neumorphism: permata geser (cincin gilt + badan turunan `playedColor`) di batas bar terputar; menggantikan
+        // thumb bulat M3 yang ditransparankan di pemanggil. Posisi = `progress * lebar` (sama dgn batas bar terputar), digambar
+        // di fase gambar. null = tanpa permata (tema lain, perilaku lama).
+        if (gemRim != null) {
+            val gemR = 7.dp.toPx()
+            drawSkeuGem(
+                center = androidx.compose.ui.geometry.Offset(
+                    x = (progress * size.width).coerceIn(gemR, size.width - gemR),
+                    y = size.height / 2f
+                ),
+                radius = gemR,
+                rim = gemRim,
+                hi = lerp(playedColor, Color.White, 0.40f),
+                lo = lerp(playedColor, Color.Black, 0.45f)
+            )
+        }
     }
 }
 
 private const val BAR_COUNT = 48
-
-@Composable
-private fun StarRatingRow(rating: Int, onRate: (Int) -> Unit, accentColor: Color) {
-    val haptic = LocalHapticFeedback.current
-    Row(horizontalArrangement = Arrangement.Center) {
-        for (star in 1..5) {
-            IconButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onRate(if (rating == star) 0 else star)
-                }
-            ) {
-                Icon(
-                    if (star <= rating) Icons.Default.Star else Icons.Default.StarBorder,
-                    contentDescription = "Beri rating $star bintang",
-                    tint = if (star <= rating) accentColor else MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: Color, label: String? = null) {
@@ -1187,19 +1745,20 @@ private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: 
     // literal glassmorphism cue) for Skeu; now gets the same opaque + embossed treatment Tactile
     // already had, consistent with the rest of this batch's frostedGlass()/skeuEmboss() fixes.
     val isSkeu = isSkeuTheme()
-    val isPanelTheme = isTactile || isSkeu
+    // Batch 552 — Apple/Calm Retro/Liquid Glass/Aurora: `neuSurface()` (kedalaman Neumorphism
+    // Boomly); fill kini digambar mesin itu (opak), bukan Surface surface@0.9f; Surface transparan.
     Surface(
         modifier = when {
             isTactile -> Modifier.tactileEmboss(shape = RoundedCornerShape(Radius.xl), elevation = 8.dp)
             isSkeu -> Modifier.skeuEmboss(shape = RoundedCornerShape(Radius.xl), elevation = 8.dp)
-            else -> Modifier
+            else -> Modifier.neuSurface(shape = RoundedCornerShape(Radius.xl), elevation = 8.dp)
         },
         shape = RoundedCornerShape(Radius.xl),
-        color = if (isPanelTheme) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        color = Color.Transparent,
         // Batch 48/49 lesson: explicit contentColor, never rely on the Transparent fallback.
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = if (isPanelTheme) 0.dp else 6.dp,
-        shadowElevation = if (isPanelTheme) 0.dp else 4.dp
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
@@ -1222,438 +1781,6 @@ private fun GestureIndicatorBadge(icon: ImageVector, value: Float, accentColor: 
                     color = MaterialTheme.colorScheme.secondary
                 )
             }
-        }
-    }
-}
-
-/** Apple Music-style hero art: a large rounded-square image with a soft ambient glow
- * (tinted by the same accent color already extracted from this song's artwork) instead of
- * the old spinning vinyl. Horizontal swipe-to-skip gesture logic is unchanged from before. */
-@Composable
-private fun AlbumArtHero(
-    artworkUri: Uri?,
-    accentColor: Color,
-    onSwipeNext: () -> Unit,
-    onSwipePrevious: () -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-    var totalDrag by remember { mutableStateOf(0f) }
-    // Batch 178 — Now Playing item 10/11 fix: swipe-to-skip di sini sebelumnya 0 feedback
-    // visual selama drag berlangsung (cuma haptic SEKALI di dragEnd kalau lolos threshold
-    // 120px) — beda dari gesture brightness/volume di Box induk (GestureIndicatorBadge
-    // muncul LIVE mengikuti drag). User tidak tahu sudah "cukup jauh" menggeser sampai
-    // jarinya dilepas. `dragOffset` bikin art ikut bergeser mengikuti jari (clamp ±48dp,
-    // damped 0.5x — bukan 1:1, supaya tidak terkesan bisa diseret jauh tak terbatas) lalu
-    // spring balik ke tengah begitu jari dilepas/gesture dibatalkan. Threshold/logic
-    // swipe-next/prev itu sendiri (totalDrag, 120px) SAMA SEKALI TIDAK DIUBAH — murni layer
-    // visual tambahan di atasnya, bukan perubahan playback/navigation logic.
-    val dragOffset = remember { Animatable(0f) }
-    val dragScope = rememberCoroutineScope()
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .graphicsLayer { translationX = dragOffset.value }
-            .pointerInput(Unit) {
-            val maxOffsetPx = 48.dp.toPx()
-            // Batch 256 — POLISH_AUDIT §Motion: stiffness = Spring.StiffnessLow ditambah ke 2
-            // spring snap-back di bawah (onDragEnd + onDragCancel), dulu default (Medium),
-            // beda dari bouncyPress (Utils.kt) & entrance spring (baris ~410) yg sama-sama pakai
-            // StiffnessLow eksplisit — biar swipe-snap terasa 1 sistem sama animasi bouncy lain
-            // di screen ini, bukan 2 "rasa" beda. dampingRatio (MediumBouncy) tidak diubah.
-            detectHorizontalDragGestures(
-                onDragStart = { totalDrag = 0f },
-                onDragEnd = {
-                    if (totalDrag < -120f) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onSwipeNext()
-                    } else if (totalDrag > 120f) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onSwipePrevious()
-                    }
-                    dragScope.launch { dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) }
-                },
-                onDragCancel = {
-                    dragScope.launch { dragOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) }
-                },
-                onHorizontalDrag = { change, dragAmount ->
-                    totalDrag += dragAmount
-                    change.consume()
-                    dragScope.launch { dragOffset.snapTo((totalDrag * 0.5f).coerceIn(-maxOffsetPx, maxOffsetPx)) }
-                }
-            )
-        }
-    ) {
-        val isTactile = isTactileTheme()
-        // Batch 59 — same gap as HomeScreen/LibraryScreen/MiniPlayerBar: this hero art (the
-        // single largest, most-looked-at surface on the whole screen) was Tactile-only, Skeu
-        // fell into the generic Apple shadow-only branch below with no bevel of its own at all.
-        val isSkeu = isSkeuTheme()
-        val isPanelTheme = isTactile || isSkeu
-        // v3 upgrade — Pilar A spec palet_warna_calm_retro_v3.md (CRT scanlines), dipasang di
-        // bawah lewat .calmScanlines() SETELAH .clip(heroShape) (bukan sebelum, beda dari
-        // teknik shadow Tactile/Skeu di atas yang sengaja bocor sebelum clip) — scanline harus
-        // terkurung rapi di dalam bentuk album art, tidak boleh meluber ke luar shape.
-        val isCalmRetroHero = isCalmRetroTheme()
-        // Batch 74 — fix: this manual draw (unlike skeuEmboss()/tactileEmboss(), which both
-        // already branch on LocalIsDarkTheme) hardcoded dark-only tokens (TactileHighlight/
-        // TactileShadow, SkeuHighlight/SkeuShadow/SkeuAmbientOcclusion/SkeuSpecular/
-        // SkeuInnerGroove) with no light-mode branch at all — since Batch 61 made Tactile/Skeu
-        // fully autonomous per light/dark mode, this hero art (the single largest surface on
-        // the whole screen) has been silently drawing dark bevel colors over a light-mode panel
-        // this whole time. Fixed below via isDark + light-token fallback, matching the pattern
-        // skeuEmboss()/tactileEmboss() already use.
-        val isDark = LocalIsDarkTheme.current
-        // Batch 52: recolored again for the literal Midnight Blue spec
-        // (compose-skeuomorphism-lite-midnight-blue.md) — same drawn top-down shadow +
-        // vertical-gradient bevel border technique kept from Batch 45/46/49-51, no code changes
-        // here at all; TactileHighlight/TactileShadow are plain white/black-based again this
-        // batch (see Color.kt), so this hero art picks up the new palette automatically through
-        // those same two token references.
-        val heroShape = if (isPanelTheme) MaterialTheme.shapes.large else RoundedCornerShape(Radius.hero)
-        Box(
-            modifier = Modifier
-                .size(300.dp)
-                .blur(90.dp)
-                .background(accentColor.copy(alpha = 0.38f), CircleShape)
-        )
-        AlbumArt(
-            artworkUri = artworkUri,
-            modifier = Modifier
-                .size(280.dp)
-                .then(
-                    when {
-                        isTactile -> {
-                            val heroHighlight = if (isDark) TactileHighlight else TactileLightHighlight
-                            val heroShadow = if (isDark) TactileShadow else TactileLightShadow
-                            Modifier
-                                .drawBehind {
-                                    val outline = heroShape.createOutline(size, layoutDirection, this)
-                                    val outlinePath = Path().apply { addOutline(outline) }
-                                    translate(top = 9.dp.toPx()) {
-                                        drawPath(outlinePath, color = heroShadow.copy(alpha = if (isDark) 0.55f else 0.30f))
-                                    }
-                                }
-                                .clip(heroShape)
-                                .border(
-                                    BorderStroke(
-                                        1.5.dp,
-                                        // Batch 55 — was verticalGradient, the one remaining spot in the
-                                        // whole Tactile identity still drawing top-down light instead of
-                                        // spec §9's diagonal top-left -> bottom-right (BlurUtils.kt's
-                                        // edgeBrush and TactileDepth.kt's tactileEmboss() border both
-                                        // already use linearGradient's default diagonal — this hero art
-                                        // border was the one inconsistent leftover from Batch 45/46,
-                                        // predating the diagonal rule adopted in Batch 53).
-                                        Brush.linearGradient(
-                                            listOf(
-                                                heroHighlight.copy(alpha = if (isDark) 0.12f else heroHighlight.alpha),
-                                                heroShadow.copy(alpha = if (isDark) 0.32f else heroShadow.alpha)
-                                            )
-                                        )
-                                    ),
-                                    heroShape
-                                )
-                                // Localized accent glow on the hero art is spec-sanctioned (§9: "Use
-                                // [glow] for… selected states… important tactile edges") since this
-                                // is the one always-active/selected surface on the whole screen —
-                                // alpha trimmed from the old 0.5f for restraint per §9/§13.
-                                .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
-                        }
-                        isSkeu -> {
-                            // Batch 79 — NEUMORPHISM upgrade: sama arsitektur dual-shadow dgn
-                            // skeuEmboss() (TactileDepth.kt, Batch 79) — sisi gelap kanan-bawah
-                            // (AO dekat + shadow jauh, 3 layer offset+alpha bertingkat), sisi
-                            // terang kiri-atas (specular dekat + highlight jauh, 2 layer) — TIDAK
-                            // ADA lagi border/inner-groove sama sekali (neumorphism generik tidak
-                            // punya garis batas, kedalaman murni dari bayangan). Manual draw di
-                            // sini (bukan lewat skeuEmboss() langsung) tetap dipertahankan karena
-                            // Box ini juga membawa .shadow() accent glow per-lagu di bawah, yang
-                            // perlu tetap jadi layer terpisah/paling akhir.
-                            // Batch 81 — fix 2 hal: (1) sisi TERANG dulu ada di drawBehind TERPISAH
-                            // SETELAH .clip(heroShape) (beda dari sisi gelap yg SEBELUM .clip()) —
-                            // artinya sisi terang selama ini kepotong tepat di tepi shape, tidak
-                            // pernah benar-benar "meluber ke luar" sebagai bayangan lembut kayak
-                            // sisi gelap, beda arsitektur dari skeuEmboss() sendiri yg gambar KEDUA
-                            // sisi dalam 1 drawBehind sebelum .clip(). Disatukan di bawah, sama
-                            // pola dgn skeuEmboss(). (2) clipRect() halo ditambahkan (fix "Ambient
-                            // Light gak bocor", instruksi user yg belum tersentuh Batch 79/80) —
-                            // hero art ini panel TERBESAR di app, jadi juga yg paling berisiko
-                            // numpang-nimpa MiniPlayerBar/tombol kontrol di bawahnya kalau tidak
-                            // dibatasi.
-                            val heroAo = if (isDark) SkeuAmbientOcclusion else SkeuLightAmbientOcclusion
-                            val heroShadow = if (isDark) SkeuShadow else SkeuLightShadow
-                            val heroSpecular = if (isDark) SkeuSpecular else SkeuLightSpecular
-                            val heroHighlight = if (isDark) SkeuHighlight else SkeuLightHighlight
-                            val emerald = if (isDark) SkeuEmerald else SkeuLightEmerald
-                            // Batch 80 — fix: Batch 79's emerald di hero art cuma lerp-blend 14%
-                            // ke arah heroSpecular (putih/perak nyaris opaque) — di layar HP nyaris
-                            // tak berubah dari putih polos (user: "yang kelihatan cuman Titanium
-                            // dominan, mana zamrudnya??"). Sekarang jadi radial glint TERPISAH
-                            // (warna emerald murni, bukan campuran) di pojok kiri-atas, alpha tetap
-                            // & jauh lebih tinggi (0.35f/0.42f) — permanen (hero art statis, tidak
-                            // ada state pressed spt skeuEmboss()), genuinely kebaca sebagai titik
-                            // hijau di logam titanium, bukan cuma teknis-ada-di-kode.
-                            val heroEmeraldAlpha = if (isDark) 0.35f else 0.42f
-                            Modifier
-                                .drawBehind {
-                                    val outline = heroShape.createOutline(size, layoutDirection, this)
-                                    val outlinePath = Path().apply { addOutline(outline) }
-                                    // Halo tetap (18.dp) — offset terjauh yg dipakai di bawah cuma
-                                    // 14.dp (literal, bukan proporsional ke param elevation kayak
-                                    // skeuEmboss(), krn hero art ini ukurannya selalu tetap 280.dp),
-                                    // jadi 18.dp cukup longgar utk tidak memotong bentuk bayangan
-                                    // sendiri, sekaligus jadi batas tegas yg dijamin tidak dilewati.
-                                    val haloPx = 18.dp.toPx()
-                                    clipRect(
-                                        left = -haloPx,
-                                        top = -haloPx,
-                                        right = size.width + haloPx,
-                                        bottom = size.height + haloPx
-                                    ) {
-                                        // Sisi GELAP — kanan-bawah, 3 layer offset makin jauh +
-                                        // alpha makin tipis (faux-blur bertingkat, sama teknik
-                                        // skeuEmboss()).
-                                        translate(left = 3.dp.toPx(), top = 3.dp.toPx()) {
-                                            drawPath(outlinePath, color = heroAo)
-                                        }
-                                        translate(left = 8.dp.toPx(), top = 8.dp.toPx()) {
-                                            drawPath(outlinePath, color = heroShadow.copy(alpha = (if (isDark) 0.40f else heroShadow.alpha) * 0.75f))
-                                        }
-                                        translate(left = 14.dp.toPx(), top = 14.dp.toPx()) {
-                                            drawPath(outlinePath, color = heroShadow.copy(alpha = (if (isDark) 0.40f else heroShadow.alpha) * 0.35f))
-                                        }
-                                        // Sisi TERANG — kiri-atas, 2 layer, murni Titanium/Silver.
-                                        // Batch 81: dipindah ke sini (sebelum .clip()), sisi gelap
-                                        // di atas — dulu di drawBehind terpisah SETELAH .clip(),
-                                        // jadi tak pernah bisa meluber sama sekali (lihat komentar
-                                        // Batch 81 di atas).
-                                        translate(left = -3.dp.toPx(), top = -3.dp.toPx()) {
-                                            drawPath(outlinePath, color = heroSpecular.copy(alpha = if (isDark) 0.35f else heroSpecular.alpha * 0.6f))
-                                        }
-                                        translate(left = -8.dp.toPx(), top = -8.dp.toPx()) {
-                                            drawPath(outlinePath, color = heroHighlight.copy(alpha = (if (isDark) 0.16f else heroHighlight.alpha) * 0.7f))
-                                        }
-                                    }
-                                }
-                                .clip(heroShape)
-                                .drawBehind {
-                                    // Zamrud — glint bulat kecil terpisah, pojok kiri-atas, warna
-                                    // murni (bukan blend) supaya genuinely kebaca hijau. Sengaja
-                                    // tetap SETELAH .clip() (beda dari dual-shadow di atas) — ini
-                                    // permata di PERMUKAAN panel, bukan bayangan yg perlu meluber.
-                                    drawRect(
-                                        brush = Brush.radialGradient(
-                                            colors = listOf(emerald.copy(alpha = heroEmeraldAlpha), Color.Transparent),
-                                            center = Offset(size.width * 0.16f, size.height * 0.14f),
-                                            radius = size.minDimension.coerceAtLeast(1f) * 0.28f
-                                        )
-                                    )
-                                }
-                                .shadow(elevation = 18.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.42f))
-                        }
-                        else -> Modifier.shadow(elevation = 28.dp, shape = heroShape, spotColor = accentColor.copy(alpha = 0.45f))
-                    }
-                )
-                .clip(heroShape)
-                .then(if (isCalmRetroHero) Modifier.calmScanlines() else Modifier)
-        )
-    }
-}
-
-@Composable
-private fun SleepTimerDialog(
-    currentRemainingMs: Long?,
-    onDismiss: () -> Unit,
-    onSelect: (Int) -> Unit,
-    onCancelTimer: () -> Unit
-) {
-    val options = listOf(10, 15, 30, 45, 60)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Sleep Timer") },
-        text = {
-            Column {
-                if (currentRemainingMs != null) {
-                    Text(
-                        "Aktif — berhenti dalam ${formatDuration(currentRemainingMs)}",
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-                options.forEach { minutes ->
-                    TextButton(
-                        onClick = { onSelect(minutes); onDismiss() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("$minutes menit")
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            if (currentRemainingMs != null) {
-                TextButton(onClick = { onCancelTimer(); onDismiss() }) { Text("Matikan Timer") }
-            } else {
-                TextButton(onClick = onDismiss) { Text("Tutup") }
-            }
-        },
-        dismissButton = {
-            if (currentRemainingMs != null) {
-                TextButton(onClick = onDismiss) { Text("Tutup") }
-            }
-        }
-    )
-}
-
-@Composable
-private fun SpeedDialog(
-    currentSpeed: Float,
-    crossfadeEnabled: Boolean,
-    audiobookModeEnabled: Boolean,
-    onDismiss: () -> Unit,
-    onSelect: (Float) -> Unit,
-    onToggleCrossfade: (Boolean) -> Unit,
-    onToggleAudiobookMode: (Boolean) -> Unit
-) {
-    val options = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Pengaturan Putar") },
-        text = {
-            // Batch 318 (laporan user, screenshot) — Column ini beda dari 5 sheet yang sudah
-            // diaudit Batch 314-316 (semua ModalBottomSheet): SpeedDialog ini AlertDialog, jadi
-            // luput dari audit "pola tab serupa" yang scope-nya cuma ModalBottomSheet. Simptom
-            // & root cause PERSIS sama: total tinggi konten (6 opsi Kecepatan + toggle Mode
-            // Audiobook + 2 opsi Transisi Antar Lagu dengan subtitle panjang) melebihi tinggi
-            // yang dialokasikan Material3 AlertDialog ke slot `text`, baris paling bawah
-            // ("Fade Halus" subtitle) diam-diam ke-clip alih-alih bisa digeser.
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text(
-                    "Kecepatan",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                // Batch 163 (Micro UI/UX kategori #5, Interactive States — selected/active
-                // consistency) — dulu di sini TextButton polos + teks "✓" (dan warna teks
-                // berubah) buat menandai speed yang aktif, PADAHAL daftar pilihan-tunggal LAIN
-                // di dialog yang SAMA persis ini (Transisi Antar Lagu, langsung di bawah lewat
-                // TransitionModeOption) sudah pakai widget RadioButton sungguhan. Dua bahasa
-                // visual beda utk konsep yang identik (pilih 1 dari beberapa opsi), padahal
-                // cuma dipisah 1 Divider — disamakan ke pola RadioButton yang sama.
-                options.forEach { speed ->
-                    val isSelected = speed == currentSpeed
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(Radius.md))
-                            .selectable(
-                                selected = isSelected,
-                                onClick = { onSelect(speed) },
-                                role = Role.RadioButton
-                            )
-                            .padding(vertical = 8.dp, horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(selected = isSelected, onClick = null)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("${speed}x", style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Roadmap #12 (Mode Audiobook/Podcast, Batch 93) — per-song opt-in, scoped to
-                // whichever song is loaded when this dialog is open (PlayerViewModel keys the
-                // saved state off currentSong.id, not a global setting).
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Mode Audiobook/Podcast", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Ingat kecepatan & posisi khusus lagu ini, terpisah dari lagu lain",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-                    Switch(checked = audiobookModeEnabled, onCheckedChange = onToggleAudiobookMode)
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    "Transisi Antar Lagu",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Gapless has always been the actual playback engine's default behavior —
-                // ExoPlayer decodes a real back-to-back playlist with zero re-buffering
-                // between tracks whenever crossfade doesn't touch volume. The only thing
-                // that was missing was ever telling the user this exists; before this, "off"
-                // was just the crossfade switch's unlabeled resting state.
-                TransitionModeOption(
-                    title = "Gapless (Murni)",
-                    subtitle = "Sambung langsung tanpa jeda atau perubahan volume — persis seperti file aslinya",
-                    selected = !crossfadeEnabled,
-                    onClick = { onToggleCrossfade(false) }
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                // Batch 102 — subtitle diperbarui: sebelum ini cuma volume 1 pemutar yang
-                // dilandaikan turun-naik di sekitar titik ganti lagu (jeda senyap singkat tetap
-                // ada, cuma disamarkan). Sekarang lagu berikutnya benar-benar mulai main
-                // (overlap) SEBELUM lagu ini habis — dua sumber suara sungguhan tumpang tindih,
-                // bukan cuma efek volume. Lihat CrossfadeEngine.kt.
-                TransitionModeOption(
-                    title = "Fade Halus",
-                    subtitle = "Lagu berikutnya mulai main sebelum lagu ini habis, saling menumpuk lalu bertukar halus",
-                    selected = crossfadeEnabled,
-                    onClick = { onToggleCrossfade(true) }
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Tutup") }
-        }
-    )
-}
-
-@Composable
-private fun TransitionModeOption(
-    title: String,
-    subtitle: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.md))
-            .selectable(
-                selected = selected,
-                onClick = onClick,
-                role = Role.RadioButton
-            )
-            .padding(vertical = 8.dp, horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Spacer(modifier = Modifier.width(4.dp))
-        Column {
-            Text(title, style = MaterialTheme.typography.bodyMedium)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
         }
     }
 }
