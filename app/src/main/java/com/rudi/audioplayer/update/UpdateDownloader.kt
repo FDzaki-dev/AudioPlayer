@@ -32,7 +32,11 @@ object UpdateDownloader {
 
     sealed class DownloadResult {
         data class Success(val file: File) : DownloadResult()
-        data class Failure(val message: String) : DownloadResult()
+        /**
+         * [message] = pesan mentah galat. [retryable] = galat jaringan yang layak diulang ([DownloadRetryPolicy.isTransient]).
+         * [attempts] = jumlah percobaan yang dijalankan sampai gagal (Batch 708).
+         */
+        data class Failure(val message: String, val retryable: Boolean = false, val attempts: Int = 1) : DownloadResult()
     }
 
     /**
@@ -40,12 +44,37 @@ object UpdateDownloader {
      *        rate limit. Sent as "Authorization: Bearer <token>" per spec, never logged.
      * @param onProgress called after every chunk with (bytesDownloaded, totalBytes).
      *        totalBytes is -1 if the server response omits Content-Length.
+     * @param onRetry Batch 708 — dipanggil sebelum jeda pengulangan akibat galat jaringan sementara
+     *        ([DownloadRetryPolicy]): (percobaan yang gagal, total percobaan, lama jeda ms, pesan galat mentah).
+     * @param pause Batch 708 — jeda antar percobaan (blocking); default `Thread.sleep`, diganti di tes.
      */
     fun download(
         url: String,
         destFile: File,
         githubToken: String? = null,
-        onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit = { _, _ -> }
+        onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit = { _, _ -> },
+        onRetry: (failedAttempt: Int, maxAttempts: Int, delayMs: Long, reason: String) -> Unit = { _, _, _, _ -> },
+        pause: (Long) -> Unit = { Thread.sleep(it) }
+    ): DownloadResult {
+        val outcome = DownloadRetryPolicy.execute<DownloadResult>(
+            shouldRetry = { it is DownloadResult.Failure && it.retryable },
+            pause = pause,
+            onRetry = { failedAttempt, delayMs, failed ->
+                val reason = (failed as? DownloadResult.Failure)?.message.orEmpty()
+                onRetry(failedAttempt, DownloadRetryPolicy.MAX_ATTEMPTS, delayMs, reason)
+            },
+            attempt = { downloadOnce(url, destFile, githubToken, onProgress) }
+        )
+        val last = outcome.result
+        return if (last is DownloadResult.Failure) last.copy(attempts = outcome.attempts) else last
+    }
+
+    /** Satu percobaan unduh (isi `download` sebelum Batch 708). Galat IO ditandai [DownloadResult.Failure.retryable]. */
+    private fun downloadOnce(
+        url: String,
+        destFile: File,
+        githubToken: String?,
+        onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit
     ): DownloadResult {
         val requestBuilder = Request.Builder()
             .url(url)
@@ -93,8 +122,12 @@ object UpdateDownloader {
             }
         } catch (e: IOException) {
             // Covers connect/read timeout (15s/20s above) and any dropped-connection case.
+            // Batch 708 — DNS/koneksi/timeout ditandai retryable supaya `download` mengulang (log v707: DNS gagal 18:03:10, pulih ±5 dtk).
             destFile.delete()
-            DownloadResult.Failure(e.message ?: "Gagal koneksi atau timeout")
+            DownloadResult.Failure(
+                e.message ?: "Gagal koneksi atau timeout (${e.javaClass.simpleName})",
+                retryable = DownloadRetryPolicy.isTransient(e)
+            )
         } catch (e: Exception) {
             destFile.delete()
             DownloadResult.Failure(e.message ?: "Gagal tidak terduga saat unduh")

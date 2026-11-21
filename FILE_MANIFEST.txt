@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 708: + app/src/main/java/com/rudi/audioplayer/update/DownloadRetryPolicy.kt + app/src/test/java/com/rudi/audioplayer/update/DownloadRetryPolicyTest.kt (pengulangan unduhan APK pembaruan; update/UpdateDownloader.kt, update/UpdateManager.kt, ui/UpdateCheckSheet.kt diubah) — 263->265.
 # Batch 707: 0 file baru (update/UpdateApkCache.kt, update/UpdateApkCacheTest.kt diubah); jumlah tetap 263.
 # Batch 706: 0 file baru (update/UpdateApkCache.kt, update/UpdateDownloader.kt, update/UpdateManager.kt, update/UpdateApkCacheTest.kt diubah); jumlah tetap 263.
 # Batch 705: 0 file baru (util/PowerProbe.kt, AudioPlayerApplication.kt diubah); jumlah tetap 263.
@@ -287,6 +288,7 @@ app/src/main/java/com/rudi/audioplayer/ui/theme/Spacing.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/TactileDepth.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Theme.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Type.kt
+app/src/main/java/com/rudi/audioplayer/update/DownloadRetryPolicy.kt
 app/src/main/java/com/rudi/audioplayer/update/GitHubReleaseChecker.kt
 app/src/main/java/com/rudi/audioplayer/update/UpdateApkCache.kt
 app/src/main/java/com/rudi/audioplayer/update/UpdateDownloader.kt
@@ -382,6 +384,7 @@ app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/UpdateResumePolicyTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
+app/src/test/java/com/rudi/audioplayer/update/DownloadRetryPolicyTest.kt
 app/src/test/java/com/rudi/audioplayer/update/UpdateApkCacheTest.kt
 app/src/test/java/com/rudi/audioplayer/util/ChangeGateTest.kt
 app/src/test/java/com/rudi/audioplayer/util/DebugLogFormatTest.kt

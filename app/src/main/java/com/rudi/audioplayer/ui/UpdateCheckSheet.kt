@@ -211,6 +211,12 @@ fun UpdateCheckSheet(onDismiss: () -> Unit) {
                         icon = Icons.Default.Error,
                         text = s.message
                     )
+                    // Batch 708 — log v707: DNS gagal 18:03:10 lalu pengguna menutup+membuka ulang sheet (4 dtk) agar bisa mencoba lagi;
+                    // status Error sebelumnya tanpa aksi. Cek ulang -> Available -> "Unduh & Instal".
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(onClick = { UpdateManager.checkForUpdate(BuildConfig.VERSION_NAME) }) {
+                        Text("Coba lagi")
+                    }
                 }
             }
         }

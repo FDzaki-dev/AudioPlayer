@@ -113,6 +113,11 @@ object UpdateManager {
                         if (total > 0) {
                             _state.value = UpdateState.Downloading(((downloaded * 100) / total).toInt())
                         }
+                    },
+                    // Batch 708 — galat jaringan sementara (DNS/koneksi/timeout) diulang otomatis; tiap pengulangan dicatat mentah.
+                    onRetry = { failedAttempt, maxAttempts, delayMs, reason ->
+                        AppLogger.w(TAG, "Unduhan percobaan $failedAttempt/$maxAttempts gagal (jaringan sementara): $reason; ulang dalam ${delayMs}ms")
+                        _state.value = UpdateState.Downloading(0)
                     }
                 )
                 _state.value = when (result) {
@@ -127,7 +132,7 @@ object UpdateManager {
                         }
                     }
                     is UpdateDownloader.DownloadResult.Failure -> {
-                        AppLogger.e(TAG, "Unduhan gagal: ${result.message}")
+                        AppLogger.e(TAG, "Unduhan gagal setelah ${result.attempts} percobaan: ${result.message}")
                         UpdateState.Error(result.message)
                     }
                 }

@@ -1,5 +1,21 @@
 # Changelog
 
+## Batch 708 — unduhan APK pembaruan mengulang otomatis galat jaringan sementara + tombol "Coba lagi" pada status Error
+
+- Input user: `sonix_debug_20261121_180441.txt` (v707 = 1.11.18 build 568, ekspor 18:04:36) + `SONIX_v707.zip`, tanpa teks; tanpa laporan CI.
+
+- (A) CI v707 TIDAK dilaporkan -> ArchUnit/SpotBugs/detekt/lint/Tes **NOT VERIFIED**; kompilasi source utama terbukti tidak langsung (APK `v1.11.18-run680` terpasang 18:03:19, proses baru pid 25903 berjalan).
+
+- LOG v707 — Batch 706 (log unduhan) **VERIFIED** untuk pertama kali: 18:03:02 `Unduhan dimulai: AudioPlayer-v1.11.18-run680.apk` -> 18:03:10 `Unduhan gagal: Unable to resolve host "github.com": No address associated with hostname` (8 dtk) -> 18:03:15 `Unduhan dimulai` -> 18:03:18 `Unduhan selesai: update_AudioPlayer-v1.11.18-run680.apk 7101147 byte` -> `Pasang senyap via Shizuku dimulai` (18:03:18). Lanjut-putar pasca-update **VERIFIED** lagi: `PACKAGE_UPDATED` 18:03:19,833 -> `keputusan=RESUME sejak_mati=1825ms` -> `isPlaying=true` pada `sejak_proses_mulai=1004ms`, `posisi_pulih=6296334ms` -> AudioTrack `start()` 18:03:22,526 (±2,69 dtk setelah proses mati; v706 ±2,37). Rinciannya: porsi sistem (mati -> proses lahir) 1,70 dtk (v706 0,78), porsi app (proses lahir -> audio) 1,00 dtk (v706 1,60) = tak ada regresi sisi app. Pembersihan APK terpasang `terhapus=1 (7101147 byte) gagal=0` 18:03:21 **VERIFIED** lagi. `PowerProbe [periodik]` 18:03:06 `musik_sistem=ya ... sonix_putar=ya` konsisten; kasus pembeda (SONIX jeda + audio aplikasi lain) **NOT VERIFIED**. 0 `FATAL`/ANR/`Skipped frames` baru pada proses v706 (pid 25164) dan v707 (pid 25903); 2 `Skipped` lama ada di proses v705 (pid 21869, 17:41:06/08, pasca-instal). meminfo pid 25903: PSS total 233584 KB, Graphics 143180 KB (tak ada baseline -> tak ditindak).
+
+- CACAT NYATA (dua): (1) DNS sesaat gagal membatalkan unduhan (pulih ±5 dtk: 18:03:15 berhasil dalam 3 dtk) karena `UpdateDownloader` menyerah pada galat pertama. (2) `UpdateCheckSheet` status `Error` hanya banner tanpa aksi: log menunjukkan sheet ditutup + dibuka ulang (`setView` 18:03:13,5) lalu unduhan dimulai 18:03:15 = jalan memutar pengguna.
+
+- PERBAIKAN (3 file diubah + 2 BARU): `update/DownloadRetryPolicy.kt` (BARU, murni JVM): `MAX_ATTEMPTS=3`, `isTransient` (UnknownHost/SocketException+turunan/SocketTimeout), `retryDelayMs` (1500·n), `execute` (loop; jeda; `InterruptedException` -> flag dipulihkan + berhenti). `update/UpdateDownloader.kt`: isi lama `download` = `downloadOnce`; `download` membungkusnya dengan `DownloadRetryPolicy.execute`; `Failure(message, retryable=false, attempts=1)`; parameter `onRetry` + `pause` (default `Thread.sleep`). `update/UpdateManager.kt`: log `Unduhan percobaan n/3 gagal (jaringan sementara): <pesan mentah>; ulang dalam Xms`, status kembali `Downloading(0)` saat mengulang, log akhir `Unduhan gagal setelah N percobaan: ...`. `ui/UpdateCheckSheet.kt`: tombol "Coba lagi" (`checkForUpdate`) pada status Error. `DownloadRetryPolicyTest.kt` (BARU, 9 tes). Tidak diulang: HTTP non-2xx, SSL, unduhan tidak lengkap/0 byte.
+
+- VERIFIKASI LOKAL: kompiler Kotlin 2.0.21 (embeddable dari Gradle 8.14.3) mengompilasi `DownloadRetryPolicy` + `UpdateApkCache` + `UpdateDownloader` (dengan stub okhttp/okio buatan sendiri, BUKAN di ZIP) + 2 berkas tes tanpa error/warning; JUnit 4.13.2 **34/34 lulus** (9 baru + 25 `UpdateApkCacheTest`). `UpdateManager.kt`/`UpdateCheckSheet.kt`: kurung/kurawal seimbang, tanpa galat sintaks (galat lain hanya karena tak ada android.jar/Compose). **NOT VERIFIED**: compile Android/R8/CI, dan tes `unduhan ke port tertutup` terhadap OkHttp asli (lokal memakai stub). PREDIKSI: Tes 345 (336 + 9), ArchUnit 7, detekt 0, lint 0, Kotlin 0, SpotBugs 0.
+
+- LANGKAH BERIKUTNYA: kirim CI v708 (lintDebug + detekt). Pada pembaruan berikutnya dari 1.11.18+ cari `Unduhan percobaan n/3 gagal` (hanya bila jaringan sementara gagal) dan `Unduhan gagal setelah N percobaan`; tampilan "Coba lagi" di Cek Update hanya terlihat bila unduhan/cek benar-benar gagal.
+
 ## Batch 707 — `fileProblem` menolak berkas non-APK (header ZIP); log v706 memverifikasi unduhan normal + lanjut-putar
 
 - Input user: `sonix_debug_20261121_175321.txt` (v706 = 1.11.17 build 567, ekspor 17:53:17) saja, tanpa teks; tanpa laporan CI.
