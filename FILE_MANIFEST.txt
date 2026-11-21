@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 711: + app/src/main/java/com/rudi/audioplayer/playback/FocusPauseTally.kt + app/src/test/java/com/rudi/audioplayer/playback/FocusPauseTallyTest.kt (catat sebab jeda otomatis karena fokus audio direbut aplikasi lain; playback/PlaybackService.kt diubah) — 267->269.
 # Batch 710: 0 berkas baru (ui/theme/HapticPacing.kt, ui/theme/AppHaptics.kt, test ui/theme/HapticPacingTest.kt diubah) — 267.
 # Batch 709: + app/src/main/java/com/rudi/audioplayer/ui/theme/HapticPacing.kt + app/src/test/java/com/rudi/audioplayer/ui/theme/HapticPacingTest.kt (haptic on/off kustom + pembatas laju utk HP tanpa kontrol amplitudo; ui/theme/AppHaptics.kt diubah) — 265->267.
 # Batch 708: + app/src/main/java/com/rudi/audioplayer/update/DownloadRetryPolicy.kt + app/src/test/java/com/rudi/audioplayer/update/DownloadRetryPolicyTest.kt (pengulangan unduhan APK pembaruan; update/UpdateDownloader.kt, update/UpdateManager.kt, ui/UpdateCheckSheet.kt diubah) — 263->265.
@@ -233,6 +234,7 @@ app/src/main/java/com/rudi/audioplayer/playback/CrossfadeEngine.kt
 app/src/main/java/com/rudi/audioplayer/playback/EqProfileImport.kt
 app/src/main/java/com/rudi/audioplayer/playback/EqualizerController.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlaybackAudioSession.kt
+app/src/main/java/com/rudi/audioplayer/playback/FocusPauseTally.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlaybackService.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlayCountTracker.kt
 app/src/main/java/com/rudi/audioplayer/playback/PlayerViewModel.kt
@@ -381,6 +383,7 @@ app/src/test/java/com/rudi/audioplayer/data/PinLockoutPolicyTest.kt
 app/src/test/java/com/rudi/audioplayer/data/RingtoneCutterTest.kt
 app/src/test/java/com/rudi/audioplayer/data/SmartPlaylistEngineTest.kt
 app/src/test/java/com/rudi/audioplayer/data/VaultCryptoTest.kt
+app/src/test/java/com/rudi/audioplayer/playback/FocusPauseTallyTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/AbRepeatLogicTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/PlayCountTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt

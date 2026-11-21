@@ -159,6 +159,9 @@ class PlaybackService : MediaLibraryService() {
     private val sleepTimerStore by lazy { com.rudi.audioplayer.data.SleepTimerStore(this) }
     // Batch 102 (Gap List #1, True Crossfade) — lihat CrossfadeEngine.kt untuk mekanisme penuh.
     private var crossfadeEngine: CrossfadeEngine? = null
+
+    // Batch 711 — jeda otomatis karena fokus audio direbut aplikasi lain (lihat FocusPauseTally.kt).
+    private val focusPauseTally = FocusPauseTally()
     // Batch 599 — job polling jendela crossfade; hanya hidup selagi Crossfade AKTIF (lihat startCrossfadePoll()).
     private var crossfadePollJob: Job? = null
     // Batch 34: pushWidgetUpdate fires on every track transition and every play/pause tap —
@@ -302,6 +305,36 @@ class PlaybackService : MediaLibraryService() {
                     // (langkah handback) SENGAJA tidak ikut kena — lihat pendingInternalSeeks di
                     // CrossfadeEngine.kt (Batch 626: dulu flag boolean yang tak pernah bekerja).
                     crossfadeEngine?.onSessionManualDiscontinuity(reason)
+                }
+            }
+
+            // Batch 711 — keluhan user "audio sering naik turun": log v711 membuktikan com.shopee.id meminta fokus sementara
+            // (GAIN_TRANSIENT) berulang 1-14 dtk, tiap kali SONIX dijeda ExoPlayer lalu dilanjutkan. Sebab jeda/lanjut kini tertulis di
+            // log aplikasi (sebelumnya hanya "Antrean disimpan (jeda)" tanpa sebab). Hanya pencatatan; perilaku putar TIDAK berubah.
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                SafeGuard.guard("PlaybackService", "listener.onPlayWhenReadyChanged") {
+                    val now = SystemClock.elapsedRealtime()
+                    val byFocus = reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS
+                    val label = when (reason) {
+                        Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST -> "USER_REQUEST"
+                        Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS -> "AUDIO_FOCUS_LOSS"
+                        Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY -> "AUDIO_BECOMING_NOISY"
+                        Player.PLAY_WHEN_READY_CHANGE_REASON_REMOTE -> "REMOTE"
+                        Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM -> "END_OF_MEDIA_ITEM"
+                        else -> "alasan=$reason"
+                    }
+                    val line = if (playWhenReady) {
+                        val pausedMs = focusPauseTally.onResume(now, byFocus)
+                        if (pausedMs != null) {
+                            "Lanjut otomatis setelah fokus kembali: jeda=${pausedMs}ms | ${focusPauseTally.summary()}"
+                        } else {
+                            "Lanjut: alasan=$label"
+                        }
+                    } else {
+                        if (byFocus) focusPauseTally.onFocusPause(now)
+                        "Jeda: alasan=$label"
+                    }
+                    serviceScope.launch(Dispatchers.IO) { AppLogger.w("AudioFocus", line) }
                 }
             }
 
