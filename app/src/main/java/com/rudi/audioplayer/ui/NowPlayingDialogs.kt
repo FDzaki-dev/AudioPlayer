@@ -253,7 +253,7 @@ private fun PowerSavingSection() {
     Spacer(modifier = Modifier.height(4.dp))
     PowerSavingRow(
         title = "Ducking Fokus Audio",
-        subtitle = "Saat aplikasi lain meminta fokus sementara (mis. video Shopee), volume musik diturunkan, tidak dijeda. Panggilan tetap menjeda. Berlaku setelah aplikasi dimulai ulang",
+        subtitle = "Saat aplikasi lain meminta fokus sementara (mis. video Shopee), volume musik diturunkan, tidak dijeda. Panggilan tetap menjeda. Berlaku langsung",
         checked = duckFocus,
         onCheckedChange = {
             duckFocus = it

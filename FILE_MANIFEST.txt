@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 714: 0 berkas baru (playback/AudioFocusDucking.kt, playback/PlaybackService.kt, data/PowerSavingStore.kt, ui/NowPlayingDialogs.kt, test playback/AudioFocusDuckingTest.kt diubah; saklar Ducking Fokus Audio berlaku langsung) — 271.
 # Batch 713: + app/src/main/java/com/rudi/audioplayer/playback/AudioFocusDucking.kt + app/src/test/java/com/rudi/audioplayer/playback/AudioFocusDuckingTest.kt (saklar uji Ducking Fokus Audio, default MATI; playback/PlaybackService.kt, data/PowerSavingStore.kt, ui/NowPlayingDialogs.kt diubah) — 269->271.
 # Batch 712: 0 berkas baru (playback/FocusPauseTally.kt, playback/PlaybackService.kt, test playback/FocusPauseTallyTest.kt diubah) — 269.
 # Batch 711: + app/src/main/java/com/rudi/audioplayer/playback/FocusPauseTally.kt + app/src/test/java/com/rudi/audioplayer/playback/FocusPauseTallyTest.kt (catat sebab jeda otomatis karena fokus audio direbut aplikasi lain; playback/PlaybackService.kt diubah) — 267->269.

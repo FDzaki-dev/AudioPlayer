@@ -113,4 +113,20 @@ class AudioFocusDuckingTest {
         assertFalse(s.pausedByFocus)
         assertFalse(s.reset())
     }
+
+    @Test
+    fun toggle_nyalaSaatBelumTerpasang_pasang() {
+        assertEquals(FocusToggleStep.ENABLE, FocusToggle.step(enabled = true, active = false))
+    }
+
+    @Test
+    fun toggle_matiSaatTerpasang_lepas() {
+        assertEquals(FocusToggleStep.DISABLE, FocusToggle.step(enabled = false, active = true))
+    }
+
+    @Test
+    fun toggle_keadaanSama_tidakAdaLangkah() {
+        assertEquals(FocusToggleStep.NONE, FocusToggle.step(enabled = true, active = true))
+        assertEquals(FocusToggleStep.NONE, FocusToggle.step(enabled = false, active = false))
+    }
 }

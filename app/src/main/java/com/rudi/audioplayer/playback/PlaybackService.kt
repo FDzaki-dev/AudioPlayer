@@ -163,7 +163,7 @@ class PlaybackService : MediaLibraryService() {
     // Batch 711 — jeda otomatis karena fokus audio direbut aplikasi lain (lihat FocusPauseTally.kt).
     private val focusPauseTally = FocusPauseTally()
 
-    // Batch 713 — pengelola fokus kustom (ducking), hanya bila saklar ON saat service dibuat (lihat AudioFocusDucking.kt).
+    // Batch 713 — pengelola fokus kustom (ducking), terpasang selama saklar ON (Batch 714: dipasang/dilepas LIVE, lihat applyDuckingFocus).
     private var duckingFocus: DuckingFocusController? = null
     // Batch 599 — job polling jendela crossfade; hanya hidup selagi Crossfade AKTIF (lihat startCrossfadePoll()).
     private var crossfadePollJob: Job? = null
@@ -180,6 +180,9 @@ class PlaybackService : MediaLibraryService() {
             (mediaSession?.player as? ExoPlayer)?.let {
                 applyAudioOffload(it, SilenceSkipStore(this).isEnabled(), CrossfadeStore(this).isEnabled())
             }
+        } else if (key == PowerSavingStore.KEY_DUCK_ON_TRANSIENT_FOCUS) {
+            // Batch 714 — Ducking Fokus Audio berlaku LANGSUNG (sebelumnya baru setelah mulai ulang -> log v713 tak pernah memuat AKTIF).
+            (mediaSession?.player as? ExoPlayer)?.let { applyDuckingFocus(it, PowerSavingStore(this).isDuckOnTransientFocus()) }
         }
     }
 
@@ -197,8 +200,8 @@ class PlaybackService : MediaLibraryService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
-        // Batch 713 — saklar Ducking Fokus Audio (default MATI; berlaku setelah aplikasi dimulai ulang): ON -> ExoPlayer TIDAK mengurus fokus,
-        // DuckingFocusController yang mengurus (turunkan volume saat fokus sementara hilang, jeda saat panggilan).
+        // Batch 713 — saklar Ducking Fokus Audio (default MATI; Batch 714: perubahan saat service hidup berlaku LANGSUNG): ON -> ExoPlayer
+        // TIDAK mengurus fokus, DuckingFocusController yang mengurus (turunkan volume saat fokus sementara hilang, jeda saat panggilan).
         val duckOnFocus = PowerSavingStore(this).isDuckOnTransientFocus()
         val player = ExoPlayer.Builder(this)
             // true = ExoPlayer requests/abandons audio focus automatically, ducking or
@@ -226,9 +229,12 @@ class PlaybackService : MediaLibraryService() {
             .build()
         val startupExoAt = SystemClock.elapsedRealtime()
         if (duckOnFocus) {
-            duckingFocus = DuckingFocusController(this, player) { msg ->
-                serviceScope.launch(Dispatchers.IO) { AppLogger.w("AudioFocus", msg) }
-            }.also { it.attach() }
+            startDuckingFocus(player)
+        } else {
+            // Batch 714 — keadaan saklar tercatat di tiap proses baru, supaya log membedakan "MATI" dari "AKTIF tetapi tak berfungsi".
+            serviceScope.launch(Dispatchers.IO) {
+                AppLogger.w("AudioFocus", "Ducking fokus audio MATI: ExoPlayer mengurus fokus (dijeda saat fokus sementara direbut aplikasi lain)")
+            }
         }
 
         // Roadmap #8, Trim Keheningan Otomatis — dibaca sekali di sini untuk proses BARU (mis.
@@ -1301,6 +1307,37 @@ class PlaybackService : MediaLibraryService() {
      * != 1x tetap didukung (isSpeedChangeSupportRequired) karena opsi kecepatan 0,5x-2x ada di UI.
      */
     @UnstableApi
+    /** Batch 714 — pasang pengelola fokus kustom pada [player] (pemain sudah/harus berstatus `handleAudioFocus=false`). */
+    private fun startDuckingFocus(player: ExoPlayer) {
+        duckingFocus = DuckingFocusController(this, player) { msg ->
+            serviceScope.launch(Dispatchers.IO) { AppLogger.w("AudioFocus", msg) }
+        }.also { it.attach() }
+    }
+
+    /**
+     * Batch 714 — terapkan saklar Ducking Fokus Audio saat service sudah hidup. ON: ExoPlayer berhenti mengurus fokus (melepasnya),
+     * lalu pengelola kustom dipasang (meminta fokus bila sedang memutar). OFF: pengelola dilepas (volume dipulihkan, fokus dilepas),
+     * lalu ExoPlayer mengurus fokus lagi. Bila pemutaran sedang dijeda OLEH pengelola kustom saat saklar dimatikan, pemutaran tetap
+     * dijeda sampai pengguna menekan putar.
+     */
+    private fun applyDuckingFocus(player: ExoPlayer, enabled: Boolean) {
+        when (FocusToggle.step(enabled, active = duckingFocus != null)) {
+            FocusToggleStep.ENABLE -> {
+                player.setAudioAttributes(player.audioAttributes, false)
+                startDuckingFocus(player)
+            }
+            FocusToggleStep.DISABLE -> {
+                duckingFocus?.release()
+                duckingFocus = null
+                player.setAudioAttributes(player.audioAttributes, true)
+                serviceScope.launch(Dispatchers.IO) {
+                    AppLogger.w("AudioFocus", "Ducking fokus audio NONAKTIF: ExoPlayer mengurus fokus lagi (dijeda saat fokus sementara direbut aplikasi lain)")
+                }
+            }
+            FocusToggleStep.NONE -> Unit
+        }
+    }
+
     private fun applyAudioOffload(player: ExoPlayer, skipSilence: Boolean, crossfade: Boolean) {
         val mode = if (!PowerSavingStore(this).isAudioOffload() || skipSilence || crossfade) {
             AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED

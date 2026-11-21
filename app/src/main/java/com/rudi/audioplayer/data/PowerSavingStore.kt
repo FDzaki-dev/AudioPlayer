@@ -19,7 +19,7 @@ class PowerSavingStore(context: Context) {
     }
 
     /**
-     * Batch 713 — saklar uji Ducking Fokus Audio (default MATI, berlaku setelah aplikasi dimulai ulang): fokus audio sementara yang
+     * Batch 713 — saklar uji Ducking Fokus Audio (default MATI; sejak Batch 714 berlaku LIVE lewat [registerOnChange]): fokus audio sementara yang
      * direbut aplikasi lain -> volume diturunkan alih-alih dijeda (lihat playback/AudioFocusDucking.kt). Bukan penghemat daya; ditaruh
      * di sini karena store saklar uji pemutaran ini sudah dipakai PlaybackService dan dialog Pengaturan Putar.
      */
@@ -48,6 +48,6 @@ class PowerSavingStore(context: Context) {
         private const val PREFS_NAME = "power_saving"
         private const val KEY_DYNAMIC_SCHEDULING = "dynamic_scheduling"
         const val KEY_AUDIO_OFFLOAD = "audio_offload"
-        private const val KEY_DUCK_ON_TRANSIENT_FOCUS = "duck_on_transient_focus"
+        const val KEY_DUCK_ON_TRANSIENT_FOCUS = "duck_on_transient_focus"
     }
 }

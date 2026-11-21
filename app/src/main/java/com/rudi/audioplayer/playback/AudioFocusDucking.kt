@@ -9,13 +9,29 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 
 /**
- * Batch 713 — pengelola fokus audio kustom OPT-IN (default MATI, Pengaturan Putar > Fokus Audio > Ducking Fokus Audio, berlaku setelah
- * aplikasi dimulai ulang). Latar: log v711/v712 membuktikan com.shopee.id berulang meminta fokus SEMENTARA (`requestAudioFocus req=2`),
+ * Batch 713 — pengelola fokus audio kustom OPT-IN (default MATI, Pengaturan Putar > Fokus Audio > Ducking Fokus Audio; sejak Batch 714
+ * berlaku LANGSUNG tanpa mulai ulang). Latar: log v711/v712 membuktikan com.shopee.id berulang meminta fokus SEMENTARA (`requestAudioFocus req=2`),
  * sehingga ExoPlayer menjeda otomatis (6 jeda, total 53 dtk dari ±131 dtk pada 22 Nov 06:31-06:33). Saat saklar ON, ExoPlayer dibangun
  * dengan `handleAudioFocus=false` dan kelas ini mengurus fokus: fokus hilang sementara dari aplikasi lain -> volume DITURUNKAN (musik tetap
  * jalan), saat panggilan/dering -> dijeda, hilang permanen -> dijeda dan fokus dilepas, fokus kembali -> volume dipulihkan/dilanjutkan.
  */
 internal enum class FocusAction { NONE, PAUSE, DUCK, RESUME_AND_UNDUCK, PAUSE_PERMANENT }
+
+/** Langkah yang harus dijalankan [PlaybackService] saat saklar Ducking Fokus Audio berubah. */
+internal enum class FocusToggleStep { NONE, ENABLE, DISABLE }
+
+/**
+ * Batch 714 — saklar berlaku LANGSUNG: log v713 (06:44-06:47) menunjukkan pengguna mengetes Shopee tanpa baris `Ducking fokus audio AKTIF`
+ * (2 jeda fokus masih lewat jalur ExoPlayer) karena saklar hanya dibaca saat service dibuat. [step] murni: [enabled] = nilai saklar,
+ * [active] = pengelola kustom sedang terpasang.
+ */
+internal object FocusToggle {
+    fun step(enabled: Boolean, active: Boolean): FocusToggleStep = when {
+        enabled && !active -> FocusToggleStep.ENABLE
+        !enabled && active -> FocusToggleStep.DISABLE
+        else -> FocusToggleStep.NONE
+    }
+}
 
 /** Keputusan murni atas satu perubahan fokus ([change] = `AudioManager.AUDIOFOCUS_*`; [inCall] = mode audio panggilan/dering). */
 internal object FocusPolicy {
@@ -120,6 +136,9 @@ internal class DuckingFocusController(
     fun attach() {
         player.addListener(playerListener)
         log("Ducking fokus audio AKTIF: ExoPlayer handleAudioFocus=false, fokus diurus kustom (turunkan volume x$DUCK_FACTOR saat fokus sementara hilang)")
+        // Batch 714 — dipasang saat pemain SUDAH memutar (saklar dinyalakan langsung): ExoPlayer baru saja melepas fokusnya, jadi minta fokus
+        // sekarang; pada pemasangan di onCreate `playWhenReady` masih false dan fokus diminta oleh listener saat mulai memutar.
+        if (player.playWhenReady) requestFocus()
     }
 
     fun release() {
