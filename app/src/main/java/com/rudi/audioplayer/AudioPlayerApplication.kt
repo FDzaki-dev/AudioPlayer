@@ -9,6 +9,7 @@ import com.rudi.audioplayer.data.SilenceSkipStore
 import com.rudi.audioplayer.playback.EqualizerController
 import com.rudi.audioplayer.playback.PlaybackAudioSession
 import com.rudi.audioplayer.playback.UpdateResumeCoordinator
+import com.rudi.audioplayer.playback.UpdateResumeStore
 import com.rudi.audioplayer.update.UpdateApkCache
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.AudioArtFetcher
@@ -49,7 +50,11 @@ class AudioPlayerApplication : Application(), SingletonImageLoader.Factory {
         PowerProbe.setStateExtras {
             val xfade = CrossfadeStore(this).isEnabled()
             val silence = SilenceSkipStore(this).isEnabled()
-            "xfade=${if (xfade) "ya" else "tidak"} senyap=${if (silence) "ya" else "tidak"}"
+            // Batch 705 — status pemutaran SONIX sendiri (penanda persisten "berniat memutar", aman dibaca dari thread probe);
+            // `musik_sistem` di PowerProbe bersifat global (aplikasi lain ikut terhitung).
+            val playing = UpdateResumeStore(this).wasPlaying()
+            val sonix = if (playing) "ya" else "tidak"
+            "sonix_putar=$sonix xfade=${if (xfade) "ya" else "tidak"} senyap=${if (silence) "ya" else "tidak"}"
         }
         PowerProbe.start(this) // Batch 669 — catcher daya (baris `PowerProbe` di log debug)
         warmUpSharedPreferences()

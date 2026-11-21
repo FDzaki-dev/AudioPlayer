@@ -301,7 +301,10 @@ object PowerProbe {
         val power = ctx.getSystemService(PowerManager::class.java)
         val info = ActivityManager.RunningAppProcessInfo()
         ActivityManager.getMyMemoryState(info)
-        return "musik=${yn(audio?.isMusicActive)} impor=${importanceLabel(info.importance)}(${info.importance}) " +
+        // Batch 705 — `isMusicActive` = musik aktif dari APLIKASI MANA PUN (global), BUKAN pemutar SONIX. Log v704 12:30-15:35: `musik=ya`
+        // padahal SONIX jeda sejak 12:19:43 (cpuApp 0,00%, impor=SVC) = audio aplikasi lain. Dilabeli `musik_sistem`; status SONIX
+        // sendiri ada di `sonix_putar` (lihat `setStateExtras` di AudioPlayerApplication).
+        return "musik_sistem=${yn(audio?.isMusicActive)} impor=${importanceLabel(info.importance)}(${info.importance}) " +
             "hemat=${yn(power?.isPowerSaveMode)} doze=${yn(power?.isDeviceIdleMode)} termal=${power?.currentThermalStatus ?: -1}" +
             describeExtras()
     }

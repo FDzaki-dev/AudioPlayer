@@ -1,5 +1,19 @@
 # Changelog
 
+## Batch 705 — baris `PowerProbe` tak lagi menyamakan musik aplikasi lain dengan pemutaran SONIX (`musik_sistem` + `sonix_putar`)
+
+- Input user: `sonix_debug_20261121_171915.txt` (v704 = 1.11.15 build 565, ekspor 17:19:10) + `SONIX_v704.zip`, tanpa teks; tanpa laporan CI run #131.
+
+- (A) CI v704 TIDAK dilaporkan (tanpa run #131) -> ArchUnit/SpotBugs/detekt/lint/Tes **NOT VERIFIED**; kompilasi source utama terbukti tidak langsung (APK `v1.11.15-run677` dibangun CI, terpasang, berjalan).
+
+- LOG v704 (1.11.15 build 565, ekspor 17:19:10) **VERIFIED** untuk Batch 704: pembersihan APK terpasang `APK pembaruan versi terpasang dibersihkan dari cache: terhapus=1 (7101147 byte) gagal=0` 17:18:59 (proses baru pid 14019); `terhapus=1` 17:18:41 sebelum unduhan = sisa v1.11.14 dari v703 (bukti CACAT 1 Batch 704 nyata); lanjut-putar pasca-update **VERIFIED** lagi: pasang senyap 17:18:45 -> proses mati 17:18:58,185 -> `keputusan=RESUME sejak_mati=1133ms` -> AudioTrack `start()` 17:19:00,026 = ±1,84 dtk setelah proses mati (v703 ±2,97) -> `isPlaying=true` pada +1126 ms, `posisi_pulih=4318405ms` (simpan berkala 4315465 + 2940 ms ekstrapolasi); 0 `Skipped frames`/ANR/FATAL baru. `AudioHardening ... level: full` kembali tercatat 17:18:59,702 = cabang `play()` ditolak tetap **NOT VERIFIED** (Android 16 baru "would be").
+
+- CACAT NYATA (log + kode): `PowerProbe` mencetak `musik=` dari `AudioManager.isMusicActive` = musik aktif dari APLIKASI MANA PUN. Log v704: SONIX jeda sejak 12:19:43 (`Antrean disimpan ... (jeda)` + `Penanda berniat-memutar -> false`; posisi antrean beku 4290860 ms sampai 17:18:29; tak ada `Penanda ... -> true` di antaranya), tetapi 14 baris periodik 12:30:58-15:35:03 tetap `musik=ya` dengan `cpuApp` 0,00-0,07% (saat benar-benar memutar 12:20:58: 13,24% + `MediaCodec_loop`) dan `impor=SVC(300)` (memutar = `FGS(125)`) = audio aplikasi lain. Dampak: analisis baterai (`kuras ~50-90mA` + `musik=ya`) bisa salah dikaitkan ke SONIX.
+
+- PERBAIKAN (2 file; 0 baru; FILE_MANIFEST tetap 263): `util/PowerProbe.kt` label `musik=` -> `musik_sistem=` (nilai tak berubah, kini jelas global) + komentar; `AudioPlayerApplication.kt` `setStateExtras` menambah `sonix_putar=ya|tidak` dari `UpdateResumeStore.wasPlaying()` (penanda persisten SONIX sendiri; SharedPreferences aman dibaca dari thread probe). Tak ada perilaku pemutaran/daya yang berubah; tak ada konsumen lain string `musik=` (CI/tes/skrip dicek).
+
+- VERIFIKASI LOKAL: `diff` terhadap v704 = HANYA titik itu; kurung/kurawal seimbang (tanda kurung -1 di `PowerProbe.kt` sudah ada sejak v704, dari teks komentar); `UpdateResumeStore` sudah publik di `playback` dan paket itu sudah diimpor `AudioPlayerApplication`; **NOT VERIFIED** compile Android/CI (sandbox tanpa android.jar; validasi ketat = lintDebug + detekt). PREDIKSI: Tes 326, ArchUnit 7, detekt 0, lint 0, Kotlin 0, SpotBugs 0. LANGKAH BERIKUTNYA: kirim CI v705 (lintDebug + detekt); pasang v705 lalu cari baris `PowerProbe [periodik]`: `musik_sistem=` + `sonix_putar=` harus berbeda saat audio aplikasi lain berbunyi dan SONIX jeda. Detail: `CHANGELOG.md` Batch 705.
+
 ## Batch 704 — sisa APK yang baru terpasang ikut dibersihkan + cadangan "Ketuk untuk melanjutkan" bila `play()` pemulihan pasca-update ditolak (temuan `AudioHardening` di `dumpsys audio`)
 
 - Input user: `sonix_debug_20261121_121113.txt` (v703 = 1.11.14 build 564, ekspor 12:11:08) + `SONIX_v703.zip`, tanpa teks; tanpa laporan CI run #130.
