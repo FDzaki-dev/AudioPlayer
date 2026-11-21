@@ -1,5 +1,21 @@
 # Changelog
 
+## Batch 710 — haptic: koreksi tafsir durasi dumpsys + ringkasan ketuk terkirim/dilewati di log
+
+- Input user: `sonix_debug_20261121_185932.txt` (v709 = 1.11.20 build 570, ekspor 18:59:27) + pesan "buruan"; tanpa laporan CI.
+
+- (A) VERIFIED: v709 terpasang dan berjalan (APK `v1.11.20-run682`, pid 9168; kompilasi source v709 terbukti tidak langsung). Log `[AppHaptics] Haptic aktif: mode=on-off-kustom(tap=45ms, kuat=90+45+90ms, kontrol_amplitudo=false, efek_prabuat_tidak_dipakai(dukungan CLICK/HEAVY=1/1)) usage=MEDIA`. `dumpsys vibrator_manager`: 13 entri SONIX baru (18:59:08-18:59:20), semuanya `played: [Step=0ms(amplitude=0,00),Step=90ms(amplitude=1,00),Step=45ms(amplitude=0,00),Step=90ms(amplitude=1,00)]`, mulai 2-8 ms setelah panggilan (mis. panggilan 18:59:09.444 -> start 09.448). Jalur baru SAMPAI ke motor sesuai pola. ArchUnit/SpotBugs/detekt/lint/Tes v708 dan v709 tetap **NOT VERIFIED** (tak ada laporan CI).
+
+- (B) KOREKSI Batch 709 (E): prediksi "durasi dumpsys ±45/±225 ms" SALAH. Tercatat 452-670 ms (`cancelled_superseded`) dan 1238-1243 ms (`finished`) untuk pola 225 ms. Dugaan kuat (tak terbukti dari source): framework menunggu ±1000 ms tambahan karena motor tanpa kapabilitas callback (`capabilities = []`): 1238-1243 - 225 = 1013-1018 ms, dan lama klik prabuat 1034-1050 ms = 1000 + 34-50 ms. Bukti independen waktu getar FISIK sesuai permintaan: `batterystats` `Vibrator: 240ms (8 times)` (log v708) -> `3s 195ms (22 times)` = +2955 ms / +14 kali ≈ 211 ms per getaran ≈ pola 225 ms (sebagian terpotong getaran berikutnya). Jadi angka `duration` dumpsys BUKAN lama getar; yang menjadi bukti jalur = isi `played:`. `cancelled_superseded` tak berbahaya (getaran sebelumnya sudah selesai secara fisik).
+
+- (C) Jalur KETUK (45 ms) **NOT VERIFIED**: 0 entri `Step=45ms(amplitude=-1,00)` — user hanya memicu tekan-lama dan 20 slot dumpsys per kategori terisi semuanya oleh tekan-lama (rolling). Rasa getar di tangan **NOT VERIFIED** (belum ada tanggapan user).
+
+- (D) Log lain: pemulihan pasca-update **VERIFIED** lagi (`proses_mulai ... keputusan=RESUME sejak_mati=1098ms` -> `isPlaying=true sejak_proses_mulai=1324ms posisi_pulih=148494ms`; `MY_PACKAGE_REPLACED ... SKIP_NOT_PLAYING` sesudahnya = benar, tak memulai ganda); unduhan 18:58:49-52 (7101151 byte) normal tanpa galat -> pengulangan Batch 708 tetap **NOT VERIFIED**; pembersihan APK `terhapus=1 (7101151 byte) gagal=0` **VERIFIED** lagi; 0 ERROR/FATAL/ANR/`Skipped frames` baru pada pid 9168. meminfo pid 9168: PSS total 273377 KB, GL mtrack 165024 KB (v708: 223623/133880 KB pada ±35 dtk setelah mulai; keadaan UI berbeda, tanpa baseline -> tak ditindak).
+
+- (E) AUDIT KODE: 84 call site haptic = 47 `TextHandleMove` + 37 `LongPress`, tanpa jalur View/`HapticFeedbackConstants`/`Vibrator` lain; `tabSwipeHaptic` (MainActivity) memakai `LocalHapticFeedback.current` di dalam `AudioPlayerTheme` -> semua lewat `StrongHapticFeedback`, tak ada getaran kategori TOUCH yang dibuang `TOUCH = OFF`. Audit pengulangan unduhan Batch 708: tak ada jalur pembatalan unduhan (singleton scope tanpa `cancel`), jadi tak ada risiko mengulang setelah dibatalkan.
+
+- (F) PERBAIKAN v710, 3 file (semua DIUBAH, 0 berkas baru; FILE_MANIFEST tetap 267): `ui/theme/HapticPacing.kt` (`HapticThrottle` menghitung `ketuk_terkirim`/`ketuk_dilewati`/`kuat_terkirim` + `summary()`), `ui/theme/AppHaptics.kt` (log `ringkasan sampai panggilan #N: ...` tiap 20 panggilan, supaya terkirim-vs-dilewati tercatat walau dumpsys tersapu; perilaku getar TIDAK berubah), `HapticPacingTest.kt` (+2 tes -> 14). PREDIKSI: Tes 359, ArchUnit 7, detekt 0, lint 0, Kotlin 0, SpotBugs 0. **NOT VERIFIED** compile/JUnit v710 (sandbox tanpa kotlinc/JUnit).
+
 ## Batch 709 — haptic: HP tanpa kontrol amplitudo memakai denyut on/off kustom (bukan efek prabuat lemah) + pembatas laju tick
 
 - Input user: `sonix_debug_20261121_184546.txt` (v708 = 1.11.19 build 569, ekspor 18:45:41) + `SONIX_v708.zip`, tanpa teks; tanpa laporan CI.

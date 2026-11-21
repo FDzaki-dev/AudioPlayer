@@ -47,6 +47,9 @@ internal class HapticThrottle(
 ) {
     private var lastTapAt = NONE
     private var lastHeavyAt = NONE
+    private var tapSent = 0
+    private var tapSkipped = 0
+    private var heavySent = 0
 
     @Synchronized
     fun allow(tier: HapticTier, nowMs: Long): Boolean {
@@ -56,8 +59,20 @@ internal class HapticThrottle(
         if (allowed) {
             if (isHeavy) lastHeavyAt = nowMs else lastTapAt = nowMs
         }
+        when {
+            isHeavy -> heavySent++
+            allowed -> tapSent++
+            else -> tapSkipped++
+        }
         return allowed
     }
+
+    /**
+     * Batch 710 — hitungan kumulatif untuk log: `dumpsys vibrator_manager` hanya menyimpan 20 getaran terakhir per kategori
+     * (log v709: semua 20 slot terisi tekan-lama, ketukan tak terlihat), jadi bukti ketuk terkirim/dilewati dicatat di sini.
+     */
+    @Synchronized
+    fun summary(): String = "ketuk_terkirim=$tapSent ketuk_dilewati=$tapSkipped kuat_terkirim=$heavySent"
 
     private companion object {
         const val NONE = -1L

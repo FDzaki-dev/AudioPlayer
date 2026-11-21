@@ -104,6 +104,7 @@ private const val NO_REPEAT = -1
 // Jumlah panggilan haptic PERTAMA per proses yang dicatat ke Log Diagnostik (bukti wrapper terpanggil);
 // dibatasi supaya log tidak banjir saat drag/scroll memicu tick berulang.
 private const val HAPTIC_TRACE_LIMIT = 6
+private const val HAPTIC_SUMMARY_EVERY = 20
 
 private val hapticLogScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -229,7 +230,10 @@ internal class StrongHapticFeedback(
         val trace = n <= HAPTIC_TRACE_LIMIT
         if (effect != null && vibrator != null) {
             val tierKind = if (isHeavy) HapticTier.HEAVY else HapticTier.TAP
-            if (!throttle.allow(tierKind, SystemClock.elapsedRealtime())) {
+            val allowed = throttle.allow(tierKind, SystemClock.elapsedRealtime())
+            // Batch 710 — ringkasan berkala (tiap 20 panggilan) supaya terkirim-vs-dilewati terlihat di log walau dumpsys tersapu.
+            if (n % HAPTIC_SUMMARY_EVERY == 0) traceHaptic("ringkasan sampai panggilan #$n: ${throttle.summary()}")
+            if (!allowed) {
                 if (trace) traceHaptic("panggilan #$n tier=$tier: dilewati (pembatas laju, denyut sebelumnya masih berjalan)")
                 return
             }

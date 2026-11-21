@@ -92,4 +92,19 @@ class HapticPacingTest {
         assertTrue(throttle.allow(HapticTier.TAP, 1_000L))
         assertTrue(throttle.allow(HapticTier.TAP, 500L))
     }
+
+    @Test
+    fun summary_awalSemuaNol() {
+        assertEquals("ketuk_terkirim=0 ketuk_dilewati=0 kuat_terkirim=0", HapticThrottle().summary())
+    }
+
+    @Test
+    fun summary_menghitungTerkirimDanDilewati() {
+        val throttle = HapticThrottle()
+        throttle.allow(HapticTier.TAP, 0L)
+        throttle.allow(HapticTier.TAP, 1L)
+        throttle.allow(HapticTier.TAP, 2L)
+        throttle.allow(HapticTier.HEAVY, 3L)
+        assertEquals("ketuk_terkirim=1 ketuk_dilewati=2 kuat_terkirim=1", throttle.summary())
+    }
 }
