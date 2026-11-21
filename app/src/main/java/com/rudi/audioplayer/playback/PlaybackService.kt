@@ -162,6 +162,9 @@ class PlaybackService : MediaLibraryService() {
 
     // Batch 711 — jeda otomatis karena fokus audio direbut aplikasi lain (lihat FocusPauseTally.kt).
     private val focusPauseTally = FocusPauseTally()
+
+    // Batch 713 — pengelola fokus kustom (ducking), hanya bila saklar ON saat service dibuat (lihat AudioFocusDucking.kt).
+    private var duckingFocus: DuckingFocusController? = null
     // Batch 599 — job polling jendela crossfade; hanya hidup selagi Crossfade AKTIF (lihat startCrossfadePoll()).
     private var crossfadePollJob: Job? = null
     // Batch 34: pushWidgetUpdate fires on every track transition and every play/pause tap —
@@ -194,10 +197,13 @@ class PlaybackService : MediaLibraryService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
+        // Batch 713 — saklar Ducking Fokus Audio (default MATI; berlaku setelah aplikasi dimulai ulang): ON -> ExoPlayer TIDAK mengurus fokus,
+        // DuckingFocusController yang mengurus (turunkan volume saat fokus sementara hilang, jeda saat panggilan).
+        val duckOnFocus = PowerSavingStore(this).isDuckOnTransientFocus()
         val player = ExoPlayer.Builder(this)
             // true = ExoPlayer requests/abandons audio focus automatically, ducking or
             // pausing when a call, notification sound, or another app needs the output.
-            .setAudioAttributes(audioAttributes, true)
+            .setAudioAttributes(audioAttributes, !duckOnFocus)
             // Gap #2 (Batch 495, re-added post media3 1.10.1 bump Batch 494): kunci threshold
             // "restart lagu ini vs pindah ke lagu sebelumnya" secara eksplisit alih-alih warisan
             // default Media3 (C.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS = 3000ms, nilai identik).
@@ -219,6 +225,11 @@ class PlaybackService : MediaLibraryService() {
             .experimentalSetDynamicSchedulingEnabled(PowerSavingStore(this).isDynamicScheduling())
             .build()
         val startupExoAt = SystemClock.elapsedRealtime()
+        if (duckOnFocus) {
+            duckingFocus = DuckingFocusController(this, player) { msg ->
+                serviceScope.launch(Dispatchers.IO) { AppLogger.w("AudioFocus", msg) }
+            }.also { it.attach() }
+        }
 
         // Roadmap #8, Trim Keheningan Otomatis — dibaca sekali di sini untuk proses BARU (mis.
         // setelah app di-kill total lalu playback resumption memanggil onCreate lagi); toggle
@@ -1486,6 +1497,8 @@ class PlaybackService : MediaLibraryService() {
         // oleh `player.release()` di bawah kalau tidak dilepas eksplisit di sini dulu.
         crossfadeEngine?.release()
         crossfadeEngine = null
+        duckingFocus?.release() // Batch 713
+        duckingFocus = null
         // Batch 491 — pasangan yang benar utk EqualizerController.getInstance() (shared
         // per-process, Batch 490): dilepas DI SINI (akhir sesi audio sungguhan), BUKAN lagi di
         // PlayerViewModel.onCleared() (akhir UI, lihat komentar di sana utk root cause bug yang

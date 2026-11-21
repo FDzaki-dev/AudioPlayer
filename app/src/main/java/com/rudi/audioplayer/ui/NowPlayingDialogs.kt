@@ -217,6 +217,7 @@ private fun PowerSavingSection() {
     val store = remember { PowerSavingStore(context) }
     var dynamicScheduling by remember { mutableStateOf(store.isDynamicScheduling()) }
     var audioOffload by remember { mutableStateOf(store.isAudioOffload()) }
+    var duckFocus by remember { mutableStateOf(store.isDuckOnTransientFocus()) }
     Text(
         "Hemat Daya (Eksperimen)",
         style = MaterialTheme.typography.labelSmall,
@@ -240,6 +241,23 @@ private fun PowerSavingSection() {
         onCheckedChange = {
             audioOffload = it
             store.setAudioOffload(it)
+        }
+    )
+    // Batch 713 — Ducking Fokus Audio (default MATI): lihat playback/AudioFocusDucking.kt.
+    Spacer(modifier = Modifier.height(12.dp))
+    Text(
+        "Fokus Audio (Eksperimen)",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.secondary
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    PowerSavingRow(
+        title = "Ducking Fokus Audio",
+        subtitle = "Saat aplikasi lain meminta fokus sementara (mis. video Shopee), volume musik diturunkan, tidak dijeda. Panggilan tetap menjeda. Berlaku setelah aplikasi dimulai ulang",
+        checked = duckFocus,
+        onCheckedChange = {
+            duckFocus = it
+            store.setDuckOnTransientFocus(it)
         }
     )
 }
