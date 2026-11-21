@@ -26,6 +26,10 @@ class UpdateApkCacheTest {
     private fun file(dir: File, name: String, bytes: Int): File =
         File(dir, name).also { it.writeBytes(ByteArray(bytes)) }
 
+    /** Berkas berisi header ZIP `PK 0x03 0x04` + [bytes] nol (bentuk minimal yang dianggap APK). */
+    private fun apk(dir: File, name: String, bytes: Int): File =
+        File(dir, name).also { it.writeBytes(byteArrayOf(0x50, 0x4B, 0x03, 0x04) + ByteArray(bytes)) }
+
     @Test
     fun `nama aset nyata dari log v701 dikenali sebagai APK pembaruan`() {
         realNames.forEach { assertTrue(it, UpdateApkCache.isUpdateApk(it)) }
@@ -214,7 +218,20 @@ class UpdateApkCacheTest {
 
     @Test
     fun `fileProblem berkas berisi lolos`() {
-        assertNull(UpdateApkCache.fileProblem(file(tmp.root, "update_AudioPlayer-v1.11.16-run678.apk", 1024)))
+        assertNull(UpdateApkCache.fileProblem(apk(tmp.root, "update_AudioPlayer-v1.11.16-run678.apk", 1024)))
+    }
+
+    // Batch 707 — berkas TIDAK kosong tapi bukan APK (halaman galat, dst.) ditolak dengan jumlah byte terbaca.
+    @Test
+    fun `fileProblem berkas bukan ZIP dilaporkan`() {
+        val html = File(tmp.root, "update_AudioPlayer-v1.11.17-run679.apk").also { it.writeText("<html>Not Found</html>") }
+        assertEquals("bukan APK (header ZIP PK tidak ada; terbaca 4 byte)", UpdateApkCache.fileProblem(html))
+    }
+
+    @Test
+    fun `fileProblem berkas lebih pendek dari header ZIP dilaporkan`() {
+        val short = File(tmp.root, "update_AudioPlayer-v1.11.17-run679.apk").also { it.writeText("PK") }
+        assertEquals("bukan APK (header ZIP PK tidak ada; terbaca 2 byte)", UpdateApkCache.fileProblem(short))
     }
 
     @Test

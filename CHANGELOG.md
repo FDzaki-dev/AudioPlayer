@@ -1,5 +1,19 @@
 # Changelog
 
+## Batch 707 — `fileProblem` menolak berkas non-APK (header ZIP); log v706 memverifikasi unduhan normal + lanjut-putar
+
+- Input user: `sonix_debug_20261121_175321.txt` (v706 = 1.11.17 build 567, ekspor 17:53:17) saja, tanpa teks; tanpa laporan CI.
+
+- (A) CI v706 TIDAK dilaporkan -> ArchUnit/SpotBugs/detekt/lint/Tes **NOT VERIFIED**; kompilasi source utama terbukti tidak langsung (APK `v1.11.17-run679` terpasang dan berjalan).
+
+- LOG v706: unduhan `update_AudioPlayer-v1.11.17-run679.apk` 7101147 byte utuh (pasang senyap 17:53:04 oleh proses v705) -> 11x 0 byte Batch 706 = anomali sesaat. Lanjut-putar pasca-update dan pembersihan APK terpasang **VERIFIED** lagi (AudioTrack start ±2,37 dtk setelah proses mati; `isPlaying=true` pada +1660 ms). `PowerProbe` memuat `musik_sistem=ya ... sonix_putar=ya` saat SONIX memutar; kasus pembeda **NOT VERIFIED**. Baris `Unduhan dimulai/selesai` **NOT VERIFIED** (menunggu pembaruan dari 1.11.17+).
+
+- TIDAK DITINDAK: tren waktu pemulihan 1126/1637/1660 ms (v704 saat charger tersambung; v705/v706 di baterai; satu sampel per kondisi) dan Graphics 145356 KB di meminfo (tak ada baseline).
+
+- PENGETATAN (bukan cacat terbukti di log): `UpdateApkCache.fileProblem` + `zipMagicProblem` memeriksa 4 byte awal `PK 0x03 0x04`; berkas tidak kosong tapi bukan APK tak lagi menjadi `ReadyToInstall`. `UpdateApkCacheTest.kt` +2 tes (helper `apk()`), total 336.
+
+- VERIFIKASI: kurung seimbang, diff terbatas pada titik itu; **NOT VERIFIED** compile Android/CI dan JUnit (sandbox tanpa android.jar/kotlinc/JUnit). PREDIKSI: Tes 336, ArchUnit 7, detekt 0, lint 0, Kotlin 0, SpotBugs 0.
+
 ## Batch 706 — unduhan/pasang APK pembaruan menolak berkas 0 byte/tak lengkap, satu unduhan pada satu waktu, log unduhan
 
 - Input user: `sonix_debug_20261121_174123.txt` (v705 = 1.11.16 build 566, ekspor 17:41:19) + `SONIX_v705.zip`, tanpa teks; tanpa laporan CI.

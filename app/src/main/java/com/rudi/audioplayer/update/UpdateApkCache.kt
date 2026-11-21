@@ -1,6 +1,7 @@
 package com.rudi.audioplayer.update
 
 import java.io.File
+import java.io.IOException
 
 /**
  * Batch 702 — pembersih APK pembaruan lama di `cacheDir`.
@@ -31,11 +32,18 @@ import java.io.File
  * Tak ada satu pun baris unduhan di log (penyebab 0 byte tak terbukti), jadi [fileProblem] + [downloadProblem] menolak berkas
  * kosong/tak lengkap di titik unduh dan titik pasang, dan alasannya dicatat mentah.
  *
+ * Batch 707 — [fileProblem] juga memeriksa 4 byte awal (`PK 0x03 0x04`, header ZIP/APK). Log v706 (`sonix_debug_20261121_175321.txt`):
+ * unduhan `update_AudioPlayer-v1.11.17-run679.apk` 7101147 byte terpasang normal, jadi 11x 0 byte Batch 706 anomali sesaat; berkas
+ * TIDAK kosong tapi bukan APK (mis. halaman galat) tetap lolos pemeriksaan 0 byte. Ini pengetatan, bukan cacat yang terbukti di log.
+ *
  * Murni `java.io` + Kotlin (tanpa API Android) supaya bisa diuji di JVM.
  */
 internal object UpdateApkCache {
     private const val PREFIX = "update_"
     private const val SUFFIX = ".apk"
+
+    /** `PK 0x03 0x04`: 4 byte awal berkas ZIP (APK = ZIP). */
+    private val ZIP_MAGIC = byteArrayOf(0x50, 0x4B, 0x03, 0x04)
 
     /** `<...>-v<M>.<m>.<p>-run<N>.apk` (pola nama aset rilis CI: `AudioPlayer-v1.11.14-run676.apk`). */
     private val ASSET_VERSION = Regex("""-v(\d+)\.(\d+)\.(\d+)-run\d+\.apk$""", RegexOption.IGNORE_CASE)
@@ -89,7 +97,16 @@ internal object UpdateApkCache {
         !file.exists() -> "berkas tidak ada"
         !file.isFile -> "bukan berkas biasa"
         file.length() <= 0L -> "berkas 0 byte"
-        else -> null
+        else -> zipMagicProblem(file)
+    }
+
+    /** null bila 4 byte awal [file] = header ZIP; selain itu alasan mentah (jumlah byte terbaca / pesan IOException). */
+    private fun zipMagicProblem(file: File): String? = try {
+        val head = ByteArray(ZIP_MAGIC.size)
+        val read = file.inputStream().use { it.read(head) }
+        if (read == head.size && head.contentEquals(ZIP_MAGIC)) null else "bukan APK (header ZIP PK tidak ada; terbaca $read byte)"
+    } catch (e: IOException) {
+        "gagal membaca berkas: ${e.message}"
     }
 
     /**
