@@ -3,7 +3,7 @@ package com.rudi.audioplayer.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -197,9 +197,15 @@ fun QueueSheet(
 }
 
 /**
- * Long-press-then-drag on a dedicated handle only (never the whole row) so it can never hijack
- * the LazyColumn's own vertical scroll or the row's tap-to-play. `deltaY` is reported raw and
- * un-thresholded — the caller decides how many pixels constitute "moved one slot".
+ * Immediate vertical drag on a dedicated handle only (never the whole row), so it can never hijack
+ * the row's tap-to-play and only claims the LazyColumn's scroll while the handle itself is dragged.
+ * `deltaY` is reported raw and un-thresholded — the caller decides how many pixels constitute
+ * "moved one slot".
+ *
+ * Batch 723 — was `detectDragGesturesAfterLongPress`: a swipe that moved past touch slop before the
+ * long-press timeout was cancelled, unconsumed, and fell through to list scroll, so the handle felt
+ * dead (same defect as `PlaylistScreen.kt`). `detectVerticalDragGestures` starts at slop and consumes
+ * on the Main pass (child before the parent scroll).
  */
 private fun Modifier.pointerInputDragHandle(
     slotId: Long,
@@ -208,13 +214,13 @@ private fun Modifier.pointerInputDragHandle(
     onDragDelta: (deltaY: Float) -> Unit
 ): Modifier = this.then(
     Modifier.pointerInput(slotId) {
-        detectDragGesturesAfterLongPress(
+        detectVerticalDragGestures(
             onDragStart = { onDragStart() },
             onDragEnd = { onDragEnd() },
             onDragCancel = { onDragEnd() },
-            onDrag = { change, dragAmount ->
+            onVerticalDrag = { change, dragAmount ->
                 change.consume()
-                onDragDelta(dragAmount.y)
+                onDragDelta(dragAmount)
             }
         )
     }
@@ -251,7 +257,7 @@ private fun QueueRow(
         ) {
             Icon(
                 Icons.Default.DragHandle,
-                contentDescription = "Tahan lalu geser untuk mengurutkan ulang",
+                contentDescription = "Geser untuk mengurutkan ulang",
                 tint = MaterialTheme.colorScheme.secondary
             )
         }

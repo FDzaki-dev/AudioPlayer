@@ -2,7 +2,7 @@ package com.rudi.audioplayer.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
@@ -305,9 +305,16 @@ fun PlaylistTabView(
 }
 
 /**
- * Tahan-lalu-drag di handle khusus, persis pola `QueueSheet.kt`'s `pointerInputDragHandle` —
- * duplikat sengaja (bukan diekstrak shared) karena masing-masing private ke file composable-nya,
- * konsisten cara file ini sudah berdiri sendiri dari QueueSheet.
+ * Geser vertikal LANGSUNG di handle khusus (tanpa tahan-lama), persis pola `QueueSheet.kt`'s
+ * `pointerInputDragHandle` — duplikat sengaja (bukan diekstrak shared) karena masing-masing private
+ * ke file composable-nya, konsisten cara file ini sudah berdiri sendiri dari QueueSheet.
+ *
+ * Batch 723 — dulu `detectDragGesturesAfterLongPress`: geseran yang langsung bergerak melewati touch
+ * slop sebelum jeda long-press (~400 ms) dibatalkan, tak dikonsumsi, lalu jatuh jadi scroll
+ * LazyColumn -> handle ≡ terasa mati, hanya tombol panah yang bekerja. `detectVerticalDragGestures`
+ * mulai begitu jari melewati slop vertikal dan mengonsumsi perubahan pada pass Main (anak lebih dulu
+ * dari scroll induk), sehingga LazyColumn tidak ikut menggulir selama handle digeser. Hit area hanya
+ * kotak handle 48dp — scroll dari bagian baris lain tak berubah. `deltaY` dilaporkan mentah.
  */
 private fun Modifier.pointerInputPlaylistDragHandle(
     songId: Long,
@@ -316,13 +323,13 @@ private fun Modifier.pointerInputPlaylistDragHandle(
     onDragDelta: (deltaY: Float) -> Unit
 ): Modifier = this.then(
     Modifier.pointerInput(songId) {
-        detectDragGesturesAfterLongPress(
+        detectVerticalDragGestures(
             onDragStart = { onDragStart() },
             onDragEnd = { onDragEnd() },
             onDragCancel = { onDragEnd() },
-            onDrag = { change, dragAmount ->
+            onVerticalDrag = { change, dragAmount ->
                 change.consume()
-                onDragDelta(dragAmount.y)
+                onDragDelta(dragAmount)
             }
         )
     }
@@ -360,7 +367,7 @@ private fun PlaylistSongRow(
         ) {
             Icon(
                 Icons.Default.DragHandle,
-                contentDescription = "Tahan lalu geser untuk mengurutkan ulang",
+                contentDescription = "Geser untuk mengurutkan ulang",
                 tint = MaterialTheme.colorScheme.secondary
             )
         }

@@ -1,5 +1,21 @@
 # Changelog
 
+## Batch 723 — Handle ≡ urutan playlist/antrean: geser vertikal langsung (tak lagi wajib tahan-lama)
+
+- Input user: tangkapan layar Perpustakaan > Playlist (playlist bernama "67" berisi 2 lagu, handle ≡ di kiri tiap baris) + `sonix_debug_20261123_070104.txt` (v722 = 1.11.33 build 583, ekspor 23 Nov 07:00) + `SONIX_v722.zip` + `SONIX_laporan-untuk-claude_run149.zip`; teks: "tidak bisa swipe atas bawah padahal tersedia handle ≡. bisanya cuman via tap atas-bawah!!"
+
+- (A) VERIFIED dari artefak CI run #149 (commit d684b69, Gradle exit 0/0/0/0): ArchUnit 7/0, SpotBugs 0, detekt 0, lintDebug 0, Tes 420, Kotlin 0 peringatan -> Batch 722 VERIFIED (prediksi Tes 420 COCOK).
+
+- (B) Log v722 (ekspor 07:00): 0 FATAL/ANR baru (satu-satunya baris ERROR = `ApplicationExitInfo` 22 Nov 13:05 "Swipe-up clean", lama); 0 baris yang menyebut playlist/reorder/drag layar daftar (jalur ini memang tak mencatat apa pun). Keluhan murni perilaku gestur, ditelusuri dari kode.
+
+- (C) AKAR (dari kode): `PlaylistScreen.kt` `pointerInputPlaylistDragHandle` memakai `detectDragGesturesAfterLongPress`. Geseran yang LANGSUNG bergerak melewati touch slop sebelum jeda long-press (~400 ms) berakhir dibatalkan oleh `awaitLongPressOrCancellation` TANPA mengonsumsi apa pun -> sentuhan jatuh jadi scroll `LazyColumn` -> handle terasa mati; hanya tombol panah (tap) yang bekerja. Satu-satunya petunjuk "tahan dulu" cuma `contentDescription` (tak terlihat). Cacat yang sama ada di `QueueSheet.kt` `pointerInputDragHandle` (pola disalin 1:1).
+
+- (D) PERBAIKAN v723 (2 file source, 0 baru; manifest tetap 274): `ui/PlaylistScreen.kt` dan `ui/QueueSheet.kt` — `detectDragGesturesAfterLongPress` -> `detectVerticalDragGestures` (callback `onDragStart/onDragEnd/onDragCancel` dan `deltaY` mentah ke `onDragDelta` TIDAK berubah; hanya `dragAmount.y` -> `dragAmount`). Drag mulai begitu jari melewati slop vertikal di dalam kotak handle 48dp dan mengonsumsi perubahan pada pass Main (anak lebih dulu dari scroll induk), jadi `LazyColumn` tak ikut menggulir selama handle digeser; gestur di luar kotak handle (tap putar, scroll dari badan baris, tombol panah/hapus) tak tersentuh. Logika geser slot (`rowHeightPx`, ambang `h/2`, `translationY`) tak diubah. `contentDescription` "Tahan lalu geser untuk mengurutkan ulang" -> "Geser untuk mengurutkan ulang" (2 file). KDoc kedua helper diperbarui singkat.
+
+- (E) VERIFIKASI LOKAL: diff terhadap `SONIX_v722.zip` = hanya 2 file di atas + docs; kurung/kurawal seimbang (PlaylistScreen 137/137, 240/240; QueueSheet 39/39, 123/123); 0 sisa `detectDragGesturesAfterLongPress` di kode kedua file (hanya di komentar); kompiler Kotlin 2.0.21 bawaan Gradle: 0 galat sintaks pada kedua file (hanya galat tipe-tak-terselesaikan karena sandbox tanpa Compose/Android, identik dengan baseline v722). **NOT VERIFIED**: kompilasi Android penuh, JUnit, detekt, SpotBugs, lint lokal (sandbox tanpa android.jar/Compose) dan PERILAKU gestur di perangkat (tak ada tes UI untuk jalur ini; build hijau != perilaku terverifikasi). PREDIKSI CI #150: Tes 420, ArchUnit 7, detekt 0, SpotBugs 0, lint 0, Kotlin 0.
+
+- (F) CARA UJI: pasang v723 -> Perpustakaan > Playlist (buka playlist dengan >= 2 lagu): sentuh handle ≡ lalu geser atas/bawah LANGSUNG (tanpa menahan) -> baris terangkat mengikuti jari dan bertukar tempat tiap melewati setengah tinggi baris + haptik; angkat jari = urutan tersimpan. Pastikan: (1) scroll daftar dari badan baris tetap normal, (2) tap baris tetap memutar, (3) tombol panah atas/bawah tetap berfungsi, (4) sheet Antrean (ikon antrean di pemutar): geser handle ≡ juga langsung bekerja dan sheet TIDAK ikut tertutup/bergeser. Bila drag terasa tersendat: kirim log sesudah mencoba. Belum dikerjakan: auto-scroll saat baris diseret ke tepi layar (daftar panjang masih butuh beberapa kali seret / tombol panah).
+
 ## Batch 722 — Memo sampul: catatan "tanpa sampul" tak lagi tertimpa lagu lain (pola A -> B -> A)
 
 - Input user: `sonix_debug_20261123_064812.txt` (v721 = 1.11.32 build 582, ekspor 23 Nov 06:48) + `SONIX_laporan-untuk-claude_run148.zip`, tanpa teks.
