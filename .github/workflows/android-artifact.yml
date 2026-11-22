@@ -81,24 +81,48 @@ jobs:
           SONIX_ARCH_REPORT: "1"
         run: |
           set +e
+          # Batch 720 — run #146: SpotBugs/detekt/lint NOT VERIFIED karena runner gagal mengunduh dependensi (`Could not find
+          # kotlin-stdlib:2.0.21`, `detekt-cli:1.23.8`, plugin ksp 2.3.10 `was not found`; semua repositori sekaligus = gangguan
+          # jaringan runner, BUKAN kode: tes 416 + ArchUnit di run yang sama lulus). Sebelumnya SpotBugs TANPA ulang sama sekali dan
+          # detekt/lint hanya 1x dgn jeda 30 dtk (run #146: ulang itu ikut gagal). Kini keduanya lewat `run_retry`: maks 3 percobaan,
+          # jeda 45 dtk lalu 90 dtk, percobaan ke-2/3 dgn --refresh-dependencies. Syarat ulang TETAP ketat: exit != 0 + laporan alat
+          # TIDAK terbentuk + pesan unduhan pada output percobaan TERAKHIR saja (temuan nyata / galat lain tak pernah diulang, tak
+          # ada yang disembunyikan; `[ULANG]` tercatat di log).
+          DEP_PATTERN='Could not (find|resolve|GET)|Received status code 5|Read timed out|Connection reset|was not found in any of the following sources'
+          run_retry() {
+            local log="$1" report="$2" tool="$3"
+            shift 3
+            local attempt=1
+            : > "$log"
+            while true; do
+              if [ "$attempt" -gt 1 ]; then
+                "$@" --refresh-dependencies > "$log.try" 2>&1
+              else
+                "$@" > "$log.try" 2>&1
+              fi
+              RETRY_RC=$?
+              cat "$log.try" >> "$log"
+              if [ "$RETRY_RC" = "0" ] || [ -f "$report" ] || [ "$attempt" -ge 3 ] || ! grep -q -E "$DEP_PATTERN" "$log.try"; then
+                break
+              fi
+              attempt=$((attempt + 1))
+              echo "[ULANG] $tool: dependensi gagal diunduh (bukan temuan kode); percobaan $attempt/3 setelah jeda $(( (attempt - 1) * 45 )) dtk dengan --refresh-dependencies" >> "$log"
+              sleep $(( (attempt - 1) * 45 ))
+            done
+            rm -f "$log.try"
+            RETRY_ATTEMPTS=$attempt
+          }
           gradle testReleaseUnitTest --tests "com.rudi.audioplayer.ArchitectureTest" --no-daemon --no-build-cache > gradle-arch.log 2>&1
           echo "ARCH_EXIT=$?" > gradle-exit.txt
           gradle testReleaseUnitTest --continue --no-daemon --no-build-cache > gradle-tests.log 2>&1
           echo "TESTS_EXIT=$?" >> gradle-exit.txt
-          gradle spotbugsRelease -Psonix.spotbugs=true --no-daemon --build-cache > gradle-spotbugs.log 2>&1
-          echo "SPOTBUGS_EXIT=$?" >> gradle-exit.txt
-          gradle detekt lintDebug --continue --no-daemon --no-build-cache > gradle-static.log 2>&1
-          STATIC_RC=$?
-          # Batch 697 — run #123: `Could not find ...detekt-cli:1.23.8` (unduhan dependensi gagal, BUKAN temuan kode) membuat detekt
-          # NOT VERIFIED; run #122 dgn kode/konfigurasi sama lulus. Hanya bila kegagalan itu sendiri (tanpa detekt.xml + pesan unduhan di
-          # log): ulang SEKALI dgn --refresh-dependencies. Temuan nyata / galat lain tak diulang (tak ada yang disembunyikan).
-          if [ "$STATIC_RC" != "0" ] && [ ! -f app/build/reports/detekt/detekt.xml ] && grep -q -E 'Could not (find|resolve|GET)|Received status code 5|Read timed out|Connection reset' gradle-static.log; then
-            echo "[ULANG] detekt/lint: dependensi gagal diunduh (bukan temuan kode); diulang sekali dengan --refresh-dependencies" >> gradle-static.log
-            sleep 30
-            gradle detekt lintDebug --continue --no-daemon --no-build-cache --refresh-dependencies >> gradle-static.log 2>&1
-            STATIC_RC=$?
-            echo "STATIC_RETRY=1" >> gradle-exit.txt
-          fi
+          run_retry gradle-spotbugs.log app/build/reports/spotbugs/spotbugs.sarif SpotBugs gradle spotbugsRelease -Psonix.spotbugs=true --no-daemon --build-cache
+          echo "SPOTBUGS_EXIT=$RETRY_RC" >> gradle-exit.txt
+          [ "$RETRY_ATTEMPTS" -gt 1 ] && echo "SPOTBUGS_RETRY=$((RETRY_ATTEMPTS - 1))" >> gradle-exit.txt
+          # Batch 697 — run #123: `Could not find ...detekt-cli:1.23.8`; Batch 720: ulang kini lewat `run_retry` (lihat atas).
+          run_retry gradle-static.log app/build/reports/detekt/detekt.xml detekt/lint gradle detekt lintDebug --continue --no-daemon --no-build-cache
+          STATIC_RC=$RETRY_RC
+          [ "$RETRY_ATTEMPTS" -gt 1 ] && echo "STATIC_RETRY=$((RETRY_ATTEMPTS - 1))" >> gradle-exit.txt
           echo "STATIC_EXIT=$STATIC_RC" >> gradle-exit.txt
           cat gradle-exit.txt
           exit 0

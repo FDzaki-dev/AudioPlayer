@@ -4,8 +4,8 @@ package com.rudi.audioplayer.util
  * Batch 719 — memo SATU-SLOT hasil muat sampul untuk pemanggil yang memuat sampul lagu yang SAMA berulang kali.
  *
  * DASAR (log v718, ekspor 22 Nov 18:22): 4 URI lagu TANPA sampul tertanam (probe `embeddedPicture: null` 4/4) masing-masing
- * gagal dimuat 12-13x dalam sehari; `WidgetUpdater` 7x per URI (±3 pembaruan penuh dalam ±1 dtk tiap lagu mulai: onUpdate +
- * metadata + status putar). Tiap percobaan memanggil `ContentResolver.loadThumbnail` lagi dan melempar lagi (lagu WAV 47 MB =
+ * gagal dimuat 12-13x dalam sehari; `WidgetUpdater` 7x per URI (±3 pembaruan penuh dalam ±1 dtk tiap service/proses baru mulai, mis. pasca-update atau
+ * swipe-clean: onUpdate + metadata + status putar; pergantian lagu biasa hanya 1x). Tiap percobaan memanggil `ContentResolver.loadThumbnail` lagi dan melempar lagi (lagu WAV 47 MB =
  * berkas dibuka ulang oleh MediaProvider). Lagu BERSAMPUL ikut dimuat + didecode ulang pada tiap pembaruan penuh.
  *
  * Kelas ini murni (tanpa tipe Android) supaya bisa dites di JVM: menyimpan hasil TERAKHIR per kunci ([rememberHit] = nilai, [rememberMiss] =
