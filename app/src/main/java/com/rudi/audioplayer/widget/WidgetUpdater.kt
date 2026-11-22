@@ -228,7 +228,7 @@ object WidgetUpdater {
     // berubah atau widget baru terlihat di proses ini. Dulu ditulis tiap pembaruan = 30,8% byte log v680 (lihat KDoc ChangeGate).
     private val diagGate = ChangeGate()
 
-    // Batch 719 — sampul terakhir (atau "tanpa sampul") diingat per (URI, ukuran): update penuh datang beruntun saat service/proses baru mulai
+    // Batch 719/722 — sampul terakhir + himpunan "tanpa sampul" (tak tertimpa lagu lain: pola A -> B -> A) diingat per (URI, ukuran): update penuh datang beruntun saat service/proses baru mulai
     // (onUpdate + metadata + status putar, ±3 dalam ±1 dtk) dan tiap kali memuat + mendecode ulang / gagal ulang di MediaProvider. Hanya dibaca/ditulis dari
     // [performUpdate] di bawah `updateLock`. Bitmap tersimpan TIDAK pernah di-recycle di jalur widget ([buildArtPlate] hanya mendaur-ulang
     // bitmap perantaranya sendiri, bukan sumber).

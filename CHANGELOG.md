@@ -1,5 +1,21 @@
 # Changelog
 
+## Batch 722 — Memo sampul: catatan "tanpa sampul" tak lagi tertimpa lagu lain (pola A -> B -> A)
+
+- Input user: `sonix_debug_20261123_064812.txt` (v721 = 1.11.32 build 582, ekspor 23 Nov 06:48) + `SONIX_laporan-untuk-claude_run148.zip`, tanpa teks.
+
+- (A) VERIFIED dari artefak CI run #148 (commit fbb54a2, Gradle exit 0/0/0/0): **SEMUA LULUS** — ArchUnit 7/0, SpotBugs 0, **detekt 0** (2 temuan #147 hilang -> Batch 721 VERIFIED), lintDebug 0, Tes 416, Kotlin 0 peringatan.
+
+- (B) Log v721 (ekspor 06:48): pasang senyap `v1.11.32-run694` 06:47:48 -> `proses_mulai ... keputusan=RESUME` -> `isPlaying=true` pada `sejak_proses_mulai=1024ms`, `posisi_pulih=19444ms`, pembersihan APK `terhapus=1 gagal=0`; 0 FATAL/ANR baru. **Memo sampul 719 TERBUKTI sebagian**: lagu tanpa sampul id=282279 (mp4/m4a 3 MB, `embeddedPicture: null`) — pada proses v721 pasca-update (`onUpdate ids=220,221`) `Gagal muat artwork widget` hanya **1x** (06:47:51) dan tak ada lagi sesudahnya, dibanding 3x per restart di v718 (12:26, 12:35, 13:06). Jalur lain (notifikasi, aksen) tetap 1x per lagu seperti rancangan.
+
+- (C) CACAT NYATA pada rancangan Batch 719 (terbukti di log v720): pengguna menekan Next/Previous cepat (06:47:21-29, ±12 transisi): `282279` (tanpa sampul) 06:47:28 -> `282229` 06:47:28 -> kembali ke `282279` 06:47:29; `Gagal muat artwork widget` untuk URI yang SAMA muncul 2x dalam 1 dtk (06:47:28 dan 06:47:29) padahal memo aktif. Sebab: memo Batch 719 SATU-slot — memuat sampul lagu bersampul (`282229`) MENIMPA catatan "282279 tanpa sampul", sehingga kembali ke lagu itu memuat ulang + gagal ulang.
+
+- (D) PERBAIKAN v722 (2 berkas kode + 1 tes; manifest tetap 274): `util/ThumbnailMemo.kt` — dua struktur: (1) SATU slot sampul yang sudah dimuat (satu bitmap, memori terbatas, TTL 2 mnt), (2) himpunan "tanpa sampul" ber-batas `MAX_MISSES=64` (hanya kunci + waktu, tanpa bitmap; TTL 10 mnt; dipangkas dari entri TERLAMA; mengingat ulang kunci menyegarkan urutannya). `rememberHit(kunci)` menghapus kunci itu dari himpunan miss; `rememberMiss(kunci)` mengosongkan slot sampul bila kuncinya sama. API publik (`recall`/`rememberHit`/`rememberMiss`) TIDAK berubah. `widget/WidgetUpdater.kt`: hanya komentar. `ThumbnailMemoTest.kt`: 9 -> 13 tes (A->B->A, satu slot sampul, pangkas terlama, segarkan urutan, jam mundur untuk hit + miss).
+
+- (E) VERIFIKASI LOKAL: kurung/kurawal seimbang; port Python semantik baru 13/13 sama dengan tes JUnit; `WidgetUpdater.kt` tak berubah selain 1 komentar. **NOT VERIFIED**: compile Android/JUnit/detekt/SpotBugs lokal (sandbox tanpa kotlinc/detekt/SpotBugs). PREDIKSI CI #149: Tes 420 (416 - 9 + 13), ArchUnit 7, detekt 0, SpotBugs 0, lint 0, Kotlin 0.
+
+- (F) CARA UJI: pasang v722; dengan widget terpasang tekan Next -> Previous cepat melewati lagu TANPA sampul: `Gagal muat artwork widget` untuk URI itu muncul 1x per 10 menit (bukan tiap kembali ke lagu itu). Lagu bersampul tetap tampil dan berganti normal. Jalur retry CI Batch 720 masih belum terbukti di runner (NOT VERIFIED, run #147/#148 tanpa gangguan). Temuan lama yang BELUM diselidiki: `GL mtrack` ±129 MB (Graphics PSS) dgn 1 Activity — butuh `dumpsys gfxinfo`.
+
 ## Batch 721 — detekt: `InstanceOfCheckForException` pada memo sampul widget (temuan CI #147, kode Batch 719)
 
 - Input user: `sonix_debug_20261123_062401.txt` (v720 = 1.11.31 build 581, ekspor 23 Nov 06:23) + `SONIX_laporan-untuk-claude_run147.zip`, tanpa teks.

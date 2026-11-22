@@ -9,6 +9,7 @@ class ThumbnailMemoTest {
 
     private val keyA = "content://media/external/audio/media/61407#200"
     private val keyB = "content://media/external/audio/media/307375#200"
+    private val keyC = "content://media/external/audio/media/282279#200"
 
     private fun memo() = ThumbnailMemo<String>(hitTtlMs = 1_000L, missTtlMs = 5_000L)
 
@@ -45,19 +46,35 @@ class ThumbnailMemoTest {
     }
 
     @Test
-    fun `kunci lain tak tahu dan menyimpan kunci baru membuang yang lama`() {
+    fun `kunci yang belum pernah dimuat tak diketahui`() {
         val memo = memo()
         memo.rememberMiss(keyA, 0L)
-        assertTrue(memo.recall(keyB, 10L) === ThumbnailMemo.Recall.Unknown)
-        memo.rememberHit(keyB, "bitmap-B", 20L)
-        assertTrue(memo.recall(keyA, 30L) === ThumbnailMemo.Recall.Unknown)
-        assertTrue(memo.recall(keyB, 30L) is ThumbnailMemo.Recall.Hit)
+        memo.rememberHit(keyB, "bitmap-B", 5L)
+        assertTrue(memo.recall(keyC, 10L) === ThumbnailMemo.Recall.Unknown)
+    }
+
+    @Test
+    fun `pola A ke B ke A - sampul B tak menimpa catatan tanpa sampul A`() {
+        val memo = memo()
+        memo.rememberMiss(keyA, 0L)
+        memo.rememberHit(keyB, "bitmap-B", 10L)
+        assertTrue(memo.recall(keyA, 20L) === ThumbnailMemo.Recall.Miss)
+        assertTrue(memo.recall(keyB, 20L) is ThumbnailMemo.Recall.Hit)
+    }
+
+    @Test
+    fun `hanya satu slot sampul - sampul baru membuang sampul lama`() {
+        val memo = memo()
+        memo.rememberHit(keyA, "bitmap-A", 0L)
+        memo.rememberHit(keyB, "bitmap-B", 10L)
+        assertTrue(memo.recall(keyA, 20L) === ThumbnailMemo.Recall.Unknown)
+        assertTrue(memo.recall(keyB, 20L) is ThumbnailMemo.Recall.Hit)
     }
 
     @Test
     fun `ukuran berbeda untuk lagu yang sama adalah kunci berbeda`() {
         val memo = memo()
-        memo.rememberHit("content://media/external/audio/media/61407#200", "kecil", 0L)
+        memo.rememberMiss("content://media/external/audio/media/61407#200", 0L)
         assertTrue(memo.recall("content://media/external/audio/media/61407#480", 10L) === ThumbnailMemo.Recall.Unknown)
     }
 
@@ -77,13 +94,39 @@ class ThumbnailMemoTest {
     fun `jam mundur membuat catatan tak dipercaya`() {
         val memo = memo()
         memo.rememberHit(keyA, "bitmap-A", 500L)
+        memo.rememberMiss(keyB, 500L)
         assertTrue(memo.recall(keyA, 499L) === ThumbnailMemo.Recall.Unknown)
+        assertTrue(memo.recall(keyB, 499L) === ThumbnailMemo.Recall.Unknown)
     }
 
     @Test
-    fun `nilai bawaan masa berlaku`() {
+    fun `himpunan tanpa sampul dipangkas dari entri terlama`() {
+        val memo = ThumbnailMemo<String>(hitTtlMs = 1_000L, missTtlMs = 5_000L, maxMisses = 2)
+        memo.rememberMiss("k1", 0L)
+        memo.rememberMiss("k2", 1L)
+        memo.rememberMiss("k3", 2L)
+        assertTrue(memo.recall("k1", 3L) === ThumbnailMemo.Recall.Unknown)
+        assertTrue(memo.recall("k2", 3L) === ThumbnailMemo.Recall.Miss)
+        assertTrue(memo.recall("k3", 3L) === ThumbnailMemo.Recall.Miss)
+    }
+
+    @Test
+    fun `mengingat ulang kunci menyegarkan urutan sehingga bukan lagi yang terlama`() {
+        val memo = ThumbnailMemo<String>(hitTtlMs = 1_000L, missTtlMs = 5_000L, maxMisses = 2)
+        memo.rememberMiss("k1", 0L)
+        memo.rememberMiss("k2", 1L)
+        memo.rememberMiss("k1", 2L)
+        memo.rememberMiss("k3", 3L)
+        assertTrue(memo.recall("k2", 4L) === ThumbnailMemo.Recall.Unknown)
+        assertTrue(memo.recall("k1", 4L) === ThumbnailMemo.Recall.Miss)
+        assertTrue(memo.recall("k3", 4L) === ThumbnailMemo.Recall.Miss)
+    }
+
+    @Test
+    fun `nilai bawaan masa berlaku dan batas`() {
         assertEquals(120_000L, ThumbnailMemo.HIT_TTL_MS)
         assertEquals(600_000L, ThumbnailMemo.MISS_TTL_MS)
+        assertEquals(64, ThumbnailMemo.MAX_MISSES)
         val memo = ThumbnailMemo<String>()
         memo.rememberHit(keyA, "bitmap-A", 0L)
         assertTrue(memo.recall(keyA, 119_999L) is ThumbnailMemo.Recall.Hit)
