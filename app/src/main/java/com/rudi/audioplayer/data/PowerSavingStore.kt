@@ -19,11 +19,12 @@ class PowerSavingStore(context: Context) {
     }
 
     /**
-     * Batch 713 — saklar uji Ducking Fokus Audio (default MATI; sejak Batch 714 berlaku LIVE lewat [registerOnChange]): fokus audio sementara yang
+     * Batch 713 — saklar Ducking Fokus Audio (Batch 715: default AKTIF; log v713/v714 = pengguna tak pernah menyalakannya sehingga 4 jeda
+     * Shopee lagi tetap lewat ExoPlayer; matikan di Pengaturan Putar bila bermasalah; sejak Batch 714 berlaku LIVE lewat [registerOnChange]): fokus audio sementara yang
      * direbut aplikasi lain -> volume diturunkan alih-alih dijeda (lihat playback/AudioFocusDucking.kt). Bukan penghemat daya; ditaruh
      * di sini karena store saklar uji pemutaran ini sudah dipakai PlaybackService dan dialog Pengaturan Putar.
      */
-    fun isDuckOnTransientFocus(): Boolean = prefs.getBoolean(KEY_DUCK_ON_TRANSIENT_FOCUS, false)
+    fun isDuckOnTransientFocus(): Boolean = prefs.getBoolean(KEY_DUCK_ON_TRANSIENT_FOCUS, true)
 
     fun setDuckOnTransientFocus(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_DUCK_ON_TRANSIENT_FOCUS, enabled).apply()

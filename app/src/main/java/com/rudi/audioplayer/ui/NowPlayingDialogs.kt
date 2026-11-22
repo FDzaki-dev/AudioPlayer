@@ -243,7 +243,7 @@ private fun PowerSavingSection() {
             store.setAudioOffload(it)
         }
     )
-    // Batch 713 — Ducking Fokus Audio (default MATI): lihat playback/AudioFocusDucking.kt.
+    // Batch 713 — Ducking Fokus Audio (Batch 715: default AKTIF): lihat playback/AudioFocusDucking.kt.
     Spacer(modifier = Modifier.height(12.dp))
     Text(
         "Fokus Audio (Eksperimen)",

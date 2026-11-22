@@ -129,4 +129,40 @@ class AudioFocusDuckingTest {
         assertEquals(FocusToggleStep.NONE, FocusToggle.step(enabled = true, active = true))
         assertEquals(FocusToggleStep.NONE, FocusToggle.step(enabled = false, active = false))
     }
+
+    // MODE_NORMAL=0, MODE_RINGTONE=1, MODE_IN_CALL=2, MODE_IN_COMMUNICATION=3
+    @Test
+    fun mode_tigaModePanggilanDikenali() {
+        assertFalse(FocusPolicy.isCallMode(0))
+        assertTrue(FocusPolicy.isCallMode(1))
+        assertTrue(FocusPolicy.isCallMode(2))
+        assertTrue(FocusPolicy.isCallMode(3))
+    }
+
+    @Test
+    fun mode_panggilanSaatDiturunkan_jeda() {
+        assertEquals(FocusAction.PAUSE, FocusPolicy.onModeChange(1, ducked = true))
+        assertEquals(FocusAction.PAUSE, FocusPolicy.onModeChange(2, ducked = true))
+    }
+
+    @Test
+    fun mode_panggilanTanpaDiturunkan_tidakAdaAksi() {
+        assertEquals(FocusAction.NONE, FocusPolicy.onModeChange(2, ducked = false))
+    }
+
+    @Test
+    fun mode_normalSaatDiturunkan_tidakAdaAksi() {
+        assertEquals(FocusAction.NONE, FocusPolicy.onModeChange(0, ducked = true))
+    }
+
+    @Test
+    fun state_modePanggilanSaatDiturunkan_jedaLaluGainPulihkanDanLanjut() {
+        val s = DuckingFocusState()
+        s.apply(FocusAction.DUCK)
+        assertTrue(s.apply(FocusPolicy.onModeChange(1, ducked = s.ducked)).pause)
+        assertTrue(s.ducked)
+        val e = s.apply(FocusAction.RESUME_AND_UNDUCK)
+        assertTrue(e.resume)
+        assertTrue(e.unduck)
+    }
 }

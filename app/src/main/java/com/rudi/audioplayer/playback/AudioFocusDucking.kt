@@ -9,8 +9,8 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 
 /**
- * Batch 713 — pengelola fokus audio kustom OPT-IN (default MATI, Pengaturan Putar > Fokus Audio > Ducking Fokus Audio; sejak Batch 714
- * berlaku LANGSUNG tanpa mulai ulang). Latar: log v711/v712 membuktikan com.shopee.id berulang meminta fokus SEMENTARA (`requestAudioFocus req=2`),
+ * Batch 713 — pengelola fokus audio kustom (Pengaturan Putar > Fokus Audio > Ducking Fokus Audio; sejak Batch 714 berlaku LANGSUNG tanpa
+ * mulai ulang; sejak Batch 715 default AKTIF, dimatikan lewat saklar yang sama). Latar: log v711/v712 membuktikan com.shopee.id berulang meminta fokus SEMENTARA (`requestAudioFocus req=2`),
  * sehingga ExoPlayer menjeda otomatis (6 jeda, total 53 dtk dari ±131 dtk pada 22 Nov 06:31-06:33). Saat saklar ON, ExoPlayer dibangun
  * dengan `handleAudioFocus=false` dan kelas ini mengurus fokus: fokus hilang sementara dari aplikasi lain -> volume DITURUNKAN (musik tetap
  * jalan), saat panggilan/dering -> dijeda, hilang permanen -> dijeda dan fokus dilepas, fokus kembali -> volume dipulihkan/dilanjutkan.
@@ -35,6 +35,17 @@ internal object FocusToggle {
 
 /** Keputusan murni atas satu perubahan fokus ([change] = `AudioManager.AUDIOFOCUS_*`; [inCall] = mode audio panggilan/dering). */
 internal object FocusPolicy {
+    /** Mode audio panggilan/dering ([mode] = `AudioManager.MODE_*`). */
+    fun isCallMode(mode: Int): Boolean =
+        mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION || mode == AudioManager.MODE_RINGTONE
+
+    /**
+     * Batch 715 — pengaman default AKTIF: fokus sementara dari telepon bisa tiba SEBELUM `AudioManager.mode` berganti, sehingga dering
+     * dikira video biasa dan hanya diturunkan volumenya. Bila mode kemudian berubah ke panggilan/dering SELAGI volume diturunkan -> jeda.
+     */
+    fun onModeChange(mode: Int, ducked: Boolean): FocusAction =
+        if (ducked && isCallMode(mode)) FocusAction.PAUSE else FocusAction.NONE
+
     fun onFocusChange(change: Int, inCall: Boolean): FocusAction = when (change) {
         AudioManager.AUDIOFOCUS_GAIN -> FocusAction.RESUME_AND_UNDUCK
         AudioManager.AUDIOFOCUS_LOSS -> FocusAction.PAUSE_PERMANENT
@@ -108,7 +119,7 @@ internal class DuckingFocusState {
  * Batasan: volume yang diubah pengguna/crossfade SELAMA ducking (beberapa detik) ditimpa saat dipulihkan.
  */
 internal class DuckingFocusController(
-    context: Context,
+    private val context: Context,
     private val player: ExoPlayer,
     private val log: (String) -> Unit
 ) {
@@ -120,6 +131,9 @@ internal class DuckingFocusController(
     private var expectedInternal = 0
 
     private val focusListener = AudioManager.OnAudioFocusChangeListener { change -> onFocusChange(change) }
+
+    // Batch 715 — API 31 (minSdk project = 31); callback di thread utama (executor utama), sama dengan [handler].
+    private val modeListener = AudioManager.OnModeChangedListener { mode -> onModeChanged(mode) }
 
     private val playerListener = object : Player.Listener {
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -135,6 +149,7 @@ internal class DuckingFocusController(
 
     fun attach() {
         player.addListener(playerListener)
+        audioManager.addOnModeChangedListener(context.mainExecutor, modeListener)
         log("Ducking fokus audio AKTIF: ExoPlayer handleAudioFocus=false, fokus diurus kustom (turunkan volume x$DUCK_FACTOR saat fokus sementara hilang)")
         // Batch 714 — dipasang saat pemain SUDAH memutar (saklar dinyalakan langsung): ExoPlayer baru saja melepas fokusnya, jadi minta fokus
         // sekarang; pada pemasangan di onCreate `playWhenReady` masih false dan fokus diminta oleh listener saat mulai memutar.
@@ -143,6 +158,7 @@ internal class DuckingFocusController(
 
     fun release() {
         player.removeListener(playerListener)
+        audioManager.removeOnModeChangedListener(modeListener)
         handler.removeCallbacksAndMessages(null)
         if (state.reset()) restoreVolume()
         abandonFocus()
@@ -181,9 +197,7 @@ internal class DuckingFocusController(
     }
 
     private fun onFocusChange(change: Int) {
-        val inCall = audioManager.mode.let {
-            it == AudioManager.MODE_IN_CALL || it == AudioManager.MODE_IN_COMMUNICATION || it == AudioManager.MODE_RINGTONE
-        }
+        val inCall = FocusPolicy.isCallMode(audioManager.mode)
         val action = FocusPolicy.onFocusChange(change, inCall)
         val effects = state.apply(action)
         if (effects.unduck) restoreVolume()
@@ -192,6 +206,14 @@ internal class DuckingFocusController(
         if (effects.resume) internalPlay()
         if (effects.abandon) abandonFocus()
         log("Fokus berubah: kode=$change panggilan=$inCall aksi=$action volume=${player.volume}")
+    }
+
+    private fun onModeChanged(mode: Int) {
+        val action = FocusPolicy.onModeChange(mode, state.ducked)
+        if (action == FocusAction.NONE) return
+        val effects = state.apply(action)
+        if (effects.pause) internalPause()
+        log("Mode audio berubah: mode=$mode saat volume diturunkan -> aksi=$action (dijeda, lanjut saat fokus kembali)")
     }
 
     private fun duck() {

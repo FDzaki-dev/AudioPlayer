@@ -1,5 +1,21 @@
 # Changelog
 
+## Batch 715 — Ducking Fokus Audio default AKTIF + pengaman mode panggilan
+
+- Input user: `sonix_debug_20261122_070651.txt` (v714 = 1.11.25 build 575, ekspor 07:06:46), tanpa teks; tanpa laporan CI; pesan: "buruan".
+
+- (A) VERIFIED v714 (tidak langsung): APK `v1.11.25-run687` (7117535 byte) diunduh 07:05:17-07:05:21, dipasang senyap 07:05:24, proses mati 07:05:25 (`PACKAGE_UPDATED`) -> `keputusan=RESUME sejak_mati=1240ms` -> `isPlaying=true` pada `sejak_proses_mulai=2331ms`; pembersihan APK `terhapus=1 (7117535 byte) gagal=0`. Baris baru v714 bekerja: `Ducking fokus audio MATI: ExoPlayer mengurus fokus ...` tercatat 07:05:26. Kompilasi source utama v714 terbukti tidak langsung (APK dibangun CI dan berjalan); tes + CI v713/v714 **NOT VERIFIED** (tanpa laporan). 0 FATAL/ANR baru (5 FATAL buffer = lama 8-11 Nov); 1 `Skipped 30 frames` = proses v711 (lama). `AudioHardening ... would be ignored/muted` 3x tepat pada pemulihan pasca-update (pola Batch 704), tak diubah.
+
+- (B) CACAT NYATA: DUA jeda fokus `com.shopee.id` setelah v714 terpasang (07:05:55-07:06:03 = 8,1 dtk; 07:06:10-07:06:39 = 28,9 dtk, dumpsys `req=2 CONTENT_TYPE_MOVIE` -> `handleLoss -2` -> `handleGain 1`) tetap lewat jalur ExoPlayer (`Jeda: fokus audio direbut ...`). Saklar Ducking Fokus Audio TERBUKTI MATI (`Ducking fokus audio MATI` saat proses mulai, tanpa baris AKTIF/NONAKTIF sesudahnya, tanpa sheet pengaturan dibuka) -> pengguna tidak menyalakan saklar pada v713 maupun v714, jadi default MATI membuat keluhan "naik turun" tak pernah teruji.
+
+- (C) PERBAIKAN v715, 5 file DIUBAH (0 baru; FILE_MANIFEST tetap 271): `data/PowerSavingStore.kt` (`isDuckOnTransientFocus()` default `true`; nilai yang tersimpan tetap dihormati, jadi pengguna yang mematikan saklar tidak terpengaruh), `playback/AudioFocusDucking.kt` (pengaman: `FocusPolicy.isCallMode`/`onModeChange` + `OnModeChangedListener` (API 31) pada pengelola -> bila mode audio berubah ke dering/panggilan SELAGI volume diturunkan -> jeda; fokus sementara telepon bisa tiba sebelum mode berganti), `playback/PlaybackService.kt` + `ui/NowPlayingDialogs.kt` (komentar "default MATI" diperbarui), `AudioFocusDuckingTest.kt` (+5 tes = 22). Jalan keluar: matikan saklar di Pengaturan Putar > Fokus Audio (Eksperimen) (berlaku langsung sejak Batch 714).
+
+- (D) BATASAN **NOT VERIFIED** di perangkat: apakah Android 16 meredam/memudarkan pemain sendiri saat fokus sementara hilang meski aplikasi menurunkan volume sendiri; crossfade (overlapPlayer) tidak ikut diturunkan; dimatikan saat dijeda pengelola kustom -> tetap jeda sampai putar; volume ubahan pengguna selama ducking ditimpa saat dipulihkan.
+
+- (E) VERIFIKASI LOKAL: diff terhadap v714 = hanya titik di atas; kurung/kurawal seimbang di 5 file; port Python `isCallMode`/`onModeChange` 4/4. **NOT VERIFIED**: compile tes/JUnit (sandbox tanpa kotlinc/JUnit/android.jar), perilaku ducking di perangkat. PREDIKSI: Tes 392, ArchUnit 7, detekt 0, lint 0 (minSdk 31 -> API 31 aman), Kotlin 0, SpotBugs 0.
+
+- (F) CARA UJI: pasang v715, putar musik, buka video Shopee. Log harus memuat `Ducking fokus audio AKTIF`, `Fokus berubah: kode=-2 ... aksi=DUCK volume=0.2`, `kode=1 ... RESUME_AND_UNDUCK volume=1.0`, dan TANPA `Jeda: fokus audio direbut`. Uji juga panggilan masuk (harus menjeda). Bermasalah -> matikan saklar.
+
 ## Batch 714 — Ducking Fokus Audio berlaku LANGSUNG (saklar tak lagi butuh mulai ulang) + keadaan saklar tercatat di log
 
 - Input user: `sonix_debug_20261122_064750.txt` (v713 = 1.11.24 build 574, ekspor 06:47:45) + `SONIX_v713.zip`, tanpa teks; tanpa laporan CI.

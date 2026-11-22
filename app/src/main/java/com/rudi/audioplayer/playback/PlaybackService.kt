@@ -163,7 +163,8 @@ class PlaybackService : MediaLibraryService() {
     // Batch 711 — jeda otomatis karena fokus audio direbut aplikasi lain (lihat FocusPauseTally.kt).
     private val focusPauseTally = FocusPauseTally()
 
-    // Batch 713 — pengelola fokus kustom (ducking), terpasang selama saklar ON (Batch 714: dipasang/dilepas LIVE, lihat applyDuckingFocus).
+    // Batch 713 — pengelola fokus kustom (ducking), terpasang selama saklar ON (Batch 714: dipasang/dilepas LIVE, lihat applyDuckingFocus;
+    // Batch 715: saklar default ON).
     private var duckingFocus: DuckingFocusController? = null
     // Batch 599 — job polling jendela crossfade; hanya hidup selagi Crossfade AKTIF (lihat startCrossfadePoll()).
     private var crossfadePollJob: Job? = null
@@ -200,7 +201,7 @@ class PlaybackService : MediaLibraryService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
-        // Batch 713 — saklar Ducking Fokus Audio (default MATI; Batch 714: perubahan saat service hidup berlaku LANGSUNG): ON -> ExoPlayer
+        // Batch 713 — saklar Ducking Fokus Audio (Batch 715: default ON; Batch 714: perubahan saat service hidup berlaku LANGSUNG): ON -> ExoPlayer
         // TIDAK mengurus fokus, DuckingFocusController yang mengurus (turunkan volume saat fokus sementara hilang, jeda saat panggilan).
         val duckOnFocus = PowerSavingStore(this).isDuckOnTransientFocus()
         val player = ExoPlayer.Builder(this)
