@@ -2,6 +2,7 @@
 
 > **Item yang JUJUR belum sempat diverifikasi di device fisik** (bukan diasumsikan beres —
 > daftar lengkap & konteks di `PROJECT_STATE.md`):
+> - Batch 718: CI #144 hijau (ArchUnit 7/0, detekt 0, lint 0, Tes 407, Kotlin 0) tetapi SpotBugs 8 temuan di `PlaybackService.kt` (penanda lintas-thread non-volatile); v718 menjadikannya `@Volatile`/`AtomicInteger` tanpa mengubah perilaku; SpotBugs 0 menunggu CI #145 (NOT VERIFIED).
 > - Batch 716: log v715 membuktikan ducking jalan (musik tak lagi dijeda saat video Shopee) tetapi suara media masih kalah oleh musik keras; faktor ducking diperdalam 0.2 -> 0.05 (-26 dB); kenyamanan di telinga dan compile/JUnit NOT VERIFIED.
 > - Batch 715: log v714 membuktikan saklar "Ducking Fokus Audio" tak pernah dinyalakan (2 jeda Shopee lagi, 8 dtk dan 29 dtk); v715 menjadikannya default AKTIF (bisa dimatikan di Pengaturan Putar) + pengaman mode panggilan; compile/JUnit dan perilaku di perangkat NOT VERIFIED.
 > - Batch 714: tanpa laporan CI v713 (NOT VERIFIED). Log v713: 2 jeda fokus Shopee setelah pembaruan masih lewat jalur ExoPlayer karena saklar "Ducking Fokus Audio" hanya dibaca saat service dibuat; v714 membuatnya berlaku LANGSUNG (tanpa mulai ulang) dan mencatat keadaan saklar di log (`Ducking fokus audio MATI/AKTIF/NONAKTIF`); default tetap MATI; compile/JUnit dan perilaku di perangkat NOT VERIFIED.

@@ -88,10 +88,13 @@ class PlaybackService : MediaLibraryService() {
     private val serviceScope =
         CoroutineScope(Dispatchers.Main + SupervisorJob() + SafeGuard.handler("PlaybackService", "serviceScope")) // Batch 618
     private var shakeDetector: ShakeDetector? = null
+    // Batch 718 — SpotBugs run #144 (AT_STALE_THREAD_WRITE_OF_PRIMITIVE): penanda lintas lambda/listener/coroutine -> @Volatile (visibilitas antar-thread).
+    @Volatile
     private var coldStartNotificationActive = false
     // Batch 594 — generasi penanda jalur widget "service hidup tapi TIDAK sedang memutar" (lihat
     // [handleWidgetActionWhileNotPlaying]); hanya yang terbaru boleh membongkar placeholder foreground.
-    private var widgetPausedHandoffGen = 0
+    // Batch 718 — `++` pada Int biasa tak atomik (AT_NONATOMIC_OPERATIONS_ON_SHARED_VARIABLE) -> AtomicInteger.
+    private val widgetPausedHandoffGen = java.util.concurrent.atomic.AtomicInteger(0)
 
     // Batch 688 — pemulihan pasca-update: penanda persisten "berniat memutar" (dibaca [UpdateResumeReceiver] setelah
     // instalasi mematikan proses) + pencatat posisi berkala selagi memutar (lihat [startPositionPersistTick]).
@@ -703,6 +706,7 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    @Volatile
     private var lastQueuePersistLogKey = -1
 
     /**
@@ -984,7 +988,7 @@ class PlaybackService : MediaLibraryService() {
      * ([coldStartNotificationActive]) mengurus dirinya sendiri dan tidak disentuh. */
     private fun handleWidgetActionWhileNotPlaying(action: String?) {
         startForegroundColdStartNotification()
-        val gen = ++widgetPausedHandoffGen
+        val gen = widgetPausedHandoffGen.incrementAndGet()
         applyWidgetAction(action)
         serviceScope.launch {
             try {
@@ -998,7 +1002,7 @@ class PlaybackService : MediaLibraryService() {
                     delay(WIDGET_PAUSED_PLACEHOLDER_MS)
                 }
             } finally {
-                if (gen == widgetPausedHandoffGen && !coldStartNotificationActive) {
+                if (gen == widgetPausedHandoffGen.get() && !coldStartNotificationActive) {
                     try {
                         if (mediaSession?.player?.playWhenReady == true) {
                             NotificationManagerCompat.from(this@PlaybackService).cancel(COLD_START_NOTIFICATION_ID)
@@ -1166,6 +1170,7 @@ class PlaybackService : MediaLibraryService() {
             .build()
 
     /** Batch 717 — true setelah antrean BARU masuk (urutan Shuffle kosong terisi); [Player.Listener.onTimelineChanged] menyusun ulang urutan berjangkar lagu aktif. */
+    @Volatile
     private var shuffleAnchorPending = false
 
     /** Batch 717 — lagu rusak berturut-turut yang sudah dilewati service tanpa UI; direset saat benar-benar memutar. */
@@ -1220,6 +1225,7 @@ class PlaybackService : MediaLibraryService() {
     private data class PendingQueueRest(val headId: Long, val ids: List<Long>, val headIndex: Int)
 
     /** Batch 692 — true selama pemain berisi lagu pembuka SAJA dan sisa antrean belum disambung; lihat [persistQueueFromService]. */
+    @Volatile
     private var queueRestorePending = false
 
     /** Batch 693 — id lagu pembuka bila sambung sisa antrean gagal total; lihat [persistQueueFromService]. null = tak dibekukan. */

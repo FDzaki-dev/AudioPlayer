@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 718: 0 berkas baru (playback/PlaybackService.kt diubah: @Volatile + AtomicInteger untuk penanda lintas-thread, SpotBugs 8 -> 0) — 272.
 # Batch 717: + app/src/test/java/com/rudi/audioplayer/playback/AntiRepeatShuffleOrderTest.kt (tes urutan Shuffle; playback/AntiRepeatShuffleOrder.kt, playback/PlaybackService.kt, playback/PlayerViewModel.kt diubah: jangkar lagu aktif, antrean baru acak, Putar Berikutnya, galat lagu tanpa UI) — 271->272.
 # Batch 716: 0 berkas baru (playback/AudioFocusDucking.kt diubah: DUCK_FACTOR 0.2 -> 0.05) — 271.
 # Batch 715: 0 berkas baru (data/PowerSavingStore.kt, playback/AudioFocusDucking.kt, playback/PlaybackService.kt, ui/NowPlayingDialogs.kt, test playback/AudioFocusDuckingTest.kt diubah; Ducking Fokus Audio default AKTIF) — 271.
