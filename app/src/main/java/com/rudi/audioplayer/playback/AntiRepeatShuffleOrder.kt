@@ -2,6 +2,7 @@ package com.rudi.audioplayer.playback
 
 import androidx.media3.common.C
 import androidx.media3.exoplayer.source.ShuffleOrder
+import kotlin.random.Random
 
 /**
  * Batch 498 — Gap #3 roadmap (shuffle anti-repeat-nearby). Jawaban eksplisit user (diminta
@@ -41,8 +42,30 @@ import androidx.media3.exoplayer.source.ShuffleOrder
  * `DefaultShuffleOrder` asli) — behavior valid, 0 risiko off-by-one dari logika sisip acak.
  *
  * NOT VERIFIED — 0 CI/device fisik sesi ini (lihat PROJECT_STATE.md § RESUME POINT Batch 498).
+ *
+ * Batch 717 — perburuan bug algoritma pemutaran. 3 cacat nyata di urutan shuffle:
+ *  1. Antrean DIGANTI selagi Shuffle ON (`setMediaItems`): ExoPlayer mengosongkan lalu menyisipkan lewat
+ *     [cloneAndInsert] ke urutan kosong -> dulu hasilnya identitas 0,1,2,... (Shuffle ON tetapi berurutan). Kini
+ *     urutan kosong yang diisi = antrean baru: permutasi acak + [onQueueReplaced] supaya pemilik menyusun ulang
+ *     dengan lagu aktif sebagai jangkar.
+ *  2. Lagu aktif bisa berada di posisi acak mana pun dalam permutasi; next/auto-advance hanya menjelajah posisi
+ *     SETELAH-nya, jadi lagu di posisi sebelumnya tak terjangkau (Repeat OFF: antrean habis lebih awal). Lihat
+ *     parameter `anchorIndex` pada [buildAntiRepeatNearbyOrder]: lagu aktif dipaku di posisi pertama.
+ *  3. "Putar Berikutnya" (sisip tepat setelah lagu aktif) dulu masuk EKOR urutan Shuffle -> dimainkan paling
+ *     akhir. Kini sisipan di `indeksAktif + 1` (bukan penambahan di ujung antrean) ditaruh tepat setelah lagu
+ *     aktif di urutan Shuffle. [currentIndexProvider] dibaca di thread aplikasi pemain (ExoPlayer memanggil
+ *     clone di thread itu); gagal baca = jatuh ke perilaku lama (ekor). Batas: "Putar Berikutnya" ketika lagu
+ *     aktif adalah indeks TERAKHIR antrean sama dengan penambahan di ujung, tetap masuk ekor.
  */
-class AntiRepeatShuffleOrder(private val shuffled: IntArray) : ShuffleOrder {
+class AntiRepeatShuffleOrder(
+    private val shuffled: IntArray,
+    private val currentIndexProvider: () -> Int = { C.INDEX_UNSET },
+    private val onQueueReplaced: () -> Unit = {},
+    private val random: Random = Random.Default
+) : ShuffleOrder {
+
+    private fun derive(order: IntArray): AntiRepeatShuffleOrder =
+        AntiRepeatShuffleOrder(order, currentIndexProvider, onQueueReplaced, random)
 
     // Reverse lookup: original media-item index -> posisinya di dalam [shuffled]. O(1) utk
     // getNextIndex/getPreviousIndex, sama pola dgn ExoPlayer's own DefaultShuffleOrder.
@@ -75,12 +98,33 @@ class AntiRepeatShuffleOrder(private val shuffled: IntArray) : ShuffleOrder {
     override fun getFirstIndex(): Int = if (shuffled.isEmpty()) C.INDEX_UNSET else shuffled[0]
 
     override fun cloneAndInsert(insertionIndex: Int, insertionCount: Int): ShuffleOrder {
+        if (insertionCount <= 0) return this
+        if (shuffled.isEmpty()) {
+            // Batch 717 — antrean BARU (pertama kali atau menggantikan yang lama): acak, BUKAN identitas.
+            runCatching { onQueueReplaced() }
+            return derive(IntArray(insertionCount) { it }.also { it.shuffle(random) })
+        }
         val shifted = IntArray(shuffled.size) { i ->
             val value = shuffled[i]
             if (value >= insertionIndex) value + insertionCount else value
         }
         val appended = IntArray(insertionCount) { insertionIndex + it }
-        return AntiRepeatShuffleOrder(shifted + appended)
+        val after = positionForPlayNext(insertionIndex)
+        if (after < 0) return derive(shifted + appended)
+        // Batch 717 — "Putar Berikutnya": sisip tepat setelah posisi lagu aktif di urutan Shuffle.
+        val result = IntArray(shifted.size + insertionCount)
+        shifted.copyInto(result, 0, 0, after + 1)
+        appended.copyInto(result, after + 1)
+        shifted.copyInto(result, after + 1 + insertionCount, after + 1, shifted.size)
+        return derive(result)
+    }
+
+    /** Posisi (di [shuffled]) lagu aktif bila sisipan di [insertionIndex] adalah "Putar Berikutnya", selain itu -1. */
+    private fun positionForPlayNext(insertionIndex: Int): Int {
+        if (insertionIndex >= shuffled.size) return -1 // penambahan di ujung antrean = ekor
+        val current = runCatching { currentIndexProvider() }.getOrDefault(C.INDEX_UNSET)
+        if (current < 0 || current >= shuffled.size || insertionIndex != current + 1) return -1
+        return positionOf[current]
     }
 
     override fun cloneAndRemove(indexFrom: Int, indexToExclusive: Int): ShuffleOrder {
@@ -93,10 +137,10 @@ class AntiRepeatShuffleOrder(private val shuffled: IntArray) : ShuffleOrder {
                 else -> result.add(value)
             }
         }
-        return AntiRepeatShuffleOrder(result.toIntArray())
+        return derive(result.toIntArray())
     }
 
-    override fun cloneAndClear(): ShuffleOrder = AntiRepeatShuffleOrder(IntArray(0))
+    override fun cloneAndClear(): ShuffleOrder = derive(IntArray(0))
 
     companion object {
         /** Ukuran window "baru-baru diputar" — lihat poin 2 di doc kelas ini. Skala mengikuti
@@ -116,26 +160,34 @@ class AntiRepeatShuffleOrder(private val shuffled: IntArray) : ShuffleOrder {
  * antrean yang sama dimasukkan 2x lewat "Tambah ke Antrean"). Degradasi aman: kalau seluruh
  * antrean jatuh ke satu kelompok saja (window relatif kelewat besar/kecil dari ukuran antrean
  * saat itu), fallback ke shuffle penuh biasa alih-alih memaksa split yang tidak berguna.
+ *
+ * Batch 717 — [anchorIndex] (0 until size): indeks lagu yang sedang diputar, dipaku di POSISI PERTAMA urutan; sisanya
+ * diacak seperti biasa (segar dulu, baru-diputar belakangan). Di luar rentang (default) = perilaku lama tanpa jangkar.
  */
-fun buildAntiRepeatNearbyOrder(songIds: List<Long>, recentlyPlayedIds: Set<Long>): IntArray {
+fun buildAntiRepeatNearbyOrder(
+    songIds: List<Long>,
+    recentlyPlayedIds: Set<Long>,
+    anchorIndex: Int = C.INDEX_UNSET,
+    random: Random = Random.Default
+): IntArray {
     val n = songIds.size
     if (n <= 1) return IntArray(n) { it }
 
+    val anchored = anchorIndex in 0 until n
     val freshIdx = ArrayList<Int>(n)
     val recentIdx = ArrayList<Int>(n)
     for (i in 0 until n) {
+        if (anchored && i == anchorIndex) continue
         if (songIds[i] in recentlyPlayedIds) recentIdx.add(i) else freshIdx.add(i)
     }
 
-    val order: MutableList<Int> = if (freshIdx.isEmpty() || recentIdx.isEmpty()) {
-        (0 until n).toMutableList().apply { shuffle() }
+    val order: MutableList<Int> = ArrayList<Int>(n)
+    if (anchored) order.add(anchorIndex)
+    if (freshIdx.isEmpty() || recentIdx.isEmpty()) {
+        order.addAll((freshIdx + recentIdx).shuffled(random))
     } else {
-        freshIdx.shuffle()
-        recentIdx.shuffle()
-        ArrayList<Int>(n).apply {
-            addAll(freshIdx)
-            addAll(recentIdx)
-        }
+        order.addAll(freshIdx.shuffled(random))
+        order.addAll(recentIdx.shuffled(random))
     }
 
     // Guard adjacency lagu SAMA PERSIS — best-effort: cari posisi j lain yang aman utk
@@ -147,6 +199,7 @@ fun buildAntiRepeatNearbyOrder(songIds: List<Long>, recentlyPlayedIds: Set<Long>
         var swapWith = -1
         for (j in order.indices) {
             if (j == i || j == i - 1) continue
+            if (anchored && j == 0) continue // jangkar tak boleh bergeser
             if (songIds[order[j]] == target) continue
             val leftOk = j == 0 || songIds[order[j - 1]] != target
             val rightOk = j == order.size - 1 || songIds[order[j + 1]] != target

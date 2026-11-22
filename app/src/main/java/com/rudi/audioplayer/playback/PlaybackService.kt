@@ -17,7 +17,9 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -228,6 +230,9 @@ class PlaybackService : MediaLibraryService() {
             // dibaca saat player dibangun -> berlaku setelah aplikasi dimulai ulang).
             .experimentalSetDynamicSchedulingEnabled(PowerSavingStore(this).isDynamicScheduling())
             .build()
+        // Batch 717 — urutan Shuffle kustom dipasang sejak pemain dibuat (antrean masih kosong = syarat setShuffleOrder), bukan hanya
+        // saat Shuffle dinyalakan: setiap antrean baru lalu lewat AntiRepeatShuffleOrder (acak + penanda jangkar), tak pernah identitas.
+        player.setShuffleOrder(newShuffleOrder(player, IntArray(0)))
         val startupExoAt = SystemClock.elapsedRealtime()
         if (duckOnFocus) {
             startDuckingFocus(player)
@@ -379,6 +384,7 @@ class PlaybackService : MediaLibraryService() {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 SafeGuard.guard("PlaybackService", "listener.onIsPlayingChanged") {
+                    if (isPlaying) serviceErrorStreak.set(0) // Batch 717
                     // Batch 623 — saat memutar, task dikecualikan dari Recents (tak ada kartu untuk di-swipe; OEM
                     // membunuh proses seketika pada swipe, log 9 Nov 17:57); jeda > tenggang = kartu kembali.
                     RecentsGuard.onPlaybackActive(this@PlaybackService, isPlaying)
@@ -428,17 +434,27 @@ class PlaybackService : MediaLibraryService() {
                 // `player` di sini adalah val ExoPlayer yang sama persis dibangun di atas
                 // (closure, pola sama dgn pushWidgetUpdate(player) di onIsPlayingChanged) — 0
                 // cast diperlukan, sudah konkret ExoPlayer sejak awal.
-                val count = player.mediaItemCount
-                if (count <= 1) return
-                val songIds = (0 until count).map { i -> player.getMediaItemAt(i).mediaId.toLongOrNull() ?: -1L }
-                val windowSize = AntiRepeatShuffleOrder.windowSizeFor(count)
-                val recentIds = if (windowSize > 0) {
-                    PlayStatsStore(this@PlaybackService).getRecentIds(windowSize).toHashSet()
-                } else {
-                    emptySet()
+                // Batch 717 — urutan kini berjangkar lagu aktif (lihat applyAnchoredShuffle).
+                shuffleAnchorPending = false
+                SafeGuard.guard("PlaybackService", "listener.onShuffleModeEnabledChanged") { applyAnchoredShuffle(player) }
+            }
+
+            // Batch 717 — antrean DIGANTI selagi Shuffle sudah ON tidak memicu onShuffleModeEnabledChanged (flag tak berubah) -> urutan
+            // dulu jadi identitas 0,1,2,...; kini urutan baru ditandai lewat [shuffleAnchorPending] dan disusun ulang di sini,
+            // setelah ExoPlayer menetapkan lagu mulai (indeks aktif sudah benar pada callback ini).
+            override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+                if (!shuffleAnchorPending) return
+                shuffleAnchorPending = false
+                if (player.shuffleModeEnabled) {
+                    SafeGuard.guard("PlaybackService", "listener.onTimelineChanged.shuffle") { applyAnchoredShuffle(player) }
                 }
-                val order = buildAntiRepeatNearbyOrder(songIds, recentIds)
-                player.setShuffleOrder(AntiRepeatShuffleOrder(order))
+            }
+
+            // Batch 717 — UI hidup: PlayerViewModel yang melewati lagu rusak (+ Snackbar); tanpa UI: service (lihat recoverFromPlayerErrorWithoutUi).
+            override fun onPlayerError(error: PlaybackException) {
+                SafeGuard.guard("PlaybackService", "listener.onPlayerError") {
+                    if (!PlayCountOwner.viewModelListening) recoverFromPlayerErrorWithoutUi(player, error)
+                }
             }
         })
 
@@ -1149,6 +1165,57 @@ class PlaybackService : MediaLibraryService() {
             )
             .build()
 
+    /** Batch 717 — true setelah antrean BARU masuk (urutan Shuffle kosong terisi); [Player.Listener.onTimelineChanged] menyusun ulang urutan berjangkar lagu aktif. */
+    private var shuffleAnchorPending = false
+
+    /** Batch 717 — lagu rusak berturut-turut yang sudah dilewati service tanpa UI; direset saat benar-benar memutar. */
+    private val serviceErrorStreak = java.util.concurrent.atomic.AtomicInteger(0)
+
+    private fun newShuffleOrder(player: ExoPlayer, order: IntArray) =
+        AntiRepeatShuffleOrder(order, { player.currentMediaItemIndex }, { shuffleAnchorPending = true })
+
+    /** Batch 717 — susun ulang urutan Shuffle: lagu aktif di posisi pertama, sisanya acak anti-ulang (lihat KDoc AntiRepeatShuffleOrder). */
+    private fun applyAnchoredShuffle(player: ExoPlayer) {
+        val count = player.mediaItemCount
+        if (count <= 1) return
+        val songIds = (0 until count).map { i -> player.getMediaItemAt(i).mediaId.toLongOrNull() ?: -1L }
+        val windowSize = AntiRepeatShuffleOrder.windowSizeFor(count)
+        val recentIds = if (windowSize > 0) {
+            PlayStatsStore(this).getRecentIds(windowSize).toHashSet()
+        } else {
+            emptySet()
+        }
+        val order = buildAntiRepeatNearbyOrder(songIds, recentIds, player.currentMediaItemIndex)
+        player.setShuffleOrder(newShuffleOrder(player, order))
+    }
+
+    /**
+     * Batch 717 — pemulihan galat pemutaran saat TIDAK ada UI (widget/Bluetooth/notifikasi/pasca-update). Dulu hanya
+     * PlayerViewModel yang melewati lagu rusak, dan ia mati bersama Activity: satu berkas hilang/rusak menghentikan
+     * seluruh antrean (pemain IDLE) sampai pengguna menekan putar. Hanya bila pemain BERNIAT memutar (tak mengejutkan
+     * dengan suara setelah restore dalam keadaan jeda); `prepare()` wajib agar pemain keluar dari IDLE pasca-galat.
+     */
+    private fun recoverFromPlayerErrorWithoutUi(player: ExoPlayer, error: PlaybackException) {
+        val streak = serviceErrorStreak.incrementAndGet()
+        AppLogger.e(
+            "PlaybackService",
+            "Galat pemutaran tanpa UI: kode=${error.errorCodeName} indeks=${player.currentMediaItemIndex}/${player.mediaItemCount} " +
+                "id=${player.currentMediaItem?.mediaId} beruntun=$streak berniat_putar=${player.playWhenReady}",
+            error
+        )
+        if (!player.playWhenReady) return
+        if (streak >= MAX_CONSECUTIVE_SERVICE_ERRORS) {
+            serviceErrorStreak.set(0)
+            player.pause()
+            AppLogger.w("PlaybackService", "Galat pemutaran tanpa UI: $streak lagu berturut-turut gagal, pemutaran dijeda")
+            return
+        }
+        if (!player.hasNextMediaItem()) return
+        player.seekToNextMediaItem()
+        player.prepare()
+        player.play()
+    }
+
     /** Batch 692 — sisa antrean tersimpan yang menunggu disambung setelah lagu pembuka diputar ([restoreRestOfQueue]). */
     private data class PendingQueueRest(val headId: Long, val ids: List<Long>, val headIndex: Int)
 
@@ -1257,6 +1324,9 @@ class PlaybackService : MediaLibraryService() {
                 }
                 if (before.isNotEmpty()) player.addMediaItems(0, before)
                 if (after.isNotEmpty()) player.addMediaItems(after)
+                // Batch 717 — sambungan memasukkan blok "sebelum" lalu "sesudah" ke urutan Shuffle secara berurutan (bukan acak);
+                // susun ulang sekali di akhir dengan lagu pembuka sebagai jangkar.
+                if (player.shuffleModeEnabled) (player as? ExoPlayer)?.let { applyAnchoredShuffle(it) }
                 AppLogger.w(
                     "PlaybackService",
                     "Pemulihan pasca-update: sisa antrean disambung +${before.size}/+${after.size} lagu dalam " +
@@ -1593,6 +1663,9 @@ class PlaybackService : MediaLibraryService() {
 
         // Batch 693 — jeda sebelum percobaan ulang membaca sisa antrean (galat sementara MediaStore tepat setelah update).
         private const val REST_SPLICE_RETRY_DELAY_MS = 1500L
+
+        // Batch 717 — batas lagu rusak berturut-turut yang dilewati otomatis TANPA UI (sama dengan PlayerViewModel); lewat batas = jeda.
+        private const val MAX_CONSECUTIVE_SERVICE_ERRORS = 5
 
         // Roadmap #8, Trim Keheningan Otomatis — nama custom SessionCommand + key Bundle-nya,
         // dipakai bareng PlayerViewModel.setSilenceSkipEnabled() lewat MediaController.

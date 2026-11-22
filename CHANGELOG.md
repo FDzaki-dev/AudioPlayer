@@ -1,5 +1,29 @@
 # Changelog
 
+## Batch 717 — Perburuan bug algoritma pemutaran: urutan Shuffle, "Putar Berikutnya", galat lagu tanpa UI
+
+- Input user: `sonix_debug_20261122_123640.txt` (v716 ekspor 12:36) + `SONIX_v716.zip` + `SONIX_laporan-untuk-claude_run143.zip` + pesan "lakukan perburuan bug di sektor algoritma pemutaran musik!!" (reopen eksplisit sektor pemutaran) lalu "buruan".
+
+- (A) VERIFIED dari artefak: CI run #143 semua LULUS (laporan tanpa temuan); log 12:36 tanpa FATAL/ANR baru (FATAL di logcat hanya 8-11 Nov); pemulihan pasca-update, ducking `volume=0.05`, transisi/antrean normal. Tidak ada cacat pemutaran yang tampak di log -> perburuan dilakukan pada kode.
+
+- (B) CACAT NYATA (terbukti dari kode, belum dari perangkat): 
+  1. **Shuffle ON + antrean DIGANTI = urutan identitas.** `AntiRepeatShuffleOrder` hanya dibangun saat `onShuffleModeEnabledChanged(true)`. `playQueue()` (pilih album/playlist/lagu baru) memanggil `setMediaItems` tanpa mengubah flag Shuffle: ExoPlayer memanggil `cloneAndRemove` lalu `cloneAndInsert(0, n)` ke urutan KOSONG -> hasil 0,1,2,...; Shuffle terlihat ON tetapi lagu dimainkan berurutan.
+  2. **Lagu aktif tidak dipaku di posisi pertama urutan Shuffle.** Next/auto-advance hanya menjelajah posisi SETELAH lagu aktif di permutasi; yang di posisi sebelumnya tak terjangkau (Repeat OFF: antrean habis lebih awal, rata-rata separuh antrean terlewat). Berlaku juga di jalur restore (`restoreHeadForResume` menyambung blok "sebelum" lalu "sesudah" dengan `addMediaItems`).
+  3. **"Putar Berikutnya" saat Shuffle ON dimainkan PALING AKHIR.** `cloneAndInsert` selalu menaruh sisipan di ekor urutan Shuffle; UI menaruhnya di `indeksAktif + 1`.
+  4. **Service tak punya penanganan galat lagu.** Lompat-lewat-lagu-rusak hanya ada di `PlayerViewModel` (mati bersama Activity; dicatat di Batch ~Gap #8). Tanpa UI (widget/Bluetooth/notifikasi/pasca-update) satu berkas hilang/rusak membuat pemain IDLE dan antrean berhenti. Selain itu jalur ViewModel memanggil `seekToNextMediaItem()` + `play()` tanpa `prepare()` (pemain IDLE pasca-galat tidak keluar dari IDLE hanya karena seek/play).
+
+- (C) PERBAIKAN v717, 4 file (1 baru; FILE_MANIFEST 271 -> 272):
+  - `playback/AntiRepeatShuffleOrder.kt`: ctor +`currentIndexProvider`/`onQueueReplaced`/`random` (default = perilaku lama); `cloneAndInsert` ke urutan kosong = permutasi ACAK + hook `onQueueReplaced`; sisipan di `indeksAktif + 1` (bukan ujung antrean) ditaruh tepat setelah lagu aktif; `buildAntiRepeatNearbyOrder(..., anchorIndex, random)` memaku lagu aktif di posisi pertama (penjaga duplikat tak menggeser jangkar).
+  - `playback/PlaybackService.kt`: urutan kustom dipasang sejak `onCreate` (antrean kosong); `onShuffleModeEnabledChanged` + `onTimelineChanged` (via penanda `shuffleAnchorPending`) memanggil `applyAnchoredShuffle`; `restoreRestOfQueue` menyusun ulang sekali setelah sambungan; `onPlayerError` -> `recoverFromPlayerErrorWithoutUi` hanya saat `PlayCountOwner.viewModelListening == false`: log mentah, lewati ke lagu berikut + `prepare()` + `play()` bila pemain BERNIAT memutar (tak mengejutkan dengan suara setelah restore dalam keadaan jeda), maks 5 galat beruntun lalu jeda; hitungan direset saat `isPlaying`.
+  - `playback/PlayerViewModel.kt`: `c.prepare()` ditambahkan antara `seekToNextMediaItem()` dan `play()` di `onPlayerError`.
+  - `test/.../AntiRepeatShuffleOrderTest.kt` (BARU, 15 tes).
+
+- (D) BATASAN **NOT VERIFIED**: perilaku nyata ExoPlayer di perangkat (urutan setelah ganti antrean, "Putar Berikutnya" saat Shuffle, pemulihan galat tanpa UI); `ExoPlayerImpl` memanggil clone di thread aplikasi (provider dibungkus `runCatching`, gagal = ekor); "Putar Berikutnya" ketika lagu aktif = indeks TERAKHIR antrean tak bisa dibedakan dari "Tambah ke Antrean" (tetap ekor); crossfade ke lagu yang sama pada antrean 1 lagu + Repeat All tidak diubah (tak terbukti); `prepare()` di ViewModel berdasarkan dokumentasi Media3 (galat -> IDLE).
+
+- (E) VERIFIKASI LOKAL: `AntiRepeatShuffleOrder.kt` + tes dikompilasi dengan kompiler Kotlin 2.0.21 (stub `ShuffleOrder`/`C` media3) dan 15/15 tes JUnit lulus; `PlaybackService.kt`/`PlayerViewModel.kt` hanya dicek kurung seimbang (compile Android/CI **NOT VERIFIED**). PREDIKSI: Tes 407 (392 + 15), ArchUnit 7, detekt 0, lint 0, Kotlin 0, SpotBugs 0.
+
+- (F) CARA UJI: (1) Shuffle ON, lalu pilih album/playlist lain -> lagu berikutnya harus acak, bukan urut. (2) Shuffle ON, "Putar Berikutnya" pada lagu -> dimainkan setelah lagu aktif. (3) Tutup aplikasi, putar dari widget dengan satu berkas dihapus di tengah antrean -> lanjut ke lagu berikut; log `Galat pemutaran tanpa UI: kode=... beruntun=1`.
+
 ## Batch 716 — Ducking lebih dalam (0.2 -> 0.05) setelah laporan "suara media kalah jauh sama musik yang keras"
 
 - Input user: `sonix_debug_20261122_122704.txt` (v715 = 1.11.26 build 576, ekspor 12:26:59) + pesan "suara media kalah jauh sama musik yang keras".

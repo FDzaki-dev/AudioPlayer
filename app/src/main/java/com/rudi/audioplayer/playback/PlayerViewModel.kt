@@ -741,6 +741,9 @@ class PlayerViewModel(private val appContext: Context) : ViewModel() {
                 _playbackErrorMessage.value = "$label tidak bisa diputar ($reason)."
                 if (c != null && c.hasNextMediaItem()) {
                     c.seekToNextMediaItem()
+                    // Batch 717 — pasca-galat pemain IDLE; seek + play saja tidak keluar dari IDLE (tanpa suara). prepare() wajib
+                    // (no-op bila pemain sudah tidak IDLE).
+                    c.prepare()
                     c.play()
                 }
             }
