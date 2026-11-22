@@ -1,5 +1,24 @@
 # Changelog
 
+## Batch 719 — Memo sampul widget: lagu tanpa sampul tak lagi dimuat ulang tiap pembaruan penuh
+
+- Input user: `sonix_debug_20261122_182257.txt` (v718 = 1.11.29 build 579, ekspor 18:22) + `SONIX_v718.zip` + `SONIX_laporan-untuk-claude_run145.zip`, tanpa teks.
+
+- (A) VERIFIED dari artefak: CI run #145 (commit a4a4689, Gradle exit 0/0/0/0): ArchUnit 7/0, **SpotBugs 0 (8 -> 0)**, detekt 0, lintDebug 0, Tes 407 (0 dilewati), Kotlin 0 -> perbaikan Batch 718 **VERIFIED**. Log v718: pasang senyap `v1.11.29-run691` 18:22:14 -> `proses_mulai ... keputusan=RESUME` -> `isPlaying=true` pada `sejak_proses_mulai=1640ms`, `posisi_pulih=42255ms`, pembersihan APK `terhapus=1 gagal=0`; 0 `FATAL`/ANR; `MY_PACKAGE_REPLACED ... SKIP_NOT_PLAYING` sesudah pemicu awal = benar (penanda sudah dikonsumsi pemicu awal; tak memulai ganda). 1 `Skipped 33 frames` pada 18:22:16.297 = frame PERTAMA Choreographer proses baru (±0,5 dtk setelah proses mulai, Activity belum ada) -> tak ditindak. `Galat pemutaran tanpa UI` tak muncul (jalur Batch 717 belum teruji = **NOT VERIFIED**).
+
+- (B) CACAT NYATA (terbukti di log, perbaikan lokal): 4 URI lagu TANPA sampul tertanam (probe `embeddedPicture: null` 4/4) dimuat ulang terus. Dua URI yang diputar berulang (61407 = WAV 47 MB, 307375 = MP3 7 MB) masing-masing 12 kegagalan `ImageDecoder$DecodeException` dalam sehari: `WidgetUpdater` 7x, `SongArtBitmapLoader` 2-3x, `AccentColorExtractor` 2-3x. Penyebab di widget: `WidgetUpdater.performUpdate` memanggil `ContentResolver.loadThumbnail` pada SETIAP pembaruan penuh (±3 dalam ±1 dtk tiap lagu mulai: `onUpdate` + metadata + status putar) tanpa mengingat hasil sebelumnya; lagu bersampul ikut dimuat + didecode ulang tiap kali. Batch 622 hanya merapikan pencatatannya (1 baris WARN + probe 1x per URI), bukan jumlah percobaan.
+
+- (C) PERBAIKAN v719, 3 file (2 BARU; FILE_MANIFEST 272 -> 274):
+  - `util/ThumbnailMemo.kt` (BARU, murni tanpa tipe Android): memo SATU-SLOT per kunci `(URI, ukuran)`; `recall` -> `Hit(nilai)` / `Miss` / `Unknown`; sampul berlaku 2 menit, "tanpa sampul" 10 menit, kedaluwarsa = tak diketahui (dimuat ulang); jam mundur = tak dipercaya; `@Synchronized`.
+  - `widget/WidgetUpdater.kt`: `loadAlbumArtBitmap` memakai `artMemo` (`Hit` -> pakai ulang bitmap, `Miss` -> `null` tanpa memanggil `loadThumbnail`); hasil sukses disimpan; hanya `ImageDecoder.DecodeException`/`IOException` ("tanpa sampul") yang diingat sebagai `Miss` — `SecurityException` dll. TIDAK diingat sehingga pembaruan berikutnya mencoba lagi. Pencatatan kegagalan (`ArtFailureLog.logFailure`) tetap seperti Batch 622 pada percobaan nyata pertama. Bitmap tersimpan tak pernah di-recycle di jalur widget (`buildArtPlate` hanya mendaur-ulang bitmap perantaranya sendiri, bukan sumber; satu-satunya pemakai `albumArt` = `buildArtPlate`).
+  - `test/.../util/ThumbnailMemoTest.kt` (BARU, 9 tes).
+
+- (D) TIDAK diubah (sengaja): `AccentColorExtractor`, `SongArtBitmapLoader` (notifikasi), `AudioArtFetcher` (Coil), bubble — masing-masing 1x per lagu/pembukaan layar, di luar jalur beruntun widget. **NOT VERIFIED**: compile Android + JUnit lokal (sandbox tanpa kotlinc/android.jar/JUnit), perilaku di perangkat. Temuan yang BELUM diselidiki (tak ada dasar perbaikan): `dumpsys meminfo` 18:22 dengan 1 Activity terbuka = `GL mtrack` 130.984 KB (Graphics PSS ±131 MB dari total 216 MB; Native Heap 46,5 MB; 74 bitmap malloc 23,5 MB) — sumbernya (layer/blur/bitmap neumorphic) tak terbaca dari log; perlu data pembanding (mis. `dumpsys gfxinfo`) sebelum disentuh.
+
+- (E) VERIFIKASI LOKAL: `diff` terhadap v718 = HANYA `WidgetUpdater.kt` (impor + 1 bidang + isi `loadAlbumArtBitmap`) + 2 berkas baru; kurung/kurawal seimbang di 3 berkas; port Python logika memo 9/9 sama dengan tes JUnit. PREDIKSI: Tes 416 (407 + 9), ArchUnit 7 (`util` tanpa dependensi keluar; `widget` -> `util` diizinkan), detekt 0, lint 0, Kotlin 0, SpotBugs 0.
+
+- (F) CARA UJI: pasang v719, pilih lagu TANPA sampul tertanam saat widget terpasang. Log: `Gagal muat artwork widget` muncul 1x per lagu (bukan 2-4x) selama 10 menit; sampul lagu bersampul tetap tampil dan berganti saat lagu berganti. Bila widget tampil ikon bawaan untuk lagu BERSAMPUL -> catat (cabut `artMemo` di `loadAlbumArtBitmap`).
+
 ## Batch 718 — SpotBugs 8 -> 0: penanda lintas-thread PlaybackService (@Volatile + AtomicInteger)
 
 - Input user: `sonix_debug_20261122_180255.txt` (v717 = 1.11.28 build 578, ekspor 18:02) + `SONIX_v717.zip` + `SONIX_laporan-untuk-claude_run144.zip` + pesan "pokoknya yang gak sesuai standar. diberesin sampai tuntas!!".

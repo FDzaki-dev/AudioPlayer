@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 719: + app/src/main/java/com/rudi/audioplayer/util/ThumbnailMemo.kt + app/src/test/java/com/rudi/audioplayer/util/ThumbnailMemoTest.kt (memo sampul satu-slot; widget/WidgetUpdater.kt diubah: lagu tanpa sampul tak dimuat ulang tiap pembaruan penuh) — 272->274.
 # Batch 718: 0 berkas baru (playback/PlaybackService.kt diubah: @Volatile + AtomicInteger untuk penanda lintas-thread, SpotBugs 8 -> 0) — 272.
 # Batch 717: + app/src/test/java/com/rudi/audioplayer/playback/AntiRepeatShuffleOrderTest.kt (tes urutan Shuffle; playback/AntiRepeatShuffleOrder.kt, playback/PlaybackService.kt, playback/PlayerViewModel.kt diubah: jangkar lagu aktif, antrean baru acak, Putar Berikutnya, galat lagu tanpa UI) — 271->272.
 # Batch 716: 0 berkas baru (playback/AudioFocusDucking.kt diubah: DUCK_FACTOR 0.2 -> 0.05) — 271.
@@ -319,6 +320,7 @@ app/src/main/java/com/rudi/audioplayer/util/SafeGuard.kt
 app/src/main/java/com/rudi/audioplayer/util/ShizukuBridge.kt
 app/src/main/java/com/rudi/audioplayer/util/StartupKind.kt
 app/src/main/java/com/rudi/audioplayer/util/StartupTrace.kt
+app/src/main/java/com/rudi/audioplayer/util/ThumbnailMemo.kt
 app/src/main/java/com/rudi/audioplayer/widget/PlayerWidgetProvider.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetMarquee.kt
 app/src/main/java/com/rudi/audioplayer/widget/WidgetUpdater.kt
@@ -409,6 +411,7 @@ app/src/test/java/com/rudi/audioplayer/util/DumpsysFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/util/LogOrderTest.kt
 app/src/test/java/com/rudi/audioplayer/util/ShizukuInstallOutputTest.kt
 app/src/test/java/com/rudi/audioplayer/util/StartupKindTest.kt
+app/src/test/java/com/rudi/audioplayer/util/ThumbnailMemoTest.kt
 app/src/test/java/com/rudi/audioplayer/widget/WidgetMarqueeMathTest.kt
 app/src/test/java/com/rudi/audioplayer/widget/WidgetStripSizingTest.kt
 build.gradle.kts

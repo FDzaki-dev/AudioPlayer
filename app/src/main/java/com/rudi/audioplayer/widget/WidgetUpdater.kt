@@ -32,6 +32,7 @@ import com.rudi.audioplayer.ui.theme.ThemeMode
 import com.rudi.audioplayer.util.AppLogger
 import com.rudi.audioplayer.util.ArtFailureLog
 import com.rudi.audioplayer.util.ChangeGate
+import com.rudi.audioplayer.util.ThumbnailMemo
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -226,6 +227,12 @@ object WidgetUpdater {
     // Batch 681 — pintu log per id widget: baris `Marquee diag` hanya ditulis bila tanda (mode/ukuran/skala font/teks>kolom)
     // berubah atau widget baru terlihat di proses ini. Dulu ditulis tiap pembaruan = 30,8% byte log v680 (lihat KDoc ChangeGate).
     private val diagGate = ChangeGate()
+
+    // Batch 719 — sampul terakhir (atau "tanpa sampul") diingat per (URI, ukuran): update penuh datang beruntun (onUpdate + metadata +
+    // status putar, ±3 dalam ±1 dtk) dan tiap kali memuat + mendecode ulang / gagal ulang di MediaProvider. Hanya dibaca/ditulis dari
+    // [performUpdate] di bawah `updateLock`. Bitmap tersimpan TIDAK pernah di-recycle di jalur widget ([buildArtPlate] hanya mendaur-ulang
+    // bitmap perantaranya sendiri, bukan sumber).
+    private val artMemo = ThumbnailMemo<Bitmap>()
 
     fun updateAll(context: Context) {
         val ticket = updateTicket.incrementAndGet()
@@ -656,15 +663,29 @@ object WidgetUpdater {
     }
 
     private fun loadAlbumArtBitmap(context: Context, uri: Uri, sizePx: Int): Bitmap? {
+        // Batch 719 — pakai hasil terakhir untuk (URI, ukuran) yang sama; lagu tanpa sampul tak lagi memanggil loadThumbnail berulang.
+        val memoKey = "$uri#$sizePx"
+        when (val recalled = artMemo.recall(memoKey, SystemClock.elapsedRealtime())) {
+            is ThumbnailMemo.Recall.Hit -> return recalled.value
+            ThumbnailMemo.Recall.Miss -> return null
+            ThumbnailMemo.Recall.Unknown -> Unit
+        }
         return try {
             // Batch 402: pre-Q decodeStream() fallback removed — minSdk 31 guarantees API>=29
             // on every installable device, so that branch was unreachable dead code.
-            context.contentResolver.loadThumbnail(uri, android.util.Size(sizePx, sizePx), null)
+            val bitmap = context.contentResolver.loadThumbnail(uri, android.util.Size(sizePx, sizePx), null)
+            artMemo.rememberHit(memoKey, bitmap, SystemClock.elapsedRealtime())
+            bitmap
         } catch (e: Exception) {
             // Widget jatuh balik ke ikon aplikasi kalau ini gagal (masih terlihat wajar di layar
             // beranda), tapi dicatat supaya kegagalan muat artwork tidak sepenuhnya tak terlihat.
             // Batch 622 — DecodeException (lagu tanpa sampul) = 1 baris WARN; galat lain tetap ERROR + stacktrace; + probe 1x per URI.
             ArtFailureLog.logFailure(context, "WidgetUpdater", "Gagal muat artwork widget", uri, sizePx, e)
+            // Batch 719 — hanya "tanpa sampul" (DecodeException perangkat ini / IOException) diingat; SecurityException dll. (izin/transien)
+            // TIDAK diingat supaya pembaruan berikutnya mencoba lagi.
+            if (e is android.graphics.ImageDecoder.DecodeException || e is java.io.IOException) {
+                artMemo.rememberMiss(memoKey, SystemClock.elapsedRealtime())
+            }
             null
         }
     }
