@@ -1,5 +1,21 @@
 # Changelog
 
+## Batch 716 — Ducking lebih dalam (0.2 -> 0.05) setelah laporan "suara media kalah jauh sama musik yang keras"
+
+- Input user: `sonix_debug_20261122_122704.txt` (v715 = 1.11.26 build 576, ekspor 12:26:59) + pesan "suara media kalah jauh sama musik yang keras".
+
+- (A) VERIFIED v715 (log): APK `v1.11.26-run688` (7117531 byte) terpasang senyap 12:26:05, `Ducking fokus audio AKTIF` 12:26:07 (default ON bekerja), `Fokus audio diberikan` 12:26:08, lalu pada video `com.shopee.id` (`req=2 CONTENT_TYPE_MOVIE`, 12:26:32 `handleLoss -2` -> 12:26:51 `handleGain 1`) tercatat `Fokus berubah: kode=-2 panggilan=false aksi=DUCK volume=0.2` dan `kode=1 ... aksi=RESUME_AND_UNDUCK volume=1.0`; tanpa `Jeda: fokus audio direbut`. Jadi musik TIDAK lagi dijeda, mekanisme ducking terbukti jalan (19 dtk). Pemulihan pasca-update normal (`isPlaying=true` +1322 ms), pembersihan APK `terhapus=1`; 0 FATAL/ANR baru (FATAL buffer = lama 9-11 Nov). Lagu: `bxkq & HARDX - Aria Math.wav` (WAV PCM 47 MB, keras).
+
+- (B) KELUHAN NYATA: volume musik saat ducking masih terlalu keras dibanding suara video. Akar (analisis, bukan terukur): faktor 0.2 = -14 dB; efek Equalizer sesi pemain (`EqualizerController`, sesi 17745) berada SETELAH volume pemain, dan WAV keras + penguatan band membuat penurunan yang terdengar jauh lebih kecil dari 14 dB. Besaran ukur (level keluaran/band EQ pengguna) **NOT VERIFIED**: log tak memuat level band maupun loudness.
+
+- (C) PERBAIKAN v716, 1 file kode DIUBAH (0 baru; FILE_MANIFEST tetap 271): `playback/AudioFocusDucking.kt` `DUCK_FACTOR` 0.2f -> 0.05f (-26 dB) + komentar alasan. Tanpa tes baru (konstanta di `private companion`, tak ada logika murni baru). Tak ada perubahan lain; saklar tetap default AKTIF.
+
+- (D) BATASAN **NOT VERIFIED**: apakah 0.05 cukup/terlalu dalam di telinga pengguna (bila masih terlalu keras -> turunkan lagi, mis. 0.02; bila musik terlalu hilang -> 0.1); penurunan/pemulihan masih mendadak (tanpa ramp); crossfade (overlapPlayer) tak ikut turun; volume ubahan pengguna selama ducking ditimpa saat dipulihkan.
+
+- (E) VERIFIKASI LOKAL: diff terhadap v715 = hanya konstanta + komentar + dokumentasi; kurung seimbang. **NOT VERIFIED**: compile/JUnit (sandbox tanpa kotlinc/JUnit), perilaku di perangkat. PREDIKSI: Tes 392 (tetap), ArchUnit 7, detekt 0, lint 0, Kotlin 0, SpotBugs 0.
+
+- (F) CARA UJI: pasang v716, putar musik keras, buka video Shopee. Log: `Fokus berubah: kode=-2 ... aksi=DUCK volume=0.05` dan `... RESUME_AND_UNDUCK volume=1.0`. Beri tahu terlalu pelan/keras agar faktor disetel.
+
 ## Batch 715 — Ducking Fokus Audio default AKTIF + pengaman mode panggilan
 
 - Input user: `sonix_debug_20261122_070651.txt` (v714 = 1.11.25 build 575, ekspor 07:06:46), tanpa teks; tanpa laporan CI; pesan: "buruan".

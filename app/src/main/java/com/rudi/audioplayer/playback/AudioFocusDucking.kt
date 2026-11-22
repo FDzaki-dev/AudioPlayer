@@ -244,6 +244,9 @@ internal class DuckingFocusController(
     }
 
     private companion object {
-        const val DUCK_FACTOR = 0.2f
+        // Batch 716 — 0.2 (-14 dB, bawaan Media3) terlalu dangkal: log v715 (12:26:32-12:26:51) membuktikan ducking bekerja (volume=0.2,
+        // musik tak dijeda) tetapi pengguna melapor suara media (video Shopee) "kalah jauh" oleh musik keras. Efek Equalizer berada SETELAH
+        // volume pemain, jadi penguatan band + clipping WAV keras membuat penurunan terdengar jauh < 14 dB. 0.05 = -26 dB.
+        const val DUCK_FACTOR = 0.05f
     }
 }
