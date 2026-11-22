@@ -676,16 +676,19 @@ object WidgetUpdater {
             val bitmap = context.contentResolver.loadThumbnail(uri, android.util.Size(sizePx, sizePx), null)
             artMemo.rememberHit(memoKey, bitmap, SystemClock.elapsedRealtime())
             bitmap
+        } catch (e: java.io.IOException) {
+            // Batch 719/721 — "tanpa sampul": ImageDecoder.DecodeException (perangkat ini) adalah turunan IOException, begitu pula
+            // FileNotFoundException; keduanya diingat 10 mnt supaya pembaruan berikutnya tak memanggil loadThumbnail lagi. Batch 721:
+            // dipisah lewat urutan `catch` (bukan `e is ...` di dalam catch) — detekt `InstanceOfCheckForException` (run #147, 2 temuan).
+            ArtFailureLog.logFailure(context, "WidgetUpdater", "Gagal muat artwork widget", uri, sizePx, e)
+            artMemo.rememberMiss(memoKey, SystemClock.elapsedRealtime())
+            null
         } catch (e: Exception) {
             // Widget jatuh balik ke ikon aplikasi kalau ini gagal (masih terlihat wajar di layar
             // beranda), tapi dicatat supaya kegagalan muat artwork tidak sepenuhnya tak terlihat.
             // Batch 622 — DecodeException (lagu tanpa sampul) = 1 baris WARN; galat lain tetap ERROR + stacktrace; + probe 1x per URI.
+            // Batch 719 — SecurityException dll. (izin/transien) TIDAK diingat supaya pembaruan berikutnya mencoba lagi.
             ArtFailureLog.logFailure(context, "WidgetUpdater", "Gagal muat artwork widget", uri, sizePx, e)
-            // Batch 719 — hanya "tanpa sampul" (DecodeException perangkat ini / IOException) diingat; SecurityException dll. (izin/transien)
-            // TIDAK diingat supaya pembaruan berikutnya mencoba lagi.
-            if (e is android.graphics.ImageDecoder.DecodeException || e is java.io.IOException) {
-                artMemo.rememberMiss(memoKey, SystemClock.elapsedRealtime())
-            }
             null
         }
     }

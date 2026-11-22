@@ -1,5 +1,21 @@
 # Changelog
 
+## Batch 721 — detekt: `InstanceOfCheckForException` pada memo sampul widget (temuan CI #147, kode Batch 719)
+
+- Input user: `sonix_debug_20261123_062401.txt` (v720 = 1.11.31 build 581, ekspor 23 Nov 06:23) + `SONIX_laporan-untuk-claude_run147.zip`, tanpa teks.
+
+- (A) VERIFIED dari artefak CI run #147 (commit 29a213a, Gradle exit 0/0/0/0): ArchUnit 7/0, **SpotBugs 0**, **lintDebug 0**, **Tes 416 LULUS**, Kotlin 0 peringatan; SpotBugs/lint kini TERBACA (di run #146 NOT VERIFIED akibat jaringan runner). **detekt: 2 temuan** `detekt.InstanceOfCheckForException @ widget/WidgetUpdater.kt:686` (dua kali = dua cek `is` pada baris yang sama).
+
+- (B) AKAR MASALAH: kode Batch 719 sendiri — di `loadAlbumArtBitmap`, dalam `catch (e: Exception)` ada `if (e is ImageDecoder.DecodeException || e is IOException) artMemo.rememberMiss(...)`. Aturan detekt `InstanceOfCheckForException` (potential-bugs) melarang cek tipe galat di dalam blok catch; temuan ini baru terlihat sekarang karena detekt di run #146 NOT VERIFIED (run #145 = detekt 0 sebelum kode itu ada). Perilaku kode benar, gaya salah.
+
+- (C) PERBAIKAN v721 (1 berkas kode: `widget/WidgetUpdater.kt`): cek `is` diganti urutan `catch`: `catch (e: java.io.IOException)` (mencakup `ImageDecoder.DecodeException` — turunan `IOException` — dan `FileNotFoundException`) -> `logFailure` + `artMemo.rememberMiss`; lalu `catch (e: Exception)` -> `logFailure` saja (SecurityException dll. tetap TIDAK diingat). Perilaku identik dengan Batch 719; tak ada `e is ...` lagi di fungsi itu. `ArtFailureLog.logFailure` (cek `is` di luar catch) tak disentuh.
+
+- (D) Log v720 (ekspor 06:23): pasang senyap `v1.11.31-run693` 06:23:43 -> `proses_mulai ... keputusan=RESUME` -> `isPlaying=true` pada `sejak_proses_mulai=1566ms`, `posisi_pulih=27666048ms`, pembersihan APK `terhapus=1 gagal=0`; `MY_PACKAGE_REPLACED ... SKIP_NOT_PLAYING` sesudah pemicu awal = benar (sama seperti v718/v719). 0 FATAL baru; `FATAL EXCEPTION` di buffer logcat bertanggal 08 Nov (`UnsupportedOperationException: AudioEffect: invalid parameter operation`) dan 11 Nov (`IllegalArgumentException: process hasn't exited`) = riwayat lama yang SUDAH ditangani batch sebelumnya (tercatat di CHANGELOG/PROJECT_STATE), bukan kejadian baru. **Memo sampul 719 masih NOT VERIFIED**: tak ada lagu TANPA sampul yang diputar sejak v719 (satu-satunya `Gagal muat artwork` bertanggal 18:25:19 = v718). Jalur retry CI Batch 720: run #147 tak memuat `SPOTBUGS_RETRY`/`STATIC_RETRY` di laporan -> belum terbukti dipakai di runner (NOT VERIFIED; tak ada regresi).
+
+- (E) VERIFIKASI LOKAL: `diff` terhadap v720 = HANYA blok `catch` di `loadAlbumArtBitmap` (+ docs); kurung/kurawal seimbang; urutan catch (IOException sebelum Exception) valid. **NOT VERIFIED**: compile Android/JUnit/detekt lokal (sandbox tanpa kotlinc/detekt). PREDIKSI CI #148: detekt 0, Tes 416, ArchUnit 7, SpotBugs 0, lint 0, Kotlin 0.
+
+- (F) CARA UJI: push v721; `laporan-untuk-claude.txt` harus memuat `detekt: LULUS`. Putar lagu TANPA sampul dengan widget terpasang -> `Gagal muat artwork widget` 1x per lagu per 10 menit (memo 719). Temuan lama yang BELUM diselidiki: `GL mtrack` ±129 MB (Graphics PSS) dgn 1 Activity — butuh `dumpsys gfxinfo`.
+
 ## Batch 720 — CI: ulang unduhan dependensi SpotBugs + detekt/lint (run #146 NOT VERIFIED akibat jaringan runner)
 
 - Input user: `sonix_debug_20261122_184010.txt` (v719 = 1.11.30 build 580, ekspor 18:40) + `SONIX_laporan-untuk-claude_run146.zip`, tanpa teks.

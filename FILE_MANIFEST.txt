@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 721: 0 berkas baru (widget/WidgetUpdater.kt diubah: blok catch loadAlbumArtBitmap) — 274 tetap.
 # Batch 720: 0 berkas baru (.github/workflows/android-artifact.yml diubah: run_retry SpotBugs + detekt/lint) — 274 tetap.
 # Batch 719: + app/src/main/java/com/rudi/audioplayer/util/ThumbnailMemo.kt + app/src/test/java/com/rudi/audioplayer/util/ThumbnailMemoTest.kt (memo sampul satu-slot; widget/WidgetUpdater.kt diubah: lagu tanpa sampul tak dimuat ulang tiap pembaruan penuh) — 272->274.
 # Batch 718: 0 berkas baru (playback/PlaybackService.kt diubah: @Volatile + AtomicInteger untuk penanda lintas-thread, SpotBugs 8 -> 0) — 272.
