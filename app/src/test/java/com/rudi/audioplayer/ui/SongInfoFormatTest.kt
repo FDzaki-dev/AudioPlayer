@@ -5,7 +5,10 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import java.util.Locale
 
-/** Batch 726 — format tampilan Info Lagu. Fungsi murni (tanpa Context), jalan di JVM biasa. */
+/**
+ * Batch 726 — format tampilan Info Lagu. Fungsi murni (tanpa Context), jalan di JVM biasa.
+ * Batch 729 — keputusan penelan sisa fling sheet ([SheetFling]) di berkas yang sama.
+ */
 class SongInfoFormatTest {
 
     @Test
@@ -118,5 +121,27 @@ class SongInfoFormatTest {
         assertEquals(true, OggHeader.mightBeOgg("application/octet-stream", "lagu.oga"))
         assertEquals(false, OggHeader.mightBeOgg("audio/mpeg", "lagu.mp3"))
         assertEquals(false, OggHeader.mightBeOgg(null, null))
+    }
+
+    @Test
+    fun `sisa fling ke atas selalu ditelan agar sheet tak memantul`() {
+        assertEquals(true, SheetFling.swallowLeftover(-4_000f, resting = true))
+        assertEquals(true, SheetFling.swallowLeftover(-4_000f, resting = false))
+        assertEquals(true, SheetFling.swallowLeftover(0f, resting = true))
+    }
+
+    @Test
+    fun `sisa fling ke bawah hanya diteruskan bila sheet sedang ditarik`() {
+        assertEquals(true, SheetFling.swallowLeftover(3_000f, resting = true))
+        assertEquals(false, SheetFling.swallowLeftover(3_000f, resting = false))
+    }
+
+    @Test
+    fun `sheet dianggap diam dalam toleransi dan NaN dianggap tidak diam`() {
+        assertEquals(true, SheetFling.isResting(120f, 120f))
+        assertEquals(true, SheetFling.isResting(120f + SheetFling.REST_TOLERANCE_PX, 120f))
+        assertEquals(false, SheetFling.isResting(120f + SheetFling.REST_TOLERANCE_PX + 0.5f, 120f))
+        assertEquals(true, SheetFling.isResting(100f, 120f)) // lebih ke atas dari anchor tetap "diam"
+        assertEquals(false, SheetFling.isResting(120f, Float.NaN))
     }
 }
