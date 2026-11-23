@@ -1,5 +1,19 @@
 # Changelog
 
+## Batch 725 — Bilah tab pas dengan pil geser (tinggi bilah dikunci 60.dp, pil 84% x 84%, wajah dibatasi selebar pil)
+
+- Input user: tangkapan layar bilah tab (v724) + `sonix_debug_20261123_082605.txt` (v724 = 1.11.35 build 585, ekspor 23 Nov 08:26) + `SONIX_v724.zip`; teks: "bilah tab masih kebesaran. tidak fit dengan pil geser nya!!". Tanpa laporan CI #151 -> hasil CI v724 NOT VERIFIED (kompilasi source utama terbukti tidak langsung: APK `v1.11.35-run697` terpasang senyap 08:24:21 dan berjalan).
+
+- (A) Log v724: 0 FATAL; `fontScale=1.15` masih terbaca (24 baris; app kini membatasinya 1.0 di dalam `LocalDensity`, jadi nilai di log = font sistem, bukan skala di app); 3x `Skipped 30/43/31 frames` (07:00 proses v722, 08:11 proses v723 = sebelum skala UI v724; tak ditindak).
+
+- (B) AKAR (angka diukur dari tangkapan layar 1080 px, kepadatan efektif ±2,7 px/dp): tinggi bilah = minimum `NavigationBar` M3 80.dp (internal `defaultMinSize`), pil = 62% = 49,6.dp -> ±15.dp ruang kosong di atas/bawah pil; wajah ikon+label (6+24+2+16+6 = 54.dp) justru LEBIH TINGGI dari pil; label "Perpustakaan" ±86.dp vs pil 74% slot ±90.dp (sisa ±2,7.dp per sisi) = label menempel di tepi pil. Skala x0.90 Batch 724 mengecilkan semuanya sama rata, jadi rasio bilah:pil:wajah tak berubah -> tetap "kebesaran dan tidak fit".
+
+- (C) PERBAIKAN v725 (3 file source/test; 0 baru; manifest tetap 276): SATU kontrak ukuran di `BottomNavBar.kt` (konstanta `NAV_*`), dipakai bersama `MainActivity.kt` dan wajah tab. `MainActivity.kt`: `.height(NAV_BAR_HEIGHT_DP.dp)` (60.dp) pada modifier `NavigationBar` setelah `.padding(...)` (height tetap = batas keras, `defaultMinSize(80.dp)` internal M3 terpotong); `neuSlidingKey` memakai `TAB_PILL_WIDTH_FRACTION`/`TAB_PILL_HEIGHT_FRACTION` (sebelumnya literal 0.74f/0.62f duplikat). `BottomNavBar.kt`: pil 84% x 84% (50,4.dp, membungkus wajah 46.dp dengan ±2,2.dp per sisi di atas padding wajah); ikon 22.dp (dulu 24 default), label 11sp/14sp (`labelMedium.copy(fontSize, lineHeight)`; letterSpacing/bobot tetap ikut tema), padding wajah 6.dp kiri-kanan + 4.dp atas-bawah; `limitToPillWidth` (layout modifier) membatasi lebar wajah = 84% lebar slot di KEDUA salinan (dasar + aksen) -> label yang lebih lebar disusutkan oleh `shrinkToFitWidth` yang sudah ada (lantai 9sp) dan tak pernah keluar dari pil; slot sentuh `heightIn(min = 52.dp)` (sebelum `onPlaced`/`selectable`), BUKAN `fillMaxHeight` (pelajaran Batch 450). `TabPillMathTest.kt`: +6 tes (wajah muat di pil, pil muat di bilah, slot sentuh, `navFaceHeightDp` = 46, `tabFaceMaxWidth`, `tabPillLeft` dgn pecahan baru).
+
+- (D) Hasil hitung (port Python, lebar efektif 355/400/436.dp): bilah 80 -> 60.dp (-25%); jarak vertikal pil-bilah 15 -> 4,8.dp; label 11sp ±79.dp muat dgn jarak ±12.dp ke tepi pil di layar 400/436.dp efektif, di layar sempit 355.dp efektif disusutkan x0,93.
+
+- (E) NOT VERIFIED: kompilasi Android/Kotlin, detekt/SpotBugs/lint/ArchUnit/JUnit (sandbox tanpa kompiler Kotlin dan tanpa Gradle; kurung/kurawal seimbang di 3 file), perilaku `.height(60.dp)` terhadap `NavigationBar` M3 versi compose-bom 2026.04.01, dan tampilan di perangkat. PREDIKSI CI #152: Tes 432, ArchUnit 7, detekt 0, SpotBugs 0, lint 0, Kotlin 0.
+
 ## Batch 724 — Skala UI global: tampilan lebih ringkas/minimalis (kepadatan x0.90, font sistem dibatasi 1.0)
 
 - Input user: `sonix_debug_20261123_081207.txt` (v723 = 1.11.34 build 584, ekspor 23 Nov 08:12) + `SONIX_laporan-untuk-claude_run150.zip`; teks: "saya rasa juga tampilan aplikasi serba jumbo. gak kelihatan minimalis!!". ZIP v723 tidak dilampirkan ulang (dasar kerja = hasil Batch 723 di sesi yang sama).

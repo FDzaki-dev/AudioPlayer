@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Icon
@@ -38,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.rudi.audioplayer.ui.theme.isSkeuTheme
 import kotlin.math.ceil
 import kotlin.math.roundToInt
@@ -149,15 +152,15 @@ internal fun GlassTabIcon(
         else -> tint
     }
     Column(
-        // Padding horizontal 4.dp (Batch 452: cegah ellipsis "Perpustakaan"/"Pengaturan") dipertahankan; area sentuh = slot
-        // `CustomNavBarTabItem`, bukan padding ini.
+        // Batch 725 — ukuran wajah = konstanta `NAV_*` (satu sumber, diuji `navFaceHeightDp`): padding 6.dp kiri-kanan (dulu 4.dp)
+        // memberi jarak label ke tepi pil; padding vertikal 4.dp (dulu 6.dp). Area sentuh = slot `CustomNavBarTabItem`, bukan padding ini.
         modifier = Modifier
             .widthIn(min = 64.dp)
-            .padding(horizontal = 4.dp, vertical = 6.dp),
+            .padding(horizontal = NAV_FACE_PADDING_H_DP.dp, vertical = NAV_FACE_PADDING_V_DP.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalArrangement = Arrangement.spacedBy(NAV_FACE_GAP_DP.dp)
     ) {
-        Icon(icon, contentDescription = null, tint = iconColor)
+        Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(NAV_ICON_DP.dp))
         FittedNavLabel(text = label, color = labelColor)
     }
 }
@@ -212,7 +215,7 @@ private fun Modifier.shrinkToFitWidth(minScale: Float): Modifier = layout { meas
 
 @Composable
 private fun FittedNavLabel(text: String, color: Color) {
-    val base = MaterialTheme.typography.labelMedium
+    val base = MaterialTheme.typography.labelMedium.copy(fontSize = NAV_LABEL_SP.sp, lineHeight = NAV_LABEL_LINE_HEIGHT_SP.sp)
     val baseSp = base.fontSize.value
     val minScale = if (base.fontSize == TextUnit.Unspecified || baseSp <= 0f) 1f else (NAV_LABEL_MIN_SP / baseSp).coerceIn(0.5f, 1f)
     Text(
@@ -318,10 +321,50 @@ private object NoRippleIndication : IndicationNodeFactory {
 // SELURUH bottom nav (bukan cuma 1 tab), lebih parah dari bug yg sedang diperbaiki.
 // Batch 657 — geometri pil + pemetaan jari (fungsi MURNI, diuji `TabPillMathTest`). Rumus `tabPillLeft` = rumus `neuKeyDraw`
 // (TactileDepth.kt: `(position * slotW - kw / 2).coerceIn(0, width - kw)`), karena lapisan warna ter-klip di bawah WAJIB sama persis
-// dgn kunci timbul yang digambar `neuSlidingKey` (74% lebar slot, 62% tinggi bar — nilai yang sama dikirim MainActivity).
-internal const val TAB_PILL_WIDTH_FRACTION = 0.74f
-internal const val TAB_PILL_HEIGHT_FRACTION = 0.62f
+// dgn kunci timbul yang digambar `neuSlidingKey` (`TAB_PILL_*_FRACTION` di bawah — konstanta yang sama dipakai MainActivity; Batch 725: 84% x 84%, dulu 74%/62%).
+internal const val TAB_PILL_WIDTH_FRACTION = 0.84f
+internal const val TAB_PILL_HEIGHT_FRACTION = 0.84f
 private const val TAB_PILL_CORNER_DP = 16f
+
+// Batch 725 — user (tangkapan layar v724): "bilah tab masih kebesaran. tidak fit dengan pil geser nya!!". AKAR (angka diukur dari
+// tangkapan layar 1080 px): tinggi bilah = minimum M3 `NavigationBar` 80.dp, pil 62% = 49,6.dp -> ±15.dp ruang kosong di atas/bawah pil,
+// sedangkan wajah ikon+label (6+24+2+16+6 = 54.dp) justru LEBIH TINGGI dari pil dan label "Perpustakaan" (±86.dp) hampir selebar pil
+// (74% slot = ±90.dp). Bilah terlalu besar, pil terlalu kecil. FIX = SATU kontrak ukuran (konstanta di bawah, dipakai bersama oleh
+// `MainActivity` [tinggi bilah + pecahan kunci timbul] dan wajah tab di file ini): bilah tetap `NAV_BAR_HEIGHT_DP`, pil 84% x 84% (50,4.dp
+// penuh membungkus wajah 46.dp), wajah (ikon 22.dp, label 11sp/14sp) DIBATASI selebar pil (`limitToPillWidth`) sehingga label tak pernah
+// keluar dari pil — label yang lebih lebar menyusut lewat `shrinkToFitWidth`. Semua dalam satuan desain (dp/sp) yang diskalakan global
+// oleh `UiScale` (Batch 724), jadi perbandingan tetap berlaku di semua perangkat.
+internal const val NAV_BAR_HEIGHT_DP = 60f
+internal const val NAV_ICON_DP = 22f
+internal const val NAV_LABEL_SP = 11f
+internal const val NAV_LABEL_LINE_HEIGHT_SP = 14f
+internal const val NAV_FACE_PADDING_H_DP = 6f
+internal const val NAV_FACE_PADDING_V_DP = 4f
+internal const val NAV_FACE_GAP_DP = 2f
+
+/** Tinggi sentuh minimum slot tab (dp desain); slot dipusatkan vertikal di bilah `NAV_BAR_HEIGHT_DP`. */
+internal const val NAV_TAB_MIN_TOUCH_DP = 52f
+
+/** Tinggi wajah tab (padding atas+bawah + ikon + jarak + satu baris label), satuan dp/sp desain (skala font <= 1,0 di app). */
+internal fun navFaceHeightDp(): Float =
+    2f * NAV_FACE_PADDING_V_DP + NAV_ICON_DP + NAV_FACE_GAP_DP + NAV_LABEL_LINE_HEIGHT_SP
+
+/** Lebar maksimum wajah tab (px) = [widthFraction] dari lebar slot [slotPx]; slot tak valid -> 0. */
+internal fun tabFaceMaxWidth(slotPx: Int, widthFraction: Float): Int {
+    if (slotPx <= 0 || widthFraction <= 0f) return 0
+    return (slotPx * widthFraction.coerceAtMost(1f)).toInt()
+}
+
+// Batas lebar wajah = lebar pil. Dipasang pada KEDUA salinan (dasar + aksen) -> constraint identik -> skala label identik.
+private fun Modifier.limitToPillWidth(widthFraction: Float): Modifier = layout { measurable, constraints ->
+    val limit = if (constraints.maxWidth == Constraints.Infinity) {
+        Constraints.Infinity
+    } else {
+        tabFaceMaxWidth(constraints.maxWidth, widthFraction).coerceAtLeast(constraints.minWidth)
+    }
+    val placeable = measurable.measure(constraints.copy(maxWidth = limit))
+    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+}
 
 /** Indeks tab di bawah koordinat-x jari (0 until [count]); lebar/jumlah tidak valid -> 0. */
 internal fun tabIndexAt(x: Float, width: Float, count: Int): Int {
@@ -374,6 +417,9 @@ internal fun RowScope.CustomNavBarTabItem(
     Box(
         modifier = Modifier
             .weight(1f, fill = true)
+            // Batch 725 — slot sentuh >= 52.dp (wajah kini 46.dp); sebelum `onPlaced`/`selectable` supaya keduanya ikut tinggi ini.
+            // Bukan `fillMaxHeight` (pelajaran Batch 450): tinggi bilah tetap dikunci di `MainActivity`, ini hanya batas bawah.
+            .heightIn(min = NAV_TAB_MIN_TOUCH_DP.dp)
             .onPlaced { coordinates ->
                 val position = coordinates.positionInParent()
                 geometry.left = position.x
@@ -391,7 +437,7 @@ internal fun RowScope.CustomNavBarTabItem(
             ),
         contentAlignment = Alignment.Center
     ) {
-        content(false)
+        Box(modifier = Modifier.limitToPillWidth(TAB_PILL_WIDTH_FRACTION)) { content(false) }
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -424,7 +470,7 @@ internal fun RowScope.CustomNavBarTabItem(
             contentAlignment = Alignment.Center
         ) {
             Box(
-                modifier = Modifier.onSizeChanged { size ->
+                modifier = Modifier.limitToPillWidth(TAB_PILL_WIDTH_FRACTION).onSizeChanged { size ->
                     geometry.faceWidth = size.width.toFloat()
                     geometry.faceHeight = size.height.toFloat()
                 }

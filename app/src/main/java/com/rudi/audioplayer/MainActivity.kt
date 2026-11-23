@@ -1298,6 +1298,10 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                         // ketutup gesture bar.
                         modifier = Modifier
                             .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                            // Batch 725 — tinggi bilah DIKUNCI `NAV_BAR_HEIGHT_DP` (BottomNavBar.kt; dulu minimum M3 80.dp = ±15.dp kosong di
+                            // atas/bawah pil, user: "bilah tab masih kebesaran. tidak fit dengan pil geser nya"). `height` tetap = batas
+                            // keras sehingga `defaultMinSize(80.dp)` internal M3 ikut terpotong; pil = `TAB_PILL_*_FRACTION` dari tinggi ini.
+                            .height(NAV_BAR_HEIGHT_DP.dp)
                             // Batch 555 — `.clip(RoundedCornerShape(28.dp))` + garis catch-light atas (Tactile/Skeu) DIGANTI palung
                             // cekung `neuTrough()` (sudah mengandung clip yang sama persis; garis sorot di tepi ATAS bertentangan dgn
                             // cahaya kiri-atas pada permukaan cekung). TETAP SETELAH `.padding(...)` (margin di luar palung).
@@ -1418,7 +1422,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                             // Batch 555 — KUNCI TIMBUL (depth) di dalam palung `neuTrough()`; menggantikan pill alpha-0.16/stroke putih
                             // lama (Batch 448, digambar DI ATAS ikon lewat `drawWithContent`) dan latar `secondaryContainer` statis Skeu di
                             // `GlassTabIcon` -> SATU kunci untuk 6 tema, digambar DI BELAKANG ikon/label (Surface NavigationBar transparan,
-                            // lihat `containerColor` di bawah). Geometri IDENTIK pill lama: 74% lebar kolom, 62% tinggi bar, sudut 16.dp,
+                            // lihat `containerColor` di bawah). Geometri = `TAB_PILL_*_FRACTION` (Batch 725: 84% lebar kolom x 84% tinggi bar; dulu 74%/62%), sudut 16.dp,
                             // pusat = `idxPos` (satuan tab) di-clamp ke tepi bar. Sumber posisi 3 tingkat TIDAK berubah (Batch 448): (1) drag
                             // LANGSUNG di bar (`tabBarDragIndexPx`), (2) nudge swipe-konten (`tabDragOffsetPx`), (3) rest `navPillIndexAnim`.
                             // Lambda dibaca di fase GAMBAR (0 rekomposisi per frame); hanya menutup 3 state stabil hasil `remember`.
@@ -1426,8 +1430,8 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                                 shape = RoundedCornerShape(16.dp),
                                 base = navBarKeyBase,
                                 count = TAB_ROUTES.size,
-                                widthFraction = 0.74f,
-                                heightFraction = 0.62f,
+                                widthFraction = TAB_PILL_WIDTH_FRACTION,
+                                heightFraction = TAB_PILL_HEIGHT_FRACTION,
                                 wine = navBarKeyWine
                             ) {
                                 // Batch 657 — posisi kunci = SATU sumber `navPillPosition()` (pegas + nudge swipe-konten); jari mentah

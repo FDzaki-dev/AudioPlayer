@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 725: 0 berkas baru (BottomNavBar.kt + MainActivity.kt + TabPillMathTest.kt diubah: bilah tab 60.dp, pil 84% x 84%, wajah dibatasi selebar pil) — 276 tetap.
 # Batch 724: + app/src/main/java/com/rudi/audioplayer/ui/theme/UiScale.kt + app/src/test/java/com/rudi/audioplayer/ui/theme/UiScaleTest.kt (skala UI global: kepadatan x0.90 + batas font sistem 1.0; ui/theme/Theme.kt diubah) — 274->276.
 # Batch 723: 0 berkas baru (ui/PlaylistScreen.kt + ui/QueueSheet.kt diubah: handle ≡ geser langsung) — 274 tetap.
 # Batch 722: 0 berkas baru (util/ThumbnailMemo.kt + util/ThumbnailMemoTest.kt diubah; widget/WidgetUpdater.kt hanya komentar) — 274 tetap.

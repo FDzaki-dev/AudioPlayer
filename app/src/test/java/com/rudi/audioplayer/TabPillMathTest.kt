@@ -1,6 +1,7 @@
 package com.rudi.audioplayer
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Batch 657 — geometri pil bilah tab (jari -> indeks/pusat pil, tepi kiri pil) yang dipakai gestur & lapisan warna ter-klip. */
@@ -76,5 +77,47 @@ class TabPillMathTest {
         assertEquals(1f, navLabelFitScale(naturalPx = 0, availablePx = 96, minScale = 0.75f), eps)
         assertEquals(1f, navLabelFitScale(naturalPx = 120, availablePx = 0, minScale = 0.75f), eps)
         assertEquals(1f, navLabelFitScale(naturalPx = 120, availablePx = 96, minScale = 1.5f), eps)
+    }
+
+    // Batch 725 — kontrak ukuran bilah/pil/wajah ("bilah tab kebesaran, tidak fit dengan pil geser").
+
+    @Test
+    fun `wajah tab muat penuh di dalam pil dan pil muat di dalam bilah`() {
+        val pillHeight = NAV_BAR_HEIGHT_DP * TAB_PILL_HEIGHT_FRACTION
+        assertTrue("wajah ${navFaceHeightDp()} > pil $pillHeight", navFaceHeightDp() <= pillHeight)
+        assertTrue("pil $pillHeight > bilah $NAV_BAR_HEIGHT_DP", pillHeight < NAV_BAR_HEIGHT_DP)
+        // ruang di atas/bawah pil dibatasi: bilah tidak boleh jauh lebih besar dari pil (dulu 80 vs 49,6)
+        assertTrue(NAV_BAR_HEIGHT_DP - pillHeight <= 12f)
+    }
+
+    @Test
+    fun `slot sentuh minimum tidak melebihi bilah dan tidak lebih kecil dari wajah`() {
+        assertTrue(NAV_TAB_MIN_TOUCH_DP <= NAV_BAR_HEIGHT_DP)
+        assertTrue(NAV_TAB_MIN_TOUCH_DP >= navFaceHeightDp())
+    }
+
+    @Test
+    fun `tinggi wajah dihitung dari padding ikon jarak dan baris label`() {
+        assertEquals(46f, navFaceHeightDp(), eps)
+    }
+
+    @Test
+    fun `lebar maksimum wajah adalah pecahan lebar slot`() {
+        assertEquals(98, tabFaceMaxWidth(slotPx = 117, widthFraction = 0.84f))
+        assertEquals(100, tabFaceMaxWidth(slotPx = 100, widthFraction = 1f))
+        assertEquals(100, tabFaceMaxWidth(slotPx = 100, widthFraction = 3f))
+    }
+
+    @Test
+    fun `lebar maksimum wajah dengan ukuran tak valid kembali nol`() {
+        assertEquals(0, tabFaceMaxWidth(slotPx = 0, widthFraction = 0.84f))
+        assertEquals(0, tabFaceMaxWidth(slotPx = -5, widthFraction = 0.84f))
+        assertEquals(0, tabFaceMaxWidth(slotPx = 100, widthFraction = 0f))
+    }
+
+    @Test
+    fun `tepi kiri pil memakai pecahan lebar pil terbaru`() {
+        // bar 300 px, 3 tab -> slot 100, pil 84% = 84 px; pusat tab ke-2 (1,5) -> 150 - 42 = 108
+        assertEquals(108f, tabPillLeft(position = 1.5f, barWidth = 300f, count = 3, widthFraction = TAB_PILL_WIDTH_FRACTION), eps)
     }
 }
