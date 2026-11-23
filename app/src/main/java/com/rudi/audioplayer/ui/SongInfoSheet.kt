@@ -59,8 +59,54 @@ val LocalSongTagSaver = staticCompositionLocalOf<((Song, Id3TagWriter.EditableTa
  */
 internal data class SongTechProbe(
     val sampleRateHz: Int?,
-    val bitsPerSample: Int?
+    val bitsPerSample: Int?,
+    /** true = dibaca dari header OGG (±4 KB); false = lewat `MediaMetadataRetriever` (memindai file). */
+    val fromHeader: Boolean = false
 )
+
+/**
+ * Batch 728 — sample rate dari halaman Ogg PERTAMA (±4 KB) tanpa memindai seluruh file. Log uji v727:
+ * `MediaMetadataRetriever.setDataSource` pada .opus 80-132 MB memakan 875-4055 ms (5 dari 6 >2 dtk).
+ * Murni (ByteArray), teruji di JVM. Halaman pertama OGG wajib berisi tepat satu paket header.
+ */
+internal object OggHeader {
+
+    /** Opus selalu didekode pada 48 kHz (sama dgn yang dilaporkan retriever); `input_sample_rate` hanya informasi. */
+    private const val OPUS_DECODE_RATE_HZ = 48_000
+
+    /** MIME/ekstensi yang mungkin berisi OGG; keputusan akhir tetap dari isi header ("OggS"). */
+    fun mightBeOgg(mime: String?, fileName: String?): Boolean {
+        val m = mime?.trim()?.lowercase(Locale.ROOT).orEmpty()
+        if (m == "audio/ogg" || m == "application/ogg" || m == "audio/opus") return true
+        val ext = fileName?.substringAfterLast('.', "")?.lowercase(Locale.ROOT).orEmpty()
+        return ext == "ogg" || ext == "oga" || ext == "opus"
+    }
+
+    /** Sample rate (Hz) dari [head] (awal file, [length] byte valid); null bila bukan OGG Opus/Vorbis atau terpotong. */
+    fun sampleRateHz(head: ByteArray, length: Int = head.size): Int? {
+        val n = minOf(length, head.size)
+        if (n < 28 || !startsWith(head, 0, "OggS")) return null
+        val dataStart = 27 + (head[26].toInt() and 0xFF)
+        if (startsWith(head, dataStart, "OpusHead")) {
+            return if (n >= dataStart + 19) OPUS_DECODE_RATE_HZ else null
+        }
+        if (n >= dataStart + 16 && head[dataStart].toInt() == 1 && startsWith(head, dataStart + 1, "vorbis")) {
+            val b = dataStart + 12
+            val rate = (head[b].toInt() and 0xFF) or
+                ((head[b + 1].toInt() and 0xFF) shl 8) or
+                ((head[b + 2].toInt() and 0xFF) shl 16) or
+                ((head[b + 3].toInt() and 0xFF) shl 24)
+            return rate.takeIf { it > 0 }
+        }
+        return null
+    }
+
+    private fun startsWith(buf: ByteArray, offset: Int, ascii: String): Boolean {
+        if (offset < 0 || offset + ascii.length > buf.size) return false
+        for (i in ascii.indices) if (buf[offset + i].toInt() != ascii[i].code) return false
+        return true
+    }
+}
 
 /** Format tampilan murni (tanpa Context) agar teruji di JVM. */
 internal object SongInfoFormat {
@@ -141,8 +187,33 @@ private fun queryFileName(context: Context, song: Song): String? {
     return fileName
 }
 
-/** Sample rate + bit depth dari isi file. LAMBAT, blocking: panggil dari Dispatchers.IO. */
-private fun probeTechnical(context: Context, song: Song): SongTechProbe {
+/** Baca ±4 KB awal file untuk header OGG. Blocking: panggil dari Dispatchers.IO. Null = bukan OGG dikenal/gagal. */
+private fun readOggSampleRate(context: Context, song: Song): Int? = try {
+    context.contentResolver.openInputStream(song.uri)?.use { input ->
+        val head = ByteArray(OGG_HEAD_BYTES)
+        var filled = 0
+        while (filled < head.size) {
+            val r = input.read(head, filled, head.size - filled)
+            if (r < 0) break
+            filled += r
+        }
+        OggHeader.sampleRateHz(head, filled)
+    }
+} catch (e: Exception) {
+    AppLogger.e("SongInfoSheet", "Gagal baca header OGG uri=${song.uri}", e)
+    null
+}
+
+private const val OGG_HEAD_BYTES = 4096
+
+/**
+ * Sample rate + bit depth. Jalur cepat: header OGG (.opus/.ogg) tanpa memindai file; selain itu
+ * (atau bila header tak dikenali) jalur lambat `MediaMetadataRetriever`. Blocking: Dispatchers.IO.
+ */
+private fun probeTechnical(context: Context, song: Song, fileName: String?): SongTechProbe {
+    if (OggHeader.mightBeOgg(song.mimeType, fileName)) {
+        readOggSampleRate(context, song)?.let { return SongTechProbe(it, null, fromHeader = true) }
+    }
     var sampleRate: Int? = null
     var bits: Int? = null
     val retriever = MediaMetadataRetriever()
@@ -192,8 +263,9 @@ private fun songInfoRows(song: Song, fileName: String?, tech: SongTechProbe?): L
 /**
  * Batch 726 — Info Lagu (baca-saja): semua metadata yang sudah ada di [Song] + detail dari file.
  * Batch 727 — dimuat DUA TAHAP di Dispatchers.IO: (1) nama berkas (cepat) -> Format/Nama Berkas
- * langsung benar (.opus tak lagi tampil "OGG"); (2) sample rate/bit depth (lambat, baris
- * "Memuat…" sampai selesai). Bitrate rata-rata dihitung seketika dari ukuran dan durasi.
+ * langsung benar (.opus tak lagi tampil "OGG"); (2) sample rate/bit depth (baris "Memuat…" sampai
+ * selesai; Batch 728: OGG dibaca dari header ±4 KB, format lain lewat retriever yang lambat).
+ * Bitrate rata-rata dihitung seketika dari ukuran dan durasi.
  * Judul sheet dan tombol Edit dipatok di luar area scroll. Durasi tiap tahap dicatat ke
  * AppLogger sebagai angka mentah. [onEdit] != null menampilkan tombol "Edit Info Lagu".
  */
@@ -210,13 +282,16 @@ fun SongInfoSheet(
     var tech by remember(song.id) { mutableStateOf<SongTechProbe?>(null) }
     LaunchedEffect(song.id) {
         val t0 = SystemClock.elapsedRealtime()
-        fileName = withContext(Dispatchers.IO) { queryFileName(context, song) }
+        val name = withContext(Dispatchers.IO) { queryFileName(context, song) }
+        fileName = name
         val t1 = SystemClock.elapsedRealtime()
-        tech = withContext(Dispatchers.IO) { probeTechnical(context, song) }
+        val probed = withContext(Dispatchers.IO) { probeTechnical(context, song, name) }
+        tech = probed
         val t2 = SystemClock.elapsedRealtime()
         AppLogger.w(
             "SongInfoSheet",
-            "probe nama=${t1 - t0}ms teknis=${t2 - t1}ms mime=${song.mimeType} ukuran=${song.fileSize}B uri=${song.uri}"
+            "probe nama=${t1 - t0}ms teknis=${t2 - t1}ms jalur=${if (probed.fromHeader) "header" else "retriever"} " +
+                "mime=${song.mimeType} ukuran=${song.fileSize}B uri=${song.uri}"
         )
     }
     val rows = remember(song, fileName, tech) { songInfoRows(song, fileName, tech) }

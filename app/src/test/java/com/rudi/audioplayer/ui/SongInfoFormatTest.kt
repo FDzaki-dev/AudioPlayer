@@ -63,4 +63,60 @@ class SongInfoFormatTest {
         assertNull(SongInfoFormat.bitDepth(0))
         assertNull(SongInfoFormat.bitDepth(null))
     }
+
+    // ---- Batch 728: header OGG (sample rate tanpa memindai file) ----
+
+    /** Halaman OGG pertama minimal: "OggS" + 22 byte header tetap + 1 segmen berisi [payload]. */
+    private fun oggPage(payload: ByteArray): ByteArray {
+        val header = ByteArray(27)
+        "OggS".forEachIndexed { i, c -> header[i] = c.code.toByte() }
+        header[5] = 0x02 // awal stream
+        header[26] = 1 // jumlah segmen
+        return header + byteArrayOf(payload.size.toByte()) + payload
+    }
+
+    private fun le32(v: Int) = byteArrayOf(v.toByte(), (v shr 8).toByte(), (v shr 16).toByte(), (v shr 24).toByte())
+
+    private fun opusHead(inputRate: Int): ByteArray =
+        "OpusHead".toByteArray(Charsets.US_ASCII) + byteArrayOf(1, 2, 0x38, 0x01) + le32(inputRate) + byteArrayOf(0, 0, 0)
+
+    private fun vorbisId(rate: Int): ByteArray =
+        byteArrayOf(1) + "vorbis".toByteArray(Charsets.US_ASCII) + le32(0) + byteArrayOf(2) + le32(rate) +
+            le32(0) + le32(128_000) + le32(0) + byteArrayOf(0xB8.toByte(), 1)
+
+    @Test
+    fun `header opus selalu 48 kHz walau input_sample_rate lain`() {
+        assertEquals(48_000, OggHeader.sampleRateHz(oggPage(opusHead(44_100))))
+        assertEquals(48_000, OggHeader.sampleRateHz(oggPage(opusHead(48_000))))
+    }
+
+    @Test
+    fun `header vorbis membaca sample rate little-endian`() {
+        assertEquals(44_100, OggHeader.sampleRateHz(oggPage(vorbisId(44_100))))
+        assertEquals(48_000, OggHeader.sampleRateHz(oggPage(vorbisId(48_000))))
+        assertEquals(22_050, OggHeader.sampleRateHz(oggPage(vorbisId(22_050))))
+    }
+
+    @Test
+    fun `bukan OGG atau terpotong atau paket lain menghasilkan null`() {
+        assertNull(OggHeader.sampleRateHz("ID3\u0004\u0000\u0000\u0000\u0000\u0000\u0000padding-padding-padding".toByteArray(Charsets.ISO_8859_1)))
+        assertNull(OggHeader.sampleRateHz(ByteArray(0)))
+        val opus = oggPage(opusHead(48_000))
+        assertNull(OggHeader.sampleRateHz(opus, opus.size - 1)) // OpusHead terpotong
+        val vorbis = oggPage(vorbisId(44_100))
+        assertNull(OggHeader.sampleRateHz(vorbis, 27 + 1 + 15)) // Vorbis terpotong sebelum sample rate lengkap
+        val flacInOgg = oggPage(byteArrayOf(0x7F) + "FLAC".toByteArray(Charsets.US_ASCII) + ByteArray(30))
+        assertNull(OggHeader.sampleRateHz(flacInOgg))
+        assertNull(OggHeader.sampleRateHz(oggPage(vorbisId(0)))) // sample rate 0 tidak valid
+    }
+
+    @Test
+    fun `mightBeOgg dari MIME atau ekstensi`() {
+        assertEquals(true, OggHeader.mightBeOgg("audio/ogg", null))
+        assertEquals(true, OggHeader.mightBeOgg("AUDIO/OGG", "x.bin"))
+        assertEquals(true, OggHeader.mightBeOgg(null, "lagu.OPUS"))
+        assertEquals(true, OggHeader.mightBeOgg("application/octet-stream", "lagu.oga"))
+        assertEquals(false, OggHeader.mightBeOgg("audio/mpeg", "lagu.mp3"))
+        assertEquals(false, OggHeader.mightBeOgg(null, null))
+    }
 }
