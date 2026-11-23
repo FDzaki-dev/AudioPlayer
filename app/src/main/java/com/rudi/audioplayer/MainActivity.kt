@@ -140,6 +140,7 @@ import com.rudi.audioplayer.util.StartupTrace
 import com.rudi.audioplayer.ui.HomeScreen
 import com.rudi.audioplayer.ui.LockScreen
 import com.rudi.audioplayer.ui.LibraryScreen
+import com.rudi.audioplayer.ui.LocalSongTagSaver
 import com.rudi.audioplayer.ui.SettingsScreen
 import com.rudi.audioplayer.ui.StatsDashboardScreen
 import com.rudi.audioplayer.ui.MiniPlayerBar
@@ -1799,6 +1800,11 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                 )
             }
             composable("library") {
+                // Batch 726 — menu ⋮ lagu di Library kini punya "Edit Info Lagu": penyimpan tag sama
+                // dengan yang dipakai Now Playing (`requestSaveTags`, alur izin tulis sudah global di sini).
+                CompositionLocalProvider(
+                    LocalSongTagSaver provides { song, tags -> playerViewModel.requestSaveTags(song, tags) }
+                ) {
                 LibraryScreen(
                     rawSongs = librarySongs,
                     loading = libraryLoading,
@@ -1844,6 +1850,7 @@ private fun AppNavHost(playerViewModel: PlayerViewModel, biometricAvailable: Boo
                     // default parameter yang sama.
                     currentSongId = uiState.currentSong?.id
                 )
+                }
             }
             composable("settings") {
                 val settingsThemeIdentity by playerViewModel.themeIdentity.collectAsStateWithLifecycle()

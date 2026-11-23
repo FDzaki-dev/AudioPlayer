@@ -1,5 +1,6 @@
 package com.rudi.audioplayer.ui
 
+import android.content.Intent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -20,10 +21,13 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,6 +46,7 @@ import com.rudi.audioplayer.ui.theme.neuCastOnly
 import com.rudi.audioplayer.ui.theme.neuArtFillet
 import com.rudi.audioplayer.ui.theme.neuPressTile
 import com.rudi.audioplayer.ui.theme.rememberIosFlingBehavior
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
@@ -425,6 +430,12 @@ internal fun SongRow(
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    // Batch 726 — Info Lagu / Edit Info Lagu dikelola di dalam SongRow (tanpa callback baru di tiap
+    // lapisan); penyimpan tag datang dari `LocalSongTagSaver` (null di luar layar Library).
+    var showInfo by remember { mutableStateOf(false) }
+    var showEdit by remember { mutableStateOf(false) }
+    val tagSaver = LocalSongTagSaver.current
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     // v3 upgrade lanjutan — spread Pilar A (CRT scanlines, Batch 133) dari AlbumArtHero (Now
     // Playing) ke sini: kandidat "Card list lagu" yang spec sebut eksplisit tapi sengaja
@@ -548,52 +559,102 @@ internal fun SongRow(
                 // cuma Favorit/Playlist seperti dugaan awal (Batch 262/264). Playlist tab sendiri
                 // TETAP belum tersentuh — itu `PlaylistTabView`, composable lain total, tidak
                 // lewat SongRow sama sekali, root cause ini tidak menjangkaunya.
-                IconButton(onClick = { showMenu = true }) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = "Opsi lagu lainnya"
-                    )
+                // Batch 726 — AKAR menu muncul di tepi kiri layar (video user): DropdownMenu dulu
+                // saudara `Row` di dalam `Box` selebar baris, jadi popup berjangkar ke SELURUH baris
+                // (tepi kiri x=0), bukan ke tombol ⋮. Kini dibungkus `Box` sebesar tombol ⋮ sehingga
+                // popup berjangkar ke tombol dan Compose memilih posisi yang muat di layar.
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = "Opsi lagu lainnya"
+                        )
+                    }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Putar Berikutnya") },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = null) },
+                            onClick = { showMenu = false; onPlayNext() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Tambah ke Antrean") },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null) },
+                            onClick = { showMenu = false; onAddToQueue() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Tambah ke Playlist") },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null) },
+                            onClick = { showMenu = false; onAddToPlaylist() }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                        // Batch 726 — menu sebelumnya tak punya metadata/berbagi sama sekali.
+                        DropdownMenuItem(
+                            text = { Text("Info Lagu") },
+                            leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
+                            onClick = { showMenu = false; showInfo = true }
+                        )
+                        if (tagSaver != null) {
+                            DropdownMenuItem(
+                                text = { Text("Edit Info Lagu") },
+                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                onClick = { showMenu = false; showEdit = true }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("Bagikan") },
+                            leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                            onClick = {
+                                showMenu = false
+                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "audio/*"
+                                    putExtra(Intent.EXTRA_STREAM, song.uri)
+                                    putExtra(Intent.EXTRA_TITLE, song.title)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, "Bagikan lagu"))
+                            }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                        DropdownMenuItem(
+                            text = { Text("Sembunyikan") },
+                            leadingIcon = { Icon(Icons.Default.VisibilityOff, contentDescription = null) },
+                            onClick = { showMenu = false; onHideSong() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Pilih") },
+                            leadingIcon = { Icon(Icons.Default.CheckCircleOutline, contentDescription = null) },
+                            onClick = { showMenu = false; onEnterSelectionMode() }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                        DropdownMenuItem(
+                            text = { Text("Hapus dari Perangkat", color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.DeleteForever,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            onClick = { showMenu = false; onDeleteSong() }
+                        )
+                    }
                 }
             }
         }
 
-        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-            DropdownMenuItem(
-                text = { Text("Putar Berikutnya") },
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = null) },
-                onClick = { showMenu = false; onPlayNext() }
-            )
-            DropdownMenuItem(
-                text = { Text("Tambah ke Antrean") },
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null) },
-                onClick = { showMenu = false; onAddToQueue() }
-            )
-            DropdownMenuItem(
-                text = { Text("Tambah ke Playlist") },
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null) },
-                onClick = { showMenu = false; onAddToPlaylist() }
-            )
-            DropdownMenuItem(
-                text = { Text("Sembunyikan") },
-                leadingIcon = { Icon(Icons.Default.VisibilityOff, contentDescription = null) },
-                onClick = { showMenu = false; onHideSong() }
-            )
-            DropdownMenuItem(
-                text = { Text("Pilih") },
-                leadingIcon = { Icon(Icons.Default.CheckCircleOutline, contentDescription = null) },
-                onClick = { showMenu = false; onEnterSelectionMode() }
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            DropdownMenuItem(
-                text = { Text("Hapus dari Perangkat", color = MaterialTheme.colorScheme.error) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.DeleteForever,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                },
-                onClick = { showMenu = false; onDeleteSong() }
+        if (showInfo) {
+            val onEditInfo: (() -> Unit)? =
+                if (tagSaver != null) ({ showInfo = false; showEdit = true }) else null
+            SongInfoSheet(song = song, onDismiss = { showInfo = false }, onEdit = onEditInfo)
+        }
+        if (showEdit && tagSaver != null) {
+            SongInfoEditSheet(
+                song = song,
+                onDismiss = { showEdit = false },
+                onSave = { tags ->
+                    tagSaver(song, tags)
+                    showEdit = false
+                }
             )
         }
     }

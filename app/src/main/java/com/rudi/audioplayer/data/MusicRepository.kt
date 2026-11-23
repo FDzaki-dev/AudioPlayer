@@ -127,8 +127,11 @@ class MusicRepository(private val context: Context) {
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
                 val title = cursor.getString(titleCol) ?: "Tanpa Judul"
-                val artist = cursor.getString(artistCol) ?: "Tidak Diketahui"
-                val album = cursor.getString(albumCol) ?: ""
+                // Batch 726 — MediaStore mengisi ARTIST/ALBUM kosong dengan literal "<unknown>", BUKAN
+                // null, sehingga `?:` lama tak pernah jalan dan "<unknown>" bocor ke UI (mini player,
+                // grup tab Artis/Album). Dinormalisasi di sumber -> semua konsumen ikut benar.
+                val artist = cleanMediaStoreText(cursor.getString(artistCol), "Tidak Diketahui")
+                val album = cleanMediaStoreText(cursor.getString(albumCol), "")
                 val albumId = cursor.getLong(albumIdCol)
                 val duration = cursor.getLong(durationCol)
                 val dateAdded = cursor.getLong(dateAddedCol)
@@ -200,6 +203,17 @@ class MusicRepository(private val context: Context) {
         // the column names themselves are stable API 30+ platform contract either way.
         private const val CD_TRACK_NUMBER_COLUMN = "cd_track_number"
         private const val DISC_NUMBER_COLUMN = "disc_number"
+
+        /** Literal pengganti MediaStore untuk teks kosong (`MediaStore.UNKNOWN_STRING`). */
+        private const val MEDIASTORE_UNKNOWN_TEXT = "<unknown>"
+
+        /**
+         * Batch 726 — null, kosong/spasi, atau literal `"<unknown>"` (tanpa memandang huruf) -> [fallback];
+         * selain itu nilai apa adanya (tidak di-trim agar teks asli tak berubah).
+         */
+        internal fun cleanMediaStoreText(raw: String?, fallback: String): String =
+            if (raw == null || raw.isBlank() || raw.trim().equals(MEDIASTORE_UNKNOWN_TEXT, ignoreCase = true)) fallback
+            else raw
 
         /**
          * Turns MediaStore's raw folder column into the short display name shown in Library

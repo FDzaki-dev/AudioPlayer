@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 726: + app/src/main/java/com/rudi/audioplayer/ui/SongInfoSheet.kt + app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryUnknownTextTest.kt + app/src/test/java/com/rudi/audioplayer/ui/SongInfoFormatTest.kt (menu ⋮ lagu: Info Lagu/Edit Info Lagu/Bagikan; ui/LibraryLists.kt, MainActivity.kt, data/MusicRepository.kt diubah) — 276->279.
 # Batch 725: 0 berkas baru (BottomNavBar.kt + MainActivity.kt + TabPillMathTest.kt diubah: bilah tab 60.dp, pil 84% x 84%, wajah dibatasi selebar pil) — 276 tetap.
 # Batch 724: + app/src/main/java/com/rudi/audioplayer/ui/theme/UiScale.kt + app/src/test/java/com/rudi/audioplayer/ui/theme/UiScaleTest.kt (skala UI global: kepadatan x0.90 + batas font sistem 1.0; ui/theme/Theme.kt diubah) — 274->276.
 # Batch 723: 0 berkas baru (ui/PlaylistScreen.kt + ui/QueueSheet.kt diubah: handle ≡ geser langsung) — 274 tetap.
@@ -290,6 +291,7 @@ app/src/main/java/com/rudi/audioplayer/ui/SharedComponents.kt
 app/src/main/java/com/rudi/audioplayer/ui/SignatureMatcherSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SmartPlaylistScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/SongInfoEditSheet.kt
+app/src/main/java/com/rudi/audioplayer/ui/SongInfoSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SongPickerSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/StatsDashboardScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/UpdateCheckSheet.kt
@@ -396,6 +398,7 @@ app/src/test/java/com/rudi/audioplayer/data/LrcSyncEditorTest.kt
 app/src/test/java/com/rudi/audioplayer/data/LyricsParserTest.kt
 app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryFolderNameTest.kt
 app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryTrackDiscTest.kt
+app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryUnknownTextTest.kt
 app/src/test/java/com/rudi/audioplayer/data/PinLockoutPolicyTest.kt
 app/src/test/java/com/rudi/audioplayer/data/RingtoneCutterTest.kt
 app/src/test/java/com/rudi/audioplayer/data/SmartPlaylistEngineTest.kt
@@ -408,6 +411,7 @@ app/src/test/java/com/rudi/audioplayer/playback/PlayCountTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/UpdateResumePolicyTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
+app/src/test/java/com/rudi/audioplayer/ui/SongInfoFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/theme/HapticPacingTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/theme/UiScaleTest.kt
