@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 732: + app/src/main/java/com/rudi/audioplayer/ui/SheetDragHandle.kt + app/src/test/java/com/rudi/audioplayer/ui/DragDismissTrackerTest.kt (handle sheet Info Lagu berfungsi: tarik/ketuk = tutup; ui/SongInfoSheet.kt diubah) — 279->281.
 # Batch 731: 0 berkas baru (ui/SongInfoSheet.kt diubah: sheet Info Lagu tak bisa ditarik, SheetFlingGuard dihapus; test ui/SongInfoFormatTest.kt tak diubah) — 279 tetap.
 # Batch 730: 0 berkas baru (ui/SongInfoSheet.kt + test ui/SongInfoFormatTest.kt diubah: gestur daftar tak lagi menggeser sheet Info Lagu — sisa gulir + sisa fling ditelan seluruhnya) — 279 tetap.
 # Batch 729: 0 berkas baru (ui/SongInfoSheet.kt + test ui/SongInfoFormatTest.kt diubah: sisa fling daftar ditelan agar sheet Info Lagu tak memantul, overscroll daftar dimatikan) — 279 tetap.
@@ -293,6 +294,7 @@ app/src/main/java/com/rudi/audioplayer/ui/RingtoneCutterSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SettingsScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/SettingsSections.kt
 app/src/main/java/com/rudi/audioplayer/ui/SharedComponents.kt
+app/src/main/java/com/rudi/audioplayer/ui/SheetDragHandle.kt
 app/src/main/java/com/rudi/audioplayer/ui/SignatureMatcherSheet.kt
 app/src/main/java/com/rudi/audioplayer/ui/SmartPlaylistScreen.kt
 app/src/main/java/com/rudi/audioplayer/ui/SongInfoEditSheet.kt
@@ -415,6 +417,7 @@ app/src/test/java/com/rudi/audioplayer/playback/AbRepeatLogicTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/PlayCountTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/ShakePulseTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/playback/UpdateResumePolicyTest.kt
+app/src/test/java/com/rudi/audioplayer/ui/DragDismissTrackerTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/SongInfoFormatTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt

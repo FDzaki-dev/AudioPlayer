@@ -1,5 +1,23 @@
 # Changelog
 
+## Batch 732 — Info Lagu: handle sheet BERFUNGSI (tarik ke bawah / ketuk = tutup) tanpa menggerakkan sheet
+
+- Input user: `Screen_Recording_20261123_164347.mp4` (13,5 dtk, 720x1624, 60 fps = 812 frame) + `sonix_debug_20261123_164417.txt` (v731 = 1.11.42 build 592) + teks "sekarang flickering nya pindah ke handle. mana cuman pajangan doang lagi si handle nya!!". Tanpa laporan CI v731 (NOT VERIFIED; APK v731 terpasang di perangkat = kompilasi build lolos).
+
+- (A) Video v731 (penanda sentuh dilacak per frame, 16 segmen sentuh): **14 segmen** = jari mendarat TEPAT di handle (x 171-186, y 52-64 pada frame 360 px; pil handle x 164-195, y 55-58) lalu menarik ke BAWAH 80-110 px frame (±240-330 px layar asli) selama 0,33-0,58 dtk, diulang berkali-kali — pengguna mencoba menutup sheet dengan menarik handle; hasilnya NOL (sheet diam sejak Batch 731, handle bawaan = pajangan). 2 segmen lain mulai di x 286-300, y 55 (dekat ikon status) -> shade sistem terbuka (frame 355-469 dan >= 775) = satu-satunya layar yang "berkedip" di rekaman, di luar aplikasi. Pil handle berada di y = 55 pada 727/727 frame yang terlihat; selisih antar-frame area atas (y 30-140) = 0 di luar dua periode shade -> **TIDAK ada gerak/kedip pada handle atau sheet yang terekam**; kedip handle yang dilaporkan tak bisa direproduksi dari rekaman ini (indikasi sentuh/ripple handle bawaan tak bisa dibedakan dari penanda sentuh layar).
+- Log v731: 0 FATAL baru (5 FATAL di buffer = 8-11 Nov, lama), 0 galat AppLogger pada sesi uji; `probe ... jalur=header teknis=26ms`; `Skipped 33-44 frames` hanya pada start proses pasca-update (16:34/16:35), bukan saat sheet dibuka.
+
+- (B) AKAR: Batch 731 mematikan SEMUA gestur sheet (`sheetGesturesEnabled = false`) dan handle bawaan (`BottomSheetDefaults.DragHandle`) ikut mati sebagai kendali -> gestur yang paling alami (tarik handle ke bawah) tak melakukan apa-apa.
+
+- (C) PERBAIKAN v732 (3 berkas; manifest 279 -> 281):
+  - `ui/SheetDragHandle.kt` (BARU): `DragDismissTracker` (murni; `begin()`/`onDelta(dy)`; true TEPAT SEKALI saat total gerak ke bawah >= ambang; gerak ke atas mengurangi total tetapi tak pernah < 0) + `SheetDragHandle(onDismiss)` composable: area sentuh selebar sheet x 48 dp, pil 32x4 dp, `detectVerticalDragGestures` (mulai sesudah touch slop, `change.consume()`), ambang 32 dp, ketuk = tutup (`clickable(indication = null)` — tanpa ripple). Sheet TIDAK bergerak mengikuti jari (tak ada pantulan).
+  - `ui/SongInfoSheet.kt`: `ModalBottomSheet(sheetGesturesEnabled = false, dragHandle = { SheetDragHandle(onDismiss = closeSheet) })`; `closeSheet` = `sheetState.hide()` lalu `onDismiss()` setelah selesai (pola dokumentasi Material3), dengan penjaga `closing` agar `onDismiss` tak ganda. Sisanya (gestur sheet mati, `LocalOverscrollFactory provides null`) tak berubah.
+  - `test/.../ui/DragDismissTrackerTest.kt` (BARU, 6 tes).
+
+- (D) NOT VERIFIED: kompilasi (`dragHandle` sudah dipakai `DiagnosticLogSheet`; `clickable(interactionSource, indication = null, onClickLabel, onClick)` + `detectVerticalDragGestures` sama polanya dgn `QueueSheet`/`PlaylistScreen`), detekt, SpotBugs, lint, ArchUnit, perilaku di perangkat (sandbox tanpa kompiler Kotlin/Gradle). Port Python `DragDismissTracker` 6/6 sama dgn tes JUnit; kurung seimbang di 3 berkas. PREDIKSI CI: Tes 453 (447 + 6), ArchUnit 7, detekt 0, SpotBugs 0, lint 0, Kotlin 0.
+
+- (E) CARA UJI: buka Info Lagu; tarik handle ke bawah ±32 dp lalu lepas -> sheet menutup dgn animasi; ketuk handle -> menutup; menarik dari judul/daftar/mana pun TIDAK menggeser sheet (bilah Library di belakang tetap diam); tombol Kembali + ketuk area gelap tetap menutup. Bila handle masih terasa mati: kirim rekaman baru (penanda sentuh harus di y handle). BELUM dikerjakan: sheet lain berpola `ModalBottomSheet` (`QueueSheet`, `LyricsSheet`, `SongInfoEditSheet`, `UpdateCheckSheet`, `DuplicateFinderSheet`) dan shade sistem yang terbuka bila jari mulai dekat ikon status.
+
 ## Batch 731 — Info Lagu: sheet DIAM total (`sheetGesturesEnabled = false`); penelan Batch 730 dihapus
 
 - Input user: `Screen_Recording_20261123_161951.mp4` (17,1 dtk, 720x1624, 60 fps = 1023 frame) + `sonix_debug_20261123_162024.txt` (v730 = 1.11.41 build 591) + teks "masih aja flickering!!". Tanpa laporan CI v730 (CI v730 NOT VERIFIED).

@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -41,6 +42,7 @@ import com.rudi.audioplayer.data.Song
 import com.rudi.audioplayer.ui.theme.frostedGlass
 import com.rudi.audioplayer.util.AppLogger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -271,6 +273,7 @@ private fun songInfoRows(song: Song, fileName: String?, tech: SongTechProbe?): L
  * Judul sheet dan tombol Edit dipatok di luar area scroll. Durasi tiap tahap dicatat ke
  * AppLogger sebagai angka mentah. [onEdit] != null menampilkan tombol "Edit Info Lagu".
  * Batch 731 — sheet tidak bisa ditarik (`sheetGesturesEnabled = false`): tak ada gerak sheet sama sekali.
+ * Batch 732 — handle sheet kembali BERFUNGSI lewat [SheetDragHandle] (tarik ke bawah / ketuk = tutup) tanpa menggerakkan sheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -299,14 +302,27 @@ fun SongInfoSheet(
     }
     val rows = remember(song, fileName, tech) { songInfoRows(song, fileName, tech) }
 
+    // Batch 732: penutupan lewat handle memakai pola dokumentasi Material3 (hide() lalu onDismiss setelah selesai);
+    // `closing` mencegah onDismiss ganda bila tarikan/ketukan datang beruntun saat animasi tutup berjalan.
+    val scope = rememberCoroutineScope()
+    var closing by remember { mutableStateOf(false) }
+    val closeSheet: () -> Unit = {
+        if (!closing) {
+            closing = true
+            scope.launch { sheetState.hide() }.invokeOnCompletion { if (!sheetState.isVisible) onDismiss() }
+        }
+    }
+
     // Batch 731: sheet DIAM — `sheetGesturesEnabled = false` mematikan tarikan sheet (draggable di
     // permukaan sheet, termasuk saat jari mendarat di handle/judul) DAN koneksi gulir bersarang yang
-    // menarik sheet dari sisa gulir daftar. Ditutup lewat ketuk scrim, tombol Kembali, atau ketuk handle.
+    // menarik sheet dari sisa gulir daftar. Batch 732: handle bawaan (pajangan sejak 731) diganti [SheetDragHandle];
+    // ditutup lewat tarik/ketuk handle, ketuk scrim, atau tombol Kembali.
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         sheetGesturesEnabled = false,
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent,
+        dragHandle = { SheetDragHandle(onDismiss = closeSheet) }
     ) {
         Column(
             modifier = Modifier
