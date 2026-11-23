@@ -1,6 +1,8 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 724: + app/src/main/java/com/rudi/audioplayer/ui/theme/UiScale.kt + app/src/test/java/com/rudi/audioplayer/ui/theme/UiScaleTest.kt (skala UI global: kepadatan x0.90 + batas font sistem 1.0; ui/theme/Theme.kt diubah) — 274->276.
+# Batch 723: 0 berkas baru (ui/PlaylistScreen.kt + ui/QueueSheet.kt diubah: handle ≡ geser langsung) — 274 tetap.
 # Batch 722: 0 berkas baru (util/ThumbnailMemo.kt + util/ThumbnailMemoTest.kt diubah; widget/WidgetUpdater.kt hanya komentar) — 274 tetap.
 # Batch 721: 0 berkas baru (widget/WidgetUpdater.kt diubah: blok catch loadAlbumArtBitmap) — 274 tetap.
 # Batch 720: 0 berkas baru (.github/workflows/android-artifact.yml diubah: run_retry SpotBugs + detekt/lint) — 274 tetap.
@@ -305,6 +307,7 @@ app/src/main/java/com/rudi/audioplayer/ui/theme/Spacing.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/TactileDepth.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Theme.kt
 app/src/main/java/com/rudi/audioplayer/ui/theme/Type.kt
+app/src/main/java/com/rudi/audioplayer/ui/theme/UiScale.kt
 app/src/main/java/com/rudi/audioplayer/update/DownloadRetryPolicy.kt
 app/src/main/java/com/rudi/audioplayer/update/GitHubReleaseChecker.kt
 app/src/main/java/com/rudi/audioplayer/update/UpdateApkCache.kt
@@ -406,6 +409,7 @@ app/src/test/java/com/rudi/audioplayer/playback/UpdateResumePolicyTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/LibrarySearchIndexTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/UtilsTest.kt
 app/src/test/java/com/rudi/audioplayer/ui/theme/HapticPacingTest.kt
+app/src/test/java/com/rudi/audioplayer/ui/theme/UiScaleTest.kt
 app/src/test/java/com/rudi/audioplayer/update/DownloadRetryPolicyTest.kt
 app/src/test/java/com/rudi/audioplayer/update/UpdateApkCacheTest.kt
 app/src/test/java/com/rudi/audioplayer/util/ChangeGateTest.kt

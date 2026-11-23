@@ -8,9 +8,12 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import androidx.compose.foundation.LocalIndication
@@ -603,9 +606,22 @@ fun AudioPlayerTheme(
     // ini menguatkan SEMUA 75 titik haptic di app tanpa menyentuh call site-nya satu-satu (pola
     // sama CompositionLocal lain di blok ini). Jenis haptic selain LongPress/TextHandleMove tetap
     // diteruskan ke implementasi bawaan Compose.
+    // Batch 724 — User: "tampilan aplikasi serba jumbo. gak kelihatan minimalis!!". Log v723: fontScale
+    // sistem 1.15 membesarkan semua teks 15% di atas desain. `LocalDensity` di sini = SATU titik skala UI
+    // global (kepadatan x0.90, font sistem dibatasi 1.0; angka & alasan di `UiScale.kt`) — berlaku untuk semua
+    // layar/sheet/dialog di bawah tema, tanpa menyentuh call site. Dihitung dari density ASLI (di luar override),
+    // di-`remember` supaya instans Density stabil antar-rekomposisi.
+    val systemDensity = LocalDensity.current
+    val uiDensity = remember(systemDensity.density, systemDensity.fontScale) {
+        Density(
+            density = UiScale.density(systemDensity.density),
+            fontScale = UiScale.fontScale(systemDensity.fontScale)
+        )
+    }
     CompositionLocalProvider(
         LocalIsDarkTheme provides isDark,
         LocalHapticFeedback provides rememberStrongHapticFeedback(),
+        LocalDensity provides uiDensity,
     ) {
         MaterialTheme(
             colorScheme = colorsFor(identity, isDark),
