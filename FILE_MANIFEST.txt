@@ -1,6 +1,7 @@
 # FILE_MANIFEST.txt
 # Setara output 'git ls-files' — diperbarui tiap rilis untuk mempercepat diff sesi berikutnya.
 # Dibuat manual di Batch 16 (repo belum ada .git saat file ini dibuat pertama kali).
+# Batch 727: 0 berkas baru (ui/SongInfoSheet.kt + ui/SongInfoFormatTest.kt diubah: probe dua tahap, bitrate rata-rata instan, header/tombol Edit dipatok) — 279 tetap.
 # Batch 726: + app/src/main/java/com/rudi/audioplayer/ui/SongInfoSheet.kt + app/src/test/java/com/rudi/audioplayer/data/MusicRepositoryUnknownTextTest.kt + app/src/test/java/com/rudi/audioplayer/ui/SongInfoFormatTest.kt (menu ⋮ lagu: Info Lagu/Edit Info Lagu/Bagikan; ui/LibraryLists.kt, MainActivity.kt, data/MusicRepository.kt diubah) — 276->279.
 # Batch 725: 0 berkas baru (BottomNavBar.kt + MainActivity.kt + TabPillMathTest.kt diubah: bilah tab 60.dp, pil 84% x 84%, wajah dibatasi selebar pil) — 276 tetap.
 # Batch 724: + app/src/main/java/com/rudi/audioplayer/ui/theme/UiScale.kt + app/src/test/java/com/rudi/audioplayer/ui/theme/UiScaleTest.kt (skala UI global: kepadatan x0.90 + batas font sistem 1.0; ui/theme/Theme.kt diubah) — 274->276.

@@ -2,6 +2,7 @@ package com.rudi.audioplayer.ui
 
 import android.content.Context
 import android.media.MediaMetadataRetriever
+import android.os.SystemClock
 import android.provider.OpenableColumns
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -51,10 +52,12 @@ import java.util.Locale
  */
 val LocalSongTagSaver = staticCompositionLocalOf<((Song, Id3TagWriter.EditableTags) -> Unit)?> { null }
 
-/** Detail file yang hanya bisa dibaca dari file itu sendiri; diambil sekali saat sheet dibuka. */
-internal data class SongFileProbe(
-    val fileName: String?,
-    val bitrateBps: Long?,
+/**
+ * Batch 727 — detail teknis LAMBAT yang hanya bisa dibaca dari isi file (sample rate, bit depth).
+ * Dipisah dari nama berkas karena `MediaMetadataRetriever.setDataSource` pada .opus/.ogg besar
+ * memakan >3 dtk di perangkat uji; hasil non-null = selesai (nilai individual boleh null).
+ */
+internal data class SongTechProbe(
     val sampleRateHz: Int?,
     val bitsPerSample: Int?
 )
@@ -107,6 +110,16 @@ internal object SongInfoFormat {
 
     fun bitrate(bps: Long?): String? = bps?.takeIf { it > 0L }?.let { "${(it + 500L) / 1000L} kbps" }
 
+    /**
+     * Bitrate rata-rata = ukuran berkas x 8 / durasi; tersedia SEKETIKA dari kolom MediaStore
+     * (nilai yang sama dgn yang dilaporkan retriever di log uji: 125,9 MiB / 128:11 = 137 kbps).
+     * Null bila ukuran atau durasi tak valid.
+     */
+    fun averageBitrate(sizeBytes: Long, durationMs: Long): String? {
+        if (sizeBytes <= 0L || durationMs <= 0L) return null
+        return bitrate(sizeBytes * 8_000L / durationMs)
+    }
+
     fun sampleRate(hz: Int?, locale: Locale = Locale.getDefault()): String? {
         if (hz == null || hz <= 0) return null
         return if (hz % 1000 == 0) "${hz / 1000} kHz" else String.format(locale, "%.1f kHz", hz / 1000.0)
@@ -115,8 +128,8 @@ internal object SongInfoFormat {
     fun bitDepth(bits: Int?): String? = bits?.takeIf { it > 0 }?.let { "$it-bit" }
 }
 
-/** Baca nama berkas + bitrate/sample rate/bit depth. Blocking: panggil dari Dispatchers.IO. */
-private fun probeSongFile(context: Context, song: Song): SongFileProbe {
+/** Nama berkas lewat MediaProvider (milidetik). Blocking: panggil dari Dispatchers.IO. */
+private fun queryFileName(context: Context, song: Song): String? {
     var fileName: String? = null
     try {
         context.contentResolver.query(song.uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
@@ -125,13 +138,16 @@ private fun probeSongFile(context: Context, song: Song): SongFileProbe {
     } catch (e: Exception) {
         AppLogger.e("SongInfoSheet", "Gagal baca nama berkas uri=${song.uri}", e)
     }
-    var bitrate: Long? = null
+    return fileName
+}
+
+/** Sample rate + bit depth dari isi file. LAMBAT, blocking: panggil dari Dispatchers.IO. */
+private fun probeTechnical(context: Context, song: Song): SongTechProbe {
     var sampleRate: Int? = null
     var bits: Int? = null
     val retriever = MediaMetadataRetriever()
     try {
         retriever.setDataSource(context, song.uri)
-        bitrate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toLongOrNull()
         sampleRate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_SAMPLERATE)?.toIntOrNull()
         bits = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITS_PER_SAMPLE)?.toIntOrNull()
     } catch (e: Exception) {
@@ -139,10 +155,14 @@ private fun probeSongFile(context: Context, song: Song): SongFileProbe {
     } finally {
         retriever.release()
     }
-    return SongFileProbe(fileName, bitrate, sampleRate, bits)
+    return SongTechProbe(sampleRate, bits)
 }
 
-private fun songInfoRows(song: Song, probe: SongFileProbe?): List<Pair<String, String>> = buildList {
+/**
+ * Baris Info Lagu. [fileName] null = belum/tidak ada; [tech] null = probe lambat belum selesai
+ * (baris "Sample Rate" diisi "Memuat…" agar tinggi sheet tak melompat saat hasil datang).
+ */
+private fun songInfoRows(song: Song, fileName: String?, tech: SongTechProbe?): List<Pair<String, String>> = buildList {
     add("Judul" to song.title)
     add("Artis" to song.artist)
     if (song.album.isNotBlank()) add("Album" to song.album)
@@ -153,22 +173,29 @@ private fun songInfoRows(song: Song, probe: SongFileProbe?): List<Pair<String, S
     song.trackNumber?.let { add("Nomor Trek" to it.toString()) }
     song.discNumber?.let { add("Nomor Disk" to it.toString()) }
     add("Durasi" to formatDuration(song.duration))
-    add("Format" to SongInfoFormat.container(song.mimeType, probe?.fileName))
-    SongInfoFormat.bitrate(probe?.bitrateBps)?.let { add("Bitrate" to it) }
-    SongInfoFormat.sampleRate(probe?.sampleRateHz)?.let { add("Sample Rate" to it) }
-    SongInfoFormat.bitDepth(probe?.bitsPerSample)?.let { add("Kedalaman Bit" to it) }
+    add("Format" to SongInfoFormat.container(song.mimeType, fileName))
+    SongInfoFormat.averageBitrate(song.fileSize, song.duration)?.let { add("Bitrate (rata-rata)" to it) }
+    if (tech == null) {
+        add("Sample Rate" to "Memuat…")
+    } else {
+        SongInfoFormat.sampleRate(tech.sampleRateHz)?.let { add("Sample Rate" to it) }
+        SongInfoFormat.bitDepth(tech.bitsPerSample)?.let { add("Kedalaman Bit" to it) }
+    }
     if (song.fileSize > 0L) add("Ukuran" to SongInfoFormat.fileSize(song.fileSize))
     if (song.dateAdded > 0L) {
         add("Ditambahkan" to SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault()).format(Date(song.dateAdded * 1000L)))
     }
-    probe?.fileName?.let { add("Nama Berkas" to it) }
+    fileName?.let { add("Nama Berkas" to it) }
     add("Folder" to song.folderPath.ifBlank { song.folderName })
 }
 
 /**
- * Batch 726 — Info Lagu (baca-saja): semua metadata yang sudah ada di [Song] + detail teknis
- * dari file (bitrate, sample rate, bit depth, nama berkas) yang dimuat sekali di Dispatchers.IO.
- * [onEdit] != null menampilkan tombol "Edit Info Lagu".
+ * Batch 726 — Info Lagu (baca-saja): semua metadata yang sudah ada di [Song] + detail dari file.
+ * Batch 727 — dimuat DUA TAHAP di Dispatchers.IO: (1) nama berkas (cepat) -> Format/Nama Berkas
+ * langsung benar (.opus tak lagi tampil "OGG"); (2) sample rate/bit depth (lambat, baris
+ * "Memuat…" sampai selesai). Bitrate rata-rata dihitung seketika dari ukuran dan durasi.
+ * Judul sheet dan tombol Edit dipatok di luar area scroll. Durasi tiap tahap dicatat ke
+ * AppLogger sebagai angka mentah. [onEdit] != null menampilkan tombol "Edit Info Lagu".
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -179,11 +206,20 @@ fun SongInfoSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
-    var probe by remember(song.id) { mutableStateOf<SongFileProbe?>(null) }
+    var fileName by remember(song.id) { mutableStateOf<String?>(null) }
+    var tech by remember(song.id) { mutableStateOf<SongTechProbe?>(null) }
     LaunchedEffect(song.id) {
-        probe = withContext(Dispatchers.IO) { probeSongFile(context, song) }
+        val t0 = SystemClock.elapsedRealtime()
+        fileName = withContext(Dispatchers.IO) { queryFileName(context, song) }
+        val t1 = SystemClock.elapsedRealtime()
+        tech = withContext(Dispatchers.IO) { probeTechnical(context, song) }
+        val t2 = SystemClock.elapsedRealtime()
+        AppLogger.w(
+            "SongInfoSheet",
+            "probe nama=${t1 - t0}ms teknis=${t2 - t1}ms mime=${song.mimeType} ukuran=${song.fileSize}B uri=${song.uri}"
+        )
     }
-    val rows = remember(song, probe) { songInfoRows(song, probe) }
+    val rows = remember(song, fileName, tech) { songInfoRows(song, fileName, tech) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -194,7 +230,6 @@ fun SongInfoSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .frostedGlass()
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
             Text(
@@ -203,21 +238,28 @@ fun SongInfoSheet(
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
-            SelectionContainer {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    rows.forEach { (label, value) ->
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                        Text(value, style = MaterialTheme.typography.bodyMedium)
+            // Hanya daftar baris yang bergulir; judul di atas dan tombol Edit di bawah tetap terlihat.
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                SelectionContainer {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        rows.forEach { (label, value) ->
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            Text(value, style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
             }
             if (onEdit != null) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Edit, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
