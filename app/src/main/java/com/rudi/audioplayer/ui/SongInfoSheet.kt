@@ -32,14 +32,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.rudi.audioplayer.data.Id3TagWriter
 import com.rudi.audioplayer.data.Song
@@ -237,23 +232,6 @@ private fun probeTechnical(context: Context, song: Song, fileName: String?): Son
 }
 
 /**
- * Batch 730 — akar sisa "efek fling": `ModalBottomSheet` memakai SISA gulir daftar (jari terus turun
- * saat daftar sudah di atas) untuk menarik SELURUH sheet mengikuti jari, lalu menyetel ulang dengan
- * sisa kecepatan fling (video v729: sheet turun ±86-136 px lalu kembali tiap lemparan; bilah
- * navigasi di belakangnya ikut muncul-hilang). Connection ini dipasang DI DALAM sheet (lebih dekat
- * ke daftar) dan menelan SELURUH sisa vertikal, gulir maupun kecepatan, sehingga gestur di daftar
- * tak pernah menggeser sheet. Sheet tetap bisa ditutup lewat tarikan handle/judul, ketuk scrim, atau
- * tombol Kembali. Menggantikan penelan sebagian Batch 729 (hanya sisa fling ke atas).
- */
-private object SheetFlingGuard : NestedScrollConnection {
-    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
-        Offset(0f, available.y)
-
-    override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity =
-        Velocity(0f, available.y)
-}
-
-/**
  * Baris Info Lagu. [fileName] null = belum/tidak ada; [tech] null = probe lambat belum selesai
  * (baris "Sample Rate" diisi "Memuat…" agar tinggi sheet tak melompat saat hasil datang).
  */
@@ -292,6 +270,7 @@ private fun songInfoRows(song: Song, fileName: String?, tech: SongTechProbe?): L
  * Bitrate rata-rata dihitung seketika dari ukuran dan durasi.
  * Judul sheet dan tombol Edit dipatok di luar area scroll. Durasi tiap tahap dicatat ke
  * AppLogger sebagai angka mentah. [onEdit] != null menampilkan tombol "Edit Info Lagu".
+ * Batch 731 — sheet tidak bisa ditarik (`sheetGesturesEnabled = false`): tak ada gerak sheet sama sekali.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -320,15 +299,18 @@ fun SongInfoSheet(
     }
     val rows = remember(song, fileName, tech) { songInfoRows(song, fileName, tech) }
 
+    // Batch 731: sheet DIAM — `sheetGesturesEnabled = false` mematikan tarikan sheet (draggable di
+    // permukaan sheet, termasuk saat jari mendarat di handle/judul) DAN koneksi gulir bersarang yang
+    // menarik sheet dari sisa gulir daftar. Ditutup lewat ketuk scrim, tombol Kembali, atau ketuk handle.
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        sheetGesturesEnabled = false,
         containerColor = Color.Transparent
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .nestedScroll(SheetFlingGuard)
                 .frostedGlass()
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
@@ -340,7 +322,6 @@ fun SongInfoSheet(
             Spacer(modifier = Modifier.height(8.dp))
             // Hanya daftar baris yang bergulir; judul di atas dan tombol Edit di bawah tetap terlihat.
             // Batch 729: overscroll stretch bawaan daftar dimatikan (pola SmartPlaylistScreen Batch 263).
-            // Batch 730: seluruh sisa gulir/fling daftar ditelan [SheetFlingGuard] -> sheet tak ikut bergerak.
             CompositionLocalProvider(LocalOverscrollFactory provides null) {
                 Column(
                     modifier = Modifier

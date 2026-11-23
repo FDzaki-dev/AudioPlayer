@@ -1,6 +1,20 @@
 # Changelog
 
-## Batch 730 — Info Lagu: gestur daftar tak lagi menggeser sheet (sisa gulir + sisa fling ditelan seluruhnya)
+## Batch 731 — Info Lagu: sheet DIAM total (`sheetGesturesEnabled = false`); penelan Batch 730 dihapus
+
+- Input user: `Screen_Recording_20261123_161951.mp4` (17,1 dtk, 720x1624, 60 fps = 1023 frame) + `sonix_debug_20261123_162024.txt` (v730 = 1.11.41 build 591) + teks "masih aja flickering!!". Tanpa laporan CI v730 (CI v730 NOT VERIFIED).
+
+- (A) Video v730: sheet MASIH bergerak — 17 kejadian (puncak >= 14 px pada frame 360 px; t ≈ 0,6 / 2,5 / 3,4 / 4,3 / 5,0 / 5,9 / 6,6 / 7,4 / 8,1 / 8,8 / 9,6 / 10,3 / 11,0 / 11,7 / 12,5 / 13,5 / 14,9 dtk), puncak 83 px (= ±166 px layar 720 px), tiap kali turun mengikuti jari lalu kembali ±0,35 dtk; bilah "Musik Saya" + chip tab Library di belakangnya tersingkap lalu tertutup lagi, handle sheet ikut naik-turun = "flickering" yang dilihat user. Penanda sentuh: di SEMUA kejadian jari mendarat di zona handle/judul (y ≈ 67-115 pada frame 360 px; judul = 93-118, handle ≈ 57, daftar mulai ≈ 126) dan menarik turun ±60-75 px, bukan di dalam daftar (video v729 jarinya di daftar, y ≈ 490-650). Log: 0 FATAL baru (5 FATAL di buffer = 8-11 Nov), `probe ... jalur=header teknis=24-27ms`.
+
+- (B) AKAR: tarikan di zona judul/handle ditangani `draggable` milik permukaan `ModalBottomSheet` sendiri (bukan sisa gulir daftar), jadi penelan sisa gulir/fling Batch 730 tak pernah dilewati gestur itu. Dibaca dari source Material3 (mirror JetBrains compose-multiplatform-core v1.9.0/v1.10.0, `ModalBottomSheet.kt`; BUKAN dari artefak BOM 2026.04.01, jadi kecocokan versi tepat tak terbukti): `sheetGesturesEnabled` menentukan (1) `Modifier.nestedScroll(ConsumeSwipeWithinBottomSheetBoundsNestedScrollConnection)` dipasang atau tidak, (2) `draggable(enabled = sheetGesturesEnabled && isVisible)`.
+
+- (C) PERBAIKAN v731 (1 berkas kode: `ui/SongInfoSheet.kt` + docs; 0 baru; manifest 279): `ModalBottomSheet(sheetGesturesEnabled = false)`; `SheetFlingGuard` + `.nestedScroll(...)` + impor `Offset`/`NestedScrollConnection`/`NestedScrollSource`/`nestedScroll`/`Velocity` dihapus (kode mati bila gestur mati; `UnusedPrivateClass` detekt dihindari). `LocalOverscrollFactory provides null` tetap. `SongInfoFormatTest.kt` tak diubah (10 tes). Ditutup lewat ketuk scrim, tombol Kembali, atau ketuk handle (`clickable` handle -> `animateToDismiss`); tarik-turun untuk menutup SENGAJA hilang.
+
+- (D) NOT VERIFIED: kompilasi (parameter `sheetGesturesEnabled` ada di Material3 CMP v1.9.0+; versi persis di BOM 2026.04.01 tak dicek), detekt, SpotBugs, lint, ArchUnit, perilaku di perangkat (sandbox tanpa kompiler Kotlin/Gradle). PREDIKSI CI: Tes 447, ArchUnit 7, detekt 0, SpotBugs 0, lint 0, Kotlin 0.
+
+- (E) BELUM dikerjakan: sheet lain berpola `ModalBottomSheet` + daftar (`QueueSheet`, `LyricsSheet`, `SongInfoEditSheet`, `UpdateCheckSheet`, `DuplicateFinderSheet`) kemungkinan bergerak serupa; menu ⋮ 9 item menimpa tombol; `showInfo/showEdit` di `SongRow` masih `remember`.
+
+## Batch 730 — Info Lagu: gestur daftar tak lagi menggeser sheet (sisa gulir + sisa fling ditelan seluruhnya) [TIDAK CUKUP: digantikan Batch 731]
 
 - Input user: `SONIX_v729.zip` + `SONIX_laporan-untuk-claude_run156.zip` + `Screen_Recording_20261123_155958.mp4` (13,7 dtk, 720x1624, 60 fps = 820 frame) + `sonix_debug_20261123_160026.txt` (v729 = 1.11.40 build 590) + teks "bounce sudah hilang. namun efek fling masih nongol!!".
 
