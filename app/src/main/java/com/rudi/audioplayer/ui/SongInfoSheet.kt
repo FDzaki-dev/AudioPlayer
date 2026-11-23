@@ -21,8 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -239,49 +237,20 @@ private fun probeTechnical(context: Context, song: Song, fileName: String?): Son
 }
 
 /**
- * Batch 729 — keputusan murni penelan sisa fling daftar terhadap [ModalBottomSheet] (dipakai
- * [SheetFlingGuard]; dipisah supaya bisa dites di JVM tanpa Compose).
+ * Batch 730 — akar sisa "efek fling": `ModalBottomSheet` memakai SISA gulir daftar (jari terus turun
+ * saat daftar sudah di atas) untuk menarik SELURUH sheet mengikuti jari, lalu menyetel ulang dengan
+ * sisa kecepatan fling (video v729: sheet turun ±86-136 px lalu kembali tiap lemparan; bilah
+ * navigasi di belakangnya ikut muncul-hilang). Connection ini dipasang DI DALAM sheet (lebih dekat
+ * ke daftar) dan menelan SELURUH sisa vertikal, gulir maupun kecepatan, sehingga gestur di daftar
+ * tak pernah menggeser sheet. Sheet tetap bisa ditutup lewat tarikan handle/judul, ketuk scrim, atau
+ * tombol Kembali. Menggantikan penelan sebagian Batch 729 (hanya sisa fling ke atas).
  */
-internal object SheetFling {
-    /** Toleransi piksel agar sheet yang "hampir" di anchor Expanded tetap dianggap diam. */
-    const val REST_TOLERANCE_PX = 1.5f
-
-    /** Sheet diam di anchor Expanded bila [offset] tak melebihi [restOffset] + toleransi (NaN -> false). */
-    fun isResting(offset: Float, restOffset: Float): Boolean = offset <= restOffset + REST_TOLERANCE_PX
-
-    /**
-     * true = sisa kecepatan fling [velocityY] ditelan (sheet tak kebagian). Sisa ke atas (<= 0) SELALU
-     * ditelan: itu yang memantulkan sheet melewati anchor Expanded. Sisa ke bawah hanya diteruskan bila
-     * sheet sedang ditarik jari (agar lempar-turun untuk menutup tetap jalan).
-     */
-    fun swallowLeftover(velocityY: Float, resting: Boolean): Boolean = velocityY <= 0f || resting
-}
-
-/**
- * Batch 729 — akar "bounce": `ModalBottomSheet` meneruskan SISA kecepatan fling daftar (saat daftar
- * sudah di ujung) ke `SheetState.settle(velocity)`; pegas settle dari anchor Expanded dengan kecepatan
- * ke atas melempar seluruh sheet naik lalu turun lagi (bilah navigasi di belakang ikut berkedip).
- * Connection ini dipasang DI DALAM sheet (lebih dekat ke daftar), jadi menelan sisa itu lebih dulu.
- * Tarikan jari 1:1 dan lempar-turun untuk menutup sheet tidak diubah.
- */
-private class SheetFlingGuard(private val sheetState: SheetState) : NestedScrollConnection {
-    private var restOffset = Float.NaN
-
-    private fun resting(): Boolean {
-        if (sheetState.currentValue != SheetValue.Expanded) return false
-        val offset = sheetState.requireOffset()
-        if (restOffset.isNaN() || offset < restOffset) restOffset = offset
-        return SheetFling.isResting(offset, restOffset)
-    }
-
-    /** Dipanggil sebelum gestur menggeser sheet, jadi offset di sini = posisi diam. */
-    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-        resting()
-        return Offset.Zero
-    }
+private object SheetFlingGuard : NestedScrollConnection {
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
+        Offset(0f, available.y)
 
     override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity =
-        if (SheetFling.swallowLeftover(available.y, resting())) available else Velocity.Zero
+        Velocity(0f, available.y)
 }
 
 /**
@@ -332,7 +301,6 @@ fun SongInfoSheet(
     onEdit: (() -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val flingGuard = remember(sheetState) { SheetFlingGuard(sheetState) }
     val context = LocalContext.current
     var fileName by remember(song.id) { mutableStateOf<String?>(null) }
     var tech by remember(song.id) { mutableStateOf<SongTechProbe?>(null) }
@@ -360,7 +328,7 @@ fun SongInfoSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .nestedScroll(flingGuard)
+                .nestedScroll(SheetFlingGuard)
                 .frostedGlass()
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
@@ -371,8 +339,8 @@ fun SongInfoSheet(
             )
             Spacer(modifier = Modifier.height(8.dp))
             // Hanya daftar baris yang bergulir; judul di atas dan tombol Edit di bawah tetap terlihat.
-            // Batch 729: overscroll stretch bawaan daftar dimatikan (pola SmartPlaylistScreen Batch 263)
-            // dan sisa fling ditelan [SheetFlingGuard] -> tak ada bounce di ujung daftar.
+            // Batch 729: overscroll stretch bawaan daftar dimatikan (pola SmartPlaylistScreen Batch 263).
+            // Batch 730: seluruh sisa gulir/fling daftar ditelan [SheetFlingGuard] -> sheet tak ikut bergerak.
             CompositionLocalProvider(LocalOverscrollFactory provides null) {
                 Column(
                     modifier = Modifier

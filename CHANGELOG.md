@@ -1,5 +1,21 @@
 # Changelog
 
+## Batch 730 — Info Lagu: gestur daftar tak lagi menggeser sheet (sisa gulir + sisa fling ditelan seluruhnya)
+
+- Input user: `SONIX_v729.zip` + `SONIX_laporan-untuk-claude_run156.zip` + `Screen_Recording_20261123_155958.mp4` (13,7 dtk, 720x1624, 60 fps = 820 frame) + `sonix_debug_20261123_160026.txt` (v729 = 1.11.40 build 590) + teks "bounce sudah hilang. namun efek fling masih nongol!!".
+
+- (A) VERIFIED: CI #156 (commit 638c728, exit 0/0/0/0): ArchUnit 7/0, SpotBugs 0, detekt 0, lint 0, Tes 450, Kotlin 0 -> Batch 729 terkompilasi + tes lulus. Video: bounce ke ATAS hilang (posisi judul "Info Lagu" dilacak per frame lewat template matching: tak pernah di atas posisi diam). Log: 0 FATAL baru (5 FATAL di buffer = 8-11 Nov, lama), `probe ... jalur=header teknis=23-30ms`.
+
+- (B) SISA di video: 7 kejadian (t ≈ 0,8 / 2,1 / 3,6 / 5,1 / 9,3 / 10,5 / 11,6 dtk), tiap kali SELURUH sheet (judul + tombol "Edit Info Lagu") TURUN lalu kembali: puncak 22-68 px pada frame 360 px (= ±44-136 px pada layar 720 px), tahan ±0,3 dtk lalu kembali ±0,15 dtk; bilah navigasi di belakangnya ikut tersingkap. Penanda sentuh di video: jari turun ±120-165 px (skala 360) — daftar menyerap ±77 px pertama (sampai ke atas), SISANYA diikuti sheet 1:1 (sheet turun 43 / 68 px); saat jari naik lagi sheet ikut naik kembali. Ini gerak nyata sheet, bukan artefak rekaman (konstan 93 px di frame lain).
+
+- (C) AKAR (dari video + kode; internal Material3 TIDAK dibaca dari artefak BOM 2026.04.01): `ModalBottomSheet` memakai SISA gulir daftar (saat daftar sudah di atas) untuk menarik sheet mengikuti jari, lalu menyetel ulang dengan sisa kecepatan fling. Batch 729 hanya menelan sisa fling KE ATAS, dan sisa ke bawah baru ditelan bila sheet "diam" -> begitu jari menggeser sheet, sheet dianggap sedang ditarik dan geraknya diteruskan.
+
+- (D) PERBAIKAN v730 (2 file: 1 source + 1 tes; 0 baru; manifest 279): `ui/SongInfoSheet.kt` — `SheetFling` (objek murni) + kelas `SheetFlingGuard(sheetState)` diganti `private object SheetFlingGuard : NestedScrollConnection` tanpa status: `onPostScroll` dan `onPostFling` mengklaim SELURUH sisa vertikal (`Offset(0f, available.y)` / `Velocity(0f, available.y)`), dipasang DI DALAM sheet (lebih dekat ke daftar daripada connection milik `ModalBottomSheet`) -> sheet tak kebagian apa pun dari gestur di daftar; `remember(sheetState)` + impor `SheetState`/`SheetValue` dihapus. Sheet tetap bisa ditutup lewat tarikan handle/judul, ketuk scrim, tombol Kembali. `LocalOverscrollFactory provides null` tetap. `SongInfoFormatTest.kt` — 3 tes `SheetFling` dihapus (API-nya hilang) = 10 tes.
+
+- (E) NOT VERIFIED: kompilasi Compose/Android, detekt, SpotBugs, lint, ArchUnit, perilaku di perangkat (sandbox tanpa kompiler Kotlin/Gradle/android.jar; hanya cek kurung seimbang + impor terpakai). PREDIKSI CI: Tes 447, ArchUnit 7, detekt 0, SpotBugs 0, lint 0, Kotlin 0. Tarik-turun untuk menutup LEWAT DAFTAR sengaja dihilangkan (itu persis gerak yang dikeluhkan).
+
+- (F) BELUM dikerjakan: sheet lain (`QueueSheet`, `LyricsSheet`, `SongInfoEditSheet`, `UpdateCheckSheet`, `DuplicateFinderSheet`) berpola `ModalBottomSheet` + daftar kemungkinan bergerak serupa — belum diperiksa/diubah (scope); menu ⋮ 9 item menimpa tombol; `showInfo/showEdit` di `SongRow` masih `remember`.
+
 ## Batch 729 — Info Lagu: bounce sheet saat fling di ujung daftar dihentikan (sisa fling ditelan + overscroll daftar dimatikan)
 
 - Input user: `SONIX_v728.zip` (log: 1.11.39 build 589) + `Screen_Recording_20261123_144727.mp4` (11,5 dtk, 720x1624, 276 frame ≈ 24 fps efektif) + `sonix_debug_20261123_144752.txt` + teks "kenapa masih ada effect bounce dan nge blink gak jelas?!!".
